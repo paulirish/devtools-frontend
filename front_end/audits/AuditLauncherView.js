@@ -268,7 +268,7 @@ WebInspector.AuditLauncherView.prototype = {
         this._buttonContainerElement.appendChild(radio);
         this._auditReloadedStateElement = radio.radioElement;
 
-        this._launchButton = createTextButton(WebInspector.UIString("Run"), this._launchButtonClicked.bind(this));
+        this._launchButton = createTextButton(WebInspector.UIString("Run Audits"), this._launchButtonClicked.bind(this));
         this._buttonContainerElement.appendChild(this._launchButton);
 
         this._clearButton = createTextButton(WebInspector.UIString("Clear"), this._clearButtonClicked.bind(this));

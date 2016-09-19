@@ -102,7 +102,8 @@ WebInspector.TracingManager.prototype = {
     {
         this._eventBufferSize = 0;
         this._eventsRetrieved = 0;
-        this._activeClient.tracingComplete();
+        if (this._activeClient)
+            this._activeClient.tracingComplete();
         this._activeClient = null;
         this._finishing = false;
     },

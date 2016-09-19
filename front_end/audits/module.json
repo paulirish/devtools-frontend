@@ -21,6 +21,8 @@
         "AuditLauncherView.js",
         "AuditResultView.js",
         "AuditRules.js",
+        "PWAAuditRules.js",
+        "lighthouse-lib.js",
         "AuditExtensionCategory.js"
     ],
     "resources": [

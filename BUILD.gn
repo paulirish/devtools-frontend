@@ -366,6 +366,8 @@ devtools_audits_js_files = [
   "front_end/audits/AuditLauncherView.js",
   "front_end/audits/AuditResultView.js",
   "front_end/audits/AuditRules.js",
+  "front_end/audits/PWAAuditRules.js",
+  "front_end/audits/lighthouse-lib.js",
   "front_end/audits/AuditsPanel.js",
 ]
 devtools_cm_modes_js_files = [

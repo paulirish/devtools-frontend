@@ -48,7 +48,7 @@ InspectorBackendClass.DevToolsStubErrorCode = -32015;
  */
 InspectorBackendClass.reportProtocolError = function(error, messageObject)
 {
-    console.error(error + ": " + JSON.stringify(messageObject));
+    console.error(error, messageObject);
 }
 
 InspectorBackendClass.prototype = {
@@ -284,7 +284,7 @@ InspectorBackendClass.Connection.prototype = {
         var wrappedCallback = this._wrap(callback, domain, method);
 
         if (InspectorBackendClass.Options.dumpInspectorProtocolMessages)
-            this._dumpProtocolMessage("frontend: " + JSON.stringify(messageObject));
+            this._dumpProtocolMessage("frontend: ", messageObject);
 
         this.sendMessage(messageObject);
         ++this._pendingResponsesCount;
@@ -335,7 +335,7 @@ InspectorBackendClass.Connection.prototype = {
     dispatch: function(message)
     {
         if (InspectorBackendClass.Options.dumpInspectorProtocolMessages)
-            this._dumpProtocolMessage("backend: " + ((typeof message === "string") ? message : JSON.stringify(message)));
+            this._dumpProtocolMessage("backend: ", JSON.parse(message));
 
         var messageObject = /** @type {!Object} */ ((typeof message === "string") ? JSON.parse(message) : message);
 
@@ -415,9 +415,13 @@ InspectorBackendClass.Connection.prototype = {
         }
     },
 
-    _dumpProtocolMessage: function(message)
+    /**
+     *@param {string} message
+     * @param {!Object} messageObject
+     */
+    _dumpProtocolMessage: function(message, messageObject)
     {
-        console.log(message);
+        console.log(message, messageObject);
     },
 
     /**
@@ -645,7 +649,7 @@ InspectorBackendClass.AgentPrototype.prototype = {
     {
         if (messageObject.error && messageObject.error.code !== InspectorBackendClass._DevToolsErrorCode && messageObject.error.code !== InspectorBackendClass.DevToolsStubErrorCode && !InspectorBackendClass.Options.suppressRequestErrors && !this._suppressErrorLogging) {
             var id = InspectorBackendClass.Options.dumpInspectorProtocolMessages ? " with id = " + messageObject.id : "";
-            console.error("Request " + methodName + id + " failed. " + JSON.stringify(messageObject.error));
+            console.error("Request " + methodName + id + " failed. ", messageObject.error);
         }
 
         var argumentsArray = [];

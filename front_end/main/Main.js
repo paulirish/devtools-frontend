@@ -945,9 +945,17 @@ WebInspector.sendOverProtocol = function(method, params)
 {
     var connection = WebInspector.targetManager.mainTarget().connection();
     return new Promise((resolve, reject) => {
-        connection.sendRawMessageForTesting(method, params, (err, result) => {
+        const domain = method.split('.')[0];
+        connection.sendRawMessageForTesting(method, params, function(err){
             if (err)
                 return reject(err);
+
+            const result = {};
+            const paramNames = connection.agent(domain)._replyArgs[method];
+            const args = Array.from(arguments).slice(1);
+            for (var i = 0; i < args.length && paramNames[i]; i++) {
+              result[paramNames[i]] = args[i];
+            }
             return resolve(result);
         });
     });

@@ -75,3 +75,22 @@ WebInspector.AuditCategories.NetworkUtilization.prototype = {
 
     __proto__: WebInspector.AuditCategoryImpl.prototype
 }
+
+/**
+ * @constructor
+ * @extends {WebInspector.AuditCategoryImpl}
+ */
+WebInspector.AuditCategories.ProgressiveWebApp = function() {
+    WebInspector.AuditCategoryImpl.call(this, WebInspector.AuditCategories.ProgressiveWebApp.AuditCategoryName);
+}
+WebInspector.AuditCategories.ProgressiveWebApp.AuditCategoryName = WebInspector.UIString("Progressive Web App");
+WebInspector.AuditCategories.ProgressiveWebApp.prototype = {
+    initialize: function()
+    {
+        WebInspector.AuditRules.pwaRuleManager.config().audits.forEach(audit => {
+            this.addRule(new WebInspector.AuditRules.PWARule(audit, audit), WebInspector.AuditRule.Severity.Severe);
+        });
+    },
+    __proto__: WebInspector.AuditCategoryImpl.prototype
+}
+
