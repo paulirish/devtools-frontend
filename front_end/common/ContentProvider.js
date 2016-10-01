@@ -31,77 +31,82 @@
 /**
  * @interface
  */
-WebInspector.ContentProvider = function() { }
+WebInspector.ContentProvider = function() {}
 
-WebInspector.ContentProvider.prototype = {
-    /**
+                               WebInspector.ContentProvider.prototype =
+    {
+      /**
      * @return {string}
      */
-    contentURL: function() { },
+      contentURL: function() {},
 
-    /**
+      /**
      * @return {!WebInspector.ResourceType}
      */
-    contentType: function() { },
+      contentType: function() {},
 
-    /**
+      /**
      * @return {!Promise<?string>}
      */
-    requestContent: function() { },
+      requestContent: function() {},
+
+      /**
+       * @param {string} query
+       * @param {boolean} caseSensitive
+       * @param {boolean} isRegex
+       * @param {function(!Array.<!WebInspector.ContentProvider.SearchMatch>)}
+       * callback
+       */
+      searchInContent: function(query, caseSensitive, isRegex, callback) {}
+    }
 
     /**
-     * @param {string} query
-     * @param {boolean} caseSensitive
-     * @param {boolean} isRegex
-     * @param {function(!Array.<!WebInspector.ContentProvider.SearchMatch>)} callback
+     * @constructor
+     * @param {number} lineNumber
+     * @param {string} lineContent
      */
-    searchInContent: function(query, caseSensitive, isRegex, callback) { }
-}
+    WebInspector.ContentProvider.SearchMatch =
+        function(lineNumber, lineContent) {
+      this.lineNumber = lineNumber;
+      this.lineContent = lineContent;
+    }
 
-/**
- * @constructor
- * @param {number} lineNumber
- * @param {string} lineContent
- */
-WebInspector.ContentProvider.SearchMatch = function(lineNumber, lineContent) {
-    this.lineNumber = lineNumber;
-    this.lineContent = lineContent;
-}
-
-/**
+        /**
  * @param {string} content
  * @param {string} query
  * @param {boolean} caseSensitive
  * @param {boolean} isRegex
  * @return {!Array.<!WebInspector.ContentProvider.SearchMatch>}
  */
-WebInspector.ContentProvider.performSearchInContent = function(content, query, caseSensitive, isRegex)
-{
-    var regex = createSearchRegex(query, caseSensitive, isRegex);
+        WebInspector.ContentProvider.performSearchInContent =
+            function(content, query, caseSensitive, isRegex) {
+      var regex = createSearchRegex(query, caseSensitive, isRegex);
 
-    var text = new WebInspector.Text(content);
-    var result = [];
-    for (var i = 0; i < text.lineCount(); ++i) {
+      var text = new WebInspector.Text(content);
+      var result = [];
+      for (var i = 0; i < text.lineCount(); ++i) {
         var lineContent = text.lineAt(i);
         regex.lastIndex = 0;
         if (regex.exec(lineContent))
-            result.push(new WebInspector.ContentProvider.SearchMatch(i, lineContent));
+          result.push(
+              new WebInspector.ContentProvider.SearchMatch(i, lineContent));
+      }
+      return result;
     }
-    return result;
-}
 
-/**
+            /**
  * @param {?string} content
  * @param {string} mimeType
  * @param {boolean} contentEncoded
  * @param {?string=} charset
  * @return {?string}
  */
-WebInspector.ContentProvider.contentAsDataURL = function(content, mimeType, contentEncoded, charset)
-{
-    const maxDataUrlSize = 1024 * 1024;
-    if (content === null || content.length > maxDataUrlSize)
+            WebInspector.ContentProvider.contentAsDataURL = function(
+                content, mimeType, contentEncoded, charset) {
+      const maxDataUrlSize = 1024 * 1024;
+      if (content === null || content.length > maxDataUrlSize)
         return null;
 
-    return "data:" + mimeType + (charset ? ";charset=" + charset : "") + (contentEncoded ? ";base64" : "") + "," + content;
-}
+      return 'data:' + mimeType + (charset ? ';charset=' + charset : '') +
+          (contentEncoded ? ';base64' : '') + ',' + content;
+    }

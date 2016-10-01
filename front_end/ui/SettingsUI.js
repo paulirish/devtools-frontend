@@ -30,94 +30,87 @@
 
 WebInspector.SettingsUI = {}
 
-/**
+                          /**
  * @param {string} name
  * @param {!WebInspector.Setting} setting
  * @param {boolean=} omitParagraphElement
  * @param {string=} tooltip
  * @return {!Element}
  */
-WebInspector.SettingsUI.createSettingCheckbox = function(name, setting, omitParagraphElement, tooltip)
-{
-    var label = createCheckboxLabel(name);
-    if (tooltip)
-        label.title = tooltip;
+                          WebInspector.SettingsUI.createSettingCheckbox =
+    function(name, setting, omitParagraphElement, tooltip) {
+  var label = createCheckboxLabel(name);
+  if (tooltip)
+    label.title = tooltip;
 
-    var input = label.checkboxElement;
-    input.name = name;
-    WebInspector.SettingsUI.bindCheckbox(input, setting);
+  var input = label.checkboxElement;
+  input.name = name;
+  WebInspector.SettingsUI.bindCheckbox(input, setting);
 
-    if (omitParagraphElement)
-        return label;
+  if (omitParagraphElement)
+    return label;
 
-    var p = createElement("p");
-    p.appendChild(label);
-    return p;
+  var p = createElement('p');
+  p.appendChild(label);
+  return p;
 }
 
-/**
- * @param {!Element} input
- * @param {!WebInspector.Setting} setting
- */
-WebInspector.SettingsUI.bindCheckbox = function(input, setting)
-{
-    function settingChanged()
-    {
-        if (input.checked !== setting.get())
-            input.checked = setting.get();
-    }
-    setting.addChangeListener(settingChanged);
-    settingChanged();
+    /**
+     * @param {!Element} input
+     * @param {!WebInspector.Setting} setting
+     */
+    WebInspector.SettingsUI.bindCheckbox =
+        function(input, setting) {
+  function settingChanged() {
+    if (input.checked !== setting.get())
+      input.checked = setting.get();
+  }
+  setting.addChangeListener(settingChanged);
+  settingChanged();
 
-    function inputChanged()
-    {
-        if (setting.get() !== input.checked)
-            setting.set(input.checked);
-    }
-    input.addEventListener("change", inputChanged, false);
+  function inputChanged() {
+    if (setting.get() !== input.checked)
+      setting.set(input.checked);
+  }
+  input.addEventListener('change', inputChanged, false);
 }
 
-/**
+        /**
  * @param {string} name
  * @param {!Element} element
  * @return {!Element}
  */
-WebInspector.SettingsUI.createCustomSetting = function(name, element)
-{
-    var p = createElement("p");
-    var fieldsetElement = p.createChild("fieldset");
-    fieldsetElement.createChild("label").textContent = name;
-    fieldsetElement.appendChild(element);
-    return p;
+        WebInspector.SettingsUI.createCustomSetting =
+            function(name, element) {
+  var p = createElement('p');
+  var fieldsetElement = p.createChild('fieldset');
+  fieldsetElement.createChild('label').textContent = name;
+  fieldsetElement.appendChild(element);
+  return p;
 }
 
-/**
+            /**
  * @param {!WebInspector.Setting} setting
  * @return {!Element}
  */
-WebInspector.SettingsUI.createSettingFieldset = function(setting)
-{
-    var fieldset = createElement("fieldset");
-    fieldset.disabled = !setting.get();
-    setting.addChangeListener(settingChanged);
-    return fieldset;
+            WebInspector.SettingsUI.createSettingFieldset =
+                function(setting) {
+  var fieldset = createElement('fieldset');
+  fieldset.disabled = !setting.get();
+  setting.addChangeListener(settingChanged);
+  return fieldset;
 
-    function settingChanged()
-    {
-        fieldset.disabled = !setting.get();
-    }
+  function settingChanged() { fieldset.disabled = !setting.get(); }
 }
 
-/**
- * @interface
- */
-WebInspector.SettingUI = function()
-{
-}
+                /**
+                 * @interface
+                 */
+                WebInspector.SettingUI = function() {}
 
-WebInspector.SettingUI.prototype = {
-    /**
+                                         WebInspector.SettingUI.prototype = {
+  /**
      * @return {?Element}
      */
-    settingElement: function() { }
+  settingElement: function() {}
 }

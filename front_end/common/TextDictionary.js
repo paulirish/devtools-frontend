@@ -31,73 +31,61 @@
 /**
  * @constructor
  */
-WebInspector.TextDictionary = function()
-{
-    /** @type {!Map<string, number>} */
-    this._words = new Map();
+WebInspector.TextDictionary =
+    function() {
+  /** @type {!Map<string, number>} */
+  this._words = new Map();
 }
 
-WebInspector.TextDictionary.prototype = {
-    /**
-     * @param {string} word
-     */
-    addWord: function(word)
-    {
-        var count = this._words.get(word) || 0;
-        ++count;
-        this._words.set(word, count);
-    },
+    WebInspector.TextDictionary.prototype = {
+  /**
+   * @param {string} word
+   */
+  addWord: function(word) {
+    var count = this._words.get(word) || 0;
+    ++count;
+    this._words.set(word, count);
+  },
 
-    /**
-     * @param {string} word
-     */
-    removeWord: function(word)
-    {
-        var count = this._words.get(word) || 0;
-        if (!count)
-            return;
-        if (count === 1) {
-            this._words.delete(word);
-            return;
-        }
-        --count;
-        this._words.set(word, count);
-    },
+  /**
+   * @param {string} word
+   */
+  removeWord: function(word) {
+    var count = this._words.get(word) || 0;
+    if (!count)
+      return;
+    if (count === 1) {
+      this._words.delete(word);
+      return;
+    }
+    --count;
+    this._words.set(word, count);
+  },
 
-    /**
+  /**
      * @param {string} prefix
      * @return {!Array.<string>}
      */
-    wordsWithPrefix: function(prefix)
-    {
-        var words = [];
-        for (var word of this._words.keys()) {
-            if (word.startsWith(prefix))
-                words.push(word);
-        }
-        return words;
-    },
+  wordsWithPrefix: function(prefix) {
+    var words = [];
+    for (var word of this._words.keys()) {
+      if (word.startsWith(prefix))
+        words.push(word);
+    }
+    return words;
+  },
 
-    /**
+  /**
      * @param {string} word
      * @return {boolean}
      */
-    hasWord: function(word)
-    {
-        return this._words.has(word);
-    },
+  hasWord: function(word) { return this._words.has(word); },
 
-    /**
+  /**
      * @param {string} word
      * @return {number}
      */
-    wordCount: function(word)
-    {
-        return this._words.get(word) || 0;
-    },
+  wordCount: function(word) { return this._words.get(word) || 0; },
 
-    reset: function()
-    {
-        this._words.clear();
-    }
+  reset: function() { this._words.clear(); }
 }

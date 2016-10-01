@@ -8,54 +8,45 @@
  * @param {!Window} window
  * @param {!InspectorFrontendHostAPI} frontendHost
  */
-WebInspector.ZoomManager = function(window, frontendHost)
-{
-    this._frontendHost = frontendHost;
-    this._zoomFactor = this._frontendHost.zoomFactor();
-    window.addEventListener("resize", this._onWindowResize.bind(this), true);
+WebInspector.ZoomManager = function(window, frontendHost) {
+  this._frontendHost = frontendHost;
+  this._zoomFactor = this._frontendHost.zoomFactor();
+  window.addEventListener('resize', this._onWindowResize.bind(this), true);
 };
 
 /** @enum {symbol} */
 WebInspector.ZoomManager.Events = {
-    ZoomChanged: Symbol("ZoomChanged")
+  ZoomChanged: Symbol('ZoomChanged')
 };
 
 WebInspector.ZoomManager.prototype = {
-    /**
+  /**
      * @return {number}
      */
-    zoomFactor: function()
-    {
-        return this._zoomFactor;
-    },
+  zoomFactor: function() { return this._zoomFactor; },
 
-    /**
+  /**
      * @param {number} value
      * @return {number}
      */
-    cssToDIP: function(value)
-    {
-        return value * this._zoomFactor;
-    },
+  cssToDIP: function(value) { return value * this._zoomFactor; },
 
-    /**
+  /**
      * @param {number} valueDIP
      * @return {number}
      */
-    dipToCSS: function(valueDIP)
-    {
-        return valueDIP / this._zoomFactor;
-    },
+  dipToCSS: function(valueDIP) { return valueDIP / this._zoomFactor; },
 
-    _onWindowResize: function()
-    {
-        var oldZoomFactor = this._zoomFactor;
-        this._zoomFactor = this._frontendHost.zoomFactor();
-        if (oldZoomFactor !== this._zoomFactor)
-            this.dispatchEventToListeners(WebInspector.ZoomManager.Events.ZoomChanged, {from: oldZoomFactor, to: this._zoomFactor});
-    },
+  _onWindowResize: function() {
+    var oldZoomFactor = this._zoomFactor;
+    this._zoomFactor = this._frontendHost.zoomFactor();
+    if (oldZoomFactor !== this._zoomFactor)
+      this.dispatchEventToListeners(
+          WebInspector.ZoomManager.Events.ZoomChanged,
+          {from: oldZoomFactor, to: this._zoomFactor});
+  },
 
-    __proto__: WebInspector.Object.prototype
+  __proto__: WebInspector.Object.prototype
 };
 
 /**

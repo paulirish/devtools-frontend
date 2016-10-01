@@ -4,11 +4,13 @@
  */
 
 /**
- * Represents the viewport of a terminal, the visible area within the larger buffer of output.
+ * Represents the viewport of a terminal, the visible area within the larger
+ * buffer of output.
  * Logic for the virtual scroll bar is included in this object.
  * @param {Terminal} terminal The Terminal object.
  * @param {HTMLElement} viewportElement The DOM element acting as the viewport
- * @param {HTMLElement} charMeasureElement A DOM element used to measure the character size of
+ * @param {HTMLElement} charMeasureElement A DOM element used to measure the
+ * character size of
  *   the terminal.
  */
 function Viewport(terminal, viewportElement, scrollArea, charMeasureElement) {
@@ -28,9 +30,11 @@ function Viewport(terminal, viewportElement, scrollArea, charMeasureElement) {
 }
 
 /**
- * Refreshes row height, setting line-height, viewport height and scroll area height if
+ * Refreshes row height, setting line-height, viewport height and scroll area
+ * height if
  * necessary.
- * @param {number|undefined} charSize A character size measurement bounding rect object, if it
+ * @param {number|undefined} charSize A character size measurement bounding rect
+ * object, if it
  *   doesn't exist it will be created.
  */
 Viewport.prototype.refresh = function(charSize) {
@@ -42,12 +46,15 @@ Viewport.prototype.refresh = function(charSize) {
       this.viewportElement.style.lineHeight = size.height + 'px';
       this.terminal.rowContainer.style.lineHeight = size.height + 'px';
     }
-    var viewportHeightChanged = this.lastRecordedViewportHeight !== this.terminal.rows;
+    var viewportHeightChanged =
+        this.lastRecordedViewportHeight !== this.terminal.rows;
     if (rowHeightChanged || viewportHeightChanged) {
       this.lastRecordedViewportHeight = this.terminal.rows;
-      this.viewportElement.style.height = size.height * this.terminal.rows + 'px';
+      this.viewportElement.style.height =
+          size.height * this.terminal.rows + 'px';
     }
-    this.scrollArea.style.height = (size.height * this.lastRecordedBufferLength) + 'px';
+    this.scrollArea.style.height =
+        (size.height * this.lastRecordedBufferLength) + 'px';
   }
 };
 
@@ -78,19 +85,23 @@ Viewport.prototype.syncScrollArea = function() {
 };
 
 /**
- * Handles scroll events on the viewport, calculating the new viewport and requesting the
+ * Handles scroll events on the viewport, calculating the new viewport and
+ * requesting the
  * terminal to scroll to it.
  * @param {Event} ev The scroll event.
  */
 Viewport.prototype.onScroll = function(ev) {
-  var newRow = Math.round(this.viewportElement.scrollTop / this.currentRowHeight);
+  var newRow =
+      Math.round(this.viewportElement.scrollTop / this.currentRowHeight);
   var diff = newRow - this.terminal.ydisp;
   this.terminal.scrollDisp(diff, true);
 };
 
 /**
- * Handles mouse wheel events by adjusting the viewport's scrollTop and delegating the actual
- * scrolling to `onScroll`, this event needs to be attached manually by the consumer of
+ * Handles mouse wheel events by adjusting the viewport's scrollTop and
+ * delegating the actual
+ * scrolling to `onScroll`, this event needs to be attached manually by the
+ * consumer of
  * `Viewport`.
  * @param {WheelEvent} ev The mouse wheel event.
  */
@@ -111,4 +122,4 @@ Viewport.prototype.onWheel = function(ev) {
   ev.preventDefault();
 };
 
-export { Viewport };
+export {Viewport};

@@ -30,208 +30,180 @@
  * @extends {WebInspector.VBox}
  * @constructor
  */
-WebInspector.Panel = function(name)
-{
-    WebInspector.VBox.call(this);
+WebInspector.Panel =
+    function(name) {
+  WebInspector.VBox.call(this);
 
-    this.element.classList.add("panel");
-    this.element.setAttribute("role", "tabpanel");
-    this.element.setAttribute("aria-label", name);
-    this.element.classList.add(name);
-    this._panelName = name;
+  this.element.classList.add('panel');
+  this.element.setAttribute('role', 'tabpanel');
+  this.element.setAttribute('aria-label', name);
+  this.element.classList.add(name);
+  this._panelName = name;
 
-    this._shortcuts = /** !Object.<number, function(Event=):boolean> */ ({});
+  this._shortcuts = /** !Object.<number, function(Event=):boolean> */ ({});
 }
 
-// Should by in sync with style declarations.
-WebInspector.Panel.counterRightMargin = 25;
+    // Should by in sync with style declarations.
+    WebInspector.Panel.counterRightMargin = 25;
 
 WebInspector.Panel.prototype = {
-    get name()
-    {
-        return this._panelName;
-    },
+  get name() { return this._panelName; },
 
-    reset: function()
-    {
-    },
+  reset: function() {},
 
-    /**
+  /**
      * @return {?WebInspector.SearchableView}
      */
-    searchableView: function()
-    {
-        return null;
-    },
+  searchableView: function() { return null; },
 
-    /**
+  /**
      * @override
      * @return {!Array.<!Element>}
      */
-    elementsToRestoreScrollPositionsFor: function()
-    {
-        return [];
-    },
+  elementsToRestoreScrollPositionsFor: function() { return []; },
 
-    /**
-     * @param {!KeyboardEvent} event
-     */
-    handleShortcut: function(event)
-    {
-        var shortcutKey = WebInspector.KeyboardShortcut.makeKeyFromEvent(event);
-        var handler = this._shortcuts[shortcutKey];
-        if (handler && handler(event))
-            event.handled = true;
-    },
+  /**
+   * @param {!KeyboardEvent} event
+   */
+  handleShortcut: function(event) {
+    var shortcutKey = WebInspector.KeyboardShortcut.makeKeyFromEvent(event);
+    var handler = this._shortcuts[shortcutKey];
+    if (handler && handler(event))
+      event.handled = true;
+  },
 
-    /**
-     * @param {!Array.<!WebInspector.KeyboardShortcut.Descriptor>} keys
-     * @param {function(!Event=):boolean} handler
-     */
-    registerShortcuts: function(keys, handler)
-    {
-        for (var i = 0; i < keys.length; ++i)
-            this._shortcuts[keys[i].key] = handler;
-    },
+  /**
+   * @param {!Array.<!WebInspector.KeyboardShortcut.Descriptor>} keys
+   * @param {function(!Event=):boolean} handler
+   */
+  registerShortcuts: function(keys, handler) {
+    for (var i = 0; i < keys.length; ++i)
+      this._shortcuts[keys[i].key] = handler;
+  },
 
-    /**
-     * @param {!WebInspector.Infobar} infobar
-     */
-    showInfobar: function(infobar)
-    {
-        infobar.setCloseCallback(this._onInfobarClosed.bind(this, infobar));
-        if (this.element.firstChild)
-            this.element.insertBefore(infobar.element, this.element.firstChild);
-        else
-            this.element.appendChild(infobar.element);
-        infobar.setParentView(this);
-        this.doResize();
-    },
+  /**
+   * @param {!WebInspector.Infobar} infobar
+   */
+  showInfobar: function(infobar) {
+    infobar.setCloseCallback(this._onInfobarClosed.bind(this, infobar));
+    if (this.element.firstChild)
+      this.element.insertBefore(infobar.element, this.element.firstChild);
+    else
+      this.element.appendChild(infobar.element);
+    infobar.setParentView(this);
+    this.doResize();
+  },
 
-    /**
-     * @param {!WebInspector.Infobar} infobar
-     */
-    _onInfobarClosed: function(infobar)
-    {
-        infobar.element.remove();
-        this.doResize();
-    },
+  /**
+   * @param {!WebInspector.Infobar} infobar
+   */
+  _onInfobarClosed: function(infobar) {
+    infobar.element.remove();
+    this.doResize();
+  },
 
-    __proto__: WebInspector.VBox.prototype
+  __proto__: WebInspector.VBox.prototype
 }
 
-/**
- * @extends {WebInspector.Panel}
- * @param {string} name
- * @param {number=} defaultWidth
- * @constructor
- */
-WebInspector.PanelWithSidebar = function(name, defaultWidth)
-{
-    WebInspector.Panel.call(this, name);
+                               /**
+                                * @extends {WebInspector.Panel}
+                                * @param {string} name
+                                * @param {number=} defaultWidth
+                                * @constructor
+                                */
+                               WebInspector.PanelWithSidebar =
+    function(name, defaultWidth) {
+  WebInspector.Panel.call(this, name);
 
-    this._panelSplitWidget = new WebInspector.SplitWidget(true, false, this._panelName + "PanelSplitViewState", defaultWidth || 200);
-    this._panelSplitWidget.show(this.element);
+  this._panelSplitWidget = new WebInspector.SplitWidget(
+      true, false, this._panelName + 'PanelSplitViewState',
+      defaultWidth || 200);
+  this._panelSplitWidget.show(this.element);
 
-    this._mainWidget = new WebInspector.VBox();
-    this._panelSplitWidget.setMainWidget(this._mainWidget);
+  this._mainWidget = new WebInspector.VBox();
+  this._panelSplitWidget.setMainWidget(this._mainWidget);
 
-    this._sidebarWidget = new WebInspector.VBox();
-    this._sidebarWidget.setMinimumSize(100, 25);
-    this._panelSplitWidget.setSidebarWidget(this._sidebarWidget);
+  this._sidebarWidget = new WebInspector.VBox();
+  this._sidebarWidget.setMinimumSize(100, 25);
+  this._panelSplitWidget.setSidebarWidget(this._sidebarWidget);
 
-    this._sidebarWidget.element.classList.add("panel-sidebar");
+  this._sidebarWidget.element.classList.add('panel-sidebar');
 }
 
-WebInspector.PanelWithSidebar.prototype = {
-    /**
+    WebInspector.PanelWithSidebar.prototype = {
+  /**
      * @return {!Element}
      */
-    panelSidebarElement: function()
-    {
-        return this._sidebarWidget.element;
-    },
+  panelSidebarElement: function() { return this._sidebarWidget.element; },
 
-    /**
+  /**
      * @return {!Element}
      */
-    mainElement: function()
-    {
-        return this._mainWidget.element;
-    },
+  mainElement: function() { return this._mainWidget.element; },
 
-    /**
+  /**
      * @return {!WebInspector.SplitWidget}
      */
-    splitWidget: function()
-    {
-        return this._panelSplitWidget;
-    },
+  splitWidget: function() { return this._panelSplitWidget; },
 
-    __proto__: WebInspector.Panel.prototype
+  __proto__: WebInspector.Panel.prototype
 }
 
-/**
- * @interface
- */
-WebInspector.PanelDescriptor = function()
-{
-}
+                                              /**
+                                               * @interface
+                                               */
+                                              WebInspector.PanelDescriptor =
+        function() {}
 
-WebInspector.PanelDescriptor.prototype = {
-    /**
+        WebInspector.PanelDescriptor
+            .prototype = {
+  /**
      * @return {string}
      */
-    name: function() {},
+  name: function() {},
 
-    /**
+  /**
      * @return {string}
      */
-    title: function() {},
+  title: function() {},
 
-    /**
+  /**
      * @return {!Promise.<!WebInspector.Panel>}
      */
-    panel: function() {}
+  panel: function() {}
 }
 
-/**
- * @constructor
- * @param {!Runtime.Extension} extension
- * @implements {WebInspector.PanelDescriptor}
- */
-WebInspector.ExtensionPanelDescriptor = function(extension)
-{
-    this._name = extension.descriptor()["name"];
-    this._title = WebInspector.UIString(extension.descriptor()["title"]);
-    this._extension = extension;
+                         /**
+                          * @constructor
+                          * @param {!Runtime.Extension} extension
+                          * @implements {WebInspector.PanelDescriptor}
+                          */
+                         WebInspector.ExtensionPanelDescriptor =
+            function(extension) {
+  this._name = extension.descriptor()['name'];
+  this._title = WebInspector.UIString(extension.descriptor()['title']);
+  this._extension = extension;
 }
 
-WebInspector.ExtensionPanelDescriptor.prototype = {
-    /**
+            WebInspector.ExtensionPanelDescriptor.prototype = {
+  /**
      * @override
      * @return {string}
      */
-    name: function()
-    {
-        return this._name;
-    },
+  name: function() { return this._name; },
 
-    /**
+  /**
      * @override
      * @return {string}
      */
-    title: function()
-    {
-        return this._title;
-    },
+  title: function() { return this._title; },
 
-    /**
+  /**
      * @override
      * @return {!Promise.<!WebInspector.Panel>}
      */
-    panel: function()
-    {
-        return  /** @type {!Promise<!WebInspector.Panel>} */(this._extension.instance());
-    }
+  panel: function() {
+    return /** @type {!Promise<!WebInspector.Panel>} */ (
+        this._extension.instance());
+  }
 }

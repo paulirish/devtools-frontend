@@ -33,457 +33,456 @@
  */
 WebInspector.ProjectSearchConfig = function() {}
 
-WebInspector.ProjectSearchConfig.prototype = {
-    /**
+                                   WebInspector.ProjectSearchConfig.prototype =
+    {
+      /**
      * @return {string}
      */
-    query: function() { },
+      query: function() {},
 
-    /**
+      /**
      * @return {boolean}
      */
-    ignoreCase: function() { },
+      ignoreCase: function() {},
 
-    /**
+      /**
      * @return {boolean}
      */
-    isRegex: function() { },
+      isRegex: function() {},
 
-    /**
+      /**
      * @return {!Array.<string>}
      */
-    queries: function() { },
+      queries: function() {},
 
-    /**
+      /**
      * @param {string} filePath
      * @return {boolean}
      */
-    filePathMatchesFileQuery: function(filePath) { }
-}
+      filePathMatchesFileQuery: function(filePath) {}
+    }
 
-/**
- * @interface
- */
-WebInspector.Project = function() { }
+    /**
+     * @interface
+     */
+    WebInspector.Project = function() {}
 
-/**
+                           /**
  * @param {!WebInspector.Project} project
  * @return {boolean}
  */
-WebInspector.Project.isServiceProject = function(project)
-{
-    return project.type() === WebInspector.projectTypes.Debugger || project.type() === WebInspector.projectTypes.Formatter || project.type() === WebInspector.projectTypes.Service;
-}
+                           WebInspector.Project.isServiceProject =
+        function(project) {
+      return project.type() === WebInspector.projectTypes.Debugger ||
+          project.type() === WebInspector.projectTypes.Formatter ||
+          project.type() === WebInspector.projectTypes.Service;
+    }
 
-WebInspector.Project.prototype = {
-    /**
+        WebInspector.Project.prototype = {
+      /**
      * @return {!WebInspector.Workspace}
      */
-    workspace: function() { },
+      workspace: function() {},
 
-    /**
+      /**
      * @return {string}
      */
-    id: function() { },
+      id: function() {},
 
-    /**
+      /**
      * @return {string}
      */
-    type: function() { },
+      type: function() {},
 
-    /**
+      /**
      * @return {string}
      */
-    displayName: function() { },
+      displayName: function() {},
 
-    /**
-     * @param {!WebInspector.UISourceCode} uiSourceCode
-     * @param {function(?string)} callback
-     */
-    requestFileContent: function(uiSourceCode, callback) { },
+      /**
+       * @param {!WebInspector.UISourceCode} uiSourceCode
+       * @param {function(?string)} callback
+       */
+      requestFileContent: function(uiSourceCode, callback) {},
 
-    /**
+      /**
      * @return {boolean}
      */
-    canSetFileContent: function() { },
+      canSetFileContent: function() {},
 
-    /**
-     * @param {!WebInspector.UISourceCode} uiSourceCode
-     * @param {string} newContent
-     * @param {function(?string)} callback
-     */
-    setFileContent: function(uiSourceCode, newContent, callback) { },
+      /**
+       * @param {!WebInspector.UISourceCode} uiSourceCode
+       * @param {string} newContent
+       * @param {function(?string)} callback
+       */
+      setFileContent: function(uiSourceCode, newContent, callback) {},
 
-    /**
+      /**
      * @return {boolean}
      */
-    canRename: function() { },
+      canRename: function() {},
 
-    /**
-     * @param {!WebInspector.UISourceCode} uiSourceCode
-     * @param {string} newName
-     * @param {function(boolean, string=, string=, !WebInspector.ResourceType=)} callback
-     */
-    rename: function(uiSourceCode, newName, callback) { },
+      /**
+       * @param {!WebInspector.UISourceCode} uiSourceCode
+       * @param {string} newName
+       * @param {function(boolean, string=, string=,
+       * !WebInspector.ResourceType=)} callback
+       */
+      rename: function(uiSourceCode, newName, callback) {},
 
-    /**
-     * @param {string} path
-     * @param {function()=} callback
-     */
-    refresh: function(path, callback) { },
+      /**
+       * @param {string} path
+       * @param {function()=} callback
+       */
+      refresh: function(path, callback) {},
 
-    /**
-     * @param {string} path
-     */
-    excludeFolder: function(path) { },
+      /**
+       * @param {string} path
+       */
+      excludeFolder: function(path) {},
 
-    /**
-     * @param {string} path
-     * @param {?string} name
-     * @param {string} content
-     * @param {function(?WebInspector.UISourceCode)} callback
-     */
-    createFile: function(path, name, content, callback) { },
+      /**
+       * @param {string} path
+       * @param {?string} name
+       * @param {string} content
+       * @param {function(?WebInspector.UISourceCode)} callback
+       */
+      createFile: function(path, name, content, callback) {},
 
-    /**
-     * @param {string} path
-     */
-    deleteFile: function(path) { },
+      /**
+       * @param {string} path
+       */
+      deleteFile: function(path) {},
 
-    remove: function() { },
+      remove: function() {},
 
-    /**
-     * @param {!WebInspector.UISourceCode} uiSourceCode
-     * @param {string} query
-     * @param {boolean} caseSensitive
-     * @param {boolean} isRegex
-     * @param {function(!Array.<!WebInspector.ContentProvider.SearchMatch>)} callback
-     */
-    searchInFileContent: function(uiSourceCode, query, caseSensitive, isRegex, callback) { },
+      /**
+       * @param {!WebInspector.UISourceCode} uiSourceCode
+       * @param {string} query
+       * @param {boolean} caseSensitive
+       * @param {boolean} isRegex
+       * @param {function(!Array.<!WebInspector.ContentProvider.SearchMatch>)}
+       * callback
+       */
+      searchInFileContent: function(
+          uiSourceCode, query, caseSensitive, isRegex, callback) {},
 
-    /**
-     * @param {!WebInspector.ProjectSearchConfig} searchConfig
-     * @param {!Array.<string>} filesMathingFileQuery
-     * @param {!WebInspector.Progress} progress
-     * @param {function(!Array.<string>)} callback
-     */
-    findFilesMatchingSearchRequest: function(searchConfig, filesMathingFileQuery, progress, callback) { },
+      /**
+       * @param {!WebInspector.ProjectSearchConfig} searchConfig
+       * @param {!Array.<string>} filesMathingFileQuery
+       * @param {!WebInspector.Progress} progress
+       * @param {function(!Array.<string>)} callback
+       */
+      findFilesMatchingSearchRequest: function(
+          searchConfig, filesMathingFileQuery, progress, callback) {},
 
-    /**
-     * @param {!WebInspector.Progress} progress
-     */
-    indexContent: function(progress) { },
+      /**
+       * @param {!WebInspector.Progress} progress
+       */
+      indexContent: function(progress) {},
 
-    /**
+      /**
      * @param {string} url
      * @return {?WebInspector.UISourceCode}
      */
-    uiSourceCodeForURL: function(url) { },
+      uiSourceCodeForURL: function(url) {},
 
-    /**
+      /**
      * @return {!Array.<!WebInspector.UISourceCode>}
      */
-    uiSourceCodes: function() { }
-}
+      uiSourceCodes: function() {}
+    }
 
-/**
- * @enum {string}
- */
-WebInspector.projectTypes = {
-    Debugger: "debugger",
-    Formatter: "formatter",
-    Network: "network",
-    Snippets: "snippets",
-    FileSystem: "filesystem",
-    ContentScripts: "contentscripts",
-    Service: "service"
-}
+                                         /**
+                                          * @enum {string}
+                                          */
+                                         WebInspector.projectTypes = {
+      Debugger: 'debugger',
+      Formatter: 'formatter',
+      Network: 'network',
+      Snippets: 'snippets',
+      FileSystem: 'filesystem',
+      ContentScripts: 'contentscripts',
+      Service: 'service'
+    }
 
-/**
- * @constructor
- * @param {!WebInspector.Workspace} workspace
- * @param {string} id
- * @param {!WebInspector.projectTypes} type
- * @param {string} displayName
- */
-WebInspector.ProjectStore = function(workspace, id, type, displayName)
-{
-    this._workspace = workspace;
-    this._id = id;
-    this._type = type;
-    this._displayName = displayName;
+                                                                     /**
+                                                                      * @constructor
+                                                                      * @param
+                                                                      * {!WebInspector.Workspace}
+                                                                      * workspace
+                                                                      * @param
+                                                                      * {string}
+                                                                      * id
+                                                                      * @param
+                                                                      * {!WebInspector.projectTypes}
+                                                                      * type
+                                                                      * @param
+                                                                      * {string}
+                                                                      * displayName
+                                                                      */
+                                                                     WebInspector
+                                                                         .ProjectStore =
+            function(workspace, id, type, displayName) {
+      this._workspace = workspace;
+      this._id = id;
+      this._type = type;
+      this._displayName = displayName;
 
-    /** @type {!Map.<string, !{uiSourceCode: !WebInspector.UISourceCode, index: number}>} */
-    this._uiSourceCodesMap = new Map();
-    /** @type {!Array.<!WebInspector.UISourceCode>} */
-    this._uiSourceCodesList = [];
+      /** @type {!Map.<string, !{uiSourceCode: !WebInspector.UISourceCode,
+       * index: number}>} */
+      this._uiSourceCodesMap = new Map();
+      /** @type {!Array.<!WebInspector.UISourceCode>} */
+      this._uiSourceCodesList = [];
 
-    this._project = /** @type {!WebInspector.Project} */(this);
-}
+      this._project = /** @type {!WebInspector.Project} */ (this);
+    }
 
-WebInspector.ProjectStore.prototype = {
-    /**
+            WebInspector.ProjectStore.prototype = {
+      /**
      * @return {string}
      */
-    id: function()
-    {
-        return this._id;
-    },
+      id: function() { return this._id; },
 
-    /**
+      /**
      * @return {string}
      */
-    type: function()
-    {
-        return this._type;
-    },
+      type: function() { return this._type; },
 
-    /**
+      /**
      * @return {string}
      */
-    displayName: function()
-    {
-        return this._displayName;
-    },
+      displayName: function() { return this._displayName; },
 
-    /**
+      /**
      * @return {!WebInspector.Workspace}
      */
-    workspace: function()
-    {
-        return this._workspace;
-    },
+      workspace: function() { return this._workspace; },
 
-    /**
+      /**
      * @param {string} url
      * @param {!WebInspector.ResourceType} contentType
      * @return {!WebInspector.UISourceCode}
      */
-    createUISourceCode: function(url, contentType)
-    {
+      createUISourceCode: function(url, contentType) {
         return new WebInspector.UISourceCode(this._project, url, contentType);
-    },
+      },
 
-    /**
+      /**
      * @param {!WebInspector.UISourceCode} uiSourceCode
      * @param {boolean=} replace
      * @return {boolean}
      */
-    addUISourceCode: function(uiSourceCode, replace)
-    {
+      addUISourceCode: function(uiSourceCode, replace) {
         var url = uiSourceCode.url();
         if (this.uiSourceCodeForURL(url)) {
-            if (replace)
-                this.removeUISourceCode(url);
-            else
-                return false;
+          if (replace)
+            this.removeUISourceCode(url);
+          else
+            return false;
         }
-        this._uiSourceCodesMap.set(url, {uiSourceCode: uiSourceCode, index: this._uiSourceCodesList.length});
+        this._uiSourceCodesMap.set(url, {
+          uiSourceCode: uiSourceCode,
+          index: this._uiSourceCodesList.length
+        });
         this._uiSourceCodesList.push(uiSourceCode);
-        this._workspace.dispatchEventToListeners(WebInspector.Workspace.Events.UISourceCodeAdded, uiSourceCode);
+        this._workspace.dispatchEventToListeners(
+            WebInspector.Workspace.Events.UISourceCodeAdded, uiSourceCode);
         return true;
-    },
+      },
 
-    /**
-     * @param {string} url
-     */
-    removeUISourceCode: function(url)
-    {
+      /**
+       * @param {string} url
+       */
+      removeUISourceCode: function(url) {
         var uiSourceCode = this.uiSourceCodeForURL(url);
         if (!uiSourceCode)
-            return;
+          return;
 
         var entry = this._uiSourceCodesMap.get(url);
-        var movedUISourceCode = this._uiSourceCodesList[this._uiSourceCodesList.length - 1];
+        var movedUISourceCode =
+            this._uiSourceCodesList[this._uiSourceCodesList.length - 1];
         this._uiSourceCodesList[entry.index] = movedUISourceCode;
         var movedEntry = this._uiSourceCodesMap.get(movedUISourceCode.url());
         movedEntry.index = entry.index;
         this._uiSourceCodesList.splice(this._uiSourceCodesList.length - 1, 1);
         this._uiSourceCodesMap.delete(url);
-        this._workspace.dispatchEventToListeners(WebInspector.Workspace.Events.UISourceCodeRemoved, entry.uiSourceCode);
-    },
+        this._workspace.dispatchEventToListeners(
+            WebInspector.Workspace.Events.UISourceCodeRemoved,
+            entry.uiSourceCode);
+      },
 
-    removeProject: function()
-    {
+      removeProject: function() {
         this._workspace._removeProject(this._project);
         this._uiSourceCodesMap = new Map();
         this._uiSourceCodesList = [];
-    },
+      },
 
-    /**
+      /**
      * @param {string} url
      * @return {?WebInspector.UISourceCode}
      */
-    uiSourceCodeForURL: function(url)
-    {
+      uiSourceCodeForURL: function(url) {
         var entry = this._uiSourceCodesMap.get(url);
         return entry ? entry.uiSourceCode : null;
-    },
+      },
 
-    /**
+      /**
      * @return {!Array.<!WebInspector.UISourceCode>}
      */
-    uiSourceCodes: function()
-    {
-        return this._uiSourceCodesList;
-    },
+      uiSourceCodes: function() { return this._uiSourceCodesList; },
 
-    /**
-     * @param {!WebInspector.UISourceCode} uiSourceCode
-     * @param {string} newName
-     */
-    renameUISourceCode: function(uiSourceCode, newName)
-    {
+      /**
+       * @param {!WebInspector.UISourceCode} uiSourceCode
+       * @param {string} newName
+       */
+      renameUISourceCode: function(uiSourceCode, newName) {
         var oldPath = uiSourceCode.url();
-        var newPath = uiSourceCode.parentURL() ? uiSourceCode.parentURL() + "/" + newName : newName;
-        var value = /** @type {!{uiSourceCode: !WebInspector.UISourceCode, index: number}} */ (this._uiSourceCodesMap.get(oldPath));
+        var newPath = uiSourceCode.parentURL() ?
+            uiSourceCode.parentURL() + '/' + newName :
+            newName;
+        var value =
+            /** @type {!{uiSourceCode: !WebInspector.UISourceCode, index: number}} */
+            (this._uiSourceCodesMap.get(oldPath));
         this._uiSourceCodesMap.set(newPath, value);
         this._uiSourceCodesMap.delete(oldPath);
+      }
     }
-}
 
-/**
- * @constructor
- * @extends {WebInspector.Object}
- */
-WebInspector.Workspace = function()
-{
-    /** @type {!Map<string, !WebInspector.Project>} */
-    this._projects = new Map();
-    this._hasResourceContentTrackingExtensions = false;
-}
+                                                  /**
+                                                   * @constructor
+                                                   * @extends
+                                                   * {WebInspector.Object}
+                                                   */
+                                                  WebInspector.Workspace =
+                function() {
+      /** @type {!Map<string, !WebInspector.Project>} */
+      this._projects = new Map();
+      this._hasResourceContentTrackingExtensions = false;
+    }
 
-/** @enum {symbol} */
-WebInspector.Workspace.Events = {
-    UISourceCodeAdded: Symbol("UISourceCodeAdded"),
-    UISourceCodeRemoved: Symbol("UISourceCodeRemoved"),
-    WorkingCopyChanged: Symbol("WorkingCopyChanged"),
-    WorkingCopyCommitted: Symbol("WorkingCopyCommitted"),
-    WorkingCopyCommittedByUser: Symbol("WorkingCopyCommittedByUser"),
-    ProjectAdded: Symbol("ProjectAdded"),
-    ProjectRemoved: Symbol("ProjectRemoved")
-}
+                /** @enum {symbol} */
+                WebInspector.Workspace.Events = {
+      UISourceCodeAdded: Symbol('UISourceCodeAdded'),
+      UISourceCodeRemoved: Symbol('UISourceCodeRemoved'),
+      WorkingCopyChanged: Symbol('WorkingCopyChanged'),
+      WorkingCopyCommitted: Symbol('WorkingCopyCommitted'),
+      WorkingCopyCommittedByUser: Symbol('WorkingCopyCommittedByUser'),
+      ProjectAdded: Symbol('ProjectAdded'),
+      ProjectRemoved: Symbol('ProjectRemoved')
+    }
 
-WebInspector.Workspace.prototype = {
-    /**
+                                                WebInspector.Workspace
+                                                    .prototype = {
+      /**
      * @param {string} projectId
      * @param {string} url
      * @return {?WebInspector.UISourceCode}
      */
-    uiSourceCode: function(projectId, url)
-    {
+      uiSourceCode: function(projectId, url) {
         var project = this._projects.get(projectId);
         return project ? project.uiSourceCodeForURL(url) : null;
-    },
+      },
 
-    /**
+      /**
      * @param {string} url
      * @return {?WebInspector.UISourceCode}
      */
-    uiSourceCodeForURL: function(url)
-    {
+      uiSourceCodeForURL: function(url) {
         for (var project of this._projects.values()) {
-            var uiSourceCode = project.uiSourceCodeForURL(url);
-            if (uiSourceCode)
-                return uiSourceCode;
+          var uiSourceCode = project.uiSourceCodeForURL(url);
+          if (uiSourceCode)
+            return uiSourceCode;
         }
         return null;
-    },
+      },
 
-    /**
+      /**
      * @param {string} type
      * @return {!Array.<!WebInspector.UISourceCode>}
      */
-    uiSourceCodesForProjectType: function(type)
-    {
+      uiSourceCodesForProjectType: function(type) {
         var result = [];
         for (var project of this._projects.values()) {
-            if (project.type() === type)
-                result = result.concat(project.uiSourceCodes());
+          if (project.type() === type)
+            result = result.concat(project.uiSourceCodes());
         }
         return result;
-    },
+      },
 
-    /**
-     * @param {!WebInspector.Project} project
-     */
-    addProject: function(project)
-    {
-        console.assert(!this._projects.has(project.id()), `A project with id ${project.id()} already exists!`);
+      /**
+       * @param {!WebInspector.Project} project
+       */
+      addProject: function(project) {
+        console.assert(
+            !this._projects.has(project.id()),
+            `A project with id ${project.id()} already exists!`);
         this._projects.set(project.id(), project);
-        this.dispatchEventToListeners(WebInspector.Workspace.Events.ProjectAdded, project);
-    },
+        this.dispatchEventToListeners(
+            WebInspector.Workspace.Events.ProjectAdded, project);
+      },
 
-    /**
-     * @param {!WebInspector.Project} project
-     */
-    _removeProject: function(project)
-    {
+      /**
+       * @param {!WebInspector.Project} project
+       */
+      _removeProject: function(project) {
         this._projects.delete(project.id());
-        this.dispatchEventToListeners(WebInspector.Workspace.Events.ProjectRemoved, project);
-    },
+        this.dispatchEventToListeners(
+            WebInspector.Workspace.Events.ProjectRemoved, project);
+      },
 
-    /**
+      /**
      * @param {string} projectId
      * @return {?WebInspector.Project}
      */
-    project: function(projectId)
-    {
+      project: function(projectId) {
         return this._projects.get(projectId) || null;
-    },
+      },
 
-    /**
+      /**
      * @return {!Array.<!WebInspector.Project>}
      */
-    projects: function()
-    {
-        return this._projects.valuesArray();
-    },
+      projects: function() { return this._projects.valuesArray(); },
 
-    /**
+      /**
      * @param {string} type
      * @return {!Array.<!WebInspector.Project>}
      */
-    projectsForType: function(type)
-    {
-        function filterByType(project)
-        {
-            return project.type() === type;
-        }
+      projectsForType: function(type) {
+        function filterByType(project) { return project.type() === type; }
         return this.projects().filter(filterByType);
-    },
+      },
 
-    /**
+      /**
      * @return {!Array.<!WebInspector.UISourceCode>}
      */
-    uiSourceCodes: function()
-    {
+      uiSourceCodes: function() {
         var result = [];
         for (var project of this._projects.values())
-            result = result.concat(project.uiSourceCodes());
+          result = result.concat(project.uiSourceCodes());
         return result;
-    },
+      },
 
-    /**
-     * @param {boolean} hasExtensions
-     */
-    setHasResourceContentTrackingExtensions: function(hasExtensions)
-    {
+      /**
+       * @param {boolean} hasExtensions
+       */
+      setHasResourceContentTrackingExtensions: function(hasExtensions) {
         this._hasResourceContentTrackingExtensions = hasExtensions;
-    },
+      },
 
-    /**
+      /**
      * @return {boolean}
      */
-    hasResourceContentTrackingExtensions: function()
-    {
+      hasResourceContentTrackingExtensions: function() {
         return this._hasResourceContentTrackingExtensions;
-    },
+      },
 
-    __proto__: WebInspector.Object.prototype
-}
+      __proto__: WebInspector.Object.prototype
+    }
 
-/**
- * @type {!WebInspector.Workspace}
- */
-WebInspector.workspace;
+                                                                 /**
+                                                                  * @type
+                                                                  * {!WebInspector.Workspace}
+                                                                  */
+                                                                 WebInspector
+                                                                     .workspace;

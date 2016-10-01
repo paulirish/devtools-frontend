@@ -5,100 +5,85 @@
 /** @interface */
 WebInspector.LiveLocation = function() {}
 
-WebInspector.LiveLocation.prototype = {
-    update: function() {},
+                            WebInspector.LiveLocation.prototype =
+    {
+      update: function() {},
 
-    /**
+      /**
      * @return {?WebInspector.UILocation}
      */
-    uiLocation: function() {},
+      uiLocation: function() {},
 
-    dispose: function() {},
+      dispose: function() {},
 
-    /**
+      /**
      * @return {boolean}
      */
-    isBlackboxed: function() {}
-}
+      isBlackboxed: function() {}
+    }
 
-/**
- * @constructor
- * @implements {WebInspector.LiveLocation}
- * @param {function(!WebInspector.LiveLocation)} updateDelegate
- * @param {!WebInspector.LiveLocationPool} locationPool
- */
-WebInspector.LiveLocationWithPool = function(updateDelegate, locationPool)
-{
-    this._updateDelegate = updateDelegate;
-    this._locationPool = locationPool;
-    this._locationPool._add(this);
-}
-
-WebInspector.LiveLocationWithPool.prototype = {
     /**
-     * @override
+     * @constructor
+     * @implements {WebInspector.LiveLocation}
+     * @param {function(!WebInspector.LiveLocation)} updateDelegate
+     * @param {!WebInspector.LiveLocationPool} locationPool
      */
-    update: function()
-    {
-        this._updateDelegate(this);
-    },
+    WebInspector.LiveLocationWithPool =
+        function(updateDelegate, locationPool) {
+      this._updateDelegate = updateDelegate;
+      this._locationPool = locationPool;
+      this._locationPool._add(this);
+    }
 
-    /**
+        WebInspector.LiveLocationWithPool.prototype = {
+      /**
+       * @override
+       */
+      update: function() { this._updateDelegate(this); },
+
+      /**
      * @override
      * @return {?WebInspector.UILocation}
      */
-    uiLocation: function()
-    {
-        throw "Not implemented";
-    },
+      uiLocation: function() { throw 'Not implemented'; },
 
-    /**
-     * @override
-     */
-    dispose: function()
-    {
+      /**
+       * @override
+       */
+      dispose: function() {
         this._locationPool._delete(this);
         this._updateDelegate = null;
-    },
+      },
 
-    /**
+      /**
      * @override
      * @return {boolean}
      */
-    isBlackboxed: function()
-    {
-        throw "Not implemented";
+      isBlackboxed: function() { throw 'Not implemented'; }
     }
-}
 
-/**
- * @constructor
- */
-WebInspector.LiveLocationPool = function()
-{
-    this._locations = new Set();
-}
+                                                      /**
+                                                       * @constructor
+                                                       */
+                                                      WebInspector
+                                                          .LiveLocationPool =
+            function() {
+      this._locations = new Set();
+    }
 
-WebInspector.LiveLocationPool.prototype = {
-    /**
-     * @param {!WebInspector.LiveLocation} location
-     */
-    _add: function(location)
-    {
-        this._locations.add(location);
-    },
+            WebInspector.LiveLocationPool.prototype = {
+      /**
+       * @param {!WebInspector.LiveLocation} location
+       */
+      _add: function(location) { this._locations.add(location); },
 
-    /**
-     * @param {!WebInspector.LiveLocation} location
-     */
-    _delete: function(location)
-    {
-        this._locations.delete(location);
-    },
+      /**
+       * @param {!WebInspector.LiveLocation} location
+       */
+      _delete: function(location) { this._locations.delete(location); },
 
-    disposeAll: function()
-    {
+      disposeAll: function() {
         for (var location of this._locations)
-            location.dispose();
+          location.dispose();
+      }
     }
-}
