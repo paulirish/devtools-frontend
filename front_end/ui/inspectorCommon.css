@@ -52,6 +52,8 @@
 
 img {
     -webkit-user-drag: none;
+    width: 100px;
+    height: 100px;
 }
 
 iframe,

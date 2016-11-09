@@ -14,6 +14,7 @@ var chromeArgs = [
     `--remote-debugging-port=${remoteDebuggingPort}`,
     `--custom-devtools-frontend=http://localhost:${serverPort}/front_end/`,
     `--no-first-run`,
+    '--enable-devtools-experiments',
     `http://localhost:${remoteDebuggingPort}#custom=true&experiments=true`,
     `https://devtools.chrome.com`
 ].concat(process.argv.slice(2));
