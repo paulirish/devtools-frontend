@@ -1,6 +1,27 @@
 // Copyright (c) 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+/**
+ * @typedef {{
+ *     lighthouseVersion: ?string,
+ *     generatedTime: !string,
+ *     initialUrl: !string,
+ *     url: !string,
+ *     audits: ?Object,
+ *     aggregations: !Array.<*>
+ * }}
+ */
+Audits2.LighthouseResult;
+
+/**
+ * @typedef {{
+ *     bloburl: !string,
+ *     lighthouseResult: ?Audits2.LighthouseResult
+ * }}
+ */
+Audits2.WorkerResult;
+
 /**
  * @unrestricted
  */
@@ -67,7 +88,7 @@ Audits2.Audits2Panel = class extends UI.Panel {
 
     this._inspectedURL = SDK.targetManager.mainTarget().inspectedURL();
 
-    Promise.resolve()
+    return Promise.resolve()
         .then(_ => this._protocolService.attach())
         .then(_ => this._protocolService.startLighthouse(this._inspectedURL))
         .then(this._finish.bind(this));
@@ -109,14 +130,13 @@ Audits2.Audits2Panel = class extends UI.Panel {
   }
 
   /**
-   * @param {!Object=} result Lighthouse result object
-   * @return {!Promise<!Object|undefined>}
+   * @param {!Audits2.WorkerResult} result
    */
   _finish(result) {
     this._stop();
     this.resultsView.removeChildren();
 
-    this.resultsView.appendChild(this._createResultsBar(result.results.url, result.results.generatedTime));
+    this.resultsView.appendChild(this._createResultsBar(result.lighthouseResult.url, result.lighthouseResult.generatedTime));
     this.resultsView.appendChild(this._createIframe(result.bloburl));
     this.contentElement.classList.add('show-results');
   }
@@ -156,9 +176,16 @@ Audits2.Audits2Panel = class extends UI.Panel {
 };
 
 Audits2.ProtocolService = class extends Common.Object {
+  constructor() {
+    super();
+    this._rawConnection = undefined;
+    this._backend = undefined;
+    this._backendPromise = undefined;
+    this._status = undefined;
+  }
 
   /**
-   * @return {!Promise<!Object|undefined>}
+   * @return {!Promise<undefined>}
    */
   attach() {
     return SDK.targetManager.interceptMainConnection(this._dispatchProtocolMessage.bind(this))
@@ -190,7 +217,7 @@ Audits2.ProtocolService = class extends Common.Object {
   }
 
   /**
-   * @param {function(string)}
+   *  @param {function (string): undefined} callback
    */
   registerStatusCallback(callback) {
     this._status = callback;
@@ -206,6 +233,7 @@ Audits2.ProtocolService = class extends Common.Object {
   _initWorker() {
     this._backendPromise = Services.serviceManager.createAppService('audits2_worker', 'Audits2Service', false);
     this._backendPromise.then(backend => {
+      /** @type {!ServiceManager.Service} */
       this._backend = backend;
       this._backend.on('statusUpdate', result => this._status(result.message));
       this._backend.on('sendProtocolMessage', result => this._rawConnection.sendMessage(result.message));

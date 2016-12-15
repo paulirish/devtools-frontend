@@ -37,20 +37,25 @@ var Audits2Service = class {
   }
 
   /**
-   * @return {!Promise<!Object|undefined>}
+   * @return {!Promise<!Audits2.WorkerResult>}
    */
   start(params) {
-    window.listenForStatus(message => {
+    const connection = this;
+    const options = undefined;
+    const requestedAggregations = {};
+
+    self.getDefaultAggregations().forEach(agg => {
+        requestedAggregations[agg.name] = true;
+    });
+    self.listenForStatus(message => {
       this.statusUpdate(message[1]);
     });
 
-    const requestedAggregations = {};
-    window.getDefaultAggregations().forEach(agg => {
-        requestedAggregations[agg.name] = true;
-    });
-
-    return window.runLighthouseInWorker(this, params.url, undefined, requestedAggregations)
-        .then(results => ({results, bloburl: window.createReportPageAsBlob(results, 'devtools')}));
+    return self.runLighthouseInWorker(connection, params.url, options, requestedAggregations)
+        .then(/** @type {!Audits2.LighthouseResult} */ lighthouseResults => ({
+            bloburl: /** @type {(null|string)} */ window.createReportPageAsBlob(lighthouseResults, 'devtools'),
+            lighthouseResults
+        }));
   }
 
   /**
