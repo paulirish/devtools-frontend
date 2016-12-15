@@ -840,6 +840,7 @@ devtools_image_files = [
   "front_end/Images/profileIcon.png",
   "front_end/Images/profileSmallIcon.png",
   "front_end/Images/radioDot.png",
+  "front_end/Images/reportCheck.png",
   "front_end/Images/resizeDiagonal.png",
   "front_end/Images/resizeDiagonal_2x.png",
   "front_end/Images/resizeHorizontal.png",
@@ -922,6 +923,7 @@ generated_entry_files = [
 ]
 
 generated_workers = [
+  "$resources_out_dir/audits2_worker.js",
   "$resources_out_dir/formatter_worker.js",
   "$resources_out_dir/heap_snapshot_worker.js",
   "$resources_out_dir/utility_shared_worker.js",
@@ -930,6 +932,7 @@ generated_workers = [
 generated_bundled_modules = [
   "$resources_out_dir/animation/animation_module.js",
   "$resources_out_dir/audits/audits_module.js",
+  "$resources_out_dir/audits2_worker/audits2_worker_module.js",
   "$resources_out_dir/audits2/audits2_module.js",
   "$resources_out_dir/components_lazy/components_lazy_module.js",
   "$resources_out_dir/console/console_module.js",
@@ -967,6 +970,7 @@ devtools_applications = [
   "toolbox",
   "unit_test_runner",
   "formatter_worker",
+  "audits2_worker",
   "heap_snapshot_worker",
   "utility_shared_worker",
 ]
