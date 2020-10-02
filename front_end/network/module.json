@@ -177,75 +177,6 @@
             "vsCode"
           ]
         }
-<<<<<<< HEAD
-    ],
-    "dependencies": [
-        "search",
-        "source_frame",
-        "components",
-        "perf_ui",
-        "cookie_table",
-        "data_grid",
-        "browser_sdk",
-        "mobile_throttling",
-        "har_importer",
-        "persistence"
-    ],
-    "scripts": [],
-    "modules": [
-        "network.js",
-        "network-legacy.js",
-        "BinaryResourceView.js",
-        "BlockedURLsPane.js",
-        "EventSourceMessagesView.js",
-        "HARWriter.js",
-        "NetworkConfigView.js",
-        "NetworkDataGridNode.js",
-        "NetworkItemView.js",
-        "NetworkTimeCalculator.js",
-        "NetworkLogView.js",
-        "NetworkLogViewColumns.js",
-        "NetworkFrameGrouper.js",
-        "NetworkManageCustomHeadersView.js",
-        "NetworkSearchScope.js",
-        "NetworkWaterfallColumn.js",
-        "RequestCookiesView.js",
-        "RequestHeadersView.js",
-        "RequestHTMLView.js",
-        "RequestInitiatorView.js",
-        "RequestResponseView.js",
-        "RequestPreviewView.js",
-        "RequestSourceMapView.js",
-        "RequestTimingView.js",
-        "ResourceWebSocketFrameView.js",
-        "SignedExchangeInfoView.js",
-        "NetworkOverview.js",
-        "NetworkPanel.js",
-        "../third_party/webtreemap/webtreemap.js"
-    ],
-    "resources": [
-        "binaryResourceView.css",
-        "blockedURLsPane.css",
-        "eventSourceMessagesView.css",
-        "networkConfigView.css",
-        "networkLogView.css",
-        "networkManageCustomHeadersView.css",
-        "networkPanel.css",
-        "networkTimingTable.css",
-        "networkWaterfallColumn.css",
-        "requestCookiesView.css",
-        "requestHeadersTree.css",
-        "requestHeadersView.css",
-        "requestSourceMapView.css",
-        "requestHTMLView.css",
-        "requestInitiatorView.css",
-        "signedExchangeInfoTree.css",
-        "signedExchangeInfoView.css",
-        "webSocketFrameView.css",
-        "../third_party/webtreemap/webtreemap.js"
-    ]
-}
-=======
       ]
     }
   ],
@@ -265,7 +196,8 @@
     "sdk",
     "search",
     "source_frame",
-    "ui"
+    "ui",
+    "webtreemap"
   ],
   "modules": [
     "network.js",
@@ -289,6 +221,7 @@
     "RequestHTMLView.js",
     "RequestInitiatorView.js",
     "RequestResponseView.js",
+    "RequestSourceMapView.js",
     "RequestPreviewView.js",
     "RequestTimingView.js",
     "ResourceWebSocketFrameView.js",
@@ -311,9 +244,9 @@
     "requestHeadersView.css",
     "requestHTMLView.css",
     "requestInitiatorView.css",
+    "requestSourceMapView.css",
     "signedExchangeInfoTree.css",
     "signedExchangeInfoView.css",
-    "webSocketFrameView.css"
+    "webSocketFrameView.css",
   ]
 }
->>>>>>> master

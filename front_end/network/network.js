@@ -29,7 +29,6 @@ import './ResourceWebSocketFrameView.js';
 import './SignedExchangeInfoView.js';
 import './NetworkOverview.js';
 import './NetworkPanel.js';
-import '../third_party/webtreemap/webtreemap.js';
 
 import * as BinaryResourceView from './BinaryResourceView.js';
 import * as BlockedURLsPane from './BlockedURLsPane.js';

@@ -200,10 +200,9 @@
   <message name="IDS_DEVTOOLS_3f23f0e9da2803d48c2d67aa09f01bf5" desc="Tooltip to explain why a cookie was blocked">
     This Set-Cookie didn&apos;t specify a &quot;SameSite&quot; attribute and was defaulted to &quot;SameSite=Lax,&quot; and was blocked because it came from a cross-site response which was not the response to a top-level navigation. The Set-Cookie had to have been set with &quot;SameSite=None&quot; to enable cross-site usage.
   </message>
-<<<<<<< HEAD
   <message name="IDS_DEVTOOLS_50b80c589dba5d9c84f70e025b710b7f" desc="Error message after a source map referenced a column that isn't in the generated file.">
     Source map (<ph name="MAP_URL__">$1s<ex>http://site.com/app.min.js</ex></ph>) mapping for last column is out of bounds: <ph name="LINENUM____">$2s<ex>3</ex></ph>:<ph name="LASTCOLNUM">$3s<ex>10</ex></ph>
-=======
+  </message>
   <message name="IDS_DEVTOOLS_3fd3771f616eea7c212f93f2c6096cde" desc="Description of a SameSiteCookie issue">
     A cookie is being set by <ph name="ORIGIN">$1s<ex>a secure</ex></ph> origin in <ph name="DESTINATION">$2s<ex>an insecure</ex></ph> context.
         Because this cookie is being set across schemes on the same site, it will be blocked in a future version of Chrome.
@@ -297,7 +296,6 @@
   </message>
   <message name="IDS_DEVTOOLS_4350ac6a723ad6f3b6e77713a27c2de1" desc="Resolution for a SameSiteCookie issue">
     Specify <ph name="LOCKED_1">|SameSite=None|</ph> and <ph name="LOCKED_1">|Secure|</ph> if the cookie should be sent in cross-site requests. This enables third-party use.
->>>>>>> master
   </message>
   <message name="IDS_DEVTOOLS_43fde213dddc0ce31eca48a551757f41" desc="Title of a setting under the Rendering drawer that can be invoked through the Command Menu">
     Emulate blurred vision

@@ -228,13 +228,11 @@
   <message name="IDS_DEVTOOLS_408f8a4ecdacbe1d9989b800a0c12936" desc="An option in the user agent dropdown menu in the Network conditions tool">
     <ph name="LOCKED_1">Internet Explorer 11</ph>
   </message>
-<<<<<<< HEAD
   <message name="IDS_DEVTOOLS_40c85feedfa235dd2dcfe21b5ff4efdd" desc="Text in the Network Item View of the network panel communicating that this network request has no associated source map.">
     This request has no source map.
-=======
+  </message>
   <message name="IDS_DEVTOOLS_4109dce9b5309157da5948c7aac41e29" desc="Comment used in decoded X-Client-Data HTTP header output in Headers View of the Network panel">
     Active client experiment variation IDs that trigger server-side behavior.
->>>>>>> master
   </message>
   <message name="IDS_DEVTOOLS_4145ea54b6f576d7646d6a68eb39813f" desc="An option in the user agent dropdown menu in the Network conditions tool">
     <ph name="LOCKED_1">Opera (Presto) — Mac</ph>

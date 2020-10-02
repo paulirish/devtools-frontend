@@ -29,6 +29,7 @@ devtools_module("network") {
     "RequestInitiatorView.js",
     "RequestPreviewView.js",
     "RequestResponseView.js",
+    "RequestSourceMapView.js",
     "RequestTimingView.js",
     "ResourceWebSocketFrameView.js",
     "SignedExchangeInfoView.js",
@@ -54,6 +55,7 @@ devtools_module("network") {
     "../source_frame:bundle",
     "../text_utils:bundle",
     "../theme_support:bundle",
+    "../webtreemap:bundle",
     "../ui:bundle",
     "../workspace:bundle",
   ]

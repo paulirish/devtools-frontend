@@ -4,7 +4,7 @@
  * https://github.com/paulirish/webtreemap-cdt
  */
 
-self.webtreemap = (function (exports) {
+// self.webtreemap = (function (exports) {
     'use strict';
 
     /**
@@ -384,6 +384,5 @@ self.webtreemap = (function (exports) {
     exports.sort = sort;
     exports.treeify = treeify;
 
-    return exports;
-
-}({}));
+    const WebTreemap = exports;
+    export default WebTreemap;

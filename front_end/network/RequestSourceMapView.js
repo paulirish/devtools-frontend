@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+
+import * as WebTreemap from '../webtreemap/webtreemap.js';
+
+
 /**
  * @unrestricted
  */
@@ -49,7 +53,7 @@ export class RequestSourceMapView extends UI.VBox {
     }
     const treemapNodes = this._prepareTreemapNodes(sourceBytes);
     webtreemap.sort(treemapNodes);
-    this._treemap = new webtreemap.TreeMap(treemapNodes, {padding: [18, 3, 3, 3]});
+    this._treemap = new WebTreemap.TreeMap(treemapNodes, {padding: [18, 3, 3, 3]});
     this._treemap.render(this._container);
     return;
   }
