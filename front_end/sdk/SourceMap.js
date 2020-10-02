@@ -30,6 +30,7 @@
 
 import * as Common from '../common/common.js';
 import * as Root from '../root/root.js';
+import * as SDK from '../sdk/sdk.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 
 import {CompilerSourceMappingContentProvider} from './CompilerSourceMappingContentProvider.js';
@@ -107,9 +108,10 @@ export class SourceMap {
 
   /**
    * @param {string} resourceContent
-   * @return {?SDK.TextSourceMap.SourceMappedBytes}
+   * @return {?SourceMappedBytes}
    */
   attributableSourceBytes(resourceContent) {
+    return null;
   }
 
   dispose() {
@@ -341,7 +343,7 @@ export class TextSourceMap {
    * Same as findEntry, but mapped entry must be on the requested lineNumber.
    * @param {number} lineNumber in compiled resource
    * @param {number} columnNumber in compiled resource
-   * @return {?SDK.SourceMapEntry}
+   * @return {?SourceMapEntry}
    */
   _findExactEntry(lineNumber, columnNumber) {
     const entry = this.findEntry(lineNumber, columnNumber);
@@ -626,7 +628,7 @@ export class TextSourceMap {
    * Implementation heavily inspired by https://github.com/danvk/source-map-explorer
    * @override
    * @param {string} resourceContent
-   * @return {?SDK.TextSourceMap.SourceMappedBytes}
+   * @return {?SourceMappedBytes}
    */
   attributableSourceBytes(resourceContent) {
     if (this._attributableSourceBytes === null) {
@@ -652,19 +654,22 @@ export class TextSourceMap {
 
         // Check three edge cases of invalid source map data
         if (line === undefined) {
-          return Common.Console.Console.instance().warn(
-              ls`Source map (${this.compiledURL()}) mapping for line is out of bounds: ${lineNum + 1}`);
+          Common.Console.Console.instance().warn(
+             ls`Source map (${this.compiledURL()}) mapping for line is out of bounds: ${lineNum + 1}`);
+          return null;
         }
         if (colNum > line.length) {
-          return Common.Console.Console.instance().warn(
-              ls`Source map (${this.compiledURL()}) mapping for column is out of bounds: ${lineNum + 1}:${colNum}`);
+          Common.Console.Console.instance().warn(
+             ls`Source map (${this.compiledURL()}) mapping for column is out of bounds: ${lineNum + 1}:${colNum}`);
+          return null;
         }
 
         let mappingLength = 0;
         if (lastColNum !== undefined) {
           if (lastColNum > line.length) {
-            return Common.Console.Console.instance().warn(ls`Source map (${
+            Common.Console.Console.instance().warn(ls`Source map (${
                 this.compiledURL()}) mapping for last column is out of bounds: ${lineNum + 1}:${lastColNum}`);
+            return null;
           }
           mappingLength = lastColNum - colNum + 1;
         } else {
@@ -886,7 +891,7 @@ export class WasmSourceMap {
    * @override
    */
   attributableSourceBytes() {
-    throw new Error('Not implemented');
+    return null;
   }
 
   /**
@@ -896,6 +901,19 @@ export class WasmSourceMap {
     this._resolver.free();
   }
 }
+
+/** @typedef {{
+ *    sourceURL: ?string,
+ *    cursor: TextUtils.TextCursor,
+ *  }}
+ */
+// @ts-ignore typedef
+export let NamedTextCursor;
+
+/** @typedef {Map<?string, number>} */
+// @ts-ignore typedef
+export let SourceMappedBytes;
+
 
 /* Special URL that should be kept in sync with one in V8 */
 WasmSourceMap.FAKE_URL = 'wasm://dwarf';

@@ -4,7 +4,7 @@
 
 
 // import '../third_party/codemirror/package/addon/fold/brace-fold.js';
-
+// @ts-ignore
 import WebTreeMap from '../third_party/webtreemap/webtreemap.js';
 
 export {WebTreeMap};

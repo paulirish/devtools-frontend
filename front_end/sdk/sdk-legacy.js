@@ -215,12 +215,6 @@ SDK.SourceMap = SDKModule.SourceMap.SourceMap;
 /** @constructor */
 SDK.TextSourceMap = SDKModule.SourceMap.TextSourceMap;
 
-/** @typedef {{sourceURL: ?string, cursor: TextUtils.TextCursor}} */
-SDK.TextSourceMap.NamedTextCursor;
-
-/** @typedef {Map<?string, number>} */
-SDK.TextSourceMap.SourceMappedBytes;
-
 /** @constructor */
 SDK.SourceMapManager = SDKModule.SourceMapManager.SourceMapManager;
 

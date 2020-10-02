@@ -5,6 +5,7 @@
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
+import * as SDK from '../sdk/sdk.js';
 
 import {FrameAssociated} from './FrameAssociated.js';  // eslint-disable-line no-unused-vars
 import {Script} from './Script.js';
