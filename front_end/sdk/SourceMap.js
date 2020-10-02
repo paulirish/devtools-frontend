@@ -30,7 +30,6 @@
 
 import * as Common from '../common/common.js';
 import * as Root from '../root/root.js';
-import * as SDK from '../sdk/sdk.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 
 import {CompilerSourceMappingContentProvider} from './CompilerSourceMappingContentProvider.js';
@@ -128,7 +127,7 @@ class SourceMapV3 {
     /** @type {string} */ this.mappings;
     /** @type {string|undefined} */ this.sourceRoot;
     /** @type {!Array.<string>|undefined} */ this.names;
-    /** @type {string|undefined} */ this.sourcesContent;
+    /** @type {Array.<string>|undefined} */ this.sourcesContent;
   }
 }
 
@@ -693,7 +692,7 @@ export class TextSourceMap {
    *   A: lineNumber: 0, columnNumber: 0
    *   B: lineNumber: 0, columnNumber: 8
    * Then this function will mark mapping A with endColumnNumber: 7
-   * @see `lastGeneratedColumn` in https://github.com/mozilla/source-map
+   * @url lastGeneratedColumn() in https://github.com/mozilla/source-map
    */
   _computeEndColumns() {
     const mappings = this.mappings();

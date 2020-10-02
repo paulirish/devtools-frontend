@@ -30,7 +30,6 @@
 
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
-import * as SDK from '../sdk/sdk.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 
 import {Attributes, Cookie} from './Cookie.js';  // eslint-disable-line no-unused-vars
@@ -38,6 +37,8 @@ import {CookieParser} from './CookieParser.js';
 import {NetworkManager} from './NetworkManager.js';
 import {Type} from './SDKModel.js';
 import {ServerTiming} from './ServerTiming.js';
+import {SourceMap} from './SourceMap.js';
+import {sourceMapManagerObserver} from './SourceMapManager.js';
 
 /** @enum {string} */
 export const MIME_TYPE = {
@@ -157,7 +158,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper {
     // Assume no body initially
     /** @type {?Promise<?string>} */
     this._requestFormDataPromise = /** @type {?Promise<?string>} */ (Promise.resolve(null));
-    /** @type {?SDK.SourceMap} */
+    /** @type {?SourceMap} */
     this._sourceMap = null;
 
     /** @type {boolean} */
@@ -1318,10 +1319,10 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   /**
-   * @return {?SDK.SourceMap}
+   * @return {?SourceMap}
    */
   sourceMap() {
-    return SDK.sourceMapManagerObserver().sourceMapForURL(this.url());
+    return sourceMapManagerObserver().sourceMapForURL(this.url());
   }
 
 

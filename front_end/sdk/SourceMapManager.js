@@ -5,7 +5,6 @@
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
-import * as SDK from '../sdk/sdk.js';
 
 import {FrameAssociated} from './FrameAssociated.js';  // eslint-disable-line no-unused-vars
 import {Script} from './Script.js';
@@ -41,7 +40,7 @@ export class SourceMapManager extends Common.ObjectWrapper.ObjectWrapper {
     /** @type {!Platform.Multimap<string, !T>} */
     this._sourceMapIdToClients = new Platform.Multimap();
 
-    SDK.sourceMapManagerObserver().addManager(this);
+    sourceMapManagerObserver().addManager(this);
 
     TargetManager.instance().addEventListener(TargetManagerEvents.InspectedURLChanged, this._inspectedURLChanged, this);
   }
@@ -269,7 +268,7 @@ export class SourceMapManager extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   dispose() {
-    SDK.sourceMapManagerObserver().removeManager(this);
+    sourceMapManagerObserver().removeManager(this);
     for (const sourceMap of this._sourceMapById.values()) {
       sourceMap.dispose();
     }
@@ -293,13 +292,13 @@ export class SourceMapManagerObserver extends Common.ObjectWrapper.ObjectWrapper
     this._managers = new Set();
   }
   /**
-   * @param {!SDK.SourceMapManager} sourceMapManager
+   * @param {!SourceMapManager<*>} sourceMapManager
    */
   addManager(sourceMapManager) {
     this._managers.add(sourceMapManager);
   }
   /**
-   * @param {!SDK.SourceMapManager} sourceMapManager
+   * @param {!SourceMapManager<*>} sourceMapManager
    */
   removeManager(sourceMapManager) {
     this._managers.delete(sourceMapManager);
@@ -307,7 +306,7 @@ export class SourceMapManagerObserver extends Common.ObjectWrapper.ObjectWrapper
 
   /**
    * @param {string} url
-   * @return {?SDK.SourceMap}
+   * @return {?SourceMap}
    */
   sourceMapForURL(url) {
     for (const manager of this._managers) {
@@ -326,12 +325,16 @@ export class SourceMapManagerObserver extends Common.ObjectWrapper.ObjectWrapper
   }
 }
 
+
+/** @type {?SourceMapManagerObserver} */
+let _observerInstance = null;
+
 /**
- * @return {!SDK.SourceMapManagerObserver}
+ * @return {!SourceMapManagerObserver}
  */
 export function sourceMapManagerObserver() {
-  if (!SDK.SourceMapManagerObserver._instance) {
-    SDK.SourceMapManagerObserver._instance = new SDK.SourceMapManagerObserver();
+  if (!_observerInstance) {
+    _observerInstance = new SourceMapManagerObserver();
   }
-  return SDK.SourceMapManagerObserver._instance;
+  return _observerInstance;
 }

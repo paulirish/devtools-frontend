@@ -249,7 +249,7 @@ describe('TextSourceMap', () => {
 //# sourceMappingURL=foo.min.js.map
 `.trim();
 
-      const sourceMap = new TextSourceMap('foo.min.js', 'foo.min.js.map', mappingPayload);
+      const sourceMap = new TextSourceMap('foo.min.js', 'foo.min.js.map', mappingPayload, fakeInitiator);
       const sourceMappedBytes = sourceMap.attributableSourceBytes(jsPayload);
       if (!sourceMappedBytes) {
         return assert.fail('No sourcemapped bytes');
