@@ -1,0 +1,8 @@
+{  "modules": [
+    "webtreemap.js",
+    "../third_party/webtreemap/webtreemap.js"
+  ],
+  "skip_compilation": [
+    "../third_party/webtreemap/webtreemap.js"
+  ]
+}
