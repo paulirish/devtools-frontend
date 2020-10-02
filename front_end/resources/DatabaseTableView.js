@@ -23,6 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as DataGrid from '../data_grid/data_grid.js';
 import * as UI from '../ui/ui.js';
@@ -39,7 +42,8 @@ export class DatabaseTableView extends UI.View.SimpleView {
 
     this.element.classList.add('storage-view', 'table');
 
-    this._visibleColumnsSetting = self.Common.settings.createSetting('databaseTableViewVisibleColumns', {});
+    this._visibleColumnsSetting =
+        Common.Settings.Settings.instance().createSetting('databaseTableViewVisibleColumns', {});
 
     this.refreshButton = new UI.Toolbar.ToolbarButton(Common.UIString.UIString('Refresh'), 'largeicon-refresh');
     this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this._refreshButtonClicked, this);

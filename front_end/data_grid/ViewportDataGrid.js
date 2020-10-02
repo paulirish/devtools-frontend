@@ -1,6 +1,10 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Platform from '../platform/platform.js';
 
 import {DataGridImpl, DataGridNode, Parameters} from './DataGrid.js';  // eslint-disable-line no-unused-vars
 
@@ -430,7 +434,7 @@ export class ViewportDataGridNode extends DataGridNode {
       throw 'removeChild: Node is not a child of this node.';
     }
 
-    this.children.remove(child, true);
+    Platform.ArrayUtilities.removeElement(this.children, child, true);
     child._unlink();
 
     if (!this.children.length) {

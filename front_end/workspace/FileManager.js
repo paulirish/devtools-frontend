@@ -31,13 +31,19 @@
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 
+/** @type {?FileManager} */
+let fileManagerInstance;
+
 /**
  * @unrestricted
  */
 export class FileManager extends Common.ObjectWrapper.ObjectWrapper {
+  /**
+   * @private
+   */
   constructor() {
     super();
-    /** @type {!Map<string, function(?{fileSystemPath: (string|undefined)})>} */
+    /** @type {!Map<string, function(?{fileSystemPath: (string|undefined)}):void>} */
     this._saveCallbacks = new Map();
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
         Host.InspectorFrontendHostAPI.Events.SavedURL, this._savedURL, this);
@@ -45,6 +51,18 @@ export class FileManager extends Common.ObjectWrapper.ObjectWrapper {
         Host.InspectorFrontendHostAPI.Events.CanceledSaveURL, this._canceledSavedURL, this);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
         Host.InspectorFrontendHostAPI.Events.AppendedToURL, this._appendedToURL, this);
+  }
+
+  /**
+   * @param {{forceNew: ?boolean}} opts
+   */
+  static instance(opts = {forceNew: null}) {
+    const {forceNew} = opts;
+    if (!fileManagerInstance || forceNew) {
+      fileManagerInstance = new FileManager();
+    }
+
+    return fileManagerInstance;
   }
 
   /**

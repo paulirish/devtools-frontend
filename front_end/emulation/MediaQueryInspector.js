@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Bindings from '../bindings/bindings.js';
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as SDK from '../sdk/sdk.js';
@@ -30,7 +34,8 @@ export class MediaQueryInspector extends UI.Widget.Widget {
     this._scale = 1;
 
     SDK.SDKModel.TargetManager.instance().observeModels(SDK.CSSModel.CSSModel, this);
-    self.UI.zoomManager.addEventListener(UI.ZoomManager.Events.ZoomChanged, this._renderMediaQueries.bind(this), this);
+    UI.ZoomManager.ZoomManager.instance().addEventListener(
+        UI.ZoomManager.Events.ZoomChanged, this._renderMediaQueries.bind(this), this);
   }
 
   /**
@@ -119,7 +124,8 @@ export class MediaQueryInspector extends UI.Widget.Widget {
     const locations = mediaQueryMarker._locations;
     const uiLocations = new Map();
     for (let i = 0; i < locations.length; ++i) {
-      const uiLocation = self.Bindings.cssWorkspaceBinding.rawLocationToUILocation(locations[i]);
+      const uiLocation =
+          Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().rawLocationToUILocation(locations[i]);
       if (!uiLocation) {
         continue;
       }
@@ -192,7 +198,7 @@ export class MediaQueryInspector extends UI.Widget.Widget {
       for (let j = 0; j < cssMedia.mediaList.length; ++j) {
         const mediaQuery = cssMedia.mediaList[j];
         const queryModel = MediaQueryUIModel.createFromMediaQuery(cssMedia, mediaQuery);
-        if (queryModel && queryModel.rawLocation()) {
+        if (queryModel) {
           queryModels.push(queryModel);
         }
       }
@@ -230,11 +236,18 @@ export class MediaQueryInspector extends UI.Widget.Widget {
     for (let i = 0; i < this._cachedQueryModels.length; ++i) {
       const model = this._cachedQueryModels[i];
       if (lastMarker && lastMarker.model.dimensionsEqual(model)) {
-        lastMarker.locations.push(model.rawLocation());
         lastMarker.active = lastMarker.active || model.active();
       } else {
-        lastMarker = {active: model.active(), model: model, locations: [model.rawLocation()]};
+        lastMarker = {
+          active: model.active(),
+          model,
+          locations: /** @type {!Array<!SDK.CSSModel.CSSLocation>} */ ([]),
+        };
         markers.push(lastMarker);
+      }
+      const rawLocation = model.rawLocation();
+      if (rawLocation) {
+        lastMarker.locations.push(rawLocation);
       }
     }
 
@@ -258,7 +271,7 @@ export class MediaQueryInspector extends UI.Widget.Widget {
    * @return {number}
    */
   _zoomFactor() {
-    return self.UI.zoomManager.zoomFactor() / this._scale;
+    return UI.ZoomManager.ZoomManager.instance().zoomFactor() / this._scale;
   }
 
   /**
@@ -276,7 +289,8 @@ export class MediaQueryInspector extends UI.Widget.Widget {
     const zoomFactor = this._zoomFactor();
     const minWidthValue = model.minWidthExpression() ? model.minWidthExpression().computedLength() / zoomFactor : 0;
     const maxWidthValue = model.maxWidthExpression() ? model.maxWidthExpression().computedLength() / zoomFactor : 0;
-    const result = createElementWithClass('div', 'media-inspector-bar');
+    const result = document.createElement('div');
+    result.classList.add('media-inspector-bar');
 
     if (model.section() === Section.Max) {
       result.createChild('div', 'media-inspector-marker-spacer');
@@ -293,8 +307,8 @@ export class MediaQueryInspector extends UI.Widget.Widget {
       const leftElement = result.createChild('div', 'media-inspector-marker media-inspector-marker-min-max-width');
       leftElement.style.width = (maxWidthValue - minWidthValue) * 0.5 + 'px';
       leftElement.title = model.mediaText();
-      appendLabel(leftElement, model.minWidthExpression(), true, false);
-      appendLabel(leftElement, model.maxWidthExpression(), false, true);
+      appendLabel(leftElement, model.maxWidthExpression(), true, false);
+      appendLabel(leftElement, model.minWidthExpression(), false, true);
       result.createChild('div', 'media-inspector-marker-spacer').style.flex = '0 0 ' + minWidthValue + 'px';
       const rightElement = result.createChild('div', 'media-inspector-marker media-inspector-marker-min-max-width');
       rightElement.style.width = (maxWidthValue - minWidthValue) * 0.5 + 'px';

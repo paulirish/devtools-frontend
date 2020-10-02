@@ -36,9 +36,7 @@ export class WorkerWrapper {
    * @param {string} appName
    */
   constructor(appName) {
-    let url = appName + '.js';
-    // @ts-ignore Runtime needs to be properly exported
-    url += Root.Runtime.queryParamsString();
+    const url = appName + '.js' + location.search;
 
     /** @type {!Promise<!Worker>} */
     this._workerPromise = new Promise(fulfill => {
@@ -75,13 +73,17 @@ export class WorkerWrapper {
    * @param {?function(!MessageEvent):void} listener
    */
   set onmessage(listener) {
-    this._workerPromise.then(worker => worker.onmessage = listener);
+    this._workerPromise.then(worker => {
+      worker.onmessage = listener;
+    });
   }
 
   /**
    * @param {?function(!Event):void} listener
    */
   set onerror(listener) {
-    this._workerPromise.then(worker => worker.onerror = listener);
+    this._workerPromise.then(worker => {
+      worker.onerror = listener;
+    });
   }
 }

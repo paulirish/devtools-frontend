@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Root from '../root/root.js';
+
 import {TabbedPane} from './TabbedPane.js';  // eslint-disable-line no-unused-vars
 import {ItemsProvider, Toolbar, ToolbarItem, ToolbarMenuButton} from './Toolbar.js';  // eslint-disable-line no-unused-vars
+import {ViewManager} from './ViewManager.js';
 import {VBox, Widget} from './Widget.js';
 
 /**
@@ -14,45 +17,50 @@ export class View {
    * @return {string}
    */
   viewId() {
+    throw new Error('not implemented');
   }
 
   /**
    * @return {string}
    */
   title() {
+    throw new Error('not implemented');
   }
 
   /**
    * @return {boolean}
    */
   isCloseable() {
+    throw new Error('not implemented');
   }
 
   /**
    * @return {boolean}
    */
   isTransient() {
+    throw new Error('not implemented');
   }
 
   /**
    * @return {!Promise<!Array<!ToolbarItem>>}
    */
   toolbarItems() {
+    throw new Error('not implemented');
   }
 
   /**
    * @return {!Promise<!Widget>}
    */
   widget() {
+    throw new Error('not implemented');
   }
 
   /**
-   * @return {!Promise|undefined}
+   * @return {!Promise<void>|void}
    */
   disposeView() {}
 }
 
-export const _symbol = Symbol('view');
 export const _widgetSymbol = Symbol('widget');
 
 // Closure is unhappy with the private access of _widgetSymbol,
@@ -71,7 +79,6 @@ export class SimpleView extends VBox {
   constructor(title, isWebComponent) {
     super(isWebComponent);
     this._title = title;
-    this[_symbol] = this;
   }
 
   /**
@@ -124,16 +131,35 @@ export class SimpleView extends VBox {
   }
 
   /**
-   * @return {!Promise}
+   * @return {!Promise<void>}
    */
   revealView() {
-    return self.UI.viewManager.revealView(this);
+    return ViewManager.instance().revealView(this);
   }
 
   /**
    * @override
    */
   disposeView() {
+  }
+}
+
+class ProvidedViewExtensionDescriptor  // eslint-disable-line no-unused-vars
+    extends Root.Runtime.RuntimeExtensionDescriptor {
+  constructor() {
+    super();
+
+    /** @type {string} */
+    this.id;
+
+    /** @type {?string} */
+    this.persistence;
+
+    /** @type {?string} */
+    this.actionIds;
+
+    /** @type {?boolean} */
+    this.hasToolbar;
   }
 }
 
@@ -154,7 +180,7 @@ export class ProvidedView {
    * @return {string}
    */
   viewId() {
-    return this._extension.descriptor()['id'];
+    return this._descriptor().id;
   }
 
   /**
@@ -170,7 +196,7 @@ export class ProvidedView {
    * @return {boolean}
    */
   isCloseable() {
-    return this._extension.descriptor()['persistence'] === 'closeable';
+    return this._descriptor().persistence === 'closeable';
   }
 
   /**
@@ -178,7 +204,7 @@ export class ProvidedView {
    * @return {boolean}
    */
   isTransient() {
-    return this._extension.descriptor()['persistence'] === 'transient';
+    return this._descriptor().persistence === 'transient';
   }
 
   /**
@@ -186,14 +212,14 @@ export class ProvidedView {
    * @return {!Promise<!Array<!ToolbarItem>>}
    */
   toolbarItems() {
-    const actionIds = this._extension.descriptor()['actionIds'];
+    const actionIds = this._descriptor().actionIds;
     if (actionIds) {
       const result = actionIds.split(',').map(id => Toolbar.createActionButtonForId(id.trim()));
       return Promise.resolve(result);
     }
 
-    if (this._extension.descriptor()['hasToolbar']) {
-      return this.widget().then(widget => /** @type {!ItemsProvider} */ (widget).toolbarItems());
+    if (this._descriptor().hasToolbar) {
+      return this.widget().then(widget => /** @type {!ItemsProvider} */ (/** @type {*} */ (widget)).toolbarItems());
     }
     return Promise.resolve([]);
   }
@@ -208,9 +234,7 @@ export class ProvidedView {
     if (!(widget instanceof Widget)) {
       throw new Error('view className should point to a UI.Widget');
     }
-    widget[_symbol] = this;
-    return (
-        /** @type {!Widget} */ (widget));
+    return /** @type {!Widget} */ (widget);
   }
 
   /**
@@ -222,6 +246,13 @@ export class ProvidedView {
     }
     const widget = await this.widget();
     widget.ownerViewDisposed();
+  }
+
+  /**
+   * @return {!ProvidedViewExtensionDescriptor}
+   */
+  _descriptor() {
+    return /** @type {!ProvidedViewExtensionDescriptor} */ (this._extension.descriptor());
   }
 }
 
@@ -246,9 +277,10 @@ export class ViewLocation {
    * @param {!View} view
    * @param {?View=} insertBefore
    * @param {boolean=} userGesture
-   * @return {!Promise}
+   * @return {!Promise<*>}
    */
   showView(view, insertBefore, userGesture) {
+    throw new Error('not implemented');
   }
 
   /**
@@ -261,6 +293,7 @@ export class ViewLocation {
    * @return {!Widget}
    */
   widget() {
+    throw new Error('not implemented');
   }
 }
 
@@ -272,12 +305,14 @@ export class TabbedViewLocation extends ViewLocation {
    * @return {!TabbedPane}
    */
   tabbedPane() {
+    throw new Error('not implemented');
   }
 
   /**
    * @return {!ToolbarMenuButton}
    */
   enableMoreTabsButton() {
+    throw new Error('not implemented');
   }
 }
 
@@ -290,5 +325,6 @@ export class ViewLocationResolver {
    * @return {?ViewLocation}
    */
   resolveLocation(location) {
+    throw new Error('not implemented');
   }
 }

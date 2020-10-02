@@ -1,10 +1,13 @@
 // Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Common from '../common/common.js';
 import * as Components from '../components/components.js';
 import * as DataGrid from '../data_grid/data_grid.js';
+import * as Platform from '../platform/platform.js';
 import * as SDK from '../sdk/sdk.js';
 import * as TimelineModel from '../timeline_model/timeline_model.js';
 import * as UI from '../ui/ui.js';
@@ -84,7 +87,7 @@ export class TimelineTreeView extends UI.Widget.VBox {
         new TimelineModel.TimelineModelFilter.ExclusiveNameFilter([TimelineModel.TimelineModel.RecordType.Task]);
     this._textFilter = new TimelineRegExp();
 
-    this._currentThreadSetting = self.Common.settings.createSetting('timelineTreeCurrentThread', 0);
+    this._currentThreadSetting = Common.Settings.Settings.instance().createSetting('timelineTreeCurrentThread', 0);
     this._currentThreadSetting.addChangeListener(this.refreshTree, this);
 
     const columns = /** @type {!Array<!DataGrid.DataGrid.ColumnDescriptor>} */ ([]);
@@ -280,7 +283,7 @@ export class TimelineTreeView extends UI.Widget.VBox {
     }
     const rootNode = this._dataGrid.rootNode();
     if (rootNode.children.length > 0) {
-      rootNode.children[0].select();
+      rootNode.children[0].select(/* supressSelectedEvent */ true);
     }
   }
 
@@ -485,7 +488,7 @@ export class TimelineTreeView extends UI.Widget.VBox {
       return;
     }
     this.selectProfileNode(this._searchResults[this._currentResult], false);
-    this._currentResult = mod(this._currentResult + 1, this._searchResults.length);
+    this._currentResult = Platform.NumberUtilities.mod(this._currentResult + 1, this._searchResults.length);
   }
 
   /**
@@ -496,7 +499,7 @@ export class TimelineTreeView extends UI.Widget.VBox {
       return;
     }
     this.selectProfileNode(this._searchResults[this._currentResult], false);
-    this._currentResult = mod(this._currentResult - 1, this._searchResults.length);
+    this._currentResult = Platform.NumberUtilities.mod(this._currentResult - 1, this._searchResults.length);
   }
 
   /**
@@ -541,7 +544,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode {
   /**
    * @override
    * @param {string} columnId
-   * @return {!Element}
+   * @return {!HTMLElement}
    */
   createCell(columnId) {
     if (columnId === 'activity') {
@@ -552,7 +555,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode {
 
   /**
    * @param {string} columnId
-   * @return {!Element}
+   * @return {!HTMLElement}
    */
   _createNameCell(columnId) {
     const cell = this.createTD(columnId);
@@ -592,7 +595,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode {
 
   /**
    * @param {string} columnId
-   * @return {?Element}
+   * @return {?HTMLElement}
    */
   _createValueCell(columnId) {
     if (columnId !== 'self' && columnId !== 'total' && columnId !== 'startTime') {
@@ -681,8 +684,8 @@ TreeGridNode._gridNodeSymbol = Symbol('treeGridNode');
 export class AggregatedTimelineTreeView extends TimelineTreeView {
   constructor() {
     super();
-    this._groupBySetting =
-        self.Common.settings.createSetting('timelineTreeGroupBy', AggregatedTimelineTreeView.GroupBy.None);
+    this._groupBySetting = Common.Settings.Settings.instance().createSetting(
+        'timelineTreeGroupBy', AggregatedTimelineTreeView.GroupBy.None);
     this._groupBySetting.addChangeListener(this.refreshTree.bind(this));
     this.init();
     this._stackView = new TimelineStackView(this);
@@ -712,7 +715,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     super.updateContents(selection);
     const rootNode = this._dataGrid.rootNode();
     if (rootNode.children.length) {
-      rootNode.children[0].select();
+      rootNode.children[0].select(/* suppressSelectedEvent */ true);
     }
   }
 

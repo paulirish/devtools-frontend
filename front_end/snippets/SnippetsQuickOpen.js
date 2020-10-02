@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as QuickOpen from '../quick_open/quick_open.js';
 import * as Workspace from '../workspace/workspace.js';  // eslint-disable-line no-unused-vars
 
 import {evaluateScriptSnippet} from './ScriptSnippetFileSystem.js';
 
-export default class SnippetsQuickOpen extends QuickOpen.FilteredListWidget.Provider {
+export class SnippetsQuickOpen extends QuickOpen.FilteredListWidget.Provider {
   constructor() {
     super();
     /** @type {!Array<!Workspace.UISourceCode.UISourceCode>} */

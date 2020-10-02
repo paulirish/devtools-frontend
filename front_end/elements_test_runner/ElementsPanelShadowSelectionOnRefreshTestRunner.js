@@ -6,6 +6,7 @@
  * @fileoverview using private properties isn't a Closure violation in tests.
  * @suppress {accessControls}
  */
+self.ElementsTestRunner = self.ElementsTestRunner || {};
 
 ElementsTestRunner.selectReloadAndDump = function(next, node) {
   ElementsTestRunner.selectNode(node).then(onSelected);
@@ -13,8 +14,8 @@ ElementsTestRunner.selectReloadAndDump = function(next, node) {
   let selected = false;
 
   function onSelected() {
-    TestRunner.reloadPage(onReloaded);
     TestRunner.addSniffer(Elements.ElementsPanel.prototype, '_lastSelectedNodeSelectedForTest', onReSelected);
+    TestRunner.reloadPage(onReloaded);
   }
 
   function onReloaded() {
@@ -31,7 +32,6 @@ ElementsTestRunner.selectReloadAndDump = function(next, node) {
     if (!reloaded || !selected) {
       return;
     }
-
     const selectedElement = ElementsTestRunner.firstElementsTreeOutline().selectedTreeElement;
     const nodeName = (selectedElement ? selectedElement.node().nodeNameInCorrectCase() : 'null');
     TestRunner.addResult('Selected node: \'' + nodeName + '\'');

@@ -28,7 +28,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
+import * as CookieTable from '../cookie_table/cookie_table.js';  // eslint-disable-line no-unused-vars
 import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
 
@@ -43,10 +47,8 @@ export class RequestCookiesView extends UI.Widget.Widget {
 
     /** @type {!SDK.NetworkRequest.NetworkRequest} */
     this._request = request;
-    /** @type {?Array<!SDK.Cookie.Cookie>} */
-    this._detailedRequestCookies = null;
-    this._showFilteredOutCookiesSetting =
-        self.Common.settings.createSetting('show-filtered-out-request-cookies', /* defaultValue */ false);
+    this._showFilteredOutCookiesSetting = Common.Settings.Settings.instance().createSetting(
+        'show-filtered-out-request-cookies', /* defaultValue */ false);
 
     this._emptyWidget = new UI.EmptyWidget.EmptyWidget(Common.UIString.UIString('This request has no cookies.'));
     this._emptyWidget.show(this.element);
@@ -67,7 +69,7 @@ export class RequestCookiesView extends UI.Widget.Widget {
     this._requestCookiesEmpty = this.element.createChild('div', 'cookies-panel-item');
     this._requestCookiesEmpty.textContent = ls`No request cookies were sent.`;
 
-    this._requestCookiesTable = new CookieTable.CookiesTable(/* renderInline */ true);
+    this._requestCookiesTable = new CookieTable.CookiesTable.CookiesTable(/* renderInline */ true);
     this._requestCookiesTable.contentElement.classList.add('cookie-table', 'cookies-panel-item');
     this._requestCookiesTable.show(this.element);
 
@@ -76,7 +78,7 @@ export class RequestCookiesView extends UI.Widget.Widget {
     this._responseCookiesTitle.title =
         ls`Cookies that were received from the server in the 'set-cookie' header of the response`;
 
-    this._responseCookiesTable = new CookieTable.CookiesTable(/* renderInline */ true);
+    this._responseCookiesTable = new CookieTable.CookiesTable.CookiesTable(/* renderInline */ true);
     this._responseCookiesTable.contentElement.classList.add('cookie-table', 'cookies-panel-item');
     this._responseCookiesTable.show(this.element);
 
@@ -89,41 +91,12 @@ export class RequestCookiesView extends UI.Widget.Widget {
   }
 
   /**
-   * @return {!{requestCookies: !Array<!SDK.Cookie.Cookie>, requestCookieToBlockedReasons: !Map<!SDK.Cookie.Cookie, !Array<!CookieTable.BlockedReason>>}}
+   * @return {!{requestCookies: !Array<!SDK.Cookie.Cookie>, requestCookieToBlockedReasons: !Map<!SDK.Cookie.Cookie, !Array<!SDK.CookieModel.BlockedReason>>}}
    */
   _getRequestCookies() {
-    let requestCookies = [];
-    /** @type {!Map<!SDK.Cookie.Cookie, !Array<!CookieTable.BlockedReason>>} */
+    /** @type {!Map<!SDK.Cookie.Cookie, !Array<!SDK.CookieModel.BlockedReason>>} */
     const requestCookieToBlockedReasons = new Map();
-
-    if (this._request.requestCookies.length) {
-      requestCookies = this._request.requestCookies.slice();
-
-      // request.requestCookies are generated from headers which are missing
-      // cookie attributes that we can fetch from the backend.
-      if (this._detailedRequestCookies) {
-        requestCookies = requestCookies.map(cookie => {
-          for (const detailedCookie of (this._detailedRequestCookies || [])) {
-            if (detailedCookie.name() === cookie.name() && detailedCookie.value() === cookie.value()) {
-              return detailedCookie;
-            }
-          }
-          return cookie;
-        });
-
-      } else {
-        const networkManager = SDK.NetworkManager.NetworkManager.forRequest(this._request);
-        if (networkManager) {
-          const cookieModel = networkManager.target().model(SDK.CookieModel.CookieModel);
-          if (cookieModel) {
-            cookieModel.getCookies([this._request.url()]).then(cookies => {
-              this._detailedRequestCookies = cookies;
-              this._refreshRequestCookiesView();
-            });
-          }
-        }
-      }
-    }
+    const requestCookies = this._request.includedRequestCookies().slice();
 
     if (this._showFilteredOutCookiesSetting.get()) {
       for (const blockedCookie of this._request.blockedRequestCookies()) {
@@ -141,12 +114,12 @@ export class RequestCookiesView extends UI.Widget.Widget {
   }
 
   /**
-   * @return {!{responseCookies: !Array<!SDK.Cookie.Cookie>, responseCookieToBlockedReasons: !Map<!SDK.Cookie.Cookie, !Array<!CookieTable.BlockedReason>>, malformedResponseCookies: !Array<!SDK.NetworkRequest.BlockedSetCookieWithReason>}}
+   * @return {!{responseCookies: !Array<!SDK.Cookie.Cookie>, responseCookieToBlockedReasons: !Map<!SDK.Cookie.Cookie, !Array<!SDK.CookieModel.BlockedReason>>, malformedResponseCookies: !Array<!SDK.NetworkRequest.BlockedSetCookieWithReason>}}
    */
   _getResponseCookies() {
     /** @type {!Array<!SDK.Cookie.Cookie>} */
     let responseCookies = [];
-    /** @type {!Map<!SDK.Cookie.Cookie, !Array<!CookieTable.BlockedReason>>} */
+    /** @type {!Map<!SDK.Cookie.Cookie, !Array<!SDK.CookieModel.BlockedReason>>} */
     const responseCookieToBlockedReasons = new Map();
     /** @type {!Array<!SDK.NetworkRequest.BlockedSetCookieWithReason>} */
     const malformedResponseCookies = [];
@@ -192,7 +165,7 @@ export class RequestCookiesView extends UI.Widget.Widget {
       return;
     }
 
-    const gotCookies = this._request.requestCookies.length || this._request.responseCookies.length;
+    const gotCookies = this._request.hasRequestCookies() || this._request.responseCookies.length;
     if (gotCookies) {
       this._emptyWidget.hideWidget();
     } else {

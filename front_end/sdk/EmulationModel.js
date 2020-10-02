@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Common from '../common/common.js';
+
 import {CSSModel} from './CSSModel.js';
 import {Events, OverlayModel} from './OverlayModel.js';
 import {Capability, SDKModel, Target} from './SDKModel.js';  // eslint-disable-line no-unused-vars
@@ -21,18 +26,40 @@ export class EmulationModel extends SDKModel {
       this._overlayModel.addEventListener(Events.InspectModeWillBeToggled, this._updateTouch, this);
     }
 
-    const disableJavascriptSetting = self.Common.settings.moduleSetting('javaScriptDisabled');
+    const disableJavascriptSetting = Common.Settings.Settings.instance().moduleSetting('javaScriptDisabled');
     disableJavascriptSetting.addChangeListener(
         () => this._emulationAgent.setScriptExecutionDisabled(disableJavascriptSetting.get()));
     if (disableJavascriptSetting.get()) {
       this._emulationAgent.setScriptExecutionDisabled(true);
     }
 
-    const mediaTypeSetting = self.Common.settings.moduleSetting('emulatedCSSMedia');
+    const touchSetting = Common.Settings.Settings.instance().moduleSetting('emulation.touch');
+    touchSetting.addChangeListener(() => {
+      const settingValue = touchSetting.get();
+
+      this.overrideEmulateTouch(settingValue === 'force');
+    });
+
+    const idleDetectionSetting = Common.Settings.Settings.instance().moduleSetting('emulation.idleDetection');
+    idleDetectionSetting.addChangeListener(async () => {
+      const settingValue = idleDetectionSetting.get();
+      if (settingValue === 'none') {
+        await this.clearIdleOverride();
+        return;
+      }
+
+      const emulationParams =
+          /** @type {{isUserActive: boolean, isScreenUnlocked: boolean}} */ (JSON.parse(settingValue));
+      await this.setIdleOverride(emulationParams);
+    });
+
+    const mediaTypeSetting = Common.Settings.Settings.instance().moduleSetting('emulatedCSSMedia');
     const mediaFeaturePrefersColorSchemeSetting =
-        self.Common.settings.moduleSetting('emulatedCSSMediaFeaturePrefersColorScheme');
+        Common.Settings.Settings.instance().moduleSetting('emulatedCSSMediaFeaturePrefersColorScheme');
     const mediaFeaturePrefersReducedMotionSetting =
-        self.Common.settings.moduleSetting('emulatedCSSMediaFeaturePrefersReducedMotion');
+        Common.Settings.Settings.instance().moduleSetting('emulatedCSSMediaFeaturePrefersReducedMotion');
+    const mediaFeaturePrefersReducedDataSetting =
+        Common.Settings.Settings.instance().moduleSetting('emulatedCSSMediaFeaturePrefersReducedData');
     // Note: this uses a different format than what the CDP API expects,
     // because we want to update these values per media type/feature
     // without having to search the `features` array (inefficient) or
@@ -41,6 +68,7 @@ export class EmulationModel extends SDKModel {
       ['type', mediaTypeSetting.get()],
       ['prefers-color-scheme', mediaFeaturePrefersColorSchemeSetting.get()],
       ['prefers-reduced-motion', mediaFeaturePrefersReducedMotionSetting.get()],
+      ['prefers-reduced-data', mediaFeaturePrefersReducedDataSetting.get()],
     ]);
     mediaTypeSetting.addChangeListener(() => {
       this._mediaConfiguration.set('type', mediaTypeSetting.get());
@@ -54,18 +82,32 @@ export class EmulationModel extends SDKModel {
       this._mediaConfiguration.set('prefers-reduced-motion', mediaFeaturePrefersReducedMotionSetting.get());
       this._updateCssMedia();
     });
+    mediaFeaturePrefersReducedDataSetting.addChangeListener(() => {
+      this._mediaConfiguration.set('prefers-reduced-data', mediaFeaturePrefersReducedDataSetting.get());
+      this._updateCssMedia();
+    });
     this._updateCssMedia();
 
-    const visionDeficiencySetting = self.Common.settings.moduleSetting('emulatedVisionDeficiency');
+    const visionDeficiencySetting = Common.Settings.Settings.instance().moduleSetting('emulatedVisionDeficiency');
     visionDeficiencySetting.addChangeListener(() => this._emulateVisionDeficiency(visionDeficiencySetting.get()));
     if (visionDeficiencySetting.get()) {
       this._emulateVisionDeficiency(visionDeficiencySetting.get());
     }
 
+    const localFontsDisabledSetting = Common.Settings.Settings.instance().moduleSetting('localFontsDisabled');
+    localFontsDisabledSetting.addChangeListener(() => this._setLocalFontsDisabled(localFontsDisabledSetting.get()));
+    if (localFontsDisabledSetting.get()) {
+      this._setLocalFontsDisabled(localFontsDisabledSetting.get());
+    }
+
     this._touchEnabled = false;
     this._touchMobile = false;
     this._customTouchEnabled = false;
-    this._touchConfiguration = {enabled: false, configuration: 'mobile', scriptId: ''};
+    this._touchConfiguration = {
+      enabled: false,
+      configuration: Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Mobile,
+      scriptId: ''
+    };
   }
 
   /**
@@ -76,15 +118,15 @@ export class EmulationModel extends SDKModel {
   }
 
   /**
-   * @return {!Promise}
+   * @return {!Promise<?>}
    */
   resetPageScaleFactor() {
     return this._emulationAgent.resetPageScaleFactor();
   }
 
   /**
-   * @param {?Protocol.PageAgent.SetDeviceMetricsOverrideRequest} metrics
-   * @return {!Promise}
+   * @param {?Protocol.Page.SetDeviceMetricsOverrideRequest} metrics
+   * @return {!Promise<?>}
    */
   emulateDevice(metrics) {
     if (metrics) {
@@ -101,24 +143,57 @@ export class EmulationModel extends SDKModel {
   }
 
   /**
-   * @param {?Geolocation} geolocation
+   * @param {?Location} location
    */
-  async emulateGeolocation(geolocation) {
-    if (!geolocation) {
+  async emulateLocation(location) {
+    if (!location) {
       this._emulationAgent.clearGeolocationOverride();
       this._emulationAgent.setTimezoneOverride('');
+      this._emulationAgent.setLocaleOverride('');
+      this._emulationAgent.setUserAgentOverride(SDK.multitargetNetworkManager.currentUserAgent());
     }
 
-    if (geolocation.error) {
+    if (location.error) {
       this._emulationAgent.setGeolocationOverride();
       this._emulationAgent.setTimezoneOverride('');
+      this._emulationAgent.setLocaleOverride('');
+      this._emulationAgent.setUserAgentOverride(SDK.multitargetNetworkManager.currentUserAgent());
     } else {
+      const processEmulationResult = (errorType, result) => {
+        const errorMessage = result.getError();
+        if (errorMessage) {
+          return Promise.reject({
+            type: errorType,
+            message: errorMessage,
+          });
+        }
+        return Promise.resolve(result);
+      };
+
       return Promise.all([
         this._emulationAgent
-            .setGeolocationOverride(geolocation.latitude, geolocation.longitude, Geolocation.DefaultMockAccuracy)
-            .catch(err => Promise.reject({type: 'emulation-set-geolocation', message: err.message})),
-        this._emulationAgent.setTimezoneOverride(geolocation.timezoneId)
-            .catch(err => Promise.reject({type: 'emulation-set-timezone', message: err.message}))
+            .invoke_setGeolocationOverride({
+              latitude: location.latitude,
+              longitude: location.longitude,
+              accuracy: Location.DefaultGeoMockAccuracy,
+            })
+            .then(result => processEmulationResult('emulation-set-location', result)),
+        this._emulationAgent
+            .invoke_setTimezoneOverride({
+              timezoneId: location.timezoneId,
+            })
+            .then(result => processEmulationResult('emulation-set-timezone', result)),
+        this._emulationAgent
+            .invoke_setLocaleOverride({
+              locale: location.locale,
+            })
+            .then(result => processEmulationResult('emulation-set-locale', result)),
+        this._emulationAgent
+            .invoke_setUserAgentOverride({
+              userAgent: SDK.multitargetNetworkManager.currentUserAgent(),
+              acceptLanguage: location.locale,
+            })
+            .then(result => processEmulationResult('emulation-set-user-agent', result)),
       ]);
     }
   }
@@ -136,6 +211,17 @@ export class EmulationModel extends SDKModel {
   }
 
   /**
+   * @param {{isUserActive: boolean, isScreenUnlocked: boolean}} emulationParams
+   */
+  async setIdleOverride(emulationParams) {
+    await this._emulationAgent.invoke_setIdleOverride(emulationParams);
+  }
+
+  async clearIdleOverride() {
+    await this._emulationAgent.invoke_clearIdleOverride();
+  }
+
+  /**
    * @param {string} type
    * @param {!Array<{name: string, value: string}>} features
    */
@@ -147,10 +233,14 @@ export class EmulationModel extends SDKModel {
   }
 
   /**
-   * @param {string} type
+   * @param {!Protocol.Emulation.SetEmulatedVisionDeficiencyRequestType} type
    */
   _emulateVisionDeficiency(type) {
     this._emulationAgent.setEmulatedVisionDeficiency(type);
+  }
+
+  _setLocalFontsDisabled(disabled) {
+    this._cssModel.setLocalFontsEnabled(!disabled);
   }
 
   /**
@@ -181,14 +271,21 @@ export class EmulationModel extends SDKModel {
   _updateTouch() {
     let configuration = {
       enabled: this._touchEnabled,
-      configuration: this._touchMobile ? 'mobile' : 'desktop',
+      configuration: this._touchMobile ? Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Mobile :
+                                         Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Desktop,
     };
     if (this._customTouchEnabled) {
-      configuration = {enabled: true, configuration: 'mobile'};
+      configuration = {
+        enabled: true,
+        configuration: Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Mobile
+      };
     }
 
     if (this._overlayModel && this._overlayModel.inspectModeEnabled()) {
-      configuration = {enabled: false, configuration: 'mobile'};
+      configuration = {
+        enabled: false,
+        configuration: Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Mobile
+      };
     }
 
     if (!this._touchConfiguration.enabled && !configuration.enabled) {
@@ -216,50 +313,56 @@ export class EmulationModel extends SDKModel {
         name: 'prefers-reduced-motion',
         value: this._mediaConfiguration.get('prefers-reduced-motion'),
       },
+      {
+        name: 'prefers-reduced-data',
+        value: this._mediaConfiguration.get('prefers-reduced-data'),
+      },
     ];
     this._emulateCSSMedia(type, features);
   }
 }
 
-export class Geolocation {
+export class Location {
   /**
    * @param {number} latitude
    * @param {number} longitude
    * @param {string} timezoneId
+   * @param {string} locale
    * @param {boolean} error
    */
-  constructor(latitude, longitude, timezoneId, error) {
+  constructor(latitude, longitude, timezoneId, locale, error) {
     this.latitude = latitude;
     this.longitude = longitude;
     this.timezoneId = timezoneId;
+    this.locale = locale;
     this.error = error;
   }
 
   /**
-   * @return {!Geolocation}
+   * @return {!Location}
    */
   static parseSetting(value) {
     if (value) {
-      const [position, timezoneId, error] = value.split(':');
+      const [position, timezoneId, locale, error] = value.split(':');
       const [latitude, longitude] = position.split('@');
-      return new Geolocation(parseFloat(latitude), parseFloat(longitude), timezoneId, Boolean(error));
+      return new Location(parseFloat(latitude), parseFloat(longitude), timezoneId, locale, Boolean(error));
     }
-    return new Geolocation(0, 0, '', false);
+    return new Location(0, 0, '', '', false);
   }
 
   /**
    * @param {string} latitudeString
    * @param {string} longitudeString
    * @param {string} timezoneId
-   * @return {?Geolocation}
+   * @return {?Location}
    */
-  static parseUserInput(latitudeString, longitudeString, timezoneId) {
+  static parseUserInput(latitudeString, longitudeString, timezoneId, locale) {
     if (!latitudeString && !longitudeString) {
       return null;
     }
 
-    const {valid: isLatitudeValid} = Geolocation.latitudeValidator(latitudeString);
-    const {valid: isLongitudeValid} = Geolocation.longitudeValidator(longitudeString);
+    const {valid: isLatitudeValid} = Location.latitudeValidator(latitudeString);
+    const {valid: isLongitudeValid} = Location.longitudeValidator(longitudeString);
 
     if (!isLatitudeValid && !isLongitudeValid) {
       return null;
@@ -267,7 +370,7 @@ export class Geolocation {
 
     const latitude = isLatitudeValid ? parseFloat(latitudeString) : -1;
     const longitude = isLongitudeValid ? parseFloat(longitudeString) : -1;
-    return new Geolocation(latitude, longitude, timezoneId, false);
+    return new Location(latitude, longitude, timezoneId, locale, false);
   }
 
   /**
@@ -306,14 +409,29 @@ export class Geolocation {
   }
 
   /**
+   * @param {string} value
+   * @return {{valid: boolean, errorMessage: (string|undefined)}}
+   */
+  static localeValidator(value) {
+    // Similarly to timezone IDs, there's not much point in validating
+    // input locales other than checking if it contains at least two
+    // alphabetic characters.
+    // https://unicode.org/reports/tr35/#Unicode_language_identifier
+    // The empty string resets the override, and is accepted as
+    // well.
+    const valid = value === '' || /[a-zA-Z]{2}/.test(value);
+    return {valid};
+  }
+
+  /**
    * @return {string}
    */
   toSetting() {
-    return `${this.latitude}@${this.longitude}:${this.timezoneId}:${this.error || ''}`;
+    return `${this.latitude}@${this.longitude}:${this.timezoneId}:${this.locale}:${this.error || ''}`;
   }
 }
 
-Geolocation.DefaultMockAccuracy = 150;
+Location.DefaultGeoMockAccuracy = 150;
 
 export class DeviceOrientation {
   /**

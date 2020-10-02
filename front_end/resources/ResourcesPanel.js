@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';  // eslint-disable-line no-unused-vars
 import * as SDK from '../sdk/sdk.js';
 import * as SourceFrame from '../source_frame/source_frame.js';
@@ -15,12 +18,19 @@ import {DOMStorageItemsView} from './DOMStorageItemsView.js';
 import {DOMStorage} from './DOMStorageModel.js';  // eslint-disable-line no-unused-vars
 import {StorageItemsView} from './StorageItemsView.js';
 
+/** @type {!ResourcesPanel} */
+let resourcesPanelInstance;
+
 export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
+  /**
+   * @private
+   */
   constructor() {
     super('resources');
     this.registerRequiredCSS('resources/resourcesPanel.css');
 
-    this._resourcesLastSelectedItemSetting = self.Common.settings.createSetting('resourcesLastSelectedElementPath', []);
+    this._resourcesLastSelectedItemSetting =
+        Common.Settings.Settings.instance().createSetting('resourcesLastSelectedElementPath', []);
 
     /** @type {?UI.Widget.Widget} */
     this.visibleView = null;
@@ -50,10 +60,22 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
   }
 
   /**
+   * @param {{forceNew: ?boolean}} opts
+   */
+  static instance(opts = {forceNew: null}) {
+    const {forceNew} = opts;
+    if (!resourcesPanelInstance || forceNew) {
+      resourcesPanelInstance = new ResourcesPanel();
+    }
+
+    return resourcesPanelInstance;
+  }
+
+  /**
    * @return {!ResourcesPanel}
    */
   static _instance() {
-    return /** @type {!ResourcesPanel} */ (self.runtime.sharedInstance(ResourcesPanel));
+    return ResourcesPanel.instance();
   }
 
   /**
@@ -187,11 +209,11 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
    * @param {string} cookieDomain
    */
   clearCookies(target, cookieDomain) {
-    const model = target.model(SDK.CookieModel.CookieModel);
+    const model = /** @type {?SDK.CookieModel.CookieModel} */ (target.model(SDK.CookieModel.CookieModel));
     if (!model) {
       return;
     }
-    model.clear(cookieDomain, () => {
+    model.clear(cookieDomain).then(() => {
       if (this._cookieView) {
         this._cookieView.refreshItems();
       }
@@ -213,7 +235,49 @@ export class ResourceRevealer {
       return Promise.reject(new Error('Internal error: not a resource'));
     }
     const sidebar = ResourcesPanel._instance()._sidebar;
-    await self.UI.viewManager.showView('resources');
+    await UI.ViewManager.ViewManager.instance().showView('resources');
     await sidebar.showResource(resource);
+  }
+}
+
+/**
+ * @implements {Common.Revealer.Revealer}
+ */
+export class CookieReferenceRevealer {
+  /**
+   * @override
+   * @param {!Object} cookie
+   * @return {!Promise}
+   */
+  async reveal(cookie) {
+    if (!(cookie instanceof SDK.Cookie.CookieReference)) {
+      throw new Error('Internal error: not a cookie reference');
+    }
+
+    const sidebar = ResourcesPanel._instance()._sidebar;
+    await UI.ViewManager.ViewManager.instance().showView('resources');
+    await sidebar.cookieListTreeElement.select();
+
+    const contextUrl = cookie.contextUrl();
+    if (contextUrl && await this._revealByDomain(sidebar, contextUrl)) {
+      return;
+    }
+    // Fallback: try to reveal the cookie using its domain as context, which may not work, because the
+    // Application Panel shows cookies grouped by context, see crbug.com/1060563.
+    this._revealByDomain(sidebar, cookie.domain());
+  }
+
+  /**
+   * @param {!ApplicationPanelSidebar} sidebar
+   * @param {string} domain
+   * @returns {!Promise<boolean>}
+   */
+  async _revealByDomain(sidebar, domain) {
+    const item = sidebar.cookieListTreeElement.children().find(c => c._cookieDomain.endsWith(domain));
+    if (item) {
+      await item.revealAndSelect();
+      return true;
+    }
+    return false;
   }
 }

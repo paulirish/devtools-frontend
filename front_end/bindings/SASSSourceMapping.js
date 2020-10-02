@@ -27,13 +27,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
-import {SourceMapping} from './CSSWorkspaceBinding.js';  // eslint-disable-line no-unused-vars
+import {CSSWorkspaceBinding, SourceMapping} from './CSSWorkspaceBinding.js';  // eslint-disable-line no-unused-vars
 import {NetworkProject} from './NetworkProject.js';
 
 /**
@@ -106,7 +108,7 @@ export class SASSSourceMapping {
       uiSourceCode[_sourceMapSymbol] = sourceMap;
       this._project.addUISourceCodeWithProvider(uiSourceCode, contentProvider, metadata, mimeType);
     }
-    await self.Bindings.cssWorkspaceBinding.updateLocations(header);
+    await CSSWorkspaceBinding.instance().updateLocations(header);
     this._sourceMapAttachedForTest(sourceMap);
   }
 
@@ -128,7 +130,7 @@ export class SASSSourceMapping {
         this._project.removeFile(sassURL);
       }
     }
-    await self.Bindings.cssWorkspaceBinding.updateLocations(header);
+    await CSSWorkspaceBinding.instance().updateLocations(header);
   }
 
   /**
@@ -147,7 +149,7 @@ export class SASSSourceMapping {
       const sassText = /** @type {string} */ (newSources.get(sourceURL));
       uiSourceCode.setWorkingCopy(sassText);
     }
-    const updatePromises = headers.map(header => self.Bindings.cssWorkspaceBinding.updateLocations(header));
+    const updatePromises = headers.map(header => CSSWorkspaceBinding.instance().updateLocations(header));
     await Promise.all(updatePromises);
   }
 

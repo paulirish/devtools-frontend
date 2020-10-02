@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Bindings from '../bindings/bindings.js';
 import * as ColorPicker from '../color_picker/color_picker.js';
 import * as Common from '../common/common.js';
 import * as InlineEditor from '../inline_editor/inline_editor.js';
@@ -57,8 +61,8 @@ export class BezierPopoverIcon {
 
     this._originalPropertyText = this._treeElement.property.propertyText;
     this._treeElement.parentPane().setEditingStyle(true);
-    const uiLocation =
-        self.Bindings.cssWorkspaceBinding.propertyUILocation(this._treeElement.property, false /* forName */);
+    const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
+        this._treeElement.property, false /* forName */);
     if (uiLocation) {
       Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
@@ -76,7 +80,7 @@ export class BezierPopoverIcon {
    * @param {!Event} event
    */
   _onScroll(event) {
-    this._swatchPopoverHelper.reposition();
+    this._swatchPopoverHelper.hide(true);
   }
 
   /**
@@ -197,8 +201,8 @@ export class ColorSwatchPopoverIcon {
 
     this._originalPropertyText = this._treeElement.property.propertyText;
     this._treeElement.parentPane().setEditingStyle(true);
-    const uiLocation =
-        self.Bindings.cssWorkspaceBinding.propertyUILocation(this._treeElement.property, false /* forName */);
+    const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
+        this._treeElement.property, false /* forName */);
     if (uiLocation) {
       Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
@@ -232,7 +236,7 @@ export class ColorSwatchPopoverIcon {
    * @param {!Event} event
    */
   _onScroll(event) {
-    this._swatchPopoverHelper.reposition();
+    this._swatchPopoverHelper.hide(true);
   }
 
   /**
@@ -312,8 +316,8 @@ export class ShadowSwatchPopoverHelper {
 
     this._originalPropertyText = this._treeElement.property.propertyText;
     this._treeElement.parentPane().setEditingStyle(true);
-    const uiLocation =
-        self.Bindings.cssWorkspaceBinding.propertyUILocation(this._treeElement.property, false /* forName */);
+    const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
+        this._treeElement.property, false /* forName */);
     if (uiLocation) {
       Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
@@ -331,7 +335,7 @@ export class ShadowSwatchPopoverHelper {
    * @param {!Event} event
    */
   _onScroll(event) {
-    this._swatchPopoverHelper.reposition();
+    this._swatchPopoverHelper.hide(true);
   }
 
   /**

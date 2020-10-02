@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 
 /**
@@ -25,8 +28,8 @@ export function uiLabelToNetworkPriority(priorityLabel) {
   return PerfUI._uiLabelToPriorityMapInstance.get(priorityLabel) || '';
 }
 
-/** @type {?Map<!Protocol.Network.ResourcePriority, string>} */
-let _priorityUILabelMapInstance = null;
+/** @type {!Map<!Protocol.Network.ResourcePriority, string>} */
+let _priorityUILabelMapInstance;
 
 /**
  * @return {!Map<!Protocol.Network.ResourcePriority, string>}

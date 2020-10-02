@@ -8,6 +8,8 @@ import * as UI from '../ui/ui.js';  // eslint-disable-line no-unused-vars
 
 import {releaseNoteText} from './ReleaseNoteText.js';
 
+export const releaseVersionSeen = 'releaseNoteVersionSeen';
+
 /**
  * @const
  * @type {string}
@@ -15,31 +17,44 @@ import {releaseNoteText} from './ReleaseNoteText.js';
 export const releaseNoteViewId = 'release-note';
 
 /**
- * @return {!Help.ReleaseNote}
+ * @type {!ReleaseNote}
+ */
+let _latestReleaseNote;
+
+/**
+ * @return {!ReleaseNote}
  */
 export function latestReleaseNote() {
-  if (!Help._latestReleaseNote) {
-    /** @type {!Help.ReleaseNote} */
-    Help._latestReleaseNote =
-        (self.Help.releaseNoteText || releaseNoteText).reduce((acc, note) => note.version > acc.version ? note : acc);
+  /**
+   * @type {!Array<!ReleaseNote>}
+   */
+  // @ts-ignore Included only for layout tests.
+  const globalReleaseNotes = self.Help.releaseNoteText;
+  if (!_latestReleaseNote) {
+    _latestReleaseNote =
+        (globalReleaseNotes || releaseNoteText).reduce((acc, note) => note.version > acc.version ? note : acc);
   }
-  return Help._latestReleaseNote;
+  return _latestReleaseNote;
 }
 
 export function showReleaseNoteIfNeeded() {
+  const releaseNoteVersionSetting = Common.Settings.Settings.instance().createSetting(releaseVersionSeen, 0);
+  const releaseNoteVersionSettingValue = releaseNoteVersionSetting.get();
   innerShowReleaseNoteIfNeeded(
-      Help._releaseNoteVersionSetting.get(), latestReleaseNote().version,
-      self.Common.settings.moduleSetting('help.show-release-note').get());
+      releaseNoteVersionSettingValue, latestReleaseNote().version,
+      Common.Settings.Settings.instance().moduleSetting('help.show-release-note').get());
 }
 
 /**
  * @param {number} lastSeenVersion
  * @param {number} latestVersion
  * @param {boolean} showReleaseNote
+ *
  */
 export function innerShowReleaseNoteIfNeeded(lastSeenVersion, latestVersion, showReleaseNote) {
+  const releaseNoteVersionSetting = Common.Settings.Settings.instance().createSetting(releaseVersionSeen, 0);
   if (!lastSeenVersion) {
-    Help._releaseNoteVersionSetting.set(latestVersion);
+    releaseNoteVersionSetting.set(latestVersion);
     return;
   }
   if (!showReleaseNote) {
@@ -48,8 +63,8 @@ export function innerShowReleaseNoteIfNeeded(lastSeenVersion, latestVersion, sho
   if (lastSeenVersion >= latestVersion) {
     return;
   }
-  Help._releaseNoteVersionSetting.set(latestVersion);
-  self.UI.viewManager.showView(releaseNoteViewId, true);
+  releaseNoteVersionSetting.set(latestVersion);
+  UI.ViewManager.ViewManager.instance().showView(releaseNoteViewId, true);
 }
 
 /**
@@ -98,3 +113,14 @@ export class ReportIssueActionDelegate {
     return true;
   }
 }
+
+/** @typedef {!{title: string, subtitle: string, link: string}} */
+// @ts-ignore typedef
+export let ReleaseNoteHighlight;
+
+/**
+ * @typedef {!{version: number, header: string, highlights: !Array<!ReleaseNoteHighlight>,
+ *    link: string}}
+ */
+// @ts-ignore typedef
+export let ReleaseNote;

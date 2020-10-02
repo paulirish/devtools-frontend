@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Components from '../components/components.js';
 import * as Host from '../host/host.js';
-import * as ProtocolModule from '../protocol/protocol.js';  // eslint-disable-line no-unused-vars
+import * as ProtocolClient from '../protocol_client/protocol_client.js';  // eslint-disable-line no-unused-vars
 import * as SDK from '../sdk/sdk.js';
 
 /**
@@ -146,7 +149,7 @@ export class NodeChildTargetManager extends SDK.SDKModel.SDKModel {
 }
 
 /**
- * @implements {ProtocolModule.InspectorBackend.Connection}
+ * @implements {ProtocolClient.InspectorBackend.Connection}
  */
 export class NodeConnection {
   /**

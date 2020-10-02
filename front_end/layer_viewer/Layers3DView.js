@@ -27,6 +27,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as SDK from '../sdk/sdk.js';  // eslint-disable-line no-unused-vars
@@ -570,7 +574,7 @@ export class Layers3DView extends UI.Widget.VBox {
       return;
     }
 
-    const drawChrome = !self.Common.settings.moduleSetting('frameViewerHideChromeWindow').get() &&
+    const drawChrome = !Common.Settings.Settings.instance().moduleSetting('frameViewerHideChromeWindow').get() &&
         this._chromeTextures.length >= 3 && this._chromeTextures.indexOf(undefined) < 0;
     const z = (this._maxDepth + 1) * LayerSpacing;
     const borderWidth = Math.ceil(ViewportBorderWidth * this._scale);
@@ -700,7 +704,7 @@ export class Layers3DView extends UI.Widget.VBox {
    * @return {!Common.Settings.Setting}
    */
   _createVisibilitySetting(caption, name, value, toolbar) {
-    const setting = self.Common.settings.createSetting(name, value);
+    const setting = Common.Settings.Settings.instance().createSetting(name, value);
     setting.setTitle(Common.UIString.UIString(caption));
     setting.addChangeListener(this._update, this);
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(setting));
@@ -715,7 +719,9 @@ export class Layers3DView extends UI.Widget.VBox {
     this._showPaintsSetting =
         this._createVisibilitySetting(ls`Paints`, 'frameViewerShowPaints', true, this._panelToolbar);
     this._showPaintsSetting.addChangeListener(this._updatePaints, this);
-    self.Common.settings.moduleSetting('frameViewerHideChromeWindow').addChangeListener(this._update, this);
+    Common.Settings.Settings.instance()
+        .moduleSetting('frameViewerHideChromeWindow')
+        .addChangeListener(this._update, this);
   }
 
   /**

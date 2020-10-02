@@ -1,11 +1,13 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Bindings from '../bindings/bindings.js';
 import * as Common from '../common/common.js';
 import * as Extensions from '../extensions/extensions.js';  // eslint-disable-line no-unused-vars
-import * as ProtocolModule from '../protocol/protocol.js';
+import * as ProtocolClient from '../protocol_client/protocol_client.js';
 import * as SDK from '../sdk/sdk.js';
 import * as TimelineModel from '../timeline_model/timeline_model.js';
 
@@ -55,7 +57,7 @@ export class TimelineController {
    * @return {!Promise<!Object>}
    */
   async startRecording(options, providers) {
-    this._extensionTraceProviders = self.Extensions.extensionServer.traceProviders().slice();
+    this._extensionTraceProviders = Extensions.ExtensionServer.ExtensionServer.instance().traceProviders().slice();
 
     /**
      * @param {string} category
@@ -65,9 +67,14 @@ export class TimelineController {
       return 'disabled-by-default-' + category;
     }
     const categoriesArray = [
-      '-*', 'devtools.timeline', disabledByDefault('devtools.timeline'), disabledByDefault('devtools.timeline.frame'),
-      'v8.execute', TimelineModel.TimelineModel.TimelineModelImpl.Category.Console,
-      TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming
+      '-*',
+      'devtools.timeline',
+      disabledByDefault('devtools.timeline'),
+      disabledByDefault('devtools.timeline.frame'),
+      'v8.execute',
+      TimelineModel.TimelineModel.TimelineModelImpl.Category.Console,
+      TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming,
+      TimelineModel.TimelineModel.TimelineModelImpl.Category.Loading,
     ];
     categoriesArray.push(TimelineModel.TimelineModel.TimelineModelImpl.Category.LatencyInfo);
 
@@ -80,9 +87,6 @@ export class TimelineController {
     }
     if (!Root.Runtime.queryParam('timelineTracingJSProfileDisabled') && options.enableJSSampling) {
       categoriesArray.push(disabledByDefault('v8.cpu_profiler'));
-      if (self.Common.settings.moduleSetting('highResolutionCpuProfiling').get()) {
-        categoriesArray.push(disabledByDefault('v8.cpu_profiler.hires'));
-      }
     }
     categoriesArray.push(disabledByDefault('devtools.timeline.stack'));
     if (Root.Runtime.experiments.isEnabled('timelineInvalidationTracking')) {
@@ -101,8 +105,9 @@ export class TimelineController {
     this._extensionSessions.forEach(session => session.start());
     this._performanceModel.setRecordStartTime(Date.now());
     const response = await this._startRecordingWithCategories(categoriesArray.join(','), options.enableJSSampling);
-    if (response[ProtocolModule.InspectorBackend.ProtocolError]) {
+    if (response[ProtocolClient.InspectorBackend.ProtocolError]) {
       await this._waitForTracingToStop(false);
+      await SDK.SDKModel.TargetManager.instance().resumeAllTargets();
     }
     return response;
   }
@@ -129,7 +134,9 @@ export class TimelineController {
   _waitForTracingToStop(awaitTracingCompleteCallback) {
     const tracingStoppedPromises = [];
     if (this._tracingManager && awaitTracingCompleteCallback) {
-      tracingStoppedPromises.push(new Promise(resolve => this._tracingCompleteCallback = resolve));
+      tracingStoppedPromises.push(new Promise(resolve => {
+        this._tracingCompleteCallback = resolve;
+      }));
     }
     tracingStoppedPromises.push(this._stopProfilingOnAllModels());
 
@@ -217,9 +224,7 @@ export class TimelineController {
       return;
     }
 
-    const samplingFrequencyHz = self.Common.settings.moduleSetting('highResolutionCpuProfiling').get() ? 10000 : 1000;
-    const options = 'sampling-frequency=' + samplingFrequencyHz;
-    return this._tracingManager.start(this, categories, options);
+    return this._tracingManager.start(this, categories, '');
   }
 
   /**

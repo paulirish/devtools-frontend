@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as UI from '../ui/ui.js';
 
@@ -207,7 +211,7 @@ export class ChartViewport extends UI.Widget.VBox {
    */
   _onMouseWheel(e) {
     const doZoomInstead =
-        e.shiftKey ^ (self.Common.settings.moduleSetting('flamechartMouseWheelAction').get() === 'zoom');
+        e.shiftKey ^ (Common.Settings.Settings.instance().moduleSetting('flamechartMouseWheelAction').get() === 'zoom');
     const panVertically = !doZoomInstead && (e.wheelDeltaY || Math.abs(e.wheelDeltaX) === 120);
     const panHorizontally = doZoomInstead && Math.abs(e.wheelDeltaX) > Math.abs(e.wheelDeltaY);
     if (panVertically) {
@@ -521,8 +525,9 @@ export class ChartViewport extends UI.Widget.VBox {
     this._targetRightTime = endTime;
     this._cancelWindowTimesAnimation = UI.UIUtils.animateFunction(
         this.element.window(), animateWindowTimes.bind(this),
-        [{from: this._visibleLeftTime, to: startTime}, {from: this._visibleRightTime, to: endTime}], 100,
-        () => this._cancelWindowTimesAnimation = null);
+        [{from: this._visibleLeftTime, to: startTime}, {from: this._visibleRightTime, to: endTime}], 100, () => {
+          this._cancelWindowTimesAnimation = null;
+        });
 
     /**
      * @param {number} startTime

@@ -10,9 +10,6 @@ Workspace = Workspace || {};
 /** @constructor */
 Workspace.FileManager = WorkspaceModule.FileManager.FileManager;
 
-/** @enum {symbol} */
-Workspace.FileManager.Events = WorkspaceModule.FileManager.Events;
-
 /** @constructor */
 Workspace.UISourceCode = WorkspaceModule.UISourceCode.UISourceCode;
 
@@ -21,9 +18,6 @@ Workspace.UISourceCode.Events = WorkspaceModule.UISourceCode.Events;
 
 /** @constructor */
 Workspace.UISourceCode.Message = WorkspaceModule.UISourceCode.Message;
-
-/** @constructor */
-Workspace.UISourceCode.LineMarker = WorkspaceModule.UISourceCode.LineMarker;
 
 /** @constructor */
 Workspace.UILocation = WorkspaceModule.UISourceCode.UILocation;
@@ -38,9 +32,6 @@ Workspace.Workspace = WorkspaceModule.Workspace.WorkspaceImpl;
 Workspace.Workspace.Events = WorkspaceModule.Workspace.Events;
 
 /** @interface */
-Workspace.ProjectSearchConfig = WorkspaceModule.Workspace.ProjectSearchConfig;
-
-/** @interface */
 Workspace.Project = WorkspaceModule.Workspace.Project;
 
 /** @enum {string} */
@@ -48,13 +39,3 @@ Workspace.projectTypes = WorkspaceModule.Workspace.projectTypes;
 
 /** @constructor */
 Workspace.ProjectStore = WorkspaceModule.Workspace.ProjectStore;
-
-/**
- * @type {?Workspace.FileManager}
- */
-self.Workspace.fileManager;
-
-/**
- * @type {!Workspace.Workspace}
- */
-self.Workspace.workspace;

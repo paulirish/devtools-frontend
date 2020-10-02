@@ -28,6 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 
@@ -35,9 +38,17 @@ import {IsolatedFileSystem} from './IsolatedFileSystem.js';
 import {PlatformFileSystem} from './PlatformFileSystem.js';  // eslint-disable-line no-unused-vars
 
 /**
+ * @type {!IsolatedFileSystemManager}
+ */
+let isolatedFileSystemManagerInstance;
+
+/**
  * @unrestricted
  */
 export class IsolatedFileSystemManager extends Common.ObjectWrapper.ObjectWrapper {
+  /**
+   * @private
+   */
   constructor() {
     super();
 
@@ -73,11 +84,25 @@ export class IsolatedFileSystemManager extends Common.ObjectWrapper.ObjectWrappe
   }
 
   /**
+   * @param {{forceNew: ?boolean}} opts
+   */
+  static instance(opts = {forceNew: null}) {
+    const {forceNew} = opts;
+    if (!isolatedFileSystemManagerInstance || forceNew) {
+      isolatedFileSystemManagerInstance = new IsolatedFileSystemManager();
+    }
+
+    return isolatedFileSystemManagerInstance;
+  }
+
+  /**
    * @return {!Promise<!Array<!IsolatedFileSystem>>}
    */
   _requestFileSystems() {
     let fulfill;
-    const promise = new Promise(f => fulfill = f);
+    const promise = new Promise(f => {
+      fulfill = f;
+    });
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
         Host.InspectorFrontendHostAPI.Events.FileSystemsLoaded, onFileSystemsLoaded, this);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.requestFileSystems();
@@ -277,7 +302,7 @@ export class IsolatedFileSystemManager extends Common.ObjectWrapper.ObjectWrappe
       defaultExcludedFolders = defaultExcludedFolders.concat(defaultLinuxExcludedFolders);
     }
     const defaultExcludedFoldersPattern = defaultExcludedFolders.join('|');
-    this._workspaceFolderExcludePatternSetting = self.Common.settings.createRegExpSetting(
+    this._workspaceFolderExcludePatternSetting = Common.Settings.Settings.instance().createRegExpSetting(
         'workspaceFolderExcludePattern', defaultExcludedFoldersPattern, Host.Platform.isWin() ? 'i' : '');
   }
 

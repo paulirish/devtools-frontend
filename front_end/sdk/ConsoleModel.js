@@ -28,6 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as HostModule from '../host/host.js';
 
@@ -42,9 +45,17 @@ import {Observer, Target, TargetManager} from './SDKModel.js';  // eslint-disabl
 const _events = Symbol('SDK.ConsoleModel.events');
 
 /**
+ * @type {!ConsoleModel}
+ */
+let settingsInstance;
+
+/**
  * @implements {Observer}
  */
 export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
+  /**
+   * @private
+   */
   constructor() {
     super();
 
@@ -58,6 +69,18 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
     this._pageLoadSequenceNumber = 0;
 
     TargetManager.instance().observeTargets(this);
+  }
+
+  /**
+   * @param {{forceNew: ?boolean}} opts
+   */
+  static instance(opts = {forceNew: null}) {
+    const {forceNew} = opts;
+    if (!settingsInstance || forceNew) {
+      settingsInstance = new ConsoleModel();
+    }
+
+    return settingsInstance;
   }
 
   /**
@@ -133,10 +156,8 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
    * @param {!ConsoleMessage} originatingMessage
    * @param {string} expression
    * @param {boolean} useCommandLineAPI
-   * @param {boolean} awaitPromise
    */
-  async evaluateCommandInConsole(executionContext, originatingMessage, expression, useCommandLineAPI, awaitPromise) {
-    // TODO(crbug/1021921): Remove {awaitPromise} argument. {awaitPromise} is hard-coded to false by all call-sites.
+  async evaluateCommandInConsole(executionContext, originatingMessage, expression, useCommandLineAPI) {
     const result = await executionContext.evaluate(
         {
           expression: expression,
@@ -145,9 +166,10 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
           silent: false,
           returnByValue: false,
           generatePreview: true,
-          replMode: true
+          replMode: true,
+          allowUnsafeEvalBlockedByCSP: false
         },
-        self.Common.settings.moduleSetting('consoleUserActivationEval').get(), awaitPromise);
+        Common.Settings.Settings.instance().moduleSetting('consoleUserActivationEval').get(), /* awaitPromise */ false);
     HostModule.userMetrics.actionTaken(Host.UserMetrics.Action.ConsoleEvaluated);
     if (result.error) {
       return;
@@ -267,7 +289,7 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   _clearIfNecessary() {
-    if (!self.Common.settings.moduleSetting('preserveConsoleLog').get()) {
+    if (!Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').get()) {
       this._clear();
     }
     ++this._pageLoadSequenceNumber;
@@ -277,7 +299,7 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
    * @param {!Common.EventTarget.EventTargetEvent} event
    */
   _mainFrameNavigated(event) {
-    if (self.Common.settings.moduleSetting('preserveConsoleLog').get()) {
+    if (Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').get()) {
       Common.Console.Console.instance().log(Common.UIString.UIString('Navigated to %s', event.data.url));
     }
   }
@@ -414,8 +436,7 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper {
     } else {
       const text = /** @type {string} */ (callFunctionResult.object.value);
       const message = this.addCommandMessage(executionContext, text);
-      this.evaluateCommandInConsole(
-          executionContext, message, text, /* useCommandLineAPI */ false, /* awaitPromise */ false);
+      this.evaluateCommandInConsole(executionContext, message, text, /* useCommandLineAPI */ false);
     }
     if (callFunctionResult.object) {
       callFunctionResult.object.release();
@@ -471,7 +492,7 @@ export class ConsoleMessage {
    * @param {?string=} url
    * @param {number=} line
    * @param {number=} column
-   * @param {!Array.<!Protocol.Runtime.RemoteObject>=} parameters
+   * @param {!Array.<!Protocol.Runtime.RemoteObject|string>=} parameters
    * @param {!Protocol.Runtime.StackTrace=} stackTrace
    * @param {number=} timestamp
    * @param {!Protocol.Runtime.ExecutionContextId=} executionContextId
@@ -500,6 +521,7 @@ export class ConsoleMessage {
     this.executionContextId = executionContextId || 0;
     this.scriptId = scriptId || null;
     this.workerId = workerId || null;
+    this.frameId = null;
 
     if (!this.executionContextId && this._runtimeModel) {
       if (this.scriptId) {
@@ -507,6 +529,11 @@ export class ConsoleMessage {
       } else if (this.stackTrace) {
         this.executionContextId = this._runtimeModel.executionContextForStackTrace(this.stackTrace);
       }
+    }
+
+    if (this.executionContextId && this._runtimeModel) {
+      const executionContext = this._runtimeModel.executionContext(this.executionContextId);
+      this.frameId = executionContext ? executionContext.frameId : null;
     }
 
     if (context) {
@@ -648,8 +675,7 @@ export class ConsoleMessage {
 
     return (this.runtimeModel() === msg.runtimeModel()) && (this.source === msg.source) && (this.type === msg.type) &&
         (this.level === msg.level) && (this.line === msg.line) && (this.url === msg.url) &&
-        (this.messageText === msg.messageText) && (this.request === msg.request) &&
-        (this.executionContextId === msg.executionContextId);
+        (this.messageText === msg.messageText) && (this.executionContextId === msg.executionContextId);
   }
 
   /**

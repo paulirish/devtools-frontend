@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as TextUtils from '../text_utils/text_utils.js';  // eslint-disable-line no-unused-vars
+
 import * as CoverageModule from './coverage.js';
 
 self.Coverage = self.Coverage || {};
@@ -31,6 +33,12 @@ Coverage.CoverageModel.Events = CoverageModule.CoverageModel.Events;
 Coverage.CoverageType = CoverageModule.CoverageModel.CoverageType;
 
 /**
+ * @param {!Coverage.CoverageType} type
+ * @returns {string}
+ */
+Coverage.coverageTypeToString = CoverageModule.CoverageListView.coverageTypeToString;
+
+/**
  * @constructor
  */
 Coverage.URLCoverageInfo = CoverageModule.CoverageModel.URLCoverageInfo;
@@ -54,23 +62,3 @@ Coverage.CoverageView.LineDecorator = CoverageModule.CoverageView.LineDecorator;
  * @constructor
  */
 Coverage.CoverageView.ActionDelegate = CoverageModule.CoverageView.ActionDelegate;
-
-/**
- * @typedef {!{
- *    id: string,
- *    contentProvider: !Common.ContentProvider,
- *    line: number,
- *    column: number
- * }}
- */
-Coverage.RawLocation;
-
-// Copyright (c) 2017 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/** @typedef {{startOffset: number, endOffset: number, count: number}} */
-Coverage.RangeUseCount;
-
-/** @typedef {{end: number, count: (number|undefined)}} */
-Coverage.CoverageSegment;

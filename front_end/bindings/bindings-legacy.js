@@ -101,34 +101,3 @@ Bindings.TempFile = BindingsModule.TempFile.TempFile;
 
 /** @constructor */
 Bindings.TempFileBackingStorage = BindingsModule.TempFile.TempFileBackingStorage;
-
-/** @type {!BindingsModule.BlackboxManager.BlackboxManager} */
-self.Bindings.blackboxManager;
-
-/** @typedef {{
- *    breakpoint: !BindingsModule.BreakpointManager.Breakpoint,
- *    uiLocation: !Workspace.UILocation
- *  }}
- */
-Bindings.BreakpointManager.BreakpointLocation;
-
-/** @type {!BindingsModule.BreakpointManager.BreakpointManager} */
-self.Bindings.breakpointManager;
-
-/**
- * @type {!BindingsModule.CSSWorkspaceBinding.CSSWorkspaceBinding}
- */
-self.Bindings.cssWorkspaceBinding;
-
-/**
- * @type {!BindingsModule.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding}
- */
-self.Bindings.debuggerWorkspaceBinding;
-
-/**
- * @typedef {{
-  *      startOffset: number,
-  *      endOffset: number
-  * }}
-  */
-Bindings.TempFileBackingStorage.Chunk;

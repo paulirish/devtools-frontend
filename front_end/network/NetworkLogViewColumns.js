@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Components from '../components/components.js';
 import * as DataGrid from '../data_grid/data_grid.js';
@@ -29,7 +32,7 @@ export class NetworkLogViewColumns {
     this._networkLogView = networkLogView;
 
     /** @type {!Common.Settings.Setting} */
-    this._persistantSettings = self.Common.settings.createSetting('networkLogColumns', {});
+    this._persistantSettings = Common.Settings.Settings.instance().createSetting('networkLogColumns', {});
 
     this._networkLogLargeRowsSetting = networkLogLargeRowsSetting;
     this._networkLogLargeRowsSetting.addChangeListener(this._updateRowsSize, this);
@@ -141,7 +144,14 @@ export class NetworkLogViewColumns {
 
     this._waterfallColumn.element.addEventListener('contextmenu', handleContextMenu.bind(this));
     this._waterfallColumn.element.addEventListener('mousewheel', this._onMouseWheel.bind(this, false), {passive: true});
+    this._waterfallColumn.element.addEventListener('touchstart', this._onTouchStart.bind(this));
+    this._waterfallColumn.element.addEventListener('touchmove', this._onTouchMove.bind(this));
+    this._waterfallColumn.element.addEventListener('touchend', this._onTouchEnd.bind(this));
+
     this._dataGridScroller.addEventListener('mousewheel', this._onMouseWheel.bind(this, true), true);
+    this._dataGridScroller.addEventListener('touchstart', this._onTouchStart.bind(this));
+    this._dataGridScroller.addEventListener('touchmove', this._onTouchMove.bind(this));
+    this._dataGridScroller.addEventListener('touchend', this._onTouchEnd.bind(this));
 
     this._waterfallScroller = this._waterfallColumn.contentElement.createChild('div', 'network-waterfall-v-scroll');
     this._waterfallScrollerContent = this._waterfallScroller.createChild('div', 'network-waterfall-v-scroll-content');
@@ -192,6 +202,35 @@ export class NetworkLogViewColumns {
     this._activeScroller.scrollBy({top: -event.wheelDeltaY, behavior: hasRecentWheel ? 'instant' : 'smooth'});
     this._syncScrollers();
     this._lastWheelTime = Date.now();
+  }
+
+  /**
+   * @param {!Event} event
+   */
+  _onTouchStart(event) {
+    this._hasScrollerTouchStarted = true;
+    this._scrollerTouchStartPos = event.changedTouches[0].pageY;
+  }
+
+  /**
+   * @param {!Event} event
+   */
+  _onTouchMove(event) {
+    if (!this._hasScrollerTouchStarted) {
+      return;
+    }
+
+    const currentPos = event.changedTouches[0].pageY;
+    const delta = this._scrollerTouchStartPos - currentPos;
+
+    this._activeScroller.scrollBy({top: delta, behavior: 'instant'});
+    this._syncScrollers();
+
+    this._scrollerTouchStartPos = currentPos;
+  }
+
+  _onTouchEnd() {
+    this._hasScrollerTouchStarted = false;
   }
 
   _syncScrollers() {
@@ -317,7 +356,9 @@ export class NetworkLogViewColumns {
         this._waterfallColumnSortIcon.setIconType('smallicon-triangle-down');
       }
 
-      const sortFunction = NetworkRequestNode.RequestPropertyComparator.bind(null, this._activeWaterfallSortId);
+      const sortFunction =
+          /** @type {function(!DataGrid.SortableDataGrid.SortableDataGridNode<!NetworkNode>, !DataGrid.SortableDataGrid.SortableDataGridNode<!NetworkNode>):number} */
+          (NetworkRequestNode.RequestPropertyComparator.bind(null, this._activeWaterfallSortId));
       this._dataGrid.sortNodes(sortFunction, !this._dataGrid.isSortOrderAscending());
       this._dataGridSortedForTest();
       return;
@@ -328,8 +369,13 @@ export class NetworkLogViewColumns {
     if (!columnConfig || !columnConfig.sortingFunction) {
       return;
     }
-
-    this._dataGrid.sortNodes(columnConfig.sortingFunction, !this._dataGrid.isSortOrderAscending());
+    const sortingFunction =
+        /** @type {undefined|function(!DataGrid.SortableDataGrid.SortableDataGridNode<!NetworkNode>, !DataGrid.SortableDataGrid.SortableDataGridNode<!NetworkNode>):number} */
+        (columnConfig.sortingFunction);
+    if (!sortingFunction) {
+      return;
+    }
+    this._dataGrid.sortNodes(sortingFunction, !this._dataGrid.isSortOrderAscending());
     this._dataGridSortedForTest();
   }
 
@@ -650,12 +696,17 @@ export class NetworkLogViewColumns {
     }
     return {
       box: anchor.boxInWindow(),
-      show: popover => {
+      show: async popover => {
+        this._popupLinkifier.setLiveLocationUpdateCallback(() => {
+          popover.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
+        });
         const content = RequestInitiatorView.createStackTracePreview(
-            /** @type {!SDK.NetworkRequest.NetworkRequest} */ (request), this._popupLinkifier, false,
-            () => popover.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent));
+            /** @type {!SDK.NetworkRequest.NetworkRequest} */ (request), this._popupLinkifier, false);
+        if (!content) {
+          return false;
+        }
         popover.contentElement.appendChild(content.element);
-        return Promise.resolve(true);
+        return true;
       },
       hide: this._popupLinkifier.reset.bind(this._popupLinkifier)
     };
@@ -751,14 +802,14 @@ export const _defaultColumns = [
     title: ls`Path`,
     hideable: true,
     hideableGroup: 'path',
-    sortingFunction: NetworkRequestNode.RequestPropertyComparator.bind(null, 'path')
+    sortingFunction: NetworkRequestNode.RequestPropertyComparator.bind(null, 'pathname')
   },
   {
     id: 'url',
     title: ls`Url`,
     hideable: true,
     hideableGroup: 'path',
-    sortingFunction: NetworkRequestNode.RequestPropertyComparator.bind(null, 'url')
+    sortingFunction: NetworkRequestNode.RequestURLComparator
   },
   {
     id: 'method',

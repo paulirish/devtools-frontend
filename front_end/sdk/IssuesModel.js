@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../common/common.js';  // eslint-disable-line no-unused-vars
-
-import {CookieModel} from './CookieModel.js';
-import {Issue} from './Issue.js';
-import {Events as NetworkManagerEvents, NetworkManager} from './NetworkManager.js';
-import {NetworkRequest,  // eslint-disable-line no-unused-vars
-        setCookieBlockedReasonToAttribute, setCookieBlockedReasonToUiString,} from './NetworkRequest.js';
-import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
+import {ContentSecurityPolicyIssue} from './ContentSecurityPolicyIssue.js';
+import {CrossOriginEmbedderPolicyIssue, isCrossOriginEmbedderPolicyIssue} from './CrossOriginEmbedderPolicyIssue.js';
+import {HeavyAdIssue} from './HeavyAdIssue.js';
+import {Issue} from './Issue.js';  // eslint-disable-line no-unused-vars
+import {MixedContentIssue} from './MixedContentIssue.js';
+import {SameSiteCookieIssue} from './SameSiteCookieIssue.js';
 import {Capability, SDKModel, Target} from './SDKModel.js';  // eslint-disable-line no-unused-vars
 
-const connectedIssuesSymbol = Symbol('issues');
 
 /**
- * @implements {Protocol.AuditsDispatcher}
- * @unrestricted
+ * The `IssuesModel` is a thin dispatch that does not store issues, but only creates the representation
+ * class (usually derived from `Issue`) and passes the instances on via a dispatched event.
+ * We chose this approach here because the lifetime of the Model is tied to the target, but DevTools
+ * wants to preserve issues for targets (e.g. iframes) that are already gone as well.
+ * @implements {ProtocolProxyApi.AuditsDispatcher}
  */
 export class IssuesModel extends SDKModel {
   /**
@@ -25,32 +25,17 @@ export class IssuesModel extends SDKModel {
   constructor(target) {
     super(target);
     this._enabled = false;
-    this._issues = [];
-    this._browserIssues = [];
-    this._browserIssuesByCode = new Map();
-    this._cookiesModel = target.model(CookieModel);
-
-    const networkManager = target.model(NetworkManager);
-    if (networkManager) {
-      networkManager.addEventListener(NetworkManagerEvents.RequestFinished, this._handleRequestFinished, this);
-    }
-
-    const resourceTreeModel = /** @type {?ResourceTreeModel} */ (target.model(ResourceTreeModel));
-    if (resourceTreeModel) {
-      resourceTreeModel.addEventListener(
-        ResourceTreeModelEvents.MainFrameNavigated, this._onMainFrameNavigated, this);
-    }
+    /** @type {*} */
+    this._auditsAgent = null;
+    this.ensureEnabled();
+    this._disposed = false;
   }
 
-  _onMainFrameNavigated() {
-    this._clearIssues();
-  }
-
-  _clearIssues() {
-    this._issues = [];
-    this._browserIssues = [];
-    this._browserIssuesByCode = new Map();
-    this.dispatchEventToListeners(Events.AllIssuesCleared);
+  /**
+   * @return {!Protocol.UsesObjectNotation}
+   */
+  usesObjectNotation() {
+    return true;
   }
 
   ensureEnabled() {
@@ -61,98 +46,152 @@ export class IssuesModel extends SDKModel {
     this._enabled = true;
     this.target().registerAuditsDispatcher(this);
     this._auditsAgent = this.target().auditsAgent();
-    this._auditsAgent.enable();
+    this._auditsAgent.invoke_enable();
   }
 
   /**
    * @override
-   * @param {!Protocol.Audits.Issue} payload
+   * @param {!Protocol.Audits.IssueAddedEvent} issueAddedEvent
    */
-  issueAdded(payload) {
-    if (!this._browserIssuesByCode.has(payload.code)) {
-      const issue = new Issue(payload.code);
-      this._browserIssuesByCode.set(payload.code, issue);
-      this.dispatchEventToListeners(Events.IssueAdded, issue);
-    } else {
-      const issue = this._browserIssuesByCode.get(payload.code);
-      this.dispatchEventToListeners(Events.IssueUpdated, issue);
+  issueAdded(issueAddedEvent) {
+    const issues = this._createIssuesFromProtocolIssue(issueAddedEvent.issue);
+    for (const issue of issues) {
+      this.addIssue(issue);
     }
   }
 
   /**
-   * @returns {!Iterator<Issue>}
-   */
-  issues() {
-    return this._browserIssuesByCode.values();
-  }
-
-   /**
-   * @return {number}
-   */
-  size() {
-    return this._browserIssuesByCode.size;
-  }
-
-  /**
-   * @param {!*} obj
    * @param {!Issue} issue
    */
-  static connectWithIssue(obj, issue) {
-    if (!obj) {
-      return;
-    }
-
-    if (!obj[connectedIssuesSymbol]) {
-      obj[connectedIssuesSymbol] = [];
-    }
-
-    obj[connectedIssuesSymbol].push(issue);
+  addIssue(issue) {
+    this.dispatchEventToListeners(Events.IssueAdded, {issuesModel: this, issue});
   }
 
   /**
-   * @param {!*} obj
+   * Each issue reported by the backend can result in multiple {!Issue} instances.
+   * Handlers are simple functions hard-coded into a map.
+   * @param {!Protocol.Audits.InspectorIssue} inspectorIssue} inspectorIssue
+   * @return {!Array<!Issue>}
    */
-  static hasIssues(obj) {
-    if (!obj) {
-      return false;
+  _createIssuesFromProtocolIssue(inspectorIssue) {
+    const handler = issueCodeHandlers.get(inspectorIssue.code);
+    if (handler) {
+      return handler(this, inspectorIssue.details);
     }
 
-    return obj[connectedIssuesSymbol] && obj[connectedIssuesSymbol].length;
+    console.warn(`No handler registered for issue code ${inspectorIssue.code}`);
+    return [];
   }
 
   /**
-   * @param {!Common.EventTarget.EventTargetEvent} event
+   * @override
    */
-  _handleRequestFinished(event) {
-    const request = /** @type {!NetworkRequest} */ (event.data);
+  dispose() {
+    super.dispose();
+    this._disposed = true;
+  }
 
-    const blockedResponseCookies = request.blockedResponseCookies();
-    for (const blockedCookie of blockedResponseCookies) {
-      const cookie = blockedCookie.cookie;
-      if (!cookie) {
-        continue;
-      }
-
-      const issue = new Issue('SameSiteCookies::SameSiteNoneMissingForThirdParty');
-
-      IssuesModel.connectWithIssue(request, issue);
-      IssuesModel.connectWithIssue(cookie, issue);
-
-      this._cookiesModel.addBlockedCookie(
-          cookie, blockedCookie.blockedReasons.map(blockedReason => ({
-                                                     attribute: setCookieBlockedReasonToAttribute(blockedReason),
-                                                     uiString: setCookieBlockedReasonToUiString(blockedReason)
-                                                   })));
+  /**
+   * @returns {?Target}
+   */
+  getTargetIfNotDisposed() {
+    if (!this._disposed) {
+      return this.target();
     }
+    return null;
   }
 }
 
+/**
+ * @param {!IssuesModel} issuesModel
+ * @param {!Protocol.Audits.InspectorIssueDetails} inspectorDetails
+ * @return {!Array<!Issue>}
+ */
+function createIssuesForSameSiteCookieIssue(issuesModel, inspectorDetails) {
+  const sameSiteDetails = inspectorDetails.sameSiteCookieIssueDetails;
+  if (!sameSiteDetails) {
+    console.warn('SameSite issue without details received.');
+    return [];
+  }
+
+  return SameSiteCookieIssue.createIssuesFromSameSiteDetails(sameSiteDetails);
+}
+
+/**
+ * @param {!IssuesModel} issuesModel
+ * @param {!Protocol.Audits.InspectorIssueDetails} inspectorDetails
+ * @return {!Array<!Issue>}
+ */
+function createIssuesForMixedContentIssue(issuesModel, inspectorDetails) {
+  const mixedContentDetails = inspectorDetails.mixedContentIssueDetails;
+  if (!mixedContentDetails) {
+    console.warn('Mixed content issue without details received.');
+    return [];
+  }
+  return [new MixedContentIssue(mixedContentDetails)];
+}
+
+
+/**
+ * @param {!IssuesModel} issuesModel
+ * @param {!Protocol.Audits.InspectorIssueDetails} inspectorDetails
+ * @return {!Array<!Issue>}
+ */
+function createIssuesForContentSecurityPolicyIssue(issuesModel, inspectorDetails) {
+  const cspDetails = inspectorDetails.contentSecurityPolicyIssueDetails;
+  if (!cspDetails) {
+    console.warn('Content security policy issue without details received.');
+    return [];
+  }
+  return [new ContentSecurityPolicyIssue(cspDetails, issuesModel)];
+}
+
+
+/**
+ * @param {!IssuesModel} issuesModel
+ * @param {!Protocol.Audits.InspectorIssueDetails} inspectorDetails
+ * @return {!Array<!Issue>}
+ */
+function createIssuesForHeavyAdIssue(issuesModel, inspectorDetails) {
+  const heavyAdIssueDetails = inspectorDetails.heavyAdIssueDetails;
+  if (!heavyAdIssueDetails) {
+    console.warn('Heavy Ad issue without details received.');
+    return [];
+  }
+  return [new HeavyAdIssue(heavyAdIssueDetails)];
+}
+
+/**
+ * @param {!IssuesModel} issuesModel
+ * @param {!Protocol.Audits.InspectorIssueDetails} inspectorDetails
+ * @return {!Array<!Issue>}
+ */
+function createIssuesForBlockedByResponseIssue(issuesModel, inspectorDetails) {
+  const blockedByResponseIssueDetails = inspectorDetails.blockedByResponseIssueDetails;
+  if (!blockedByResponseIssueDetails) {
+    console.warn('BlockedByResponse issue without details received.');
+    return [];
+  }
+  if (isCrossOriginEmbedderPolicyIssue(blockedByResponseIssueDetails.reason)) {
+    return [new CrossOriginEmbedderPolicyIssue(blockedByResponseIssueDetails)];
+  }
+  return [];
+}
+
+/**
+ * @type {!Map<!Protocol.Audits.InspectorIssueCode, function(!IssuesModel, !Protocol.Audits.InspectorIssueDetails):!Array<!Issue>>}
+ */
+const issueCodeHandlers = new Map([
+  [Protocol.Audits.InspectorIssueCode.SameSiteCookieIssue, createIssuesForSameSiteCookieIssue],
+  [Protocol.Audits.InspectorIssueCode.MixedContentIssue, createIssuesForMixedContentIssue],
+  [Protocol.Audits.InspectorIssueCode.HeavyAdIssue, createIssuesForHeavyAdIssue],
+  [Protocol.Audits.InspectorIssueCode.ContentSecurityPolicyIssue, createIssuesForContentSecurityPolicyIssue],
+  [Protocol.Audits.InspectorIssueCode.BlockedByResponseIssue, createIssuesForBlockedByResponseIssue],
+]);
+
 /** @enum {symbol} */
 export const Events = {
-  Updated: Symbol('Updated'),
   IssueAdded: Symbol('IssueAdded'),
-  IssueUpdated: Symbol('IssueUpdated'),
-  AllIssuesCleared: Symbol('AllIssuesCleared'),
 };
 
-SDKModel.register(IssuesModel, Capability.None, true);
+SDKModel.register(IssuesModel, Capability.Audits, true);

@@ -67,6 +67,9 @@ Resources.DatabaseQueryView.Events = ResourcesModule.DatabaseQueryView.Events;
 Resources.DatabaseTableView = ResourcesModule.DatabaseTableView.DatabaseTableView;
 
 /** @constructor */
+Resources.FrameDetailsView = ResourcesModule.FrameDetailsView.FrameDetailsView;
+
+/** @constructor */
 Resources.IndexedDBModel = ResourcesModule.IndexedDBModel.IndexedDBModel;
 
 /** @enum {symbol} */
@@ -92,6 +95,9 @@ Resources.ResourcesPanel = ResourcesModule.ResourcesPanel.ResourcesPanel;
 
 /** @constructor */
 Resources.ResourcesPanel.ResourceRevealer = ResourcesModule.ResourcesPanel.ResourceRevealer;
+
+/** @constructor */
+Resources.ResourcesPanel.CookieReferenceRevealer = ResourcesModule.ResourcesPanel.CookieReferenceRevealer;
 
 /** @constructor */
 Resources.FrameTreeElement = ResourcesModule.ApplicationPanelSidebar.FrameTreeElement;

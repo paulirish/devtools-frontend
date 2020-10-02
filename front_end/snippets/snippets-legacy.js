@@ -11,9 +11,7 @@ Snippets.evaluateScriptSnippet = SnippetsModule.ScriptSnippetFileSystem.evaluate
 Snippets.isSnippetsUISourceCode = SnippetsModule.ScriptSnippetFileSystem.isSnippetsUISourceCode;
 Snippets.isSnippetsProject = SnippetsModule.ScriptSnippetFileSystem.isSnippetsProject;
 
-Snippets.project = /** @type {!Workspace.Project} */ (
-    self.Workspace.workspace.projectsForType(Workspace.projectTypes.FileSystem)
-        .find(project => Persistence.FileSystemWorkspaceBinding.fileSystemType(project) === 'snippets'));
+Snippets.project = SnippetsModule.project;
 
 /**
  * @constructor

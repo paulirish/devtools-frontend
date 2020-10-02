@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as DataGrid from '../data_grid/data_grid.js';
 import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
+import * as Workspace from '../workspace/workspace.js';
 
 import {SamplingHeapProfileNode} from './HeapProfileView.js';  // eslint-disable-line no-unused-vars
 
@@ -19,11 +23,12 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     this._gridNodeByUrl = new Map();
     this.registerRequiredCSS('profiler/liveHeapProfile.css');
 
-    this._setting = self.Common.settings.moduleSetting('memoryLiveHeapProfile');
+    this._setting = Common.Settings.Settings.instance().moduleSetting('memoryLiveHeapProfile');
     const toolbar = new UI.Toolbar.Toolbar('live-heap-profile-toolbar', this.contentElement);
 
     this._toggleRecordAction =
-        /** @type {!UI.Action.Action }*/ (self.UI.actionRegistry.action('live-heap-profile.toggle-recording'));
+        /** @type {!UI.Action.Action }*/ (
+            UI.ActionRegistry.ActionRegistry.instance().action('live-heap-profile.toggle-recording'));
     this._toggleRecordButton = UI.Toolbar.Toolbar.createActionButton(this._toggleRecordAction);
     this._toggleRecordButton.setToggled(this._setting.get());
     toolbar.appendToolbarItem(this._toggleRecordButton);
@@ -31,7 +36,8 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     const mainTarget = SDK.SDKModel.TargetManager.instance().mainTarget();
     if (mainTarget && mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel)) {
       const startWithReloadAction =
-          /** @type {!UI.Action.Action }*/ (self.UI.actionRegistry.action('live-heap-profile.start-with-reload'));
+          /** @type {!UI.Action.Action }*/ (
+              UI.ActionRegistry.ActionRegistry.instance().action('live-heap-profile.start-with-reload'));
       this._startWithReloadButton = UI.Toolbar.Toolbar.createActionButton(startWithReloadAction);
       toolbar.appendToolbarItem(this._startWithReloadButton);
     }
@@ -108,7 +114,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
   async _poll() {
     const pollId = this._currentPollId;
     do {
-      const isolates = Array.from(self.SDK.isolateManager.isolates());
+      const isolates = Array.from(SDK.IsolateManager.IsolateManager.instance().isolates());
       const profiles = await Promise.all(
           isolates.map(isolate => isolate.heapProfilerModel() && isolate.heapProfilerModel().getSamplingProfile()));
       if (this._currentPollId !== pollId) {
@@ -157,7 +163,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
       if (!exisitingNodes.has(node)) {
         node.remove();
       }
-      this._gridNodeByUrl.delete(node);
+      this._gridNodeByUrl.delete(node._url);
     }
 
     this._sortingChanged();
@@ -218,7 +224,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     if (!node || !node._url) {
       return;
     }
-    const sourceCode = self.Workspace.workspace.uiSourceCodeForURL(node._url);
+    const sourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(node._url);
     if (sourceCode) {
       Common.Revealer.reveal(sourceCode);
     }
@@ -297,7 +303,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode {
   /**
    * @override
    * @param {string} columnId
-   * @return {!Element}
+   * @return {!HTMLElement}
    */
   createCell(columnId) {
     const cell = this.createTD(columnId);
@@ -310,7 +316,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode {
         cell.createChild('span', 'size-units').textContent = ls`KB`;
         break;
       case 'isolates':
-        cell.textContent = this._isolateCount;
+        cell.textContent = `${this._isolateCount}`;
         break;
     }
     return cell;
@@ -330,8 +336,8 @@ export class ActionDelegate {
   handleAction(context, actionId) {
     (async () => {
       const profileViewId = 'live_heap_profile';
-      await self.UI.viewManager.showView(profileViewId);
-      const widget = await self.UI.viewManager.view(profileViewId).widget();
+      await UI.ViewManager.ViewManager.instance().showView(profileViewId);
+      const widget = await UI.ViewManager.ViewManager.instance().view(profileViewId).widget();
       this._innerHandleAction(/** @type {!LiveHeapProfileView} */ (widget), actionId);
     })();
     return true;

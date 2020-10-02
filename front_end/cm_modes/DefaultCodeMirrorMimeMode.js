@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as TextEditor from '../text_editor/text_editor.js';  // eslint-disable-line no-unused-vars
 
 /**
@@ -14,10 +17,11 @@ export class DefaultCodeMirrorMimeMode {
    * @override
    */
   async install(extension) {
-    const modeFileName = extension.descriptor()['fileName'];
-
-    return /** @type {!Promise} */ (eval(`import('./${modeFileName}')`));
+    return Promise.resolve();
   }
 }
+
+self.CmModes = self.CmModes || {};
+CmModes = CmModes || {};
 
 CmModes.DefaultCodeMirrorMimeMode = DefaultCodeMirrorMimeMode;

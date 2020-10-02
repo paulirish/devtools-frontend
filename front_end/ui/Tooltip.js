@@ -1,11 +1,16 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Platform from '../platform/platform.js';
 
 import {GlassPane} from './GlassPane.js';
+import {ShortcutRegistry} from './ShortcutRegistry.js';
 import {createShadowRootWithCoreStyles} from './utils/create-shadow-root-with-core-styles.js';
-import {Events as ZoomManagerEvents} from './ZoomManager.js';
+import {Events as ZoomManagerEvents, ZoomManager} from './ZoomManager.js';
 
 /**
  * @unrestricted
@@ -23,7 +28,7 @@ export class Tooltip {
     doc.addEventListener('mousedown', this._hide.bind(this, true), true);
     doc.addEventListener('mouseleave', this._hide.bind(this, false), true);
     doc.addEventListener('keydown', this._hide.bind(this, true), true);
-    self.UI.zoomManager.addEventListener(ZoomManagerEvents.ZoomChanged, this._reset, this);
+    ZoomManager.instance().addEventListener(ZoomManagerEvents.ZoomChanged, this._reset, this);
     doc.defaultView.addEventListener('resize', this._reset.bind(this), false);
   }
 
@@ -38,7 +43,7 @@ export class Tooltip {
    * @param {!Element} element
    * @param {?Element|string} tooltipContent
    * @param {string=} actionId
-   * @param {!Object=} options
+   * @param {?TooltipOptions=} options
    */
   static install(element, tooltipContent, actionId, options) {
     if (!tooltipContent) {
@@ -88,44 +93,9 @@ export class Tooltip {
    * @param {!Element} anchorElement
    * @param {!Event} event
    */
-  _show(anchorElement, event) {
-    const tooltip = anchorElement[_symbol];
-    this._anchorElement = anchorElement;
-    this._tooltipElement.removeChildren();
-
-    // Check if native tooltips should be used.
-    for (const element of _nativeOverrideContainer) {
-      if (this._anchorElement.isSelfOrDescendant(element)) {
-        Object.defineProperty(this._anchorElement, 'title', /** @type {!Object} */ (_nativeTitle));
-        this._anchorElement.title = tooltip.content;
-        return;
-      }
-    }
-
-    if (typeof tooltip.content === 'string') {
-      this._tooltipElement.setTextContentTruncatedIfNeeded(tooltip.content);
-    } else {
-      this._tooltipElement.appendChild(tooltip.content);
-    }
-
-    if (tooltip.actionId) {
-      const shortcuts = self.UI.shortcutRegistry.shortcutDescriptorsForAction(tooltip.actionId);
-      for (const shortcut of shortcuts) {
-        const shortcutElement = this._tooltipElement.createChild('div', 'tooltip-shortcut');
-        shortcutElement.textContent = shortcut.name;
-      }
-    }
-
-    this._tooltipElement.classList.add('shown');
+  _reposition(anchorElement, event) {
     // Reposition to ensure text doesn't overflow unnecessarily.
     this._tooltipElement.positionAt(0, 0);
-
-    // Show tooltip instantly if a tooltip was shown recently.
-    const now = Date.now();
-    const instant = (this._tooltipLastClosed && now - this._tooltipLastClosed < Timing.InstantThreshold);
-    this._tooltipElement.classList.toggle('instant', instant);
-    this._tooltipLastOpened = instant ? now : now + Timing.OpeningDelay;
-
     // Get container element.
     const container = GlassPane.container(/** @type {!Document} */ (anchorElement.ownerDocument));
     // Position tooltip based on the anchor element.
@@ -139,8 +109,7 @@ export class Tooltip {
     this._tooltipElement.style.maxHeight = '';
     const tooltipWidth = this._tooltipElement.offsetWidth;
     const tooltipHeight = this._tooltipElement.offsetHeight;
-    const anchorTooltipAtElement =
-        this._anchorElement.nodeName === 'BUTTON' || this._anchorElement.nodeName === 'LABEL';
+    const anchorTooltipAtElement = this._anchorTooltipAtElement();
     let tooltipX = anchorTooltipAtElement ? anchorBox.x : event.x + cursorOffset;
     tooltipX = Platform.NumberUtilities.clamp(
         tooltipX, containerBox.x + pageMargin, containerBox.x + containerBox.width - tooltipWidth - pageMargin);
@@ -155,6 +124,72 @@ export class Tooltip {
       tooltipY = onBottom ? anchorBox.y + anchorBox.height + anchorOffset : anchorBox.y - tooltipHeight - anchorOffset;
     }
     this._tooltipElement.positionAt(tooltipX, tooltipY);
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  _anchorTooltipAtElement() {
+    const tooltip = this._anchorElement[_symbol];
+
+    if (tooltip.options.anchorTooltipAtElement !== undefined) {
+      return tooltip.options.anchorTooltipAtElement;
+    }
+
+    // default legacy behavior; better to explicitly configure tooltip placement via options
+    return this._anchorElement.nodeName === 'BUTTON' || this._anchorElement.nodeName === 'LABEL';
+  }
+
+  /**
+   * @param {!Element} anchorElement
+   * @param {!Event} event
+   */
+  _show(anchorElement, event) {
+    const tooltip = anchorElement[_symbol];
+    this._anchorElement = anchorElement;
+    this._tooltipElement.removeChildren();
+
+    // Check if native tooltips should be used.
+    if (this._shouldUseNativeTooltips()) {
+      Object.defineProperty(this._anchorElement, 'title', /** @type {!Object} */ (_nativeTitle));
+      this._anchorElement.title = tooltip.content;
+      return;
+    }
+
+    if (typeof tooltip.content === 'string') {
+      this._tooltipElement.setTextContentTruncatedIfNeeded(tooltip.content);
+    } else {
+      this._tooltipElement.appendChild(tooltip.content);
+    }
+
+    if (tooltip.actionId) {
+      const shortcuts = ShortcutRegistry.instance().shortcutsForAction(tooltip.actionId);
+      for (const shortcut of shortcuts) {
+        const shortcutElement = this._tooltipElement.createChild('div', 'tooltip-shortcut');
+        shortcutElement.textContent = shortcut.title();
+      }
+    }
+
+    // Show tooltip instantly if a tooltip was shown recently.
+    const now = Date.now();
+    const instant = (this._tooltipLastClosed && now - this._tooltipLastClosed < Timing.InstantThreshold);
+    this._tooltipElement.classList.toggle('instant', instant);
+    this._tooltipLastOpened = instant ? now : now + Timing.OpeningDelay;
+
+    this._reposition(anchorElement, event);
+    this._tooltipElement.classList.add('shown');
+  }
+
+  /**
+   * @return {boolean}
+   */
+  _shouldUseNativeTooltips() {
+    for (const element of _nativeOverrideContainer) {
+      if (this._anchorElement.isSelfOrDescendant(element)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -178,6 +213,13 @@ export class Tooltip {
     this._tooltipElement.style.maxHeight = '0';
   }
 }
+
+/**
+ * @typedef {{
+ * anchorTooltipAtElement: (boolean|undefined)
+ * }}
+ */
+export let TooltipOptions;
 
 const Timing = {
   // Max time between tooltips showing that no opening delay is required.

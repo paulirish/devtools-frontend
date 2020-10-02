@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
+import * as TextUtils from '../text_utils/text_utils.js';  // eslint-disable-line no-unused-vars
 import * as UI from '../ui/ui.js';  // eslint-disable-line no-unused-vars
 import * as Workspace from '../workspace/workspace.js';
+
+import {NetworkPersistenceManager} from './NetworkPersistenceManager.js';
+import {PersistenceImpl} from './PersistenceImpl.js';
 
 /**
  * @implements {UI.ContextMenu.Provider}
@@ -19,7 +26,7 @@ export class ContextMenuProvider {
    * @param {!Object} target
    */
   appendApplicableItems(event, contextMenu, target) {
-    const contentProvider = /** @type {!Common.ContentProvider.ContentProvider} */ (target);
+    const contentProvider = /** @type {!TextUtils.ContentProvider.ContentProvider} */ (target);
     async function saveAs() {
       if (contentProvider instanceof Workspace.UISourceCode.UISourceCode) {
         /** @type {!Workspace.UISourceCode.UISourceCode} */ (contentProvider).commitWorkingCopy();
@@ -29,8 +36,8 @@ export class ContextMenuProvider {
         content = window.atob(content);
       }
       const url = contentProvider.contentURL();
-      self.Workspace.fileManager.save(url, /** @type {string} */ (content), true);
-      self.Workspace.fileManager.close(url);
+      Workspace.FileManager.FileManager.instance().save(url, /** @type {string} */ (content), true);
+      Workspace.FileManager.FileManager.instance().close(url);
     }
 
     if (contentProvider.contentType().isDocumentOrScriptOrStyleSheet()) {
@@ -38,17 +45,17 @@ export class ContextMenuProvider {
     }
 
     // Retrieve uiSourceCode by URL to pick network resources everywhere.
-    const uiSourceCode = self.Workspace.workspace.uiSourceCodeForURL(contentProvider.contentURL());
-    if (uiSourceCode && self.Persistence.networkPersistenceManager.canSaveUISourceCodeForOverrides(uiSourceCode)) {
+    const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(contentProvider.contentURL());
+    if (uiSourceCode && NetworkPersistenceManager.instance().canSaveUISourceCodeForOverrides(uiSourceCode)) {
       contextMenu.saveSection().appendItem(Common.UIString.UIString('Save for overrides'), () => {
         uiSourceCode.commitWorkingCopy();
-        self.Persistence.networkPersistenceManager.saveUISourceCodeForOverrides(
+        NetworkPersistenceManager.instance().saveUISourceCodeForOverrides(
             /** @type {!Workspace.UISourceCode.UISourceCode} */ (uiSourceCode));
         Common.Revealer.reveal(uiSourceCode);
       });
     }
 
-    const binding = uiSourceCode && self.Persistence.persistence.binding(uiSourceCode);
+    const binding = uiSourceCode && PersistenceImpl.instance().binding(uiSourceCode);
     const fileURL = binding ? binding.fileSystem.contentURL() : contentProvider.contentURL();
     if (fileURL.startsWith('file://')) {
       const path = Common.ParsedURL.ParsedURL.urlToPlatformPath(fileURL, Host.Platform.isWin());

@@ -23,7 +23,7 @@ export const DiffWrapper = {
   /**
    * @param {!Array.<string>} lines1
    * @param {!Array.<string>} lines2
-   * @return {!Diff.Diff.DiffArray}
+   * @return {!DiffArray}
    */
   lineDiff: function(lines1, lines2) {
     /** @type {!Common.CharacterIdMap.CharacterIdMap<string>} */
@@ -36,7 +36,7 @@ export const DiffWrapper = {
     for (let i = 0; i < diff.length; i++) {
       const lines = [];
       for (let j = 0; j < diff[i][1].length; j++) {
-        lines.push(idMap.fromChar(diff[i][1][j]));
+        lines.push(idMap.fromChar(diff[i][1][j]) || '');
       }
 
       lineDiff.push({0: diff[i][0], 1: lines});
@@ -45,7 +45,7 @@ export const DiffWrapper = {
   },
 
   /**
-   * @param {!Diff.Diff.DiffArray} diff
+   * @param {!DiffArray} diff
    * @return {!Array<!Array<number>>}
    */
   convertToEditDiff: function(diff) {
@@ -81,7 +81,24 @@ export const DiffWrapper = {
         removed = 0;
       }
     }
-  }
+  },
+
+  /**
+   * Scores character-sequence diffs, giving higher scores for longer sequences.
+   * @param {string} item
+   * @param {string} against
+   * @return {number}
+   */
+  characterScore: function(item, against) {
+    let score = 0;
+    const diff = DiffWrapper.charDiff(item, against);
+    for (let i = 0; i < diff.length; ++i) {
+      if (diff[i][0] === Operation.Equal) {
+        score += diff[i][1].length * diff[i][1].length;
+      }
+    }
+    return score;
+  },
 
 };
 
@@ -94,4 +111,5 @@ export const Operation = {
 };
 
 /** @typedef {!Array<!{0: !Operation, 1: !Array<string>}>} */
+// @ts-ignore typedef
 export let DiffArray;

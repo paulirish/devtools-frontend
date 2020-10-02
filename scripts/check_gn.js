@@ -9,32 +9,14 @@ const path = require('path');
 const FRONTEND_PATH = path.resolve(__dirname, '..', 'front_end');
 
 const manifestModules = [];
-for (var config of ['inspector.json', 'devtools_app.json', 'js_app.json', 'node_app.json', 'shell.json', 'worker_app.json'])
+for (const config
+         of ['inspector.json', 'devtools_app.json', 'js_app.json', 'node_app.json', 'shell.json', 'worker_app.json']) {
   manifestModules.push(...require(path.resolve(FRONTEND_PATH, config)).modules);
-
-const utils = require('./utils');
+}
 
 const gnPath = path.resolve(__dirname, '..', 'BUILD.gn');
 const gnFile = fs.readFileSync(gnPath, 'utf-8');
 const gnLines = gnFile.split('\n');
-
-function main() {
-  let errors = [
-    ...checkNonAutostartNonRemoteModules(),
-    ...checkAllDevToolsFiles(),
-    ...checkAllDevToolsModules(),
-    ...checkCopiedDevToolsModules(),
-  ];
-  if (errors.length) {
-    console.log('DevTools BUILD.gn checker detected errors!');
-    console.log(`There's an issue with: ${gnPath}`);
-    console.log(errors.join('\n'));
-    process.exit(1);
-  }
-  console.log('DevTools BUILD.gn checker passed');
-}
-
-main();
 
 /**
  * Ensures that generated module files are in the right list in BUILD.gn.
@@ -52,18 +34,20 @@ function checkNonAutostartNonRemoteModules() {
     ];
   }
   const text = lines.join('\n');
-  const modules = manifestModules.filter(m => m.type !== 'autostart' && m.type !== 'remote').map(m => m.name);
+  const modules = manifestModules.filter(m => m.type !== 'autostart').map(m => m.name);
 
-  const missingModules = modules.filter(m => !utils.includes(text, `${m}/${m}_module.js`));
-  if (missingModules.length)
+  const missingModules = modules.filter(m => !text.includes(`${m}/${m}_module.js`));
+  if (missingModules.length) {
     errors.push(`Check that you've included [${missingModules.join(', ')}] modules in: ` + gnVariable);
+  }
 
   // e.g. "$resources_out_dir/lighthouse/lighthouse_module.js" => "lighthouse"
   const mapLineToModuleName = line => line.split('/')[2].split('_module')[0];
 
-  const extraneousModules = lines.map(mapLineToModuleName).filter(module => !utils.includes(modules, module));
-  if (extraneousModules.length)
+  const extraneousModules = lines.map(mapLineToModuleName).filter(module => !modules.includes(module));
+  if (extraneousModules.length) {
     errors.push(`Found extraneous modules [${extraneousModules.join(', ')}] in: ` + gnVariable);
+  }
 
   return errors;
 }
@@ -73,39 +57,38 @@ function checkNonAutostartNonRemoteModules() {
  * listed in BUILD.gn.
  */
 function checkAllDevToolsFiles() {
-  return checkGNVariable('all_devtools_files', (moduleJSON) => {
-    const scripts = moduleJSON.scripts || [];
+  return checkGNVariable('all_devtools_files', 'all_devtools_files', moduleJSON => {
     const resources = moduleJSON.resources || [];
     return [
       'module.json',
-      ...scripts,
       ...resources,
     ];
   });
 }
 
-function checkAllDevToolsModules() {
-  return checkGNVariable('all_devtools_modules', (moduleJSON) => {
-    return moduleJSON.modules || [];
-  });
-}
-
-function checkCopiedDevToolsModules() {
+function checkDevtoolsModuleEntrypoints() {
   return checkGNVariable(
-      'copied_devtools_modules',
-      (moduleJSON) => {
-        return moduleJSON.modules || [];
+      'devtools_module_entrypoints', 'devtools_module_entrypoint_sources',
+      (moduleJSON, folderName) => {
+        return (moduleJSON.modules || []).filter(fileName => {
+          return fileName === `${folderName}-legacy.js`;
+        });
       },
-      (buildGNPath) => (filename) => {
-        const relativePath = path.normalize(`$resources_out_dir/${buildGNPath}/${filename}`);
+      buildGNPath => filename => {
+        const relativePath = path.normalize(`${buildGNPath}/${filename}`);
         return `"${relativePath}",`;
       });
 }
 
-function checkGNVariable(gnVariable, obtainFiles, obtainRelativePath) {
+function checkGNVariable(fileName, gnVariable, obtainFiles, obtainRelativePath) {
+  const filePath = path.resolve(__dirname, '..', `${fileName}.gni`);
+  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  const linesToCheck = fileContent.split('\n');
+
   const errors = [];
-  const excludedFiles = ['axe.js', 'formatter_worker/', 'third_party/lighthouse/'].map(path.normalize);
-  const lines = selectGNLines(`${gnVariable} = [`, ']').map(path.normalize);
+  const excludedFiles =
+      ['axe.js', 'formatter_worker/', 'third_party/lighthouse/', 'third_party/i18n/'].map(path.normalize);
+  const lines = selectGNLines(`${gnVariable} = [`, ']', linesToCheck).map(path.normalize);
   if (!lines.length) {
     return [
       `Could not identify ${gnVariable} list in gn file`,
@@ -113,11 +96,11 @@ function checkGNVariable(gnVariable, obtainFiles, obtainRelativePath) {
     ];
   }
   const gnFiles = new Set(lines);
-  var moduleFiles = [];
+  let moduleFiles = [];
 
-  function addModuleFilesForDirectory(moduleJSONPath, buildGNPath) {
+  function addModuleFilesForDirectory(moduleJSONPath, buildGNPath, folderName) {
     const moduleJSON = require(moduleJSONPath);
-    const files = obtainFiles(moduleJSON)
+    const files = obtainFiles(moduleJSON, folderName)
                       .map(obtainRelativePath && obtainRelativePath(buildGNPath) || relativePathFromBuildGN)
                       .filter(file => excludedFiles.every(excludedFile => !file.includes(excludedFile)));
     moduleFiles = moduleFiles.concat(files);
@@ -133,35 +116,55 @@ function checkGNVariable(gnVariable, obtainFiles, obtainRelativePath) {
       return;
     }
     const moduleJSONPath = path.join(folderName, 'module.json');
-    if (utils.isFile(moduleJSONPath)) {
-      addModuleFilesForDirectory(moduleJSONPath, buildGNPath);
+    if (fs.existsSync(moduleJSONPath)) {
+      addModuleFilesForDirectory(moduleJSONPath, buildGNPath, path.basename(folderName));
     }
 
-    fs.readdirSync(folderName).forEach((nestedModuleName) => {
+    fs.readdirSync(folderName).forEach(nestedModuleName => {
       traverseDirectoriesForModuleJSONFiles(
           path.join(folderName, nestedModuleName), `${buildGNPath}/${nestedModuleName}`);
     });
   }
 
-  fs.readdirSync(FRONTEND_PATH).forEach((moduleName) => {
+  fs.readdirSync(FRONTEND_PATH).forEach(moduleName => {
     traverseDirectoriesForModuleJSONFiles(path.join(FRONTEND_PATH, moduleName), moduleName);
   });
 
   for (const file of moduleFiles) {
-    if (!gnFiles.has(file))
+    if (!gnFiles.has(file)) {
       errors.push(`Missing file in BUILD.gn for ${gnVariable}: ` + file);
+    }
   }
 
   return errors;
 }
 
-function selectGNLines(startLine, endLine) {
-  let lines = gnLines.map(line => line.trim());
-  let startIndex = lines.indexOf(startLine);
-  if (startIndex === -1)
+function selectGNLines(startLine, endLine, linesToCheck = gnLines) {
+  const lines = linesToCheck.map(line => line.trim());
+  const startIndex = lines.indexOf(startLine);
+  if (startIndex === -1) {
     return [];
-  let endIndex = lines.indexOf(endLine, startIndex);
-  if (endIndex === -1)
+  }
+  const endIndex = lines.indexOf(endLine, startIndex);
+  if (endIndex === -1) {
     return [];
+  }
   return lines.slice(startIndex + 1, endIndex);
 }
+
+function main() {
+  const errors = [
+    ...checkNonAutostartNonRemoteModules(),
+    ...checkAllDevToolsFiles(),
+    ...checkDevtoolsModuleEntrypoints(),
+  ];
+  if (errors.length) {
+    console.log('DevTools BUILD.gn checker detected errors!');
+    console.log(`There's an issue with: ${gnPath}`);
+    console.log(errors.join('\n'));
+    process.exit(1);
+  }
+  console.log('DevTools BUILD.gn checker passed');
+}
+
+main();

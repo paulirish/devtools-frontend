@@ -30,7 +30,9 @@
 
 import * as Bindings from '../bindings/bindings.js';
 import * as Common from '../common/common.js';
+import * as Persistence from '../persistence/persistence.js';
 import * as Search from '../search/search.js';  // eslint-disable-line no-unused-vars
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 /**
@@ -42,9 +44,9 @@ export class SourcesSearchScope {
     this._searchId = 0;
     /** @type {!Array<!Workspace.UISourceCode.UISourceCode>} */
     this._searchResultCandidates = [];
-    /** @type {?function(!Search.SearchConfig.SearchResult)} */
+    /** @type {?function(!Search.SearchConfig.SearchResult):void} */
     this._searchResultCallback = null;
-    /** @type {?function(boolean)} */
+    /** @type {?function(boolean):void} */
     this._searchFinishedCallback = null;
     /** @type {?Workspace.Workspace.ProjectSearchConfig} */
     this._searchConfig = null;
@@ -63,9 +65,9 @@ export class SourcesSearchScope {
       return 1;
     }
     const isFileSystem1 = uiSourceCode1.project().type() === Workspace.Workspace.projectTypes.FileSystem &&
-        !self.Persistence.persistence.binding(uiSourceCode1);
+        !Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode1);
     const isFileSystem2 = uiSourceCode2.project().type() === Workspace.Workspace.projectTypes.FileSystem &&
-        !self.Persistence.persistence.binding(uiSourceCode2);
+        !Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode2);
     if (isFileSystem1 !== isFileSystem2) {
       return isFileSystem1 ? 1 : -1;
     }
@@ -101,9 +103,9 @@ export class SourcesSearchScope {
    */
   _projects() {
     const searchInAnonymousAndContentScripts =
-        self.Common.settings.moduleSetting('searchInAnonymousAndContentScripts').get();
+        Common.Settings.Settings.instance().moduleSetting('searchInAnonymousAndContentScripts').get();
 
-    return self.Workspace.workspace.projects().filter(project => {
+    return Workspace.Workspace.WorkspaceImpl.instance().projects().filter(project => {
       if (project.type() === Workspace.Workspace.projectTypes.Service) {
         return false;
       }
@@ -121,8 +123,8 @@ export class SourcesSearchScope {
    * @override
    * @param {!Workspace.Workspace.ProjectSearchConfig} searchConfig
    * @param {!Common.Progress.Progress} progress
-   * @param {function(!Search.SearchConfig.SearchResult)} searchResultCallback
-   * @param {function(boolean)} searchFinishedCallback
+   * @param {function(!Search.SearchConfig.SearchResult):void} searchResultCallback
+   * @param {function(boolean):void} searchFinishedCallback
    */
   performSearch(searchConfig, progress, searchResultCallback, searchFinishedCallback) {
     this.stopSearch();
@@ -165,7 +167,7 @@ export class SourcesSearchScope {
       if (!uiSourceCode.contentType().isTextType()) {
         continue;
       }
-      const binding = self.Persistence.persistence.binding(uiSourceCode);
+      const binding = Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode);
       if (binding && binding.network === uiSourceCode) {
         continue;
       }
@@ -188,7 +190,7 @@ export class SourcesSearchScope {
    * @param {!Array<string>} files
    */
   _processMatchingFilesForProject(searchId, project, searchConfig, filesMathingFileQuery, files) {
-    if (searchId !== this._searchId) {
+    if (searchId !== this._searchId && this._searchFinishedCallback) {
       this._searchFinishedCallback(false);
       return;
     }
@@ -218,10 +220,10 @@ export class SourcesSearchScope {
   /**
    * @param {number} searchId
    * @param {!Common.Progress.Progress} progress
-   * @param {function()} callback
+   * @param {function():void} callback
    */
   _processMatchingFiles(searchId, progress, callback) {
-    if (searchId !== this._searchId) {
+    if (searchId !== this._searchId && this._searchFinishedCallback) {
       this._searchFinishedCallback(false);
       return;
     }
@@ -282,24 +284,26 @@ export class SourcesSearchScope {
      */
     function contentLoaded(uiSourceCode, content) {
       /**
-       * @param {!Common.ContentProvider.SearchMatch} a
-       * @param {!Common.ContentProvider.SearchMatch} b
+       * @param {!TextUtils.ContentProvider.SearchMatch} a
+       * @param {!TextUtils.ContentProvider.SearchMatch} b
        */
       function matchesComparator(a, b) {
         return a.lineNumber - b.lineNumber;
       }
 
       progress.worked(1);
+      /** @type {!Array<!TextUtils.ContentProvider.SearchMatch>} */
       let matches = [];
-      const queries = this._searchConfig.queries();
+      const searchConfig = /** @type {!Workspace.Workspace.ProjectSearchConfig} */ (this._searchConfig);
+      const queries = searchConfig.queries();
       if (content !== null) {
         for (let i = 0; i < queries.length; ++i) {
-          const nextMatches = Common.ContentProvider.performSearchInContent(
-              content, queries[i], !this._searchConfig.ignoreCase(), this._searchConfig.isRegex());
+          const nextMatches = TextUtils.TextUtils.performSearchInContent(
+              content, queries[i], !searchConfig.ignoreCase(), searchConfig.isRegex());
           matches = matches.mergeOrdered(nextMatches, matchesComparator);
         }
       }
-      if (matches) {
+      if (matches && this._searchResultCallback) {
         const searchResult = new FileBasedSearchResult(uiSourceCode, matches);
         this._searchResultCallback(searchResult);
       }
@@ -323,7 +327,7 @@ export class SourcesSearchScope {
 export class FileBasedSearchResult {
   /**
    * @param {!Workspace.UISourceCode.UISourceCode} uiSourceCode
-   * @param {!Array.<!Common.ContentProvider.SearchMatch>} searchMatches
+   * @param {!Array.<!TextUtils.ContentProvider.SearchMatch>} searchMatches
    */
   constructor(uiSourceCode, searchMatches) {
     this._uiSourceCode = uiSourceCode;

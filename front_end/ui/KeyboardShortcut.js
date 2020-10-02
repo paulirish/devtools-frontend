@@ -27,12 +27,96 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import * as Host from '../host/host.js';
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
-/**
- * @unrestricted
- */
+import * as Host from '../host/host.js';
+import {DefaultShortcutSetting} from './ShortcutRegistry.js';
+
+
 export class KeyboardShortcut {
+  /**
+   * @param {!Array.<!Descriptor>} descriptors
+   * @param {string} action
+   * @param {!Type} type
+   * @param {!Set.<string>=} keybindSets
+   */
+  constructor(descriptors, action, type, keybindSets) {
+    this.descriptors = descriptors;
+    this.action = action;
+    this.type = type;
+    this.keybindSets = keybindSets;
+  }
+
+  /**
+   * @return {string}
+   */
+  title() {
+    return this.descriptors.map(descriptor => descriptor.name).join(' ');
+  }
+
+  /**
+  * @return {boolean}
+  */
+  isDefault() {
+    return this.type === Type.DefaultShortcut ||
+        (this.type === Type.KeybindSetShortcut && this.keybindSets.has(DefaultShortcutSetting));
+  }
+
+  /**
+   * @param {!Type} type
+   * @return {!KeyboardShortcut}
+   */
+  changeType(type) {
+    return new KeyboardShortcut(this.descriptors, this.action, type);
+  }
+
+  /**
+   * @param {!Array.<!Descriptor>} descriptors
+   * @return {!KeyboardShortcut}
+   */
+  changeKeys(descriptors) {
+    this.descriptors = descriptors;
+    return this;
+  }
+
+  /**
+   * @param {!Array.<!Descriptor>} descriptors
+   * @return {boolean}
+   */
+  descriptorsMatch(descriptors) {
+    if (descriptors.length !== this.descriptors.length) {
+      return false;
+    }
+    return descriptors.every((descriptor, index) => descriptor.key === this.descriptors[index].key);
+  }
+
+  /**
+   * @param {string} keybindSet
+   * @return {boolean}
+   */
+  hasKeybindSet(keybindSet) {
+    return !this.keybindSets || this.keybindSets.has(keybindSet);
+  }
+
+  /**
+   * @param {!KeyboardShortcut} shortcut
+   * @return {boolean}
+   */
+  equals(shortcut) {
+    return this.descriptorsMatch(shortcut.descriptors) && this.type === shortcut.type &&
+        this.action === shortcut.action;
+  }
+
+  /**
+   * @param {!{action: string, descriptors: !Array.<!Descriptor>, type: !Type}} settingObject
+   * @return {!KeyboardShortcut}
+   */
+  static createShortcutFromSettingObject(settingObject) {
+    return new KeyboardShortcut(settingObject.descriptors, settingObject.action, settingObject.type);
+  }
+
+
   /**
    * Creates a number encoding keyCode in the lower 8 bits and modifiers mask in the higher 8 bits.
    * It is useful for matching pressed keys.
@@ -181,6 +265,16 @@ export class KeyboardShortcut {
   }
 
   /**
+   * @param {number} key
+   * @return {boolean}
+   */
+  static isModifier(key) {
+    const {keyCode} = KeyboardShortcut.keyCodeAndModifiersFromKey(key);
+    return keyCode === Keys.Shift.code || keyCode === Keys.Ctrl.code || keyCode === Keys.Alt.code ||
+        keyCode === Keys.Meta.code;
+  }
+
+  /**
    * @param {number|undefined} modifiers
    * @return {string}
    */
@@ -230,6 +324,7 @@ export const Keys = {
   Enter: {code: 13, name: {mac: '\u21a9', other: 'Enter'}},
   Shift: {code: 16, name: {mac: '\u21e7', other: 'Shift'}},
   Ctrl: {code: 17, name: 'Ctrl'},
+  Alt: {code: 18, name: 'Alt'},
   Esc: {code: 27, name: 'Esc'},
   Space: {code: 32, name: 'Space'},
   PageUp: {code: 33, name: {mac: '\u21de', other: 'PageUp'}},      // also NUM_NORTH_EAST
@@ -278,6 +373,15 @@ export const Keys = {
     // "default" command/ctrl key for platform, Command on Mac, Ctrl on other platforms
     return Host.Platform.isMac() ? this.Meta : this.Ctrl;
   },
+};
+
+/** @enum {string} */
+export const Type = {
+  UserShortcut: 'UserShortcut',
+  DefaultShortcut: 'DefaultShortcut',
+  DisabledDefault: 'DisabledDefault',
+  UnsetShortcut: 'UnsetShortcut',
+  KeybindSetShortcut: 'KeybindSetShortcut',
 };
 
 export const KeyBindings = {};

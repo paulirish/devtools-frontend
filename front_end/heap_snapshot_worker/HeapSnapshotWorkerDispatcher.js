@@ -31,22 +31,46 @@
 import * as HeapSnapshotModel from '../heap_snapshot_model/heap_snapshot_model.js';  // eslint-disable-line no-unused-vars
 
 /**
+ * @typedef {{
+ *   callId: (number|undefined),
+ *   result: *,
+ *   error: (string|undefined),
+ *   errorCallStack: (!Object|undefined),
+ *   errorMethodName: (string|undefined),
+ * }}
+ */
+let DispatcherResponse;  // eslint-disable-line no-unused-vars
+
+/**
  * @unrestricted
+
  */
 export class HeapSnapshotWorkerDispatcher {
+  /**
+   *
+   * @param {!Worker} globalObject
+   * @param {!Function} postMessage
+   */
   constructor(globalObject, postMessage) {
+    /**
+     * @type {!Array<*>};
+     */
     this._objects = [];
     this._global = globalObject;
     this._postMessage = postMessage;
   }
 
+  /**
+   * @param {string} name
+   * @return {!Function}
+   */
   _findFunction(name) {
     const path = name.split('.');
-    let result = this._global;
+    let result = /** @type {*} */ (this._global);
     for (let i = 0; i < path.length; ++i) {
       result = result[path[i]];
     }
-    return result;
+    return /** @type {!Function} */ (result);
   }
 
   /**
@@ -57,18 +81,27 @@ export class HeapSnapshotWorkerDispatcher {
     this._postMessage({eventName: name, data: data});
   }
 
-  dispatchMessage(event) {
-    const data = /** @type {!HeapSnapshotModel.HeapSnapshotModel.WorkerCommand } */ (event.data);
-    const response = {callId: data.callId};
+  /**
+   * @param {{data: !HeapSnapshotModel.HeapSnapshotModel.WorkerCommand}} event
+   */
+  dispatchMessage({data}) {
+    /**
+     * @type {!DispatcherResponse}
+     */
+    const response =
+        {callId: data.callId, result: null, error: undefined, errorCallStack: undefined, errorMethodName: undefined};
     try {
       switch (data.disposition) {
-        case 'create':
+        case 'create': {
           const constructorFunction = this._findFunction(data.methodName);
+          // @ts-ignore
           this._objects[data.objectId] = new constructorFunction(this);
           break;
-        case 'dispose':
+        }
+        case 'dispose': {
           delete this._objects[data.objectId];
           break;
+        }
         case 'getter': {
           const object = this._objects[data.objectId];
           const result = object[data.methodName];
@@ -89,17 +122,18 @@ export class HeapSnapshotWorkerDispatcher {
           response.result = object[data.methodName].apply(object, data.methodArguments);
           break;
         }
-        case 'evaluateForTest':
+        case 'evaluateForTest': {
           try {
             response.result = self.eval(data.source);
-          } catch (e) {
-            response.result = e.toString();
+          } catch (error) {
+            response.result = error.toString();
           }
           break;
+        }
       }
-    } catch (e) {
-      response.error = e.toString();
-      response.errorCallStack = e.stack;
+    } catch (error) {
+      response.error = error.toString();
+      response.errorCallStack = error.stack;
       if (data.methodName) {
         response.errorMethodName = data.methodName;
       }

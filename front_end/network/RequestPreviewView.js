@@ -28,9 +28,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';  // eslint-disable-line no-unused-vars
 import * as SourceFrame from '../source_frame/source_frame.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as UI from '../ui/ui.js';
 
 import {RequestHTMLView} from './RequestHTMLView.js';
@@ -71,8 +75,8 @@ export class RequestPreviewView extends RequestResponseView {
       return new UI.EmptyWidget.EmptyWidget(Common.UIString.UIString('Failed to load response data'));
     }
 
-    const whitelist = new Set(['text/html', 'text/plain', 'application/xhtml+xml']);
-    if (!whitelist.has(this.request.mimeType)) {
+    const allowlist = new Set(['text/html', 'text/plain', 'application/xhtml+xml']);
+    if (!allowlist.has(this.request.mimeType)) {
       return null;
     }
 
@@ -85,7 +89,7 @@ export class RequestPreviewView extends RequestResponseView {
       return jsonView;
     }
 
-    const dataURL = Common.ContentProvider.contentAsDataURL(
+    const dataURL = TextUtils.ContentProvider.contentAsDataURL(
         contentData.content, this.request.mimeType, contentData.encoded, this.request.charset());
     return dataURL ? new RequestHTMLView(dataURL) : null;
   }

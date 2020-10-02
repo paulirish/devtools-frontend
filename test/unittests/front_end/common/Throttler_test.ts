@@ -4,7 +4,9 @@
 
 const {assert} = chai;
 
-import {Throttler} from '../../../../front_end/common/Throttler.js';
+import * as Common from '../../../../front_end/common/common.js';
+
+const Throttler = Common.Throttler.Throttler;
 
 describe('Throttler class', () => {
   it('is able to schedule a process as soon as possible', () => {
@@ -17,10 +19,10 @@ describe('Throttler class', () => {
     const throttler = new Throttler(10);
     const promiseTest = throttler.schedule(assignVar1, true);
     promiseTest.then(() => {
-      assert.equal(result, 'new value', 'process was not scheduled correctly');
+      assert.strictEqual(result, 'new value', 'process was not scheduled correctly');
     });
 
-    assert.equal(result, 'original value', 'process was not scheduled correctly');
+    assert.strictEqual(result, 'original value', 'process was not scheduled correctly');
   });
 
   it('is able to schedule two processes as soon as possible', () => {
@@ -38,9 +40,9 @@ describe('Throttler class', () => {
     const promiseTest = throttler.schedule(assignVar1, true);
     throttler.schedule(assignVar2, true);
     promiseTest.then(() => {
-      assert.equal(result, 'new value 2', 'process was not scheduled correctly');
+      assert.strictEqual(result, 'new value 2', 'process was not scheduled correctly');
     });
 
-    assert.equal(result, 'original value', 'process was not scheduled correctly');
+    assert.strictEqual(result, 'original value', 'process was not scheduled correctly');
   });
 });

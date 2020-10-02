@@ -28,9 +28,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
-import * as ProtocolModule from '../protocol/protocol.js';
+import * as ProtocolClient from '../protocol_client/protocol_client.js';
 
 import {DebuggerModel, FunctionDetails} from './DebuggerModel.js';  // eslint-disable-line no-unused-vars
 import {HeapProfilerModel} from './HeapProfilerModel.js';
@@ -39,9 +42,7 @@ import {RemoteFunction, RemoteObject,
         RemoteObjectProperty, ScopeRef, ScopeRemoteObject,} from './RemoteObject.js';  // eslint-disable-line no-unused-vars
 import {Capability, SDKModel, Target, Type} from './SDKModel.js';  // eslint-disable-line no-unused-vars
 
-/**
- * @unrestricted
- */
+
 export class RuntimeModel extends SDKModel {
   /**
    * @param {!Target} target
@@ -54,15 +55,17 @@ export class RuntimeModel extends SDKModel {
     this._agent.enable();
     /** @type {!Map<number, !ExecutionContext>} */
     this._executionContextById = new Map();
+    /** @type {function(!ExecutionContext,!ExecutionContext):number} */
     this._executionContextComparator = ExecutionContext.comparator;
     /** @type {?boolean} */
     this._hasSideEffectSupport = null;
 
-    if (self.Common.settings.moduleSetting('customFormatters').get()) {
+    if (Common.Settings.Settings.instance().moduleSetting('customFormatters').get()) {
       this._agent.setCustomObjectFormatterEnabled(true);
     }
 
-    self.Common.settings.moduleSetting('customFormatters')
+    Common.Settings.Settings.instance()
+        .moduleSetting('customFormatters')
         .addChangeListener(this._customFormattersStateChanged.bind(this));
   }
 
@@ -71,7 +74,7 @@ export class RuntimeModel extends SDKModel {
    * @return {boolean}
    */
   static isSideEffectFailure(response) {
-    const exceptionDetails = !response[ProtocolModule.InspectorBackend.ProtocolError] && response.exceptionDetails;
+    const exceptionDetails = !response[ProtocolClient.InspectorBackend.ProtocolError] && response.exceptionDetails;
     return !!(
         exceptionDetails && exceptionDetails.exception && exceptionDetails.exception.description &&
         exceptionDetails.exception.description.startsWith('EvalError: Possible side-effect in debug-evaluate'));
@@ -99,14 +102,14 @@ export class RuntimeModel extends SDKModel {
   }
 
   /**
-   * @param {function(!ExecutionContext,!ExecutionContext)} comparator
+   * @param {function(!ExecutionContext,!ExecutionContext):number} comparator
    */
   setExecutionContextComparator(comparator) {
     this._executionContextComparator = comparator;
   }
 
   /**
-   * @return {function(!ExecutionContext,!ExecutionContext)} comparator
+   * @return {function(!ExecutionContext,!ExecutionContext):number} comparator
    */
   executionContextComparator() {
     return this._executionContextComparator;
@@ -269,8 +272,8 @@ export class RuntimeModel extends SDKModel {
       executionContextId: executionContextId,
     });
 
-    if (response[ProtocolModule.InspectorBackend.ProtocolError]) {
-      console.error(response[ProtocolModule.InspectorBackend.ProtocolError]);
+    if (response[ProtocolClient.InspectorBackend.ProtocolError]) {
+      console.error(response[ProtocolClient.InspectorBackend.ProtocolError]);
       return null;
     }
     return {scriptId: response.scriptId, exceptionDetails: response.exceptionDetails};
@@ -301,7 +304,7 @@ export class RuntimeModel extends SDKModel {
       awaitPromise,
     });
 
-    const error = response[ProtocolModule.InspectorBackend.ProtocolError];
+    const error = response[ProtocolClient.InspectorBackend.ProtocolError];
     if (error) {
       console.error(error);
       return {error: error};
@@ -319,7 +322,7 @@ export class RuntimeModel extends SDKModel {
     }
     const response = await this._agent.invoke_queryObjects(
         {prototypeObjectId: /** @type {string} */ (prototype.objectId), objectGroup: 'console'});
-    const error = response[ProtocolModule.InspectorBackend.ProtocolError];
+    const error = response[ProtocolClient.InspectorBackend.ProtocolError];
     if (error) {
       console.error(error);
       return {error: error};
@@ -339,7 +342,7 @@ export class RuntimeModel extends SDKModel {
    */
   async heapUsage() {
     const result = await this._agent.invoke_getHeapUsage({});
-    return result[ProtocolModule.InspectorBackend.ProtocolError] ? null : result;
+    return result[ProtocolClient.InspectorBackend.ProtocolError] ? null : result;
   }
 
   /**
@@ -530,7 +533,7 @@ export class RuntimeModel extends SDKModel {
   }
 
   /**
-   * @return {!Promise}
+   * @return {!Promise<*>}
    */
   terminateExecution() {
     return this._agent.invoke_terminateExecution({});
@@ -817,9 +820,10 @@ export class ExecutionContext {
       timeout: options.timeout,
       disableBreaks: options.disableBreaks,
       replMode: options.replMode,
+      allowUnsafeEvalBlockedByCSP: options.allowUnsafeEvalBlockedByCSP,
     });
 
-    const error = response[ProtocolModule.InspectorBackend.ProtocolError];
+    const error = response[ProtocolClient.InspectorBackend.ProtocolError];
     if (error) {
       console.error(error);
       return {error: error};
@@ -832,7 +836,7 @@ export class ExecutionContext {
    */
   async globalLexicalScopeNames() {
     const response = await this.runtimeModel._agent.invoke_globalLexicalScopeNames({executionContextId: this.id});
-    return response[ProtocolModule.InspectorBackend.ProtocolError] ? [] : response.names;
+    return response[ProtocolClient.InspectorBackend.ProtocolError] ? [] : response.names;
   }
 
   /**
@@ -870,9 +874,9 @@ export class ExecutionContext {
 SDKModel.register(RuntimeModel, Capability.JS, true);
 
 /** @typedef {{
- *    object: (!RemoteObject|undefined),
- *    exceptionDetails: (!Protocol.Runtime.ExceptionDetails|undefined),
- *    error: (!ProtocolModule.InspectorBackend.ProtocolError|undefined)}
+ *    object: !RemoteObject,
+ *    exceptionDetails: (!Protocol.Runtime.ExceptionDetails|undefined)}|{
+ *    error: (!ProtocolClient.InspectorBackend.ProtocolError|undefined)}
  *  }}
  */
 export let EvaluationResult;
@@ -894,14 +898,15 @@ export let CompileScriptResult;
  *    throwOnSideEffect: (boolean|undefined),
  *    timeout: (number|undefined),
  *    disableBreaks: (boolean|undefined),
- *    replMode: (boolean|undefined)
+ *    replMode: (boolean|undefined),
+ *    allowUnsafeEvalBlockedByCSP: (boolean|undefined)
  *  }}
  */
 export let EvaluationOptions;
 
 /** @typedef {{
  *    objects: (!RemoteObject|undefined),
- *    error: (!ProtocolModule.InspectorBackend.ProtocolError|undefined)}
+ *    error: (!ProtocolClient.InspectorBackend.ProtocolError|undefined)}
  *  }}
  */
 export let QueryObjectResult;

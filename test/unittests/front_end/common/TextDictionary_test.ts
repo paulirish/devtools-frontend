@@ -4,8 +4,10 @@
 
 const {assert} = chai;
 
-import {TextDictionary} from '../../../../front_end/common/TextDictionary.js';
-import {Trie} from '../../../../front_end/common/Trie.js';
+import * as Common from '../../../../front_end/common/common.js';
+
+const TextDictionary = Common.TextDictionary.TextDictionary;
+const Trie = Common.Trie.Trie;
 
 describe('Text Dictionary', () => {
   it('can be created with its basic attributes', () => {
@@ -51,8 +53,8 @@ describe('Text Dictionary', () => {
     textDic.addWord('ten');
     textDic.addWord('nine');
     const foundWords = textDic.wordsWithPrefix('te');
-    assert.equal(foundWords[0], 'test', 'first word was not retrieved');
-    assert.equal(foundWords[1], 'ten', 'second word was not retrieved');
+    assert.strictEqual(foundWords[0], 'test', 'first word was not retrieved');
+    assert.strictEqual(foundWords[1], 'ten', 'second word was not retrieved');
   });
 
   it('retrieve the word count for a certain word', () => {
@@ -60,7 +62,7 @@ describe('Text Dictionary', () => {
     textDic.addWord('test');
     textDic.addWord('test');
     textDic.addWord('ten');
-    assert.equal(textDic.wordCount('test'), 2, 'word count is incorrect');
+    assert.strictEqual(textDic.wordCount('test'), 2, 'word count is incorrect');
   });
 
   it('retrieve the word count for a certain word that is not in the dictionary', () => {
@@ -68,7 +70,7 @@ describe('Text Dictionary', () => {
     textDic.addWord('test');
     textDic.addWord('test');
     textDic.addWord('ten');
-    assert.equal(textDic.wordCount('testing'), 0, 'word count is incorrect');
+    assert.strictEqual(textDic.wordCount('testing'), 0, 'word count is incorrect');
   });
 
   it('reset the dictionary after adding words to it', () => {
@@ -79,7 +81,7 @@ describe('Text Dictionary', () => {
     textDic.reset();
     assert.isFalse(textDic.hasWord('test'), 'first word still in the dictionary');
     assert.isFalse(textDic.hasWord('ten'), 'second word still in the dictionary');
-    assert.equal(textDic.wordCount('test'), 0, 'first word still has a count');
-    assert.equal(textDic.wordCount('ten'), 0, 'second word still has a count');
+    assert.strictEqual(textDic.wordCount('test'), 0, 'first word still has a count');
+    assert.strictEqual(textDic.wordCount('ten'), 0, 'second word still has a count');
   });
 });

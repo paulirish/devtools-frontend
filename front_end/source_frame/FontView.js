@@ -26,8 +26,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as UI from '../ui/ui.js';
 
 /**
@@ -36,7 +40,7 @@ import * as UI from '../ui/ui.js';
 export class FontView extends UI.View.SimpleView {
   /**
    * @param {string} mimeType
-   * @param {!Common.ContentProvider.ContentProvider} contentProvider
+   * @param {!TextUtils.ContentProvider.ContentProvider} contentProvider
    */
   constructor(mimeType, contentProvider) {
     super(Common.UIString.UIString('Font'));
@@ -59,13 +63,14 @@ export class FontView extends UI.View.SimpleView {
 
   /**
    * @param {string} uniqueFontName
-   * @param {!Common.ContentProvider.DeferredContent} deferredContent
+   * @param {!TextUtils.ContentProvider.DeferredContent} deferredContent
    */
   _onFontContentLoaded(uniqueFontName, deferredContent) {
     const {content} = deferredContent;
-    const url = content ? Common.ContentProvider.contentAsDataURL(content, this._mimeType, true) : this._url;
+    const url = content ? TextUtils.ContentProvider.contentAsDataURL(content, this._mimeType, true) : this._url;
     this.fontStyleElement.textContent =
         Platform.StringUtilities.sprintf('@font-face { font-family: "%s"; src: url(%s); }', uniqueFontName, url);
+    this.updateFontPreviewSize();
   }
 
   _createContentIfNeeded() {

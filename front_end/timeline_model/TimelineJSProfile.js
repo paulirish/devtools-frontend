@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
 
 import {RecordType, TimelineModelImpl} from './TimelineModel.js';
@@ -87,7 +91,8 @@ export class TimelineJSProfileProcessor {
     let ordinal = 0;
     const showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
     const showRuntimeCallStats = Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats');
-    const showNativeFunctions = self.Common.settings.moduleSetting('showNativeFunctionsInJSProfile').get();
+    const showNativeFunctions =
+        Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get();
 
     /**
      * @param {!SDK.TracingModel.Event} e

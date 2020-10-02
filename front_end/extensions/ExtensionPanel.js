@@ -28,7 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import * as ProtocolModule from '../protocol/protocol.js';  // eslint-disable-line no-unused-vars
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as ProtocolClient from '../protocol_client/protocol_client.js';  // eslint-disable-line no-unused-vars
 import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
 
@@ -256,7 +259,7 @@ export class ExtensionSidebarPane extends UI.View.SimpleView {
   /**
    * @param {string} title
    * @param {function(?string=)} callback
-   * @param {?ProtocolModule.InspectorBackend.ProtocolError} error
+   * @param {?ProtocolClient.InspectorBackend.ProtocolError} error
    * @param {?SDK.RemoteObject.RemoteObject} result
    * @param {boolean=} wasThrown
    */

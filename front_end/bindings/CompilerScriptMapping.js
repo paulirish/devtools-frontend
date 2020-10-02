@@ -30,8 +30,10 @@
 
 import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
+import {BlackboxManager} from './BlackboxManager.js';
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
 import {DebuggerSourceMapping, DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';  // eslint-disable-line no-unused-vars
 import {NetworkProject} from './NetworkProject.js';
@@ -107,7 +109,7 @@ export class CompilerScriptMapping {
   _addStubUISourceCode(script) {
     const stubUISourceCode = this._stubProject.addContentProvider(
         script.sourceURL + ':sourcemap',
-        Common.StaticContentProvider.StaticContentProvider.fromString(
+        TextUtils.StaticContentProvider.StaticContentProvider.fromString(
             script.sourceURL, Common.ResourceType.resourceTypes.Script,
             '\n\n\n\n\n// Please wait a bit.\n// Compiled script is not shown while source map is being loaded!'),
         'text/javascript');
@@ -120,7 +122,9 @@ export class CompilerScriptMapping {
   async _removeStubUISourceCode(script) {
     const uiSourceCode = this._stubUISourceCodes.get(script);
     this._stubUISourceCodes.delete(script);
-    this._stubProject.removeFile(uiSourceCode.url());
+    if (uiSourceCode) {
+      this._stubProject.removeFile(uiSourceCode.url());
+    }
     await this._debuggerWorkspaceBinding.updateLocations(script);
   }
 
@@ -129,7 +133,7 @@ export class CompilerScriptMapping {
    * @return {?string}
    */
   static uiSourceCodeOrigin(uiSourceCode) {
-    const sourceMap = uiSourceCode[_sourceMapSymbol];
+    const sourceMap = uiSourceCodeToSourceMap.get(uiSourceCode);
     if (!sourceMap) {
       return null;
     }
@@ -206,7 +210,7 @@ export class CompilerScriptMapping {
    * @return {!Array<!SDK.DebuggerModel.Location>}
    */
   uiLocationToRawLocations(uiSourceCode, lineNumber, columnNumber) {
-    const sourceMap = uiSourceCode[_sourceMapSymbol];
+    const sourceMap = uiSourceCodeToSourceMap.get(uiSourceCode);
     if (!sourceMap) {
       return [];
     }
@@ -250,7 +254,7 @@ export class CompilerScriptMapping {
     const sourceMap = /** @type {!SDK.SourceMap.SourceMap} */ (event.data.sourceMap);
     await this._removeStubUISourceCode(script);
 
-    if (self.Bindings.blackboxManager.isBlackboxedURL(script.sourceURL, script.isContentScript())) {
+    if (BlackboxManager.instance().isBlackboxedURL(script.sourceURL, script.isContentScript())) {
       this._sourceMapAttachedForTest(sourceMap);
       return;
     }
@@ -316,7 +320,7 @@ export class CompilerScriptMapping {
    * @return {boolean}
    */
   static uiLineHasMapping(uiSourceCode, lineNumber) {
-    const sourceMap = uiSourceCode[_sourceMapSymbol];
+    const sourceMap = uiSourceCodeToSourceMap.get(uiSourceCode);
     if (!sourceMap) {
       return true;
     }
@@ -331,7 +335,8 @@ export class CompilerScriptMapping {
   }
 }
 
-const _sourceMapSymbol = Symbol('_sourceMapSymbol');
+/** @type {!WeakMap<!Workspace.UISourceCode.UISourceCode, !SDK.SourceMap.SourceMap>} */
+const uiSourceCodeToSourceMap = new WeakMap();
 
 class Binding {
   /**
@@ -344,23 +349,24 @@ class Binding {
 
     /** @type {!Array<!SDK.SourceMap.SourceMap>} */
     this._referringSourceMaps = [];
+    /** @type {?SDK.SourceMap.SourceMap} */
     this._activeSourceMap = null;
     this._uiSourceCode = null;
   }
 
   /**
-   * @param {string} frameId
+   * @param {!Protocol.Page.FrameId} frameId
    */
   _recreateUISourceCodeIfNeeded(frameId) {
     const sourceMap = this._referringSourceMaps.peekLast();
-    if (this._activeSourceMap === sourceMap) {
+    if (!sourceMap || this._activeSourceMap === sourceMap) {
       return;
     }
     this._activeSourceMap = sourceMap;
 
     const newUISourceCode =
         this._project.createUISourceCode(this._url, Common.ResourceType.resourceTypes.SourceMapScript);
-    newUISourceCode[_sourceMapSymbol] = sourceMap;
+    uiSourceCodeToSourceMap.set(newUISourceCode, sourceMap);
     const contentProvider =
         sourceMap.sourceContentProvider(this._url, Common.ResourceType.resourceTypes.SourceMapScript);
     const mimeType = Common.ResourceType.ResourceType.mimeFromURL(this._url) || 'text/javascript';
@@ -381,7 +387,7 @@ class Binding {
 
   /**
    * @param {!SDK.SourceMap.SourceMap} sourceMap
-   * @param {string} frameId
+   * @param {!Protocol.Page.FrameId} frameId
    */
   addSourceMap(sourceMap, frameId) {
     if (this._uiSourceCode) {
@@ -393,17 +399,17 @@ class Binding {
 
   /**
    * @param {!SDK.SourceMap.SourceMap} sourceMap
-   * @param {string} frameId
+   * @param {!Protocol.Page.FrameId} frameId
    */
   removeSourceMap(sourceMap, frameId) {
-    NetworkProject.removeFrameAttribution(
-        /** @type {!Workspace.UISourceCode.UISourceCode} */ (this._uiSourceCode), frameId);
+    const uiSourceCode = /** @type {!Workspace.UISourceCode.UISourceCode} */ (this._uiSourceCode);
+    NetworkProject.removeFrameAttribution(uiSourceCode, frameId);
     const lastIndex = this._referringSourceMaps.lastIndexOf(sourceMap);
     if (lastIndex !== -1) {
       this._referringSourceMaps.splice(lastIndex, 1);
     }
     if (!this._referringSourceMaps.length) {
-      this._project.removeFile(this._uiSourceCode.url());
+      this._project.removeFile(uiSourceCode.url());
       this._uiSourceCode = null;
     } else {
       this._recreateUISourceCodeIfNeeded(frameId);

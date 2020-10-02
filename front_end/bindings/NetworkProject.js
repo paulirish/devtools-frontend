@@ -27,12 +27,37 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
 import * as Workspace from '../workspace/workspace.js';  // eslint-disable-line no-unused-vars
 
-export class NetworkProjectManager extends Common.ObjectWrapper.ObjectWrapper {}
+/**
+ * @type {!NetworkProjectManager}
+ */
+let networkProjectManagerInstance;
+
+export class NetworkProjectManager extends Common.ObjectWrapper.ObjectWrapper {
+  /**
+   * @private
+   */
+  constructor() {
+    super();
+  }
+
+  /**
+   * @param {{forceNew: boolean}} opts
+   */
+  static instance({forceNew} = {forceNew: false}) {
+    if (!networkProjectManagerInstance || forceNew) {
+      networkProjectManagerInstance = new NetworkProjectManager();
+    }
+
+    return networkProjectManagerInstance;
+  }
+}
 
 export const Events = {
   FrameAttributionAdded: Symbol('FrameAttributionAdded'),
@@ -104,7 +129,7 @@ export class NetworkProject {
     }
 
     const data = {uiSourceCode: uiSourceCode, frame: frame};
-    self.Bindings.networkProjectManager.dispatchEventToListeners(Events.FrameAttributionAdded, data);
+    NetworkProjectManager.instance().dispatchEventToListeners(Events.FrameAttributionAdded, data);
   }
 
   /**
@@ -118,13 +143,16 @@ export class NetworkProject {
     }
     const attributionInfo = frameAttribution.get(frameId);
     console.assert(attributionInfo, 'Failed to remove frame attribution for url: ' + uiSourceCode.url());
+    if (!attributionInfo) {
+      return;
+    }
     attributionInfo.count -= 1;
     if (attributionInfo.count > 0) {
       return;
     }
     frameAttribution.delete(frameId);
     const data = {uiSourceCode: uiSourceCode, frame: attributionInfo.frame};
-    self.Bindings.networkProjectManager.dispatchEventToListeners(Events.FrameAttributionRemoved, data);
+    NetworkProjectManager.instance().dispatchEventToListeners(Events.FrameAttributionRemoved, data);
   }
 
   /**
@@ -141,6 +169,14 @@ export class NetworkProject {
    */
   static setTargetForProject(project, target) {
     project[_targetSymbol] = target;
+  }
+
+  /**
+   * @param {!Workspace.Workspace.Project} project
+   * @return {?SDK.SDKModel.Target}
+   */
+  static getTargetForProject(project) {
+    return project[_targetSymbol] || null;
   }
 
   /**

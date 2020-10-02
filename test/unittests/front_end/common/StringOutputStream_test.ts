@@ -4,18 +4,20 @@
 
 const {assert} = chai;
 
-import {StringOutputStream} from '../../../../front_end/common/StringOutputStream.js';
+import * as Common from '../../../../front_end/common/common.js';
+
+const StringOutputStream = Common.StringOutputStream.StringOutputStream;
 
 describe('StringOutputStream', () => {
   it('can be instantiated without issues', () => {
     const stream = new StringOutputStream();
-    assert.equal(stream.data(), '', 'data is not empty');
+    assert.strictEqual(stream.data(), '', 'data is not empty');
   });
 
   it('can be closed without issues', async () => {
     const stream = new StringOutputStream();
     await stream.close();
-    assert.equal(stream.data(), '', 'data is not empty');
+    assert.strictEqual(stream.data(), '', 'data is not empty');
   });
 
   it('can be written to without issues', async () => {
@@ -24,6 +26,6 @@ describe('StringOutputStream', () => {
     await stream.write(' ');
     await stream.write('world!');
     await stream.close();
-    assert.equal(stream.data(), 'Hello world!', 'data does not match what was written');
+    assert.strictEqual(stream.data(), 'Hello world!', 'data does not match what was written');
   });
 });

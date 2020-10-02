@@ -5,6 +5,7 @@
 import * as AnimationModule from './animation.js';
 
 self.Animation = self.Animation || {};
+/* global Animation:writable */
 Animation = Animation || {};
 
 /**
@@ -46,6 +47,3 @@ Animation.AnimationUI = AnimationModule.AnimationUI.AnimationUI;
  * @enum {string}
  */
 Animation.AnimationUI.Events = AnimationModule.AnimationUI.Events;
-
-/** @typedef {{ endTime: number, screenshots: !Array.<string>}} */
-Animation.AnimationModel.ScreenshotCapture.Request;

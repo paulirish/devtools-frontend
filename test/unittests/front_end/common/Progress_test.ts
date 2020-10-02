@@ -4,9 +4,12 @@
 
 const {assert} = chai;
 
-import {Progress, CompositeProgress, ProgressProxy} from '../../../../front_end/common/Progress.js';
+import * as Common from '../../../../front_end/common/common.js';
 
-class MockProgressIndicator implements Progress {
+const CompositeProgress = Common.Progress.CompositeProgress;
+const ProgressProxy = Common.Progress.ProgressProxy;
+
+class MockProgressIndicator implements Common.Progress.Progress {
   private isCanceledInternal = false;
   private totalWork = 0;
   private workCompleted = 0;
@@ -63,30 +66,30 @@ describe('Composite Progress Bar', () => {
     const composite = new CompositeProgress(indicator);
     const subProgress = composite.createSubProgress();
 
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress.setTitle('cuckooing');
     subProgress.setWorked(10);
-    assert.equal(indicator.getTitle, 'cuckooing');
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'cuckooing');
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress.setTotalWork(100);
-    assert.equal(indicator.getTitle, 'cuckooing');
-    assert.equal(indicator.getWorkCompleted, 0.1);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'cuckooing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.1);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress.setWorked(20, 'meowing');
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 0.2);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.2);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress.done();
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 1);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 1);
+    assert.strictEqual(indicator.getTotalWork, 1);
   });
 
   it('works correctly with multiple subprogresses', () => {
@@ -97,43 +100,43 @@ describe('Composite Progress Bar', () => {
     // Creates a sub progress with the weight of 3
     const subProgress2 = composite.createSubProgress(3);
 
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress1.setTitle('cuckooing');
     subProgress1.setTotalWork(100);
     subProgress1.setWorked(20);
-    assert.equal(indicator.getTitle, 'cuckooing');
-    assert.equal(indicator.getWorkCompleted, 0.05);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'cuckooing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.05);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress2.setWorked(10);
-    assert.equal(indicator.getTitle, 'cuckooing');
-    assert.equal(indicator.getWorkCompleted, 0.05);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'cuckooing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.05);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress2.setTotalWork(10);
     subProgress2.setWorked(3, 'barking');
-    assert.equal(indicator.getTitle, 'barking');
-    assert.equal(indicator.getWorkCompleted, 0.275);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'barking');
+    assert.strictEqual(indicator.getWorkCompleted, 0.275);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress1.setWorked(50, 'meowing');
     subProgress2.setWorked(5);
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 0.5);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.5);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress2.done();
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 0.875);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.875);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress1.done();
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 1);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 1);
+    assert.strictEqual(indicator.getTotalWork, 1);
   });
 
   it('returns the correct cancellation status', () => {
@@ -153,33 +156,33 @@ describe('Composite Progress Bar', () => {
     const composite1 = new CompositeProgress(subProgress01);
     const subProgress11 = composite1.createSubProgress(10);  // Weight should have no effect
 
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress11.setWorked(10);
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress11.setTotalWork(100);
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0.1);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0.1);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     subProgress11.setWorked(50, 'meowing');
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 0.5);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 0.5);
+    assert.strictEqual(indicator.getTotalWork, 1);
 
     assert.isFalse(subProgress11.isCanceled(), 'progress should not be canceled');
     indicator.cancel();
     assert.isTrue(subProgress11.isCanceled(), 'progress should be canceled');
 
     subProgress11.done();
-    assert.equal(indicator.getTitle, 'meowing');
-    assert.equal(indicator.getWorkCompleted, 1);
-    assert.equal(indicator.getTotalWork, 1);
+    assert.strictEqual(indicator.getTitle, 'meowing');
+    assert.strictEqual(indicator.getWorkCompleted, 1);
+    assert.strictEqual(indicator.getTotalWork, 1);
   });
 
   it('can set sub progress to be worked', () => {
@@ -187,17 +190,17 @@ describe('Composite Progress Bar', () => {
     const composite = new CompositeProgress(indicator);
     const subProgress = composite.createSubProgress();
 
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
-    assert.equal(subProgress._worked, 0);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
+    assert.strictEqual(subProgress._worked, 0);
 
     subProgress.worked();
 
-    assert.equal(indicator.getTitle, undefined);
-    assert.equal(indicator.getWorkCompleted, 0);
-    assert.equal(indicator.getTotalWork, 1);
-    assert.equal(subProgress._worked, 1);
+    assert.strictEqual(indicator.getTitle, undefined);
+    assert.strictEqual(indicator.getWorkCompleted, 0);
+    assert.strictEqual(indicator.getTotalWork, 1);
+    assert.strictEqual(subProgress._worked, 1);
   });
 
   it('returns the correct cancellation status for a progress proxy with no delegate', () => {
@@ -231,7 +234,7 @@ describe('Composite Progress Bar', () => {
     const progressProxy = new ProgressProxy(subProgress);
 
     progressProxy.setTitle('test proxy');
-    assert.equal(indicator.getTitle, 'test proxy');
+    assert.strictEqual(indicator.getTitle, 'test proxy');
   });
 
   it('marks a progress proxy as done', () => {
@@ -242,7 +245,7 @@ describe('Composite Progress Bar', () => {
 
     progressProxy.setTotalWork(1);
     progressProxy.done();
-    assert.equal(subProgress._worked, 1);
+    assert.strictEqual(subProgress._worked, 1);
   });
 
   it('able to set worked with title for a progress proxy', () => {
@@ -252,8 +255,8 @@ describe('Composite Progress Bar', () => {
     const progressProxy = new ProgressProxy(subProgress);
 
     progressProxy.setWorked(1, 'test proxy');
-    assert.equal(subProgress._worked, 1);
-    assert.equal(indicator.getTitle, 'test proxy');
+    assert.strictEqual(subProgress._worked, 1);
+    assert.strictEqual(indicator.getTitle, 'test proxy');
   });
 
   it('able to set worked without title for a progress proxy', () => {
@@ -263,6 +266,6 @@ describe('Composite Progress Bar', () => {
     const progressProxy = new ProgressProxy(subProgress);
 
     progressProxy.worked(1);
-    assert.equal(subProgress._worked, 1);
+    assert.strictEqual(subProgress._worked, 1);
   });
 });

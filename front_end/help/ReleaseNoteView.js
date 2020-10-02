@@ -5,24 +5,33 @@
 import * as Host from '../host/host.js';
 import * as UI from '../ui/ui.js';
 
-import {latestReleaseNote, releaseNoteViewId} from './HelpImpl.js';
+import {latestReleaseNote, ReleaseNote, releaseNoteViewId} from './HelpImpl.js';  // eslint-disable-line no-unused-vars
 
 export class ReleaseNoteView extends UI.Widget.VBox {
   constructor() {
     super(true);
     this.registerRequiredCSS('help/releaseNote.css');
-    const releaseNoteElement = this._createReleaseNoteElement(latestReleaseNote());
+    this._releaseNoteElement = this._createReleaseNoteElement(latestReleaseNote());
     const topSection = this.contentElement.createChild('div', 'release-note-top-section');
     topSection.textContent = ls`${latestReleaseNote().header}`;
-    this.contentElement.appendChild(releaseNoteElement);
+    this.contentElement.appendChild(this._releaseNoteElement);
   }
 
   /**
-   * @param {!Help.ReleaseNote} releaseNote
+   * @override
+   * @return {!Array<!Element>}
+   */
+  elementsToRestoreScrollPositionsFor() {
+    return [this._releaseNoteElement];
+  }
+
+  /**
+   * @param {!ReleaseNote} releaseNote
    * @return {!Element}
    */
   _createReleaseNoteElement(releaseNote) {
-    const hbox = createElementWithClass('div', 'hbox');
+    const hbox = document.createElement('div');
+    hbox.classList.add('hbox');
     const container = hbox.createChild('div', 'release-note-container');
     const contentContainer = container.createChild('ul');
     UI.ARIAUtils.setAccessibleName(contentContainer, ls`${latestReleaseNote().header}`);
@@ -56,15 +65,15 @@ export class ReleaseNoteView extends UI.Widget.VBox {
 
     actionContainer.appendChild(UI.UIUtils.createTextButton(ls`Close`, event => {
       event.consume(true);
-      self.UI.inspectorView.closeDrawerTab(releaseNoteViewId, true);
+      UI.InspectorView.InspectorView.instance().closeDrawerTab(releaseNoteViewId, true);
     }, 'close-release-note'));
 
-    const imageLink = UI.XLink.XLink.create(releaseNote.link, ' ');
+    const imageLink = /** @type {!HTMLElement} */ (UI.XLink.XLink.create(releaseNote.link, ' '));
     imageLink.classList.add('release-note-image');
     imageLink.title = ls`${latestReleaseNote().header}`;
 
     hbox.appendChild(imageLink);
-    const image = imageLink.createChild('img');
+    const image = /** @type {!HTMLImageElement} */ (imageLink.createChild('img'));
     image.src = 'Images/whatsnew.png';
     image.title = imageLink.title;
     image.alt = image.title;

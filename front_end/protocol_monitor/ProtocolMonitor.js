@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as DataGrid from '../data_grid/data_grid.js';
 import * as Host from '../host/host.js';
-import * as ProtocolModule from '../protocol/protocol.js';
+import * as ProtocolClient from '../protocol_client/protocol_client.js';
 import * as SDK from '../sdk/sdk.js';
 import * as SourceFrame from '../source_frame/source_frame.js';
 import * as TextUtils from '../text_utils/text_utils.js';
@@ -123,7 +126,7 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
 
   /**
    * @param {!UI.ContextMenu.ContextMenu} contextMenu
-   * @param {!ProtocolNode} node
+   * @param {!DataGrid.SortableDataGrid.SortableDataGridNode<!ProtocolNode>} node
    */
   _innerRowContextMenu(contextMenu, node) {
     contextMenu.defaultSection().appendItem(ls`Filter`, () => {
@@ -190,11 +193,11 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
    */
   _setRecording(recording) {
     if (recording) {
-      ProtocolModule.InspectorBackend.test.onMessageSent = this._messageSent.bind(this);
-      ProtocolModule.InspectorBackend.test.onMessageReceived = this._messageRecieved.bind(this);
+      ProtocolClient.InspectorBackend.test.onMessageSent = this._messageSent.bind(this);
+      ProtocolClient.InspectorBackend.test.onMessageReceived = this._messageReceived.bind(this);
     } else {
-      ProtocolModule.InspectorBackend.test.onMessageSent = null;
-      ProtocolModule.InspectorBackend.test.onMessageReceived = null;
+      ProtocolClient.InspectorBackend.test.onMessageSent = null;
+      ProtocolClient.InspectorBackend.test.onMessageReceived = null;
     }
   }
 
@@ -212,9 +215,9 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
 
   /**
    * @param {!Object} message
-   * @param {?ProtocolModule.InspectorBackend.TargetBase} target
+   * @param {?ProtocolClient.InspectorBackend.TargetBase} target
    */
-  _messageRecieved(message, target) {
+  _messageReceived(message, target) {
     if ('id' in message) {
       const node = this._nodeForId[message.id];
       if (!node) {
@@ -224,7 +227,10 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
       node.hasError = !!message.error;
       node.refresh();
       if (this._dataGrid.selectedNode === node) {
-        this._infoWidget.render(node.data);
+        const data =
+            /** @type {?{method: string, direction: string, request: ?Object, response: ?Object, timestamp: number}}*/ (
+                node.data);
+        this._infoWidget.render(data);
       }
       return;
     }
@@ -232,7 +238,7 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
     const sdkTarget = /** @type {?SDK.SDKModel.Target} */ (target);
     const node = new ProtocolNode({
       method: message.method,
-      direction: 'recieved',
+      direction: 'received',
       response: message.params,
       timestamp: Date.now() - this._startTime,
       request: '',
@@ -246,7 +252,7 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
 
   /**
    * @param {{domain: string, method: string, params: !Object, id: number}} message
-   * @param {?ProtocolModule.InspectorBackend.TargetBase} target
+   * @param {?ProtocolClient.InspectorBackend.TargetBase} target
    */
   _messageSent(message, target) {
     const sdkTarget = /** @type {?SDK.SDKModel.Target} */ (target);
@@ -266,7 +272,9 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
     }
   }
 }
-
+/**
+ * @extends {DataGrid.SortableDataGrid.SortableDataGridNode<ProtocolNode>}
+ */
 export class ProtocolNode extends DataGrid.SortableDataGrid.SortableDataGridNode {
   constructor(data) {
     super(data);
@@ -276,7 +284,7 @@ export class ProtocolNode extends DataGrid.SortableDataGrid.SortableDataGridNode
   /**
    * @override
    * @param {string} columnId
-   * @return {!Element}
+   * @return {!HTMLElement}
    */
   createCell(columnId) {
     switch (columnId) {
@@ -310,7 +318,7 @@ export class ProtocolNode extends DataGrid.SortableDataGrid.SortableDataGridNode
   element() {
     const element = super.element();
     element.classList.toggle('protocol-message-sent', this.data.direction === 'sent');
-    element.classList.toggle('protocol-message-recieved', this.data.direction !== 'sent');
+    element.classList.toggle('protocol-message-received', this.data.direction !== 'sent');
     element.classList.toggle('error', this.hasError);
     return element;
   }

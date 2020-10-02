@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Components from '../components/components.js';
 import * as Host from '../host/host.js';
@@ -140,17 +143,19 @@ export class NodeIndicator {
  */
 export class SourcesPanelIndicator {
   constructor() {
-    self.Common.settings.moduleSetting('javaScriptDisabled').addChangeListener(javaScriptDisabledChanged);
+    Common.Settings.Settings.instance()
+        .moduleSetting('javaScriptDisabled')
+        .addChangeListener(javaScriptDisabledChanged);
     javaScriptDisabledChanged();
 
     function javaScriptDisabledChanged() {
       let icon = null;
-      const javaScriptDisabled = self.Common.settings.moduleSetting('javaScriptDisabled').get();
+      const javaScriptDisabled = Common.Settings.Settings.instance().moduleSetting('javaScriptDisabled').get();
       if (javaScriptDisabled) {
         icon = UI.Icon.Icon.create('smallicon-warning');
         icon.title = Common.UIString.UIString('JavaScript is disabled');
       }
-      self.UI.inspectorView.setPanelIcon('sources', icon);
+      UI.InspectorView.InspectorView.instance().setPanelIcon('sources', icon);
     }
   }
 }
@@ -161,14 +166,14 @@ export class SourcesPanelIndicator {
  */
 export class BackendSettingsSync {
   constructor() {
-    this._autoAttachSetting = self.Common.settings.moduleSetting('autoAttachToCreatedPages');
+    this._autoAttachSetting = Common.Settings.Settings.instance().moduleSetting('autoAttachToCreatedPages');
     this._autoAttachSetting.addChangeListener(this._updateAutoAttach, this);
     this._updateAutoAttach();
 
-    this._adBlockEnabledSetting = self.Common.settings.moduleSetting('network.adBlockingEnabled');
+    this._adBlockEnabledSetting = Common.Settings.Settings.instance().moduleSetting('network.adBlockingEnabled');
     this._adBlockEnabledSetting.addChangeListener(this._update, this);
 
-    this._emulatePageFocusSetting = self.Common.settings.moduleSetting('emulatePageFocus');
+    this._emulatePageFocusSetting = Common.Settings.Settings.instance().moduleSetting('emulatePageFocus');
     this._emulatePageFocusSetting.addChangeListener(this._update, this);
 
     SDK.SDKModel.TargetManager.instance().observeTargets(this);

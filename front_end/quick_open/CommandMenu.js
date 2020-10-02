@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Diff from '../diff/diff.js';
 import * as Host from '../host/host.js';
+import * as Root from '../root/root.js';
 import * as UI from '../ui/ui.js';
 
 import {FilteredListWidget, Provider} from './FilteredListWidget.js';
@@ -20,15 +24,12 @@ export class CommandMenu {
   }
 
   /**
-   * @param {string} category
-   * @param {string} keys
-   * @param {string} title
-   * @param {string} shortcut
-   * @param {function()} executeHandler
-   * @param {function()=} availableHandler
+   * @param {!CreateCommandOptions} options
    * @return {!Command}
    */
-  static createCommand(category, keys, title, shortcut, executeHandler, availableHandler) {
+  static createCommand(options) {
+    const {category, keys, title, shortcut, executeHandler, availableHandler, userActionCode} = options;
+
     // Get localized keys and separate by null character to prevent fuzzy matching from matching across them.
     const keyList = keys.split(',');
     let key = '';
@@ -36,7 +37,16 @@ export class CommandMenu {
       key += (ls(k.trim()) + '\0');
     });
 
-    return new Command(category, title, key, shortcut, executeHandler, availableHandler);
+    let handler = executeHandler;
+    if (userActionCode) {
+      const actionCode = userActionCode;
+      handler = () => {
+        Host.userMetrics.actionTaken(actionCode);
+        executeHandler();
+      };
+    }
+
+    return new Command(category, title, key, shortcut, handler, availableHandler);
   }
 
   /**
@@ -49,8 +59,22 @@ export class CommandMenu {
   static createSettingCommand(extension, title, value) {
     const category = extension.descriptor()['category'] || '';
     const tags = extension.descriptor()['tags'] || '';
-    const setting = self.Common.settings.moduleSetting(extension.descriptor()['settingName']);
-    return CommandMenu.createCommand(ls(category), tags, title, '', setting.set.bind(setting, value), availableHandler);
+    const reloadRequired = !!extension.descriptor()['reloadRequired'];
+    const setting = Common.Settings.Settings.instance().moduleSetting(extension.descriptor()['settingName']);
+    return CommandMenu.createCommand({
+      category: ls(category),
+      keys: tags,
+      title,
+      shortcut: '',
+      executeHandler: () => {
+        setting.set(value);
+        if (reloadRequired) {
+          UI.InspectorView.InspectorView.instance().displayReloadRequiredWarning(
+              ls`One or more settings have changed which requires a reload to take effect.`);
+        }
+      },
+      availableHandler,
+    });
 
     /**
      * @return {boolean}
@@ -61,47 +85,65 @@ export class CommandMenu {
   }
 
   /**
-   * @param {!UI.Action.Action} action
+   * @param {!ActionCommandOptions} options
    * @return {!Command}
    */
-  static createActionCommand(action) {
-    const shortcut = self.UI.shortcutRegistry.shortcutTitleForAction(action.id()) || '';
-    return CommandMenu.createCommand(
-        action.category(), action.tags(), action.title(), shortcut, action.execute.bind(action));
+  static createActionCommand(options) {
+    const {action, userActionCode} = options;
+    const shortcut = UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutTitleForAction(action.id()) || '';
+
+    return CommandMenu.createCommand({
+      category: action.category(),
+      keys: action.tags(),
+      title: action.title(),
+      shortcut,
+      executeHandler: action.execute.bind(action),
+      userActionCode,
+    });
   }
 
   /**
-   * @param {!Root.Runtime.Extension} extension
-   * @param {string} category
+   * @param {!RevealViewCommandOptions} options
    * @return {!Command}
    */
-  static createRevealViewCommand(extension, category) {
+  static createRevealViewCommand(options) {
+    const {extension, category, userActionCode} = options;
     const viewId = extension.descriptor()['id'];
-    const executeHandler = self.UI.viewManager.showView.bind(self.UI.viewManager, viewId);
-    const tags = extension.descriptor()['tags'] || '';
-    return CommandMenu.createCommand(
-        category, tags, Common.UIString.UIString('Show %s', extension.title()), '', executeHandler);
+
+    return CommandMenu.createCommand({
+      category,
+      keys: extension.descriptor()['tags'] || '',
+      title: Common.UIString.UIString('Show %s', extension.title()),
+      shortcut: '',
+      executeHandler: UI.ViewManager.ViewManager.instance().showView.bind(
+          UI.ViewManager.ViewManager.instance(), viewId, /* userGesture */ true),
+      userActionCode,
+    });
   }
 
   _loadCommands() {
     const locations = new Map();
-    self.runtime.extensions(UI.View.ViewLocationResolver).forEach(extension => {
+    Root.Runtime.Runtime.instance().extensions(UI.View.ViewLocationResolver).forEach(extension => {
       const category = extension.descriptor()['category'];
       const name = extension.descriptor()['name'];
       if (category && name) {
         locations.set(name, category);
       }
     });
-    const viewExtensions = self.runtime.extensions('view');
+    const viewExtensions = Root.Runtime.Runtime.instance().extensions('view');
     for (const extension of viewExtensions) {
       const category = locations.get(extension.descriptor()['location']);
-      if (category) {
-        this._commands.push(CommandMenu.createRevealViewCommand(extension, ls(category)));
+      if (!category) {
+        continue;
       }
+
+      /** @type {!RevealViewCommandOptions} */
+      const options = {extension, category: ls(category), userActionCode: undefined};
+      this._commands.push(CommandMenu.createRevealViewCommand(options));
     }
 
-    // Populate whitelisted settings.
-    const settingExtensions = self.runtime.extensions('setting');
+    // Populate allowlisted settings.
+    const settingExtensions = Root.Runtime.Runtime.instance().extensions('setting');
     for (const extension of settingExtensions) {
       const options = extension.descriptor()['options'];
       if (!options || !extension.descriptor()['category']) {
@@ -121,6 +163,36 @@ export class CommandMenu {
   }
 }
 
+/**
+ * @typedef {{
+ *   action: !UI.Action.Action,
+ *   userActionCode: (!Host.UserMetrics.Action|undefined),
+ * }}
+ */
+export let ActionCommandOptions;
+
+/**
+ * @typedef {{
+ *   extension: !Root.Runtime.Extension,
+ *   category: string,
+ *   userActionCode: (!Host.UserMetrics.Action|undefined)
+ * }}
+ */
+export let RevealViewCommandOptions;
+
+/**
+ * @typedef {{
+ *   category: string,
+ *   keys: string,
+ *   title: string,
+ *   shortcut: string,
+ *   executeHandler: !function(),
+ *   availableHandler: (!function()|undefined),
+ *   userActionCode: (!Host.UserMetrics.Action|undefined)
+ * }}
+ */
+export let CreateCommandOptions;
+
 export class CommandMenuProvider extends Provider {
   constructor() {
     super();
@@ -133,12 +205,17 @@ export class CommandMenuProvider extends Provider {
   attach() {
     const allCommands = commandMenu.commands();
 
-    // Populate whitelisted actions.
-    const actions = self.UI.actionRegistry.availableActions();
+    // Populate allowlisted actions.
+    const actions = UI.ActionRegistry.ActionRegistry.instance().availableActions();
     for (const action of actions) {
-      if (action.category()) {
-        this._commands.push(CommandMenu.createActionCommand(action));
+      const category = action.category();
+      if (!category) {
+        continue;
       }
+
+      /** @type {!ActionCommandOptions} */
+      const options = {action};
+      this._commands.push(CommandMenu.createActionCommand(options));
     }
 
     for (const command of allCommands) {
@@ -192,14 +269,7 @@ export class CommandMenuProvider extends Provider {
    */
   itemScoreAt(itemIndex, query) {
     const command = this._commands[itemIndex];
-    const opcodes = Diff.Diff.DiffWrapper.charDiff(query.toLowerCase(), command.title().toLowerCase());
-    let score = 0;
-    // Score longer sequences higher.
-    for (let i = 0; i < opcodes.length; ++i) {
-      if (opcodes[i][0] === Diff.Diff.Operation.Equal) {
-        score += opcodes[i][1].length * opcodes[i][1].length;
-      }
-    }
+    let score = Diff.Diff.DiffWrapper.characterScore(query.toLowerCase(), command.title().toLowerCase());
 
     // Score panel/drawer reveals above regular actions.
     if (command.category().startsWith('Panel')) {
@@ -317,7 +387,6 @@ export class Command {
     this._executeHandler();
   }
 }
-
 
 /**
  * @implements {UI.ActionDelegate.ActionDelegate}

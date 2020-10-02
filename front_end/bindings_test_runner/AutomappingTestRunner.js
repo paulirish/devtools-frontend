@@ -7,6 +7,8 @@
  * @suppress {accessControls}
  */
 
+self.BindingsTestRunner = self.BindingsTestRunner || {};
+
 BindingsTestRunner.addFiles = function(testFileSystem, files) {
   for (const filePath in files) {
     const file = files[filePath];
@@ -73,7 +75,7 @@ BindingsTestRunner.AutomappingTest.prototype = {
     for (const url in assets) {
       const asset = assets[url];
       const contentType = asset.contentType || Common.resourceTypes.Script;
-      const contentProvider = Common.StaticContentProvider.fromString(url, contentType, asset.content);
+      const contentProvider = TextUtils.StaticContentProvider.fromString(url, contentType, asset.content);
       const metadata =
           (typeof asset.content === 'string' || asset.time ?
                new Workspace.UISourceCodeMetadata(asset.time, asset.content.length) :
@@ -84,7 +86,9 @@ BindingsTestRunner.AutomappingTest.prototype = {
   },
 
   waitUntilMappingIsStabilized: function() {
-    const promise = new Promise(x => this._stabilizedCallback = x);
+    const promise = new Promise(x => {
+      this._stabilizedCallback = x;
+    });
     this._checkStabilized();
     return promise;
   },

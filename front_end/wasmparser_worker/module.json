@@ -1,12 +1,11 @@
 {
-    "dependencies": [
-      "third_party/wasmparser"
-    ],
-    "scripts": [],
-    "modules": [
-      "wasmparser_worker.js",
-      "WasmParserWorker.js"
-    ],
-    "skip_compilation": [
-    ]
+  "modules": [
+    "../third_party/wasmparser/package/dist/esm/WasmDis.js",
+    "../third_party/wasmparser/package/dist/esm/WasmParser.js",
+    "wasmparser_worker.js",
+    "WasmParserWorker.js"
+  ],
+  "dependencies": [
+    "common"
+  ]
 }

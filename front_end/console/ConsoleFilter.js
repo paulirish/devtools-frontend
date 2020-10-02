@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as SDK from '../sdk/sdk.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 
@@ -91,12 +94,13 @@ export class ConsoleFilter {
         }
       } else {
         switch (filter.key) {
-          case FilterType.Context:
+          case FilterType.Context: {
             if (!passesFilter(filter, message.context, false /* exactMatch */)) {
               return false;
             }
             break;
-          case FilterType.Source:
+          }
+          case FilterType.Source: {
             const sourceNameForMessage = message.source ?
                 SDK.ConsoleModel.MessageSourceDisplayName.get(
                     /** @type {!SDK.ConsoleModel.MessageSource} */ (message.source)) :
@@ -105,11 +109,13 @@ export class ConsoleFilter {
               return false;
             }
             break;
-          case FilterType.Url:
+          }
+          case FilterType.Url: {
             if (!passesFilter(filter, message.url, false /* exactMatch */)) {
               return false;
             }
             break;
+          }
         }
       }
     }

@@ -28,7 +28,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as BrowserSDK from '../browser_sdk/browser_sdk.js';
+import * as ClientVariations from '../client_variations/client_variations.js';
 import * as Common from '../common/common.js';
+import * as Host from '../host/host.js';
 import * as ObjectUI from '../object_ui/object_ui.js';
 import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
@@ -47,6 +53,11 @@ export class RequestHeadersView extends UI.Widget.VBox {
     this._showRequestHeadersText = false;
     this._showResponseHeadersText = false;
 
+    const contentType = request.requestContentType();
+    if (contentType) {
+      this._decodeRequestParameters = !!contentType.match(/^application\/x-www-form-urlencoded\s*(;.*)?$/i);
+    }
+
     /** @type {?UI.TreeOutline.TreeElement} */
     this._highlightedElement = null;
 
@@ -61,6 +72,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
     const generalCategory = new Category(root, 'general', Common.UIString.UIString('General'));
     generalCategory.hidden = false;
     this._root = generalCategory;
+    this.setDefaultFocusedElement(this._root.listItemElement);
     this._urlItem = generalCategory.createLeaf();
     this._requestMethodItem = generalCategory.createLeaf();
     this._statusCodeItem = generalCategory.createLeaf();
@@ -110,6 +122,23 @@ export class RequestHeadersView extends UI.Widget.VBox {
   }
 
   /**
+   * @param {!UI.TreeOutline.TreeElement} treeElement
+   * @param {string} value
+   */
+  _addEntryContextMenuHandler(treeElement, value) {
+    treeElement.listItemElement.addEventListener('contextmenu', event => {
+      event.consume(true);
+      const contextMenu = new UI.ContextMenu.ContextMenu(event);
+      const decodedValue = decodeURIComponent(value);
+      const copyDecodedValueHandler = () => {
+        Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(decodedValue);
+      };
+      contextMenu.clipboardSection().appendItem(ls`Copy value`, copyDecodedValueHandler);
+      contextMenu.show();
+    });
+  }
+
+  /**
    * @param {string} name
    * @param {string} value
    * @return {!DocumentFragment}
@@ -154,6 +183,26 @@ export class RequestHeadersView extends UI.Widget.VBox {
           exampleNode.createChild('span', 'comment').textContent = example.comment;
         }
       }
+
+      if (BrowserSDK.RelatedIssue.hasIssueOfCategory(
+              this._request, SDK.Issue.IssueCategory.CrossOriginEmbedderPolicy)) {
+        const link = document.createElement('div');
+        link.classList.add('devtools-link');
+        link.onclick = () => {
+          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.LearnMoreLinkCOEP);
+          BrowserSDK.RelatedIssue.reveal(this._request, SDK.Issue.IssueCategory.CrossOriginEmbedderPolicy);
+        };
+        const text = document.createElement('span');
+        text.classList.add('devtools-link');
+        text.textContent = ls`Learn more in the issues tab`;
+        link.appendChild(text);
+        link.prepend(UI.Icon.Icon.create('largeicon-breaking-change', 'icon'));
+        callToActionBody.appendChild(link);
+      } else if (header.details.link) {
+        const link = UI.XLink.XLink.create(header.details.link.url, ls`Learn more`, 'link');
+        link.prepend(UI.Icon.Icon.create('largeicon-link'));
+        callToActionBody.appendChild(link);
+      }
     }
     return fragment;
   }
@@ -177,7 +226,10 @@ export class RequestHeadersView extends UI.Widget.VBox {
         }
       }
     }
-    const div = createElementWithClass('div', className);
+    const div = document.createElement('div');
+    if (className) {
+      div.className = className;
+    }
     if (value === '') {
       div.classList.add('empty-value');
     }
@@ -204,20 +256,21 @@ export class RequestHeadersView extends UI.Widget.VBox {
   }
 
   async _refreshFormData() {
-    this._formDataCategory.hidden = true;
-    this._requestPayloadCategory.hidden = true;
-
     const formData = await this._request.requestFormData();
     if (!formData) {
+      this._formDataCategory.hidden = true;
+      this._requestPayloadCategory.hidden = true;
       return;
     }
 
     const formParameters = await this._request.formParameters();
     if (formParameters) {
       this._formDataCategory.hidden = false;
+      this._requestPayloadCategory.hidden = true;
       this._refreshParams(Common.UIString.UIString('Form Data'), formParameters, formData, this._formDataCategory);
     } else {
       this._requestPayloadCategory.hidden = false;
+      this._formDataCategory.hidden = true;
       try {
         const json = JSON.parse(formData);
         this._refreshRequestJSONPayload(json, formData);
@@ -236,7 +289,9 @@ export class RequestHeadersView extends UI.Widget.VBox {
     const text = (sourceText || '').trim();
     const trim = text.length > max_len;
 
-    const sourceTextElement = createElementWithClass('span', 'header-value source-code');
+    const sourceTextElement = document.createElement('span');
+    sourceTextElement.classList.add('header-value');
+    sourceTextElement.classList.add('source-code');
     sourceTextElement.textContent = trim ? text.substr(0, max_len) : text;
 
     const sourceTreeElement = new UI.TreeOutline.TreeElement(sourceTextElement);
@@ -246,7 +301,8 @@ export class RequestHeadersView extends UI.Widget.VBox {
       return;
     }
 
-    const showMoreButton = createElementWithClass('button', 'request-headers-show-more-button');
+    const showMoreButton = document.createElement('button');
+    showMoreButton.classList.add('request-headers-show-more-button');
     showMoreButton.textContent = Common.UIString.UIString('Show more');
 
     function showMore() {
@@ -282,7 +338,8 @@ export class RequestHeadersView extends UI.Widget.VBox {
     paramsTreeElement.listItemElement.createChild('div', 'selection fill');
     paramsTreeElement.listItemElement.createTextChild(title);
 
-    const headerCount = createElementWithClass('span', 'header-count');
+    const headerCount = document.createElement('span');
+    headerCount.classList.add('header-count');
     headerCount.textContent = Common.UIString.UIString('\xA0(%d)', params.length);
     paramsTreeElement.listItemElement.appendChild(headerCount);
 
@@ -357,6 +414,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
       }
 
       const paramTreeElement = new UI.TreeOutline.TreeElement(paramNameValue);
+      this._addEntryContextMenuHandler(paramTreeElement, params[i].value);
       paramsTreeElement.appendChild(paramTreeElement);
     }
 
@@ -698,7 +756,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
       if (this._request.cachedInMemory() || this._request.cached()) {
         cautionText = ls`Provisional headers are shown. Disable cache to see full headers.`;
         cautionTitle = ls
-        `Only provisional headers are available because this request was not sent over the network and instead was served from a local cache, which doesn't store the original request headers. Disable cache to see full request headers.`;
+        `Only provisional headers are available because this request was not sent over the network and instead was served from a local cache, which doesn’t store the original request headers. Disable cache to see full request headers.`;
       } else {
         cautionText = ls`Provisional headers are shown`;
       }
@@ -719,12 +777,14 @@ export class RequestHeadersView extends UI.Widget.VBox {
     }
 
     headersTreeElement.hidden = !length && !provisionalHeaders;
-    for (let i = 0; i < length; ++i) {
-      const headerTreeElement = new UI.TreeOutline.TreeElement(this._formatHeaderObject(headers[i]));
-      headerTreeElement[_headerNameSymbol] = headers[i].name;
+    for (const header of headers) {
+      const headerTreeElement = new UI.TreeOutline.TreeElement(this._formatHeaderObject(header));
+      headerTreeElement[_headerNameSymbol] = header.name;
 
-      if (headers[i].name.toLowerCase() === 'set-cookie') {
-        const matchingBlockedReasons = blockedCookieLineToReasons.get(headers[i].value);
+      const headerId = header.name.toLowerCase();
+
+      if (headerId === 'set-cookie') {
+        const matchingBlockedReasons = blockedCookieLineToReasons.get(header.value);
         if (matchingBlockedReasons) {
           const icon = UI.Icon.Icon.create('smallicon-warning', '');
           headerTreeElement.listItemElement.appendChild(icon);
@@ -740,7 +800,22 @@ export class RequestHeadersView extends UI.Widget.VBox {
         }
       }
 
+      this._addEntryContextMenuHandler(headerTreeElement, header.value);
       headersTreeElement.appendChild(headerTreeElement);
+
+      if (headerId === 'x-client-data') {
+        const data = ClientVariations.parseClientVariations(header.value);
+        const output = ClientVariations.formatClientVariations(
+            data, ls`Active client experiment variation IDs.`,
+            ls`Active client experiment variation IDs that trigger server-side behavior.`);
+        const wrapper = createElement('div');
+        wrapper.classList.add('x-client-data-details');
+        wrapper.createTextChild(ls`Decoded:`);
+        const div = wrapper.createChild('div');
+        div.classList.add('source-code');
+        div.textContent = output;
+        headerTreeElement.listItemElement.appendChild(wrapper);
+      }
     }
   }
 
@@ -796,7 +871,8 @@ export class RequestHeadersView extends UI.Widget.VBox {
    * @return {!Element}
    */
   _createToggleButton(title) {
-    const button = createElementWithClass('span', 'header-toggle');
+    const button = document.createElement('span');
+    button.classList.add('header-toggle');
     button.textContent = title;
     return button;
   }
@@ -867,7 +943,8 @@ export class Category extends UI.TreeOutline.TreeElement {
     super(title || '', true);
     this.toggleOnClick = true;
     this.hidden = true;
-    this._expandedSetting = self.Common.settings.createSetting('request-info-' + name + '-category-expanded', true);
+    this._expandedSetting =
+        Common.Settings.Settings.instance().createSetting('request-info-' + name + '-category-expanded', true);
     this.expanded = this._expandedSetting.get();
     root.appendChild(this);
   }
@@ -906,7 +983,8 @@ const BlockedReasonDetails = new Map([
           explanation:
               ls
           `To embed this frame in your document, the response needs to enable the cross-origin embedder policy by specifying the following response header:`,
-          examples: [{codeSnippet:'Cross-Origin-Embedder-Policy: require-corp'}]
+          examples: [{codeSnippet:'Cross-Origin-Embedder-Policy: require-corp'}],
+          link: {url: 'https://web.dev/coop-coep/'}
       }
     }
   ],
@@ -921,7 +999,8 @@ const BlockedReasonDetails = new Map([
         examples: [
           {codeSnippet:'Cross-Origin-Resource-Policy: same-site', comment: ls`Choose this option if the resource and the document are served from the same site.` },
           {codeSnippet:'Cross-Origin-Resource-Policy: cross-origin', comment: ls`Only choose this option if an arbitrary website including this resource does not impose a security risk.` },
-        ]
+        ],
+        link: {url: 'https://web.dev/coop-coep/'}
       }
     }
   ],
@@ -934,7 +1013,8 @@ const BlockedReasonDetails = new Map([
         explanation:
         ls
         `This document was blocked from loading in an iframe with a sandbox attribute because this document specified a cross-origin opener policy.`,
-        examples: []
+        examples: [],
+        link: {url: 'https://web.dev/coop-coep/'}
       }
     }
   ],

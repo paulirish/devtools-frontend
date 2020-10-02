@@ -31,10 +31,11 @@
 import * as Common from '../common/common.js';
 import * as UI from '../ui/ui.js';
 
-import {Events} from './IsolatedFileSystemManager.js';
+import {Events, IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
+import {PlatformFileSystem} from './PlatformFileSystem.js';  // eslint-disable-line no-unused-vars
 
 /**
- * @implements {UI.ListWidget.Delegate}
+ * @implements {UI.ListWidget.Delegate<*>}
  * @unrestricted
  */
 export class EditFileSystemView extends UI.Widget.VBox {
@@ -46,9 +47,12 @@ export class EditFileSystemView extends UI.Widget.VBox {
     this.registerRequiredCSS('persistence/editFileSystemView.css');
     this._fileSystemPath = fileSystemPath;
 
+    /** @type {!Array<string>} */
+    this._excludedFolders = [];
+
     this._eventListeners = [
-      self.Persistence.isolatedFileSystemManager.addEventListener(Events.ExcludedFolderAdded, this._update, this),
-      self.Persistence.isolatedFileSystemManager.addEventListener(Events.ExcludedFolderRemoved, this._update, this)
+      IsolatedFileSystemManager.instance().addEventListener(Events.ExcludedFolderAdded, this._update, this),
+      IsolatedFileSystemManager.instance().addEventListener(Events.ExcludedFolderRemoved, this._update, this)
     ];
 
     const excludedFoldersHeader = this.contentElement.createChild('div', 'file-system-header');
@@ -59,7 +63,8 @@ export class EditFileSystemView extends UI.Widget.VBox {
     this._excludedFoldersList = new UI.ListWidget.ListWidget(this);
     this._excludedFoldersList.element.classList.add('file-system-list');
     this._excludedFoldersList.registerRequiredCSS('persistence/editFileSystemView.css');
-    const excludedFoldersPlaceholder = createElementWithClass('div', 'file-system-list-empty');
+    const excludedFoldersPlaceholder = document.createElement('div');
+    excludedFoldersPlaceholder.classList.add('file-system-list-empty');
     excludedFoldersPlaceholder.textContent = Common.UIString.UIString('None');
     this._excludedFoldersList.setEmptyPlaceholder(excludedFoldersPlaceholder);
     this._excludedFoldersList.show(this.contentElement);
@@ -71,6 +76,13 @@ export class EditFileSystemView extends UI.Widget.VBox {
     Common.EventTarget.EventTarget.removeEventListeners(this._eventListeners);
   }
 
+  /**
+   * @return {!PlatformFileSystem}
+   */
+  _getFileSystem() {
+    return /** @type {!PlatformFileSystem} */ (IsolatedFileSystemManager.instance().fileSystem(this._fileSystemPath));
+  }
+
   _update() {
     if (this._muteUpdate) {
       return;
@@ -78,9 +90,7 @@ export class EditFileSystemView extends UI.Widget.VBox {
 
     this._excludedFoldersList.clear();
     this._excludedFolders = [];
-    for (const folder of self.Persistence.isolatedFileSystemManager.fileSystem(this._fileSystemPath)
-             .excludedFolders()
-             .values()) {
+    for (const folder of this._getFileSystem().excludedFolders().values()) {
       this._excludedFolders.push(folder);
       this._excludedFoldersList.appendItem(folder, true);
     }
@@ -97,7 +107,8 @@ export class EditFileSystemView extends UI.Widget.VBox {
    * @return {!Element}
    */
   renderItem(item, editable) {
-    const element = createElementWithClass('div', 'file-system-list-item');
+    const element = document.createElement('div');
+    element.classList.add('file-system-list-item');
     const pathPrefix = /** @type {string} */ (editable ? item : Common.UIString.UIString('%s (via .devtools)', item));
     const pathPrefixElement = element.createChild('div', 'file-system-value');
     pathPrefixElement.textContent = pathPrefix;
@@ -111,24 +122,21 @@ export class EditFileSystemView extends UI.Widget.VBox {
    * @param {number} index
    */
   removeItemRequested(item, index) {
-    self.Persistence.isolatedFileSystemManager.fileSystem(this._fileSystemPath)
-        .removeExcludedFolder(this._excludedFolders[index]);
+    this._getFileSystem().removeExcludedFolder(this._excludedFolders[index]);
   }
 
   /**
    * @override
    * @param {*} item
-   * @param {!UI.ListWidget.Editor} editor
+   * @param {!UI.ListWidget.Editor<?>} editor
    * @param {boolean} isNew
    */
   commitEdit(item, editor, isNew) {
     this._muteUpdate = true;
     if (!isNew) {
-      self.Persistence.isolatedFileSystemManager.fileSystem(this._fileSystemPath)
-          .removeExcludedFolder(/** @type {string} */ (item));
+      this._getFileSystem().removeExcludedFolder(/** @type {string} */ (item));
     }
-    self.Persistence.isolatedFileSystemManager.fileSystem(this._fileSystemPath)
-        .addExcludedFolder(this._normalizePrefix(editor.control('pathPrefix').value));
+    this._getFileSystem().addExcludedFolder(this._normalizePrefix(editor.control('pathPrefix').value));
     this._muteUpdate = false;
     this._update();
   }
@@ -136,7 +144,7 @@ export class EditFileSystemView extends UI.Widget.VBox {
   /**
    * @override
    * @param {*} item
-   * @return {!UI.ListWidget.Editor}
+   * @return {!UI.ListWidget.Editor<?>}
    */
   beginEdit(item) {
     const editor = this._createExcludedFolderEditor();
@@ -145,7 +153,7 @@ export class EditFileSystemView extends UI.Widget.VBox {
   }
 
   /**
-   * @return {!UI.ListWidget.Editor}
+   * @return {!UI.ListWidget.Editor<?>}
    */
   _createExcludedFolderEditor() {
     if (this._excludedFolderEditor) {
@@ -179,14 +187,13 @@ export class EditFileSystemView extends UI.Widget.VBox {
         return {valid: false, errorMessage: ls`Enter a path`};
       }
 
-      const configurableCount =
-          self.Persistence.isolatedFileSystemManager.fileSystem(this._fileSystemPath).excludedFolders().size;
+      const configurableCount = this._getFileSystem().excludedFolders().size;
       for (let i = 0; i < configurableCount; ++i) {
         if (i !== index && this._excludedFolders[i] === prefix) {
           return {valid: false, errorMessage: ls`Enter a unique path`};
         }
       }
-      return {valid: true};
+      return {valid: true, errorMessage: undefined};
     }
   }
 

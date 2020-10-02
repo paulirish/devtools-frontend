@@ -28,16 +28,24 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {Color, Format} from './Color.js';                            // eslint-disable-line no-unused-vars
+import * as Root from '../root/root.js';
+
+import {Color, Format} from './Color.js';  // eslint-disable-line no-unused-vars
+import {Console} from './Console.js';
 import {EventDescriptor, EventTargetEvent} from './EventTarget.js';  // eslint-disable-line no-unused-vars
 import {ObjectWrapper} from './Object.js';
-import {Console} from './Console.js';
+
+/**
+ * @type {!Settings}
+ */
+let settingsInstance;
 
 /**
  * @unrestricted
  */
 export class Settings {
   /**
+   * @private
    * @param {!SettingsStorage} globalStorage
    * @param {!SettingsStorage} localStorage
    */
@@ -47,11 +55,31 @@ export class Settings {
     this._sessionStorage = new SettingsStorage({});
 
     this._eventSupport = new ObjectWrapper();
-    /** @type {!Map<string, !Setting>} */
+    /** @type {!Map<string, !Setting<*>>} */
     this._registry = new Map();
-    /** @type {!Map<string, !Setting>} */
+    /** @type {!Map<string, !Setting<*>>} */
     this._moduleSettings = new Map();
-    self.runtime.extensions('setting').forEach(this._registerModuleSetting.bind(this));
+    Root.Runtime.Runtime.instance().extensions('setting').forEach(this._registerModuleSetting.bind(this));
+  }
+
+  static hasInstance() {
+    return typeof settingsInstance !== 'undefined';
+  }
+
+  /**
+   * @param {{forceNew: ?boolean, globalStorage: ?SettingsStorage, localStorage: ?SettingsStorage}} opts
+   */
+  static instance(opts = {forceNew: null, globalStorage: null, localStorage: null}) {
+    const {forceNew, globalStorage, localStorage} = opts;
+    if (!settingsInstance || forceNew) {
+      if (!globalStorage || !localStorage) {
+        throw new Error(`Unable to create settings: global and local storage must be provided: ${new Error().stack}`);
+      }
+
+      settingsInstance = new Settings(globalStorage, localStorage);
+    }
+
+    return settingsInstance;
   }
 
   /**
@@ -64,13 +92,13 @@ export class Settings {
     const defaultValue = descriptor['defaultValue'];
     let storageType;
     switch (descriptor['storageType']) {
-      case ('local'):
+      case 'local':
         storageType = SettingStorageType.Local;
         break;
-      case ('session'):
+      case 'session':
         storageType = SettingStorageType.Session;
         break;
-      case ('global'):
+      case 'global':
         storageType = SettingStorageType.Global;
         break;
       default:
@@ -82,7 +110,7 @@ export class Settings {
       setting.setTitle(extension.title());
     }
     if (descriptor['userActionCondition']) {
-      setting.setRequiresUserAction(!!Root.Runtime.queryParam(descriptor['userActionCondition']));
+      setting.setRequiresUserAction(!!Root.Runtime.Runtime.queryParam(descriptor['userActionCondition']));
     }
     setting._extension = extension;
     this._moduleSettings.set(settingName, setting);
@@ -90,7 +118,7 @@ export class Settings {
 
   /**
    * @param {string} settingName
-   * @return {!Setting}
+   * @return {!Setting<*>}
    */
   moduleSetting(settingName) {
     const setting = this._moduleSettings.get(settingName);
@@ -102,7 +130,7 @@ export class Settings {
 
   /**
    * @param {string} settingName
-   * @return {!Setting}
+   * @return {!Setting<*>}
    */
   settingForTest(settingName) {
     const setting = this._registry.get(settingName);
@@ -116,20 +144,20 @@ export class Settings {
    * @param {string} key
    * @param {*} defaultValue
    * @param {!SettingStorageType=} storageType
-   * @return {!Setting}
+   * @return {!Setting<*>}
    */
   createSetting(key, defaultValue, storageType) {
     const storage = this._storageFromType(storageType);
     if (!this._registry.get(key)) {
       this._registry.set(key, new Setting(this, key, defaultValue, this._eventSupport, storage));
     }
-    return /** @type {!Setting} */ (this._registry.get(key));
+    return /** @type {!Setting<*>} */ (this._registry.get(key));
   }
 
   /**
    * @param {string} key
    * @param {*} defaultValue
-   * @return {!Setting}
+   * @return {!Setting<*>}
    */
   createLocalSetting(key, defaultValue) {
     return this.createSetting(key, defaultValue, SettingStorageType.Local);
@@ -155,7 +183,7 @@ export class Settings {
   clearAll() {
     this._globalStorage.removeAll();
     this._localStorage.removeAll();
-    const versionSetting = self.Common.settings.createSetting(VersionController._currentVersionName, 0);
+    const versionSetting = Settings.instance().createSetting(VersionController._currentVersionName, 0);
     versionSetting.set(VersionController.currentVersion);
   }
 
@@ -181,10 +209,10 @@ export class Settings {
  */
 export class SettingsStorage {
   /**
-   * @param {!Object} object
-   * @param {function(string, string)=} setCallback
-   * @param {function(string)=} removeCallback
-   * @param {function(string)=} removeAllCallback
+   * @param {!Object<string,string>} object
+   * @param {function(string, string):void=} setCallback
+   * @param {function(string):void=} removeCallback
+   * @param {function(string=):void=} removeAllCallback
    * @param {string=} storagePrefix
    */
   constructor(object, setCallback, removeCallback, removeAllCallback, storagePrefix) {
@@ -240,12 +268,18 @@ export class SettingsStorage {
   _dumpSizes() {
     Console.instance().log('Ten largest settings: ');
 
+    /** @type {!Object<string,number>} */
+    // @ts-ignore __proto__ optimization
     const sizes = {__proto__: null};
     for (const key in this._object) {
       sizes[key] = this._object[key].length;
     }
     const keys = Object.keys(sizes);
 
+    /**
+     * @param {string} key1
+     * @param {string} key2
+     */
     function comparator(key1, key2) {
       return sizes[key2] - sizes[key1];
     }
@@ -278,11 +312,12 @@ export class Setting {
     this._storage = storage;
     /** @type {string} */
     this._title = '';
+    /** @type {?Root.Runtime.Extension} */
     this._extension = null;
   }
 
   /**
-   * @param {function(!EventTargetEvent)} listener
+   * @param {function(!EventTargetEvent):void} listener
    * @param {!Object=} thisObject
    * @return {!EventDescriptor}
    */
@@ -291,7 +326,7 @@ export class Setting {
   }
 
   /**
-   * @param {function(!EventTargetEvent)} listener
+   * @param {function(!EventTargetEvent):void} listener
    * @param {!Object=} thisObject
    */
   removeChangeListener(listener, thisObject) {
@@ -394,6 +429,7 @@ export class Setting {
 
 /**
  * @unrestricted
+ * @extends Setting<*>
  */
 export class RegExpSetting extends Setting {
   /**
@@ -434,10 +470,11 @@ export class RegExpSetting extends Setting {
 
   /**
    * @override
+   * @suppress {checkTypes}
    * @param {string} value
    */
   set(value) {
-    this.setAsArray([{pattern: value}]);
+    this.setAsArray([{pattern: value, disabled: false}]);
   }
 
   /**
@@ -476,12 +513,12 @@ export class VersionController {
   }
 
   static get currentVersion() {
-    return 28;
+    return 30;
   }
 
   updateVersion() {
     const localStorageVersion = window.localStorage ? window.localStorage[VersionController._currentVersionName] : 0;
-    const versionSetting = self.Common.settings.createSetting(VersionController._currentVersionName, 0);
+    const versionSetting = Settings.instance().createSetting(VersionController._currentVersionName, 0);
     const currentVersion = VersionController.currentVersion;
     const oldVersion = versionSetting.get() || parseInt(localStorageVersion || '0', 10);
     if (oldVersion === 0) {
@@ -490,8 +527,9 @@ export class VersionController {
       return;
     }
     const methodsToRun = this._methodsToRunToUpdateVersion(oldVersion, currentVersion);
-    for (let i = 0; i < methodsToRun.length; ++i) {
-      this[methodsToRun[i]].call(this);
+    for (const method of methodsToRun) {
+      // @ts-ignore Special version method matching
+      this[method].call(this);
     }
     versionSetting.set(currentVersion);
   }
@@ -509,25 +547,26 @@ export class VersionController {
   }
 
   _updateVersionFrom0To1() {
-    this._clearBreakpointsWhenTooMany(self.Common.settings.createLocalSetting('breakpoints', []), 500000);
+    this._clearBreakpointsWhenTooMany(Settings.instance().createLocalSetting('breakpoints', []), 500000);
   }
 
   _updateVersionFrom1To2() {
-    self.Common.settings.createSetting('previouslyViewedFiles', []).set([]);
+    Settings.instance().createSetting('previouslyViewedFiles', []).set([]);
   }
 
   _updateVersionFrom2To3() {
-    self.Common.settings.createSetting('fileSystemMapping', {}).set({});
-    self.Common.settings.createSetting('fileMappingEntries', []).remove();
+    Settings.instance().createSetting('fileSystemMapping', {}).set({});
+    Settings.instance().createSetting('fileMappingEntries', []).remove();
   }
 
   _updateVersionFrom3To4() {
-    const advancedMode = self.Common.settings.createSetting('showHeaSnapshotObjectsHiddenProperties', false);
+    const advancedMode = Settings.instance().createSetting('showHeaSnapshotObjectsHiddenProperties', false);
     moduleSetting('showAdvancedHeapSnapshotProperties').set(advancedMode.get());
     advancedMode.remove();
   }
 
   _updateVersionFrom4To5() {
+    /** @type {!Object<string,string>} */
     const settingNames = {
       'FileSystemViewSidebarWidth': 'fileSystemViewSplitViewState',
       'elementsSidebarWidth': 'elementsPanelSplitViewState',
@@ -554,15 +593,16 @@ export class VersionController {
       const newName = settingNames[oldName];
       const oldNameH = oldName + 'H';
 
+      /** @type {?Object<string,*>} */
       let newValue = null;
-      const oldSetting = self.Common.settings.createSetting(oldName, empty);
+      const oldSetting = Settings.instance().createSetting(oldName, empty);
       if (oldSetting.get() !== empty) {
         newValue = newValue || {};
         newValue.vertical = {};
         newValue.vertical.size = oldSetting.get();
         oldSetting.remove();
       }
-      const oldSettingH = self.Common.settings.createSetting(oldNameH, empty);
+      const oldSettingH = Settings.instance().createSetting(oldNameH, empty);
       if (oldSettingH.get() !== empty) {
         newValue = newValue || {};
         newValue.horizontal = {};
@@ -570,12 +610,13 @@ export class VersionController {
         oldSettingH.remove();
       }
       if (newValue) {
-        self.Common.settings.createSetting(newName, {}).set(newValue);
+        Settings.instance().createSetting(newName, {}).set(newValue);
       }
     }
   }
 
   _updateVersionFrom5To6() {
+    /** @type {!Object<string,string>} */
     const settingNames = {
       'debuggerSidebarHidden': 'sourcesPanelSplitViewState',
       'navigatorHidden': 'sourcesPanelNavigatorSplitViewState',
@@ -583,7 +624,7 @@ export class VersionController {
     };
 
     for (const oldName in settingNames) {
-      const oldSetting = self.Common.settings.createSetting(oldName, null);
+      const oldSetting = Settings.instance().createSetting(oldName, null);
       if (oldSetting.get() === null) {
         oldSetting.remove();
         continue;
@@ -595,7 +636,7 @@ export class VersionController {
       oldSetting.remove();
       const showMode = hidden ? 'OnlyMain' : 'Both';
 
-      const newSetting = self.Common.settings.createSetting(newName, {});
+      const newSetting = Settings.instance().createSetting(newName, {});
       const newValue = newSetting.get() || {};
       newValue.vertical = newValue.vertical || {};
       newValue.vertical.showMode = showMode;
@@ -615,7 +656,7 @@ export class VersionController {
 
     const empty = {};
     for (const name in settingNames) {
-      const setting = self.Common.settings.createSetting(name, empty);
+      const setting = Settings.instance().createSetting(name, empty);
       const value = setting.get();
       if (value === empty) {
         continue;
@@ -638,7 +679,7 @@ export class VersionController {
     const settingNames = ['skipStackFramesPattern', 'workspaceFolderExcludePattern'];
 
     for (let i = 0; i < settingNames.length; ++i) {
-      const setting = self.Common.settings.createSetting(settingNames[i], '');
+      const setting = Settings.instance().createSetting(settingNames[i], '');
       let value = setting.get();
       if (!value) {
         return;
@@ -670,7 +711,7 @@ export class VersionController {
   _updateVersionFrom10To11() {
     const oldSettingName = 'customDevicePresets';
     const newSettingName = 'customEmulatedDeviceList';
-    const oldSetting = self.Common.settings.createSetting(oldSettingName, undefined);
+    const oldSetting = Settings.instance().createSetting(oldSettingName, undefined);
     const list = oldSetting.get();
     if (!Array.isArray(list)) {
       return;
@@ -678,6 +719,7 @@ export class VersionController {
     const newList = [];
     for (let i = 0; i < list.length; ++i) {
       const value = list[i];
+      /** @type {!Object<string,*>} */
       const device = {};
       device['title'] = value['title'];
       device['type'] = 'unknown';
@@ -699,7 +741,7 @@ export class VersionController {
       newList.push(device);
     }
     if (newList.length) {
-      self.Common.settings.createSetting(newSettingName, []).set(newList);
+      Settings.instance().createSetting(newSettingName, []).set(newList);
     }
     oldSetting.remove();
   }
@@ -710,17 +752,18 @@ export class VersionController {
 
   _updateVersionFrom12To13() {
     this._migrateSettingsFromLocalStorage();
-    self.Common.settings.createSetting('timelineOverviewMode', '').remove();
+    Settings.instance().createSetting('timelineOverviewMode', '').remove();
   }
 
   _updateVersionFrom13To14() {
     const defaultValue = {'throughput': -1, 'latency': 0};
-    self.Common.settings.createSetting('networkConditions', defaultValue).set(defaultValue);
+    Settings.instance().createSetting('networkConditions', defaultValue).set(defaultValue);
   }
 
   _updateVersionFrom14To15() {
-    const setting = self.Common.settings.createLocalSetting('workspaceExcludedFolders', {});
+    const setting = Settings.instance().createLocalSetting('workspaceExcludedFolders', {});
     const oldValue = setting.get();
+    /** @type {!Object<string,!Array<string>>} */
     const newValue = {};
     for (const fileSystemPath in oldValue) {
       newValue[fileSystemPath] = [];
@@ -732,7 +775,7 @@ export class VersionController {
   }
 
   _updateVersionFrom15To16() {
-    const setting = self.Common.settings.createSetting('InspectorView.panelOrder', {});
+    const setting = Settings.instance().createSetting('InspectorView.panelOrder', {});
     const tabOrders = setting.get();
     for (const key of Object.keys(tabOrders)) {
       tabOrders[key] = (tabOrders[key] + 1) * 10;
@@ -741,7 +784,7 @@ export class VersionController {
   }
 
   _updateVersionFrom16To17() {
-    const setting = self.Common.settings.createSetting('networkConditionsCustomProfiles', []);
+    const setting = Settings.instance().createSetting('networkConditionsCustomProfiles', []);
     const oldValue = setting.get();
     const newValue = [];
     if (Array.isArray(oldValue)) {
@@ -760,8 +803,9 @@ export class VersionController {
   }
 
   _updateVersionFrom17To18() {
-    const setting = self.Common.settings.createLocalSetting('workspaceExcludedFolders', {});
+    const setting = Settings.instance().createLocalSetting('workspaceExcludedFolders', {});
     const oldValue = setting.get();
+    /** @type {!Object<string,string>} */
     const newValue = {};
     for (const oldKey in oldValue) {
       let newKey = oldKey.replace(/\\/g, '/');
@@ -779,11 +823,12 @@ export class VersionController {
 
   _updateVersionFrom18To19() {
     const defaultColumns = {status: true, type: true, initiator: true, size: true, time: true};
-    const visibleColumnSettings = self.Common.settings.createSetting('networkLogColumnsVisibility', defaultColumns);
+    const visibleColumnSettings = Settings.instance().createSetting('networkLogColumnsVisibility', defaultColumns);
     const visibleColumns = visibleColumnSettings.get();
     visibleColumns.name = true;
     visibleColumns.timeline = true;
 
+    /** @type {!Object<string,{visible: number}>} */
     const configs = {};
     for (const columnId in visibleColumns) {
       if (!visibleColumns.hasOwnProperty(columnId)) {
@@ -791,28 +836,28 @@ export class VersionController {
       }
       configs[columnId.toLowerCase()] = {visible: visibleColumns[columnId]};
     }
-    const newSetting = self.Common.settings.createSetting('networkLogColumns', {});
+    const newSetting = Settings.instance().createSetting('networkLogColumns', {});
     newSetting.set(configs);
     visibleColumnSettings.remove();
   }
 
   _updateVersionFrom19To20() {
-    const oldSetting = self.Common.settings.createSetting('InspectorView.panelOrder', {});
-    const newSetting = self.Common.settings.createSetting('panel-tabOrder', {});
+    const oldSetting = Settings.instance().createSetting('InspectorView.panelOrder', {});
+    const newSetting = Settings.instance().createSetting('panel-tabOrder', {});
     newSetting.set(oldSetting.get());
     oldSetting.remove();
   }
 
   _updateVersionFrom20To21() {
-    const networkColumns = self.Common.settings.createSetting('networkLogColumns', {});
-    const columns = /** @type {!Object} */ (networkColumns.get());
+    const networkColumns = Settings.instance().createSetting('networkLogColumns', {});
+    const columns = /** @type {!Object<string,string>} */ (networkColumns.get());
     delete columns['timeline'];
     delete columns['waterfall'];
     networkColumns.set(columns);
   }
 
   _updateVersionFrom21To22() {
-    const breakpointsSetting = self.Common.settings.createLocalSetting('breakpoints', []);
+    const breakpointsSetting = Settings.instance().createLocalSetting('breakpoints', []);
     const breakpoints = breakpointsSetting.get();
     for (const breakpoint of breakpoints) {
       breakpoint['url'] = breakpoint['sourceFileId'];
@@ -826,26 +871,26 @@ export class VersionController {
   }
 
   _updateVersionFrom23To24() {
-    const oldSetting = self.Common.settings.createSetting('searchInContentScripts', false);
-    const newSetting = self.Common.settings.createSetting('searchInAnonymousAndContentScripts', false);
+    const oldSetting = Settings.instance().createSetting('searchInContentScripts', false);
+    const newSetting = Settings.instance().createSetting('searchInAnonymousAndContentScripts', false);
     newSetting.set(oldSetting.get());
     oldSetting.remove();
   }
 
   _updateVersionFrom24To25() {
     const defaultColumns = {status: true, type: true, initiator: true, size: true, time: true};
-    const networkLogColumnsSetting = self.Common.settings.createSetting('networkLogColumns', defaultColumns);
+    const networkLogColumnsSetting = Settings.instance().createSetting('networkLogColumns', defaultColumns);
     const columns = networkLogColumnsSetting.get();
     delete columns.product;
     networkLogColumnsSetting.set(columns);
   }
 
   _updateVersionFrom25To26() {
-    const oldSetting = self.Common.settings.createSetting('messageURLFilters', {});
+    const oldSetting = Settings.instance().createSetting('messageURLFilters', {});
     const urls = Object.keys(oldSetting.get());
     const textFilter = urls.map(url => `-url:${url}`).join(' ');
     if (textFilter) {
-      const textFilterSetting = self.Common.settings.createSetting('console.textFilter', '');
+      const textFilterSetting = Settings.instance().createSetting('console.textFilter', '');
       const suffix = textFilterSetting.get() ? ` ${textFilterSetting.get()}` : '';
       textFilterSetting.set(`${textFilter}${suffix}`);
     }
@@ -859,7 +904,7 @@ export class VersionController {
      * @param {string} to
      */
     function renameKeyInObjectSetting(settingName, from, to) {
-      const setting = self.Common.settings.createSetting(settingName, {});
+      const setting = Settings.instance().createSetting(settingName, {});
       const value = setting.get();
       if (from in value) {
         value[to] = value[from];
@@ -874,7 +919,7 @@ export class VersionController {
      * @param {string} to
      */
     function renameInStringSetting(settingName, from, to) {
-      const setting = self.Common.settings.createSetting(settingName, '');
+      const setting = Settings.instance().createSetting(settingName, '');
       const value = setting.get();
       if (value === from) {
         setting.set(to);
@@ -887,7 +932,7 @@ export class VersionController {
   }
 
   _updateVersionFrom27To28() {
-    const setting = self.Common.settings.createSetting('uiTheme', 'systemPreferred');
+    const setting = Settings.instance().createSetting('uiTheme', 'systemPreferred');
     if (setting.get() === 'default') {
       setting.set('systemPreferred');
     }
@@ -900,7 +945,7 @@ export class VersionController {
      * @param {string} to
      */
     function renameKeyInObjectSetting(settingName, from, to) {
-      const setting = self.Common.settings.createSetting(settingName, {});
+      const setting = Settings.instance().createSetting(settingName, {});
       const value = setting.get();
       if (from in value) {
         value[to] = value[from];
@@ -915,7 +960,7 @@ export class VersionController {
      * @param {string} to
      */
     function renameInStringSetting(settingName, from, to) {
-      const setting = self.Common.settings.createSetting(settingName, '');
+      const setting = Settings.instance().createSetting(settingName, '');
       const value = setting.get();
       if (value === from) {
         setting.set(to);
@@ -925,6 +970,25 @@ export class VersionController {
     renameKeyInObjectSetting('panel-tabOrder', 'audits', 'lighthouse');
     renameKeyInObjectSetting('panel-closeableTabs', 'audits', 'lighthouse');
     renameInStringSetting('panel-selectedTab', 'audits', 'lighthouse');
+  }
+
+  _updateVersionFrom29To30() {
+    // Create new location agnostic setting
+    const closeableTabSetting = Settings.instance().createSetting('closeableTabs', {});
+
+    // Read current settings
+    const panelCloseableTabSetting = Settings.instance().createSetting('panel-closeableTabs', {});
+    const drawerCloseableTabSetting = Settings.instance().createSetting('drawer-view-closeableTabs', {});
+    const openTabsInPanel = panelCloseableTabSetting.get();
+    const openTabsInDrawer = panelCloseableTabSetting.get();
+
+    // Set value of new setting
+    const newValue = Object.assign(openTabsInDrawer, openTabsInPanel);
+    closeableTabSetting.set(newValue);
+
+    // Remove old settings
+    panelCloseableTabSetting.remove();
+    drawerCloseableTabSetting.remove();
   }
 
   _migrateSettingsFromLocalStorage() {
@@ -944,12 +1008,12 @@ export class VersionController {
       }
       const value = window.localStorage[key];
       window.localStorage.removeItem(key);
-      self.Common.settings._globalStorage[key] = value;
+      Settings.instance()._globalStorage.set(key, value);
     }
   }
 
   /**
-   * @param {!Setting} breakpointsSetting
+   * @param {!Setting<*>} breakpointsSetting
    * @param {number} maxBreakpointsCount
    */
   _clearBreakpointsWhenTooMany(breakpointsSetting, maxBreakpointsCount) {
@@ -972,18 +1036,18 @@ export const SettingStorageType = {
 
 /**
  * @param {string} settingName
- * @return {!Setting}
+ * @return {!Setting<*>}
  */
 export function moduleSetting(settingName) {
-  return self.Common.settings.moduleSetting(settingName);
+  return Settings.instance().moduleSetting(settingName);
 }
 
 /**
  * @param {string} settingName
- * @return {!Setting}
+ * @return {!Setting<*>}
  */
 export function settingForTest(settingName) {
-  return self.Common.settings.settingForTest(settingName);
+  return Settings.instance().settingForTest(settingName);
 }
 
 /**
@@ -993,17 +1057,17 @@ export function settingForTest(settingName) {
 export function detectColorFormat(color) {
   const cf = Format;
   let format;
-  const formatSetting = self.Common.settings.moduleSetting('colorFormat').get();
+  const formatSetting = Settings.instance().moduleSetting('colorFormat').get();
   if (formatSetting === cf.Original) {
     format = cf.Original;
   } else if (formatSetting === cf.RGB) {
-    format = (color.hasAlpha() ? cf.RGBA : cf.RGB);
+    format = cf.RGB;
   } else if (formatSetting === cf.HSL) {
-    format = (color.hasAlpha() ? cf.HSLA : cf.HSL);
+    format = cf.HSL;
   } else if (formatSetting === cf.HEX) {
     format = color.detectHEXFormat();
   } else {
-    format = cf.RGBA;
+    format = cf.RGB;
   }
 
   return format;

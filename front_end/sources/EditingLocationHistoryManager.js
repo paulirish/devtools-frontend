@@ -28,6 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';  // eslint-disable-line no-unused-vars
 import * as SourceFrame from '../source_frame/source_frame.js';
 import * as TextUtils from '../text_utils/text_utils.js';  // eslint-disable-line no-unused-vars
@@ -183,7 +186,7 @@ export class EditingLocationHistoryEntry {
    */
   valid() {
     const position = this._positionHandle.resolve();
-    const uiSourceCode = self.Workspace.workspace.uiSourceCode(this._projectId, this._url);
+    const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCode(this._projectId, this._url);
     return !!(position && uiSourceCode);
   }
 
@@ -192,7 +195,7 @@ export class EditingLocationHistoryEntry {
    */
   reveal() {
     const position = this._positionHandle.resolve();
-    const uiSourceCode = self.Workspace.workspace.uiSourceCode(this._projectId, this._url);
+    const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCode(this._projectId, this._url);
     if (!position || !uiSourceCode) {
       return;
     }

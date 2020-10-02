@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as SDK from '../sdk/sdk.js';
 
 export class InputModel extends SDK.SDKModel.SDKModel {
@@ -165,7 +168,7 @@ export class InputModel extends SDK.SDKModel.SDKModel {
   }
 
   /**
-   * @param {!KeyboardEventData } eventData
+   * @param {!KeyboardEventData} eventData
    */
   async _dispatchKeyEvent(eventData) {
     console.assert(InputModel.KeyboardEventTypes.has(eventData.type));
@@ -202,5 +205,5 @@ export let EventData;
 /** @typedef {{x: number, y: number, button: number, buttons: number, clickCount: number, deltaX: number, deltaY: number}} */
 export let MouseEventData;
 
-/** @typedef {{code: string, key: string}} */
+/** @typedef {{code: string, key: string, modifiers: number}} */
 export let KeyboardEventData;

@@ -4,10 +4,12 @@
 
 const {assert} = chai;
 
-import {Trie} from '../../../../front_end/common/Trie.js';
+import * as Common from '../../../../front_end/common/common.js';
+
+const Trie = Common.Trie.Trie;
 
 describe('Trie', () => {
-  let trie: Trie;
+  let trie: Common.Trie.Trie;
   beforeEach(() => {
     trie = new Trie();
   });
@@ -50,9 +52,9 @@ describe('Trie', () => {
     trie.add('supercar');
 
     // Longest non-word prefix match.
-    assert.equal(trie.longestPrefix('supercalifragilisticexpialidocious', false), 'superca');
+    assert.strictEqual(trie.longestPrefix('supercalifragilisticexpialidocious', false), 'superca');
 
     // Longest word prefix match.
-    assert.equal(trie.longestPrefix('supercalifragilisticexpialidocious', true), 'super');
+    assert.strictEqual(trie.longestPrefix('supercalifragilisticexpialidocious', true), 'super');
   });
 });

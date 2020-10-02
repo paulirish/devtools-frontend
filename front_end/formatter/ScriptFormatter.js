@@ -27,11 +27,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Common from '../common/common.js';  // eslint-disable-line no-unused-vars
 import * as Platform from '../platform/platform.js';
 
-import {FormatResult, formatterWorkerPool} from './FormatterWorkerPool.js';  // eslint-disable-line no-unused-vars
+import {FormatMapping, FormatResult, formatterWorkerPool} from './FormatterWorkerPool.js';  // eslint-disable-line no-unused-vars
 
 /**
  * @interface
@@ -89,13 +91,23 @@ export class ScriptFormatter {
    * @param {function(string, !FormatterSourceMapping)} callback
    */
   constructor(mimeType, content, callback) {
-    content = content.replace(/\r\n?|[\n\u2028\u2029]/g, '\n').replace(/^\uFEFF/, '');
+    this._mimeType = mimeType;
+    this._originalContent = content.replace(/\r\n?|[\n\u2028\u2029]/g, '\n').replace(/^\uFEFF/, '');
     this._callback = callback;
-    this._originalContent = content;
 
-    formatterWorkerPool()
-        .format(mimeType, content, self.Common.settings.moduleSetting('textEditorIndent').get())
-        .then(this._didFormatContent.bind(this));
+    this._initialize();
+  }
+
+  async _initialize() {
+    const pool = formatterWorkerPool();
+    const indent = Common.Settings.Settings.instance().moduleSetting('textEditorIndent').get();
+
+    const formatResult = await pool.format(this._mimeType, this._originalContent, indent);
+    if (!formatResult) {
+      this._callback(this._originalContent, new IdentityFormatterSourceMapping());
+    } else {
+      this._didFormatContent(formatResult);
+    }
   }
 
   /**
@@ -180,7 +192,7 @@ class FormatterSourceMappingImpl {
   /**
    * @param {!Array.<number>} originalLineEndings
    * @param {!Array.<number>} formattedLineEndings
-   * @param {!Formatter.FormatterWorkerPool.FormatMapping} mapping
+   * @param {!FormatMapping} mapping
    */
   constructor(originalLineEndings, formattedLineEndings, mapping) {
     this._originalLineEndings = originalLineEndings;

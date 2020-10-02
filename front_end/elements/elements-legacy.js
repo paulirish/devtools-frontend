@@ -38,9 +38,6 @@ Elements.ElementStatePaneWidget = ElementsModule.ElementStatePaneWidget.ElementS
 Elements.ElementStatePaneWidget.ButtonProvider = ElementsModule.ElementStatePaneWidget.ButtonProvider;
 
 /** @constructor */
-Elements.ElementsBreadcrumbs = ElementsModule.ElementsBreadcrumbs.ElementsBreadcrumbs;
-
-/** @constructor */
 Elements.ElementsPanel = ElementsModule.ElementsPanel.ElementsPanel;
 
 /** @constructor */
@@ -83,6 +80,9 @@ Elements.MarkerDecorator = ElementsModule.MarkerDecorator.MarkerDecorator;
 Elements.GenericDecorator = ElementsModule.MarkerDecorator.GenericDecorator;
 
 /** @constructor */
+Elements.LayoutSidebarPane = ElementsModule.LayoutSidebarPane.LayoutSidebarPane;
+
+/** @constructor */
 Elements.MetricsSidebarPane = ElementsModule.MetricsSidebarPane.MetricsSidebarPane;
 
 /** @constructor */
@@ -105,21 +105,3 @@ Elements.StylesSidebarPane.ButtonProvider = ElementsModule.StylesSidebarPane.But
 
 /** @constructor */
 Elements.StylePropertiesSection = ElementsModule.StylesSidebarPane.StylePropertiesSection;
-
-/** @typedef {{cancel: function(), commit: function(), resize: function(), editor:!UI.TextEditor}} */
-Elements.MultilineEditorController;
-
-/** @typedef {{node: !SDK.DOMNode, isCut: boolean}} */
-Elements.ElementsTreeOutline.ClipboardData;
-
-/** @typedef {{
- *    expanded: boolean,
- *    hasChildren: boolean,
- *    isEditingName: boolean,
- *    originalProperty: (!SDK.CSSProperty|undefined),
- *    originalName: (string|undefined),
- *    originalValue: (string|undefined),
- *    previousContent: string
- *  }}
- */
-Elements.StylePropertyTreeElement.Context;

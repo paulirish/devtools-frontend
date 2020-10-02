@@ -1,5 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
-// Copyright (C) Microsoft Corporation. All rights reserved.
+// Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -13,11 +12,11 @@
  */
 
 const fs = require('fs');
-const {promisify} = require('util');
-const writeFileAsync = promisify(fs.writeFile);
-const appendFileAsync = promisify(fs.appendFile);
+const writeFileAsync = fs.promises.writeFile;
+const appendFileAsync = fs.promises.appendFile;
 const checkLocalizedStrings = require('./utils/check_localized_strings');
 const localizationUtils = require('./utils/localization_utils');
+const localizationV2Checks = require('./localizationV2Checks');
 
 const grdpFileStart = '<?xml version="1.0" encoding="utf-8"?>\n<grit-part>\n';
 const grdpFileEnd = '</grit-part>';
@@ -26,14 +25,17 @@ async function main() {
   try {
     const shouldAutoFix = process.argv.includes('--autofix');
     const error = await checkLocalizedStrings.validateGrdAndGrdpFiles(shouldAutoFix);
-    if (error !== '' && !shouldAutoFix)
+    if (error !== '' && !shouldAutoFix) {
       throw new Error(error);
+    }
 
     await checkLocalizedStrings.parseLocalizableResourceMaps();
-    if (shouldAutoFix)
+    if (shouldAutoFix) {
       await autofix(error);
-    else
-      getErrors();
+    } else {
+      await getErrors();
+    }
+
   } catch (e) {
     console.log(e.stack);
     process.exit(1);
@@ -42,55 +44,99 @@ async function main() {
 
 main();
 
-function getErrors(existingError) {
-  const toAddError = checkLocalizedStrings.getAndReportResourcesToAdd();
-  const toModifyError = checkLocalizedStrings.getAndReportIDSKeysToModify();
-  const toRemoveError = checkLocalizedStrings.getAndReportResourcesToRemove();
-  let error =
-      `${existingError ? `${existingError}\n` : ''}${toAddError || ''}${toModifyError || ''}${toRemoveError || ''}`;
+async function getErrors() {
+  let error = getV1Errors();
+  error += await getV2Errors();
 
   if (error === '') {
     console.log('DevTools localizable resources checker passed.');
     return;
   }
 
-  error += '\nThe errors are potentially fixable with the `--autofix` option.';
-
+  error += '\nSome errors are potentially fixable with the `--autofix` option.';
   throw new Error(error);
 }
 
+function getV1Errors() {
+  const toAddError = checkLocalizedStrings.getAndReportResourcesToAdd();
+  const toModifyError = checkLocalizedStrings.getAndReportIDSKeysToModify();
+  const toRemoveError = checkLocalizedStrings.getAndReportResourcesToRemove();
+  const localizabilityError = checkLocalizedStrings.getLocalizabilityError();
+  const v1ErrorMessage = `${toAddError || ''}${toModifyError || ''}${toRemoveError || ''}${localizabilityError || ''}`;
+  return v1ErrorMessage;
+}
+
+async function getV2Errors() {
+  const checkUIStringsError = await localizationV2Checks.checkUIStrings();
+  const checkMigratedDirectoryError = localizationV2Checks.checkNoV1CallsInMigratedDir();
+  const v2ErrorMessage = `${checkUIStringsError || ''}${checkMigratedDirectoryError || ''}`;
+  return v2ErrorMessage;
+}
+
 async function autofix(existingError) {
+  let autoFixMessage = await autofixV1(existingError);
+  autoFixMessage += await autofixV2();
+
+  if (autoFixMessage === '') {
+    console.log('DevTools localizable resources checker passed.');
+    return;
+  }
+
+  autoFixMessage += '\n';
+  autoFixMessage += '\nUse git status to see what has changed.';
+  throw new Error(autoFixMessage);
+}
+
+async function autofixV1(existingError) {
+  const localizabilityError = checkLocalizedStrings.getLocalizabilityError();
   const keysToAddToGRD = checkLocalizedStrings.getMessagesToAdd();
   const keysToRemoveFromGRD = checkLocalizedStrings.getMessagesToRemove();
   const resourceAdded = await addResourcesToGRDP(keysToAddToGRD, keysToRemoveFromGRD);
   const resourceModified = await modifyResourcesInGRDP();
   const resourceRemoved = await removeResourcesFromGRDP(keysToRemoveFromGRD);
   const shouldAddExampleTag = checkShouldAddExampleTag(keysToAddToGRD);
+  const isV1checksPassed =
+      !localizabilityError && !resourceAdded && !resourceRemoved && !resourceModified && existingError === '';
 
-  if (!resourceAdded && !resourceRemoved && !resourceModified && existingError === '') {
-    console.log('DevTools localizable resources checker passed.');
-    return;
-  }
-
-  let message =
-      'Found changes to localizable DevTools resources.\nDevTools localizable resources checker has updated the appropriate grd/grdp file(s).';
-  if (existingError !== '') {
+  let message = '';
+  if (!isV1checksPassed) {
     message +=
-        `\nGrd/Grdp files have been updated. Please verify the updated grdp files and/or the <part> file references in ${
-            localizationUtils.getRelativeFilePathFromSrc(localizationUtils.GRD_PATH)} are correct.`;
-  }
-  if (resourceAdded) {
-    message += '\nManually write a description for any new <message> entries.';
-    if (shouldAddExampleTag) {
-      message += ' Add example tag(s) <ex> for messages that contain placeholder(s)';
+        'Found changes to localizable DevTools resources.\nDevTools localizable resources checker has updated the appropriate grd/grdp file(s).';
+    if (existingError !== '') {
+      message +=
+          `\nGrd/Grdp files have been updated. Please verify the updated grdp files and/or the <part> file references in ${
+              localizationUtils.getRelativeFilePathFromSrc(localizationUtils.GRD_PATH)} are correct.`;
     }
-    message += '\nFor more details, see devtools/docs/langpacks/grdp_files.md';
+    if (resourceAdded) {
+      message += '\nManually write a description for any new <message> entries.';
+      if (shouldAddExampleTag) {
+        message += ' Add example tag(s) <ex> for messages that contain placeholder(s)';
+      }
+      message += '\nFor more details, see src/docs/localization/grdp_files.md';
+    }
+    if (resourceRemoved && duplicateRemoved(keysToRemoveFromGRD)) {
+      message += '\nDuplicate <message> entries are removed. Please verify the retained descriptions are correct.';
+    }
+    if (localizabilityError) {
+      message += localizabilityError;
+    }
   }
-  if (resourceRemoved && duplicateRemoved(keysToRemoveFromGRD))
-    message += '\nDuplicate <message> entries are removed. Please verify the retained descriptions are correct.';
-  message += '\n'
-  message += '\nUse git status to see what has changed.';
-  throw new Error(message);
+  return message;
+}
+
+async function autofixV2() {
+  const checkAndFixUIStringsError = await localizationV2Checks.checkUIStrings(true);
+  const checkMigratedDirectoryError = localizationV2Checks.checkNoV1CallsInMigratedDir();
+
+  let message = '';
+  if (checkAndFixUIStringsError) {
+    message += `\n${checkAndFixUIStringsError}`;
+  }
+  if (checkMigratedDirectoryError) {
+    message += `\n${checkMigratedDirectoryError}`;
+  }
+
+  return message;
 }
 
 function checkShouldAddExampleTag(keys) {
@@ -103,9 +149,10 @@ function checkShouldAddExampleTag(keys) {
 }
 
 function duplicateRemoved(keysToRemoveFromGRD) {
-  for (const [_, messages] of keysToRemoveFromGRD) {
-    if (messages.length > 1)
+  for (const [, messages] of keysToRemoveFromGRD) {
+    if (messages.length > 1) {
       return true;
+    }
   }
   return false;
 }
@@ -116,22 +163,27 @@ async function addResourcesToGRDP(keysToAddToGRD, keysToRemoveFromGRD) {
     const grdpFilePathToStrings = new Map();
     // Get the grdp files that need to be modified
     for (const [key, stringObj] of keysToAddToGRD) {
-      if (!grdpFilePathToStrings.has(stringObj.grdpPath))
+      if (!grdpFilePathToStrings.has(stringObj.grdpPath)) {
         grdpFilePathToStrings.set(stringObj.grdpPath, []);
+      }
 
       // Add the IDS key to stringObj so we have access to it later
       stringObj.ids = key;
-      // If the same key is to be removed, this is likely a string copy
-      // to another folder. Keep the description.
-      if (keysToRemoveFromGRD.has(key))
-        stringObj.description = checkLocalizedStrings.getLongestDescription(keysToRemoveFromGRD.get(key));
+      // If the same key is to be removed, this is likely a string copy to another folder.
+      // Keep the string from grd to preserve all <ex> and <ph> tags and the description.
+      if (keysToRemoveFromGRD.has(key)) {
+        const existingMessage = keysToRemoveFromGRD.get(key);
+        stringObj.grdString = existingMessage[0].grdString;
+        stringObj.description = checkLocalizedStrings.getLongestDescription(existingMessage);
+      }
       grdpFilePathToStrings.get(stringObj.grdpPath).push(stringObj);
     }
     return grdpFilePathToStrings;
   }
 
-  if (keysToAddToGRD.size === 0)
+  if (keysToAddToGRD.size === 0) {
     return false;
+  }
 
   // Map grdp file path to strings to be added to that file so that we only need to
   // modify every grdp file once
@@ -139,12 +191,14 @@ async function addResourcesToGRDP(keysToAddToGRD, keysToRemoveFromGRD) {
   const promises = [];
 
   const grdpFilePathsToAdd = [];
-  for (let [grdpFilePath, stringsToAdd] of grdpFilePathToStrings) {
+  for (const [grdpFilePath, initialStringsToAdd] of grdpFilePathToStrings) {
+    let stringsToAdd = initialStringsToAdd;
     // The grdp file doesn't exist, so create one.
     if (!fs.existsSync(grdpFilePath)) {
       let grdpMessagesToAdd = '';
-      for (const stringObj of stringsToAdd)
+      for (const stringObj of stringsToAdd) {
         grdpMessagesToAdd += localizationUtils.createGrdpMessage(stringObj.ids, stringObj);
+      }
 
       // Create a new grdp file and reference it in the parent grd file
       promises.push(appendFileAsync(grdpFilePath, `${grdpFileStart}${grdpMessagesToAdd}${grdpFileEnd}`));
@@ -167,20 +221,23 @@ async function addResourcesToGRDP(keysToAddToGRD, keysToRemoveFromGRD) {
         const stringsToAddRemaining = [];
         for (const stringObj of stringsToAdd) {
           // Insert the new <message> in sorted order.
-          if (ids > stringObj.ids)
+          if (ids > stringObj.ids) {
             newGrdpFileContent += localizationUtils.createGrdpMessage(stringObj.ids, stringObj);
-          else
+          } else {
             stringsToAddRemaining.push(stringObj);
+          }
         }
         stringsToAdd = stringsToAddRemaining;
       } else if (grdpLine.includes(grdpFileEnd)) {
         // Just hit the end tag, so insert any remaining <message>s.
-        for (const stringObj of stringsToAdd)
+        for (const stringObj of stringsToAdd) {
           newGrdpFileContent += localizationUtils.createGrdpMessage(stringObj.ids, stringObj);
+        }
       }
       newGrdpFileContent += grdpLine;
-      if (i < grdpFileLines.length - 1)
+      if (i < grdpFileLines.length - 1) {
         newGrdpFileContent += '\n';
+      }
     }
 
     promises.push(writeFileAsync(grdpFilePath, newGrdpFileContent));
@@ -193,8 +250,9 @@ async function addResourcesToGRDP(keysToAddToGRD, keysToRemoveFromGRD) {
 // Return true if any resources are updated
 async function modifyResourcesInGRDP() {
   const messagesToModify = checkLocalizedStrings.getIDSKeysToModify();
-  if (messagesToModify.size === 0)
+  if (messagesToModify.size === 0) {
     return false;
+  }
 
   const grdpToMessages = mapGRDPFilePathToMessages(messagesToModify);
   const promises = [];
@@ -217,14 +275,16 @@ async function removeResourcesFromGRDP(keysToRemoveFromGRD) {
       const message = messages[i];
       const match =
         line.match(new RegExp(`<message[^>]*name="${message.ids}"[^>]*desc="(.*)?"[^>]*>`));
-      if (match)
+      if (match) {
         return i;
+      }
     }
     return -1;
   }
 
-  if (keysToRemoveFromGRD.size === 0)
+  if (keysToRemoveFromGRD.size === 0) {
     return false;
+  }
 
   const grdpToMessages = mapGRDPFilePathToMessages(keysToRemoveFromGRD);
   const promises = [];
@@ -237,14 +297,16 @@ async function removeResourcesFromGRDP(keysToRemoveFromGRD) {
       const index = indexOfFirstMatchingMessage(grdpFileLines[i], messages);
       if (index === -1) {
         newGrdpFileContent += grdpFileLines[i];
-        if (i < grdpFileLines.length - 1)
+        if (i < grdpFileLines.length - 1) {
           newGrdpFileContent += '\n';
+        }
         continue;
       }
 
       messages.splice(index, 1);
-      while (!grdpFileLines[i].includes('</message>'))
+      while (!grdpFileLines[i].includes('</message>')) {
         i++;
+      }
     }
 
     promises.push(writeFileAsync(grdpFilePath, newGrdpFileContent));
@@ -260,8 +322,9 @@ function mapGRDPFilePathToMessages(keyToMessages) {
   const grdpFilePathToMessages = new Map();
   for (const [ids, messages] of keyToMessages) {
     for (const message of messages) {
-      if (!grdpFilePathToMessages.has(message.grdpPath))
+      if (!grdpFilePathToMessages.has(message.grdpPath)) {
         grdpFilePathToMessages.set(message.grdpPath, []);
+      }
 
       message.ids = ids;
       grdpFilePathToMessages.get(message.grdpPath).push(message);

@@ -105,7 +105,9 @@ export class FilesNavigatorView extends NavigatorView {
     this.setPlaceholder(placeholder);
     placeholder.appendParagraph().appendChild(UI.Fragment.html`
       <div>${ls`Sync changes in DevTools with the local filesystem`}</div><br />
-      ${UI.XLink.XLink.create('https://developers.google.com/web/tools/chrome-devtools/workspaces/', ls`Learn more`)}
+      ${
+        UI.XLink.XLink.create(
+            'https://developers.google.com/web/tools/chrome-devtools/workspaces/', ls`Learn more about Workspaces`)}
     `);
 
     const toolbar = new UI.Toolbar.Toolbar('navigator-toolbar');
@@ -152,7 +154,7 @@ export class OverridesNavigatorView extends NavigatorView {
 
     this.contentElement.insertBefore(this._toolbar.element, this.contentElement.firstChild);
 
-    self.Persistence.networkPersistenceManager.addEventListener(
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().addEventListener(
         Persistence.NetworkPersistenceManager.Events.ProjectChanged, this._updateProjectAndUI, this);
     this.workspace().addEventListener(Workspace.Workspace.Events.ProjectAdded, this._onProjectAddOrRemoved, this);
     this.workspace().addEventListener(Workspace.Workspace.Events.ProjectRemoved, this._onProjectAddOrRemoved, this);
@@ -173,7 +175,7 @@ export class OverridesNavigatorView extends NavigatorView {
 
   _updateProjectAndUI() {
     this.reset();
-    const project = self.Persistence.networkPersistenceManager.project();
+    const project = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project();
     if (project) {
       this.tryAddProject(project);
     }
@@ -182,10 +184,10 @@ export class OverridesNavigatorView extends NavigatorView {
 
   _updateUI() {
     this._toolbar.removeToolbarItems();
-    const project = self.Persistence.networkPersistenceManager.project();
+    const project = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project();
     if (project) {
       const enableCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(
-          self.Common.settings.moduleSetting('persistenceNetworkOverridesEnabled'));
+          Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled'));
       this._toolbar.appendToolbarItem(enableCheckbox);
 
       this._toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator(true));
@@ -206,11 +208,12 @@ export class OverridesNavigatorView extends NavigatorView {
   }
 
   async _setupNewWorkspace() {
-    const fileSystem = await self.Persistence.isolatedFileSystemManager.addFileSystem('overrides');
+    const fileSystem =
+        await Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.instance().addFileSystem('overrides');
     if (!fileSystem) {
       return;
     }
-    self.Common.settings.moduleSetting('persistenceNetworkOverridesEnabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled').set(true);
   }
 
   /**
@@ -219,7 +222,7 @@ export class OverridesNavigatorView extends NavigatorView {
    * @return {boolean}
    */
   acceptProject(project) {
-    return project === self.Persistence.networkPersistenceManager.project();
+    return project === Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project();
   }
 }
 
@@ -263,9 +266,10 @@ export class SnippetsNavigatorView extends NavigatorView {
     `);
 
     const toolbar = new UI.Toolbar.Toolbar('navigator-toolbar');
-    const newButton = new UI.Toolbar.ToolbarButton('', 'largeicon-add', Common.UIString.UIString('New snippet'));
+    const newButton =
+        new UI.Toolbar.ToolbarButton(ls`New snippet`, 'largeicon-add', Common.UIString.UIString('New snippet'));
     newButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, event => {
-      this.create(self.Snippets.project, '');
+      this.create(Snippets.project, '');
     });
     toolbar.appendToolbarItem(newButton);
     this.contentElement.insertBefore(toolbar.element, this.contentElement.firstChild);
@@ -286,7 +290,7 @@ export class SnippetsNavigatorView extends NavigatorView {
    */
   handleContextMenu(event) {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
-    contextMenu.headerSection().appendItem(ls`Create new snippet`, () => this.create(self.Snippets.project, ''));
+    contextMenu.headerSection().appendItem(ls`Create new snippet`, () => this.create(Snippets.project, ''));
     contextMenu.show();
   }
 
@@ -314,8 +318,8 @@ export class SnippetsNavigatorView extends NavigatorView {
   async _handleSaveAs(uiSourceCode) {
     uiSourceCode.commitWorkingCopy();
     const {content} = await uiSourceCode.requestContent();
-    self.Workspace.fileManager.save(uiSourceCode.url(), content || '', true);
-    self.Workspace.fileManager.close(uiSourceCode.url());
+    Workspace.FileManager.FileManager.instance().save(uiSourceCode.url(), content || '', true);
+    Workspace.FileManager.FileManager.instance().close(uiSourceCode.url());
   }
 }
 
@@ -332,10 +336,10 @@ export class ActionDelegate {
   handleAction(context, actionId) {
     switch (actionId) {
       case 'sources.create-snippet':
-        self.Snippets.project.createFile('', null, '').then(uiSourceCode => Common.Revealer.reveal(uiSourceCode));
+        Snippets.project.createFile('', null, '').then(uiSourceCode => Common.Revealer.reveal(uiSourceCode));
         return true;
       case 'sources.add-folder-to-workspace':
-        self.Persistence.isolatedFileSystemManager.addFileSystem();
+        Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.instance().addFileSystem();
         return true;
     }
     return false;

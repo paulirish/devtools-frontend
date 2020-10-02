@@ -15,8 +15,10 @@ Generate report: enabled visible
 =============== Audits run ===============
 bootup-time
 critical-request-chains
+cumulative-layout-shift
 diagnostics
 dom-size
+duplicated-javascript
 efficient-animated-content
 estimated-input-latency
 final-screenshot
@@ -25,6 +27,11 @@ first-cpu-idle
 first-meaningful-paint
 font-display
 interactive
+largest-contentful-paint
+largest-contentful-paint-element
+layout-shift-elements
+legacy-javascript
+long-tasks
 main-thread-tasks
 mainthread-work-breakdown
 max-potential-fid
@@ -32,28 +39,38 @@ metrics
 network-requests
 network-rtt
 network-server-latency
+no-document-write
+non-composited-animations
 offscreen-images
 performance-budget
 redirects
 render-blocking-resources
 resource-summary
 screenshot-thumbnails
+server-response-time
 speed-index
 third-party-summary
-time-to-first-byte
+timing-budget
 total-blocking-time
 total-byte-weight
 unminified-css
 unminified-javascript
+unsized-images
 unused-css-rules
+unused-javascript
 user-timings
+uses-http2
 uses-long-cache-ttl
 uses-optimized-images
+uses-passive-event-listeners
 uses-rel-preconnect
 uses-rel-preload
 uses-responsive-images
 uses-text-compression
 uses-webp-images
+
+View Trace Button Text: "View Original Trace"
+View Trace Button Title: "The performance metrics above are simulated and won't match the timings found in this trace. Disable simulated throttling in "Lighthouse Settings" if you want the timings to match."
 
 Showing view: timeline
 

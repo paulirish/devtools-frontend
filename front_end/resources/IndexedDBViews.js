@@ -28,6 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as DataGrid from '../data_grid/data_grid.js';
 import * as ObjectUI from '../object_ui/object_ui.js';
@@ -471,7 +474,6 @@ export class IDBDataView extends UI.View.SimpleView {
 
   _updateToolbarEnablement() {
     const empty = !this._dataGrid || this._dataGrid.rootNode().children.length === 0;
-    this._clearButton.setEnabled(!empty);
     this._deleteSelectedButton.setEnabled(!empty && this._dataGrid.selectedNode !== null);
   }
 }
@@ -492,14 +494,14 @@ export class IDBDataGridNode extends DataGrid.DataGrid.DataGridNode {
 
   /**
    * @override
-   * @return {!Element}
+   * @return {!HTMLElement}
    */
   createCell(columnIdentifier) {
     const cell = super.createCell(columnIdentifier);
     const value = /** @type {!SDK.RemoteObject.RemoteObject} */ (this.data[columnIdentifier]);
 
     switch (columnIdentifier) {
-      case 'value':
+      case 'value': {
         cell.removeChildren();
         const objectPropSection =
             ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.defaultObjectPropertiesSection(
@@ -507,14 +509,17 @@ export class IDBDataGridNode extends DataGrid.DataGrid.DataGridNode {
         cell.appendChild(objectPropSection.element);
         this.valueObjectPresentation = objectPropSection;
         break;
+      }
       case 'key':
-      case 'primaryKey':
+      case 'primaryKey': {
         cell.removeChildren();
         const objectElement = ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.defaultObjectPresentation(
             value, undefined /* linkifier */, true /* skipProto */, true /* readOnly */);
         cell.appendChild(objectElement);
         break;
-      default:
+      }
+      default: {
+      }
     }
 
     return cell;

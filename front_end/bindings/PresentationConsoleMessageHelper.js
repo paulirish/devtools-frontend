@@ -27,11 +27,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Common from '../common/common.js';  // eslint-disable-line no-unused-vars
 import * as SDK from '../sdk/sdk.js';
 import * as Workspace from '../workspace/workspace.js';
 
+import {DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
 import {LiveLocation, LiveLocationPool} from './LiveLocation.js';  // eslint-disable-line no-unused-vars
 
 /**
@@ -41,11 +44,12 @@ export class PresentationConsoleMessageManager {
   constructor() {
     SDK.SDKModel.TargetManager.instance().observeModels(SDK.DebuggerModel.DebuggerModel, this);
 
-    self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.ConsoleCleared, this._consoleCleared, this);
-    self.SDK.consoleModel.addEventListener(
+    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
+        SDK.ConsoleModel.Events.ConsoleCleared, this._consoleCleared, this);
+    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
         SDK.ConsoleModel.Events.MessageAdded,
         event => this._consoleMessageAdded(/** @type {!SDK.ConsoleModel.ConsoleMessage} */ (event.data)));
-    self.SDK.consoleModel.messages().forEach(this._consoleMessageAdded, this);
+    SDK.ConsoleModel.ConsoleModel.instance().messages().forEach(this._consoleMessageAdded, this);
   }
 
   /**
@@ -218,18 +222,17 @@ export class PresentationConsoleMessage {
     this._text = message.messageText;
     this._level = message.level === SDK.ConsoleModel.MessageLevel.Error ? Workspace.UISourceCode.Message.Level.Error :
                                                                           Workspace.UISourceCode.Message.Level.Warning;
-    self.Bindings.debuggerWorkspaceBinding.createLiveLocation(
-        rawLocation, this._updateLocation.bind(this), locationPool);
+    DebuggerWorkspaceBinding.instance().createLiveLocation(rawLocation, this._updateLocation.bind(this), locationPool);
   }
 
   /**
    * @param {!LiveLocation} liveLocation
    */
-  _updateLocation(liveLocation) {
+  async _updateLocation(liveLocation) {
     if (this._uiMessage) {
       this._uiMessage.remove();
     }
-    const uiLocation = liveLocation.uiLocation();
+    const uiLocation = await liveLocation.uiLocation();
     if (!uiLocation) {
       return;
     }

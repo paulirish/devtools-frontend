@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Bindings from '../bindings/bindings.js';
-import * as ProtocolModule from '../protocol/protocol.js';
+import * as Platform from '../platform/platform.js';
+import * as ProtocolClient from '../protocol_client/protocol_client.js';
 import * as SDK from '../sdk/sdk.js';
 import * as Timeline from '../timeline/timeline.js';
 import * as UI from '../ui/ui.js';
@@ -28,11 +32,11 @@ export class InputTimeline extends UI.Widget.VBox {
 
 
     this._toggleRecordAction =
-        /** @type {!UI.Action.Action }*/ (self.UI.actionRegistry.action('input.toggle-recording'));
+        /** @type {!UI.Action.Action }*/ (UI.ActionRegistry.ActionRegistry.instance().action('input.toggle-recording'));
     this._startReplayAction =
-        /** @type {!UI.Action.Action }*/ (self.UI.actionRegistry.action('input.start-replaying'));
+        /** @type {!UI.Action.Action }*/ (UI.ActionRegistry.ActionRegistry.instance().action('input.start-replaying'));
     this._togglePauseAction =
-        /** @type {!UI.Action.Action }*/ (self.UI.actionRegistry.action('input.toggle-pause'));
+        /** @type {!UI.Action.Action }*/ (UI.ActionRegistry.ActionRegistry.instance().action('input.toggle-pause'));
 
     const toolbarContainer = this.contentElement.createChild('div', 'input-timeline-toolbar-container');
     this._panelToolbar = new UI.Toolbar.Toolbar('input-timeline-toolbar', toolbarContainer);
@@ -152,7 +156,7 @@ export class InputTimeline extends UI.Widget.VBox {
   async _saveToFile() {
     console.assert(this._state === State.Idle && this._tracingModel);
 
-    const fileName = `InputProfile-${new Date().toISO8601Compact()}.json`;
+    const fileName = `InputProfile-${Platform.DateUtilities.toISO8601Compact(new Date())}.json`;
     const stream = new Bindings.FileUtils.FileOutputStream();
 
     const accepted = await stream.open(fileName);
@@ -190,8 +194,8 @@ export class InputTimeline extends UI.Widget.VBox {
         /** @type {!SDK.SDKModel.Target} */ (SDK.SDKModel.TargetManager.instance().mainTarget()), this);
 
     const response = await this._tracingClient.startRecording();
-    if (response[ProtocolModule.InspectorBackend.ProtocolError]) {
-      this._recordingFailed(response[ProtocolModule.InspectorBackend.ProtocolError]);
+    if (response[ProtocolClient.InspectorBackend.ProtocolError]) {
+      this._recordingFailed(response[ProtocolClient.InspectorBackend.ProtocolError]);
     } else {
       this._setState(State.Recording);
     }
@@ -291,8 +295,9 @@ export class ActionDelegate {
    */
   handleAction(context, actionId) {
     const inputViewId = 'Inputs';
-    self.UI.viewManager.showView(inputViewId)
-        .then(() => self.UI.viewManager.view(inputViewId).widget())
+    UI.ViewManager.ViewManager.instance()
+        .showView(inputViewId)
+        .then(() => UI.ViewManager.ViewManager.instance().view(inputViewId).widget())
         .then(widget => this._innerHandleAction(/** @type !InputTimeline} */ (widget), actionId));
 
     return true;

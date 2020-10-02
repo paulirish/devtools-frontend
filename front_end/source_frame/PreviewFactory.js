@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
+import * as TextUtils from '../text_utils/text_utils.js';  // eslint-disable-line no-unused-vars
 import * as UI from '../ui/ui.js';
 
 import {FontView} from './FontView.js';
@@ -13,7 +17,7 @@ import {XMLView} from './XMLView.js';
 
 export class PreviewFactory {
   /**
-   * @param {!Common.ContentProvider.ContentProvider} provider
+   * @param {!TextUtils.ContentProvider.ContentProvider} provider
    * @param {string} mimeType
    * @returns {!Promise<?UI.Widget.Widget>}
    */

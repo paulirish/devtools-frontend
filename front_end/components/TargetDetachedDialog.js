@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
 
 /**
  * @implements {Protocol.InspectorDispatcher}
  */
-export class TargetDetachedDialog extends SDK.SDKModel {
+export class TargetDetachedDialog extends SDK.SDKModel.SDKModel {
   /**
-   * @param {!SDK.Target} target
+   * @param {!SDK.SDKModel.Target} target
    */
   constructor(target) {
     super(target);
-    if (target.parentTarget()) {
-      return;
-    }
     target.registerInspectorDispatcher(this);
     target.inspectorAgent().enable();
     this._hideCrashedDialog = null;
@@ -39,12 +40,22 @@ export class TargetDetachedDialog extends SDK.SDKModel {
    * @override
    */
   targetCrashed() {
+    // In case of service workers targetCrashed usually signals that the worker is stopped
+    // and in any case it is restarted automatically (in which case front-end will receive
+    // targetReloadedAfterCrash event).
+    if (this.target().parentTarget()) {
+      return;
+    }
     const dialog = new UI.Dialog.Dialog();
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
     dialog.addCloseButton();
     dialog.setDimmed(true);
     this._hideCrashedDialog = dialog.hide.bind(dialog);
-    new UI.TargetCrashedScreen.TargetCrashedScreen(() => this._hideCrashedDialog = null).show(dialog.contentElement);
+    new UI.TargetCrashedScreen
+        .TargetCrashedScreen(() => {
+          this._hideCrashedDialog = null;
+        })
+        .show(dialog.contentElement);
     dialog.show();
   }
 
@@ -60,4 +71,4 @@ export class TargetDetachedDialog extends SDK.SDKModel {
   }
 }
 
-SDK.SDKModel.register(TargetDetachedDialog, SDK.Target.Capability.Inspector, true);
+SDK.SDKModel.SDKModel.register(TargetDetachedDialog, SDK.SDKModel.Capability.Inspector, true);

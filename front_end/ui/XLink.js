@@ -7,7 +7,7 @@ import * as Host from '../host/host.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import {ContextMenu, Provider} from './ContextMenu.js';  // eslint-disable-line no-unused-vars
 import {html} from './Fragment.js';
-import {copyLinkAddressLabel, MaxLengthForDisplayedURLs, openLinkExternallyLabel} from './UIUtils.js';
+import {addReferrerToURLIfNecessary, copyLinkAddressLabel, MaxLengthForDisplayedURLs, openLinkExternallyLabel} from './UIUtils.js';
 import {XElement} from './XElement.js';
 
 /**
@@ -26,6 +26,7 @@ export class XLink extends XElement {
       linkText = url;
     }
     className = className || '';
+    url = addReferrerToURLIfNecessary(url);
     // clang-format off
     // TODO(dgozman): migrate css from 'devtools-link' to 'x-link'.
     return html`
@@ -47,10 +48,12 @@ export class XLink extends XElement {
     this._href = null;
     this._clickable = true;
 
+    /** @type {function(!Event):void} */
     this._onClick = event => {
       event.consume(true);
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(/** @type {string} */ (this._href));
     };
+    /** @type {function(!Event):void} */
     this._onKeyDown = event => {
       if (isEnterOrSpaceKey(event)) {
         event.consume(true);
@@ -130,19 +133,25 @@ export class ContextMenuProvider {
    * @param {!Object} target
    */
   appendApplicableItems(event, contextMenu, target) {
-    let targetNode = /** @type {!Node} */ (target);
+    let targetNode = /** @type {?Node} */ (target);
     while (targetNode && !(targetNode instanceof XLink)) {
       targetNode = targetNode.parentNodeOrShadowHost();
     }
     if (!targetNode || !targetNode._href) {
       return;
     }
-    contextMenu.revealSection().appendItem(
-        openLinkExternallyLabel(),
-        () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(targetNode._href));
-    contextMenu.revealSection().appendItem(
-        copyLinkAddressLabel(),
-        () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(targetNode._href));
+    /** @type {!XLink} */
+    const node = targetNode;
+    contextMenu.revealSection().appendItem(openLinkExternallyLabel(), () => {
+      if (node._href) {
+        Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(node._href);
+      }
+    });
+    contextMenu.revealSection().appendItem(copyLinkAddressLabel(), () => {
+      if (node._href) {
+        Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(node._href);
+      }
+    });
   }
 }
 

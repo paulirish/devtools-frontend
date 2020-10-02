@@ -56,7 +56,13 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     this._appendTab(tabIds.EventLog, Common.UIString.UIString('Event Log'), eventsView);
     this._rangeDetailViews.set(tabIds.EventLog, eventsView);
 
+    this._additionalMetricsToolbar = new UI.Toolbar.Toolbar('timeline-additional-metrics');
+    this.element.appendChild(this._additionalMetricsToolbar.element);
+
     this._tabbedPane.addEventListener(UI.TabbedPane.Events.TabSelected, this._tabSelected, this);
+
+    /** @type {!PerformanceModel} */
+    this._model;
   }
 
   /**
@@ -68,7 +74,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       if (this._model) {
         this._model.removeEventListener(Events.WindowChanged, this._onWindowChanged, this);
       }
-      this._model = model;
+      this._model = /** @type {!PerformanceModel} */ (model);
       if (this._model) {
         this._model.addEventListener(Events.WindowChanged, this._onWindowChanged, this);
       }
@@ -81,6 +87,25 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     this._lazyPaintProfilerView = null;
     this._lazyLayersView = null;
     this.setSelection(null);
+
+    // Add TBT info to the footer.
+    this._additionalMetricsToolbar.removeToolbarItems();
+    if (model && model.timelineModel()) {
+      const {estimated, time} = model.timelineModel().totalBlockingTime();
+      const isEstimate = estimated ? ` (${ls`estimated`})` : '';
+      const message = ls`Total blocking time: ${time.toFixed(2)}ms${isEstimate}`;
+
+      const warning = document.createElement('span');
+      const clsLink = /** @type {!UI.XLink.XLink} */ (UI.UIUtils.createWebDevLink('tbt/', ls`Learn more`));
+      // crbug.com/1103188: In dark mode the focus ring is hidden by the surrounding
+      // container of this link. For some additional spacing on the right to make
+      // sure the ring is fully visible.
+      clsLink.style.marginRight = '2px';
+      warning.appendChild(UI.UIUtils.formatLocalized('%s', [clsLink]));
+
+      this._additionalMetricsToolbar.appendText(message);
+      this._additionalMetricsToolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(warning));
+    }
   }
 
   /**
@@ -162,12 +187,13 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       return;
     }
     switch (this._selection.type()) {
-      case TimelineSelection.Type.TraceEvent:
+      case TimelineSelection.Type.TraceEvent: {
         const event = /** @type {!SDK.TracingModel.Event} */ (this._selection.object());
         TimelineUIUtils.buildTraceEventDetails(event, this._model.timelineModel(), this._detailsLinkifier, true)
             .then(fragment => this._appendDetailsTabsForTraceEventAndShowDetails(event, fragment));
         break;
-      case TimelineSelection.Type.Frame:
+      }
+      case TimelineSelection.Type.Frame: {
         const frame = /** @type {!TimelineModel.TimelineFrameModel.TimelineFrame} */ (this._selection.object());
         const filmStripFrame = this._model.filmStripModelFrame(frame);
         this._setContent(TimelineUIUtils.generateDetailsContentForFrame(frame, filmStripFrame));
@@ -179,14 +205,17 @@ export class TimelineDetailsView extends UI.Widget.VBox {
           }
         }
         break;
-      case TimelineSelection.Type.NetworkRequest:
+      }
+      case TimelineSelection.Type.NetworkRequest: {
         const request = /** @type {!TimelineModel.TimelineModel.NetworkRequest} */ (this._selection.object());
         TimelineUIUtils.buildNetworkRequestDetails(request, this._model.timelineModel(), this._detailsLinkifier)
             .then(this._setContent.bind(this));
         break;
-      case TimelineSelection.Type.Range:
+      }
+      case TimelineSelection.Type.Range: {
         this._updateSelectedRangeStats(this._selection.startTime(), this._selection.endTime());
         break;
+      }
     }
 
     this._updateContents();
@@ -204,7 +233,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   }
 
   /**
-   * @return {!UI.Widget.Widget}
+   * @return {!TimelineLayersView}
    */
   _layersView() {
     if (this._lazyLayersView) {

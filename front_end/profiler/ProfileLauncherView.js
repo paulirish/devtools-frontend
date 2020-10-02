@@ -28,6 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as UI from '../ui/ui.js';
 
@@ -50,7 +53,7 @@ export class ProfileLauncherView extends UI.Widget.VBox {
     this._contentElement = this.element.createChild('div', 'profile-launcher-view-content vbox');
 
     const profileTypeSelectorElement = this._contentElement.createChild('div', 'vbox');
-    this._selectedProfileTypeSetting = self.Common.settings.createSetting('selectedProfileType', 'CPU');
+    this._selectedProfileTypeSetting = Common.Settings.Settings.instance().createSetting('selectedProfileType', 'CPU');
     this._profileTypeHeaderElement = profileTypeSelectorElement.createChild('h1');
     this._profileTypeSelectorForm = profileTypeSelectorElement.createChild('form');
     UI.ARIAUtils.markAsRadioGroup(this._profileTypeSelectorForm);

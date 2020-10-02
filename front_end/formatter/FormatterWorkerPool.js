@@ -1,6 +1,8 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
 
 import * as Common from '../common/common.js';
 
@@ -107,27 +109,13 @@ export class FormatterWorkerPool {
    */
   _runTask(methodName, params) {
     let callback;
-    const promise = new Promise(fulfill => callback = fulfill);
+    const promise = new Promise(fulfill => {
+      callback = fulfill;
+    });
     const task = new Task(methodName, params, callback, false);
     this._taskQueue.push(task);
     this._processNextTask();
     return promise;
-  }
-
-  /**
-   * @param {string} content
-   * @return {!Promise<*>}
-   */
-  parseJSONRelaxed(content) {
-    return this._runTask('parseJSONRelaxed', {content: content});
-  }
-
-  /**
-   * @param {string} content
-   * @return {!Promise<!Array<!SCSSRule>>}
-   */
-  parseSCSS(content) {
-    return this._runTask('parseSCSS', {content: content}).then(rules => rules || []);
   }
 
   /**
@@ -159,7 +147,7 @@ export class FormatterWorkerPool {
 
   /**
    * @param {string} content
-   * @param {function(boolean, !Array<!Formatter.FormatterWorkerPool.CSSRule>)} callback
+   * @param {function(boolean, !Array<!CSSRule>)} callback
    */
   parseCSS(content, callback) {
     this._runChunkedTask('parseCSS', {content: content}, onDataChunk);
@@ -169,7 +157,7 @@ export class FormatterWorkerPool {
      * @param {*} data
      */
     function onDataChunk(isLastChunk, data) {
-      const rules = /** @type {!Array<!Formatter.FormatterWorkerPool.CSSRule>} */ (data || []);
+      const rules = /** @type {!Array<!CSSRule>} */ (data || []);
       callback(isLastChunk, rules);
     }
   }
@@ -194,7 +182,7 @@ export class FormatterWorkerPool {
   /**
    * @param {string} content
    * @param {string} mimeType
-   * @param {function(boolean, !Array<!Formatter.FormatterWorkerPool.OutlineItem>)} callback
+   * @param {function(boolean, !Array<!OutlineItem>)} callback
    * @return {boolean}
    */
   outlineForMimetype(content, mimeType, callback) {
@@ -221,7 +209,7 @@ export class FormatterWorkerPool {
 
     /**
      * @param {boolean} isLastChunk
-     * @param {!Array<!Formatter.FormatterWorkerPool.CSSRule>} rules
+     * @param {!Array<!CSSRule>} rules
      */
     function cssCallback(isLastChunk, rules) {
       callback(
@@ -233,19 +221,18 @@ export class FormatterWorkerPool {
 
   /**
    * @param {string} content
-   * @return {!Promise<?{baseExpression: string, possibleSideEffects:boolean}>}
+   * @return {!Promise<?string>}
    */
   findLastExpression(content) {
-    return /** @type {!Promise<?{baseExpression: string, possibleSideEffects:boolean}>} */ (
-        this._runTask('findLastExpression', {content}));
+    return /** @type {!Promise<?string>} */ (this._runTask('findLastExpression', {content}));
   }
 
   /**
    * @param {string} content
-   * @return {!Promise<?{baseExpression: string, possibleSideEffects:boolean, receiver: string, argumentIndex: number, functionName: string}>}
+   * @return {!Promise<?{baseExpression: string, receiver: string, argumentIndex: number, functionName: string}>}
    */
   findLastFunctionCall(content) {
-    return /** @type {!Promise<?{baseExpression: string, possibleSideEffects:boolean, receiver: string, argumentIndex: number, functionName: string}>} */ (
+    return /** @type {!Promise<?{baseExpression: string, receiver: string, argumentIndex: number, functionName: string}>} */ (
         this._runTask('findLastFunctionCall', {content}));
   }
 
@@ -280,7 +267,7 @@ export class FormatResult {
   constructor() {
     /** @type {string} */
     this.content;
-    /** @type {!Formatter.FormatterWorkerPool.FormatMapping} */
+    /** @type {!FormatMapping} */
     this.mapping;
   }
 }
@@ -304,13 +291,13 @@ class CSSProperty {
   constructor() {
     /** @type {string} */
     this.name;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.nameRange;
     /** @type {string} */
     this.value;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.valueRange;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.range;
     /** @type {(boolean|undefined)} */
     this.disabled;
@@ -322,7 +309,7 @@ class CSSStyleRule {
   constructor() {
     /** @type {string} */
     this.selectorText;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.styleRange;
     /** @type {number} */
     this.lineNumber;
@@ -336,11 +323,11 @@ class CSSStyleRule {
 // eslint-disable-next-line no-unused-vars
 class SCSSProperty {
   constructor() {
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.range;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.name;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.value;
     /** @type {boolean} */
     this.disabled;
@@ -350,11 +337,11 @@ class SCSSProperty {
 // eslint-disable-next-line no-unused-vars
 class SCSSRule {
   constructor() {
-    /** @type {!Array<!Formatter.FormatterWorkerPool.TextRange>} */
+    /** @type {!Array<!TextRange>} */
     this.selectors;
     /** @type {!Array<!SCSSProperty>} */
     this.properties;
-    /** @type {!Formatter.FormatterWorkerPool.TextRange} */
+    /** @type {!TextRange} */
     this.styleRange;
   }
 }
@@ -371,3 +358,21 @@ export function formatterWorkerPool() {
 
 /** @typedef {{line: number, column: number, title: string, subtitle: (string|undefined) }} */
 export let OutlineItem;
+
+/** @typedef {{original: !Array<number>, formatted: !Array<number>}} */
+export let FormatMapping;
+
+/**
+ * @typedef {{atRule: string, lineNumber: number, columnNumber: number}}
+ */
+export let CSSAtRule;
+
+/**
+ * @typedef {(CSSStyleRule|CSSAtRule)}
+ */
+export let CSSRule;
+
+/**
+ * @typedef {{startLine: number, startColumn: number, endLine: number, endColumn: number}}
+ */
+export let TextRange;

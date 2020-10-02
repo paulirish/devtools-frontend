@@ -4,9 +4,7 @@
 
 import {Capability, SDKModel, Target} from './SDKModel.js';  // eslint-disable-line no-unused-vars
 
-/**
- * @unrestricted
- */
+
 export class SecurityOriginManager extends SDKModel {
   /**
    * @param {!Target} target
@@ -19,6 +17,7 @@ export class SecurityOriginManager extends SDKModel {
     // its origin. In this situation, the original unreachable URL's security
     // origin will be stored in |this._unreachableMainSecurityOrigin|.
     this._mainSecurityOrigin = '';
+    /** @type {?string} */
     this._unreachableMainSecurityOrigin = '';
 
     /** @type {!Set<string>} */
@@ -60,7 +59,7 @@ export class SecurityOriginManager extends SDKModel {
   }
 
   /**
-   * @return {string}
+   * @return {?string}
    */
   unreachableMainSecurityOrigin() {
     return this._unreachableMainSecurityOrigin;

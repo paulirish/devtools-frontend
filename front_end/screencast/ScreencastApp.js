@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
@@ -18,7 +21,7 @@ let _appInstance;
  */
 export class ScreencastApp {
   constructor() {
-    this._enabledSetting = self.Common.settings.createSetting('screencastEnabled', true);
+    this._enabledSetting = Common.Settings.Settings.instance().createSetting('screencastEnabled', true);
     this._toggleButton = new UI.Toolbar.ToolbarToggle(Common.UIString.UIString('Toggle screencast'), 'largeicon-phone');
     this._toggleButton.setToggled(this._enabledSetting.get());
     this._toggleButton.setEnabled(false);
@@ -50,8 +53,8 @@ export class ScreencastApp {
     this._rootSplitWidget.show(rootView.element);
     this._rootSplitWidget.hideMain();
 
-    this._rootSplitWidget.setSidebarWidget(self.UI.inspectorView);
-    self.UI.inspectorView.setOwnerSplit(this._rootSplitWidget);
+    this._rootSplitWidget.setSidebarWidget(UI.InspectorView.InspectorView.instance());
+    UI.InspectorView.InspectorView.instance().setOwnerSplit(this._rootSplitWidget);
     rootView.attachToDocument(document);
     rootView.focus();
   }

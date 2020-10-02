@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as SDK from '../sdk/sdk.js';
 
 /**
@@ -598,7 +601,7 @@ export class AnimationGroup {
   }
 
   release() {
-    this._animationModel._animationGroups.remove(this.id());
+    this._animationModel._animationGroups.delete(this.id());
     this._animationModel._releaseAnimations(this._animationIds());
   }
 
@@ -767,7 +770,7 @@ export class ScreenshotCapture {
    * @param {!SDK.ScreenCaptureModel.ScreenCaptureModel} screenCaptureModel
    */
   constructor(animationModel, screenCaptureModel) {
-    /** @type {!Array<!Animation.AnimationModel.ScreenshotCapture.Request>} */
+    /** @type {!Array<!Request>} */
     this._requests = [];
     this._screenCaptureModel = screenCaptureModel;
     this._animationModel = animationModel;
@@ -794,7 +797,8 @@ export class ScreenshotCapture {
     }
     this._capturing = true;
     this._screenCaptureModel.startScreencast(
-        'jpeg', 80, undefined, 300, 2, this._screencastFrame.bind(this), visible => {});
+        Protocol.Page.StartScreencastRequestFormat.Jpeg, 80, undefined, 300, 2, this._screencastFrame.bind(this),
+        visible => {});
   }
 
   /**
@@ -803,7 +807,7 @@ export class ScreenshotCapture {
    */
   _screencastFrame(base64Data, metadata) {
     /**
-     * @param {!Animation.AnimationModel.ScreenshotCapture.Request} request
+     * @param {!Request} request
      * @return {boolean}
      */
     function isAnimating(request) {
@@ -835,3 +839,6 @@ export class ScreenshotCapture {
 }
 
 SDK.SDKModel.SDKModel.register(AnimationModel, SDK.SDKModel.Capability.DOM, false);
+
+/** @typedef {{ endTime: number, screenshots: !Array.<string>}} */
+export let Request;

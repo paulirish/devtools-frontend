@@ -28,6 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
+import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
 import * as UI from '../ui/ui.js';
 
@@ -42,7 +46,7 @@ export class InspectElementModeController {
    * @suppressGlobalPropertiesCheck
    */
   constructor() {
-    this._toggleSearchAction = self.UI.actionRegistry.action('elements.toggle-element-search');
+    this._toggleSearchAction = UI.ActionRegistry.ActionRegistry.instance().action('elements.toggle-element-search');
     this._mode = Protocol.Overlay.InspectMode.None;
     SDK.SDKModel.TargetManager.instance().addEventListener(
         SDK.SDKModel.Events.SuspendStateChanged, this._suspendStateChanged, this);
@@ -52,7 +56,8 @@ export class InspectElementModeController {
     SDK.OverlayModel.OverlayModel.setInspectNodeHandler(this._inspectNode.bind(this));
     SDK.SDKModel.TargetManager.instance().observeModels(SDK.OverlayModel.OverlayModel, this);
 
-    this._showDetailedInspectTooltipSetting = self.Common.settings.moduleSetting('showDetailedInspectTooltip');
+    this._showDetailedInspectTooltipSetting =
+        Common.Settings.Settings.instance().moduleSetting('showDetailedInspectTooltip');
     this._showDetailedInspectTooltipSetting.addChangeListener(this._showDetailedInspectTooltipChanged.bind(this));
 
     document.addEventListener('keydown', event => {
@@ -99,7 +104,7 @@ export class InspectElementModeController {
     if (this._isInInspectElementMode()) {
       mode = Protocol.Overlay.InspectMode.None;
     } else {
-      mode = self.Common.settings.moduleSetting('showUAShadowDOM').get() ?
+      mode = Common.Settings.Settings.instance().moduleSetting('showUAShadowDOM').get() ?
           Protocol.Overlay.InspectMode.SearchForUAShadowDOM :
           Protocol.Overlay.InspectMode.SearchForNode;
     }
@@ -136,7 +141,7 @@ export class InspectElementModeController {
   /**
    * @param {!SDK.DOMModel.DOMNode} node
    */
-  async _inspectNode(node) {
+  _inspectNode(node) {
     ElementsPanel.instance().revealAndSelectNode(node, true, true);
   }
 

@@ -4,20 +4,28 @@
  * found in the LICENSE file.
  */
 
-:host {
-    cursor: pointer;
-    padding: 0 2px;
-    min-width: 26px;
+:host(div:nth-child(1)) {
+  margin-left: 6px;
 }
 
-:host:hover {
-    color: #333;
+button {
+  cursor: pointer;
+  background-color: #f3f3f3;
+  border: 1px solid #d0d0d0;
+  border-radius: 2px;
+  color: #333;
+  margin-right: 2px;
+}
+
+button:hover,
+button:focus-visible {
+  background-color: #eaeaea;
 }
 
 .counter-item {
-    margin-left: 6px;
+  margin-left: 6px;
 }
 
 .counter-item.counter-item-first {
-    margin-left: 0;
+  margin-left: 0;
 }

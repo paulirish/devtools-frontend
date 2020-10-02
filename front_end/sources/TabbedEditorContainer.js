@@ -28,7 +28,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
+import * as Extensions from '../extensions/extensions.js';
 import * as Persistence from '../persistence/persistence.js';
 import * as Snippets from '../snippets/snippets.js';
 import * as SourceFrame from '../source_frame/source_frame.js';
@@ -81,9 +85,9 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
     this._tabbedPane.addEventListener(UI.TabbedPane.Events.TabClosed, this._tabClosed, this);
     this._tabbedPane.addEventListener(UI.TabbedPane.Events.TabSelected, this._tabSelected, this);
 
-    self.Persistence.persistence.addEventListener(
+    Persistence.Persistence.PersistenceImpl.instance().addEventListener(
         Persistence.Persistence.Events.BindingCreated, this._onBindingCreated, this);
-    self.Persistence.persistence.addEventListener(
+    Persistence.Persistence.PersistenceImpl.instance().addEventListener(
         Persistence.Persistence.Events.BindingRemoved, this._onBindingRemoved, this);
 
     this._tabIds = new Map();
@@ -91,7 +95,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
 
     this._previouslyViewedFilesSetting = setting;
     this._history = History.fromObject(this._previouslyViewedFilesSetting.get());
-    this._historyUriToUISourceCode = new Map();
+    this._uriToUISourceCode = new Map();
   }
 
   /**
@@ -188,7 +192,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
    * @param {!Workspace.UISourceCode.UISourceCode} uiSourceCode
    */
   showFile(uiSourceCode) {
-    this._innerShowFile(uiSourceCode, true);
+    this._innerShowFile(this._canonicalUISourceCode(uiSourceCode), true);
   }
 
   /**
@@ -213,7 +217,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
     const result = [];
     const uris = this._history._urls();
     for (const uri of uris) {
-      const uiSourceCode = this._historyUriToUISourceCode.get(uri);
+      const uiSourceCode = this._uriToUISourceCode.get(uri);
       if (uiSourceCode) {
         result.push(uiSourceCode);
       }
@@ -268,7 +272,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
     this._history.updateSelectionRange(this._currentFile.url(), range);
     this._history.save(this._previouslyViewedFilesSetting);
 
-    self.Extensions.extensionServer.sourceSelectionChanged(this._currentFile.url(), range);
+    Extensions.ExtensionServer.ExtensionServer.instance().sourceSelectionChanged(this._currentFile.url(), range);
   }
 
   /**
@@ -276,7 +280,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
    * @param {boolean=} userGesture
    */
   _innerShowFile(uiSourceCode, userGesture) {
-    const binding = self.Persistence.persistence.binding(uiSourceCode);
+    const binding = Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode);
     uiSourceCode = binding ? binding.fileSystem : uiSourceCode;
     if (this._currentFile === uiSourceCode) {
       return;
@@ -379,10 +383,31 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
 
   /**
    * @param {!Workspace.UISourceCode.UISourceCode} uiSourceCode
+   * @return {!Workspace.UISourceCode.UISourceCode}
+   */
+  _canonicalUISourceCode(uiSourceCode) {
+    // Check if we have already a UISourceCode for this url
+    if (this._uriToUISourceCode.has(uiSourceCode.url())) {
+      // Ignore incoming uiSourceCode, we already have this file.
+      return this._uriToUISourceCode.get(uiSourceCode.url());
+    }
+    this._uriToUISourceCode.set(uiSourceCode.url(), uiSourceCode);
+    return uiSourceCode;
+  }
+
+  /**
+   * @param {!Workspace.UISourceCode.UISourceCode} uiSourceCode
    */
   addUISourceCode(uiSourceCode) {
-    const binding = self.Persistence.persistence.binding(uiSourceCode);
-    uiSourceCode = binding ? binding.fileSystem : uiSourceCode;
+    const canonicalSourceCode = this._canonicalUISourceCode(uiSourceCode);
+    const duplicated = canonicalSourceCode !== uiSourceCode;
+    const binding = Persistence.Persistence.PersistenceImpl.instance().binding(canonicalSourceCode);
+    uiSourceCode = binding ? binding.fileSystem : canonicalSourceCode;
+
+    if (duplicated && uiSourceCode.project().type() !== Workspace.Workspace.projectTypes.FileSystem) {
+      uiSourceCode.disableEdit();
+    }
+
     if (this._currentFile === uiSourceCode) {
       return;
     }
@@ -392,12 +417,6 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
     if (index === -1) {
       return;
     }
-
-    // Check if we have already opened a tab for this uri....
-    if (this._historyUriToUISourceCode.has(uiSourceCode.url())) {
-      return;
-    }
-    this._historyUriToUISourceCode.set(uiSourceCode.url(), uiSourceCode);
 
     if (!this._tabIds.has(uiSourceCode)) {
       this._appendFileTab(uiSourceCode, false);
@@ -437,8 +456,8 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
       if (tabId) {
         tabIds.push(tabId);
       }
-      if (this._historyUriToUISourceCode.get(uiSourceCode.url()) === uiSourceCode) {
-        this._historyUriToUISourceCode.delete(uiSourceCode.url());
+      if (this._uriToUISourceCode.get(uiSourceCode.url()) === uiSourceCode) {
+        this._uriToUISourceCode.delete(uiSourceCode.url());
       }
     }
     this._tabbedPane.closeTabs(tabIds);
@@ -476,7 +495,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
    * @return {string}
    */
   _tooltipForFile(uiSourceCode) {
-    uiSourceCode = self.Persistence.persistence.network(uiSourceCode) || uiSourceCode;
+    uiSourceCode = Persistence.Persistence.PersistenceImpl.instance().network(uiSourceCode) || uiSourceCode;
     return uiSourceCode.url();
   }
 
@@ -562,7 +581,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
       delete this._currentView;
       delete this._currentFile;
     }
-    this._tabIds.remove(uiSourceCode);
+    this._tabIds.delete(uiSourceCode);
     delete this._files[tabId];
 
     this._removeUISourceCodeListeners(uiSourceCode);
@@ -620,7 +639,7 @@ export class TabbedEditorContainer extends Common.ObjectWrapper.ObjectWrapper {
       if (uiSourceCode.loadError()) {
         icon = UI.Icon.Icon.create('smallicon-error');
         icon.title = ls`Unable to load this content.`;
-      } else if (self.Persistence.persistence.hasUnsavedCommittedChanges(uiSourceCode)) {
+      } else if (Persistence.Persistence.PersistenceImpl.instance().hasUnsavedCommittedChanges(uiSourceCode)) {
         icon = UI.Icon.Icon.create('smallicon-warning');
         icon.title = Common.UIString.UIString('Changes to this file were not saved to file system.');
       } else {
@@ -742,7 +761,10 @@ export class History {
   static fromObject(serializedHistory) {
     const items = [];
     for (let i = 0; i < serializedHistory.length; ++i) {
-      items.push(HistoryItem.fromObject(serializedHistory[i]));
+      // crbug.com/876265 Old versions of DevTools don't have urls set in their localStorage
+      if (serializedHistory[i].url) {
+        items.push(HistoryItem.fromObject(serializedHistory[i]));
+      }
     }
     return new History(items);
   }

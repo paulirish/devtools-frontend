@@ -2,15 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as SDK from '../sdk/sdk.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {FileSystem, FileSystemWorkspaceBinding} from './FileSystemWorkspaceBinding.js';  // eslint-disable-line no-unused-vars
-import {PersistenceBinding} from './PersistenceImpl.js';
+import {PersistenceBinding, PersistenceImpl} from './PersistenceImpl.js';
+
+/** @type {?NetworkPersistenceManager} */
+let networkPersistenceManagerInstance;
 
 export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrapper {
   /**
+   * @private
    * @param {!Workspace.Workspace.WorkspaceImpl} workspace
    */
   constructor(workspace) {
@@ -19,7 +26,7 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     this._originalResponseContentPromiseSymbol = Symbol('OriginalResponsePromise');
     this._savingSymbol = Symbol('SavingForOverrides');
 
-    this._enabledSetting = self.Common.settings.moduleSetting('persistenceNetworkOverridesEnabled');
+    this._enabledSetting = Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled');
     this._enabledSetting.addChangeListener(this._enabledChanged, this);
 
     this._workspace = workspace;
@@ -44,11 +51,26 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
       this._onProjectRemoved(/** @type {!Workspace.Workspace.Project} */ (event.data));
     });
 
-    self.Persistence.persistence.addNetworkInterceptor(this._canHandleNetworkUISourceCode.bind(this));
+    PersistenceImpl.instance().addNetworkInterceptor(this._canHandleNetworkUISourceCode.bind(this));
 
     /** @type {!Array<!Common.EventTarget.EventDescriptor>} */
     this._eventDescriptors = [];
     this._enabledChanged();
+  }
+
+  /**
+   * @param {{forceNew: ?boolean, workspace: ?Workspace.Workspace.WorkspaceImpl}} opts
+   */
+  static instance(opts = {forceNew: null, workspace: null}) {
+    const {forceNew, workspace} = opts;
+    if (!networkPersistenceManagerInstance || forceNew) {
+      if (!workspace) {
+        throw new Error('Missing workspace for NetworkPersistenceManager');
+      }
+      networkPersistenceManagerInstance = new NetworkPersistenceManager(workspace);
+    }
+
+    return networkPersistenceManagerInstance;
   }
 
   /**
@@ -85,22 +107,22 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     this._enabled = this._enabledSetting.get();
     if (this._enabled) {
       this._eventDescriptors = [
-        self.Workspace.workspace.addEventListener(
+        Workspace.Workspace.WorkspaceImpl.instance().addEventListener(
             Workspace.Workspace.Events.UISourceCodeRenamed,
             event => {
               this._uiSourceCodeRenamedListener(event);
             }),
-        self.Workspace.workspace.addEventListener(
+        Workspace.Workspace.WorkspaceImpl.instance().addEventListener(
             Workspace.Workspace.Events.UISourceCodeAdded,
             event => {
               this._uiSourceCodeAdded(event);
             }),
-        self.Workspace.workspace.addEventListener(
+        Workspace.Workspace.WorkspaceImpl.instance().addEventListener(
             Workspace.Workspace.Events.UISourceCodeRemoved,
             event => {
               this._uiSourceCodeRemovedListener(event);
             }),
-        self.Workspace.workspace.addEventListener(
+        Workspace.Workspace.WorkspaceImpl.instance().addEventListener(
             Workspace.Workspace.Events.WorkingCopyCommitted,
             event => this._onUISourceCodeWorkingCopyCommitted(
                 /** @type {!Workspace.UISourceCode.UISourceCode} */ (event.data.uiSourceCode)))
@@ -157,7 +179,7 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
           this._project.uiSourceCodes().map(uiSourceCode => this._filesystemUISourceCodeRemoved(uiSourceCode)));
       this._networkUISourceCodeForEncodedPath.clear();
     }
-    self.Persistence.persistence.refreshAutomapping();
+    PersistenceImpl.instance().refreshAutomapping();
   }
 
   /**
@@ -253,7 +275,7 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     if (binding) {
       delete binding.network[this._bindingSymbol];
       delete binding.fileSystem[this._bindingSymbol];
-      await self.Persistence.persistence.removeBinding(binding);
+      await PersistenceImpl.instance().removeBinding(binding);
     }
   }
 
@@ -271,11 +293,11 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     const binding = new PersistenceBinding(networkUISourceCode, fileSystemUISourceCode);
     networkUISourceCode[this._bindingSymbol] = binding;
     fileSystemUISourceCode[this._bindingSymbol] = binding;
-    await self.Persistence.persistence.addBinding(binding);
+    await PersistenceImpl.instance().addBinding(binding);
     const uiSourceCodeOfTruth = networkUISourceCode[this._savingSymbol] ? networkUISourceCode : fileSystemUISourceCode;
     const [{content}, encoded] =
         await Promise.all([uiSourceCodeOfTruth.requestContent(), uiSourceCodeOfTruth.contentEncoded()]);
-    self.Persistence.persistence.syncContent(uiSourceCodeOfTruth, content, encoded);
+    PersistenceImpl.instance().syncContent(uiSourceCodeOfTruth, content, encoded);
   }
 
   /**
@@ -392,7 +414,8 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
      */
     function innerUpdateInterceptionPatterns() {
       if (!this._active) {
-        return self.SDK.multitargetNetworkManager.setInterceptionHandlerForPatterns([], this._interceptionHandlerBound);
+        return SDK.NetworkManager.MultitargetNetworkManager.instance().setInterceptionHandlerForPatterns(
+            [], this._interceptionHandlerBound);
       }
       const patterns = new Set();
       const indexFileName = 'index.html';
@@ -404,7 +427,7 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
         }
       }
 
-      return self.SDK.multitargetNetworkManager.setInterceptionHandlerForPatterns(
+      return SDK.NetworkManager.MultitargetNetworkManager.instance().setInterceptionHandlerForPatterns(
           Array.from(patterns).map(
               pattern =>
                   ({urlPattern: pattern, interceptionStage: Protocol.Network.InterceptionStage.HeadersReceived})),

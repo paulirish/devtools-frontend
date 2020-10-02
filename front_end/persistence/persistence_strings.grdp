@@ -9,9 +9,6 @@
   <message name="IDS_DEVTOOLS_03ad5ac9c1a313e19064670f92981353" desc="Text of the add button in Workspace Settings Tab of the Workspace settings in Settings">
     Add folder…
   </message>
-  <message name="IDS_DEVTOOLS_10573b873d2fa5a365d558a45e328e47" desc="A tag of Enable Local Overrides setting that can be searched in the command menu">
-    request
-  </message>
   <message name="IDS_DEVTOOLS_14f221497f99c10993cd293628adeefd" desc="A context menu item in the Persistence Actions of the Workspace settings in Settings">
     Open in containing folder
   </message>
@@ -44,6 +41,9 @@
   </message>
   <message name="IDS_DEVTOOLS_6b8a6e4cad0454926dd845d32b525f04" desc="Error message when reading a file.">
     Can&apos;t read file: <ph name="PATH"><ex>c:\dir\file.js</ex>$1s</ph>: <ph name="READER_ERROR"><ex>Underlying error</ex>$2s</ph>
+  </message>
+  <message name="IDS_DEVTOOLS_780b04f4f89a6fac135c5eb3b44b2588" desc="Error message when attempting to create a binding from a malformed URI.">
+    The attempt to bind &quot;<ph name="URL">$1s<ex>file://%E0%A4%A</ex></ph>&quot; in the workspace failed as this URI is malformed.
   </message>
   <message name="IDS_DEVTOOLS_7b4639e8d528d7a3eedafe23e9cdfee1" desc="A tag of Enable Local Overrides setting that can be searched in the command menu">
     rewrite

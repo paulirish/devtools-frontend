@@ -2,18 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Bindings from '../bindings/bindings.js';
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
-import * as Profiler from '../profiler/profiler.js';  // eslint-disable-line no-unused-vars
 import * as SDK from '../sdk/sdk.js';
 import * as SourceFrame from '../source_frame/source_frame.js';  // eslint-disable-line no-unused-vars
 import * as TextEditor from '../text_editor/text_editor.js';     // eslint-disable-line no-unused-vars
 import * as Workspace from '../workspace/workspace.js';          // eslint-disable-line no-unused-vars
 
+/** @type {!Performance} */
+let performanceInstance;
+
 export class Performance {
+  /**
+   * @private
+   */
   constructor() {
     this._helper = new Helper('performance');
+  }
+
+  /**
+   * @param {{forceNew: ?boolean}} opts
+   */
+  static instance(opts = {forceNew: null}) {
+    const {forceNew} = opts;
+    if (!performanceInstance || forceNew) {
+      performanceInstance = new Performance();
+    }
+
+    return performanceInstance;
   }
 
   reset() {
@@ -72,9 +92,27 @@ export class Performance {
   }
 }
 
+/** @type {!Memory} */
+let memoryInstance;
+
 export class Memory {
+  /**
+   * @private
+   */
   constructor() {
     this._helper = new Helper('memory');
+  }
+
+  /**
+   * @param {{forceNew: ?boolean}} opts
+   */
+  static instance(opts = {forceNew: null}) {
+    const {forceNew} = opts;
+    if (!memoryInstance || forceNew) {
+      memoryInstance = new Memory();
+    }
+
+    return memoryInstance;
   }
 
   reset() {
@@ -158,7 +196,8 @@ export class Helper {
 
   _doUpdate() {
     this._locationPool.disposeAll();
-    self.Workspace.workspace.uiSourceCodes().forEach(uiSourceCode => uiSourceCode.removeDecorationsForType(this._type));
+    Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodes().forEach(
+        uiSourceCode => uiSourceCode.removeDecorationsForType(this._type));
     for (const targetToScript of this._lineData) {
       const target = /** @type {?SDK.SDKModel.Target} */ (targetToScript[0]);
       const debuggerModel = target ? target.model(SDK.DebuggerModel.DebuggerModel) : null;
@@ -169,7 +208,7 @@ export class Helper {
         // debuggerModel is null when the profile is loaded from file.
         // Try to get UISourceCode by the URL in this case.
         const uiSourceCode = !debuggerModel && typeof scriptIdOrUrl === 'string' ?
-            self.Workspace.workspace.uiSourceCodeForURL(scriptIdOrUrl) :
+            Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(scriptIdOrUrl) :
             null;
         if (!debuggerModel && !uiSourceCode) {
           continue;
@@ -204,18 +243,18 @@ export class Presentation {
     this._type = type;
     this._time = time;
     this._uiLocation = null;
-    self.Bindings.debuggerWorkspaceBinding.createLiveLocation(
+    Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().createLiveLocation(
         rawLocation, this.updateLocation.bind(this), locationPool);
   }
 
   /**
    * @param {!Bindings.LiveLocation.LiveLocation} liveLocation
    */
-  updateLocation(liveLocation) {
+  async updateLocation(liveLocation) {
     if (this._uiLocation) {
       this._uiLocation.uiSourceCode.removeDecorationsForType(this._type);
     }
-    this._uiLocation = liveLocation.uiLocation();
+    this._uiLocation = await liveLocation.uiLocation();
     if (this._uiLocation) {
       this._uiLocation.uiSourceCode.addLineDecoration(this._uiLocation.lineNumber, this._type, this._time);
     }
@@ -229,7 +268,7 @@ export class LineDecorator {
   /**
    * @override
    * @param {!Workspace.UISourceCode.UISourceCode} uiSourceCode
-   * @param {!TextEditor.CodeMirrorTextEditor.CodeMirrorTextEditor} textEditor
+   * @param {!SourceFrame.SourcesTextEditor.SourcesTextEditor} textEditor
    * @param {string} type
    */
   decorate(uiSourceCode, textEditor, type) {
@@ -253,7 +292,8 @@ export class LineDecorator {
    * @return {!Element}
    */
   _createElement(type, value) {
-    const element = createElementWithClass('div', 'text-editor-line-marker-text');
+    const element = document.createElement('div');
+    element.classList.add('text-editor-line-marker-text');
     if (type === 'performance') {
       const intensity = Platform.NumberUtilities.clamp(Math.log10(1 + 10 * value) / 5, 0.02, 1);
       element.textContent = Common.UIString.UIString('%.1f', value);

@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @ts-nocheck
+// TODO(crbug.com/1011811): Enable TypeScript compiler checks
+
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import * as ObjectUI from '../object_ui/object_ui.js';
+import * as Root from '../root/root.js';
 import * as SDK from '../sdk/sdk.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 import * as UI from '../ui/ui.js';
@@ -21,7 +25,8 @@ export class ConsolePrompt extends UI.Widget.Widget {
     this._initialText = '';
     /** @type {?UI.TextEditor.TextEditor} */
     this._editor = null;
-    this._eagerPreviewElement = createElementWithClass('div', 'console-eager-preview');
+    this._eagerPreviewElement = document.createElement('div');
+    this._eagerPreviewElement.classList.add('console-eager-preview');
     this._textChangeThrottler = new Common.Throttler.Throttler(150);
     this._formatter = new ObjectUI.RemoteObjectPreviewFormatter.RemoteObjectPreviewFormatter();
     this._requestPreviewBound = this._requestPreview.bind(this);
@@ -35,7 +40,7 @@ export class ConsolePrompt extends UI.Widget.Widget {
     this.element.appendChild(this._promptIcon);
     this._iconThrottler = new Common.Throttler.Throttler(0);
 
-    this._eagerEvalSetting = self.Common.settings.moduleSetting('consoleEagerEval');
+    this._eagerEvalSetting = Common.Settings.Settings.instance().moduleSetting('consoleEagerEval');
     this._eagerEvalSetting.addChangeListener(this._eagerSettingChanged.bind(this));
     this._eagerPreviewElement.classList.toggle('hidden', !this._eagerEvalSetting.get());
 
@@ -48,7 +53,9 @@ export class ConsolePrompt extends UI.Widget.Widget {
 
     this._highlightingNode = false;
 
-    self.runtime.extension(UI.TextEditor.TextEditorFactory).instance().then(gotFactory.bind(this));
+    Root.Runtime.Runtime.instance().extension(UI.TextEditor.TextEditorFactory).instance().then(factory => {
+      gotFactory.call(this, /** @type {!UI.TextEditor.TextEditorFactory} */ (factory));
+    });
 
     /**
      * @param {!UI.TextEditor.TextEditorFactory} factory
@@ -121,7 +128,7 @@ export class ConsolePrompt extends UI.Widget.Widget {
    */
   async _requestPreview() {
     const text = this._editor.textWithCurrentSuggestion().trim();
-    const executionContext = self.UI.context.flavor(SDK.RuntimeModel.ExecutionContext);
+    const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
     const {preview, result} =
         await ObjectUI.JavaScriptREPL.JavaScriptREPL.evaluateAndBuildPreview(text, true /* throwOnSideEffect */, 500);
     this._innerPreviewElement.removeChildren();
@@ -214,7 +221,7 @@ export class ConsolePrompt extends UI.Widget.Widget {
     const cursorY = this._editor.visualCoordinates(selection.endLine, selection.endColumn).y;
 
     switch (keyboardEvent.keyCode) {
-      case UI.KeyboardShortcut.Keys.Up.code:
+      case UI.KeyboardShortcut.Keys.Up.code: {
         const startY = this._editor.visualCoordinates(0, 0).y;
         if (keyboardEvent.shiftKey || !selection.isEmpty() || cursorY !== startY) {
           break;
@@ -222,7 +229,8 @@ export class ConsolePrompt extends UI.Widget.Widget {
         newText = this._history.previous(this.text());
         isPrevious = true;
         break;
-      case UI.KeyboardShortcut.Keys.Down.code:
+      }
+      case UI.KeyboardShortcut.Keys.Down.code: {
         const fullRange = this._editor.fullRange();
         const endY = this._editor.visualCoordinates(fullRange.endLine, fullRange.endColumn).y;
         if (keyboardEvent.shiftKey || !selection.isEmpty() || cursorY !== endY) {
@@ -230,27 +238,32 @@ export class ConsolePrompt extends UI.Widget.Widget {
         }
         newText = this._history.next();
         break;
-      case UI.KeyboardShortcut.Keys.P.code:  // Ctrl+P = Previous
+      }
+      case UI.KeyboardShortcut.Keys.P.code: {  // Ctrl+P = Previous
         if (Host.Platform.isMac() && keyboardEvent.ctrlKey && !keyboardEvent.metaKey && !keyboardEvent.altKey &&
             !keyboardEvent.shiftKey) {
           newText = this._history.previous(this.text());
           isPrevious = true;
         }
         break;
-      case UI.KeyboardShortcut.Keys.N.code:  // Ctrl+N = Next
+      }
+      case UI.KeyboardShortcut.Keys.N.code: {  // Ctrl+N = Next
         if (Host.Platform.isMac() && keyboardEvent.ctrlKey && !keyboardEvent.metaKey && !keyboardEvent.altKey &&
             !keyboardEvent.shiftKey) {
           newText = this._history.next();
         }
         break;
-      case UI.KeyboardShortcut.Keys.Enter.code:
+      }
+      case UI.KeyboardShortcut.Keys.Enter.code: {
         this._enterKeyPressed(keyboardEvent);
         break;
-      case UI.KeyboardShortcut.Keys.Tab.code:
+      }
+      case UI.KeyboardShortcut.Keys.Tab.code: {
         if (!this.text()) {
           keyboardEvent.consume();
         }
         break;
+      }
     }
 
     if (newText === undefined) {
@@ -316,14 +329,13 @@ export class ConsolePrompt extends UI.Widget.Widget {
    */
   async _appendCommand(text, useCommandLineAPI) {
     this.setText('');
-    const currentExecutionContext = self.UI.context.flavor(SDK.RuntimeModel.ExecutionContext);
+    const currentExecutionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
     if (currentExecutionContext) {
       const executionContext = currentExecutionContext;
-      const message = self.SDK.consoleModel.addCommandMessage(executionContext, text);
+      const message = SDK.ConsoleModel.ConsoleModel.instance().addCommandMessage(executionContext, text);
       const expression = ObjectUI.JavaScriptREPL.JavaScriptREPL.preprocessExpression(text);
-      self.SDK.consoleModel.evaluateCommandInConsole(
-          executionContext, message, expression, useCommandLineAPI,
-          /* awaitPromise */ false);
+      SDK.ConsoleModel.ConsoleModel.instance().evaluateCommandInConsole(
+          executionContext, message, expression, useCommandLineAPI);
       if (ConsolePanel.instance().isShowing()) {
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.CommandEvaluatedInConsolePanel);
       }

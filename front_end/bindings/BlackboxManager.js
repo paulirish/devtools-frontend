@@ -9,11 +9,17 @@ import * as Workspace from '../workspace/workspace.js';
 import {DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';  // eslint-disable-line no-unused-vars
 
 /**
+ * @type {!BlackboxManager}
+ */
+let blackboxManagerInstance;
+
+/**
  * @unrestricted
  * @implements {SDK.SDKModel.SDKModelObserver<!SDK.DebuggerModel.DebuggerModel>}
  */
 export class BlackboxManager {
   /**
+   * @private
    * @param {!DebuggerWorkspaceBinding} debuggerWorkspaceBinding
    */
   constructor(debuggerWorkspaceBinding) {
@@ -22,10 +28,14 @@ export class BlackboxManager {
     SDK.SDKModel.TargetManager.instance().addModelListener(
         SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.GlobalObjectCleared,
         this._clearCacheIfNeeded.bind(this), this);
-    self.Common.settings.moduleSetting('skipStackFramesPattern').addChangeListener(this._patternChanged.bind(this));
-    self.Common.settings.moduleSetting('skipContentScripts').addChangeListener(this._patternChanged.bind(this));
+    Common.Settings.Settings.instance()
+        .moduleSetting('skipStackFramesPattern')
+        .addChangeListener(this._patternChanged.bind(this));
+    Common.Settings.Settings.instance()
+        .moduleSetting('skipContentScripts')
+        .addChangeListener(this._patternChanged.bind(this));
 
-    /** @type {!Set<function()>} */
+    /** @type {!Set<function():void>} */
     this._listeners = new Set();
 
     /** @type {!Map<string, boolean>} */
@@ -35,14 +45,32 @@ export class BlackboxManager {
   }
 
   /**
-   * @param {function()} listener
+   * @param {{forceNew: ?boolean, debuggerWorkspaceBinding: ?DebuggerWorkspaceBinding}} opts
+   */
+  static instance(opts = {forceNew: null, debuggerWorkspaceBinding: null}) {
+    const {forceNew, debuggerWorkspaceBinding} = opts;
+    if (!blackboxManagerInstance || forceNew) {
+      if (!debuggerWorkspaceBinding) {
+        throw new Error(
+            `Unable to create settings: targetManager, workspace, and debuggerWorkspaceBinding must be provided: ${
+                new Error().stack}`);
+      }
+
+      blackboxManagerInstance = new BlackboxManager(debuggerWorkspaceBinding);
+    }
+
+    return blackboxManagerInstance;
+  }
+
+  /**
+   * @param {function():void} listener
    */
   addChangeListener(listener) {
     this._listeners.add(listener);
   }
 
   /**
-   * @param {function()} listener
+   * @param {function():void} listener
    */
   removeChangeListener(listener) {
     this._listeners.delete(listener);
@@ -76,12 +104,17 @@ export class BlackboxManager {
     }
   }
 
+  _getSkipStackFramesPatternSetting() {
+    return /** @type {!Common.Settings.RegExpSetting} */ (
+        Common.Settings.Settings.instance().moduleSetting('skipStackFramesPattern'));
+  }
+
   /**
    * @param {!SDK.DebuggerModel.DebuggerModel} debuggerModel
    * @return {!Promise<boolean>}
    */
   _setBlackboxPatterns(debuggerModel) {
-    const regexPatterns = self.Common.settings.moduleSetting('skipStackFramesPattern').getAsArray();
+    const regexPatterns = this._getSkipStackFramesPatternSetting().getAsArray();
     const patterns = /** @type {!Array<string>} */ ([]);
     for (const item of regexPatterns) {
       if (!item.disabled && item.pattern) {
@@ -98,7 +131,7 @@ export class BlackboxManager {
   isBlackboxedUISourceCode(uiSourceCode) {
     const projectType = uiSourceCode.project().type();
     const isContentScript = projectType === Workspace.Workspace.projectTypes.ContentScripts;
-    if (isContentScript && self.Common.settings.moduleSetting('skipContentScripts').get()) {
+    if (isContentScript && Common.Settings.Settings.instance().moduleSetting('skipContentScripts').get()) {
       return true;
     }
     const url = this._uiSourceCodeURL(uiSourceCode);
@@ -114,10 +147,10 @@ export class BlackboxManager {
     if (this._isBlackboxedURLCache.has(url)) {
       return !!this._isBlackboxedURLCache.get(url);
     }
-    if (isContentScript && self.Common.settings.moduleSetting('skipContentScripts').get()) {
+    if (isContentScript && Common.Settings.Settings.instance().moduleSetting('skipContentScripts').get()) {
       return true;
     }
-    const regex = self.Common.settings.moduleSetting('skipStackFramesPattern').asRegExp();
+    const regex = this._getSkipStackFramesPatternSetting().asRegExp();
     const isBlackboxed = (regex && regex.test(url)) || false;
     this._isBlackboxedURLCache.set(url, isBlackboxed);
     return isBlackboxed;
@@ -143,44 +176,51 @@ export class BlackboxManager {
   /**
    * @param {!SDK.Script.Script} script
    * @param {?SDK.SourceMap.SourceMap} sourceMap
-   * @return {!Promise<undefined>}
+   * @return {!Promise<void>}
    */
   async _updateScriptRanges(script, sourceMap) {
     let hasBlackboxedMappings = false;
-    if (!self.Bindings.blackboxManager.isBlackboxedURL(script.sourceURL, script.isContentScript())) {
+    if (!BlackboxManager.instance().isBlackboxedURL(script.sourceURL, script.isContentScript())) {
       hasBlackboxedMappings = sourceMap ? sourceMap.sourceURLs().some(url => this.isBlackboxedURL(url)) : false;
     }
     if (!hasBlackboxedMappings) {
-      if (script[_blackboxedRanges] && await script.setBlackboxedRanges([])) {
-        delete script[_blackboxedRanges];
+      if (scriptToRange.get(script) && await script.setBlackboxedRanges([])) {
+        scriptToRange.delete(script);
       }
       await this._debuggerWorkspaceBinding.updateLocations(script);
       return;
     }
 
-    const mappings = sourceMap.mappings();
-    const newRanges = [];
-    let currentBlackboxed = false;
-    if (mappings[0].lineNumber !== 0 || mappings[0].columnNumber !== 0) {
-      newRanges.push({lineNumber: 0, columnNumber: 0});
-      currentBlackboxed = true;
+    if (!sourceMap) {
+      return;
     }
-    for (const mapping of mappings) {
-      if (mapping.sourceURL && currentBlackboxed !== this.isBlackboxedURL(mapping.sourceURL)) {
-        newRanges.push({lineNumber: mapping.lineNumber, columnNumber: mapping.columnNumber});
-        currentBlackboxed = !currentBlackboxed;
+
+    const mappings = sourceMap.mappings();
+    /** @type {!Array<!SourceRange>} */
+    const newRanges = [];
+    if (mappings.length > 0) {
+      let currentBlackboxed = false;
+      if (mappings[0].lineNumber !== 0 || mappings[0].columnNumber !== 0) {
+        newRanges.push({lineNumber: 0, columnNumber: 0});
+        currentBlackboxed = true;
+      }
+      for (const mapping of mappings) {
+        if (mapping.sourceURL && currentBlackboxed !== this.isBlackboxedURL(mapping.sourceURL)) {
+          newRanges.push({lineNumber: mapping.lineNumber, columnNumber: mapping.columnNumber});
+          currentBlackboxed = !currentBlackboxed;
+        }
       }
     }
 
-    const oldRanges = script[_blackboxedRanges] || [];
+    const oldRanges = scriptToRange.get(script) || [];
     if (!isEqual(oldRanges, newRanges) && await script.setBlackboxedRanges(newRanges)) {
-      script[_blackboxedRanges] = newRanges;
+      scriptToRange.set(script, newRanges);
     }
     this._debuggerWorkspaceBinding.updateLocations(script);
 
     /**
-     * @param {!Array<!{lineNumber: number, columnNumber: number}>} rangesA
-     * @param {!Array<!{lineNumber: number, columnNumber: number}>} rangesB
+     * @param {!Array<!SourceRange>} rangesA
+     * @param {!Array<!SourceRange>} rangesB
      * @return {boolean}
      */
     function isEqual(rangesA, rangesB) {
@@ -234,18 +274,18 @@ export class BlackboxManager {
   }
 
   blackboxContentScripts() {
-    self.Common.settings.moduleSetting('skipContentScripts').set(true);
+    Common.Settings.Settings.instance().moduleSetting('skipContentScripts').set(true);
   }
 
   unblackboxContentScripts() {
-    self.Common.settings.moduleSetting('skipContentScripts').set(false);
+    Common.Settings.Settings.instance().moduleSetting('skipContentScripts').set(false);
   }
 
   /**
    * @param {string} url
    */
   _blackboxURL(url) {
-    const regexPatterns = self.Common.settings.moduleSetting('skipStackFramesPattern').getAsArray();
+    const regexPatterns = this._getSkipStackFramesPatternSetting().getAsArray();
     const regexValue = this._urlToRegExpString(url);
     if (!regexValue) {
       return;
@@ -260,17 +300,17 @@ export class BlackboxManager {
       }
     }
     if (!found) {
-      regexPatterns.push({pattern: regexValue});
+      regexPatterns.push({pattern: regexValue, disabled: undefined});
     }
-    self.Common.settings.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
+    this._getSkipStackFramesPatternSetting().setAsArray(regexPatterns);
   }
 
   /**
    * @param {string} url
    */
   _unblackboxURL(url) {
-    let regexPatterns = self.Common.settings.moduleSetting('skipStackFramesPattern').getAsArray();
-    const regexValue = self.Bindings.blackboxManager._urlToRegExpString(url);
+    let regexPatterns = this._getSkipStackFramesPatternSetting().getAsArray();
+    const regexValue = BlackboxManager.instance()._urlToRegExpString(url);
     if (!regexValue) {
       return;
     }
@@ -290,13 +330,13 @@ export class BlackboxManager {
       } catch (e) {
       }
     }
-    self.Common.settings.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
+    this._getSkipStackFramesPatternSetting().setAsArray(regexPatterns);
   }
 
   async _patternChanged() {
     this._isBlackboxedURLCache.clear();
 
-    /** @type {!Array<!Promise>} */
+    /** @type {!Array<!Promise<*>>} */
     const promises = [];
     for (const debuggerModel of SDK.SDKModel.TargetManager.instance().models(SDK.DebuggerModel.DebuggerModel)) {
       promises.push(this._setBlackboxPatterns(debuggerModel));
@@ -354,4 +394,9 @@ export class BlackboxManager {
   }
 }
 
-const _blackboxedRanges = Symbol('blackboxedRanged');
+/** @typedef {{lineNumber: number, columnNumber: number}} */
+// @ts-ignore
+export let SourceRange;
+
+/** @type {!WeakMap<!SDK.Script.Script, !Array<!SourceRange>>} */
+const scriptToRange = new WeakMap();

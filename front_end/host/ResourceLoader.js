@@ -5,6 +5,7 @@
 import * as Common from '../common/common.js';
 
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
+import {LoadNetworkResourceResult} from './InspectorFrontendHostAPI.js';  // eslint-disable-line no-unused-vars
 
 export const ResourceLoader = {};
 
@@ -46,12 +47,13 @@ export const streamWrite = function(id, chunk) {
     urlValid: (boolean|undefined),
     message: (string|undefined)
 }} */
+// @ts-ignore typedef.
 export let LoadErrorDescription;
 
 /**
  * @param {string} url
  * @param {?Object.<string, string>} headers
- * @param {function(boolean, !Object.<string, string>, string, !LoadErrorDescription)} callback
+ * @param {function(boolean, !Object.<string, string>, string, !LoadErrorDescription):void} callback
  */
 export let load = function(url, headers, callback) {
   const stream = new Common.StringOutputStream.StringOutputStream();
@@ -67,6 +69,9 @@ export let load = function(url, headers, callback) {
   }
 };
 
+/**
+ * @param {function(string, ?Object<string, string>, function(boolean, !Object<string, string>, string, !LoadErrorDescription): void): void} newLoad
+ */
 export function setLoadForTest(newLoad) {
   load = newLoad;
 }
@@ -116,7 +121,29 @@ function isHTTPError(netError) {
 }
 
 /**
- * @param {!InspectorFrontendHostAPI.LoadNetworkResourceResult} response
+ *
+ * @param {number|undefined} netError
+ * @param {number|undefined} httpStatusCode
+ * @param {string|undefined} netErrorName
+ */
+export function netErrorToMessage(netError, httpStatusCode, netErrorName) {
+  if (netError === undefined || httpStatusCode === undefined || netErrorName === undefined) {
+    return null;
+  }
+  if (netError !== 0) {
+    if (isHTTPError(netError)) {
+      return ls`HTTP error: status code ${httpStatusCode}, ${netErrorName}`;
+    }
+    const errorCategory = getNetErrorCategory(netError);
+    // We don't localize here, as `errorCategory` is already localized,
+    // and `netErrorName` is an error code like 'net::ERR_CERT_AUTHORITY_INVALID'.
+    return `${errorCategory}: ${netErrorName}`;
+  }
+  return null;
+}
+
+/**
+ * @param {!LoadNetworkResourceResult} response
  * @returns {!{success:boolean, description: !LoadErrorDescription}}
  */
 function createErrorMessageFromResponse(response) {
@@ -133,15 +160,9 @@ function createErrorMessageFromResponse(response) {
         message = ls`Unknown error`;
       }
     } else {
-      if (netError !== 0) {
-        if (isHTTPError(netError)) {
-          message += ls`HTTP error: status code ${statusCode}, ${netErrorName}`;
-        } else {
-          const errorCategory = getNetErrorCategory(netError);
-          // We don't localize here, as `errorCategory` is already localized,
-          // and `netErrorName` is an error code like 'net::ERR_CERT_AUTHORITY_INVALID'.
-          message = `${errorCategory}: ${netErrorName}`;
-        }
+      const maybeMessage = netErrorToMessage(netError, statusCode, netErrorName);
+      if (maybeMessage) {
+        message = maybeMessage;
       }
     }
   }
@@ -151,9 +172,36 @@ function createErrorMessageFromResponse(response) {
 
 /**
  * @param {string} url
+ * @return {!Promise<string>}
+ */
+const loadXHR = url => {
+  return new Promise((successCallback, failureCallback) => {
+    function onReadyStateChanged() {
+      if (xhr.readyState !== XMLHttpRequest.DONE) {
+        return;
+      }
+      if (xhr.status !== 200) {
+        xhr.onreadystatechange = null;
+        failureCallback(new Error(String(xhr.status)));
+        return;
+      }
+      xhr.onreadystatechange = null;
+      successCallback(xhr.responseText);
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.withCredentials = false;
+    xhr.open('GET', url, true);
+    xhr.onreadystatechange = onReadyStateChanged;
+    xhr.send(null);
+  });
+};
+
+/**
+ * @param {string} url
  * @param {?Object.<string, string>} headers
  * @param {!Common.StringOutputStream.OutputStream} stream
- * @param {function(boolean, !Object.<string, string>, !LoadErrorDescription)=} callback
+ * @param {function(boolean, !Object.<string, string>, !LoadErrorDescription):void=} callback
  */
 export const loadAsStream = function(url, headers, stream, callback) {
   const streamId = _bindOutputStream(stream);
@@ -172,7 +220,7 @@ export const loadAsStream = function(url, headers, stream, callback) {
   InspectorFrontendHostInstance.loadNetworkResource(url, rawHeaders.join('\r\n'), streamId, finishedCallback);
 
   /**
-   * @param {!InspectorFrontendHostAPI.LoadNetworkResourceResult} response
+   * @param {!LoadNetworkResourceResult} response
    */
   function finishedCallback(response) {
     if (callback) {
@@ -187,12 +235,15 @@ export const loadAsStream = function(url, headers, stream, callback) {
    */
   function dataURLDecodeSuccessful(text) {
     streamWrite(streamId, text);
-    finishedCallback(/** @type {!InspectorFrontendHostAPI.LoadNetworkResourceResult} */ ({statusCode: 200}));
+    finishedCallback(/** @type {!LoadNetworkResourceResult} */ ({statusCode: 200}));
   }
 
+  /**
+   * @param {*} xhrStatus
+   */
   function dataURLDecodeFailed(xhrStatus) {
     const messageOverride = ls`Decoding Data URL failed`;
     finishedCallback(
-        /** @type {!InspectorFrontendHostAPI.LoadNetworkResourceResult} */ ({statusCode: 404, messageOverride}));
+        /** @type {!LoadNetworkResourceResult} */ ({statusCode: 404, messageOverride}));
   }
 };

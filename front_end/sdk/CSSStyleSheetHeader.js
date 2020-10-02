@@ -3,14 +3,17 @@
 // found in the LICENSE file.
 
 import * as Common from '../common/common.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 import {CSSModel} from './CSSModel.js';  // eslint-disable-line no-unused-vars
 import {DeferredDOMNode} from './DOMModel.js';
+import {FrameAssociated} from './FrameAssociated.js';  // eslint-disable-line no-unused-vars
+import {PageResourceLoadInitiator} from './PageResourceLoader.js';  // eslint-disable-line no-unused-vars
 import {ResourceTreeModel} from './ResourceTreeModel.js';
 
 /**
- * @implements {Common.ContentProvider.ContentProvider}
- * @unrestricted
+ * @implements {TextUtils.ContentProvider.ContentProvider}
+ * TODO(chromium:1011811): make `implements {FrameAssociated}` annotation work here.
  */
 export class CSSStyleSheetHeader {
   /**
@@ -27,6 +30,9 @@ export class CSSStyleSheetHeader {
     this.title = payload.title;
     this.disabled = payload.disabled;
     this.isInline = payload.isInline;
+    this.isMutable = payload.isMutable;
+    // TODO(alexrudenko): Needs a roll of the browser_protocol.pdl.
+    this.isConstructed = /** @type {*} */ (payload).isConstructed;
     this.startLine = payload.startLine;
     this.startColumn = payload.startColumn;
     this.endLine = payload.endLine;
@@ -35,24 +41,25 @@ export class CSSStyleSheetHeader {
     if (payload.ownerNode) {
       this.ownerNode = new DeferredDOMNode(cssModel.target(), payload.ownerNode);
     }
-    this.setSourceMapURL(payload.sourceMapURL);
+    this.sourceMapURL = payload.sourceMapURL;
+    this._originalContentProvider = null;
   }
 
   /**
-   * @return {!Common.ContentProvider.ContentProvider}
+   * @return {!TextUtils.ContentProvider.ContentProvider}
    */
   originalContentProvider() {
     if (!this._originalContentProvider) {
-      const lazyContent = /** @type {function():!Promise<!Common.ContentProvider.DeferredContent>} */ (async () => {
+      const lazyContent = /** @type {function():!Promise<!TextUtils.ContentProvider.DeferredContent>} */ (async () => {
         const originalText = await this._cssModel.originalStyleSheetText(this);
         // originalText might be an empty string which should not trigger the error
         if (originalText === null) {
-          return {error: ls`Could not find the original style sheet.`, isEncoded: false};
+          return {content: null, error: ls`Could not find the original style sheet.`, isEncoded: false};
         }
         return {content: originalText, isEncoded: false};
       });
       this._originalContentProvider =
-          new Common.StaticContentProvider.StaticContentProvider(this.contentURL(), this.contentType(), lazyContent);
+          new TextUtils.StaticContentProvider.StaticContentProvider(this.contentURL(), this.contentType(), lazyContent);
     }
     return this._originalContentProvider;
   }
@@ -157,7 +164,7 @@ export class CSSStyleSheetHeader {
 
   /**
    * @override
-   * @return {!Promise<!Common.ContentProvider.DeferredContent>}
+   * @return {!Promise<!TextUtils.ContentProvider.DeferredContent>}
    */
   async requestContent() {
     try {
@@ -165,6 +172,7 @@ export class CSSStyleSheetHeader {
       return {content: /** @type{string} */ (cssText), isEncoded: false};
     } catch (err) {
       return {
+        content: null,
         error: ls`There was an error retrieving the source styles.`,
         isEncoded: false,
       };
@@ -176,11 +184,14 @@ export class CSSStyleSheetHeader {
    * @param {string} query
    * @param {boolean} caseSensitive
    * @param {boolean} isRegex
-   * @return {!Promise<!Array<!Common.ContentProvider.SearchMatch>>}
+   * @return {!Promise<!Array<!TextUtils.ContentProvider.SearchMatch>>}
    */
   async searchInContent(query, caseSensitive, isRegex) {
-    const {content} = await this.requestContent();
-    return Common.ContentProvider.performSearchInContent(content || '', query, caseSensitive, isRegex);
+    const requestedContent = await this.requestContent();
+    if (requestedContent.content === null) {
+      return [];
+    }
+    return TextUtils.TextUtils.performSearchInContent(requestedContent.content, query, caseSensitive, isRegex);
   }
 
   /**
@@ -188,5 +199,12 @@ export class CSSStyleSheetHeader {
    */
   isViaInspector() {
     return this.origin === 'inspector';
+  }
+
+  /**
+   * @returns {!PageResourceLoadInitiator}
+   */
+  createPageResourceLoadInitiator() {
+    return {target: null, frameId: this.frameId, initiatorUrl: this.hasSourceURL ? '' : this.sourceURL};
   }
 }
