@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
-// import '../third_party/codemirror/package/addon/fold/brace-fold.js';
 // @ts-ignore
-import WebTreeMap from '../third_party/webtreemap/webtreemap.js';
+import * as TreeMap from '../third_party/webtreemap/webtreemap.js';
 
-export {WebTreeMap};
+// @ts-ignore
+export const WebTreemap = TreeMap;

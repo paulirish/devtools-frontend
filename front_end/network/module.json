@@ -247,6 +247,6 @@
     "requestSourceMapView.css",
     "signedExchangeInfoTree.css",
     "signedExchangeInfoView.css",
-    "webSocketFrameView.css",
+    "webSocketFrameView.css"
   ]
 }
