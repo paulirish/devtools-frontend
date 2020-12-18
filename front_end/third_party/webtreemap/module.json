@@ -1,0 +1,8 @@
+{
+  "scripts": [
+    "webtreemap.js"
+  ],
+  "skip_compilation": [
+    "webtreemap.js"
+  ]
+}
