@@ -472,6 +472,11 @@ export class SessionRouter {
 
     // Send all messages to proxy connections.
     let suppressUnknownMessageErrors = false;
+    // if (messageObject?.params?.request?.url.includes('simple')) {
+    //   debugger;
+    // }
+    window.requestAnimationFrame;
+
     for (const session of this._sessions.values()) {
       if (!session.proxyConnection) {
         continue;

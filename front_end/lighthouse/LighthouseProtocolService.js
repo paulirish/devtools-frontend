@@ -35,7 +35,12 @@ export class ProtocolService extends Common.ObjectWrapper.ObjectWrapper {
     if (!childTargetManager) {
       throw new Error('Unable to find child target manager required for LightHouse');
     }
-    this._rawConnection = await childTargetManager.createParallelConnection(this._dispatchProtocolMessage.bind(this));
+    this._rawConnection = await childTargetManager.createParallelConnection(message => {
+      if (typeof message === 'string') {
+        message = JSON.parse(message);
+      }
+      this._dispatchProtocolMessage(message);
+    });
   }
 
   getLocales() {
@@ -77,10 +82,14 @@ export class ProtocolService extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   /**
-   * @param {(!Object|string)} message
+   * @param {!{sessionId: string, url: string, id: number, error: ?Object, result: ?Object}|!{sessionId: string, url: string, method: string, params: !Array<string>}} message
    */
   _dispatchProtocolMessage(message) {
-    this._send('dispatchProtocolMessage', {message: JSON.stringify(message)});
+    const protocolMessage = /** @type {{id?: string, sessionId?: string, method: string, params: Object}} */ (message);
+
+    if (protocolMessage.sessionId || protocolMessage.method.startsWith('Target')) {
+      this._send('dispatchProtocolMessage', {message: JSON.stringify(message)});
+    }
   }
 
   _initWorker() {

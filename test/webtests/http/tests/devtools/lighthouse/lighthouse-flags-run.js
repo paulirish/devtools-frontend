@@ -19,7 +19,7 @@
   LighthouseTestRunner.dumpStartAuditState();
   LighthouseTestRunner.getRunButton().click();
 
-  const {lhr} = await LighthouseTestRunner.waitForResults();
+  const {artifacts, lhr} = await LighthouseTestRunner.waitForResults();
   TestRunner.addResult('\n=============== Lighthouse Results ===============');
   TestRunner.addResult(`formFactor: ${lhr.configSettings.formFactor}`);
   TestRunner.addResult(`disableStorageReset: ${lhr.configSettings.disableStorageReset}`);

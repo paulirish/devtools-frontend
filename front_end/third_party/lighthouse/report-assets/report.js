@@ -66,6 +66,10 @@ class Util {
     if (!clone.configSettings.locale) {
       clone.configSettings.locale = 'en';
     }
+    if (!clone.configSettings.formFactor) {
+      // @ts-expect-error fallback handling for emulatedFormFactor
+      clone.configSettings.formFactor = clone.configSettings.emulatedFormFactor;
+    }
 
     for (const audit of Object.values(clone.audits)) {
       // Turn 'not-applicable' (LHR <4.0) and 'not_applicable' (older proto versions)
@@ -425,9 +429,10 @@ class Util {
     }
 
     // TODO(paulirish): revise Runtime Settings strings: https://github.com/GoogleChrome/lighthouse/pull/11796
-    const deviceEmulation = settings.formFactor === 'mobile'
-      ? Util.i18n.strings.runtimeMobileEmulation
-      : Util.i18n.strings.runtimeDesktopEmulation;
+    const deviceEmulation = {
+      mobile: Util.i18n.strings.runtimeMobileEmulation,
+      desktop: Util.i18n.strings.runtimeDesktopEmulation,
+    }[settings.formFactor] || Util.i18n.strings.runtimeNoEmulation;
 
     return {
       deviceEmulation,

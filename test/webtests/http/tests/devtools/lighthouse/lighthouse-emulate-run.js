@@ -11,7 +11,7 @@
 
   LighthouseTestRunner.dumpStartAuditState();
   LighthouseTestRunner.getRunButton().click();
-  const {lhr} = await LighthouseTestRunner.waitForResults();
+  const {artifacts, lhr} = await LighthouseTestRunner.waitForResults();
 
   TestRunner.addResult('\n=============== Lighthouse Results ===============');
   TestRunner.addResult(`URL: ${lhr.finalUrl}`);

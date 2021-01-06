@@ -221,12 +221,12 @@ export class ChildTargetManager extends SDKModel {
    */
   async _createParallelConnectionAndSessionForTarget(target, targetId) {
     const targetAgent = target.targetAgent();
-    const targetRouter = /** @type {!ProtocolClient.InspectorBackend.SessionRouter} */ (target.router());
+    const sessionRouter = /** @type {!ProtocolClient.InspectorBackend.SessionRouter} */ (target.router());
     const sessionId = (await targetAgent.invoke_attachToTarget({targetId, flatten: true})).sessionId;
-    const connection = new ParallelConnection(targetRouter.connection(), sessionId);
-    targetRouter.registerSession(target, sessionId, connection);
+    const connection = new ParallelConnection(sessionRouter.connection(), sessionId);
+    sessionRouter.registerSession(target, sessionId, connection);
     connection.setOnDisconnect(() => {
-      targetRouter.unregisterSession(sessionId);
+      sessionRouter.unregisterSession(sessionId);
       targetAgent.invoke_detachFromTarget({sessionId});
     });
     return {connection, sessionId};
