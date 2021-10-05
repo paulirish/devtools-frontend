@@ -1437,7 +1437,7 @@
     "message": "Worker — {PH1}"
   },
   "models/timeline_model/TimelineModel.ts | workerSS": {
-    "message": "Worker: {PH1} — {PH2}"
+    "message": "Worker: {PH1} {PH2}"
   },
   "models/workspace/UISourceCode.ts | index": {
     "message": "(index)"

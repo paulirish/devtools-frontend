@@ -61,7 +61,7 @@ const UIStrings = {
   *@example {FormatterWorker} PH1
   *@example {https://google.com} PH2
   */
-  workerSS: '`Worker`: {PH1} — {PH2}',
+  workerSS: '`Worker`: {PH1} {PH2}',
 };
 const str_ = i18n.i18n.registerUIStrings('models/timeline_model/TimelineModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -722,7 +722,7 @@ export class TimelineModelImpl {
       if (cpuProfileEvent) {
         const target = this.targetByEvent(cpuProfileEvent);
         if (target) {
-          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: track.url});
+          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: ''});
         }
       }
     }

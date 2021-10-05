@@ -1498,6 +1498,11 @@ export class TimelineUIUtils {
     if (event.name === TimelineModel.TimelineModel.RecordType.JSFrame) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {
+        if (frame.callFrame?.functionName.includes('emscripten_futex_wait') ||
+            frame.callFrame?.functionName.includes('timedwait')) {
+          return 'hsl(0deg 0% 73%)';
+        }
+
         return TimelineUIUtils.colorForId(frame.url);
       }
     }
