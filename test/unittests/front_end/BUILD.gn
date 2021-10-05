@@ -33,6 +33,7 @@ group("front_end") {
     "panels/elements",
     "panels/help",
     "panels/issues",
+    "panels/lighthouse",
     "panels/media",
     "panels/network/components",
     "panels/settings/emulation",

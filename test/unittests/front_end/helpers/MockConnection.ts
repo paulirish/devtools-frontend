@@ -123,3 +123,5 @@ export function describeWithMockConnection(title: string, fn: (this: Mocha.Suite
     describe(title, fn);
   });
 }
+
+describeWithMockConnection.only = describe.only;

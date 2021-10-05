@@ -43,6 +43,8 @@ devtools_module("lighthouse") {
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/utils:bundle",
   ]
+
+  visibility = [ "../../../test/unittests/front_end/lighthouse" ]
 }
 
 devtools_entrypoint("bundle") {
@@ -58,6 +60,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
+    "../../../test/unittests/front_end/panels/lighthouse/*",
     "../../entrypoints/*",
   ]
 
