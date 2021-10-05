@@ -83,6 +83,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
     const categoriesArray = [
       '-*',
       'devtools.timeline',
+      'blink.resource',
       disabledByDefault('devtools.timeline'),
       disabledByDefault('devtools.timeline.frame'),
       'v8.execute',

@@ -322,6 +322,10 @@ const UIStrings = {
   */
   receiveData: 'Receive Data',
   /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  requestResource: 'Request Resource',
+  /**
   *@description Event category in the Performance panel for time spent to execute microtasks in JavaScript
   */
   runMicrotasks: 'Run Microtasks',
@@ -1334,6 +1338,8 @@ export class TimelineUIUtils {
     eventStyles[type.ResourceReceiveResponse] = new TimelineRecordStyle(i18nString(UIStrings.receiveResponse), loading);
     eventStyles[type.ResourceFinish] = new TimelineRecordStyle(i18nString(UIStrings.finishLoading), loading);
     eventStyles[type.ResourceReceivedData] = new TimelineRecordStyle(i18nString(UIStrings.receiveData), loading);
+    eventStyles[type.RequestResource] = new TimelineRecordStyle(i18nString(UIStrings.requestResource), loading);
+
     eventStyles[type.RunMicrotasks] = new TimelineRecordStyle(i18nString(UIStrings.runMicrotasks), scripting);
     eventStyles[type.FunctionCall] = new TimelineRecordStyle(i18nString(UIStrings.functionCall), scripting);
     eventStyles[type.GCEvent] = new TimelineRecordStyle(i18nString(UIStrings.gcEvent), scripting);
@@ -1763,6 +1769,7 @@ export class TimelineUIUtils {
       case recordType.ResourceReceivedData:
       case recordType.ResourceReceiveResponse:
       case recordType.ResourceFinish:
+      case recordType.RequestResource:
       case recordType.PaintImage:
       case recordType.DecodeImage:
       case recordType.ResizeImage:
@@ -1869,7 +1876,8 @@ export class TimelineUIUtils {
       case recordType.ResourceSendRequest:
       case recordType.ResourceReceivedData:
       case recordType.ResourceReceiveResponse:
-      case recordType.ResourceFinish: {
+      case recordType.ResourceFinish:
+      case recordType.RequestResource: {
         const url = TimelineModel.TimelineModel.TimelineData.forEvent(event).url;
         if (url) {
           const options = {

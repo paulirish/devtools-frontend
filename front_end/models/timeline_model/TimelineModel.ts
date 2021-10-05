@@ -1194,6 +1194,11 @@ export class TimelineModelImpl {
         break;
       }
 
+      case RecordType.RequestResource: {
+        timelineData.url = event.args?.url;
+        break;
+      }
+
       case RecordType.FireIdleCallback: {
         if (event.duration !== undefined &&
             event.duration > eventData['allottedMilliseconds'] + TimelineModelImpl.Thresholds.IdleCallbackAddon) {
@@ -1517,6 +1522,7 @@ export enum RecordType {
   ResourceReceivedData = 'ResourceReceivedData',
   ResourceFinish = 'ResourceFinish',
   ResourceMarkAsCached = 'ResourceMarkAsCached',
+  RequestResource = 'ResourceFetcher::requestResource',
 
   RunMicrotasks = 'RunMicrotasks',
   FunctionCall = 'FunctionCall',
