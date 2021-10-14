@@ -477,7 +477,7 @@
     "message": "‏‮Avoid‬‏ ‏‮serving‬‏ ‏‮legacy‬‏ ‏‮JavaScript‬‏ ‏‮to‬‏ ‏‮modern‬‏ ‏‮browsers‬‏"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "‏‮Image‬‏ ‏‮formats‬‏ ‏‮like‬‏ ‏‮JPEG‬‏ 2000, ‏‮JPEG‬‏ ‏‮XR‬‏, ‏‮and‬‏ ‏‮WebP‬‏ ‏‮often‬‏ ‏‮provide‬‏ ‏‮better‬‏ ‏‮compression‬‏ ‏‮than‬‏ ‏‮PNG‬‏ ‏‮or‬‏ ‏‮JPEG‬‏, ‏‮which‬‏ ‏‮means‬‏ ‏‮faster‬‏ ‏‮downloads‬‏ ‏‮and‬‏ ‏‮less‬‏ ‏‮data‬‏ ‏‮consumption‬‏. [‏‮Learn‬‏ ‏‮more‬‏](https://web.dev/uses-webp-images/)."
+    "message": "‏‮Image‬‏ ‏‮formats‬‏ ‏‮like‬‏ ‏‮WebP‬‏ ‏‮and‬‏ ‏‮AVIF‬‏ ‏‮often‬‏ ‏‮provide‬‏ ‏‮better‬‏ ‏‮compression‬‏ ‏‮than‬‏ ‏‮PNG‬‏ ‏‮or‬‏ ‏‮JPEG‬‏, ‏‮which‬‏ ‏‮means‬‏ ‏‮faster‬‏ ‏‮downloads‬‏ ‏‮and‬‏ ‏‮less‬‏ ‏‮data‬‏ ‏‮consumption‬‏. [‏‮Learn‬‏ ‏‮more‬‏](https://web.dev/uses-webp-images/)."
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "‏‮Serve‬‏ ‏‮images‬‏ ‏‮in‬‏ ‏‮next‬‏-‏‮gen‬‏ ‏‮formats‬‏"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "‏‮Efficiently‬‏ ‏‮encode‬‏ ‏‮images‬‏"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "‏‮Actual‬‏ ‏‮dimensions‬‏"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "‏‮Displayed‬‏ ‏‮dimensions‬‏"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "‏‮Serve‬‏ ‏‮images‬‏ ‏‮that‬‏ ‏‮are‬‏ ‏‮appropriately‬‏-‏‮sized‬‏ ‏‮to‬‏ ‏‮save‬‏ ‏‮cellular‬‏ ‏‮data‬‏ ‏‮and‬‏ ‏‮improve‬‏ ‏‮load‬‏ ‏‮time‬‏. [‏‮Learn‬‏ ‏‮more‬‏](https://web.dev/uses-responsive-images/)."
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "‏‮Allowed‬‏ ‏‮with‬‏ ‏‮warning‬‏"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "‏‮Library‬‏"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "‏‮Large‬‏ ‏‮JavaScript‬‏ ‏‮libraries‬‏ ‏‮can‬‏ ‏‮lead‬‏ ‏‮to‬‏ ‏‮poor‬‏ ‏‮performance‬‏. ‏‮Prefer‬‏ ‏‮smaller‬‏, ‏‮functionally‬‏ ‏‮equivalent‬‏ ‏‮libraries‬‏ ‏‮to‬‏ ‏‮reduce‬‏ ‏‮your‬‏ ‏‮bundle‬‏ ‏‮size‬‏. [‏‮Learn‬‏ ‏‮more‬‏](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)."
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{1 ‏‮large‬‏ ‏‮library‬‏ ‏‮found‬‏}zero{# ‏‮large‬‏ ‏‮libraries‬‏ ‏‮found‬‏}two{# ‏‮large‬‏ ‏‮libraries‬‏ ‏‮found‬‏}few{# ‏‮large‬‏ ‏‮libraries‬‏ ‏‮found‬‏}many{# ‏‮large‬‏ ‏‮libraries‬‏ ‏‮found‬‏}other{# ‏‮large‬‏ ‏‮libraries‬‏ ‏‮found‬‏}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "‏‮Replace‬‏ ‏‮unnecessarily‬‏ ‏‮large‬‏ ‏‮JavaScript‬‏ ‏‮libraries‬‏"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "‏‮Avoids‬‏ ‏‮large‬‏ ‏‮JavaScript‬‏ ‏‮libraries‬‏ ‏‮with‬‏ ‏‮smaller‬‏ ‏‮alternatives‬‏"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "‏‮This‬‏ ‏‮is‬‏ ‏‮the‬‏ ‏‮largest‬‏ ‏‮contentful‬‏ ‏‮element‬‏ ‏‮painted‬‏ ‏‮within‬‏ ‏‮the‬‏ ‏‮viewport‬‏. [‏‮Learn‬‏ ‏‮More‬‏](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "‏‮Points‬‏ ‏‮to‬‏ ‏‮another‬‏ `hreflang` ‏‮location‬‏ ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "‏‮Relative‬‏ ‏‮URL‬‏ ({url})"
+    "message": "‏‮Is‬‏ ‏‮not‬‏ ‏‮an‬‏ ‏‮absolute‬‏ ‏‮URL‬‏ ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "‏‮Points‬‏ ‏‮to‬‏ ‏‮the‬‏ ‏‮domain‬‏'‏‮s‬‏ ‏‮root‬‏ ‏‮URL‬‏ (‏‮the‬‏ ‏‮homepage‬‏), ‏‮instead‬‏ ‏‮of‬‏ ‏‮an‬‏ ‏‮equivalent‬‏ ‏‮page‬‏ ‏‮of‬‏ ‏‮content‬‏"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "{keyword} ‏‮seems‬‏ ‏‮to‬‏ ‏‮be‬‏ ‏‮an‬‏ ‏‮invalid‬‏ ‏‮keyword‬‏."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "'‏‮unsafe‬‏-‏‮inline‬‏' ‏‮allows‬‏ ‏‮the‬‏ ‏‮execution‬‏ ‏‮of‬‏ ‏‮unsafe‬‏ ‏‮in‬‏-‏‮page‬‏ ‏‮scripts‬‏ ‏‮and‬‏ ‏‮event‬‏ ‏‮handlers‬‏. ‏‮Consider‬‏ ‏‮using‬‏ ‏‮CSP‬‏ ‏‮nonces‬‏ ‏‮or‬‏ ‏‮hashes‬‏ ‏‮to‬‏ ‏‮allow‬‏ ‏‮scripts‬‏ ‏‮individually‬‏."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "‏‮Consider‬‏ ‏‮adding‬‏ '‏‮unsafe‬‏-‏‮inline‬‏' (‏‮ignored‬‏ ‏‮by‬‏ ‏‮browsers‬‏ ‏‮supporting‬‏ ‏‮nonces‬‏/‏‮hashes‬‏) ‏‮to‬‏ ‏‮be‬‏ ‏‮backward‬‏ ‏‮compatible‬‏ ‏‮with‬‏ ‏‮older‬‏ ‏‮browsers‬‏."

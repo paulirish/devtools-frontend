@@ -10,7 +10,7 @@ import * as ProtocolClientModule from '../../core/protocol_client/protocol_clien
 import * as Root from '../../core/root/root.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import * as TextEditor from '../../ui/legacy/components/text_editor/text_editor.js';
+import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 /**
@@ -401,7 +401,7 @@ export function textContentWithoutStyles(node) {
   let buffer = '';
   let currentNode = node;
   while (currentNode.traverseNextNode(node)) {
-    currentNode = currentNode.traverseNextNode(node);
+    currentNode = currentNode.traverseNextNode(node, currentNode.tagName === 'DEVTOOLS-CSS-LENGTH');
     if (currentNode.nodeType === Node.TEXT_NODE) {
       buffer += currentNode.nodeValue;
     } else if (currentNode.nodeName === 'STYLE') {
@@ -706,7 +706,6 @@ export function addScriptForFrame(url, content, frame) {
 }
 
 export const formatters = {
-
 
   /**
  * @param {*} value
@@ -1231,8 +1230,8 @@ export class StringOutputStream {
    * @param {function(string):void} callback
    */
   constructor(callback) {
-    this._callback = callback;
-    this._buffer = '';
+    this.callback = callback;
+    this.buffer = '';
   }
 
   /**
@@ -1247,11 +1246,11 @@ export class StringOutputStream {
    * @param {string} chunk
    */
   async write(chunk) {
-    this._buffer += chunk;
+    this.buffer += chunk;
   }
 
   async close() {
-    this._callback(this._buffer);
+    this.callback(this.buffer);
   }
 }
 
@@ -1263,21 +1262,21 @@ export class MockSetting {
    * @param {V} value
    */
   constructor(value) {
-    this._value = value;
+    this.value = value;
   }
 
   /**
    * @return {V}
    */
   get() {
-    return this._value;
+    return this.value;
   }
 
   /**
    * @param {V} value
    */
   set(value) {
-    this._value = value;
+    this.value = value;
   }
 }
 
@@ -1285,7 +1284,7 @@ export class MockSetting {
  * @return {!Array<!Root.Runtime.Module>}
  */
 export function loadedModules() {
-  return self.runtime._modules.filter(module => module._loadedForTest)
+  return self.runtime.modules.filter(module => module.loadedForTest)
       .filter(module => module.name() !== 'help')
       .filter(module => module.name().indexOf('test_runner') === -1);
 }
@@ -1297,7 +1296,7 @@ export function loadedModules() {
 export function dumpLoadedModules(relativeTo) {
   const previous = new Set(relativeTo || []);
   function moduleSorter(left, right) {
-    return Platform.StringUtilities.naturalOrderComparator(left._descriptor.name, right._descriptor.name);
+    return Platform.StringUtilities.naturalOrderComparator(left.descriptor.name, right.descriptor.name);
   }
 
   addResult('Loaded modules:');
@@ -1306,7 +1305,7 @@ export function dumpLoadedModules(relativeTo) {
     if (previous.has(module)) {
       continue;
     }
-    addResult('    ' + module._descriptor.name);
+    addResult('    ' + module.descriptor.name);
   }
   return sortedLoadedModules;
 }
@@ -1370,8 +1369,7 @@ export function url(url = '') {
 export function dumpSyntaxHighlight(str, mimeType) {
   const node = document.createElement('span');
   node.textContent = str;
-  const javascriptSyntaxHighlighter = new TextEditor.SyntaxHighlighter.SyntaxHighlighter(mimeType, false);
-  return javascriptSyntaxHighlighter.syntaxHighlightNode(node).then(dumpSyntax);
+  return CodeHighlighter.CodeHighlighter.highlightNode(node, mimeType).then(dumpSyntax);
 
   function dumpSyntax() {
     const node_parts = [];

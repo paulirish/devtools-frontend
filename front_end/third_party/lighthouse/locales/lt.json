@@ -477,7 +477,7 @@
     "message": "Neteikite pasenusios „JavaScript“ modernioms naršyklėms"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "Tokių formatų kaip JPEG 2000, JPEG XR ir „WebP“ vaizdai dažniausiai glaudinami geriau nei PNG ar JPEG vaizdai, todėl yra atsisiunčiami greičiau ir sunaudoja mažiau duomenų. [Sužinokite daugiau](https://web.dev/uses-webp-images/)."
+    "message": "Tokių formatų kaip „WebP“ ir AVIF vaizdai dažniausiai glaudinami geriau nei PNG ar JPEG vaizdai, todėl yra atsisiunčiami greičiau ir sunaudoja mažiau duomenų. [Sužinokite daugiau](https://web.dev/uses-webp-images/)"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "Pateikite naujos kartos formatų vaizdus"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "Efektyviai koduokite vaizdus"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "Tikrieji matmenys"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "Rodomi matmenys"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "Teikite tinkamo dydžio vaizdus, kad būtų taupomi mobiliojo ryšio duomenys ir puslapis būtų įkeliamas greičiau. [Sužinokite daugiau](https://web.dev/uses-responsive-images/)."
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "Leidžiama su įspėjimu"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "Biblioteka"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "Dėl didelių „JavaScript“ bibliotekų našumas gali būti prastas. Pirmenybę teikite mažesnėms atitinkamoms bibliotekoms, kad sumažintumėte rinkinio dydį. [Sužinokite daugiau](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{Rasta 1 didelė biblioteka}one{Rasta # didelė biblioteka}few{Rastos # didelės bibliotekos}many{Rasta # didelės bibliotekos}other{Rasta # didelių bibliotekų}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "Pakeiskite nepagrįstai dideles „JavaScript“ bibliotekas"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "Vengiama didelių „JavaScript“ bibliotekų – naudojamos mažesnės alternatyvos"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "Tai didžiausias turiningas elementas, pažymėtas peržiūros srityje. [Sužinokite daugiau](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "Nukreipia į kitą „`hreflang`“ vietą ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "Susijęs URL ({url})"
+    "message": "Tai nėra absoliutusis URL ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "Nukreipiama į domeno šakninį URL (pagrindinį puslapį) vietoje atitinkamo turinio puslapio"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "Panašu, kad „{keyword}“ yra netinkamas raktinis žodis."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "Raktinis žodis „unsafe-inline“ leidžia vykdyti nesaugius puslapio scenarijus ir įvykių dorokles. Apsvarstykite galimybę naudoti CSP vertes „nonce“ arba „hash“, kad scenarijų vykdymas būtų leidžiamas atskirai."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "Apsvarstykite galimybę pridėti raktinį žodį „unsafe-inline“ (nepaisoma naršyklėse, palaikančiose vertes „nonce“ / „hash“), kad būtų užtikrintas atgalinis suderinamumas su senesnėmis naršyklėmis."

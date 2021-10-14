@@ -38,42 +38,45 @@ const str_ = i18n.i18n.registerUIStrings('ui/components/linear_memory_inspector/
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const {render, html} = LitHtml;
 
-
 export const enum Navigation {
   Backward = 'Backward',
   Forward = 'Forward',
 }
 
 export class AddressInputChangedEvent extends Event {
+  static readonly eventName = 'addressinputchanged';
   data: {address: string, mode: Mode};
 
   constructor(address: string, mode: Mode) {
-    super('addressinputchanged');
+    super(AddressInputChangedEvent.eventName);
     this.data = {address, mode};
   }
 }
 
 export class PageNavigationEvent extends Event {
+  static readonly eventName = 'pagenavigation';
   data: Navigation;
 
   constructor(navigation: Navigation) {
-    super('pagenavigation', {});
+    super(PageNavigationEvent.eventName, {});
     this.data = navigation;
   }
 }
 
 export class HistoryNavigationEvent extends Event {
+  static readonly eventName = 'historynavigation';
   data: Navigation;
 
   constructor(navigation: Navigation) {
-    super('historynavigation', {});
+    super(HistoryNavigationEvent.eventName, {});
     this.data = navigation;
   }
 }
 
 export class RefreshRequestedEvent extends Event {
+  static readonly eventName = 'refreshrequested';
   constructor() {
-    super('refreshrequested', {});
+    super(RefreshRequestedEvent.eventName, {});
   }
 }
 

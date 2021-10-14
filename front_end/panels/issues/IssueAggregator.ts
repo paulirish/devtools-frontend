@@ -3,9 +3,21 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import type * as SDK from '../../core/sdk/sdk.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import type * as Protocol from '../../generated/protocol.js';
+
+type AggregationKeyTag = {
+  aggregationKeyTag: undefined,
+};
+
+/**
+ * An opaque type for the key which we use to aggregate issues. The key must be
+ * chosen such that if two aggregated issues have the same aggregation key, then
+ * they also have the same issue code.
+ */
+export type AggregationKey = {
+  toString(): string,
+}&AggregationKeyTag;
 
 /**
  * An `AggregatedIssue` representes a number of `IssuesManager.Issue.Issue` objects that are displayed together.
@@ -17,6 +29,7 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
     cookie: Protocol.Audits.AffectedCookie,
     hasRequest: boolean,
   }>();
+  private affectedRawCookieLines = new Map<string, {rawCookieLine: string, hasRequest: boolean}>();
   private affectedRequests = new Map<string, Protocol.Audits.AffectedRequest>();
   private affectedLocations = new Map<string, Protocol.Audits.SourceCodeLocation>();
   private heavyAdIssues = new Set<IssuesManager.HeavyAdIssue.HeavyAdIssue>();
@@ -32,11 +45,22 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
   private attributionReportingIssues = new Set<IssuesManager.AttributionReportingIssue.AttributionReportingIssue>();
   private wasmCrossOriginModuleSharingIssues =
       new Set<IssuesManager.WasmCrossOriginModuleSharingIssue.WasmCrossOriginModuleSharingIssue>();
+  private genericIssues = new Set<IssuesManager.GenericIssue.GenericIssue>();
   private representative?: IssuesManager.Issue.Issue;
   private aggregatedIssuesCount = 0;
+  private key: AggregationKey;
 
-  primaryKey(): string {
+  constructor(code: string, aggregationKey: AggregationKey) {
+    super(code);
+    this.key = aggregationKey;
+  }
+
+  override primaryKey(): string {
     throw new Error('This should never be called');
+  }
+
+  aggregationKey(): AggregationKey {
+    return this.key;
   }
 
   getBlockedByResponseDetails(): Iterable<Protocol.Audits.BlockedByResponseIssueDetails> {
@@ -45,6 +69,10 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
 
   cookies(): Iterable<Protocol.Audits.AffectedCookie> {
     return Array.from(this.affectedCookies.values()).map(x => x.cookie);
+  }
+
+  getRawCookieLines(): Iterable<{rawCookieLine: string, hasRequest: boolean}> {
+    return this.affectedRawCookieLines.values();
   }
 
   sources(): Iterable<Protocol.Audits.SourceCodeLocation> {
@@ -103,6 +131,10 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
     return this.wasmCrossOriginModuleSharingIssues;
   }
 
+  getGenericIssues(): ReadonlySet<IssuesManager.GenericIssue.GenericIssue> {
+    return this.genericIssues;
+  }
+
   getDescription(): IssuesManager.MarkdownIssueDescription.MarkdownIssueDescription|null {
     if (this.representative) {
       return this.representative.getDescription();
@@ -149,6 +181,11 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
         this.affectedCookies.set(key, {cookie, hasRequest});
       }
     }
+    for (const rawCookieLine of issue.rawCookieLines()) {
+      if (!this.affectedRawCookieLines.has(rawCookieLine)) {
+        this.affectedRawCookieLines.set(rawCookieLine, {rawCookieLine, hasRequest});
+      }
+    }
     for (const location of issue.sources()) {
       const key = JSON.stringify(location);
       if (!this.affectedLocations.has(key)) {
@@ -189,16 +226,27 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
     if (issue instanceof IssuesManager.WasmCrossOriginModuleSharingIssue.WasmCrossOriginModuleSharingIssue) {
       this.wasmCrossOriginModuleSharingIssues.add(issue);
     }
+    if (issue instanceof IssuesManager.GenericIssue.GenericIssue) {
+      this.genericIssues.add(issue);
+    }
   }
 
   getKind(): IssuesManager.Issue.IssueKind {
     return this.issueKind;
   }
+
+  isHidden(): boolean {
+    return this.representative?.isHidden() || false;
+  }
+
+  setHidden(_value: boolean): void {
+    throw new Error('Should not call setHidden on aggregatedIssue');
+  }
 }
 
-export class IssueAggregator extends Common.ObjectWrapper.ObjectWrapper {
-  private readonly aggregatedIssuesByCode = new Map<string, AggregatedIssue>();
-
+export class IssueAggregator extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
+  private readonly aggregatedIssuesByKey = new Map<AggregationKey, AggregatedIssue>();
+  private readonly hiddenAggregatedIssuesByKey = new Map<AggregationKey, AggregatedIssue>();
   constructor(private readonly issuesManager: IssuesManager.IssuesManager.IssuesManager) {
     super();
     this.issuesManager.addEventListener(IssuesManager.IssuesManager.Events.IssueAdded, this.onIssueAdded, this);
@@ -209,16 +257,13 @@ export class IssueAggregator extends Common.ObjectWrapper.ObjectWrapper {
     }
   }
 
-  private onIssueAdded(event: Common.EventTarget.EventTargetEvent): void {
-    const {issue} = (event.data as {
-      issuesModel: SDK.IssuesModel.IssuesModel,
-      issue: IssuesManager.Issue.Issue,
-    });
-    this.aggregateIssue(issue);
+  private onIssueAdded(event: Common.EventTarget.EventTargetEvent<IssuesManager.IssuesManager.IssueAddedEvent>): void {
+    this.aggregateIssue(event.data.issue);
   }
 
   private onFullUpdateRequired(): void {
-    this.aggregatedIssuesByCode.clear();
+    this.aggregatedIssuesByKey.clear();
+    this.hiddenAggregatedIssuesByKey.clear();
     for (const issue of this.issuesManager.issues()) {
       this.aggregateIssue(issue);
     }
@@ -226,22 +271,62 @@ export class IssueAggregator extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   private aggregateIssue(issue: IssuesManager.Issue.Issue): AggregatedIssue {
-    let aggregatedIssue = this.aggregatedIssuesByCode.get(issue.code());
-    if (!aggregatedIssue) {
-      aggregatedIssue = new AggregatedIssue(issue.code());
-      this.aggregatedIssuesByCode.set(issue.code(), aggregatedIssue);
-    }
-    aggregatedIssue.addInstance(issue);
+    const map = issue.isHidden() ? this.hiddenAggregatedIssuesByKey : this.aggregatedIssuesByKey;
+    const aggregatedIssue = this.aggregateIssueByStatus(map, issue);
     this.dispatchEventToListeners(Events.AggregatedIssueUpdated, aggregatedIssue);
     return aggregatedIssue;
   }
 
+  private aggregateIssueByStatus(
+      aggregatedIssuesMap: Map<AggregationKey, AggregatedIssue>, issue: IssuesManager.Issue.Issue): AggregatedIssue {
+    const key = issue.code() as unknown as AggregationKey;
+    let aggregatedIssue = aggregatedIssuesMap.get(key);
+    if (!aggregatedIssue) {
+      aggregatedIssue = new AggregatedIssue(issue.code(), key);
+      aggregatedIssuesMap.set(key, aggregatedIssue);
+    }
+    aggregatedIssue.addInstance(issue);
+    return aggregatedIssue;
+  }
+
   aggregatedIssues(): Iterable<AggregatedIssue> {
-    return this.aggregatedIssuesByCode.values();
+    return [...this.aggregatedIssuesByKey.values(), ...this.hiddenAggregatedIssuesByKey.values()];
+  }
+
+  hiddenAggregatedIssues(): Iterable<AggregatedIssue> {
+    return this.hiddenAggregatedIssuesByKey.values();
+  }
+
+  aggregatedIssueCodes(): Set<AggregationKey> {
+    return new Set([...this.aggregatedIssuesByKey.keys(), ...this.hiddenAggregatedIssuesByKey.keys()]);
+  }
+
+  aggregatedIssueCategories(): Set<IssuesManager.Issue.IssueCategory> {
+    const result = new Set<IssuesManager.Issue.IssueCategory>();
+    for (const issue of this.aggregatedIssuesByKey.values()) {
+      result.add(issue.getCategory());
+    }
+    return result;
+  }
+
+  aggregatedIssueKinds(): Set<IssuesManager.Issue.IssueKind> {
+    const result = new Set<IssuesManager.Issue.IssueKind>();
+    for (const issue of this.aggregatedIssuesByKey.values()) {
+      result.add(issue.getKind());
+    }
+    return result;
   }
 
   numberOfAggregatedIssues(): number {
-    return this.aggregatedIssuesByCode.size;
+    return this.aggregatedIssuesByKey.size;
+  }
+
+  numberOfHiddenAggregatedIssues(): number {
+    return this.hiddenAggregatedIssuesByKey.size;
+  }
+
+  keyForIssue(issue: IssuesManager.Issue.Issue<string>): AggregationKey {
+    return issue.code() as unknown as AggregationKey;
   }
 }
 
@@ -249,3 +334,8 @@ export const enum Events {
   AggregatedIssueUpdated = 'AggregatedIssueUpdated',
   FullUpdateRequired = 'FullUpdateRequired',
 }
+
+export type EventTypes = {
+  [Events.AggregatedIssueUpdated]: AggregatedIssue,
+  [Events.FullUpdateRequired]: void,
+};

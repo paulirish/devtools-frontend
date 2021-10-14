@@ -9,7 +9,7 @@
 /**
  * @fileoverview Instead of loading report assets form the filesystem, in Devtools we must load
  * them via Runtime.cachedResources. We use this module to shim
- * report/report-assets.js in Devtools.
+ * report/generator/report-assets.js in Devtools.
  */
 
 /* global globalThis */
@@ -31,9 +31,6 @@ module.exports = {
   get REPORT_TEMPLATE() {
     return cachedResources.get('third_party/lighthouse/report-assets/standalone-template.html');
   },
-  get REPORT_TEMPLATES() {
-    return cachedResources.get('third_party/lighthouse/report-assets/templates.html');
-  },
 };
 
 },{}],1:[function(require,module,exports){
@@ -45,6 +42,9 @@ module.exports = {
 'use strict';
 
 const htmlReportAssets = require('./report-assets.js');
+
+/** @typedef {import('../../types/lhr/lhr').default} LHResult */
+/** @typedef {import('../../types/lhr/flow').default} FlowResult */
 
 class ReportGenerator {
   /**
@@ -67,22 +67,48 @@ class ReportGenerator {
   }
 
   /**
-   * Returns the report HTML as a string with the report JSON and renderer JS inlined.
-   * @param {LH.Result} lhr
+   * @param {unknown} object
+   * @return {string}
+   */
+  static sanitizeJson(object) {
+    return JSON.stringify(object)
+    .replace(/</g, '\\u003c') // replaces opening script tags
+    .replace(/\u2028/g, '\\u2028') // replaces line separators ()
+    .replace(/\u2029/g, '\\u2029'); // replaces paragraph separators
+  }
+
+  /**
+   * Returns the standalone report HTML as a string with the report JSON and renderer JS inlined.
+   * @param {LHResult} lhr
    * @return {string}
    */
   static generateReportHtml(lhr) {
-    const sanitizedJson = JSON.stringify(lhr)
-      .replace(/</g, '\\u003c') // replaces opening script tags
-      .replace(/\u2028/g, '\\u2028') // replaces line separators ()
-      .replace(/\u2029/g, '\\u2029'); // replaces paragraph separators
+    const sanitizedJson = ReportGenerator.sanitizeJson(lhr);
+    // terser does its own sanitization, but keep this basic replace for when
+    // we want to generate a report without minification.
     const sanitizedJavascript = htmlReportAssets.REPORT_JAVASCRIPT.replace(/<\//g, '\\u003c/');
 
     return ReportGenerator.replaceStrings(htmlReportAssets.REPORT_TEMPLATE, [
       {search: '%%LIGHTHOUSE_JSON%%', replacement: sanitizedJson},
       {search: '%%LIGHTHOUSE_JAVASCRIPT%%', replacement: sanitizedJavascript},
       {search: '/*%%LIGHTHOUSE_CSS%%*/', replacement: htmlReportAssets.REPORT_CSS},
-      {search: '%%LIGHTHOUSE_TEMPLATES%%', replacement: htmlReportAssets.REPORT_TEMPLATES},
+    ]);
+  }
+
+  /**
+   * Returns the standalone flow report HTML as a string with the report JSON and renderer JS inlined.
+   * @param {FlowResult} flow
+   * @return {string}
+   */
+  static generateFlowReportHtml(flow) {
+    const sanitizedJson = ReportGenerator.sanitizeJson(flow);
+    return ReportGenerator.replaceStrings(htmlReportAssets.FLOW_REPORT_TEMPLATE, [
+      /* eslint-disable max-len */
+      {search: '%%LIGHTHOUSE_FLOW_JSON%%', replacement: sanitizedJson},
+      {search: '%%LIGHTHOUSE_FLOW_JAVASCRIPT%%', replacement: htmlReportAssets.FLOW_REPORT_JAVASCRIPT},
+      {search: '/*%%LIGHTHOUSE_FLOW_CSS%%*/', replacement: htmlReportAssets.FLOW_REPORT_CSS},
+      {search: '/*%%LIGHTHOUSE_CSS%%*/', replacement: htmlReportAssets.REPORT_CSS},
+      /* eslint-enable max-len */
     ]);
   }
 
@@ -95,7 +121,7 @@ class ReportGenerator {
    *  - the score type that is used for the audit
    *  - the score value of the audit
    *
-   * @param {LH.Result} lhr
+   * @param {LHResult} lhr
    * @return {string}
    */
   static generateReportCSV(lhr) {
@@ -132,8 +158,8 @@ class ReportGenerator {
 
   /**
    * Creates the results output in a format based on the `mode`.
-   * @param {LH.Result} lhr
-   * @param {LH.Config.Settings['output']} outputModes
+   * @param {LHResult} lhr
+   * @param {LHResult['configSettings']['output']} outputModes
    * @return {string|string[]}
    */
   static generateReport(lhr, outputModes) {

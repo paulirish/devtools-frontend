@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
 import './BinaryResourceView.js';
 import './BlockedURLsPane.js';
 import './EventSourceMessagesView.js';
@@ -47,6 +46,7 @@ import * as RequestCookiesView from './RequestCookiesView.js';
 import * as RequestHeadersView from './RequestHeadersView.js';
 import * as RequestHTMLView from './RequestHTMLView.js';
 import * as RequestInitiatorView from './RequestInitiatorView.js';
+import * as RequestPayloadView from './RequestPayloadView.js';
 import * as RequestPreviewView from './RequestPreviewView.js';
 import * as RequestResponseView from './RequestResponseView.js';
 import * as RequestTimingView from './RequestTimingView.js';
@@ -73,6 +73,7 @@ export {
   RequestHeadersView,
   RequestHTMLView,
   RequestInitiatorView,
+  RequestPayloadView,
   RequestPreviewView,
   RequestResponseView,
   RequestTimingView,

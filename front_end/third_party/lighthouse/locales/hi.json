@@ -18,7 +18,7 @@
     "message": "`[aria-*]` विशेषताएं और उनकी भूमिकाएं एक-दूसरे से मेल खाती हैं"
   },
   "lighthouse-core/audits/accessibility/aria-command-name.js | description": {
-    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सकता हो, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन लोगों के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
+    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सके, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन उपयोगकर्ताओं के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
   },
   "lighthouse-core/audits/accessibility/aria-command-name.js | failureTitle": {
     "message": "`button`, `link`, और `menuitem` एलिमेंट के नाम ऐक्सेस नहीं किए जा सकते."
@@ -54,7 +54,7 @@
     "message": "ARIA इनपुट फ़ील्ड के ऐसे नाम हैं जिन्हें ऐक्सेस किया जा सकता है"
   },
   "lighthouse-core/audits/accessibility/aria-meter-name.js | description": {
-    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सकता हो, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन लोगों के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
+    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सके, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन उपयोगकर्ताओं के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
   },
   "lighthouse-core/audits/accessibility/aria-meter-name.js | failureTitle": {
     "message": "ARIA `meter` एलिमेंट के नाम ऐक्सेस नहीं किए जा सकते."
@@ -117,7 +117,7 @@
     "message": "ARIA टॉगल फ़ील्ड के ऐसे नाम हैं जिन्हें ऐक्सेस किया जा सकता है"
   },
   "lighthouse-core/audits/accessibility/aria-tooltip-name.js | description": {
-    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सकता हो, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन लोगों के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
+    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सके, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन उपयोगकर्ताओं के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
   },
   "lighthouse-core/audits/accessibility/aria-tooltip-name.js | failureTitle": {
     "message": "ARIA `tooltip` एलिमेंट के नाम ऐक्सेस नहीं किए जा सकते."
@@ -126,7 +126,7 @@
     "message": "ARIA `tooltip` एलिमेंट के नाम ऐक्सेस किए जा सकते हैं"
   },
   "lighthouse-core/audits/accessibility/aria-treeitem-name.js | description": {
-    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सकता हो, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन लोगों के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
+    "message": "अगर किसी एलिमेंट का कोई ऐसा नाम नहीं है जिसे ऐक्सेस किया जा सके, तो स्क्रीन रीडर उस एलिमेंट को किसी सामान्य नाम से बुलाते हैं. इस वजह से, एलिमेंट का मूल नाम उन उपयोगकर्ताओं के लिए किसी काम का नहीं रहता जो स्क्रीन रीडर की मदद से ही टेक्स्ट पढ़ या समझ सकते हैं. [ज़्यादा जानें](https://web.dev/aria-name/)."
   },
   "lighthouse-core/audits/accessibility/aria-treeitem-name.js | failureTitle": {
     "message": "ARIA `treeitem` एलिमेंट के नाम ऐक्सेस नहीं किए जा सकते."
@@ -477,7 +477,7 @@
     "message": "पुरानी JavaScript को नए ब्राउज़र में खोलने से बचें"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "JPEG 2000, JPEG XR, और WebP जैसे इमेज फ़ॉर्मैट, ज़्यादातर PNG या JPEG से बेहतर कंप्रेस करते हैं जिससे उपयोगकर्ता कम डेटा खर्च करके तेज़ डाउनलोड कर सकते हैं. [ज़्यादा जानें](https://web.dev/uses-webp-images/)."
+    "message": "WebP और AVIF जैसे इमेज फ़ॉर्मैट, PNG या JPEG के मुकाबले अक्सर बेहतर तरीके से कंप्रेस करने की सुविधा देते हैं. इससे डाउनलोड तेज़ी से होता है और डेटा की खपत भी कम होती है. [ज़्यादा जानें](https://web.dev/uses-webp-images/)."
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "इमेज अगली जेनरेशन के फ़ॉर्मेट में ऑफ़र करें"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "इमेज को कुशलता से एन्कोड करें"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "असल डाइमेंशन"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "दिखाए गए डाइमेंशन"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "ऐसी इमेज ऑफ़र करें जिनका आकार सही हो, ताकि सेल्युलर डेटा बचाया जा सके और लोड होने में लगने वाले समय को कम किया जा सके. [ज़्यादा जानें](https://web.dev/uses-responsive-images/)."
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "चेतावनी के साथ अनुमति दी गई"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "लाइब्रेरी"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "JavaScript की लाइब्रेरी बड़ी होने से परफ़ॉर्मेंस खराब हो सकती है. इस बंडल का साइज़ कम करने के लिए छोटी और बराबर काम करने वाली लाइब्रेरी को प्राथमिकता दें. [ज़्यादा जानें](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)."
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{1 बड़ी लाइब्रेरी मिली}one{# बड़ी लाइब्रेरी मिली}other{# बड़ी लाइब्रेरी मिलीं}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "गैर-ज़रूरी रूप से बड़ी JavaScript लाइब्रेरी को बदलें"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "बड़ी JavaScript लाइब्रेरी से बचें, इनकी जगह छोटे विकल्प आज़माएं"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "यह व्यूपोर्ट में पेंट किया गया सबसे बड़ा कॉन्टेंटफ़ुल एलिमेंट है. [ज़्यादा जानें](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "किसी दूसरी `hreflang` जगह वाली विशेषता ({url}) की तरफ़ इशारा करता है"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "मिलता-जुलता यूआरएल ({url})"
+    "message": "यह एक संपूर्ण यूआरएल नहीं है ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "मिलती-जुलती सामग्री वाले पेज पर ले जाने के बजाय डोमेन के रूट यूआरएल (होम पेज) पर ले जाता है"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "{keyword} एक गलत/अमान्य कीवर्ड लग रहा है."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "'unsafe-inline', असुरक्षित इन-पेज स्क्रिप्ट और इवेंट हैंडलर चलाने की अनुमति देता है. एक-एक करके स्क्रिप्ट को अनुमति देने के लिए, CSP nonces या hashes इस्तेमाल करें."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "'unsafe-inline' जोड़ें, ताकि CSP पुराने ब्राउज़र के साथ काम कर सके. nonces/hashes के साथ काम करने वाले ब्राउज़र पर 'unsafe-inline' को अनदेखा किया जा सकता है."

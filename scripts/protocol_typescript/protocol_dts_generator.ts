@@ -217,16 +217,17 @@ const emitInlineEnums = (prefix: string, propertyTypes?: Protocol.PropertyType[]
   }
 };
 
+// Please keep the keys sorted.
+const identifierTypesOverride = new Map([
+  ['IO.StreamHandle', true],
+  ['Page.ScriptIdentifier', true],
+]);
 
-// Please keep `knownIdentifierTypes` sorted.
-const knownIdentifierTypes = [
-  'Accessibility.AXNodeId',
-  'CacheStorage.CacheId',
-  'DOM.BackendNodeId',
-  'DOM.NodeId',
-  'Fetch.RequestId',
-  'Network.RequestId',
-];
+function isIdentifierTypeName(identifierName: string): boolean {
+  const looksLikeIdentifierName = identifierName.endsWith('Id') || identifierName.endsWith('ID');
+  const override = identifierTypesOverride.get(identifierName);
+  return looksLikeIdentifierName && override !== false || override;
+}
 
 const emitDomainType = (domain: Protocol.Domain, type: Protocol.DomainType) => {
   // Check if this type is an object that declares inline enum types for some of its properties.
@@ -241,7 +242,7 @@ const emitDomainType = (domain: Protocol.Domain, type: Protocol.DomainType) => {
   } else if (type.type === 'string' && type.enum) {
     // Explicit enums declared as separate types that inherit from 'string'.
     emitEnum(type.id, type.enum);
-  } else if (knownIdentifierTypes.includes(`${domain.domain}.${type.id}`)) {
+  } else if (isIdentifierTypeName(`${domain.domain}.${type.id}`)) {
     const representationType = getPropertyType(type.id, type);
     const tag = `Protocol.${domain.domain}.${type.id}`;
     const opaqueType = `OpaqueIdentifier<${representationType}, '${tag}'>`;

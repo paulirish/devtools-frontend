@@ -35,6 +35,7 @@
 
 .style-panes-wrapper {
   overflow: hidden scroll;
+  background-color: var(--color-background);
 }
 
 .style-panes-wrapper > div:not(:last-child) {

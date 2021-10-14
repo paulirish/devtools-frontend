@@ -7,7 +7,7 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 interface BaseTreeNode<TreeNodeDataType> {
   treeNodeData: TreeNodeDataType;
   renderer?: (node: TreeNode<TreeNodeDataType>, state: {isExpanded: boolean}) => LitHtml.TemplateResult;
-  id?: string;
+  id: string;
 }
 
 export interface TreeNodeWithChildren<TreeNodeDataType> extends BaseTreeNode<TreeNodeDataType> {
@@ -62,7 +62,6 @@ class TrackDOMNodeToTreeNode extends LitHtml.Directive.Directive {
 }
 
 export const trackDOMNodeToTreeNode = LitHtml.Directive.directive(TrackDOMNodeToTreeNode);
-
 
 /**
  * Finds the next sibling of the node's parent, recursing up the tree if
@@ -184,7 +183,6 @@ export const getNodeChildren =
   return children;
 };
 
-
 /**
  * Searches the tree and returns a path to the given node.
  * e.g. if the tree is:
@@ -212,13 +210,10 @@ export const getPathToTreeNode =
 const getPathToTreeNodeRecursively = async<TreeNodeDataType>(
     currentNode: TreeNode<TreeNodeDataType>, nodeToFind: TreeNode<TreeNodeDataType>,
     pathToNode: TreeNode<TreeNodeDataType>[]): Promise<TreeNode<TreeNodeDataType>[]|null> => {
-  if (nodeToFind.id && currentNode.id && currentNode.id === nodeToFind.id) {
+  if (currentNode.id === nodeToFind.id) {
     return pathToNode;
   }
 
-  if (currentNode === nodeToFind) {
-    return pathToNode;
-  }
   if (currentNode.children) {
     const children = await getNodeChildren(currentNode);
     for (const child of children) {

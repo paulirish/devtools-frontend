@@ -10,7 +10,6 @@ import {Issue, IssueCategory, IssueKind} from './Issue.js';
 import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 import {isCausedByThirdParty} from './SameSiteCookieIssue.js';
 
-
 const UIStrings = {
   /**
    * @description Label for the link for User-Agent String reduction issues, that is, issues that are related to an
@@ -47,7 +46,7 @@ export class DeprecationIssue extends Issue<IssueCode> {
     return {
       file: 'deprecationNavigatorUserAgent.md',
       links: [{
-        link: 'https://blog.chromium.org/2021/05/update-on-user-agent-string-reduction.html',
+        link: 'https://blog.chromium.org/2021/09/user-agent-reduction-origin-trial-and-dates.html',
         linkTitle: i18nString(UIStrings.userAgentReduction),
       }],
     };

@@ -18,8 +18,9 @@ export interface LinkifierData {
 }
 
 export class LinkifierClick extends Event {
+  static readonly eventName = 'linkifieractivated';
   constructor(public data: LinkifierData) {
-    super('linkifieractivated', {
+    super(LinkifierClick.eventName, {
       bubbles: true,
       composed: true,
     });
@@ -65,9 +66,7 @@ export class Linkifier extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     await coordinator.write(() => {
       // clang-format off
-      LitHtml.render(LitHtml.html`
-        <a class="link" href=${this.#url} @click=${this.onLinkActivation}>${LinkifierUtils.linkText(this.#url, this.#lineNumber)}</a>
-      `, this.#shadow, { host: this});
+      LitHtml.render(LitHtml.html`<a class="link" href=${this.#url} @click=${this.onLinkActivation}><slot>${LinkifierUtils.linkText(this.#url, this.#lineNumber)}</slot></a>`, this.#shadow, { host: this});
       // clang-format on
     });
   }

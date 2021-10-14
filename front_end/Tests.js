@@ -29,7 +29,6 @@
  */
 /* eslint-disable indent */
 
-
 /**
  * @fileoverview This file contains small testing framework along with the
  * test suite for the frontend. These tests are a part of the continues build
@@ -225,7 +224,7 @@
         return;
       }
 
-      test.addSniffer(throttler, '_processCompletedForTests', checkState);
+      test.addSniffer(throttler, 'processCompletedForTests', checkState);
     }
 
     function onSchedule() {
@@ -384,7 +383,7 @@
     function testScriptPause() {
       // The script should be in infinite loop. Click "Pause" button to
       // pause it and wait for the result.
-      UI.panels.sources._togglePause();
+      UI.panels.sources.togglePause();
 
       this._waitForScriptPause(this.releaseControl.bind(this));
     }
@@ -403,7 +402,7 @@
       test.releaseControl();
     }
 
-    this.addSniffer(SDK.NetworkDispatcher.prototype, '_finishNetworkRequest', finishRequest);
+    this.addSniffer(SDK.NetworkDispatcher.prototype, 'finishNetworkRequest', finishRequest);
 
     // Reload inspected page to sniff network events
     test.evaluateInConsole_('window.location.reload(true);', function(resultText) {});
@@ -422,7 +421,7 @@
       test.releaseControl();
     }
 
-    this.addSniffer(SDK.NetworkDispatcher.prototype, '_finishNetworkRequest', finishRequest);
+    this.addSniffer(SDK.NetworkDispatcher.prototype, 'finishNetworkRequest', finishRequest);
 
     // Send synchronous XHR to sniff network events
     test.evaluateInConsole_(
@@ -447,7 +446,7 @@
       test.releaseControl();
     }
 
-    this.addSniffer(SDK.NetworkDispatcher.prototype, '_finishNetworkRequest', finishRequest);
+    this.addSniffer(SDK.NetworkDispatcher.prototype, 'finishNetworkRequest', finishRequest);
 
     // Reload inspected page to sniff network events
     test.evaluateInConsole_('window.location.reload(true);', function(resultText) {});
@@ -482,7 +481,7 @@
       test.releaseControl();
     }
 
-    this.addSniffer(SDK.NetworkDispatcher.prototype, '_finishNetworkRequest', finishRequest);
+    this.addSniffer(SDK.NetworkDispatcher.prototype, 'finishNetworkRequest', finishRequest);
 
     // Reload inspected page to sniff network events
     test.evaluateInConsole_('window.location.reload(true);', function(resultText) {});
@@ -515,7 +514,7 @@
       }
     }
 
-    this.addSniffer(SDK.NetworkDispatcher.prototype, '_finishNetworkRequest', finishRequest, true);
+    this.addSniffer(SDK.NetworkDispatcher.prototype, 'finishNetworkRequest', finishRequest, true);
 
     test.evaluateInConsole_('addImage(\'' + url + '\')', function(resultText) {});
     test.evaluateInConsole_('addImage(\'' + url + '?pushUseNullEndTime\')', function(resultText) {});
@@ -533,7 +532,6 @@
     } else {
       self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, firstConsoleMessageReceived, this);
     }
-
 
     function firstConsoleMessageReceived(event) {
       if (event && event.data.source === Protocol.Log.LogEntrySource.Violation) {
@@ -774,7 +772,7 @@
   TestSuite.prototype.testForwardedKeysChanged = function() {
     this.takeControl();
 
-    this.addSniffer(self.UI.shortcutRegistry, '_registerBindings', () => {
+    this.addSniffer(self.UI.shortcutRegistry, 'registerBindings', () => {
       self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'rawKeyDown', key: 'F1', windowsVirtualKeyCode: 112, nativeVirtualKeyCode: 112});
     });
@@ -888,11 +886,10 @@
       test.releaseControl();
     }
 
-    this.addSniffer(SDK.NetworkDispatcher.prototype, '_finishNetworkRequest', finishRequest);
+    this.addSniffer(SDK.NetworkDispatcher.prototype, 'finishNetworkRequest', finishRequest);
 
-    // Allow more time for this test as it needs to reload the inspected page.
-    test.takeControl({slownessFactor: 10});
-    test.evaluateInConsole_('window.location.reload(true);', function(resultText) {});
+    test.takeControl();
+    test.evaluateInConsole_('await fetch("/");', function(resultText) {});
   };
 
   TestSuite.prototype.testEmulateNetworkConditions = function() {
@@ -1054,7 +1051,7 @@
     }
 
     function gotPreferences(prefs) {
-      Main.Main._instanceForTest._createSettings(prefs);
+      Main.Main.instanceForTest.createSettings(prefs);
 
       const localSetting = self.Common.settings.createLocalSetting('local', undefined);
       test.assertEquals('object', typeof localSetting.get());
@@ -1093,9 +1090,9 @@
 
     function onExecutionContexts() {
       const consoleView = Console.ConsoleView.instance();
-      const selector = consoleView._consoleContextSelector;
+      const selector = consoleView.consoleContextSelector;
       const values = [];
-      for (const item of selector._items) {
+      for (const item of selector.items) {
         values.push(selector.titleFor(item));
       }
       test.assertEquals('top', values[0]);
@@ -1219,7 +1216,7 @@
     const test = this;
     this.showPanel('timeline').then(function() {
       const timeline = UI.panels.timeline;
-      test._overrideMethod(timeline, '_recordingStarted', callback);
+      test._overrideMethod(timeline, 'recordingStarted', callback);
       timeline._toggleRecording();
     });
   };
@@ -1294,10 +1291,10 @@
   TestSuite.prototype.testInspectedElementIs = async function(nodeName) {
     this.takeControl();
     await self.runtime.loadModulePromise('elements');
-    if (!Elements.ElementsPanel._firstInspectElementNodeNameForTest) {
-      await new Promise(f => this.addSniffer(Elements.ElementsPanel, '_firstInspectElementCompletedForTest', f));
+    if (!Elements.ElementsPanel.firstInspectElementNodeNameForTest) {
+      await new Promise(f => this.addSniffer(Elements.ElementsPanel, 'firstInspectElementCompletedForTest', f));
     }
-    this.assertEquals(nodeName, Elements.ElementsPanel._firstInspectElementNodeNameForTest);
+    this.assertEquals(nodeName, Elements.ElementsPanel.firstInspectElementNodeNameForTest);
     this.releaseControl();
   };
 
@@ -1420,7 +1417,6 @@
     this.assertEquals(parentFrameOutput, await takeLogs(self.SDK.targetManager.targets()[0]));
     childFrameOutput = 'Event type: mousedown button: 0 x: 30 y: 40 Event type: mouseup button: 0 x: 30 y: 50';
     this.assertEquals(childFrameOutput, await takeLogs(self.SDK.targetManager.targets()[1]));
-
 
     await inputAgent.invoke_dispatchKeyEvent({type: 'keyDown', key: 'a'});
     await runtimeAgent.invoke_evaluate({expression: "document.querySelector('iframe').focus()"});
@@ -1563,9 +1559,9 @@
     function innerEvaluate() {
       self.UI.context.removeFlavorChangeListener(SDK.ExecutionContext, showConsoleAndEvaluate, this);
       const consoleView = Console.ConsoleView.instance();
-      consoleView._prompt._appendCommand(code);
+      consoleView.prompt.appendCommand(code);
 
-      this.addSniffer(Console.ConsoleView.prototype, '_consoleMessageAddedForTest', function(viewMessage) {
+      this.addSniffer(Console.ConsoleView.prototype, 'consoleMessageAddedForTest', function(viewMessage) {
         callback(viewMessage.toMessageElement().deepTextContent());
       }.bind(this));
     }
@@ -1609,7 +1605,7 @@
    * @param {function():void} callback
    */
   TestSuite.prototype._waitForScriptPause = function(callback) {
-    this.addSniffer(SDK.DebuggerModel.prototype, '_pausedScript', callback);
+    this.addSniffer(SDK.DebuggerModel.prototype, 'pausedScript', callback);
   };
 
   /**
@@ -1622,7 +1618,7 @@
       if (test._scriptsAreParsed(expectedScripts)) {
         callback();
       } else {
-        test.addSniffer(UI.panels.sources.sourcesView(), '_addUISourceCode', waitForAllScripts);
+        test.addSniffer(UI.panels.sources.sourcesView(), 'addUISourceCode', waitForAllScripts);
       }
     }
 
@@ -1649,11 +1645,10 @@
       if (runtimeModel.executionContexts().length >= n) {
         callback.call(null);
       } else {
-        this.addSniffer(SDK.RuntimeModel.prototype, '_executionContextCreated', checkForExecutionContexts.bind(this));
+        this.addSniffer(SDK.RuntimeModel.prototype, 'executionContextCreated', checkForExecutionContexts.bind(this));
       }
     }
   };
-
 
   window.uiTests = new TestSuite(window.domAutomationController);
 })(window);

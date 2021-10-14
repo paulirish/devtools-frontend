@@ -4,7 +4,7 @@
 
 import {assert} from 'chai';
 
-import {assertNotNull, goToResourceWithCustomHost} from '../../shared/helper.js';
+import {assertNotNullOrUndefined, goToResourceWithCustomHost} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {ensureResourceSectionIsExpanded, expandIssue, getIssueByTitle, getResourcesElement, navigateToIssuesTab, waitForTableFromResourceSectionContents} from '../helpers/issues-helpers.js';
 
@@ -13,11 +13,12 @@ describe('Wasm cross-origin sharing issue', async () => {
     await goToResourceWithCustomHost('a.devtools.test', 'issues/wasm-co-sharing.html');
   });
 
-  it('should appear when cross-origin sharing a wasm module', async () => {
+  // Disabled until wasm module sharing is reenabled.
+  it.skip('[crbug.com/1247980] should appear when cross-origin sharing a wasm module', async () => {
     await navigateToIssuesTab();
     await expandIssue();
-    const issueElement = await getIssueByTitle('Share WebAssembly modules only between same-origin contexts');
-    assertNotNull(issueElement);
+    const issueElement = await getIssueByTitle('Share WebAssembly modules only between same-origin environments');
+    assertNotNullOrUndefined(issueElement);
     const section = await getResourcesElement('module', issueElement);
     const text = await section.label.evaluate(el => el.textContent);
     assert.strictEqual(text, '1 module');

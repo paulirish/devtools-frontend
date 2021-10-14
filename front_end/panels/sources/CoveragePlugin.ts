@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Formatter from '../../models/formatter/formatter.js';
-import type * as Workspace from '../../models/workspace/workspace.js'; // eslint-disable-line no-unused-vars
-import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js'; // eslint-disable-line no-unused-vars
+import type * as Workspace from '../../models/workspace/workspace.js';
+import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Coverage from '../coverage/coverage.js';
 

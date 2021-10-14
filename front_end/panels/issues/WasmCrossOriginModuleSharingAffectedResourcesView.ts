@@ -9,10 +9,6 @@ import type * as Protocol from '../../generated/protocol.js';
 
 import {AffectedResourcesView} from './AffectedResourcesView.js';
 
-import type {AggregatedIssue} from './IssueAggregator.js';
-import type {IssueView} from './IssueView.js';
-
-
 const UIStrings = {
   /**
    * @description Label for number of affected resources indication in issue view. The number designates the number of attempts to transfer a module to cross-origin context.
@@ -24,12 +20,16 @@ const UIStrings = {
   */
   wasmModuleUrl: 'Wasm Module URL',
   /**
-  *@description Title for a column in an Wasm cross-origin module sharing affected resource view
-  */
+   * @description Title for a column in an Wasm cross-origin module sharing affected resource view.
+   * The issue is about a transfer of a module between different origins (see  https://developer.mozilla.org/en-US/docs/Glossary/Origin).
+   * The transfer occurs from a source origin to a target origin.
+   */
   sourceOrigin: 'Source Origin',
   /**
-  *@description Title for a column in an Wasm cross-origin module sharing affected resource view
-  */
+   * @description Title for a column in an Wasm cross-origin module sharing affected resource view.
+   * The issue is about a transfer of a module between different origins (see  https://developer.mozilla.org/en-US/docs/Glossary/Origin).
+   * The transfer occurs from a source origin to a target origin.
+   */
   targetOrigin: 'Target Origin',
   /**
   *@description Title for a column in an Wasm cross-origin module sharing affected resource view
@@ -49,12 +49,6 @@ const str_ =
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class WasmCrossOriginModuleSharingAffectedResourcesView extends AffectedResourcesView {
-  private issue: AggregatedIssue;
-  constructor(parent: IssueView, issue: AggregatedIssue) {
-    super(parent);
-    this.issue = issue;
-  }
-
   private appendIssues(
       issues: Iterable<IssuesManager.WasmCrossOriginModuleSharingIssue.WasmCrossOriginModuleSharingIssue>): void {
     const header = document.createElement('tr');

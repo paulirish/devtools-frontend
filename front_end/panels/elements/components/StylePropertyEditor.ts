@@ -48,19 +48,21 @@ interface EditableProperty {
 }
 
 export class PropertySelectedEvent extends Event {
+  static readonly eventName = 'propertyselected';
   data: {name: string, value: string};
 
   constructor(name: string, value: string) {
-    super('propertyselected', {});
+    super(PropertySelectedEvent.eventName, {});
     this.data = {name, value};
   }
 }
 
 export class PropertyDeselectedEvent extends Event {
+  static readonly eventName = 'propertydeselected';
   data: {name: string, value: string};
 
   constructor(name: string, value: string) {
-    super('propertydeselected', {});
+    super(PropertyDeselectedEvent.eventName, {});
     this.data = {name, value};
   }
 }
@@ -132,8 +134,8 @@ export class StylePropertyEditor extends HTMLElement {
       'button': true,
       'selected': selected,
     });
-    const title =
-        i18nString(selected ? UIStrings.deselectButton : UIStrings.selectButton, {propertyName, propertyValue});
+    const values = {propertyName, propertyValue};
+    const title = selected ? i18nString(UIStrings.deselectButton, values) : i18nString(UIStrings.selectButton, values);
     return html`<button title=${title} class=${classes} @click=${
         (): void => this.onButtonClick(propertyName, propertyValue, selected)}>
        <${IconButton.Icon.Icon.litTagName} style=${transform} .data=${

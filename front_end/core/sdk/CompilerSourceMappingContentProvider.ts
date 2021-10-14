@@ -28,14 +28,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-import type * as Common from '../common/common.js'; // eslint-disable-line no-unused-vars
+import type * as Common from '../common/common.js';
+import type * as Platform from '../platform/platform.js';
 import * as i18n from '../i18n/i18n.js';
 
 import type {PageResourceLoadInitiator} from './PageResourceLoader.js';
-import {PageResourceLoader} from './PageResourceLoader.js';  // eslint-disable-line no-unused-vars
+import {PageResourceLoader} from './PageResourceLoader.js';
 
 const UIStrings = {
   /**
@@ -50,22 +49,23 @@ const str_ = i18n.i18n.registerUIStrings('core/sdk/CompilerSourceMappingContentP
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CompilerSourceMappingContentProvider implements TextUtils.ContentProvider.ContentProvider {
-  _sourceURL: string;
-  _contentType: Common.ResourceType.ResourceType;
-  _initiator: PageResourceLoadInitiator;
+  readonly #sourceURL: string;
+  readonly #contentTypeInternal: Common.ResourceType.ResourceType;
+  readonly #initiator: PageResourceLoadInitiator;
 
   constructor(sourceURL: string, contentType: Common.ResourceType.ResourceType, initiator: PageResourceLoadInitiator) {
-    this._sourceURL = sourceURL;
-    this._contentType = contentType;
-    this._initiator = initiator;
+    this.#sourceURL = sourceURL;
+    this.#contentTypeInternal = contentType;
+    this.#initiator = initiator;
   }
 
-  contentURL(): string {
-    return this._sourceURL;
+  // TODO(crbug.com/1253323): Cast to UrlString will be removed when migration to branded types is complete.
+  contentURL(): Platform.DevToolsPath.UrlString {
+    return this.#sourceURL as Platform.DevToolsPath.UrlString;
   }
 
   contentType(): Common.ResourceType.ResourceType {
-    return this._contentType;
+    return this.#contentTypeInternal;
   }
 
   async contentEncoded(): Promise<boolean> {
@@ -74,10 +74,10 @@ export class CompilerSourceMappingContentProvider implements TextUtils.ContentPr
 
   async requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
     try {
-      const {content} = await PageResourceLoader.instance().loadResource(this._sourceURL, this._initiator);
+      const {content} = await PageResourceLoader.instance().loadResource(this.#sourceURL, this.#initiator);
       return {content, isEncoded: false};
     } catch (e) {
-      const error = i18nString(UIStrings.couldNotLoadContentForSS, {PH1: this._sourceURL, PH2: e.message});
+      const error = i18nString(UIStrings.couldNotLoadContentForSS, {PH1: this.#sourceURL, PH2: e.message});
       console.error(error);
       return {content: null, error, isEncoded: false};
     }

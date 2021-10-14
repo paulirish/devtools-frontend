@@ -7,13 +7,9 @@ import type * as puppeteer from 'puppeteer';
 
 import {$, getBrowserAndPages, step} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {CONSOLE_MESSAGE_WRAPPER_SELECTOR, deleteConsoleMessagesFilter, filterConsoleMessages, getConsoleMessages, getCurrentConsoleMessages, showVerboseMessages} from '../helpers/console-helpers.js';
+import {CONSOLE_MESSAGE_WRAPPER_SELECTOR, deleteConsoleMessagesFilter, filterConsoleMessages, getConsoleMessages, getCurrentConsoleMessages, showVerboseMessages, toggleShowCorsErrors, waitForConsoleMessagesToBeNonEmpty} from '../helpers/console-helpers.js';
 
 type MessageCheck = (msg: string) => boolean;
-
-function toConsoleRegex(regex: string) {
-  return regex.replace('\\', '\\\\');
-}
 
 function createUrlFilter(url: string) {
   return `-url:${url}`;
@@ -29,10 +25,6 @@ function collectSourceUrlsFromConsoleOutput(frontend: puppeteer.Page) {
 
 function getExpectedMessages(unfilteredMessages: string[], filter: MessageCheck) {
   return unfilteredMessages.filter((msg: string) => {
-    // console.group() outputs are not filtered
-    if (/outerGroup$|innerGroup$/.test(msg)) {
-      return true;
-    }
     return filter(msg);
   });
 }
@@ -165,7 +157,7 @@ describe('The Console Tab', async () => {
     });
 
     for (const urlToKeep of uniqueUrls) {
-      const filter = urlToKeep;
+      const filter = `url:${urlToKeep}`;
       const expectedMessageFilter: MessageCheck = msg => {
         return msg.indexOf(urlToKeep) !== -1;
       };
@@ -187,18 +179,19 @@ describe('The Console Tab', async () => {
   it('can apply text filter', async () => {
     const filter = 'outer';
     const expectedMessageFilter: MessageCheck = msg => {
-      return msg.indexOf(filter) !== -1;
+      // With new implementation of console group filtering, we also include child messages
+      // if parent group is filtered.
+      return msg.indexOf(filter) !== -1 || msg.indexOf('inner') !== -1;
     };
     await testMessageFilter(filter, expectedMessageFilter);
   });
 
   it('can apply start/end line regex filter', async () => {
-    const filter = '/^Hello\s\d$/';
+    const filter = new RegExp(/.*Hello\s\d$/);
     const expectedMessageFilter: MessageCheck = msg => {
-      const regExp = new RegExp(filter);
-      return regExp.test(msg);
+      return filter.test(msg);
     };
-    await testMessageFilter(toConsoleRegex(filter), expectedMessageFilter);
+    await testMessageFilter(filter.toString(), expectedMessageFilter);
   });
 
   it('can apply context filter', async () => {
@@ -217,12 +210,11 @@ describe('The Console Tab', async () => {
   });
 
   it('can apply filter on anchor', async () => {
-    const filter = '/^log-source\.js:\d+$/';
+    const filter = new RegExp(/.*log-source\.js:\d+/);
     const expectedMessageFilter: MessageCheck = msg => {
-      const regex = new RegExp(filter.replace('$', ''));
-      return regex.test(msg);
+      return filter.test(msg);
     };
-    await testMessageFilter(toConsoleRegex(filter), expectedMessageFilter);
+    await testMessageFilter(filter.toString(), expectedMessageFilter);
   });
 
   it('can reset filter', async () => {
@@ -246,4 +238,44 @@ describe('The Console Tab', async () => {
       assert.deepEqual(messages, unfilteredMessages);
     });
   });
+
+  it('will show group parent message if child is filtered', async () => {
+    const filter = '1outerGroup';
+    const expectedMessageFilter: MessageCheck = msg => {
+      return new RegExp(/.* (1|)outerGroup.*$/).test(msg);
+    };
+    await testMessageFilter(filter, expectedMessageFilter);
+  });
+
+  it('will show messages in group if group name is filtered', async () => {
+    const filter = 'innerGroup';
+    const expectedMessageFilter: MessageCheck = msg => {
+      return msg.indexOf(filter) !== -1 || new RegExp(/.* outerGroup.*$/).test(msg);
+    };
+    await testMessageFilter(filter, expectedMessageFilter);
+  });
+
+  it('can exclude CORS error messages', async () => {
+    const CORS_DETAILED_ERROR_PATTERN =
+        /Access to fetch at 'https:.*' from origin 'https:.*' has been blocked by CORS policy: .*/;
+    const NETWORK_ERROR_PATTERN = /GET https:.* net::ERR_FAILED/;
+    const JS_ERROR_PATTERN = /Uncaught \(in promise\) TypeError: Failed to fetch.*/;
+    const allMessages = await getConsoleMessages('cors-issue', false, () => waitForConsoleMessagesToBeNonEmpty(6));
+    allMessages.sort();
+    assert.strictEqual(allMessages.length, 6);
+    assert.match(allMessages[0], CORS_DETAILED_ERROR_PATTERN);
+    assert.match(allMessages[1], CORS_DETAILED_ERROR_PATTERN);
+    assert.match(allMessages[2], NETWORK_ERROR_PATTERN);
+    assert.match(allMessages[3], NETWORK_ERROR_PATTERN);
+    assert.match(allMessages[4], JS_ERROR_PATTERN);
+    assert.match(allMessages[5], JS_ERROR_PATTERN);
+
+    await toggleShowCorsErrors();
+    const filteredMessages = await getCurrentConsoleMessages();
+    assert.strictEqual(2, filteredMessages.length);
+    for (const message of filteredMessages) {
+      assert.match(message, JS_ERROR_PATTERN);
+    }
+  });
+
 });

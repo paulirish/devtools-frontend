@@ -52,28 +52,31 @@ export type Settings = {
 };
 
 export class MemoryRequestEvent extends Event {
+  static readonly eventName = 'memoryrequest';
   data: {start: number, end: number, address: number};
 
   constructor(start: number, end: number, address: number) {
-    super('memoryrequest');
+    super(MemoryRequestEvent.eventName);
     this.data = {start, end, address};
   }
 }
 
 export class AddressChangedEvent extends Event {
+  static readonly eventName = 'addresschanged';
   data: number;
 
   constructor(address: number) {
-    super('addresschanged');
+    super(AddressChangedEvent.eventName);
     this.data = address;
   }
 }
 
 export class SettingsChangedEvent extends Event {
+  static readonly eventName = 'settingschanged';
   data: Settings;
 
   constructor(settings: Settings) {
-    super('settingschanged');
+    super(SettingsChangedEvent.eventName);
     this.data = settings;
   }
 }
@@ -321,23 +324,16 @@ export class LinearMemoryInspector extends HTMLElement {
   }
 }
 
-export interface LinearMemoryInspectorEventMap extends HTMLElementEventMap {
-  'memoryrequest': MemoryRequestEvent;
-  'addresschanged': AddressChangedEvent;
-  'settingschanged': SettingsChangedEvent;
-}
-
-export interface LinearMemoryInspector extends HTMLElement {
-  addEventListener<K extends keyof LinearMemoryInspectorEventMap>(
-      type: K, listener: (this: HTMLElement, ev: LinearMemoryInspectorEventMap[K]) => unknown,
-      options?: boolean|AddEventListenerOptions): void;
-}
-
 ComponentHelpers.CustomElements.defineComponent('devtools-linear-memory-inspector-inspector', LinearMemoryInspector);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-linear-memory-inspector-inspector': LinearMemoryInspector;
+  }
+
+  interface HTMLElementEventMap {
+    'memoryrequest': MemoryRequestEvent;
+    'addresschanged': AddressChangedEvent;
+    'settingschanged': SettingsChangedEvent;
   }
 }

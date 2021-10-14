@@ -373,9 +373,9 @@
       name: {
         valid_type: "str",
         valid_values: ["border", "border-color", "border-radius",
-                       "border-style", "border-width", "inset",
-                       "margin", "max-size", "min-size", "overflow", "padding",
-                       "scroll-margin", "scroll-padding", "size",
+                       "border-style", "border-width", "contain-intrinsic-size",
+                       "inset", "margin", "max-size", "min-size", "overflow",
+                       "padding", "scroll-margin", "scroll-padding", "size",
                        "visited-border-color"],
       },
       // The name of the mapping function used to convert between equivalent
@@ -510,6 +510,31 @@
       valid_type: "bool",
     },
 
+    // - is_border_radius
+    // The property, when used by the author, will disable any native
+    // appearance on UI elements.
+    is_border_radius: {
+      default: false,
+      valid_type: "bool",
+    },
+
+    // - is_highlight_colors
+    // The property participates in paired cascade, such that when encountered
+    // in highlight styles, we make all other highlight color properties default
+    // to initial, rather than the UA default.
+    // https://drafts.csswg.org/css-pseudo-4/#highlight-cascade
+    is_highlight_colors: {
+      default: false,
+      valid_type: "bool",
+    },
+
+    // - is_animation_property
+    // The property is a longhand of the 'animation' or 'transition' shorthands.
+    is_animation_property: {
+      default: false,
+      valid_type: "bool",
+    },
+
     // - tree_scoped_value: true
     // Whether the property takes a tree-scoped reference as its value.
     // https://drafts.csswg.org/css-scoping/#css-tree-scoped-reference
@@ -536,6 +561,7 @@
       typedom_types: ["Time"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "animation-direction",
@@ -549,6 +575,7 @@
       },
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "animation-duration",
@@ -561,6 +588,7 @@
       typedom_types: ["Time"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "animation-fill-mode",
@@ -573,6 +601,7 @@
       typedom_types: ["Keyword"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "animation-iteration-count",
@@ -587,6 +616,7 @@
       typedom_types: ["Keyword", "Number"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "animation-name",
@@ -600,6 +630,7 @@
       separator: ",",
       valid_for_marker: true,
       tree_scoped_value: true,
+      is_animation_property: true,
     },
     {
       name: "animation-play-state",
@@ -612,6 +643,7 @@
       typedom_types: ["Keyword"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "animation-timeline",
@@ -625,6 +657,7 @@
       separator: ",",
       valid_for_marker: true,
       runtime_flag: "CSSScrollTimeline",
+      is_animation_property: true,
     },
     {
       name: "animation-timing-function",
@@ -649,6 +682,7 @@
       typedom_types: ["Keyword"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "transition-delay",
@@ -660,6 +694,7 @@
       typedom_types: ["Time"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "transition-duration",
@@ -671,6 +706,7 @@
         attribute: "Duration",
       },
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "transition-property",
@@ -682,6 +718,7 @@
       keywords: ["none"],
       typedom_types: ["Keyword"],
       valid_for_marker: true,
+      is_animation_property: true,
     },
     {
       name: "transition-timing-function",
@@ -705,6 +742,7 @@
       typedom_types: ["Keyword"],
       separator: ",",
       valid_for_marker: true,
+      is_animation_property: true,
     },
 
     // High Priority and all other font properties.
@@ -730,6 +768,7 @@
       valid_for_cue: true,
       valid_for_marker: true,
       valid_for_highlight: true,
+      is_highlight_colors: true,
     },
     {
       name: "direction",
@@ -950,6 +989,51 @@
       valid_for_marker: true,
     },
     {
+      name: "font-synthesis-weight",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      inherited: true,
+      runtime_flag: "FontSynthesis",
+      font: true,
+      name_for_methods: "FontSynthesisWeight",
+      type_name: "FontDescription::FontSynthesisWeight",
+      priority: "High",
+      keywords: ["auto", "none"],
+      typedom_types: ["Keyword"],
+      valid_for_first_letter: true,
+      valid_for_first_line: true,
+      valid_for_marker: true,
+    },
+    {
+      name: "font-synthesis-style",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      inherited: true,
+      runtime_flag: "FontSynthesis",
+      font: true,
+      name_for_methods: "FontSynthesisStyle",
+      type_name: "FontDescription::FontSynthesisStyle",
+      priority: "High",
+      keywords: ["auto", "none"],
+      typedom_types: ["Keyword"],
+      valid_for_first_letter: true,
+      valid_for_first_line: true,
+      valid_for_marker: true,
+    },
+    {
+      name: "font-synthesis-small-caps",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      inherited: true,
+      runtime_flag: "FontSynthesis",
+      font: true,
+      name_for_methods: "FontSynthesisSmallCaps",
+      type_name: "FontDescription::FontSynthesisSmallCaps",
+      priority: "High",
+      keywords: ["auto", "none"],
+      typedom_types: ["Keyword"],
+      valid_for_first_letter: true,
+      valid_for_first_line: true,
+      valid_for_marker: true,
+    },
+    {
       name: "font-feature-settings",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       is_descriptor: true,
@@ -994,6 +1078,7 @@
     },
     {
       name: "forced-color-adjust",
+      field_group: "*",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
       runtime_flag: "ForcedColors",
@@ -1261,6 +1346,7 @@
       valid_for_cue: true,
       valid_for_highlight: true,
       is_background: true,
+      is_highlight_colors: true,
     },
     {
       name: "background-image",
@@ -1406,6 +1492,7 @@
       typedom_types: ["Length", "Percentage"],
       valid_for_first_letter: true,
       is_border: true,
+      is_border_radius: true,
       logical_property_group: {
         name: "border-radius",
         resolver: "bottom-left",
@@ -1424,6 +1511,7 @@
       typedom_types: ["Length", "Percentage"],
       valid_for_first_letter: true,
       is_border: true,
+      is_border_radius: true,
       logical_property_group: {
         name: "border-radius",
         resolver: "bottom-right",
@@ -1691,6 +1779,7 @@
       typedom_types: ["Length", "Percentage"],
       valid_for_first_letter: true,
       is_border: true,
+      is_border_radius: true,
       logical_property_group: {
         name: "border-radius",
         resolver: "top-left",
@@ -1709,6 +1798,7 @@
       typedom_types: ["Length", "Percentage"],
       valid_for_first_letter: true,
       is_border: true,
+      is_border_radius: true,
       logical_property_group: {
         name: "border-radius",
         resolver: "top-right",
@@ -1894,6 +1984,7 @@
       name: "clip-path",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       interpolable: true,
+      compositable: true,
       field_group: "*",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/style/clip_path_operation.h"],
@@ -1990,17 +2081,28 @@
       computable: false,
     },
     {
-      name: "contain-intrinsic-size",
+      name: "contain-intrinsic-width",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       interpolable: true,
       field_group: "box",
       field_template: "external",
-      keywords: ["auto"],
-      default_value: "LengthSize(Length::Auto(), Length::Auto())",
-      type_name: "LengthSize",
-      converter: "ConvertIntrinsicSize",
-      include_paths: ["third_party/blink/renderer/platform/geometry/length_size.h"],
-      computable: false,
+      include_paths: ["third_party/blink/renderer/core/style/style_intrinsic_length.h"],
+      keywords: ["auto", "none"],
+      default_value: "absl::nullopt",
+      type_name: "absl::optional<StyleIntrinsicLength>",
+      converter: "ConvertIntrinsicDimension",
+    },
+    {
+      name: "contain-intrinsic-height",
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
+      interpolable: true,
+      field_group: "box",
+      field_template: "external",
+      include_paths: ["third_party/blink/renderer/core/style/style_intrinsic_length.h"],
+      keywords: ["auto", "none"],
+      default_value: "absl::optional<StyleIntrinsicLength>()",
+      type_name: "absl::optional<StyleIntrinsicLength>",
+      converter: "ConvertIntrinsicDimension",
     },
     {
       name: "container-name",
@@ -2017,7 +2119,7 @@
     {
       name: "container-type",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
-      keywords: ["none", "block-size", "inline-size"],
+      keywords: ["none", "block-size", "inline-size", "size"],
       field_group: "*",
       field_size: 2,
       field_template: "primitive",
@@ -2229,9 +2331,9 @@
       field_group: "*",
       field_template: "<length>",
       default_value: "Length::Auto()",
-      converter: "ConvertLengthOrAuto",
+      converter: "ConvertLengthSizing",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      keywords: ["auto"],
+      keywords: ["auto", "fit-content", "min-content", "max-content", "content"],
     },
     {
       name: "flex-direction",
@@ -2642,21 +2744,8 @@
       type_name: "ListStyleTypeData",
       keywords: [
         "disc", "circle", "square", "disclosure-open", "disclosure-closed",
-        "decimal", "decimal-leading-zero",
-        "arabic-indic", "bengali", "cambodian", "khmer", "devanagari",
-        "gujarati", "gurmukhi", "kannada", "lao", "malayalam", "mongolian",
-        "myanmar", "oriya", "persian", "urdu", "telugu", "tibetan", "thai",
-        "lower-roman", "upper-roman", "lower-greek", "lower-alpha",
-        "lower-latin", "upper-alpha", "upper-latin", "cjk-earthly-branch",
-        "cjk-heavenly-stem", "ethiopic-halehame", "ethiopic-halehame-am",
-        "ethiopic-halehame-ti-er", "ethiopic-halehame-ti-et", "hangul",
-        "hangul-consonant", "korean-hangul-formal", "korean-hanja-formal",
-        "korean-hanja-informal", "hebrew", "armenian", "lower-armenian",
-        "upper-armenian", "georgian", "cjk-ideographic", "simp-chinese-formal",
-        "simp-chinese-informal", "trad-chinese-formal", "trad-chinese-informal",
-        "hiragana", "katakana", "hiragana-iroha", "katakana-iroha", "none"
+        "decimal", "none"
       ],
-      computed_style_custom_functions: ["getter"],
       style_builder_custom_functions: ["initial", "inherit", "value"],
       tree_scoped_value: true,
     },
@@ -2799,6 +2888,7 @@
     {
       name: "math-shift",
       property_methods: ["CSSValueFromComputedStyleInternal"],
+      field_group: "*",
       field_template: "keyword",
       inherited: true,
       keywords: ["normal", "compact"],
@@ -2809,6 +2899,7 @@
     {
       name: "math-style",
       property_methods: ["CSSValueFromComputedStyleInternal"],
+      field_group: "*",
       field_template: "keyword",
       inherited: true,
       keywords: ["normal", "compact"],
@@ -3463,7 +3554,7 @@
       type_name: "unsigned",
       converter: "ConvertScrollbarGutter",
       keywords: [
-        "auto", "stable", "always"
+        "auto", "stable", "both-edges"
       ],
       typedom_types: ["Keyword"],
       runtime_flag: "ScrollbarGutter",
@@ -4416,6 +4507,7 @@
       field_group: "*",
       field_size: 5,
       field_template: "primitive",
+      include_paths: ["third_party/blink/renderer/platform/theme_types.h"],
       computed_style_custom_functions: ["getter"],
       default_value: "kNoControlPart",
       type_name: "ControlPart",
@@ -4425,7 +4517,7 @@
       alias_for: "appearance",
     },
     {
-      name: "-webkit-app-region",
+      name: "app-region",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       field_group: "*",
       field_template: "keyword",
@@ -4433,6 +4525,10 @@
       default_value: "none",
       name_for_methods: "DraggableRegionMode",
       style_builder_custom_functions: ["initial", "inherit", "value"],
+    },
+    {
+      name: "-webkit-app-region",
+      alias_for: "app-region",
     },
     {
       name: "-webkit-border-horizontal-spacing",
@@ -4874,7 +4970,10 @@
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "ColorIncludingFallback"],
       inherited: true,
       field_group: "*",
-      field_template: "<color>",
+      field_template: "external",
+      include_paths: ["third_party/blink/renderer/core/css/style_color.h",
+                      "third_party/blink/renderer/core/layout/layout_theme.h"],
+      type_name: "StyleColor",
       default_value: "StyleColor(LayoutTheme::TapHighlightColor())",
       converter: "ConvertStyleColor",
     },
@@ -5640,12 +5739,6 @@
       runtime_flag: "CSSScrollTimeline",
     },
     {
-      name: "time-range",
-      is_descriptor: true,
-      is_property: false,
-      runtime_flag: "CSSScrollTimeline",
-    },
-    {
       name: "ascent-override",
       is_descriptor: true,
       is_property: false,
@@ -5947,6 +6040,40 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
     },
     {
+      name: "contain-intrinsic-inline-size",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group: {
+        name: "contain-intrinsic-size",
+        resolver: "inline",
+      },
+      typedom_types: ["Keyword", "Length"],
+    },
+    {
+      name: "contain-intrinsic-block-size",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group: {
+        name: "contain-intrinsic-size",
+        resolver: "block",
+      },
+      typedom_types: ["Keyword", "Length"],
+    },
+    {
+      name: "contain-intrinsic-size",
+      longhands: [
+        "contain-intrinsic-width", "contain-intrinsic-height"
+      ],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      computable: true,
+    },
+    {
+      name: "container",
+      longhands: [
+        "container-type", "container-name"
+      ],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      runtime_flag: "CSSContainerQueries",
+    },
+    {
       name: "flex",
       longhands: ["flex-grow", "flex-shrink", "flex-basis"],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
@@ -5974,6 +6101,12 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       is_descriptor: true,
       computable: true,
+    },
+    {
+      name: "font-synthesis",
+      longhands: ["font-synthesis-weight", "font-synthesis-style", "font-synthesis-small-caps"],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      runtime_flag: "FontSynthesis"
     },
     {
       name: "grid",
@@ -6299,7 +6432,7 @@
       visited_property_for: "caret-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
       inherited: true,
-      field_group: "*",
+      field_group: "*->inherited_visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_auto_color.h"],
       default_value: "StyleAutoColor::AutoColor()",
@@ -6316,7 +6449,7 @@
       name: "-internal-visited-column-rule-color",
       visited_property_for: "column-rule-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*->multi-col",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6329,7 +6462,7 @@
       name: "-internal-visited-background-color",
       visited_property_for: "background-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor(Color::kTransparent)",
@@ -6349,7 +6482,7 @@
       name: "-internal-visited-border-left-color",
       visited_property_for: "border-left-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6367,7 +6500,7 @@
       name: "-internal-visited-border-right-color",
       visited_property_for: "border-right-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6385,7 +6518,7 @@
       name: "-internal-visited-border-top-color",
       visited_property_for: "border-top-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6403,7 +6536,7 @@
       name: "-internal-visited-border-bottom-color",
       visited_property_for: "border-bottom-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6479,7 +6612,7 @@
       name: "-internal-visited-outline-color",
       visited_property_for: "outline-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6511,7 +6644,7 @@
       name: "-internal-visited-text-decoration-color",
       visited_property_for: "text-decoration-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6529,7 +6662,7 @@
       visited_property_for: "-webkit-text-emphasis-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
       inherited: true,
-      field_group: "*",
+      field_group: "*->inherited_visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6544,7 +6677,7 @@
       visited_property_for: "-webkit-text-fill-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
       inherited: true,
-      field_group: "*",
+      field_group: "*->inherited_visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6559,7 +6692,7 @@
       visited_property_for: "-webkit-text-stroke-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
       inherited: true,
-      field_group: "*",
+      field_group: "*->inherited_visited",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6574,9 +6707,10 @@
     {
       name: "-internal-forced-background-color",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->forced_colors",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/layout/layout_theme.h"],
+      include_paths: ["third_party/blink/renderer/core/css_value_keywords.h",
+                      "third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor(CSSValueID::kCanvas)",
       type_name: "StyleColor",
       computed_style_custom_functions: ["getter"],
@@ -6592,7 +6726,7 @@
     {
       name: "-internal-forced-border-color",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->forced_colors",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6606,9 +6740,10 @@
       name: "-internal-forced-color",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "ColorIncludingFallback"],
       inherited: true,
-      field_group: "*",
+      field_group: "*->inherited_forced_colors",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/layout/layout_theme.h"],
+      include_paths: ["third_party/blink/renderer/core/css_value_keywords.h",
+                      "third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor(CSSValueID::kCanvastext)",
       type_name: "StyleColor",
       computed_style_custom_functions: ["getter"],
@@ -6621,7 +6756,7 @@
     {
       name: "-internal-forced-outline-color",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "ColorIncludingFallback"],
-      field_group: "*",
+      field_group: "*->forced_colors",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor::CurrentColor()",
@@ -6636,9 +6771,10 @@
       visited_property_for: "-internal-forced-color",
       property_methods: ["ParseSingleValue", "ColorIncludingFallback"],
       inherited: true,
-      field_group: "*",
+      field_group: "*->inherited_forced_colors",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/layout/layout_theme.h"],
+      include_paths: ["third_party/blink/renderer/core/css_value_keywords.h",
+                      "third_party/blink/renderer/core/css/style_color.h"],
       default_value: "StyleColor(CSSValueID::kCanvastext)",
       type_name: "StyleColor",
       computed_style_custom_functions: ["getter", "setter"],

@@ -13,11 +13,10 @@ describe('MultitargetNetworkManager', () => {
   describe('Trust Token done event', () => {
     it('is not lost when arriving before the corresponding requestWillBeSent event', () => {
       // 1) Setup a NetworkManager and listen to "RequestStarted" events.
-      const networkManager = new Common.ObjectWrapper.ObjectWrapper();
+      const networkManager = new Common.ObjectWrapper.ObjectWrapper<SDK.NetworkManager.EventTypes>();
       const startedRequests: SDK.NetworkRequest.NetworkRequest[] = [];
       networkManager.addEventListener(SDK.NetworkManager.Events.RequestStarted, event => {
-        const request = event.data.request as SDK.NetworkRequest.NetworkRequest;
-        startedRequests.push(request);
+        startedRequests.push(event.data.request);
       });
       const networkDispatcher =
           new SDK.NetworkManager.NetworkDispatcher(networkManager as SDK.NetworkManager.NetworkManager);

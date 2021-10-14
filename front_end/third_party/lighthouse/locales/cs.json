@@ -477,7 +477,7 @@
     "message": "Nepoužívejte v moderních prohlížečích zastaralý JavaScript"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "Formáty obrázků JPEG 2000, JPEG XR a WebP často poskytují lepší kompresi než formáty PNG a JPEG, což znamená rychlejší stahování a menší spotřebu dat. [Další informace](https://web.dev/uses-webp-images/)"
+    "message": "Formáty obrázků jako WebP a AVIF často nabízejí lepší kompresi než PNG nebo JPEG, což znamená rychlejší stahování a menší využití dat. [Další informace](https://web.dev/uses-webp-images/)"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "Zobrazujte obrázky ve formátech nové generace"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "Používejte efektivní kódování obrázků"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "Skutečné rozměry"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "Zobrazené rozměry"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "Zobrazujte obrázky s vhodnou velikostí, abyste ušetřili mobilní data a zrychlili načítání. [Další informace](https://web.dev/uses-responsive-images/)"
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "Povoleno s upozorněním"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "Knihovna"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "Velké javascriptové knihovny mohou snižovat rychlost. Abyste dosáhli menších balíčků, používejte raději menší funkčně rovnocenné knihovny. [Další informace](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{Byla nalezena 1 velká knihovna}few{Byly nalezeny # velké knihovny}many{Bylo nalezeno # velké knihovny}other{Bylo nalezeno # velkých knihoven}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "Zbytečně velké javascriptové knihovny nahraďte jinými alternativami"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "Místo velkých javascriptových knihoven jsou použity menší alternativy"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "Toto je největší obsahový prvek vykreslený v zobrazované oblasti. [Další informace](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "Odkazuje na jiné umístění `hreflang` ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "Relativní adresa URL ({url})"
+    "message": "Nejedná se o absolutní adresu URL ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "Neodkazuje na ekvivalentní obsahovou stránku, ale na kořenovou adresu URL domény (domovskou stránku)"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "{keyword} je zřejmě neplatné klíčové slovo."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "unsafe-inline umožňuje spouštění skriptů na stránce a obslužných rutin událostí, které nejsou bezpečné. Zvažte, zda nepoužít hodnoty nonce nebo hash CSP, abyste skripty povolovali individuálně."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "Zvažte, zda nepřidat unsafe-inline (ignorováno prohlížeči, které podporují hodnoty nonce/hash) z důvodu zpětné kompatibility se staršími prohlížeči."

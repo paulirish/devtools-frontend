@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -12,6 +10,9 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as MobileThrottling from '../../panels/mobile_throttling/mobile_throttling.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+
+import nodeIconStyles from './nodeIcon.css.js';
+
 import type * as Protocol from '../../generated/protocol.js';
 
 const UIStrings = {
@@ -27,12 +28,16 @@ const UIStrings = {
   * DevTools is connected to.
   */
   javascriptIsDisabled: 'JavaScript is disabled',
+  /**
+  * @description A message that prompts the user to open devtools for a specific environment (Node.js)
+  */
+  openDedicatedTools: 'Open dedicated DevTools for `Node.js`',
 };
 const str_ = i18n.i18n.registerUIStrings('entrypoints/inspector_main/InspectorMain.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let inspectorMainImplInstance: InspectorMainImpl;
 
-export class InspectorMainImpl extends Common.ObjectWrapper.ObjectWrapper implements Common.Runnable.Runnable {
+export class InspectorMainImpl implements Common.Runnable.Runnable {
   static instance(opts: {
     forceNew: boolean|null,
   } = {forceNew: null}): InspectorMainImpl {
@@ -79,8 +84,7 @@ export class InspectorMainImpl extends Common.ObjectWrapper.ObjectWrapper implem
     new MobileThrottling.NetworkPanelIndicator.NetworkPanelIndicator();
 
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.ReloadInspectedPage, event => {
-          const hard = (event.data as boolean);
+        Host.InspectorFrontendHostAPI.Events.ReloadInspectedPage, ({data: hard}) => {
           SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(hard);
         });
   }
@@ -141,22 +145,21 @@ export class FocusDebuggeeActionDelegate implements UI.ActionRegistration.Action
 let nodeIndicatorInstance: NodeIndicator;
 
 export class NodeIndicator implements UI.Toolbar.Provider {
-  _element: Element;
-  _button: UI.Toolbar.ToolbarItem;
+  private readonly element: Element;
+  private readonly button: UI.Toolbar.ToolbarItem;
   private constructor() {
     const element = document.createElement('div');
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
-        element, {cssFile: 'entrypoints/inspector_main/nodeIcon.css', delegatesFocus: undefined});
-    this._element = shadowRoot.createChild('div', 'node-icon');
+    const shadowRoot =
+        UI.Utils.createShadowRootWithCoreStyles(element, {cssFile: [nodeIconStyles], delegatesFocus: undefined});
+    this.element = shadowRoot.createChild('div', 'node-icon');
     element.addEventListener(
         'click', () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openNodeFrontend(), false);
-    this._button = new UI.Toolbar.ToolbarItem(element);
-    this._button.setTitle(i18nString('Open dedicated DevTools for Node.js'));
+    this.button = new UI.Toolbar.ToolbarItem(element);
+    this.button.setTitle(i18nString(UIStrings.openDedicatedTools));
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.AvailableTargetsChanged,
-        event => this._update((event.data as Protocol.Target.TargetInfo[])));
-    this._button.setVisible(false);
-    this._update([]);
+        SDK.TargetManager.Events.AvailableTargetsChanged, event => this.update(event.data));
+    this.button.setVisible(false);
+    this.update([]);
   }
   static instance(opts: {
     forceNew: boolean|null,
@@ -169,16 +172,16 @@ export class NodeIndicator implements UI.Toolbar.Provider {
     return nodeIndicatorInstance;
   }
 
-  _update(targetInfos: Protocol.Target.TargetInfo[]): void {
+  private update(targetInfos: Protocol.Target.TargetInfo[]): void {
     const hasNode = Boolean(targetInfos.find(target => target.type === 'node' && !target.attached));
-    this._element.classList.toggle('inactive', !hasNode);
+    this.element.classList.toggle('inactive', !hasNode);
     if (hasNode) {
-      this._button.setVisible(true);
+      this.button.setVisible(true);
     }
   }
 
   item(): UI.Toolbar.ToolbarItem|null {
-    return this._button;
+    return this.button;
   }
 }
 
@@ -202,44 +205,44 @@ export class SourcesPanelIndicator {
 }
 
 export class BackendSettingsSync implements SDK.TargetManager.Observer {
-  _autoAttachSetting: Common.Settings.Setting<boolean>;
-  _adBlockEnabledSetting: Common.Settings.Setting<boolean>;
-  _emulatePageFocusSetting: Common.Settings.Setting<boolean>;
+  private readonly autoAttachSetting: Common.Settings.Setting<boolean>;
+  private readonly adBlockEnabledSetting: Common.Settings.Setting<boolean>;
+  private readonly emulatePageFocusSetting: Common.Settings.Setting<boolean>;
 
   constructor() {
-    this._autoAttachSetting = Common.Settings.Settings.instance().moduleSetting('autoAttachToCreatedPages');
-    this._autoAttachSetting.addChangeListener(this._updateAutoAttach, this);
-    this._updateAutoAttach();
+    this.autoAttachSetting = Common.Settings.Settings.instance().moduleSetting('autoAttachToCreatedPages');
+    this.autoAttachSetting.addChangeListener(this.updateAutoAttach, this);
+    this.updateAutoAttach();
 
-    this._adBlockEnabledSetting = Common.Settings.Settings.instance().moduleSetting('network.adBlockingEnabled');
-    this._adBlockEnabledSetting.addChangeListener(this._update, this);
+    this.adBlockEnabledSetting = Common.Settings.Settings.instance().moduleSetting('network.adBlockingEnabled');
+    this.adBlockEnabledSetting.addChangeListener(this.update, this);
 
-    this._emulatePageFocusSetting = Common.Settings.Settings.instance().moduleSetting('emulatePageFocus');
-    this._emulatePageFocusSetting.addChangeListener(this._update, this);
+    this.emulatePageFocusSetting = Common.Settings.Settings.instance().moduleSetting('emulatePageFocus');
+    this.emulatePageFocusSetting.addChangeListener(this.update, this);
 
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
   }
 
-  _updateTarget(target: SDK.Target.Target): void {
+  private updateTarget(target: SDK.Target.Target): void {
     if (target.type() !== SDK.Target.Type.Frame || target.parentTarget()) {
       return;
     }
-    target.pageAgent().invoke_setAdBlockingEnabled({enabled: this._adBlockEnabledSetting.get()});
-    target.emulationAgent().invoke_setFocusEmulationEnabled({enabled: this._emulatePageFocusSetting.get()});
+    target.pageAgent().invoke_setAdBlockingEnabled({enabled: this.adBlockEnabledSetting.get()});
+    target.emulationAgent().invoke_setFocusEmulationEnabled({enabled: this.emulatePageFocusSetting.get()});
   }
 
-  _updateAutoAttach(): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.setOpenNewWindowForPopups(this._autoAttachSetting.get());
+  private updateAutoAttach(): void {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.setOpenNewWindowForPopups(this.autoAttachSetting.get());
   }
 
-  _update(): void {
+  private update(): void {
     for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
-      this._updateTarget(target);
+      this.updateTarget(target);
     }
   }
 
   targetAdded(target: SDK.Target.Target): void {
-    this._updateTarget(target);
+    this.updateTarget(target);
   }
 
   targetRemoved(_target: SDK.Target.Target): void {

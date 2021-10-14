@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import * as Common from '../../core/common/common.js';
 
 import {EmulationModel} from './EmulationModel.js';
@@ -12,13 +10,13 @@ import {TargetManager} from './TargetManager.js';
 
 let throttlingManagerInstance: CPUThrottlingManager;
 
-export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper implements
+export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     SDKModelObserver<EmulationModel> {
-  _cpuThrottlingRate: number;
+  #cpuThrottlingRateInternal: number;
 
   private constructor() {
     super();
-    this._cpuThrottlingRate = CPUThrottlingRates.NoThrottling;
+    this.#cpuThrottlingRateInternal = CPUThrottlingRates.NoThrottling;
     TargetManager.instance().observeModels(EmulationModel, this);
   }
 
@@ -32,20 +30,20 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper imp
   }
 
   cpuThrottlingRate(): number {
-    return this._cpuThrottlingRate;
+    return this.#cpuThrottlingRateInternal;
   }
 
   setCPUThrottlingRate(rate: number): void {
-    this._cpuThrottlingRate = rate;
+    this.#cpuThrottlingRateInternal = rate;
     for (const emulationModel of TargetManager.instance().models(EmulationModel)) {
-      emulationModel.setCPUThrottlingRate(this._cpuThrottlingRate);
+      emulationModel.setCPUThrottlingRate(this.#cpuThrottlingRateInternal);
     }
-    this.dispatchEventToListeners(Events.RateChanged, this._cpuThrottlingRate);
+    this.dispatchEventToListeners(Events.RateChanged, this.#cpuThrottlingRateInternal);
   }
 
   modelAdded(emulationModel: EmulationModel): void {
-    if (this._cpuThrottlingRate !== CPUThrottlingRates.NoThrottling) {
-      emulationModel.setCPUThrottlingRate(this._cpuThrottlingRate);
+    if (this.#cpuThrottlingRateInternal !== CPUThrottlingRates.NoThrottling) {
+      emulationModel.setCPUThrottlingRate(this.#cpuThrottlingRateInternal);
     }
   }
 
@@ -60,10 +58,13 @@ export enum Events {
   RateChanged = 'RateChanged',
 }
 
+export type EventTypes = {
+  [Events.RateChanged]: number,
+};
+
 export function throttlingManager(): CPUThrottlingManager {
   return CPUThrottlingManager.instance();
 }
-
 
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum

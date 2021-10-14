@@ -30,7 +30,6 @@ async function clickAndDragResizeHandlerHorizontally(handler: ElementHandle<Elem
   await frontend.mouse.up();
 }
 
-
 async function getColumnPixelWidths(columns: ElementHandle<Element>[]) {
   return Promise.all(columns.map(col => {
     return col.evaluate(cell => cell.clientWidth);
@@ -38,9 +37,9 @@ async function getColumnPixelWidths(columns: ElementHandle<Element>[]) {
 }
 
 async function getColumnPercentageWidthsRounded(dataGrid: ElementHandle<Element>) {
-  const cols = await $$('col', dataGrid);
+  const cols = await $$<HTMLTableColElement>('col', dataGrid);
   return Promise.all(cols.map(col => {
-    return col.evaluate(cell => Math.round(window.parseFloat((cell as HTMLElement).style.width)));
+    return col.evaluate(cell => Math.round(window.parseFloat(cell.style.width)));
   }));
 }
 
@@ -75,13 +74,13 @@ describe('data grid', async () => {
     ];
 
     let columnWidths = await getColumnPixelWidths(columns);
-    assertNumberBetween(columnWidths[0], 485, 500);
-    assertNumberBetween(columnWidths[1], 485, 500);
+    assertNumberBetween(columnWidths[0], 500, 515);
+    assertNumberBetween(columnWidths[1], 500, 515);
 
     await clickAndDragResizeHandlerHorizontally(firstResizeHandler, -50);
     columnWidths = await getColumnPixelWidths(columns);
-    assertNumberBetween(columnWidths[0], 435, 450);
-    assertNumberBetween(columnWidths[1], 530, 550);
+    assertNumberBetween(columnWidths[0], 450, 465);
+    assertNumberBetween(columnWidths[1], 545, 565);
   });
 
   it('can resize empty columns', async () => {
@@ -152,65 +151,64 @@ describe('data grid', async () => {
     assertNumberBetween(columnWidths[2], 297, 304);  // 33% of 900 = 300
   });
 
-  it(
-      'lets the user resize columns when there is a middle hidden column inbetween', async () => {
-        /** Imagine we have a data grid with 3 columns:
+  it('lets the user resize columns when there is a middle hidden column inbetween', async () => {
+    /** Imagine we have a data grid with 3 columns:
      * A | B | C And then we hide B, so the user sees:
      * A | C
      * If the user clicks and drags between A and C,
      * it should resize them accordingly, and leave B alone, even though
      * there is technically the B column inbetween them, but it's hidden.
      */
-        await loadComponentDocExample('data_grid/hide-cols.html');
+    await loadComponentDocExample('data_grid/hide-cols.html');
 
-        /**
+    /**
      * The value column is visible by default, so clicking this will hide it.
      */
-        const toggleValueColumnButton = await $('.value-visibility-toggle');
-        if (!toggleValueColumnButton) {
-          assert.fail('Could not find value column toggle button.');
-        }
-        await click(toggleValueColumnButton);
+    const toggleValueColumnButton = await $('.value-visibility-toggle');
+    if (!toggleValueColumnButton) {
+      assert.fail('Could not find value column toggle button.');
+    }
+    await click(toggleValueColumnButton);
 
-        await waitForFunction(async () => {
-          const dataGrid = await getDataGrid();
-          const hiddenCells = await $$('tbody td.hidden', dataGrid);
-          const resizerHandlers = await $$('.cell-resize-handle', dataGrid);
-          // Now there are only 2 columns visible, there should be 1 resize handler.
-          return hiddenCells.length === 3 && resizerHandlers.length === 1;
-        });
+    await waitForFunction(async () => {
+      const dataGrid = await getDataGrid();
+      const hiddenCells = await $$('tbody td.hidden', dataGrid);
+      const resizerHandlers = await $$('.cell-resize-handle', dataGrid);
+      // Now there are only 2 columns visible, there should be 1 resize handler.
+      return hiddenCells.length === 3 && resizerHandlers.length === 1;
+    });
 
-        const dataGrid = await getDataGrid();
-        await getDataGridRows(3, dataGrid);
-        const renderedText = await getInnerTextOfDataGridCells(dataGrid, 3);
-        // Make sure that the middle column ("value") is hidden now.
-        assert.deepEqual(renderedText, [
-          ['Bravo', '1'],
-          ['Alpha', '2'],
-          ['Charlie', '3'],
-        ]);
+    const dataGrid = await getDataGrid();
+    await getDataGridRows(3, dataGrid);
+    const renderedText = await getInnerTextOfDataGridCells(dataGrid, 3);
+    // Make sure that the middle column ("value") is hidden now.
+    assert.deepEqual(renderedText, [
+      ['Bravo', '1'],
+      ['Alpha', '2'],
+      ['Charlie', '3'],
+    ]);
 
-        await waitFor('.cell-resize-handle', dataGrid);
-        const firstResizeHandler = await $('.cell-resize-handle', dataGrid);
-        if (!firstResizeHandler) {
-          assert.fail('Could not find resizeHandler');
-        }
+    await waitFor('.cell-resize-handle', dataGrid);
+    const firstResizeHandler = await $('.cell-resize-handle', dataGrid);
+    if (!firstResizeHandler) {
+      assert.fail('Could not find resizeHandler');
+    }
 
-        const columns = [
-          await getDataGridCellAtIndex(dataGrid, {row: 1, column: 0}),
-          await getDataGridCellAtIndex(dataGrid, {row: 1, column: 2}),
-        ];
+    const columns = [
+      await getDataGridCellAtIndex(dataGrid, {row: 1, column: 0}),
+      await getDataGridCellAtIndex(dataGrid, {row: 1, column: 2}),
+    ];
 
-        let columnWidths = await getColumnPixelWidths(columns);
+    let columnWidths = await getColumnPixelWidths(columns);
 
-        // The container is 900px wide and the first column has a weighting of 2 and
-        // the last column has a waiting of 1, so we expect one column to be ~600
-        // and the other ~300
-        assertNumberBetween(columnWidths[0], 602, 607);
-        assertNumberBetween(columnWidths[1], 294, 300);
+    // The container is 900px wide and the first column has a weighting of 2 and
+    // the last column has a waiting of 1, so we expect one column to be ~600
+    // and the other ~300
+    assertNumberBetween(columnWidths[0], 602, 607);
+    assertNumberBetween(columnWidths[1], 294, 300);
 
-        await clickAndDragResizeHandlerHorizontally(firstResizeHandler, -100);
-        /* The resize calculation is roughly as follows
+    await clickAndDragResizeHandlerHorizontally(firstResizeHandler, -100);
+    /* The resize calculation is roughly as follows
      * mouse delta = 100px (-100, but we Math.abs it)
      * delta as a % = (100 / (leftCellWidth + rightCellWidth)) * 100
      * % delta = (100 / 666 + 333) * 100
@@ -218,17 +216,17 @@ describe('data grid', async () => {
      * therefore left column % = -11.1%
      * and right column % = + 11.1%
      */
-        const newColumnPercentageWidths = await getColumnPercentageWidthsRounded(dataGrid);
-        assert.deepEqual(
-            newColumnPercentageWidths,
-            [
-              56,  // 66.66 - 11.1 rounded
-              44,  // 33.33 + 11.1 rounded
-            ]);
-        columnWidths = await getColumnPixelWidths(columns);
-        assertNumberBetween(columnWidths[0], 500, 504);  // 55.8% of 900 = 502
-        assertNumberBetween(columnWidths[1], 395, 400);  // 44.12% of 900 = 397
-      });
+    const newColumnPercentageWidths = await getColumnPercentageWidthsRounded(dataGrid);
+    assert.deepEqual(
+        newColumnPercentageWidths,
+        [
+          56,  // 66.66 - 11.1 rounded
+          44,  // 33.33 + 11.1 rounded
+        ]);
+    columnWidths = await getColumnPixelWidths(columns);
+    assertNumberBetween(columnWidths[0], 500, 504);  // 55.8% of 900 = 502
+    assertNumberBetween(columnWidths[1], 395, 400);  // 44.12% of 900 = 397
+  });
 
   it('persists the column resizes when new data is added', async () => {
     await loadComponentDocExample('data_grid/adding-data.html');
@@ -282,19 +280,18 @@ describe('data grid', async () => {
       await addButton.click();
     }
 
-
     beforeEach(async function() {
       await loadComponentDocExample('data_grid/adding-data.html');
       const dataGrid = await getDataGrid();
       await getDataGridRows(10, dataGrid);
     });
 
-    it('auto-scrolls by default if a new row is added', async () => {
+    it('.auto-scrolls by default if a new row is added', async () => {
       const dataGrid = await getDataGrid();
       await assertDataGridNotScrolled(dataGrid);
       await clickAddButton();
       await getDataGridRows(11, dataGrid);
-      await waitForScrollTopOfDataGrid(dataGrid, 85);
+      await waitForScrollTopOfDataGrid(dataGrid, 89);
     });
 
     it('does not auto-scroll if the user has clicked on a cell', async () => {
@@ -337,7 +334,7 @@ describe('data grid', async () => {
          await waitFor('tr.selected', dataGrid);
          await clickAddButton();
          await getDataGridRows(11, dataGrid);
-         await waitForScrollTopOfDataGrid(dataGrid, 85);
+         await waitForScrollTopOfDataGrid(dataGrid, 89);
        });
 
     it('will resume autoscroll if the user clicks a cell but then scrolls to the bottom', async () => {
@@ -357,12 +354,12 @@ describe('data grid', async () => {
       await waitForScrollTopOfDataGrid(dataGrid, 0);
 
       // Now scroll down to the very bottom of the grid
-      await scrollDataGridDown(dataGrid, 85);
+      await scrollDataGridDown(dataGrid, 89);
       await frontend.evaluate('window.addNewRow()');
       await getDataGridRows(12, dataGrid);
       // Ensure the scrollTop has changed: we are auto-scrolling again as the
       // user scrolled to the bottom
-      await waitForScrollTopOfDataGrid(dataGrid, 105);
+      await waitForScrollTopOfDataGrid(dataGrid, 109);
     });
   });
 });

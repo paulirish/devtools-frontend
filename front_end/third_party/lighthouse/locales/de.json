@@ -18,7 +18,7 @@
     "message": "`[aria-*]`-Attribute entsprechen ihren Rollen"
   },
   "lighthouse-core/audits/accessibility/aria-command-name.js | description": {
-    "message": "Wenn ein Element keinen zugänglichen Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
+    "message": "Wenn ein Element keinen barrierefreien Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
   },
   "lighthouse-core/audits/accessibility/aria-command-name.js | failureTitle": {
     "message": "`button`-, `link`- und `menuitem`-Elemente haben keine zugänglichen Namen."
@@ -54,7 +54,7 @@
     "message": "ARIA-Eingabefelder haben zugängliche Namen"
   },
   "lighthouse-core/audits/accessibility/aria-meter-name.js | description": {
-    "message": "Wenn ein Element keinen zugänglichen Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
+    "message": "Wenn ein Element keinen barrierefreien Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
   },
   "lighthouse-core/audits/accessibility/aria-meter-name.js | failureTitle": {
     "message": "ARIA `meter`-Elemente haben keine zugänglichen Namen."
@@ -117,7 +117,7 @@
     "message": "ARIA-Ein-/Aus-Schaltflächen haben zugängliche Namen"
   },
   "lighthouse-core/audits/accessibility/aria-tooltip-name.js | description": {
-    "message": "Wenn ein Element keinen zugänglichen Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
+    "message": "Wenn ein Element keinen barrierefreien Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
   },
   "lighthouse-core/audits/accessibility/aria-tooltip-name.js | failureTitle": {
     "message": "ARIA `tooltip`-Elemente haben keine zugänglichen Namen."
@@ -126,7 +126,7 @@
     "message": "ARIA `tooltip`-Elemente haben zugängliche Namen"
   },
   "lighthouse-core/audits/accessibility/aria-treeitem-name.js | description": {
-    "message": "Wenn ein Element keinen zugänglichen Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
+    "message": "Wenn ein Element keinen barrierefreien Namen hat, wird es von Screenreadern mit einer allgemeinen Bezeichnung angesagt. Dadurch ist es für Nutzer, die auf Screenreader angewiesen sind, unbrauchbar. [Weitere Informationen](https://web.dev/aria-name/)"
   },
   "lighthouse-core/audits/accessibility/aria-treeitem-name.js | failureTitle": {
     "message": "ARIA `treeitem`-Elemente haben keine zugänglichen Namen."
@@ -477,7 +477,7 @@
     "message": "Verhindern, dass in modernen Browsern veraltetes JavaScript bereitgestellt wird"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "Bildformate wie JPEG 2000, JPEG XR und WebP bieten oft eine bessere Komprimierung als PNG oder JPEG, was schnellere Downloads und einen geringeren Datenverbrauch ermöglicht. [Weitere Informationen.](https://web.dev/uses-webp-images/)"
+    "message": "Bildformate wie WebP und AVIF bieten oft eine bessere Komprimierung als PNG oder JPEG, wodurch sie schneller heruntergeladen werden und weniger Daten verbrauchen. [Weitere Informationen](https://web.dev/uses-webp-images/)"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "Bilder in modernen Formaten bereitstellen"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "Bilder effizient codieren"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "Tatsächliche Abmessungen"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "Angezeigte Abmessungen"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "Stellen Sie Bilder bereit, die eine angemessene Größe haben, um mobile Daten zu sparen und die Ladezeit zu verbessern. [Weitere Informationen.](https://web.dev/uses-responsive-images/)"
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "Zugelassen mit Warnung"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "Bibliothek"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "Große JavaScript-Bibliotheken können die Ursache für schlechte Leistung sein. Verwenden Sie kleinere, funktionell gleichwertige Bibliotheken, um die Bundle-Größe zu verringern. [Weitere Informationen.](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{1 große Bibliothek gefunden}other{# große Bibliotheken gefunden}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "Unnötig große JavaScript-Bibliotheken ersetzen"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "Verhindert große JavaScript-Bibliotheken durch kleinere Alternativen"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "Dies ist das größte Inhaltselement, das im Darstellungsbereich angezeigt wird. [Weitere Informationen](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "Verweist auf einen anderen `hreflang`-Speicherort ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "Relative URL ({url})"
+    "message": "Ist keine absolute URL ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "Verweist auf die Stamm-URL (die Startseite) der Domain statt auf eine identische Inhaltsseite"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "„{keyword}“ ist ein ungültiges Keyword."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "„unsafe-inline“ lässt die Ausführung unsicherer In-Page-Skripts und Event-Handler zu. Sie können CSP-Nonces oder -Hashes verwenden, um Skripts einzeln zuzulassen."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "Sie können „unsafe-inline“ hinzufügen (wird von Browsern ignoriert, die Nonces/Hashes unterstützen), um mit älteren Browsern kompatibel zu sein."

@@ -201,13 +201,15 @@ const UIStrings = {
   */
   nextCallFrame: 'Next call frame',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (increment CSS unit by 10 in Styles pane)
+  *@description Text in the Shortcuts page to explain a keyboard shortcut (increment CSS unit by the amount passed in the placeholder in Styles pane)
+  *@example {10} PH1
   */
-  incrementCssUnitByTen: 'Increment CSS unit by 10',
+  incrementCssUnitBy: 'Increment CSS unit by {PH1}',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (decrement CSS unit by 10 in Styles pane)
+  *@description Text in the Shortcuts page to explain a keyboard shortcut (decrement CSS unit by the amount passed in the placeholder in Styles pane)
+  *@example {10} PH1
   */
-  decrementCssUnitByTen: 'Decrement CSS unit by 10',
+  decrementCssUnitBy: 'Decrement CSS unit by {PH1}',
   /**
   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
   */
@@ -346,13 +348,25 @@ const UIStrings = {
   */
   disallowScrollingPastEndOfFile: 'Disallow scrolling past end of file',
   /**
-  *@description Title of the Filtered List WidgetProvider of Quick Open
+  *@description Text for command prefix of go to a given line or symbol
   */
-  goToSymbol: 'Go to symbol',
+  goTo: 'Go to',
   /**
-  *@description Text to open a file
+  *@description Text for command suggestion of go to a given line
   */
-  openFile: 'Open file',
+  line: 'Line',
+  /**
+  *@description Text for command suggestion of go to a given symbol
+  */
+  symbol: 'Symbol',
+  /**
+  *@description Text for command prefix of open a file
+  */
+  open: 'Open',
+  /**
+  *@description Text for command suggestion of open a file
+  */
+  file: 'File',
   /**
   * @description  Title of a setting under the Sources category in Settings. If this option is off,
   * the sources panel will not be automatically be focsed whenever the application hits a breakpoint
@@ -509,10 +523,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   contextTypes() {
     return maybeRetrieveContextTypes(
-        Sources =>
-            [Sources.SourcesView.SourcesView,
-             UI.ShortcutRegistry.ForwardedShortcut,
-    ]);
+        Sources => [Sources.SourcesView.SourcesView, UI.ShortcutRegistry.ForwardedShortcut]);
   },
   options: [
     {
@@ -1189,7 +1200,7 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'sources.increment-css',
   category: UI.ActionRegistration.ActionCategory.SOURCES,
-  title: i18nLazyString('Increment CSS unit by 1'),
+  title: i18nLazyString(UIStrings.incrementCssUnitBy, {PH1: 1}),
   bindings: [
     {
       shortcut: 'Alt+Up',
@@ -1199,7 +1210,7 @@ UI.ActionRegistration.registerActionExtension({
 
 UI.ActionRegistration.registerActionExtension({
   actionId: 'sources.increment-css-by-ten',
-  title: i18nLazyString(UIStrings.incrementCssUnitByTen),
+  title: i18nLazyString(UIStrings.incrementCssUnitBy, {PH1: 10}),
   category: UI.ActionRegistration.ActionCategory.SOURCES,
   bindings: [
     {
@@ -1211,7 +1222,7 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'sources.decrement-css',
   category: UI.ActionRegistration.ActionCategory.SOURCES,
-  title: i18nLazyString('Decrement CSS unit by 1'),
+  title: i18nLazyString(UIStrings.decrementCssUnitBy, {PH1: 1}),
   bindings: [
     {
       shortcut: 'Alt+Down',
@@ -1222,7 +1233,7 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'sources.decrement-css-by-ten',
   category: UI.ActionRegistration.ActionCategory.SOURCES,
-  title: i18nLazyString(UIStrings.decrementCssUnitByTen),
+  title: i18nLazyString(UIStrings.decrementCssUnitBy, {PH1: 10}),
   bindings: [
     {
       shortcut: 'Alt+PageDown',
@@ -1557,19 +1568,6 @@ UI.ContextMenu.registerProvider({
 });
 
 UI.ContextMenu.registerProvider({
-  contextTypes() {
-    return [
-      Workspace.UISourceCode.UISourceCode,
-    ];
-  },
-  async loadProvider() {
-    const Sources = await loadSourcesModule();
-    return Sources.GutterDiffPlugin.ContextMenuProvider.instance();
-  },
-  experiment: undefined,
-});
-
-UI.ContextMenu.registerProvider({
   async loadProvider() {
     const Sources = await loadSourcesModule();
     return Sources.ScopeChainSidebarPane.OpenLinearMemoryInspector.instance();
@@ -1698,27 +1696,33 @@ UI.ContextMenu.registerItem({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '@',
-  title: i18nLazyString(UIStrings.goToSymbol),
+  iconName: 'ic_command_go_to_symbol',
   async provider() {
     const Sources = await loadSourcesModule();
     return Sources.OutlineQuickOpen.OutlineQuickOpen.instance();
   },
+  titlePrefix: i18nLazyString(UIStrings.goTo),
+  titleSuggestion: i18nLazyString(UIStrings.symbol),
 });
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: ':',
-  title: i18nLazyString(UIStrings.goToLine),
+  iconName: 'ic_command_go_to_line',
   async provider() {
     const Sources = await loadSourcesModule();
     return Sources.GoToLineQuickOpen.GoToLineQuickOpen.instance();
   },
+  titlePrefix: i18nLazyString(UIStrings.goTo),
+  titleSuggestion: i18nLazyString(UIStrings.line),
 });
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '',
-  title: i18nLazyString(UIStrings.openFile),
+  iconName: 'ic_command_open_file',
   async provider() {
     const Sources = await loadSourcesModule();
     return Sources.OpenFileQuickOpen.OpenFileQuickOpen.instance();
   },
+  titlePrefix: i18nLazyString(UIStrings.open),
+  titleSuggestion: i18nLazyString(UIStrings.file),
 });

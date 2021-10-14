@@ -10,6 +10,7 @@ module.exports = {
   'rules': {
     // L10n rules are only relevant in 'front_end'.
     'rulesdir/l10n_filename_matches': 2,
+    'rulesdir/l10n_i18nString_call_only_with_uistrings': 2,
     'rulesdir/l10n_no_i18nString_calls_module_instantiation': 2,
     'rulesdir/l10n_no_locked_or_placeholder_only_phrase': 2,
     'rulesdir/l10n_no_uistrings_export': 2,
@@ -31,6 +32,8 @@ module.exports = {
         'rulesdir/ban_style_tags_in_lit_html': 2,
         'rulesdir/check_component_naming': 2,
         'rulesdir/check_was_shown_methods': 2,
+        'rulesdir/static_custom_event_names': 2,
+        'rulesdir/lit_html_host_this': 2,
         '@typescript-eslint/naming-convention': [
           'error', {
             'selector': ['property', 'parameterProperty'],

@@ -477,7 +477,7 @@
     "message": "Unngå å sende JavaScript i en eldre versjon til moderne nettlesere"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "Bildeformater som JPEG 2000, JPEG XR og WebP gir ofte bedre komprimering enn PNG eller JPEG, noe som betyr raskere nedlasting og mindre databruk. [Finn ut mer](https://web.dev/uses-webp-images/)."
+    "message": "Bildeformater som WebP og AVIF gir ofte bedre komprimering enn PNG og JPEG, noe som betyr raskere nedlastinger og lavere dataforbruk. [Finn ut mer](https://web.dev/uses-webp-images/)."
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "Bruk nyere bildeformater"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "Effektiviser omgjøring av bilder til kode"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "Faktiske dimensjoner"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "Viste dimensjoner"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "Vis bilder som har passende størrelse, for å spare mobildata og redusere innlastingstiden. [Finn ut mer](https://web.dev/uses-responsive-images/)."
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "Tillatt med advarsel"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "Bibliotek"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "Store JavaScript-bibliotek kan føre til lav ytelse. Du bør bruke mindre bibliotek med tilsvarende funksjonalitet for å redusere pakkestørrelsen. [Finn ut mer](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)."
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{1 stort bibliotek funnet}other{# store bibliotek funnet}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "Bytt ut unødvendig store JavaScript-bibliotek"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "Unngår store JavaScript-bibliotek der det finnes mindre alternativer"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "Dette er det største innholdsrike elementet som ble tegnet innenfor det synlige området. [Finn ut mer](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "Peker til en annen `hreflang`-plassering ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "Relativ nettadresse ({url})"
+    "message": "Er ikke en fullstendig nettadresse ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "Peker til domenets rotadresse (startsiden) i stedet for en tilsvarende side med innhold"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "{keyword} ser ut til å være et ugyldig nøkkelord."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "«unsafe-inline» muliggjør kjøring av utrygge skript og hendelsesbehandlere på siden. Vurder å bruke CSP-engangsverdier eller -hasher for å la skript kjøre individuelt."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "Vurder å legge til «unsafe-inline» (ignoreres av nettlesere som støtter engangsverdier eller hasher) for bakoverkompatibilitet med eldre nettlesere."

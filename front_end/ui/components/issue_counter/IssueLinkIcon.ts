@@ -24,7 +24,7 @@ const UIStrings = {
    * @description Title for a link to show an issue in the issues tab
    * @example {A title of an Issue} title
    */
-  clickToShowIssueWithTitle: 'Click to open the issue tab and show issue \'{title}\'',
+  clickToShowIssueWithTitle: 'Click to open the issue tab and show issue: {title}',
   /**
    *@description Title for an link to show an issue that is unavailable because the issue couldn't be resolved
    */
@@ -163,6 +163,7 @@ export class IssueLinkIcon extends HTMLElement {
     // clang-format off
     return LitHtml.html`
       <span class=${LitHtml.Directives.classMap({'link': Boolean(this.issue)})}
+            tabindex="0"
             @click=${this.handleClick}>
         <${IconButton.Icon.Icon.litTagName} .data=${this.iconData() as IconButton.Icon.IconData}
           title=${this.getTooltip()}></${IconButton.Icon.Icon.litTagName}>

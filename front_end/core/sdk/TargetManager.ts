@@ -2,38 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import type * as ProtocolClient from '../protocol_client/protocol_client.js';
 import type * as Protocol from '../../generated/protocol.js';
-import type {Type as TargetType} from './Target.js';
+import {Type as TargetType} from './Target.js';
 import {Target} from './Target.js';
 import type {SDKModel} from './SDKModel.js';
+import * as Root from '../root/root.js';
+import * as Host from '../host/host.js';
 
 let targetManagerInstance: TargetManager|undefined;
 
-export class TargetManager extends Common.ObjectWrapper.ObjectWrapper {
-  _targets: Set<Target>;
-  _observers: Set<Observer>;
-  _modelListeners: Platform.MapUtilities.Multimap<string|symbol, {
+export class TargetManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
+  #targetsInternal: Set<Target>;
+  readonly #observers: Set<Observer>;
+  #modelListeners: Platform.MapUtilities.Multimap<string|symbol|number, {
     modelClass: new(arg1: Target) => SDKModel,
     thisObject: (Object|undefined),
-    listener: (arg0: Common.EventTarget.EventTargetEvent) => void,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    listener: Common.EventTarget.EventListener<any, any>,
   }>;
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _modelObservers: Platform.MapUtilities.Multimap<new(arg1: Target) => SDKModel, SDKModelObserver<any>>;
-  _isSuspended: boolean;
+  readonly #modelObservers: Platform.MapUtilities.Multimap<new(arg1: Target) => SDKModel, SDKModelObserver<any>>;
+  #isSuspended: boolean;
+  #browserTargetInternal: Target|null;
 
   private constructor() {
     super();
-    this._targets = new Set();
-    this._observers = new Set();
-    this._modelListeners = new Platform.MapUtilities.Multimap();
-    this._modelObservers = new Platform.MapUtilities.Multimap();
-    this._isSuspended = false;
+    this.#targetsInternal = new Set();
+    this.#observers = new Set();
+    this.#modelListeners = new Platform.MapUtilities.Multimap();
+    this.#modelObservers = new Platform.MapUtilities.Multimap();
+    this.#isSuspended = false;
+    this.#browserTargetInternal = null;
   }
 
   static instance({forceNew}: {
@@ -59,32 +62,32 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   async suspendAllTargets(reason?: string): Promise<void> {
-    if (this._isSuspended) {
+    if (this.#isSuspended) {
       return;
     }
-    this._isSuspended = true;
+    this.#isSuspended = true;
     this.dispatchEventToListeners(Events.SuspendStateChanged);
-    const suspendPromises = Array.from(this._targets.values(), target => target.suspend(reason));
+    const suspendPromises = Array.from(this.#targetsInternal.values(), target => target.suspend(reason));
     await Promise.all(suspendPromises);
   }
 
   async resumeAllTargets(): Promise<void> {
-    if (!this._isSuspended) {
+    if (!this.#isSuspended) {
       return;
     }
-    this._isSuspended = false;
+    this.#isSuspended = false;
     this.dispatchEventToListeners(Events.SuspendStateChanged);
-    const resumePromises = Array.from(this._targets.values(), target => target.resume());
+    const resumePromises = Array.from(this.#targetsInternal.values(), target => target.resume());
     await Promise.all(resumePromises);
   }
 
   allTargetsSuspended(): boolean {
-    return this._isSuspended;
+    return this.#isSuspended;
   }
 
   models<T extends SDKModel>(modelClass: new(arg1: Target) => T): T[] {
     const result = [];
-    for (const target of this._targets) {
+    for (const target of this.#targetsInternal) {
       const model = target.model(modelClass);
       if (model) {
         result.push(model);
@@ -100,41 +103,41 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper {
 
   observeModels<T extends SDKModel>(modelClass: new(arg1: Target) => T, observer: SDKModelObserver<T>): void {
     const models = this.models(modelClass);
-    this._modelObservers.set(modelClass, observer);
+    this.#modelObservers.set(modelClass, observer);
     for (const model of models) {
       observer.modelAdded(model);
     }
   }
 
   unobserveModels<T extends SDKModel>(modelClass: new(arg1: Target) => SDKModel, observer: SDKModelObserver<T>): void {
-    this._modelObservers.delete(modelClass, observer);
+    this.#modelObservers.delete(modelClass, observer);
   }
 
   modelAdded(target: Target, modelClass: new(arg1: Target) => SDKModel, model: SDKModel): void {
-    for (const observer of this._modelObservers.get(modelClass).values()) {
+    for (const observer of this.#modelObservers.get(modelClass).values()) {
       observer.modelAdded(model);
     }
   }
 
-  _modelRemoved(target: Target, modelClass: new(arg1: Target) => SDKModel, model: SDKModel): void {
-    for (const observer of this._modelObservers.get(modelClass).values()) {
+  private modelRemoved(target: Target, modelClass: new(arg1: Target) => SDKModel, model: SDKModel): void {
+    for (const observer of this.#modelObservers.get(modelClass).values()) {
       observer.modelRemoved(model);
     }
   }
 
-  addModelListener(
-      modelClass: new(arg1: Target) => SDKModel, eventType: string|symbol,
-      listener: (arg0: Common.EventTarget.EventTargetEvent) => void, thisObject?: Object): void {
+  addModelListener<Events, T extends keyof Events>(
+      modelClass: new(arg1: Target) => SDKModel<Events>, eventType: T,
+      listener: Common.EventTarget.EventListener<Events, T>, thisObject?: Object): void {
     for (const model of this.models(modelClass)) {
       model.addEventListener(eventType, listener, thisObject);
     }
-    this._modelListeners.set(eventType, {modelClass: modelClass, thisObject: thisObject, listener: listener});
+    this.#modelListeners.set(eventType, {modelClass: modelClass, thisObject: thisObject, listener: listener});
   }
 
-  removeModelListener(
-      modelClass: new(arg1: Target) => SDKModel, eventType: string|symbol,
-      listener: (arg0: Common.EventTarget.EventTargetEvent) => void, thisObject?: Object): void {
-    if (!this._modelListeners.has(eventType)) {
+  removeModelListener<Events, T extends keyof Events>(
+      modelClass: new(arg1: Target) => SDKModel<Events>, eventType: T,
+      listener: Common.EventTarget.EventListener<Events, T>, thisObject?: Object): void {
+    if (!this.#modelListeners.has(eventType)) {
       return;
     }
 
@@ -142,52 +145,50 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper {
       model.removeEventListener(eventType, listener, thisObject);
     }
 
-    for (const info of this._modelListeners.get(eventType)) {
+    for (const info of this.#modelListeners.get(eventType)) {
       if (info.modelClass === modelClass && info.listener === listener && info.thisObject === thisObject) {
-        this._modelListeners.delete(eventType, info);
+        this.#modelListeners.delete(eventType, info);
       }
     }
   }
 
   observeTargets(targetObserver: Observer): void {
-    if (this._observers.has(targetObserver)) {
+    if (this.#observers.has(targetObserver)) {
       throw new Error('Observer can only be registered once');
     }
-    for (const target of this._targets) {
+    for (const target of this.#targetsInternal) {
       targetObserver.targetAdded(target);
     }
-    this._observers.add(targetObserver);
+    this.#observers.add(targetObserver);
   }
 
   unobserveTargets(targetObserver: Observer): void {
-    this._observers.delete(targetObserver);
+    this.#observers.delete(targetObserver);
   }
 
   createTarget(
-      id: string, name: string, type: TargetType, parentTarget: Target|null, sessionId?: string,
-      waitForDebuggerInPage?: boolean, connection?: ProtocolClient.InspectorBackend.Connection,
+      id: Protocol.Target.TargetID|'main', name: string, type: TargetType, parentTarget: Target|null,
+      sessionId?: string, waitForDebuggerInPage?: boolean, connection?: ProtocolClient.InspectorBackend.Connection,
       targetInfo?: Protocol.Target.TargetInfo): Target {
     const target = new Target(
-        this, id, name, type, parentTarget, sessionId || '', this._isSuspended, connection || null, targetInfo);
+        this, id, name, type, parentTarget, sessionId || '', this.#isSuspended, connection || null, targetInfo);
     if (waitForDebuggerInPage) {
-      // @ts-ignore TODO(1063322): Find out where pageAgent() is set on Target/TargetBase.
-      target.pageAgent().waitForDebugger();
+      target.pageAgent().invoke_waitForDebugger();
     }
-    target.createModels(new Set(this._modelObservers.keysArray()));
-    this._targets.add(target);
+    target.createModels(new Set(this.#modelObservers.keysArray()));
+    this.#targetsInternal.add(target);
 
-    // Iterate over a copy. _observers might be modified during iteration.
-    for (const observer of [...this._observers]) {
+    // Iterate over a copy. #observers might be modified during iteration.
+    for (const observer of [...this.#observers]) {
       observer.targetAdded(target);
     }
 
-    for (const modelClass of target.models().keys()) {
-      const model = (target.models().get(modelClass) as SDKModel);
+    for (const [modelClass, model] of target.models().entries()) {
       this.modelAdded(target, modelClass, model);
     }
 
-    for (const key of this._modelListeners.keysArray()) {
-      for (const info of this._modelListeners.get(key)) {
+    for (const key of this.#modelListeners.keysArray()) {
+      for (const info of this.#modelListeners.get(key)) {
         const model = target.model(info.modelClass);
         if (model) {
           model.addEventListener(key, info.listener, info.thisObject);
@@ -199,23 +200,23 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   removeTarget(target: Target): void {
-    if (!this._targets.has(target)) {
+    if (!this.#targetsInternal.has(target)) {
       return;
     }
 
-    this._targets.delete(target);
+    this.#targetsInternal.delete(target);
     for (const modelClass of target.models().keys()) {
       const model = (target.models().get(modelClass) as SDKModel);
-      this._modelRemoved(target, modelClass, model);
+      this.modelRemoved(target, modelClass, model);
     }
 
-    // Iterate over a copy. _observers might be modified during iteration.
-    for (const observer of [...this._observers]) {
+    // Iterate over a copy. #observers might be modified during iteration.
+    for (const observer of [...this.#observers]) {
       observer.targetRemoved(target);
     }
 
-    for (const key of this._modelListeners.keysArray()) {
-      for (const info of this._modelListeners.get(key)) {
+    for (const key of this.#modelListeners.keysArray()) {
+      for (const info of this.#modelListeners.get(key)) {
         const model = target.model(info.modelClass);
         if (model) {
           model.removeEventListener(key, info.listener, info.thisObject);
@@ -225,16 +226,46 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper {
   }
 
   targets(): Target[] {
-    return [...this._targets];
+    return [...this.#targetsInternal];
   }
 
   targetById(id: string): Target|null {
-    // TODO(dgozman): add a map id -> target.
+    // TODO(dgozman): add a map #id -> #target.
     return this.targets().find(target => target.id() === id) || null;
   }
 
   mainTarget(): Target|null {
-    return this._targets.size ? this._targets.values().next().value : null;
+    return this.#targetsInternal.size ? this.#targetsInternal.values().next().value : null;
+  }
+
+  browserTarget(): Target|null {
+    return this.#browserTargetInternal;
+  }
+
+  async maybeAttachInitialTarget(): Promise<boolean> {
+    if (!Boolean(Root.Runtime.Runtime.queryParam('browserConnection'))) {
+      return false;
+    }
+    if (!this.#browserTargetInternal) {
+      this.#browserTargetInternal = new Target(
+          this, /* #id*/ 'main', /* #name*/ 'browser', TargetType.Browser, /* #parentTarget*/ null,
+          /* #sessionId */ '', /* suspended*/ false, /* #connection*/ null, /* targetInfo*/ undefined);
+      this.#browserTargetInternal.createModels(new Set(this.#modelObservers.keysArray()));
+    }
+    const targetId =
+        await Host.InspectorFrontendHost.InspectorFrontendHostInstance.initialTargetId() as Protocol.Target.TargetID;
+    // Do not await for Target.autoAttachRelated to return, as it goes throguh the renderer and we don't want to block early
+    // at front-end initialization if a renderer is stuck. The rest of #target discovery and auto-attach process should happen
+    // asynchronously upon Target.attachedToTarget.
+    this.#browserTargetInternal.targetAgent().invoke_autoAttachRelated({
+      targetId,
+      waitForDebuggerOnStart: true,
+    });
+    return true;
+  }
+
+  clearAllTargetsForTest(): void {
+    this.#targetsInternal.clear();
   }
 }
 
@@ -246,6 +277,13 @@ export enum Events {
   NameChanged = 'NameChanged',
   SuspendStateChanged = 'SuspendStateChanged',
 }
+
+export type EventTypes = {
+  [Events.AvailableTargetsChanged]: Protocol.Target.TargetInfo[],
+  [Events.InspectedURLChanged]: Target,
+  [Events.NameChanged]: Target,
+  [Events.SuspendStateChanged]: void,
+};
 
 export class Observer {
   targetAdded(_target: Target): void {

@@ -6,6 +6,7 @@ const https = require('https');
 const path = require('path');
 const parseURL = require('url').parse;
 const promisify = require('util').promisify;
+const WebSocketServer = require('ws').Server;
 
 const remoteDebuggingPort = parseInt(process.env.REMOTE_DEBUGGING_PORT, 10) || 9222;
 const port = parseInt(process.env.PORT, 10);
@@ -57,6 +58,14 @@ server.once('listening', () => {
   console.log('https://bit.ly/devtools-contribution-guide');
   console.log('Tip: Look for the \'Development server options\' section\n');
 });
+const wss = new WebSocketServer({server});
+
+wss.on('connection', ws => {
+  ws.on('message', (message, binary) => {
+    ws.send(message, {binary});
+  });
+});
+
 server.listen(requestedPort);
 
 async function requestHandler(request, response) {
@@ -95,7 +104,8 @@ async function requestHandler(request, response) {
 
   let encoding = 'utf8';
   if (absoluteFilePath.endsWith('.wasm') || absoluteFilePath.endsWith('.png') || absoluteFilePath.endsWith('.jpg') ||
-      absoluteFilePath.endsWith('.avif') || absoluteFilePath.endsWith('.wbn')) {
+      absoluteFilePath.endsWith('.avif') || absoluteFilePath.endsWith('.wbn') || absoluteFilePath.endsWith('.dwp') ||
+      absoluteFilePath.endsWith('.dwo')) {
     encoding = 'binary';
   }
 

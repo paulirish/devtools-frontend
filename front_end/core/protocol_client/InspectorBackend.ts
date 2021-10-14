@@ -28,8 +28,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import {NodeURL} from './NodeURL.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
@@ -99,15 +97,15 @@ interface CallbackWithDebugInfo {
 }
 
 export class InspectorBackend {
-  _agentPrototypes: Map<ProtocolDomainName, _AgentPrototype> = new Map();
-  private initialized: boolean = false;
-  private eventParameterNamesForDomain = new Map<ProtocolDomainName, EventParameterNames>();
+  readonly agentPrototypes: Map<ProtocolDomainName, _AgentPrototype> = new Map();
+  #initialized: boolean = false;
+  #eventParameterNamesForDomain = new Map<ProtocolDomainName, EventParameterNames>();
 
   private getOrCreateEventParameterNamesForDomain(domain: ProtocolDomainName): EventParameterNames {
-    let map = this.eventParameterNamesForDomain.get(domain);
+    let map = this.#eventParameterNamesForDomain.get(domain);
     if (!map) {
       map = new Map();
-      this.eventParameterNamesForDomain.set(domain, map);
+      this.#eventParameterNamesForDomain.set(domain, map);
     }
     return map;
   }
@@ -117,7 +115,7 @@ export class InspectorBackend {
   }
 
   getEventParamterNames(): ReadonlyMap<ProtocolDomainName, ReadonlyEventParameterNames> {
-    return this.eventParameterNamesForDomain;
+    return this.#eventParameterNamesForDomain;
   }
 
   static reportProtocolError(error: string, messageObject: Object): void {
@@ -129,22 +127,22 @@ export class InspectorBackend {
   }
 
   isInitialized(): boolean {
-    return this.initialized;
+    return this.#initialized;
   }
 
-  _agentPrototype(domain: ProtocolDomainName): _AgentPrototype {
-    let prototype = this._agentPrototypes.get(domain);
+  private agentPrototype(domain: ProtocolDomainName): _AgentPrototype {
+    let prototype = this.agentPrototypes.get(domain);
     if (!prototype) {
       prototype = new _AgentPrototype(domain);
-      this._agentPrototypes.set(domain, prototype);
+      this.agentPrototypes.set(domain, prototype);
     }
     return prototype;
   }
 
   registerCommand(method: QualifiedName, parameters: CommandParameter[], replyArgs: string[]): void {
     const [domain, command] = splitQualifiedName(method);
-    this._agentPrototype(domain as ProtocolDomainName).registerCommand(command, parameters, replyArgs);
-    this.initialized = true;
+    this.agentPrototype(domain as ProtocolDomainName).registerCommand(command, parameters, replyArgs);
+    this.#initialized = true;
   }
 
   registerEnum(type: QualifiedName, values: Object): void {
@@ -157,21 +155,21 @@ export class InspectorBackend {
 
     // @ts-ignore Protocol global namespace pollution
     Protocol[domain][name] = values;
-    this.initialized = true;
+    this.#initialized = true;
   }
 
   registerEvent(eventName: QualifiedName, params: string[]): void {
     const domain = eventName.split('.')[0];
     const eventParameterNames = this.getOrCreateEventParameterNamesForDomain(domain as ProtocolDomainName);
     eventParameterNames.set(eventName, params);
-    this.initialized = true;
+    this.#initialized = true;
   }
 }
 
 let connectionFactory: () => Connection;
 
 export class Connection {
-  _onMessage!: ((arg0: Object) => void)|null;
+  onMessage!: ((arg0: Object) => void)|null;
   constructor() {
   }
 
@@ -197,7 +195,7 @@ export class Connection {
   }
 }
 
-type SendRawMessageCallback = (...args: unknown[]) => void;  // eslint-disable-line no-unused-vars
+type SendRawMessageCallback = (...args: unknown[]) => void;
 
 export const test = {
   /**
@@ -240,34 +238,34 @@ export const test = {
 const LongPollingMethods = new Set<string>(['CSS.takeComputedStyleUpdates']);
 
 export class SessionRouter {
-  _connection: Connection;
-  _lastMessageId: number;
-  _pendingResponsesCount: number;
-  _pendingLongPollingMessageIds: Set<number>;
-  _sessions: Map<string, {
+  readonly #connectionInternal: Connection;
+  #lastMessageId: number;
+  #pendingResponsesCount: number;
+  readonly #pendingLongPollingMessageIds: Set<number>;
+  readonly #sessions: Map<string, {
     target: TargetBase,
     callbacks: Map<number, CallbackWithDebugInfo>,
     proxyConnection: ((Connection | undefined)|null),
   }>;
-  _pendingScripts: (() => void)[];
+  #pendingScripts: (() => void)[];
 
   constructor(connection: Connection) {
-    this._connection = connection;
-    this._lastMessageId = 1;
-    this._pendingResponsesCount = 0;
-    this._pendingLongPollingMessageIds = new Set();
+    this.#connectionInternal = connection;
+    this.#lastMessageId = 1;
+    this.#pendingResponsesCount = 0;
+    this.#pendingLongPollingMessageIds = new Set();
 
-    this._sessions = new Map();
+    this.#sessions = new Map();
 
-    this._pendingScripts = [];
+    this.#pendingScripts = [];
 
-    test.deprecatedRunAfterPendingDispatches = this._deprecatedRunAfterPendingDispatches.bind(this);
-    test.sendRawMessage = this._sendRawMessageForTesting.bind(this);
+    test.deprecatedRunAfterPendingDispatches = this.deprecatedRunAfterPendingDispatches.bind(this);
+    test.sendRawMessage = this.sendRawMessageForTesting.bind(this);
 
-    this._connection.setOnMessage(this._onMessage.bind(this));
+    this.#connectionInternal.setOnMessage(this.onMessage.bind(this));
 
-    this._connection.setOnDisconnect(reason => {
-      const session = this._sessions.get('');
+    this.#connectionInternal.setOnDisconnect(reason => {
+      const session = this.#sessions.get('');
       if (session) {
         session.target.dispose(reason);
       }
@@ -278,7 +276,7 @@ export class SessionRouter {
     // Only the Audits panel uses proxy connections. If it is ever possible to have multiple active at the
     // same time, it should be tested thoroughly.
     if (proxyConnection) {
-      for (const session of this._sessions.values()) {
+      for (const session of this.#sessions.values()) {
         if (session.proxyConnection) {
           console.error('Multiple simultaneous proxy connections are currently unsupported');
           break;
@@ -286,38 +284,38 @@ export class SessionRouter {
       }
     }
 
-    this._sessions.set(sessionId, {target, callbacks: new Map(), proxyConnection});
+    this.#sessions.set(sessionId, {target, callbacks: new Map(), proxyConnection});
   }
 
   unregisterSession(sessionId: string): void {
-    const session = this._sessions.get(sessionId);
+    const session = this.#sessions.get(sessionId);
     if (!session) {
       return;
     }
     for (const callback of session.callbacks.values()) {
       SessionRouter.dispatchUnregisterSessionError(callback);
     }
-    this._sessions.delete(sessionId);
+    this.#sessions.delete(sessionId);
   }
 
-  _getTargetBySessionId(sessionId: string): TargetBase|null {
-    const session = this._sessions.get(sessionId ? sessionId : '');
+  private getTargetBySessionId(sessionId: string): TargetBase|null {
+    const session = this.#sessions.get(sessionId ? sessionId : '');
     if (!session) {
       return null;
     }
     return session.target;
   }
 
-  _nextMessageId(): number {
-    return this._lastMessageId++;
+  private nextMessageId(): number {
+    return this.#lastMessageId++;
   }
 
   connection(): Connection {
-    return this._connection;
+    return this.#connectionInternal;
   }
 
   sendMessage(sessionId: string, domain: string, method: QualifiedName, params: Object|null, callback: Callback): void {
-    const messageId = this._nextMessageId();
+    const messageId = this.nextMessageId();
     const messageObject: Message = {
       id: messageId,
       method: method,
@@ -338,58 +336,58 @@ export class SessionRouter {
       const paramsObject = JSON.parse(JSON.stringify(params || {}));
       test.onMessageSent(
           {domain, method, params: (paramsObject as Object), id: messageId, sessionId},
-          this._getTargetBySessionId(sessionId));
+          this.getTargetBySessionId(sessionId));
     }
 
-    ++this._pendingResponsesCount;
+    ++this.#pendingResponsesCount;
     if (LongPollingMethods.has(method)) {
-      this._pendingLongPollingMessageIds.add(messageId);
+      this.#pendingLongPollingMessageIds.add(messageId);
     }
 
-    const session = this._sessions.get(sessionId);
+    const session = this.#sessions.get(sessionId);
     if (!session) {
       return;
     }
     session.callbacks.set(messageId, {callback, method});
-    this._connection.sendRawMessage(JSON.stringify(messageObject));
+    this.#connectionInternal.sendRawMessage(JSON.stringify(messageObject));
   }
 
-  _sendRawMessageForTesting(method: QualifiedName, params: Object|null, callback: Callback|null): void {
+  private sendRawMessageForTesting(method: QualifiedName, params: Object|null, callback: Callback|null): void {
     const domain = method.split('.')[0];
     this.sendMessage('', domain, method, params, callback || ((): void => {}));
   }
 
-  _onMessage(message: string|Object): void {
+  private onMessage(message: string|Object): void {
     if (test.dumpProtocol) {
       test.dumpProtocol('backend: ' + ((typeof message === 'string') ? message : JSON.stringify(message)));
     }
 
     if (test.onMessageReceived) {
       const messageObjectCopy = JSON.parse((typeof message === 'string') ? message : JSON.stringify(message));
-      test.onMessageReceived(messageObjectCopy, this._getTargetBySessionId(messageObjectCopy.sessionId));
+      test.onMessageReceived(messageObjectCopy, this.getTargetBySessionId(messageObjectCopy.sessionId));
     }
 
     const messageObject = ((typeof message === 'string') ? JSON.parse(message) : message) as Message;
 
     // Send all messages to proxy connections.
     let suppressUnknownMessageErrors = false;
-    for (const session of this._sessions.values()) {
+    for (const session of this.#sessions.values()) {
       if (!session.proxyConnection) {
         continue;
       }
 
-      if (!session.proxyConnection._onMessage) {
+      if (!session.proxyConnection.onMessage) {
         InspectorBackend.reportProtocolError(
             'Protocol Error: the session has a proxyConnection with no _onMessage', messageObject);
         continue;
       }
 
-      session.proxyConnection._onMessage(messageObject);
+      session.proxyConnection.onMessage(messageObject);
       suppressUnknownMessageErrors = true;
     }
 
     const sessionId = messageObject.sessionId || '';
-    const session = this._sessions.get(sessionId);
+    const session = this.#sessions.get(sessionId);
     if (!session) {
       if (!suppressUnknownMessageErrors) {
         InspectorBackend.reportProtocolError('Protocol Error: the message with wrong session id', messageObject);
@@ -402,7 +400,7 @@ export class SessionRouter {
       return;
     }
 
-    if (session.target._needsNodeJSPatching) {
+    if (session.target.getNeedsNodeJSPatching()) {
       NodeURL.patch(messageObject);
     }
 
@@ -417,11 +415,11 @@ export class SessionRouter {
       }
 
       callback.callback(messageObject.error || null, messageObject.result || null);
-      --this._pendingResponsesCount;
-      this._pendingLongPollingMessageIds.delete(messageObject.id);
+      --this.#pendingResponsesCount;
+      this.#pendingLongPollingMessageIds.delete(messageObject.id);
 
-      if (this._pendingScripts.length && !this._hasOutstandingNonLongPollingRequests()) {
-        this._deprecatedRunAfterPendingDispatches();
+      if (this.#pendingScripts.length && !this.hasOutstandingNonLongPollingRequests()) {
+        this.deprecatedRunAfterPendingDispatches();
       }
     } else {
       if (messageObject.method === undefined) {
@@ -434,29 +432,29 @@ export class SessionRouter {
     }
   }
 
-  _hasOutstandingNonLongPollingRequests(): boolean {
-    return this._pendingResponsesCount - this._pendingLongPollingMessageIds.size > 0;
+  private hasOutstandingNonLongPollingRequests(): boolean {
+    return this.#pendingResponsesCount - this.#pendingLongPollingMessageIds.size > 0;
   }
 
-  _deprecatedRunAfterPendingDispatches(script?: (() => void)): void {
+  private deprecatedRunAfterPendingDispatches(script?: (() => void)): void {
     if (script) {
-      this._pendingScripts.push(script);
+      this.#pendingScripts.push(script);
     }
 
     // Execute all promises.
     setTimeout(() => {
-      if (!this._hasOutstandingNonLongPollingRequests()) {
-        this._executeAfterPendingDispatches();
+      if (!this.hasOutstandingNonLongPollingRequests()) {
+        this.executeAfterPendingDispatches();
       } else {
-        this._deprecatedRunAfterPendingDispatches();
+        this.deprecatedRunAfterPendingDispatches();
       }
     }, 0);
   }
 
-  _executeAfterPendingDispatches(): void {
-    if (!this._hasOutstandingNonLongPollingRequests()) {
-      const scripts = this._pendingScripts;
-      this._pendingScripts = [];
+  private executeAfterPendingDispatches(): void {
+    if (!this.hasOutstandingNonLongPollingRequests()) {
+      const scripts = this.#pendingScripts;
+      this.#pendingScripts = [];
       for (let id = 0; id < scripts.length; ++id) {
         scripts[id]();
       }
@@ -501,48 +499,48 @@ interface DispatcherMap extends Map<ProtocolDomainName, ProtocolProxyApi.Protoco
 }
 
 export class TargetBase {
-  _needsNodeJSPatching: boolean;
-  _sessionId: string;
-  _router: SessionRouter|null;
-  private agents: AgentsMap = new Map();
-  private dispatchers: DispatcherMap = new Map();
+  needsNodeJSPatching: boolean;
+  readonly sessionId: string;
+  routerInternal: SessionRouter|null;
+  #agents: AgentsMap = new Map();
+  #dispatchers: DispatcherMap = new Map();
 
   constructor(
       needsNodeJSPatching: boolean, parentTarget: TargetBase|null, sessionId: string, connection: Connection|null) {
-    this._needsNodeJSPatching = needsNodeJSPatching;
-    this._sessionId = sessionId;
+    this.needsNodeJSPatching = needsNodeJSPatching;
+    this.sessionId = sessionId;
 
     if ((!parentTarget && connection) || (!parentTarget && sessionId) || (connection && sessionId)) {
       throw new Error('Either connection or sessionId (but not both) must be supplied for a child target');
     }
 
     let router: SessionRouter;
-    if (sessionId && parentTarget && parentTarget._router) {
-      router = parentTarget._router;
+    if (sessionId && parentTarget && parentTarget.routerInternal) {
+      router = parentTarget.routerInternal;
     } else if (connection) {
       router = new SessionRouter(connection);
     } else {
       router = new SessionRouter(connectionFactory());
     }
 
-    this._router = router;
+    this.routerInternal = router;
 
-    router.registerSession(this, this._sessionId);
+    router.registerSession(this, this.sessionId);
 
-    for (const [domain, agentPrototype] of inspectorBackend._agentPrototypes) {
+    for (const [domain, agentPrototype] of inspectorBackend.agentPrototypes) {
       const agent = Object.create((agentPrototype as _AgentPrototype));
-      agent._target = this;
-      this.agents.set(domain, agent);
+      agent.target = this;
+      this.#agents.set(domain, agent);
     }
 
     for (const [domain, eventParameterNames] of inspectorBackend.getEventParamterNames().entries()) {
-      this.dispatchers.set(domain, new DispatcherManager(eventParameterNames));
+      this.#dispatchers.set(domain, new DispatcherManager(eventParameterNames));
     }
   }
 
   dispatch(eventMessage: EventMessage): void {
     const [domainName, method] = splitQualifiedName(eventMessage.method);
-    const dispatcher = this.dispatchers.get(domainName as ProtocolDomainName);
+    const dispatcher = this.#dispatchers.get(domainName as ProtocolDomainName);
     if (!dispatcher) {
       InspectorBackend.reportProtocolError(
           `Protocol Error: the message ${eventMessage.method} is for non-existing domain '${domainName}'`,
@@ -553,23 +551,23 @@ export class TargetBase {
   }
 
   dispose(_reason: string): void {
-    if (!this._router) {
+    if (!this.routerInternal) {
       return;
     }
-    this._router.unregisterSession(this._sessionId);
-    this._router = null;
+    this.routerInternal.unregisterSession(this.sessionId);
+    this.routerInternal = null;
   }
 
   isDisposed(): boolean {
-    return !this._router;
+    return !this.routerInternal;
   }
 
   markAsNodeJSForTest(): void {
-    this._needsNodeJSPatching = true;
+    this.needsNodeJSPatching = true;
   }
 
   router(): SessionRouter|null {
-    return this._router;
+    return this.routerInternal;
   }
 
   // Agent accessors, keep alphabetically sorted.
@@ -579,7 +577,7 @@ export class TargetBase {
    * name, because if `Domain` allows multiple domains, the type is unsound.
    */
   private getAgent<Domain extends ProtocolDomainName>(domain: Domain): ProtocolProxyApi.ProtocolApi[Domain] {
-    const agent = this.agents.get<Domain>(domain);
+    const agent = this.#agents.get<Domain>(domain);
     if (!agent) {
       throw new Error('Accessing undefined agent');
     }
@@ -746,7 +744,7 @@ export class TargetBase {
    */
   private registerDispatcher<Domain extends ProtocolDomainName>(
       domain: Domain, dispatcher: ProtocolProxyApi.ProtocolDispatchers[Domain]): void {
-    const manager = this.dispatchers.get(domain);
+    const manager = this.#dispatchers.get(domain);
     if (!manager) {
       return;
     }
@@ -759,7 +757,7 @@ export class TargetBase {
    */
   private unregisterDispatcher<Domain extends ProtocolDomainName>(
       domain: Domain, dispatcher: ProtocolProxyApi.ProtocolDispatchers[Domain]): void {
-    const manager = this.dispatchers.get(domain);
+    const manager = this.#dispatchers.get(domain);
     if (!manager) {
       return;
     }
@@ -869,12 +867,16 @@ export class TargetBase {
   registerWebAudioDispatcher(dispatcher: ProtocolProxyApi.WebAudioDispatcher): void {
     this.registerDispatcher('WebAudio', dispatcher);
   }
+
+  getNeedsNodeJSPatching(): boolean {
+    return this.needsNodeJSPatching;
+  }
 }
 
 /**
- * This is a class that serves as the prototype for a domains agents (every target
- * has it's own set of agents). The InspectorBackend keeps an instance of this class
- * per domain, and each TargetBase creates its agents (via Object.create) and installs
+ * This is a class that serves as the prototype for a domains #agents (every target
+ * has it's own set of #agents). The InspectorBackend keeps an instance of this class
+ * per domain, and each TargetBase creates its #agents (via Object.create) and installs
  * this instance as prototype.
  *
  * The reasons this is done is so that on the prototypes we can install the implementations
@@ -883,21 +885,21 @@ export class TargetBase {
 // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
 // eslint-disable-next-line @typescript-eslint/naming-convention
 class _AgentPrototype {
-  _replyArgs: {
+  replyArgs: {
     [x: string]: string[],
   };
-  _domain: string;
-  _target!: TargetBase;
+  readonly domain: string;
+  target!: TargetBase;
   constructor(domain: string) {
-    this._replyArgs = {};
-    this._domain = domain;
+    this.replyArgs = {};
+    this.domain = domain;
   }
 
   registerCommand(methodName: UnqualifiedName, parameters: CommandParameter[], replyArgs: string[]): void {
-    const domainAndMethod = qualifyName(this._domain, methodName);
+    const domainAndMethod = qualifyName(this.domain, methodName);
 
     function sendMessagePromise(this: _AgentPrototype, ...args: unknown[]): Promise<unknown> {
-      return _AgentPrototype.prototype._sendMessageToBackendPromise.call(this, domainAndMethod, parameters, args);
+      return _AgentPrototype.prototype.sendMessageToBackendPromise.call(this, domainAndMethod, parameters, args);
     }
 
     // @ts-ignore Method code generation
@@ -905,16 +907,16 @@ class _AgentPrototype {
 
     function invoke(
         this: _AgentPrototype, request: Object|undefined = {}): Promise<Protocol.ProtocolResponseWithError> {
-      return this._invoke(domainAndMethod, request);
+      return this.invoke(domainAndMethod, request);
     }
 
     // @ts-ignore Method code generation
     this['invoke_' + methodName] = invoke;
 
-    this._replyArgs[domainAndMethod] = replyArgs;
+    this.replyArgs[domainAndMethod] = replyArgs;
   }
 
-  _prepareParameters(
+  private prepareParameters(
       method: string, parameters: CommandParameter[], args: unknown[], errorCallback: (arg0: string) => void): Object
       |null {
     const params: {[x: string]: unknown} = {};
@@ -956,14 +958,14 @@ class _AgentPrototype {
     return hasParams ? params : null;
   }
 
-  _sendMessageToBackendPromise(method: QualifiedName, parameters: CommandParameter[], args: unknown[]):
+  private sendMessageToBackendPromise(method: QualifiedName, parameters: CommandParameter[], args: unknown[]):
       Promise<unknown> {
     let errorMessage;
     function onError(message: string): void {
       console.error(message);
       errorMessage = message;
     }
-    const params = this._prepareParameters(method, parameters, args, onError);
+    const params = this.prepareParameters(method, parameters, args, onError);
     if (errorMessage) {
       return Promise.resolve(null);
     }
@@ -982,19 +984,20 @@ class _AgentPrototype {
           return;
         }
 
-        const args = this._replyArgs[method];
+        const args = this.replyArgs[method];
         resolve(result && args.length ? result[args[0]] : undefined);
       };
 
-      if (!this._target._router) {
+      const router = this.target.router();
+      if (!router) {
         SessionRouter.dispatchConnectionError(callback, method);
       } else {
-        this._target._router.sendMessage(this._target._sessionId, this._domain, method, params, callback);
+        router.sendMessage(this.target.sessionId, this.domain, method, params, callback);
       }
     });
   }
 
-  _invoke(method: QualifiedName, request: Object|null): Promise<Protocol.ProtocolResponseWithError> {
+  private invoke(method: QualifiedName, request: Object|null): Promise<Protocol.ProtocolResponseWithError> {
     return new Promise(fulfill => {
       const callback: Callback = (error: MessageError|undefined|null, result: Object|null): void => {
         if (error && !test.suppressRequestErrors && error.code !== DevToolsStubErrorCode &&
@@ -1006,56 +1009,57 @@ class _AgentPrototype {
         fulfill({...result, getError: (): string | undefined => errorMessage});
       };
 
-      if (!this._target._router) {
+      const router = this.target.router();
+      if (!router) {
         SessionRouter.dispatchConnectionError(callback, method);
       } else {
-        this._target._router.sendMessage(this._target._sessionId, this._domain, method, request, callback);
+        router.sendMessage(this.target.sessionId, this.domain, method, request, callback);
       }
     });
   }
 }
 
 /**
- * A `DispatcherManager` has a collection of dispatchers that implement one of the
+ * A `DispatcherManager` has a collection of #dispatchers that implement one of the
  * `ProtocolProxyApi.{Foo}Dispatcher` interfaces. Each target uses one of these per
- * domain to manage the registered dispatchers. The class knows the parameter names
- * of the events via `eventArgs`, which is a map managed by the inspector back-end
+ * domain to manage the registered #dispatchers. The class knows the parameter names
+ * of the events via `#eventArgs`, which is a map managed by the inspector back-end
  * so that there is only one map per domain that is shared among all DispatcherManagers.
  */
 class DispatcherManager<Domain extends ProtocolDomainName> {
-  private eventArgs: ReadonlyEventParameterNames;
-  private dispatchers: ProtocolProxyApi.ProtocolDispatchers[Domain][] = [];
+  #eventArgs: ReadonlyEventParameterNames;
+  #dispatchers: ProtocolProxyApi.ProtocolDispatchers[Domain][] = [];
 
   constructor(eventArgs: ReadonlyEventParameterNames) {
-    this.eventArgs = eventArgs;
+    this.#eventArgs = eventArgs;
   }
 
   addDomainDispatcher(dispatcher: ProtocolProxyApi.ProtocolDispatchers[Domain]): void {
-    this.dispatchers.push(dispatcher);
+    this.#dispatchers.push(dispatcher);
   }
 
   removeDomainDispatcher(dispatcher: ProtocolProxyApi.ProtocolDispatchers[Domain]): void {
-    const index = this.dispatchers.indexOf(dispatcher);
+    const index = this.#dispatchers.indexOf(dispatcher);
     if (index === -1) {
       return;
     }
-    this.dispatchers.splice(index, 1);
+    this.#dispatchers.splice(index, 1);
   }
 
   dispatch(event: UnqualifiedName, messageObject: EventMessage): void {
-    if (!this.dispatchers.length) {
+    if (!this.#dispatchers.length) {
       return;
     }
 
-    if (!this.eventArgs.has(messageObject.method)) {
+    if (!this.#eventArgs.has(messageObject.method)) {
       InspectorBackend.reportProtocolWarning(
           `Protocol Warning: Attempted to dispatch an unspecified event '${messageObject.method}'`, messageObject);
       return;
     }
 
     const messageParams = {...messageObject.params};
-    for (let index = 0; index < this.dispatchers.length; ++index) {
-      const dispatcher = this.dispatchers[index];
+    for (let index = 0; index < this.#dispatchers.length; ++index) {
+      const dispatcher = this.#dispatchers[index];
 
       if (event in dispatcher) {
         const f = dispatcher[event as string as keyof ProtocolProxyApi.ProtocolDispatchers[Domain]];

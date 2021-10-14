@@ -6,7 +6,7 @@ import * as Protocol from '../../../../../../front_end/generated/protocol.js';
 import * as ApplicationComponents from '../../../../../../front_end/panels/application/components/components.js';
 import * as Coordinator from '../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import * as TreeOutline from '../../../../../../front_end/ui/components/tree_outline/tree_outline.js';
-import {assertShadowRoot, getElementWithinComponent, renderElementIntoDOM, stripLitHtmlCommentNodes} from '../../../helpers/DOMHelpers.js';
+import {assertElement, assertShadowRoot, getElementWithinComponent, renderElementIntoDOM, stripLitHtmlCommentNodes} from '../../../helpers/DOMHelpers.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -126,7 +126,6 @@ const trialWithUnparsableToken: Protocol.Page.OriginTrial = {
   ],
 };
 
-
 function extractBadgeTextFromTreeNode(node: HTMLLIElement): string[] {
   return [...node.querySelectorAll('devtools-resources-origin-trial-tree-view-badge')].map(badgeElement => {
     assertShadowRoot(badgeElement.shadowRoot);
@@ -145,7 +144,7 @@ function extractBadgeTextFromTreeNode(node: HTMLLIElement): string[] {
   });
 }
 
-function nodeKeyInnerHTML(node: HTMLLIElement) {
+function nodeKeyInnerHTML(node: HTMLLIElement|ShadowRoot) {
   const keyNode = node.querySelector('[data-node-key]');
   if (!keyNode) {
     throw new Error('Found tree node without a key within it.');
@@ -284,8 +283,10 @@ describe('OriginTrialTreeView', () => {
     }
     assert.lengthOf(tokenDetailNodes, 2);
     const tokenFieldsNode = tokenDetailNodes[0];
-
-    const innerHTML = nodeKeyInnerHTML(tokenFieldsNode.nodeElement);
+    const rowsComponent = tokenFieldsNode.nodeElement.querySelector('devtools-resources-origin-trial-token-rows');
+    assertElement(rowsComponent, ApplicationComponents.OriginTrialTreeView.OriginTrialTokenRows);
+    assertShadowRoot(rowsComponent.shadowRoot);
+    const innerHTML = rowsComponent.shadowRoot.innerHTML;
     const parsedToken = trialWithSingleToken.tokensWithStatus[0].parsedToken;
     assert.isDefined(parsedToken);
     if (parsedToken === undefined) {
@@ -401,5 +402,49 @@ describe('OriginTrialTreeView', () => {
       const badges = extractBadgeTextFromTreeNode(tokenWithStatusNode.nodeElement);
       assert.lengthOf(badges, 0);
     }
+  });
+
+  it('shows trial name for token with status UnknownTrial', async () => {
+    const unknownTrialName = 'UnkownTrialName';
+    const {component, shadowRoot} = await renderOriginTrialTreeViewTreeOutline({
+      trials: [
+        {
+          trialName: 'UNKNOWN',
+          status: Protocol.Page.OriginTrialStatus.ValidTokenNotProvided,
+          tokensWithStatus: [
+            {
+              status: Protocol.Page.OriginTrialTokenStatus.UnknownTrial,
+              parsedToken: {
+                trialName: unknownTrialName,
+                origin: 'https://foo.com',
+                expiryTime: 1000,
+                usageRestriction: Protocol.Page.OriginTrialUsageRestriction.None,
+                isThirdParty: false,
+                matchSubDomains: false,
+              },
+              rawTokenText: tokenPlaceHolder,
+            },
+          ],
+        },
+      ],
+    });  // Node counts by level: 1/2/1
+
+    await component.expandRecursively(/* maxDepth= */ 1);
+    await waitForRenderedTreeNodeCount(shadowRoot, 3);
+    const visibleTree = visibleNodesToTree(shadowRoot);
+
+    const tokenDetailNodes = visibleTree[0].children;
+    assert.isDefined(tokenDetailNodes);
+    if (tokenDetailNodes === undefined) {
+      return;
+    }
+    assert.lengthOf(tokenDetailNodes, 2);
+    const tokenFieldsNode = tokenDetailNodes[0];
+    const rowsComponent = tokenFieldsNode.nodeElement.querySelector('devtools-resources-origin-trial-token-rows');
+    assertElement(rowsComponent, ApplicationComponents.OriginTrialTreeView.OriginTrialTokenRows);
+    assertShadowRoot(rowsComponent.shadowRoot);
+    const innerHTML = rowsComponent.shadowRoot.innerHTML;
+
+    assert.include(innerHTML, unknownTrialName);
   });
 });

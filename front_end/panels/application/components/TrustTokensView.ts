@@ -118,7 +118,7 @@ export class TrustTokensView extends HTMLElement {
         </${IconButton.Icon.Icon.litTagName}>
         ${this.renderGridOrNoDataMessage()}
       </div>
-    `, this.shadow);
+    `, this.shadow, {host: this});
     // clang-format on
   }
 
@@ -196,11 +196,8 @@ function removeTrailingSlash(s: string): string {
   return s.replace(/\/$/, '');
 }
 
-// TODO(jacktfranklin): re-enable once https://crbug.com/1226741 is resolved.
-// eslint-disable-next-line rulesdir/check_component_naming
 ComponentHelpers.CustomElements.defineComponent('devtools-trust-tokens-delete-button', TrustTokensDeleteButton);
 ComponentHelpers.CustomElements.defineComponent('devtools-trust-tokens-storage-view', TrustTokensView);
-
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

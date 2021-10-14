@@ -31,8 +31,6 @@
 /**
  * @interface
  */
-/* eslint-disable rulesdir/no_underscored_properties */
-
 export interface HistoryEntry {
   valid(): boolean;
 
@@ -40,36 +38,36 @@ export interface HistoryEntry {
 }
 
 export class SimpleHistoryManager {
-  private entries: HistoryEntry[];
-  private activeEntryIndex: number;
-  private coalescingReadonly: number;
-  private readonly historyDepth: number;
+  #entries: HistoryEntry[];
+  #activeEntryIndex: number;
+  #coalescingReadonly: number;
+  readonly #historyDepth: number;
   constructor(historyDepth: number) {
-    this.entries = [];
-    this.activeEntryIndex = -1;
+    this.#entries = [];
+    this.#activeEntryIndex = -1;
 
     // Lock is used to make sure that reveal() does not
     // make any changes to the history while we are
     // rolling back or rolling over.
-    this.coalescingReadonly = 0;
-    this.historyDepth = historyDepth;
+    this.#coalescingReadonly = 0;
+    this.#historyDepth = historyDepth;
   }
 
-  _readOnlyLock(): void {
-    ++this.coalescingReadonly;
+  private readOnlyLock(): void {
+    ++this.#coalescingReadonly;
   }
 
-  _releaseReadOnlyLock(): void {
-    --this.coalescingReadonly;
+  private releaseReadOnlyLock(): void {
+    --this.#coalescingReadonly;
   }
 
-  _getPreviousValidIndex(): number {
+  private getPreviousValidIndex(): number {
     if (this.empty()) {
       return -1;
     }
 
-    let revealIndex = this.activeEntryIndex - 1;
-    while (revealIndex >= 0 && !this.entries[revealIndex].valid()) {
+    let revealIndex = this.#activeEntryIndex - 1;
+    while (revealIndex >= 0 && !this.#entries[revealIndex].valid()) {
       --revealIndex;
     }
     if (revealIndex < 0) {
@@ -79,93 +77,93 @@ export class SimpleHistoryManager {
     return revealIndex;
   }
 
-  _getNextValidIndex(): number {
-    let revealIndex = this.activeEntryIndex + 1;
+  private getNextValidIndex(): number {
+    let revealIndex = this.#activeEntryIndex + 1;
 
-    while (revealIndex < this.entries.length && !this.entries[revealIndex].valid()) {
+    while (revealIndex < this.#entries.length && !this.#entries[revealIndex].valid()) {
       ++revealIndex;
     }
-    if (revealIndex >= this.entries.length) {
+    if (revealIndex >= this.#entries.length) {
       return -1;
     }
 
     return revealIndex;
   }
 
-  _readOnly(): boolean {
-    return Boolean(this.coalescingReadonly);
+  private readOnly(): boolean {
+    return Boolean(this.#coalescingReadonly);
   }
 
   filterOut(filterOutCallback: (arg0: HistoryEntry) => boolean): void {
-    if (this._readOnly()) {
+    if (this.readOnly()) {
       return;
     }
     const filteredEntries = [];
     let removedBeforeActiveEntry = 0;
-    for (let i = 0; i < this.entries.length; ++i) {
-      if (!filterOutCallback(this.entries[i])) {
-        filteredEntries.push(this.entries[i]);
-      } else if (i <= this.activeEntryIndex) {
+    for (let i = 0; i < this.#entries.length; ++i) {
+      if (!filterOutCallback(this.#entries[i])) {
+        filteredEntries.push(this.#entries[i]);
+      } else if (i <= this.#activeEntryIndex) {
         ++removedBeforeActiveEntry;
       }
     }
-    this.entries = filteredEntries;
-    this.activeEntryIndex = Math.max(0, this.activeEntryIndex - removedBeforeActiveEntry);
+    this.#entries = filteredEntries;
+    this.#activeEntryIndex = Math.max(0, this.#activeEntryIndex - removedBeforeActiveEntry);
   }
 
   empty(): boolean {
-    return !this.entries.length;
+    return !this.#entries.length;
   }
 
   active(): HistoryEntry|null {
-    return this.empty() ? null : this.entries[this.activeEntryIndex];
+    return this.empty() ? null : this.#entries[this.#activeEntryIndex];
   }
 
   push(entry: HistoryEntry): void {
-    if (this._readOnly()) {
+    if (this.readOnly()) {
       return;
     }
     if (!this.empty()) {
-      this.entries.splice(this.activeEntryIndex + 1);
+      this.#entries.splice(this.#activeEntryIndex + 1);
     }
-    this.entries.push(entry);
-    if (this.entries.length > this.historyDepth) {
-      this.entries.shift();
+    this.#entries.push(entry);
+    if (this.#entries.length > this.#historyDepth) {
+      this.#entries.shift();
     }
-    this.activeEntryIndex = this.entries.length - 1;
+    this.#activeEntryIndex = this.#entries.length - 1;
   }
 
   canRollback(): boolean {
-    return this._getPreviousValidIndex() >= 0;
+    return this.getPreviousValidIndex() >= 0;
   }
 
   canRollover(): boolean {
-    return this._getNextValidIndex() >= 0;
+    return this.getNextValidIndex() >= 0;
   }
 
   rollback(): boolean {
-    const revealIndex = this._getPreviousValidIndex();
+    const revealIndex = this.getPreviousValidIndex();
     if (revealIndex === -1) {
       return false;
     }
-    this._readOnlyLock();
-    this.activeEntryIndex = revealIndex;
-    this.entries[revealIndex].reveal();
-    this._releaseReadOnlyLock();
+    this.readOnlyLock();
+    this.#activeEntryIndex = revealIndex;
+    this.#entries[revealIndex].reveal();
+    this.releaseReadOnlyLock();
 
     return true;
   }
 
   rollover(): boolean {
-    const revealIndex = this._getNextValidIndex();
+    const revealIndex = this.getNextValidIndex();
     if (revealIndex === -1) {
       return false;
     }
 
-    this._readOnlyLock();
-    this.activeEntryIndex = revealIndex;
-    this.entries[revealIndex].reveal();
-    this._releaseReadOnlyLock();
+    this.readOnlyLock();
+    this.#activeEntryIndex = revealIndex;
+    this.#entries[revealIndex].reveal();
+    this.releaseReadOnlyLock();
 
     return true;
   }

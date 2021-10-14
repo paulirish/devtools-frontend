@@ -4,7 +4,7 @@
 
 import {assert} from 'chai';
 import type {puppeteer} from '../../shared/helper.js';
-import {$$, assertNotNull, click, getBrowserAndPages, goToResource, step, waitFor, waitForElementsWithTextContent, waitForElementWithTextContent, waitForFunction, waitForNoElementsWithTextContent} from '../../shared/helper.js';
+import {$$, assertNotNullOrUndefined, click, getBrowserAndPages, goToResource, step, waitFor, waitForElementsWithTextContent, waitForElementWithTextContent, waitForFunction, waitForNoElementsWithTextContent} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {changeAllocationSampleViewViaDropdown, changeViewViaDropdown, findSearchResult, getDataGridRows, navigateToMemoryTab, setSearchFilter, takeAllocationProfile, takeAllocationTimelineProfile, takeHeapSnapshot, waitForNonEmptyHeapSnapshotData, waitForRetainerChain, waitForSearchResultNumber, waitUntilRetainerChainSatisfies} from '../helpers/memory-helpers.js';
 
@@ -161,7 +161,8 @@ describe('The Memory Panel', async function() {
             ({propertyName, retainerClassName}) => propertyName === 'aUniqueName' && retainerClassName === 'Window'));
   });
 
-  it('Correctly shows multiple retainer paths for an object', async () => {
+  // Fails on mac after Chromium roll
+  it.skipOnPlatforms(['mac'], '[crbug.com/1256710] Correctly shows multiple retainer paths for an object', async () => {
     await goToResource('memory/multiple-retainers.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -226,7 +227,8 @@ describe('The Memory Panel', async function() {
     assert.isTrue(childText[1].includes('inEventListener'));
   });
 
-  it('Shows the correct output for a detached iframe', async () => {
+  // Flaky test causing build failures
+  it.skip('[crbug.com/1239550] Shows the correct output for a detached iframe', async () => {
     await goToResource('memory/detached-iframe.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -249,7 +251,7 @@ describe('The Memory Panel', async function() {
     });
     const rows = await getDataGridRows('.retaining-paths-view table.data');
     const propertyNameElement = await rows[0].$('span.property-name');
-    assertNotNull(propertyNameElement);
+    assertNotNullOrUndefined(propertyNameElement);
     propertyNameElement.hover();
     const el = await waitFor('div.vbox.flex-auto.no-pointer-events');
     await waitFor('.source-code', el);

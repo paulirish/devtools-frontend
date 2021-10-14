@@ -16,6 +16,9 @@ declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     __pendingEvents: Map<string, Event[]>;
+
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    __getRenderCoordinatorPendingFrames(): number;
   }
 }
 
@@ -128,7 +131,8 @@ export const typeText = async (text: string) => {
   await frontend.keyboard.type(text);
 };
 
-export const pressKey = async (key: string, modifiers?: {control?: boolean, alt?: boolean, shift?: boolean}) => {
+export const pressKey =
+    async (key: puppeteer.KeyInput, modifiers?: {control?: boolean, alt?: boolean, shift?: boolean}) => {
   const {frontend} = getBrowserAndPages();
   if (modifiers) {
     if (modifiers.control) {
@@ -146,7 +150,7 @@ export const pressKey = async (key: string, modifiers?: {control?: boolean, alt?
       await frontend.keyboard.down('Shift');
     }
   }
-  await frontend.keyboard.press(key as puppeteer.KeyInput);
+  await frontend.keyboard.press(key);
   if (modifiers) {
     if (modifiers.shift) {
       await frontend.keyboard.up('Shift');
@@ -171,18 +175,20 @@ export const pasteText = async (text: string) => {
 };
 
 // Get a single element handle. Uses `pierce` handler per default for piercing Shadow DOM.
-export const $ = async (selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
+export const $ =
+    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
   const {frontend} = getBrowserAndPages();
   const rootElement = root ? root as puppeteer.ElementHandle : frontend;
-  const element = await rootElement.$(`${handler}/${selector}`);
+  const element = await rootElement.$<ElementType>(`${handler}/${selector}`);
   return element;
 };
 
 // Get multiple element handles. Uses `pierce` handler per default for piercing Shadow DOM.
-export const $$ = async (selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
+export const $$ =
+    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
   const {frontend} = getBrowserAndPages();
   const rootElement = root ? root.asElement() || frontend : frontend;
-  const elements = await rootElement.$$(`${handler}/${selector}`);
+  const elements = await rootElement.$$<ElementType>(`${handler}/${selector}`);
   return elements;
 };
 
@@ -208,10 +214,10 @@ export const $$textContent = async (textContent: string, root?: puppeteer.JSHand
 
 export const timeout = (duration: number) => new Promise(resolve => setTimeout(resolve, duration));
 
-export const waitFor =
-    async (selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
+export const waitFor = async<ElementType extends Element = Element>(
+    selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
   return await asyncScope.exec(() => waitForFunction(async () => {
-                                 const element = await $(selector, root, handler);
+                                 const element = await $<ElementType>(selector, root, handler);
                                  return (element || undefined);
                                }, asyncScope));
 };
@@ -237,6 +243,10 @@ export const waitForNone =
 
 export const waitForAria = (selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
   return waitFor(selector, root, asyncScope, 'aria');
+};
+
+export const waitForAriaNone = (selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
+  return waitForNone(selector, root, asyncScope, 'aria');
 };
 
 export const waitForElementWithTextContent =
@@ -581,8 +591,15 @@ export const waitForClass = async(element: puppeteer.ElementHandle<Element>, cla
   });
 };
 
-export function assertNotNull<T>(val: T): asserts val is NonNullable<T> {
-  assert.isNotNull(val);
+/**
+ * This is useful to keep TypeScript happy in a test - if you have a value
+ * that's potentially `null` you can use this function to assert that it isn't,
+ * and satisfy TypeScript that the value is present.
+ */
+export function assertNotNullOrUndefined<T>(val: T): asserts val is NonNullable<T> {
+  if (val === null || val === undefined) {
+    throw new Error(`Expected given value to not be null/undefined but it was: ${val}`);
+  }
 }
 
 // We export Puppeteer so other test utils can import it from here and not rely
@@ -638,10 +655,24 @@ export const matchStringTable = (actual: string[][], expected: (string|RegExp)[]
     matchTable(actual, expected, matchString);
 
 export async function renderCoordinatorQueueEmpty(): Promise<void> {
-  const {frontend} = await getBrowserAndPages();
+  const {frontend} = getBrowserAndPages();
   await frontend.evaluate(() => {
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
+      const pendingFrames = globalThis.__getRenderCoordinatorPendingFrames();
+      if (pendingFrames < 1) {
+        resolve();
+        return;
+      }
       globalThis.addEventListener('renderqueueempty', resolve, {once: true});
     });
   });
+}
+
+export async function setCheckBox(selector: string, wantChecked: boolean): Promise<void> {
+  const checkbox = await waitFor(selector);
+  const checked = await checkbox.evaluate(box => (box as HTMLInputElement).checked);
+  if (checked !== wantChecked) {
+    await click(`${selector} + label`);
+  }
+  assert.strictEqual(await checkbox.evaluate(box => (box as HTMLInputElement).checked), wantChecked);
 }

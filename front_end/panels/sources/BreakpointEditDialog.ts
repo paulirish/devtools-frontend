@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
 import * as i18n from '../../core/i18n/i18n.js';
-import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
-import * as TextEditor from '../../ui/legacy/components/text_editor/text_editor.js';
+import type * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as UI from '../../ui/legacy/legacy.js';
+
+import breakpointEditDialogStyles from './breakpointEditDialog.css.js';
 
 const UIStrings = {
   /**
@@ -35,7 +35,8 @@ const UIStrings = {
   */
   pauseOnlyWhenTheConditionIsTrue: 'Pause only when the condition is true',
   /**
-  *@description Text in Breakpoint Edit Dialog of the Sources panel. Provides the user with
+  *@description Text in Breakpoint Edit Dialog of the Sources panel. It is used as
+  *the placeholder for a text input field before the user enters text. Provides the user with
   *an example on how to use Logpoints. 'Log' is a verb and 'message' is a noun.
   *See: https://developer.chrome.com/blog/new-in-devtools-73/#logpoints
   */
@@ -47,154 +48,175 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/BreakpointEditDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
 export class BreakpointEditDialog extends UI.Widget.Widget {
-  _onFinish: (arg0: {
+  private readonly onFinish: (arg0: {
     committed: boolean,
     condition: string,
   }) => Promise<void>;
-  _finished: boolean;
-  _editor: TextEditor.CodeMirrorTextEditor.CodeMirrorTextEditor|null;
-  _isLogpoint: boolean;
-  _typeSelector: UI.Toolbar.ToolbarComboBox;
+  private finished: boolean;
+  private editor: TextEditor.TextEditor.TextEditor;
+  private isLogpoint: boolean;
+  private readonly typeSelector: UI.Toolbar.ToolbarComboBox;
+  private placeholderCompartment: CodeMirror.Compartment;
 
-  constructor(editorLineNumber: number, oldCondition: string, preferLogpoint: boolean, onFinish: (arg0: {
-                                                                                         committed: boolean,
-                                                                                         condition: string,
-                                                                                       }) => Promise<void>) {
+  static async create(
+      editorLineNumber: number,
+      oldCondition: string,
+      preferLogpoint: boolean,
+      onFinish: (arg0: {committed: boolean, condition: string}) => Promise<void>,
+      ): Promise<BreakpointEditDialog> {
+    const TextEditor = await import('../../ui/components/text_editor/text_editor.js');
+    const CodeMirror = await import('../../third_party/codemirror.next/codemirror.next.js');
+    const editorConfig = [
+      (await CodeMirror.javascript()).javascriptLanguage,
+      TextEditor.Config.baseConfiguration(oldCondition || ''),
+      CodeMirror.EditorView.lineWrapping,
+      TextEditor.Config.showCompletionHint,
+      await TextEditor.JavaScript.completion(),
+      TextEditor.JavaScript.argumentHints(),
+    ];
+    return new BreakpointEditDialog(
+        editorLineNumber, oldCondition, preferLogpoint, onFinish, TextEditor, CodeMirror, editorConfig);
+  }
+
+  constructor(
+      editorLineNumber: number,
+      oldCondition: string,
+      preferLogpoint: boolean,
+      onFinish: (arg0: {committed: boolean, condition: string}) => Promise<void>,
+      modTextEditor: typeof TextEditor,
+      readonly modCodeMirror: typeof CodeMirror,
+      editorConfig: CodeMirror.Extension,
+  ) {
     super(true);
-    this.registerRequiredCSS('panels/sources/breakpointEditDialog.css');
-    this._onFinish = onFinish;
-    this._finished = false;
-    this._editor = null;
+
+    this.onFinish = onFinish;
+    this.finished = false;
     this.element.tabIndex = -1;
 
     const logpointPrefix = LogpointPrefix;
     const logpointSuffix = LogpointSuffix;
-    this._isLogpoint = oldCondition.startsWith(logpointPrefix) && oldCondition.endsWith(logpointSuffix);
-    if (this._isLogpoint) {
+    this.isLogpoint = oldCondition.startsWith(logpointPrefix) && oldCondition.endsWith(logpointSuffix);
+    if (this.isLogpoint) {
       oldCondition = oldCondition.substring(logpointPrefix.length, oldCondition.length - logpointSuffix.length);
     }
-    this._isLogpoint = this._isLogpoint || preferLogpoint;
+    this.isLogpoint = this.isLogpoint || preferLogpoint;
 
     this.element.classList.add('sources-edit-breakpoint-dialog');
     const toolbar = new UI.Toolbar.Toolbar('source-frame-breakpoint-toolbar', this.contentElement);
     toolbar.appendText(`Line ${editorLineNumber + 1}:`);
 
-    this._typeSelector =
-        new UI.Toolbar.ToolbarComboBox(this._onTypeChanged.bind(this), i18nString(UIStrings.breakpointType));
-    this._typeSelector.createOption(i18nString(UIStrings.breakpoint), BreakpointType.Breakpoint);
+    this.typeSelector =
+        new UI.Toolbar.ToolbarComboBox(this.onTypeChanged.bind(this), i18nString(UIStrings.breakpointType));
+    this.typeSelector.createOption(i18nString(UIStrings.breakpoint), BreakpointType.Breakpoint);
     const conditionalOption =
-        this._typeSelector.createOption(i18nString(UIStrings.conditionalBreakpoint), BreakpointType.Conditional);
-    const logpointOption = this._typeSelector.createOption(i18nString(UIStrings.logpoint), BreakpointType.Logpoint);
-    this._typeSelector.select(this._isLogpoint ? logpointOption : conditionalOption);
-    toolbar.appendToolbarItem(this._typeSelector);
+        this.typeSelector.createOption(i18nString(UIStrings.conditionalBreakpoint), BreakpointType.Conditional);
+    const logpointOption = this.typeSelector.createOption(i18nString(UIStrings.logpoint), BreakpointType.Logpoint);
+    this.typeSelector.select(this.isLogpoint ? logpointOption : conditionalOption);
+    toolbar.appendToolbarItem(this.typeSelector);
 
-    const factory = TextEditor.CodeMirrorTextEditor.CodeMirrorTextEditorFactory.instance();
-    const editorOptions = {
-      lineNumbers: false,
-      lineWrapping: true,
-      mimeType: 'javascript',
-      autoHeight: true,
-      bracketMatchingSetting: undefined,
-      devtoolsAccessibleName: undefined,
-      padBottom: undefined,
-      maxHighlightLength: undefined,
-      placeholder: undefined,
-      lineWiseCopyCut: undefined,
-      inputStyle: undefined,
-    };
-    this._editor = factory.createEditor(editorOptions);
-    this._updatePlaceholder();
-    this._editor.widget().element.classList.add('condition-editor');
-    this._editor.configureAutocomplete(
-        ObjectUI.JavaScriptAutocomplete.JavaScriptAutocompleteConfig.createConfigForEditor(this._editor));
-    if (oldCondition) {
-      this._editor.setText(oldCondition);
-    }
-    this._editor.widget().markAsExternallyManaged();
-    this._editor.widget().show(this.contentElement);
-    this._editor.setSelection(this._editor.fullRange());
-    this._editor.widget().element.addEventListener('keydown', this._onKeyDown.bind(this), true);
+    const content = oldCondition || '';
+    const keymap = [
+      {
+        key: 'Mod-Enter',
+        run: (view: CodeMirror.EditorView): boolean => {
+          if (modTextEditor.JavaScript.isExpressionComplete(view.state)) {
+            this.finishEditing(true, this.editor.state.doc.toString());
+            return true;
+          }
+          return false;
+        },
+      },
+      {
+        key: 'Escape',
+        run: (): boolean => {
+          this.finishEditing(false, '');
+          return true;
+        },
+      },
+    ];
+
+    this.placeholderCompartment = new modCodeMirror.Compartment();
+
+    this.editor = new modTextEditor.TextEditor.TextEditor(modCodeMirror.EditorState.create({
+      doc: content,
+      selection: {anchor: 0, head: content.length},
+      extensions: [
+        this.placeholderCompartment.of(this.getPlaceholder()),
+        modCodeMirror.keymap.of(keymap),
+        editorConfig,
+      ],
+    }));
+    this.editor.classList.add('condition-editor');
+
+    this.updateTooltip();
+    this.contentElement.appendChild(this.editor);
     this.element.addEventListener('blur', event => {
       if (!event.relatedTarget ||
           (event.relatedTarget && !(event.relatedTarget as Node).isSelfOrDescendant(this.element))) {
-        this._finishEditing(true);
+        this.finishEditing(true, this.editor.state.doc.toString());
       }
     }, true);
   }
 
   focusEditor(): void {
-    if (this._editor) {
-      this._editor.widget().focus();
-    }
+    this.editor.editor.focus();
   }
-  static _conditionForLogpoint(condition: string): string {
+  private static conditionForLogpoint(condition: string): string {
     return `${LogpointPrefix}${condition}${LogpointSuffix}`;
   }
 
-  _onTypeChanged(): void {
-    const option = this._typeSelector.selectedOption();
-    if (!option || !this._editor) {
-      return;
-    }
-    const value = option.value;
-    this._isLogpoint = value === BreakpointType.Logpoint;
-    this._updatePlaceholder();
-    if (value === BreakpointType.Breakpoint) {
-      this._editor.setText('');
-      this._finishEditing(true);
+  private onTypeChanged(): void {
+    const type = this.breakpointType;
+    if (type === BreakpointType.Breakpoint) {
+      this.finishEditing(true, '');
+    } else {
+      this.editor.editor.dispatch({effects: this.placeholderCompartment.reconfigure(this.getPlaceholder())});
+      this.updateTooltip();
     }
   }
 
-  _updatePlaceholder(): void {
-    const option = this._typeSelector.selectedOption();
-    if (!option || !this._editor) {
-      return;
+  private get breakpointType(): string|null {
+    const option = this.typeSelector.selectedOption();
+    return option ? option.value : null;
+  }
+
+  private getPlaceholder(): CodeMirror.Extension {
+    const type = this.breakpointType;
+    if (type === BreakpointType.Conditional) {
+      return this.modCodeMirror.placeholder(i18nString(UIStrings.expressionToCheckBeforePausingEg));
     }
-    const selectedValue = option.value;
-    if (selectedValue === BreakpointType.Conditional) {
-      this._editor.setPlaceholder(i18nString(UIStrings.expressionToCheckBeforePausingEg));
-      UI.Tooltip.Tooltip.install((this._typeSelector.element), i18nString(UIStrings.pauseOnlyWhenTheConditionIsTrue));
-    } else if (selectedValue === BreakpointType.Logpoint) {
-      this._editor.setPlaceholder(i18nString(UIStrings.logMessageEgXIsX));
-      UI.Tooltip.Tooltip.install((this._typeSelector.element), i18nString(UIStrings.logAMessageToConsoleDoNotBreak));
+    if (type === BreakpointType.Logpoint) {
+      return this.modCodeMirror.placeholder(i18nString(UIStrings.logMessageEgXIsX));
+    }
+    return [];
+  }
+
+  private updateTooltip(): void {
+    const type = this.breakpointType;
+    if (type === BreakpointType.Conditional) {
+      UI.Tooltip.Tooltip.install((this.typeSelector.element), i18nString(UIStrings.pauseOnlyWhenTheConditionIsTrue));
+    } else if (type === BreakpointType.Logpoint) {
+      UI.Tooltip.Tooltip.install((this.typeSelector.element), i18nString(UIStrings.logAMessageToConsoleDoNotBreak));
     }
   }
 
-  _finishEditing(committed: boolean): void {
-    if (this._finished) {
+  private finishEditing(committed: boolean, condition: string): void {
+    if (this.finished) {
       return;
     }
-    this._finished = true;
-    if (!this._editor) {
-      return;
+    this.finished = true;
+    this.editor.remove();
+    if (this.isLogpoint) {
+      condition = BreakpointEditDialog.conditionForLogpoint(condition);
     }
-    this._editor.widget().detach();
-    let condition = this._editor.text();
-    if (this._isLogpoint) {
-      condition = BreakpointEditDialog._conditionForLogpoint(condition);
-    }
-    this._onFinish({committed, condition});
+    this.onFinish({committed, condition});
   }
 
-  async _onKeyDown(event: Event): Promise<void> {
-    if (!(event instanceof KeyboardEvent) || !this._editor) {
-      return;
-    }
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.consume(true);
-      const expression = this._editor.text();
-      if (event.ctrlKey ||
-          await ObjectUI.JavaScriptAutocomplete.JavaScriptAutocomplete.isExpressionComplete(expression)) {
-        this._finishEditing(true);
-      } else {
-        this._editor.newlineAndIndent();
-      }
-    }
-    if (isEscKey(event)) {
-      this._finishEditing(false);
-      event.stopImmediatePropagation();
-    }
+  wasShown(): void {
+    super.wasShown();
+    this.registerCSSFiles([breakpointEditDialogStyles]);
   }
 }
 

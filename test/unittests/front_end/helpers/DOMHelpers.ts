@@ -105,7 +105,6 @@ export function waitForScrollLeft<T extends Element>(element: T, desiredScrollLe
 
   const timeBetweenPolls = 50;
 
-
   return new Promise(resolve => {
     const pollForScrollLeft = () => {
       const newScrollLeft = element.scrollLeft;
@@ -137,6 +136,11 @@ export function dispatchClickEvent<T extends Element>(element: T, options: Mouse
 
 export function dispatchFocusEvent<T extends Element>(element: T, options: FocusEventInit = {}) {
   const focusEvent = new FocusEvent('focus', options);
+  element.dispatchEvent(focusEvent);
+}
+
+export function dispatchFocusOutEvent<T extends Element>(element: T, options: FocusEventInit = {}) {
+  const focusEvent = new FocusEvent('focusout', options);
   element.dispatchEvent(focusEvent);
 }
 

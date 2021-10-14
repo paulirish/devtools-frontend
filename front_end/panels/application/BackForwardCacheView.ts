@@ -8,7 +8,10 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 import * as ReportView from '../../ui/components/report_view/report_view.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import type * as Protocol from '../../generated/protocol.js';
+import * as Protocol from '../../generated/protocol.js';
+
+import {NotRestoredReasonDescription} from './BackForwardCacheStrings.js';
+import backForwardCacheViewStyles from './backForwardCacheView.css.js';
 
 const UIStrings = {
   /**
@@ -40,19 +43,31 @@ const UIStrings = {
    */
   unknown: 'unknown',
   /**
-   * @description Text for the row with explanations for the back-forward cache status
-   */
-  explanations: 'Explanations',
-  /**
    * @description Status text for the status of the back-forward cache status indicating that
    * the back-forward cache was not used and a normal navigation occured instead.
    */
-  normalNavigation: 'Normal navigation',
+  normalNavigation: 'Normal navigation (Not restored from back-forward cache)',
   /**
    * @description Status text for the status of the back-forward cache status indicating that
    * the back-forward cache was used to restore the page instead of reloading it.
    */
   restoredFromBFCache: 'Restored from back-forward cache',
+  /**
+   * @description Category text for the reasons which need to be cleaned up on the websites in
+   * order to make the page eligible for the back-forward cache.
+   */
+  pageSupportNeeded: 'Actionable',
+  /**
+   * @description Category text for the reasons which are circumstantial and cannot be addressed
+   * by developers.
+   */
+  circumstantial: 'Not Actionable',
+  /**
+   * @description Explanation text appended to a reason why the usage of the back-forward cache
+   * is not possible, if in a future version of Chrome this reason will not prevent the usage
+   * of the back-forward cache anymore.
+   */
+  supportPending: 'Pending Support',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/application/BackForwardCacheView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -67,6 +82,11 @@ export class BackForwardCacheView extends UI.ThrottledWidget.ThrottledWidget {
     this.update();
   }
 
+  wasShown(): void {
+    super.wasShown();
+    this.registerCSSFiles([backForwardCacheViewStyles]);
+  }
+
   private onBackForwardCacheUpdate(): void {
     this.update();
   }
@@ -78,7 +98,7 @@ export class BackForwardCacheView extends UI.ThrottledWidget.ThrottledWidget {
       ${this.renderMainFrameInformation(this.getMainFrame())}
       </${ReportView.ReportView.Report.litTagName}>
     `;
-    LitHtml.render(html, this.contentElement);
+    LitHtml.render(html, this.contentElement, {host: this});
   }
 
   private getMainResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel|null {
@@ -129,10 +149,44 @@ export class BackForwardCacheView extends UI.ThrottledWidget.ThrottledWidget {
     if (explanations.length === 0) {
       return LitHtml.nothing;
     }
-    return LitHtml.html`<${ReportView.ReportView.ReportKey.litTagName}>${i18nString(UIStrings.explanations)}</${
-        ReportView.ReportView.ReportKey.litTagName}>
-    <${ReportView.ReportView.ReportValue.litTagName}>${LitHtml.html`${explanations.map(explanation => {
-      return LitHtml.html`<div>${explanation.reason} (${explanation.type})</div>`;
-    })}`}</${ReportView.ReportView.ReportValue.litTagName}>`;
+
+    const pageSupportNeeded = explanations.filter(
+        explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.PageSupportNeeded);
+    const supportPending = explanations.filter(
+        explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.SupportPending);
+    const circumstantial = explanations.filter(
+        explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.Circumstantial);
+
+    // Disabled until https://crbug.com/1079231 is fixed.
+    // clang-format off
+    return LitHtml.html`
+      ${this.renderExplanations(UIStrings.pageSupportNeeded, pageSupportNeeded)}
+      ${this.renderExplanations(UIStrings.supportPending, supportPending)}
+      ${this.renderExplanations(UIStrings.circumstantial, circumstantial)}
+    `;
+    // clang-format on
+  }
+
+  private renderExplanations(category: string, explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[]):
+      LitHtml.TemplateResult {
+    return LitHtml.html`
+      ${
+        explanations.length > 0 ? LitHtml.html`
+          <${ReportView.ReportView.ReportKey.litTagName}>${category}</${ReportView.ReportView.ReportKey.litTagName}>
+          <${ReportView.ReportView.ReportValue.litTagName}>
+          <ul class='not-restored-reason-list'>${explanations.map(explanation => this.renderReason(explanation))}</ul>
+          </${ReportView.ReportView.ReportValue.litTagName}>
+        ` :
+                                  LitHtml.nothing}
+    `;
+  }
+
+  private renderReason(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): LitHtml.TemplateResult {
+    return LitHtml.html`
+      <li>${explanation.reason} : ${
+        (explanation.reason in NotRestoredReasonDescription) ?
+            LitHtml.html`${NotRestoredReasonDescription[explanation.reason].name()}` :
+            LitHtml.nothing} </li>
+    `;
   }
 }

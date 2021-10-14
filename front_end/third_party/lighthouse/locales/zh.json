@@ -18,7 +18,7 @@
     "message": "`[aria-*]` 属性与其角色匹配"
   },
   "lighthouse-core/audits/accessibility/aria-command-name.js | description": {
-    "message": "如果某个元素没有可供访问的名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
+    "message": "如果某个元素没有无障碍名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
   },
   "lighthouse-core/audits/accessibility/aria-command-name.js | failureTitle": {
     "message": "`button`、`link` 和 `menuitem` 元素缺少可供访问的名称。"
@@ -54,7 +54,7 @@
     "message": "ARIA 输入字段都有可供访问的名称"
   },
   "lighthouse-core/audits/accessibility/aria-meter-name.js | description": {
-    "message": "如果某个元素没有可供访问的名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
+    "message": "如果某个元素没有无障碍名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
   },
   "lighthouse-core/audits/accessibility/aria-meter-name.js | failureTitle": {
     "message": "ARIA `meter` 元素缺少可供访问的名称。"
@@ -117,7 +117,7 @@
     "message": "ARIA 切换字段都有可供访问的名称"
   },
   "lighthouse-core/audits/accessibility/aria-tooltip-name.js | description": {
-    "message": "如果某个元素没有可供访问的名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
+    "message": "如果某个元素没有无障碍名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
   },
   "lighthouse-core/audits/accessibility/aria-tooltip-name.js | failureTitle": {
     "message": "ARIA `tooltip` 元素缺少可供访问的名称。"
@@ -126,7 +126,7 @@
     "message": "ARIA `tooltip` 元素都有可供访问的名称"
   },
   "lighthouse-core/audits/accessibility/aria-treeitem-name.js | description": {
-    "message": "如果某个元素没有可供访问的名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
+    "message": "如果某个元素没有无障碍名称，屏幕阅读器会将它读为通用名称，这会导致依赖屏幕阅读器的用户无法使用它。[了解详情](https://web.dev/aria-name/)。"
   },
   "lighthouse-core/audits/accessibility/aria-treeitem-name.js | failureTitle": {
     "message": "ARIA `treeitem` 元素缺少可供访问的名称。"
@@ -477,7 +477,7 @@
     "message": "应避免向新型浏览器提供旧版 JavaScript"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "JPEG 2000、JPEG XR 和 WebP 等图片格式的压缩效果通常比 PNG 或 JPEG 好，因此下载速度更快，消耗的数据流量更少。[了解详情](https://web.dev/uses-webp-images/)。"
+    "message": "WebP 和 AVIF 等图片格式的压缩效果通常优于 PNG 或 JPEG，因而下载速度更快，消耗的数据流量更少。[了解详情](https://web.dev/uses-webp-images/)。"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "采用新一代格式提供图片"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "对图片进行高效编码"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "实际尺寸"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "显示时的尺寸"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "提供大小合适的图片可节省移动数据网络流量并缩短加载用时。[了解详情](https://web.dev/uses-responsive-images/)。"
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "允许（附带警告）"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "库"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "大型 JavaScript 库可能会导致性能不佳。最好使用功能相当且规模较小的 JavaScript 库，以缩减软件包大小。[了解详情](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)。"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{发现了 1 个大型库}other{发现了 # 个大型库}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "替换不必要的大型 JavaScript 库"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "请避免使用大型 JavaScript 库，尽量用功能相当且规模较小的库替换"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "这是此视口内渲染的最大内容元素。[了解详情](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "指向了其他 `hreflang` 位置 ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "相对网址 ({url})"
+    "message": "不是一个绝对网址 ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "指向了网域的根网址（首页），而非等效内容页面"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "{keyword}似乎是无效关键字。"
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "“unsafe-inline”允许执行不安全的页内脚本和事件处理脚本。建议您使用 CSP nonces 或 hashes 来逐一允许各个脚本。"
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "建议您添加“unsafe-inline”（会被支持 nonces/hashes 的浏览器忽略），以便向后兼容旧版浏览器。"

@@ -477,7 +477,7 @@
     "message": "Voorkomen dat verouderde JavaScript wordt geleverd aan moderne browsers"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | description": {
-    "message": "Afbeeldingsindelingen zoals JPEG 2000, JPEG XR en WebP bieden vaak betere compressie dan PNG of JPEG. Dit resulteert in snellere downloads en minder dataverbruik. [Meer informatie](https://web.dev/uses-webp-images/)"
+    "message": "Afbeeldingsindelingen zoals webp en avif bieden vaak betere compressie dan png of jpeg. Dit zorgt voor snellere downloads en minder dataverbruik. [Meer informatie](https://web.dev/uses-webp-images/)"
   },
   "lighthouse-core/audits/byte-efficiency/modern-image-formats.js | title": {
     "message": "Lever afbeeldingen in moderne indelingen"
@@ -547,6 +547,12 @@
   },
   "lighthouse-core/audits/byte-efficiency/uses-optimized-images.js | title": {
     "message": "Codeer afbeeldingen op een efficiënte manier"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnActualDimensions": {
+    "message": "Werkelijke afmetingen"
+  },
+  "lighthouse-core/audits/byte-efficiency/uses-responsive-images-snapshot.js | columnDisplayedDimensions": {
+    "message": "Getoonde afmetingen"
   },
   "lighthouse-core/audits/byte-efficiency/uses-responsive-images.js | description": {
     "message": "Lever afbeeldingen met het juiste formaat om mobiele data te besparen en de laadtijd te verbeteren. [Meer informatie](https://web.dev/uses-responsive-images/)"
@@ -986,21 +992,6 @@
   "lighthouse-core/audits/is-on-https.js | warning": {
     "message": "Toegestaan met waarschuwing"
   },
-  "lighthouse-core/audits/large-javascript-libraries.js | columnLibraryName": {
-    "message": "Bibliotheek"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | description": {
-    "message": "Grote JavaScript-bibliotheken kunnen slechte prestaties tot gevolg hebben. Geef de voorkeur aan kleinere, functioneel gelijke bibliotheken om de bundelgrootte te beperken. [Meer informatie](https://developers.google.com/web/fundamentals/performance/webpack/decrease-frontend-size#optimize_dependencies)"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | displayValue": {
-    "message": "{libraryCount,plural, =1{1 grote bibliotheek gevonden}other{# grote bibliotheken gevonden}}"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | failureTitle": {
-    "message": "Onnodig grote JavaScript-bibliotheken vervangen"
-  },
-  "lighthouse-core/audits/large-javascript-libraries.js | title": {
-    "message": "Vermijdt grote JavaScript-bibliotheken door kleinere alternatieven te gebruiken"
-  },
   "lighthouse-core/audits/largest-contentful-paint-element.js | description": {
     "message": "Dit is het grootste element met content dat is weergegeven in het kijkvenster. [Meer informatie](https://web.dev/lighthouse-largest-contentful-paint/)"
   },
@@ -1200,7 +1191,7 @@
     "message": "Wijst naar een andere `hreflang`-locatie ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRelative": {
-    "message": "Relatieve URL ({url})"
+    "message": "Is geen absolute URL ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationRoot": {
     "message": "Verwijst naar de root-URL van het domein (de homepage), in plaats van een equivalente pagina van de content"
@@ -1750,9 +1741,6 @@
   },
   "lighthouse-core/lib/csp-evaluator.js | unknownKeyword": {
     "message": "Zo te zien is {keyword} een ongeldig zoekwoord."
-  },
-  "lighthouse-core/lib/csp-evaluator.js | unsafeInline": {
-    "message": "Met 'unsafe-inline' kunnen onveilige scripts en gebeurtenishandlers op de pagina worden uitgevoerd. Overweeg CSP-nonces of -hashes te gebruiken om scripts afzonderlijk toe te staan."
   },
   "lighthouse-core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "Voor compatibiliteit met oudere browsers kun je overwegen 'unsafe-inline' toe te voegen (dit wordt genegeerd door browsers die nonces/hashes ondersteunen)."

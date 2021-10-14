@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/no_underscored_properties */
-
-import type * as Workspace from '../../models/workspace/workspace.js'; // eslint-disable-line no-unused-vars
-import type * as UI from '../../ui/legacy/legacy.js';                  // eslint-disable-line no-unused-vars
+import type * as Workspace from '../../models/workspace/workspace.js';
+import type * as UI from '../../ui/legacy/legacy.js';
 
 export class Plugin {
   static accepts(_uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {

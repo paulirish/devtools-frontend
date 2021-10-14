@@ -9,8 +9,12 @@ import("../../visibility.gni")
 
 generate_css("css_files") {
   sources = [
+    "badge.css",
     "frameDetailsReportView.css",
+    "originTrialTokenRows.css",
+    "originTrialTreeView.css",
     "permissionsPolicySection.css",
+    "reportingApiGrid.css",
     "stackTraceLinkButton.css",
     "stackTraceRow.css",
     "trustTokensView.css",
@@ -20,9 +24,11 @@ generate_css("css_files") {
 
 devtools_module("components") {
   sources = [
+    "EndpointsGrid.ts",
     "FrameDetailsView.ts",
     "OriginTrialTreeView.ts",
     "PermissionsPolicySection.ts",
+    "ReportsGrid.ts",
     "StackTrace.ts",
     "TrustTokensView.ts",
   ]
@@ -43,6 +49,7 @@ devtools_module("components") {
     "../../../ui/components/report_view:bundle",
     "../../../ui/components/tree_outline:bundle",
     "../../../ui/legacy:bundle",
+    "../../../ui/legacy/components/source_frame:bundle",
     "../../../ui/legacy/components/utils:bundle",
   ]
 }

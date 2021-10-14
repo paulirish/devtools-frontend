@@ -4,7 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
-import * as UI from '../../ui/legacy/legacy.js';  // eslint-disable-line no-unused-vars
+import * as UI from '../../ui/legacy/legacy.js';
 
 import {releaseNoteText} from './ReleaseNoteText.js';
 
@@ -110,6 +110,22 @@ export class ReportIssueActionDelegate implements UI.ActionRegistration.ActionDe
     }
 
     return reportIssueActionDelegateInstance;
+  }
+}
+
+let reportTranslationIssueActionDelegateInstance: ReportTranslationIssueActionDelegate;
+export class ReportTranslationIssueActionDelegate implements UI.ActionRegistration.ActionDelegate {
+  handleAction(_context: UI.Context.Context, _actionId: string): boolean {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab('https://goo.gle/devtools-translate');
+    return true;
+  }
+  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): ReportTranslationIssueActionDelegate {
+    const {forceNew} = opts;
+    if (!reportTranslationIssueActionDelegateInstance || forceNew) {
+      reportTranslationIssueActionDelegateInstance = new ReportTranslationIssueActionDelegate();
+    }
+
+    return reportTranslationIssueActionDelegateInstance;
   }
 }
 export interface ReleaseNoteHighlight {
