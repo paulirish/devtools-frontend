@@ -196,7 +196,7 @@ export class LighthouseReportUIFeatures extends LighthouseReport.ReportUIFeature
   // which follows a different naming convention.
   // eslint-disable-next-line rulesdir/no_underscored_properties, @typescript-eslint/naming-convention
   async _print(): Promise<void> {
-    const document = this.getDocument();
+
     const clonedReport = (document.querySelector('.lh-root') as HTMLElement).cloneNode(true);
     const printWindow = window.open('', '_blank', 'channelmode=1,status=1,resizable=1');
     if (!printWindow) {
@@ -218,10 +218,6 @@ export class LighthouseReportUIFeatures extends LighthouseReport.ReportUIFeature
     if (this.afterPrint) {
       this.afterPrint();
     }
-  }
-
-  getDocument(): Document {
-    return this._document;
   }
   resetUIState(): void {
     this._resetUIState();

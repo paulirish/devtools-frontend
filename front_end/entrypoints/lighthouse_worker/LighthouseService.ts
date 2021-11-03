@@ -50,7 +50,7 @@ async function start(params: any): Promise<unknown> {
   try {
     const locale = await fetchLocaleData(params.locales);
     const flags = params.flags;
-    flags.logLevel = flags.logLevel || 'info';
+    flags.logLevel = 'verbose'; // flags.logLevel || 'info';
     flags.channel = 'devtools';
     flags.locale = locale;
 
