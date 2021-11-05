@@ -242,7 +242,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       this.pauseOnAsyncCall(_scheduledPauseOnAsyncCall);
     }
     this.dispatchEventToListeners(Events.DebuggerWasEnabled, this);
-    await enablePromise;
+    // await enablePromise;
   }
 
   async syncDebuggerId(): Promise<Protocol.Debugger.EnableResponse> {

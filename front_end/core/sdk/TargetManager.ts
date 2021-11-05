@@ -172,6 +172,7 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
       targetInfo?: Protocol.Target.TargetInfo): Target {
     const target = new Target(
         this, id, name, type, parentTarget, sessionId || '', this.#isSuspended, connection || null, targetInfo);
+    console.log('createTarget', target, waitForDebuggerInPage);
     if (waitForDebuggerInPage) {
       target.pageAgent().invoke_waitForDebugger();
     }
@@ -200,6 +201,7 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
   }
 
   removeTarget(target: Target): void {
+    console.log('removeTarget', target, !this.#targetsInternal.has(target));
     if (!this.#targetsInternal.has(target)) {
       return;
     }

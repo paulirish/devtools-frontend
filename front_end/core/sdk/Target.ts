@@ -183,23 +183,55 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
   }
 
   async suspend(reason?: string): Promise<void> {
+    const that = this;
+    function llog(message?: any, ...optionalParams: any[]): void {
+      if (that.type() === 'frame') {return;}
+      return console.log(message, ...optionalParams);
+    }
+
+    llog('target suspend', this, this.#isSuspended);
     if (this.#isSuspended) {
       return;
     }
     this.#isSuspended = true;
+    llog('target 0/2', Array.from(this.models().values()).length, this, !this.#isSuspended);
 
     await Promise.all(Array.from(this.models().values(), m => m.preSuspendModel(reason)));
     await Promise.all(Array.from(this.models().values(), m => m.suspendModel(reason)));
   }
 
   async resume(): Promise<void> {
+    const that = this;
+    function llog(message?: any, ...optionalParams: any[]): void {
+      if (that.type() === 'frame') {return;}
+      return console.log(message, ...optionalParams);
+    }
+
+    llog('target resume', this, !this.#isSuspended);
     if (!this.#isSuspended) {
       return;
     }
     this.#isSuspended = false;
 
-    await Promise.all(Array.from(this.models().values(), m => m.resumeModel()));
-    await Promise.all(Array.from(this.models().values(), m => m.postResumeModel()));
+    llog('target 0/2', Array.from(this.models().values()).length, this, !this.#isSuspended);
+    const p1 = Promise.all(Array.from(this.models().values(), m => {
+      llog('resume model', m);
+      const x = m.resumeModel();
+      llog('resume model done', m, x);
+      return x;
+    }));
+    llog({p1});
+    await p1;
+    llog('target 1/2', this, !this.#isSuspended);
+    const p2 = Promise.all(Array.from(this.models().values(), m => {
+      llog('postResumeModel model', m);
+      const x = m.postResumeModel();
+      llog('postResumeModel model done', m, x);
+      return x;
+    }));
+    llog({p2});
+    await p2;
+    llog('target 2/2', this, !this.#isSuspended);
   }
 
   suspended(): boolean {

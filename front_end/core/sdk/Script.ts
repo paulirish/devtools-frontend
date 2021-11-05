@@ -70,10 +70,10 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   debugSymbols: Protocol.Debugger.DebugSymbols|null;
   hasSourceURL: boolean;
   contentLength: number;
-  #originalContentProviderInternal: TextUtils.ContentProvider.ContentProvider|null;
+  private originalContentProviderInternal: TextUtils.ContentProvider.ContentProvider|null;
   originStackTrace: Protocol.Runtime.StackTrace|null;
   readonly #codeOffsetInternal: number|null;
-  readonly #language: string|null;
+  private readonly language: string|null;
   #contentPromise: Promise<TextUtils.ContentProvider.DeferredContent>|null;
   readonly #embedderNameInternal: string|null;
   readonly isModule: boolean|null;
@@ -101,10 +101,10 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
     this.debugSymbols = debugSymbols;
     this.hasSourceURL = hasSourceURL;
     this.contentLength = length;
-    this.#originalContentProviderInternal = null;
+    this.originalContentProviderInternal = null;
     this.originStackTrace = originStackTrace;
     this.#codeOffsetInternal = codeOffset;
-    this.#language = scriptLanguage;
+    this.language = scriptLanguage;
     this.#contentPromise = null;
     this.#embedderNameInternal = embedderName;
   }
@@ -145,15 +145,15 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   }
 
   isJavaScript(): boolean {
-    return this.#language === Protocol.Debugger.ScriptLanguage.JavaScript;
+    return this.language === Protocol.Debugger.ScriptLanguage.JavaScript;
   }
 
   isWasm(): boolean {
-    return this.#language === Protocol.Debugger.ScriptLanguage.WebAssembly;
+    return this.language === Protocol.Debugger.ScriptLanguage.WebAssembly;
   }
 
   scriptLanguage(): string|null {
-    return this.#language;
+    return this.language;
   }
 
   executionContext(): ExecutionContext|null {
@@ -191,10 +191,10 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   }
 
   originalContentProvider(): TextUtils.ContentProvider.ContentProvider {
-    if (!this.#originalContentProviderInternal) {
+    if (!this.originalContentProviderInternal) {
       /* } */
       let lazyContentPromise: Promise<TextUtils.ContentProvider.DeferredContent>|null;
-      this.#originalContentProviderInternal =
+      this.originalContentProviderInternal =
           new TextUtils.StaticContentProvider.StaticContentProvider(this.contentURL(), this.contentType(), () => {
             if (!lazyContentPromise) {
               lazyContentPromise = (async(): Promise<{
@@ -234,7 +234,7 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
             return lazyContentPromise;
           });
     }
-    return this.#originalContentProviderInternal;
+    return this.originalContentProviderInternal;
   }
 
   async searchInContent(query: string, caseSensitive: boolean, isRegex: boolean):
