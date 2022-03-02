@@ -42,8 +42,8 @@ import type {ResourceTreeFrame, ResourceTreeModel} from './ResourceTreeModel.js'
 export class Resource implements TextUtils.ContentProvider.ContentProvider {
   readonly #resourceTreeModel: ResourceTreeModel;
   #requestInternal: NetworkRequest|null;
-  #urlInternal!: string;
-  readonly #documentURLInternal: string;
+  #urlInternal!: Platform.DevToolsPath.UrlString;
+  readonly #documentURLInternal: Platform.DevToolsPath.UrlString;
   readonly #frameIdInternal: Protocol.Page.FrameId|null;
   readonly #loaderIdInternal: Protocol.Network.LoaderId|null;
   readonly #type: Common.ResourceType.ResourceType;
@@ -52,16 +52,16 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
   #lastModifiedInternal: Date|null;
   readonly #contentSizeInternal: number|null;
   #contentInternal!: string|null;
-  #contentLoadError!: string|null;
   #contentEncodedInternal!: boolean;
   readonly #pendingContentCallbacks: ((arg0: Object|null) => void)[];
   #parsedURLInternal?: Common.ParsedURL.ParsedURL;
   #contentRequested?: boolean;
 
   constructor(
-      resourceTreeModel: ResourceTreeModel, request: NetworkRequest|null, url: string, documentURL: string,
-      frameId: Protocol.Page.FrameId|null, loaderId: Protocol.Network.LoaderId|null,
-      type: Common.ResourceType.ResourceType, mimeType: string, lastModified: Date|null, contentSize: number|null) {
+      resourceTreeModel: ResourceTreeModel, request: NetworkRequest|null, url: Platform.DevToolsPath.UrlString,
+      documentURL: Platform.DevToolsPath.UrlString, frameId: Protocol.Page.FrameId|null,
+      loaderId: Protocol.Network.LoaderId|null, type: Common.ResourceType.ResourceType, mimeType: string,
+      lastModified: Date|null, contentSize: number|null) {
     this.#resourceTreeModel = resourceTreeModel;
     this.#requestInternal = request;
     this.url = url;
@@ -102,11 +102,11 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
     return this.#requestInternal;
   }
 
-  get url(): string {
+  get url(): Platform.DevToolsPath.UrlString {
     return this.#urlInternal;
   }
 
-  set url(x: string) {
+  set url(x: Platform.DevToolsPath.UrlString) {
     this.#urlInternal = x;
     this.#parsedURLInternal = new Common.ParsedURL.ParsedURL(x);
   }
@@ -115,7 +115,7 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
     return this.#parsedURLInternal;
   }
 
-  get documentURL(): string {
+  get documentURL(): Platform.DevToolsPath.UrlString {
     return this.#documentURLInternal;
   }
 
@@ -151,9 +151,8 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
     this.#isGeneratedInternal = val;
   }
 
-  // TODO(crbug.com/1253323): Cast to UrlString will be removed when migration to branded types is complete.
   contentURL(): Platform.DevToolsPath.UrlString {
-    return this.#urlInternal as Platform.DevToolsPath.UrlString;
+    return this.#urlInternal;
   }
 
   contentType(): Common.ResourceType.ResourceType {
@@ -169,15 +168,18 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
     return this.#contentEncodedInternal;
   }
 
-  requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
+  async requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
     if (typeof this.#contentInternal !== 'undefined') {
-      return Promise.resolve({content: (this.#contentInternal as string), isEncoded: this.#contentEncodedInternal});
+      return {
+        content: (this.#contentInternal as string),
+        isEncoded: this.#contentEncodedInternal,
+      };
     }
 
     return new Promise(resolve => {
       this.#pendingContentCallbacks.push((resolve as (arg0: Object|null) => void));
       if (!this.#requestInternal || this.#requestInternal.finished) {
-        this.innerRequestContent();
+        void this.innerRequestContent();
       }
     });
   }
@@ -211,7 +213,7 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
       this.#requestInternal.removeEventListener(Events.FinishedLoading, this.requestFinished, this);
     }
     if (this.#pendingContentCallbacks.length) {
-      this.innerRequestContent();
+      void this.innerRequestContent();
     }
   }
 
@@ -245,12 +247,10 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
           {frameId: this.frameId as Protocol.Page.FrameId, url: this.url});
       const protocolError = response.getError();
       if (protocolError) {
-        this.#contentLoadError = protocolError;
         this.#contentInternal = null;
         loadResult = {content: null, error: protocolError, isEncoded: false};
       } else {
         this.#contentInternal = response.content;
-        this.#contentLoadError = null;
         loadResult = {content: response.content, isEncoded: response.base64Encoded};
       }
       this.#contentEncodedInternal = response.base64Encoded;

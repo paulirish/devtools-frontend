@@ -33,7 +33,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import type * as Common from '../../core/common/common.js';
 import * as DOMExtension from '../../core/dom_extension/dom_extension.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -46,13 +45,19 @@ import {Size} from './Geometry.js';
 import {GlassPane, PointerEventsBehavior, SizeBehavior} from './GlassPane.js';
 import {Icon} from './Icon.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
-import * as ThemeSupport from './theme_support/theme_support.js';  // eslint-disable-line rulesdir/es_modules_import
 import * as Utils from './utils/utils.js';
 
 import type {ToolbarButton} from './Toolbar.js';
 import {Toolbar} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import type {TreeOutline} from './Treeoutline.js';
+import checkboxTextLabelStyles from './checkboxTextLabel.css.legacy.js';
+import closeButtonStyles from './closeButton.css.legacy.js';
+import confirmDialogStyles from './confirmDialog.css.legacy.js';
+import inlineButtonStyles from './inlineButton.css.legacy.js';
+import radioButtonStyles from './radioButton.css.legacy.js';
+import sliderStyles from './slider.css.legacy.js';
+import smallBubbleStyles from './smallBubble.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -134,9 +139,9 @@ export function installDragHandle(
   }
 
   let startTimer: number|null;
-  element.addEventListener('mousedown', onMouseDown, false);
+  element.addEventListener('pointerdown', onMouseDown, false);
   if (startDelay) {
-    element.addEventListener('mouseup', onMouseUp, false);
+    element.addEventListener('pointerup', onMouseUp, false);
   }
   if (hoverCursor !== null) {
     (element as HTMLElement).style.cursor = hoverCursor || cursor || '';
@@ -226,12 +231,12 @@ class DragHandler {
       this.dragEventsTargetDocumentTop = this.dragEventsTargetDocument;
     }
 
-    targetDocument.addEventListener('mousemove', this.elementDragMove, true);
-    targetDocument.addEventListener('mouseup', this.elementDragEnd, true);
+    targetDocument.addEventListener('pointermove', this.elementDragMove, true);
+    targetDocument.addEventListener('pointerup', this.elementDragEnd, true);
     DragHandler.rootForMouseOut &&
-        DragHandler.rootForMouseOut.addEventListener('mouseout', this.mouseOutWhileDragging, {capture: true});
+        DragHandler.rootForMouseOut.addEventListener('pointerout', this.mouseOutWhileDragging, {capture: true});
     if (this.dragEventsTargetDocumentTop && targetDocument !== this.dragEventsTargetDocumentTop) {
-      this.dragEventsTargetDocumentTop.addEventListener('mouseup', this.elementDragEnd, true);
+      this.dragEventsTargetDocumentTop.addEventListener('pointerup', this.elementDragEnd, true);
     }
 
     const targetHtmlElement = (targetElement as HTMLElement);
@@ -257,17 +262,17 @@ class DragHandler {
     if (!DragHandler.rootForMouseOut) {
       return;
     }
-    DragHandler.rootForMouseOut.removeEventListener('mouseout', this.mouseOutWhileDragging, {capture: true});
+    DragHandler.rootForMouseOut.removeEventListener('pointerout', this.mouseOutWhileDragging, {capture: true});
   }
 
   private unregisterDragEvents(): void {
     if (!this.dragEventsTargetDocument) {
       return;
     }
-    this.dragEventsTargetDocument.removeEventListener('mousemove', this.elementDragMove, true);
-    this.dragEventsTargetDocument.removeEventListener('mouseup', this.elementDragEnd, true);
+    this.dragEventsTargetDocument.removeEventListener('pointermove', this.elementDragMove, true);
+    this.dragEventsTargetDocument.removeEventListener('pointerup', this.elementDragEnd, true);
     if (this.dragEventsTargetDocumentTop && this.dragEventsTargetDocument !== this.dragEventsTargetDocumentTop) {
-      this.dragEventsTargetDocumentTop.removeEventListener('mouseup', this.elementDragEnd, true);
+      this.dragEventsTargetDocumentTop.removeEventListener('pointerup', this.elementDragEnd, true);
     }
     delete this.dragEventsTargetDocument;
     delete this.dragEventsTargetDocumentTop;
@@ -450,7 +455,7 @@ function modifiedHexValue(hexString: string, event: Event): string|null {
   return resultString;
 }
 
-function modifiedFloatNumber(number: number, event: Event, modifierMultiplier?: number): number|null {
+export function modifiedFloatNumber(number: number, event: Event, modifierMultiplier?: number): number|null {
   const direction = getValueModificationDirection(event);
   if (!direction) {
     return null;
@@ -574,18 +579,6 @@ export function handleElementValueModifications(
     return true;
   }
   return false;
-}
-
-export function formatLocalized<U>(format: string, substitutions: ArrayLike<U>|null): Element {
-  const formatters = {
-    s: (substitution: unknown): unknown => substitution,
-  };
-  function append(a: Element, b: string|Element): Element {
-    a.appendChild(typeof b === 'string' ? document.createTextNode(b) : b as Element);
-    return a;
-  }
-  return Platform.StringUtilities.format(format, substitutions, formatters, document.createElement('span'), append)
-      .formattedResult;
 }
 
 export function openLinkExternallyLabel(): string {
@@ -998,9 +991,9 @@ export class LongClickController {
 
     this.element.addEventListener('keydown', boundKeyDown, false);
     this.element.addEventListener('keyup', boundKeyUp, false);
-    this.element.addEventListener('mousedown', boundMouseDown, false);
-    this.element.addEventListener('mouseout', boundReset, false);
-    this.element.addEventListener('mouseup', boundMouseUp, false);
+    this.element.addEventListener('pointerdown', boundMouseDown, false);
+    this.element.addEventListener('pointerout', boundReset, false);
+    this.element.addEventListener('pointerup', boundMouseUp, false);
     this.element.addEventListener('click', boundReset, true);
 
     this.longClickData = {mouseUp: boundMouseUp, mouseDown: boundMouseDown, reset: boundReset};
@@ -1038,9 +1031,9 @@ export class LongClickController {
     if (!this.longClickData) {
       return;
     }
-    this.element.removeEventListener('mousedown', this.longClickData.mouseDown, false);
-    this.element.removeEventListener('mouseout', this.longClickData.reset, false);
-    this.element.removeEventListener('mouseup', this.longClickData.mouseUp, false);
+    this.element.removeEventListener('pointerdown', this.longClickData.mouseDown, false);
+    this.element.removeEventListener('pointerout', this.longClickData.reset, false);
+    this.element.removeEventListener('pointerup', this.longClickData.mouseUp, false);
     this.element.addEventListener('click', this.longClickData.reset, true);
     delete this.longClickData;
   }
@@ -1048,18 +1041,13 @@ export class LongClickController {
   static readonly TIME_MS = 200;
 }
 
-export function initializeUIUtils(document: Document, themeSetting: Common.Settings.Setting<string>): void {
+export function initializeUIUtils(document: Document): void {
   document.body.classList.toggle('inactive', !document.hasFocus());
   if (document.defaultView) {
     document.defaultView.addEventListener('focus', windowFocused.bind(undefined, document), false);
     document.defaultView.addEventListener('blur', windowBlurred.bind(undefined, document), false);
   }
   document.addEventListener('focus', Utils.focusChanged.bind(undefined), true);
-
-  if (!ThemeSupport.ThemeSupport.hasInstance()) {
-    ThemeSupport.ThemeSupport.instance({forceNew: true, setting: themeSetting});
-  }
-  ThemeSupport.ThemeSupport.instance().applyTheme(document);
 
   const body = (document.body as Element);
   GlassPane.setContainer(body);
@@ -1110,7 +1098,7 @@ export function createInput(className?: string, type?: string): HTMLInputElement
   if (type) {
     element.type = type;
   }
-  return /** @type {!HTMLInputElement} */ element as HTMLInputElement;
+  return element;
 }
 
 export function createSelect(name: string, options: string[]|Map<string, string[]>[]|Set<string>): HTMLSelectElement {
@@ -1186,8 +1174,8 @@ export class CheckboxLabel extends HTMLSpanElement {
     super();
     CheckboxLabel.lastId = CheckboxLabel.lastId + 1;
     const id = 'ui-checkbox-label' + CheckboxLabel.lastId;
-    this.shadowRootInternal = Utils.createShadowRootWithCoreStyles(
-        this, {cssFile: 'ui/legacy/checkboxTextLabel.css', delegatesFocus: undefined});
+    this.shadowRootInternal =
+        Utils.createShadowRootWithCoreStyles(this, {cssFile: checkboxTextLabelStyles, delegatesFocus: undefined});
     this.checkboxElement = (this.shadowRootInternal.createChild('input') as HTMLInputElement);
     this.checkboxElement.type = 'checkbox';
     this.checkboxElement.setAttribute('id', id);
@@ -1268,8 +1256,7 @@ export class DevToolsRadioButton extends HTMLSpanElement {
     this.radioElement.id = id;
     this.radioElement.type = 'radio';
     this.labelElement.htmlFor = id;
-    const root =
-        Utils.createShadowRootWithCoreStyles(this, {cssFile: 'ui/legacy/radioButton.css', delegatesFocus: undefined});
+    const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: radioButtonStyles, delegatesFocus: undefined});
     root.createChild('slot');
     this.addEventListener('click', this.radioClickHandler.bind(this), false);
   }
@@ -1291,8 +1278,7 @@ export class DevToolsSlider extends HTMLSpanElement {
 
   constructor() {
     super();
-    const root =
-        Utils.createShadowRootWithCoreStyles(this, {cssFile: 'ui/legacy/slider.css', delegatesFocus: undefined});
+    const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: sliderStyles, delegatesFocus: undefined});
     this.sliderElement = document.createElement('input');
     this.sliderElement.classList.add('dt-range-input');
     this.sliderElement.type = 'range';
@@ -1315,8 +1301,7 @@ export class DevToolsSmallBubble extends HTMLSpanElement {
 
   constructor() {
     super();
-    const root =
-        Utils.createShadowRootWithCoreStyles(this, {cssFile: 'ui/legacy/smallBubble.css', delegatesFocus: undefined});
+    const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: smallBubbleStyles, delegatesFocus: undefined});
     this.textElement = root.createChild('div');
     this.textElement.className = 'info';
     this.textElement.createChild('slot');
@@ -1336,8 +1321,7 @@ export class DevToolsCloseButton extends HTMLDivElement {
 
   constructor() {
     super();
-    const root =
-        Utils.createShadowRootWithCoreStyles(this, {cssFile: 'ui/legacy/closeButton.css', delegatesFocus: undefined});
+    const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: closeButtonStyles, delegatesFocus: undefined});
     this.buttonElement = (root.createChild('div', 'close-button') as HTMLElement);
     Tooltip.install(this.buttonElement, i18nString(UIStrings.close));
     ARIAUtils.setAccessibleName(this.buttonElement, i18nString(UIStrings.close));
@@ -1566,7 +1550,7 @@ export class MessageDialog {
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
-        dialog.contentElement, {cssFile: 'ui/legacy/confirmDialog.css', delegatesFocus: undefined});
+        dialog.contentElement, {cssFile: confirmDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');
     await new Promise(resolve => {
       const okButton = createTextButton(i18nString(UIStrings.ok), resolve, '', true);
@@ -1590,7 +1574,7 @@ export class ConfirmDialog {
     dialog.setDimmed(true);
     ARIAUtils.setAccessibleName(dialog.contentElement, message);
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
-        dialog.contentElement, {cssFile: 'ui/legacy/confirmDialog.css', delegatesFocus: undefined});
+        dialog.contentElement, {cssFile: confirmDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');
     content.createChild('div', 'message').createChild('span').textContent = message;
     const buttonsBar = content.createChild('div', 'button');
@@ -1615,7 +1599,7 @@ export class ConfirmDialog {
 export function createInlineButton(toolbarButton: ToolbarButton): Element {
   const element = document.createElement('span');
   const shadowRoot =
-      Utils.createShadowRootWithCoreStyles(element, {cssFile: 'ui/legacy/inlineButton.css', delegatesFocus: undefined});
+      Utils.createShadowRootWithCoreStyles(element, {cssFile: inlineButtonStyles, delegatesFocus: undefined});
   element.classList.add('inline-button');
   const toolbar = new Toolbar('');
   toolbar.appendToolbarItem(toolbarButton);

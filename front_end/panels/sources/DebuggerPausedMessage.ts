@@ -142,7 +142,7 @@ export class DebuggerPausedMessage {
     }
 
     const mainElement = messageWrapper.createChild('div', 'status-main');
-    mainElement.appendChild(UI.Icon.Icon.create('smallicon-info', 'status-icon'));
+    mainElement.appendChild(UI.Icon.Icon.create('smallicon-clear-info', 'status-icon'));
     const breakpointType = BreakpointTypeNouns.get(data.type);
     mainElement.appendChild(document.createTextNode(
         i18nString(UIStrings.pausedOnS, {PH1: breakpointType ? breakpointType() : String(null)})));
@@ -191,13 +191,20 @@ export class DebuggerPausedMessage {
     } else if (details.reason === Protocol.Debugger.PausedEventReason.EventListener) {
       let eventNameForUI = '';
       if (details.auxData) {
-        eventNameForUI =
-            SDK.DOMDebuggerModel.DOMDebuggerManager.instance().resolveEventListenerBreakpointTitle((details.auxData as {
-              directiveText: string,
-              eventName: string,
-              targetName: string,
-              webglErrorName: string,
-            }));
+        const maybeNonDomEventNameForUI =
+            SDK.EventBreakpointsModel.EventBreakpointsManager.instance().resolveEventListenerBreakpointTitle(
+                (details.auxData as {eventName: string}));
+        if (maybeNonDomEventNameForUI) {
+          eventNameForUI = maybeNonDomEventNameForUI;
+        } else {
+          eventNameForUI = SDK.DOMDebuggerModel.DOMDebuggerManager.instance().resolveEventListenerBreakpointTitle(
+              (details.auxData as {
+                directiveText: string,
+                eventName: string,
+                targetName: string,
+                webglErrorName: string,
+              }));
+        }
       }
       messageWrapper = buildWrapper(i18nString(UIStrings.pausedOnEventListener), eventNameForUI);
     } else if (details.reason === Protocol.Debugger.PausedEventReason.XHR) {
@@ -249,7 +256,7 @@ export class DebuggerPausedMessage {
     function buildWrapper(mainText: string, subText?: string, title?: string): Element {
       const messageWrapper = document.createElement('span');
       const mainElement = messageWrapper.createChild('div', 'status-main');
-      const icon = UI.Icon.Icon.create(errorLike ? 'smallicon-error' : 'smallicon-info', 'status-icon');
+      const icon = UI.Icon.Icon.create(errorLike ? 'smallicon-clear-error' : 'smallicon-clear-info', 'status-icon');
       mainElement.appendChild(icon);
       mainElement.appendChild(document.createTextNode(mainText));
       if (subText) {

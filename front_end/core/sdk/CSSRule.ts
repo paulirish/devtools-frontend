@@ -6,7 +6,9 @@ import * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 
 import {CSSContainerQuery} from './CSSContainerQuery.js';
+import {CSSLayer} from './CSSLayer.js';
 import {CSSMedia} from './CSSMedia.js';
+import {CSSSupports} from './CSSSupports.js';
 
 import type {CSSModel, Edit} from './CSSModel.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
@@ -73,7 +75,7 @@ export class CSSRule {
   getStyleSheetHeader(styleSheetId: Protocol.CSS.StyleSheetId): CSSStyleSheetHeader {
     const styleSheetHeader = this.cssModelInternal.styleSheetHeaderForId(styleSheetId);
     console.assert(styleSheetHeader !== null);
-    return /** @type {!CSSStyleSheetHeader} */ styleSheetHeader as CSSStyleSheetHeader;
+    return styleSheetHeader as CSSStyleSheetHeader;
   }
 }
 
@@ -99,6 +101,8 @@ export class CSSStyleRule extends CSSRule {
   selectors!: CSSValue[];
   media: CSSMedia[];
   containerQueries: CSSContainerQuery[];
+  supports: CSSSupports[];
+  layers: CSSLayer[];
   wasUsed: boolean;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSRule, wasUsed?: boolean) {
     // TODO(crbug.com/1011811): Replace with spread operator or better types once Closure is gone.
@@ -108,6 +112,8 @@ export class CSSStyleRule extends CSSRule {
     this.containerQueries = payload.containerQueries ?
         CSSContainerQuery.parseContainerQueriesPayload(cssModel, payload.containerQueries) :
         [];
+    this.supports = payload.supports ? CSSSupports.parseSupportsPayload(cssModel, payload.supports) : [];
+    this.layers = payload.layers ? CSSLayer.parseLayerPayload(cssModel, payload.layers) : [];
     this.wasUsed = wasUsed || false;
   }
 
@@ -191,23 +197,18 @@ export class CSSStyleRule extends CSSRule {
         this.selectors[i].rebase(edit);
       }
     }
-    for (const media of this.media) {
-      media.rebase(edit);
-    }
-    for (const containerQuery of this.containerQueries) {
-      containerQuery.rebase(edit);
-    }
+    this.media.forEach(media => media.rebase(edit));
+    this.containerQueries.forEach(cq => cq.rebase(edit));
+    this.supports.forEach(supports => supports.rebase(edit));
 
     super.rebase(edit);
   }
 }
 
 export class CSSKeyframesRule {
-  readonly #cssModel: CSSModel;
   readonly #animationName: CSSValue;
   readonly #keyframesInternal: CSSKeyframeRule[];
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSKeyframesRule) {
-    this.#cssModel = cssModel;
     this.#animationName = new CSSValue(payload.animationName);
     this.#keyframesInternal = payload.keyframes.map(keyframeRule => new CSSKeyframeRule(cssModel, keyframeRule));
   }

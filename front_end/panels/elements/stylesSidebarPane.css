@@ -217,6 +217,10 @@
   margin-left: 2px;
 }
 
+.sidebar-separator.layer-separator {
+  display: flex;
+}
+
 .sidebar-pane-section-toolbar {
   position: absolute;
   right: 0;
@@ -260,6 +264,10 @@
     text-decoration-color: linktext;
   }
 
+  .styles-section .styles-section-subtitle .devtools-link:focus-visible {
+    color: HighlightText;
+  }
+
   .styles-section:focus-visible *,
   .styles-section.read-only:focus-visible *,
   .styles-section:focus-visible .styles-section-subtitle .devtools-link {
@@ -275,6 +283,10 @@
 
   .styles-section:focus-visible .sidebar-pane-section-toolbar {
     background-color: ButtonFace;
+  }
+
+  .styles-section:focus-visible {
+    --webkit-css-property-color: HighlightText;
   }
 }
 

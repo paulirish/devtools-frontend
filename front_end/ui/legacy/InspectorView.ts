@@ -52,6 +52,7 @@ import {ViewManager} from './ViewManager.js';
 import type {Widget} from './Widget.js';
 import {VBox, WidgetFocusRestorer} from './Widget.js';
 import * as ARIAUtils from './ARIAUtils.js';
+import inspectorViewTabbedPaneStyles from './inspectorViewTabbedPane.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -106,6 +107,14 @@ const UIStrings = {
   *@description The aria label for the drawer.
   */
   drawer: 'Tool drawer',
+  /**
+  *@description The aria label for the drawer shown.
+  */
+  drawerShown: 'Drawer shown',
+  /**
+  *@description The aria label for the drawer hidden.
+  */
+  drawerHidden: 'Drawer hidden',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/InspectorView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -167,7 +176,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
 
     this.tabbedPane = this.tabbedLocation.tabbedPane();
     this.tabbedPane.element.classList.add('main-tabbed-pane');
-    this.tabbedPane.registerRequiredCSS('ui/legacy/inspectorViewTabbedPane.css');
+    this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(TabbedPaneEvents.TabSelected, this.tabSelected, this);
     this.tabbedPane.setAccessibleName(i18nString(UIStrings.panels));
     this.tabbedPane.setTabDelegate(this.tabDelegate);
@@ -189,7 +198,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
         Host.InspectorFrontendHostAPI.Events.ShowPanel, showPanel.bind(this));
 
     function showPanel(this: InspectorView, {data: panelName}: Common.EventTarget.EventTargetEvent<string>): void {
-      this.showPanel(panelName);
+      void this.showPanel(panelName);
     }
 
     if (shouldShowLocaleInfobar()) {
@@ -207,6 +216,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       inspectorViewInstance = new InspectorView();
     }
 
+    return inspectorViewInstance;
+  }
+
+  static maybeGetInspectorViewInstance(): InspectorView|undefined {
     return inspectorViewInstance;
   }
 
@@ -246,7 +259,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     if (!view) {
       throw new Error(`Expected view for panel '${panelName}'`);
     }
-    return /** @type {!Promise.<!Panel>} */ view.widget() as Promise<Panel>;
+    return view.widget() as Promise<Panel>;
   }
 
   onSuspendStateChanged(allTargetsSuspended: boolean): void {
@@ -307,6 +320,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       this.focusRestorer = null;
     }
     this.emitDrawerChangeEvent(true);
+    ARIAUtils.alert(i18nString(UIStrings.drawerShown));
   }
 
   drawerVisible(): boolean {
@@ -323,6 +337,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.drawerSplitWidget.hideSidebar(true);
 
     this.emitDrawerChangeEvent(false);
+    ARIAUtils.alert(i18nString(UIStrings.drawerHidden));
   }
 
   setDrawerMinimized(minimized: boolean): void {
@@ -360,7 +375,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
         const panelName = this.tabbedPane.tabIds()[panelIndex];
         if (panelName) {
           if (!Dialog.hasInstance() && !this.currentPanelLocked) {
-            this.showPanel(panelName);
+            void this.showPanel(panelName);
           }
           event.consume(true);
         }
@@ -443,10 +458,6 @@ function getDisableLocaleInfoBarSetting(): Common.Settings.Setting<boolean> {
 }
 
 function shouldShowLocaleInfobar(): boolean {
-  if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.LOCALIZED_DEVTOOLS)) {
-    return false;
-  }
-
   if (getDisableLocaleInfoBarSetting().get()) {
     return false;
   }
@@ -467,10 +478,9 @@ function shouldShowLocaleInfobar(): boolean {
 function createLocaleInfobar(): Infobar {
   const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance();
   const closestSupportedLocale = devtoolsLocale.lookupClosestDevToolsLocale(navigator.language);
-  // @ts-ignore TODO(crbug.com/1163928) Wait for Intl support.
   const locale = new Intl.Locale(closestSupportedLocale);
   const closestSupportedLanguageInCurrentLocale =
-      new Intl.DisplayNames([devtoolsLocale.locale], {type: 'language'}).of(locale.language);
+      new Intl.DisplayNames([devtoolsLocale.locale], {type: 'language'}).of(locale.language || 'en');
 
   const languageSetting = Common.Settings.Settings.instance().moduleSetting<string>('language');
   return new Infobar(

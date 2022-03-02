@@ -29,38 +29,34 @@ export interface HiddenIssuesMenuData {
 
 export class HideIssuesMenu extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-hide-issues-menu`;
-  private readonly shadow: ShadowRoot = this.attachShadow({mode: 'open'});
-  private visible: boolean = false;
-  private menuItemLabel: Common.UIString.LocalizedString = Common.UIString.LocalizedEmptyString;
-  private menuItemAction: () => void = () => {};
+  readonly #shadow: ShadowRoot = this.attachShadow({mode: 'open'});
+  #menuItemLabel: Common.UIString.LocalizedString = Common.UIString.LocalizedEmptyString;
+  #menuItemAction: () => void = () => {};
 
   set data(data: HiddenIssuesMenuData) {
-    this.menuItemLabel = data.menuItemLabel;
-    this.menuItemAction = data.menuItemAction;
-    this.render();
+    this.#menuItemLabel = data.menuItemLabel;
+    this.#menuItemAction = data.menuItemAction;
+    this.#render();
   }
 
   connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [hideIssuesMenuStyles];
-  }
-
-  setVisible(x: boolean): void {
-    if (this.visible === x) {
-      return;
-    }
-    this.visible = x;
-    this.render();
+    this.#shadow.adoptedStyleSheets = [hideIssuesMenuStyles];
   }
 
   onMenuOpen(event: Event): void {
     event.stopPropagation();
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
-    contextMenu.headerSection().appendItem(this.menuItemLabel, () => this.menuItemAction());
-    contextMenu.show();
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {
+      useSoftMenu: true,
+      onSoftMenuClosed: (): void => {
+        this.classList.toggle('has-context-menu-opened', false);
+      },
+    });
+    contextMenu.headerSection().appendItem(this.#menuItemLabel, () => this.#menuItemAction());
+    void contextMenu.show();
+    this.classList.toggle('has-context-menu-opened', true);
   }
 
-  private render(): void {
-    this.classList.toggle('hidden', !this.visible);
+  #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
       LitHtml.render(LitHtml.html`
@@ -70,7 +66,7 @@ export class HideIssuesMenu extends HTMLElement {
         >
         </${IconButton.Icon.Icon.litTagName}>
         </button>
-      `, this.shadow, {host: this});
+      `, this.#shadow, {host: this});
     }
   }
 

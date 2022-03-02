@@ -6,20 +6,19 @@ const needlessDisables = require('./needlessDisables');
 const reportDisables = require('./reportDisables');
 
 /** @typedef {import('stylelint').Formatter} Formatter */
-/** @typedef {import('stylelint').StylelintResult} StylelintResult */
-/** @typedef {import('stylelint').StylelintStandaloneOptions} StylelintStandaloneOptions */
-/** @typedef {import('stylelint').StylelintStandaloneReturnValue} StylelintStandaloneReturnValue */
+/** @typedef {import('stylelint').LintResult} StylelintResult */
+/** @typedef {import('stylelint').LinterOptions["maxWarnings"]} maxWarnings */
+/** @typedef {import('stylelint').LinterResult} LinterResult */
 
 /**
  * @param {StylelintResult[]} stylelintResults
- * @param {StylelintStandaloneOptions} options
+ * @param {maxWarnings} maxWarnings
  * @param {Formatter} formatter
+ * @param {string} cwd
  *
- * @returns {StylelintStandaloneReturnValue}
+ * @returns {LinterResult}
  */
-function prepareReturnValue(stylelintResults, options, formatter) {
-	const { maxWarnings } = options;
-
+function prepareReturnValue(stylelintResults, maxWarnings, formatter, cwd) {
 	reportDisables(stylelintResults);
 	needlessDisables(stylelintResults);
 	invalidScopeDisables(stylelintResults);
@@ -32,8 +31,9 @@ function prepareReturnValue(stylelintResults, options, formatter) {
 			result.warnings.some((warning) => warning.severity === 'error'),
 	);
 
-	/** @type {StylelintStandaloneReturnValue} */
+	/** @type {LinterResult} */
 	const returnValue = {
+		cwd,
 		errored,
 		results: [],
 		output: '',
@@ -41,9 +41,7 @@ function prepareReturnValue(stylelintResults, options, formatter) {
 	};
 
 	if (maxWarnings !== undefined) {
-		const foundWarnings = stylelintResults.reduce((count, file) => {
-			return count + file.warnings.length;
-		}, 0);
+		const foundWarnings = stylelintResults.reduce((count, file) => count + file.warnings.length, 0);
 
 		if (foundWarnings > maxWarnings) {
 			returnValue.maxWarningsExceeded = { maxWarnings, foundWarnings };

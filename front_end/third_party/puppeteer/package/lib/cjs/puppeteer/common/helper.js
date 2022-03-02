@@ -39,7 +39,7 @@ const Errors_js_1 = require("./Errors.js");
 const Debug_js_1 = require("./Debug.js");
 const assert_js_1 = require("./assert.js");
 const environment_js_1 = require("../environment.js");
-exports.debugError = Debug_js_1.debug('puppeteer:error');
+exports.debugError = (0, Debug_js_1.debug)('puppeteer:error');
 function getExceptionMessage(exceptionDetails) {
     if (exceptionDetails.exception)
         return (exceptionDetails.exception.description || exceptionDetails.exception.value);
@@ -58,7 +58,7 @@ function getExceptionMessage(exceptionDetails) {
     return message;
 }
 function valueFromRemoteObject(remoteObject) {
-    assert_js_1.assert(!remoteObject.objectId, 'Cannot extract value when objectId is given');
+    (0, assert_js_1.assert)(!remoteObject.objectId, 'Cannot extract value when objectId is given');
     if (remoteObject.unserializableValue) {
         if (remoteObject.type === 'bigint' && typeof BigInt !== 'undefined')
             return BigInt(remoteObject.unserializableValue.replace('n', ''));
@@ -86,7 +86,7 @@ async function releaseObject(client, remoteObject) {
         .catch((error) => {
         // Exceptions might happen in case of a page been navigated or closed.
         // Swallow these since they are harmless and we don't leak anything in this case.
-        exports.debugError(error);
+        (0, exports.debugError)(error);
     });
 }
 function addEventListener(emitter, eventName, handler) {
@@ -105,7 +105,9 @@ function isNumber(obj) {
     return typeof obj === 'number' || obj instanceof Number;
 }
 async function waitForEvent(emitter, eventName, predicate, timeout, abortPromise) {
-    let eventTimeout, resolveCallback, rejectCallback;
+    let eventTimeout;
+    let resolveCallback;
+    let rejectCallback;
     const promise = new Promise((resolve, reject) => {
         resolveCallback = resolve;
         rejectCallback = reject;
@@ -137,7 +139,7 @@ async function waitForEvent(emitter, eventName, predicate, timeout, abortPromise
 }
 function evaluationString(fun, ...args) {
     if (isString(fun)) {
-        assert_js_1.assert(args.length === 0, 'Cannot evaluate a string with arguments');
+        (0, assert_js_1.assert)(args.length === 0, 'Cannot evaluate a string with arguments');
         return fun;
     }
     function serializeArgument(arg) {
@@ -199,7 +201,9 @@ function makePredicateString(predicate, predicateQueryHandler) {
             return waitForHidden;
         if (!waitForVisible && !waitForHidden)
             return node;
-        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+        const element = node.nodeType === Node.TEXT_NODE
+            ? node.parentElement
+            : node;
         const style = window.getComputedStyle(element);
         const isVisible = style && style.visibility !== 'hidden' && hasVisibleBoundingBox();
         const success = waitForVisible === isVisible || waitForHidden === !isVisible;
@@ -246,11 +250,11 @@ async function getReadableAsBuffer(readable, path) {
     const buffers = [];
     for await (const chunk of readable) {
         buffers.push(chunk);
-        if (fileHandle) {
+        if (fileHandle && fs) {
             await fs.promises.writeFile(fileHandle, chunk);
         }
     }
-    if (path)
+    if (path && fileHandle)
         await fileHandle.close();
     let resultBuffer = null;
     try {
@@ -269,16 +273,19 @@ async function getReadableFromProtocolStream(client, handle) {
     const { Readable } = await Promise.resolve().then(() => __importStar(require('stream')));
     let eof = false;
     return new Readable({
-        async read(size) {
+        async read() {
+            // TODO: use the advised size parameter to read function once
+            // crbug.com/1290727 is resolved.
+            // Also, see https://github.com/puppeteer/puppeteer/pull/7868.
             if (eof) {
                 return null;
             }
-            const response = await client.send('IO.read', { handle, size });
+            const response = await client.send('IO.read', { handle });
             this.push(response.data, response.base64Encoded ? 'base64' : undefined);
             if (response.eof) {
-                this.push(null);
                 eof = true;
                 await client.send('IO.close', { handle });
+                this.push(null);
             }
         },
     });

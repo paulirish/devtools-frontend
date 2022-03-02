@@ -11,13 +11,13 @@ const rules = require('../rules');
  * @template {Object} O
  * @param {{
 		ruleName: string,
-		ruleSettings: import('stylelint').StylelintConfigRuleSettings<T, O>,
+		ruleSettings: import('stylelint').ConfigRuleSettings<T, O>,
 		root: import('postcss').Root,
 	}} options
- * @param {Function} callback
+ * @param {(warning: import('postcss').Warning) => void} callback
  * @returns {void}
  */
-module.exports = function (options, callback) {
+function checkAgainstRule(options, callback) {
 	if (!options)
 		throw new Error(
 			"checkAgainstRule requires an options object with 'ruleName', 'ruleSettings', and 'root' properties",
@@ -48,5 +48,10 @@ module.exports = function (options, callback) {
 		/** @type {O} */ (settings[1]),
 		{},
 	)(options.root, tmpPostcssResult);
-	tmpPostcssResult.warnings().forEach(callback);
-};
+
+	for (const warning of tmpPostcssResult.warnings()) callback(warning);
+}
+
+module.exports = /** @type {typeof import('stylelint').utils.checkAgainstRule} */ (
+	checkAgainstRule
+);

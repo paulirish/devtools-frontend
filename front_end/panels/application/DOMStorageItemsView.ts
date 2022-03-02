@@ -32,6 +32,7 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -99,10 +100,10 @@ export class DOMStorageItemsView extends StorageItemsView {
       refreshCallback: this.refreshItems.bind(this),
     });
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SelectedNode, event => {
-      this.previewEntry(event.data);
+      void this.previewEntry(event.data);
     });
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.DeselectedNode, () => {
-      this.previewEntry(null);
+      void this.previewEntry(null);
     });
     this.dataGrid.setStriped(true);
     this.dataGrid.setName('DOMStorageItemsView');
@@ -208,7 +209,7 @@ export class DOMStorageItemsView extends StorageItemsView {
     if (!childNode.selected) {
       return;
     }
-    this.previewEntry(childNode);
+    void this.previewEntry(childNode);
     this.setCanDeleteSelected(true);
   }
 
@@ -253,7 +254,7 @@ export class DOMStorageItemsView extends StorageItemsView {
   }
 
   refreshItems(): void {
-    this.domStorage.getItems().then(items => items && this.showDOMStorageItems(items));
+    void this.domStorage.getItems().then(items => items && this.showDOMStorageItems(items));
   }
 
   deleteAllItems(): void {
@@ -319,7 +320,7 @@ export class DOMStorageItemsView extends StorageItemsView {
     const value = entry && entry.data && entry.data.value;
     if (entry && entry.data && entry.data.value) {
       const protocol = this.domStorage.isLocalStorage ? 'localstorage' : 'sessionstorage';
-      const url = `${protocol}://${entry.key}`;
+      const url = `${protocol}://${entry.key}` as Platform.DevToolsPath.UrlString;
       const provider = TextUtils.StaticContentProvider.StaticContentProvider.fromString(
           url, Common.ResourceType.resourceTypes.XHR, (value as string));
       const preview = await SourceFrame.PreviewFactory.PreviewFactory.createPreview(provider, 'text/plain');

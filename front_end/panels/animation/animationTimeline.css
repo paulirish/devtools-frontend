@@ -24,7 +24,10 @@
   margin-bottom: -1px;
   background-color: var(--color-background-elevation-1);
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: flex-start;
+  white-space: nowrap;
   flex: 0 0 150px;
 }
 
@@ -112,7 +115,7 @@ circle.animation-keyframe-point:active {
 }
 
 .animation-timeline-header::after {
-  content: '';
+  content: "";
   height: calc(100% - 48px - 28px);
   position: absolute;
   width: 150px;
@@ -184,14 +187,14 @@ circle.animation-keyframe-point:active {
   height: 100%;
   width: 100%;
   top: 28px;
-  border-left: 1px solid var(--color-syntax-1);
+  border-left: 1px solid var(--color-red);
   z-index: 2;
   cursor: col-resize;
 }
 
 .animation-scrubber-line {
   width: 11px;
-  background: linear-gradient(to right, transparent 5px, var(--color-syntax-1) 5px, var(--color-syntax-1) 6px, transparent 6px);
+  background: linear-gradient(to right, transparent 5px, var(--color-red) 5px, var(--color-red) 6px, transparent 6px);
   position: absolute;
   top: -28px;
   height: 28px;
@@ -204,7 +207,7 @@ circle.animation-keyframe-point:active {
   width: 7px;
   height: 7px;
   transform: rotate(45deg);
-  background: var(--color-syntax-1);
+  background: var(--color-red);
   position: absolute;
   left: 2px;
   top: 1px;
@@ -335,7 +338,6 @@ text.animation-timeline-grid-label {
   background: var(--color-background-elevation-2);
   opacity: 0%;
   border-right: 1px solid var(--color-details-hairline);
-  cursor: pointer;
 }
 
 .animation-buffer-preview:focus-visible {
@@ -361,7 +363,7 @@ text.animation-timeline-grid-label {
 
 .animation-paused::before,
 .animation-paused::after {
-  content: '';
+  content: "";
   background: var(--color-background);
   width: 7px;
   height: 20px;
@@ -399,15 +401,14 @@ text.animation-timeline-grid-label {
 }
 
 .animation-playback-rate-button {
-  border: 1px solid var(--color-details-hairline);
+  border: 1px solid var(--color-button-secondary-border);
   color: var(--color-text-primary);
   display: inline-block;
   margin-right: -1px;
   padding: 1px 4px;
-  background: var(--color-background);
+  background-color: transparent;
   flex: 1 0 auto;
   text-align: center;
-  cursor: pointer;
 }
 
 .animation-playback-rate-button:first-child {
@@ -419,9 +420,9 @@ text.animation-timeline-grid-label {
 }
 
 .animation-playback-rate-button.selected {
-  color: var(--legacy-selection-fg-color);
-  background-color: var(--legacy-selection-bg-color);
-  border-color: var(--legacy-selection-bg-color);
+  color: var(--color-button-primary-text);
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
   z-index: 1;
 }
 
@@ -451,7 +452,6 @@ text.animation-timeline-grid-label {
   box-shadow: 0 1px 4px 0 var(--color-background-highlight);
   z-index: 100;
   display: none;
-  cursor: pointer;
   font-weight: 700;
   color: var(--color-background);
 }

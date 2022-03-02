@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { isNode } from '../environment.js';
-
-import { assert } from './assert.js';
-import { debug } from './Debug.js';
 import { TimeoutError } from './Errors.js';
-
+import { debug } from './Debug.js';
+import { assert } from './assert.js';
+import { isNode } from '../environment.js';
 export const debugError = debug('puppeteer:error');
 function getExceptionMessage(exceptionDetails) {
     if (exceptionDetails.exception)
@@ -85,7 +83,9 @@ function isNumber(obj) {
     return typeof obj === 'number' || obj instanceof Number;
 }
 async function waitForEvent(emitter, eventName, predicate, timeout, abortPromise) {
-    let eventTimeout, resolveCallback, rejectCallback;
+    let eventTimeout;
+    let resolveCallback;
+    let rejectCallback;
     const promise = new Promise((resolve, reject) => {
         resolveCallback = resolve;
         rejectCallback = reject;
@@ -179,7 +179,9 @@ function makePredicateString(predicate, predicateQueryHandler) {
             return waitForHidden;
         if (!waitForVisible && !waitForHidden)
             return node;
-        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+        const element = node.nodeType === Node.TEXT_NODE
+            ? node.parentElement
+            : node;
         const style = window.getComputedStyle(element);
         const isVisible = style && style.visibility !== 'hidden' && hasVisibleBoundingBox();
         const success = waitForVisible === isVisible || waitForHidden === !isVisible;
@@ -226,11 +228,11 @@ async function getReadableAsBuffer(readable, path) {
     const buffers = [];
     for await (const chunk of readable) {
         buffers.push(chunk);
-        if (fileHandle) {
+        if (fileHandle && fs) {
             await fs.promises.writeFile(fileHandle, chunk);
         }
     }
-    if (path)
+    if (path && fileHandle)
         await fileHandle.close();
     let resultBuffer = null;
     try {
@@ -249,16 +251,19 @@ async function getReadableFromProtocolStream(client, handle) {
     const { Readable } = await import('stream');
     let eof = false;
     return new Readable({
-        async read(size) {
+        async read() {
+            // TODO: use the advised size parameter to read function once
+            // crbug.com/1290727 is resolved.
+            // Also, see https://github.com/puppeteer/puppeteer/pull/7868.
             if (eof) {
                 return null;
             }
-            const response = await client.send('IO.read', { handle, size });
+            const response = await client.send('IO.read', { handle });
             this.push(response.data, response.base64Encoded ? 'base64' : undefined);
             if (response.eof) {
-                this.push(null);
                 eof = true;
                 await client.send('IO.close', { handle });
+                this.push(null);
             }
         },
     });

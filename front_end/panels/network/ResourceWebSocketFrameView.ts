@@ -200,7 +200,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
     this.dataGrid.setName('ResourceWebSocketFrameView');
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SelectedNode, event => {
-      this.onFrameSelected(event);
+      void this.onFrameSelected(event);
     }, this);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.DeselectedNode, this.onFrameDeselected, this);
 
@@ -331,7 +331,8 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
     this.splitWidget.setSidebarWidget(new SourceFrame.ResourceSourceFrame.ResourceSourceFrame(
         TextUtils.StaticContentProvider.StaticContentProvider.fromString(
-            this.request.url(), Common.ResourceType.resourceTypes.WebSocket, content)));
+            this.request.url(), Common.ResourceType.resourceTypes.WebSocket, content),
+        ''));
   }
 
   private onFrameDeselected(): void {
@@ -460,8 +461,9 @@ export class ResourceWebSocketFrameNode extends DataGrid.SortableDataGrid.Sortab
 
     if (!this.binaryViewInternal) {
       if (this.dataTextInternal.length > 0) {
-        this.binaryViewInternal =
-            new BinaryResourceView(this.dataTextInternal, /* url */ '', Common.ResourceType.resourceTypes.WebSocket);
+        this.binaryViewInternal = new BinaryResourceView(
+            this.dataTextInternal, /* url */ '' as Platform.DevToolsPath.UrlString,
+            Common.ResourceType.resourceTypes.WebSocket);
       }
     }
     return this.binaryViewInternal;

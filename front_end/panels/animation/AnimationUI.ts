@@ -42,7 +42,6 @@ type CachedElement = {
 export class AnimationUI {
   #animationInternal: AnimationImpl;
   #timeline: AnimationTimeline;
-  readonly #parentElement: Element;
   #keyframes?: KeyframeStyle[];
   #nameElement: HTMLElement;
   readonly #svg: Element;
@@ -62,7 +61,6 @@ export class AnimationUI {
   constructor(animation: AnimationImpl, timeline: AnimationTimeline, parentElement: Element) {
     this.#animationInternal = animation;
     this.#timeline = timeline;
-    this.#parentElement = parentElement;
 
     const keyframesRule = this.#animationInternal.source().keyframesRule();
     if (keyframesRule) {
@@ -281,7 +279,8 @@ export class AnimationUI {
     const iterationWidth = this.duration() * this.#timeline.pixelMsRatio();
     let iteration;
     for (iteration = 1; iteration < this.#animationInternal.source().iterations() &&
-         iterationWidth * (iteration - 1) < this.#timeline.width();
+         iterationWidth * (iteration - 1) < this.#timeline.width() &&
+         (iterationWidth > 0 || this.#animationInternal.source().iterations() !== Infinity);
          iteration++) {
       this.renderIteration(this.#tailGroup, iteration);
     }
@@ -387,7 +386,7 @@ export class AnimationUI {
     this.#downMouseX = mouseEvent.clientX;
     event.consume(true);
     if (this.#node) {
-      Common.Revealer.reveal(this.#node);
+      void Common.Revealer.reveal(this.#node);
     }
     return true;
   }
@@ -464,10 +463,10 @@ export class AnimationUI {
       }
       const contextMenu = new UI.ContextMenu.ContextMenu(event);
       contextMenu.appendApplicableItems(remoteObject);
-      contextMenu.show();
+      void contextMenu.show();
     }
 
-    this.#animationInternal.remoteObjectPromise().then(showContextMenu);
+    void this.#animationInternal.remoteObjectPromise().then(showContextMenu);
     event.consume(true);
   }
 }

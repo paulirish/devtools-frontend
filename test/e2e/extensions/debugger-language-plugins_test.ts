@@ -5,9 +5,9 @@
 import {assert} from 'chai';
 
 import type {Chrome} from '../../../extension-api/ExtensionAPI.js';
-import {$, click, enableExperiment, getBrowserAndPages, getResourcesPath, goToResource, pasteText, waitFor, waitForFunction, waitForMany, waitForNone} from '../../shared/helper.js';
+import {$, click, enableExperiment, getBrowserAndPages, goToResource, pasteText, waitFor, waitForFunction, waitForMany, waitForNone} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {loadExtension} from '../helpers/extension-helpers.js';
+import {getResourcesPathWithDevToolsHostname, loadExtension} from '../helpers/extension-helpers.js';
 import {CONSOLE_TAB_SELECTOR, focusConsolePrompt, getCurrentConsoleMessages, getStructuredConsoleMessages} from '../helpers/console-helpers.js';
 import {addBreakpointForLine, getCallFrameLocations, getCallFrameNames, getNonBreakableLines, getValuesForScope, isBreakpointSet, listenForSourceFilesAdded, openFileInEditor, openFileInSourcesPanel, openSourceCodeEditorForFile, openSourcesPanel, PAUSE_ON_EXCEPTION_BUTTON, RESUME_BUTTON, retrieveSourceFilesAdded, retrieveTopCallFrameScriptLocation, switchToCallFrame, waitForAdditionalSourceFiles} from '../helpers/sources-helpers.js';
 
@@ -27,7 +27,8 @@ describe('The Debugger Language Plugins', async () => {
   // Load a simple wasm file and verify that the source file shows up in the file tree.
   it('can show C filenames after loading the module', async () => {
     const {target, frontend} = getBrowserAndPages();
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       // A simple plugin that resolves to a single source file
       class SingleFilePlugin {
@@ -52,7 +53,8 @@ describe('The Debugger Language Plugins', async () => {
 
   // Resolve a single code offset to a source line to test the correctness of offset computations.
   it('use correct code offsets to interpret raw locations', async () => {
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       class LocationMappingPlugin {
         private modules:
@@ -99,13 +101,14 @@ describe('The Debugger Language Plugins', async () => {
       return messages.find(message => message.message.startsWith('Uncaught (in promise) RuntimeError: unreachable'));
     });
     const callframes = error.message.split('\n').slice(1);
-    assert.deepEqual(callframes, ['    at Main (unreachable.ll:6)', '    at go (unreachable.html:27)']);
+    assert.deepEqual(callframes, ['    at Main (unreachable.ll:6:3)', '    at go (unreachable.html:27:29)']);
   });
 
   // Resolve the location for a breakpoint.
   it('resolve locations for breakpoints correctly', async () => {
     const {target, frontend} = getBrowserAndPages();
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       // This plugin will emulate a source mapping with a single file and a single corresponding source line and byte
       // code offset pair.
@@ -168,7 +171,7 @@ describe('The Debugger Language Plugins', async () => {
         items.indexOf('(provided via debug info by global_variable.wasm)'), 0, 'Toolbar debug info hint not found');
 
     // Line 4 is non-breakable.
-    assert.include(await getNonBreakableLines(frontend), 4);
+    assert.include(await getNonBreakableLines(), 4);
 
     await addBreakpointForLine(frontend, 9);
 
@@ -179,7 +182,8 @@ describe('The Debugger Language Plugins', async () => {
   });
 
   it('shows top-level and nested variables', async () => {
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluateHandle(() => {
       class VariableListingPlugin {
         private modules:
@@ -240,7 +244,8 @@ describe('The Debugger Language Plugins', async () => {
   });
 
   it('shows inline frames', async () => {
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       class InliningPlugin {
         private modules: Map<string, {
@@ -337,12 +342,13 @@ describe('The Debugger Language Plugins', async () => {
     at inner_inline_func (unreachable.ll:6)
     at outer_inline_func (unreachable.ll:11)
     at Main (unreachable.ll:16)
-    at go (unreachable.html:27)`;
+    at go (unreachable.html:27:29)`;
     });
   });
 
   it('falls back to wasm function names when inline info not present', async () => {
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       class InliningPlugin {
         private modules: Map<string, {
@@ -407,7 +413,8 @@ describe('The Debugger Language Plugins', async () => {
   });
 
   it('shows variable values with JS formatters', async () => {
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       class VariableListingPlugin {
         private modules:
@@ -570,7 +577,8 @@ describe('The Debugger Language Plugins', async () => {
   });
 
   it('shows variable value in popover', async () => {
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       class VariableListingPlugin {
         private modules:
@@ -654,7 +662,7 @@ describe('The Debugger Language Plugins', async () => {
     await waitFor(RESUME_BUTTON);
 
     const pausedPosition = await waitForFunction(async () => {
-      const element = await $('.cm-execution-line-tail');
+      const element = await $('.cm-executionToken');
       if (element && await element.evaluate(e => e.isConnected)) {
         return element;
       }
@@ -668,7 +676,8 @@ describe('The Debugger Language Plugins', async () => {
 
   it('shows sensible error messages.', async () => {
     const {frontend} = getBrowserAndPages();
-    const extension = await loadExtension('TestExtension', `${getResourcesPath()}/extensions/language_extensions.html`);
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
       class FormattingErrorsPlugin {
         private modules:

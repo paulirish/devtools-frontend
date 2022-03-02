@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import type * as SDKModule from '../../../../../front_end/core/sdk/sdk.js';
+import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import type * as Protocol from '../../../../../front_end/generated/protocol.js';
 
 import {createTarget, describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
@@ -89,6 +89,47 @@ describeWithMockConnection('DebuggerModel', () => {
       const model = new SDK.DebuggerModel.DebuggerModel(target);
       const {breakpointId} = await model.setBreakpointByURL('fs.js' as Platform.DevToolsPath.UrlString, 1);
       assert.strictEqual(breakpointId, breakpointId1);
+    });
+  });
+
+  describe('scriptsForSourceURL', () => {
+    it('returns the latest script at the front of the result for scripts with the same URL', () => {
+      const target = createTarget();
+      const url = 'http://localhost/index.html';
+      dispatchEvent(target, 'Debugger.scriptParsed', {
+        scriptId: SCRIPT_ID_ONE,
+        url,
+        startLine: 0,
+        startColumn: 0,
+        endLine: 1,
+        endColumn: 10,
+        executionContextId: 1,
+        hash: '',
+        isLiveEdit: false,
+        sourceMapURL: undefined,
+        hasSourceURL: false,
+        length: 10,
+      });
+      dispatchEvent(target, 'Debugger.scriptParsed', {
+        scriptId: SCRIPT_ID_TWO,
+        url,
+        startLine: 20,
+        startColumn: 0,
+        endLine: 21,
+        endColumn: 10,
+        executionContextId: 1,
+        hash: '',
+        isLiveEdit: false,
+        sourceMapURL: undefined,
+        hasSourceURL: false,
+        length: 10,
+      });
+
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      const scripts = debuggerModel?.scriptsForSourceURL(url) || [];
+
+      assert.strictEqual(scripts[0].scriptId, SCRIPT_ID_TWO);
+      assert.strictEqual(scripts[1].scriptId, SCRIPT_ID_ONE);
     });
   });
 });

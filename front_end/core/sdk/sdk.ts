@@ -11,6 +11,7 @@ import './NetworkManager.js';
 import './RuntimeModel.js';
 
 import * as AccessibilityModel from './AccessibilityModel.js';
+import * as CategorizedBreakpoint from './CategorizedBreakpoint.js';
 import * as ChildTargetManager from './ChildTargetManager.js';
 import * as CompilerSourceMappingContentProvider from './CompilerSourceMappingContentProvider.js';
 import * as Connections from './Connections.js';
@@ -23,6 +24,7 @@ import * as CPUProfilerModel from './CPUProfilerModel.js';
 import * as CPUThrottlingManager from './CPUThrottlingManager.js';
 import * as CSSContainerQuery from './CSSContainerQuery.js';
 import * as CSSFontFace from './CSSFontFace.js';
+import * as CSSLayer from './CSSLayer.js';
 import * as CSSMatchedStyles from './CSSMatchedStyles.js';
 import * as CSSMedia from './CSSMedia.js';
 import * as CSSMetadata from './CSSMetadata.js';
@@ -33,10 +35,12 @@ import * as CSSQuery from './CSSQuery.js';
 import * as CSSRule from './CSSRule.js';
 import * as CSSStyleDeclaration from './CSSStyleDeclaration.js';
 import * as CSSStyleSheetHeader from './CSSStyleSheetHeader.js';
+import * as CSSSupports from './CSSSupports.js';
 import * as DebuggerModel from './DebuggerModel.js';
 import * as DOMDebuggerModel from './DOMDebuggerModel.js';
 import * as DOMModel from './DOMModel.js';
 import * as EmulationModel from './EmulationModel.js';
+import * as EventBreakpointsModel from './EventBreakpointsModel.js';
 import * as FilmStripModel from './FilmStripModel.js';
 import * as FrameManager from './FrameManager.js';
 import * as HeapProfilerModel from './HeapProfilerModel.js';
@@ -76,6 +80,7 @@ import * as WebAuthnModel from './WebAuthnModel.js';
 
 export {
   AccessibilityModel,
+  CategorizedBreakpoint,
   ChildTargetManager,
   CompilerSourceMappingContentProvider,
   Connections,
@@ -88,6 +93,7 @@ export {
   CPUThrottlingManager,
   CSSContainerQuery,
   CSSFontFace,
+  CSSLayer,
   CSSMatchedStyles,
   CSSMedia,
   CSSMetadata,
@@ -98,10 +104,12 @@ export {
   CSSRule,
   CSSStyleDeclaration,
   CSSStyleSheetHeader,
+  CSSSupports,
   DebuggerModel,
   DOMDebuggerModel,
   DOMModel,
   EmulationModel,
+  EventBreakpointsModel,
   FilmStripModel,
   FrameManager,
   HeapProfilerModel,

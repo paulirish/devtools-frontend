@@ -5,18 +5,19 @@
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer';
 
-import {$$, click, getBrowserAndPages, getPendingEvents, getTestServerPort, goToResource, platform, pressKey, step, timeout, typeText, waitFor, waitForFunction} from '../../shared/helper.js';
+import {$$, click, getBrowserAndPages, getPendingEvents, getTestServerPort, goToResource, pasteText, platform, pressKey, step, timeout, typeText, waitFor, waitForFunction} from '../../shared/helper.js';
 
 export const ACTIVE_LINE = '.CodeMirror-activeline > pre > span';
-export const PAUSE_ON_EXCEPTION_BUTTON = '[aria-label="Don\'t pause on exceptions"]';
+export const PAUSE_ON_EXCEPTION_BUTTON = '[aria-label="Pause on exceptions"]';
 export const PAUSE_BUTTON = '[aria-label="Pause script execution"]';
 export const RESUME_BUTTON = '[aria-label="Resume script execution"]';
 export const SOURCES_LINES_SELECTOR = '.CodeMirror-code > div';
 export const PAUSE_INDICATOR_SELECTOR = '.paused-status';
-export const CODE_LINE_SELECTOR = '.CodeMirror-code .CodeMirror-linenumber';
+export const CODE_LINE_SELECTOR = '.cm-lineNumbers .cm-gutterElement';
 export const SCOPE_LOCAL_VALUES_SELECTOR = 'li[aria-label="Local"] + ol';
 export const SELECTED_THREAD_SELECTOR = 'div.thread-item.selected > div.thread-item-title';
 export const STEP_OVER_BUTTON = '[aria-label="Step over next function call"]';
+export const STEP_OUT_BUTTON = '[aria-label="Step out of current function"]';
 export const TURNED_OFF_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-off';
 export const TURNED_ON_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-on';
 export const DEBUGGER_PAUSED_EVENT = 'DevTools.DebuggerPaused';
@@ -103,8 +104,16 @@ export async function openSnippetsSubPane() {
   await waitFor('[aria-label="New snippet"]');
 }
 
-export async function createNewSnippet(snippetName: string) {
-  const {frontend} = await getBrowserAndPages();
+/**
+ * Creates a new snippet, optionally pre-filling it with the provided content.
+ * `snippetName` must not contain spaces or special characters, otherwise
+ * `createNewSnippet` will time out.
+ * DevTools uses the escaped snippet name for the ARIA label. `createNewSnippet`
+ * doesn't mirror the escaping so it won't be able to wait for the snippet
+ * entry in the navigation tree to appear.
+ */
+export async function createNewSnippet(snippetName: string, content?: string) {
+  const {frontend} = getBrowserAndPages();
 
   await click('[aria-label="New snippet"]');
   await waitFor('[aria-label^="Script snippet"]');
@@ -112,6 +121,12 @@ export async function createNewSnippet(snippetName: string) {
   await typeText(snippetName);
 
   await frontend.keyboard.press('Enter');
+  await waitFor(`[aria-label*="${snippetName}"]`);
+
+  if (content) {
+    await pasteText(content);
+    await pressKey('s', {control: true});
+  }
 }
 
 export async function openFileInEditor(sourceFile: string) {
@@ -154,8 +169,13 @@ export async function waitForHighlightedLineWhichIncludesText(expectedTextConten
 
 export async function waitForHighlightedLine(lineNumber: number) {
   await waitForFunction(async () => {
-    const selectedLineNumber = await waitFor('.CodeMirror-activeline-gutter > .CodeMirror-linenumber');
-    const text = await selectedLineNumber.evaluate(node => node.textContent);
+    const selectedLine = await waitFor('.cm-highlightedLine');
+    const currentlySelectedLineNumber = await selectedLine.evaluate(line => {
+      return [...line.parentElement?.childNodes || []].indexOf(line);
+    });
+    const lineNumbers = await waitFor('.cm-lineNumbers');
+    const text = await lineNumbers.evaluate(
+        (node, lineNumber) => node.childNodes[lineNumber].textContent, currentlySelectedLineNumber + 1);
     return Number(text) === lineNumber;
   });
 }
@@ -195,8 +215,8 @@ export function sourceLineNumberSelector(lineNumber: number) {
 }
 
 export async function isBreakpointSet(lineNumber: number|string) {
-  const breakpointLineParentClasses =
-      await (await getLineNumberElement(lineNumber))?.evaluate(n => n.parentElement?.className);
+  const lineNumberElement = await getLineNumberElement(lineNumber);
+  const breakpointLineParentClasses = await lineNumberElement?.evaluate(n => n.className);
   return breakpointLineParentClasses?.includes('cm-breakpoint');
 }
 
@@ -211,15 +231,23 @@ export async function checkBreakpointDidNotActivate() {
   });
 }
 
-export async function getBreakpointDecorators(frontend: puppeteer.Page, disabledOnly = false) {
-  const selector = `.cm-breakpoint${disabledOnly ? '-disabled' : ''} .CodeMirror-linenumber`;
-  return await frontend.$$eval(selector, nodes => nodes.map(n => Number(n.textContent)));
+export async function getBreakpointDecorators(disabledOnly = false) {
+  const selector = `.cm-breakpoint${disabledOnly ? '-disabled' : ''}`;
+  const breakpointDecorators = await $$(selector);
+  return await Promise.all(
+      breakpointDecorators.map(breakpointDecorator => breakpointDecorator.evaluate(n => Number(n.textContent))));
 }
 
-export async function getNonBreakableLines(frontend: puppeteer.Page) {
-  const selector = '.cm-non-breakable-line .CodeMirror-linenumber';
+export async function getNonBreakableLines() {
+  const selector = '.cm-nonBreakableLine';
   await waitFor(selector);
-  return await frontend.$$eval(selector, nodes => nodes.map(n => Number(n.textContent)));
+  const unbreakableLines = await $$(selector);
+  return await Promise.all(
+      unbreakableLines.map(unbreakableLine => unbreakableLine.evaluate(n => Number(n.textContent))));
+}
+
+export async function executionLineHighlighted() {
+  return await waitFor('.cm-executionLine');
 }
 
 export async function getExecutionLine() {

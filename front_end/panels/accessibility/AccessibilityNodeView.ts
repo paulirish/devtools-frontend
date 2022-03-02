@@ -203,8 +203,7 @@ export class AXNodeSubPane extends AccessibilitySubPane {
       };
       addProperty(roleProperty);
     }
-    for (const property of /** @type {!Array.<!Protocol.Accessibility.AXProperty>} */ axNode.properties() as
-         Protocol.Accessibility.AXProperty[]) {
+    for (const property of axNode.properties() as Protocol.Accessibility.AXProperty[]) {
       addProperty(property);
     }
 
@@ -587,8 +586,8 @@ export class AXRelatedNodeElement {
     if (this.deferredNode) {
       const valueElement = document.createElement('span');
       element.appendChild(valueElement);
-      this.deferredNode.resolvePromise().then(node => {
-        Common.Linkifier.Linkifier.linkify(node, {tooltip: undefined, preventKeyboardFocus: true})
+      void this.deferredNode.resolvePromise().then(node => {
+        void Common.Linkifier.Linkifier.linkify(node, {tooltip: undefined, preventKeyboardFocus: true})
             .then(linkfied => valueElement.appendChild(linkfied));
       });
     } else if (this.idref) {
@@ -606,7 +605,7 @@ export class AXRelatedNodeElement {
    */
   revealNode(): void {
     if (this.deferredNode) {
-      this.deferredNode.resolvePromise().then(node => Common.Revealer.reveal(node));
+      void this.deferredNode.resolvePromise().then(node => Common.Revealer.reveal(node));
     }
   }
 }
@@ -673,7 +672,7 @@ export class AXNodeIgnoredReasonTreeElement extends AXNodePropertyTreeElement {
         reasonElement = i18n.i18n.getFormatLocalizedString(str_, UIStrings.elementIsNotVisible, {});
         break;
       case 'presentationalRole': {
-        const role = axNode && axNode.role() || '';
+        const role = axNode && axNode.role()?.value || '';
         const rolePresentationSpan = document.createElement('span', {is: 'source-code'}).textContent = 'role=' + role;
         reasonElement =
             i18n.i18n.getFormatLocalizedString(str_, UIStrings.elementHasPlaceholder, {PH1: rolePresentationSpan});

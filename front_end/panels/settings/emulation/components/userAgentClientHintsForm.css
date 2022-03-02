@@ -75,10 +75,6 @@
   margin-right: 5px;
 }
 
-.delete-icon {
-  cursor: pointer;
-}
-
 .brand-row {
   display: flex;
   align-items: center;
@@ -94,18 +90,6 @@
   display: flex;
   align-items: center;
   margin-left: 5px;
-}
-
-.submit-button {
-  border: none;
-  border-radius: 2px;
-  font-weight: normal;
-  height: 24px;
-  font-size: 12px;
-  padding: 0 12px;
-  cursor: pointer;
-  background-color: var(--color-primary-variant);
-  color: var(--color-text-primary);
 }
 
 .hide-container {
@@ -127,7 +111,7 @@
     border: 1px solid;
   }
 
-  .tree-title[aria-disabled='true'] {
+  .tree-title[aria-disabled="true"] {
     color: GrayText;
   }
 }

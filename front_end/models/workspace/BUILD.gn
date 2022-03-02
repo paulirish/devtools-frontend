@@ -56,6 +56,7 @@ devtools_entrypoint("bundle") {
     "../../ui/legacy/components/utils/*",
     "../formatter/*",
     "../issues_manager/*",
+    "../source_map_scopes/*",
   ]
 
   visibility += devtools_models_visibility
@@ -68,6 +69,6 @@ devtools_entrypoint("legacy") {
 
   visibility = [
     "../..:legacy_entrypoints",
-    "../../entrypoints/shell/*",
+    "../../legacy_test_runner/*",
   ]
 }

@@ -40,7 +40,10 @@ devtools_module("utils") {
 devtools_entrypoint("bundle") {
   entrypoint = "utils.ts"
 
-  deps = [ ":utils" ]
+  deps = [
+    ":css_files",
+    ":utils",
+  ]
 
   visibility = [
     ":*",
@@ -63,13 +66,10 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("legacy") {
   entrypoint = "utils-legacy.ts"
 
-  deps = [
-    ":bundle",
-    ":css_files",
-  ]
+  deps = [ ":bundle" ]
 
   visibility = [
     "../../../..:legacy_entrypoints",
-    "../../../../entrypoints/shell/*",
+    "../../../../legacy_test_runner/*",
   ]
 }

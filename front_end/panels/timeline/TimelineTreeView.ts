@@ -138,6 +138,14 @@ const UIStrings = {
   */
   hideHeaviestStack: 'Hide Heaviest stack',
   /**
+   * @description Screen reader announcement when the heaviest stack sidebar is shown in the Performance panel.
+   */
+  heaviestStackShown: 'Heaviest stack sidebar shown',
+  /**
+   * @description Screen reader announcement when the heaviest stack sidebar is hidden in the Performance panel.
+   */
+  heaviestStackHidden: 'Heaviest stack sidebar hidden',
+  /**
   *@description Data grid name for Timeline Stack data grids
   */
   timelineStack: 'Timeline Stack',
@@ -284,7 +292,8 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
         new UI.Toolbar.ToolbarInput(i18nString(UIStrings.filter), this.getToolbarInputAccessiblePlaceHolder());
     textFilterUI.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, () => {
       const searchQuery = textFilterUI.value();
-      this.textFilterInternal.setRegExp(searchQuery ? createPlainTextSearchRegex(searchQuery, 'i') : null);
+      this.textFilterInternal.setRegExp(
+          searchQuery ? Platform.StringUtilities.createPlainTextSearchRegex(searchQuery, 'i') : null);
       this.refreshTree();
     }, this);
     this.textFilterUI = textFilterUI;
@@ -314,7 +323,7 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
     if (!frame) {
       return null;
     }
-    return this.linkifier.maybeLinkifyConsoleCallFrame(target, frame);
+    return this.linkifier.maybeLinkifyConsoleCallFrame(target, frame, {showColumnNumber: true, inlineFrameIndex: 0});
   }
 
   selectProfileNode(treeNode: TimelineModel.TimelineProfileTree.Node, suppressSelectedEvent: boolean): void {
@@ -524,7 +533,7 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
       return;
     }
     const searchRegex = searchConfig.toSearchRegex();
-    this.searchResults = this.root.searchTree(event => TimelineUIUtils.testContentMatching(event, searchRegex));
+    this.searchResults = this.root.searchTree(event => TimelineUIUtils.testContentMatching(event, searchRegex.regex));
     this.searchableView.updateSearchMatchesCount(this.searchResults.length);
   }
 
@@ -651,6 +660,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
     }
     const cell = this.createTD(columnId);
     cell.className = 'numeric-column';
+    cell.setAttribute('title', i18nString(UIStrings.fms, {PH1: value.toFixed(4)}));
     const textDiv = cell.createChild('div');
     textDiv.createChild('span').textContent = i18nString(UIStrings.fms, {PH1: value.toFixed(1)});
 
@@ -830,7 +840,8 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
         new UI.Toolbar.ToolbarSettingComboBox(options, this.groupBySetting, i18nString(UIStrings.groupBy)));
     toolbar.appendSpacer();
     toolbar.appendToolbarItem(this.splitWidget.createShowHideSidebarButton(
-        i18nString(UIStrings.showHeaviestStack), i18nString(UIStrings.hideHeaviestStack)));
+        i18nString(UIStrings.showHeaviestStack), i18nString(UIStrings.hideHeaviestStack),
+        i18nString(UIStrings.heaviestStackShown), i18nString(UIStrings.heaviestStackHidden)));
   }
 
   private buildHeaviestStack(treeNode: TimelineModel.TimelineProfileTree.Node):

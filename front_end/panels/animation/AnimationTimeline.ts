@@ -107,7 +107,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
   #uiAnimations: AnimationUI[];
   #groupBuffer: AnimationGroup[];
   readonly #previewMap: Map<AnimationGroup, AnimationGroupPreviewUI>;
-  readonly #symbol: symbol;
   readonly #animationsMap: Map<string, AnimationImpl>;
   #timelineScrubberLine?: HTMLElement;
   #pauseButton?: UI.Toolbar.ToolbarToggle;
@@ -143,7 +142,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     this.#uiAnimations = [];
     this.#groupBuffer = [];
     this.#previewMap = new Map();
-    this.#symbol = Symbol('animationTimeline');
     this.#animationsMap = new Map();
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.DOMModel.DOMModel, SDK.DOMModel.Events.NodeRemoved, this.nodeRemoved, this);
@@ -198,7 +196,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
   }
 
   private addEventListeners(animationModel: AnimationModel): void {
-    animationModel.ensureEnabled();
+    void animationModel.ensureEnabled();
     animationModel.addEventListener(Events.AnimationGroupStarted, this.animationGroupStarted, this);
     animationModel.addEventListener(Events.ModelReset, this.reset, this);
   }
@@ -242,7 +240,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     UI.ARIAUtils.markAsListBox(playbackRateControl);
     UI.ARIAUtils.setAccessibleName(playbackRateControl, i18nString(UIStrings.playbackRates));
 
-    /** @type {!Array<!HTMLElement>} */
     this.#playbackRateButtons = [];
     for (const playbackRate of GlobalPlaybackRates) {
       const button = (playbackRateControl.createChild('button', 'animation-playback-rate-button') as HTMLElement);
@@ -332,7 +329,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       show: (popover: UI.GlassPane.GlassPane): Promise<boolean> => {
         let animGroup;
         for (const [group, previewUI] of this.#previewMap) {
-          if (previewUI.element === element.parentElement) {
+          if (previewUI.element === element || previewUI.element === element.parentElement) {
             animGroup = group;
           }
         }
@@ -438,15 +435,15 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
   }
 
   private togglePause(pause: boolean): void {
-    if (this.#scrubberPlayer) {
-      this.#scrubberPlayer.playbackRate = this.effectivePlaybackRate();
-    }
     if (this.#selectedGroup) {
       this.#selectedGroup.togglePause(pause);
       const preview = this.#previewMap.get(this.#selectedGroup);
       if (preview) {
         preview.element.classList.toggle('paused', pause);
       }
+    }
+    if (this.#scrubberPlayer) {
+      this.#scrubberPlayer.playbackRate = this.effectivePlaybackRate();
     }
     this.updateControlButton();
   }
@@ -773,7 +770,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     if (!this.#selectedGroup) {
       return;
     }
-    this.#selectedGroup.currentTimePromise()
+    void this.#selectedGroup.currentTimePromise()
         .then(this.animateTime.bind(this))
         .then(this.updateControlButton.bind(this));
   }
@@ -900,7 +897,7 @@ export class NodeUI {
     }
     this.#node = node;
     this.nodeChanged();
-    Common.Linkifier.Linkifier.linkify(node).then(link => this.#description.appendChild(link));
+    void Common.Linkifier.Linkifier.linkify(node).then(link => this.#description.appendChild(link));
     if (!node.ownerDocument) {
       this.nodeRemoved();
     }

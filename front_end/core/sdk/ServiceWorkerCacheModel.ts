@@ -25,13 +25,17 @@ const str_ = i18n.i18n.registerUIStrings('core/sdk/ServiceWorkerCacheModel.ts', 
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements ProtocolProxyApi.StorageDispatcher {
-  readonly #cachesInternal: Map<string, Cache>;
   readonly cacheAgent: ProtocolProxyApi.CacheStorageApi;
   readonly #storageAgent: ProtocolProxyApi.StorageApi;
   readonly #securityOriginManager: SecurityOriginManager;
-  readonly #originsUpdated: Set<string>;
-  readonly #throttler: Common.Throttler.Throttler;
-  #enabled: boolean;
+
+  readonly #cachesInternal = new Map<string, Cache>();
+  readonly #originsUpdated = new Set<string>();
+  readonly #throttler = new Common.Throttler.Throttler(2000);
+  #enabled = false;
+
+  // Used by tests to remove the Throttler timeout.
+  #scheduleAsSoonAsPossible = false;
 
   /**
    * Invariant: This #model can only be constructed on a ServiceWorker target.
@@ -40,16 +44,9 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
     super(target);
     target.registerStorageDispatcher(this);
 
-    this.#cachesInternal = new Map();
-
     this.cacheAgent = target.cacheStorageAgent();
     this.#storageAgent = target.storageAgent();
     this.#securityOriginManager = (target.model(SecurityOriginManager) as SecurityOriginManager);
-
-    this.#originsUpdated = new Set();
-    this.#throttler = new Common.Throttler.Throttler(2000);
-
-    this.#enabled = false;
   }
 
   enable(): void {
@@ -80,7 +77,7 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
     this.#cachesInternal.clear();
     const securityOrigins = this.#securityOriginManager.securityOrigins();
     for (const securityOrigin of securityOrigins) {
-      this.loadCacheNames(securityOrigin);
+      void this.loadCacheNames(securityOrigin);
     }
   }
 
@@ -106,13 +103,13 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
   loadCacheData(
       cache: Cache, skipCount: number, pageSize: number, pathFilter: string,
       callback: (arg0: Array<Protocol.CacheStorage.DataEntry>, arg1: number) => void): void {
-    this.requestEntries(cache, skipCount, pageSize, pathFilter, callback);
+    void this.requestEntries(cache, skipCount, pageSize, pathFilter, callback);
   }
 
   loadAllCacheData(
       cache: Cache, pathFilter: string,
       callback: (arg0: Array<Protocol.CacheStorage.DataEntry>, arg1: number) => void): void {
-    this.requestAllEntries(cache, pathFilter, callback);
+    void this.requestAllEntries(cache, pathFilter, callback);
   }
 
   caches(): Cache[] {
@@ -137,9 +134,9 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
   }
 
   private addOrigin(securityOrigin: string): void {
-    this.loadCacheNames(securityOrigin);
+    void this.loadCacheNames(securityOrigin);
     if (this.isValidSecurityOrigin(securityOrigin)) {
-      this.#storageAgent.invoke_trackCacheStorageForOrigin({origin: securityOrigin});
+      void this.#storageAgent.invoke_trackCacheStorageForOrigin({origin: securityOrigin});
     }
   }
 
@@ -151,7 +148,7 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
       }
     }
     if (this.isValidSecurityOrigin(securityOrigin)) {
-      this.#storageAgent.invoke_untrackCacheStorageForOrigin({origin: securityOrigin});
+      void this.#storageAgent.invoke_untrackCacheStorageForOrigin({origin: securityOrigin});
     }
   }
 
@@ -236,11 +233,11 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
   cacheStorageListUpdated({origin}: Protocol.Storage.CacheStorageListUpdatedEvent): void {
     this.#originsUpdated.add(origin);
 
-    this.#throttler.schedule(() => {
+    void this.#throttler.schedule(() => {
       const promises = Array.from(this.#originsUpdated, origin => this.loadCacheNames(origin));
       this.#originsUpdated.clear();
       return Promise.all(promises);
-    });
+    }, this.#scheduleAsSoonAsPossible);
   }
 
   cacheStorageContentUpdated({origin, cacheName}: Protocol.Storage.CacheStorageContentUpdatedEvent): void {
@@ -251,6 +248,13 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
   }
 
   indexedDBContentUpdated(_event: Protocol.Storage.IndexedDBContentUpdatedEvent): void {
+  }
+
+  interestGroupAccessed(_event: Protocol.Storage.InterestGroupAccessedEvent): void {
+  }
+
+  setThrottlerSchedulesAsSoonAsPossibleForTest(): void {
+    this.#scheduleAsSoonAsPossible = true;
   }
 }
 

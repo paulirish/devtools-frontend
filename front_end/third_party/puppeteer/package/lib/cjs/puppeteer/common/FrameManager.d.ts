@@ -13,21 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Protocol } from 'devtools-protocol';
-
-import { CDPSession } from './Connection.js';
-import { DOMWorld, WaitForSelectorOptions } from './DOMWorld.js';
-import { EvaluateFn, EvaluateFnReturnType, EvaluateHandleFn, SerializableOrJSHandle, UnwrapPromiseLike , WrapElementHandle} from './EvalTypes.js';
 import { EventEmitter } from './EventEmitter.js';
 import { ExecutionContext } from './ExecutionContext.js';
-import { HTTPResponse } from './HTTPResponse.js';
-import { MouseButton } from './Input.js';
-import { ElementHandle , JSHandle} from './JSHandle.js';
 import { PuppeteerLifeCycleEvent } from './LifecycleWatcher.js';
+import { DOMWorld, WaitForSelectorOptions } from './DOMWorld.js';
 import { NetworkManager } from './NetworkManager.js';
-import { Page } from './Page.js';
 import { TimeoutSettings } from './TimeoutSettings.js';
-
+import { CDPSession } from './Connection.js';
+import { JSHandle, ElementHandle } from './JSHandle.js';
+import { MouseButton } from './Input.js';
+import { Page } from './Page.js';
+import { HTTPResponse } from './HTTPResponse.js';
+import { Protocol } from 'devtools-protocol';
+import { SerializableOrJSHandle, EvaluateHandleFn, WrapElementHandle, EvaluateFn, EvaluateFnReturnType, UnwrapPromiseLike } from './EvalTypes.js';
 /**
  * We use symbols to prevent external parties listening to these events.
  * They are internal to Puppeteer.
@@ -56,7 +54,8 @@ export declare class FrameManager extends EventEmitter {
     private _isolatedWorlds;
     private _mainFrame;
     constructor(client: CDPSession, page: Page, ignoreHTTPSErrors: boolean, timeoutSettings: TimeoutSettings);
-    initialize(): Promise<void>;
+    private setupEventListeners;
+    initialize(client?: CDPSession): Promise<void>;
     networkManager(): NetworkManager;
     navigateFrame(frame: Frame, url: string, options?: {
         referer?: string;
@@ -67,23 +66,24 @@ export declare class FrameManager extends EventEmitter {
         timeout?: number;
         waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
     }): Promise<HTTPResponse | null>;
-    private _onFrameMoved;
+    private _onAttachedToTarget;
+    private _onDetachedFromTarget;
     _onLifecycleEvent(event: Protocol.Page.LifecycleEventEvent): void;
     _onFrameStoppedLoading(frameId: string): void;
-    _handleFrameTree(frameTree: Protocol.Page.FrameTree): void;
+    _handleFrameTree(session: CDPSession, frameTree: Protocol.Page.FrameTree): void;
     page(): Page;
     mainFrame(): Frame;
     frames(): Frame[];
     frame(frameId: string): Frame | null;
-    _onFrameAttached(frameId: string, parentFrameId?: string): void;
+    _onFrameAttached(session: CDPSession, frameId: string, parentFrameId?: string): void;
     _onFrameNavigated(framePayload: Protocol.Page.Frame): void;
-    _ensureIsolatedWorld(name: string): Promise<void>;
+    _ensureIsolatedWorld(session: CDPSession, name: string): Promise<void>;
     _onFrameNavigatedWithinDocument(frameId: string, url: string): void;
-    _onFrameDetached(frameId: string): void;
-    _onExecutionContextCreated(contextPayload: Protocol.Runtime.ExecutionContextDescription): void;
+    _onFrameDetached(frameId: string, reason: Protocol.Page.FrameDetachedEventReason): void;
+    _onExecutionContextCreated(contextPayload: Protocol.Runtime.ExecutionContextDescription, session: CDPSession): void;
     private _onExecutionContextDestroyed;
     private _onExecutionContextsCleared;
-    executionContextById(contextId: number): ExecutionContext;
+    executionContextById(contextId: number, session?: CDPSession): ExecutionContext;
     private _removeFramesRecursively;
 }
 /**
@@ -242,7 +242,21 @@ export declare class Frame {
     /**
      * @internal
      */
-    constructor(frameManager: FrameManager, parentFrame: Frame | null, frameId: string);
+    _client: CDPSession;
+    /**
+     * @internal
+     */
+    constructor(frameManager: FrameManager, parentFrame: Frame | null, frameId: string, client: CDPSession);
+    /**
+     * @internal
+     */
+    _updateClient(client: CDPSession): void;
+    /**
+     * @remarks
+     *
+     * @returns `true` if the frame is an OOP frame, or `false` otherwise.
+     */
+    isOOPFrame(): boolean;
     /**
      * @remarks
      *
@@ -311,6 +325,10 @@ export declare class Frame {
         timeout?: number;
         waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
     }): Promise<HTTPResponse | null>;
+    /**
+     * @internal
+     */
+    client(): CDPSession;
     /**
      * @returns a promise that resolves to the frame's default execution context.
      */

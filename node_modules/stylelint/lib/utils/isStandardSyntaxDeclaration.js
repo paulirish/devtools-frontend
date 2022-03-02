@@ -1,7 +1,7 @@
 'use strict';
 
 const isScssVariable = require('./isScssVariable');
-const { isRoot } = require('./typeGuards');
+const { isRoot, isRule } = require('./typeGuards');
 
 /**
  * @param {string} [lang]
@@ -21,16 +21,17 @@ module.exports = function (decl) {
 
 	// Declarations belong in a declaration block or standard CSS source
 	if (
+		parent &&
 		isRoot(parent) &&
 		parent.source &&
 		!isStandardSyntaxLang(
-			/** @type {import('postcss').NodeSource & {lang?: string}} */ (parent.source).lang,
+			/** @type {import('postcss').Source & {lang?: string}} */ (parent.source).lang,
 		)
 	) {
 		return false;
 	}
 
-	// SCSS var
+	// SCSS var; covers map and list declarations
 	if (isScssVariable(prop)) {
 		return false;
 	}
@@ -40,13 +41,28 @@ module.exports = function (decl) {
 		return false;
 	}
 
+	// Less map declaration
+	if (parent && parent.type === 'atrule' && parent.raws.afterName === ':') {
+		return false;
+	}
+
+	// Less map (e.g. #my-map() { myprop: red; })
+	if (
+		parent &&
+		isRule(parent) &&
+		parent.selector &&
+		parent.selector.startsWith('#') &&
+		parent.selector.endsWith('()')
+	) {
+		return false;
+	}
+
 	// Sass nested properties (e.g. border: { style: solid; color: red; })
 	if (
-		// @ts-ignore TODO TYPES selector does not exists
+		parent &&
+		isRule(parent) &&
 		parent.selector &&
-		// @ts-ignore
 		parent.selector[parent.selector.length - 1] === ':' &&
-		// @ts-ignore
 		parent.selector.substring(0, 2) !== '--'
 	) {
 		return false;

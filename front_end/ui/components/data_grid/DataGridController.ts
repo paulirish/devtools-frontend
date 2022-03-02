@@ -27,12 +27,12 @@ export interface DataGridControllerData {
 
 export class DataGridController extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-data-grid-controller`;
-  private readonly shadow = this.attachShadow({mode: 'open'});
+  readonly #shadow = this.attachShadow({mode: 'open'});
 
-  private hasRenderedAtLeastOnce = false;
-  private columns: readonly Column[] = [];
-  private rows: Row[] = [];
-  private contextMenus?: DataGridContextMenusConfiguration = undefined;
+  #hasRenderedAtLeastOnce = false;
+  #columns: readonly Column[] = [];
+  #rows: Row[] = [];
+  #contextMenus?: DataGridContextMenusConfiguration = undefined;
 
   /**
    * Because the controller will sort data in place (e.g. mutate it) when we get
@@ -40,47 +40,47 @@ export class DataGridController extends HTMLElement {
    * mutate the data we're given, but a copy of the data. If our `get data` is
    * called, we'll return the original, not the sorted data.
    */
-  private originalColumns: readonly Column[] = [];
-  private originalRows: Row[] = [];
+  #originalColumns: readonly Column[] = [];
+  #originalRows: Row[] = [];
 
-  private sortState: Readonly<SortState>|null = null;
-  private filters: readonly TextUtils.TextUtils.ParsedFilter[] = [];
+  #sortState: Readonly<SortState>|null = null;
+  #filters: readonly TextUtils.TextUtils.ParsedFilter[] = [];
 
   connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [dataGridControllerStyles];
+    this.#shadow.adoptedStyleSheets = [dataGridControllerStyles];
   }
 
   get data(): DataGridControllerData {
     return {
-      columns: this.originalColumns as Column[],
-      rows: this.originalRows as Row[],
-      filters: this.filters,
-      contextMenus: this.contextMenus,
+      columns: this.#originalColumns as Column[],
+      rows: this.#originalRows as Row[],
+      filters: this.#filters,
+      contextMenus: this.#contextMenus,
     };
   }
 
   set data(data: DataGridControllerData) {
-    this.originalColumns = data.columns;
-    this.originalRows = data.rows;
-    this.contextMenus = data.contextMenus;
-    this.filters = data.filters || [];
-    this.contextMenus = data.contextMenus;
+    this.#originalColumns = data.columns;
+    this.#originalRows = data.rows;
+    this.#contextMenus = data.contextMenus;
+    this.#filters = data.filters || [];
+    this.#contextMenus = data.contextMenus;
 
-    this.columns = [...this.originalColumns];
-    this.rows = this.cloneAndFilterRows(data.rows, this.filters);
+    this.#columns = [...this.#originalColumns];
+    this.#rows = this.#cloneAndFilterRows(data.rows, this.#filters);
 
-    if (!this.hasRenderedAtLeastOnce && data.initialSort) {
-      this.sortState = data.initialSort;
+    if (!this.#hasRenderedAtLeastOnce && data.initialSort) {
+      this.#sortState = data.initialSort;
     }
 
-    if (this.sortState) {
-      this.sortRows(this.sortState);
+    if (this.#sortState) {
+      this.#sortRows(this.#sortState);
     }
 
-    this.render();
+    this.#render();
   }
 
-  private testRowWithFilter(row: Row, filter: TextUtils.TextUtils.ParsedFilter): boolean {
+  #testRowWithFilter(row: Row, filter: TextUtils.TextUtils.ParsedFilter): boolean {
     let rowMatchesFilter = false;
 
     const {key, text, negative, regex} = filter;
@@ -107,7 +107,7 @@ export class DataGridController extends HTMLElement {
     return negative ? !rowMatchesFilter : rowMatchesFilter;
   }
 
-  private cloneAndFilterRows(rows: Row[], filters: readonly TextUtils.TextUtils.ParsedFilter[]): Row[] {
+  #cloneAndFilterRows(rows: Row[], filters: readonly TextUtils.TextUtils.ParsedFilter[]): Row[] {
     if (filters.length === 0) {
       return [...rows];
     }
@@ -116,7 +116,7 @@ export class DataGridController extends HTMLElement {
       // We assume that the row should be visible by default.
       let rowShouldBeVisible = true;
       for (const filter of filters) {
-        const rowMatchesFilter = this.testRowWithFilter(row, filter);
+        const rowMatchesFilter = this.#testRowWithFilter(row, filter);
         // If there are multiple filters, if any return false we hide the row.
         // So if we get a false from testRowWithFilter, we can break early and return false.
         if (!rowMatchesFilter) {
@@ -131,10 +131,10 @@ export class DataGridController extends HTMLElement {
     });
   }
 
-  private sortRows(state: SortState): void {
+  #sortRows(state: SortState): void {
     const {columnId, direction} = state;
 
-    this.rows.sort((row1, row2) => {
+    this.#rows.sort((row1, row2) => {
       const cell1 = getRowEntryForColumnId(row1, columnId);
       const cell2 = getRowEntryForColumnId(row2, columnId);
 
@@ -148,76 +148,76 @@ export class DataGridController extends HTMLElement {
       }
       return 0;
     });
-    this.render();
+    this.#render();
   }
 
-  private onColumnHeaderClick(event: ColumnHeaderClickEvent): void {
+  #onColumnHeaderClick(event: ColumnHeaderClickEvent): void {
     const {column} = event.data;
-    this.applySortOnColumn(column);
+    this.#applySortOnColumn(column);
   }
 
-  private applySortOnColumn(column: Column): void {
-    if (this.sortState && this.sortState.columnId === column.id) {
-      const {columnId, direction} = this.sortState;
+  #applySortOnColumn(column: Column): void {
+    if (this.#sortState && this.#sortState.columnId === column.id) {
+      const {columnId, direction} = this.#sortState;
 
       /* When users sort, we go No Sort => ASC => DESC => No sort
        * So if the current direction is DESC, we clear the state.
        */
       if (direction === SortDirection.DESC) {
-        this.sortState = null;
+        this.#sortState = null;
       } else {
         /* The state is ASC, so toggle to DESC */
-        this.sortState = {
+        this.#sortState = {
           columnId,
           direction: SortDirection.DESC,
         };
       }
     } else {
       /* The column wasn't previously sorted, so we sort it in ASC order. */
-      this.sortState = {
+      this.#sortState = {
         columnId: column.id,
         direction: SortDirection.ASC,
       };
     }
 
-    if (this.sortState) {
-      this.sortRows(this.sortState);
+    if (this.#sortState) {
+      this.#sortRows(this.#sortState);
     } else {
       // No sortstate = render the original rows.
-      this.rows = this.cloneAndFilterRows(this.originalRows, this.filters);
-      this.render();
+      this.#rows = this.#cloneAndFilterRows(this.#originalRows, this.#filters);
+      this.#render();
     }
   }
 
-  private onContextMenuColumnSortClick(event: ContextMenuColumnSortClickEvent): void {
-    this.applySortOnColumn(event.data.column);
+  #onContextMenuColumnSortClick(event: ContextMenuColumnSortClickEvent): void {
+    this.#applySortOnColumn(event.data.column);
   }
 
-  private onContextMenuHeaderResetClick(): void {
-    this.sortState = null;
-    this.rows = [...this.originalRows];
-    this.render();
+  #onContextMenuHeaderResetClick(): void {
+    this.#sortState = null;
+    this.#rows = [...this.#originalRows];
+    this.#render();
   }
 
-  private render(): void {
+  #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     LitHtml.render(LitHtml.html`
       <${DataGrid.litTagName} .data=${{
-          columns: this.columns,
-          rows: this.rows,
-          activeSort: this.sortState,
-          contextMenus: this.contextMenus,
+          columns: this.#columns,
+          rows: this.#rows,
+          activeSort: this.#sortState,
+          contextMenus: this.#contextMenus,
         } as DataGridData}
-        @columnheaderclick=${this.onColumnHeaderClick}
-        @contextmenucolumnsortclick=${this.onContextMenuColumnSortClick}
-        @contextmenuheaderresetclick=${this.onContextMenuHeaderResetClick}
+        @columnheaderclick=${this.#onColumnHeaderClick}
+        @contextmenucolumnsortclick=${this.#onContextMenuColumnSortClick}
+        @contextmenuheaderresetclick=${this.#onContextMenuHeaderResetClick}
      ></${DataGrid.litTagName}>
-    `, this.shadow, {
+    `, this.#shadow, {
       host: this,
     });
     // clang-format on
-    this.hasRenderedAtLeastOnce = true;
+    this.#hasRenderedAtLeastOnce = true;
   }
 }
 

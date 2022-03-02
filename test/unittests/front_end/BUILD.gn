@@ -4,8 +4,7 @@
 
 group("front_end") {
   deps = [
-    "../../../front_end:legacy_css",
-    "../../../front_end/Images",
+    "../../../front_end/Images:optimize_images",
     "client_variations",
     "core/common",
     "core/dom_extension",
@@ -29,15 +28,17 @@ group("front_end") {
     "models/timeline_model",
     "panels/animation",
     "panels/application",
+    "panels/console",
     "panels/coverage",
     "panels/elements",
-    "panels/help",
     "panels/issues",
     "panels/media",
     "panels/network/components",
+    "panels/settings/components",
     "panels/settings/emulation",
     "panels/settings/emulation/components",
     "panels/sources",
+    "panels/timeline",
     "panels/timeline/components",
     "test_setup",
     "third_party/i18n",
@@ -50,11 +51,13 @@ group("front_end") {
     "ui/components/linear_memory_inspector",
     "ui/components/render_coordinator",
     "ui/components/request_link_icon",
+    "ui/components/settings",
     "ui/legacy",
     "ui/legacy/components/inline_editor",
     "ui/legacy/components/object_ui",
     "ui/legacy/components/perf_ui",
     "ui/legacy/components/utils",
+    "ui/legacy/theme_support",
     "ui/lit-html",
   ]
 }

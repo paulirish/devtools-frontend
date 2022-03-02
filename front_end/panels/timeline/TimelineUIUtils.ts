@@ -1526,7 +1526,7 @@ export class TimelineUIUtils {
       if (!color) {
         throw new Error('Unable to parse color from TimelineUIUtils.categories().scripting.color');
       }
-      return /** @type {string} */ color.setAlpha(0.3).asString(null) as string;
+      return color.setAlpha(0.3).asString(null) as string;
     }
 
     return color;
@@ -1815,7 +1815,7 @@ export class TimelineUIUtils {
       const uiLocation =
           await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().rawLocationToUILocation(
               rawLocation);
-      return uiLocation ? uiLocation.linkText() : null;
+      return uiLocation ? uiLocation.linkText(false /* skipTrim*/, true /* showColumnNumber*/) : null;
     }
 
     async function linkifyTopCallFrameAsText(): Promise<string|null> {
@@ -1826,10 +1826,7 @@ export class TimelineUIUtils {
       let text: string|(string | null) =
           await linkifyLocationAsText(frame.scriptId, frame.lineNumber, frame.columnNumber);
       if (!text) {
-        text = frame.url;
-        if (typeof frame.lineNumber === 'number') {
-          text += ':' + (frame.lineNumber + 1);
-        }
+        text = frame.url + ':' + (frame.lineNumber + 1) + ':' + (frame.columnNumber + 1);
       }
       return text;
     }
@@ -1879,14 +1876,8 @@ export class TimelineUIUtils {
         if (url) {
           const options = {
             tabStop: true,
-            className: undefined,
-            columnNumber: undefined,
+            showColumnNumber: false,
             inlineFrameIndex: 0,
-            text: undefined,
-            lineNumber: undefined,
-            preventClick: undefined,
-            maxLength: undefined,
-            bypassURLTrimming: undefined,
           };
           details = Components.Linkifier.Linkifier.linkifyURL(url, options);
         }
@@ -1948,7 +1939,8 @@ export class TimelineUIUtils {
     function linkifyLocation(
         scriptId: Protocol.Runtime.ScriptId|null, url: string, lineNumber: number, columnNumber?: number): Element|
         null {
-      const options = {columnNumber, inlineFrameIndex: 0, className: 'timeline-details', tabStop: true};
+      const options =
+          {columnNumber, showColumnNumber: true, inlineFrameIndex: 0, className: 'timeline-details', tabStop: true};
       return linkifier.linkifyScriptLocation(target, scriptId, url, lineNumber, options);
     }
 
@@ -1956,7 +1948,7 @@ export class TimelineUIUtils {
       const frame = TimelineModel.TimelineModel.TimelineData.forEvent(event).topFrame();
       return frame ? linkifier.maybeLinkifyConsoleCallFrame(
                          target, frame,
-                         {className: 'timeline-details', tabStop: true, inlineFrameIndex: 0, columnNumber: undefined}) :
+                         {className: 'timeline-details', tabStop: true, inlineFrameIndex: 0, showColumnNumber: true}) :
                      null;
     }
   }
@@ -2132,14 +2124,8 @@ export class TimelineUIUtils {
         if (url) {
           const options = {
             tabStop: true,
-            className: undefined,
-            columnNumber: undefined,
+            showColumnNumber: false,
             inlineFrameIndex: 0,
-            lineNumber: undefined,
-            text: undefined,
-            preventClick: undefined,
-            maxLength: undefined,
-            bypassURLTrimming: undefined,
           };
           contentHelper.appendElementRow(
               i18nString(UIStrings.resource), Components.Linkifier.Linkifier.linkifyURL(url, options));
@@ -2269,14 +2255,8 @@ export class TimelineUIUtils {
         if (url) {
           const options = {
             tabStop: true,
-            className: undefined,
-            columnNumber: undefined,
-            lineNumber: undefined,
+            showColumnNumber: false,
             inlineFrameIndex: 0,
-            text: undefined,
-            preventClick: undefined,
-            maxLength: undefined,
-            bypassURLTrimming: undefined,
           };
           contentHelper.appendElementRow(
               i18nString(UIStrings.imageUrl), Components.Linkifier.Linkifier.linkifyURL(url, options));
@@ -2289,14 +2269,8 @@ export class TimelineUIUtils {
         if (url) {
           const options = {
             tabStop: true,
-            className: undefined,
-            columnNumber: undefined,
+            showColumnNumber: false,
             inlineFrameIndex: 0,
-            lineNumber: undefined,
-            text: undefined,
-            preventClick: undefined,
-            maxLength: undefined,
-            bypassURLTrimming: undefined,
           };
           contentHelper.appendElementRow(
               i18nString(UIStrings.stylesheetUrl), Components.Linkifier.Linkifier.linkifyURL(url, options));
@@ -2424,9 +2398,13 @@ export class TimelineUIUtils {
         contentHelper.appendTextRow(i18nString(UIStrings.score), eventData['score'].toPrecision(4));
         contentHelper.appendTextRow(
             i18nString(UIStrings.cumulativeScore), eventData['cumulative_score'].toPrecision(4));
-        contentHelper.appendTextRow(i18nString(UIStrings.currentClusterId), eventData['_current_cluster_id']);
-        contentHelper.appendTextRow(
-            i18nString(UIStrings.currentClusterScore), eventData['_current_cluster_score'].toPrecision(4));
+        if ('_current_cluster_id' in eventData) {
+          contentHelper.appendTextRow(i18nString(UIStrings.currentClusterId), eventData['_current_cluster_id']);
+        }
+        if ('_current_cluster_score' in eventData) {
+          contentHelper.appendTextRow(
+              i18nString(UIStrings.currentClusterScore), eventData['_current_cluster_score'].toPrecision(4));
+        }
         contentHelper.appendTextRow(
             i18nString(UIStrings.hadRecentInput),
             eventData['had_recent_input'] ? i18nString(UIStrings.yes) : i18nString(UIStrings.no));
@@ -2640,14 +2618,8 @@ export class TimelineUIUtils {
     if (request.url) {
       const options = {
         tabStop: true,
-        className: undefined,
-        columnNumber: undefined,
-        text: undefined,
+        showColumnNumber: false,
         inlineFrameIndex: 0,
-        lineNumber: undefined,
-        preventClick: undefined,
-        maxLength: undefined,
-        bypassURLTrimming: undefined,
       };
       contentHelper.appendElementRow(
           i18n.i18n.lockedString('URL'), Components.Linkifier.Linkifier.linkifyURL(request.url, options));
@@ -2709,7 +2681,7 @@ export class TimelineUIUtils {
     const topFrame = TimelineModel.TimelineModel.TimelineData.forEvent(sendRequest).topFrame();
     if (topFrame) {
       const link = linkifier.maybeLinkifyConsoleCallFrame(
-          target, topFrame, {tabStop: true, className: undefined, inlineFrameIndex: 0, columnNumber: undefined});
+          target, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
       if (link) {
         contentHelper.appendElementRow(title, link);
       }
@@ -2718,9 +2690,8 @@ export class TimelineUIUtils {
       if (initiator) {
         const initiatorURL = TimelineModel.TimelineModel.TimelineData.forEvent(initiator).url;
         if (initiatorURL) {
-          const link = linkifier.maybeLinkifyScriptLocation(
-              target, null, initiatorURL, 0,
-              {tabStop: true, className: undefined, inlineFrameIndex: 0, columnNumber: undefined});
+          const link =
+              linkifier.maybeLinkifyScriptLocation(target, null, initiatorURL, 0, {tabStop: true, inlineFrameIndex: 0});
           if (link) {
             contentHelper.appendElementRow(title, link);
           }
@@ -3143,7 +3114,7 @@ export class TimelineUIUtils {
     if (filmStripFrame) {
       const filmStripPreview = document.createElement('div');
       filmStripPreview.classList.add('timeline-filmstrip-preview');
-      filmStripFrame.imageDataPromise()
+      void filmStripFrame.imageDataPromise()
           .then(data => UI.UIUtils.loadImageFromData(data))
           .then(image => image && filmStripPreview.appendChild(image));
       contentHelper.appendElementRow('', filmStripPreview);
@@ -3460,7 +3431,8 @@ export class InvalidationsGroupElement extends UI.TreeOutline.TreeElement {
       stack.createChild('span').textContent = TimelineUIUtils.frameDisplayName(topFrame);
       const linkifier = this.contentHelper.linkifier();
       if (linkifier) {
-        const link = linkifier.maybeLinkifyConsoleCallFrame(target, topFrame);
+        const link =
+            linkifier.maybeLinkifyConsoleCallFrame(target, topFrame, {showColumnNumber: true, inlineFrameIndex: 0});
         if (link) {
           // Linkifier is using a workaround with the 'zero width space' (\u200b).
           // TODO(szuend): Remove once the Linkifier is no longer using the workaround.
@@ -3579,7 +3551,7 @@ export class InvalidationsGroupElement extends UI.TreeOutline.TreeElement {
     const node = (invalidation.nodeId && this.relatedNodesMap) ? this.relatedNodesMap.get(invalidation.nodeId) : null;
     if (node) {
       const nodeSpan = document.createElement('span');
-      Common.Linkifier.Linkifier.linkify(node).then(link => nodeSpan.appendChild(link));
+      void Common.Linkifier.Linkifier.linkify(node).then(link => nodeSpan.appendChild(link));
       return nodeSpan;
     }
     if (invalidation.nodeName) {
@@ -3711,14 +3683,9 @@ export class TimelineDetailsContentHelper {
 
     const options = {
       tabStop: true,
-      className: undefined,
       columnNumber: startColumn,
+      showColumnNumber: true,
       inlineFrameIndex: 0,
-      text: undefined,
-      lineNumber: undefined,
-      preventClick: undefined,
-      maxLength: undefined,
-      bypassURLTrimming: undefined,
     };
     const link = this.linkifierInternal.maybeLinkifyScriptLocation(this.target, null, url, startLine, options);
     if (!link) {
@@ -3733,8 +3700,7 @@ export class TimelineDetailsContentHelper {
     }
     const locationContent = document.createElement('span');
     const link = this.linkifierInternal.maybeLinkifyScriptLocation(
-        this.target, null, url, startLine,
-        {tabStop: true, className: undefined, inlineFrameIndex: 0, columnNumber: undefined});
+        this.target, null, url, startLine, {tabStop: true, inlineFrameIndex: 0});
     if (!link) {
       return;
     }
@@ -3782,4 +3748,48 @@ export interface TimelineMarkerStyle {
   dashStyle: number[];
   tall: boolean;
   lowPriority: boolean;
+}
+
+export function assignLayoutShiftsToClusters(layoutShifts: readonly SDK.TracingModel.Event[]): void {
+  const gapTimeInMs = 1000;
+  const limitTimeInMs = 5000;
+  let firstTimestamp = Number.NEGATIVE_INFINITY;
+  let previousTimestamp = Number.NEGATIVE_INFINITY;
+  let currentClusterId = 0;
+  let currentClusterScore = 0;
+  let currentCluster = new Set<SDK.TracingModel.Event>();
+
+  for (const event of layoutShifts) {
+    if (event.args['data']['had_recent_input'] || event.args['data']['weighted_score_delta'] === undefined) {
+      continue;
+    }
+
+    if (event.startTime - firstTimestamp > limitTimeInMs || event.startTime - previousTimestamp > gapTimeInMs) {
+      // This means the event does not fit into the current session/cluster, so we need to start a new cluster.
+      firstTimestamp = event.startTime;
+
+      // Update all the layout shifts we found in this cluster to associate them with the cluster.
+      for (const layoutShift of currentCluster) {
+        layoutShift.args['data']['_current_cluster_score'] = currentClusterScore;
+        layoutShift.args['data']['_current_cluster_id'] = currentClusterId;
+      }
+
+      // Increment the cluster ID and reset the data.
+      currentClusterId += 1;
+      currentClusterScore = 0;
+      currentCluster = new Set();
+    }
+
+    // Store the timestamp of the previous layout shift.
+    previousTimestamp = event.startTime;
+    // Update the score of the current cluster and store this event in that cluster
+    currentClusterScore += event.args['data']['weighted_score_delta'];
+    currentCluster.add(event);
+  }
+
+  // The last cluster we find may not get closed out - so if not, update all the shifts that we associate with it.
+  for (const layoutShift of currentCluster) {
+    layoutShift.args['data']['_current_cluster_score'] = currentClusterScore;
+    layoutShift.args['data']['_current_cluster_id'] = currentClusterId;
+  }
 }

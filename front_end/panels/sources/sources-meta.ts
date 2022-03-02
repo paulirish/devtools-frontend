@@ -3,18 +3,17 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
-import * as TextEditor from '../../ui/legacy/components/text_editor/text_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-// eslint-disable-next-line rulesdir/es_modules_import
 import type * as Sources from './sources.js';
 
-import * as i18n from '../../core/i18n/i18n.js';
 const UIStrings = {
   /**
   *@description Command for showing the 'Sources' tool
@@ -387,8 +386,6 @@ let loadedSourcesModule: (typeof Sources|undefined);
 
 async function loadSourcesModule(): Promise<typeof Sources> {
   if (!loadedSourcesModule) {
-    // Side-effect import resources in module.json
-    await Root.Runtime.Runtime.instance().loadModulePromise('panels/sources');
     loadedSourcesModule = await import('./sources.js');
   }
   return loadedSourcesModule;
@@ -1101,17 +1098,19 @@ UI.ActionRegistration.registerActionExtension({
   title: i18nLazyString(UIStrings.createNewSnippet),
 });
 
-UI.ActionRegistration.registerActionExtension({
-  category: UI.ActionRegistration.ActionCategory.SOURCES,
-  actionId: 'sources.add-folder-to-workspace',
-  async loadActionDelegate() {
-    const Sources = await loadSourcesModule();
-    return Sources.SourcesNavigator.ActionDelegate.instance();
-  },
-  iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_ADD,
-  title: i18nLazyString(UIStrings.addFolderToWorkspace),
-  condition: Root.Runtime.ConditionName.NOT_SOURCES_HIDE_ADD_FOLDER,
-});
+if (!Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
+  UI.ActionRegistration.registerActionExtension({
+    category: UI.ActionRegistration.ActionCategory.SOURCES,
+    actionId: 'sources.add-folder-to-workspace',
+    async loadActionDelegate() {
+      const Sources = await loadSourcesModule();
+      return Sources.SourcesNavigator.ActionDelegate.instance();
+    },
+    iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_ADD,
+    title: i18nLazyString(UIStrings.addFolderToWorkspace),
+    condition: Root.Runtime.ConditionName.NOT_SOURCES_HIDE_ADD_FOLDER,
+  });
+}
 
 UI.ActionRegistration.registerActionExtension({
   category: UI.ActionRegistration.ActionCategory.DEBUGGER,
@@ -1249,6 +1248,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.searchInAnonymousAndContent),
   settingName: 'searchInAnonymousAndContentScripts',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1267,6 +1267,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.automaticallyRevealFilesIn),
   settingName: 'autoRevealInNavigator',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1285,6 +1286,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.enableJavascriptSourceMaps),
   settingName: 'jsSourceMapsEnabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1303,6 +1305,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.enableTabMovesFocus),
   settingName: 'textEditorTabMovesFocus',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1321,6 +1324,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.detectIndentation),
   settingName: 'textEditorAutoDetectIndent',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1339,6 +1343,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.autocompletion),
   settingName: 'textEditorAutocompletion',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1375,6 +1380,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.codeFolding),
   settingName: 'textEditorCodeFolding',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1393,6 +1399,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.showWhitespaceCharacters),
   settingName: 'showWhitespacesInEditor',
   settingType: Common.Settings.SettingType.ENUM,
@@ -1418,6 +1425,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.displayVariableValuesInlineWhile),
   settingName: 'inlineVariableValues',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1436,6 +1444,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.enableAutoFocusOnDebuggerPaused),
   settingName: 'autoFocusOnDebuggerPausedEnabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1454,6 +1463,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.enableCssSourceMaps),
   settingName: 'cssSourceMapsEnabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1472,6 +1482,7 @@ Common.Settings.registerSettingExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.allowScrollingPastEndOfFile),
   settingName: 'allowScrollPastEof',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1556,9 +1567,7 @@ UI.ContextMenu.registerProvider({
 
 UI.ContextMenu.registerProvider({
   contextTypes() {
-    return [
-      TextEditor.CodeMirrorTextEditor.CodeMirrorTextEditor,
-    ];
+    return maybeRetrieveContextTypes(Sources => [Sources.UISourceCodeFrame.UISourceCodeFrame]);
   },
   async loadProvider() {
     const Sources = await loadSourcesModule();

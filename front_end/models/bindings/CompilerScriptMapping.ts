@@ -30,6 +30,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as Platform from '../../core/platform/platform.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
@@ -99,7 +100,7 @@ export class CompilerScriptMapping implements DebuggerSourceMapping {
     const uiSourceCode = event.data;
     if (uiSourceCode.contentType().isDocument()) {
       for (const script of this.#debuggerModel.scriptsForSourceURL(uiSourceCode.url())) {
-        this.#debuggerWorkspaceBinding.updateLocations(script);
+        void this.#debuggerWorkspaceBinding.updateLocations(script);
       }
     }
   }
@@ -327,12 +328,11 @@ const uiSourceCodeToBinding = new WeakMap<Workspace.UISourceCode.UISourceCode, B
 
 class Binding {
   readonly #project: ContentProviderBasedProject;
-  readonly #url: string;
+  readonly #url: Platform.DevToolsPath.UrlString;
   referringSourceMaps: SDK.SourceMap.SourceMap[];
-  readonly #activeSourceMap?: SDK.SourceMap.SourceMap|null;
   uiSourceCode: Workspace.UISourceCode.UISourceCode|null;
 
-  constructor(project: ContentProviderBasedProject, url: string) {
+  constructor(project: ContentProviderBasedProject, url: Platform.DevToolsPath.UrlString) {
     this.#project = project;
     this.#url = url;
 

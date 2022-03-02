@@ -30,6 +30,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Workspace from '../workspace/workspace.js';
 import type * as Protocol from '../../generated/protocol.js';
@@ -83,7 +84,7 @@ export class ResourceScriptMapping implements DebuggerSourceMapping {
       this.debuggerModel.addEventListener(
           SDK.DebuggerModel.Events.ParsedScriptSource,
           event => {
-            this.parsedScriptSource(event);
+            void this.parsedScriptSource(event);
           },
           this),
       this.debuggerModel.addEventListener(SDK.DebuggerModel.Events.GlobalObjectCleared, this.globalObjectCleared, this),
@@ -127,30 +128,22 @@ export class ResourceScriptMapping implements DebuggerSourceMapping {
     if (!scriptFile.hasScripts([script])) {
       return null;
     }
-    const lineNumber = rawLocation.lineNumber - (script.isInlineScriptWithSourceURL() ? script.lineOffset : 0);
-    let columnNumber = rawLocation.columnNumber || 0;
-    if (script.isInlineScriptWithSourceURL() && !lineNumber && columnNumber) {
-      columnNumber -= script.columnOffset;
-    }
+    const {lineNumber, columnNumber = 0} = rawLocation;
     return uiSourceCode.uiLocation(lineNumber, columnNumber);
   }
 
   uiLocationToRawLocations(uiSourceCode: Workspace.UISourceCode.UISourceCode, lineNumber: number, columnNumber: number):
       SDK.DebuggerModel.Location[] {
     const scriptFile = this.#uiSourceCodeToScriptFile.get(uiSourceCode);
-    if (!scriptFile || typeof scriptFile.script === 'undefined') {
+    if (!scriptFile) {
       return [];
     }
 
-    const script = scriptFile.script;
+    const {script} = scriptFile;
     if (!script) {
       return [];
     }
 
-    if (script.isInlineScriptWithSourceURL()) {
-      return [this.debuggerModel.createRawLocation(
-          script, lineNumber + script.lineOffset, lineNumber ? columnNumber : columnNumber + script.columnOffset)];
-    }
     return [this.debuggerModel.createRawLocation(script, lineNumber, columnNumber)];
   }
 
@@ -227,21 +220,21 @@ export class ResourceScriptMapping implements DebuggerSourceMapping {
     const executionContext = event.data;
     const scripts = this.debuggerModel.scriptsForExecutionContext(executionContext);
     for (const script of scripts) {
-      this.removeScript(script);
+      void this.removeScript(script);
     }
   }
 
   private globalObjectCleared(): void {
     const scripts = Array.from(this.#acceptedScripts);
     for (const script of scripts) {
-      this.removeScript(script);
+      void this.removeScript(script);
     }
   }
 
   resetForTest(): void {
     const scripts = Array.from(this.#acceptedScripts);
     for (const script of scripts) {
-      this.removeScript(script);
+      void this.removeScript(script);
     }
   }
 
@@ -249,7 +242,7 @@ export class ResourceScriptMapping implements DebuggerSourceMapping {
     Common.EventTarget.removeEventListeners(this.#eventListeners);
     const scripts = Array.from(this.#acceptedScripts);
     for (const script of scripts) {
-      this.removeScript(script);
+      void this.removeScript(script);
     }
     for (const project of this.#projects.values()) {
       project.removeProject();
@@ -313,7 +306,7 @@ export class ResourceScriptFile extends Common.ObjectWrapper.ObjectWrapper<Resou
   }
 
   private workingCopyChanged(): void {
-    this.update();
+    void this.update();
   }
 
   private workingCopyCommitted(): void {
@@ -329,7 +322,7 @@ export class ResourceScriptFile extends Common.ObjectWrapper.ObjectWrapper<Resou
                             .map(breakpointLocation => breakpointLocation.breakpoint);
     const source = this.#uiSourceCodeInternal.workingCopy();
     debuggerModel.setScriptSource(this.scriptInternal.scriptId, source, (error, exceptionDetails) => {
-      this.scriptSourceWasSet(source, breakpoints, error, exceptionDetails);
+      void this.scriptSourceWasSet(source, breakpoints, error, exceptionDetails);
     });
   }
 
@@ -403,9 +396,9 @@ export class ResourceScriptFile extends Common.ObjectWrapper.ObjectWrapper<Resou
       this.mappingCheckedForTest();
       return;
     }
-    this.scriptInternal.requestContent().then(deferredContent => {
+    void this.scriptInternal.requestContent().then(deferredContent => {
       this.#scriptSource = deferredContent.content;
-      this.update().then(() => this.mappingCheckedForTest());
+      void this.update().then(() => this.mappingCheckedForTest());
     });
   }
 
@@ -419,7 +412,7 @@ export class ResourceScriptFile extends Common.ObjectWrapper.ObjectWrapper<Resou
         Workspace.UISourceCode.Events.WorkingCopyCommitted, this.workingCopyCommitted, this);
   }
 
-  addSourceMapURL(sourceMapURL: string): void {
+  addSourceMapURL(sourceMapURL: Platform.DevToolsPath.UrlString): void {
     if (!this.scriptInternal) {
       return;
     }

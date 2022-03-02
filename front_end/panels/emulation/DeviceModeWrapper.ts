@@ -56,17 +56,21 @@ export class DeviceModeWrapper extends UI.Widget.VBox {
     this.showDeviceModeSetting.set(!this.showDeviceModeSetting.get());
   }
 
+  isDeviceModeOn(): boolean {
+    return this.showDeviceModeSetting.get();
+  }
+
   captureScreenshot(fullSize?: boolean, clip?: Protocol.Page.Viewport): boolean {
     if (!this.deviceModeView) {
       this.deviceModeView = new DeviceModeView();
     }
     this.deviceModeView.setNonEmulatedAvailableSize(this.inspectedPagePlaceholder.element);
     if (fullSize) {
-      this.deviceModeView.captureFullSizeScreenshot();
+      void this.deviceModeView.captureFullSizeScreenshot();
     } else if (clip) {
-      this.deviceModeView.captureAreaScreenshot(clip);
+      void this.deviceModeView.captureAreaScreenshot(clip);
     } else {
-      this.deviceModeView.captureScreenshot();
+      void this.deviceModeView.captureScreenshot();
     }
     return true;
   }
@@ -154,7 +158,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
             clip.height *= page_zoom;
             DeviceModeWrapper.instance().captureScreenshot(false, clip);
           }
-          captureClip();
+          void captureClip();
           return true;
         }
 

@@ -107,7 +107,6 @@
 .orientation-stage.disabled {
   filter: grayscale();
   opacity: 50%;
-  cursor: default !important; /* stylelint-disable-line declaration-no-important */
 }
 
 .orientation-element,
@@ -185,7 +184,7 @@
 .orientation-left::after,
 .orientation-right::before,
 .orientation-right::after {
-  content: '';
+  content: "";
   width: 8px;
   height: 6px;
 }
@@ -242,7 +241,7 @@
 .orientation-top::after,
 .orientation-bottom::before,
 .orientation-bottom::after {
-  content: '';
+  content: "";
   width: 8px;
   height: 8px;
 }
@@ -293,7 +292,7 @@ fieldset.device-orientation-override-section {
 }
 
 button.text-button {
-  margin: 0 10px;
+  margin: 4px 0 0 10px;
 }
 
 @media (forced-colors: active) {

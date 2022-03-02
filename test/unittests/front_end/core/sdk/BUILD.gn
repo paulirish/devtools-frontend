@@ -10,11 +10,11 @@ ts_library("sdk") {
     "AccessibilityModel_test.ts",
     "CSSContainerQuery_test.ts",
     "CSSPropertyParser_test.ts",
-    "CSSProperty_test.ts",
     "ConsoleModel_test.ts",
     "CookieModel_test.ts",
     "CookieParser_test.ts",
     "Cookie_test.ts",
+    "DOMModel_test.ts",
     "DebuggerModel_test.ts",
     "FrameManager_test.ts",
     "NetworkManager_test.ts",
@@ -33,7 +33,6 @@ ts_library("sdk") {
     "../../../../../front_end/core/protocol_client:bundle",
     "../../../../../front_end/core/sdk:bundle",
     "../../../../../front_end/generated:protocol",
-    "../../../../../front_end/ui/legacy/components/text_editor:bundle",
     "../../helpers",
   ]
 }

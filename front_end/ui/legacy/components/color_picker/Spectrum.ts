@@ -42,6 +42,7 @@ import {ContrastDetails, Events as ContrastDetailsEvents} from './ContrastDetail
 
 import type {ContrastInfo} from './ContrastInfo.js';
 import {ContrastOverlay} from './ContrastOverlay.js';
+import spectrumStyles from './spectrum.css.js';
 
 const UIStrings = {
   /**
@@ -183,7 +184,6 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private colorFormat?: string;
   constructor(contrastInfo?: ContrastInfo|null) {
     super(true);
-    this.registerRequiredCSS('ui/legacy/components/color_picker/spectrum.css');
 
     this.contentElement.tabIndex = 0;
     this.colorElement = this.contentElement.createChild('div', 'spectrum-color');
@@ -267,14 +267,14 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     UI.ARIAUtils.markAsButton(displaySwitcher);
 
     UI.UIUtils.installDragHandle(
-        this.hueElement, this.dragStart.bind(this, positionHue.bind(this)), positionHue.bind(this), null, 'pointer',
-        'default');
+        this.hueElement, this.dragStart.bind(this, positionHue.bind(this)), positionHue.bind(this), null, 'ew-resize',
+        'crosshair');
     UI.UIUtils.installDragHandle(
         this.alphaElement, this.dragStart.bind(this, positionAlpha.bind(this)), positionAlpha.bind(this), null,
-        'pointer', 'default');
+        'ew-resize', 'crosshair');
     UI.UIUtils.installDragHandle(
-        this.colorElement, this.dragStart.bind(this, positionColor.bind(this)), positionColor.bind(this), null,
-        'pointer', 'default');
+        this.colorElement, this.dragStart.bind(this, positionColor.bind(this)), positionColor.bind(this), null, 'move',
+        'crosshair');
 
     // Color contrast business.
     if (contrastInfo) {
@@ -347,7 +347,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         case 'ArrowUp':
           return elementPosition.right + 1;
         default:
-          return /** @type {!MouseEvent} */ (event as MouseEvent).x;
+          return (event as MouseEvent).x;
       }
     }
 
@@ -894,7 +894,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
     contextMenu.defaultSection().appendItem(
         i18nString(UIStrings.clearPalette), this.deletePaletteColors.bind(this, -1, true));
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   private deletePaletteColors(colorIndex: number, toRight: boolean): void {
@@ -1089,7 +1089,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   /**
    * If the pasted input is parsable as a color, applies it converting to the current user format
    */
-  private pasted(/** @type {!ClipboardEvent} */ event: ClipboardEvent): void {
+  private pasted(event: ClipboardEvent): void {
     if (!event.clipboardData) {
       return;
     }
@@ -1140,6 +1140,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   wasShown(): void {
+    this.registerCSSFiles([spectrumStyles]);
     this.hueAlphaWidth = this.hueElement.offsetWidth;
     this.slideHelperWidth = this.hueSlider.offsetWidth / 2;
     this.dragWidth = this.colorElement.offsetWidth;
@@ -1230,7 +1231,7 @@ export class PaletteGenerator {
         stylesheetPromises.push(this.processStylesheet(stylesheet));
       }
     }
-    Promise.all(stylesheetPromises)
+    void Promise.all(stylesheetPromises)
         .catch(error => {
           console.error(error);
         })

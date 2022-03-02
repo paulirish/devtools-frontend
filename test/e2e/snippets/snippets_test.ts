@@ -10,6 +10,7 @@ import {getCurrentConsoleMessages} from '../helpers/console-helpers.js';
 import {getAvailableSnippets, openCommandMenu, showSnippetsAutocompletion} from '../helpers/quick_open-helpers.js';
 import {addSelectedTextToWatches, createNewSnippet, evaluateSelectedTextInConsole, getWatchExpressionsValues, openSnippetsSubPane, openSourcesPanel, runSnippet} from '../helpers/sources-helpers.js';
 
+// Flaky test
 describe.skip('[crbug.com/1198160]: Snippet creation', () => {
   it('can show newly created snippets show up in command menu', async () => {
     const {frontend} = getBrowserAndPages();
@@ -40,6 +41,7 @@ describe.skip('[crbug.com/1198160]: Snippet creation', () => {
   });
 });
 
+// Flaky test (likely further bit-rotted by CM6 transition)
 describe.skip('[crbug.com/1198160]: Expression evaluation', () => {
   const message = '"Hello"';
 
@@ -83,5 +85,22 @@ describe.skip('[crbug.com/1198160]: Expression evaluation', () => {
     assert.deepEqual(watchExpressions, [
       message,
     ]);
+  });
+});
+
+describe('Snippet evaluation', () => {
+  it('highlights the correct line when a snippet throws an error', async () => {
+    await openSourcesPanel();
+    await openSnippetsSubPane();
+    await createNewSnippet('throwing', `
+      (function foo() {
+        throw new Error('kaboom');
+      })();`);
+
+    await runSnippet();
+
+    const errorLine = await waitFor('.cm-waveUnderline');
+    const text = await errorLine.evaluate(el => el.textContent);
+    assert.strictEqual(text, 'throw new Error(\'kaboom\');');
   });
 });

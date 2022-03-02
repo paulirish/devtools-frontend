@@ -10,7 +10,6 @@ import {describe, it} from '../../shared/mocha-extensions.js';
 import {toggleShowCorsErrors} from '../helpers/console-helpers.js';
 import {navigateToCssOverviewTab, startCaptureCSSOverview} from '../helpers/css-overview-helpers.js';
 import {editCSSProperty, focusElementsTree, navigateToSidePane, waitForContentOfSelectedElementsNode, waitForElementsStyleSection} from '../helpers/elements-helpers.js';
-import {clickToggleButton, selectDualScreen, startEmulationWithDualScreenFlag} from '../helpers/emulation-helpers.js';
 import {openCommandMenu} from '../helpers/quick_open-helpers.js';
 import {closeSecurityTab, navigateToSecurityTab} from '../helpers/security-helpers.js';
 import {openPanelViaMoreTools, openSettingsTab} from '../helpers/settings-helpers.js';
@@ -43,7 +42,6 @@ declare global {
       UserMetrics: UserMetrics,
       userMetrics: {
         actionTaken(name: number): void,
-        cssEditorOpened(editorName: string): void,
       },
     };
   }
@@ -366,35 +364,12 @@ describe('User Metrics', () => {
       },
     ]);
   });
-});
 
-describe('User Metrics for dual screen emulation', () => {
-  beforeEach(async () => {
-    await startEmulationWithDualScreenFlag();
-  });
-
-  it('dispatch events when dual screen emulation started and span button hit', async () => {
-    await selectDualScreen();
-    await clickToggleButton();
-
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.DualScreenDeviceEmulated',
-        actionCode: 0,  // Dual screen/fold device selected
-      },
-      {
-        actionName: 'DevTools.ActionTaken',
-        actionCode: 10,  // Device mode enabled
-      },
-      {
-        actionName: 'DevTools.DualScreenDeviceEmulated',
-        actionCode: 1,  // Toggle single/dual screen mode (span button)
-      },
-      {
-        actionName: 'DevTools.ActionTaken',
-        actionCode: 10,  // Device mode enabled.
-      },
-    ]);
+  it('records the sync setting', async () => {
+    await assertHistogramEventsInclude([{
+      actionName: 'DevTools.SyncSetting',
+      actionCode: 1,  // Chrome Sync is disabled
+    }]);
   });
 });
 
@@ -413,88 +388,6 @@ describe('User Metrics for CSS Overview', () => {
       {
         actionName: 'DevTools.ActionTaken',
         actionCode: 41,  // CaptureCssOverviewClicked
-      },
-    ]);
-  });
-});
-
-describe('User Metrics for CSS Editors in Styles Pane', () => {
-  it('dispatch CssEditorOpened events', async () => {
-    const {frontend} = getBrowserAndPages();
-
-    await frontend.evaluate(() => {
-      self.Host.userMetrics.cssEditorOpened('colorPicker');
-      self.Host.userMetrics.cssEditorOpened('shadowEditor');
-      self.Host.userMetrics.cssEditorOpened('bezierEditor');
-      self.Host.userMetrics.cssEditorOpened('fontEditor');
-    });
-
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 0,  // colorPicker
-      },
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 1,  // shadowEditor
-      },
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 2,  // bezierEditor
-      },
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 3,  // fontEditor
-      },
-    ]);
-  });
-
-  it('click swatches and listen for events', async () => {
-    await enableExperiment('fontEditor');
-    const {frontend} = getBrowserAndPages();
-    await goToResource('host/css-editor.html');
-    await waitForElementsStyleSection();
-    await waitFor('.color-swatch-inner');
-    await click('.color-swatch-inner');
-    await frontend.keyboard.press('Escape');
-    await waitFor('.shadow-swatch-icon');
-    await click('.shadow-swatch-icon');
-    await frontend.keyboard.press('Escape');
-    await waitFor('.bezier-swatch-icon');
-    await click('.bezier-swatch-icon');
-    await frontend.keyboard.press('Escape');
-    await waitFor('.largeicon-font-editor');
-    await click('.largeicon-font-editor');
-    await frontend.keyboard.press('Escape');
-
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 0,  // colorPicker
-      },
-      {
-        actionName: 'DevTools.ActionTaken',
-        actionCode: 14,  // StyleRuleEdited
-      },
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 1,  // shadowEditor
-      },
-      {
-        actionName: 'DevTools.ActionTaken',
-        actionCode: 14,  // StyleRuleEdited
-      },
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 2,  // bezierEditor
-      },
-      {
-        actionName: 'DevTools.ActionTaken',
-        actionCode: 14,  // StyleRuleEdited
-      },
-      {
-        actionName: 'DevTools.CssEditorOpened',
-        actionCode: 3,  // fontEditor
       },
     ]);
   });
@@ -585,6 +478,10 @@ describe('User Metrics for Issue Panel', () => {
       },
       {
         actionName: 'DevTools.IssueCreated',
+        actionCode: 60,  // DeprecationIssue
+      },
+      {
+        actionName: 'DevTools.IssueCreated',
         actionCode: 36,  // SharedArrayBufferIssue::TransferIssue
       },
     ]);
@@ -660,6 +557,30 @@ describe('User Metrics for Issue Panel', () => {
       {
         actionName: 'DevTools.IssueCreated',
         actionCode: 59,  // QuirksModeIssue::LimitedQuirksMode
+      },
+    ]);
+  });
+
+  it('dispatches an event when a Client Hints are used with invalid origin', async () => {
+    await goToResource('issues/client-hint-issue-MetaTagAllowListInvalidOrigin.html');
+    await waitFor('.issue');
+
+    await assertHistogramEventsInclude([
+      {
+        actionName: 'DevTools.IssueCreated',
+        actionCode: 61,  // ClientHintIssue::MetaTagAllowListInvalidOrigin
+      },
+    ]);
+  });
+
+  it('dispatches an event when a Client Hints are modified by javascript', async () => {
+    await goToResource('issues/client-hint-issue-MetaTagModifiedHTML.html');
+    await waitFor('.issue');
+
+    await assertHistogramEventsInclude([
+      {
+        actionName: 'DevTools.IssueCreated',
+        actionCode: 62,  // ClientHintIssue::MetaTagModifiedHTML
       },
     ]);
   });

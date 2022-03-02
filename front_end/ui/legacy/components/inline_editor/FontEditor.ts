@@ -8,6 +8,7 @@ import * as SDK from '../../../../core/sdk/sdk.js';
 import * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as UI from '../../legacy.js';
 
+import fontEditorStyles from './fontEditor.css.js';
 import * as FontEditorUnitConverter from './FontEditorUnitConverter.js';
 import * as FontEditorUtils from './FontEditorUtils.js';
 
@@ -123,7 +124,6 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   constructor(propertyMap: Map<string, string>) {
     super(true);
-    this.registerRequiredCSS('ui/legacy/components/inline_editor/fontEditor.css');
     this.selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
 
     this.propertyMap = propertyMap;
@@ -140,7 +140,7 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     const propertyValue: string|undefined = this.propertyMap.get('font-family');
 
-    this.createFontSelectorSection(propertyValue);
+    void this.createFontSelectorSection(propertyValue);
 
     //  CSS Font Property Section
     const cssPropertySection = this.contentElement.createChild('div', 'font-section');
@@ -174,6 +174,10 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
         /** hasUnits= */ true);
   }
 
+  wasShown(): void {
+    this.registerCSSFiles([fontEditorStyles]);
+  }
+
   private async createFontSelectorSection(propertyValue?: string): Promise<void> {
     if (propertyValue) {
       // FIXME(crbug.com/1148434): propertyValue will not be split correctly for font family names that contain commas.
@@ -183,11 +187,11 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
       if (!FontEditorUtils.GlobalValues.includes(splitValue[0])) {
         // We add one to the splitValue length so that we have an additional empty fallback selector
         for (let i = 1; i < splitValue.length + 1; i++) {
-          this.createFontSelector(splitValue[i]);
+          void this.createFontSelector(splitValue[i]);
         }
       }
     } else {
-      this.createFontSelector('', true);
+      void this.createFontSelector('', true);
     }
     this.resizePopout();
   }
@@ -379,7 +383,7 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // selector's value is not a global value and if the list of selectors has not exceeded 10.
     if (this.fontSelectors[this.fontSelectors.length - 1].input.value !== '' && !isGlobalValue &&
         this.fontSelectors.length < 10) {
-      this.createFontSelector(/** value= */ '');
+      void this.createFontSelector(/** value= */ '');
       this.resizePopout();
     }
     this.updatePropertyValue('font-family', value);

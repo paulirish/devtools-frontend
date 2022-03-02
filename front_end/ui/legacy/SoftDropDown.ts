@@ -4,6 +4,7 @@
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as ThemeSupport from './theme_support/theme_support.js';
 import * as Utils from './utils/utils.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
@@ -14,6 +15,8 @@ import type {ListDelegate} from './ListControl.js';
 import {ListControl, ListMode} from './ListControl.js';
 import type {ItemsReplacedEvent, ListModel} from './ListModel.js';
 import {Events as ListModelEvents} from './ListModel.js';
+import softDropDownStyles from './softDropDown.css.legacy.js';
+import softDropDownButtonStyles from './softDropDownButton.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -46,7 +49,7 @@ export class SoftDropDown<T> implements ListDelegate<T> {
 
     this.element = document.createElement('button');
     this.element.classList.add('soft-dropdown');
-    Utils.appendStyle(this.element, 'ui/legacy/softDropDownButton.css');
+    ThemeSupport.ThemeSupport.instance().appendStyle(this.element, softDropDownButtonStyles);
     this.titleElement = this.element.createChild('span', 'title');
     const dropdownArrowIcon = Icon.create('smallicon-triangle-down');
     this.element.appendChild(dropdownArrowIcon);
@@ -63,7 +66,7 @@ export class SoftDropDown<T> implements ListDelegate<T> {
     this.width = 315;
     Utils
         .createShadowRootWithCoreStyles(this.glassPane.contentElement, {
-          cssFile: 'ui/legacy/softDropDown.css',
+          cssFile: softDropDownStyles,
           delegatesFocus: undefined,
         })
         .appendChild(this.list.element);
@@ -108,7 +111,7 @@ export class SoftDropDown<T> implements ListDelegate<T> {
       this.list.selectItem(this.selectedItem);
     }
     event.consume(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
       this.listWasShowing200msAgo = true;
     }, 200);
   }
@@ -120,7 +123,7 @@ export class SoftDropDown<T> implements ListDelegate<T> {
   }
 
   private hide(event: Event): void {
-    setTimeout(() => {
+    window.setTimeout(() => {
       this.listWasShowing200msAgo = false;
     }, 200);
     this.glassPane.hide();

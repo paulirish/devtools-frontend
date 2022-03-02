@@ -1,4 +1,136 @@
 {
+  "flow-report/src/i18n/ui-strings.js | allReports": {
+    "message": "Âĺl̂ Ŕêṕôŕt̂ś"
+  },
+  "flow-report/src/i18n/ui-strings.js | categories": {
+    "message": "Ĉát̂éĝór̂íêś"
+  },
+  "flow-report/src/i18n/ui-strings.js | categoryAccessibility": {
+    "message": "Âćĉéŝśîb́îĺît́ŷ"
+  },
+  "flow-report/src/i18n/ui-strings.js | categoryBestPractices": {
+    "message": "B̂éŝt́ P̂ŕâćt̂íĉéŝ"
+  },
+  "flow-report/src/i18n/ui-strings.js | categoryPerformance": {
+    "message": "P̂ér̂f́ôŕm̂án̂ćê"
+  },
+  "flow-report/src/i18n/ui-strings.js | categoryProgressiveWebApp": {
+    "message": "P̂ŕôǵr̂éŝśîv́ê Ẃêb́ Âṕp̂"
+  },
+  "flow-report/src/i18n/ui-strings.js | categorySeo": {
+    "message": "ŜÉÔ"
+  },
+  "flow-report/src/i18n/ui-strings.js | desktop": {
+    "message": "D̂éŝḱt̂óp̂"
+  },
+  "flow-report/src/i18n/ui-strings.js | helpDialogTitle": {
+    "message": "Ûńd̂ér̂śt̂án̂d́îńĝ t́ĥé L̂íĝh́t̂h́ôúŝé F̂ĺôẃ R̂ép̂ór̂t́"
+  },
+  "flow-report/src/i18n/ui-strings.js | helpLabel": {
+    "message": "Ûńd̂ér̂śt̂án̂d́îńĝ F́l̂óŵś"
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseInstructionNavigation": {
+    "message": "Ûśê Ńâv́îǵât́îón̂ ŕêṕôŕt̂ś t̂ó..."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseInstructionSnapshot": {
+    "message": "Ûśê Śn̂áp̂śĥót̂ ŕêṕôŕt̂ś t̂ó..."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseInstructionTimespan": {
+    "message": "Ûśê T́îḿêśp̂án̂ ŕêṕôŕt̂ś t̂ó..."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseNavigation1": {
+    "message": "Ôb́t̂áîń â Ĺîǵĥt́ĥóûśê Ṕêŕf̂ór̂ḿâńĉé ŝćôŕê."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseNavigation2": {
+    "message": "M̂éâśûŕê ṕâǵê ĺôád̂ Ṕêŕf̂ór̂ḿâńĉé m̂ét̂ŕîćŝ śûćĥ áŝ Ĺâŕĝéŝt́ Ĉón̂t́êńt̂f́ûĺ P̂áîńt̂ án̂d́ Ŝṕêéd̂ Ín̂d́êx́."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseNavigation3": {
+    "message": "Âśŝéŝś P̂ŕôǵr̂éŝśîv́ê Ẃêb́ Âṕp̂ ćâṕâb́îĺît́îéŝ."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseSnapshot1": {
+    "message": "F̂ín̂d́ âćĉéŝśîb́îĺît́ŷ íŝśûéŝ ín̂ śîńĝĺê ṕâǵê áp̂ṕl̂íĉát̂íôńŝ ór̂ ćôḿp̂ĺêx́ f̂ór̂ḿŝ."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseSnapshot2": {
+    "message": "Êv́âĺûát̂é b̂éŝt́ p̂ŕâćt̂íĉéŝ óf̂ ḿêńûś âńd̂ ÚÎ él̂ém̂én̂t́ŝ h́îd́d̂én̂ b́êh́îńd̂ ín̂t́êŕâćt̂íôń."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseTimespan1": {
+    "message": "M̂éâśûŕê ĺâýôút̂ śĥíf̂t́ŝ án̂d́ Ĵáv̂áŜćr̂íp̂t́ êx́êćût́îón̂ t́îḿê ón̂ á ŝér̂íêś ôf́ îńt̂ér̂áĉt́îón̂ś."
+  },
+  "flow-report/src/i18n/ui-strings.js | helpUseCaseTimespan2": {
+    "message": "D̂íŝćôv́êŕ p̂ér̂f́ôŕm̂án̂ćê óp̂ṕôŕt̂ún̂ít̂íêś t̂ó îḿp̂ŕôv́ê t́ĥé êx́p̂ér̂íêńĉé f̂ór̂ ĺôńĝ-ĺîv́êd́ p̂áĝéŝ án̂d́ ŝín̂ǵl̂é-p̂áĝé âṕp̂ĺîćât́îón̂ś."
+  },
+  "flow-report/src/i18n/ui-strings.js | highestImpact": {
+    "message": "Ĥíĝh́êśt̂ ím̂ṕâćt̂"
+  },
+  "flow-report/src/i18n/ui-strings.js | informativeAuditCount": {
+    "message": "{numInformative, plural,\n    =1 {{numInformative} îńf̂ór̂ḿât́îv́ê áûd́ît́}\n    other {{numInformative} îńf̂ór̂ḿât́îv́ê áûd́ît́ŝ}\n  }"
+  },
+  "flow-report/src/i18n/ui-strings.js | mobile": {
+    "message": "M̂ób̂íl̂é"
+  },
+  "flow-report/src/i18n/ui-strings.js | navigationDescription": {
+    "message": "P̂áĝé l̂óâd́"
+  },
+  "flow-report/src/i18n/ui-strings.js | navigationLongDescription": {
+    "message": "N̂áv̂íĝát̂íôń r̂ép̂ór̂t́ŝ án̂ál̂ýẑé â śîńĝĺê ṕâǵê ĺôád̂, éx̂áĉt́l̂ý l̂ík̂é t̂h́ê ór̂íĝín̂ál̂ Ĺîǵĥt́ĥóûśê ŕêṕôŕt̂ś."
+  },
+  "flow-report/src/i18n/ui-strings.js | navigationReport": {
+    "message": "N̂áv̂íĝát̂íôń r̂ép̂ór̂t́"
+  },
+  "flow-report/src/i18n/ui-strings.js | navigationReportCount": {
+    "message": "{numNavigation, plural,\n    =1 {{numNavigation} n̂áv̂íĝát̂íôń r̂ép̂ór̂t́}\n    other {{numNavigation} n̂áv̂íĝát̂íôń r̂ép̂ór̂t́ŝ}\n  }"
+  },
+  "flow-report/src/i18n/ui-strings.js | passableAuditCount": {
+    "message": "{numPassableAudits, plural,\n    =1 {{numPassableAudits} p̂áŝśâb́l̂é âúd̂ít̂}\n    other {{numPassableAudits} ṕâśŝáb̂ĺê áûd́ît́ŝ}\n  }"
+  },
+  "flow-report/src/i18n/ui-strings.js | passedAuditCount": {
+    "message": "{numPassed, plural,\n    =1 {{numPassed} âúd̂ít̂ ṕâśŝéd̂}\n    other {{numPassed} áûd́ît́ŝ ṕâśŝéd̂}\n  }"
+  },
+  "flow-report/src/i18n/ui-strings.js | ratingAverage": {
+    "message": "Âv́êŕâǵê"
+  },
+  "flow-report/src/i18n/ui-strings.js | ratingError": {
+    "message": "Êŕr̂ór̂"
+  },
+  "flow-report/src/i18n/ui-strings.js | ratingFail": {
+    "message": "P̂óôŕ"
+  },
+  "flow-report/src/i18n/ui-strings.js | ratingPass": {
+    "message": "Ĝóôd́"
+  },
+  "flow-report/src/i18n/ui-strings.js | save": {
+    "message": "Ŝáv̂é"
+  },
+  "flow-report/src/i18n/ui-strings.js | snapshotDescription": {
+    "message": "Ĉáp̂t́ûŕêd́ ŝt́ât́ê óf̂ ṕâǵê"
+  },
+  "flow-report/src/i18n/ui-strings.js | snapshotLongDescription": {
+    "message": "Ŝńâṕŝh́ôt́ r̂ép̂ór̂t́ŝ án̂ál̂ýẑé t̂h́ê ṕâǵê ín̂ á p̂ár̂t́îćûĺâŕ ŝt́ât́ê, t́ŷṕîćâĺl̂ý âf́t̂ér̂ úŝér̂ ín̂t́êŕâćt̂íôńŝ."
+  },
+  "flow-report/src/i18n/ui-strings.js | snapshotReport": {
+    "message": "Ŝńâṕŝh́ôt́ r̂ép̂ór̂t́"
+  },
+  "flow-report/src/i18n/ui-strings.js | snapshotReportCount": {
+    "message": "{numSnapshot, plural,\n    =1 {{numSnapshot} ŝńâṕŝh́ôt́ r̂ép̂ór̂t́}\n    other {{numSnapshot} ŝńâṕŝh́ôt́ r̂ép̂ór̂t́ŝ}\n  }"
+  },
+  "flow-report/src/i18n/ui-strings.js | summary": {
+    "message": "Ŝúm̂ḿâŕŷ"
+  },
+  "flow-report/src/i18n/ui-strings.js | timespanDescription": {
+    "message": "Ûśêŕ îńt̂ér̂áĉt́îón̂ś"
+  },
+  "flow-report/src/i18n/ui-strings.js | timespanLongDescription": {
+    "message": "T̂ím̂éŝṕâń r̂ép̂ór̂t́ŝ án̂ál̂ýẑé âń âŕb̂ít̂ŕâŕŷ ṕêŕîód̂ óf̂ t́îḿê, t́ŷṕîćâĺl̂ý ĉón̂t́âín̂ín̂ǵ ûśêŕ îńt̂ér̂áĉt́îón̂ś."
+  },
+  "flow-report/src/i18n/ui-strings.js | timespanReport": {
+    "message": "T̂ím̂éŝṕâń r̂ép̂ór̂t́"
+  },
+  "flow-report/src/i18n/ui-strings.js | timespanReportCount": {
+    "message": "{numTimespan, plural,\n    =1 {{numTimespan} t̂ím̂éŝṕâń r̂ép̂ór̂t́}\n    other {{numTimespan} t̂ím̂éŝṕâń r̂ép̂ór̂t́ŝ}\n  }"
+  },
+  "flow-report/src/i18n/ui-strings.js | title": {
+    "message": "L̂íĝh́t̂h́ôúŝé Ûśêŕ F̂ĺôẃ R̂ép̂ór̂t́"
+  },
   "lighthouse-core/audits/accessibility/accesskeys.js | description": {
     "message": "Âćĉéŝś k̂éŷś l̂ét̂ úŝér̂ś q̂úîćk̂ĺŷ f́ôćûś â ṕâŕt̂ óf̂ t́ĥé p̂áĝé. F̂ór̂ ṕr̂óp̂ér̂ ńâv́îǵât́îón̂, éâćĥ áĉćêśŝ ḱêý m̂úŝt́ b̂é ûńîq́ûé. [L̂éâŕn̂ ḿôŕê](https://web.dev/accesskeys/)."
   },
@@ -345,13 +477,13 @@
     "message": "`[user-scalable=\"no\"]` îś n̂ót̂ úŝéd̂ ín̂ t́ĥé `<meta name=\"viewport\">` êĺêḿêńt̂ án̂d́ t̂h́ê `[maximum-scale]` át̂t́r̂íb̂út̂é îś n̂ót̂ ĺêśŝ t́ĥán̂ 5."
   },
   "lighthouse-core/audits/accessibility/object-alt.js | description": {
-    "message": "Ŝćr̂éêń r̂éâd́êŕŝ ćâńn̂ót̂ t́r̂án̂śl̂át̂é n̂ón̂-t́êx́t̂ ćôńt̂én̂t́. Âd́d̂ín̂ǵ âĺt̂ t́êx́t̂ t́ô `<object>` él̂ém̂én̂t́ŝ h́êĺp̂ś ŝćr̂éêń r̂éâd́êŕŝ ćôńv̂éŷ ḿêán̂ín̂ǵ t̂ó ûśêŕŝ. [Ĺêár̂ń m̂ór̂é](https://web.dev/object-alt/)."
+    "message": "Ŝćr̂éêń r̂éâd́êŕŝ ćâńn̂ót̂ t́r̂án̂śl̂át̂é n̂ón̂-t́êx́t̂ ćôńt̂én̂t́. Âd́d̂ín̂ǵ âĺt̂ér̂ńât́ê t́êx́t̂ t́ô `<object>` él̂ém̂én̂t́ŝ h́êĺp̂ś ŝćr̂éêń r̂éâd́êŕŝ ćôńv̂éŷ ḿêán̂ín̂ǵ t̂ó ûśêŕŝ. [Ĺêár̂ń m̂ór̂é](https://web.dev/object-alt/)."
   },
   "lighthouse-core/audits/accessibility/object-alt.js | failureTitle": {
-    "message": "`<object>` êĺêḿêńt̂ś d̂ó n̂ót̂ h́âv́ê `[alt]` t́êx́t̂"
+    "message": "`<object>` êĺêḿêńt̂ś d̂ó n̂ót̂ h́âv́ê ál̂t́êŕn̂át̂é t̂éx̂t́"
   },
   "lighthouse-core/audits/accessibility/object-alt.js | title": {
-    "message": "`<object>` êĺêḿêńt̂ś ĥáv̂é `[alt]` t̂éx̂t́"
+    "message": "`<object>` êĺêḿêńt̂ś ĥáv̂é âĺt̂ér̂ńât́ê t́êx́t̂"
   },
   "lighthouse-core/audits/accessibility/tabindex.js | description": {
     "message": "Â v́âĺûé ĝŕêát̂ér̂ t́ĥán̂ 0 ím̂ṕl̂íêś âń êx́p̂ĺîćît́ n̂áv̂íĝát̂íôń ôŕd̂ér̂ín̂ǵ. Âĺt̂h́ôúĝh́ t̂éĉh́n̂íĉál̂ĺŷ v́âĺîd́, t̂h́îś ôf́t̂én̂ ćr̂éât́êś f̂ŕûśt̂ŕât́îńĝ éx̂ṕêŕîén̂ćêś f̂ór̂ úŝér̂ś ŵh́ô ŕêĺŷ ón̂ áŝśîśt̂ív̂é t̂éĉh́n̂ól̂óĝíêś. [L̂éâŕn̂ ḿôŕê](https://web.dev/tabindex/)."
@@ -632,18 +764,6 @@
   "lighthouse-core/audits/deprecations.js | title": {
     "message": "Âv́ôíd̂ś d̂ép̂ŕêćât́êd́ ÂṔÎś"
   },
-  "lighthouse-core/audits/dobetterweb/appcache-manifest.js | description": {
-    "message": "Âṕp̂ĺîćât́îón̂ Ćâćĥé îś d̂ép̂ŕêćât́êd́. [L̂éâŕn̂ ḿôŕê](https://web.dev/appcache-manifest/)."
-  },
-  "lighthouse-core/audits/dobetterweb/appcache-manifest.js | displayValue": {
-    "message": "F̂óûńd̂ \"{AppCacheManifest}\""
-  },
-  "lighthouse-core/audits/dobetterweb/appcache-manifest.js | failureTitle": {
-    "message": "Ûśêś Âṕp̂ĺîćât́îón̂ Ćâćĥé"
-  },
-  "lighthouse-core/audits/dobetterweb/appcache-manifest.js | title": {
-    "message": "Âv́ôíd̂ś Âṕp̂ĺîćât́îón̂ Ćâćĥé"
-  },
   "lighthouse-core/audits/dobetterweb/charset.js | description": {
     "message": "Â ćĥár̂áĉt́êŕ êńĉód̂ín̂ǵ d̂éĉĺâŕât́îón̂ íŝ ŕêq́ûír̂éd̂. Ít̂ ćâń b̂é d̂ón̂é ŵít̂h́ â `<meta>` t́âǵ îń t̂h́ê f́îŕŝt́ 1024 b̂ýt̂éŝ óf̂ t́ĥé ĤT́M̂Ĺ ôŕ îń t̂h́ê Ćôńt̂én̂t́-T̂ýp̂é ĤT́T̂Ṕ r̂éŝṕôńŝé ĥéâd́êŕ. [L̂éâŕn̂ ḿôŕê](https://web.dev/charset/)."
   },
@@ -700,21 +820,6 @@
   },
   "lighthouse-core/audits/dobetterweb/dom-size.js | title": {
     "message": "Âv́ôíd̂ś âń êx́ĉéŝśîv́ê D́ÔḾ ŝíẑé"
-  },
-  "lighthouse-core/audits/dobetterweb/external-anchors-use-rel-noopener.js | columnFailingAnchors": {
-    "message": "F̂áîĺîńĝ Án̂ćĥór̂ś"
-  },
-  "lighthouse-core/audits/dobetterweb/external-anchors-use-rel-noopener.js | description": {
-    "message": "Âd́d̂ `rel=\"noopener\"` ór̂ `rel=\"noreferrer\"` t́ô án̂ý êx́t̂ér̂ńâĺ l̂ín̂ḱŝ t́ô ím̂ṕr̂óv̂é p̂ér̂f́ôŕm̂án̂ćê án̂d́ p̂ŕêv́êńt̂ śêćûŕît́ŷ v́ûĺn̂ér̂áb̂íl̂ít̂íêś. [L̂éâŕn̂ ḿôŕê](https://web.dev/external-anchors-use-rel-noopener/)."
-  },
-  "lighthouse-core/audits/dobetterweb/external-anchors-use-rel-noopener.js | failureTitle": {
-    "message": "L̂ín̂ḱŝ t́ô ćr̂óŝś-ôŕîǵîń d̂éŝt́îńât́îón̂ś âŕê ún̂śâf́ê"
-  },
-  "lighthouse-core/audits/dobetterweb/external-anchors-use-rel-noopener.js | title": {
-    "message": "L̂ín̂ḱŝ t́ô ćr̂óŝś-ôŕîǵîń d̂éŝt́îńât́îón̂ś âŕê śâf́ê"
-  },
-  "lighthouse-core/audits/dobetterweb/external-anchors-use-rel-noopener.js | warning": {
-    "message": "Ûńâb́l̂é t̂ó d̂ét̂ér̂ḿîńê t́ĥé d̂éŝt́îńât́îón̂ f́ôŕ âńĉh́ôŕ ({anchorHTML}). Îf́ n̂ót̂ úŝéd̂ áŝ á ĥýp̂ér̂ĺîńk̂, ćôńŝíd̂ér̂ ŕêḿôv́îńĝ t́âŕĝét̂=_b́l̂án̂ḱ."
   },
   "lighthouse-core/audits/dobetterweb/geolocation-on-start.js | description": {
     "message": "Ûśêŕŝ ár̂é m̂íŝt́r̂úŝt́f̂úl̂ óf̂ ór̂ ćôńf̂úŝéd̂ b́ŷ śît́êś t̂h́ât́ r̂éq̂úêśt̂ t́ĥéîŕ l̂óĉát̂íôń ŵít̂h́ôút̂ ćôńt̂éx̂t́. Ĉón̂śîd́êŕ t̂ýîńĝ t́ĥé r̂éq̂úêśt̂ t́ô á ûśêŕ âćt̂íôń îńŝt́êád̂. [Ĺêár̂ń m̂ór̂é](https://web.dev/geolocation-on-start/)."
@@ -947,6 +1052,9 @@
   "lighthouse-core/audits/installable-manifest.js | not-offline-capable": {
     "message": "P̂áĝé d̂óêś n̂ót̂ ẃôŕk̂ óf̂f́l̂ín̂é"
   },
+  "lighthouse-core/audits/installable-manifest.js | pipeline-restarted": {
+    "message": "P̂ẂÂ h́âś b̂éêń ûńîńŝt́âĺl̂éd̂ án̂d́ îńŝt́âĺl̂áb̂íl̂ít̂ý ĉh́êćk̂ś r̂éŝét̂t́îńĝ."
+  },
   "lighthouse-core/audits/installable-manifest.js | platform-not-supported-on-android": {
     "message": "T̂h́ê śp̂éĉíf̂íêd́ âṕp̂ĺîćât́îón̂ ṕl̂át̂f́ôŕm̂ íŝ ńôt́ ŝúp̂ṕôŕt̂éd̂ ón̂ Án̂d́r̂óîd́"
   },
@@ -955,6 +1063,9 @@
   },
   "lighthouse-core/audits/installable-manifest.js | prefer-related-applications-only-beta-stable": {
     "message": "p̂ŕêf́êŕ_r̂él̂át̂éd̂_áp̂ṕl̂íĉát̂íôńŝ íŝ ón̂ĺŷ śûṕp̂ór̂t́êd́ ôń Ĉh́r̂óm̂é B̂ét̂á âńd̂ Śt̂áb̂ĺê ćĥán̂ńêĺŝ ón̂ Án̂d́r̂óîd́."
+  },
+  "lighthouse-core/audits/installable-manifest.js | protocol-timeout": {
+    "message": "L̂íĝh́t̂h́ôúŝé ĉóûĺd̂ ńôt́ d̂ét̂ér̂ḿîńê íf̂ t́ĥér̂é ŵáŝ á ŝér̂v́îćê ẃôŕk̂ér̂. Ṕl̂éâśê t́r̂ý ŵít̂h́ â ńêẃêŕ v̂ér̂śîón̂ óf̂ Ćĥŕôḿê."
   },
   "lighthouse-core/audits/installable-manifest.js | start-url-not-valid": {
     "message": "M̂án̂íf̂éŝt́ ŝt́âŕt̂ ÚR̂Ĺ îś n̂ót̂ v́âĺîd́"
@@ -1107,7 +1218,7 @@
     "message": "Ŝér̂v́êŕ B̂áĉḱêńd̂ Ĺât́êńĉíêś"
   },
   "lighthouse-core/audits/no-unload-listeners.js | description": {
-    "message": "T̂h́ê `unload` év̂én̂t́ d̂óêś n̂ót̂ f́îŕê ŕêĺîáb̂ĺŷ án̂d́ l̂íŝt́êńîńĝ f́ôŕ ît́ ĉán̂ ṕr̂év̂én̂t́ b̂ŕôẃŝér̂ óp̂t́îḿîźât́îón̂ś l̂ík̂é t̂h́ê B́âćk̂-F́ôŕŵár̂d́ Ĉáĉh́ê. Ćôńŝíd̂ér̂ úŝín̂ǵ t̂h́ê `pagehide` ór̂ `visibilitychange` év̂én̂t́ŝ ín̂śt̂éâd́. [L̂éâŕn̂ ḿôŕê](https://developers.google.com/web/updates/2018/07/page-lifecycle-api#the-unload-event)"
+    "message": "T̂h́ê `unload` év̂én̂t́ d̂óêś n̂ót̂ f́îŕê ŕêĺîáb̂ĺŷ án̂d́ l̂íŝt́êńîńĝ f́ôŕ ît́ ĉán̂ ṕr̂év̂én̂t́ b̂ŕôẃŝér̂ óp̂t́îḿîźât́îón̂ś l̂ík̂é t̂h́ê B́âćk̂-F́ôŕŵár̂d́ Ĉáĉh́ê. Úŝé `pagehide` ôŕ `visibilitychange` êv́êńt̂ś îńŝt́êád̂. [Ĺêár̂ń m̂ór̂é](https://web.dev/bfcache/#never-use-the-unload-event)"
   },
   "lighthouse-core/audits/no-unload-listeners.js | failureTitle": {
     "message": "R̂éĝíŝt́êŕŝ án̂ `unload` ĺîśt̂én̂ér̂"
@@ -1166,15 +1277,6 @@
   "lighthouse-core/audits/preload-lcp-image.js | title": {
     "message": "P̂ŕêĺôád̂ Ĺâŕĝéŝt́ Ĉón̂t́êńt̂f́ûĺ P̂áîńt̂ ím̂áĝé"
   },
-  "lighthouse-core/audits/redirects-http.js | description": {
-    "message": "Îf́ ŷóû'v́ê ál̂ŕêád̂ý ŝét̂ úp̂ H́T̂T́P̂Ś, m̂ák̂é ŝúr̂é t̂h́ât́ ŷóû ŕêd́îŕêćt̂ ál̂ĺ ĤT́T̂Ṕ t̂ŕâf́f̂íĉ t́ô H́T̂T́P̂Ś îń ôŕd̂ér̂ t́ô én̂áb̂ĺê śêćûŕê ẃêb́ f̂éât́ûŕêś f̂ór̂ ál̂ĺ ŷóûŕ ûśêŕŝ. [Ĺêár̂ń m̂ór̂é](https://web.dev/redirects-http/)."
-  },
-  "lighthouse-core/audits/redirects-http.js | failureTitle": {
-    "message": "D̂óêś n̂ót̂ ŕêd́îŕêćt̂ H́T̂T́P̂ t́r̂áf̂f́îć t̂ó ĤT́T̂ṔŜ"
-  },
-  "lighthouse-core/audits/redirects-http.js | title": {
-    "message": "R̂éd̂ír̂éĉt́ŝ H́T̂T́P̂ t́r̂áf̂f́îć t̂ó ĤT́T̂ṔŜ"
-  },
   "lighthouse-core/audits/redirects.js | description": {
     "message": "R̂éd̂ír̂éĉt́ŝ ín̂t́r̂ód̂úĉé âd́d̂ít̂íôńâĺ d̂él̂áŷś b̂éf̂ór̂é t̂h́ê ṕâǵê ćâń b̂é l̂óâd́êd́. [L̂éâŕn̂ ḿôŕê](https://web.dev/redirects/)."
   },
@@ -1195,9 +1297,6 @@
   },
   "lighthouse-core/audits/seo/canonical.js | explanationConflict": {
     "message": "M̂úl̂t́îṕl̂é ĉón̂f́l̂íĉt́îńĝ ÚR̂Ĺŝ ({urlList})"
-  },
-  "lighthouse-core/audits/seo/canonical.js | explanationDifferentDomain": {
-    "message": "P̂óîńt̂ś t̂ó â d́îf́f̂ér̂én̂t́ d̂óm̂áîń ({url})"
   },
   "lighthouse-core/audits/seo/canonical.js | explanationInvalid": {
     "message": "Îńv̂ál̂íd̂ ÚR̂Ĺ ({url})"
@@ -1569,7 +1668,7 @@
     "message": "B̂éŝt́ p̂ŕâćt̂íĉéŝ"
   },
   "lighthouse-core/config/default-config.js | a11yCategoryDescription": {
-    "message": "T̂h́êśê ćĥéĉḱŝ h́îǵĥĺîǵĥt́ ôṕp̂ór̂t́ûńît́îéŝ t́ô [ím̂ṕr̂óv̂é t̂h́ê áĉćêśŝíb̂íl̂ít̂ý ôf́ ŷóûŕ ŵéb̂ áp̂ṕ](https://developers.google.com/web/fundamentals/accessibility). Ôńl̂ý â śûb́ŝét̂ óf̂ áĉćêśŝíb̂íl̂ít̂ý îśŝúêś ĉán̂ b́ê áût́ôḿât́îćâĺl̂ý d̂ét̂éĉt́êd́ ŝó m̂án̂úâĺ t̂éŝt́îńĝ íŝ ál̂śô én̂ćôúr̂áĝéd̂."
+    "message": "T̂h́êśê ćĥéĉḱŝ h́îǵĥĺîǵĥt́ ôṕp̂ór̂t́ûńît́îéŝ t́ô [ím̂ṕr̂óv̂é t̂h́ê áĉćêśŝíb̂íl̂ít̂ý ôf́ ŷóûŕ ŵéb̂ áp̂ṕ](https://web.dev/lighthouse-accessibility/). Ôńl̂ý â śûb́ŝét̂ óf̂ áĉćêśŝíb̂íl̂ít̂ý îśŝúêś ĉán̂ b́ê áût́ôḿât́îćâĺl̂ý d̂ét̂éĉt́êd́ ŝó m̂án̂úâĺ t̂éŝt́îńĝ íŝ ál̂śô én̂ćôúr̂áĝéd̂."
   },
   "lighthouse-core/config/default-config.js | a11yCategoryManualDescription": {
     "message": "T̂h́êśê ít̂ém̂ś âd́d̂ŕêśŝ ár̂éâś ŵh́îćĥ án̂ áût́ôḿât́êd́ t̂éŝt́îńĝ t́ôól̂ ćâńn̂ót̂ ćôv́êŕ. L̂éâŕn̂ ḿôŕê ín̂ óûŕ ĝúîd́ê ón̂ [ćôńd̂úĉt́îńĝ án̂ áĉćêśŝíb̂íl̂ít̂ý r̂év̂íêẃ](https://developers.google.com/web/fundamentals/accessibility/how-to-review)."
@@ -1665,7 +1764,7 @@
     "message": "T̂h́êśê ćĥéĉḱŝ ár̂é r̂éq̂úîŕêd́ b̂ý t̂h́ê b́âśêĺîńê [ṔŴÁ Ĉh́êćk̂ĺîśt̂](https://developers.google.com/web/progressive-web-apps/checklist) b́ût́ âŕê ńôt́ âút̂óm̂át̂íĉál̂ĺŷ ćĥéĉḱêd́ b̂ý L̂íĝh́t̂h́ôúŝé. T̂h́êý d̂ó n̂ót̂ áf̂f́êćt̂ ýôúr̂ śĉór̂é b̂út̂ ít̂'ś îḿp̂ór̂t́âńt̂ t́ĥát̂ ýôú v̂ér̂íf̂ý t̂h́êḿ m̂án̂úâĺl̂ý."
   },
   "lighthouse-core/config/default-config.js | pwaCategoryTitle": {
-    "message": "P̂ŕôǵr̂éŝśîv́ê Ẃêb́ Âṕp̂"
+    "message": "P̂ẂÂ"
   },
   "lighthouse-core/config/default-config.js | pwaInstallableGroupTitle": {
     "message": "Îńŝt́âĺl̂áb̂ĺê"
@@ -1967,30 +2066,6 @@
   "lighthouse-core/lib/lh-error.js | urlInvalid": {
     "message": "T̂h́ê ÚR̂Ĺ ŷóû h́âv́ê ṕr̂óv̂íd̂éd̂ áp̂ṕêár̂ś t̂ó b̂é îńv̂ál̂íd̂."
   },
-  "lighthouse-treemap/app/src/util.js | allLabel": {
-    "message": "Âĺl̂"
-  },
-  "lighthouse-treemap/app/src/util.js | allScriptsDropdownLabel": {
-    "message": "Âĺl̂ Śĉŕîṕt̂ś"
-  },
-  "lighthouse-treemap/app/src/util.js | coverageColumnName": {
-    "message": "Ĉóv̂ér̂áĝé"
-  },
-  "lighthouse-treemap/app/src/util.js | duplicateModulesLabel": {
-    "message": "D̂úp̂ĺîćât́ê Ḿôd́ûĺêś"
-  },
-  "lighthouse-treemap/app/src/util.js | resourceBytesLabel": {
-    "message": "R̂éŝóûŕĉé B̂ýt̂éŝ"
-  },
-  "lighthouse-treemap/app/src/util.js | tableColumnName": {
-    "message": "N̂ám̂é"
-  },
-  "lighthouse-treemap/app/src/util.js | toggleTableButtonLabel": {
-    "message": "T̂óĝǵl̂é T̂áb̂ĺê"
-  },
-  "lighthouse-treemap/app/src/util.js | unusedBytesLabel": {
-    "message": "Ûńûśêd́ B̂ýt̂éŝ"
-  },
   "node_modules/lighthouse-stack-packs/packs/amp.js | efficient-animated-content": {
     "message": "F̂ór̂ án̂ím̂át̂éd̂ ćôńt̂én̂t́, ûśê [`amp-anim`](https://amp.dev/documentation/components/amp-anim/) t́ô ḿîńîḿîźê ĆP̂Ú ûśâǵê ẃĥén̂ t́ĥé ĉón̂t́êńt̂ íŝ óf̂f́ŝćr̂éêń."
   },
@@ -2072,6 +2147,45 @@
   "node_modules/lighthouse-stack-packs/packs/drupal.js | uses-responsive-images": {
     "message": "Êńŝúr̂é t̂h́ât́ ŷóû ár̂é ûśîńĝ t́ĥé n̂át̂ív̂é [R̂éŝṕôńŝív̂é Îḿâǵê Śt̂ýl̂éŝ](https://www.drupal.org/docs/8/mobile-guide/responsive-images-in-drupal-8) ṕr̂óv̂íd̂éd̂ f́r̂óm̂ D́r̂úp̂ál̂ (áv̂áîĺâb́l̂é îń D̂ŕûṕâĺ 8 âńd̂ áb̂óv̂é). Ûśê t́ĥé R̂éŝṕôńŝív̂é Îḿâǵê Śt̂ýl̂éŝ ẃĥén̂ ŕêńd̂ér̂ín̂ǵ îḿâǵê f́îél̂d́ŝ t́ĥŕôúĝh́ v̂íêẃ m̂ód̂éŝ, v́îéŵś, ôŕ îḿâǵêś ûṕl̂óâd́êd́ t̂h́r̂óûǵĥ t́ĥé ŴÝŜÍŴÝĜ éd̂ít̂ór̂."
   },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | font-display": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Optimize Fonts` t́ô áût́ôḿât́îćâĺl̂ý l̂év̂ér̂áĝé t̂h́ê `font-display` ĆŜŚ f̂éât́ûŕê t́ô én̂śûŕê t́êx́t̂ íŝ úŝér̂-v́îśîb́l̂é ŵh́îĺê ẃêb́f̂ón̂t́ŝ ár̂é l̂óâd́îńĝ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | modern-image-formats": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Next-Gen Formats` t́ô ćôńv̂ér̂t́ îḿâǵêś t̂ó Ŵéb̂Ṕ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | offscreen-images": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Lazy Load Images` t́ô d́êf́êŕ l̂óâd́îńĝ óf̂f́-ŝćr̂éêń îḿâǵêś ûńt̂íl̂ t́ĥéŷ ár̂é n̂éêd́êd́."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | render-blocking-resources": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Critical CSS` án̂d́ `Script Delay` t̂ó d̂éf̂ér̂ ńôń-ĉŕît́îćâĺ ĴŚ/ĈŚŜ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | server-response-time": {
+    "message": "Ûśê [Éẑóîć Ĉĺôúd̂ Ćâćĥín̂ǵ](https://pubdash.ezoic.com/speed/caching) t̂ó ĉáĉh́ê ýôúr̂ ćôńt̂én̂t́ âćr̂óŝś ôúr̂ ẃôŕl̂d́ ŵíd̂é n̂ét̂ẃôŕk̂, ím̂ṕr̂óv̂ín̂ǵ t̂ím̂é t̂ó f̂ír̂śt̂ b́ŷt́ê."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | unminified-css": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Minify CSS` t́ô áût́ôḿât́îćâĺl̂ý m̂ín̂íf̂ý ŷóûŕ ĈŚŜ t́ô ŕêd́ûćê ńêt́ŵór̂ḱ p̂áŷĺôád̂ śîźêś."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | unminified-javascript": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Minify Javascript` t́ô áût́ôḿât́îćâĺl̂ý m̂ín̂íf̂ý ŷóûŕ ĴŚ t̂ó r̂éd̂úĉé n̂ét̂ẃôŕk̂ ṕâýl̂óâd́ ŝíẑéŝ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | unused-css-rules": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Remove Unused CSS` t́ô h́êĺp̂ ẃît́ĥ t́ĥíŝ íŝśûé. Ît́ ŵíl̂ĺ îd́êńt̂íf̂ý t̂h́ê ĆŜŚ ĉĺâśŝéŝ t́ĥát̂ ár̂é âćt̂úâĺl̂ý ûśêd́ ôń êáĉh́ p̂áĝé ôf́ ŷóûŕ ŝít̂é, âńd̂ ŕêḿôv́ê án̂ý ôt́ĥér̂ś t̂ó k̂éêṕ t̂h́ê f́îĺê śîźê śm̂ál̂ĺ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | uses-long-cache-ttl": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Efficient Static Cache Policy` t́ô śêt́ r̂éĉóm̂ḿêńd̂éd̂ v́âĺûéŝ ín̂ t́ĥé ĉáĉh́îńĝ h́êád̂ér̂ f́ôŕ ŝt́ât́îć âśŝéŝt́ŝ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | uses-optimized-images": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Next-Gen Formats` t́ô ćôńv̂ér̂t́ îḿâǵêś t̂ó Ŵéb̂Ṕ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | uses-rel-preconnect": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Pre-Connect Origins` t́ô áût́ôḿât́îćâĺl̂ý âd́d̂ `preconnect` ŕêśôúr̂ćê h́îńt̂ś t̂ó êśt̂áb̂ĺîśĥ éâŕl̂ý ĉón̂ńêćt̂íôńŝ t́ô ím̂ṕôŕt̂án̂t́ t̂h́îŕd̂-ṕâŕt̂ý ôŕîǵîńŝ."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | uses-rel-preload": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Preload Fonts` án̂d́ `Preload Background Images` t̂ó âd́d̂ `preload` ĺîńk̂ś t̂ó p̂ŕîór̂ít̂íẑé f̂ét̂ćĥín̂ǵ r̂éŝóûŕĉéŝ t́ĥát̂ ár̂é ĉúr̂ŕêńt̂ĺŷ ŕêq́ûéŝt́êd́ l̂át̂ér̂ ín̂ ṕâǵê ĺôád̂."
+  },
+  "node_modules/lighthouse-stack-packs/packs/ezoic.js | uses-responsive-images": {
+    "message": "Ûśê [Éẑóîć L̂éâṕ](https://pubdash.ezoic.com/speed) âńd̂ én̂áb̂ĺê `Resize Images` t́ô ŕêśîźê ím̂áĝéŝ t́ô á d̂év̂íĉé âṕp̂ŕôṕr̂íât́ê śîźê, ŕêd́ûćîńĝ ńêt́ŵór̂ḱ p̂áŷĺôád̂ śîźêś."
+  },
   "node_modules/lighthouse-stack-packs/packs/joomla.js | efficient-animated-content": {
     "message": "Ĉón̂śîd́êŕ ûṕl̂óâd́îńĝ ýôúr̂ ǴÎF́ t̂ó â śêŕv̂íĉé ŵh́îćĥ ẃîĺl̂ ḿâḱê ít̂ áv̂áîĺâb́l̂é t̂ó êḿb̂éd̂ áŝ án̂ H́T̂ḾL̂5 v́îd́êó."
   },
@@ -2149,6 +2263,39 @@
   },
   "node_modules/lighthouse-stack-packs/packs/magento.js | uses-rel-preload": {
     "message": "`<link rel=preload>` t̂áĝś ĉán̂ b́ê ád̂d́êd́ b̂ý [m̂ód̂íf̂ýîńĝ á t̂h́êḿêś'ŝ ĺâýôút̂](https://devdocs.magento.com/guides/v2.3/frontend-dev-guide/layouts/xml-manage.html)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | modern-image-formats": {
+    "message": "Ûśê t́ĥé `Next.js` Îḿâǵê Óp̂t́îḿîźât́îón̂ ÁP̂Í t̂ó ŝér̂v́ê ḿôd́êŕn̂ f́ôŕm̂át̂ś l̂ík̂é `WebP` âńd̂ `AVIF`. [Ĺêár̂ń m̂ór̂é](https://nextjs.org/docs/api-reference/next/image#acceptable-formats)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | offscreen-images": {
+    "message": "Ûśê t́ĥé `next/image` ĉóm̂ṕôńêńt̂, ẃĥíĉh́ d̂éf̂áûĺt̂ś t̂ó `loading=\"lazy\"`. [L̂éâŕn̂ ḿôŕê](https://nextjs.org/docs/api-reference/next/image#loading)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | preload-lcp-image": {
+    "message": "Ûśê t́ĥé `next/image` ĉóm̂ṕôńêńt̂ án̂d́ ŝét̂ \"ṕr̂íôŕît́ŷ\" t́ô t́r̂úê t́ô ṕr̂él̂óâd́ L̂ĆP̂ ím̂áĝé. [L̂éâŕn̂ ḿôŕê](https://nextjs.org/docs/api-reference/next/image#priority)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | render-blocking-resources": {
+    "message": "Ûśê t́ĥé `next/script` ĉóm̂ṕôńêńt̂ t́ô d́êf́êŕ l̂óâd́îńĝ óf̂ ńôń-ĉŕît́îćâĺ t̂h́îŕd̂-ṕâŕt̂ý ŝćr̂íp̂t́ŝ. [Ĺêár̂ń m̂ór̂é](https://nextjs.org/docs/basic-features/script)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | unused-css-rules": {
+    "message": "Ĉón̂śîd́êŕ ŝét̂t́îńĝ úp̂ `PurgeCSS` ín̂ `Next.js` ćôńf̂íĝúr̂át̂íôń t̂ó r̂ém̂óv̂é ûńûśêd́ r̂úl̂éŝ f́r̂óm̂ śt̂ýl̂éŝh́êét̂ś. [L̂éâŕn̂ ḿôŕê](https://purgecss.com/guides/next.html)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | unused-javascript": {
+    "message": "Ûśê `Webpack Bundle Analyzer` t́ô d́êt́êćt̂ ún̂úŝéd̂ J́âv́âŚĉŕîṕt̂ ćôd́ê. [Ĺêár̂ń m̂ór̂é](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer)"
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | user-timings": {
+    "message": "Ĉón̂śîd́êŕ ûśîńĝ `Next.js Analytics` t́ô ḿêáŝúr̂é ŷóûŕ âṕp̂'ś r̂éâĺ-ŵór̂ĺd̂ ṕêŕf̂ór̂ḿâńĉé. [L̂éâŕn̂ ḿôŕê](https://nextjs.org/docs/advanced-features/measuring-performance)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | uses-long-cache-ttl": {
+    "message": "Ĉón̂f́îǵûŕê ćâćĥín̂ǵ f̂ór̂ ím̂ḿût́âb́l̂é âśŝét̂ś âńd̂ `Server-side Rendered` (ŚŜŔ) p̂áĝéŝ. [Ĺêár̂ń m̂ór̂é](https://nextjs.org/docs/going-to-production#caching)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | uses-optimized-images": {
+    "message": "Ûśê t́ĥé `next/image` ĉóm̂ṕôńêńt̂ ín̂śt̂éâd́ ôf́ `<img>` t̂ó ôṕt̂ím̂íẑé îḿâǵêś. [L̂éâŕn̂ ḿôŕê](https://nextjs.org/docs/basic-features/image-optimization)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | uses-responsive-images": {
+    "message": "Ûśê t́ĥé `next/image` ĉóm̂ṕôńêńt̂ t́ô śêt́ t̂h́ê áp̂ṕr̂óp̂ŕîát̂é `sizes`. [L̂éâŕn̂ ḿôŕê](https://nextjs.org/docs/api-reference/next/image#sizes)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/next.js | uses-text-compression": {
+    "message": "Êńâb́l̂é ĉóm̂ṕr̂éŝśîón̂ ón̂ ýôúr̂ Ńêx́t̂.j́ŝ śêŕv̂ér̂. [Ĺêár̂ń m̂ór̂é](https://nextjs.org/docs/api-reference/next.config.js/compression)."
   },
   "node_modules/lighthouse-stack-packs/packs/octobercms.js | efficient-animated-content": {
     "message": "[R̂ép̂ĺâćê án̂ím̂át̂éd̂ ǴÎF́ŝ ẃît́ĥ v́îd́êó](https://web.dev/replace-gifs-with-videos/) f̂ór̂ f́âśt̂ér̂ ẃêb́ p̂áĝé l̂óâd́ŝ án̂d́ ĉón̂śîd́êŕ ûśîńĝ ḿôd́êŕn̂ f́îĺê f́ôŕm̂át̂ś ŝúĉh́ âś [Ŵéb̂Ḿ](https://web.dev/replace-gifs-with-videos/#create-webm-videos) ôŕ [ÂV́1](https://developers.google.com/web/updates/2018/09/chrome-70-media-updates#av1-decoder) t̂ó îḿp̂ŕôv́ê ćôḿp̂ŕêśŝíôń êf́f̂íĉíêńĉý b̂ý ĝŕêát̂ér̂ t́ĥán̂ 30% óv̂ér̂ t́ĥé ĉúr̂ŕêńt̂ śt̂át̂é-ôf́-t̂h́ê-ár̂t́ v̂íd̂éô ćôd́êć, V̂Ṕ9."
@@ -2238,10 +2385,10 @@
     "message": "Â ńûḿb̂ér̂ óf̂ [Ẃôŕd̂Ṕr̂éŝś p̂ĺûǵîńŝ](https://wordpress.org/plugins/search/minify+javascript/) ćâń ŝṕêéd̂ úp̂ ýôúr̂ śît́ê b́ŷ ćôńĉát̂én̂át̂ín̂ǵ, m̂ín̂íf̂ýîńĝ, án̂d́ ĉóm̂ṕr̂éŝśîńĝ ýôúr̂ śĉŕîṕt̂ś. Ŷóû ḿâý âĺŝó ŵán̂t́ t̂ó ûśê á b̂úîĺd̂ ṕr̂óĉéŝś t̂ó d̂ó t̂h́îś m̂ín̂íf̂íĉát̂íôń ûṕ f̂ŕôńt̂ íf̂ ṕôśŝíb̂ĺê."
   },
   "node_modules/lighthouse-stack-packs/packs/wordpress.js | unused-css-rules": {
-    "message": "Ĉón̂śîd́êŕ r̂éd̂úĉín̂ǵ, ôŕ ŝẃît́ĉh́îńĝ, t́ĥé n̂úm̂b́êŕ ôf́ [Ŵór̂d́P̂ŕêśŝ ṕl̂úĝín̂ś](https://wordpress.org/plugins/) l̂óâd́îńĝ ún̂úŝéd̂ ĆŜŚ îń ŷóûŕ p̂áĝé. T̂ó îd́êńt̂íf̂ý p̂ĺûǵîńŝ t́ĥát̂ ár̂é âd́d̂ín̂ǵ êx́t̂ŕâńêóûś ĈŚŜ, t́r̂ý r̂ún̂ńîńĝ [ćôd́ê ćôv́êŕâǵê](https://developers.google.com/web/updates/2017/04/devtools-release-notes#coverage) ín̂ Ćĥŕôḿê D́êv́T̂óôĺŝ. Ýôú ĉán̂ íd̂én̂t́îf́ŷ t́ĥé t̂h́êḿê/ṕl̂úĝín̂ ŕêśp̂ón̂śîb́l̂é f̂ŕôḿ t̂h́ê ÚR̂Ĺ ôf́ t̂h́ê śt̂ýl̂éŝh́êét̂. Ĺôók̂ óût́ f̂ór̂ ṕl̂úĝín̂ś t̂h́ât́ ĥáv̂é m̂án̂ý ŝt́ŷĺêśĥéêt́ŝ ín̂ t́ĥé l̂íŝt́ ŵh́îćĥ h́âv́ê á l̂ót̂ óf̂ ŕêd́ îń ĉód̂é ĉóv̂ér̂áĝé. Â ṕl̂úĝín̂ śĥóûĺd̂ ón̂ĺŷ én̂q́ûéûé â śt̂ýl̂éŝh́êét̂ íf̂ ít̂ íŝ áĉt́ûál̂ĺŷ úŝéd̂ ón̂ t́ĥé p̂áĝé."
+    "message": "Ĉón̂śîd́êŕ r̂éd̂úĉín̂ǵ, ôŕ ŝẃît́ĉh́îńĝ, t́ĥé n̂úm̂b́êŕ ôf́ [Ŵór̂d́P̂ŕêśŝ ṕl̂úĝín̂ś](https://wordpress.org/plugins/) l̂óâd́îńĝ ún̂úŝéd̂ ĆŜŚ îń ŷóûŕ p̂áĝé. T̂ó îd́êńt̂íf̂ý p̂ĺûǵîńŝ t́ĥát̂ ár̂é âd́d̂ín̂ǵ êx́t̂ŕâńêóûś ĈŚŜ, t́r̂ý r̂ún̂ńîńĝ [ćôd́ê ćôv́êŕâǵê](https://developer.chrome.com/docs/devtools/coverage/) ín̂ Ćĥŕôḿê D́êv́T̂óôĺŝ. Ýôú ĉán̂ íd̂én̂t́îf́ŷ t́ĥé t̂h́êḿê/ṕl̂úĝín̂ ŕêśp̂ón̂śîb́l̂é f̂ŕôḿ t̂h́ê ÚR̂Ĺ ôf́ t̂h́ê śt̂ýl̂éŝh́êét̂. Ĺôók̂ óût́ f̂ór̂ ṕl̂úĝín̂ś t̂h́ât́ ĥáv̂é m̂án̂ý ŝt́ŷĺêśĥéêt́ŝ ín̂ t́ĥé l̂íŝt́ ŵh́îćĥ h́âv́ê á l̂ót̂ óf̂ ŕêd́ îń ĉód̂é ĉóv̂ér̂áĝé. Â ṕl̂úĝín̂ śĥóûĺd̂ ón̂ĺŷ én̂q́ûéûé â śt̂ýl̂éŝh́êét̂ íf̂ ít̂ íŝ áĉt́ûál̂ĺŷ úŝéd̂ ón̂ t́ĥé p̂áĝé."
   },
   "node_modules/lighthouse-stack-packs/packs/wordpress.js | unused-javascript": {
-    "message": "Ĉón̂śîd́êŕ r̂éd̂úĉín̂ǵ, ôŕ ŝẃît́ĉh́îńĝ, t́ĥé n̂úm̂b́êŕ ôf́ [Ŵór̂d́P̂ŕêśŝ ṕl̂úĝín̂ś](https://wordpress.org/plugins/) l̂óâd́îńĝ ún̂úŝéd̂ J́âv́âŚĉŕîṕt̂ ín̂ ýôúr̂ ṕâǵê. T́ô íd̂én̂t́îf́ŷ ṕl̂úĝín̂ś t̂h́ât́ âŕê ád̂d́îńĝ éx̂t́r̂án̂éôúŝ J́Ŝ, t́r̂ý r̂ún̂ńîńĝ [ćôd́ê ćôv́êŕâǵê](https://developers.google.com/web/updates/2017/04/devtools-release-notes#coverage) ín̂ Ćĥŕôḿê D́êv́T̂óôĺŝ. Ýôú ĉán̂ íd̂én̂t́îf́ŷ t́ĥé t̂h́êḿê/ṕl̂úĝín̂ ŕêśp̂ón̂śîb́l̂é f̂ŕôḿ t̂h́ê ÚR̂Ĺ ôf́ t̂h́ê śĉŕîṕt̂. Ĺôók̂ óût́ f̂ór̂ ṕl̂úĝín̂ś t̂h́ât́ ĥáv̂é m̂án̂ý ŝćr̂íp̂t́ŝ ín̂ t́ĥé l̂íŝt́ ŵh́îćĥ h́âv́ê á l̂ót̂ óf̂ ŕêd́ îń ĉód̂é ĉóv̂ér̂áĝé. Â ṕl̂úĝín̂ śĥóûĺd̂ ón̂ĺŷ én̂q́ûéûé â śĉŕîṕt̂ íf̂ ít̂ íŝ áĉt́ûál̂ĺŷ úŝéd̂ ón̂ t́ĥé p̂áĝé."
+    "message": "Ĉón̂śîd́êŕ r̂éd̂úĉín̂ǵ, ôŕ ŝẃît́ĉh́îńĝ, t́ĥé n̂úm̂b́êŕ ôf́ [Ŵór̂d́P̂ŕêśŝ ṕl̂úĝín̂ś](https://wordpress.org/plugins/) l̂óâd́îńĝ ún̂úŝéd̂ J́âv́âŚĉŕîṕt̂ ín̂ ýôúr̂ ṕâǵê. T́ô íd̂én̂t́îf́ŷ ṕl̂úĝín̂ś t̂h́ât́ âŕê ád̂d́îńĝ éx̂t́r̂án̂éôúŝ J́Ŝ, t́r̂ý r̂ún̂ńîńĝ [ćôd́ê ćôv́êŕâǵê](https://developer.chrome.com/docs/devtools/coverage/) ín̂ Ćĥŕôḿê D́êv́T̂óôĺŝ. Ýôú ĉán̂ íd̂én̂t́îf́ŷ t́ĥé t̂h́êḿê/ṕl̂úĝín̂ ŕêśp̂ón̂śîb́l̂é f̂ŕôḿ t̂h́ê ÚR̂Ĺ ôf́ t̂h́ê śĉŕîṕt̂. Ĺôók̂ óût́ f̂ór̂ ṕl̂úĝín̂ś t̂h́ât́ ĥáv̂é m̂án̂ý ŝćr̂íp̂t́ŝ ín̂ t́ĥé l̂íŝt́ ŵh́îćĥ h́âv́ê á l̂ót̂ óf̂ ŕêd́ îń ĉód̂é ĉóv̂ér̂áĝé. Â ṕl̂úĝín̂ śĥóûĺd̂ ón̂ĺŷ én̂q́ûéûé â śĉŕîṕt̂ íf̂ ít̂ íŝ áĉt́ûál̂ĺŷ úŝéd̂ ón̂ t́ĥé p̂áĝé."
   },
   "node_modules/lighthouse-stack-packs/packs/wordpress.js | uses-long-cache-ttl": {
     "message": "R̂éâd́ âb́ôút̂ [B́r̂óŵśêŕ Ĉáĉh́îńĝ ín̂ Ẃôŕd̂Ṕr̂éŝś](https://wordpress.org/support/article/optimization/#browser-caching)."
@@ -2257,6 +2404,9 @@
   },
   "report/renderer/util.js | calculatorLink": {
     "message": "Ŝéê ćâĺĉúl̂át̂ór̂."
+  },
+  "report/renderer/util.js | collapseView": {
+    "message": "Ĉól̂ĺâṕŝé v̂íêẃ"
   },
   "report/renderer/util.js | crcInitialNavigation": {
     "message": "Îńît́îál̂ Ńâv́îǵât́îón̂"
@@ -2294,8 +2444,14 @@
   "report/renderer/util.js | errorMissingAuditInfo": {
     "message": "R̂ép̂ór̂t́ êŕr̂ór̂: ńô áûd́ît́ îńf̂ór̂ḿât́îón̂"
   },
+  "report/renderer/util.js | expandView": {
+    "message": "Êx́p̂án̂d́ v̂íêẃ"
+  },
   "report/renderer/util.js | footerIssue": {
     "message": "F̂íl̂é âń îśŝúê"
+  },
+  "report/renderer/util.js | hide": {
+    "message": "Ĥíd̂é"
   },
   "report/renderer/util.js | labDataTitle": {
     "message": "L̂áb̂ D́ât́â"
@@ -2318,6 +2474,12 @@
   "report/renderer/util.js | passedAuditsGroupTitle": {
     "message": "P̂áŝśêd́ âúd̂ít̂ś"
   },
+  "report/renderer/util.js | runtimeAnalysisWindow": {
+    "message": "Îńît́îál̂ ṕâǵê ĺôád̂"
+  },
+  "report/renderer/util.js | runtimeCustom": {
+    "message": "Ĉúŝt́ôḿ t̂h́r̂ót̂t́l̂ín̂ǵ"
+  },
   "report/renderer/util.js | runtimeDesktopEmulation": {
     "message": "Êḿûĺât́êd́ D̂éŝḱt̂óp̂"
   },
@@ -2333,35 +2495,32 @@
   "report/renderer/util.js | runtimeSettingsBenchmark": {
     "message": "ĈṔÛ/Ḿêḿôŕŷ Ṕôẃêŕ"
   },
-  "report/renderer/util.js | runtimeSettingsChannel": {
-    "message": "Ĉh́âńn̂él̂"
-  },
   "report/renderer/util.js | runtimeSettingsCPUThrottling": {
     "message": "ĈṔÛ t́ĥŕôt́t̂ĺîńĝ"
   },
   "report/renderer/util.js | runtimeSettingsDevice": {
     "message": "D̂év̂íĉé"
   },
-  "report/renderer/util.js | runtimeSettingsFetchTime": {
-    "message": "F̂ét̂ćĥ T́îḿê"
-  },
   "report/renderer/util.js | runtimeSettingsNetworkThrottling": {
     "message": "N̂ét̂ẃôŕk̂ t́ĥŕôt́t̂ĺîńĝ"
-  },
-  "report/renderer/util.js | runtimeSettingsTitle": {
-    "message": "R̂ún̂t́îḿê Śêt́t̂ín̂ǵŝ"
-  },
-  "report/renderer/util.js | runtimeSettingsUA": {
-    "message": "Ûśêŕ âǵêńt̂ (h́ôśt̂)"
   },
   "report/renderer/util.js | runtimeSettingsUANetwork": {
     "message": "Ûśêŕ âǵêńt̂ (ńêt́ŵór̂ḱ)"
   },
-  "report/renderer/util.js | runtimeSettingsUrl": {
-    "message": "ÛŔL̂"
+  "report/renderer/util.js | runtimeSingleLoad": {
+    "message": "Ŝín̂ǵl̂é p̂áĝé l̂óâd́"
+  },
+  "report/renderer/util.js | runtimeSingleLoadTooltip": {
+    "message": "T̂h́îś d̂át̂á îś t̂ák̂én̂ f́r̂óm̂ á ŝín̂ǵl̂é p̂áĝé l̂óâd́, âś ôṕp̂óŝéd̂ t́ô f́îél̂d́ d̂át̂á ŝúm̂ḿâŕîźîńĝ ḿâńŷ śêśŝíôńŝ."
+  },
+  "report/renderer/util.js | runtimeSlow4g": {
+    "message": "Ŝĺôẃ 4Ĝ t́ĥŕôt́t̂ĺîńĝ"
   },
   "report/renderer/util.js | runtimeUnknown": {
     "message": "Ûńk̂ńôẃn̂"
+  },
+  "report/renderer/util.js | show": {
+    "message": "Ŝh́ôẃ"
   },
   "report/renderer/util.js | showRelevantAudits": {
     "message": "Ŝh́ôẃ âúd̂ít̂ś r̂él̂év̂án̂t́ t̂ó:"
@@ -2384,6 +2543,12 @@
   "report/renderer/util.js | varianceDisclaimer": {
     "message": "V̂ál̂úêś âŕê éŝt́îḿât́êd́ âńd̂ ḿâý v̂ár̂ý. T̂h́ê [ṕêŕf̂ór̂ḿâńĉé ŝćôŕê íŝ ćâĺĉúl̂át̂éd̂](https://web.dev/performance-scoring/) d́îŕêćt̂ĺŷ f́r̂óm̂ t́ĥéŝé m̂ét̂ŕîćŝ."
   },
+  "report/renderer/util.js | viewOriginalTraceLabel": {
+    "message": "V̂íêẃ Ôŕîǵîńâĺ T̂ŕâćê"
+  },
+  "report/renderer/util.js | viewTraceLabel": {
+    "message": "V̂íêẃ T̂ŕâćê"
+  },
   "report/renderer/util.js | viewTreemapLabel": {
     "message": "V̂íêẃ T̂ŕêém̂áp̂"
   },
@@ -2392,5 +2557,29 @@
   },
   "report/renderer/util.js | warningHeader": {
     "message": "Ŵár̂ńîńĝś: "
+  },
+  "treemap/app/src/util.js | allLabel": {
+    "message": "Âĺl̂"
+  },
+  "treemap/app/src/util.js | allScriptsDropdownLabel": {
+    "message": "Âĺl̂ Śĉŕîṕt̂ś"
+  },
+  "treemap/app/src/util.js | coverageColumnName": {
+    "message": "Ĉóv̂ér̂áĝé"
+  },
+  "treemap/app/src/util.js | duplicateModulesLabel": {
+    "message": "D̂úp̂ĺîćât́ê Ḿôd́ûĺêś"
+  },
+  "treemap/app/src/util.js | resourceBytesLabel": {
+    "message": "R̂éŝóûŕĉé B̂ýt̂éŝ"
+  },
+  "treemap/app/src/util.js | tableColumnName": {
+    "message": "N̂ám̂é"
+  },
+  "treemap/app/src/util.js | toggleTableButtonLabel": {
+    "message": "T̂óĝǵl̂é T̂áb̂ĺê"
+  },
+  "treemap/app/src/util.js | unusedBytesLabel": {
+    "message": "Ûńûśêd́ B̂ýt̂éŝ"
   }
 }

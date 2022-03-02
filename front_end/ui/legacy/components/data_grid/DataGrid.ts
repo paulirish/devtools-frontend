@@ -31,6 +31,8 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as UI from '../../legacy.js';
 
+import dataGridStyles from './dataGrid.css.js';
+
 const UIStrings = {
   /**
   *@description Accessible text label for expandible nodes in datagrids
@@ -121,9 +123,9 @@ const elementToIndexMap = new WeakMap<Element, number>();
 export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTypes<T>> {
   element: HTMLDivElement;
   private displayName: string;
-  private editCallback: ((arg0: any, arg1: string, arg2: any, arg3: any) => any)|undefined;
-  private readonly deleteCallback: ((arg0: any) => any)|undefined;
-  private readonly refreshCallback: (() => any)|undefined;
+  private editCallback: ((arg0: any, arg1: string, arg2: any, arg3: any) => void)|undefined;
+  private readonly deleteCallback: ((arg0: any) => void)|undefined;
+  private readonly refreshCallback: (() => void)|undefined;
   private readonly headerTable: Element;
   private headerTableHeaders: {
     [x: string]: Element,
@@ -169,7 +171,6 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     const {displayName, columns: columnsArray, editCallback, deleteCallback, refreshCallback} = dataGridParameters;
     this.element = document.createElement('div');
     this.element.classList.add('data-grid');
-    UI.Utils.appendStyle(this.element, 'ui/legacy/components/data_grid/dataGrid.css');
     this.element.tabIndex = 0;
     this.element.addEventListener('keydown', this.keyDown.bind(this), false);
     this.element.addEventListener('contextmenu', this.contextMenu.bind(this), true);
@@ -191,8 +192,6 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     const headerContainer = this.element.createChild('div', 'header-container');
     this.headerTable = headerContainer.createChild('table', 'header');
-    // Hide the header table from screen readers since titles are also added to data table.
-    UI.ARIAUtils.markAsHidden(this.headerTable);
     this.headerTableHeaders = {};
     this.scrollContainerInternal = this.element.createChild('div', 'data-container');
     this.dataTable = this.scrollContainerInternal.createChild('table', 'data');
@@ -870,7 +869,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       for (let i = 0; i < numColumns; i++) {
         const column = this.visibleColumnsArray[i];
         if (!column.weight) {
-          column.weight = 100 * cells[i].offsetWidth / tableWidth || 10;
+          column.weight = 100 * this.getPreferredWidth(i) / tableWidth || 10;
         }
       }
       this.columnWidthsInitialized = true;
@@ -935,6 +934,11 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   willHide(): void {
   }
 
+  private getPreferredWidth(columnIndex: number): number {
+    return elementToPreferedWidthMap.get(this.headerTableColumnGroup.children[columnIndex]) ||
+        this.headerTableBodyInternal.rows[0].cells[columnIndex].offsetWidth;
+  }
+
   private applyColumnWeights(): void {
     let tableWidth = this.element.offsetWidth - this.cornerWidth;
     if (tableWidth <= 0) {
@@ -946,9 +950,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     for (let i = 0; i < this.visibleColumnsArray.length; ++i) {
       const column = this.visibleColumnsArray[i];
       if (column.fixedWidth) {
-        const currentChild = this.headerTableColumnGroup.children[i];
-        const width =
-            elementToPreferedWidthMap.get(currentChild) || this.headerTableBodyInternal.rows[0].cells[i].offsetWidth;
+        const width = this.getPreferredWidth(i);
         fixedColumnWidths[i] = width;
         tableWidth -= width;
       } else {
@@ -1259,7 +1261,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return;
     }
 
-    if (/** @type {!MouseEvent} */ (event as MouseEvent).metaKey) {
+    if ((event as MouseEvent).metaKey) {
       if (gridNode.selected) {
         gridNode.deselect();
       } else {
@@ -1308,7 +1310,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         this.headerContextMenuCallback(contextMenu);
       }
       contextMenu.defaultSection().appendItem(i18nString(UIStrings.resetColumns), this.resetColumnWeights.bind(this));
-      contextMenu.show();
+      void contextMenu.show();
       return;
     }
 
@@ -1369,7 +1371,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       }
     }
 
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   private clickInDataTable(event: Event): void {
@@ -1379,13 +1381,13 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
 
     if (gridNode.expanded) {
-      if (/** @type {!MouseEvent}*/ (event as MouseEvent).altKey) {
+      if ((event as MouseEvent).altKey) {
         gridNode.collapseRecursively();
       } else {
         gridNode.collapse();
       }
     } else {
-      if (/** @type {!MouseEvent}*/ (event as MouseEvent).altKey) {
+      if ((event as MouseEvent).altKey) {
         gridNode.expandRecursively();
       } else {
         gridNode.expand();
@@ -1416,7 +1418,6 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     // Constrain the dragpoint to be within the containing div of the
     // datagrid.
     let dragPoint: number = event.clientX - this.element.totalOffsetLeft();
-    const firstRowCells = this.headerTableBodyInternal.rows[0].cells;
     let leftEdgeOfPreviousColumn = 0;
     // Constrain the dragpoint to be within the space made up by the
     // column directly to the left and the column directly to the right.
@@ -1426,19 +1427,19 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
     let rightCellIndex: number = leftCellIndex + 1;
     for (let i = 0; i < leftCellIndex; i++) {
-      leftEdgeOfPreviousColumn += firstRowCells[i].offsetWidth;
+      leftEdgeOfPreviousColumn += this.getPreferredWidth(i);
     }
 
     // Differences for other resize methods
     if (this.resizeMethod === ResizeMethod.Last) {
       rightCellIndex = this.resizers.length;
     } else if (this.resizeMethod === ResizeMethod.First) {
-      leftEdgeOfPreviousColumn += firstRowCells[leftCellIndex].offsetWidth - firstRowCells[0].offsetWidth;
+      leftEdgeOfPreviousColumn += this.getPreferredWidth(leftCellIndex) - this.getPreferredWidth(0);
       leftCellIndex = 0;
     }
 
     const rightEdgeOfNextColumn =
-        leftEdgeOfPreviousColumn + firstRowCells[leftCellIndex].offsetWidth + firstRowCells[rightCellIndex].offsetWidth;
+        leftEdgeOfPreviousColumn + this.getPreferredWidth(leftCellIndex) + this.getPreferredWidth(rightCellIndex);
 
     // Give each column some padding so that they don't disappear.
     const leftMinimum = leftEdgeOfPreviousColumn + ColumnResizePadding;
@@ -1466,6 +1467,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
 
     this.positionResizers();
+    this.updateWidths();
     event.preventDefault();
   }
 
@@ -2353,6 +2355,7 @@ export class DataGridWidget<T> extends UI.Widget.VBox {
   }
 
   wasShown(): void {
+    this.registerCSSFiles([dataGridStyles]);
     this.dataGrid.wasShown();
   }
 
@@ -2371,9 +2374,9 @@ export class DataGridWidget<T> extends UI.Widget.VBox {
 export interface Parameters {
   displayName: string;
   columns: ColumnDescriptor[];
-  editCallback?: ((arg0: any, arg1: string, arg2: any, arg3: any) => any);
-  deleteCallback?: ((arg0: any) => any);
-  refreshCallback?: (() => any);
+  editCallback?: ((arg0: any, arg1: string, arg2: any, arg3: any) => void);
+  deleteCallback?: ((arg0: any) => void);
+  refreshCallback?: (() => void);
 }
 export interface ColumnDescriptor {
   id: string;

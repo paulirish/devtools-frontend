@@ -101,10 +101,10 @@ export class InplaceFormatterEditorAction implements EditorAction {
     }
 
     if (uiSourceCode.isDirty()) {
-      this.contentLoaded(uiSourceCode, uiSourceCode.workingCopy());
+      void this.contentLoaded(uiSourceCode, uiSourceCode.workingCopy());
     } else {
-      uiSourceCode.requestContent().then(deferredContent => {
-        this.contentLoaded((uiSourceCode as Workspace.UISourceCode.UISourceCode), deferredContent.content || '');
+      void uiSourceCode.requestContent().then(deferredContent => {
+        void this.contentLoaded((uiSourceCode as Workspace.UISourceCode.UISourceCode), deferredContent.content || '');
       });
     }
   }
@@ -128,12 +128,12 @@ export class InplaceFormatterEditorAction implements EditorAction {
     const sourceFrame = (this.sourcesView.viewForFile(uiSourceCode) as SourceFrame.SourceFrame.SourceFrameImpl);
     let start: number[]|number[] = [0, 0];
     if (sourceFrame) {
-      const selection = sourceFrame.selection();
-      start = formatterMapping.originalToFormatted(selection.startLine, selection.startColumn);
+      const selection = sourceFrame.textEditor.toLineColumn(sourceFrame.textEditor.state.selection.main.head);
+      start = formatterMapping.originalToFormatted(selection.lineNumber, selection.columnNumber);
     }
     uiSourceCode.setWorkingCopy(formattedContent);
 
-    this.sourcesView.showSourceLocation(uiSourceCode, start[0], start[1]);
+    this.sourcesView.showSourceLocation(uiSourceCode, {lineNumber: start[0], columnNumber: start[1]});
   }
 }
 

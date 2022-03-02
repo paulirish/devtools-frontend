@@ -8,15 +8,12 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
+import {CoverageDecorationManager} from './CoverageDecorationManager.js';
+import {CoverageListView} from './CoverageListView.js';
 import coverageViewStyles from './coverageView.css.js';
 
-import type * as Workspace from '../../models/workspace/workspace.js';
-
-import {CoverageDecorationManager, decoratorType} from './CoverageDecorationManager.js';
-import {CoverageListView} from './CoverageListView.js';
 import type {CoverageInfo, URLCoverageInfo} from './CoverageModel.js';
 import {CoverageModel, Events, CoverageType} from './CoverageModel.js';
 
@@ -177,7 +174,7 @@ export class CoverageView extends UI.Widget.VBox {
     toolbar.appendSeparator();
     this.saveButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.export), 'largeicon-download');
     this.saveButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
-      this.exportReport();
+      void this.exportReport();
     });
     toolbar.appendToolbarItem(this.saveButton);
     this.saveButton.setEnabled(false);
@@ -286,9 +283,9 @@ export class CoverageView extends UI.Widget.VBox {
     const enable = !this.toggleRecordAction.toggled();
 
     if (enable) {
-      this.startRecording({reload: false, jsCoveragePerBlock: this.isBlockCoverageSelected()});
+      void this.startRecording({reload: false, jsCoveragePerBlock: this.isBlockCoverageSelected()});
     } else {
-      this.stopRecording();
+      void this.stopRecording();
     }
   }
 
@@ -384,7 +381,7 @@ export class CoverageView extends UI.Widget.VBox {
     if (reload && this.resourceTreeModel) {
       this.resourceTreeModel.reloadPage();
     } else {
-      this.model.startPolling();
+      void this.model.startPolling();
     }
   }
 
@@ -473,7 +470,7 @@ export class CoverageView extends UI.Widget.VBox {
       return;
     }
     const text = this.filterInput.value();
-    this.textFilterRegExp = text ? createPlainTextSearchRegex(text, 'i') : null;
+    this.textFilterRegExp = text ? Platform.StringUtilities.createPlainTextSearchRegex(text, 'i') : null;
     this.listView.updateFilterAndHighlight(this.textFilterRegExp);
     this.updateStats();
   }
@@ -533,7 +530,7 @@ let actionDelegateInstance: ActionDelegate;
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(context: UI.Context.Context, actionId: string): boolean {
     const coverageViewId = 'coverage';
-    UI.ViewManager.ViewManager.instance()
+    void UI.ViewManager.ViewManager.instance()
         .showView(coverageViewId, /** userGesture= */ false, /** omitFocus= */ true)
         .then(() => {
           const view = UI.ViewManager.ViewManager.instance().view(coverageViewId);
@@ -557,110 +554,10 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         coverageView.toggleRecording();
         break;
       case 'coverage.start-with-reload':
-        coverageView.startRecording({reload: true, jsCoveragePerBlock: coverageView.isBlockCoverageSelected()});
+        void coverageView.startRecording({reload: true, jsCoveragePerBlock: coverageView.isBlockCoverageSelected()});
         break;
       default:
         console.assert(false, `Unknown action: ${actionId}`);
     }
   }
 }
-let lineDecoratorInstance: LineDecorator;
-export class LineDecorator implements SourceFrame.SourceFrame.LineDecorator {
-  static instance({forceNew}: {forceNew: boolean} = {forceNew: false}): LineDecorator {
-    if (!lineDecoratorInstance || forceNew) {
-      lineDecoratorInstance = new LineDecorator();
-    }
-
-    return lineDecoratorInstance;
-  }
-
-  private readonly listeners: WeakMap<
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      SourceFrame.SourcesTextEditor.SourcesTextEditor, (arg0: Common.EventTarget.EventTargetEvent<any>) => void>;
-  constructor() {
-    this.listeners = new WeakMap();
-  }
-
-  decorate(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode,
-      textEditor: SourceFrame.SourcesTextEditor.SourcesTextEditor): void {
-    const decorations = uiSourceCode.decorationsForType(decoratorType);
-    if (!decorations || !decorations.size) {
-      this.uninstallGutter(textEditor);
-      return;
-    }
-    const decorationManager = decorations.values().next().value.data() as CoverageDecorationManager;
-    decorationManager.usageByLine(uiSourceCode).then(lineUsage => {
-      textEditor.operation(() => this.innerDecorate(uiSourceCode, textEditor, lineUsage));
-    });
-  }
-
-  private innerDecorate(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, textEditor: SourceFrame.SourcesTextEditor.SourcesTextEditor,
-      lineUsage: (boolean|undefined)[]): void {
-    const gutterType = LineDecorator.GUTTER_TYPE;
-    this.uninstallGutter(textEditor);
-    if (lineUsage.length) {
-      this.installGutter(textEditor, uiSourceCode.url());
-    }
-    for (let line = 0; line < lineUsage.length; ++line) {
-      // Do not decorate the line if we don't have data.
-      if (typeof lineUsage[line] !== 'boolean') {
-        continue;
-      }
-      const className = lineUsage[line] ? 'text-editor-coverage-used-marker' : 'text-editor-coverage-unused-marker';
-      const gutterElement = document.createElement('div');
-      gutterElement.classList.add(className);
-      textEditor.setGutterDecoration(line, gutterType, gutterElement);
-    }
-  }
-
-  makeGutterClickHandler(url: string):
-      (arg0: Common.EventTarget.EventTargetEvent<SourceFrame.SourcesTextEditor.GutterClickEventData>) => void {
-    function handleGutterClick(
-        event: Common.EventTarget.EventTargetEvent<SourceFrame.SourcesTextEditor.GutterClickEventData>): void {
-      if (event.data.gutterType !== LineDecorator.GUTTER_TYPE) {
-        return;
-      }
-      const coverageViewId = 'coverage';
-      UI.ViewManager.ViewManager.instance()
-          .showView(coverageViewId)
-          .then(() => {
-            const view = UI.ViewManager.ViewManager.instance().view(coverageViewId);
-            return view && view.widget();
-          })
-          .then(widget => {
-            const matchFormattedSuffix = url.match(/(.*):formatted$/);
-            const urlWithoutFormattedSuffix = (matchFormattedSuffix && matchFormattedSuffix[1]) || url;
-            (widget as CoverageView).selectCoverageItemByUrl(urlWithoutFormattedSuffix);
-          });
-    }
-    return handleGutterClick;
-  }
-
-  private installGutter(textEditor: SourceFrame.SourcesTextEditor.SourcesTextEditor, url: string): void {
-    let listener = this.listeners.get(textEditor);
-    if (!listener) {
-      listener = this.makeGutterClickHandler(url);
-      this.listeners.set(textEditor, listener);
-    }
-    textEditor.installGutter(LineDecorator.GUTTER_TYPE, false);
-    textEditor.addEventListener(SourceFrame.SourcesTextEditor.Events.GutterClick, listener, this);
-  }
-
-  private uninstallGutter(textEditor: SourceFrame.SourcesTextEditor.SourcesTextEditor): void {
-    textEditor.uninstallGutter(LineDecorator.GUTTER_TYPE);
-    const listener = this.listeners.get(textEditor);
-    if (listener) {
-      textEditor.removeEventListener(SourceFrame.SourcesTextEditor.Events.GutterClick, listener, this);
-      this.listeners.delete(textEditor);
-    }
-  }
-
-  static readonly GUTTER_TYPE = 'CodeMirror-gutter-coverage';
-}
-
-SourceFrame.SourceFrame.registerLineDecorator({
-  lineDecorator: LineDecorator.instance,
-  decoratorType: SourceFrame.SourceFrame.DecoratorType.COVERAGE,
-});

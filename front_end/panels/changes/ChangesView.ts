@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Root from '../../core/root/root.js';
 import * as Diff from '../../third_party/diff/diff.js';
 import * as DiffView from '../../ui/components/diff_view/diff_view.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -121,7 +122,7 @@ export class ChangesView extends UI.Widget.VBox {
     if (!uiSourceCode) {
       return;
     }
-    this.workspaceDiff.revertToOriginal(uiSourceCode);
+    void this.workspaceDiff.revertToOriginal(uiSourceCode);
   }
 
   private click(event: MouseEvent): void {
@@ -135,7 +136,7 @@ export class ChangesView extends UI.Widget.VBox {
           // Unfortunately, caretRangeFromPoint is broken in shadow
           // roots, which makes determining the character offset more
           // work than justified here.
-          Common.Revealer.reveal(this.selectedUISourceCode.uiLocation(Number(number) - 1, 0), false);
+          void Common.Revealer.reveal(this.selectedUISourceCode.uiLocation(Number(number) - 1, 0), false);
           event.consume(true);
         }
         break;
@@ -158,21 +159,21 @@ export class ChangesView extends UI.Widget.VBox {
     }
 
     this.selectedUISourceCode = uiSourceCode;
-    this.refreshDiff();
+    void this.refreshDiff();
   }
 
   wasShown(): void {
-    this.refreshDiff();
+    void this.refreshDiff();
     this.registerCSSFiles([changesViewStyles]);
   }
 
-  private refreshDiff(): void {
+  private async refreshDiff(): Promise<void> {
     if (!this.isShowing()) {
       return;
     }
 
     if (!this.selectedUISourceCode) {
-      this.renderDiffRows(null);
+      this.renderDiffRows();
       return;
     }
     const uiSourceCode = this.selectedUISourceCode;
@@ -180,12 +181,12 @@ export class ChangesView extends UI.Widget.VBox {
       this.hideDiff(i18nString(UIStrings.binaryData));
       return;
     }
-    this.workspaceDiff.requestDiff(uiSourceCode).then((diff: Diff.Diff.DiffArray|null): void => {
-      if (this.selectedUISourceCode !== uiSourceCode) {
-        return;
-      }
-      this.renderDiffRows(diff);
-    });
+    const diffResponse = await this.workspaceDiff.requestDiff(
+        uiSourceCode, {shouldFormatDiff: Root.Runtime.experiments.isEnabled('preciseChanges')});
+    if (this.selectedUISourceCode !== uiSourceCode) {
+      return;
+    }
+    this.renderDiffRows(diffResponse?.diff);
   }
 
   private hideDiff(message: string): void {
@@ -196,7 +197,7 @@ export class ChangesView extends UI.Widget.VBox {
     this.emptyWidget.showWidget();
   }
 
-  private renderDiffRows(diff: Diff.Diff.DiffArray|null): void {
+  private renderDiffRows(diff?: Diff.Diff.DiffArray): void {
     if (!diff || (diff.length === 1 && diff[0][0] === Diff.Diff.Operation.Equal)) {
       this.hideDiff(i18nString(UIStrings.noChanges));
     } else {

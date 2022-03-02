@@ -65,6 +65,7 @@
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
+  line-height: 1.2;
 }
 
 .filter-bitset-filter span:focus-visible {
@@ -100,7 +101,7 @@
   position: relative;
 }
 
-.filter-checkbox-filter > [is=dt-checkbox] {
+.filter-checkbox-filter > [is="dt-checkbox"] {
   display: flex;
   margin: auto 0;
 }

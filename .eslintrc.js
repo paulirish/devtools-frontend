@@ -106,6 +106,7 @@ module.exports = {
 
     // no-implicit-globals will prevent accidental globals
     'no-implicit-globals': [0],
+    'no-unused-private-class-members': 2,
 
     // forbids interfaces starting with an I prefix.
     '@typescript-eslint/naming-convention':
@@ -156,6 +157,7 @@ module.exports = {
           }
         }
       ],
+      '@typescript-eslint/no-floating-promises': [2, {ignoreVoid: true}],
       // func-call-spacing doesn't work well with .ts
       'func-call-spacing': 0,
       '@typescript-eslint/func-call-spacing': 2,

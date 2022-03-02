@@ -4,7 +4,6 @@
 
 import * as ComponentHelpers from '../../../../../../front_end/ui/components/helpers/helpers.js';
 import * as Coordinator from '../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
-import * as ThemeSupport from '../../../../../../front_end/ui/legacy/theme_support/theme_support.js';
 import * as LitHtml from '../../../../../../front_end/ui/lit-html/lit-html.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
@@ -39,38 +38,6 @@ customElements.define('x-devtools-test-element', TestElement);
 const {assert} = chai;
 
 describe('ComponentHelpers', () => {
-  describe('legacyGetStylesheets', () => {
-    it('returns a single stylesheet with the contents of the resource', () => {
-      const sheets = ComponentHelpers.LegacyGetStylesheet.legacyGetStyleSheets('ui/legacy/inspectorCommon.css');
-      assert.lengthOf(sheets, 1);
-      assert.instanceOf(sheets[0], CSSStyleSheet);
-    });
-
-    it('caches the stylesheet rather than constructing it every time', () => {
-      const firstCallSheet =
-          ComponentHelpers.LegacyGetStylesheet.legacyGetStyleSheets('ui/legacy/inspectorCommon.css')[0];
-      const secondCallSheet =
-          ComponentHelpers.LegacyGetStylesheet.legacyGetStyleSheets('ui/legacy/inspectorCommon.css')[0];
-      assert.strictEqual(firstCallSheet, secondCallSheet);
-    });
-
-    describe('patching stylesheets', () => {
-      beforeEach(() => {
-        // Patch theme support to return a patch in all cases, necessary for testing these
-        // particular set of behaviors.
-        ThemeSupport.ThemeSupport.instance().themeStyleSheet = () => {
-          return 'p { color: red; }';
-        };
-      });
-
-      it('does not patch by default', () => {
-        const sheets = ComponentHelpers.LegacyGetStylesheet.legacyGetStyleSheets('ui/legacy/inspectorCommon.css');
-        assert.lengthOf(sheets, 1);
-        assert.instanceOf(sheets[0], CSSStyleSheet);
-      });
-    });
-  });
-
   describe('setCSSProperty', () => {
     it('sets a property on the shadow root host element', () => {
       class TestComponent extends HTMLElement {
@@ -138,8 +105,8 @@ describe('ComponentHelpers', () => {
 
     it('only renders once if second render call is made before the first has been handled', async () => {
       const element = new TestElement();
-      ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderBound);
-      ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderBound);
+      void ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderBound);
+      void ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderBound);
 
       await coordinator.done();
       assert.strictEqual(element.renderCount, 1);
@@ -147,8 +114,8 @@ describe('ComponentHelpers', () => {
 
     it('handles async callbacks', async () => {
       const element = new TestElement();
-      ComponentHelpers.ScheduledRender.scheduleRender(element, async () => {
-        ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderAsyncBound);
+      void ComponentHelpers.ScheduledRender.scheduleRender(element, async () => {
+        void ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderAsyncBound);
 
         await element.renderAsyncBound();
       });
@@ -159,8 +126,8 @@ describe('ComponentHelpers', () => {
 
     it('re-renders if second render call is made during the first', async () => {
       const element = new TestElement();
-      ComponentHelpers.ScheduledRender.scheduleRender(element, () => {
-        ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderBound);
+      void ComponentHelpers.ScheduledRender.scheduleRender(element, () => {
+        void ComponentHelpers.ScheduledRender.scheduleRender(element, element.renderBound);
 
         element.renderBound();
       });

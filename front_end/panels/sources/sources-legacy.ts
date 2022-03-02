@@ -4,6 +4,8 @@
 
 // @ts-nocheck
 
+import * as SourceMapScopesModule from '../../models/source_map_scopes/source_map_scopes.js';
+
 import * as SourcesModule from './sources.js';
 
 self.Sources = self.Sources || {};
@@ -18,12 +20,6 @@ Sources.BreakpointEditDialog = SourcesModule.BreakpointEditDialog.BreakpointEdit
 Sources.BreakpointEditDialog.LogpointPrefix = SourcesModule.BreakpointEditDialog.LogpointPrefix;
 Sources.BreakpointEditDialog._LogpointSuffix = SourcesModule.BreakpointEditDialog.LogpointSuffix;
 Sources.BreakpointEditDialog.BreakpointType = SourcesModule.BreakpointEditDialog.BreakpointType;
-
-/** @constructor */
-Sources.CSSPlugin = SourcesModule.CSSPlugin.CSSPlugin;
-
-Sources.CSSPlugin.maxSwatchProcessingLength = SourcesModule.CSSPlugin.maxSwatchProcessingLength;
-Sources.CSSPlugin.SwatchBookmark = SourcesModule.CSSPlugin.SwatchBookmark;
 
 /** @constructor */
 Sources.CallStackSidebarPane = SourcesModule.CallStackSidebarPane.CallStackSidebarPane;
@@ -145,26 +141,13 @@ Sources.SnippetsPlugin = SourcesModule.SnippetsPlugin.SnippetsPlugin;
 
 Sources.SourceMapNamesResolver = {};
 
-Sources.SourceMapNamesResolver.setScopeResolvedForTest = SourcesModule.SourceMapNamesResolver.setScopeResolvedForTest;
-
 // Tests can override this global symbol and therefore can't be exported
 Object.defineProperty(Sources.SourceMapNamesResolver, '_scopeResolvedForTest', {
-  get: SourcesModule.SourceMapNamesResolver.getScopeResolvedForTest,
-  set: SourcesModule.SourceMapNamesResolver.setScopeResolvedForTest,
+  get: SourceMapScopesModule.NamesResolver.getScopeResolvedForTest,
+  set: SourceMapScopesModule.NamesResolver.setScopeResolvedForTest,
 });
 
-Sources.SourceMapNamesResolver._scopeIdentifiers = SourcesModule.SourceMapNamesResolver.scopeIdentifiers;
-Sources.SourceMapNamesResolver._resolveScope = SourcesModule.SourceMapNamesResolver.resolveScope;
-Sources.SourceMapNamesResolver._allVariablesInCallFrame = SourcesModule.SourceMapNamesResolver.allVariablesInCallFrame;
-Sources.SourceMapNamesResolver.resolveExpression = SourcesModule.SourceMapNamesResolver.resolveExpression;
-Sources.SourceMapNamesResolver.resolveThisObject = SourcesModule.SourceMapNamesResolver.resolveThisObject;
-Sources.SourceMapNamesResolver.resolveScopeInObject = SourcesModule.SourceMapNamesResolver.resolveScopeInObject;
-
-/** @constructor */
-Sources.SourceMapNamesResolver.Identifier = SourcesModule.SourceMapNamesResolver.Identifier;
-
-/** @constructor */
-Sources.SourceMapNamesResolver.RemoteObject = SourcesModule.SourceMapNamesResolver.RemoteObject;
+Sources.SourceMapNamesResolver.resolveExpression = SourceMapScopesModule.NamesResolver.resolveExpression;
 
 /** @constructor */
 Sources.NetworkNavigatorView = SourcesModule.SourcesNavigator.NetworkNavigatorView;

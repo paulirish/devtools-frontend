@@ -18,6 +18,9 @@ const DEBUG_ENABLED = Boolean(process.env['DEBUG_TEST']);
 const REPEAT_ENABLED = Boolean(process.env['REPEAT']);
 const COVERAGE_ENABLED = Boolean(process.env['COVERAGE']) || Boolean(USER_DEFINED_COVERAGE_FOLDERS);
 const EXPANDED_REPORTING = Boolean(process.env['EXPANDED_REPORTING']);
+const KARMA_TIMEOUT = process.env['KARMA_TIMEOUT'] ? Number(process.env['KARMA_TIMEOUT']) : undefined;
+
+const MOCHA_FGREP = process.env['MOCHA_FGREP'] || undefined;
 
 // true by default
 const TEXT_COVERAGE_ENABLED = COVERAGE_ENABLED && !process.env['NO_TEXT_COVERAGE'];
@@ -162,6 +165,10 @@ module.exports = function(config) {
        * so.
        */
       targetDir,
+
+      mocha: {
+        grep: MOCHA_FGREP,
+      }
     },
 
     plugins: [
@@ -192,6 +199,10 @@ module.exports = function(config) {
     },
 
     singleRun,
+
+    pingTimeout: KARMA_TIMEOUT,
+    browserNoActivityTimeout: KARMA_TIMEOUT,
+    browserSocketTimeout: KARMA_TIMEOUT,
 
     mochaReporter: {
       showDiff: true,

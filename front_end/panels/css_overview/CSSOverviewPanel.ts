@@ -21,12 +21,13 @@ import type {UnusedDeclaration} from './CSSOverviewUnusedDeclarations.js';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 let CSSOverviewPanelInstance: CSSOverviewPanel;
 
-export class CSSOverviewPanel extends UI.Panel.Panel {
-  readonly #model: CSSOverviewModel;
+export class CSSOverviewPanel extends UI.Panel.Panel implements SDK.TargetManager.Observer {
   readonly #controller: OverviewController;
   readonly #startView: CSSOverviewComponents.CSSOverviewStartView.CSSOverviewStartView;
   readonly #processingView: CSSOverviewProcessingView;
   readonly #completedView: CSSOverviewCompletedView;
+  #model?: CSSOverviewModel;
+  #target?: SDK.Target.Target;
   #backgroundColors!: Map<string, Set<Protocol.DOM.BackendNodeId>>;
   #textColors!: Map<string, Set<Protocol.DOM.BackendNodeId>>;
   #fillColors!: Map<string, Set<Protocol.DOM.BackendNodeId>>;
@@ -35,7 +36,6 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
   #mediaQueries!: Map<string, Protocol.CSS.CSSMedia[]>;
   #unusedDeclarations!: Map<string, UnusedDeclaration[]>;
   #elementCount!: number;
-  #cancelled?: boolean;
   #globalStyleStats!: GlobalStyleStats;
   #textColorContrastIssues!: Map<string, ContrastIssue[]>;
 
@@ -44,26 +44,24 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
 
     this.element.classList.add('css-overview-panel');
 
-    const [model] = SDK.TargetManager.TargetManager.instance().models(CSSOverviewModel);
-    this.#model = (model as CSSOverviewModel);
-
     this.#controller = new OverviewController();
     this.#startView = new CSSOverviewComponents.CSSOverviewStartView.CSSOverviewStartView();
     this.#startView.addEventListener(
         'overviewstartrequested', () => this.#controller.dispatchEventToListeners(Events.RequestOverviewStart));
     this.#processingView = new CSSOverviewProcessingView(this.#controller);
-    this.#completedView = new CSSOverviewCompletedView(this.#controller, model.target());
+    this.#completedView = new CSSOverviewCompletedView(this.#controller);
+
+    SDK.TargetManager.TargetManager.instance().observeTargets(this);
 
     this.#controller.addEventListener(Events.RequestOverviewStart, _event => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.CaptureCssOverviewClicked);
-      this.startOverview();
+      void this.#startOverview();
     }, this);
-    this.#controller.addEventListener(Events.RequestOverviewCancel, this.cancelOverview, this);
-    this.#controller.addEventListener(Events.OverviewCompleted, this.overviewCompleted, this);
-    this.#controller.addEventListener(Events.Reset, this.reset, this);
-    this.#controller.addEventListener(Events.RequestNodeHighlight, this.requestNodeHighlight, this);
+    this.#controller.addEventListener(Events.OverviewCompleted, this.#overviewCompleted, this);
+    this.#controller.addEventListener(Events.Reset, this.#reset, this);
+    this.#controller.addEventListener(Events.RequestNodeHighlight, this.#requestNodeHighlight, this);
 
-    this.reset();
+    this.#reset();
   }
 
   static instance(): CSSOverviewPanel {
@@ -73,7 +71,27 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
     return CSSOverviewPanelInstance;
   }
 
-  private reset(): void {
+  targetAdded(target: SDK.Target.Target): void {
+    if (this.#target) {
+      return;
+    }
+    this.#target = target;
+    this.#completedView.initializeModels(target);
+    const [model] = SDK.TargetManager.TargetManager.instance().models(CSSOverviewModel);
+    this.#model = (model as CSSOverviewModel);
+  }
+
+  targetRemoved(): void {
+  }
+
+  #getModel(): CSSOverviewModel {
+    if (!this.#model) {
+      throw new Error('Did not retrieve model information yet.');
+    }
+    return this.#model;
+  }
+
+  #reset(): void {
     this.#backgroundColors = new Map();
     this.#textColors = new Map();
     this.#fillColors = new Map();
@@ -82,7 +100,6 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
     this.#mediaQueries = new Map();
     this.#unusedDeclarations = new Map();
     this.#elementCount = 0;
-    this.#cancelled = false;
     this.#globalStyleStats = {
       styleRules: 0,
       inlineStyles: 0,
@@ -100,14 +117,14 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
       },
     };
     this.#textColorContrastIssues = new Map();
-    this.renderInitialView();
+    this.#renderInitialView();
   }
 
-  private requestNodeHighlight(evt: Common.EventTarget.EventTargetEvent<number>): void {
-    this.#model.highlightNode((evt.data as Protocol.DOM.BackendNodeId));
+  #requestNodeHighlight(evt: Common.EventTarget.EventTargetEvent<number>): void {
+    this.#getModel().highlightNode((evt.data as Protocol.DOM.BackendNodeId));
   }
 
-  private renderInitialView(): void {
+  #renderInitialView(): void {
     this.#processingView.hideWidget();
     this.#completedView.hideWidget();
 
@@ -115,14 +132,14 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
     this.#startView.show();
   }
 
-  private renderOverviewStartedView(): void {
+  #renderOverviewStartedView(): void {
     this.#startView.hide();
     this.#completedView.hideWidget();
 
     this.#processingView.show(this.contentElement);
   }
 
-  private renderOverviewCompletedView(): void {
+  #renderOverviewCompletedView(): void {
     this.#startView.hide();
     this.#processingView.hideWidget();
 
@@ -141,13 +158,14 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
     });
   }
 
-  private async startOverview(): Promise<void> {
-    this.renderOverviewStartedView();
+  async #startOverview(): Promise<void> {
+    this.#renderOverviewStartedView();
 
+    const model = this.#getModel();
     const [globalStyleStats, { elementCount, backgroundColors, textColors, textColorContrastIssues, fillColors, borderColors, fontInfo, unusedDeclarations }, mediaQueries] = await Promise.all([
-      this.#model.getGlobalStylesheetStats(),
-      this.#model.getNodeStyleStats(),
-      this.#model.getMediaQueries(),
+      model.getGlobalStylesheetStats(),
+      model.getNodeStyleStats(),
+      model.getMediaQueries(),
     ]);
 
     if (elementCount) {
@@ -193,21 +211,8 @@ export class CSSOverviewPanel extends UI.Panel.Panel {
     this.#controller.dispatchEventToListeners(Events.OverviewCompleted);
   }
 
-  private getStyleValue(styles: Protocol.CSS.CSSComputedStyleProperty[], name: string): string|undefined {
-    const item = styles.filter(style => style.name === name);
-    if (!item.length) {
-      return;
-    }
-
-    return item[0].value;
-  }
-
-  private cancelOverview(): void {
-    this.#cancelled = true;
-  }
-
-  private overviewCompleted(): void {
-    this.renderOverviewCompletedView();
+  #overviewCompleted(): void {
+    this.#renderOverviewCompletedView();
   }
   wasShown(): void {
     super.wasShown();

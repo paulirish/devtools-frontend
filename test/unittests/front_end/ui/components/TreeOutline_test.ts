@@ -14,10 +14,12 @@ const {assert} = chai;
 async function renderTreeOutline<TreeNodeDataType>({
   tree,
   defaultRenderer,
+  filter,
 }: {
   tree: TreeOutline.TreeOutline.TreeOutlineData<TreeNodeDataType>['tree'],
   // defaultRenderer is required usually but here we make it optinal and provide a default one as part of renderTreeOutline, to save duplication in every single test where we want to use a simple string renderer.
   defaultRenderer?: TreeOutline.TreeOutline.TreeOutlineData<TreeNodeDataType>['defaultRenderer'],
+  filter?: TreeOutline.TreeOutline.TreeOutlineData<TreeNodeDataType>['filter'],
 }): Promise<{
   component: TreeOutline.TreeOutline.TreeOutline<TreeNodeDataType>,
   shadowRoot: ShadowRoot,
@@ -27,6 +29,7 @@ async function renderTreeOutline<TreeNodeDataType>({
     tree,
     defaultRenderer: defaultRenderer ||
         ((node: TreeOutline.TreeOutlineUtils.TreeNode<TreeNodeDataType>) => LitHtml.html`${node.treeNodeData}`),
+    filter,
   };
   component.data = data;
   renderElementIntoDOM(component);
@@ -94,37 +97,31 @@ const nodeBelgraveHouse = {
 const nodeLondon = {
   treeNodeData: 'LON',
   id: 'LON',
-  children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> =>
-      Promise.resolve([{treeNodeData: '6PS', id: '6PS'}, {treeNodeData: 'CSG', id: 'CSG'}, nodeBelgraveHouse]),
+  children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> =>
+      [{treeNodeData: '6PS', id: '6PS'}, {treeNodeData: 'CSG', id: 'CSG'}, nodeBelgraveHouse],
 };
 
 const nodeUK = {
   treeNodeData: 'UK',
   id: 'UK',
-  children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([nodeLondon]),
+  children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [nodeLondon],
 };
 
 const nodeEurope = {
   treeNodeData: 'Europe',
   id: 'Europe',
-  children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
-    nodeUK,
-    {
-      treeNodeData: 'Germany',
-      id: 'Germany',
-      children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
-        {treeNodeData: 'MUC', id: 'MUC'},
-        {treeNodeData: 'BER', id: 'BER'},
-      ]),
-    },
-  ]),
+  children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [nodeUK, {
+    treeNodeData: 'Germany',
+    id: 'Germany',
+    children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> =>
+        [{treeNodeData: 'MUC', id: 'MUC'}, {treeNodeData: 'BER', id: 'BER'}],
+  }],
 };
 
 const nodeOffices = {
   treeNodeData: 'Offices',
   id: 'Offices',
-  children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([nodeEurope]),
-
+  children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [nodeEurope],
 };
 
 const basicTreeData: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [
@@ -132,24 +129,23 @@ const basicTreeData: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [
   {
     treeNodeData: 'Products',
     id: '1',
-    children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
-      {
-        treeNodeData: 'Chrome',
-        id: '2',
-      },
-      {
-        treeNodeData: 'YouTube',
-        id: '3',
-      },
-      {
-        treeNodeData: 'Drive',
-        id: '4',
-      },
-      {
-        treeNodeData: 'Calendar',
-        id: '5',
-      },
-    ]),
+    children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> =>
+        [{
+          treeNodeData: 'Chrome',
+          id: '2',
+        },
+         {
+           treeNodeData: 'YouTube',
+           id: '3',
+         },
+         {
+           treeNodeData: 'Drive',
+           id: '4',
+         },
+         {
+           treeNodeData: 'Calendar',
+           id: '5',
+         }],
   },
 ];
 
@@ -171,32 +167,32 @@ The structure represented by nodeAustralia is:
 const nodeAustralia = {
   treeNodeData: 'Australia',
   id: 'australia',
-  children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+  children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
     {
       treeNodeData: 'SA',
       id: 'sa',
-      children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+      children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
         {
           treeNodeData: 'Adelaide',
           id: 'adelaide',
-          children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+          children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
             {treeNodeData: 'Toorak Gardens', id: 'toorak'},
             {treeNodeData: 'Woodville South', id: 'woodville'},
             {treeNodeData: 'Gawler', id: 'gawler'},
-          ]),
+          ],
         },
-      ]),
+      ],
     },
     {
       treeNodeData: 'NSW',
       id: 'nsw',
-      children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+      children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
         {treeNodeData: 'Glebe', id: 'glebe'},
         {treeNodeData: 'Newtown', id: 'newtown'},
         {treeNodeData: 'Camperdown', id: 'camperdown'},
-      ]),
+      ],
     },
-  ]),
+  ],
 };
 
 const NODE_COUNT_BASIC_DATA_FULLY_EXPANDED = 15;
@@ -206,6 +202,7 @@ interface VisibleTreeNodeFromDOM {
   renderedKey: string;
   children?: VisibleTreeNodeFromDOM[];
 }
+
 /**
  * Converts the nodes into a tree structure that we can assert against.
  */
@@ -379,23 +376,22 @@ describe('TreeOutline', () => {
       treeNodeData: {property: 'name', value: 'jack'},
       id: '0',
       renderer: customRenderer,
-      children: () => Promise.resolve<TreeOutline.TreeOutlineUtils.TreeNode<CustomTreeKeyType>[]>([
-        {
-          renderer: customRenderer,
-          id: '1',
-          treeNodeData: {property: 'locationGroupName', value: 'EMEA'},
-        },
-        {
-          renderer: customRenderer,
-          id: '2',
-          treeNodeData: {property: 'locationGroupName', value: 'USA'},
-        },
-        {
-          renderer: customRenderer,
-          id: '3',
-          treeNodeData: {property: 'locationGroupName', value: 'APAC'},
-        },
-      ]),
+      children: async(): Promise<TreeOutline.TreeOutlineUtils.TreeNode<CustomTreeKeyType>[]> =>
+          [{
+            renderer: customRenderer,
+            id: '1',
+            treeNodeData: {property: 'locationGroupName', value: 'EMEA'},
+          },
+           {
+             renderer: customRenderer,
+             id: '2',
+             treeNodeData: {property: 'locationGroupName', value: 'USA'},
+           },
+           {
+             renderer: customRenderer,
+             id: '3',
+             treeNodeData: {property: 'locationGroupName', value: 'APAC'},
+           }],
     }];
     const {component, shadowRoot} = await renderTreeOutline({
       tree: tinyTree,
@@ -545,9 +541,28 @@ describe('TreeOutline', () => {
     ]);
   });
 
+  it('can collapse all nodes', async () => {
+    const {component, shadowRoot} = await renderTreeOutline({
+      tree: basicTreeData,
+    });
+    await component.expandRecursively(Number.POSITIVE_INFINITY);
+    await waitForRenderedTreeNodeCount(shadowRoot, NODE_COUNT_BASIC_DATA_FULLY_EXPANDED);
+    await component.collapseAllNodes();
+    await waitForRenderedTreeNodeCount(shadowRoot, 2);
+    const visibleTree = visibleNodesToTree(shadowRoot);
+    assert.deepEqual(visibleTree, [
+      {
+        renderedKey: 'Offices',
+      },
+      {
+        renderedKey: 'Products',
+      },
+    ]);
+  });
+
   it('caches async child nodes and only fetches them once', async () => {
-    const fetchChildrenSpy = sinon.spy<() => Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]>>(() => {
-      return Promise.resolve([
+    const fetchChildrenSpy = sinon.spy<() => Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]>>(async () => {
+      return [
         {
           treeNodeData: 'EMEA',
           id: '1',
@@ -560,7 +575,7 @@ describe('TreeOutline', () => {
           treeNodeData: 'APAC',
           id: '3',
         },
-      ]);
+      ];
     });
     const tinyTree: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [
       {
@@ -606,20 +621,19 @@ describe('TreeOutline', () => {
       treeNodeData: 'Offices',
       id: 'Offices',
       renderer: node => LitHtml.html`<h2 class="top-node">${node.treeNodeData.toUpperCase()}</h2>`,
-      children: () => Promise.resolve([
-        {
-          treeNodeData: 'EMEA',
-          id: 'EMEA',
-        },
-        {
-          treeNodeData: 'USA',
-          id: 'USA',
-        },
-        {
-          treeNodeData: 'APAC',
-          id: 'APAC',
-        },
-      ]),
+      children: async () =>
+          [{
+            treeNodeData: 'EMEA',
+            id: 'EMEA',
+          },
+           {
+             treeNodeData: 'USA',
+             id: 'USA',
+           },
+           {
+             treeNodeData: 'APAC',
+             id: 'APAC',
+           }],
     }];
 
     const {component, shadowRoot} = await renderTreeOutline({
@@ -642,20 +656,19 @@ describe('TreeOutline', () => {
       renderer: (node, {isExpanded}) => {
         return LitHtml.html`<h2 class="top-node">${node.treeNodeData.toUpperCase()}. Expanded: ${isExpanded}</h2>`;
       },
-      children: () => Promise.resolve([
-        {
-          treeNodeData: 'EMEA',
-          id: 'EMEA',
-        },
-        {
-          treeNodeData: 'USA',
-          id: 'USA',
-        },
-        {
-          treeNodeData: 'APAC',
-          id: 'APAC',
-        },
-      ]),
+      children: async () =>
+          [{
+            treeNodeData: 'EMEA',
+            id: 'EMEA',
+          },
+           {
+             treeNodeData: 'USA',
+             id: 'USA',
+           },
+           {
+             treeNodeData: 'APAC',
+             id: 'APAC',
+           }],
     }];
 
     const {component, shadowRoot} = await renderTreeOutline({
@@ -701,7 +714,7 @@ describe('TreeOutline', () => {
         const {component, shadowRoot} = await renderTreeOutline({
           tree: basicTreeData,
         });
-        component.expandRecursively();
+        void component.expandRecursively();
         await waitForRenderedTreeNodeCount(shadowRoot, NODE_COUNT_BASIC_DATA_DEFAULT_EXPANDED);
         const officeNode = getVisibleTreeNodeByText(shadowRoot, 'Offices');
         dispatchClickEvent(officeNode);
@@ -1286,21 +1299,21 @@ describe('TreeOutline', () => {
       const newNodeAustralia = {
         treeNodeData: 'New Australia',
         id: 'australia',
-        children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+        children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
           {
             treeNodeData: 'Different SA',
             id: 'sa',
-            children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+            children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
               {
                 treeNodeData: 'Phantom Adelaide',
                 id: 'adelaide',
-                children: (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => Promise.resolve([
+                children: async (): Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]> => [
                   {treeNodeData: 'Totally not Gawler', id: 'gawler'},
-                ]),
+                ],
               },
-            ]),
+            ],
           },
-        ]),
+        ],
       };
 
       component.data = {
@@ -1351,14 +1364,41 @@ describe('TreeOutline', () => {
 describe('TreeOutlineUtils', () => {
   describe('getPathToTreeNode', () => {
     it('can find the path to the given node', async () => {
-      const path = await TreeOutline.TreeOutlineUtils.getPathToTreeNode(basicTreeData, nodeBelgraveHouse);
+      const path = await TreeOutline.TreeOutlineUtils.getPathToTreeNode(basicTreeData, nodeBelgraveHouse.id);
       assert.deepEqual(path, [nodeOffices, nodeEurope, nodeUK, nodeLondon, nodeBelgraveHouse]);
     });
 
     it('returns null if no path is found', async () => {
-      const path = await TreeOutline.TreeOutlineUtils.getPathToTreeNode(
-          basicTreeData, {treeNodeData: 'does-not-exist', id: '-1'});
+      const path = await TreeOutline.TreeOutlineUtils.getPathToTreeNode(basicTreeData, '-1');
       assert.strictEqual(path, null);
     });
+  });
+});
+
+describe('TreeOutlineFiltering', () => {
+  it('can flatten nodes', async () => {
+    const {component, shadowRoot} = await renderTreeOutline({
+      tree: [nodeAustralia],
+      filter: node => node === 'SA' || node === 'NSW' || node === 'Adelaide' ?
+          TreeOutline.TreeOutline.FilterOption.FLATTEN :
+          TreeOutline.TreeOutline.FilterOption.SHOW,
+    });
+
+    await component.expandRecursively();
+    await coordinator.done();
+    await waitForRenderedTreeNodeCount(shadowRoot, 7);
+    const visibleTree = visibleNodesToTree(shadowRoot);
+
+    assert.deepEqual(visibleTree, [{
+                       renderedKey: 'Australia',
+                       children: [
+                         {renderedKey: 'Toorak Gardens'},
+                         {renderedKey: 'Woodville South'},
+                         {renderedKey: 'Gawler'},
+                         {renderedKey: 'Glebe'},
+                         {renderedKey: 'Newtown'},
+                         {renderedKey: 'Camperdown'},
+                       ],
+                     }]);
   });
 });

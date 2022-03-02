@@ -55,7 +55,6 @@ const MAX_RECORDED_HISTOGRAMS_SIZE = 100;
 export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   readonly #urlsBeingSaved: Map<string, string[]>;
   events!: Common.EventTarget.EventTarget<EventTypes>;
-  #windowVisible?: boolean;
 
   recordedEnumeratedHistograms: {actionName: EnumeratedHistogram, actionCode: number}[] = [];
   recordedPerformanceHistograms: {histogramName: string, duration: number}[] = [];
@@ -89,23 +88,21 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   bringToFront(): void {
-    this.#windowVisible = true;
   }
 
   closeWindow(): void {
-    this.#windowVisible = false;
   }
 
   setIsDocked(isDocked: boolean, callback: () => void): void {
-    setTimeout(callback, 0);
+    window.setTimeout(callback, 0);
   }
 
   showSurvey(trigger: string, callback: (arg0: ShowSurveyResult) => void): void {
-    setTimeout(() => callback({surveyShown: false}), 0);
+    window.setTimeout(() => callback({surveyShown: false}), 0);
   }
 
   canShowSurvey(trigger: string, callback: (arg0: CanShowSurveyResult) => void): void {
-    setTimeout(() => callback({canShowSurvey: false}), 0);
+    window.setTimeout(() => callback({canShowSurvey: false}), 0);
   }
 
   /**
@@ -133,7 +130,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
     if (text === undefined || text === null) {
       return;
     }
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
   }
 
   openInNewTab(url: string): void {
@@ -223,7 +220,8 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 
   loadNetworkResource(
       url: string, headers: string, streamId: number, callback: (arg0: LoadNetworkResourceResult) => void): void {
-    Root.Runtime.loadResourcePromise(url)
+    fetch(url)
+        .then(result => result.text())
         .then(function(text) {
           resourceLoaderStreamWrite(streamId, text);
           callback({
@@ -260,6 +258,10 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
       prefs[name] = window.localStorage[name];
     }
     callback(prefs);
+  }
+
+  getPreference(name: string, callback: (arg0: string) => void): void {
+    callback(window.localStorage[name]);
   }
 
   setPreference(name: string, value: string): void {
@@ -364,13 +366,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 export let InspectorFrontendHostInstance: InspectorFrontendHostStub = window.InspectorFrontendHost;
 
 class InspectorFrontendAPIImpl {
-  readonly #debugFrontend: boolean;
-
   constructor() {
-    this.#debugFrontend = (Boolean(Root.Runtime.Runtime.queryParam('debugFrontend'))) ||
-        // @ts-ignore Compatibility hacks
-        (window['InspectorTest'] && window['InspectorTest']['debugTest']);
-
     for (const descriptor of EventDescriptors) {
       // @ts-ignore Dispatcher magic
       this[descriptor[1]] = this.dispatch.bind(this, descriptor[0], descriptor[2], descriptor[3]);
@@ -378,35 +374,27 @@ class InspectorFrontendAPIImpl {
   }
 
   private dispatch(name: symbol, signature: string[], runOnceLoaded: boolean, ...params: string[]): void {
-    if (this.#debugFrontend) {
-      setTimeout(() => innerDispatch(), 0);
-    } else {
-      innerDispatch();
-    }
-
-    function innerDispatch(): void {
-      // Single argument methods get dispatched with the param.
-      if (signature.length < 2) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          InspectorFrontendHostInstance.events.dispatchEventToListeners<any>(name, params[0]);
-        } catch (error) {
-          console.error(error + ' ' + error.stack);
-        }
-        return;
-      }
-      const data: {
-        [x: string]: string,
-      } = {};
-      for (let i = 0; i < signature.length; ++i) {
-        data[signature[i]] = params[i];
-      }
+    // Single argument methods get dispatched with the param.
+    if (signature.length < 2) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        InspectorFrontendHostInstance.events.dispatchEventToListeners<any>(name, data);
+        InspectorFrontendHostInstance.events.dispatchEventToListeners<any>(name, params[0]);
       } catch (error) {
         console.error(error + ' ' + error.stack);
       }
+      return;
+    }
+    const data: {
+      [x: string]: string,
+    } = {};
+    for (let i = 0; i < signature.length; ++i) {
+      data[signature[i]] = params[i];
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      InspectorFrontendHostInstance.events.dispatchEventToListeners<any>(name, data);
+    } catch (error) {
+      console.error(error + ' ' + error.stack);
     }
   }
 

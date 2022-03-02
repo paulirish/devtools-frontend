@@ -36,6 +36,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import type {WindowChangedWithPositionEvent} from './OverviewGrid.js';
 import {Events as OverviewGridEvents, OverviewGrid} from './OverviewGrid.js';
 import type {Calculator} from './TimelineGrid.js';
+import timelineOverviewInfoStyles from './timelineOverviewInfo.css.js';
 
 export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
     UI.Widget.VBox) {
@@ -93,7 +94,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.cursorPosition = mouseEvent.offsetX + target.offsetLeft;
     this.cursorElement.style.left = this.cursorPosition + 'px';
     this.cursorElement.style.visibility = 'visible';
-    this.overviewInfo.setContent(this.buildOverviewInfo());
+    void this.overviewInfo.setContent(this.buildOverviewInfo());
   }
 
   private async buildOverviewInfo(): Promise<DocumentFragment> {
@@ -152,7 +153,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 
   scheduleUpdate(): void {
-    this.updateThrottler.schedule(async () => {
+    void this.updateThrottler.schedule(async () => {
       this.update();
     });
   }
@@ -387,8 +388,8 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
   reset(): void {
   }
 
-  overviewInfoPromise(_x: number): Promise<Element|null> {
-    return Promise.resolve((null as Element | null));
+  async overviewInfoPromise(_x: number): Promise<Element|null> {
+    return null;
   }
 
   setCalculator(calculator: TimelineOverviewCalculator): void {
@@ -426,7 +427,7 @@ export class OverviewInfo {
     this.visible = false;
     this.element = UI.Utils
                        .createShadowRootWithCoreStyles(this.glassPane.contentElement, {
-                         cssFile: 'ui/legacy/components/perf_ui/timelineOverviewInfo.css',
+                         cssFile: [timelineOverviewInfoStyles],
                          delegatesFocus: undefined,
                        })
                        .createChild('div', 'overview-info');

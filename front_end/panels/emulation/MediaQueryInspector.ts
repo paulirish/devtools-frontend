@@ -10,6 +10,8 @@ import * as Bindings from '../../models/bindings/bindings.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
+import mediaQueryInspectorStyles from './mediaQueryInspector.css.legacy.js';
+
 const UIStrings = {
   /**
   * @description A context menu item/command in the Media Query Inspector of the Device Toolbar.
@@ -32,7 +34,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
 
   constructor(getWidthCallback: () => number, setWidthCallback: (arg0: number) => void) {
     super(true);
-    this.registerRequiredCSS('panels/emulation/mediaQueryInspector.css');
+    this.registerRequiredCSS(mediaQueryInspectorStyles);
     this.contentElement.classList.add('media-inspector-view');
     this.contentElement.addEventListener('click', this.onMediaQueryClicked.bind(this), false);
     this.contentElement.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
@@ -144,18 +146,18 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
       subMenuItem.defaultSection().appendItem(
           title, this.revealSourceLocation.bind(this, (uiLocations.get(title) as Workspace.UISourceCode.UILocation)));
     }
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   private revealSourceLocation(location: Workspace.UISourceCode.UILocation): void {
-    Common.Revealer.reveal(location);
+    void Common.Revealer.reveal(location);
   }
 
   private scheduleMediaQueriesUpdate(): void {
     if (!this.isShowing()) {
       return;
     }
-    this.mediaThrottler.schedule(this.refetchMediaQueries.bind(this));
+    void this.mediaThrottler.schedule(this.refetchMediaQueries.bind(this));
   }
 
   private refetchMediaQueries(): Promise<void> {

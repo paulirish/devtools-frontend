@@ -7,13 +7,30 @@ import * as Formatter from '../../../models/formatter/formatter.js';
 import * as JavaScriptMetaData from '../../../models/javascript_metadata/javascript_metadata.js';
 import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
 import * as UI from '../../legacy/legacy.js';
-import {cursorTooltip} from './cursor_tooltip.js';
 
-export async function completion(): Promise<CodeMirror.Extension> {
-  const {javascriptLanguage} = await CodeMirror.javascript();
-  return javascriptLanguage.data.of({
+import {type ArgumentHintsTooltip, closeTooltip, cursorTooltip} from './cursor_tooltip.js';
+
+export function completion(): CodeMirror.Extension {
+  return CodeMirror.javascript.javascriptLanguage.data.of({
     autocomplete: javascriptCompletionSource,
   });
+}
+
+export async function completeInContext(
+    textBefore: string, query: string, force: boolean = false): Promise<UI.SuggestBox.Suggestions> {
+  const state = CodeMirror.EditorState.create({
+    doc: textBefore + query,
+    selection: {anchor: textBefore.length},
+    extensions: CodeMirror.javascript.javascriptLanguage,
+  });
+  const result = await javascriptCompletionSource(new CodeMirror.CompletionContext(state, state.doc.length, force));
+  return result ?
+      result.options.filter((o): boolean => o.label.startsWith(query)).map((o): UI.SuggestBox.Suggestion => ({
+                                                                             text: o.label,
+                                                                             priority: 100 + (o.boost || 0),
+                                                                             isSecondary: o.type === 'secondary',
+                                                                           })) :
+      [];
 }
 
 class CompletionSet {
@@ -36,10 +53,10 @@ class CompletionSet {
 }
 
 const javascriptKeywords = [
-  'async',  'await',      'break',  'case',   'catch',   'class',   'const',  'continue', 'debugger', 'default',
-  'delete', 'do',         'else',   'export', 'extends', 'finally', 'for',    'function', 'if',       'import',
-  'in',     'instanceof', 'let',    'new',    'of',      'return',  'static', 'super',    'switch',   'this',
-  'throw',  'try',        'typeof', 'var',    'void',    'while',   'with',   'yield',
+  'async',      'await', 'break',  'case',    'catch', 'class',   'const',  'continue', 'debugger', 'default', 'delete',
+  'do',         'else',  'export', 'extends', 'false', 'finally', 'for',    'function', 'if',       'import',  'in',
+  'instanceof', 'let',   'new',    'null',    'of',    'return',  'static', 'super',    'switch',   'this',    'throw',
+  'true',       'try',   'typeof', 'var',     'void',  'while',   'with',   'yield',
 ];
 const consoleBuiltinFunctions = [
   'clear',
@@ -91,7 +108,7 @@ export const enum QueryType {
   PropertyExpression = 2,
 }
 
-export function getQueryType(tree: CodeMirror.Tree, pos: number): {
+export function getQueryType(tree: CodeMirror.Tree, pos: number, doc: CodeMirror.Text): {
   type: QueryType,
   from?: number,
   relatedNode?: CodeMirror.SyntaxNode,
@@ -102,12 +119,14 @@ export function getQueryType(tree: CodeMirror.Tree, pos: number): {
     return null;
   }
 
-  if (node.name === 'VariableName') {
-    return {type: QueryType.Expression, from: node.from};
-  }
-  if (node.name === 'PropertyName') {
+  if (node.name === 'PropertyName' || node.name === 'PrivatePropertyName') {
     return parent?.name !== 'MemberExpression' ? null :
                                                  {type: QueryType.PropertyName, from: node.from, relatedNode: parent};
+  }
+  if (node.name === 'VariableName' ||
+      // Treat alphabetic keywords as variables
+      !node.firstChild && node.to - node.from < 20 && !/[^a-z]/.test(doc.sliceString(node.from, node.to))) {
+    return {type: QueryType.Expression, from: node.from};
   }
   if (node.name === 'String') {
     const parent = node.parent;
@@ -135,12 +154,13 @@ export function getQueryType(tree: CodeMirror.Tree, pos: number): {
 
 export async function javascriptCompletionSource(cx: CodeMirror.CompletionContext):
     Promise<CodeMirror.CompletionResult|null> {
-  const query = getQueryType(CodeMirror.syntaxTree(cx.state), cx.pos);
-  if (!query || query.from === undefined && !cx.explicit) {
+  const query = getQueryType(CodeMirror.syntaxTree(cx.state), cx.pos, cx.state.doc);
+  if (!query || query.from === undefined && !cx.explicit && query.type === QueryType.Expression) {
     return null;
   }
 
   let result: CompletionSet;
+  let quote: string|undefined = undefined;
   if (query.type === QueryType.Expression) {
     const [scope, global] = await Promise.all([
       completeExpressionInScope(),
@@ -156,23 +176,26 @@ export async function javascriptCompletionSource(cx: CodeMirror.CompletionContex
     }
   } else if (query.type === QueryType.PropertyName || query.type === QueryType.PropertyExpression) {
     const objectExpr = (query.relatedNode as CodeMirror.SyntaxNode).getChild('Expression');
-    let quote = undefined;
     if (query.type === QueryType.PropertyExpression) {
       quote = query.from === undefined ? '\'' : cx.state.sliceDoc(query.from, query.from + 1);
     }
     if (!objectExpr) {
       return null;
     }
-    result = await completeProperties(cx.state.sliceDoc(objectExpr.from, objectExpr.to), quote);
+    result = await completeProperties(
+        cx.state.sliceDoc(objectExpr.from, objectExpr.to), quote, cx.state.sliceDoc(cx.pos, cx.pos + 1) === ']');
   } else {
     return null;
   }
   return {
     from: query.from ?? cx.pos,
     options: result.completions,
-    span: /^[\w\P{ASCII}]*/u,
+    span: !quote ? SPAN_IDENT : quote === '\'' ? SPAN_SINGLE_QUOTE : SPAN_DOUBLE_QUOTE,
   };
 }
+
+const SPAN_IDENT = /^#?[\w\P{ASCII}]*$/u, SPAN_SINGLE_QUOTE = /^\'(\\.|[^\\'\n])*'?$/,
+      SPAN_DOUBLE_QUOTE = /^"(\\.|[^\\"\n])*"?$/;
 
 function getExecutionContext(): SDK.RuntimeModel.ExecutionContext|null {
   return UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
@@ -203,6 +226,7 @@ async function evaluateExpression(
 
 const primitivePrototypes = new Map<string, string>([
   ['string', 'String'],
+  ['symbol', 'Symbol'],
   ['number', 'Number'],
   ['boolean', 'Boolean'],
   ['bigint', 'BigInt'],
@@ -215,10 +239,10 @@ let cacheInstance: PropertyCache|null = null;
 // Store recent collections of property completions. The empty string
 // is used to store the set of global bindings.
 class PropertyCache {
-  private readonly cache: Map<string, Promise<CompletionSet>> = new Map();
+  readonly #cache: Map<string, Promise<CompletionSet>> = new Map();
 
   constructor() {
-    const clear = (): void => this.cache.clear();
+    const clear = (): void => this.#cache.clear();
     SDK.ConsoleModel.ConsoleModel.instance().addEventListener(SDK.ConsoleModel.Events.CommandEvaluated, clear);
     UI.Context.Context.instance().addFlavorChangeListener(SDK.RuntimeModel.ExecutionContext, clear);
     SDK.TargetManager.TargetManager.instance().addModelListener(
@@ -228,14 +252,14 @@ class PropertyCache {
   }
 
   get(expression: string): Promise<CompletionSet>|undefined {
-    return this.cache.get(expression);
+    return this.#cache.get(expression);
   }
 
   set(expression: string, value: Promise<CompletionSet>): void {
-    this.cache.set(expression, value);
-    setTimeout(() => {
-      if (this.cache.get(expression) === value) {
-        this.cache.delete(expression);
+    this.#cache.set(expression, value);
+    window.setTimeout(() => {
+      if (this.#cache.get(expression) === value) {
+        this.#cache.delete(expression);
       }
     }, maxCacheAge);
   }
@@ -251,6 +275,7 @@ class PropertyCache {
 async function completeProperties(
     expression: string,
     quoted?: string,
+    hasBracket: boolean = false,
     ): Promise<CompletionSet> {
   const cache = PropertyCache.instance();
   if (!quoted) {
@@ -263,7 +288,7 @@ async function completeProperties(
   if (!context) {
     return new CompletionSet();
   }
-  const result = completePropertiesInner(expression, context, quoted);
+  const result = completePropertiesInner(expression, context, quoted, hasBracket);
   if (!quoted) {
     cache.set(expression, result);
   }
@@ -276,6 +301,7 @@ async function completePropertiesInner(
     expression: string,
     context: SDK.RuntimeModel.ExecutionContext,
     quoted?: string,
+    hasBracket: boolean = false,
     ): Promise<CompletionSet> {
   const result = new CompletionSet();
   if (!context) {
@@ -295,26 +321,27 @@ async function completePropertiesInner(
     object = innerObject as SDK.RemoteObject.RemoteObject;
   }
 
-  const toPrototype = object.subtype === 'array' ?
-      'Array' :
-      object.subtype === 'typedarray' ? 'Uint8Array' : primitivePrototypes.get(object.type);
+  const toPrototype = primitivePrototypes.get(object.type);
   if (toPrototype) {
     object = await evaluateExpression(context, toPrototype + '.prototype', 'completion');
   }
 
-  const functionType = expression === 'window' ? 'function' : 'method';
-  const otherType = expression === 'window' ? 'variable' : 'property';
+  const functionType = expression === 'globalThis' ? 'function' : 'method';
+  const otherType = expression === 'globalThis' ? 'variable' : 'property';
   if (object && (object.type === 'object' || object.type === 'function')) {
-    const properties = await object.getAllProperties(false, false);
+    const properties = await object.getAllProperties(
+        /* accessorPropertiesOnly */ false, /* generatePreview */ false, /* nonIndexedPropertiesOnly */ true);
     const isFunction = object.type === 'function';
     for (const prop of properties.properties || []) {
-      if (!prop.symbol && !(isFunction && (prop.name === 'arguments' || prop.name === 'caller'))) {
-        const label = quoted ? quoted + prop.name + quoted : prop.name;
+      if (!prop.symbol && !(isFunction && (prop.name === 'arguments' || prop.name === 'caller')) &&
+          (!prop.private || expression === 'this') && (quoted || SPAN_IDENT.test(prop.name))) {
+        const label =
+            quoted ? quoted + prop.name.replaceAll('\\', '\\\\').replaceAll(quoted, '\\' + quoted) + quoted : prop.name;
         const completion: CodeMirror.Completion = {
           label,
           type: prop.value?.type === 'function' ? functionType : otherType,
         };
-        if (quoted) {
+        if (quoted && !hasBracket) {
           completion.apply = label + ']';
         }
         if (!prop.isOwn) {
@@ -361,7 +388,7 @@ async function completeExpressionGlobal(): Promise<CompletionSet> {
   }
   const result = baseCompletions.copy();
 
-  const fetchNames = completePropertiesInner('window', context).then(fromWindow => {
+  const fetchNames = completePropertiesInner('globalThis', context).then(fromWindow => {
     return context.globalLexicalScopeNames().then(globals => {
       for (const option of fromWindow.completions) {
         result.add(option);
@@ -376,17 +403,37 @@ async function completeExpressionGlobal(): Promise<CompletionSet> {
   return fetchNames;
 }
 
-export function isExpressionComplete(state: CodeMirror.EditorState): boolean {
-  for (const cursor = CodeMirror.syntaxTree(state).cursor(); cursor.next();) {
-    if (cursor.type.isError) {
-      return false;
-    }
+export async function isExpressionComplete(expression: string): Promise<boolean> {
+  const currentExecutionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
+  if (!currentExecutionContext) {
+    return true;
   }
-  return true;
+  const result =
+      await currentExecutionContext.runtimeModel.compileScript(expression, '', false, currentExecutionContext.id);
+  if (!result || !result.exceptionDetails || !result.exceptionDetails.exception) {
+    return true;
+  }
+  const description = result.exceptionDetails.exception.description;
+  if (description) {
+    return !description.startsWith('SyntaxError: Unexpected end of input') &&
+        !description.startsWith('SyntaxError: Unterminated template literal');
+  }
+  return false;
 }
 
-export function argumentHints(): CodeMirror.Extension {
+export function argumentHints(): ArgumentHintsTooltip {
   return cursorTooltip(getArgumentHints);
+}
+
+export function closeArgumentsHintsTooltip(
+    view: CodeMirror.EditorView, tooltip: CodeMirror.StateField<CodeMirror.Tooltip|null>): boolean {
+  // If the tooltip is currently showing, the state will reflect its properties.
+  // If it isn't showing, the state is explicitly set to `null`.
+  if (view.state.field(tooltip) === null) {
+    return false;
+  }
+  view.dispatch({effects: closeTooltip.of(null)});
+  return true;
 }
 
 async function getArgumentHints(

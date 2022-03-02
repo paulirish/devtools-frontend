@@ -34,6 +34,8 @@ import * as SDK from '../../../../core/sdk/sdk.js';
 import * as UI from '../../legacy.js';
 import * as ObjectUI from '../object_ui/object_ui.js';
 
+import jsonViewStyles from './jsonView.css.legacy.js';
+
 const UIStrings = {
   /**
   *@description Text to find an item
@@ -54,7 +56,7 @@ export class JSONView extends UI.Widget.VBox implements UI.SearchableView.Search
   constructor(parsedJSON: ParsedJSON, startCollapsed?: boolean) {
     super();
     this.initialized = false;
-    this.registerRequiredCSS('ui/legacy/components/source_frame/jsonView.css');
+    this.registerRequiredCSS(jsonViewStyles);
     this.parsedJSON = parsedJSON;
     this.startCollapsed = Boolean(startCollapsed);
     this.element.classList.add('json-view');
@@ -228,7 +230,7 @@ export class JSONView extends UI.Widget.VBox implements UI.SearchableView.Search
     let newIndex: number = this.currentSearchFocusIndex;
     const previousSearchFocusElement = this.currentSearchTreeElements[newIndex];
     this.searchCanceled();
-    this.searchRegex = searchConfig.toSearchRegex(true);
+    this.searchRegex = searchConfig.toSearchRegex(true).regex;
 
     let element: UI.TreeOutline.TreeElement|null;
     for (element = this.treeOutline.rootElement(); element; element = element.traverseNextTreeElement(false)) {

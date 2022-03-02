@@ -12,6 +12,7 @@ import * as EmulationModel from '../../models/emulation/emulation.js';
 
 import {DeviceModeToolbar} from './DeviceModeToolbar.js';
 import {MediaQueryInspector} from './MediaQueryInspector.js';
+import deviceModeViewStyles from './deviceModeView.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -98,7 +99,7 @@ export class DeviceModeView extends UI.Widget.VBox {
 
     this.setMinimumSize(150, 150);
     this.element.classList.add('device-mode-view');
-    this.registerRequiredCSS('panels/emulation/deviceModeView.css');
+    this.registerRequiredCSS(deviceModeViewStyles);
 
     this.model = EmulationModel.DeviceModeModel.DeviceModeModel.instance();
     this.model.addEventListener(EmulationModel.DeviceModeModel.Events.Updated, this.updateUI, this);
@@ -466,7 +467,9 @@ export class DeviceModeView extends UI.Widget.VBox {
 
       const canvas = document.createElement('canvas');
       canvas.width = Math.floor(outlineRect.width);
-      canvas.height = Math.floor(outlineRect.height);
+      // Cap the height to not hit the GPU limit.
+      // https://crbug.com/1260828
+      canvas.height = Math.min((1 << 14), Math.floor(outlineRect.height));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error('Could not get 2d context from canvas.');
@@ -506,7 +509,9 @@ export class DeviceModeView extends UI.Widget.VBox {
     pageImage.onload = (): void => {
       const canvas = document.createElement('canvas');
       canvas.width = pageImage.naturalWidth;
-      canvas.height = pageImage.naturalHeight;
+      // Cap the height to not hit the GPU limit.
+      // https://crbug.com/1260828
+      canvas.height = Math.min((1 << 14), Math.floor(pageImage.naturalHeight));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error('Could not get 2d context for base64 screenshot.');
@@ -546,6 +551,9 @@ export class DeviceModeView extends UI.Widget.VBox {
     const link = document.createElement('a');
     link.download = fileName + '.png';
     canvas.toBlob(blob => {
+      if (blob === null) {
+        return;
+      }
       link.href = URL.createObjectURL(blob);
       link.click();
     });
@@ -576,11 +584,11 @@ export class Ruler extends UI.Widget.VBox {
 
   render(scale: number): void {
     this.scale = scale;
-    this.throttler.schedule(this.update.bind(this));
+    void this.throttler.schedule(this.update.bind(this));
   }
 
   onResize(): void {
-    this.throttler.schedule(this.update.bind(this));
+    void this.throttler.schedule(this.update.bind(this));
   }
 
   private update(): Promise<void> {

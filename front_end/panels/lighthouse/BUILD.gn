@@ -24,7 +24,9 @@ devtools_module("lighthouse") {
     "LighthouseReportSelector.ts",
     "LighthouseReporterTypes.ts",
     "LighthouseStartView.ts",
+    "LighthouseStartViewFR.ts",
     "LighthouseStatusView.ts",
+    "LighthouseTimespanView.ts",
     "RadioSetting.ts",
   ]
 
@@ -52,7 +54,6 @@ devtools_entrypoint("bundle") {
     ":css_files",
     ":lighthouse",
     "../../third_party/lighthouse",
-    "../../third_party/lighthouse:css_files",
   ]
 
   visibility = [

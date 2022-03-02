@@ -289,6 +289,10 @@ export class CSSStyleDeclaration {
     return this.#allPropertiesInternal;
   }
 
+  hasActiveProperty(name: string): boolean {
+    return this.#activePropertyMap.has(name);
+  }
+
   getPropertyValue(name: string): string {
     const property = this.#activePropertyMap.get(name);
     return property ? property.value : '';
@@ -349,7 +353,7 @@ export class CSSStyleDeclaration {
   }
 
   insertPropertyAt(index: number, name: string, value: string, userCallback?: ((arg0: boolean) => void)): void {
-    this.newBlankProperty(index).setText(name + ': ' + value + ';', false, true).then(userCallback);
+    void this.newBlankProperty(index).setText(name + ': ' + value + ';', false, true).then(userCallback);
   }
 
   appendProperty(name: string, value: string, userCallback?: ((arg0: boolean) => void)): void {

@@ -9,6 +9,7 @@ import * as UI from '../../legacy.js';
 import type * as Protocol from '../../../../generated/protocol.js';
 
 import {ObjectPropertiesSection} from './ObjectPropertiesSection.js';
+import customPreviewComponentStyles from './customPreviewComponent.css.js';
 
 const UIStrings = {
   /**
@@ -132,7 +133,7 @@ export class CustomPreviewSection {
     if (this.cachedContent) {
       this.toggleExpand();
     } else {
-      this.loadBody();
+      void this.loadBody();
     }
   }
 
@@ -188,7 +189,7 @@ export class CustomPreviewComponent {
     this.element = document.createElement('span');
     this.element.classList.add('source-code');
     const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(this.element, {
-      cssFile: 'ui/legacy/components/object_ui/customPreviewComponent.css',
+      cssFile: [customPreviewComponentStyles],
       delegatesFocus: undefined,
     });
     this.element.addEventListener('contextmenu', this.contextMenuEventFired.bind(this), false);
@@ -198,7 +199,7 @@ export class CustomPreviewComponent {
   expandIfPossible(): void {
     const customPreview = this.object.customPreview();
     if (customPreview && customPreview.bodyGetterId && this.customPreviewSection) {
-      this.customPreviewSection.loadBody();
+      void this.customPreviewSection.loadBody();
     }
   }
 
@@ -208,7 +209,7 @@ export class CustomPreviewComponent {
       contextMenu.revealSection().appendItem(i18nString(UIStrings.showAsJavascriptObject), this.disassemble.bind(this));
     }
     contextMenu.appendApplicableItems(this.object);
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   private disassemble(): void {

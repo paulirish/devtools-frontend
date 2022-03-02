@@ -750,7 +750,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     }
     const file = items[0].getAsFile();
     if (file) {
-      this.onLoadFromFile(file);
+      void this.onLoadFromFile(file);
     }
   }
 
@@ -958,9 +958,22 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
           (initiatorLink as HTMLElement).focus();
         }
       }
+
       if (isEnterOrSpaceKey(event)) {
         this.dispatchEventToListeners(Events.RequestActivated, {showPanel: true, takeFocus: true});
         event.consume(true);
+      }
+    });
+    this.dataGrid.element.addEventListener('keyup', event => {
+      if ((event.key === 'r' || event.key === 'R') && this.dataGrid.selectedNode) {
+        const request = (this.dataGrid.selectedNode as NetworkNode).request();
+        if (!request) {
+          return;
+        }
+
+        if (SDK.NetworkManager.NetworkManager.canReplayRequest(request)) {
+          SDK.NetworkManager.NetworkManager.replayRequest(request);
+        }
       }
     });
     this.dataGrid.element.addEventListener('focus', this.onDataGridFocus.bind(this), true);
@@ -1536,6 +1549,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         footerSection.appendItem(i18nString(UIStrings.copyAllAsCurlBash), this.copyAllCurlCommand.bind(this, 'unix'));
       } else {
         footerSection.appendItem(
+            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request), disableIfBlob);
+        footerSection.appendItem(
             i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
             disableIfBlob);
         footerSection.appendItem(
@@ -1543,6 +1558,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
             disableIfBlob);
         footerSection.appendItem(
             i18nString(UIStrings.copyAsCurl), this.copyCurlCommand.bind(this, request, 'unix'), disableIfBlob);
+        footerSection.appendItem(i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
         footerSection.appendItem(
             i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
         footerSection.appendItem(
@@ -1569,13 +1585,13 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         patterns.push({enabled: true, url: url});
         manager.setBlockedPatterns(patterns);
         manager.setBlockingEnabled(true);
-        UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
+        void UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
       }
 
       function removeBlockedURL(url: string): void {
         patterns = patterns.filter(pattern => pattern.url !== url);
         manager.setBlockedPatterns(patterns);
-        UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
+        void UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
       }
 
       const urlWithoutScheme = request.parsedURL.urlWithoutScheme();
@@ -1668,7 +1684,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.progressBarContainer.appendChild(progressIndicator.element);
     await HAR.Writer.Writer.write(stream, this.harRequests(), progressIndicator);
     progressIndicator.done();
-    stream.close();
+    void stream.close();
   }
 
   private clearBrowserCache(): void {
@@ -2249,15 +2265,11 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   static getDCLEventColor(): string {
-    if (ThemeSupport.ThemeSupport.instance().themeName() === 'dark') {
-      return '#03A9F4';
-    }
-    return '#0867CB';
+    return ThemeSupport.ThemeSupport.instance().getComputedValue('--color-syntax-3');
   }
 
   static getLoadEventColor(): string {
-    return ThemeSupport.ThemeSupport.instance().patchColorText(
-        '#B31412', ThemeSupport.ThemeSupport.ColorUsage.Foreground);
+    return ThemeSupport.ThemeSupport.instance().getComputedValue('--color-syntax-1');
   }
 }
 

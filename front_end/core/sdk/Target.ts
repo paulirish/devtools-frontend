@@ -4,6 +4,7 @@
 
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
+import type * as Platform from '../platform/platform.js';
 import * as ProtocolClient from '../protocol_client/protocol_client.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type {TargetManager} from './TargetManager.js';
@@ -12,7 +13,7 @@ import {SDKModel} from './SDKModel.js';
 export class Target extends ProtocolClient.InspectorBackend.TargetBase {
   readonly #targetManagerInternal: TargetManager;
   #nameInternal: string;
-  #inspectedURLInternal: string;
+  #inspectedURLInternal: Platform.DevToolsPath.UrlString;
   #inspectedURLName: string;
   readonly #capabilitiesMask: number;
   #typeInternal: Type;
@@ -31,7 +32,7 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
     super(needsNodeJSPatching, parentTarget, sessionId, connection);
     this.#targetManagerInternal = targetManager;
     this.#nameInternal = name;
-    this.#inspectedURLInternal = '';
+    this.#inspectedURLInternal = '' as Platform.DevToolsPath.UrlString;
     this.#inspectedURLName = '';
     this.#capabilitiesMask = 0;
     switch (type) {
@@ -65,6 +66,9 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         break;
       case Type.Node:
         this.#capabilitiesMask = Capability.JS;
+        break;
+      case Type.AuctionWorklet:
+        this.#capabilitiesMask = Capability.JS | Capability.EventBreakpoints;
         break;
       case Type.Browser:
         this.#capabilitiesMask = Capability.Target | Capability.IO;
@@ -162,11 +166,11 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
     return this.#modelByConstructor;
   }
 
-  inspectedURL(): string {
+  inspectedURL(): Platform.DevToolsPath.UrlString {
     return this.#inspectedURLInternal;
   }
 
-  setInspectedURL(inspectedURL: string): void {
+  setInspectedURL(inspectedURL: Platform.DevToolsPath.UrlString): void {
     this.#inspectedURLInternal = inspectedURL;
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(inspectedURL);
     this.#inspectedURLName = parsedURL ? parsedURL.lastPathComponentWithFragment() : '#' + this.#idInternal;
@@ -221,6 +225,7 @@ export enum Type {
   SharedWorker = 'shared-worker',
   Node = 'node',
   Browser = 'browser',
+  AuctionWorklet = 'auction-worklet',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -245,5 +250,6 @@ export enum Capability {
   WebAuthn = 1 << 16,
   IO = 1 << 17,
   Media = 1 << 18,
+  EventBreakpoints = 1 << 19,
   None = 0,
 }

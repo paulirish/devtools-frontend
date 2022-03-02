@@ -37,6 +37,7 @@ import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
+import * as ThemeSupport from './theme_support/theme_support.js';
 import * as Utils from './utils/utils.js';
 
 import type {Icon} from './Icon.js';
@@ -45,6 +46,7 @@ import {InplaceEditor} from './InplaceEditor.js';
 import {Keys} from './KeyboardShortcut.js';
 import {Tooltip} from './Tooltip.js';
 import {deepElementFromPoint, enclosingNodeOrSelfWithNodeNameInArray, isEditing} from './UIUtils.js';
+import treeoutlineStyles from './treeoutline.css.legacy.js';
 
 const nodeToParentTreeElementMap = new WeakMap<Node, TreeElement>();
 
@@ -77,7 +79,7 @@ export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   showSelectionOnKeyboardFocus: boolean;
   private focusable: boolean;
   element: HTMLElement;
-  useLightSelectionColorInternal: boolean;
+  private useLightSelectionColor: boolean;
   private treeElementToScrollIntoView: TreeElement|null;
   private centerUponScrollIntoView: boolean;
 
@@ -99,7 +101,7 @@ export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     this.setFocusable(true);
     this.element = this.contentElement;
     ARIAUtils.markAsTree(this.element);
-    this.useLightSelectionColorInternal = false;
+    this.useLightSelectionColor = false;
     this.treeElementToScrollIntoView = null;
     this.centerUponScrollIntoView = false;
   }
@@ -203,8 +205,12 @@ export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     }
   }
 
-  useLightSelectionColor(): void {
-    this.useLightSelectionColorInternal = true;
+  setUseLightSelectionColor(flag: boolean): void {
+    this.useLightSelectionColor = flag;
+  }
+
+  getUseLightSelectionColor(): boolean {
+    return this.useLightSelectionColor;
   }
 
   bindTreeElement(element: TreeElement): void {
@@ -387,15 +393,15 @@ export class TreeOutlineInShadow extends TreeOutline {
     super();
     this.contentElement.classList.add('tree-outline');
     this.element = document.createElement('div');
-    this.shadowRoot = Utils.createShadowRootWithCoreStyles(
-        this.element, {cssFile: 'ui/legacy/treeoutline.css', delegatesFocus: undefined});
+    this.shadowRoot =
+        Utils.createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles, delegatesFocus: undefined});
     this.disclosureElement = this.shadowRoot.createChild('div', 'tree-outline-disclosure');
     this.disclosureElement.appendChild(this.contentElement);
     this.renderSelection = true;
   }
 
-  registerRequiredCSS(cssFile: string): void {
-    Utils.appendStyle(this.shadowRoot, cssFile);
+  registerRequiredCSS(cssFile: {cssContent: string}): void {
+    ThemeSupport.ThemeSupport.instance().appendStyle(this.shadowRoot, cssFile);
   }
 
   registerCSSFiles(cssFiles: CSSStyleSheet[]): void {
@@ -840,6 +846,10 @@ export class TreeElement {
     }
   }
 
+  isCollapsible(): boolean {
+    return this.collapsible;
+  }
+
   setCollapsible(collapsible: boolean): void {
     if (this.collapsible === collapsible) {
       return;
@@ -915,7 +925,7 @@ export class TreeElement {
       }
     } else {
       if (event.altKey) {
-        this.expandRecursively();
+        void this.expandRecursively();
       } else {
         this.expand();
       }
@@ -1011,7 +1021,7 @@ export class TreeElement {
 
     this.expanded = true;
 
-    this.populateIfNeeded();
+    void this.populateIfNeeded();
     this.listItemNode.classList.add('expanded');
     this.childrenListNode.classList.add('expanded');
     ARIAUtils.setExpanded(this.listItemNode, true);
@@ -1084,7 +1094,7 @@ export class TreeElement {
 
     if (!this.expanded) {
       if (altKey) {
-        this.expandRecursively();
+        void this.expandRecursively();
       } else {
         this.expand();
       }
@@ -1195,7 +1205,7 @@ export class TreeElement {
   }
 
   private onFocus(): void {
-    if (!this.treeOutline || this.treeOutline.useLightSelectionColor()) {
+    if (!this.treeOutline || this.treeOutline.getUseLightSelectionColor()) {
       return;
     }
     if (!this.treeOutline.contentElement.classList.contains('hide-selection-when-blurred')) {
@@ -1204,7 +1214,7 @@ export class TreeElement {
   }
 
   private onBlur(): void {
-    if (!this.treeOutline || this.treeOutline.useLightSelectionColor()) {
+    if (!this.treeOutline || this.treeOutline.getUseLightSelectionColor()) {
       return;
     }
     if (!this.treeOutline.contentElement.classList.contains('hide-selection-when-blurred')) {
@@ -1283,7 +1293,7 @@ export class TreeElement {
     depthChange: number,
   }): TreeElement|null {
     if (!dontPopulate) {
-      this.populateIfNeeded();
+      void this.populateIfNeeded();
     }
 
     if (info) {
@@ -1329,14 +1339,14 @@ export class TreeElement {
     let element: (TreeElement|null) =
         skipUnrevealed ? (this.revealed() ? this.previousSibling : null) : this.previousSibling;
     if (!dontPopulate && element) {
-      element.populateIfNeeded();
+      void element.populateIfNeeded();
     }
 
     while (element &&
            (skipUnrevealed ? (element.revealed() && element.expanded ? element.lastChild() : null) :
                              element.lastChild())) {
       if (!dontPopulate) {
-        element.populateIfNeeded();
+        void element.populateIfNeeded();
       }
       element =
           (skipUnrevealed ? (element.revealed() && element.expanded ? element.lastChild() : null) :

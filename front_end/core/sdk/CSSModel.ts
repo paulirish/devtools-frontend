@@ -47,6 +47,7 @@ import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
 import {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
 import type {DOMNode} from './DOMModel.js';
 import {DOMModel} from './DOMModel.js';
+import type {ResourceTreeFrame} from './ResourceTreeModel.js';
 import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
 import type {Target} from './Target.js';
 import {Capability} from './Target.js';
@@ -54,62 +55,60 @@ import {SDKModel} from './SDKModel.js';
 import {SourceMapManager} from './SourceMapManager.js';
 
 export class CSSModel extends SDKModel<EventTypes> {
-  #isEnabledInternal: boolean;
+  readonly agent: ProtocolProxyApi.CSSApi;
+  readonly #domModel: DOMModel;
+  readonly #fontFaces: Map<string, CSSFontFace>;
+  readonly #originalStyleSheetText: Map<CSSStyleSheetHeader, Promise<string|null>>;
+  readonly #resourceTreeModel: ResourceTreeModel|null;
+  readonly #sourceMapManager: SourceMapManager<CSSStyleSheetHeader>;
+  readonly #styleLoader: ComputedStyleLoader;
+  readonly #stylePollingThrottler: Common.Throttler.Throttler;
+  readonly #styleSheetIdsForURL: Map<string, Map<string, Set<Protocol.CSS.StyleSheetId>>>;
+  readonly #styleSheetIdToHeader: Map<Protocol.CSS.StyleSheetId, CSSStyleSheetHeader>;
   #cachedMatchedCascadeNode: DOMNode|null;
   #cachedMatchedCascadePromise: Promise<CSSMatchedStyles|null>|null;
-  readonly #domModelInternal: DOMModel;
-  readonly #sourceMapManagerInternal: SourceMapManager<CSSStyleSheetHeader>;
-  agent: ProtocolProxyApi.CSSApi;
-  readonly #styleLoader: ComputedStyleLoader;
-  readonly #resourceTreeModel: ResourceTreeModel|null;
-  #styleSheetIdToHeader: Map<Protocol.CSS.StyleSheetId, CSSStyleSheetHeader>;
-  readonly #styleSheetIdsForURL: Map<string, Map<string, Set<Protocol.CSS.StyleSheetId>>>;
-  readonly #originalStyleSheetTextInternal: Map<CSSStyleSheetHeader, Promise<string|null>>;
-  #isRuleUsageTrackingEnabled: boolean;
-  readonly #fontFacesInternal: Map<string, CSSFontFace>;
   #cssPropertyTracker: CSSPropertyTracker|null;
   #isCSSPropertyTrackingEnabled: boolean;
+  #isEnabled: boolean;
+  #isRuleUsageTrackingEnabled: boolean;
   #isTrackingRequestPending: boolean;
-  readonly #trackedCSSProperties: Map<number, Protocol.CSS.CSSComputedStyleProperty[]>;
-  readonly #stylePollingThrottler: Common.Throttler.Throttler;
 
   constructor(target: Target) {
     super(target);
-    this.#isEnabledInternal = false;
+    this.#isEnabled = false;
     this.#cachedMatchedCascadeNode = null;
     this.#cachedMatchedCascadePromise = null;
-    this.#domModelInternal = (target.model(DOMModel) as DOMModel);
-    this.#sourceMapManagerInternal = new SourceMapManager(target);
+    this.#domModel = (target.model(DOMModel) as DOMModel);
+    this.#sourceMapManager = new SourceMapManager(target);
     this.agent = target.cssAgent();
     this.#styleLoader = new ComputedStyleLoader(this);
     this.#resourceTreeModel = target.model(ResourceTreeModel);
     if (this.#resourceTreeModel) {
-      this.#resourceTreeModel.addEventListener(ResourceTreeModelEvents.MainFrameNavigated, this.resetStyleSheets, this);
+      this.#resourceTreeModel.addEventListener(
+          ResourceTreeModelEvents.MainFrameNavigated, this.onMainFrameNavigated, this);
     }
     target.registerCSSDispatcher(new CSSDispatcher(this));
     if (!target.suspended()) {
-      this.enable();
+      void this.enable();
     }
     this.#styleSheetIdToHeader = new Map();
     this.#styleSheetIdsForURL = new Map();
 
-    this.#originalStyleSheetTextInternal = new Map();
+    this.#originalStyleSheetText = new Map();
 
     this.#isRuleUsageTrackingEnabled = false;
 
-    this.#fontFacesInternal = new Map();
+    this.#fontFaces = new Map();
 
     this.#cssPropertyTracker = null;  // TODO: support multiple trackers when we refactor the backend
     this.#isCSSPropertyTrackingEnabled = false;
     this.#isTrackingRequestPending = false;
-    this.#trackedCSSProperties = new Map();
     this.#stylePollingThrottler = new Common.Throttler.Throttler(StylePollingInterval);
 
-    this.#sourceMapManagerInternal.setEnabled(
-        Common.Settings.Settings.instance().moduleSetting('cssSourceMapsEnabled').get());
+    this.#sourceMapManager.setEnabled(Common.Settings.Settings.instance().moduleSetting('cssSourceMapsEnabled').get());
     Common.Settings.Settings.instance()
         .moduleSetting('cssSourceMapsEnabled')
-        .addChangeListener(event => this.#sourceMapManagerInternal.setEnabled((event.data as boolean)));
+        .addChangeListener(event => this.#sourceMapManager.setEnabled((event.data as boolean)));
   }
 
   headersForSourceURL(sourceURL: string): CSSStyleSheetHeader[] {
@@ -148,7 +147,11 @@ export class CSSModel extends SDKModel<EventTypes> {
   }
 
   sourceMapManager(): SourceMapManager<CSSStyleSheetHeader> {
-    return this.#sourceMapManagerInternal;
+    return this.#sourceMapManager;
+  }
+
+  static readableLayerName(text: string): string {
+    return text || '<anonymous>';
   }
 
   static trimSourceURL(text: string): string {
@@ -172,7 +175,7 @@ export class CSSModel extends SDKModel<EventTypes> {
   }
 
   domModel(): DOMModel {
-    return this.#domModelInternal;
+    return this.#domModel;
   }
 
   async setStyleText(
@@ -187,7 +190,7 @@ export class CSSModel extends SDKModel<EventTypes> {
         return false;
       }
 
-      this.#domModelInternal.markUndoableState(!majorChange);
+      this.#domModel.markUndoableState(!majorChange);
       const edit = new Edit(styleSheetId, range, text, styles[0]);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
@@ -207,7 +210,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       if (!selectorList) {
         return false;
       }
-      this.#domModelInternal.markUndoableState();
+      this.#domModel.markUndoableState();
       const edit = new Edit(styleSheetId, range, text, selectorList);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
@@ -227,7 +230,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       if (!keyText) {
         return false;
       }
-      this.#domModelInternal.markUndoableState();
+      this.#domModel.markUndoableState();
       const edit = new Edit(styleSheetId, range, text, keyText);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
@@ -267,13 +270,18 @@ export class CSSModel extends SDKModel<EventTypes> {
     return medias ? CSSMedia.parseMediaArrayPayload(this, medias) : [];
   }
 
+  async rootLayerPromise(nodeId: Protocol.DOM.NodeId): Promise<Protocol.CSS.CSSLayerData> {
+    const {rootLayer} = await this.agent.invoke_getLayersForNode({nodeId});
+    return rootLayer;
+  }
+
   isEnabled(): boolean {
-    return this.#isEnabledInternal;
+    return this.#isEnabled;
   }
 
   private async enable(): Promise<void> {
     await this.agent.invoke_enable();
-    this.#isEnabledInternal = true;
+    this.#isEnabled = true;
     if (this.#isRuleUsageTrackingEnabled) {
       await this.startCoverage();
     }
@@ -287,7 +295,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       return null;
     }
 
-    const node = this.#domModelInternal.nodeForId(nodeId);
+    const node = this.#domModel.nodeForId(nodeId);
     if (!node) {
       return null;
     }
@@ -378,7 +386,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     if (node.id === undefined) {
       return false;
     }
-    this.agent.invoke_forcePseudoState({nodeId: node.id, forcedPseudoClasses});
+    void this.agent.invoke_forcePseudoState({nodeId: node.id, forcedPseudoClasses});
     this.dispatchEventToListeners(Events.PseudoStateForced, {node: node, pseudoClass: pseudoClass, enable: enable});
     return true;
   }
@@ -399,7 +407,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       if (!media) {
         return false;
       }
-      this.#domModelInternal.markUndoableState();
+      this.#domModel.markUndoableState();
       const edit = new Edit(styleSheetId, range, newMediaText, media);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
@@ -421,8 +429,29 @@ export class CSSModel extends SDKModel<EventTypes> {
       if (!containerQuery) {
         return false;
       }
-      this.#domModelInternal.markUndoableState();
+      this.#domModel.markUndoableState();
       const edit = new Edit(styleSheetId, range, newContainerQueryText, containerQuery);
+      this.fireStyleSheetChanged(styleSheetId, edit);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async setSupportsText(
+      styleSheetId: Protocol.CSS.StyleSheetId, range: TextUtils.TextRange.TextRange,
+      newSupportsText: string): Promise<boolean> {
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.StyleRuleEdited);
+
+    try {
+      await this.ensureOriginalStyleSheetText(styleSheetId);
+      const {supports} = await this.agent.invoke_setSupportsText({styleSheetId, range, text: newSupportsText});
+
+      if (!supports) {
+        return false;
+      }
+      this.#domModel.markUndoableState();
+      const edit = new Edit(styleSheetId, range, newSupportsText, supports);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
@@ -439,7 +468,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       if (!rule) {
         return null;
       }
-      this.#domModelInternal.markUndoableState();
+      this.#domModel.markUndoableState();
       const edit = new Edit(styleSheetId, ruleLocation, ruleText, rule);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return new CSSStyleRule(this, rule);
@@ -477,13 +506,13 @@ export class CSSModel extends SDKModel<EventTypes> {
 
   fontsUpdated(fontFace?: Protocol.CSS.FontFace|null): void {
     if (fontFace) {
-      this.#fontFacesInternal.set(fontFace.src, new CSSFontFace(fontFace));
+      this.#fontFaces.set(fontFace.src, new CSSFontFace(fontFace));
     }
     this.dispatchEventToListeners(Events.FontsUpdated);
   }
 
   fontFaces(): CSSFontFace[] {
-    return [...this.#fontFacesInternal.values()];
+    return [...this.#fontFaces.values()];
   }
 
   styleSheetHeaderForId(id: Protocol.CSS.StyleSheetId): CSSStyleSheetHeader|null {
@@ -503,10 +532,10 @@ export class CSSModel extends SDKModel<EventTypes> {
     if (!header) {
       return Promise.resolve(null);
     }
-    let promise = this.#originalStyleSheetTextInternal.get(header);
+    let promise = this.#originalStyleSheetText.get(header);
     if (!promise) {
       promise = this.getStyleSheetText(header.id);
-      this.#originalStyleSheetTextInternal.set(header, promise);
+      this.#originalStyleSheetText.set(header, promise);
       this.originalContentRequestedForTest(header);
     }
     return promise;
@@ -541,8 +570,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       }
       styleSheetIds.add(styleSheetHeader.id);
     }
-    this.#sourceMapManagerInternal.attachSourceMap(
-        styleSheetHeader, styleSheetHeader.sourceURL, styleSheetHeader.sourceMapURL);
+    this.#sourceMapManager.attachSourceMap(styleSheetHeader, styleSheetHeader.sourceURL, styleSheetHeader.sourceMapURL);
     this.dispatchEventToListeners(Events.StyleSheetAdded, styleSheetHeader);
   }
 
@@ -569,8 +597,8 @@ export class CSSModel extends SDKModel<EventTypes> {
         }
       }
     }
-    this.#originalStyleSheetTextInternal.delete(header);
-    this.#sourceMapManagerInternal.detachSourceMap(header);
+    this.#originalStyleSheetText.delete(header);
+    this.#sourceMapManager.detachSourceMap(header);
     this.dispatchEventToListeners(Events.StyleSheetRemoved, header);
   }
 
@@ -602,13 +630,13 @@ export class CSSModel extends SDKModel<EventTypes> {
     const response = await this.agent.invoke_setStyleSheetText({styleSheetId: header.id, text: newText});
     const sourceMapURL = response.sourceMapURL;
 
-    this.#sourceMapManagerInternal.detachSourceMap(header);
+    this.#sourceMapManager.detachSourceMap(header);
     header.setSourceMapURL(sourceMapURL);
-    this.#sourceMapManagerInternal.attachSourceMap(header, header.sourceURL, header.sourceMapURL);
+    this.#sourceMapManager.attachSourceMap(header, header.sourceURL, header.sourceMapURL);
     if (sourceMapURL === null) {
       return 'Error in CSS.setStyleSheetText';
     }
-    this.#domModelInternal.markUndoableState(!majorChange);
+    this.#domModel.markUndoableState(!majorChange);
     this.fireStyleSheetChanged(styleSheetId);
     return null;
   }
@@ -622,22 +650,38 @@ export class CSSModel extends SDKModel<EventTypes> {
     }
   }
 
+  private async onMainFrameNavigated(event: Common.EventTarget.EventTargetEvent<ResourceTreeFrame>): Promise<void> {
+    // If the main frame was restored from the back-forward cache, the order of CDP
+    // is different from the regular navigations. In this case, events about CSS
+    // stylesheet has already been received and they are mixed with the previous page
+    // stylesheets. Therefore, we re-enable the CSS agent to get fresh events.
+    // For the regular navigatons, we can just clear the local data because events about
+    // stylesheets will arrive later.
+    if (event.data.backForwardCacheDetails.restoredFromCache) {
+      await this.suspendModel();
+      await this.resumeModel();
+    } else {
+      this.resetStyleSheets();
+      this.resetFontFaces();
+    }
+  }
+
   private resetStyleSheets(): void {
     const headers = [...this.#styleSheetIdToHeader.values()];
     this.#styleSheetIdsForURL.clear();
     this.#styleSheetIdToHeader.clear();
     for (const header of headers) {
-      this.#sourceMapManagerInternal.detachSourceMap(header);
+      this.#sourceMapManager.detachSourceMap(header);
       this.dispatchEventToListeners(Events.StyleSheetRemoved, header);
     }
   }
 
   private resetFontFaces(): void {
-    this.#fontFacesInternal.clear();
+    this.#fontFaces.clear();
   }
 
   async suspendModel(): Promise<void> {
-    this.#isEnabledInternal = false;
+    this.#isEnabled = false;
     await this.agent.invoke_disable();
     this.resetStyleSheets();
     this.resetFontFaces();
@@ -648,7 +692,7 @@ export class CSSModel extends SDKModel<EventTypes> {
   }
 
   setEffectivePropertyValueForNode(nodeId: Protocol.DOM.NodeId, propertyName: string, value: string): void {
-    this.agent.invoke_setEffectivePropertyValueForNode({nodeId, propertyName, value});
+    void this.agent.invoke_setEffectivePropertyValueForNode({nodeId, propertyName, value});
   }
 
   cachedMatchedCascadeForNode(node: DOMNode): Promise<CSSMatchedStyles|null> {
@@ -681,10 +725,10 @@ export class CSSModel extends SDKModel<EventTypes> {
     if (propertiesToTrack.length === 0) {
       return;
     }
-    this.agent.invoke_trackComputedStyleUpdates({propertiesToTrack});
+    void this.agent.invoke_trackComputedStyleUpdates({propertiesToTrack});
     this.#isCSSPropertyTrackingEnabled = true;
     this.#cssPropertyTracker = cssPropertyTracker;
-    this.pollComputedStyleUpdates();
+    void this.pollComputedStyleUpdates();
   }
 
   // Since we only support one tracker at a time, this call effectively disables
@@ -693,7 +737,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     this.#isCSSPropertyTrackingEnabled = false;
     this.#cssPropertyTracker = null;
     // Sending an empty list to the backend signals the close of style tracking
-    this.agent.invoke_trackComputedStyleUpdates({propertiesToTrack: []});
+    void this.agent.invoke_trackComputedStyleUpdates({propertiesToTrack: []});
   }
 
   private async pollComputedStyleUpdates(): Promise<void> {
@@ -713,19 +757,19 @@ export class CSSModel extends SDKModel<EventTypes> {
       if (this.#cssPropertyTracker) {
         this.#cssPropertyTracker.dispatchEventToListeners(
             CSSPropertyTrackerEvents.TrackedCSSPropertiesUpdated,
-            result.nodeIds.map(nodeId => this.#domModelInternal.nodeForId(nodeId)));
+            result.nodeIds.map(nodeId => this.#domModel.nodeForId(nodeId)));
       }
     }
 
     if (this.#isCSSPropertyTrackingEnabled) {
-      this.#stylePollingThrottler.schedule(this.pollComputedStyleUpdates.bind(this));
+      void this.#stylePollingThrottler.schedule(this.pollComputedStyleUpdates.bind(this));
     }
   }
 
   dispose(): void {
     this.disableCSSPropertyTracker();
     super.dispose();
-    this.#sourceMapManagerInternal.dispose();
+    this.#sourceMapManager.dispose();
   }
 
   getAgent(): ProtocolProxyApi.CSSApi {

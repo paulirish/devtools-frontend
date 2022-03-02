@@ -31,12 +31,14 @@
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 
+import * as ARIAUtils from './ARIAUtils.js';
 import {Constraints} from './Geometry.js';
 import type {ResizeUpdatePositionEvent} from './ResizerWidget.js';
 import {Events as ResizerWidgetEvents, SimpleResizerWidget} from './ResizerWidget.js';
 import {ToolbarButton} from './Toolbar.js';
 import {Widget} from './Widget.js';
 import {Events as ZoomManagerEvents, ZoomManager} from './ZoomManager.js';
+import splitWidgetStyles from './splitWidget.css.legacy.js';
 
 export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typeof Widget>(Widget) {
   private sidebarElementInternal: HTMLElement;
@@ -77,7 +79,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       defaultSidebarHeight?: number, constraintsInDip?: boolean) {
     super(true);
     this.element.classList.add('split-widget');
-    this.registerRequiredCSS('ui/legacy/splitWidget.css');
+    this.registerRequiredCSS(splitWidgetStyles);
 
     this.contentElement.classList.add('shadow-split-widget');
     this.sidebarElementInternal =
@@ -99,8 +101,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.defaultSidebarHeight = defaultSidebarHeight || this.defaultSidebarWidth;
     this.constraintsInDip = Boolean(constraintsInDip);
     this.resizeStartSizeDIP = 0;
-    this.setting =
-        settingName ? Common.Settings.Settings.instance().createSetting(settingName, /** @type {*} */ ({})) : null;
+    this.setting = settingName ? Common.Settings.Settings.instance().createSetting(settingName, {}) : null;
 
     this.totalSizeCSS = 0;
     this.totalSizeOtherDimensionCSS = 0;
@@ -222,7 +223,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   sidebarElement(): HTMLElement {
-    return /** @type {!HTMLElement} */ this.sidebarElementInternal as HTMLElement;
+    return this.sidebarElementInternal;
   }
 
   childWasDetached(widget: Widget): void {
@@ -815,8 +816,9 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.forceUpdateLayout();
   }
 
-  createShowHideSidebarButton(showTitle: Common.UIString.LocalizedString, hideTitle: Common.UIString.LocalizedString):
-      ToolbarButton {
+  createShowHideSidebarButton(
+      showTitle: Common.UIString.LocalizedString, hideTitle: Common.UIString.LocalizedString,
+      shownString: Common.UIString.LocalizedString, hiddenString: Common.UIString.LocalizedString): ToolbarButton {
     this.showSidebarButtonTitle = showTitle;
     this.hideSidebarButtonTitle = hideTitle;
     this.showHideSidebarButton = new ToolbarButton('', '');
@@ -826,8 +828,10 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     function buttonClicked(this: SplitWidget): void {
       if (this.showModeInternal !== ShowMode.Both) {
         this.showBoth(true);
+        ARIAUtils.alert(shownString);
       } else {
         this.hideSidebar(true);
+        ARIAUtils.alert(hiddenString);
       }
     }
 

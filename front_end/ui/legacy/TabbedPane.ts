@@ -43,6 +43,7 @@ import {installDragHandle, invokeOnceAfterBatchUpdate} from './UIUtils.js';
 import type {Widget} from './Widget.js';
 import {VBox} from './Widget.js';
 import {Events as ZoomManagerEvents, ZoomManager} from './ZoomManager.js';
+import tabbedPaneStyles from './tabbedPane.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -110,7 +111,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   constructor() {
     super(true);
-    this.registerRequiredCSS('ui/legacy/tabbedPane.css');
+    this.registerRequiredCSS(tabbedPaneStyles);
     this.element.classList.add('tabbed-pane');
     this.contentElement.classList.add('tabbed-pane-shadow');
     this.contentElement.tabIndex = -1;
@@ -251,6 +252,10 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   closeTabs(ids: string[], userGesture?: boolean): void {
+    if (ids.length === 0) {
+      return;
+    }
+
     const focused = this.hasFocus();
     for (let i = 0; i < ids.length; ++i) {
       this.innerCloseTab(ids[i], userGesture);
@@ -627,7 +632,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
         menu.defaultSection().appendItem(tab.title, this.dropDownMenuItemSelected.bind(this, tab));
       }
     }
-    menu.show();
+    void menu.show();
   }
 
   private dropDownKeydown(event: Event): void {
@@ -1014,6 +1019,9 @@ export class TabbedPaneTab {
     this.titleInternal = title;
     if (this.titleElement) {
       this.titleElement.textContent = title;
+      const closeIconContainer = this.tabElementInternal?.querySelector('.close-button');
+      closeIconContainer?.setAttribute('title', i18nString(UIStrings.closeS, {PH1: title}));
+      closeIconContainer?.setAttribute('aria-label', i18nString(UIStrings.closeS, {PH1: title}));
     }
     delete this.measuredWidth;
   }
@@ -1139,7 +1147,7 @@ export class TabbedPaneTab {
       if (this.tabbedPane.allowTabReorder) {
         installDragHandle(
             tabElement, this.startTabDragging.bind(this), this.tabDragging.bind(this), this.endTabDragging.bind(this),
-            '-webkit-grabbing', 'pointer', 200);
+            null, null, 200);
       }
     }
 
@@ -1245,7 +1253,7 @@ export class TabbedPaneTab {
     if (this.delegate) {
       this.delegate.onContextMenu(this.id, contextMenu);
     }
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   private startTabDragging(ev: Event): boolean {

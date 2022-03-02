@@ -8,6 +8,7 @@ import * as ApplicationComponents from '../../../../../../front_end/panels/appli
 import * as DataGrid from '../../../../../../front_end/ui/components/data_grid/data_grid.js';
 import * as Coordinator from '../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import {assertShadowRoot, getElementWithinComponent, renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
+import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
 import {getHeaderCells, getValuesOfAllBodyRows} from '../../../ui/components/DataGridHelpers.js';
 
 const {assert} = chai;
@@ -35,11 +36,12 @@ const renderReportsGrid =
   return datagrid;
 };
 
-describe('ReportsGrid', async () => {
-  afterEach(() => {
-    Root.Runtime.experiments.clearForTest();
-  });
+const getHeaderText = (cell: HTMLTableCellElement): string|null => {
+  return cell.textContent?.trim() ||
+      cell.querySelector('devtools-resources-reports-grid-status-header')?.shadowRoot?.textContent?.trim() || null;
+};
 
+describeWithEnvironment('ReportsGrid', async () => {
   it('displays placeholder text if no data', async () => {
     const component = await renderReportsGrid();
     assertShadowRoot(component.shadowRoot);
@@ -75,8 +77,8 @@ describe('ReportsGrid', async () => {
     assertShadowRoot(dataGrid.shadowRoot);
 
     const headerCells = getHeaderCells(dataGrid.shadowRoot);
-    const values = Array.from(headerCells, cell => cell.textContent || '');
-    assert.deepEqual(values, ['URL', 'Type', 'Status', 'Destination', 'Timestamp', 'Body']);
+    const values = Array.from(headerCells, getHeaderText);
+    assert.deepEqual(values, ['URL', 'Type', 'Status', 'Destination', 'Generated at', 'Body']);
 
     const rowValues = getValuesOfAllBodyRows(dataGrid.shadowRoot);
     assert.strictEqual(rowValues[0][0], 'https://example.com/script.js', 'URL does not match');
@@ -114,8 +116,8 @@ describe('ReportsGrid', async () => {
     assertShadowRoot(dataGrid.shadowRoot);
 
     const headerCells = getHeaderCells(dataGrid.shadowRoot);
-    const values = Array.from(headerCells, cell => cell.textContent || '');
-    assert.deepEqual(values, ['ID', 'URL', 'Type', 'Status', 'Destination', 'Timestamp', 'Body']);
+    const values = Array.from(headerCells, getHeaderText);
+    assert.deepEqual(values, ['ID', 'URL', 'Type', 'Status', 'Destination', 'Generated at', 'Body']);
 
     const rowValues = getValuesOfAllBodyRows(dataGrid.shadowRoot);
     assert.strictEqual(rowValues[0][0], 'some_id', 'ID does not match');

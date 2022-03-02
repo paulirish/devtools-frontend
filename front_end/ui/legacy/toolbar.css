@@ -8,13 +8,13 @@
   flex: none;
   padding: 0 2px;
 
-  --override-toolbar-warning-red: rgb(238 68 47 / 7%);
+  --toolbar-height: 26px;
 }
 
 .toolbar-shadow {
   position: relative;
   white-space: nowrap;
-  height: 26px;
+  height: var(--toolbar-height);
   overflow: hidden;
   z-index: 12;
   display: flex;
@@ -45,7 +45,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  height: 26px;
+  height: var(--toolbar-height);
   border: none;
   white-space: pre;
 }
@@ -57,7 +57,7 @@
 
 .toolbar-shadow.vertical .toolbar-item {
   height: auto;
-  min-height: 26px;
+  min-height: var(--toolbar-height);
   white-space: normal;
 }
 
@@ -82,7 +82,6 @@ select.toolbar-item:disabled + .toolbar-dropdown-arrow {
   min-width: 28px;
   background: transparent;
   border-radius: 0;
-  cursor: pointer;
 }
 
 .toolbar-text {
@@ -176,6 +175,29 @@ it. */
 :host-context(.left) .toolbar-button.main-menu,
 :host-context(.bottom) .toolbar-button.main-menu {
   margin-inline-end: 28px;
+}
+
+.toolbar-button.copied-to-clipboard::after {
+  content: attr(data-content);
+  position: fixed;
+  top: var(--toolbar-height);
+  padding: 3px 5px;
+  color: var(--color-text-secondary);
+  background: var(--color-background-elevation-1);
+  animation: 2s fade-out;
+  font-weight: normal;
+  border: 1px solid var(--color-details-hairline);
+  border-radius: 3px;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 100%;
+  }
+
+  to {
+    opacity: 0%;
+  }
 }
 
 .toolbar-button.toolbar-state-on .toolbar-glyph {
@@ -296,6 +318,7 @@ select.toolbar-item:disabled {
   opacity: 50%;
 }
 
+button.toolbar-item:focus-visible,
 select.toolbar-item:focus-visible {
   background: var(--color-background-elevation-2);
   border-radius: 2px;
@@ -309,7 +332,7 @@ select.toolbar-item:focus-visible > * {
 .toolbar-input {
   width: 120px;
   height: 19px;
-  padding: 4px 3px 3px 3px;
+  padding: 4px 3px 3px;
   margin: 1px 3px;
   background-color: var(--color-background);
   border: 1px solid transparent;
@@ -355,6 +378,7 @@ select.toolbar-item:focus-visible > * {
   overflow: hidden;
   white-space: nowrap;
   cursor: auto;
+  color: var(--color-text-primary);
 }
 /* Separator */
 
@@ -391,23 +415,44 @@ select.toolbar-item:focus-visible > * {
   left: -2px;
 }
 
-input[is=history-input] {
+input[is="history-input"] {
   border: 1px solid transparent;
   line-height: 16px;
   padding: 1px;
+  color: var(--color-text-primary);
 }
 
-input[is=history-input]:hover {
+input[is="history-input"]:hover {
   box-shadow: var(--legacy-focus-ring-inactive-shadow);
 }
 
-input[is=history-input]:focus,
-input[is=history-input]:not(:placeholder-shown) {
+input[is="history-input"]:focus,
+input[is="history-input"]:not(:placeholder-shown) {
   box-shadow: var(--legacy-focus-ring-active-shadow);
 }
 
-.toolbar-item.warning {
-  background: var(--override-toolbar-warning-red);
+.toolbar-item.highlight::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  z-index: -1;
+}
+
+.toolbar-item.highlight {
+  color: var(--color-button-primary-text);
+}
+
+.toolbar-item.highlight:focus-visible {
+  background: var(--color-primary-variant);
+}
+
+.toolbar-item.highlight > .icon-mask {
+  background: var(--color-button-primary-text);
 }
 
 devtools-icon.leading-issue-icon {
@@ -456,7 +501,7 @@ devtools-icon.leading-issue-icon {
     color: HighlightText;
   }
 
-  .toolbar-button:disabled [is=ui-icon].icon-mask {
+  .toolbar-button:disabled [is="ui-icon"].icon-mask {
     background-color: GrayText;
     color: GrayText;
   }
@@ -491,8 +536,8 @@ devtools-icon.leading-issue-icon {
   :not(.toolbar-render-as-links) .toolbar-button:enabled:hover .toolbar-glyph,
   :not(.toolbar-render-as-links) .toolbar-button:enabled:focus .toolbar-glyph,
   :not(.toolbar-render-as-links) .toolbar-button:enabled:hover:not(:active) .toolbar-glyph,
-  .toolbar-button:enabled:hover [is=ui-icon].icon-mask,
-  .toolbar-button:enabled:focus [is=ui-icon].icon-mask {
+  .toolbar-button:enabled:hover [is="ui-icon"].icon-mask,
+  .toolbar-button:enabled:focus [is="ui-icon"].icon-mask {
     background-color: HighlightText;
   }
 
@@ -515,5 +560,11 @@ devtools-icon.leading-issue-icon {
 
   .toolbar-item .devtools-link {
     color: linktext;
+  }
+
+  .toolbar-has-dropdown {
+    forced-color-adjust: none;
+    background: ButtonFace;
+    color: ButtonText;
   }
 }

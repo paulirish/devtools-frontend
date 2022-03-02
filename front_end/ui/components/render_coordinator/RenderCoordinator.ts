@@ -90,21 +90,21 @@ export class RenderCoordinator extends EventTarget {
   // This does not affect logging frames or queue empty events.
   observeOnlyNamed = true;
 
-  private readonly logInternal: CoordinatorLogEntry[] = [];
+  readonly #logInternal: CoordinatorLogEntry[] = [];
 
-  private readonly pendingWorkFrames: CoordinatorFrame[] = [];
-  private readonly resolvers = new WeakMap<CoordinatorCallback, RenderCoordinatorResolverCallback>();
-  private readonly rejectors = new WeakMap<CoordinatorCallback, RenderCoordinatorRejectorCallback>();
-  private readonly labels = new WeakMap<CoordinatorCallback, string>();
-  private scheduledWorkId = 0;
+  readonly #pendingWorkFrames: CoordinatorFrame[] = [];
+  readonly #resolvers = new WeakMap<CoordinatorCallback, RenderCoordinatorResolverCallback>();
+  readonly #rejectors = new WeakMap<CoordinatorCallback, RenderCoordinatorRejectorCallback>();
+  readonly #labels = new WeakMap<CoordinatorCallback, string>();
+  #scheduledWorkId = 0;
 
   pendingFramesCount(): number {
-    return this.pendingWorkFrames.length;
+    return this.#pendingWorkFrames.length;
   }
 
   done(): Promise<void> {
-    if (this.pendingWorkFrames.length === 0) {
-      this.logIfEnabled('[Queue empty]');
+    if (this.#pendingWorkFrames.length === 0) {
+      this.#logIfEnabled('[Queue empty]');
       return Promise.resolve();
     }
     return new Promise(resolve => this.addEventListener('renderqueueempty', () => resolve(), {once: true}));
@@ -118,10 +118,10 @@ export class RenderCoordinator extends EventTarget {
       if (!callback) {
         throw new Error('Read called with label but no callback');
       }
-      return this.enqueueHandler<T>(callback, ACTION.READ, labelOrCallback);
+      return this.#enqueueHandler<T>(callback, ACTION.READ, labelOrCallback);
     }
 
-    return this.enqueueHandler<T>(labelOrCallback, ACTION.READ, UNNAMED_READ);
+    return this.#enqueueHandler<T>(labelOrCallback, ACTION.READ, UNNAMED_READ);
   }
 
   async write<T extends unknown>(callback: CoordinatorCallback): Promise<T>;
@@ -132,15 +132,15 @@ export class RenderCoordinator extends EventTarget {
       if (!callback) {
         throw new Error('Write called with label but no callback');
       }
-      return this.enqueueHandler<T>(callback, ACTION.WRITE, labelOrCallback);
+      return this.#enqueueHandler<T>(callback, ACTION.WRITE, labelOrCallback);
     }
 
-    return this.enqueueHandler<T>(labelOrCallback, ACTION.WRITE, UNNAMED_WRITE);
+    return this.#enqueueHandler<T>(labelOrCallback, ACTION.WRITE, UNNAMED_WRITE);
   }
 
   takeRecords(): CoordinatorLogEntry[] {
-    const logs = [...this.logInternal];
-    this.logInternal.length = 0;
+    const logs = [...this.#logInternal];
+    this.#logInternal.length = 0;
     return logs;
   }
 
@@ -158,23 +158,23 @@ export class RenderCoordinator extends EventTarget {
       if (!callback) {
         throw new Error('Scroll called with label but no callback');
       }
-      return this.enqueueHandler<T>(callback, ACTION.READ, labelOrCallback);
+      return this.#enqueueHandler<T>(callback, ACTION.READ, labelOrCallback);
     }
 
-    return this.enqueueHandler<T>(labelOrCallback, ACTION.READ, UNNAMED_SCROLL);
+    return this.#enqueueHandler<T>(labelOrCallback, ACTION.READ, UNNAMED_SCROLL);
   }
 
-  private enqueueHandler<T = unknown>(callback: CoordinatorCallback, action: ACTION, label = ''): Promise<T> {
-    this.labels.set(callback, `${action === ACTION.READ ? '[Read]' : '[Write]'}: ${label}`);
+  #enqueueHandler<T = unknown>(callback: CoordinatorCallback, action: ACTION, label = ''): Promise<T> {
+    this.#labels.set(callback, `${action === ACTION.READ ? '[Read]' : '[Write]'}: ${label}`);
 
-    if (this.pendingWorkFrames.length === 0) {
-      this.pendingWorkFrames.push({
+    if (this.#pendingWorkFrames.length === 0) {
+      this.#pendingWorkFrames.push({
         readers: [],
         writers: [],
       });
     }
 
-    const frame = this.pendingWorkFrames[0];
+    const frame = this.#pendingWorkFrames[0];
     if (!frame) {
       throw new Error('No frame available');
     }
@@ -193,34 +193,34 @@ export class RenderCoordinator extends EventTarget {
     }
 
     const resolverPromise = new Promise((resolve, reject) => {
-      this.resolvers.set(callback, resolve);
-      this.rejectors.set(callback, reject);
+      this.#resolvers.set(callback, resolve);
+      this.#rejectors.set(callback, reject);
     });
 
-    this.scheduleWork();
+    this.#scheduleWork();
     return resolverPromise as Promise<T>;
   }
 
-  private async handleWork(handler: CoordinatorCallback): Promise<void> {
+  async #handleWork(handler: CoordinatorCallback): Promise<void> {
     const data = await handler.call(undefined);
-    const resolver = this.resolvers.get(handler);
+    const resolver = this.#resolvers.get(handler);
     if (!resolver) {
       throw new Error('Unable to locate resolver');
     }
 
     resolver.call(undefined, data);
-    this.resolvers.delete(handler);
-    this.rejectors.delete(handler);
+    this.#resolvers.delete(handler);
+    this.#rejectors.delete(handler);
   }
 
-  private scheduleWork(): void {
-    const hasScheduledWork = this.scheduledWorkId !== 0;
+  #scheduleWork(): void {
+    const hasScheduledWork = this.#scheduledWorkId !== 0;
     if (hasScheduledWork) {
       return;
     }
 
-    this.scheduledWorkId = requestAnimationFrame(async () => {
-      const hasPendingFrames = this.pendingWorkFrames.length > 0;
+    this.#scheduledWorkId = requestAnimationFrame(async () => {
+      const hasPendingFrames = this.#pendingWorkFrames.length > 0;
       if (!hasPendingFrames) {
         // No pending frames means all pending work has completed.
         // The events dispatched below are mostly for testing contexts.
@@ -230,15 +230,15 @@ export class RenderCoordinator extends EventTarget {
         this.dispatchEvent(new RenderCoordinatorQueueEmptyEvent());
         window.dispatchEvent(new RenderCoordinatorQueueEmptyEvent());
 
-        this.logIfEnabled('[Queue empty]');
-        this.scheduledWorkId = 0;
+        this.#logIfEnabled('[Queue empty]');
+        this.#scheduledWorkId = 0;
         return;
       }
 
       this.dispatchEvent(new RenderCoordinatorNewFrameEvent());
-      this.logIfEnabled('[New frame]');
+      this.#logIfEnabled('[New frame]');
 
-      const frame = this.pendingWorkFrames.shift();
+      const frame = this.#pendingWorkFrames.shift();
       if (!frame) {
         return;
       }
@@ -247,8 +247,8 @@ export class RenderCoordinator extends EventTarget {
       // to proceed together.
       const readers: Promise<unknown>[] = [];
       for (const reader of frame.readers) {
-        this.logIfEnabled(this.labels.get(reader));
-        readers.push(this.handleWork(reader));
+        this.#logIfEnabled(this.#labels.get(reader));
+        readers.push(this.#handleWork(reader));
       }
 
       // Wait for them all to be done.
@@ -256,20 +256,20 @@ export class RenderCoordinator extends EventTarget {
         await Promise.race([
           Promise.all(readers),
           new Promise((_, reject) => {
-            setTimeout(
+            window.setTimeout(
                 () => reject(new Error(`Readers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)),
                 DEADLOCK_TIMEOUT);
           }),
         ]);
       } catch (err) {
-        this.rejectAll(frame.readers, err);
+        this.#rejectAll(frame.readers, err);
       }
 
       // Next do all the writers as a block.
       const writers: Promise<unknown>[] = [];
       for (const writer of frame.writers) {
-        this.logIfEnabled(this.labels.get(writer));
-        writers.push(this.handleWork(writer));
+        this.#logIfEnabled(this.#labels.get(writer));
+        writers.push(this.#handleWork(writer));
       }
 
       // And wait for them to be done, too.
@@ -277,38 +277,38 @@ export class RenderCoordinator extends EventTarget {
         await Promise.race([
           Promise.all(writers),
           new Promise((_, reject) => {
-            setTimeout(
+            window.setTimeout(
                 () => reject(new Error(`Writers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)),
                 DEADLOCK_TIMEOUT);
           }),
         ]);
       } catch (err) {
-        this.rejectAll(frame.writers, err);
+        this.#rejectAll(frame.writers, err);
       }
 
       // Since there may have been more work requested in
       // the callback of a reader / writer, we attempt to schedule
       // it at this point.
-      this.scheduledWorkId = 0;
-      this.scheduleWork();
+      this.#scheduledWorkId = 0;
+      this.#scheduleWork();
     });
   }
 
-  private rejectAll(handlers: CoordinatorCallback[], error: Error): void {
+  #rejectAll(handlers: CoordinatorCallback[], error: Error): void {
     for (const handler of handlers) {
-      const rejector = this.rejectors.get(handler);
+      const rejector = this.#rejectors.get(handler);
       if (!rejector) {
         console.warn('Unable to locate rejector');
         continue;
       }
 
       rejector.call(undefined, error);
-      this.resolvers.delete(handler);
-      this.rejectors.delete(handler);
+      this.#resolvers.delete(handler);
+      this.#rejectors.delete(handler);
     }
   }
 
-  private logIfEnabled(value: string|undefined): void {
+  #logIfEnabled(value: string|undefined): void {
     if (!this.observe || !value) {
       return;
     }
@@ -317,11 +317,11 @@ export class RenderCoordinator extends EventTarget {
       return;
     }
 
-    this.logInternal.push({time: performance.now(), value});
+    this.#logInternal.push({time: performance.now(), value});
 
     // Keep the log at the log size.
-    while (this.logInternal.length > this.recordStorageLimit) {
-      this.logInternal.shift();
+    while (this.#logInternal.length > this.recordStorageLimit) {
+      this.#logInternal.shift();
     }
   }
 }

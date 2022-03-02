@@ -7,6 +7,9 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as UI from '../../legacy.js';
 
+import xmlTreeStyles from './xmlTree.css.legacy.js';
+import xmlViewStyles from './xmlView.css.legacy.js';
+
 const UIStrings = {
   /**
   *@description Text to find an item
@@ -25,10 +28,10 @@ export class XMLView extends UI.Widget.Widget implements UI.SearchableView.Searc
 
   constructor(parsedXML: Document) {
     super(true);
-    this.registerRequiredCSS('ui/legacy/components/source_frame/xmlView.css');
+    this.registerRequiredCSS(xmlViewStyles);
     this.contentElement.classList.add('shadow-xml-view', 'source-code');
     this.treeOutline = new UI.TreeOutline.TreeOutlineInShadow();
-    this.treeOutline.registerRequiredCSS('ui/legacy/components/source_frame/xmlTree.css');
+    this.treeOutline.registerRequiredCSS(xmlTreeStyles);
     this.contentElement.appendChild(this.treeOutline.element);
     this.currentSearchFocusIndex = 0;
     this.currentSearchTreeElements = [];
@@ -73,7 +76,7 @@ export class XMLView extends UI.Widget.Widget implements UI.SearchableView.Searc
     if (!this.searchConfig) {
       return;
     }
-    const regex = this.searchConfig.toSearchRegex(true);
+    const {regex} = this.searchConfig.toSearchRegex(true);
     const previousFocusElement = this.currentSearchTreeElements[this.currentSearchFocusIndex];
     if (previousFocusElement) {
       previousFocusElement.setSearchRegex(regex);
@@ -114,7 +117,7 @@ export class XMLView extends UI.Widget.Widget implements UI.SearchableView.Searc
     const previousSearchFocusElement = this.currentSearchTreeElements[newIndex];
     this.innerSearchCanceled();
     this.currentSearchTreeElements = [];
-    const regex = this.searchConfig.toSearchRegex(true);
+    const {regex} = this.searchConfig.toSearchRegex(true);
 
     for (let element: (UI.TreeOutline.TreeElement|null) =
              (this.treeOutline.rootElement() as UI.TreeOutline.TreeElement | null);

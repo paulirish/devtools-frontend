@@ -8,10 +8,9 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-
-// eslint-disable-next-line rulesdir/es_modules_import
-import type * as Main from './main.js';
 import type * as InspectorMain from '../inspector_main/inspector_main.js';
+
+import type * as Main from './main.js';
 
 import * as i18n from '../../core/i18n/i18n.js';
 const UIStrings = {
@@ -223,8 +222,6 @@ let loadedInspectorMainModule: (typeof InspectorMain|undefined);
 
 async function loadMainModule(): Promise<typeof Main> {
   if (!loadedMainModule) {
-    // Side-effect import resources in module.json
-    await Root.Runtime.Runtime.instance().loadModulePromise('entrypoints/main');
     loadedMainModule = await import('./main.js');
   }
   return loadedMainModule;
@@ -237,8 +234,6 @@ async function loadMainModule(): Promise<typeof Main> {
 
 async function loadInspectorMainModule(): Promise<typeof InspectorMain> {
   if (!loadedInspectorMainModule) {
-    // Side-effect import resources in module.json
-    await Root.Runtime.Runtime.instance().loadModulePromise('entrypoints/inspector_main');
     loadedInspectorMainModule = await import('../inspector_main/inspector_main.js');
   }
   return loadedInspectorMainModule;
@@ -593,7 +588,7 @@ Common.Settings.registerSettingExtension({
   settingName: 'uiTheme',
   settingType: Common.Settings.SettingType.ENUM,
   defaultValue: 'systemPreferred',
-  reloadRequired: true,
+  reloadRequired: false,
   options: [
     {
       title: i18nLazyString(UIStrings.switchToSystemPreferredColor),
@@ -677,6 +672,30 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
+// Not all locales that are supported should also be made available in the
+// settings. Filter out pseudo locales e.g.
+function filterLocalesForSettings(): string[] {
+  return i18n.i18n.getAllSupportedDevToolsLocales().filter(locale => locale !== 'en-XL');
+}
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.APPEARANCE,
+  storageType: Common.Settings.SettingStorageType.Synced,
+  settingName: 'language',
+  settingType: Common.Settings.SettingType.ENUM,
+  title: i18nLazyString(UIStrings.language),
+  defaultValue: 'en-US',
+  options: [
+    {
+      value: 'browserLanguage',
+      title: i18nLazyString(UIStrings.browserLanguage),
+      text: i18nLazyString(UIStrings.browserLanguage),
+    },
+    ...filterLocalesForSettings().map(locale => createOptionForLocale(locale)),
+  ],
+  reloadRequired: true,
+});
+
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.APPEARANCE,
   storageType: Common.Settings.SettingStorageType.Synced,
@@ -717,6 +736,7 @@ Common.Settings.registerSettingExtension({
 });
 
 Common.Settings.registerSettingExtension({
+  storageType: Common.Settings.SettingStorageType.Synced,
   settingName: 'activeKeybindSet',
   settingType: Common.Settings.SettingType.ENUM,
   defaultValue: 'devToolsDefault',
@@ -747,30 +767,6 @@ function createOptionForLocale(localeString: string): Common.Settings.SettingExt
   };
 }
 
-// Not all locales that are supported should also be made available in the
-// settings. Filter out pseudo locales e.g.
-function filterLocalesForSettings(): string[] {
-  return i18n.i18n.getAllSupportedDevToolsLocales().filter(locale => locale !== 'en-XL');
-}
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.APPEARANCE,
-  settingName: 'language',
-  settingType: Common.Settings.SettingType.ENUM,
-  title: i18nLazyString(UIStrings.language),
-  defaultValue: 'en-US',
-  options: [
-    {
-      value: 'browserLanguage',
-      title: i18nLazyString(UIStrings.browserLanguage),
-      text: i18nLazyString(UIStrings.browserLanguage),
-    },
-    ...filterLocalesForSettings().map(locale => createOptionForLocale(locale)),
-  ],
-  reloadRequired: true,
-  experiment: Root.Runtime.ExperimentName.LOCALIZED_DEVTOOLS,
-});
-
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SYNC,
   // This name must be kept in sync with DevToolsSettings::kSyncDevToolsPreferencesFrontendName.
@@ -783,6 +779,7 @@ Common.Settings.registerSettingExtension({
 });
 
 Common.Settings.registerSettingExtension({
+  storageType: Common.Settings.SettingStorageType.Synced,
   settingName: 'userShortcuts',
   settingType: Common.Settings.SettingType.ARRAY,
   defaultValue: [],

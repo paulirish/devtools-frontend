@@ -37,12 +37,14 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as IconButton from '../../../components/icon_button/icon_button.js';
+import * as TextEditor from '../../../components/text_editor/text_editor.js';
 import * as UI from '../../legacy.js';
 
 import {CustomPreviewComponent} from './CustomPreviewComponent.js';
-import {JavaScriptAutocomplete} from './JavaScriptAutocomplete.js';
 import {JavaScriptREPL} from './JavaScriptREPL.js';
 import {createSpansForNodeTitle, RemoteObjectPreviewFormatter} from './RemoteObjectPreviewFormatter.js';
+import objectValueStyles from './objectValue.css.js';
+import objectPropertiesSectionStyles from './objectPropertiesSection.css.js';
 
 const UIStrings = {
   /**
@@ -161,8 +163,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     }
 
     objectPropertiesSectionMap.set(this.element, this);
-    this.registerRequiredCSS('ui/legacy/components/object_ui/objectValue.css');
-    this.registerRequiredCSS('ui/legacy/components/object_ui/objectPropertiesSection.css');
+    this.registerCSSFiles([objectValueStyles, objectPropertiesSectionStyles]);
     this.rootElement().childrenListElement.classList.add('source-code', 'object-properties-section');
   }
 
@@ -183,7 +184,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     const titleElement = document.createElement('span');
     titleElement.classList.add('source-code');
     const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(titleElement, {
-      cssFile: 'ui/legacy/components/object_ui/objectValue.css',
+      cssFile: [objectValueStyles],
       delegatesFocus: undefined,
     });
     const propertyValue =
@@ -259,7 +260,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     return UI.Fragment.html`<span class="name">${name}</span>`;
   }
 
-  static valueElementForFunctionDescription(description?: string|null, includePreview?: boolean, defaultName?: string):
+  static valueElementForFunctionDescription(description?: string, includePreview?: boolean, defaultName?: string):
       Element {
     const valueElement = document.createElement('span');
     valueElement.classList.add('object-value-function');
@@ -369,7 +370,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     };
     memoryIcon.onclick = (event: MouseEvent): void => {
       Host.userMetrics.linearMemoryInspectorRevealedFrom(Host.UserMetrics.LinearMemoryInspectorRevealedFrom.MemoryIcon);
-      LinearMemoryInspector.LinearMemoryInspectorController.LinearMemoryInspectorController.instance()
+      void LinearMemoryInspector.LinearMemoryInspectorController.LinearMemoryInspectorController.instance()
           .openInspectorView(obj);
       event.stopPropagation();
     };
@@ -475,7 +476,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       valueElement.classList.add('object-value-node');
       createSpansForNodeTitle(valueElement, (description as string));
       valueElement.addEventListener('click', event => {
-        Common.Revealer.reveal(value);
+        void Common.Revealer.reveal(value);
         event.consume(true);
       }, false);
       valueElement.addEventListener(
@@ -494,7 +495,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       if (linkify && response && response.location) {
         element.classList.add('linkified');
         element.addEventListener('click', () => {
-          Common.Revealer.reveal(response.location);
+          void Common.Revealer.reveal(response.location);
           return false;
         });
       }
@@ -552,7 +553,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
           i18nString(UIStrings.collapseChildren),
           this.objectTreeElementInternal.collapseChildren.bind(this.objectTreeElementInternal));
     }
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   titleLessMode(): void {
@@ -578,8 +579,7 @@ export class ObjectPropertiesSectionsTreeOutline extends UI.TreeOutline.TreeOutl
   private readonly editable: boolean;
   constructor(options?: TreeOutlineOptions|null) {
     super();
-    this.registerRequiredCSS('ui/legacy/components/object_ui/objectValue.css');
-    this.registerRequiredCSS('ui/legacy/components/object_ui/objectPropertiesSection.css');
+    this.registerCSSFiles([objectValueStyles, objectPropertiesSectionStyles]);
     this.editable = !(options && options.readOnly);
     this.contentElement.classList.add('source-code');
     this.contentElement.classList.add('object-properties-section');
@@ -655,7 +655,7 @@ export class RootElement extends UI.TreeOutline.TreeElement {
     contextMenu.viewSection().appendItem(
         i18nString(UIStrings.expandRecursively), this.expandRecursively.bind(this, Number.MAX_VALUE));
     contextMenu.viewSection().appendItem(i18nString(UIStrings.collapseChildren), this.collapseChildren.bind(this));
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   async onpopulate(): Promise<void> {
@@ -706,7 +706,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
       targetValue?: SDK.RemoteObject.RemoteObject): Promise<void> {
     if (value.arrayLength() > ARRAY_LOAD_THRESHOLD) {
       treeElement.removeChildren();
-      ArrayGroupingTreeElement.populateArray(treeElement, value, 0, value.arrayLength() - 1, linkifier);
+      void ArrayGroupingTreeElement.populateArray(treeElement, value, 0, value.arrayLength() - 1, linkifier);
       return;
     }
 
@@ -838,7 +838,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
         // The definition of callFunction expects an unknown, and setting to `any` causes Closure to fail.
         // However, leaving this as unknown also causes TypeScript to fail, so for now we leave this as unchecked.
         // @ts-ignore  TODO(crbug.com/1011811): Fix after Closure is removed.
-        object.callFunction(invokeGetter, [{value: JSON.stringify(propertyPath)}]).then(callback);
+        void object.callFunction(invokeGetter, [{value: JSON.stringify(propertyPath)}]).then(callback);
       }
     }
 
@@ -1018,9 +1018,23 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
           this.property.value, this.property.wasThrown, showPreview, this.listItemElement, this.linkifier);
       this.valueElement = (this.propertyValue.element as HTMLElement);
     } else if (this.property.getter) {
-      this.valueElement = ObjectPropertyTreeElement.createRemoteObjectAccessorPropertySpan(
-          (parentMap.get(this.property) as SDK.RemoteObject.RemoteObject), [this.property.name],
-          this.onInvokeGetterClick.bind(this));
+      this.valueElement = document.createElement('span');
+      const element = this.valueElement.createChild('span');
+      element.textContent = i18nString(UIStrings.dots);
+      element.classList.add('object-value-calculate-value-button');
+      UI.Tooltip.Tooltip.install(element, i18nString(UIStrings.invokePropertyGetter));
+      const object = parentMap.get(this.property) as SDK.RemoteObject.RemoteObject;
+      const getter = this.property.getter;
+      element.addEventListener('click', (event: Event) => {
+        event.consume();
+        // @ts-ignore No way to teach TypeScript to preserve the Function-ness of `getter`.
+        void object.callFunction(invokeGetter, [SDK.RemoteObject.RemoteObject.toCallArgument(getter)])
+            .then(this.onInvokeGetterClick.bind(this));
+
+        function invokeGetter(this: Object, getter: Function): Object {
+          return Reflect.apply(getter, this, []);
+        }
+      }, false);
     } else {
       this.valueElement = document.createElement('span');
       this.valueElement.classList.add('object-value-undefined');
@@ -1105,7 +1119,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     if (this.propertyValue) {
       this.propertyValue.appendApplicableItems(event, contextMenu, {});
     }
-    contextMenu.show();
+    void contextMenu.show();
   }
 
   private startEditing(): void {
@@ -1177,7 +1191,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     const keyboardEvent = (event as KeyboardEvent);
     if (keyboardEvent.key === 'Enter') {
       keyboardEvent.consume();
-      this.editingCommitted(originalContent);
+      void this.editingCommitted(originalContent);
       return;
     }
     if (keyboardEvent.key === Platform.KeyboardUtilities.ESCAPE_KEY) {
@@ -1200,7 +1214,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
         const parent = this.parent;
         if (parent) {
           parent.invalidateChildren();
-          parent.onpopulate();
+          void parent.onpopulate();
         }
       } else {
         this.update();
@@ -1225,7 +1239,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
       const parent = this.parent;
       if (parent) {
         parent.invalidateChildren();
-        parent.onpopulate();
+        void parent.onpopulate();
       }
     }
   }
@@ -1513,8 +1527,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
 export class ObjectPropertyPrompt extends UI.TextPrompt.TextPrompt {
   constructor() {
     super();
-    const javaScriptAutocomplete = JavaScriptAutocomplete.instance();
-    this.initialize(javaScriptAutocomplete.completionsForTextInCurrentContext.bind(javaScriptAutocomplete));
+    this.initialize(TextEditor.JavaScript.completeInContext);
   }
 }
 
@@ -1613,12 +1626,12 @@ export class Renderer implements UI.UIUtils.Renderer {
     return rendererInstance;
   }
 
-  render(object: Object, options?: UI.UIUtils.Options): Promise<{
+  async render(object: Object, options?: UI.UIUtils.Options): Promise<{
     node: Node,
     tree: UI.TreeOutline.TreeOutline|null,
   }|null> {
     if (!(object instanceof SDK.RemoteObject.RemoteObject)) {
-      return Promise.reject(new Error('Can\'t render ' + object));
+      throw new Error('Can\'t render ' + object);
     }
     options = options || {title: undefined, editable: undefined};
     const title = options.title;
@@ -1627,10 +1640,10 @@ export class Renderer implements UI.UIUtils.Renderer {
       section.titleLessMode();
     }
     section.editable = Boolean(options.editable);
-    return Promise.resolve(({node: section.element, tree: section} as {
+    return {node: section.element, tree: section} as {
       node: Node,
       tree: UI.TreeOutline.TreeOutline | null,
-    } | null));
+    } | null;
   }
 }
 

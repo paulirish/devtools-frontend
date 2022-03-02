@@ -9,19 +9,21 @@ import type {ContentProvider, DeferredContent, SearchMatch} from './ContentProvi
 import {performSearchInContent} from './TextUtils.js';
 
 export class StaticContentProvider implements ContentProvider {
-  private readonly contentURLInternal: string;
+  private readonly contentURLInternal: Platform.DevToolsPath.UrlString;
   private readonly contentTypeInternal: Common.ResourceType.ResourceType;
   private readonly lazyContent: () => Promise<DeferredContent>;
 
   constructor(
-      contentURL: string, contentType: Common.ResourceType.ResourceType, lazyContent: () => Promise<DeferredContent>) {
+      contentURL: Platform.DevToolsPath.UrlString, contentType: Common.ResourceType.ResourceType,
+      lazyContent: () => Promise<DeferredContent>) {
     this.contentURLInternal = contentURL;
     this.contentTypeInternal = contentType;
     this.lazyContent = lazyContent;
   }
 
-  static fromString(contentURL: string, contentType: Common.ResourceType.ResourceType, content: string):
-      StaticContentProvider {
+  static fromString(
+      contentURL: Platform.DevToolsPath.UrlString, contentType: Common.ResourceType.ResourceType,
+      content: string): StaticContentProvider {
     const lazyContent = (): Promise<{
       content: string,
       isEncoded: boolean,
@@ -29,9 +31,8 @@ export class StaticContentProvider implements ContentProvider {
     return new StaticContentProvider(contentURL, contentType, lazyContent);
   }
 
-  // TODO(crbug.com/1253323): Cast to UrlString will be removed when migration to branded types is complete.
   contentURL(): Platform.DevToolsPath.UrlString {
-    return this.contentURLInternal as Platform.DevToolsPath.UrlString;
+    return this.contentURLInternal;
   }
 
   contentType(): Common.ResourceType.ResourceType {

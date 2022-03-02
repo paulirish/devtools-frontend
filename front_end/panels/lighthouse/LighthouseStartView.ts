@@ -41,9 +41,9 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/lighthouse/LighthouseStartView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class StartView extends UI.Widget.Widget {
-  private controller: LighthouseController;
+  protected controller: LighthouseController;
   private readonly settingsToolbarInternal: UI.Toolbar.Toolbar;
-  private startButton!: HTMLButtonElement;
+  protected startButton!: HTMLButtonElement;
   private helpText?: Element;
   private warningText?: Element;
   private shouldConfirm?: boolean;
@@ -60,7 +60,7 @@ export class StartView extends UI.Widget.Widget {
     return this.settingsToolbarInternal;
   }
 
-  private populateRuntimeSettingAsRadio(settingName: string, label: string, parentElement: Element): void {
+  protected populateRuntimeSettingAsRadio(settingName: string, label: string, parentElement: Element): void {
     const runtimeSetting = RuntimeSettings.find(item => item.setting.name === settingName);
     if (!runtimeSetting || !runtimeSetting.options) {
       throw new Error(`${settingName} is not a setting with options`);
@@ -112,7 +112,8 @@ export class StartView extends UI.Widget.Widget {
     UI.ARIAUtils.setAccessibleName(pluginFormElements, i18nString(UIStrings.communityPluginsBeta));
   }
 
-  private render(): void {
+  protected render(): void {
+    this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.legacy_navigation', this.settingsToolbarInternal);
     this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.clear_storage', this.settingsToolbarInternal);
     this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.throttling', this.settingsToolbarInternal);
 
@@ -170,6 +171,10 @@ export class StartView extends UI.Widget.Widget {
     this.populateFormControls(fragment);
     this.contentElement.appendChild(fragment.element());
     this.contentElement.style.overflow = 'auto';
+  }
+
+  updateStartButton(): void {
+    // Do nothing in default case.
   }
 
   onResize(): void {

@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Root from '../../core/root/root.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
@@ -55,9 +53,6 @@ export class BezierPopoverIcon {
   }
 
   private iconClick(event: Event): void {
-    if (Root.Runtime.experiments.isEnabled('fontEditor')) {
-      Host.userMetrics.cssEditorOpened('bezierEditor');
-    }
     event.consume(true);
     if (this.swatchPopoverHelper.isShowing()) {
       this.swatchPopoverHelper.hide(true);
@@ -80,13 +75,13 @@ export class BezierPopoverIcon {
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
         this.treeElement.property, false /* forName */);
     if (uiLocation) {
-      Common.Revealer.reveal(uiLocation, true /* omitFocus */);
+      void Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
   }
 
   private bezierChanged(event: Common.EventTarget.EventTargetEvent<string>): void {
     this.swatch.setBezierText(event.data);
-    this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
+    void this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
   }
 
   private onScroll(_event: Event): void {
@@ -104,7 +99,7 @@ export class BezierPopoverIcon {
     this.bezierEditor = undefined;
 
     const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
-    this.treeElement.applyStyleText(propertyText, true);
+    void this.treeElement.applyStyleText(propertyText, true);
     this.treeElement.parentPane().setEditingStyle(false);
     delete this.originalPropertyText;
   }
@@ -163,9 +158,6 @@ export class ColorSwatchPopoverIcon {
   }
 
   private iconClick(event: Event): void {
-    if (Root.Runtime.experiments.isEnabled('fontEditor')) {
-      Host.userMetrics.cssEditorOpened('colorPicker');
-    }
     event.consume(true);
     this.showPopover();
   }
@@ -202,7 +194,7 @@ export class ColorSwatchPopoverIcon {
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
         this.treeElement.property, false /* forName */);
     if (uiLocation) {
-      Common.Revealer.reveal(uiLocation, true /* omitFocus */);
+      void Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
   }
 
@@ -226,7 +218,7 @@ export class ColorSwatchPopoverIcon {
       this.swatch.createChild('span').textContent = text;
     }
 
-    this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
+    void this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
   }
 
   private onScroll(_event: Event): void {
@@ -244,7 +236,7 @@ export class ColorSwatchPopoverIcon {
     this.spectrum = undefined;
 
     const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
-    this.treeElement.applyStyleText(propertyText, true);
+    void this.treeElement.applyStyleText(propertyText, true);
     this.treeElement.parentPane().setEditingStyle(false);
     delete this.originalPropertyText;
   }
@@ -278,9 +270,6 @@ export class ShadowSwatchPopoverHelper {
   }
 
   private iconClick(event: Event): void {
-    if (Root.Runtime.experiments.isEnabled('fontEditor')) {
-      Host.userMetrics.cssEditorOpened('shadowEditor');
-    }
     event.consume(true);
     this.showPopover();
   }
@@ -305,13 +294,13 @@ export class ShadowSwatchPopoverHelper {
     const uiLocation = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().propertyUILocation(
         this.treeElement.property, false /* forName */);
     if (uiLocation) {
-      Common.Revealer.reveal(uiLocation, true /* omitFocus */);
+      void Common.Revealer.reveal(uiLocation, true /* omitFocus */);
     }
   }
 
   private shadowChanged(event: Common.EventTarget.EventTargetEvent<InlineEditor.CSSShadowModel.CSSShadowModel>): void {
     this.shadowSwatch.setCSSShadow(event.data);
-    this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
+    void this.treeElement.applyStyleText(this.treeElement.renderedPropertyText(), false);
   }
 
   private onScroll(_event: Event): void {
@@ -330,7 +319,7 @@ export class ShadowSwatchPopoverHelper {
     this.cssShadowEditor = undefined;
 
     const propertyText = commitEdit ? this.treeElement.renderedPropertyText() : this.originalPropertyText || '';
-    this.treeElement.applyStyleText(propertyText, true);
+    void this.treeElement.applyStyleText(propertyText, true);
     this.treeElement.parentPane().setEditingStyle(false);
     delete this.originalPropertyText;
   }
@@ -369,7 +358,7 @@ export class FontEditorSectionManager {
   private fontChanged(event: Common.EventTarget.EventTargetEvent<InlineEditor.FontEditor.FontChangedEvent>): void {
     const {propertyName, value} = event.data;
     const treeElement = this.treeElementMap.get(propertyName);
-    this.updateFontProperty(propertyName, value, treeElement);
+    void this.updateFontProperty(propertyName, value, treeElement);
   }
 
   private async updateFontProperty(propertyName: string, value: string, treeElement?: StylePropertyTreeElement):

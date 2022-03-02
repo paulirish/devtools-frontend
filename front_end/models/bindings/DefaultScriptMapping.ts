@@ -75,11 +75,7 @@ export class DefaultScriptMapping implements DebuggerSourceMapping {
     if (!uiSourceCode) {
       return null;
     }
-    const lineNumber = rawLocation.lineNumber - (script.isInlineScriptWithSourceURL() ? script.lineOffset : 0);
-    let columnNumber = rawLocation.columnNumber || 0;
-    if (script.isInlineScriptWithSourceURL() && !lineNumber && columnNumber) {
-      columnNumber -= script.columnOffset;
-    }
+    const {lineNumber, columnNumber = 0} = rawLocation;
     return uiSourceCode.uiLocation(lineNumber, columnNumber);
   }
 
@@ -88,10 +84,6 @@ export class DefaultScriptMapping implements DebuggerSourceMapping {
     const script = this.#uiSourceCodeToScriptsMap.get(uiSourceCode);
     if (!script) {
       return [];
-    }
-    if (script.isInlineScriptWithSourceURL()) {
-      return [this.#debuggerModel.createRawLocation(
-          script, lineNumber + script.lineOffset, lineNumber ? columnNumber : columnNumber + script.columnOffset)];
     }
     return [this.#debuggerModel.createRawLocation(script, lineNumber, columnNumber)];
   }
@@ -111,7 +103,7 @@ export class DefaultScriptMapping implements DebuggerSourceMapping {
     }
     scriptToUISourceCodeMap.set(script, uiSourceCode);
     this.#project.addUISourceCodeWithProvider(uiSourceCode, script, null, 'text/javascript');
-    this.#debuggerWorkspaceBinding.updateLocations(script);
+    void this.#debuggerWorkspaceBinding.updateLocations(script);
   }
 
   private discardedScriptSource(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {

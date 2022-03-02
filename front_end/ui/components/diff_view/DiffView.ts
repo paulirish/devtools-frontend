@@ -44,14 +44,14 @@ interface Row {
   type: RowType;
 }
 
-const enum RowType {
+export const enum RowType {
   Deletion = 'deletion',
   Addition = 'addition',
   Equal = 'equal',
   Spacer = 'spacer',
 }
 
-function buildDiffRows(diff: Diff.Diff.DiffArray): {
+export function buildDiffRows(diff: Diff.Diff.DiffArray): {
   originalLines: readonly string[],
   currentLines: readonly string[],
   rows: readonly Row[],
@@ -189,14 +189,14 @@ class DiffRenderer {
   ) {
   }
 
-  private render(rows: readonly Row[]): LitHtml.TemplateResult {
+  #render(rows: readonly Row[]): LitHtml.TemplateResult {
     return LitHtml.html`
-      <div class="diff-listing" aria-label="${i18nString(UIStrings.changesDiffViewer)}">
-        ${rows.map(row => this.renderRow(row))}
+      <div class="diff-listing" aria-label=${i18nString(UIStrings.changesDiffViewer)}>
+        ${rows.map(row => this.#renderRow(row))}
       </div>`;
   }
 
-  private renderRow(row: Row): LitHtml.TemplateResult {
+  #renderRow(row: Row): LitHtml.TemplateResult {
     const baseNumber =
         row.type === RowType.Equal || row.type === RowType.Deletion ? String(row.originalLineNumber) : '';
     const curNumber = row.type === RowType.Equal || row.type === RowType.Addition ? String(row.currentLineNumber) : '';
@@ -213,12 +213,12 @@ class DiffRenderer {
     return LitHtml.html`
       <div class="diff-line-number" aria-hidden="true">${baseNumber}</div>
       <div class="diff-line-number" aria-hidden="true">${curNumber}</div>
-      <div class="${markerClass}" aria-hidden="true">${marker}</div>
+      <div class=${markerClass} aria-hidden="true">${marker}</div>
       <div class="diff-line-content diff-line-${row.type}" data-line-number=${curNumber}>${screenReaderText}${
-        this.renderRowContent(row)}</div>`;
+        this.#renderRowContent(row)}</div>`;
   }
 
-  private renderRowContent(row: Row): LitHtml.TemplateResult[] {
+  #renderRowContent(row: Row): LitHtml.TemplateResult[] {
     if (row.type === RowType.Spacer) {
       return row.tokens.map(tok => LitHtml.html`${tok.text}`);
     }
@@ -230,10 +230,10 @@ class DiffRenderer {
     for (const token of row.tokens) {
       const tokenContent: (LitHtml.TemplateResult|string)[] = [];
       doc.highlightRange(pos, pos + token.text.length, (text, style) => {
-        tokenContent.push(style ? LitHtml.html`<span class="${style}">${text}</span>` : text);
+        tokenContent.push(style ? LitHtml.html`<span class=${style}>${text}</span>` : text);
       });
       content.push(
-          token.className ? LitHtml.html`<span class="${token.className}">${tokenContent}</span>` :
+          token.className ? LitHtml.html`<span class=${token.className}>${tokenContent}</span>` :
                             LitHtml.html`${tokenContent}`);
       pos += token.text.length;
     }
@@ -249,7 +249,7 @@ class DiffRenderer {
         await CodeHighlighter.CodeHighlighter.create(currentLines.join('\n'), mimeType),
         documentMap(currentLines),
     );
-    LitHtml.render(renderer.render(rows), parent, {host: this});
+    LitHtml.render(renderer.#render(rows), parent, {host: this});
   }
 }
 
@@ -267,21 +267,21 @@ export type DiffViewData = {
 export class DiffView extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-diff-view`;
 
-  private readonly shadow = this.attachShadow({mode: 'open'});
+  readonly #shadow = this.attachShadow({mode: 'open'});
   loaded: Promise<void>;
 
   constructor(data?: DiffViewData) {
     super();
-    this.shadow.adoptedStyleSheets = [diffViewStyles, CodeHighlighter.Style.default];
+    this.#shadow.adoptedStyleSheets = [diffViewStyles, CodeHighlighter.Style.default];
     if (data) {
-      this.loaded = DiffRenderer.render(data.diff, data.mimeType, this.shadow);
+      this.loaded = DiffRenderer.render(data.diff, data.mimeType, this.#shadow);
     } else {
       this.loaded = Promise.resolve();
     }
   }
 
   set data(data: DiffViewData) {
-    this.loaded = DiffRenderer.render(data.diff, data.mimeType, this.shadow);
+    this.loaded = DiffRenderer.render(data.diff, data.mimeType, this.#shadow);
   }
 }
 

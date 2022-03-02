@@ -234,6 +234,8 @@ export interface InspectorFrontendHostAPI {
                    [x: string]: string,
                  }) => void): void;
 
+  getPreference(name: string, callback: (arg0: string) => void): void;
+
   setPreference(name: string, value: string): void;
 
   removePreference(name: string): void;
@@ -330,7 +332,7 @@ export interface SyncInformation {
   /** Whether Chrome Sync is enabled and active */
   isSyncActive: boolean;
   /** Whether syncing of Chrome Settings is enabled via Chrome Sync is enabled */
-  arePreferencesSynced: boolean;
+  arePreferencesSynced?: boolean;
   /** The email of the account used for syncing */
   accountEmail?: string;
   /** The image of the account used for syncing. Its a base64 encoded PNG */
@@ -357,15 +359,19 @@ export enum EnumeratedHistogram {
   IssuesPanelOpenedFrom = 'DevTools.IssuesPanelOpenedFrom',
   IssuesPanelResourceOpened = 'DevTools.IssuesPanelResourceOpened',
   KeybindSetSettingChanged = 'DevTools.KeybindSetSettingChanged',
-  DualScreenDeviceEmulated = 'DevTools.DualScreenDeviceEmulated',
   ExperimentEnabledAtLaunch = 'DevTools.ExperimentEnabledAtLaunch',
   ExperimentEnabled = 'DevTools.ExperimentEnabled',
   ExperimentDisabled = 'DevTools.ExperimentDisabled',
-  CssEditorOpened = 'DevTools.CssEditorOpened',
   DeveloperResourceLoaded = 'DevTools.DeveloperResourceLoaded',
   DeveloperResourceScheme = 'DevTools.DeveloperResourceScheme',
   LinearMemoryInspectorRevealedFrom = 'DevTools.LinearMemoryInspector.RevealedFrom',
   LinearMemoryInspectorTarget = 'DevTools.LinearMemoryInspector.Target',
   Language = 'DevTools.Language',
   ConsoleShowsCorsErrors = 'DevTools.ConsoleShowsCorsErrors',
+  SyncSetting = 'DevTools.SyncSetting',
+  RecordingEdited = 'DevTools.RecordingEdited',
+  RecordingExported = 'DevTools.RecordingExported',
+  RecordingReplayFinished = 'DevTools.RecordingReplayFinished',
+  RecordingReplayStarted = 'DevTools.RecordingReplayStarted',
+  RecordingToggled = 'DevTools.RecordingToggled',
 }

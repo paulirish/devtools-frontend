@@ -50,7 +50,7 @@ describeWithMockConnection('Linkifier', async () => {
 
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assertNotNullOrUndefined(debuggerModel);
-    debuggerModel.suspendModel();
+    void debuggerModel.suspendModel();
 
     const lineNumber = 4;
     const url = '';
@@ -68,7 +68,7 @@ describeWithMockConnection('Linkifier', async () => {
 
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assertNotNullOrUndefined(debuggerModel);
-    debuggerModel.suspendModel();
+    void debuggerModel.suspendModel();
 
     const lineNumber = 4;
     // Explicitly set url to empty string and let it resolve through the live location.
@@ -77,7 +77,7 @@ describeWithMockConnection('Linkifier', async () => {
     assertNotNullOrUndefined(anchor);
     assert.strictEqual(anchor.textContent, '\u200b');
 
-    debuggerModel.resumeModel();
+    void debuggerModel.resumeModel();
     const scriptParsedEvent: Protocol.Debugger.ScriptParsedEvent = {
       scriptId: scriptId1,
       url: 'https://www.google.com/script.js',
@@ -110,12 +110,12 @@ describeWithMockConnection('Linkifier', async () => {
     observer.observe(anchor, {childList: true});
   });
 
-  it('uses url to identify script if scriptId cannot be found', done => {
+  it('always favors script ID over url', done => {
     const {target, linkifier} = setUpEnvironment();
     const lineNumber = 4;
     const url = 'https://www.google.com/script.js';
 
-    const scriptParsedEvent: Protocol.Debugger.ScriptParsedEvent = {
+    const scriptParsedEvent1: Protocol.Debugger.ScriptParsedEvent = {
       scriptId: scriptId1,
       url,
       startLine: 0,
@@ -129,11 +129,34 @@ describeWithMockConnection('Linkifier', async () => {
       hasSourceURL: false,
       length: 10,
     };
-    dispatchEvent(target, 'Debugger.scriptParsed', scriptParsedEvent);
+    dispatchEvent(target, 'Debugger.scriptParsed', scriptParsedEvent1);
 
     // Ask for a link to a script that has not been registered yet, but has the same url.
     const anchor = linkifier.maybeLinkifyScriptLocation(target, scriptId2, url, lineNumber);
     assertNotNullOrUndefined(anchor);
+
+    // This link should not pick up the first script with the same url, since there's no
+    // warranty that the first script has anything to do with this one (other than having
+    // the same url).
+    const info = Components.Linkifier.Linkifier.linkInfo(anchor);
+    assertNotNullOrUndefined(info);
+    assert.isNull(info.uiLocation);
+
+    const scriptParsedEvent2: Protocol.Debugger.ScriptParsedEvent = {
+      scriptId: scriptId2,
+      url,
+      startLine: 0,
+      startColumn: 0,
+      endLine: 10,
+      endColumn: 10,
+      executionContextId,
+      hash: '',
+      isLiveEdit: false,
+      sourceMapURL: undefined,
+      hasSourceURL: false,
+      length: 10,
+    };
+    dispatchEvent(target, 'Debugger.scriptParsed', scriptParsedEvent2);
 
     const callback: MutationCallback = function(mutations: MutationRecord[]) {
       for (const mutation of mutations) {
@@ -144,6 +167,54 @@ describeWithMockConnection('Linkifier', async () => {
 
           // Make sure that a uiSourceCode is linked to that anchor.
           assertNotNullOrUndefined(info.uiLocation.uiSourceCode);
+          observer.disconnect();
+          done();
+        }
+      }
+    };
+    const observer = new MutationObserver(callback);
+    observer.observe(anchor, {childList: true});
+  });
+
+  it('optionally shows column numbers in the link text', done => {
+    const {target, linkifier} = setUpEnvironment();
+
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    assertNotNullOrUndefined(debuggerModel);
+    void debuggerModel.suspendModel();
+
+    const lineNumber = 4;
+    const options = {columnNumber: 8, showColumnNumber: true, inlineFrameIndex: 0};
+    // Explicitly set url to empty string and let it resolve through the live location.
+    const url = '';
+    const anchor = linkifier.maybeLinkifyScriptLocation(target, scriptId1, url, lineNumber, options);
+    assertNotNullOrUndefined(anchor);
+    assert.strictEqual(anchor.textContent, '\u200b');
+
+    void debuggerModel.resumeModel();
+    const scriptParsedEvent: Protocol.Debugger.ScriptParsedEvent = {
+      scriptId: scriptId1,
+      url: 'https://www.google.com/script.js',
+      startLine: 0,
+      startColumn: 0,
+      endLine: 10,
+      endColumn: 10,
+      executionContextId,
+      hash: '',
+      isLiveEdit: false,
+      sourceMapURL: undefined,
+      hasSourceURL: false,
+      length: 10,
+    };
+    dispatchEvent(target, 'Debugger.scriptParsed', scriptParsedEvent);
+
+    const callback: MutationCallback = function(mutations: MutationRecord[]) {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          const info = Components.Linkifier.Linkifier.linkInfo(anchor);
+          assertNotNullOrUndefined(info);
+          assertNotNullOrUndefined(info.uiLocation);
+          assert.strictEqual(anchor.textContent, `script.js:${lineNumber + 1}:${options.columnNumber + 1}`);
           observer.disconnect();
           done();
         }

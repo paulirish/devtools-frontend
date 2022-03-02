@@ -13,6 +13,7 @@ devtools_module("sdk") {
     "CPUThrottlingManager.ts",
     "CSSContainerQuery.ts",
     "CSSFontFace.ts",
+    "CSSLayer.ts",
     "CSSMatchedStyles.ts",
     "CSSMedia.ts",
     "CSSMetadata.ts",
@@ -23,6 +24,8 @@ devtools_module("sdk") {
     "CSSRule.ts",
     "CSSStyleDeclaration.ts",
     "CSSStyleSheetHeader.ts",
+    "CSSSupports.ts",
+    "CategorizedBreakpoint.ts",
     "ChildTargetManager.ts",
     "CompilerSourceMappingContentProvider.ts",
     "Connections.ts",
@@ -35,6 +38,7 @@ devtools_module("sdk") {
     "DOMModel.ts",
     "DebuggerModel.ts",
     "EmulationModel.ts",
+    "EventBreakpointsModel.ts",
     "FilmStripModel.ts",
     "FrameAssociated.ts",
     "FrameManager.ts",
@@ -84,7 +88,6 @@ devtools_module("sdk") {
     "../../generated",
     "../../generated:protocol",
     "../../models/text_utils:bundle",
-    "../../third_party/codemirror:bundle",
   ]
 }
 

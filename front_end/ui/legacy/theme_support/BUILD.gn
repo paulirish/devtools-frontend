@@ -10,7 +10,6 @@ devtools_module("theme_support") {
 
   deps = [
     "../../../core/common:bundle",
-    "../../../core/platform:bundle",
     "../../../core/root:bundle",
   ]
 }
@@ -18,12 +17,16 @@ devtools_module("theme_support") {
 devtools_entrypoint("bundle") {
   entrypoint = "theme_support.ts"
 
-  deps = [ ":theme_support" ]
+  deps = [
+    ":theme_support",
+    "../:legacy_css_files",
+  ]
 
   visibility = [
     "../*",
     "../../../../test/unittests/front_end/test_setup/*",
     "../../../../test/unittests/front_end/ui/components/helpers/*",
+    "../../../../test/unittests/front_end/ui/legacy/theme_support/*",
     "../../../entrypoints/main/*",
     "../../../models/extensions/*",
     "../../../panels/*",

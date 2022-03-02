@@ -39,7 +39,7 @@
 
 .new-authenticator-container {
   display: none;
-  margin: 10px 10px;
+  margin: 10px;
 }
 
 .webauthn-pane.enabled .new-authenticator-container {
@@ -97,7 +97,7 @@
 }
 
 .authenticator-field-value {
-  padding: 5px 0 5px 0;
+  padding: 5px 0;
   display: inline-block;
   font-family: monospace;
 }
@@ -118,18 +118,6 @@
   width: 200px;
   display: inline-block;
   padding: 5px 10px 0 0;
-}
-
-.text-button {
-  float: right;
-  white-space: nowrap;
-  overflow: hidden;
-  min-width: 28px;
-  background: transparent;
-  border: none;
-  color: var(--color-link);
-  text-decoration: underline;
-  cursor: pointer;
 }
 
 td .text-button {

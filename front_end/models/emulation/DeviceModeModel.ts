@@ -99,7 +99,6 @@ export class DeviceModeModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   #touchMobile: boolean;
   #emulationModel: SDK.EmulationModel.EmulationModel|null;
   #onModelAvailable: (() => void)|null;
-  #emulatedPageSize?: UI.Geometry.Size;
   #outlineRectInternal?: Rect;
 
   private constructor() {
@@ -423,7 +422,7 @@ export class DeviceModeModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.FrameNavigated, this.onFrameChange, this);
       }
     } else {
-      emulationModel.emulateTouch(this.#touchEnabled, this.#touchMobile);
+      void emulationModel.emulateTouch(this.#touchEnabled, this.#touchMobile);
     }
   }
 
@@ -622,7 +621,6 @@ export class DeviceModeModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     let pageWidth: 0|number = screenSize.width - insets.left - insets.right;
     let pageHeight: 0|number = screenSize.height - insets.top - insets.bottom;
-    this.#emulatedPageSize = new UI.Geometry.Size(pageWidth, pageHeight);
 
     const positionX = insets.left;
     const positionY = insets.top;
@@ -665,7 +663,7 @@ export class DeviceModeModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
 
     if (resetPageScaleFactor) {
-      this.#emulationModel.resetPageScaleFactor();
+      void this.#emulationModel.resetPageScaleFactor();
     }
     if (pageWidth || pageHeight || mobile || deviceScaleFactor || scale !== 1 || screenOrientation ||
         forceMetricsOverride) {
@@ -690,9 +688,9 @@ export class DeviceModeModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       if (screenOrientation) {
         metrics.screenOrientation = {type: screenOrientation, angle: screenOrientationAngle};
       }
-      this.#emulationModel.emulateDevice(metrics);
+      void this.#emulationModel.emulateDevice(metrics);
     } else {
-      this.#emulationModel.emulateDevice(null);
+      void this.#emulationModel.emulateDevice(null);
     }
   }
 
@@ -769,7 +767,7 @@ export class DeviceModeModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.#touchEnabled = touchEnabled;
     this.#touchMobile = mobile;
     for (const emulationModel of SDK.TargetManager.TargetManager.instance().models(SDK.EmulationModel.EmulationModel)) {
-      emulationModel.emulateTouch(touchEnabled, mobile);
+      void emulationModel.emulateTouch(touchEnabled, mobile);
     }
   }
 

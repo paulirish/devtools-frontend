@@ -161,6 +161,9 @@
   "core/common/SettingRegistration.ts | sources": {
     "message": "स्रोत"
   },
+  "core/common/SettingRegistration.ts | sync": {
+    "message": "सिंक करा"
+  },
   "core/host/InspectorFrontendHost.ts | devtoolsS": {
     "message": "DevTools - {PH1}"
   },
@@ -398,6 +401,21 @@
   "core/sdk/DebuggerModel.ts | withBlock": {
     "message": "With ब्लॉक"
   },
+  "core/sdk/EventBreakpointsModel.ts | auctionWorklet": {
+    "message": "जाहिरात लिलावाशी संबंधित वर्कलेट"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeBidderWorkletBiddingStart": {
+    "message": "बोलीदाराच्या बोली लावण्याच्या टप्प्याची सुरुवात"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeBidderWorkletReportingStart": {
+    "message": "बोलीदाराच्या रिपोर्टिंगच्या टप्प्याची सुरुवात"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeSellerWorkletReportingStart": {
+    "message": "विक्रेत्याच्या रिपोर्टिंगच्या टप्प्याची सुरुवात"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeSellerWorkletScoringStart": {
+    "message": "विक्रेत्याच्या स्कोअरिंगच्या टप्प्याची सुरुवात"
+  },
   "core/sdk/NetworkManager.ts | crossoriginReadBlockingCorb": {
     "message": "क्रॉस-ओरिजिन रीड ब्लॉकिंग (CORB) ने MIME प्रकार {PH2} सह क्रॉस-ओरिजिन प्रतिसाद {PH1} ब्लॉक केला. अधिक तपशिलांसाठी https://www.chromestatus.com/feature/5629709824032768 पहा."
   },
@@ -461,6 +479,9 @@
   "core/sdk/NetworkRequest.ts | domainMismatch": {
     "message": "ही कुकी ब्लॉक केली गेली कारण, विनंती URL चा डोमेन कुकीच्या डोमेनशी तंतोतंत जुळत नव्हता किंवा विनंती URL चा डोमेन हा कुकीच्या डोमेन विशेषता मूल्याचा सबडोमेन नव्हता."
   },
+  "core/sdk/NetworkRequest.ts | nameValuePairExceedsMaxSize": {
+    "message": "ही कुकी ब्लॉक केली गेली कारण ती खूपच मोठी होती. नाव आणि मूल्याचा एकत्रित आकार हा ४०९६ वर्णांपेक्षा कमी किंवा तितकाच असावा."
+  },
   "core/sdk/NetworkRequest.ts | notOnPath": {
     "message": "ही कुकी ब्लॉक केली गेली कारण, तिचा पाथ विनंती url च्या पाथशी अचूक जुळत नव्हता किंवा तो त्याची सुपरडिरेक्टरी नव्हता."
   },
@@ -492,7 +513,7 @@
     "message": "ही कुकी ब्लॉक केली गेली कारण, तिच्यामध्ये \"Secure\" विशेषता होती आणि कनेक्शन सुरक्षित नव्हते."
   },
   "core/sdk/NetworkRequest.ts | setcookieHeaderIsIgnoredIn": {
-    "message": "या url ला प्रतिसाद म्हणून सेट-कुकी हेडरकडे दुर्लक्ष केले गेले: {PH1}. कुकीची लांबी ४०९६ वर्णांपेक्षा कमी किंवा तितकीच असली पाहिजे."
+    "message": "या url ला प्रतिसाद म्हणून सेट-कुकी हेडरकडे दुर्लक्ष केले गेले: {PH1}. नाव आणि मूल्याचा एकत्रित आकार हा ४०९६ वर्णांपेक्षा कमी किंवा तितकाच असावा."
   },
   "core/sdk/NetworkRequest.ts | theSchemeOfThisConnectionIsNot": {
     "message": "या कनेक्शनच्या स्कीमला कुकी स्टोअर करण्याची अनुमती नाही."
@@ -511,6 +532,9 @@
   },
   "core/sdk/NetworkRequest.ts | thisSetcookieWasBlockedBecauseItHadTheSamesiteStrictLax": {
     "message": "Set-Cookie हेडरद्वारे कुकी सेट करण्याचा हा प्रयत्न ब्लॉक केला गेला कारण, त्यामध्ये \"{PH1}\" विशेषता होती, पण ती उच्च पातळीवरील नेव्हिगेशनचा प्रतिसाद नसलेल्या क्रॉस-साइट प्रतिसादामधून आली होती. हा प्रतिसाद क्रॉस-साइट समजला जातो कारण, URL मध्ये सध्याच्या साइटपेक्षा वेगळी स्कीम आहे."
+  },
+  "core/sdk/NetworkRequest.ts | thisSetcookieWasBlockedBecauseTheNameValuePairExceedsMaxSize": {
+    "message": "कुकीचा आकार खूपच मोठा असल्यामुळे Set-Cookie हेडरद्वारे कुकी सेट करण्याचा हा प्रयत्न ब्लॉक केला गेला. नाव आणि मूल्याचा एकत्रित आकार हा ४०९६ वर्णांपेक्षा कमी किंवा तितकाच असावा."
   },
   "core/sdk/NetworkRequest.ts | thisSetcookieWasBlockedDueToUser": {
     "message": "वापरकर्ता प्राधान्यामुळे Set-Cookie हेडरद्वारे कुकी सेट करण्याचा हा प्रयत्न ब्लॉक केला गेला."
@@ -668,11 +692,17 @@
   "core/sdk/sdk-meta.ts | doNotShowGridTrackSizes": {
     "message": "ग्रिड ट्रॅकचे आकार दाखवू नका"
   },
+  "core/sdk/sdk-meta.ts | doNotShowRulersOnHover": {
+    "message": "कर्सर हलवल्यावर मोजपट्ट्या दाखवू नका"
+  },
   "core/sdk/sdk-meta.ts | emulateAFocusedPage": {
     "message": "फोकस केलेल्या पेजचे अनुकरण करा"
   },
   "core/sdk/sdk-meta.ts | emulateAchromatopsia": {
     "message": "रंगांधळेपणाचे अनुकरण करा"
+  },
+  "core/sdk/sdk-meta.ts | emulateAutoDarkMode": {
+    "message": "ऑटो गडद मोडचे अनुकरण करा"
   },
   "core/sdk/sdk-meta.ts | emulateBlurredVision": {
     "message": "अस्पष्ट दृष्टीचे अनुकरण करा"
@@ -737,9 +767,6 @@
   "core/sdk/sdk-meta.ts | hideFramesPerSecondFpsMeter": {
     "message": "फ्रेम प्रति सेकंद (FPS) मीटर लपवा"
   },
-  "core/sdk/sdk-meta.ts | hideHittestBorders": {
-    "message": "हिट-टेस्ट बॉर्डर लपवा"
-  },
   "core/sdk/sdk-meta.ts | hideLayerBorders": {
     "message": "लेअर बॉर्डर लपवा"
   },
@@ -794,9 +821,6 @@
   "core/sdk/sdk-meta.ts | showGridTrackSizes": {
     "message": "ग्रिड ट्रॅकचे आकार दाखवा"
   },
-  "core/sdk/sdk-meta.ts | showHittestBorders": {
-    "message": "हिट-टेस्ट बॉर्डर दाखवा"
-  },
   "core/sdk/sdk-meta.ts | showLayerBorders": {
     "message": "लेअर बॉर्डर दाखवा"
   },
@@ -815,8 +839,8 @@
   "core/sdk/sdk-meta.ts | showPaintFlashingRectangles": {
     "message": "पेंट फ्लॅशिंग आयत दाखवा"
   },
-  "core/sdk/sdk-meta.ts | showRulers": {
-    "message": "मोजपट्ट्या दाखवा"
+  "core/sdk/sdk-meta.ts | showRulersOnHover": {
+    "message": "कर्सर फिरवल्यावर मोजपट्ट्या दाखवा"
   },
   "core/sdk/sdk-meta.ts | showScrollPerformanceBottlenecks": {
     "message": "स्क्रोल परफॉर्मन्स बॉटलनेक दाखवा"
@@ -857,11 +881,20 @@
   "entrypoints/inspector_main/RenderingOptions.ts | emulateAFocusedPage": {
     "message": "फोकस केलेल्या पेजचे अनुकरण करा"
   },
+  "entrypoints/inspector_main/RenderingOptions.ts | emulateAutoDarkMode": {
+    "message": "ऑटोमॅटिक गडद मोड सुरू करा"
+  },
   "entrypoints/inspector_main/RenderingOptions.ts | emulatesAFocusedPage": {
     "message": "फोकस केलेल्या पेजचे अनुकरण करते."
   },
+  "entrypoints/inspector_main/RenderingOptions.ts | emulatesAutoDarkMode": {
+    "message": "ऑटोमेटिक गडद मोड सुरू करते आणि prefers-color-scheme ला dark वर सेट करते."
+  },
   "entrypoints/inspector_main/RenderingOptions.ts | forcesCssColorgamutMediaFeature": {
     "message": "CSS color-gamut मीडिया वैशिष्ट्याची सक्ती करते"
+  },
+  "entrypoints/inspector_main/RenderingOptions.ts | forcesCssForcedColors": {
+    "message": "CSS च्या सक्ती केलेल्या रंगांच्या मीडिया वैशिष्ट्याची सक्ती करते"
   },
   "entrypoints/inspector_main/RenderingOptions.ts | forcesCssPreferscolorschemeMedia": {
     "message": "CSS prefers-color-scheme मीडिया वैशिष्ट्याची सक्ती करते"
@@ -899,9 +932,6 @@
   "entrypoints/inspector_main/RenderingOptions.ts | highlightsFramesRedDetectedToBe": {
     "message": "जाहिराती असल्याचे आढळलेल्या फ्रेम हायलाइट करते (लाल)."
   },
-  "entrypoints/inspector_main/RenderingOptions.ts | hittestBorders": {
-    "message": "हिट-टेस्ट बॉर्डर"
-  },
   "entrypoints/inspector_main/RenderingOptions.ts | layerBorders": {
     "message": "लेअर बॉर्डर"
   },
@@ -922,9 +952,6 @@
   },
   "entrypoints/inspector_main/RenderingOptions.ts | showsAnOverlayWithCoreWebVitals": {
     "message": "कोअर वेब व्हायटल असलेले ओव्हरले दाखवते."
-  },
-  "entrypoints/inspector_main/RenderingOptions.ts | showsBordersAroundHittestRegions": {
-    "message": "हिट-टेस्ट भागांभोवती बॉर्डर दाखवते."
   },
   "entrypoints/inspector_main/RenderingOptions.ts | showsLayerBordersOrangeoliveAnd": {
     "message": "लेअरच्या बॉर्डर (नारिंगी/ऑलिव्ह) आणि टाइल (निळसर) दाखवते."
@@ -980,7 +1007,7 @@
   "entrypoints/inspector_main/inspector_main-meta.ts | visionDeficiency": {
     "message": "दृष्टी न्यूनता"
   },
-  "entrypoints/js_app/JsMain.ts | main": {
+  "entrypoints/js_app/js_app.ts | main": {
     "message": "मुख्य"
   },
   "entrypoints/main/MainImpl.ts | customizeAndControlDevtools": {
@@ -1015,9 +1042,6 @@
   },
   "entrypoints/main/MainImpl.ts | showConsoleDrawer": {
     "message": "कन्सोल ड्रॉवर दाखवा"
-  },
-  "entrypoints/main/MainImpl.ts | theSystempreferredColorSchemeHas": {
-    "message": "सिस्टमने प्राधान्य दिलेली कलर स्कीम बदलली आहे. हा बदल DevTools वर लागू करण्यासाठी रीलोड करा."
   },
   "entrypoints/main/MainImpl.ts | undockIntoSeparateWindow": {
     "message": "वेगळ्या विंडोमध्ये अनडॉक करा"
@@ -1063,6 +1087,9 @@
   },
   "entrypoints/main/main-meta.ts | enableShortcutToSwitchPanels": {
     "message": "पॅनल स्विच करण्यासाठी ⌘ + 1-9 शॉर्टकट सुरू करा"
+  },
+  "entrypoints/main/main-meta.ts | enableSync": {
+    "message": "सेटिंग्ज सिंक करणे सुरू करा"
   },
   "entrypoints/main/main-meta.ts | findNextResult": {
     "message": "पुढील परिणाम शोधा"
@@ -1166,41 +1193,41 @@
   "entrypoints/main/main-meta.ts | zoomOut": {
     "message": "झूम आउट करा"
   },
-  "entrypoints/node_app/node_app-meta.ts | node": {
-    "message": "नोड"
-  },
-  "entrypoints/node_app/node_app-meta.ts | showNode": {
-    "message": "नोड"
-  },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | addConnection": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | addConnection": {
     "message": "कनेक्शन जोडा"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | networkAddressEgLocalhost": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | networkAddressEgLocalhost": {
     "message": "नेटवर्क अ‍ॅड्रेस (उदा. localhost:9229)"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | noConnectionsSpecified": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | noConnectionsSpecified": {
     "message": "कनेक्शन नमूद केलेली नाहीत"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | nodejsDebuggingGuide": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | nodejsDebuggingGuide": {
     "message": "Node.js डीबगिंग मार्गदर्शक"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | specifyNetworkEndpointAnd": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | specifyNetworkEndpointAnd": {
     "message": "नेटवर्क एंडपॉइट नमूद करा आणि DevTools त्याच्याशी आपोआप कनेक्ट होईल. अधिक जाणून घेण्यासाठी {PH1} वाचा."
   },
-  "entrypoints/node_main/NodeMain.ts | main": {
+  "entrypoints/node_app/NodeMain.ts | main": {
     "message": "मुख्य"
   },
-  "entrypoints/node_main/NodeMain.ts | nodejsS": {
+  "entrypoints/node_app/NodeMain.ts | nodejsS": {
     "message": "Node.js: {PH1}"
   },
-  "entrypoints/node_main/node_main-meta.ts | connection": {
+  "entrypoints/node_app/node_app.ts | connection": {
     "message": "कनेक्शन"
   },
-  "entrypoints/node_main/node_main-meta.ts | node": {
+  "entrypoints/node_app/node_app.ts | networkTitle": {
     "message": "नोड"
   },
-  "entrypoints/node_main/node_main-meta.ts | showConnection": {
+  "entrypoints/node_app/node_app.ts | node": {
+    "message": "नोड"
+  },
+  "entrypoints/node_app/node_app.ts | showConnection": {
     "message": "कनेक्शन दाखवा"
+  },
+  "entrypoints/node_app/node_app.ts | showNode": {
+    "message": "नोड"
   },
   "entrypoints/worker_app/WorkerMain.ts | main": {
     "message": "मुख्य"
@@ -1280,6 +1307,9 @@
   "models/har/Writer.ts | writingFile": {
     "message": "फाइल राइट करत आहे…"
   },
+  "models/issues_manager/ClientHintIssue.ts | clientHintsInfrastructure": {
+    "message": "Client Hints Infrastructure"
+  },
   "models/issues_manager/ContentSecurityPolicyIssue.ts | contentSecurityPolicyEval": {
     "message": "आशय सुरक्षा धोरण - Eval"
   },
@@ -1298,8 +1328,8 @@
   "models/issues_manager/CorsIssue.ts | CORS": {
     "message": "क्रॉस ओरिजिन स्रोत शेअरिंग (CORS)"
   },
-  "models/issues_manager/CorsIssue.ts | corsForPrivateNetworksRfc": {
-    "message": "खाजगी नेटवर्कसाठी CORS (RFC1918)"
+  "models/issues_manager/CorsIssue.ts | corsPrivateNetworkAccess": {
+    "message": "खाजगी नेटवर्कचा अ‍ॅक्सेस"
   },
   "models/issues_manager/CrossOriginEmbedderPolicyIssue.ts | coopAndCoep": {
     "message": "COOP आणि COEP"
@@ -1307,8 +1337,11 @@
   "models/issues_manager/CrossOriginEmbedderPolicyIssue.ts | samesiteAndSameorigin": {
     "message": "एकच साइट आणि एकच मूळ"
   },
-  "models/issues_manager/DeprecationIssue.ts | userAgentReduction": {
-    "message": "वापरकर्ता एजंट स्ट्रिंगमधील घट"
+  "models/issues_manager/FederatedAuthRequestIssue.ts | fedCm": {
+    "message": "फेडरेटेड क्रेडेंशियल व्यवस्थापन API"
+  },
+  "models/issues_manager/GenericIssue.ts | crossOriginPortalPostMessage": {
+    "message": "पोर्टल - एकसारखे मूळ असलेले संवाद चॅनल"
   },
   "models/issues_manager/HeavyAdIssue.ts | handlingHeavyAdInterventions": {
     "message": "मोठ्या प्रमाणावरील जाहिरात हस्तक्षेप हाताळणे"
@@ -1316,17 +1349,29 @@
   "models/issues_manager/Issue.ts | breakingChangeIssue": {
     "message": "हानिकारक बदलासंबंधी समस्या: Chrome च्या आगामी आवृत्तीमध्ये पेज काम करणे थांबवू शकते"
   },
+  "models/issues_manager/Issue.ts | breakingChanges": {
+    "message": "हानिकारक बदल"
+  },
   "models/issues_manager/Issue.ts | improvementIssue": {
     "message": "सुधारणेसंबंधी समस्या: पेजमध्ये सुधारणा करण्याची संधी आहे"
   },
+  "models/issues_manager/Issue.ts | improvements": {
+    "message": "सुधारणा"
+  },
   "models/issues_manager/Issue.ts | pageErrorIssue": {
     "message": "पेज एरर समस्या: पेज योग्य प्रकारे काम करत नाही"
+  },
+  "models/issues_manager/Issue.ts | pageErrors": {
+    "message": "पेज एरर"
   },
   "models/issues_manager/LowTextContrastIssue.ts | colorAndContrastAccessibility": {
     "message": "रंग आणि काँट्रास्ट अ‍ॅक्सेसिबिलिटी"
   },
   "models/issues_manager/MixedContentIssue.ts | preventingMixedContent": {
     "message": "मिश्र आशय रोखत आहे"
+  },
+  "models/issues_manager/NavigatorUserAgentIssue.ts | userAgentReduction": {
+    "message": "वापरकर्ता एजंट स्ट्रिंगमधील घट"
   },
   "models/issues_manager/QuirksModeIssue.ts | documentCompatibilityMode": {
     "message": "दस्तऐवज कंपॅटिबिलिटी मोड"
@@ -1338,7 +1383,7 @@
     "message": "an insecure"
   },
   "models/issues_manager/SameSiteCookieIssue.ts | firstPartySetsExplained": {
-    "message": "First-Party Sets समजावले"
+    "message": "First-Party Sets आणि SameParty ची विशेषता"
   },
   "models/issues_manager/SameSiteCookieIssue.ts | howSchemefulSamesiteWorks": {
     "message": "Schemeful Same-Site कसे काम करते"
@@ -1351,9 +1396,6 @@
   },
   "models/issues_manager/TrustedWebActivityIssue.ts | changesToQualityCriteriaForPwas": {
     "message": "विश्वसनीय वेब अ‍ॅक्टिव्हिटी वापरणार्‍या PWA साठी गुणवत्तेच्या निकषांमधील बदल"
-  },
-  "models/issues_manager/WasmCrossOriginModuleSharingIssue.ts | linkTitle": {
-    "message": "Wasm मॉड्युल हे समान ओरिजिनसोबत शेअर करणे प्रतिबंधित करणे"
   },
   "models/logs/NetworkLog.ts | anonymous": {
     "message": "<निनावी>"
@@ -1378,9 +1420,6 @@
   },
   "models/logs/logs-meta.ts | reset": {
     "message": "रीसेट करा"
-  },
-  "models/persistence/Automapping.ts | theAttemptToBindSInTheWorkspace": {
-    "message": "या मध्ये समस्या असल्यामुळे वर्कस्पेसमध्ये \"{PH1}\" बाइंड करण्याचा प्रयत्न अयशस्वी झाला."
   },
   "models/persistence/EditFileSystemView.ts | add": {
     "message": "जोडा"
@@ -1523,8 +1562,17 @@
   "panels/accessibility/AXBreadcrumbsPane.ts | accessibilityTree": {
     "message": "अ‍ॅक्सेसिबिलिटी ट्री"
   },
+  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentDescription": {
+    "message": "अ‍ॅक्सेसिबिलिटी ट्रीला DOM ट्रीच्या सर्वात वरच्या उजव्या कोपऱ्यात हलवले आहे."
+  },
+  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentName": {
+    "message": "पूर्ण पेजचे अ‍ॅक्सेसिबिलिटी ट्री"
+  },
   "panels/accessibility/AXBreadcrumbsPane.ts | ignored": {
     "message": "दुर्लक्ष केले"
+  },
+  "panels/accessibility/AXBreadcrumbsPane.ts | reloadRequired": {
+    "message": "बदल लागू होण्यापूर्वी रीलोड करणे आवश्यक आहे."
   },
   "panels/accessibility/AXBreadcrumbsPane.ts | scrollIntoView": {
     "message": "दिसेपर्यंत स्क्रोल करा"
@@ -1666,6 +1714,9 @@
   },
   "panels/accessibility/AccessibilityStrings.ts | fromCaption": {
     "message": "caption मधून"
+  },
+  "panels/accessibility/AccessibilityStrings.ts | fromDescription": {
+    "message": "description मधून"
   },
   "panels/accessibility/AccessibilityStrings.ts | fromLabel": {
     "message": "label मधून"
@@ -1816,6 +1867,9 @@
   },
   "panels/accessibility/AccessibilityStrings.ts | valueFromAttribute": {
     "message": "विशेषतेमधील मूल्य."
+  },
+  "panels/accessibility/AccessibilityStrings.ts | valueFromDescriptionElement": {
+    "message": "description घटकामधील मूल्य."
   },
   "panels/accessibility/AccessibilityStrings.ts | valueFromElementContents": {
     "message": "घटक आशयांमधील मूल्य."
@@ -1982,14 +2036,11 @@
   "panels/application/AppManifestView.ts | actualWidthSpxOfSSDoesNotMatch": {
     "message": "{PH2} {PH3} ची प्रत्यक्ष रुंदी ({PH1}px) नमूद केलेल्या रुंदीशी ({PH4}px) जुळत नाही"
   },
-  "panels/application/AppManifestView.ts | appId": {
-    "message": "ॲप आयडी"
-  },
   "panels/application/AppManifestView.ts | appIdExplainer": {
     "message": "मॅनिफेस्टने सध्याचे ॲप्लिकेशन अपडेट केले पाहिजे किंवा त्याने इंस्टॉल केले जाऊ शकते अशा नवीन वेब अ‍ॅपचा संदर्भ दिला पाहिजे यासाठी ब्राउझरद्वारे तो वापरला जातो."
   },
   "panels/application/AppManifestView.ts | appIdNote": {
-    "message": "टीप: मॅनिफेस्टमध्ये 'आयडी' दिलेला नाही, त्याऐवजी 'start_url' वापरली जाते. सध्याच्या ओळखीशी जुळणारा ॲप आयडी नमूद करण्यासाठी, 'आयडी' फील्ड ''{PH1}'' वर सेट करा."
+    "message": "मॅनिफेस्टमध्ये {PH1} {PH2} हा दिलेला नाही, त्याऐवजी {PH3} हा वापरला जातो. सध्याच्या ओळखीशी जुळणारा ॲप आयडी नमूद करण्यासाठी, {PH4} फील्ड {PH5} {PH6} वर सेट करा."
   },
   "panels/application/AppManifestView.ts | appManifest": {
     "message": "अ‍ॅप मॅनिफेस्ट"
@@ -2000,11 +2051,23 @@
   "panels/application/AppManifestView.ts | backgroundColor": {
     "message": "बॅकग्राउंड रंग"
   },
+  "panels/application/AppManifestView.ts | computedAppId": {
+    "message": "काँप्युट केलेला अ‍ॅप आयडी"
+  },
+  "panels/application/AppManifestView.ts | copyToClipboard": {
+    "message": "क्लिपबोर्डवर कॉपी करा"
+  },
   "panels/application/AppManifestView.ts | couldNotCheckServiceWorker": {
     "message": "मॅनिफेस्टमध्ये start_url हा भाग नसल्यामुळे service worker तपासता आला नाही"
   },
   "panels/application/AppManifestView.ts | couldNotDownloadARequiredIcon": {
     "message": "मॅनिफेस्टवरून आवश्यक आयकन डाउनलोड करता आला नाही"
+  },
+  "panels/application/AppManifestView.ts | darkBackgroundColor": {
+    "message": "बॅकग्राउंडचा गडद रंग"
+  },
+  "panels/application/AppManifestView.ts | darkThemeColor": {
+    "message": "गडद थीमचा रंग"
   },
   "panels/application/AppManifestView.ts | description": {
     "message": "वर्णन"
@@ -2038,6 +2101,9 @@
   },
   "panels/application/AppManifestView.ts | installability": {
     "message": "इंस्टॉलेबिलिटी"
+  },
+  "panels/application/AppManifestView.ts | learnMore": {
+    "message": "अधिक जाणून घ्या"
   },
   "panels/application/AppManifestView.ts | manifestContainsDisplayoverride": {
     "message": "मॅनिफेस्टमध्ये 'display_override' फील्डचा समावेश असतो आणि सपोर्ट असलेला पहिला डिस्प्ले मोड हा 'standalone', 'fullscreen' किंवा 'minimal-ui' यांपैकी एक असणे आवश्यक आहे"
@@ -2080,6 +2146,9 @@
   },
   "panels/application/AppManifestView.ts | noSuppliedIconIsAtLeastSpxSquare": {
     "message": "पुरवलेला कोणताही आयकन, उद्देश विशेषता सेट न केलेला किंवा \"any\" वर सेट केलेला, किमान {PH1} चौरस पिक्सेलचा PNG, SVG किंवा WebP फॉरमॅटमध्ये नाही."
+  },
+  "panels/application/AppManifestView.ts | note": {
+    "message": "टीप:"
   },
   "panels/application/AppManifestView.ts | orientation": {
     "message": "ओरिएंटेशन"
@@ -2180,35 +2249,8 @@
   "panels/application/AppManifestView.ts | themeColor": {
     "message": "थीमचा रंग"
   },
-  "panels/application/ApplicationCacheItemsView.ts | appcache": {
-    "message": "AppCache"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | applicationCache": {
-    "message": "ॲप्लिकेशन कॅशे"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | deleteString": {
-    "message": "हटवा"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | noApplicationCacheInformation": {
-    "message": "अ‍ॅप्लिकेशन कॅशे यासंबंधी माहिती उपलब्ध नाही."
-  },
-  "panels/application/ApplicationCacheItemsView.ts | offline": {
-    "message": "ऑफलाइन"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | online": {
-    "message": "ऑनलाइन"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | resource": {
-    "message": "स्रोत"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | sizeString": {
-    "message": "आकार"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | typeString": {
-    "message": "प्रकार"
-  },
   "panels/application/ApplicationPanelCacheSection.ts | backForwardCache": {
-    "message": "बॅक-फॉरवर्ड कॅशे"
+    "message": "बॅक/फॉरवर्ड कॅशे"
   },
   "panels/application/ApplicationPanelCacheSection.ts | cacheStorage": {
     "message": "कॅशे स्टोरेज"
@@ -2221,9 +2263,6 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | application": {
     "message": "ॲप्लिकेशन"
-  },
-  "panels/application/ApplicationPanelSidebar.ts | applicationCache": {
-    "message": "ॲप्लिकेशन कॅशे"
   },
   "panels/application/ApplicationPanelSidebar.ts | backgroundServices": {
     "message": "बॅकग्राउंड सेवा"
@@ -2293,42 +2332,6 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | worker": {
     "message": "वर्कर"
-  },
-  "panels/application/BackForwardCacheView.ts | backForwardCacheTitle": {
-    "message": "बॅक-फॉरवर्ड कॅशे"
-  },
-  "panels/application/BackForwardCacheView.ts | bfcacheStatus": {
-    "message": "बॅक-फॉरवर्ड कॅशेची स्थिती"
-  },
-  "panels/application/BackForwardCacheView.ts | chromeSupportNeeded": {
-    "message": "मागील नेव्हिगेशन कॅशे केले नव्हते कारण"
-  },
-  "panels/application/BackForwardCacheView.ts | lastMainFrameNavigation": {
-    "message": "शेवटचे मुख्य फ्रेम नेव्हिगेशन"
-  },
-  "panels/application/BackForwardCacheView.ts | mainFrame": {
-    "message": "मुख्य फ्रेम"
-  },
-  "panels/application/BackForwardCacheView.ts | normalNavigation": {
-    "message": "सामान्य नेव्हिगेशन"
-  },
-  "panels/application/BackForwardCacheView.ts | pageSupportNeeded": {
-    "message": "बॅक-फॉरवर्ड कॅशेला रोखणारी वैशिष्‍ट्ये"
-  },
-  "panels/application/BackForwardCacheView.ts | restoredFromBFCache": {
-    "message": "बॅक-फॉरवर्ड कॅशेमधून रिस्टोअर केले"
-  },
-  "panels/application/BackForwardCacheView.ts | unavailable": {
-    "message": "उपलब्ध नाही"
-  },
-  "panels/application/BackForwardCacheView.ts | unknown": {
-    "message": "अज्ञात"
-  },
-  "panels/application/BackForwardCacheView.ts | url": {
-    "message": "URL"
-  },
-  "panels/application/BackForwardCacheView.ts | willBeSupported": {
-    "message": "(Chrome च्या भविष्यातील आवृत्तीमध्ये सपोर्ट असेल)"
   },
   "panels/application/BackgroundServiceView.ts | backgroundFetch": {
     "message": "बॅकग्राउंड फेच"
@@ -2549,6 +2552,15 @@
   "panels/application/IndexedDBViews.ts | version": {
     "message": "आवृत्ती"
   },
+  "panels/application/InterestGroupStorageView.ts | clickToDisplayBody": {
+    "message": "गटाचे सध्याचे स्टेटस पाहण्यासाठी कोणत्याही स्वारस्य गट इव्हेंटवर क्लिक करा"
+  },
+  "panels/application/InterestGroupStorageView.ts | noDataAvailable": {
+    "message": "निवडलेल्या स्वारस्य गटासाठी कोणतेही तपशील उपलब्ध नाहीत. व्यक्तीने ब्राउझरमधील गट सोडला असावा."
+  },
+  "panels/application/InterestGroupTreeElement.ts | interestGroups": {
+    "message": "स्वारस्य गट"
+  },
   "panels/application/OpenedWindowDetailsView.ts | accessToOpener": {
     "message": "उघडणार्‍याचा अ‍ॅक्सेस"
   },
@@ -2602,6 +2614,12 @@
   },
   "panels/application/OpenedWindowDetailsView.ts | yes": {
     "message": "होय"
+  },
+  "panels/application/ReportingApiReportsView.ts | clickToDisplayBody": {
+    "message": "कोणत्याही अहवालाचा मुख्य मथळा पाहण्यासाठी त्यावर क्लिक करा"
+  },
+  "panels/application/ReportingApiTreeElement.ts | reportingApi": {
+    "message": "रिपोर्टिंग API"
   },
   "panels/application/ServiceWorkerCacheViews.ts | cache": {
     "message": "कॅशे"
@@ -2777,9 +2795,6 @@
   "panels/application/StorageView.ts | application": {
     "message": "ॲप्लिकेशन"
   },
-  "panels/application/StorageView.ts | applicationCache": {
-    "message": "ॲप्लिकेशन कॅशे"
-  },
   "panels/application/StorageView.ts | cache": {
     "message": "कॅशे"
   },
@@ -2885,6 +2900,390 @@
   "panels/application/application-meta.ts | stopRecordingEvents": {
     "message": "इव्हेंट रेकॉर्ड करणे थांबवा"
   },
+  "panels/application/components/BackForwardCacheStrings.ts | HTTPMethodNotGET": {
+    "message": "फक्त GET विनंतीद्वारे लोड केलेली पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र आहेत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | HTTPStatusNotOK": {
+    "message": "फक्त 2XX चा स्टेटस कोड असलेली पेज कॅशे केली जाऊ शकतात."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | JavaScriptExecution": {
+    "message": "कॅशेमध्ये असताना JavaScript अमलात आणण्याचा प्रयत्न Chrome ने डिटेक्ट केला आहे."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | appBanner": {
+    "message": "ज्या पेजनी AppBanner ची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabled": {
+    "message": "फ्लॅगद्वारे बॅक/फॉरवर्ड कॅशे बंद केली गेली. ती या डिव्हाइसवर स्थानिकरीत्या सुरू करण्यासाठी chrome://flags/#back-forward-cache ला भेट द्या."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledByCommandLine": {
+    "message": "कमांड लाइनद्वारे बॅक/फॉरवर्ड कॅशे बंद केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledByLowMemory": {
+    "message": "अपुर्‍या मेमरीमुळे बॅक/फॉरवर्ड कॅशे बंद केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledForDelegate": {
+    "message": "बॅक/फॉरवर्ड कॅशेला प्रतिनिधीचा सपोर्ट नाही."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledForPrerender": {
+    "message": "प्रीरेंडररसाठी बॅक/फॉरवर्ड कॅशे बंद केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | broadcastChannel": {
+    "message": "पेजमध्ये नोंदणी केलेल्या ऐकणार्‍यांसह BroadcastChannel इंस्टन्स असल्यामुळे ते कॅशे केले जाऊ शकत नाही."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cacheControlNoStore": {
+    "message": "ज्या पेजमध्ये cache-control:no-store आहे, ती बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cacheFlushed": {
+    "message": "कॅशे हेतुपुरस्सर साफ केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cacheLimit": {
+    "message": "दुसर्‍या पेजला कॅशे केले जाऊ देण्यासाठी पेज कॅशेमधून काढले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | containsPlugins": {
+    "message": "प्लगिनचा समावेश असलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentFileChooser": {
+    "message": "FileChooser API वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentFileSystemAccess": {
+    "message": "File System Access API वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaDevicesDispatcherHost": {
+    "message": "मीडिया डिव्हाइस डिस्पॅचर वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaPlay": {
+    "message": "सोडत असताना मीडिया प्लेअर प्ले होत होता."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaSession": {
+    "message": "MediaSession API वापरणारी आणि प्लेबॅक स्थिती सेट करणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaSessionService": {
+    "message": "MediaSession API वापरणारी आणि कृती हँडलर सेट करणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentScreenReader": {
+    "message": "स्क्रीन रीडरमुळे बॅक-फॉरवर्ड कॅशे बंद केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentSecurityHandler": {
+    "message": "SecurityHandler वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentSerial": {
+    "message": "सिरीअल API वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentWebAuthenticationAPI": {
+    "message": "WebAuthentication API वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentWebBluetooth": {
+    "message": "WebBluetooth API वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentWebUSB": {
+    "message": "WebUSB API वापरणारी पेज बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | dedicatedWorkerOrWorklet": {
+    "message": "समर्पित कर्मचारी किंवा वर्कलेट वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | documentLoaded": {
+    "message": "दस्तऐवज सोडण्यापूर्वी तो लोड होणे पूर्ण झाले नाही."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderAppBannerManager": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा अ‍ॅप बॅनर दिसत होते."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderChromePasswordManagerClientBindCredentialManager": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा Chrome पासवर्ड व्यवस्थापक दिसत होता."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderDomDistillerSelfDeletingRequestDelegate": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा DOM डिसटिलेशन प्रगतिपथावर होते."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderDomDistillerViewerSource": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा DOM डिस्टिलर व्ह्यूअर दिसत होते."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensionMessaging": {
+    "message": "मेसेजिंग API वापरणाऱ्या एक्स्टेंशनमुळे बॅक/फॉरवर्ड कॅशे बंद केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensionMessagingForOpenPort": {
+    "message": "दीर्घ कालावधीसाठी कनेक्शन असलेल्या एक्स्टेंशननी बॅक/फॉरवर्ड कॅशेमध्ये एंटर करण्यापूर्वी ते कनेक्शन बंद करणे आवश्यक आहे."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensionSentMessageToCachedFrame": {
+    "message": "दीर्घ कालावधीसाठी कनेक्शन असलेल्या एक्स्टेंशननी बॅक/फॉरवर्ड कॅशेमध्ये असलेल्या फ्रेमला मेसेज पाठवण्याचा प्रयत्न केला."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensions": {
+    "message": "एक्स्टेंशनमुळे बॅक/फॉरवर्ड कॅशे बंद केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderModalDialog": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा पेजसाठी पुन्हा सबमिट करणे किंवा http पासवर्ड डायलॉग यासारखा मोडल डायलॉग दाखवला गेला."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderOfflinePage": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा ऑफलाइन पेज दाखवले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderOomInterventionTabHelper": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा आउट-ऑफ-मेमरी इंटरव्हेंशन बार दिसत होता."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderPermissionRequestManager": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा परवानग्यांची विनंती करण्यास सांगितले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderPopupBlockerTabHelper": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा पॉपअप ब्लॉकर दिसत होते."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderSafeBrowsingThreatDetails": {
+    "message": "दुसरीकडे नेव्हिगेट केले, तेव्हा सुरक्षित ब्राउझिंग संबंधित तपशील दाखवले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderSafeBrowsingTriggeredPopupBlocker": {
+    "message": "सुरक्षित ब्राउझिंग नुसार हे पेज अपमानास्पद आहे आणि त्याचा पॉपअप ब्लॉक केला गेला."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | enteredBackForwardCacheBeforeServiceWorkerHostAdded": {
+    "message": "पेज बॅक/फॉरवर्ड कॅशेमध्ये असताना सेवा कर्मचारी अ‍ॅक्टिव्हेट केले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | foregroundCacheLimit": {
+    "message": "दुसर्‍या पेजला कॅशे केले जाऊ देण्यासाठी पेज कॅशेमधून काढले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | grantedMediaStreamAccess": {
+    "message": "ज्या पेजनी मीडिया स्ट्रीमचा अ‍ॅक्सेस दिला आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | haveInnerContents": {
+    "message": "पोर्टल वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | idleManager": {
+    "message": "IdleManager वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | indexedDBConnection": {
+    "message": "ज्या पेजमध्ये उघडलेले IndexedDB कनेक्शन आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | ineligibleAPI": {
+    "message": "अपात्र API वापरले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | injectedJavascript": {
+    "message": "ज्या पेजमध्ये एक्स्टेंशनद्वारे JavaScript इंजेक्ट केले गेले आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | injectedStyleSheet": {
+    "message": "ज्या पेजमध्ये एक्स्टेंशनद्वारे StyleSheet इंजेक्ट केले गेले आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | internalError": {
+    "message": "अंतर्गत एरर."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | keyboardLock": {
+    "message": "कीबोर्ड लॉक वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | loading": {
+    "message": "पेज सोडण्यापूर्वी ते लोड होणे पूर्ण झाले नाही."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | mainResourceHasCacheControlNoCache": {
+    "message": "ज्या पेजच्या मुख्य स्रोतामध्ये cache-control:no-cache आहे, ती बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | mainResourceHasCacheControlNoStore": {
+    "message": "ज्या पेजच्या मुख्य स्रोतामध्ये cache-control:no-store आहे, ती बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | navigationCancelledWhileRestoring": {
+    "message": "बॅक/फॉरवर्ड कॅशेमधून पेज रिस्टोअर केले जाण्यापूर्वी नेव्हिगेशन रद्द केले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkExceedsBufferLimit": {
+    "message": "अ‍ॅक्टिव्ह नेटवर्क कनेक्शनला खूप जास्त डेटा मिळाल्यामुळे पेज कॅशेमधून काढले गेले. पेज कॅशे केले असताना ते मिळवू शकत असलेल्या डेटाचे प्रमाण Chrome मर्यादित करते."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkRequestDatapipeDrainedAsBytesConsumer": {
+    "message": "ज्या पेजमध्ये इनफ्लाइट फेच() किंवा XHR आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkRequestRedirected": {
+    "message": "अ‍ॅक्टिव्ह नेटवर्क विनंतीमध्ये रीडिरेक्टचा समावेश असल्यामुळे पेज बॅक/फॉरवर्ड कॅशेमधून काढले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkRequestTimeout": {
+    "message": "नेटवर्क कनेक्शन खूप वेळ उघडे असल्यामुळे पेज कॅशेमधून काढले गेले. पेज कॅशे केले असताना ते मिळवू शकत असलेल्या डेटाला लागणार्‍या वेळाचे प्रमाण Chrome मर्यादित करते."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | noResponseHead": {
+    "message": "ज्या पेजमध्ये वैध प्रतिसाद हेड नाही, ती बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | notMainFrame": {
+    "message": "नेव्हिगेशन हे मुख्य फ्रेमव्यतिरिक्त इतर फ्रेममध्ये घडले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingIndexedDBTransaction": {
+    "message": "सुरू असलेले अनुक्रमित केलेले DB व्यवहार असलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestDirectSocket": {
+    "message": "इन-फ्लाइट नेटवर्क विनंती असलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestFetch": {
+    "message": "इन-फ्लाइट फेच नेटवर्क विनंती असलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestOthers": {
+    "message": "इन-फ्लाइट नेटवर्क विनंती असलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestXHR": {
+    "message": "इन-फ्लाइट XHR नेटवर्क विनंती असलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | paymentManager": {
+    "message": "PaymentManager वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | pictureInPicture": {
+    "message": "चित्रात-चित्र वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | portal": {
+    "message": "पोर्टल वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | printing": {
+    "message": "प्रिंटिंग UI दाखवणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | relatedActiveContentsExist": {
+    "message": "पेज 'window.open()' वापरून उघडले गेले आणि दुसर्‍या टॅबला त्याचा संदर्भ आहे किंवा पेजने विंडो उघडली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | rendererProcessCrashed": {
+    "message": "बॅक/फॉरवर्ड कॅशेमधील पेजसाठी रेंडरिंग प्रक्रिया क्रॅश झाली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | rendererProcessKilled": {
+    "message": "बॅक/फॉरवर्ड कॅशेमधील पेजसाठी रेंडरिंग प्रक्रिया थांबवली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedAudioCapturePermission": {
+    "message": "ज्या पेजनी ऑडिओ कॅप्चर परवानग्यांची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedBackForwardCacheBlockedSensors": {
+    "message": "ज्या पेजनी सेन्सर परवानग्यांची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedBackgroundWorkPermission": {
+    "message": "ज्या पेजनी बॅकग्राउंड सिंक किंवा फेच परवानग्यांची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedMIDIPermission": {
+    "message": "ज्या पेजनी MIDI परवानग्यांची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedNotificationsPermission": {
+    "message": "ज्या पेजनी सूचना परवानग्यांची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedStorageAccessGrant": {
+    "message": "स्टोरेज अ‍ॅक्सेसची विनंती केलेली पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedVideoCapturePermission": {
+    "message": "ज्या पेजनी व्हिडिओ कॅप्चर परवानग्यांची विनंती केली आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | schemeNotHTTPOrHTTPS": {
+    "message": "फक्त URL स्कीम ही HTTP / HTTPS असलेली पेज कॅशे केली जाऊ शकतात."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerClaim": {
+    "message": "पेज बॅक/फॉरवर्ड कॅशेमध्ये असताना त्यावर सेवा कर्मचार्‍याने दावा केला."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerPostMessage": {
+    "message": "सेवा कर्मचार्‍याने बॅक/फॉरवर्ड कॅशेमध्ये असलेल्या पेजला MessageEvent पाठवण्याचा प्रयत्न केला."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerUnregistration": {
+    "message": "पेज बॅक/फॉरवर्ड कॅशेमध्ये असताना ServiceWorker ची नोंदणी रद्द केली गेली."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerVersionActivation": {
+    "message": "सेवा कर्मचारी अ‍ॅक्टिव्हेशनमुळे पेज बॅक/फॉरवर्ड कॅशेमधून काढले गेले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | sessionRestored": {
+    "message": "Chrome रीस्टार्ट झाले आणि त्याने बॅक/फॉरवर्ड कॅशे एंट्री साफ केल्या."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | sharedWorker": {
+    "message": "SharedWorker वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | speechRecognizer": {
+    "message": "SpeechRecognizer वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | speechSynthesis": {
+    "message": "SpeechSynthesis वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | subframeIsNavigating": {
+    "message": "पेजवरील आयफ्रेमने नेव्हिगेशन सुरू केले, जे पूर्ण झाले नाही."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | subresourceHasCacheControlNoCache": {
+    "message": "ज्या पेजच्या सबरिसोर्समध्ये cache-control:no-cache आहे, ती बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | subresourceHasCacheControlNoStore": {
+    "message": "ज्या पेजच्या सबरिसोर्समध्ये cache-control:no-store आहे, ती बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | timeout": {
+    "message": "पेजने बॅक/फॉरवर्ड कॅशेमध्ये कमाल वेळमर्यादा ओलांडली आणि ते एक्स्पायर झाले."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | timeoutPuttingInCache": {
+    "message": "बॅक/फॉरवर्ड कॅशे एंटर करताना पेजची वेळ संपली (संभवतः खूप वेळ रन झालेल्या पेजहाइड हँडलरमुळे)."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | unloadHandlerExistsInMainFrame": {
+    "message": "पेजला मुख्य फ्रेममध्ये अनलोड हँडलर आहे."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | unloadHandlerExistsInSubFrame": {
+    "message": "पेजला सब फ्रेममध्ये अनलोड हँडलर आहे."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | userAgentOverrideDiffers": {
+    "message": "ब्राउझरने वापरकर्ता एजंट ओव्हरराइड हेडर बदलले आहे."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | wasGrantedMediaAccess": {
+    "message": "ज्या पेजनी व्हिडिओ किंवा ऑडिओ रेकॉर्ड करण्यासाठी अ‍ॅक्सेस दिला आहे, ती सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webDatabase": {
+    "message": "WebDatabase वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webHID": {
+    "message": "WebHID वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webLocks": {
+    "message": "WebLocks वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webNfc": {
+    "message": "WebNfc वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webOTPService": {
+    "message": "WebOTPService वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webRTC": {
+    "message": "WebRTC असलेली पेज बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webShare": {
+    "message": "WebShare वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webSocket": {
+    "message": "WebSocket असलेली पेज बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webTransport": {
+    "message": "WebTransport असलेली पेज बॅक/फॉरवर्ड कॅशे एंटर करू शकत नाहीत."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webXR": {
+    "message": "WebXR वापरणारी पेज सध्या बॅक/फॉरवर्ड कॅशेसाठी पात्र नाहीत."
+  },
+  "panels/application/components/BackForwardCacheView.ts | backForwardCacheTitle": {
+    "message": "बॅक/फॉरवर्ड कॅशे"
+  },
+  "panels/application/components/BackForwardCacheView.ts | circumstantial": {
+    "message": "कृती करण्यायोग्य नाही"
+  },
+  "panels/application/components/BackForwardCacheView.ts | circumstantialExplanation": {
+    "message": "ही कारणे कृती करण्यायोग्य नाहीत, म्हणजेच, पेजच्या थेट नियंत्रणाबाहेर असलेल्या एखाद्या गोष्टीमुळे कॅशे करणे रोखले गेले होते."
+  },
+  "panels/application/components/BackForwardCacheView.ts | learnMore": {
+    "message": "अधिक जाणून घ्या: बॅक/फॉरवर्ड कॅशेसंबंधित पात्रता"
+  },
+  "panels/application/components/BackForwardCacheView.ts | mainFrame": {
+    "message": "मुख्य फ्रेम"
+  },
+  "panels/application/components/BackForwardCacheView.ts | normalNavigation": {
+    "message": "बॅक/फॉरवर्ड कॅशेमधून सर्व्ह केले नाही: बॅक/फॉरवर्ड कॅशे ट्रिगर करण्यासाठी, Chrome ची बॅक/फॉरवर्ड बटणे वापरा किंवा दुसरीकडे आणि मागे आपोआप नेव्हिगेट करण्यासाठी खालील चाचणी बटण वापरा."
+  },
+  "panels/application/components/BackForwardCacheView.ts | pageSupportNeeded": {
+    "message": "कृती करण्यायोग्य आहे"
+  },
+  "panels/application/components/BackForwardCacheView.ts | pageSupportNeededExplanation": {
+    "message": "ही कारणे कृती करण्यायोग्य आहेत, म्हणजेच, बॅक/फॉरवर्ड कॅशेसाठी पेज पात्र बनवण्याकरिता समस्यांचे निराकरण करण्यासाठी तुम्ही कृती करू शकता."
+  },
+  "panels/application/components/BackForwardCacheView.ts | restoredFromBFCache": {
+    "message": "बॅक/फॉरवर्ड कॅशेमधून यशस्वीरीत्या सर्व्ह केले आहे."
+  },
+  "panels/application/components/BackForwardCacheView.ts | runTest": {
+    "message": "बॅक/फॉरवर्ड कॅशेची चाचणी करा"
+  },
+  "panels/application/components/BackForwardCacheView.ts | runningTest": {
+    "message": "चाचणी रन करत आहे"
+  },
+  "panels/application/components/BackForwardCacheView.ts | supportPending": {
+    "message": "सपोर्ट प्रलंबित आहे"
+  },
+  "panels/application/components/BackForwardCacheView.ts | supportPendingExplanation": {
+    "message": "या कारणांसाठी Chrome सपोर्ट प्रलंबित आहे, म्हणजेच, Chrome च्या भविष्यातील आवृत्तीमध्ये ती पेजला बॅक/फॉरवर्ड कॅशेसाठी पात्र ठरण्यापासून रोखणार नाहीत."
+  },
+  "panels/application/components/BackForwardCacheView.ts | unavailable": {
+    "message": "उपलब्ध नाही"
+  },
+  "panels/application/components/BackForwardCacheView.ts | unknown": {
+    "message": "अज्ञात स्टेटस"
+  },
+  "panels/application/components/BackForwardCacheView.ts | url": {
+    "message": "URL:"
+  },
+  "panels/application/components/EndpointsGrid.ts | noEndpointsToDisplay": {
+    "message": "दाखवण्यासाठी कोणतेही एंडपॉइंट नाहीत"
+  },
   "panels/application/components/FrameDetailsView.ts | aFrameAncestorIsAnInsecure": {
     "message": "फ्रेम अ‍ॅन्सेस्टर हा असुरक्षित संदर्भ आहे"
   },
@@ -2928,22 +3327,16 @@
     "message": "स्रोत पॅनलमध्ये दाखवण्यासाठी क्लिक करा"
   },
   "panels/application/components/FrameDetailsView.ts | createdByAdScriptExplanation": {
-    "message": "ही फ्रेम तयार केली तेव्हा स्टॅकमध्ये एक जाहिरातीचे स्क्रिप्ट (सिंक न केलेले) होते. या फ्रेमच्या क्रीएशन स्टॅक ट्रेसचे परीक्षण केल्यामुळे काही इनसाइट मिळू शकतात."
+    "message": "ही फ्रेम तयार केली तेव्हा (async) stack मध्ये एक जाहिरातीचे स्क्रिप्ट होते. या फ्रेमच्या क्रीएशन stack trace चे परीक्षण केल्यामुळे काही इनसाइट मिळू शकतात."
   },
   "panels/application/components/FrameDetailsView.ts | creationStackTrace": {
-    "message": "फ्रेम क्रीएशन स्टॅक ट्रेस"
+    "message": "फ्रेम क्रीएशन Stack Trace"
   },
   "panels/application/components/FrameDetailsView.ts | creationStackTraceExplanation": {
-    "message": "ही फ्रेम प्रोग्रामिकरीत्या तयार केली आहे. हे कुठे तयार केले गेले होते हे स्टॅक ट्रेस दाखवते."
-  },
-  "panels/application/components/FrameDetailsView.ts | crossoriginEmbedderPolicy": {
-    "message": "क्रॉस-ओरिजिन एम्बेडर धोरण"
+    "message": "ही फ्रेम प्रोग्रामिकरीत्या तयार केली आहे. stack trace हे कुठे घडले ते दाखवते."
   },
   "panels/application/components/FrameDetailsView.ts | crossoriginIsolated": {
     "message": "वेगळे ठेवलेले क्रॉस-ओरिजिन"
-  },
-  "panels/application/components/FrameDetailsView.ts | crossoriginOpenerPolicy": {
-    "message": "क्रॉस-ओरिजिन ओपनर धोरण"
   },
   "panels/application/components/FrameDetailsView.ts | document": {
     "message": "दस्तऐवज"
@@ -2955,7 +3348,7 @@
     "message": "अधिक जाणून घ्या"
   },
   "panels/application/components/FrameDetailsView.ts | localhostIsAlwaysASecureContext": {
-    "message": "Localhost हा नेहमी सुरक्षित संदर्भ असतो"
+    "message": "Localhost हा नेहमीच सुरक्षित संदर्भ असतो"
   },
   "panels/application/components/FrameDetailsView.ts | matchedBlockingRuleExplanation": {
     "message": "ही फ्रेम जाहिरात फ्रेम म्हणून ग्राह्य धरली जाईल कारण, त्याचा सध्याचा (किंवा मागील) मुख्य दस्तऐवज हा जाहिरात स्रोत होता."
@@ -2969,14 +3362,14 @@
   "panels/application/components/FrameDetailsView.ts | origin": {
     "message": "ओरिजिन"
   },
-  "panels/application/components/FrameDetailsView.ts | originTrials": {
-    "message": "ओरिजिन चाचण्या"
-  },
   "panels/application/components/FrameDetailsView.ts | ownerElement": {
     "message": "मालक घटक"
   },
   "panels/application/components/FrameDetailsView.ts | parentIsAdExplanation": {
     "message": "ही फ्रेम जाहिरात फ्रेम म्हणून धरली जाईल कारण, ती जाहिरात फ्रेममधील मुख्य फ्रेम आहे."
+  },
+  "panels/application/components/FrameDetailsView.ts | refresh": {
+    "message": "रिफ्रेश करा"
   },
   "panels/application/components/FrameDetailsView.ts | reportingTo": {
     "message": "येथे तक्रार करत आहे"
@@ -2997,10 +3390,10 @@
     "message": "सुरक्षितता आणि वेगळे ठेवणे"
   },
   "panels/application/components/FrameDetailsView.ts | sharedarraybufferConstructorIs": {
-    "message": "SharedArrayBuffer कंस्ट्रक्टर उपलब्ध आहे आणि SAB हे postMessage मार्फत ट्रान्सफर केले जाऊ शकतात"
+    "message": "SharedArrayBuffer कंस्ट्रक्टर उपलब्ध आहे आणि postMessage मार्फत SABs ट्रान्सफर केले जाऊ शकतात"
   },
   "panels/application/components/FrameDetailsView.ts | sharedarraybufferConstructorIsAvailable": {
-    "message": "SharedArrayBuffer कंस्ट्रक्टर उपलब्ध आहे, परंतु SAB हे postMessage मार्फत ट्रान्सफर केले जाऊ शकत नाहीत"
+    "message": "SharedArrayBuffer कंस्ट्रक्टर उपलब्ध आहे पण SABs हे postMessage मार्फत ट्रान्सफर केले जाऊ शकत नाहीत"
   },
   "panels/application/components/FrameDetailsView.ts | theFramesSchemeIsInsecure": {
     "message": "फ्रेमची स्कीम असुरक्षित आहे"
@@ -3032,6 +3425,24 @@
   "panels/application/components/FrameDetailsView.ts | yes": {
     "message": "होय"
   },
+  "panels/application/components/InterestGroupAccessGrid.ts | allInterestGroupStorageEvents": {
+    "message": "सर्व स्वारस्य गट स्टोरेज इव्हेंट."
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | eventTime": {
+    "message": "इव्हेंट वेळ"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | eventType": {
+    "message": "ॲक्सेसचा प्रकार"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | groupName": {
+    "message": "नाव"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | groupOwner": {
+    "message": "मालक"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | noEvents": {
+    "message": "स्वारस्य गटाचे कोणतेही इव्हेंट रेकॉर्ड केलेले नाहीत."
+  },
   "panels/application/components/OriginTrialTreeView.ts | expiryTime": {
     "message": "एक्स्पायरीची वेळ"
   },
@@ -3056,6 +3467,9 @@
   "panels/application/components/OriginTrialTreeView.ts | tokens": {
     "message": "{PH1} टोकन"
   },
+  "panels/application/components/OriginTrialTreeView.ts | trialName": {
+    "message": "चाचणीचे नाव"
+  },
   "panels/application/components/OriginTrialTreeView.ts | usageRestriction": {
     "message": "वापर प्रतिबंध"
   },
@@ -3067,6 +3481,9 @@
   },
   "panels/application/components/PermissionsPolicySection.ts | clickToShowIframe": {
     "message": "घटक पॅनलमध्ये या वैशिष्ट्याला अनुमती न देणाऱ्या सर्वात वर असलेले आयफ्रेम पाहण्यासाठी क्लिक करा."
+  },
+  "panels/application/components/PermissionsPolicySection.ts | disabledByFencedFrame": {
+    "message": "fencedframe मध्ये बंद केलेले"
   },
   "panels/application/components/PermissionsPolicySection.ts | disabledByHeader": {
     "message": "\"Permissions-Policy\" हेडरद्वारे बंद केले"
@@ -3082,6 +3499,18 @@
   },
   "panels/application/components/PermissionsPolicySection.ts | showDetails": {
     "message": "तपशील दाखवा"
+  },
+  "panels/application/components/ReportsGrid.ts | destination": {
+    "message": "गंतव्यस्थान"
+  },
+  "panels/application/components/ReportsGrid.ts | generatedAt": {
+    "message": "रोजी जनरेट केलेले"
+  },
+  "panels/application/components/ReportsGrid.ts | noReportsToDisplay": {
+    "message": "दाखवण्यासाठी कोणतेही अहवाल नाहीत"
+  },
+  "panels/application/components/ReportsGrid.ts | status": {
+    "message": "स्टेटस"
   },
   "panels/application/components/StackTrace.ts | cannotRenderStackTrace": {
     "message": "स्टॅक ट्रेस रेंडर करू शकत नाही"
@@ -3242,20 +3671,8 @@
   "panels/changes/ChangesSidebar.ts | sFromSourceMap": {
     "message": "{PH1} (स्रोत नकाशावरून)"
   },
-  "panels/changes/ChangesTextEditor.ts | additions": {
-    "message": "जोड:{PH1}"
-  },
-  "panels/changes/ChangesTextEditor.ts | deletions": {
-    "message": "हटवणे: {PH1}"
-  },
-  "panels/changes/ChangesView.ts | SkippingDMatchingLines": {
-    "message": "( … वगळत आहे {PH1} ओळी जुळवत आहे … )"
-  },
   "panels/changes/ChangesView.ts | binaryData": {
     "message": "बायनरी डेटा"
-  },
-  "panels/changes/ChangesView.ts | changesDiffViewer": {
-    "message": "बदलांमधील फरकांचा दर्शक"
   },
   "panels/changes/ChangesView.ts | noChanges": {
     "message": "बदल नाहीत"
@@ -3340,6 +3757,12 @@
   },
   "panels/console/ConsoleView.ts | consoleSettings": {
     "message": "कन्सोल सेटिंग्ज"
+  },
+  "panels/console/ConsoleView.ts | consoleSidebarHidden": {
+    "message": "कन्सोल साइडबार लपवला आहे"
+  },
+  "panels/console/ConsoleView.ts | consoleSidebarShown": {
+    "message": "कन्सोल साइडबार दाखवला आहे"
   },
   "panels/console/ConsoleView.ts | copyVisibleStyledSelection": {
     "message": "दृश्यमान शैलीबद्ध निवड कॉपी करा"
@@ -3440,6 +3863,9 @@
   "panels/console/ConsoleView.ts | showConsoleSidebar": {
     "message": "कन्सोल साइडबार दाखवा"
   },
+  "panels/console/ConsoleView.ts | showCorsErrorsInConsole": {
+    "message": "कन्सोलमध्ये CORS एरर दाखवा"
+  },
   "panels/console/ConsoleView.ts | verbose": {
     "message": "व्हर्बाेस मेसेज"
   },
@@ -3497,6 +3923,12 @@
   "panels/console/ConsoleViewMessage.ts | someEvent": {
     "message": "<some> इव्‍हेंट"
   },
+  "panels/console/ConsoleViewMessage.ts | stackMessageCollapsed": {
+    "message": "स्टॅक सारणी कोलॅप्स केली"
+  },
+  "panels/console/ConsoleViewMessage.ts | stackMessageExpanded": {
+    "message": "स्टॅक सारणीचा विस्तार केला"
+  },
   "panels/console/ConsoleViewMessage.ts | thisValueWasEvaluatedUponFirst": {
     "message": "पहिल्या वेळी विस्तार करताना या मूल्याचे मूल्यांकन केले गेले. त्यानंतर ते बदलले असू शकते."
   },
@@ -3521,12 +3953,6 @@
   "panels/console/ConsoleViewMessage.ts | warningS": {
     "message": "{n,plural, =1{चेतावणी, # वेळ रिपीट केली}other{चेतावणी, # वेळा रिपीट केली}}"
   },
-  "panels/console/components/SidebarDeprecation.ts | deprecationNotice": {
-    "message": "Chrome पुढील आवृत्तीमध्ये हा साइडबार काढून टाकला जाईल. तुम्हाला फीडबॅक द्यायचा असल्यास, कृपया तो आम्हाला याद्वारे कळवा"
-  },
-  "panels/console/components/SidebarDeprecation.ts | issueTrackerLinkText": {
-    "message": "समस्या ट्रॅकर"
-  },
   "panels/console/console-meta.ts | autocompleteFromHistory": {
     "message": "इतिहासामधून ऑटोकंप्लीट करा"
   },
@@ -3550,6 +3976,9 @@
   },
   "panels/console/console-meta.ts | doNotGroupSimilarMessagesIn": {
     "message": "कन्सोलमध्ये एकसारखे मेसेज गटबद्ध करू नका"
+  },
+  "panels/console/console-meta.ts | doNotShowCorsErrorsIn": {
+    "message": "कन्सोलमध्ये CORS एरर दाखवू नका"
   },
   "panels/console/console-meta.ts | doNotTreatEvaluationAsUser": {
     "message": "मूल्यांकन हे वापरकर्ता अ‍ॅक्टिव्हेशन म्हणून हाताळू नका"
@@ -3583,6 +4012,9 @@
   },
   "panels/console/console-meta.ts | showConsole": {
     "message": "कन्सोल दाखवा"
+  },
+  "panels/console/console-meta.ts | showCorsErrorsInConsole": {
+    "message": "कन्सोलमध्ये CORS एरर दाखवा"
   },
   "panels/console/console-meta.ts | showMessagesFromAllContexts": {
     "message": "सर्व संदर्भांमधील मेसेज दाखवा"
@@ -3836,12 +4268,6 @@
   "panels/css_overview/CSSOverviewSidebarPanel.ts | clearOverview": {
     "message": "अवलोकन साफ करा"
   },
-  "panels/css_overview/CSSOverviewStartView.ts | captureOverview": {
-    "message": "कॅप्चरचे अवलोकन"
-  },
-  "panels/css_overview/CSSOverviewStartView.ts | cssOverview": {
-    "message": "CSS अवलोकन"
-  },
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | bottomAppliedToAStatically": {
     "message": "स्‍टॅटिक प्रकारे स्थान निर्धारण केलेल्या घटकाला Bottom हे मूल्य लागू केले"
   },
@@ -3862,6 +4288,24 @@
   },
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | widthAppliedToAnInlineElement": {
     "message": "Width इनलाइन घटकावर लागू केले गेले"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | captureOverview": {
+    "message": "कॅप्चरचे अवलोकन"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | capturePageCSSOverview": {
+    "message": "तुमच्या पेजच्या CSS चे अवलोकन कॅप्चर करा"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | identifyCSSImprovements": {
+    "message": "संभाव्य CSS सुधारणा ओळखा"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | identifyCSSImprovementsWithExampleIssues": {
+    "message": "संभाव्य CSS सुधारणा ओळखा (उदा. कमी काँट्रास्टसंबंधी समस्या, न वापरलेल्या घोषणा, न जुळणारे रंग किंवा फाँट)"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | locateAffectedElements": {
+    "message": "घटक पॅनलमध्ये परिणाम झालेले घटक शोधा"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | quickStartWithCSSOverview": {
+    "message": "क्विक स्टार्ट: नवीन CSS अवलोकन पॅनलसोबत सुरुवात करा"
   },
   "panels/css_overview/css_overview-meta.ts | cssOverview": {
     "message": "CSS अवलोकन"
@@ -3960,7 +4404,7 @@
     "message": "शैलीवर नेव्हिगेट करा"
   },
   "panels/elements/ComputedStyleWidget.ts | noMatchingProperty": {
-    "message": "जुळणारी प्रॉपर्टी नाही"
+    "message": "कोणतीही जुळणारी प्रॉपर्टी नाही"
   },
   "panels/elements/ComputedStyleWidget.ts | showAll": {
     "message": "सर्व दाखवा"
@@ -3976,6 +4420,15 @@
   },
   "panels/elements/ElementsPanel.ts | computed": {
     "message": "काँप्युट केलेल्या"
+  },
+  "panels/elements/ElementsPanel.ts | computedStylesHidden": {
+    "message": "काँप्युट केलेल्या शैलींचा साइडबार लपवला आहे"
+  },
+  "panels/elements/ElementsPanel.ts | computedStylesShown": {
+    "message": "काँप्युट केलेल्या शैलींचा साइडबार दाखवला आहे"
+  },
+  "panels/elements/ElementsPanel.ts | domTreeExplorer": {
+    "message": "DOM ट्री एक्सप्लोरर"
   },
   "panels/elements/ElementsPanel.ts | elementStateS": {
     "message": "घटक स्थिती: {PH1}"
@@ -3997,6 +4450,12 @@
   },
   "panels/elements/ElementsPanel.ts | showComputedStylesSidebar": {
     "message": "काँप्युट केलेल्या शैलींचा साइडबार दाखवा"
+  },
+  "panels/elements/ElementsPanel.ts | sidePanelContent": {
+    "message": "साइड पॅनल आशय"
+  },
+  "panels/elements/ElementsPanel.ts | sidePanelToolbar": {
+    "message": "साइड पॅनल टूलबार"
   },
   "panels/elements/ElementsPanel.ts | styles": {
     "message": "शैली"
@@ -4084,6 +4543,12 @@
   },
   "panels/elements/ElementsTreeElement.ts | enableScrollSnap": {
     "message": "स्क्रोल-स्नॅप ओव्हरले सुरू करा"
+  },
+  "panels/elements/ElementsTreeElement.ts | enterIsolationMode": {
+    "message": "आयसोलेशन मोड मध्ये जा"
+  },
+  "panels/elements/ElementsTreeElement.ts | exitIsolationMode": {
+    "message": "आयसोलेशन मोड मधून बाहेर पडा"
   },
   "panels/elements/ElementsTreeElement.ts | expandRecursively": {
     "message": "रिकर्सिव्ह प्रकारे विस्तार करा"
@@ -4178,8 +4643,29 @@
   "panels/elements/PlatformFontsWidget.ts | renderedFonts": {
     "message": "रेंडर केलेले फाँट"
   },
+  "panels/elements/PropertiesWidget.ts | filter": {
+    "message": "फिल्टर करा"
+  },
+  "panels/elements/PropertiesWidget.ts | filterProperties": {
+    "message": "प्रॉपर्टी फिल्टर करा"
+  },
+  "panels/elements/PropertiesWidget.ts | noMatchingProperty": {
+    "message": "कोणतीही जुळणारी प्रॉपर्टी नाही"
+  },
+  "panels/elements/PropertiesWidget.ts | showAll": {
+    "message": "सर्व दाखवा"
+  },
+  "panels/elements/PropertiesWidget.ts | showAllTooltip": {
+    "message": "चौकटीतली खूण काढून टाकली असेल, तेव्हा ज्यांचे मूल्य ना रिकामे आहे ना अपरिभाषित आहे अशाच प्रॉपर्टी दाखवल्या जातील"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | copyAllCssDeclarationsAsJs": {
+    "message": "सर्व घोषणा JS म्हणून कॉपी करा"
+  },
   "panels/elements/StylePropertyTreeElement.ts | copyAllDeclarations": {
     "message": "सर्व घोषणा कॉपी करा"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | copyCssDeclarationAsJs": {
+    "message": "घोषणा JS म्हणून कॉपी करा"
   },
   "panels/elements/StylePropertyTreeElement.ts | copyDeclaration": {
     "message": "घोषणा कॉपी करा"
@@ -4220,6 +4706,12 @@
   "panels/elements/StylesSidebarPane.ts | constructedStylesheet": {
     "message": "तयार केलेली स्टाइलशीट"
   },
+  "panels/elements/StylesSidebarPane.ts | copiedToClipboard": {
+    "message": "क्लिपबोर्डवर कॉपी केले"
+  },
+  "panels/elements/StylesSidebarPane.ts | copyAllCSSChanges": {
+    "message": "CSS शी संबंधित सर्व बदल कॉपी करा"
+  },
   "panels/elements/StylesSidebarPane.ts | copyAllDeclarations": {
     "message": "सर्व घोषणा कॉपी करा"
   },
@@ -4228,6 +4720,15 @@
   },
   "panels/elements/StylesSidebarPane.ts | copySelector": {
     "message": "selector कॉपी करा"
+  },
+  "panels/elements/StylesSidebarPane.ts | cssPropertyName": {
+    "message": "CSS प्रॉपर्टीचे नाव: {PH1}"
+  },
+  "panels/elements/StylesSidebarPane.ts | cssPropertyValue": {
+    "message": "CSS प्रॉपर्टीचे मूल्य: {PH1}"
+  },
+  "panels/elements/StylesSidebarPane.ts | cssSelector": {
+    "message": "CSS सिलेक्टर"
   },
   "panels/elements/StylesSidebarPane.ts | filter": {
     "message": "फिल्टर करा"
@@ -4292,8 +4793,17 @@
   "panels/elements/components/AdornerSettingsPane.ts | settingsTitle": {
     "message": "बॅज दाखवा"
   },
+  "panels/elements/components/ElementsBreadcrumbs.ts | breadcrumbs": {
+    "message": "DOM ट्री ब्रेडक्रंब"
+  },
   "panels/elements/components/ElementsBreadcrumbsUtils.ts | text": {
     "message": "(मजकूर)"
+  },
+  "panels/elements/components/LayoutPane.ts | chooseElementOverlayColor": {
+    "message": "या घटकासाठी ओव्हरले रंग निवडा"
+  },
+  "panels/elements/components/LayoutPane.ts | colorPickerOpened": {
+    "message": "कलर पिकर उघडला."
   },
   "panels/elements/components/LayoutPane.ts | flexbox": {
     "message": "फ्लेक्सबॉक्स"
@@ -4542,7 +5052,7 @@
     "message": "मीडिया क्वेरी लपवा"
   },
   "panels/emulation/emulation-meta.ts | hideRulers": {
-    "message": "मोजपट्ट्या लपवा"
+    "message": "डिव्हाइस मोड टूलबारमध्ये मोजपट्ट्या लपवा"
   },
   "panels/emulation/emulation-meta.ts | showDeviceFrame": {
     "message": "डिव्हाइस फ्रेम दाखवा"
@@ -4551,7 +5061,7 @@
     "message": "मीडिया क्वेरी दाखवा"
   },
   "panels/emulation/emulation-meta.ts | showRulers": {
-    "message": "मोजपट्ट्या दाखवा"
+    "message": "डिव्हाइस मोड टूलबारमध्ये मोजपट्ट्या दाखवा"
   },
   "panels/emulation/emulation-meta.ts | toggleDeviceToolbar": {
     "message": "डिव्हाइस टूलबार टॉगल करा"
@@ -4576,36 +5086,6 @@
   },
   "panels/event_listeners/EventListenersView.ts | toggleWhetherEventListenerIs": {
     "message": "इव्हेंट ऐकणारा पॅसिव्ह आहे किंवा ब्लॉकिंग आहे ते टॉगल करा"
-  },
-  "panels/help/ReleaseNoteView.ts | close": {
-    "message": "बंद करा"
-  },
-  "panels/help/ReleaseNoteView.ts | learnMore": {
-    "message": "अधिक जाणून घ्या"
-  },
-  "panels/help/help-meta.ts | bug": {
-    "message": "बग"
-  },
-  "panels/help/help-meta.ts | doNotShowWhatsNewAfterEachUpdate": {
-    "message": "प्रत्येक अपडेटनंतर नवीन काय आहे ते दाखवू नका"
-  },
-  "panels/help/help-meta.ts | releaseNotes": {
-    "message": "माहितीपत्रक"
-  },
-  "panels/help/help-meta.ts | reportADevtoolsIssue": {
-    "message": "DevTools संबंधी समस्‍येची तक्रार करा"
-  },
-  "panels/help/help-meta.ts | reportTranslationIssue": {
-    "message": "भाषांतराशी संबंधित समस्‍येची तक्रार करा"
-  },
-  "panels/help/help-meta.ts | showWhatsNew": {
-    "message": "नवीन काय आहे ते दाखवा"
-  },
-  "panels/help/help-meta.ts | showWhatsNewAfterEachUpdate": {
-    "message": "प्रत्येक अपडेटनंतर नवीन काय आहे ते दाखवा"
-  },
-  "panels/help/help-meta.ts | whatsNew": {
-    "message": "नवीन काय आहे"
   },
   "panels/input/InputTimeline.ts | clearAll": {
     "message": "सर्व साफ करा"
@@ -4817,11 +5297,26 @@
   "panels/issues/AttributionReportingIssueDetailsView.ts | frame": {
     "message": "फ्रेम"
   },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidEventSourceTriggerData": {
+    "message": "चुकीचा event-source-trigger-data"
+  },
   "panels/issues/AttributionReportingIssueDetailsView.ts | invalidSourceEventId": {
     "message": "चुकीचे attributionsourceeventid"
   },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidSourceExpiry": {
+    "message": "चुकीचे attributionexpiry"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidSourcePriority": {
+    "message": "चुकीचे attributionsourcepriority"
+  },
   "panels/issues/AttributionReportingIssueDetailsView.ts | invalidTriggerData": {
     "message": "चुकीचे trigger-data"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidTriggerDedupKey": {
+    "message": "चुकीचे dedup-key"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidTriggerPriority": {
+    "message": "चुकीचे priority"
   },
   "panels/issues/AttributionReportingIssueDetailsView.ts | nViolations": {
     "message": "{n,plural, =1{# उल्लंघन}other{# उल्लंघने}}"
@@ -4849,6 +5344,9 @@
   },
   "panels/issues/CorsIssueDetailsView.ts | disallowedRequestMethod": {
     "message": "अनुमती न दिलेली विनंती पद्धत"
+  },
+  "panels/issues/CorsIssueDetailsView.ts | failedRequest": {
+    "message": "विनंती करता आली नाही"
   },
   "panels/issues/CorsIssueDetailsView.ts | header": {
     "message": "हेडर"
@@ -4913,11 +5411,26 @@
   "panels/issues/CorsIssueDetailsView.ts | warning": {
     "message": "चेतावणी"
   },
+  "panels/issues/GenericIssueDetailsView.ts | frameId": {
+    "message": "फ्रेम"
+  },
+  "panels/issues/GenericIssueDetailsView.ts | nResources": {
+    "message": "{n,plural, =1{# स्रोत}other{# स्रोत}}"
+  },
   "panels/issues/HiddenIssuesRow.ts | hiddenIssues": {
     "message": "लपवलेल्या समस्या"
   },
-  "panels/issues/HiddenIssuesRow.ts | unhideIssues": {
-    "message": "सर्व समस्या दाखवा"
+  "panels/issues/HiddenIssuesRow.ts | unhideAll": {
+    "message": "सर्व दाखवा"
+  },
+  "panels/issues/IssueKindView.ts | hideAllCurrentBreakingChanges": {
+    "message": "सध्याचे सर्व हानिकारक बदल लपवा"
+  },
+  "panels/issues/IssueKindView.ts | hideAllCurrentImprovements": {
+    "message": "सध्याच्या सर्व सुधारणा लपवा"
+  },
+  "panels/issues/IssueKindView.ts | hideAllCurrentPageErrors": {
+    "message": "सध्याच्या सर्व पेज एरर लपवा"
   },
   "panels/issues/IssueView.ts | affectedResources": {
     "message": "परिणाम झालेले स्रोत"
@@ -4927,6 +5440,9 @@
   },
   "panels/issues/IssueView.ts | blocked": {
     "message": "ब्लॉक केलेले"
+  },
+  "panels/issues/IssueView.ts | hideIssuesLikeThis": {
+    "message": "यांसारख्या समस्या लपवा"
   },
   "panels/issues/IssueView.ts | learnMoreS": {
     "message": "अधिक जाणून घ्या: {PH1}"
@@ -4943,6 +5459,9 @@
   "panels/issues/IssueView.ts | restrictionStatus": {
     "message": "प्रतिबंधाची स्थिती"
   },
+  "panels/issues/IssueView.ts | unhideIssuesLikeThis": {
+    "message": "यांसारख्या समस्या दाखवा"
+  },
   "panels/issues/IssueView.ts | warned": {
     "message": "चेतावणी दिली"
   },
@@ -4958,11 +5477,20 @@
   "panels/issues/IssuesPane.ts | crossOriginEmbedderPolicy": {
     "message": "क्रॉस-ओरिजिन एम्बेडर धोरण"
   },
+  "panels/issues/IssuesPane.ts | generic": {
+    "message": "सर्वसाधारण"
+  },
   "panels/issues/IssuesPane.ts | groupByCategory": {
     "message": "वर्गवारीनुसार गटबद्ध करा"
   },
+  "panels/issues/IssuesPane.ts | groupByKind": {
+    "message": "समस्येच्या प्रकारानुसार गट"
+  },
   "panels/issues/IssuesPane.ts | groupDisplayedIssuesUnder": {
     "message": "डिस्प्ले केलेल्या समस्या संबंधित वर्गीकरणांच्या अंतर्गत गटबद्ध करा"
+  },
+  "panels/issues/IssuesPane.ts | groupDisplayedIssuesUnderKind": {
+    "message": "गटाने पेज एरर, हानिकारक बदल आणि सुधारणा म्हणून समस्या दाखवल्या"
   },
   "panels/issues/IssuesPane.ts | heavyAds": {
     "message": "वजनी जाहिराती"
@@ -4997,35 +5525,8 @@
   "panels/issues/IssuesPane.ts | trustedWebActivity": {
     "message": "विश्वसनीय वेब अ‍ॅक्टिव्हिटी"
   },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | blocked": {
-    "message": "ब्लॉक केलेले"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | nModuleTransfers": {
-    "message": "{n,plural, =1{# मॉड्युल}other{# मॉड्युल}}"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | sourceOrigin": {
-    "message": "स्रोताचे मूळ"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | status": {
-    "message": "स्टेटस"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | targetOrigin": {
-    "message": "लक्षित ओरिजिन"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | warned": {
-    "message": "चेतावणी"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | wasmModuleUrl": {
-    "message": "Wasm मॉड्युल ची URL"
-  },
-  "panels/issues/components/HideIssuesMenu.ts | UnhideIssueByCode": {
-    "message": "यांसारख्या समस्या दाखवा"
-  },
-  "panels/issues/components/HideIssuesMenu.ts | hideIssueByCode": {
-    "message": "यांसारख्या समस्या लपवा"
-  },
   "panels/issues/components/HideIssuesMenu.ts | tooltipTitle": {
-    "message": "समस्या मेनू लपवा"
+    "message": "समस्या लपवा"
   },
   "panels/issues/issues-meta.ts | cspViolations": {
     "message": "CSP उल्लंघने"
@@ -5264,6 +5765,12 @@
   "panels/lighthouse/LighthouseController.ts | isThisPageUsableByPeopleWith": {
     "message": "हे पेज अपंगत्व किंवा शारीरिक कमतरता असलेल्या लोकांना वापरता येण्यासारखे आहे का"
   },
+  "panels/lighthouse/LighthouseController.ts | legacyNavigation": {
+    "message": "लेगसी नेव्हिगेशन"
+  },
+  "panels/lighthouse/LighthouseController.ts | lighthouseMode": {
+    "message": "Lighthouse मोड"
+  },
   "panels/lighthouse/LighthouseController.ts | localStorage": {
     "message": "स्थानिक स्टोरेज"
   },
@@ -5272,6 +5779,9 @@
   },
   "panels/lighthouse/LighthouseController.ts | multipleTabsAreBeingControlledBy": {
     "message": "एकाहून अधिक टॅब एकाच service worker द्वारे नियंत्रित केले जात आहेत. या पेजचे ऑडिट करण्यासाठी एकाच ओरिजिनवरील तुमचे इतर टॅब बंद करा."
+  },
+  "panels/lighthouse/LighthouseController.ts | navigation": {
+    "message": "नेव्हिगेशन"
   },
   "panels/lighthouse/LighthouseController.ts | performance": {
     "message": "परफॉर्मन्स"
@@ -5285,6 +5795,9 @@
   "panels/lighthouse/LighthouseController.ts | resetStorageLocalstorage": {
     "message": "ऑडिट करण्यापूर्वी स्टोरेज (cache, service workers, इ.) रीसेट करा. (परफॉर्मन्स आणि PWA चाचणीसाठी उत्तम)"
   },
+  "panels/lighthouse/LighthouseController.ts | runLighthouseInMode": {
+    "message": "नेव्हिगेशन, टाइमस्पॅन किंवा स्नॅपशॉट मोडमध्ये Lighthouse रन करा"
+  },
   "panels/lighthouse/LighthouseController.ts | seo": {
     "message": "SEO"
   },
@@ -5294,11 +5807,17 @@
   "panels/lighthouse/LighthouseController.ts | simulatedThrottling": {
     "message": "सिम्युलेट केलेले थ्रॉटलिंग"
   },
+  "panels/lighthouse/LighthouseController.ts | snapshot": {
+    "message": "स्नॅपशॉट"
+  },
   "panels/lighthouse/LighthouseController.ts | thereMayBeStoredDataAffectingLoadingPlural": {
     "message": "या स्थानांमध्ये लोडिंग परफॉर्मन्सवर परिणाम करणारा, स्टोअर केलेला डेटा असू शकतो: {PH1}. या स्रोतांना तुमच्या स्कोअरवर परिणाम करण्यापासून रोखण्यासाठी, या पेजचे गुप्त विंडोमध्ये ऑडिट करा."
   },
   "panels/lighthouse/LighthouseController.ts | thereMayBeStoredDataAffectingSingular": {
     "message": "या स्थानामध्ये लोडिंग परफॉर्मन्सवर परिणाम करणारा, स्टोअर केलेला डेटा असू शकतो: {PH1}. या स्रोतांना तुमच्या स्कोअरवर परिणाम करण्यापासून रोखण्यासाठी, या पेजचे ऑडिट गुप्त विंडोमध्ये करा."
+  },
+  "panels/lighthouse/LighthouseController.ts | useLegacyNavigation": {
+    "message": "नेव्हिगेशन मोडमध्ये असताना क्लासिक Lighthouse वापरून पेज ऑडिट करा."
   },
   "panels/lighthouse/LighthouseController.ts | webSql": {
     "message": "वेब SQL"
@@ -5356,6 +5875,9 @@
   },
   "panels/lighthouse/LighthouseStartView.ts | learnMore": {
     "message": "अधिक जाणून घ्या"
+  },
+  "panels/lighthouse/LighthouseStartViewFR.ts | mode": {
+    "message": "मोड"
   },
   "panels/lighthouse/LighthouseStatusView.ts | OfGlobalMobileUsersInWereOnGOrG": {
     "message": "२०१६ मध्ये ७५% जागतिक मोबाइल वापरकर्ते 2G किंवा 3G वर होते [स्रोत: GSMA Mobile]"
@@ -5849,6 +6371,9 @@
   "panels/network/NetworkConfigView.ts | caching": {
     "message": "कॅशे करत आहे"
   },
+  "panels/network/NetworkConfigView.ts | clientHintsStatusText": {
+    "message": "वापरकर्ता एजंट अपडेट केला."
+  },
   "panels/network/NetworkConfigView.ts | custom": {
     "message": "कस्टम..."
   },
@@ -5978,6 +6503,9 @@
   "panels/network/NetworkDataGridNode.ts | signedexchange": {
     "message": "साइन केलेले एक्‍सचेंज"
   },
+  "panels/network/NetworkDataGridNode.ts | timeSubtitleTooltipText": {
+    "message": "लेटन्सी (प्रतिसाद मिळाल्याची वेळ - सुरू होण्याची वेळ)"
+  },
   "panels/network/NetworkDataGridNode.ts | unknown": {
     "message": "(अज्ञात)"
   },
@@ -6002,14 +6530,14 @@
   "panels/network/NetworkItemView.ts | headers": {
     "message": "हेडर"
   },
-  "panels/network/NetworkItemView.ts | headersAndRequestBody": {
-    "message": "हेडर आणि विनंती बॉडी"
-  },
   "panels/network/NetworkItemView.ts | initiator": {
     "message": "इनिशिएटर"
   },
   "panels/network/NetworkItemView.ts | messages": {
     "message": "मेसेज"
+  },
+  "panels/network/NetworkItemView.ts | payload": {
+    "message": "पेलोड"
   },
   "panels/network/NetworkItemView.ts | preview": {
     "message": "पूर्वावलोकन"
@@ -6452,12 +6980,6 @@
   "panels/network/RequestHeadersView.ts | decoded": {
     "message": "डीकोड केलेले:"
   },
-  "panels/network/RequestHeadersView.ts | empty": {
-    "message": "(रिकामा)"
-  },
-  "panels/network/RequestHeadersView.ts | formData": {
-    "message": "डेटामधून"
-  },
   "panels/network/RequestHeadersView.ts | fromDiskCache": {
     "message": "(डिस्क कॅशेमधून)"
   },
@@ -6472,6 +6994,9 @@
   },
   "panels/network/RequestHeadersView.ts | fromSignedexchange": {
     "message": "(साइन केलेल्या एक्स्चेंजवरून)"
+  },
+  "panels/network/RequestHeadersView.ts | fromWebBundle": {
+    "message": "(वेब बंडल वरून)"
   },
   "panels/network/RequestHeadersView.ts | general": {
     "message": "सर्वसाधारण"
@@ -6494,9 +7019,6 @@
   "panels/network/RequestHeadersView.ts | provisionalHeadersAreShownS": {
     "message": "तात्पुरती हेडर दाखवली आहेत. पूर्ण हेडर पाहण्यासाठी कॅशे बंद करा."
   },
-  "panels/network/RequestHeadersView.ts | queryStringParameters": {
-    "message": "क्वेरी स्ट्रिंग पॅरामीटर"
-  },
   "panels/network/RequestHeadersView.ts | recordedAttribution": {
     "message": "trigger-data सह विशेषता रेकॉर्ड केली: {PH1}"
   },
@@ -6511,9 +7033,6 @@
   },
   "panels/network/RequestHeadersView.ts | requestMethod": {
     "message": "विनंतीची पद्धत"
-  },
-  "panels/network/RequestHeadersView.ts | requestPayload": {
-    "message": "पेलोडची विनंती करा"
   },
   "panels/network/RequestHeadersView.ts | requestUrl": {
     "message": "URL ची विनंती करा"
@@ -6542,32 +7061,11 @@
   "panels/network/RequestHeadersView.ts | toUseThisResourceFromADifferentSite": {
     "message": "हा स्रोत वेगळ्या साइटवरून वापरण्यासाठी, सर्व्हर क्रॉस-ओरिजिन स्रोत धोरण प्रतिसाद हेडर शिथिल करू शकतो:"
   },
-  "panels/network/RequestHeadersView.ts | unableToDecodeValue": {
-    "message": "(मूल्य डीकोड करू शकत नाही)"
-  },
-  "panels/network/RequestHeadersView.ts | viewDecoded": {
-    "message": "डीकोड केलेला डेटा पहा"
-  },
-  "panels/network/RequestHeadersView.ts | viewDecodedL": {
-    "message": "डीकोड केलेला डेटा पहा"
-  },
   "panels/network/RequestHeadersView.ts | viewParsed": {
-    "message": "पार्स केलेल्या स्वरूपात पहा"
-  },
-  "panels/network/RequestHeadersView.ts | viewParsedL": {
     "message": "पार्स केलेल्या स्वरूपात पहा"
   },
   "panels/network/RequestHeadersView.ts | viewSource": {
     "message": "स्रोत पहा"
-  },
-  "panels/network/RequestHeadersView.ts | viewSourceL": {
-    "message": "स्रोत पहा"
-  },
-  "panels/network/RequestHeadersView.ts | viewUrlEncoded": {
-    "message": "एंकोड केलेली URL पहा"
-  },
-  "panels/network/RequestHeadersView.ts | viewUrlEncodedL": {
-    "message": "एंकोड केलेली URL पहा"
   },
   "panels/network/RequestInitiatorView.ts | requestCallStack": {
     "message": "कॉल स्टॅकची विनंती करा"
@@ -6577,6 +7075,51 @@
   },
   "panels/network/RequestInitiatorView.ts | thisRequestHasNoInitiatorData": {
     "message": "या विनंतीमध्ये इनिशिएटर डेटा नाही."
+  },
+  "panels/network/RequestPayloadView.ts | copyValue": {
+    "message": "मूल्य कॉपी करा"
+  },
+  "panels/network/RequestPayloadView.ts | empty": {
+    "message": "(रिकामा)"
+  },
+  "panels/network/RequestPayloadView.ts | formData": {
+    "message": "डेटामधून"
+  },
+  "panels/network/RequestPayloadView.ts | queryStringParameters": {
+    "message": "क्वेरी स्ट्रिंग पॅरामीटर"
+  },
+  "panels/network/RequestPayloadView.ts | requestPayload": {
+    "message": "पेलोडची विनंती करा"
+  },
+  "panels/network/RequestPayloadView.ts | showMore": {
+    "message": "आणखी दाखवा"
+  },
+  "panels/network/RequestPayloadView.ts | unableToDecodeValue": {
+    "message": "(मूल्य डीकोड करू शकत नाही)"
+  },
+  "panels/network/RequestPayloadView.ts | viewDecoded": {
+    "message": "डीकोड केलेला डेटा पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewDecodedL": {
+    "message": "डीकोड केलेला डेटा पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewParsed": {
+    "message": "पार्स केलेल्या स्वरूपात पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewParsedL": {
+    "message": "पार्स केलेल्या स्वरूपात पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewSource": {
+    "message": "स्रोत पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewSourceL": {
+    "message": "स्रोत पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewUrlEncoded": {
+    "message": "एंकोड केलेली URL पहा"
+  },
+  "panels/network/RequestPayloadView.ts | viewUrlEncodedL": {
+    "message": "एंकोड केलेली URL पहा"
   },
   "panels/network/RequestPreviewView.ts | failedToLoadResponseData": {
     "message": "प्रतिसाद डेटा लोड करता आला नाही"
@@ -8423,6 +8966,18 @@
   "panels/settings/SettingsScreen.ts | warning": {
     "message": "चेतावणी:"
   },
+  "panels/settings/components/SyncSection.ts | preferencesSyncDisabled": {
+    "message": "हे सेटिंग सुरू करण्यासाठी, तुम्ही प्रथम Chrome मध्ये सिंक सुरू करणे आवश्यक आहे."
+  },
+  "panels/settings/components/SyncSection.ts | settings": {
+    "message": "सेटिंग्ज वर जा"
+  },
+  "panels/settings/components/SyncSection.ts | signedIn": {
+    "message": "Chrome मध्ये हे ईमेल खाते वापरून साइन इन केले आहे:"
+  },
+  "panels/settings/components/SyncSection.ts | syncDisabled": {
+    "message": "हे सेटिंग सुरू करण्यासाठी, तुम्ही Chrome सिंक सुरू करणे आवश्यक आहे."
+  },
   "panels/settings/emulation/DevicesSettingsTab.ts | addCustomDevice": {
     "message": "कस्टम डिव्हाइस जोडा…"
   },
@@ -8582,8 +9137,11 @@
   "panels/snippets/SnippetsQuickOpen.ts | noSnippetsFound": {
     "message": "स्निपेट सापडली नाहीत."
   },
-  "panels/snippets/SnippetsQuickOpen.ts | runSnippet": {
-    "message": "स्निपेट रन करा"
+  "panels/snippets/SnippetsQuickOpen.ts | run": {
+    "message": "रन करा"
+  },
+  "panels/snippets/SnippetsQuickOpen.ts | snippet": {
+    "message": "स्निपेट"
   },
   "panels/sources/AddSourceMapURLDialog.ts | add": {
     "message": "जोडा"
@@ -8627,6 +9185,9 @@
   "panels/sources/CallStackSidebarPane.ts | addScriptToIgnoreList": {
     "message": "दुर्लक्ष करण्याच्या गोष्टींच्या सूचीमध्ये स्क्रिप्ट जोडा"
   },
+  "panels/sources/CallStackSidebarPane.ts | callFrameWarnings": {
+    "message": "काही कॉल फ्रेममध्ये चेतावण्या आहेत"
+  },
   "panels/sources/CallStackSidebarPane.ts | callStack": {
     "message": "कॉल स्टॅक"
   },
@@ -8658,7 +9219,7 @@
     "message": "कव्हरेज: n/a"
   },
   "panels/sources/CoveragePlugin.ts | coverageS": {
-    "message": "कव्हरेज: {PH1} %"
+    "message": "कव्हरेज: {PH1}"
   },
   "panels/sources/CoveragePlugin.ts | showDetails": {
     "message": "तपशील दाखवा"
@@ -8801,11 +9362,11 @@
   "panels/sources/GoToLineQuickOpen.ts | noFileSelected": {
     "message": "फाइल निवडली नाही."
   },
+  "panels/sources/GoToLineQuickOpen.ts | noResultsFound": {
+    "message": "परिणाम सापडले नाहीत"
+  },
   "panels/sources/GoToLineQuickOpen.ts | typeANumberToGoToThatLine": {
     "message": "त्या ओळीवर जाण्यासाठी क्रमांक टाइप करा."
-  },
-  "panels/sources/GutterDiffPlugin.ts | localModifications": {
-    "message": "स्थानिक सुधारणा ..."
   },
   "panels/sources/InplaceFormatterEditorAction.ts | format": {
     "message": "फॉरमॅट करा"
@@ -8918,6 +9479,15 @@
   "panels/sources/OutlineQuickOpen.ts | openAJavascriptOrCssFileToSee": {
     "message": "चिन्हे पाहण्यासाठी JavaScript किंवा CSS फाइल उघडा"
   },
+  "panels/sources/ProfilePlugin.ts | kb": {
+    "message": "KB"
+  },
+  "panels/sources/ProfilePlugin.ts | mb": {
+    "message": "MB"
+  },
+  "panels/sources/ProfilePlugin.ts | ms": {
+    "message": "मिसे"
+  },
   "panels/sources/ScopeChainSidebarPane.ts | closure": {
     "message": "बंद"
   },
@@ -9020,6 +9590,12 @@
   "panels/sources/SourcesPanel.ts | copyStringContents": {
     "message": "स्ट्रिंग आशय कॉपी करा"
   },
+  "panels/sources/SourcesPanel.ts | debuggerHidden": {
+    "message": "डीबगर साइडबार लपवला आहे"
+  },
+  "panels/sources/SourcesPanel.ts | debuggerShown": {
+    "message": "डीबगर साइडबार दाखवला आहे"
+  },
   "panels/sources/SourcesPanel.ts | dontPauseOnExceptions": {
     "message": "एक्सेप्शनवर थांबवू नका"
   },
@@ -9037,6 +9613,12 @@
   },
   "panels/sources/SourcesPanel.ts | moreOptions": {
     "message": "आणखी पर्याय"
+  },
+  "panels/sources/SourcesPanel.ts | navigatorHidden": {
+    "message": "नेव्हिगेटर साइडबार लपवला आहे"
+  },
+  "panels/sources/SourcesPanel.ts | navigatorShown": {
+    "message": "नेव्हिगेटर साइडबार दाखवला आहे"
   },
   "panels/sources/SourcesPanel.ts | openInSourcesPanel": {
     "message": "स्रोत पॅनलमध्ये उघडा"
@@ -9230,17 +9812,20 @@
   "panels/sources/sources-meta.ts | evaluateSelectedTextInConsole": {
     "message": "कन्सोलमधील निवडलेल्या मजकुराचे विश्लेषण करा"
   },
+  "panels/sources/sources-meta.ts | file": {
+    "message": "फाइल"
+  },
   "panels/sources/sources-meta.ts | filesystem": {
     "message": "फाइलसिस्टम"
+  },
+  "panels/sources/sources-meta.ts | goTo": {
+    "message": "येथे जा"
   },
   "panels/sources/sources-meta.ts | goToAFunctionDeclarationruleSet": {
     "message": "फंक्शन घोषणा/नियम संचावर जा"
   },
   "panels/sources/sources-meta.ts | goToLine": {
     "message": "ओळीवर जा"
-  },
-  "panels/sources/sources-meta.ts | goToSymbol": {
-    "message": "चिन्हावर जा"
   },
   "panels/sources/sources-meta.ts | incrementCssUnitBy": {
     "message": "CSS युनिटमध्ये {PH1} ने वाढ करा"
@@ -9251,14 +9836,17 @@
   "panels/sources/sources-meta.ts | jumpToPreviousEditingLocation": {
     "message": "मागील संपादन स्थानावर जा"
   },
+  "panels/sources/sources-meta.ts | line": {
+    "message": "रेषा"
+  },
   "panels/sources/sources-meta.ts | nextCallFrame": {
     "message": "पुढील कॉल फ्रेम"
   },
   "panels/sources/sources-meta.ts | none": {
     "message": "काहीही नाही"
   },
-  "panels/sources/sources-meta.ts | openFile": {
-    "message": "फाइल उघडा"
+  "panels/sources/sources-meta.ts | open": {
+    "message": "उघडा"
   },
   "panels/sources/sources-meta.ts | pauseScriptExecution": {
     "message": "स्क्रिप्ट अमलात आणणे थांबवा"
@@ -9349,6 +9937,9 @@
   },
   "panels/sources/sources-meta.ts | switchFile": {
     "message": "फाइल स्विच करा"
+  },
+  "panels/sources/sources-meta.ts | symbol": {
+    "message": "चिन्ह"
   },
   "panels/sources/sources-meta.ts | threads": {
     "message": "थ्रेड"
@@ -9502,6 +10093,9 @@
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | onIgnoreList": {
     "message": "दुर्लक्ष करण्याच्या गोष्टींच्या सूचीवर"
+  },
+  "panels/timeline/TimelineFlameChartDataProvider.ts | partiallyPresentedFrame": {
+    "message": "अंशतः सादर केलेली फ्रेम"
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | raster": {
     "message": "रास्टर"
@@ -9745,6 +10339,12 @@
   },
   "panels/timeline/TimelineTreeView.ts | heaviestStack": {
     "message": "सर्वात वजनदार स्टॅक"
+  },
+  "panels/timeline/TimelineTreeView.ts | heaviestStackHidden": {
+    "message": "सर्वात वजनदार स्टॅकचा साइडबार लपवला आहे"
+  },
+  "panels/timeline/TimelineTreeView.ts | heaviestStackShown": {
+    "message": "सर्वात वजनदार स्टॅकचा साइडबार दाखवला आहे"
   },
   "panels/timeline/TimelineTreeView.ts | hideHeaviestStack": {
     "message": "सर्वात वजनदार स्टॅक लपवा"
@@ -10838,6 +11438,18 @@
   "ui/components/data_grid/DataGrid.ts | sortBy": {
     "message": "यानुसार क्रमाने लावा"
   },
+  "ui/components/diff_view/DiffView.ts | SkippingDMatchingLines": {
+    "message": "( … वगळत आहे {PH1} ओळी जुळवत आहे … )"
+  },
+  "ui/components/diff_view/DiffView.ts | additions": {
+    "message": "जोड:"
+  },
+  "ui/components/diff_view/DiffView.ts | changesDiffViewer": {
+    "message": "बदलांमधील फरकांचा दर्शक"
+  },
+  "ui/components/diff_view/DiffView.ts | deletions": {
+    "message": "हटवणे:"
+  },
   "ui/components/issue_counter/IssueCounter.ts | breakingChanges": {
     "message": "{issueCount,plural, =1{# हानिकारक बदल}other{# हानिकारक बदल}}"
   },
@@ -10913,6 +11525,24 @@
   "ui/components/linear_memory_inspector/linear_memory_inspector-meta.ts | showMemoryInspector": {
     "message": "मेमरी परीक्षक दाखवा"
   },
+  "ui/components/panel_feedback/FeedbackButton.ts | feedback": {
+    "message": "फीडबॅक"
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | previewFeature": {
+    "message": "पूर्वावलोकन वैशिष्ट्य"
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | previewText": {
+    "message": "या वैशिष्ट्यावर आमची टीम सक्रियपणे काम करत आहे आणि तुम्हाला याबद्दल काय वाटते ते जाणून घेण्यास आम्ही उत्सुक आहोत."
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | previewTextFeedbackLink": {
+    "message": "आम्हाला तुमचा फीडबॅक पाठवा."
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | videoAndDocumentation": {
+    "message": "व्हिडिओ आणि दस्तऐवजीकरण"
+  },
+  "ui/components/panel_feedback/PreviewToggle.ts | previewTextFeedbackLink": {
+    "message": "आम्हाला तुमचा फीडबॅक पाठवा."
+  },
   "ui/components/request_link_icon/RequestLinkIcon.ts | clickToShowRequestInTheNetwork": {
     "message": "नेटवर्क पॅनल उघडण्यासाठी क्लिक करा आणि URL साठी विनंत्या दाखवा: {url}"
   },
@@ -10930,6 +11560,9 @@
   },
   "ui/components/survey_link/SurveyLink.ts | thankYouForYourFeedback": {
     "message": "तुमच्या फीडबॅकबद्दल धन्यवाद"
+  },
+  "ui/components/text_editor/config.ts | codeEditor": {
+    "message": "कोड संपादक"
   },
   "ui/legacy/DockController.ts | close": {
     "message": "बंद करा"
@@ -10979,6 +11612,18 @@
   "ui/legacy/InspectorView.ts | devToolsLanguageMissmatch": {
     "message": "DevTools ही आता {PH1} मध्ये उपलब्ध आहेत!"
   },
+  "ui/legacy/InspectorView.ts | drawer": {
+    "message": "टूल ड्रॉवर"
+  },
+  "ui/legacy/InspectorView.ts | drawerHidden": {
+    "message": "ड्रॉवर लपवला आहे"
+  },
+  "ui/legacy/InspectorView.ts | drawerShown": {
+    "message": "ड्रॉवर दाखवला आहे"
+  },
+  "ui/legacy/InspectorView.ts | mainToolbar": {
+    "message": "मुख्य टूलबार"
+  },
   "ui/legacy/InspectorView.ts | moreTools": {
     "message": "आणखी टूल"
   },
@@ -11014,6 +11659,9 @@
   },
   "ui/legacy/ListWidget.ts | saveString": {
     "message": "सेव्ह करा"
+  },
+  "ui/legacy/RemoteDebuggingTerminatedScreen.ts | debuggingConnectionWasClosed": {
+    "message": "डीबगिंग कनेक्शन बंद केले होते. कारण: "
   },
   "ui/legacy/RemoteDebuggingTerminatedScreen.ts | reconnectDevtools": {
     "message": "DevTools शी पुन्हा कनेक्ट करा"
@@ -11098,6 +11746,9 @@
   },
   "ui/legacy/TabbedPane.ts | moreTabs": {
     "message": "आणखी टॅब"
+  },
+  "ui/legacy/TabbedPane.ts | previewFeature": {
+    "message": "पूर्वावलोकन वैशिष्ट्य"
   },
   "ui/legacy/TargetCrashedScreen.ts | devtoolsWasDisconnectedFromThe": {
     "message": "DevTools पेजवरून डिस्कनेक्ट केले गेले होते."
@@ -11245,6 +11896,9 @@
   },
   "ui/legacy/components/cookie_table/CookiesTable.ts | name": {
     "message": "नाव"
+  },
+  "ui/legacy/components/cookie_table/CookiesTable.ts | opaquePartitionKey": {
+    "message": "(अपारदर्शक)"
   },
   "ui/legacy/components/cookie_table/CookiesTable.ts | session": {
     "message": "सेशन"
@@ -11414,15 +12068,6 @@
   "ui/legacy/components/object_ui/CustomPreviewComponent.ts | showAsJavascriptObject": {
     "message": "JavaScript ऑब्जेक्ट म्हणून दाखवा"
   },
-  "ui/legacy/components/object_ui/JavaScriptAutocomplete.ts | keys": {
-    "message": "की"
-  },
-  "ui/legacy/components/object_ui/JavaScriptAutocomplete.ts | keywords": {
-    "message": "कीवर्ड"
-  },
-  "ui/legacy/components/object_ui/JavaScriptAutocomplete.ts | lexicalScopeVariables": {
-    "message": "लेक्सिकल व्याप्ती व्हेरिएबल"
-  },
   "ui/legacy/components/object_ui/ObjectPropertiesSection.ts | collapseChildren": {
     "message": "उपघटक कोलॅप्स करा"
   },
@@ -11510,15 +12155,6 @@
   "ui/legacy/components/perf_ui/FlameChart.ts | sSelected": {
     "message": "{PH1} निवडला"
   },
-  "ui/legacy/components/perf_ui/LineLevelProfile.ts | kb": {
-    "message": "KB"
-  },
-  "ui/legacy/components/perf_ui/LineLevelProfile.ts | mb": {
-    "message": "MB"
-  },
-  "ui/legacy/components/perf_ui/LineLevelProfile.ts | ms": {
-    "message": "मिसे"
-  },
   "ui/legacy/components/perf_ui/NetworkPriorities.ts | high": {
     "message": "उच्च"
   },
@@ -11567,14 +12203,17 @@
   "ui/legacy/components/perf_ui/perf_ui-meta.ts | zoom": {
     "message": "झूम करा"
   },
+  "ui/legacy/components/quick_open/CommandMenu.ts | command": {
+    "message": "कमांड"
+  },
   "ui/legacy/components/quick_open/CommandMenu.ts | noCommandsFound": {
     "message": "कमांड सापडल्या नाहीत"
   },
   "ui/legacy/components/quick_open/CommandMenu.ts | oneOrMoreSettingsHaveChanged": {
     "message": "एक किंवा अधिक सेटिंग्ज बदलली आहेत, जी लागू होण्यासाठी रीलोड केले जाणे आवश्यक आहे."
   },
-  "ui/legacy/components/quick_open/CommandMenu.ts | runCommand": {
-    "message": "कमांड रन करा"
+  "ui/legacy/components/quick_open/CommandMenu.ts | run": {
+    "message": "रन करा"
   },
   "ui/legacy/components/quick_open/FilteredListWidget.ts | noResultsFound": {
     "message": "परिणाम सापडले नाहीत"
@@ -11588,8 +12227,8 @@
   "ui/legacy/components/quick_open/QuickInput.ts | pressEnterToConfirmOrEscapeTo": {
     "message": "{PH1} (कंफर्म करण्यासाठी 'एंटर ' किंवा रद्द करण्यासाठी 'एस्केप' दाबा.)"
   },
-  "ui/legacy/components/quick_open/QuickOpen.ts | useTabToSwitchCommandsTypeToSeeAvailableCommands": {
-    "message": "कमांड स्विच करण्यासाठी टॅब वापरा. उपलब्ध कमांड पाहण्यासाठी '?' टाइप करा"
+  "ui/legacy/components/quick_open/QuickOpen.ts | typeToSeeAvailableCommands": {
+    "message": "उपलब्ध कमांड पाहण्यासाठी '?' टाइप करा"
   },
   "ui/legacy/components/quick_open/quick_open-meta.ts | openFile": {
     "message": "फाइल उघडा"
@@ -11692,9 +12331,6 @@
   },
   "ui/legacy/components/source_frame/source_frame-meta.ts | tabCharacter": {
     "message": "टॅब वर्ण"
-  },
-  "ui/legacy/components/text_editor/CodeMirrorTextEditor.ts | codeEditor": {
-    "message": "कोड संपादक"
   },
   "ui/legacy/components/utils/ImagePreview.ts | currentSource": {
     "message": "सध्याचा स्रोत:"

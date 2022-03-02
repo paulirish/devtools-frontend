@@ -39,12 +39,11 @@
   border: none;
   border-radius: 50%;
   background-color: var(--color-background-elevation-1);
-  cursor: pointer;
 }
 
 .close::before,
 .close::after {
-  content: '';
+  content: "";
   display: inline-block;
   position: absolute;
   left: 0;

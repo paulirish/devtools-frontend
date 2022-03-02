@@ -25,6 +25,7 @@
   border-radius: 2px 2px 0 0;
   overflow: hidden;
   flex: none;
+  touch-action: none;
 }
 
 .spectrum-dragger,
@@ -37,7 +38,8 @@
   height: 12px;
   width: 12px;
   border: 1px solid var(--color-background);
-  cursor: pointer;
+  cursor: move;
+  z-index: 1;
   position: absolute;
   top: 0;
   left: 0;
@@ -48,7 +50,7 @@
 .spectrum-slider {
   position: absolute;
   top: -1px;
-  cursor: pointer;
+  cursor: ew-resize;
   width: 13px;
   height: 13px;
   border-radius: 13px;
@@ -90,6 +92,7 @@
   width: 130px;
   height: 11px;
   border-radius: 2px;
+  touch-action: none;
 }
 
 .spectrum-hue:focus-visible .spectrum-slider,
@@ -242,26 +245,26 @@
   user-select: text;
 }
 
-.contrast-details-value [is=ui-icon] {
+.contrast-details-value [is="ui-icon"] {
   display: none;
   margin-left: 5px;
   background-color: var(--color-text-primary);
 }
 
-.spectrum-contrast-details .toolbar-state-on [is=ui-icon] {
+.spectrum-contrast-details .toolbar-state-on [is="ui-icon"] {
   background-color: var(--color-text-secondary);
 }
 
-[is=ui-icon].smallicon-no {
+[is="ui-icon"].smallicon-no {
   background-color: var(--color-accent-red);
 }
 
-.contrast-pass-fail span[is=ui-icon] {
+.contrast-pass-fail span[is="ui-icon"] {
   margin-left: 5px;
 }
 
-[is=ui-icon].smallicon-checkmark-square,
-[is=ui-icon].smallicon-checkmark-behind {
+[is="ui-icon"].smallicon-checkmark-square,
+[is="ui-icon"].smallicon-checkmark-behind {
   background-color: var(--color-accent-green);
 }
 
@@ -328,7 +331,7 @@
   background-color: var(--color-background-inverted-opacity-50);
 }
 
-[is=ui-icon].icon-mask.copy-color-icon {
+[is="ui-icon"].icon-mask.copy-color-icon {
   background-color: var(--color-background);
 }
 
@@ -425,6 +428,10 @@
   margin: 0;
   top: -5px;
   left: 3px;
+  border: 0;
+  border-radius: 1px;
+  width: 11px;
+  height: 11px;
 }
 
 .spectrum-palette-color:hover:not(.spectrum-shades-shown) > .spectrum-palette-color-shadow,
@@ -457,7 +464,7 @@
 }
 
 .palette-color-shades > .spectrum-palette-color {
-  margin: 8px 0 0 0;
+  margin: 8px 0 0;
   margin-left: 8px;
   width: 12px;
 }
@@ -640,7 +647,7 @@ div.palette-preview {
   padding-bottom: 2px;
 }
 
-.swatch.contrast [is=ui-icon] {
+.swatch.contrast [is="ui-icon"] {
   margin: -2px;
 }
 

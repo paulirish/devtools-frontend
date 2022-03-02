@@ -70,6 +70,22 @@ const UIStrings = {
   */
   hideNavigator: 'Hide navigator',
   /**
+   * @description Screen reader announcement when the navigator sidebar is shown in the Sources panel.
+   */
+  navigatorShown: 'Navigator sidebar shown',
+  /**
+   * @description Screen reader announcement when the navigator sidebar is hidden in the Sources panel.
+   */
+  navigatorHidden: 'Navigator sidebar hidden',
+  /**
+   * @description Screen reader announcement when the navigator sidebar is shown in the Sources panel.
+   */
+  debuggerShown: 'Debugger sidebar shown',
+  /**
+   * @description Screen reader announcement when the navigator sidebar is hidden in the Sources panel.
+   */
+  debuggerHidden: 'Debugger sidebar hidden',
+  /**
   * @description Tooltip for the the debugger toggle in the Sources panel. Command to open/show the
   * sidebar containing the debugger tool.
   */
@@ -252,9 +268,11 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.sourcesViewInternal.addEventListener(Events.EditorSelected, this.editorSelected.bind(this));
 
     this.toggleNavigatorSidebarButton = this.editorView.createShowHideSidebarButton(
-        i18nString(UIStrings.showNavigator), i18nString(UIStrings.hideNavigator));
+        i18nString(UIStrings.showNavigator), i18nString(UIStrings.hideNavigator), i18nString(UIStrings.navigatorShown),
+        i18nString(UIStrings.navigatorHidden));
     this.toggleDebuggerSidebarButton = this.splitWidget.createShowHideSidebarButton(
-        i18nString(UIStrings.showDebugger), i18nString(UIStrings.hideDebugger));
+        i18nString(UIStrings.showDebugger), i18nString(UIStrings.hideDebugger), i18nString(UIStrings.debuggerShown),
+        i18nString(UIStrings.debuggerHidden));
     this.editorView.setMainWidget(this.sourcesViewInternal);
 
     this.threadsSidebarPane = null;
@@ -266,7 +284,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
         .addChangeListener(this.updateSidebarPosition.bind(this));
     this.updateSidebarPosition();
 
-    this.updateDebuggerButtonsAndStatus();
+    void this.updateDebuggerButtonsAndStatus();
     this.pauseOnExceptionEnabledChanged();
     Common.Settings.Settings.instance()
         .moduleSetting('pauseOnExceptionEnabled')
@@ -293,7 +311,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     Extensions.ExtensionServer.ExtensionServer.instance().addEventListener(
         Extensions.ExtensionServer.Events.SidebarPaneAdded, this.extensionSidebarPaneAdded, this);
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
-    this.lastModificationTime = window.performance.now();
+    this.lastModificationTime = -Infinity;
   }
 
   static instance(opts: {
@@ -338,7 +356,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     if (ThreadsSidebarPane.shouldBeShown() && !this.threadsSidebarPane) {
       this.threadsSidebarPane = (UI.ViewManager.ViewManager.instance().view('sources.threads') as UI.View.View);
       if (this.sidebarPaneStack && this.threadsSidebarPane) {
-        this.sidebarPaneStack.showView(
+        void this.sidebarPaneStack.showView(
             this.threadsSidebarPane, this.splitWidget.isVertical() ? this.watchSidebarPane : this.callstackPane);
       }
     }
@@ -407,7 +425,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     if (!UI.InspectorView.InspectorView.instance().canSelectPanel('sources')) {
       return false;
     }
-    UI.ViewManager.ViewManager.instance().showView('sources');
+    void UI.ViewManager.ViewManager.instance().showView('sources');
     return true;
   }
 
@@ -424,8 +442,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   private debuggerPaused(event: Common.EventTarget.EventTargetEvent<SDK.DebuggerModel.DebuggerModel>): void {
     const debuggerModel = event.data;
     const details = debuggerModel.debuggerPausedDetails();
-    if (!this.pausedInternal) {
-      this.setAsCurrentPanel();
+    if (!this.pausedInternal &&
+        Common.Settings.Settings.instance().moduleSetting('autoFocusOnDebuggerPausedEnabled').get()) {
+      void this.setAsCurrentPanel();
     }
 
     if (UI.Context.Context.instance().flavor(SDK.Target.Target) === debuggerModel.target()) {
@@ -437,7 +456,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
   private showDebuggerPausedDetails(details: SDK.DebuggerModel.DebuggerPausedDetails): void {
     this.pausedInternal = true;
-    this.updateDebuggerButtonsAndStatus();
+    void this.updateDebuggerButtonsAndStatus();
     UI.Context.Context.instance().setFlavor(SDK.DebuggerModel.DebuggerPausedDetails, details);
     this.toggleDebuggerSidebarButton.setEnabled(false);
     this.revealDebuggerSidebar();
@@ -462,7 +481,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       return;
     }
 
-    this.updateDebuggerButtonsAndStatus();
+    void this.updateDebuggerButtonsAndStatus();
   }
 
   get visibleView(): UI.Widget.Widget|null {
@@ -480,14 +499,15 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     } else {
       this.showEditor();
     }
-    this.sourcesViewInternal.showSourceLocation(uiSourceCode, lineNumber, columnNumber, omitFocus);
+    this.sourcesViewInternal.showSourceLocation(
+        uiSourceCode, lineNumber === undefined ? undefined : {lineNumber, columnNumber}, omitFocus);
   }
 
   private showEditor(): void {
     if (WrapperView.isShowing()) {
       return;
     }
-    this.setAsCurrentPanel();
+    void this.setAsCurrentPanel();
   }
 
   showUILocation(uiLocation: Workspace.UISourceCode.UILocation, omitFocus?: boolean): void {
@@ -503,7 +523,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
         if (skipReveal) {
           this.navigatorTabbedLocation.tabbedPane().selectTab(viewId);
         } else {
-          UI.ViewManager.ViewManager.instance().showView(viewId);
+          void UI.ViewManager.ViewManager.instance().showView(viewId);
         }
       }
     }
@@ -527,14 +547,16 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
   private async executionLineChanged(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> {
     const uiLocation = await liveLocation.uiLocation();
+    if (liveLocation.isDisposed()) {
+      return;
+    }
     if (!uiLocation) {
       return;
     }
     if (window.performance.now() - this.lastModificationTime < lastModificationTimeout) {
       return;
     }
-    this.sourcesViewInternal.showSourceLocation(
-        uiLocation.uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber, undefined, true);
+    this.sourcesViewInternal.showSourceLocation(uiLocation.uiSourceCode, uiLocation, undefined, true);
   }
 
   private lastModificationTimeoutPassedForTest(): void {
@@ -562,7 +584,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const enabled = Common.Settings.Settings.instance().moduleSetting('pauseOnExceptionEnabled').get();
     const button = (this.pauseOnExceptionButton as UI.Toolbar.ToolbarToggle);
     button.setToggled(enabled);
-    button.setTitle(enabled ? i18nString(UIStrings.pauseOnExceptions) : i18nString(UIStrings.dontPauseOnExceptions));
+    button.setTitle(enabled ? i18nString(UIStrings.dontPauseOnExceptions) : i18nString(UIStrings.pauseOnExceptions));
     this.debugToolbarDrawer.classList.toggle('expanded', enabled);
   }
 
@@ -604,7 +626,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 
   private clearInterface(): void {
-    this.updateDebuggerButtonsAndStatus();
+    void this.updateDebuggerButtonsAndStatus();
     UI.Context.Context.instance().setFlavor(SDK.DebuggerModel.DebuggerPausedDetails, null);
 
     if (this.switchToPausedTargetTimeout) {
@@ -638,7 +660,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   runSnippet(): void {
     const uiSourceCode = this.sourcesViewInternal.currentUISourceCode();
     if (uiSourceCode) {
-      Snippets.ScriptSnippetFileSystem.evaluateScriptSnippet(uiSourceCode);
+      void Snippets.ScriptSnippetFileSystem.evaluateScriptSnippet(uiSourceCode);
     }
   }
 
@@ -695,7 +717,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   private terminateExecution(): void {
     const debuggerModel = this.prepareToResume();
     if (debuggerModel) {
-      debuggerModel.runtimeModel().terminateExecution();
+      void debuggerModel.runtimeModel().terminateExecution();
       debuggerModel.resume();
     }
   }
@@ -703,7 +725,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   stepOver(): boolean {
     const debuggerModel = this.prepareToResume();
     if (debuggerModel) {
-      debuggerModel.stepOver();
+      void debuggerModel.stepOver();
     }
     return true;
   }
@@ -711,7 +733,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   stepInto(): boolean {
     const debuggerModel = this.prepareToResume();
     if (debuggerModel) {
-      debuggerModel.stepInto();
+      void debuggerModel.stepInto();
     }
     return true;
   }
@@ -727,7 +749,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   stepOut(): boolean {
     const debuggerModel = this.prepareToResume();
     if (debuggerModel) {
-      debuggerModel.stepOut();
+      void debuggerModel.stepOut();
     }
     return true;
   }
@@ -824,7 +846,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     if (!(target instanceof UISourceCodeFrame)) {
       return;
     }
-    if (target.uiSourceCode().contentType().isFromSourceMap() || target.textEditor.selection().isEmpty()) {
+    if (target.uiSourceCode().contentType().isFromSourceMap() || target.textEditor.state.selection.main.empty) {
       return;
     }
     contextMenu.debugSection().appendAction('debugger.evaluate-selection');
@@ -955,14 +977,12 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       return;
     }
     const openText = i18nString(UIStrings.openInSourcesPanel);
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const callback: () => any = this.showUILocation.bind(this, uiSourceCode.uiLocation(0, 0));
+    const callback: () => void = this.showUILocation.bind(this, uiSourceCode.uiLocation(0, 0));
     contextMenu.revealSection().appendItem(openText, callback);
   }
 
   private showFunctionDefinition(remoteObject: SDK.RemoteObject.RemoteObject): void {
-    remoteObject.debuggerModel().functionDetailsPromise(remoteObject).then(this.didGetFunctionDetails.bind(this));
+    void remoteObject.debuggerModel().functionDetailsPromise(remoteObject).then(this.didGetFunctionDetails.bind(this));
   }
 
   private async didGetFunctionDetails(response: {
@@ -981,12 +1001,15 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 
   private revealNavigatorSidebar(): void {
-    this.setAsCurrentPanel();
+    void this.setAsCurrentPanel();
     this.editorView.showBoth(true);
   }
 
   private revealDebuggerSidebar(): void {
-    this.setAsCurrentPanel();
+    if (!Common.Settings.Settings.instance().moduleSetting('autoFocusOnDebuggerPausedEnabled').get()) {
+      return;
+    }
+    void this.setAsCurrentPanel();
     this.splitWidget.showBoth(true);
   }
 
@@ -1032,7 +1055,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.sidebarPaneStack.appendApplicableItems('sources.sidebar-top');
 
     if (this.threadsSidebarPane) {
-      this.sidebarPaneStack.showView(this.threadsSidebarPane);
+      void this.sidebarPaneStack.showView(this.threadsSidebarPane);
     }
 
     const jsBreakpoints = (UI.ViewManager.ViewManager.instance().view('sources.jsBreakpoints') as UI.View.View);
@@ -1046,9 +1069,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     if (!vertically) {
       // Populate the rest of the stack.
       this.sidebarPaneStack.appendView(this.watchSidebarPane);
-      this.sidebarPaneStack.showView(jsBreakpoints);
-      this.sidebarPaneStack.showView(scopeChainView);
-      this.sidebarPaneStack.showView(this.callstackPane);
+      void this.sidebarPaneStack.showView(jsBreakpoints);
+      void this.sidebarPaneStack.showView(scopeChainView);
+      void this.sidebarPaneStack.showView(this.callstackPane);
       this.extensionSidebarPanesContainer = this.sidebarPaneStack;
       this.sidebarPaneView = vbox;
       this.splitWidget.uninstallResizer(this.debugToolbar.gripElementForResize());
@@ -1057,8 +1080,8 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       splitWidget.setMainWidget(vbox);
 
       // Populate the left stack.
-      this.sidebarPaneStack.showView(jsBreakpoints);
-      this.sidebarPaneStack.showView(this.callstackPane);
+      void this.sidebarPaneStack.showView(jsBreakpoints);
+      void this.sidebarPaneStack.showView(this.callstackPane);
 
       const tabbedLocation =
           UI.ViewManager.ViewManager.instance().createTabbedLocation(this.revealDebuggerSidebar.bind(this));
@@ -1083,10 +1106,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 
   setAsCurrentPanel(): Promise<void> {
-    if (Common.Settings.Settings.instance().moduleSetting('autoFocusOnDebuggerPausedEnabled').get()) {
-      return UI.ViewManager.ViewManager.instance().showView('sources');
-    }
-    return Promise.resolve();
+    return UI.ViewManager.ViewManager.instance().showView('sources');
   }
 
   private extensionSidebarPaneAdded(
@@ -1133,12 +1153,11 @@ export class UILocationRevealer implements Common.Revealer.Revealer {
     return uILocationRevealerInstance;
   }
 
-  reveal(uiLocation: Object, omitFocus?: boolean): Promise<void> {
+  async reveal(uiLocation: Object, omitFocus?: boolean): Promise<void> {
     if (!(uiLocation instanceof Workspace.UISourceCode.UILocation)) {
-      return Promise.reject(new Error('Internal error: not a ui location'));
+      throw new Error('Internal error: not a ui location');
     }
     SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
-    return Promise.resolve();
   }
 }
 
@@ -1183,12 +1202,11 @@ export class UISourceCodeRevealer implements Common.Revealer.Revealer {
     return uISourceCodeRevealerInstance;
   }
 
-  reveal(uiSourceCode: Object, omitFocus?: boolean): Promise<void> {
+  async reveal(uiSourceCode: Object, omitFocus?: boolean): Promise<void> {
     if (!(uiSourceCode instanceof Workspace.UISourceCode.UISourceCode)) {
-      return Promise.reject(new Error('Internal error: not a ui source code'));
+      throw new Error('Internal error: not a ui source code');
     }
     SourcesPanel.instance().showUISourceCode(uiSourceCode, undefined, undefined, omitFocus);
-    return Promise.resolve();
   }
 }
 
@@ -1206,8 +1224,10 @@ export class DebuggerPausedDetailsRevealer implements Common.Revealer.Revealer {
     return debuggerPausedDetailsRevealerInstance;
   }
 
-  reveal(_object: Object): Promise<void> {
-    return SourcesPanel.instance().setAsCurrentPanel();
+  async reveal(_object: Object): Promise<void> {
+    if (Common.Settings.Settings.instance().moduleSetting('autoFocusOnDebuggerPausedEnabled').get()) {
+      return SourcesPanel.instance().setAsCurrentPanel();
+    }
   }
 }
 
@@ -1308,12 +1328,13 @@ export class DebuggingActionDelegate implements UI.ActionRegistration.ActionDele
       case 'debugger.evaluate-selection': {
         const frame = UI.Context.Context.instance().flavor(UISourceCodeFrame);
         if (frame) {
-          let text = frame.textEditor.text(frame.textEditor.selection());
+          const {state: editorState} = frame.textEditor;
+          let text = editorState.sliceDoc(editorState.selection.main.from, editorState.selection.main.to);
           const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
           if (executionContext) {
             const message = SDK.ConsoleModel.ConsoleModel.instance().addCommandMessage(executionContext, text);
             text = ObjectUI.JavaScriptREPL.JavaScriptREPL.wrapObjectLiteral(text);
-            SDK.ConsoleModel.ConsoleModel.instance().evaluateCommandInConsole(
+            void SDK.ConsoleModel.ConsoleModel.instance().evaluateCommandInConsole(
                 executionContext, message, text, /* useCommandLineAPI */ true);
           }
         }

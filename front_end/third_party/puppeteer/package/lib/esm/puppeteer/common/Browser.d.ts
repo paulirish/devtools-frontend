@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 /// <reference types="node" />
-import { ChildProcess } from 'child_process';
-import { Protocol } from 'devtools-protocol';
-
-import { Connection } from './Connection.js';
-import { EventEmitter } from './EventEmitter.js';
-import { Page } from './Page.js';
-import { Viewport } from './PuppeteerViewport.js';
 import { Target } from './Target.js';
-
+import { EventEmitter } from './EventEmitter.js';
+import { Connection } from './Connection.js';
+import { Protocol } from 'devtools-protocol';
+import { Page } from './Page.js';
+import { ChildProcess } from 'child_process';
+import { Viewport } from './PuppeteerViewport.js';
 /**
  * BrowserContext options.
  *
@@ -164,6 +162,8 @@ export declare class Browser extends EventEmitter {
     private _targetFilterCallback;
     private _defaultContext;
     private _contexts;
+    private _screenshotTaskQueue;
+    private _ignoredTargets;
     /**
      * @internal
      * Used in Target.ts directly so cannot be marked private.
@@ -264,7 +264,7 @@ export declare class Browser extends EventEmitter {
      * const newWindowTarget = await browser.waitForTarget(target => target.url() === 'https://www.example.com/');
      * ```
      */
-    waitForTarget(predicate: (x: Target) => boolean, options?: WaitForTargetOptions): Promise<Target>;
+    waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: WaitForTargetOptions): Promise<Target>;
     /**
      * An array of all open pages inside the Browser.
      *
@@ -393,7 +393,7 @@ export declare class BrowserContext extends EventEmitter {
      * @returns Promise which resolves to the first target found
      * that matches the `predicate` function.
      */
-    waitForTarget(predicate: (x: Target) => boolean, options?: {
+    waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: {
         timeout?: number;
     }): Promise<Target>;
     /**

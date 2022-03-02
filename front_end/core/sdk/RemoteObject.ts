@@ -33,7 +33,7 @@
  */
 
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
-import type * as Protocol from '../../generated/protocol.js';
+import * as Protocol from '../../generated/protocol.js';
 
 import type {DebuggerModel, FunctionDetails} from './DebuggerModel.js';
 import type {RuntimeModel} from './RuntimeModel.js';
@@ -60,6 +60,20 @@ export class RemoteObject {
     }
 
     return remoteObject.type;
+  }
+
+  static isNullOrUndefined(remoteObject: RemoteObject|null|undefined): boolean {
+    if (remoteObject === null || remoteObject === undefined) {
+      return true;
+    }
+    switch (remoteObject.type) {
+      case Protocol.Runtime.RemoteObjectType.Object:
+        return remoteObject.subtype === Protocol.Runtime.RemoteObjectSubtype.Null;
+      case Protocol.Runtime.RemoteObjectType.Undefined:
+        return true;
+      default:
+        return false;
+    }
   }
 
   static arrayNameFromDescription(description: string): string {
@@ -185,7 +199,7 @@ export class RemoteObject {
       if (property.isAccessorProperty()) {
         continue;
       }
-      if (property.symbol) {
+      if (property.private || property.symbol) {
         propertySymbols.push(property);
       } else {
         propertiesMap.set(property.name, property);
@@ -471,10 +485,18 @@ export class RemoteObjectImpl extends RemoteObject {
       result.push(remoteProperty);
     }
     for (const property of privateProperties) {
-      const propertyValue =
-          this.runtimeModelInternal.createRemoteObject((property.value as Protocol.Runtime.RemoteObject));
+      const propertyValue = property.value ? this.runtimeModelInternal.createRemoteObject(property.value) : null;
       const remoteProperty = new RemoteObjectProperty(
           property.name, propertyValue, true, true, true, false, undefined, false, undefined, true);
+
+      if (typeof property.value === 'undefined') {
+        if (property.get && property.get.type !== 'undefined') {
+          remoteProperty.getter = this.runtimeModelInternal.createRemoteObject(property.get);
+        }
+        if (property.set && property.set.type !== 'undefined') {
+          remoteProperty.setter = this.runtimeModelInternal.createRemoteObject(property.set);
+        }
+      }
       result.push(remoteProperty);
     }
 
@@ -511,7 +533,7 @@ export class RemoteObjectImpl extends RemoteObject {
     const resultPromise = this.doSetObjectPropertyValue(response.result, name);
 
     if (response.result.objectId) {
-      this.#runtimeAgent.invoke_releaseObject({objectId: response.result.objectId});
+      void this.#runtimeAgent.invoke_releaseObject({objectId: response.result.objectId});
     }
 
     return resultPromise;
@@ -597,7 +619,7 @@ export class RemoteObjectImpl extends RemoteObject {
     if (!this.#objectIdInternal) {
       return;
     }
-    this.#runtimeAgent.invoke_releaseObject({objectId: this.#objectIdInternal});
+    void this.#runtimeAgent.invoke_releaseObject({objectId: this.#objectIdInternal});
   }
 
   arrayLength(): number {

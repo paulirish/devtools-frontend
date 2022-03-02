@@ -119,9 +119,9 @@ export class FormatterWorkerPool {
     });
   }
 
-  format(mimeType: string, content: string, indentString: string): Promise<FormatResult> {
+  format(mimeType: string, content: string, indentString: string): Promise<FormatterActions.FormatResult> {
     const parameters = {mimeType: mimeType, content: content, indentString: indentString};
-    return this.runTask(FormatterActions.FormatterActions.FORMAT, parameters) as Promise<FormatResult>;
+    return this.runTask(FormatterActions.FormatterActions.FORMAT, parameters) as Promise<FormatterActions.FormatResult>;
   }
 
   javaScriptIdentifiers(content: string): Promise<{
@@ -171,24 +171,6 @@ export class FormatterWorkerPool {
     }
   }
 
-  findLastExpression(content: string): Promise<string|null> {
-    return this.runTask(FormatterActions.FormatterActions.FIND_LAST_EXPRESSION, {content}) as Promise<string|null>;
-  }
-
-  findLastFunctionCall(content: string): Promise<{
-    baseExpression: string,
-    receiver: string,
-    argumentIndex: number,
-    functionName: string,
-  }|null> {
-    return this.runTask(FormatterActions.FormatterActions.FIND_LAST_FUNCTION_CALL, {content}) as Promise<{
-             baseExpression: string,
-             receiver: string,
-             argumentIndex: number,
-             functionName: string,
-           }|null>;
-  }
-
   argumentsList(content: string): Promise<string[]> {
     return this.runTask(FormatterActions.FormatterActions.ARGUMENTS_LIST, {content}) as Promise<string[]>;
   }
@@ -213,11 +195,6 @@ class Task {
   }
 }
 
-export interface FormatResult {
-  content: string;
-  mapping: FormatMapping;
-}
-
 interface CSSProperty {
   name: string;
   nameRange: TextRange;
@@ -236,11 +213,6 @@ export interface OutlineItem {
   column: number;
   title: string;
   subtitle?: string;
-}
-
-export interface FormatMapping {
-  original: number[];
-  formatted: number[];
 }
 
 export interface CSSStyleRule {

@@ -75,6 +75,8 @@ def _CheckChangesAreExclusiveToDirectory(input_api, output_api):
         return False
 
     def FileIsInDir(file, dirs):
+        if file.endswith('OWNERS') and 'OWNERS' in dirs:
+            return True
         for dir in dirs:
             if IsParentDir(file, dir):
                 return True
@@ -89,7 +91,7 @@ def _CheckChangesAreExclusiveToDirectory(input_api, output_api):
             'package-lock.json',
             input_api.os_path.join('scripts', 'deps', 'manage_node_deps.py'),
         ],
-        ['OWNERS', input_api.os_path.join('config', 'owner')],
+        ['OWNERS'],
     ]
 
     affected_files = input_api.LocalPaths()
@@ -145,14 +147,6 @@ def _CheckBugAssociation(input_api, output_api, is_committing):
     return results
 
 
-def _CheckBuildGN(input_api, output_api):
-    results = [output_api.PresubmitNotifyResult('Running BUILD.GN check:')]
-    script_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
-                                         'scripts', 'check_gn.js')
-    results.extend(_checkWithNodeScript(input_api, output_api, script_path))
-    return results
-
-
 def _CheckExperimentTelemetry(input_api, output_api):
     experiment_telemetry_files = [
         input_api.os_path.join(input_api.PresubmitLocalPath(), 'front_end',
@@ -178,23 +172,20 @@ def _CheckExperimentTelemetry(input_api, output_api):
     return results
 
 
-def _CheckJSON(input_api, output_api):
-    results = [output_api.PresubmitNotifyResult('Running JSON Validator:')]
-    script_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
-                                         'scripts', 'json_validator',
-                                         'validate_module_json.js')
-    results.extend(_checkWithNodeScript(input_api, output_api, script_path))
-    return results
-
-
 def _CheckFormat(input_api, output_api):
     node_modules_affected_files = _getAffectedFiles(input_api, [
-        input_api.os_path.join(input_api.PresubmitLocalPath(), 'node_modules')
+        input_api.os_path.join(input_api.PresubmitLocalPath(), 'node_modules'),
+        input_api.os_path.join(input_api.PresubmitLocalPath(), 'front_end',
+                               'third_party')
     ], [], [])
 
     # TODO(crbug.com/1068198): Remove once `git cl format --js` can handle large CLs.
     if (len(node_modules_affected_files) > 0):
-        return [output_api.PresubmitNotifyResult('Skipping Format Checks because `node_modules` files are affected.')]
+        return [
+            output_api.PresubmitNotifyResult(
+                'Skipping Format Checks because `node_modules`/`front_end/third_party` files are affected.'
+            )
+        ]
 
     results = [output_api.PresubmitNotifyResult('Running Format Checks:')]
 
@@ -236,11 +227,45 @@ def _CheckDevToolsRunESLintTests(input_api, output_api):
     return results
 
 
+def _CheckDevToolsRunBuildTests(input_api, output_api):
+    # Check for changes in the build/tests directory, and run the tests if so.
+    # We don't do this on every CL as most do not touch the rules, but if we do
+    # change them we need to make sure all the tests are passing.
+    original_sys_path = sys.path
+    try:
+        sys.path = sys.path + [
+            input_api.os_path.join(input_api.PresubmitLocalPath(), 'scripts')
+        ]
+        import devtools_paths
+    finally:
+        sys.path = original_sys_path
+    scripts_build_dir_path = input_api.os_path.join(
+        input_api.PresubmitLocalPath(), 'scripts', 'build')
+    scripts_build_affected_files = _getAffectedFiles(input_api,
+                                                     [scripts_build_dir_path],
+                                                     [], [])
+
+    if len(scripts_build_affected_files) == 0:
+        return []
+
+    mocha_path = devtools_paths.mocha_path()
+    build_tests_path = input_api.os_path.join(scripts_build_dir_path, 'tests',
+                                              '*_test.js')
+
+    results = [output_api.PresubmitNotifyResult('Build plugins unit tests')]
+    results.extend(
+        # The dot reporter is more concise which is useful to not get LOADS of
+        # output when just one test fails.
+        _checkWithNodeScript(input_api, output_api, mocha_path,
+                             ['--reporter', 'dot', build_tests_path]))
+    return results
+
+
 def _CheckDevToolsStyleJS(input_api, output_api):
     results = [output_api.PresubmitNotifyResult('JS style check:')]
     lint_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
                                        'scripts', 'test',
-                                       'run_lint_check_js.js')
+                                       'run_lint_check_js.mjs')
 
     front_end_directory = input_api.os_path.join(
         input_api.PresubmitLocalPath(), 'front_end')
@@ -273,7 +298,7 @@ def _CheckDevToolsStyleJS(input_api, output_api):
         input_api.os_path.join(scripts_directory, 'test',
                                'run_lint_check_js.py'),
         input_api.os_path.join(scripts_directory, 'test',
-                               'run_lint_check_js.js'),
+                               'run_lint_check_js.mjs'),
         input_api.os_path.join(scripts_directory, '.eslintrc.js'),
         input_api.os_path.join(scripts_directory, 'eslint_rules'),
     ]
@@ -332,10 +357,6 @@ def _CheckDevToolsStyleCSS(input_api, output_api):
         input_api, output_api, lint_config_files, default_linted_directories,
         ['.css'], results)
 
-    ts_should_bail_out, ts_files_to_lint = _getFilesToLint(
-        input_api, output_api, lint_config_files, default_linted_directories,
-        ['.ts'], results)
-
     # If there are more than 50 files to check, don't bother and check
     # everything, so as to not run into command line length limits on Windows.
     if not css_should_bail_out:
@@ -343,16 +364,6 @@ def _CheckDevToolsStyleCSS(input_api, output_api):
             script_args = ["--files"] + css_files_to_lint
         else:
             script_args = []  # The defaults check all CSS files.
-        results.extend(
-            _checkWithNodeScript(input_api, output_api, lint_path,
-                                 script_args))
-
-    if not ts_should_bail_out:
-        script_args = ["--syntax", "html"]
-        if len(ts_files_to_lint) < 50:
-            script_args += ["--files"] + ts_files_to_lint
-        else:
-            script_args += ["--glob", "front_end/**/*.ts"]
         results.extend(
             _checkWithNodeScript(input_api, output_api, lint_path,
                                  script_args))
@@ -546,13 +557,12 @@ def _CommonChecks(input_api, output_api):
     results.extend(
         input_api.canned_checks.CheckAuthorizedAuthor(
             input_api, output_api, bot_allowlist=[AUTOROLL_ACCOUNT]))
-    results.extend(_CheckBuildGN(input_api, output_api))
     results.extend(_CheckExperimentTelemetry(input_api, output_api))
     results.extend(_CheckGeneratedFiles(input_api, output_api))
-    results.extend(_CheckJSON(input_api, output_api))
     results.extend(_CheckDevToolsStyleJS(input_api, output_api))
     results.extend(_CheckDevToolsStyleCSS(input_api, output_api))
     results.extend(_CheckDevToolsRunESLintTests(input_api, output_api))
+    results.extend(_CheckDevToolsRunBuildTests(input_api, output_api))
     results.extend(_CheckDevToolsNonJSFileLicenseHeaders(
         input_api, output_api))
 
@@ -627,40 +637,6 @@ def _checkWithNodeScript(input_api, output_api, script_path, script_arguments=[]
         sys.path = original_sys_path
 
     return _ExecuteSubProcess(input_api, output_api, [devtools_paths.node_path(), script_path], script_arguments, [])
-
-
-def _checkWithTypeScript(input_api,
-                         output_api,
-                         tsc_arguments,
-                         script_path,
-                         script_arguments=[]):  # pylint: disable=invalid-name
-    original_sys_path = sys.path
-    try:
-        sys.path = sys.path + [
-            input_api.os_path.join(input_api.PresubmitLocalPath(), 'scripts')
-        ]
-        import devtools_paths
-    finally:
-        sys.path = original_sys_path
-
-    # First run tsc to compile the TS script that we then run in the _ExecuteSubProcess call
-    tsc_compiler_process = input_api.subprocess.Popen(
-        [
-            devtools_paths.node_path(),
-            devtools_paths.typescript_compiler_path()
-        ] + tsc_arguments,
-        stdout=input_api.subprocess.PIPE,
-        stderr=input_api.subprocess.STDOUT)
-
-    out, _ = tsc_compiler_process.communicate()
-    if tsc_compiler_process.returncode != 0:
-        return [
-            output_api.PresubmitError('Error compiling briges regenerator:\n' +
-                                      out.decode('utf-8'))
-        ]
-
-    return _checkWithNodeScript(input_api, output_api, script_path,
-                                script_arguments)
 
 
 def _getFilesToLint(input_api, output_api, lint_config_files,

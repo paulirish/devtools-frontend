@@ -13,6 +13,8 @@ import * as Diff from '../../../../third_party/diff/diff.js';
 import * as TextPrompt from '../../../../ui/components/text_prompt/text_prompt.js';
 import * as UI from '../../legacy.js';
 
+import filteredListWidgetStyles from './filteredListWidget.css.js';
+
 const UIStrings = {
   /**
   * @description Aria label for quick open dialog prompt
@@ -64,7 +66,6 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     const listener = (this.onKeyDown.bind(this) as (arg0: Event) => void);
     this.contentElement.addEventListener('keydown', listener, true);
     UI.ARIAUtils.markAsCombobox(this.contentElement);
-    this.registerRequiredCSS('ui/legacy/components/quick_open/filteredListWidget.css');
 
     this.inputBoxElement = new TextPrompt.TextPrompt.TextPrompt();
     this.inputBoxElement.data = {ariaLabel: i18nString(UIStrings.quickOpenPrompt), prefix: '', suggestion: ''};
@@ -84,7 +85,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     this.itemElementsContainer.classList.add('container');
     this.bottomElementsContainer.appendChild(this.itemElementsContainer);
     this.itemElementsContainer.addEventListener('click', this.onClick.bind(this), false);
-    this.itemElementsContainer.addEventListener('mouseover', this.onMouseOver.bind(this), false);
+    this.itemElementsContainer.addEventListener('mousemove', this.onMouseMove.bind(this), false);
     UI.ARIAUtils.markAsListBox(this.itemElementsContainer);
     UI.ARIAUtils.setControls(this.inputBoxElement, this.itemElementsContainer);
     UI.ARIAUtils.setAutocomplete(this.inputBoxElement, UI.ARIAUtils.AutocompleteInteractionModel.list);
@@ -166,7 +167,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     this.dialog.contentElement.style.setProperty('border-radius', '4px');
     this.show(this.dialog.contentElement);
     UI.ARIAUtils.setExpanded(this.contentElement, true);
-    this.dialog.once(UI.Dialog.Events.Hidden).then(() => {
+    void this.dialog.once(UI.Dialog.Events.Hidden).then(() => {
       this.dispatchEventToListeners(Events.Hidden);
     });
     // @ts-ignore
@@ -212,6 +213,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
   }
 
   wasShown(): void {
+    this.registerCSSFiles([filteredListWidgetStyles]);
     this.attachProvider();
   }
 
@@ -307,7 +309,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     }
   }
 
-  private onMouseOver(event: Event): void {
+  private onMouseMove(event: Event): void {
     const item = this.list.itemForNode((event.target as Node | null));
     if (item === null) {
       return;
@@ -319,7 +321,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     this.query = query;
     this.inputBoxElement.focus();
     this.inputBoxElement.setText(query);
-    this.queryChanged();
+    void this.queryChanged();
     this.scheduleFilter();
   }
 
@@ -332,14 +334,20 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
         break;
       }
     }
-    if (!completion) {
-      return false;
+    // If there is an auto-completion, press 'tab' first time will show the auto-completion, second time will rewrite
+    // the query. Otherwise it will select the next item.
+    if (completion) {
+      const selection = this.inputBoxElement.getComponentSelection();
+      if (selection && selection.toString().trim() !== '') {
+        this.setQuery(completion);
+        return true;
+      }
+      this.inputBoxElement.focus();
+      this.inputBoxElement.setText(completion);
+      this.setQuerySelectedRange(userEnteredText.length, completion.length);
+      return true;
     }
-    this.inputBoxElement.focus();
-    this.inputBoxElement.setText(completion);
-    this.inputBoxElement.setSelectedRange(userEnteredText.length, completion.length);
-    this.scheduleFilter();
-    return true;
+    return this.list.selectNextItem(true, false);
   }
 
   private itemsFilteredForTest(): void {
@@ -478,7 +486,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
 
   private onInput(event: TextPrompt.TextPrompt.PromptInputEvent): void {
     this.query = event.data;
-    this.queryChanged();
+    void this.queryChanged();
     this.scheduleFilter();
   }
 
@@ -502,6 +510,10 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
         this.onEnter(keyboardEvent);
         return;
       case Platform.KeyboardUtilities.TAB_KEY:
+        if (keyboardEvent.shiftKey) {
+          handled = this.list.selectPreviousItem(true, false);
+          break;
+        }
         handled = this.tabKeyPressed();
         break;
       case Platform.KeyboardUtilities.ArrowKey.UP:

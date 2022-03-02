@@ -232,6 +232,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
 
     root.element.classList.add('request-headers-tree');
     root.makeDense();
+    root.setUseLightSelectionColor(true);
     this.element.appendChild(root.element);
 
     const generalCategory = new Category(root, 'general', i18nString(UIStrings.general));
@@ -287,7 +288,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(decodedValue);
       };
       contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyValue), copyDecodedValueHandler);
-      contextMenu.show();
+      void contextMenu.show();
     });
   }
 
@@ -349,7 +350,8 @@ export class RequestHeadersView extends UI.Widget.VBox {
         link.classList.add('devtools-link');
         link.onclick = (): void => {
           Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.LearnMoreLinkCOEP);
-          IssuesManager.RelatedIssue.reveal(this.request, IssuesManager.Issue.IssueCategory.CrossOriginEmbedderPolicy);
+          void IssuesManager.RelatedIssue.reveal(
+              this.request, IssuesManager.Issue.IssueCategory.CrossOriginEmbedderPolicy);
         };
         const text = document.createElement('span');
         text.classList.add('devtools-link');
@@ -406,7 +408,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
       const contextMenu = new UI.ContextMenu.ContextMenu(event);
       const section = contextMenu.newSection();
       section.appendItem(i18nString(UIStrings.showMore), showMore);
-      contextMenu.show();
+      void contextMenu.show();
     }
     sourceTreeElement.listItemElement.addEventListener('contextmenu', onContextMenuShowMore);
     sourceTextElement.appendChild(showMoreButton);

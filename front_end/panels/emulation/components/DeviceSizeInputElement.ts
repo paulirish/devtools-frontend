@@ -6,12 +6,17 @@ import type * as Platform from '../../../core/platform/platform.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as UILegacy from '../../../ui/legacy/legacy.js';
 
 class SizeChangedEvent extends Event {
   static readonly eventName = 'sizechanged';
   constructor(public size: number) {
     super(SizeChangedEvent.eventName);
   }
+}
+
+function getInputValue(event: Event): number {
+  return Number((event.target as HTMLInputElement).value);
 }
 
 export class SizeInputElement extends HTMLElement {
@@ -68,6 +73,8 @@ export class SizeInputElement extends HTMLElement {
           max-height: 18px;
           margin: 0 2px;
           text-align: center;
+          font-size: inherit;
+          font-family: inherit;
         }
 
         input:disabled {
@@ -86,13 +93,28 @@ export class SizeInputElement extends HTMLElement {
              placeholder=${this.#placeholder}
              ?disabled=${this.#disabled}
              .value=${this.#size}
-             @change=${this.fireSizeChange} />
+             @change=${this.#fireSizeChange}
+             @keydown=${this.#handleModifierKeys} />
     `,
         this.#root, {host: this});
   }
 
-  private fireSizeChange(event: Event): void {
-    this.dispatchEvent(new SizeChangedEvent(Number((event.target as HTMLInputElement).value)));
+  #fireSizeChange(event: Event): void {
+    this.dispatchEvent(new SizeChangedEvent(getInputValue(event)));
+  }
+
+  #handleModifierKeys(event: Event): void {
+    let modifiedValue = UILegacy.UIUtils.modifiedFloatNumber(getInputValue(event), event);
+    if (modifiedValue === null) {
+      return;
+    }
+
+    modifiedValue = Math.min(modifiedValue, EmulationModel.DeviceModeModel.MaxDeviceSize);
+    modifiedValue = Math.max(modifiedValue, EmulationModel.DeviceModeModel.MinDeviceSize);
+
+    event.preventDefault();
+    (event.target as HTMLInputElement).value = String(modifiedValue);
+    this.dispatchEvent(new SizeChangedEvent(modifiedValue));
   }
 }
 

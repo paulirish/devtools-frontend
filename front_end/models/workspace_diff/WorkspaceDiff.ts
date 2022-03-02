@@ -5,8 +5,18 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as Diff from '../../third_party/diff/diff.js';
+import * as FormatterModule from '../formatter/formatter.js';
 import * as Persistence from '../persistence/persistence.js';
 import * as Workspace from '../workspace/workspace.js';
+
+interface DiffRequestOptions {
+  shouldFormatDiff: boolean;
+}
+
+interface DiffResponse {
+  diff: Diff.Diff.DiffArray;
+  formattedCurrentMapping?: FormatterModule.ScriptFormatter.FormatterSourceMapping;
+}
 
 export class WorkspaceDiffImpl extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private readonly uiSourceCodeDiffs: WeakMap<Workspace.UISourceCode.UISourceCode, UISourceCodeDiff>;
@@ -29,8 +39,9 @@ export class WorkspaceDiffImpl extends Common.ObjectWrapper.ObjectWrapper<EventT
     workspace.uiSourceCodes().forEach(this.updateModifiedState.bind(this));
   }
 
-  requestDiff(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<Diff.Diff.DiffArray|null> {
-    return this.uiSourceCodeDiff(uiSourceCode).requestDiff();
+  requestDiff(uiSourceCode: Workspace.UISourceCode.UISourceCode, diffRequestOptions: DiffRequestOptions):
+      Promise<DiffResponse|null> {
+    return this.uiSourceCodeDiff(uiSourceCode).requestDiff(diffRequestOptions);
   }
 
   subscribeToDiffChange(uiSourceCode: Workspace.UISourceCode.UISourceCode, callback: () => void, thisObj?: Object):
@@ -63,12 +74,12 @@ export class WorkspaceDiffImpl extends Common.ObjectWrapper.ObjectWrapper<EventT
   private uiSourceCodeChanged(
       event: Common.EventTarget.EventTargetEvent<{uiSourceCode: Workspace.UISourceCode.UISourceCode}>): void {
     const uiSourceCode = event.data.uiSourceCode;
-    this.updateModifiedState(uiSourceCode);
+    void this.updateModifiedState(uiSourceCode);
   }
 
   private uiSourceCodeAdded(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
     const uiSourceCode = event.data;
-    this.updateModifiedState(uiSourceCode);
+    void this.updateModifiedState(uiSourceCode);
   }
 
   private uiSourceCodeRemoved(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
@@ -179,7 +190,7 @@ export type EventTypes = {
 
 export class UISourceCodeDiff extends Common.ObjectWrapper.ObjectWrapper<UISourceCodeDiffEventTypes> {
   private uiSourceCode: Workspace.UISourceCode.UISourceCode;
-  private requestDiffPromise: Promise<Diff.Diff.DiffArray|null>|null;
+  private requestDiffPromise: Promise<DiffResponse|null>|null;
   private pendingChanges: number|null;
   dispose: boolean;
   constructor(uiSourceCode: Workspace.UISourceCode.UISourceCode) {
@@ -212,9 +223,9 @@ export class UISourceCodeDiff extends Common.ObjectWrapper.ObjectWrapper<UISourc
     }
   }
 
-  requestDiff(): Promise<Diff.Diff.DiffArray|null> {
+  requestDiff(diffRequestOptions: DiffRequestOptions): Promise<DiffResponse|null> {
     if (!this.requestDiffPromise) {
-      this.requestDiffPromise = this.innerRequestDiff();
+      this.requestDiffPromise = this.innerRequestDiff(diffRequestOptions);
     }
     return this.requestDiffPromise;
   }
@@ -231,12 +242,12 @@ export class UISourceCodeDiff extends Common.ObjectWrapper.ObjectWrapper<UISourc
     return content.content || ('error' in content && content.error) || '';
   }
 
-  private async innerRequestDiff(): Promise<Diff.Diff.DiffArray|null> {
+  private async innerRequestDiff({shouldFormatDiff}: DiffRequestOptions): Promise<DiffResponse|null> {
     if (this.dispose) {
       return null;
     }
 
-    const baseline = await this.originalContent();
+    let baseline = await this.originalContent();
     if (baseline === null) {
       return null;
     }
@@ -264,7 +275,22 @@ export class UISourceCodeDiff extends Common.ObjectWrapper.ObjectWrapper<UISourc
     if (current === null || baseline === null) {
       return null;
     }
-    return Diff.Diff.DiffWrapper.lineDiff(baseline.split(/\r\n|\n|\r/), current.split(/\r\n|\n|\r/));
+    let formattedCurrentMapping;
+    if (shouldFormatDiff) {
+      baseline = (await FormatterModule.ScriptFormatter.format(
+                      this.uiSourceCode.contentType(), this.uiSourceCode.mimeType(), baseline))
+                     .formattedContent;
+      const formatCurrentResult = await FormatterModule.ScriptFormatter.format(
+          this.uiSourceCode.contentType(), this.uiSourceCode.mimeType(), current);
+      current = formatCurrentResult.formattedContent;
+      formattedCurrentMapping = formatCurrentResult.formattedMapping;
+    }
+    const reNewline = /\r\n?|\n/;
+    const diff = Diff.Diff.DiffWrapper.lineDiff(baseline.split(reNewline), current.split(reNewline));
+    return {
+      diff,
+      formattedCurrentMapping,
+    };
   }
 }
 

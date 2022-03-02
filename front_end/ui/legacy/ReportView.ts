@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as ARIAUtils from './ARIAUtils.js';
+import reportViewStyles from './reportView.css.legacy.js';
 import {Toolbar} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import {VBox} from './Widget.js';
@@ -20,7 +21,7 @@ export class ReportView extends VBox {
   private urlElement?: HTMLElement;
   constructor(title?: string) {
     super(true);
-    this.registerRequiredCSS('ui/legacy/reportView.css');
+    this.registerRequiredCSS(reportViewStyles);
 
     this.contentBox = this.contentElement.createChild('div', 'report-content-box');
     this.headerElement = this.contentBox.createChild('div', 'report-header vbox');
@@ -154,7 +155,7 @@ export class Section extends VBox {
     if (textValue && row.lastElementChild) {
       row.lastElementChild.textContent = textValue;
     }
-    return /** @type {!HTMLElement} */ row.lastElementChild as HTMLElement;
+    return row.lastElementChild as HTMLElement;
   }
 
   appendFlexedField(title: string, textValue?: string): Element {
@@ -184,12 +185,11 @@ export class Section extends VBox {
   }
 
   appendRow(): HTMLElement {
-    return /** @type {!HTMLElement} */ this.fieldList.createChild('div', 'report-row') as HTMLElement;
+    return this.fieldList.createChild('div', 'report-row') as HTMLElement;
   }
 
   appendSelectableRow(): HTMLElement {
-    return /** @type {!HTMLElement} */ this.fieldList.createChild('div', 'report-row report-row-selectable') as
-        HTMLElement;
+    return this.fieldList.createChild('div', 'report-row report-row-selectable') as HTMLElement;
   }
 
   clearContent(): void {

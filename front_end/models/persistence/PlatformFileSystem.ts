@@ -16,9 +16,9 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/persistence/PlatformFileSystem.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class PlatformFileSystem {
-  private readonly pathInternal: Platform.DevToolsPath.UrlString;
+  private readonly pathInternal: string;
   private readonly typeInternal: string;
-  constructor(path: Platform.DevToolsPath.UrlString, type: string) {
+  constructor(path: string, type: string) {
     this.pathInternal = path;
     this.typeInternal = type;
   }
@@ -27,16 +27,16 @@ export class PlatformFileSystem {
     return Promise.resolve(null);
   }
 
-  initialFilePaths(): string[] {
+  initialFilePaths(): Platform.DevToolsPath.EncodedPathString[] {
     return [];
   }
 
-  initialGitFolders(): string[] {
+  initialGitFolders(): Platform.DevToolsPath.EncodedPathString[] {
     return [];
   }
 
   path(): Platform.DevToolsPath.UrlString {
-    return this.pathInternal;
+    return this.pathInternal as Platform.DevToolsPath.UrlString;
   }
 
   embedderPath(): string {
@@ -111,7 +111,7 @@ export class PlatformFileSystem {
     throw new Error('Not implemented');
   }
 
-  tooltipForURL(_url: string): string {
+  tooltipForURL(_url: Platform.DevToolsPath.UrlString): string {
     throw new Error('Not implemented');
   }
 

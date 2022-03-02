@@ -36,7 +36,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 
 import type {Project} from './WorkspaceImpl.js';
-import {Events as WorkspaceImplEvents, projectTypes} from './WorkspaceImpl.js';
+import {Events as WorkspaceImplEvents} from './WorkspaceImpl.js';
 
 const UIStrings = {
   /**
@@ -56,11 +56,11 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   private projectInternal: Project;
   private urlInternal: string;
   private readonly originInternal: string;
-  private readonly parentURLInternal: string;
+  private readonly parentURLInternal: Platform.DevToolsPath.UrlString;
   private nameInternal: string;
   private contentTypeInternal: Common.ResourceType.ResourceType;
   private requestContentPromise: Promise<TextUtils.ContentProvider.DeferredContent>|null;
-  private decorations: Platform.MapUtilities.Multimap<string, LineMarker>|null;
+  private decorations: Map<string, any> = new Map();
   private hasCommitsInternal: boolean;
   private messagesInternal: Set<Message>|null;
   private contentLoadedInternal: boolean;
@@ -81,20 +81,23 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(url);
     if (parsedURL) {
       this.originInternal = parsedURL.securityOrigin();
-      this.parentURLInternal = this.originInternal + parsedURL.folderPathComponents;
-      this.nameInternal = parsedURL.lastPathComponent;
+      this.parentURLInternal = this.originInternal + parsedURL.folderPathComponents as Platform.DevToolsPath.UrlString;
       if (parsedURL.queryParams) {
-        this.nameInternal += '?' + parsedURL.queryParams;
+        // in case file name contains query params, it doesn't look like a normal file name anymore
+        // so it can as well remain encoded
+        this.nameInternal = parsedURL.lastPathComponent + '?' + parsedURL.queryParams;
+      } else {
+        // file name looks best decoded
+        this.nameInternal = decodeURIComponent(parsedURL.lastPathComponent);
       }
     } else {
       this.originInternal = '';
-      this.parentURLInternal = '';
+      this.parentURLInternal = '' as Platform.DevToolsPath.UrlString;
       this.nameInternal = url;
     }
 
     this.contentTypeInternal = contentType;
     this.requestContentPromise = null;
-    this.decorations = null;
     this.hasCommitsInternal = false;
     this.messagesInternal = null;
     this.contentLoadedInternal = false;
@@ -119,11 +122,11 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.projectInternal.mimeType(this);
   }
 
-  url(): string {
-    return this.urlInternal;
+  url(): Platform.DevToolsPath.UrlString {
+    return this.urlInternal as Platform.DevToolsPath.UrlString;
   }
 
-  parentURL(): string {
+  parentURL(): Platform.DevToolsPath.UrlString {
     return this.parentURLInternal;
   }
 
@@ -139,15 +142,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     if (!this.nameInternal) {
       return i18nString(UIStrings.index);
     }
-    let name: string = this.nameInternal;
-    try {
-      if (this.project().type() === projectTypes.FileSystem) {
-        name = unescape(name);
-      } else {
-        name = decodeURI(name);
-      }
-    } catch (error) {
-    }
+    const name = this.nameInternal;
     return skipTrim ? name : Platform.StringUtilities.trimEndWithMaxLength(name, 100);
   }
 
@@ -179,10 +174,12 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
 
   private updateName(name: string, url: string, contentType?: Common.ResourceType.ResourceType): void {
     const oldURL = this.urlInternal;
-    this.urlInternal = this.urlInternal.substring(0, this.urlInternal.length - this.nameInternal.length) + name;
     this.nameInternal = name;
     if (url) {
       this.urlInternal = url;
+    } else {
+      this.urlInternal = Common.ParsedURL.ParsedURL.relativePathToUrlString(
+          name as Platform.DevToolsPath.RawPathString, oldURL as Platform.DevToolsPath.UrlString);
     }
     if (contentType) {
       this.contentTypeInternal = contentType;
@@ -192,9 +189,8 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
         WorkspaceImplEvents.UISourceCodeRenamed, {oldURL: oldURL, uiSourceCode: this});
   }
 
-  // TODO(crbug.com/1253323): Cast to UrlString will be removed when migration to branded types is complete.
   contentURL(): Platform.DevToolsPath.UrlString {
-    return this.url() as Platform.DevToolsPath.UrlString;
+    return this.url();
   }
 
   contentType(): Common.ResourceType.ResourceType {
@@ -239,6 +235,13 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.contentInternal as TextUtils.ContentProvider.DeferredContent;
   }
 
+  #decodeContent(content: TextUtils.ContentProvider.DeferredContent|null): string|null {
+    if (!content) {
+      return null;
+    }
+    return content.isEncoded && content.content ? window.atob(content.content) : content.content;
+  }
+
   async checkContentUpdated(): Promise<void> {
     if (!this.contentLoadedInternal && !this.forceLoadOnCheckContentInternal) {
       return;
@@ -264,8 +267,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
       return;
     }
 
-    if (this.contentInternal && 'content' in this.contentInternal &&
-        this.contentInternal.content === updatedContent.content) {
+    if (this.#decodeContent(this.contentInternal) === this.#decodeContent(updatedContent)) {
       this.lastAcceptedContent = null;
       return;
     }
@@ -278,7 +280,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     await Common.Revealer.reveal(this);
 
     // Make sure we are in the next frame before stopping the world with confirm
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => window.setTimeout(resolve, 0));
 
     const shouldUpdate = window.confirm(i18nString(UIStrings.thisFileWasChangedExternally));
     if (shouldUpdate) {
@@ -294,7 +296,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
 
   private commitContent(content: string): void {
     if (this.projectInternal.canSetFileContent()) {
-      this.projectInternal.setFileContent(this, content, false);
+      void this.projectInternal.setFileContent(this, content, false);
     }
     this.contentCommitted(content, true);
   }
@@ -332,7 +334,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     if (this.isDirty()) {
       return this.workingCopyInternal as string;
     }
-    return (this.contentInternal && 'content' in this.contentInternal && this.contentInternal.content) || '';
+    return this.contentInternal?.content || '';
   }
 
   resetWorkingCopy(): void {
@@ -354,7 +356,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   setContent(content: string, isBase64: boolean): void {
     this.contentEncodedInternal = isBase64;
     if (this.projectInternal.canSetFileContent()) {
-      this.projectInternal.setFileContent(this, content, isBase64);
+      void this.projectInternal.setFileContent(this, content, isBase64);
     }
     this.contentCommitted(content, true);
   }
@@ -394,7 +396,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   }
 
   content(): string {
-    return (this.contentInternal && 'content' in this.contentInternal && this.contentInternal.content) || '';
+    return this.contentInternal?.content || '';
   }
 
   loadError(): string|null {
@@ -440,7 +442,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   }
 
   removeMessage(message: Message): void {
-    if (this.messagesInternal && this.messagesInternal.delete(message)) {
+    if (this.messagesInternal?.delete(message)) {
       this.dispatchEventToListeners(Events.MessageRemoved, message);
     }
   }
@@ -455,45 +457,15 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     this.messagesInternal = null;
   }
 
-  addLineDecoration(lineNumber: number, type: string, data: any): void {
-    this.addDecoration(TextUtils.TextRange.TextRange.createFromLocation(lineNumber, 0), type, data);
-  }
-
-  addDecoration(range: TextUtils.TextRange.TextRange, type: string, data: any): void {
-    const marker = new LineMarker(range, type, data);
-    if (!this.decorations) {
-      this.decorations = new Platform.MapUtilities.Multimap();
+  setDecorationData(type: string, data: any): void {
+    if (data !== this.decorations.get(type)) {
+      this.decorations.set(type, data);
+      this.dispatchEventToListeners(Events.DecorationChanged, type);
     }
-    this.decorations.set(type, marker);
-    this.dispatchEventToListeners(Events.LineDecorationAdded, marker);
   }
 
-  removeDecorationsForType(type: string): void {
-    if (!this.decorations) {
-      return;
-    }
-    const markers = this.decorations.get(type);
-    this.decorations.deleteAll(type);
-    markers.forEach(marker => {
-      this.dispatchEventToListeners(Events.LineDecorationRemoved, marker);
-    });
-  }
-
-  allDecorations(): LineMarker[] {
-    return this.decorations ? this.decorations.valuesArray() : [];
-  }
-
-  removeAllDecorations(): void {
-    if (!this.decorations) {
-      return;
-    }
-    const decorationList = this.decorations.valuesArray();
-    this.decorations.clear();
-    decorationList.forEach(marker => this.dispatchEventToListeners(Events.LineDecorationRemoved, marker));
-  }
-
-  decorationsForType(type: string): Set<LineMarker>|null {
-    return this.decorations ? this.decorations.get(type) : null;
+  getDecorationData(type: string): any {
+    return this.decorations.get(type);
   }
 
   disableEdit(): void {
@@ -513,8 +485,7 @@ export enum Events {
   TitleChanged = 'TitleChanged',
   MessageAdded = 'MessageAdded',
   MessageRemoved = 'MessageRemoved',
-  LineDecorationAdded = 'LineDecorationAdded',
-  LineDecorationRemoved = 'LineDecorationRemoved',
+  DecorationChanged = 'DecorationChanged',
 }
 
 export interface WorkingCopyCommitedEvent {
@@ -529,8 +500,7 @@ export type EventTypes = {
   [Events.TitleChanged]: UISourceCode,
   [Events.MessageAdded]: Message,
   [Events.MessageRemoved]: Message,
-  [Events.LineDecorationAdded]: LineMarker,
-  [Events.LineDecorationRemoved]: LineMarker,
+  [Events.DecorationChanged]: string,
 };
 
 export class UILocation {
@@ -543,7 +513,7 @@ export class UILocation {
     this.columnNumber = columnNumber;
   }
 
-  linkText(skipTrim?: boolean): string {
+  linkText(skipTrim?: boolean, showColumnNumber?: boolean): string {
     let linkText = this.uiSourceCode.displayName(skipTrim);
     if (this.uiSourceCode.mimeType() === 'application/wasm') {
       // For WebAssembly locations, we follow the conventions described in
@@ -551,8 +521,11 @@ export class UILocation {
       if (typeof this.columnNumber === 'number') {
         linkText += `:0x${this.columnNumber.toString(16)}`;
       }
-    } else if (typeof this.lineNumber === 'number') {
+    } else {
       linkText += ':' + (this.lineNumber + 1);
+      if (showColumnNumber && typeof this.columnNumber === 'number') {
+        linkText += ':' + (this.columnNumber + 1);
+      }
     }
     return linkText;
   }

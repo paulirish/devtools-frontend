@@ -35,10 +35,12 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Platform from '../../core/platform/platform.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {HistoryInput} from './HistoryInput.js';
 import {InspectorView} from './InspectorView.js';
+import searchableViewStyles from './searchableView.css.legacy.js';
 import {Toolbar, ToolbarButton, ToolbarToggle} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import {createTextButton} from './UIUtils.js';
@@ -123,13 +125,12 @@ export class SearchableView extends VBox {
 
   constructor(searchable: Searchable, replaceable: Replaceable|null, settingName?: string) {
     super(true);
-    this.registerRequiredCSS('ui/legacy/searchableView.css');
+    this.registerRequiredCSS(searchableViewStyles);
     searchableViewsByElement.set(this.element, this);
 
     this.searchProvider = searchable;
     this.replaceProvider = replaceable;
-    this.setting =
-        settingName ? Common.Settings.Settings.instance().createSetting(settingName, /** @type {*} */ ({})) : null;
+    this.setting = settingName ? Common.Settings.Settings.instance().createSetting(settingName, {}) : null;
     this.replaceable = false;
 
     this.contentElement.createChild('slot');
@@ -564,7 +565,7 @@ export class SearchableView extends VBox {
       clearTimeout(this.valueChangedTimeoutId);
     }
     const timeout = this.searchInputElement.value.length < 3 ? 200 : 0;
-    this.valueChangedTimeoutId = setTimeout(this.onValueChanged.bind(this), timeout);
+    this.valueChangedTimeoutId = window.setTimeout(this.onValueChanged.bind(this), timeout);
   }
 
   private onValueChanged(): void {
@@ -596,6 +597,11 @@ export interface Replaceable {
   replaceAllWith(searchConfig: SearchConfig, replacement: string): void;
 }
 
+export interface SearchRegexResult {
+  regex: RegExp;
+  fromQuery: boolean;
+}
+
 export class SearchConfig {
   query: string;
   caseSensitive: boolean;
@@ -607,20 +613,21 @@ export class SearchConfig {
     this.isRegex = isRegex;
   }
 
-  toSearchRegex(global?: boolean): RegExp {
+  toSearchRegex(global?: boolean): SearchRegexResult {
     let modifiers = this.caseSensitive ? '' : 'i';
     if (global) {
       modifiers += 'g';
     }
     const query = this.isRegex ? '/' + this.query + '/' : this.query;
 
-    let regex;
+    let regex: RegExp|undefined;
+    let fromQuery = false;
 
     // First try creating regex if user knows the / / hint.
     try {
       if (/^\/.+\/$/.test(query)) {
         regex = new RegExp(query.substring(1, query.length - 1), modifiers);
-        regex.__fromRegExpQuery = true;
+        fromQuery = true;
       }
     } catch (e) {
       // Silent catch.
@@ -628,9 +635,12 @@ export class SearchConfig {
 
     // Otherwise just do a plain text search.
     if (!regex) {
-      regex = createPlainTextSearchRegex(query, modifiers);
+      regex = Platform.StringUtilities.createPlainTextSearchRegex(query, modifiers);
     }
 
-    return regex;
+    return {
+      regex,
+      fromQuery,
+    };
   }
 }

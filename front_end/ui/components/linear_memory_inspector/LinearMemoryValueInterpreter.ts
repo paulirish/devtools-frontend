@@ -16,7 +16,6 @@ import {Endianness} from './ValueInterpreterDisplayUtils.js';
 import type {TypeToggleEvent, ValueInterpreterSettingsData} from './ValueInterpreterSettings.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
-import inspectorCommonStyles from '../../legacy/inspectorCommon.css.js';
 
 const UIStrings = {
   /**
@@ -66,42 +65,35 @@ export interface LinearMemoryValueInterpreterData {
 export class LinearMemoryValueInterpreter extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-linear-memory-inspector-interpreter`;
 
-  private readonly shadow = this.attachShadow({mode: 'open'});
-  private endianness = Endianness.Little;
-  private buffer = new ArrayBuffer(0);
-  private valueTypes: Set<ValueType> = new Set();
-  private valueTypeModeConfig: Map<ValueType, ValueTypeMode> = new Map();
-  private memoryLength = 0;
-  private showSettings = false;
-
-  constructor() {
-    super();
-    this.shadow.adoptedStyleSheets = [
-      inspectorCommonStyles,
-    ];
-  }
+  readonly #shadow = this.attachShadow({mode: 'open'});
+  #endianness = Endianness.Little;
+  #buffer = new ArrayBuffer(0);
+  #valueTypes: Set<ValueType> = new Set();
+  #valueTypeModeConfig: Map<ValueType, ValueTypeMode> = new Map();
+  #memoryLength = 0;
+  #showSettings = false;
 
   connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [linearMemoryValueInterpreterStyles];
+    this.#shadow.adoptedStyleSheets = [linearMemoryValueInterpreterStyles];
   }
 
   set data(data: LinearMemoryValueInterpreterData) {
-    this.endianness = data.endianness;
-    this.buffer = data.value;
-    this.valueTypes = data.valueTypes;
-    this.valueTypeModeConfig = data.valueTypeModes || new Map();
-    this.memoryLength = data.memoryLength;
-    this.render();
+    this.#endianness = data.endianness;
+    this.#buffer = data.value;
+    this.#valueTypes = data.valueTypes;
+    this.#valueTypeModeConfig = data.valueTypeModes || new Map();
+    this.#memoryLength = data.memoryLength;
+    this.#render();
   }
 
-  private render(): void {
+  #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
       <div class="value-interpreter">
         <div class="settings-toolbar">
-          ${this.renderEndiannessSetting()}
-          <button data-settings="true" class="settings-toolbar-button ${this.showSettings ? 'active' : ''}" title=${i18nString(UIStrings.toggleValueTypeSettings)} @click=${this.onSettingsToggle}>
+          ${this.#renderEndiannessSetting()}
+          <button data-settings="true" class="settings-toolbar-button ${this.#showSettings ? 'active' : ''}" title=${i18nString(UIStrings.toggleValueTypeSettings)} @click=${this.#onSettingsToggle}>
             <${IconButton.Icon.Icon.litTagName}
               .data=${{ iconName: 'settings_14x14_icon', color: 'var(--color-text-secondary)', width: '14px' } as IconButton.Icon.IconWithName}>
             </${IconButton.Icon.Icon.litTagName}>
@@ -109,39 +101,39 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
         </div>
         <span class="divider"></span>
         <div>
-          ${this.showSettings ?
+          ${this.#showSettings ?
             html`
               <${ValueInterpreterSettings.litTagName}
-                .data=${{ valueTypes: this.valueTypes } as ValueInterpreterSettingsData}
-                @typetoggle=${this.onTypeToggle}>
+                .data=${{ valueTypes: this.#valueTypes } as ValueInterpreterSettingsData}
+                @typetoggle=${this.#onTypeToggle}>
               </${ValueInterpreterSettings.litTagName}>` :
             html`
               <${ValueInterpreterDisplay.litTagName}
                 .data=${{
-                  buffer: this.buffer,
-                  valueTypes: this.valueTypes,
-                  endianness: this.endianness,
-                  valueTypeModes: this.valueTypeModeConfig,
-                  memoryLength: this.memoryLength,
+                  buffer: this.#buffer,
+                  valueTypes: this.#valueTypes,
+                  endianness: this.#endianness,
+                  valueTypeModes: this.#valueTypeModeConfig,
+                  memoryLength: this.#memoryLength,
                 } as ValueDisplayData}>
               </${ValueInterpreterDisplay.litTagName}>`}
         </div>
       </div>
     `,
-      this.shadow, { host: this },
+      this.#shadow, { host: this },
     );
     // clang-format on
   }
 
-  private onEndiannessChange(event: Event): void {
+  #onEndiannessChange(event: Event): void {
     event.preventDefault();
     const select = event.target as HTMLInputElement;
     const endianness = select.value as Endianness;
     this.dispatchEvent(new EndiannessChangedEvent(endianness));
   }
 
-  private renderEndiannessSetting(): LitHtml.TemplateResult {
-    const onEnumSettingChange = this.onEndiannessChange.bind(this);
+  #renderEndiannessSetting(): LitHtml.TemplateResult {
+    const onEnumSettingChange = this.#onEndiannessChange.bind(this);
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -150,7 +142,7 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
         style="border: none; background-color: transparent; cursor: pointer;"
         data-endianness="true" @change=${onEnumSettingChange}>
         ${[Endianness.Little, Endianness.Big].map(endianness => {
-            return html`<option value=${endianness} .selected=${this.endianness === endianness}>${
+            return html`<option value=${endianness} .selected=${this.#endianness === endianness}>${
                 i18n.i18n.lockedString(endianness)}</option>`;
         })}
       </select>
@@ -159,12 +151,12 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
     // clang-format on
   }
 
-  private onSettingsToggle(): void {
-    this.showSettings = !this.showSettings;
-    this.render();
+  #onSettingsToggle(): void {
+    this.#showSettings = !this.#showSettings;
+    this.#render();
   }
 
-  private onTypeToggle(e: TypeToggleEvent): void {
+  #onTypeToggle(e: TypeToggleEvent): void {
     this.dispatchEvent(new ValueTypeToggledEvent(e.data.type, e.data.checked));
   }
 }

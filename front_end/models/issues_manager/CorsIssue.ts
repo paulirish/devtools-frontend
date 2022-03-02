@@ -13,7 +13,7 @@ const UIStrings = {
   /**
   *@description Label for the link for CORS private network issues
   */
-  corsForPrivateNetworksRfc: 'CORS for private networks (RFC1918)',
+  corsPrivateNetworkAccess: 'Private Network Access',
   /**
   *@description Label for the link for CORS network issues
   */
@@ -26,7 +26,6 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 // eslint-disable-next-line rulesdir/const_enum
 export enum IssueCode {
   InsecurePrivateNetwork = 'CorsIssue::InsecurePrivateNetwork',
-  InsecurePrivateNetworkPreflight = 'CorsIssue::InsecurePrivateNetworkPreflight',
   InvalidHeaderValues = 'CorsIssue::InvalidHeaders',
   WildcardOriginNotAllowed = 'CorsIssue::WildcardOriginWithCredentials',
   PreflightResponseInvalid = 'CorsIssue::PreflightResponseInvalid',
@@ -37,11 +36,14 @@ export enum IssueCode {
   RedirectContainsCredentials = 'CorsIssue::RedirectContainsCredentials',
   DisallowedByMode = 'CorsIssue::DisallowedByMode',
   CorsDisabledScheme = 'CorsIssue::CorsDisabledScheme',
+  // TODO(https://crbug.com/1263483): Remove this once it's removed from CDP.
   PreflightMissingAllowExternal = 'CorsIssue::PreflightMissingAllowExternal',
+  // TODO(https://crbug.com/1263483): Remove this once it's removed from CDP.
   PreflightInvalidAllowExternal = 'CorsIssue::PreflightInvalidAllowExternal',
-  InvalidResponse = 'CorsIssue::InvalidResponse',
   NoCorsRedirectModeNotFollow = 'CorsIssue::NoCorsRedirectModeNotFollow',
   InvalidPrivateNetworkAccess = 'CorsIssue::InvalidPrivateNetworkAccess',
+  UnexpectedPrivateNetworkAccess = 'CorsIssue::UnexpectedPrivateNetworkAccess',
+  PreflightAllowPrivateNetworkError = 'CorsIssue::PreflightAllowPrivateNetworkError',
 }
 
 function getIssueCode(details: Protocol.Audits.CorsIssueDetails): IssueCode {
@@ -60,6 +62,7 @@ function getIssueCode(details: Protocol.Audits.CorsIssueDetails): IssueCode {
       return IssueCode.WildcardOriginNotAllowed;
     case Protocol.Network.CorsError.PreflightInvalidStatus:
     case Protocol.Network.CorsError.PreflightDisallowedRedirect:
+    case Protocol.Network.CorsError.InvalidResponse:
       return IssueCode.PreflightResponseInvalid;
     case Protocol.Network.CorsError.AllowOriginMismatch:
     case Protocol.Network.CorsError.PreflightAllowOriginMismatch:
@@ -81,26 +84,28 @@ function getIssueCode(details: Protocol.Audits.CorsIssueDetails): IssueCode {
       return IssueCode.PreflightMissingAllowExternal;
     case Protocol.Network.CorsError.PreflightInvalidAllowExternal:
       return IssueCode.PreflightInvalidAllowExternal;
-    case Protocol.Network.CorsError.InvalidResponse:
-      return IssueCode.InvalidResponse;
     case Protocol.Network.CorsError.InsecurePrivateNetwork:
-      return details.clientSecurityState?.initiatorIsSecureContext ? IssueCode.InsecurePrivateNetworkPreflight :
-                                                                     IssueCode.InsecurePrivateNetwork;
+      return IssueCode.InsecurePrivateNetwork;
     case Protocol.Network.CorsError.NoCorsRedirectModeNotFollow:
       return IssueCode.NoCorsRedirectModeNotFollow;
     case Protocol.Network.CorsError.InvalidPrivateNetworkAccess:
       return IssueCode.InvalidPrivateNetworkAccess;
+    case Protocol.Network.CorsError.UnexpectedPrivateNetworkAccess:
+      return IssueCode.UnexpectedPrivateNetworkAccess;
+    case Protocol.Network.CorsError.PreflightMissingAllowPrivateNetwork:
+    case Protocol.Network.CorsError.PreflightInvalidAllowPrivateNetwork:
+      return IssueCode.PreflightAllowPrivateNetworkError;
   }
 }
 
 export class CorsIssue extends Issue<IssueCode> {
-  private issueDetails: Protocol.Audits.CorsIssueDetails;
+  #issueDetails: Protocol.Audits.CorsIssueDetails;
 
   constructor(
       issueDetails: Protocol.Audits.CorsIssueDetails, issuesModel: SDK.IssuesModel.IssuesModel,
       issueId: Protocol.Audits.IssueId|undefined) {
     super(getIssueCode(issueDetails), issuesModel, issueId);
-    this.issueDetails = issueDetails;
+    this.#issueDetails = issueDetails;
   }
 
   getCategory(): IssueCategory {
@@ -108,25 +113,25 @@ export class CorsIssue extends Issue<IssueCode> {
   }
 
   details(): Protocol.Audits.CorsIssueDetails {
-    return this.issueDetails;
+    return this.#issueDetails;
   }
 
   getDescription(): MarkdownIssueDescription|null {
-    switch (getIssueCode(this.issueDetails)) {
+    switch (getIssueCode(this.#issueDetails)) {
       case IssueCode.InsecurePrivateNetwork:
         return {
           file: 'corsInsecurePrivateNetwork.md',
           links: [{
             link: 'https://developer.chrome.com/blog/private-network-access-update',
-            linkTitle: i18nString(UIStrings.corsForPrivateNetworksRfc),
+            linkTitle: i18nString(UIStrings.corsPrivateNetworkAccess),
           }],
         };
-      case IssueCode.InsecurePrivateNetworkPreflight:
+      case IssueCode.PreflightAllowPrivateNetworkError:
         return {
-          file: 'corsInsecurePrivateNetworkPreflight.md',
+          file: 'corsPreflightAllowPrivateNetworkError.md',
           links: [{
             link: 'https://developer.chrome.com/blog/private-network-access-update',
-            linkTitle: i18nString(UIStrings.corsForPrivateNetworksRfc),
+            linkTitle: i18nString(UIStrings.corsPrivateNetworkAccess),
           }],
         };
       case IssueCode.InvalidHeaderValues:
@@ -219,19 +224,23 @@ export class CorsIssue extends Issue<IssueCode> {
         };
       case IssueCode.PreflightMissingAllowExternal:
       case IssueCode.PreflightInvalidAllowExternal:
-      case IssueCode.InvalidResponse:
       case IssueCode.InvalidPrivateNetworkAccess:
+      case IssueCode.UnexpectedPrivateNetworkAccess:
         return null;
     }
   }
 
   primaryKey(): string {
-    return JSON.stringify(this.issueDetails);
+    return JSON.stringify(this.#issueDetails);
   }
 
   getKind(): IssueKind {
-    if (this.issueDetails.isWarning &&
-        this.issueDetails.corsErrorStatus.corsError === Protocol.Network.CorsError.InsecurePrivateNetwork) {
+    if (this.#issueDetails.isWarning &&
+        (this.#issueDetails.corsErrorStatus.corsError === Protocol.Network.CorsError.InsecurePrivateNetwork ||
+         this.#issueDetails.corsErrorStatus.corsError ===
+             Protocol.Network.CorsError.PreflightMissingAllowPrivateNetwork ||
+         this.#issueDetails.corsErrorStatus.corsError ===
+             Protocol.Network.CorsError.PreflightInvalidAllowPrivateNetwork)) {
       return IssueKind.BreakingChange;
     }
     return IssueKind.PageError;

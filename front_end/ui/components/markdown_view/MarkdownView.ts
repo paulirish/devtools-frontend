@@ -21,32 +21,32 @@ export interface MarkdownViewData {
 
 export class MarkdownView extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-markdown-view`;
-  private readonly shadow = this.attachShadow({mode: 'open'});
+  readonly #shadow = this.attachShadow({mode: 'open'});
 
   // TODO(crbug.com/1108699): Replace with `Marked.Marked.Token[]` once AST types are fixed upstream.
-  private tokenData: readonly Object[] = [];
+  #tokenData: readonly Object[] = [];
 
   connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [markdownViewStyles];
+    this.#shadow.adoptedStyleSheets = [markdownViewStyles];
   }
 
   set data(data: MarkdownViewData) {
-    this.tokenData = data.tokens;
-    this.update();
+    this.#tokenData = data.tokens;
+    this.#update();
   }
 
-  private update(): void {
-    this.render();
+  #update(): void {
+    this.#render();
   }
 
-  private render(): void {
+  #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
       <div class='message'>
-        ${this.tokenData.map(renderToken)}
+        ${this.#tokenData.map(renderToken)}
       </div>
-    `, this.shadow);
+    `, this.#shadow, {host: this});
     // clang-format on
   }
 }
@@ -69,7 +69,6 @@ const renderChildTokens = (token: any): string => {
 const unescape = (text: string): string => {
   // Unescape will get rid of the escaping done by Marked to avoid double escaping due to escaping it also with Lit-html
   // Table taken from: front_end/third_party/marked/package/src/helpers.js
-  /** @type {Map<string,string>} */
   const escapeReplacements = new Map<string, string>([
     ['&amp;', '&'],
     ['&lt;', '<'],
@@ -105,13 +104,13 @@ const tokenRenderers = new Map<string, (token: any) => LitHtml.TemplateResult>([
   ['space', (): LitHtml.TemplateResult => html``],
   [
     'link',
-    (token): LitHtml.TemplateResult => html`<${MarkdownLink.litTagName} .data="${
-        {key: token.href, title: token.text} as MarkdownLinkData}"></${MarkdownLink.litTagName}>`,
+    (token): LitHtml.TemplateResult => html`<${MarkdownLink.litTagName} .data=${
+        {key: token.href, title: token.text} as MarkdownLinkData}></${MarkdownLink.litTagName}>`,
   ],
   [
     'image',
-    (token): LitHtml.TemplateResult => html`<${MarkdownImage.litTagName} .data="${
-        {key: token.href, title: token.text} as MarkdownImageData}"></${MarkdownImage.litTagName}>`,
+    (token): LitHtml.TemplateResult => html`<${MarkdownImage.litTagName} .data=${
+        {key: token.href, title: token.text} as MarkdownImageData}></${MarkdownImage.litTagName}>`,
   ],
 ]);
 

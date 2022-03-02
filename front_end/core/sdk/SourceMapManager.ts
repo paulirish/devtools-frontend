@@ -110,8 +110,8 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
   }
 
   private resolveRelativeURLs(sourceURL: string, sourceMapURL: string): {
-    sourceURL: string,
-    sourceMapURL: string,
+    sourceURL: Platform.DevToolsPath.UrlString,
+    sourceMapURL: Platform.DevToolsPath.UrlString,
     sourceMapId: string,
   }|null {
     // |#sourceURL| can be a random string, but is generally an absolute path.
@@ -158,7 +158,7 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
       return;
     }
     if (!this.#sourceMapIdToLoadingClients.has(sourceMapId)) {
-      TextSourceMap.load(sourceMapURL, sourceURL, client.createPageResourceLoadInitiator())
+      void TextSourceMap.load(sourceMapURL, sourceURL, client.createPageResourceLoadInitiator())
           .catch(error => {
             Common.Console.Console.instance().warn(
                 i18nString(UIStrings.devtoolsFailedToLoadSourcemapS, {PH1: error.message}));

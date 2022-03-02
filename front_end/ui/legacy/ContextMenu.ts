@@ -137,8 +137,11 @@ export class Section {
     this.items = [];
   }
 
-  appendItem(label: string, handler: () => void, disabled?: boolean): Item {
+  appendItem(label: string, handler: () => void, disabled?: boolean, additionalElement?: Element): Item {
     const item = new Item(this.contextMenu, 'item', label, disabled);
+    if (additionalElement) {
+      item.customElement = additionalElement;
+    }
     this.items.push(item);
     if (this.contextMenu) {
       this.contextMenu.setHandler(item.id(), handler);
@@ -147,7 +150,7 @@ export class Section {
   }
 
   appendCustomItem(element: Element): Item {
-    const item = new Item(this.contextMenu, 'item', '<custom>');
+    const item = new Item(this.contextMenu, 'item');
     item.customElement = element;
     this.items.push(item);
     return item;
@@ -331,6 +334,7 @@ export class SubMenu extends Item {
 
 export interface ContextMenuOptions {
   useSoftMenu?: boolean;
+  onSoftMenuClosed?: () => void;
   x?: number;
   y?: number;
 }
@@ -344,6 +348,7 @@ export class ContextMenu extends SubMenu {
   private readonly useSoftMenu: boolean;
   private x: number;
   private y: number;
+  private onSoftMenuClosed?: () => void;
   private readonly handlers: Map<number, () => void>;
   idInternal: number;
   private softMenu?: SoftContextMenu;
@@ -360,6 +365,7 @@ export class ContextMenu extends SubMenu {
     this.useSoftMenu = Boolean(options.useSoftMenu);
     this.x = options.x === undefined ? mouseEvent.x : options.x;
     this.y = options.y === undefined ? mouseEvent.y : options.y;
+    this.onSoftMenuClosed = options.onSoftMenuClosed;
     this.handlers = new Map();
     this.idInternal = 0;
 
@@ -382,7 +388,7 @@ export class ContextMenu extends SubMenu {
 
     function handler(event: Event): void {
       const contextMenu = new ContextMenu(event);
-      contextMenu.show();
+      void contextMenu.show();
     }
   }
 
@@ -431,7 +437,8 @@ export class ContextMenu extends SubMenu {
     const ownerDocument = (eventTarget as HTMLElement).ownerDocument;
     if (this.useSoftMenu || ContextMenu.useSoftMenu ||
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
-      this.softMenu = new SoftContextMenu((menuObject as SoftContextMenuDescriptor[]), this.itemSelected.bind(this));
+      this.softMenu = new SoftContextMenu(
+          (menuObject as SoftContextMenuDescriptor[]), this.itemSelected.bind(this), undefined, this.onSoftMenuClosed);
       this.softMenu.show((ownerDocument as Document), new AnchorBox(this.x, this.y, 0, 0));
     } else {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.showContextMenuAtPoint(
@@ -465,9 +472,8 @@ export class ContextMenu extends SubMenu {
   }
 
   private buildMenuDescriptors(): (SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor)[] {
-    return /** @type {!Array.<!Host.InspectorFrontendHostAPI.ContextMenuDescriptor|!SoftContextMenuDescriptor>} */ super
-               .buildDescriptor()
-               .subItems as (SoftContextMenuDescriptor | Host.InspectorFrontendHostAPI.ContextMenuDescriptor)[];
+    return super.buildDescriptor().subItems as (
+               SoftContextMenuDescriptor | Host.InspectorFrontendHostAPI.ContextMenuDescriptor)[];
   }
 
   private onItemSelected(event: Common.EventTarget.EventTargetEvent<number>): void {

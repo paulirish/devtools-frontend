@@ -149,9 +149,17 @@ export class CPUProfileType extends ProfileType {
     super(CPUProfileType.TypeId, i18nString(UIStrings.recordJavascriptCpuProfile));
     this.recording = false;
 
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    const profilerModels = targetManager.models(SDK.CPUProfilerModel.CPUProfilerModel);
+    for (const model of profilerModels) {
+      for (const message of model.registeredConsoleProfileMessages) {
+        this.consoleProfileFinished(message);
+      }
+    }
+
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.CPUProfilerModel.CPUProfilerModel, SDK.CPUProfilerModel.Events.ConsoleProfileFinished,
-        this.consoleProfileFinished, this);
+        event => this.consoleProfileFinished(event.data), this);
   }
 
   profileBeingRecorded(): ProfileHeader|null {
@@ -172,7 +180,7 @@ export class CPUProfileType extends ProfileType {
 
   buttonClicked(): boolean {
     if (this.recording) {
-      this.stopRecordingProfile();
+      void this.stopRecordingProfile();
       return false;
     }
     this.startRecordingProfile();
@@ -187,8 +195,7 @@ export class CPUProfileType extends ProfileType {
     return i18nString(UIStrings.cpuProfilesShow);
   }
 
-  consoleProfileFinished(event: Common.EventTarget.EventTargetEvent<SDK.CPUProfilerModel.ProfileFinishedData>): void {
-    const data = event.data;
+  consoleProfileFinished(data: SDK.CPUProfilerModel.ProfileFinishedData): void {
     const profile = new CPUProfileHeader(data.cpuProfilerModel, this, data.title);
     profile.setProtocolProfile(data.cpuProfile);
     this.addProfile(profile);
@@ -201,11 +208,11 @@ export class CPUProfileType extends ProfileType {
     }
     const profile = new CPUProfileHeader(cpuProfilerModel, this);
     this.setProfileBeingRecorded(profile as ProfileHeader);
-    SDK.TargetManager.TargetManager.instance().suspendAllTargets();
+    void SDK.TargetManager.TargetManager.instance().suspendAllTargets();
     this.addProfile(profile as ProfileHeader);
     profile.updateStatus(i18nString(UIStrings.recording));
     this.recording = true;
-    cpuProfilerModel.startRecording();
+    void cpuProfilerModel.startRecording();
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.ProfilesCPUProfileTaken);
   }
 
@@ -236,7 +243,7 @@ export class CPUProfileType extends ProfileType {
   }
 
   profileBeingRecordedRemoved(): void {
-    this.stopRecordingProfile();
+    void this.stopRecordingProfile();
   }
 
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -303,7 +310,7 @@ export class NodeFormatter implements Formatter {
   linkifyNode(node: ProfileDataGridNode): Element|null {
     const cpuProfilerModel = this.profileView.profileHeader.cpuProfilerModel;
     const target = cpuProfilerModel ? cpuProfilerModel.target() : null;
-    const options = {className: 'profile-node-file', columnNumber: undefined, inlineFrameIndex: 0, tabStop: undefined};
+    const options = {className: 'profile-node-file', inlineFrameIndex: 0};
     return this.profileView.linkifier().maybeLinkifyConsoleCallFrame(target, node.profileNode.callFrame, options);
   }
 }

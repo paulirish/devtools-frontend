@@ -10,14 +10,15 @@ import {getGroupByKindChecked, getHiddenIssuesRow, getHiddenIssuesRowBody, getHi
 
 describe('Hide issues menu', async () => {
   it('should be appended to the issue header', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('issues/cross-origin-portal-post.html');
     await navigateToIssuesTab();
-    const issueTitle = 'SharedArrayBuffer usage is restricted to cross-origin isolated sites';
+    const issueTitle = 'Cross-origin portal post messages are blocked on your site';
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     const hideIssuesMenu = await getHideIssuesMenu();
-    const classList = await hideIssuesMenu.evaluate(node => node.classList.toString());
-    assert.include(classList, 'hidden');
+    const menuDisplay =
+        await hideIssuesMenu.evaluate(node => window.getComputedStyle(node as HTMLElement).getPropertyValue('display'));
+    assert.strictEqual(menuDisplay, 'none');
   });
 
   it('should become visible on hovering over the issue header', async () => {
@@ -41,11 +42,13 @@ describe('Hide issues menu', async () => {
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     const hideIssuesMenu = await getHideIssuesMenu();
-    let classList = await hideIssuesMenu.evaluate(node => node.classList.toString());
-    assert.include(classList, 'hidden');
+    let menuDisplay =
+        await hideIssuesMenu.evaluate(node => window.getComputedStyle(node as HTMLElement).getPropertyValue('display'));
+    assert.strictEqual(menuDisplay, 'none');
     await issueHeader.hover();
-    classList = await hideIssuesMenu.evaluate(node => node.classList.toString());
-    assert.notInclude(classList, 'hidden');
+    menuDisplay =
+        await hideIssuesMenu.evaluate(node => window.getComputedStyle(node as HTMLElement).getPropertyValue('display'));
+    assert.strictEqual(menuDisplay, 'block');
   });
 
   it('should open a context menu upon clicking', async () => {
@@ -75,10 +78,10 @@ describe('Hide issues menu', async () => {
   });
 
   it('should hide issue upon clicking the context menu entry', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('issues/cross-origin-portal-post.html');
     await navigateToIssuesTab();
 
-    const issueTitle = 'SharedArrayBuffer usage is restricted to cross-origin isolated sites';
+    const issueTitle = 'Cross-origin portal post messages are blocked on your site';
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     await issueHeader.hover();
@@ -92,9 +95,9 @@ describe('Hide issues menu', async () => {
   });
 
   it('should unhide all issues upon clicking unhide all issues button', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('issues/cross-origin-portal-post.html');
     await navigateToIssuesTab();
-    const issueTitle = 'SharedArrayBuffer usage is restricted to cross-origin isolated sites';
+    const issueTitle = 'Cross-origin portal post messages are blocked on your site';
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     await issueHeader.hover();
@@ -110,9 +113,9 @@ describe('Hide issues menu', async () => {
   });
 
   it('should contain unhide issues like this entry while hovering over a hidden issue', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('issues/cross-origin-portal-post.html');
     await navigateToIssuesTab();
-    const issueTitle = 'SharedArrayBuffer usage is restricted to cross-origin isolated sites';
+    const issueTitle = 'Cross-origin portal post messages are blocked on your site';
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     await issueHeader.hover();
@@ -138,9 +141,9 @@ describe('Hide issues menu', async () => {
   });
 
   it('should unhide issue after clicking the unhide issues like this entry', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('issues/cross-origin-portal-post.html');
     await navigateToIssuesTab();
-    const issueTitle = 'SharedArrayBuffer usage is restricted to cross-origin isolated sites';
+    const issueTitle = 'Cross-origin portal post messages are blocked on your site';
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     await issueHeader.hover();
@@ -174,7 +177,7 @@ describe('After enabling grouping by IssueKind, Hide issues menu', async () => {
   });
 
   it('should be appended to the issue kinds group header', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('elements/element-reveal-inline-issue.html');
     await navigateToIssuesTab();
     if (!await getGroupByKindChecked()) {
       await toggleGroupByKind();
@@ -186,7 +189,7 @@ describe('After enabling grouping by IssueKind, Hide issues menu', async () => {
   });
 
   it('should hide all available issues upon click menu entry', async () => {
-    await goToResource('issues/sab-issue.rawresponse');
+    await goToResource('elements/element-reveal-inline-issue.html');
     await navigateToIssuesTab();
     if (!await getGroupByKindChecked()) {
       await toggleGroupByKind();

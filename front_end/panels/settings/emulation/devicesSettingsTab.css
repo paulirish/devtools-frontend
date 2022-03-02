@@ -24,17 +24,16 @@
 }
 
 .devices-settings-tab .devices-list {
-  width: 350px;
+  width: min(350px, 100%);
   margin-top: 10px;
 }
 
 .devices-list-item {
-  padding: 3px 5px 3px 5px;
+  padding: 3px 5px;
   height: 30px;
   display: flex;
   align-items: center;
   flex: auto 1 1;
-  cursor: pointer;
   overflow: hidden;
   color: var(--color-text-primary);
   user-select: none;
@@ -104,7 +103,7 @@ li .devices-edit-client-hints-heading {
 
 .devices-edit-fields input {
   flex: auto;
-  margin: 8px 5px 0 5px;
+  margin: 8px 5px 0;
 }
 
 li.devices-edit-client-hints-field {
@@ -114,7 +113,7 @@ li.devices-edit-client-hints-field {
 
 .devices-edit-client-hints-field input {
   flex: auto;
-  margin: 8px 5px 0 5px;
+  margin: 8px 5px 0;
 }
 
 .devices-edit-fields .device-edit-fixed {
@@ -122,5 +121,5 @@ li.devices-edit-client-hints-field {
 }
 
 .devices-edit-fields select {
-  margin: 8px 5px 0 5px;
+  margin: 8px 5px 0;
 }

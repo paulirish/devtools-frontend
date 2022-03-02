@@ -105,6 +105,26 @@ const UIStrings = {
   */
   applyMobileEmulationDuring: 'Apply mobile emulation during auditing',
   /**
+   * @description ARIA label for a radio button input to select the Lighthouse mode.
+   */
+  lighthouseMode: 'Lighthouse mode',
+  /**
+   * @description Tooltip text of a radio button to select the Lighthouse mode. "Navigation" is a Lighthouse mode that audits a page navigation. "Timespan" is a Lighthouse mode that audits user interactions over a period of time. "Snapshot" is a Lighthouse mode that audits the current page state.
+   */
+  runLighthouseInMode: 'Run Lighthouse in navigation, timespan, or snapshot mode',
+  /**
+   * @description Label of a radio option for a Lighthouse mode that audits a page navigation.
+   */
+  navigation: 'Navigation',
+  /**
+   * @description Label of a radio option for a Lighthouse mode that audits user interactions over a period of time.
+   */
+  timespan: 'Timespan',
+  /**
+   * @description Label of a radio option for a Lighthouse mode that audits the current page state.
+   */
+  snapshot: 'Snapshot',
+  /**
   *@description Text for the mobile platform, as opposed to desktop
   */
   mobile: 'Mobile',
@@ -125,6 +145,14 @@ const UIStrings = {
   *@description Text of checkbox to reset storage features prior to running audits in Lighthouse
   */
   clearStorage: 'Clear storage',
+  /**
+   * @description Text of checkbox to use the legacy Lighthouse navigation mode
+   */
+  legacyNavigation: 'Legacy navigation',
+  /**
+   * @description Tooltip text that appears when hovering over the 'Legacy navigation' checkbox in the settings pane opened by clicking the setting cog in the start view of the audits panel. "Navigation mode" is a Lighthouse mode that analyzes a page navigation.
+   */
+  useLegacyNavigation: 'Analyze the page using classic Lighthouse when in navigation mode.',
   /**
   * @description Tooltip text of checkbox to reset storage features prior to running audits in
   * Lighthouse. Resetting the storage clears/empties it to a neutral state.
@@ -262,45 +290,27 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
       return '';
     }
     const mainTarget = this.manager.target();
-    const runtimeModel = mainTarget.model(SDK.RuntimeModel.RuntimeModel);
-    const executionContext = runtimeModel && runtimeModel.defaultExecutionContext();
-    let inspectedURL = mainTarget.inspectedURL();
-    if (!executionContext) {
+    // target.inspectedURL is reliably populated, however it lacks any url #hash
+    const inspectedURL = mainTarget.inspectedURL();
+
+    // We'll use the navigationHistory to acquire the current URL including hash
+    const resourceTreeModel = mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    const navHistory = resourceTreeModel && await resourceTreeModel.navigationHistory();
+    if (!resourceTreeModel || !navHistory) {
       return inspectedURL;
     }
 
-    // Evaluate location.href for a more specific URL than inspectedURL provides so that SPA hash navigation routes
-    // will be respected and audited.
-    try {
-      const result = await executionContext.evaluate(
-          {
-            expression: 'window.location.href',
-            objectGroup: 'lighthouse',
-            includeCommandLineAPI: false,
-            silent: false,
-            returnByValue: true,
-            generatePreview: false,
-            allowUnsafeEvalBlockedByCSP: undefined,
-            disableBreaks: undefined,
-            replMode: undefined,
-            throwOnSideEffect: undefined,
-            timeout: undefined,
-          },
-          /* userGesture */ false, /* awaitPromise */ false);
-      if ((!('exceptionDetails' in result) || !result.exceptionDetails) && 'object' in result && result.object) {
-        if (result.object.value) {
-          inspectedURL = result.object.value;
-        }
-        result.object.release();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-
-    return inspectedURL;
+    const {currentIndex, entries} = navHistory;
+    const navigationEntry = entries[currentIndex];
+    return navigationEntry.url;
   }
 
-  getFlags(): {internalDisableDeviceScreenEmulation: boolean, emulatedFormFactor: (string|undefined)} {
+  getFlags(): {
+    internalDisableDeviceScreenEmulation: boolean,
+    emulatedFormFactor: (string|undefined),
+    legacyNavigation: boolean,
+    mode: string,
+  } {
     const flags = {
       // DevTools handles all the emulation. This tells Lighthouse to not bother with emulation.
       internalDisableDeviceScreenEmulation: true,
@@ -308,11 +318,12 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
     for (const runtimeSetting of RuntimeSettings) {
       runtimeSetting.setFlags(flags, runtimeSetting.setting.get());
     }
-    return /** @type {{internalDisableDeviceScreenEmulation: boolean, emulatedFormFactor: (string|undefined)}} */ flags as
-        {
-          internalDisableDeviceScreenEmulation: boolean,
-          emulatedFormFactor: (string | undefined),
-        };
+    return flags as {
+      internalDisableDeviceScreenEmulation: boolean,
+      emulatedFormFactor: (string | undefined),
+      legacyNavigation: boolean,
+      mode: string,
+    };
   }
 
   getCategoryIDs(): string[] {
@@ -348,7 +359,7 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
 
     this.dispatchEventToListeners(Events.PageAuditabilityChanged, {helpText});
 
-    this.hasImportantResourcesNotCleared().then(warning => {
+    void this.hasImportantResourcesNotCleared().then(warning => {
       this.dispatchEventToListeners(Events.PageWarningsChanged, {warning});
     });
   }
@@ -433,6 +444,21 @@ export const RuntimeSettings: RuntimeSetting[] = [
     learnMore: undefined,
   },
   {
+    setting: Common.Settings.Settings.instance().createSetting(
+        'lighthouse.mode', 'navigation', Common.Settings.SettingStorageType.Synced),
+    title: i18nLazyString(UIStrings.lighthouseMode),
+    description: i18nLazyString(UIStrings.runLighthouseInMode),
+    setFlags: (flags: Flags, value: string|boolean): void => {
+      flags.mode = value;
+    },
+    options: [
+      {label: i18nLazyString(UIStrings.navigation), value: 'navigation'},
+      {label: i18nLazyString(UIStrings.timespan), value: 'timespan'},
+      {label: i18nLazyString(UIStrings.snapshot), value: 'snapshot'},
+    ],
+    learnMore: undefined,
+  },
+  {
     // This setting is disabled, but we keep it around to show in the UI.
     setting: Common.Settings.Settings.instance().createSetting(
         'lighthouse.throttling', true, Common.Settings.SettingStorageType.Synced),
@@ -457,6 +483,17 @@ export const RuntimeSettings: RuntimeSetting[] = [
     options: undefined,
     learnMore: undefined,
   },
+  {
+    setting: Common.Settings.Settings.instance().createSetting(
+        'lighthouse.legacy_navigation', true, Common.Settings.SettingStorageType.Synced),
+    title: i18nLazyString(UIStrings.legacyNavigation),
+    description: i18nLazyString(UIStrings.useLegacyNavigation),
+    setFlags: (flags: Flags, value: string|boolean): void => {
+      flags.legacyNavigation = value;
+    },
+    options: undefined,
+    learnMore: undefined,
+  },
 ];
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -465,6 +502,8 @@ export enum Events {
   PageAuditabilityChanged = 'PageAuditabilityChanged',
   PageWarningsChanged = 'PageWarningsChanged',
   AuditProgressChanged = 'AuditProgressChanged',
+  RequestLighthouseTimespanStart = 'RequestLighthouseTimespanStart',
+  RequestLighthouseTimespanEnd = 'RequestLighthouseTimespanEnd',
   RequestLighthouseStart = 'RequestLighthouseStart',
   RequestLighthouseCancel = 'RequestLighthouseCancel',
 }
@@ -485,6 +524,8 @@ export type EventTypes = {
   [Events.PageAuditabilityChanged]: PageAuditabilityChangedEvent,
   [Events.PageWarningsChanged]: PageWarningsChangedEvent,
   [Events.AuditProgressChanged]: AuditProgressChangedEvent,
+  [Events.RequestLighthouseTimespanStart]: boolean,
+  [Events.RequestLighthouseTimespanEnd]: boolean,
   [Events.RequestLighthouseStart]: boolean,
   [Events.RequestLighthouseCancel]: void,
 };

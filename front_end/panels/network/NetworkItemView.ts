@@ -151,7 +151,7 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
         i18nString(UIStrings.headers));
 
     this.payloadView = null;
-    this.maybeAppendPayloadPanel();
+    void this.maybeAppendPayloadPanel();
 
     this.addEventListener(UI.TabbedPane.Events.TabSelected, this.tabSelected, this);
 
@@ -235,7 +235,7 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
 
   private async requestHeadersChanged(): Promise<void> {
     this.maybeAppendCookiesPanel();
-    this.maybeAppendPayloadPanel();
+    void this.maybeAppendPayloadPanel();
   }
 
   private maybeAppendCookiesPanel(): void {
@@ -250,6 +250,9 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
   }
 
   private async maybeAppendPayloadPanel(): Promise<void> {
+    if (this.hasTab('payload')) {
+      return;
+    }
     if (this.requestInternal.queryParameters || await this.requestInternal.requestFormData()) {
       this.payloadView = new RequestPayloadView(this.requestInternal);
       this.appendTab(
@@ -270,7 +273,13 @@ export class NetworkItemView extends UI.TabbedPane.TabbedPane {
 
   private selectTabInternal(tabId: string): void {
     if (!this.selectTab(tabId)) {
-      this.selectTab('headers');
+      // maybeAppendPayloadPanel might cause payload tab to appear asynchronously, so
+      // it makes sense to retry on the next tick
+      window.setTimeout(() => {
+        if (!this.selectTab(tabId)) {
+          this.selectTab('headers');
+        }
+      }, 0);
     }
   }
 

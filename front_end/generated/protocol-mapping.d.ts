@@ -13,6 +13,15 @@
 export namespace ProtocolMapping {
   export interface Events {
     /**
+     * The loadComplete event mirrors the load complete event sent by the browser to assistive
+     * technology when the web page has finished loading.
+     */
+    'Accessibility.loadComplete': [Protocol.Accessibility.LoadCompleteEvent];
+    /**
+     * The nodesUpdated event is sent every time a previously requested node has changed the in tree.
+     */
+    'Accessibility.nodesUpdated': [Protocol.Accessibility.NodesUpdatedEvent];
+    /**
      * Event for when an animation has been cancelled.
      */
     'Animation.animationCanceled': [Protocol.Animation.AnimationCanceledEvent];
@@ -24,8 +33,6 @@ export namespace ProtocolMapping {
      * Event for animation that has been started.
      */
     'Animation.animationStarted': [Protocol.Animation.AnimationStartedEvent];
-    'ApplicationCache.applicationCacheStatusUpdated': [Protocol.ApplicationCache.ApplicationCacheStatusUpdatedEvent];
-    'ApplicationCache.networkStateUpdated': [Protocol.ApplicationCache.NetworkStateUpdatedEvent];
     'Audits.issueAdded': [Protocol.Audits.IssueAddedEvent];
     /**
      * Called when the recording state for the service has been updated.
@@ -298,6 +305,7 @@ export namespace ProtocolMapping {
      */
     'Network.reportingApiReportAdded': [Protocol.Network.ReportingApiReportAddedEvent];
     'Network.reportingApiReportUpdated': [Protocol.Network.ReportingApiReportUpdatedEvent];
+    'Network.reportingApiEndpointsChangedForOrigin': [Protocol.Network.ReportingApiEndpointsChangedForOriginEvent];
     /**
      * Fired when the node should be inspected. This happens after call to `setInspectMode` or when
      * user manually inspects an element.
@@ -440,7 +448,7 @@ export namespace ProtocolMapping {
      */
     'Security.visibleSecurityStateChanged': [Protocol.Security.VisibleSecurityStateChangedEvent];
     /**
-     * The security state of the page changed.
+     * The security state of the page changed. No longer being sent.
      */
     'Security.securityStateChanged': [Protocol.Security.SecurityStateChangedEvent];
     'ServiceWorker.workerErrorReported': [Protocol.ServiceWorker.WorkerErrorReportedEvent];
@@ -462,6 +470,10 @@ export namespace ProtocolMapping {
      * The origin's IndexedDB database list has been modified.
      */
     'Storage.indexedDBListUpdated': [Protocol.Storage.IndexedDBListUpdatedEvent];
+    /**
+     * One of the interest groups was accessed by the associated page.
+     */
+    'Storage.interestGroupAccessed': [Protocol.Storage.InterestGroupAccessedEvent];
     /**
      * Issued when attached to target because of auto-attach or `attachToTarget` command.
      */
@@ -704,6 +716,22 @@ export namespace ProtocolMapping {
       returnType: Protocol.Accessibility.GetFullAXTreeResponse;
     };
     /**
+     * Fetches the root node.
+     * Requires `enable()` to have been called previously.
+     */
+    'Accessibility.getRootAXNode': {
+      paramsType: [Protocol.Accessibility.GetRootAXNodeRequest?];
+      returnType: Protocol.Accessibility.GetRootAXNodeResponse;
+    };
+    /**
+     * Fetches a node and all ancestors up to and including the root.
+     * Requires `enable()` to have been called previously.
+     */
+    'Accessibility.getAXNodeAndAncestors': {
+      paramsType: [Protocol.Accessibility.GetAXNodeAndAncestorsRequest?];
+      returnType: Protocol.Accessibility.GetAXNodeAndAncestorsResponse;
+    };
+    /**
      * Fetches a particular accessibility node by AXNodeId.
      * Requires `enable()` to have been called previously.
      */
@@ -765,30 +793,6 @@ export namespace ProtocolMapping {
      * Sets the timing of an animation node.
      */
     'Animation.setTiming': {paramsType: [Protocol.Animation.SetTimingRequest]; returnType: void;};
-    /**
-     * Enables application cache domain notifications.
-     */
-    'ApplicationCache.enable': {paramsType: []; returnType: void;};
-    /**
-     * Returns relevant application cache data for the document in given frame.
-     */
-    'ApplicationCache.getApplicationCacheForFrame': {
-      paramsType: [Protocol.ApplicationCache.GetApplicationCacheForFrameRequest];
-      returnType: Protocol.ApplicationCache.GetApplicationCacheForFrameResponse;
-    };
-    /**
-     * Returns array of frame identifiers with manifest urls for each frame containing a document
-     * associated with some application cache.
-     */
-    'ApplicationCache.getFramesWithManifests':
-        {paramsType: []; returnType: Protocol.ApplicationCache.GetFramesWithManifestsResponse;};
-    /**
-     * Returns manifest URL for document in the given frame.
-     */
-    'ApplicationCache.getManifestForFrame': {
-      paramsType: [Protocol.ApplicationCache.GetManifestForFrameRequest];
-      returnType: Protocol.ApplicationCache.GetManifestForFrameResponse;
-    };
     /**
      * Returns the response body and size if it were re-encoded with the specified settings. Only
      * applies to images.
@@ -973,6 +977,14 @@ export namespace ProtocolMapping {
     'CSS.getStyleSheetText':
         {paramsType: [Protocol.CSS.GetStyleSheetTextRequest]; returnType: Protocol.CSS.GetStyleSheetTextResponse;};
     /**
+     * Returns all layers parsed by the rendering engine for the tree scope of a node.
+     * Given a DOM element identified by nodeId, getLayersForNode returns the root
+     * layer for the nearest ancestor document or shadow root. The layer root contains
+     * the full layer tree for the tree scope and their ordering.
+     */
+    'CSS.getLayersForNode':
+        {paramsType: [Protocol.CSS.GetLayersForNodeRequest]; returnType: Protocol.CSS.GetLayersForNodeResponse;};
+    /**
      * Starts tracking the given computed styles for updates. The specified array of properties
      * replaces the one previously specified. Pass empty array to disable tracking.
      * Use takeComputedStyleUpdates to retrieve the list of nodes that had properties modified.
@@ -1007,6 +1019,11 @@ export namespace ProtocolMapping {
     'CSS.setContainerQueryText': {
       paramsType: [Protocol.CSS.SetContainerQueryTextRequest]; returnType: Protocol.CSS.SetContainerQueryTextResponse;
     };
+    /**
+     * Modifies the expression of a supports at-rule.
+     */
+    'CSS.setSupportsText':
+        {paramsType: [Protocol.CSS.SetSupportsTextRequest]; returnType: Protocol.CSS.SetSupportsTextResponse;};
     /**
      * Modifies the rule selector.
      */
@@ -1087,6 +1104,10 @@ export namespace ProtocolMapping {
      */
     'Cast.setSinkToUse': {paramsType: [Protocol.Cast.SetSinkToUseRequest]; returnType: void;};
     /**
+     * Starts mirroring the desktop to the sink.
+     */
+    'Cast.startDesktopMirroring': {paramsType: [Protocol.Cast.StartDesktopMirroringRequest]; returnType: void;};
+    /**
      * Starts mirroring the tab to the sink.
      */
     'Cast.startTabMirroring': {paramsType: [Protocol.Cast.StartTabMirroringRequest]; returnType: void;};
@@ -1130,7 +1151,7 @@ export namespace ProtocolMapping {
     /**
      * Enables DOM agent for the given page.
      */
-    'DOM.enable': {paramsType: []; returnType: void;};
+    'DOM.enable': {paramsType: [Protocol.DOM.EnableRequest?]; returnType: void;};
     /**
      * Focuses the given element.
      */
@@ -1388,6 +1409,16 @@ export namespace ProtocolMapping {
      */
     'DOMDebugger.setXHRBreakpoint': {paramsType: [Protocol.DOMDebugger.SetXHRBreakpointRequest]; returnType: void;};
     /**
+     * Sets breakpoint on particular native event.
+     */
+    'EventBreakpoints.setInstrumentationBreakpoint':
+        {paramsType: [Protocol.EventBreakpoints.SetInstrumentationBreakpointRequest]; returnType: void;};
+    /**
+     * Removes breakpoint on particular native event.
+     */
+    'EventBreakpoints.removeInstrumentationBreakpoint':
+        {paramsType: [Protocol.EventBreakpoints.RemoveInstrumentationBreakpointRequest]; returnType: void;};
+    /**
      * Disables DOM snapshot agent for the given page.
      */
     'DOMSnapshot.disable': {paramsType: []; returnType: void;};
@@ -1570,6 +1601,11 @@ export namespace ProtocolMapping {
      * Allows overriding user agent with the given string.
      */
     'Emulation.setUserAgentOverride': {paramsType: [Protocol.Emulation.SetUserAgentOverrideRequest]; returnType: void;};
+    /**
+     * Allows overriding the automation flag.
+     */
+    'Emulation.setAutomationOverride':
+        {paramsType: [Protocol.Emulation.SetAutomationOverrideRequest]; returnType: void;};
     /**
      * Sends a BeginFrame to the target and returns when the frame was completed. Optionally captures a
      * screenshot from the resulting frame. Requires that the target was created with enabled
@@ -2082,7 +2118,7 @@ export namespace ProtocolMapping {
     'Overlay.setShowScrollBottleneckRects':
         {paramsType: [Protocol.Overlay.SetShowScrollBottleneckRectsRequest]; returnType: void;};
     /**
-     * Requests that backend shows hit-test borders on layers
+     * Deprecated, no longer has any effect.
      */
     'Overlay.setShowHitTestBorders': {paramsType: [Protocol.Overlay.SetShowHitTestBordersRequest]; returnType: void;};
     /**
@@ -2326,18 +2362,9 @@ export namespace ProtocolMapping {
      */
     'Page.stopScreencast': {paramsType: []; returnType: void;};
     /**
-     * Forces compilation cache to be generated for every subresource script.
-     * See also: `Page.produceCompilationCache`.
-     */
-    'Page.setProduceCompilationCache':
-        {paramsType: [Protocol.Page.SetProduceCompilationCacheRequest]; returnType: void;};
-    /**
      * Requests backend to produce compilation cache for the specified scripts.
-     * Unlike setProduceCompilationCache, this allows client to only produce cache
-     * for specific scripts. `scripts` are appeneded to the list of scripts
-     * for which the cache for would produced. Disabling compilation cache with
-     * `setProduceCompilationCache` would reset all pending cache requests.
-     * The list may also be reset during page navigation.
+     * `scripts` are appeneded to the list of scripts for which the cache
+     * would be produced. The list may be reset during page navigation.
      * When script with a matching URL is encountered, the cache is optionally
      * produced upon backend discretion, based on internal heuristics.
      * See also: `Page.compilationCacheProduced`.
@@ -2352,6 +2379,11 @@ export namespace ProtocolMapping {
      * Clears seeded compilation cache.
      */
     'Page.clearCompilationCache': {paramsType: []; returnType: void;};
+    /**
+     * Sets the Secure Payment Confirmation transaction mode.
+     * https://w3c.github.io/secure-payment-confirmation/#sctn-automation-set-spc-transaction-mode
+     */
+    'Page.setSPCTransactionMode': {paramsType: [Protocol.Page.SetSPCTransactionModeRequest]; returnType: void;};
     /**
      * Generates a report for testing.
      */
@@ -2491,6 +2523,18 @@ export namespace ProtocolMapping {
     'Storage.clearTrustTokens': {
       paramsType: [Protocol.Storage.ClearTrustTokensRequest]; returnType: Protocol.Storage.ClearTrustTokensResponse;
     };
+    /**
+     * Gets details for a named interest group.
+     */
+    'Storage.getInterestGroupDetails': {
+      paramsType: [Protocol.Storage.GetInterestGroupDetailsRequest];
+      returnType: Protocol.Storage.GetInterestGroupDetailsResponse;
+    };
+    /**
+     * Enables/Disables issuing of interestGroupAccessed events.
+     */
+    'Storage.setInterestGroupTracking':
+        {paramsType: [Protocol.Storage.SetInterestGroupTrackingRequest]; returnType: void;};
     /**
      * Returns information about the system.
      */
@@ -3089,6 +3133,17 @@ export namespace ProtocolMapping {
      * unsubscribes current runtime agent from Runtime.bindingCalled notifications.
      */
     'Runtime.removeBinding': {paramsType: [Protocol.Runtime.RemoveBindingRequest]; returnType: void;};
+    /**
+     * This method tries to lookup and populate exception details for a
+     * JavaScript Error object.
+     * Note that the stackTrace portion of the resulting exceptionDetails will
+     * only be populated if the Runtime domain was enabled at the time when the
+     * Error was thrown.
+     */
+    'Runtime.getExceptionDetails': {
+      paramsType: [Protocol.Runtime.GetExceptionDetailsRequest];
+      returnType: Protocol.Runtime.GetExceptionDetailsResponse;
+    };
     /**
      * Returns supported domains.
      */

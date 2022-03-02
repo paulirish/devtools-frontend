@@ -5,7 +5,7 @@
 import type * as puppeteer from 'puppeteer';
 
 import {$, $$, assertNotNullOrUndefined, click, getBrowserAndPages, goToResource, pasteText, timeout, waitFor, waitForAria, waitForFunction} from '../../shared/helper.js';
-import {AsyncScope} from '../../shared/mocha-extensions.js';
+import {AsyncScope} from '../../shared/async-scope.js';
 
 export const CONSOLE_TAB_SELECTOR = '#tab-console';
 export const CONSOLE_MESSAGES_SELECTOR = '.console-group-messages';
@@ -15,6 +15,7 @@ export const LOG_LEVELS_SELECTOR = '[aria-label^="Log level: "]';
 export const LOG_LEVELS_VERBOSE_OPTION_SELECTOR = '[aria-label^="Verbose"]';
 export const CONSOLE_PROMPT_SELECTOR = '.console-prompt-editor-container';
 export const CONSOLE_VIEW_SELECTOR = '.console-view';
+export const CONSOLE_TOOLTIP_SELECTOR = '.cm-tooltip';
 export const STACK_PREVIEW_CONTAINER = '.stack-preview-container';
 export const CONSOLE_MESSAGE_WRAPPER_SELECTOR = '.console-group-messages .console-message-wrapper';
 export const CONSOLE_SELECTOR = '.console-user-command-result';
@@ -160,8 +161,8 @@ export async function typeIntoConsole(frontend: puppeteer.Page, message: string)
   const consoleElement = await waitFor(CONSOLE_PROMPT_SELECTOR, undefined, asyncScope);
   await consoleElement.type(message);
   // Wait for autocomplete text to catch up.
-  const line = await waitFor('.CodeMirror-activeline', consoleElement, asyncScope);
-  const autocomplete = await line.$('.auto-complete-text');
+  const line = await waitFor('[aria-label="Console prompt"]', consoleElement, asyncScope);
+  const autocomplete = await $(CONSOLE_TOOLTIP_SELECTOR);
   // The autocomplete element doesn't exist until the first autocomplete suggestion
   // is actually given.
 

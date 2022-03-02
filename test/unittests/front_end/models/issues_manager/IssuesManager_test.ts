@@ -6,13 +6,30 @@ const {assert} = chai;
 
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as IssuesManager from '../../../../../front_end/models/issues_manager/issues_manager.js';
-import * as Root from '../../../../../front_end/core/root/root.js';
 
-import {createFakeSetting, enableFeatureForTest} from '../../helpers/EnvironmentHelpers.js';
-import {mkInspectorCspIssue, StubIssue, ThirdPartyStubIssue} from './StubIssue.js';
+import {createFakeSetting, describeWithEnvironment, enableFeatureForTest} from '../../helpers/EnvironmentHelpers.js';
+import {mkCookieIssue, mkInspectorCspIssue, StubIssue, ThirdPartyStubIssue} from './StubIssue.js';
 import {MockIssuesModel} from './MockIssuesModel.js';
 
-describe('IssuesManager', () => {
+describeWithEnvironment('IssuesManager', () => {
+  it('converts CookieIssue to SameSiteCookieIssue', () => {
+    const issue1 = new StubIssue('StubIssue1', ['id1', 'id2'], []);
+    const mockModel = new MockIssuesModel([issue1]) as unknown as SDK.IssuesModel.IssuesModel;
+    const showThirdPartyIssuesSetting = createFakeSetting('third party flag', true);
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting);
+    issuesManager.modelAdded(mockModel);
+
+    const dispatchedIssues: IssuesManager.Issue.Issue[] = [];
+    issuesManager.addEventListener(
+        IssuesManager.IssuesManager.Events.IssueAdded, event => dispatchedIssues.push(event.data.issue));
+
+    mockModel.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: mockModel, inspectorIssue: mkCookieIssue()});
+
+    const expected = ['SameSiteCookieIssue::ExcludeSameSiteUnspecifiedTreatedAsLax::SetCookie'];
+    assert.deepStrictEqual(dispatchedIssues.map(i => i.code()), expected);
+  });
+
   it('collects issues from an issues model', () => {
     const issue1 = new StubIssue('StubIssue1', ['id1', 'id2'], []);
     const mockModel = new MockIssuesModel([issue1]) as unknown as SDK.IssuesModel.IssuesModel;
@@ -97,13 +114,9 @@ describe('IssuesManager', () => {
   });
 });
 
-describe('IssuesManager', () => {
+describeWithEnvironment('IssuesManager', () => {
   beforeEach(() => {
     enableFeatureForTest('hideIssuesFeature');
-  });
-
-  afterEach(() => {
-    Root.Runtime.experiments.clearForTest();
   });
 
   it('hides issues added after setting has been initialised', () => {

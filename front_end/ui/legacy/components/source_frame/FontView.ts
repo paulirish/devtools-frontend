@@ -35,6 +35,8 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as UI from '../../legacy.js';
 
+import fontViewStyles from './fontView.css.legacy.js';
+
 const UIStrings = {
   /**
   *@description Text that appears on a button for the font resource type filter.
@@ -49,7 +51,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/FontView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class FontView extends UI.View.SimpleView {
-  private readonly url: string;
+  private readonly url: Platform.DevToolsPath.UrlString;
   private readonly mimeType: string;
   private readonly contentProvider: TextUtils.ContentProvider.ContentProvider;
   private readonly mimeTypeLabel: UI.Toolbar.ToolbarText;
@@ -59,7 +61,7 @@ export class FontView extends UI.View.SimpleView {
   private inResize!: boolean|null;
   constructor(mimeType: string, contentProvider: TextUtils.ContentProvider.ContentProvider) {
     super(i18nString(UIStrings.font));
-    this.registerRequiredCSS('ui/legacy/components/source_frame/fontView.css');
+    this.registerRequiredCSS(fontViewStyles);
     this.element.classList.add('font-view');
     this.url = contentProvider.contentURL();
     UI.ARIAUtils.setAccessibleName(this.element, i18nString(UIStrings.previewOfFontFromS, {PH1: this.url}));
@@ -91,7 +93,7 @@ export class FontView extends UI.View.SimpleView {
 
     const uniqueFontName = 'WebInspectorFontPreview' + (++_fontId);
     this.fontStyleElement = document.createElement('style');
-    this.contentProvider.requestContent().then(deferredContent => {
+    void this.contentProvider.requestContent().then(deferredContent => {
       this.onFontContentLoaded(uniqueFontName, deferredContent);
     });
     this.element.appendChild(this.fontStyleElement);

@@ -18,38 +18,19 @@ import type * as UIModule from '../../../../front_end/ui/legacy/legacy.js';
 // initialization phase.
 let UI: typeof UIModule;
 
-// Expose the locale.
-i18n.DevToolsLocale.DevToolsLocale.instance({
-  create: true,
-  data: {
-    navigatorLanguage: 'en-US',
-    settingLanguage: 'en-US',
-    lookupClosestDevToolsLocale: () => 'en-US',
-  },
-});
+let targetManager: SDK.TargetManager.TargetManager|null;
 
-// Load the strings from the resource file.
-const locale = i18n.DevToolsLocale.DevToolsLocale.instance().locale;
-// proxied call.
-try {
-  await i18n.i18n.fetchAndRegisterLocaleData(locale);
-} catch (error) {
-  // eslint-disable-next-line no-console
-  console.warn('EnvironmentHelper: Loading en-US locale failed', error.message);
-}
-
-let targetManager: SDK.TargetManager.TargetManager;
-
-function initializeTargetManagerIfNecessary() {
+function initializeTargetManagerIfNecessary(): SDK.TargetManager.TargetManager {
   // Create the target manager.
   targetManager = targetManager || SDK.TargetManager.TargetManager.instance({forceNew: true});
+  return targetManager;
 }
 
 export function createTarget(
-    {id = 'test' as Protocol.Target.TargetID, name = 'test', type = SDK.Target.Type.Frame}:
-        {id?: Protocol.Target.TargetID, name?: string, type?: SDK.Target.Type} = {}) {
-  initializeTargetManagerIfNecessary();
-  return targetManager.createTarget(id, name, type, null);
+    {id = 'test' as Protocol.Target.TargetID, name = 'test', type = SDK.Target.Type.Frame, parentTarget}:
+        {id?: Protocol.Target.TargetID, name?: string, type?: SDK.Target.Type, parentTarget?: SDK.Target.Target} = {}) {
+  const targetManager = initializeTargetManagerIfNecessary();
+  return targetManager.createTarget(id, name, type, parentTarget ? parentTarget : null);
 }
 
 function createSettingValue(
@@ -58,7 +39,36 @@ function createSettingValue(
   return {category, settingName, defaultValue, settingType};
 }
 
+const REGISTERED_EXPERIMENTS = [
+  'captureNodeCreationStacks',
+  'hideIssuesFeature',
+  'keyboardShortcutEditor',
+  'preciseChanges',
+  'protocolMonitor',
+  'sourcesPrettyPrint',
+  'wasmDWARFDebugging',
+];
+
 export async function initializeGlobalVars({reset = true} = {}) {
+  // Expose the locale.
+  i18n.DevToolsLocale.DevToolsLocale.instance({
+    create: true,
+    data: {
+      navigatorLanguage: 'en-US',
+      settingLanguage: 'en-US',
+      lookupClosestDevToolsLocale: () => 'en-US',
+    },
+  });
+
+  // Load the strings from the resource file.
+  const locale = i18n.DevToolsLocale.DevToolsLocale.instance().locale;
+  // proxied call.
+  try {
+    await i18n.i18n.fetchAndRegisterLocaleData(locale);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('EnvironmentHelper: Loading en-US locale failed', error.message);
+  }
 
   // Create the appropriate settings needed to boot.
   const settings = [
@@ -79,6 +89,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMedia', '', Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMediaFeaturePrefersColorScheme', '',
+        Common.Settings.SettingType.ENUM),
+    createSettingValue(
+        Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMediaFeatureForcedColors', '',
         Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMediaFeaturePrefersReducedMotion', '',
@@ -103,7 +116,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showDebugBorders', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showFPSCounter', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showScrollBottleneckRects', false),
-    createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showHitTestBorders', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showWebVitals', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'webpFormatDisabled', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'jpegXlFormatDisabled', false),
@@ -138,6 +150,11 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.NONE, 'customNetworkConditions', [], Common.Settings.SettingType.ARRAY),
     createSettingValue(
         Common.Settings.SettingCategory.APPEARANCE, 'uiTheme', 'systemPreferred', Common.Settings.SettingType.ENUM),
+    createSettingValue(
+        Common.Settings.SettingCategory.APPEARANCE, 'language', 'en-US', Common.Settings.SettingType.ENUM),
+    createSettingValue(
+        Common.Settings.SettingCategory.PERSISTENCE, 'persistenceNetworkOverridesEnabled', true,
+        Common.Settings.SettingType.BOOLEAN),
   ];
 
   Common.Settings.registerSettingsForTest(settings, reset);
@@ -147,14 +164,18 @@ export async function initializeGlobalVars({reset = true} = {}) {
   Common.Settings.Settings.instance(
       {forceNew: reset, syncedStorage: storage, globalStorage: storage, localStorage: storage});
 
+  for (const experimentName of REGISTERED_EXPERIMENTS) {
+    Root.Runtime.experiments.register(experimentName, '');
+  }
+
   // Dynamically import UI after the rest of the environment is set up, otherwise it will fail.
   UI = await import('../../../../front_end/ui/legacy/legacy.js');
   UI.ZoomManager.ZoomManager.instance(
       {forceNew: true, win: window, frontendHost: Host.InspectorFrontendHost.InspectorFrontendHostInstance});
 
-  // Needed for any context menus which may be created - either in a test or via
-  // rendering a component in the component docs server.
-  UI.GlassPane.GlassPane.setContainer(document.body);
+  // Initialize theme support and context menus.
+  Common.Settings.Settings.instance().createSetting('uiTheme', 'systemPreferred');
+  UI.UIUtils.initializeUIUtils(document);
 
   initializeTargetManagerIfNecessary();
 }
@@ -166,8 +187,11 @@ export async function deinitializeGlobalVars() {
   delete globalObject.SDK;
   delete globalObject.ls;
 
+  Root.Runtime.experiments.clearForTest();
+
   // Remove instances.
   SDK.TargetManager.TargetManager.removeInstance();
+  targetManager = null;
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
   Workspace.Workspace.WorkspaceImpl.removeInstance();

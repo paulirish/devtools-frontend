@@ -41,6 +41,7 @@ import type {ListDelegate} from './ListControl.js';
 import {ListControl, ListMode} from './ListControl.js';
 import {ListModel} from './ListModel.js';
 import {measurePreferredSize} from './UIUtils.js';
+import suggestBoxStyles from './suggestBox.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -58,9 +59,6 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/SuggestBox.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-/**
- * @interface
- */
 export interface SuggestBoxDelegate {
   applySuggestion(suggestion: Suggestion|null, isIntermediateSuggestion?: boolean): void;
 
@@ -107,7 +105,7 @@ export class SuggestBox implements ListDelegate<Suggestion> {
     this.glassPane.setAnchorBehavior(AnchorBehavior.PreferBottom);
     this.glassPane.setOutsideClickCallback(this.hide.bind(this));
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
-        this.glassPane.contentElement, {cssFile: 'ui/legacy/suggestBox.css', delegatesFocus: undefined});
+        this.glassPane.contentElement, {cssFile: suggestBoxStyles, delegatesFocus: undefined});
     shadowRoot.appendChild(this.element);
   }
 

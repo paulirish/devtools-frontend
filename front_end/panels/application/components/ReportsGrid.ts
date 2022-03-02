@@ -5,6 +5,7 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
+import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import type * as Protocol from '../../../generated/protocol.js';
@@ -18,11 +19,53 @@ const UIStrings = {
   *(https://developers.google.com/web/updates/2018/09/reportingapi#sending)
   */
   noReportsToDisplay: 'No reports to display',
+  /**
+  *@description Column header for a table displaying Reporting API reports.
+  *Status is one of 'Queued', 'Pending', 'MarkedForRemoval' or 'Success'.
+  */
+  status: 'Status',
+  /**
+  *@description Column header for a table displaying Reporting API reports.
+  *Destination is the name of the endpoint the report is being sent to.
+  */
+  destination: 'Destination',
+  /**
+  *@description Column header for a table displaying Reporting API reports.
+  *The column contains the timestamp of when a report was generated.
+  */
+  generatedAt: 'Generated at',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/ReportsGrid.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const {render, html} = LitHtml;
+
+export class ReportsGridStatusHeader extends HTMLElement {
+  static readonly litTagName = LitHtml.literal`devtools-resources-reports-grid-status-header`;
+  readonly #shadow = this.attachShadow({mode: 'open'});
+
+  connectedCallback(): void {
+    this.#shadow.adoptedStyleSheets = [reportingApiGridStyles];
+    this.#render();
+  }
+
+  #render(): void {
+    // Disabled until https://crbug.com/1079231 is fixed.
+    // clang-format off
+    render(html`
+      ${i18nString(UIStrings.status)}
+      <x-link href="https://web.dev/reporting-api/#report-status">
+        <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
+          iconName: 'help_outline',
+          color: 'var(--color-primary)',
+          width: '16px',
+          height: '16px',
+          } as IconButton.Icon.IconData}></${IconButton.Icon.Icon.litTagName}>
+      </x-link>
+    `, this.#shadow, {host: this});
+    // clang-format on
+  }
+}
 
 export interface ReportsGridData {
   reports: Protocol.Network.ReportingApiReport[];
@@ -31,22 +74,22 @@ export interface ReportsGridData {
 export class ReportsGrid extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-resources-reports-grid`;
 
-  private readonly shadow = this.attachShadow({mode: 'open'});
-  private reports: Protocol.Network.ReportingApiReport[] = [];
-  private protocolMonitorExperimentEnabled = false;
+  readonly #shadow = this.attachShadow({mode: 'open'});
+  #reports: Protocol.Network.ReportingApiReport[] = [];
+  #protocolMonitorExperimentEnabled = false;
 
   connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [reportingApiGridStyles];
-    this.protocolMonitorExperimentEnabled = Root.Runtime.experiments.isEnabled('protocolMonitor');
-    this.render();
+    this.#shadow.adoptedStyleSheets = [reportingApiGridStyles];
+    this.#protocolMonitorExperimentEnabled = Root.Runtime.experiments.isEnabled('protocolMonitor');
+    this.#render();
   }
 
   set data(data: ReportsGridData) {
-    this.reports = data.reports;
-    this.render();
+    this.#reports = data.reports;
+    this.#render();
   }
 
-  private render(): void {
+  #render(): void {
     const reportsGridData: DataGrid.DataGridController.DataGridControllerData = {
       columns: [
         {
@@ -59,27 +102,30 @@ export class ReportsGrid extends HTMLElement {
         {
           id: 'type',
           title: i18n.i18n.lockedString('Type'),
-          widthWeighting: 10,
+          widthWeighting: 20,
           hideable: false,
           visible: true,
         },
         {
           id: 'status',
-          title: i18n.i18n.lockedString('Status'),
-          widthWeighting: 10,
+          title: i18nString(UIStrings.status),
+          widthWeighting: 20,
           hideable: false,
           visible: true,
+          titleElement: html`
+          <${ReportsGridStatusHeader.litTagName}></${ReportsGridStatusHeader.litTagName}>
+          `,
         },
         {
           id: 'destination',
-          title: i18n.i18n.lockedString('Destination'),
-          widthWeighting: 10,
+          title: i18nString(UIStrings.destination),
+          widthWeighting: 20,
           hideable: false,
           visible: true,
         },
         {
           id: 'timestamp',
-          title: i18n.i18n.lockedString('Timestamp'),
+          title: i18nString(UIStrings.generatedAt),
           widthWeighting: 20,
           hideable: false,
           visible: true,
@@ -92,10 +138,10 @@ export class ReportsGrid extends HTMLElement {
           visible: true,
         },
       ],
-      rows: this.buildReportRows(),
+      rows: this.#buildReportRows(),
     };
 
-    if (this.protocolMonitorExperimentEnabled) {
+    if (this.#protocolMonitorExperimentEnabled) {
       reportsGridData.columns.unshift(
           {id: 'id', title: 'ID', widthWeighting: 30, hideable: false, visible: true},
       );
@@ -105,8 +151,8 @@ export class ReportsGrid extends HTMLElement {
     // clang-format off
     render(html`
       <div class="reporting-container">
-        <div class="reporting-header">Reports</div>
-        ${this.reports.length > 0 ? html`
+        <div class="reporting-header">${i18n.i18n.lockedString('Reports')}</div>
+        ${this.#reports.length > 0 ? html`
           <${DataGrid.DataGridController.DataGridController.litTagName} .data=${
               reportsGridData as DataGrid.DataGridController.DataGridControllerData}>
           </${DataGrid.DataGridController.DataGridController.litTagName}>
@@ -116,29 +162,32 @@ export class ReportsGrid extends HTMLElement {
           </div>
         `}
       </div>
-    `, this.shadow);
+    `, this.#shadow, {host: this});
     // clang-format on
   }
 
-  private buildReportRows(): DataGrid.DataGridUtils.Row[] {
-    return this.reports.map(report => ({
-                              cells: [
-                                {columnId: 'id', value: report.id},
-                                {columnId: 'url', value: report.initiatorUrl},
-                                {columnId: 'type', value: report.type},
-                                {columnId: 'status', value: report.status},
-                                {columnId: 'destination', value: report.destination},
-                                {columnId: 'timestamp', value: new Date(report.timestamp * 1000).toLocaleString()},
-                                {columnId: 'body', value: JSON.stringify(report.body)},
-                              ],
-                            }));
+  #buildReportRows(): DataGrid.DataGridUtils.Row[] {
+    return this.#reports.map(report => ({
+                               cells: [
+                                 {columnId: 'id', value: report.id},
+                                 {columnId: 'url', value: report.initiatorUrl},
+                                 {columnId: 'type', value: report.type},
+                                 {columnId: 'status', value: report.status},
+                                 {columnId: 'destination', value: report.destination},
+                                 {columnId: 'timestamp', value: new Date(report.timestamp * 1000).toLocaleString()},
+                                 {columnId: 'body', value: JSON.stringify(report.body)},
+                               ],
+                             }));
   }
 }
 
+ComponentHelpers.CustomElements.defineComponent(
+    'devtools-resources-reports-grid-status-header', ReportsGridStatusHeader);
 ComponentHelpers.CustomElements.defineComponent('devtools-resources-reports-grid', ReportsGrid);
 
 declare global {
   interface HTMLElementTagNameMap {
+    'devtools-resources-reports-grid-status-header': ReportsGridStatusHeader;
     'devtools-resources-reports-grid': ReportsGrid;
   }
 }

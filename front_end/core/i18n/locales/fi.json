@@ -161,6 +161,9 @@
   "core/common/SettingRegistration.ts | sources": {
     "message": "Lähteet"
   },
+  "core/common/SettingRegistration.ts | sync": {
+    "message": "Synkronointi"
+  },
   "core/host/InspectorFrontendHost.ts | devtoolsS": {
     "message": "DevTools – {PH1}"
   },
@@ -398,6 +401,21 @@
   "core/sdk/DebuggerModel.ts | withBlock": {
     "message": "Tyypin With lohko"
   },
+  "core/sdk/EventBreakpointsModel.ts | auctionWorklet": {
+    "message": "Mainoshuutokauppa-worklet"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeBidderWorkletBiddingStart": {
+    "message": "Tarjoajan tarjousvaiheen alku"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeBidderWorkletReportingStart": {
+    "message": "Tarjoajan raportointivaiheen alku"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeSellerWorkletReportingStart": {
+    "message": "Myyjän raportointivaiheen alku"
+  },
+  "core/sdk/EventBreakpointsModel.ts | beforeSellerWorkletScoringStart": {
+    "message": "Myyjän pisteytysvaiheen alku"
+  },
   "core/sdk/NetworkManager.ts | crossoriginReadBlockingCorb": {
     "message": "CORB-esto (Cross-Origin Read Blocking): eri lähteiden vastaus {PH1}, MIME-tyyppi {PH2}. Katso lisätietoja osoitteesta https://www.chromestatus.com/feature/5629709824032768."
   },
@@ -461,6 +479,9 @@
   "core/sdk/NetworkRequest.ts | domainMismatch": {
     "message": "Tämä eväste estettiin, koska pyynnön URL-osoitteen verkkotunnus ei vastannut evästeen verkkotunnusta täsmälleen eikä pyynnön URL-osoitteen verkkotunnus ollut evästeen Domain-määritearvon aliverkkotunnus."
   },
+  "core/sdk/NetworkRequest.ts | nameValuePairExceedsMaxSize": {
+    "message": "Tämä eväste estettiin, koska se oli liian suuri. Nimen ja arvon yhteenlaskettu koko saa olla korkeintaan 4 096 merkkiä."
+  },
   "core/sdk/NetworkRequest.ts | notOnPath": {
     "message": "Tämä eväste estettiin, sillä sen polku ei vastannut täsmälleen pyynnön URL-osoitteen polkua tai sen ylähakemistoa."
   },
@@ -492,7 +513,7 @@
     "message": "Tämä eväste estettiin, koska sillä oli määrite \"Secure\" eikä yhteys ollut suojattu."
   },
   "core/sdk/NetworkRequest.ts | setcookieHeaderIsIgnoredIn": {
-    "message": "Set-Cookie-otsikko ohitetaan URL-osoitteesta {PH1} saadussa vastauksessa. Evästeen pituuden tulee olla korkeintaan 4 096 merkkiä."
+    "message": "Set-Cookie-otsikko ohitetaan URL-osoitteesta {PH1} saadussa vastauksessa. Nimen ja arvon yhteenlaskettu koko saa olla korkeintaan 4 096 merkkiä."
   },
   "core/sdk/NetworkRequest.ts | theSchemeOfThisConnectionIsNot": {
     "message": "Tämän yhteyden skeema ei saa tallentaa evästeitä."
@@ -511,6 +532,9 @@
   },
   "core/sdk/NetworkRequest.ts | thisSetcookieWasBlockedBecauseItHadTheSamesiteStrictLax": {
     "message": "Tämä Set-Cookie-otsikon kautta yritetty evästeen tallennus estettiin, koska sillä oli määrite \"{PH1}\", mutta se tuli sivujen välisestä vastauksesta, joka ei ollut vastaus ylätason navigointiin. Vastauksen katsotaan olevan sivustojen välinen, koska URL-osoitteen skeema poikkeaa nykyisestä sivustosta."
+  },
+  "core/sdk/NetworkRequest.ts | thisSetcookieWasBlockedBecauseTheNameValuePairExceedsMaxSize": {
+    "message": "Set-Cookie-otsikon kautta yritetty evästeen tallennus estettiin, koska eväste oli liian suuri. Nimen ja arvon yhteenlaskettu koko saa olla korkeintaan 4 096 merkkiä."
   },
   "core/sdk/NetworkRequest.ts | thisSetcookieWasBlockedDueToUser": {
     "message": "Tämä Set-Cookie-otsikon kautta yritetty evästeen tallennus estettiin käyttäjän asetusten vuoksi."
@@ -668,11 +692,17 @@
   "core/sdk/sdk-meta.ts | doNotShowGridTrackSizes": {
     "message": "Älä näytä ruudukon raitakokoja"
   },
+  "core/sdk/sdk-meta.ts | doNotShowRulersOnHover": {
+    "message": "Älä näytä viivaimia päälleviennillä"
+  },
   "core/sdk/sdk-meta.ts | emulateAFocusedPage": {
     "message": "Emuloi kohdistettua sivua"
   },
   "core/sdk/sdk-meta.ts | emulateAchromatopsia": {
     "message": "Emuloi akromatopsiaa"
+  },
+  "core/sdk/sdk-meta.ts | emulateAutoDarkMode": {
+    "message": "Emuloi automaattinen tumma tila"
   },
   "core/sdk/sdk-meta.ts | emulateBlurredVision": {
     "message": "Emuloi sumeaa näköä"
@@ -737,9 +767,6 @@
   "core/sdk/sdk-meta.ts | hideFramesPerSecondFpsMeter": {
     "message": "Piilota kuvanopeusmittari (FPS)"
   },
-  "core/sdk/sdk-meta.ts | hideHittestBorders": {
-    "message": "Piilota osumatestin rajat"
-  },
   "core/sdk/sdk-meta.ts | hideLayerBorders": {
     "message": "Piilota tasojen rajat"
   },
@@ -794,9 +821,6 @@
   "core/sdk/sdk-meta.ts | showGridTrackSizes": {
     "message": "Näytä ruudukon raitakoot"
   },
-  "core/sdk/sdk-meta.ts | showHittestBorders": {
-    "message": "Näytä osumatestin rajat"
-  },
   "core/sdk/sdk-meta.ts | showLayerBorders": {
     "message": "Näytä tasojen rajat"
   },
@@ -815,8 +839,8 @@
   "core/sdk/sdk-meta.ts | showPaintFlashingRectangles": {
     "message": "Näytä piirtämisen vilkkuvat suorakulmiot"
   },
-  "core/sdk/sdk-meta.ts | showRulers": {
-    "message": "Näytä viivaimet"
+  "core/sdk/sdk-meta.ts | showRulersOnHover": {
+    "message": "Näytä viivaimet päälleviennillä"
   },
   "core/sdk/sdk-meta.ts | showScrollPerformanceBottlenecks": {
     "message": "Näytä vierityksen suorituskyvyn pullonkaulat"
@@ -857,11 +881,20 @@
   "entrypoints/inspector_main/RenderingOptions.ts | emulateAFocusedPage": {
     "message": "Emuloi kohdistettua sivua"
   },
+  "entrypoints/inspector_main/RenderingOptions.ts | emulateAutoDarkMode": {
+    "message": "Ota automaattinen tumma tila käyttöön"
+  },
   "entrypoints/inspector_main/RenderingOptions.ts | emulatesAFocusedPage": {
     "message": "Emuloi keskitettyä sivua."
   },
+  "entrypoints/inspector_main/RenderingOptions.ts | emulatesAutoDarkMode": {
+    "message": "Ottaa automaattisen tumman tilan käyttöön ja prefers-color-scheme saa arvon dark."
+  },
   "entrypoints/inspector_main/RenderingOptions.ts | forcesCssColorgamutMediaFeature": {
     "message": "Pakottaa käyttöön CSS:n mediaominaisuuden color-gamut"
+  },
+  "entrypoints/inspector_main/RenderingOptions.ts | forcesCssForcedColors": {
+    "message": "Pakottaa käyttöön CSS:n pakotetut värit ‑mediaominaisuuden"
   },
   "entrypoints/inspector_main/RenderingOptions.ts | forcesCssPreferscolorschemeMedia": {
     "message": "Pakottaa käyttöön CSS:n mediaominaisuuden prefers-color-scheme"
@@ -899,9 +932,6 @@
   "entrypoints/inspector_main/RenderingOptions.ts | highlightsFramesRedDetectedToBe": {
     "message": "Korostaa (punaisella) kehykset, joiden havaitaan olevan mainoksia."
   },
-  "entrypoints/inspector_main/RenderingOptions.ts | hittestBorders": {
-    "message": "Osumatestin rajat"
-  },
   "entrypoints/inspector_main/RenderingOptions.ts | layerBorders": {
     "message": "Tasojen rajat"
   },
@@ -922,9 +952,6 @@
   },
   "entrypoints/inspector_main/RenderingOptions.ts | showsAnOverlayWithCoreWebVitals": {
     "message": "Näyttää sivuston suorituskyvyn peittoelementin."
-  },
-  "entrypoints/inspector_main/RenderingOptions.ts | showsBordersAroundHittestRegions": {
-    "message": "Näyttää rajat osumatestin alueiden ympärillä."
   },
   "entrypoints/inspector_main/RenderingOptions.ts | showsLayerBordersOrangeoliveAnd": {
     "message": "Näyttää tasojen rajat (oranssi/oliivinvihreä) ja ruudut (syaani)."
@@ -980,7 +1007,7 @@
   "entrypoints/inspector_main/inspector_main-meta.ts | visionDeficiency": {
     "message": "näkörajoite"
   },
-  "entrypoints/js_app/JsMain.ts | main": {
+  "entrypoints/js_app/js_app.ts | main": {
     "message": "Ensisijainen"
   },
   "entrypoints/main/MainImpl.ts | customizeAndControlDevtools": {
@@ -1015,9 +1042,6 @@
   },
   "entrypoints/main/MainImpl.ts | showConsoleDrawer": {
     "message": "Näytä konsolin vetopaneeli"
-  },
-  "entrypoints/main/MainImpl.ts | theSystempreferredColorSchemeHas": {
-    "message": "Järjestelmän ensisijainen väriteema on muuttunut. Voit ottaa muutoksen käyttöön DevToolsissa lataamalla sen uudelleen."
   },
   "entrypoints/main/MainImpl.ts | undockIntoSeparateWindow": {
     "message": "Irrota erilliseen ikkunaan"
@@ -1063,6 +1087,9 @@
   },
   "entrypoints/main/main-meta.ts | enableShortcutToSwitchPanels": {
     "message": "Ota käyttöön paneelien vaihtaminen pikanäppäimillä ⌘ + 1–9"
+  },
+  "entrypoints/main/main-meta.ts | enableSync": {
+    "message": "Salli asetusten synkronointi"
   },
   "entrypoints/main/main-meta.ts | findNextResult": {
     "message": "Etsi seuraava tulos"
@@ -1166,41 +1193,41 @@
   "entrypoints/main/main-meta.ts | zoomOut": {
     "message": "Loitonna"
   },
-  "entrypoints/node_app/node_app-meta.ts | node": {
-    "message": "Noodi"
-  },
-  "entrypoints/node_app/node_app-meta.ts | showNode": {
-    "message": "Noodi"
-  },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | addConnection": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | addConnection": {
     "message": "Lisää yhteys"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | networkAddressEgLocalhost": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | networkAddressEgLocalhost": {
     "message": "Verkko-osoite (esim. localhost:9229)"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | noConnectionsSpecified": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | noConnectionsSpecified": {
     "message": "Yhteyksiä ei määritetty"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | nodejsDebuggingGuide": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | nodejsDebuggingGuide": {
     "message": "Node.js-sovelluksen virheenkorjausopas"
   },
-  "entrypoints/node_main/NodeConnectionsPanel.ts | specifyNetworkEndpointAnd": {
+  "entrypoints/node_app/NodeConnectionsPanel.ts | specifyNetworkEndpointAnd": {
     "message": "Määritä verkon päätepiste, niin DevTools yhdistää siihen automaattisesti. Lue lisätietoja avaamalla {PH1}."
   },
-  "entrypoints/node_main/NodeMain.ts | main": {
+  "entrypoints/node_app/NodeMain.ts | main": {
     "message": "Ensisijainen"
   },
-  "entrypoints/node_main/NodeMain.ts | nodejsS": {
+  "entrypoints/node_app/NodeMain.ts | nodejsS": {
     "message": "Node.js: {PH1}"
   },
-  "entrypoints/node_main/node_main-meta.ts | connection": {
+  "entrypoints/node_app/node_app.ts | connection": {
     "message": "Yhteys"
   },
-  "entrypoints/node_main/node_main-meta.ts | node": {
+  "entrypoints/node_app/node_app.ts | networkTitle": {
+    "message": "Noodi"
+  },
+  "entrypoints/node_app/node_app.ts | node": {
     "message": "noodi"
   },
-  "entrypoints/node_main/node_main-meta.ts | showConnection": {
+  "entrypoints/node_app/node_app.ts | showConnection": {
     "message": "Näytä yhteys"
+  },
+  "entrypoints/node_app/node_app.ts | showNode": {
+    "message": "Noodi"
   },
   "entrypoints/worker_app/WorkerMain.ts | main": {
     "message": "Ensisijainen"
@@ -1280,6 +1307,9 @@
   "models/har/Writer.ts | writingFile": {
     "message": "Kirjoitetaan tiedostoa…"
   },
+  "models/issues_manager/ClientHintIssue.ts | clientHintsInfrastructure": {
+    "message": "Client Hints ‑infrastruktuuri"
+  },
   "models/issues_manager/ContentSecurityPolicyIssue.ts | contentSecurityPolicyEval": {
     "message": "Content Security Policy ‑käytäntö – Eval"
   },
@@ -1298,8 +1328,8 @@
   "models/issues_manager/CorsIssue.ts | CORS": {
     "message": "Eri lähteistä peräisin olevien resurssien jakaminen (CORS)"
   },
-  "models/issues_manager/CorsIssue.ts | corsForPrivateNetworksRfc": {
-    "message": "Yksityisverkkojen CORS (RFC1918)"
+  "models/issues_manager/CorsIssue.ts | corsPrivateNetworkAccess": {
+    "message": "Private Network Access"
   },
   "models/issues_manager/CrossOriginEmbedderPolicyIssue.ts | coopAndCoep": {
     "message": "COOP ja COEP"
@@ -1307,8 +1337,11 @@
   "models/issues_manager/CrossOriginEmbedderPolicyIssue.ts | samesiteAndSameorigin": {
     "message": "Same-Site ja Same-Origin"
   },
-  "models/issues_manager/DeprecationIssue.ts | userAgentReduction": {
-    "message": "Käyttäjäagentin merkkijonon tiivistäminen"
+  "models/issues_manager/FederatedAuthRequestIssue.ts | fedCm": {
+    "message": "Federated Credential Management API"
+  },
+  "models/issues_manager/GenericIssue.ts | crossOriginPortalPostMessage": {
+    "message": "Portaalit – saman alkuperän viestintäkanavat"
   },
   "models/issues_manager/HeavyAdIssue.ts | handlingHeavyAdInterventions": {
     "message": "Raskaisiin mainoksiin puuttumisen käsittely"
@@ -1316,17 +1349,29 @@
   "models/issues_manager/Issue.ts | breakingChangeIssue": {
     "message": "Virheen aiheuttavaan muutokseen liittyvä ongelma: sivu voi lakata toimimasta Chromen uudemmissa versioissa"
   },
+  "models/issues_manager/Issue.ts | breakingChanges": {
+    "message": "Virheen aiheuttavat muutokset"
+  },
   "models/issues_manager/Issue.ts | improvementIssue": {
     "message": "Parannusongelma: mahdollisuus parantaa sivua"
   },
+  "models/issues_manager/Issue.ts | improvements": {
+    "message": "Parannukset"
+  },
   "models/issues_manager/Issue.ts | pageErrorIssue": {
     "message": "Sivuvirhe: sivu ei toimi oikein"
+  },
+  "models/issues_manager/Issue.ts | pageErrors": {
+    "message": "Sivuvirheet"
   },
   "models/issues_manager/LowTextContrastIssue.ts | colorAndContrastAccessibility": {
     "message": "Värin ja kontrastin esteettömyys"
   },
   "models/issues_manager/MixedContentIssue.ts | preventingMixedContent": {
     "message": "Yhdistelmäsisällön estäminen"
+  },
+  "models/issues_manager/NavigatorUserAgentIssue.ts | userAgentReduction": {
+    "message": "Käyttäjäagentin merkkijonon tiivistäminen"
   },
   "models/issues_manager/QuirksModeIssue.ts | documentCompatibilityMode": {
     "message": "Dokumentti-yhteensopivuustila"
@@ -1338,7 +1383,7 @@
     "message": "epävarma"
   },
   "models/issues_manager/SameSiteCookieIssue.ts | firstPartySetsExplained": {
-    "message": "Kuvaus: First-Party Sets"
+    "message": "Määritteet First-Party Sets ja SameParty"
   },
   "models/issues_manager/SameSiteCookieIssue.ts | howSchemefulSamesiteWorks": {
     "message": "Skeemapohjaisen Same-Siten toiminta"
@@ -1351,9 +1396,6 @@
   },
   "models/issues_manager/TrustedWebActivityIssue.ts | changesToQualityCriteriaForPwas": {
     "message": "Luotettua verkkotoimintaa käyttävien PWA-sovellusten laatukriteerien muutokset"
-  },
-  "models/issues_manager/WasmCrossOriginModuleSharingIssue.ts | linkTitle": {
-    "message": "Same-originiin jakavan Wasm-moduulin rajoittaminen"
   },
   "models/logs/NetworkLog.ts | anonymous": {
     "message": "<anonyymi>"
@@ -1378,9 +1420,6 @@
   },
   "models/logs/logs-meta.ts | reset": {
     "message": "resetoi"
-  },
-  "models/persistence/Automapping.ts | theAttemptToBindSInTheWorkspace": {
-    "message": "Kun {PH1} yritettiin sitoa työtilassa, yritys epäonnistui, koska URI on väärin muotoiltu."
   },
   "models/persistence/EditFileSystemView.ts | add": {
     "message": "Lisää"
@@ -1523,8 +1562,17 @@
   "panels/accessibility/AXBreadcrumbsPane.ts | accessibilityTree": {
     "message": "Esteettömyyspuu"
   },
+  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentDescription": {
+    "message": "Esteettömyyspuu on siirretty DOM-puun oikeaan yläkulmaan."
+  },
+  "panels/accessibility/AXBreadcrumbsPane.ts | fullTreeExperimentName": {
+    "message": "Ota käyttöön koko sivun esteettömyyspuu"
+  },
   "panels/accessibility/AXBreadcrumbsPane.ts | ignored": {
     "message": "Ohitettu"
+  },
+  "panels/accessibility/AXBreadcrumbsPane.ts | reloadRequired": {
+    "message": "Muutoksen astuminen voimaan edellyttää päivittämistä."
   },
   "panels/accessibility/AXBreadcrumbsPane.ts | scrollIntoView": {
     "message": "Vieritä, kunnes sisältö näkyy"
@@ -1666,6 +1714,9 @@
   },
   "panels/accessibility/AccessibilityStrings.ts | fromCaption": {
     "message": "Lähde: caption"
+  },
+  "panels/accessibility/AccessibilityStrings.ts | fromDescription": {
+    "message": "Lähde: description"
   },
   "panels/accessibility/AccessibilityStrings.ts | fromLabel": {
     "message": "Lähde: label"
@@ -1816,6 +1867,9 @@
   },
   "panels/accessibility/AccessibilityStrings.ts | valueFromAttribute": {
     "message": "Määritteestä saatu arvo"
+  },
+  "panels/accessibility/AccessibilityStrings.ts | valueFromDescriptionElement": {
+    "message": "Arvo elementistä description."
   },
   "panels/accessibility/AccessibilityStrings.ts | valueFromElementContents": {
     "message": "Elementin sisällöstä saatu arvo"
@@ -1982,14 +2036,11 @@
   "panels/application/AppManifestView.ts | actualWidthSpxOfSSDoesNotMatch": {
     "message": "{PH2} ({PH3}): todellinen leveys ({PH1} px) ei vastaa määritettyä leveyttä ({PH4} px)"
   },
-  "panels/application/AppManifestView.ts | appId": {
-    "message": "Sovelluksen tunnus"
-  },
   "panels/application/AppManifestView.ts | appIdExplainer": {
     "message": "Näin selain saa tietää, pitääkö manifestin päivittää nykyinen sovellus vai viittaako se uuteen verkkosovellukseen, jonka voi asentaa."
   },
   "panels/application/AppManifestView.ts | appIdNote": {
-    "message": "Huom. \"id\" ei ole määritettynä manifestissa. Sen sijaan käytössä on \"start_url\". Voit määrittää sovelluksen tunnuksen, joka vastaa nykyistä identiteettiä, valitsemalla \"id\"-kenttään osoitteen \"{PH1}\"."
+    "message": "{PH1} {PH2} ei ole määriteltynä manifestissa. Sen sijaan käytössä on {PH3}. Voit määrittää sovellustunnuksen, joka vastaa nykyistä identiteettiä, valitsemalla {PH4}-kenttään osoitteen {PH5} {PH6}."
   },
   "panels/application/AppManifestView.ts | appManifest": {
     "message": "Sovelluksen manifesti"
@@ -2000,11 +2051,23 @@
   "panels/application/AppManifestView.ts | backgroundColor": {
     "message": "Taustaväri"
   },
+  "panels/application/AppManifestView.ts | computedAppId": {
+    "message": "Laskettu sovellustunnus"
+  },
+  "panels/application/AppManifestView.ts | copyToClipboard": {
+    "message": "Kopioi leikepöydälle"
+  },
   "panels/application/AppManifestView.ts | couldNotCheckServiceWorker": {
     "message": "service worker ei ollut tarkistettavissa, koska manifestistä puuttuu \"start_url\"-kenttä"
   },
   "panels/application/AppManifestView.ts | couldNotDownloadARequiredIcon": {
     "message": "Tarvittavan kuvakkeen lataaminen teknisistä tiedoista ei onnistunut"
+  },
+  "panels/application/AppManifestView.ts | darkBackgroundColor": {
+    "message": "Tumma taustaväri"
+  },
+  "panels/application/AppManifestView.ts | darkThemeColor": {
+    "message": "Tumman teeman väri"
   },
   "panels/application/AppManifestView.ts | description": {
     "message": "Kuvaus"
@@ -2038,6 +2101,9 @@
   },
   "panels/application/AppManifestView.ts | installability": {
     "message": "Asennettavuus"
+  },
+  "panels/application/AppManifestView.ts | learnMore": {
+    "message": "Lue lisää"
   },
   "panels/application/AppManifestView.ts | manifestContainsDisplayoverride": {
     "message": "Manifestissä on \"display_override\"-kenttä, ja ensimmäisen tuetun näyttötilan on oltava \"standalone\", \"fullscreen\" tai minimal-ui\""
@@ -2080,6 +2146,9 @@
   },
   "panels/application/AppManifestView.ts | noSuppliedIconIsAtLeastSpxSquare": {
     "message": "Mikään annetuista kuvakkeista ei ole vähintään {PH1} pikselin kokoinen neliö, jonka tiedostomuoto on PNG, SVG tai WebP ja jolle ei ole asetettu purpose-määritettä tai jonka määritteen asetus on \"any\"."
+  },
+  "panels/application/AppManifestView.ts | note": {
+    "message": "Huom."
   },
   "panels/application/AppManifestView.ts | orientation": {
     "message": "Suunta"
@@ -2180,33 +2249,6 @@
   "panels/application/AppManifestView.ts | themeColor": {
     "message": "Teeman väri"
   },
-  "panels/application/ApplicationCacheItemsView.ts | appcache": {
-    "message": "Sovellusvälimuisti"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | applicationCache": {
-    "message": "Sovellusvälimuisti"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | deleteString": {
-    "message": "Poista"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | noApplicationCacheInformation": {
-    "message": "Sovellusvälimuistin tietoja ei saatavilla."
-  },
-  "panels/application/ApplicationCacheItemsView.ts | offline": {
-    "message": "Offline-tila"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | online": {
-    "message": "Verkossa"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | resource": {
-    "message": "Resurssi"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | sizeString": {
-    "message": "Koko"
-  },
-  "panels/application/ApplicationCacheItemsView.ts | typeString": {
-    "message": "Tyyppi"
-  },
   "panels/application/ApplicationPanelCacheSection.ts | backForwardCache": {
     "message": "Siirtymisvälimuisti"
   },
@@ -2221,9 +2263,6 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | application": {
     "message": "Sovellus"
-  },
-  "panels/application/ApplicationPanelSidebar.ts | applicationCache": {
-    "message": "Sovellusvälimuisti"
   },
   "panels/application/ApplicationPanelSidebar.ts | backgroundServices": {
     "message": "Taustapalvelut"
@@ -2293,42 +2332,6 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | worker": {
     "message": "worker"
-  },
-  "panels/application/BackForwardCacheView.ts | backForwardCacheTitle": {
-    "message": "Siirtymisvälimuisti"
-  },
-  "panels/application/BackForwardCacheView.ts | bfcacheStatus": {
-    "message": "Siirtymisvälimuistin tila"
-  },
-  "panels/application/BackForwardCacheView.ts | chromeSupportNeeded": {
-    "message": "Viimeistä navigointia ei tallennettu välimuistiin näistä syistä"
-  },
-  "panels/application/BackForwardCacheView.ts | lastMainFrameNavigation": {
-    "message": "Viimeisin pääkehyksen siirtyminen"
-  },
-  "panels/application/BackForwardCacheView.ts | mainFrame": {
-    "message": "Pääkehys"
-  },
-  "panels/application/BackForwardCacheView.ts | normalNavigation": {
-    "message": "Normaali siirtyminen"
-  },
-  "panels/application/BackForwardCacheView.ts | pageSupportNeeded": {
-    "message": "Siirtymisvälimuistin estävät ominaisuudet"
-  },
-  "panels/application/BackForwardCacheView.ts | restoredFromBFCache": {
-    "message": "Palautettu siirtymisvälimuistista"
-  },
-  "panels/application/BackForwardCacheView.ts | unavailable": {
-    "message": "ei saatavilla"
-  },
-  "panels/application/BackForwardCacheView.ts | unknown": {
-    "message": "tuntematon"
-  },
-  "panels/application/BackForwardCacheView.ts | url": {
-    "message": "URL-osoite"
-  },
-  "panels/application/BackForwardCacheView.ts | willBeSupported": {
-    "message": "(Tuetaan Chromen tulevassa versiossa)"
   },
   "panels/application/BackgroundServiceView.ts | backgroundFetch": {
     "message": "Haku taustalla"
@@ -2549,6 +2552,15 @@
   "panels/application/IndexedDBViews.ts | version": {
     "message": "Versio"
   },
+  "panels/application/InterestGroupStorageView.ts | clickToDisplayBody": {
+    "message": "Valitse haluamasi ryhmä, niin näet sen tämänhetkisen tilan"
+  },
+  "panels/application/InterestGroupStorageView.ts | noDataAvailable": {
+    "message": "Valitusta ryhmästä ei ole saatavilla tietoja. Selain on saatettu poistaa ryhmästä."
+  },
+  "panels/application/InterestGroupTreeElement.ts | interestGroups": {
+    "message": "Ryhmät"
+  },
   "panels/application/OpenedWindowDetailsView.ts | accessToOpener": {
     "message": "Pääsy avaajaan"
   },
@@ -2602,6 +2614,12 @@
   },
   "panels/application/OpenedWindowDetailsView.ts | yes": {
     "message": "Kyllä"
+  },
+  "panels/application/ReportingApiReportsView.ts | clickToDisplayBody": {
+    "message": "Näytä raportin runko klikkaamalla"
+  },
+  "panels/application/ReportingApiTreeElement.ts | reportingApi": {
+    "message": "Reporting API"
   },
   "panels/application/ServiceWorkerCacheViews.ts | cache": {
     "message": "Välimuisti"
@@ -2777,9 +2795,6 @@
   "panels/application/StorageView.ts | application": {
     "message": "Sovellus"
   },
-  "panels/application/StorageView.ts | applicationCache": {
-    "message": "Sovellusvälimuisti"
-  },
   "panels/application/StorageView.ts | cache": {
     "message": "Välimuisti"
   },
@@ -2885,6 +2900,390 @@
   "panels/application/application-meta.ts | stopRecordingEvents": {
     "message": "Lopeta tapahtumien nauhoittaminen"
   },
+  "panels/application/components/BackForwardCacheStrings.ts | HTTPMethodNotGET": {
+    "message": "Vain GET-pyynnön kautta ladattavat sivut voivat käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | HTTPStatusNotOK": {
+    "message": "Välimuistiin voi tallentaa vain sivuja, joilla on tilakoodi 2XX."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | JavaScriptExecution": {
+    "message": "Chrome havaitsi välimuistissa yrityksen suorittaa JavaScript."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | appBanner": {
+    "message": "AppBanneria pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabled": {
+    "message": "Merkinnät estävät siirtymisvälimuistin käytön. Ota se käyttöön paikallisesti tällä laitteella osoitteessa chrome://flags/#back-forward-cache."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledByCommandLine": {
+    "message": "Komentorivi estää siirtymisvälimuistin käytön."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledByLowMemory": {
+    "message": "Riittämätön muisti estää siirtymisvälimuistin käytön."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledForDelegate": {
+    "message": "Delegaatti ei tue siirtymisvälimuistia"
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabledForPrerender": {
+    "message": "Esirenderöijä estää siirtymisvälimuistin käytön."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | broadcastChannel": {
+    "message": "Sivua ei voi tallentaa välimuistiin, koska sillä on BroadcastChannel-esiintymä, jolla on rekisteröityjä kuuntelijoita."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cacheControlNoStore": {
+    "message": "Sivut, joilla on cache-control:no-store-otsikko, eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cacheFlushed": {
+    "message": "Välimuisti tyhjennettiin tarkoituksella."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cacheLimit": {
+    "message": "Sivu poistettiin välimuistista, jotta toinen sivu voitiin tallentaa välimuistiin."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | containsPlugins": {
+    "message": "Liitännäisiä sisältävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentFileChooser": {
+    "message": "FileChooser APIa käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentFileSystemAccess": {
+    "message": "File System Access APIa käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaDevicesDispatcherHost": {
+    "message": "Medialaitteen välittäjää käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaPlay": {
+    "message": "Mediasoitin oli käynnissä siirryttäessä pois."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaSession": {
+    "message": "MediaSession APIa käyttävät ja toiston tilan asettavat sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentMediaSessionService": {
+    "message": "MediaSession APIa käyttävät ja toimintokäsittelijöitä asettavat sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentScreenReader": {
+    "message": "Näytönlukuohjelma estää siirtymisvälimuistin käytön."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentSecurityHandler": {
+    "message": "SecurityHandleria käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentSerial": {
+    "message": "Serial APIa käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentWebAuthenticationAPI": {
+    "message": "WebAuthetication APIa käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentWebBluetooth": {
+    "message": "WebBluetooth APIa käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | contentWebUSB": {
+    "message": "WebUSB APIa käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | dedicatedWorkerOrWorklet": {
+    "message": "Dedicated workeria tai workletia käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | documentLoaded": {
+    "message": "Dokumentti ei latautunut kokonaan ennen pois siirtymistä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderAppBannerManager": {
+    "message": "Sovellusbanneri oli päällä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderChromePasswordManagerClientBindCredentialManager": {
+    "message": "Chromen Salasanojen ylläpito oli päällä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderDomDistillerSelfDeletingRequestDelegate": {
+    "message": "DOM-tislaus oli kesken pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderDomDistillerViewerSource": {
+    "message": "DOM Distiller Viewer oli näkyvissä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensionMessaging": {
+    "message": "Messaging APIa käyttävät laajennukset estävät siirtymisvälimuistin käytön."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensionMessagingForOpenPort": {
+    "message": "Pitkään yhdistettyinä olleiden laajennusten pitäisi katkaista yhteys ennen siirtymisvälimuistiin siirtymistä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensionSentMessageToCachedFrame": {
+    "message": "Pitkään yhdistettynä ollut laajennus yritti lähettää viestejä siirtymisvälimuistissa oleville kehyksille."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderExtensions": {
+    "message": "Laajennukset estävät siirtymisvälimuistin käytön."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderModalDialog": {
+    "message": "Sivun modaalivalintaikkuna (esim. lomakkeen uudelleenlähetys tai http-salasanavalintaikkuna) oli näkyvissä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderOfflinePage": {
+    "message": "Offline-sivu oli näkyvissä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderOomInterventionTabHelper": {
+    "message": "Muistin loppumisen muistutuspalkki oli näkyvissä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderPermissionRequestManager": {
+    "message": "Lupapyyntöjä oli aktiivisena pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderPopupBlockerTabHelper": {
+    "message": "Ponnahdusikkunoiden estotoiminto oli päällä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderSafeBrowsingThreatDetails": {
+    "message": "Selaussuojan tiedot olivat näkyvissä pois siirryttäessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | embedderSafeBrowsingTriggeredPopupBlocker": {
+    "message": "Selaussuoja katsoi sivun haitalliseksi ja esti ponnahdusikkunan."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | enteredBackForwardCacheBeforeServiceWorkerHostAdded": {
+    "message": "Service worker aktivoitiin, kun sivu oli siirtymisvälimuistissa."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | foregroundCacheLimit": {
+    "message": "Sivu poistettiin välimuistista, jotta toinen sivu voitiin tallentaa välimuistiin."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | grantedMediaStreamAccess": {
+    "message": "Sivut, joille on myönnetty pääsy median striimaukseen, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | haveInnerContents": {
+    "message": "Portaaleja käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | idleManager": {
+    "message": "IdleManageria käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | indexedDBConnection": {
+    "message": "Sivut, joilla on avoin IndexedDB-yhteys, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | ineligibleAPI": {
+    "message": "Käytetyt APIt eivät olleet soveltuvia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | injectedJavascript": {
+    "message": "Sivut, joihin laajennus lisää JavaScriptin, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | injectedStyleSheet": {
+    "message": "Sivut, joihin laajennus lisää tyyliarkin, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | internalError": {
+    "message": "Sisäinen virhe."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | keyboardLock": {
+    "message": "Näppäimistön lukitusta käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | loading": {
+    "message": "Sivu ei latautunut kokonaan ennen pois siirtymistä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | mainResourceHasCacheControlNoCache": {
+    "message": "Sivut, joiden pääresurssilla on cache-control:no-cache, eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | mainResourceHasCacheControlNoStore": {
+    "message": "Sivut, joiden pääresurssilla on cache-control:no-store, eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | navigationCancelledWhileRestoring": {
+    "message": "Siirtyminen peruttiin ennen kuin sivu voitiin palauttaa siirtymisvälimuistista."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkExceedsBufferLimit": {
+    "message": "Sivu poistettiin välimuistista, koska aktiivinen verkkoyhteys vastaanotti liikaa dataa. Chrome rajoittaa välimuistissa olevien sivujen vastaanottaman datan määrää."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkRequestDatapipeDrainedAsBytesConsumer": {
+    "message": "Sivut, joiden fetch()- tai XHR-pyyntö on kesken, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkRequestRedirected": {
+    "message": "Sivu poistettiin siirtymisvälimuistista, koska aktiiviseen verkkopyyntöön liittyi uudelleenohjaus."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | networkRequestTimeout": {
+    "message": "Sivu poistettiin välimuistista, koska verkkoyhteys oli auki liian pitkään. Chrome rajoittaa aikaa, jonka välimuistissa oleva sivu voi vastaanottaa dataa."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | noResponseHead": {
+    "message": "Sivut, joilla ei ole hyväksyttävää vastausotsikkoa, eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | notMainFrame": {
+    "message": "Siirtyminen tapahtui muussa kuin pääkehyksessä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingIndexedDBTransaction": {
+    "message": "Sivut, joilla on keskeneräisiä indeksoituja DB-tapahtumia, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestDirectSocket": {
+    "message": "Sivut, joiden verkkopyyntö on kesken, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestFetch": {
+    "message": "Sivut, joiden verkonhakupyyntö on kesken, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestOthers": {
+    "message": "Sivut, joiden verkkopyyntö on kesken, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | outstandingNetworkRequestXHR": {
+    "message": "Sivut, joiden XHR-verkkopyyntö on kesken, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | paymentManager": {
+    "message": "PaymentManageria käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | pictureInPicture": {
+    "message": "Pikkuruutua käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | portal": {
+    "message": "Portaaleja käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | printing": {
+    "message": "Tulostus UI:n näyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | relatedActiveContentsExist": {
+    "message": "window.open() avasi sivun, ja toisella välilehdellä on viittaus siihen, tai sivu avasi ikkunan."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | rendererProcessCrashed": {
+    "message": "Siirtymisvälimuistissa olevan sivun renderöintiprosessi kaatui."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | rendererProcessKilled": {
+    "message": "Siirtymisvälimuistissa olevan sivun renderöintiprosessi lopetettiin."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedAudioCapturePermission": {
+    "message": "Äänentallennuslupia pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedBackForwardCacheBlockedSensors": {
+    "message": "Anturilupia pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedBackgroundWorkPermission": {
+    "message": "Taustasynkronointia tai hakulupia pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedMIDIPermission": {
+    "message": "MIDI-lupia pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedNotificationsPermission": {
+    "message": "Ilmoituslupia pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedStorageAccessGrant": {
+    "message": "Sivut, jotka ovat pyytäneet pääsyä tallennustilaan, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | requestedVideoCapturePermission": {
+    "message": "Videontallennuslupia pyytäneet sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | schemeNotHTTPOrHTTPS": {
+    "message": "Välimuistiin voi tallentaa vain sivuja, joiden URL-malli on HTTP/HTTPS."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerClaim": {
+    "message": "Service worker pyysi sivun, kun se oli siirtymisvälimuistissa."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerPostMessage": {
+    "message": "Service worker yritti lähettää siirtymisvälimuistissa olevalle sivulle omaisuuden: MessageEvent."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerUnregistration": {
+    "message": "ServiceWorkerin rekisteröinti peruttiin, kun sivu oli siirtymisvälimuistissa."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | serviceWorkerVersionActivation": {
+    "message": "Sivu poistettiin siirtymisvälimuistista service workerin aktivoitumisen takia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | sessionRestored": {
+    "message": "Chrome käynnistyi uudelleen ja tyhjensi siirtymisvälimuistin."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | sharedWorker": {
+    "message": "SharedWorkeria käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | speechRecognizer": {
+    "message": "SpeechRecognizeria käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | speechSynthesis": {
+    "message": "SpeechSynthesisia käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | subframeIsNavigating": {
+    "message": "Sivulla oleva iframe aloitti siirtymisen, joka ei onnistunut."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | subresourceHasCacheControlNoCache": {
+    "message": "Sivut, joiden alaresurssilla on cache-control:no-cache, eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | subresourceHasCacheControlNoStore": {
+    "message": "Sivut, joiden alaresurssilla on cache-control:no-store, eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | timeout": {
+    "message": "Sivu ylitti enimmäisajan siirtymisvälimuistissa ja vanheni."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | timeoutPuttingInCache": {
+    "message": "Sivu aikakatkaistiin, kun se oli siirtymässä siirtymisvälimuistiin (tämä johtuu luultavasti pitkäkestoisista sivun piilotuksen käsittelijöistä)."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | unloadHandlerExistsInMainFrame": {
+    "message": "Sivun pääkehyksessä on tyhjennyksen käsittelijä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | unloadHandlerExistsInSubFrame": {
+    "message": "Sivun alakehyksessä on tyhjennyksen käsittelijä."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | userAgentOverrideDiffers": {
+    "message": "Selain on muuttanut käyttäjäagentin ohitusotsikkoa."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | wasGrantedMediaAccess": {
+    "message": "Sivut, joille on annettu lupa tallentaa videota tai ääntä, eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webDatabase": {
+    "message": "WebDatabasea käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webHID": {
+    "message": "WebHID:iä käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webLocks": {
+    "message": "WebLocksia käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webNfc": {
+    "message": "WebNfc:tä käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webOTPService": {
+    "message": "WebOTPServiceä käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webRTC": {
+    "message": "WebRTC:tä käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webShare": {
+    "message": "WebSharea käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webSocket": {
+    "message": "WebSocketia käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webTransport": {
+    "message": "WebTransportia käyttävät sivut eivät voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | webXR": {
+    "message": "WebXR:ää käyttävät sivut eivät voi tällä hetkellä käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheView.ts | backForwardCacheTitle": {
+    "message": "Siirtymisvälimuisti"
+  },
+  "panels/application/components/BackForwardCacheView.ts | circumstantial": {
+    "message": "Toimenpiteet eivät mahdollisia"
+  },
+  "panels/application/components/BackForwardCacheView.ts | circumstantialExplanation": {
+    "message": "Näihin syihin ei voi vaikuttaa, eli välimuistin käytön esti jokin sivun ulkopuolinen asia."
+  },
+  "panels/application/components/BackForwardCacheView.ts | learnMore": {
+    "message": "Lue lisää: siirtymisvälimuistin kelpoisuusehdot"
+  },
+  "panels/application/components/BackForwardCacheView.ts | mainFrame": {
+    "message": "Pääkehys"
+  },
+  "panels/application/components/BackForwardCacheView.ts | normalNavigation": {
+    "message": "Ei näytetty siirtymisvälimuistista: Ota siirtymisvälimuisti käyttöön Chromen takaisin- ja eteenpäin-painikkeilla. Voit myös siirtyä pois ja takaisin automaattisesti alla olevalla testipainikkeella."
+  },
+  "panels/application/components/BackForwardCacheView.ts | pageSupportNeeded": {
+    "message": "Edellyttää toimenpiteitä"
+  },
+  "panels/application/components/BackForwardCacheView.ts | pageSupportNeededExplanation": {
+    "message": "Näihin syihin voi vaikuttaa, eli jos sivuun tehdään muutoksia, se voi käyttää siirtymisvälimuistia."
+  },
+  "panels/application/components/BackForwardCacheView.ts | restoredFromBFCache": {
+    "message": "Näytetty siirtymisvälimuistista."
+  },
+  "panels/application/components/BackForwardCacheView.ts | runTest": {
+    "message": "Testaa siirtymisvälimuistia"
+  },
+  "panels/application/components/BackForwardCacheView.ts | runningTest": {
+    "message": "Tehdään testiä"
+  },
+  "panels/application/components/BackForwardCacheView.ts | supportPending": {
+    "message": "Odottaa tukea"
+  },
+  "panels/application/components/BackForwardCacheView.ts | supportPendingExplanation": {
+    "message": "Chromen tuki näille syille odottaa, eli ne eivät estä sivua käyttämästä siirtymisvälimuistia jossakin Chromen tulevassa versiossa."
+  },
+  "panels/application/components/BackForwardCacheView.ts | unavailable": {
+    "message": "ei saatavilla"
+  },
+  "panels/application/components/BackForwardCacheView.ts | unknown": {
+    "message": "Tuntematon tila"
+  },
+  "panels/application/components/BackForwardCacheView.ts | url": {
+    "message": "URL-osoite:"
+  },
+  "panels/application/components/EndpointsGrid.ts | noEndpointsToDisplay": {
+    "message": "Ei näytettäviä päätepisteitä"
+  },
   "panels/application/components/FrameDetailsView.ts | aFrameAncestorIsAnInsecure": {
     "message": "Kehyksen edeltäjä on suojaamaton konteksti"
   },
@@ -2928,22 +3327,16 @@
     "message": "Näytä Lähde-paneeli klikkaamalla"
   },
   "panels/application/components/FrameDetailsView.ts | createdByAdScriptExplanation": {
-    "message": "Mainosskripti oli (asynkronisessa) pinossa, kun tämä kehys luotiin. Saatat saada lisätietoja, jos tutkit tämän kehyksen luomisen jäljityslistaa."
+    "message": "(async) stack sisälsi mainosskriptin, kun tämä kehys luotiin. Saatat saada lisätietoja, jos tutkit tämän kehyksen luomista (stack trace)."
   },
   "panels/application/components/FrameDetailsView.ts | creationStackTrace": {
-    "message": "Kehysten luomisen jäljityslista"
+    "message": "Kehysten luominen (Stack Trace)"
   },
   "panels/application/components/FrameDetailsView.ts | creationStackTraceExplanation": {
-    "message": "Tämä kehys on luotu ohjelmallisesti. Jäljityslista näyttää, missä tämä tapahtui."
-  },
-  "panels/application/components/FrameDetailsView.ts | crossoriginEmbedderPolicy": {
-    "message": "Eri lähteiden upotusta koskeva käytäntö"
+    "message": "Tämä kehys on luotu ohjelmallisesti. Avaa stack trace, niin näet, missä tämä tapahtui."
   },
   "panels/application/components/FrameDetailsView.ts | crossoriginIsolated": {
     "message": "Eri lähteistä tuleva sisältö eristetty"
-  },
-  "panels/application/components/FrameDetailsView.ts | crossoriginOpenerPolicy": {
-    "message": "Eri lähteestä tulevan sisällön avauskäytäntö"
   },
   "panels/application/components/FrameDetailsView.ts | document": {
     "message": "Dokumentti"
@@ -2955,7 +3348,7 @@
     "message": "Lue lisää"
   },
   "panels/application/components/FrameDetailsView.ts | localhostIsAlwaysASecureContext": {
-    "message": "Paikallisisäntä on aina suojattu konteksti"
+    "message": "Localhost on aina suojattu konteksti"
   },
   "panels/application/components/FrameDetailsView.ts | matchedBlockingRuleExplanation": {
     "message": "Tätä kehystä pidetään mainoskehyksenä, koska sen nykyinen (tai aiempi) päädokumentti on mainosmateriaali."
@@ -2967,16 +3360,16 @@
     "message": "Ei"
   },
   "panels/application/components/FrameDetailsView.ts | origin": {
-    "message": "Lähde"
-  },
-  "panels/application/components/FrameDetailsView.ts | originTrials": {
-    "message": "Ominaisuuskokeilu"
+    "message": "Alkuperä"
   },
   "panels/application/components/FrameDetailsView.ts | ownerElement": {
     "message": "Omistajaelementti"
   },
   "panels/application/components/FrameDetailsView.ts | parentIsAdExplanation": {
     "message": "Tätä kehystä pidetään mainoskehyksenä, koska sen ylätason kehys on mainoskehys."
+  },
+  "panels/application/components/FrameDetailsView.ts | refresh": {
+    "message": "Päivitä"
   },
   "panels/application/components/FrameDetailsView.ts | reportingTo": {
     "message": "raportoi kohteelle"
@@ -2997,19 +3390,19 @@
     "message": "Turvallisuus ja eristys"
   },
   "panels/application/components/FrameDetailsView.ts | sharedarraybufferConstructorIs": {
-    "message": "SharedArrayBuffer-konstruktori on saatavilla, ja näitä konstruktoreita voi siirtää postMessage-välityksen kautta"
+    "message": "SharedArrayBuffer-konstruktori on saatavilla, jaSABs ovat siirrettävissä postMessage-välityksen kautta"
   },
   "panels/application/components/FrameDetailsView.ts | sharedarraybufferConstructorIsAvailable": {
-    "message": "SharedArrayBuffer-konstruktori on saatavilla, mutta SharedArrayBuffereita ei voi siirtää postMessagen kautta"
+    "message": "SharedArrayBuffer-konstruktori on saatavilla, muttaSABs eivät ole siirrettävissä postMessage-välityksen kautta"
   },
   "panels/application/components/FrameDetailsView.ts | theFramesSchemeIsInsecure": {
     "message": "Kehyksen skeema on suojaamaton"
   },
   "panels/application/components/FrameDetailsView.ts | thePerformanceAPI": {
-    "message": "performance.measureUserAgentSpecificMemory()-sovellusliittymä on saatavilla"
+    "message": "performance.measureUserAgentSpecificMemory() API on saatavilla"
   },
   "panels/application/components/FrameDetailsView.ts | thePerformancemeasureuseragentspecificmemory": {
-    "message": "performance.measureUserAgentSpecificMemory()-sovellusliittymä ei ole saatavilla"
+    "message": "performance.measureUserAgentSpecificMemory() API ei ole saatavilla"
   },
   "panels/application/components/FrameDetailsView.ts | thisAdditionalDebugging": {
     "message": "Nämä viankorjauksen lisätiedot näytetään, koska Protokollan seuranta ‑kokeilu on käytössä."
@@ -3031,6 +3424,24 @@
   },
   "panels/application/components/FrameDetailsView.ts | yes": {
     "message": "Kyllä"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | allInterestGroupStorageEvents": {
+    "message": "Kaikki ryhmän tallennustilatapahtumat"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | eventTime": {
+    "message": "Tapahtuman aika"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | eventType": {
+    "message": "Pääsyoikeustyyppi"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | groupName": {
+    "message": "Nimi"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | groupOwner": {
+    "message": "Omistaja"
+  },
+  "panels/application/components/InterestGroupAccessGrid.ts | noEvents": {
+    "message": "Ei tallennettuja ryhmän tapahtumia"
   },
   "panels/application/components/OriginTrialTreeView.ts | expiryTime": {
     "message": "Vanhenemisaika"
@@ -3056,6 +3467,9 @@
   "panels/application/components/OriginTrialTreeView.ts | tokens": {
     "message": "{PH1} tunnusta"
   },
+  "panels/application/components/OriginTrialTreeView.ts | trialName": {
+    "message": "Kokeilun nimi"
+  },
   "panels/application/components/OriginTrialTreeView.ts | usageRestriction": {
     "message": "Käyttörajoitus"
   },
@@ -3067,6 +3481,9 @@
   },
   "panels/application/components/PermissionsPolicySection.ts | clickToShowIframe": {
     "message": "Klikkaa nähdäksesi ylin iframe, joka ei salli ominaisuutta elementit-paneelissa."
+  },
+  "panels/application/components/PermissionsPolicySection.ts | disabledByFencedFrame": {
+    "message": "poistettu käytöstä tämän sisällä: fencedframe"
   },
   "panels/application/components/PermissionsPolicySection.ts | disabledByHeader": {
     "message": "otsikon \"Permissions-Policy\" estämä"
@@ -3082,6 +3499,18 @@
   },
   "panels/application/components/PermissionsPolicySection.ts | showDetails": {
     "message": "Näytä tiedot"
+  },
+  "panels/application/components/ReportsGrid.ts | destination": {
+    "message": "Kohde"
+  },
+  "panels/application/components/ReportsGrid.ts | generatedAt": {
+    "message": "Luotu"
+  },
+  "panels/application/components/ReportsGrid.ts | noReportsToDisplay": {
+    "message": "Ei näytettäviä raportteja"
+  },
+  "panels/application/components/ReportsGrid.ts | status": {
+    "message": "Tila"
   },
   "panels/application/components/StackTrace.ts | cannotRenderStackTrace": {
     "message": "Jäljityslistaa ei voi renderöidä"
@@ -3242,20 +3671,8 @@
   "panels/changes/ChangesSidebar.ts | sFromSourceMap": {
     "message": "{PH1} (lähdekartasta)"
   },
-  "panels/changes/ChangesTextEditor.ts | additions": {
-    "message": "Lisäys: {PH1}"
-  },
-  "panels/changes/ChangesTextEditor.ts | deletions": {
-    "message": "Poisto: {PH1}"
-  },
-  "panels/changes/ChangesView.ts | SkippingDMatchingLines": {
-    "message": "( … Ohitetaan {PH1} vastaavaa riviä …)"
-  },
   "panels/changes/ChangesView.ts | binaryData": {
     "message": "Binaaridata"
-  },
-  "panels/changes/ChangesView.ts | changesDiffViewer": {
-    "message": "Muutosten eronäkymä"
   },
   "panels/changes/ChangesView.ts | noChanges": {
     "message": "Ei muutoksia"
@@ -3340,6 +3757,12 @@
   },
   "panels/console/ConsoleView.ts | consoleSettings": {
     "message": "Konsolin asetukset"
+  },
+  "panels/console/ConsoleView.ts | consoleSidebarHidden": {
+    "message": "Konsolin sivupalkki piilotettu"
+  },
+  "panels/console/ConsoleView.ts | consoleSidebarShown": {
+    "message": "Konsolin sivupalkki näkyvissä"
   },
   "panels/console/ConsoleView.ts | copyVisibleStyledSelection": {
     "message": "Kopioi näkyvä tyylivalinta"
@@ -3440,6 +3863,9 @@
   "panels/console/ConsoleView.ts | showConsoleSidebar": {
     "message": "Näytä konsolin sivupalkki"
   },
+  "panels/console/ConsoleView.ts | showCorsErrorsInConsole": {
+    "message": "Näytä nämä virheet konsolissa: CORS"
+  },
   "panels/console/ConsoleView.ts | verbose": {
     "message": "Monisanainen"
   },
@@ -3497,6 +3923,12 @@
   "panels/console/ConsoleViewMessage.ts | someEvent": {
     "message": "<jokin> tapahtuma"
   },
+  "panels/console/ConsoleViewMessage.ts | stackMessageCollapsed": {
+    "message": "Pinotaulukko tiivistetty"
+  },
+  "panels/console/ConsoleViewMessage.ts | stackMessageExpanded": {
+    "message": "Pinotaulukko laajennettu"
+  },
   "panels/console/ConsoleViewMessage.ts | thisValueWasEvaluatedUponFirst": {
     "message": "Tämä arvo havaittiin ensimmäisen laajentamisen yhteydessä. Se on voinut muuttua myöhemmin."
   },
@@ -3521,12 +3953,6 @@
   "panels/console/ConsoleViewMessage.ts | warningS": {
     "message": "{n,plural, =1{Varoitus, toistuu # kerran}other{Varoitus, toistuu # kertaa}}"
   },
-  "panels/console/components/SidebarDeprecation.ts | deprecationNotice": {
-    "message": "Sivupalkki poistetaan Chromen tulevasta versiosta. Jos haluat antaa palautetta, kerro siitä meille:"
-  },
-  "panels/console/components/SidebarDeprecation.ts | issueTrackerLinkText": {
-    "message": "ongelmien seurantajärjestelmä"
-  },
   "panels/console/console-meta.ts | autocompleteFromHistory": {
     "message": "Täydennä automaattisesti historian perusteella"
   },
@@ -3550,6 +3976,9 @@
   },
   "panels/console/console-meta.ts | doNotGroupSimilarMessagesIn": {
     "message": "Älä ryhmittele samankaltaisia viestejä konsolissa"
+  },
+  "panels/console/console-meta.ts | doNotShowCorsErrorsIn": {
+    "message": "Älä näytä konsolissa näitä virheitä: CORS"
   },
   "panels/console/console-meta.ts | doNotTreatEvaluationAsUser": {
     "message": "Älä luokittele arviointia käyttäjän aktivoitumiseksi"
@@ -3583,6 +4012,9 @@
   },
   "panels/console/console-meta.ts | showConsole": {
     "message": "Näytä konsoli"
+  },
+  "panels/console/console-meta.ts | showCorsErrorsInConsole": {
+    "message": "Näytä nämä virheet konsolissa: CORS"
   },
   "panels/console/console-meta.ts | showMessagesFromAllContexts": {
     "message": "Näytä viestit kaikista konteksteista"
@@ -3836,12 +4268,6 @@
   "panels/css_overview/CSSOverviewSidebarPanel.ts | clearOverview": {
     "message": "Poista yleiskatsaus"
   },
-  "panels/css_overview/CSSOverviewStartView.ts | captureOverview": {
-    "message": "Kaappauksen yhteenveto"
-  },
-  "panels/css_overview/CSSOverviewStartView.ts | cssOverview": {
-    "message": "CSS-yleiskatsaus"
-  },
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | bottomAppliedToAStatically": {
     "message": "Bottom on käytössä staattisen sijainnin elementillä"
   },
@@ -3862,6 +4288,24 @@
   },
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | widthAppliedToAnInlineElement": {
     "message": "Width otettu käyttöön sisäisessä elementissä"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | captureOverview": {
+    "message": "Kaappauksen yhteenveto"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | capturePageCSSOverview": {
+    "message": "Tallenna sivusi CSS:n yleiskatsaus"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | identifyCSSImprovements": {
+    "message": "Tunnista mahdollisia CSS-parannuskohteita"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | identifyCSSImprovementsWithExampleIssues": {
+    "message": "Tunnista mahdollisia CSS-parannuksia (esim. ongelmat pienen kontrastin kanssa, käyttämättömät ilmoitukset, yhteensopimattomat värit tai fontit)"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | locateAffectedElements": {
+    "message": "Etsi kyseessä olevat elementit Elementtipaneelista"
+  },
+  "panels/css_overview/components/CSSOverviewStartView.ts | quickStartWithCSSOverview": {
+    "message": "Pika-aloitus: aloita uuden CSS-yleiskatsauspaneelin käyttö"
   },
   "panels/css_overview/css_overview-meta.ts | cssOverview": {
     "message": "CSS-yleiskatsaus"
@@ -3960,7 +4404,7 @@
     "message": "Siirry tyyliin"
   },
   "panels/elements/ComputedStyleWidget.ts | noMatchingProperty": {
-    "message": "Ei ehtoja vastaavia verkko-omaisuuksia"
+    "message": "Ei ehtoja vastaavia omaisuuksia"
   },
   "panels/elements/ComputedStyleWidget.ts | showAll": {
     "message": "Näytä kaikki"
@@ -3976,6 +4420,15 @@
   },
   "panels/elements/ElementsPanel.ts | computed": {
     "message": "Laskettu"
+  },
+  "panels/elements/ElementsPanel.ts | computedStylesHidden": {
+    "message": "Laskettujen tyylien sivupalkki piilotettu"
+  },
+  "panels/elements/ElementsPanel.ts | computedStylesShown": {
+    "message": "Laskettujen tyylien sivupalkki näkyvissä"
+  },
+  "panels/elements/ElementsPanel.ts | domTreeExplorer": {
+    "message": "DOM-puun tutustumisnäkymä"
   },
   "panels/elements/ElementsPanel.ts | elementStateS": {
     "message": "Elementin tila: {PH1}"
@@ -3997,6 +4450,12 @@
   },
   "panels/elements/ElementsPanel.ts | showComputedStylesSidebar": {
     "message": "Näytä laskettujen tyylien sivupalkki"
+  },
+  "panels/elements/ElementsPanel.ts | sidePanelContent": {
+    "message": "Sivupaneelin sisältö"
+  },
+  "panels/elements/ElementsPanel.ts | sidePanelToolbar": {
+    "message": "Sivupaneelin työkalupalkki"
   },
   "panels/elements/ElementsPanel.ts | styles": {
     "message": "Tyylit"
@@ -4084,6 +4543,12 @@
   },
   "panels/elements/ElementsTreeElement.ts | enableScrollSnap": {
     "message": "Ota vierityksen peittokuva käyttöön"
+  },
+  "panels/elements/ElementsTreeElement.ts | enterIsolationMode": {
+    "message": "Siirry keskitettyyn tilaan"
+  },
+  "panels/elements/ElementsTreeElement.ts | exitIsolationMode": {
+    "message": "Poistu keskitetystä tilasta"
   },
   "panels/elements/ElementsTreeElement.ts | expandRecursively": {
     "message": "Laajenna toistuvasti"
@@ -4178,8 +4643,29 @@
   "panels/elements/PlatformFontsWidget.ts | renderedFonts": {
     "message": "Renderöidyt fontit"
   },
+  "panels/elements/PropertiesWidget.ts | filter": {
+    "message": "Suodata"
+  },
+  "panels/elements/PropertiesWidget.ts | filterProperties": {
+    "message": "Suodata omaisuuksia"
+  },
+  "panels/elements/PropertiesWidget.ts | noMatchingProperty": {
+    "message": "Ei ehtoja vastaavia omaisuuksia"
+  },
+  "panels/elements/PropertiesWidget.ts | showAll": {
+    "message": "Näytä kaikki"
+  },
+  "panels/elements/PropertiesWidget.ts | showAllTooltip": {
+    "message": "Jos tätä ei ole valittu, näytetään vain omaisuudet, joiden arvo on nolla tai sitä ei ole määritetty"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | copyAllCssDeclarationsAsJs": {
+    "message": "Kopioi kaikki määrittelyt JS-muodossa"
+  },
   "panels/elements/StylePropertyTreeElement.ts | copyAllDeclarations": {
     "message": "Kopioi kaikki määrittelyt"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | copyCssDeclarationAsJs": {
+    "message": "Kopioi määrittely JS-muodossa"
   },
   "panels/elements/StylePropertyTreeElement.ts | copyDeclaration": {
     "message": "Kopioi määrittely"
@@ -4220,6 +4706,12 @@
   "panels/elements/StylesSidebarPane.ts | constructedStylesheet": {
     "message": "muodostettu tyyliarkki"
   },
+  "panels/elements/StylesSidebarPane.ts | copiedToClipboard": {
+    "message": "Kopioitu leikepöydälle"
+  },
+  "panels/elements/StylesSidebarPane.ts | copyAllCSSChanges": {
+    "message": "Kopioi kaikki CSS-muutokset"
+  },
   "panels/elements/StylesSidebarPane.ts | copyAllDeclarations": {
     "message": "Kopioi kaikki määrittelyt"
   },
@@ -4228,6 +4720,15 @@
   },
   "panels/elements/StylesSidebarPane.ts | copySelector": {
     "message": "Kopioi selector"
+  },
+  "panels/elements/StylesSidebarPane.ts | cssPropertyName": {
+    "message": "CSS-omaisuuden nimi {PH1}"
+  },
+  "panels/elements/StylesSidebarPane.ts | cssPropertyValue": {
+    "message": "CSS-omaisuuden arvo: {PH1}"
+  },
+  "panels/elements/StylesSidebarPane.ts | cssSelector": {
+    "message": "Valitsin: CSS"
   },
   "panels/elements/StylesSidebarPane.ts | filter": {
     "message": "Suodata"
@@ -4292,8 +4793,17 @@
   "panels/elements/components/AdornerSettingsPane.ts | settingsTitle": {
     "message": "Näytä merkit"
   },
+  "panels/elements/components/ElementsBreadcrumbs.ts | breadcrumbs": {
+    "message": "DOM-puun navigointipolut"
+  },
   "panels/elements/components/ElementsBreadcrumbsUtils.ts | text": {
     "message": "(teksti)"
+  },
+  "panels/elements/components/LayoutPane.ts | chooseElementOverlayColor": {
+    "message": "Valitse tälle elementille peittoväri"
+  },
+  "panels/elements/components/LayoutPane.ts | colorPickerOpened": {
+    "message": "Värivalitsin avattu."
   },
   "panels/elements/components/LayoutPane.ts | flexbox": {
     "message": "Flexbox"
@@ -4371,7 +4881,7 @@
     "message": "Valitse tarkasteltava sivun elementti"
   },
   "panels/elements/elements-meta.ts | showDetailedInspectTooltip": {
-    "message": "Näytä yksityiskohtainen tarkastuksen työkaluvinkki"
+    "message": "Näytä yksityiskohtainen tarkastuksen vihjeteksti"
   },
   "panels/elements/elements-meta.ts | showElements": {
     "message": "Näytä elementit"
@@ -4542,7 +5052,7 @@
     "message": "Piilota mediakyselyt"
   },
   "panels/emulation/emulation-meta.ts | hideRulers": {
-    "message": "Piilota viivaimet"
+    "message": "Piilota viivaimet laitetilan yläpalkissa"
   },
   "panels/emulation/emulation-meta.ts | showDeviceFrame": {
     "message": "Näytä laitteen kehys"
@@ -4551,7 +5061,7 @@
     "message": "Näytä mediakyselyt"
   },
   "panels/emulation/emulation-meta.ts | showRulers": {
-    "message": "Näytä viivaimet"
+    "message": "Näytä viivaimet laitetilan yläpalkissa"
   },
   "panels/emulation/emulation-meta.ts | toggleDeviceToolbar": {
     "message": "Kytke laitteen työkalupalkki päälle/pois"
@@ -4576,36 +5086,6 @@
   },
   "panels/event_listeners/EventListenersView.ts | toggleWhetherEventListenerIs": {
     "message": "Valitse, onko tapahtumaseurain passiivinen vai estävä"
-  },
-  "panels/help/ReleaseNoteView.ts | close": {
-    "message": "Sulje"
-  },
-  "panels/help/ReleaseNoteView.ts | learnMore": {
-    "message": "Lue lisää"
-  },
-  "panels/help/help-meta.ts | bug": {
-    "message": "bugi"
-  },
-  "panels/help/help-meta.ts | doNotShowWhatsNewAfterEachUpdate": {
-    "message": "Älä näytä Uutta-ilmoitusta jokaisen päivityksen jälkeen"
-  },
-  "panels/help/help-meta.ts | releaseNotes": {
-    "message": "Julkaisutiedot"
-  },
-  "panels/help/help-meta.ts | reportADevtoolsIssue": {
-    "message": "Ilmoita DevToolsin ongelmasta"
-  },
-  "panels/help/help-meta.ts | reportTranslationIssue": {
-    "message": "Ilmoita käännösongelmasta"
-  },
-  "panels/help/help-meta.ts | showWhatsNew": {
-    "message": "Näytä uutuudet"
-  },
-  "panels/help/help-meta.ts | showWhatsNewAfterEachUpdate": {
-    "message": "Näytä Uutta-ilmoitus jokaisen päivityksen jälkeen"
-  },
-  "panels/help/help-meta.ts | whatsNew": {
-    "message": "Uutta"
   },
   "panels/input/InputTimeline.ts | clearAll": {
     "message": "Poista kaikki"
@@ -4817,11 +5297,26 @@
   "panels/issues/AttributionReportingIssueDetailsView.ts | frame": {
     "message": "Kehys"
   },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidEventSourceTriggerData": {
+    "message": "Virheellinen event-source-trigger-data"
+  },
   "panels/issues/AttributionReportingIssueDetailsView.ts | invalidSourceEventId": {
     "message": "Virheellinen attributionsourceeventid"
   },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidSourceExpiry": {
+    "message": "Virheellinen attributionexpiry"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidSourcePriority": {
+    "message": "Virheellinen attributionsourcepriority"
+  },
   "panels/issues/AttributionReportingIssueDetailsView.ts | invalidTriggerData": {
     "message": "Virheellinen trigger-data"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidTriggerDedupKey": {
+    "message": "Virheellinen dedup-key"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | invalidTriggerPriority": {
+    "message": "Virheellinen priority"
   },
   "panels/issues/AttributionReportingIssueDetailsView.ts | nViolations": {
     "message": "{n,plural, =1{# rikkomus}other{# rikkomusta}}"
@@ -4849,6 +5344,9 @@
   },
   "panels/issues/CorsIssueDetailsView.ts | disallowedRequestMethod": {
     "message": "Kielletty pyyntötapa"
+  },
+  "panels/issues/CorsIssueDetailsView.ts | failedRequest": {
+    "message": "Pyyntö hylätty"
   },
   "panels/issues/CorsIssueDetailsView.ts | header": {
     "message": "Otsikko"
@@ -4913,11 +5411,26 @@
   "panels/issues/CorsIssueDetailsView.ts | warning": {
     "message": "varoitus"
   },
+  "panels/issues/GenericIssueDetailsView.ts | frameId": {
+    "message": "Kehys"
+  },
+  "panels/issues/GenericIssueDetailsView.ts | nResources": {
+    "message": "{n,plural, =1{# resurssi}other{# resurssia}}"
+  },
   "panels/issues/HiddenIssuesRow.ts | hiddenIssues": {
     "message": "Piilotetut ongelmat"
   },
-  "panels/issues/HiddenIssuesRow.ts | unhideIssues": {
-    "message": "Näytä kaikki ongelmat"
+  "panels/issues/HiddenIssuesRow.ts | unhideAll": {
+    "message": "Näytä kaikki"
+  },
+  "panels/issues/IssueKindView.ts | hideAllCurrentBreakingChanges": {
+    "message": "Piilota kaikki tämänhetkiset virheen aiheuttavat muutokset"
+  },
+  "panels/issues/IssueKindView.ts | hideAllCurrentImprovements": {
+    "message": "Piilota kaikki tämänhetkiset parannukset"
+  },
+  "panels/issues/IssueKindView.ts | hideAllCurrentPageErrors": {
+    "message": "Piilota kaikki tämänhetkiset sivuvirheet"
   },
   "panels/issues/IssueView.ts | affectedResources": {
     "message": "Resurssit, joihin tämä vaikuttaa"
@@ -4927,6 +5440,9 @@
   },
   "panels/issues/IssueView.ts | blocked": {
     "message": "estetty"
+  },
+  "panels/issues/IssueView.ts | hideIssuesLikeThis": {
+    "message": "Piilota tällaiset ongelmat"
   },
   "panels/issues/IssueView.ts | learnMoreS": {
     "message": "Lue lisää: {PH1}"
@@ -4943,6 +5459,9 @@
   "panels/issues/IssueView.ts | restrictionStatus": {
     "message": "Rajoituksen tila"
   },
+  "panels/issues/IssueView.ts | unhideIssuesLikeThis": {
+    "message": "Näytä tällaiset ongelmat"
+  },
   "panels/issues/IssueView.ts | warned": {
     "message": "Varoitettu"
   },
@@ -4958,11 +5477,20 @@
   "panels/issues/IssuesPane.ts | crossOriginEmbedderPolicy": {
     "message": "Lähteidenvälisen upotuksen käytäntö"
   },
+  "panels/issues/IssuesPane.ts | generic": {
+    "message": "Yleinen"
+  },
   "panels/issues/IssuesPane.ts | groupByCategory": {
     "message": "Ryhmittele luokan mukaan"
   },
+  "panels/issues/IssuesPane.ts | groupByKind": {
+    "message": "Ryhmittele tyypin mukaan"
+  },
   "panels/issues/IssuesPane.ts | groupDisplayedIssuesUnder": {
     "message": "Ryhmittele näkyvät ongelmat niihin liittyvien kategorioiden mukaan"
+  },
+  "panels/issues/IssuesPane.ts | groupDisplayedIssuesUnderKind": {
+    "message": "Ryhmittele ongelmat sivuvirheiksi, virheen aiheuttaviksi muutoksiksi ja parannuksiksi"
   },
   "panels/issues/IssuesPane.ts | heavyAds": {
     "message": "Raskaat mainokset"
@@ -4997,35 +5525,8 @@
   "panels/issues/IssuesPane.ts | trustedWebActivity": {
     "message": "Luotettu verkkotoiminta"
   },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | blocked": {
-    "message": "estetty"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | nModuleTransfers": {
-    "message": "{n,plural, =1{# moduuli}other{# moduulia}}"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | sourceOrigin": {
-    "message": "Lähteen alkuperä"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | status": {
-    "message": "Tila"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | targetOrigin": {
-    "message": "Kohteen alkuperä"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | warned": {
-    "message": "varoitus"
-  },
-  "panels/issues/WasmCrossOriginModuleSharingAffectedResourcesView.ts | wasmModuleUrl": {
-    "message": "Wasm-moduulin URL-osoite"
-  },
-  "panels/issues/components/HideIssuesMenu.ts | UnhideIssueByCode": {
-    "message": "Näytä tällaiset ongelmat"
-  },
-  "panels/issues/components/HideIssuesMenu.ts | hideIssueByCode": {
-    "message": "Piilota tällaiset ongelmat"
-  },
   "panels/issues/components/HideIssuesMenu.ts | tooltipTitle": {
-    "message": "Ongelmien piilotusvalikko"
+    "message": "Piilota ongelmat"
   },
   "panels/issues/issues-meta.ts | cspViolations": {
     "message": "CSP-käytännön rikkomukset"
@@ -5264,6 +5765,12 @@
   "panels/lighthouse/LighthouseController.ts | isThisPageUsableByPeopleWith": {
     "message": "Voiko tätä sivua käyttää vamman tai muiden erikoistarpeiden kanssa"
   },
+  "panels/lighthouse/LighthouseController.ts | legacyNavigation": {
+    "message": "Vanha navigointi"
+  },
+  "panels/lighthouse/LighthouseController.ts | lighthouseMode": {
+    "message": "Lighthouse-tila"
+  },
   "panels/lighthouse/LighthouseController.ts | localStorage": {
     "message": "Paikallinen tallennustila"
   },
@@ -5272,6 +5779,9 @@
   },
   "panels/lighthouse/LighthouseController.ts | multipleTabsAreBeingControlledBy": {
     "message": "Sama service worker hallinnoi useita välilehtiä. Sulje saman alkuperän muut välilehdet voidaksesi auditoida tämän sivun."
+  },
+  "panels/lighthouse/LighthouseController.ts | navigation": {
+    "message": "Navigointi"
   },
   "panels/lighthouse/LighthouseController.ts | performance": {
     "message": "Suorituskyky"
@@ -5285,6 +5795,9 @@
   "panels/lighthouse/LighthouseController.ts | resetStorageLocalstorage": {
     "message": "Tyhjennä tallennustila (cache, service workers jne.) ennen auditointia (hyödyllinen suorituskyky- ja PWA-testauksessa)."
   },
+  "panels/lighthouse/LighthouseController.ts | runLighthouseInMode": {
+    "message": "Käytä Lighthousea navigointi-, aikajana tai tilannekuvatilassa"
+  },
   "panels/lighthouse/LighthouseController.ts | seo": {
     "message": "SEO"
   },
@@ -5294,11 +5807,17 @@
   "panels/lighthouse/LighthouseController.ts | simulatedThrottling": {
     "message": "Simuloitu rajoittaminen"
   },
+  "panels/lighthouse/LighthouseController.ts | snapshot": {
+    "message": "Tilannekuva"
+  },
   "panels/lighthouse/LighthouseController.ts | thereMayBeStoredDataAffectingLoadingPlural": {
     "message": "Näihin sijainteihin on voitu tallentaa dataa, joka vaikuttaa lataukseen: {PH1}. Tarkista sivu incognito-ikkunassa, jotta voit estää kyseisten resurssien vaikutuksen tuloksiisi."
   },
   "panels/lighthouse/LighthouseController.ts | thereMayBeStoredDataAffectingSingular": {
     "message": "Tähän sijaintiin on voitu tallentaa dataa, joka vaikuttaa lataukseen: {PH1}. Tarkista sivu incognito-ikkunassa, jotta voit estää kyseisten resurssien vaikutuksen tuloksiisi."
+  },
+  "panels/lighthouse/LighthouseController.ts | useLegacyNavigation": {
+    "message": "Tarkasta sivu navigointitilassa klassisella Lighthousella."
   },
   "panels/lighthouse/LighthouseController.ts | webSql": {
     "message": "Web SQL"
@@ -5356,6 +5875,9 @@
   },
   "panels/lighthouse/LighthouseStartView.ts | learnMore": {
     "message": "Lue lisää"
+  },
+  "panels/lighthouse/LighthouseStartViewFR.ts | mode": {
+    "message": "Tila"
   },
   "panels/lighthouse/LighthouseStatusView.ts | OfGlobalMobileUsersInWereOnGOrG": {
     "message": "Vuonna 2016 75 % kaikista maailman puhelinkäyttäjistä oli joko 2G- tai 3G-verkossa [Lähde: GSMA Mobile]"
@@ -5849,6 +6371,9 @@
   "panels/network/NetworkConfigView.ts | caching": {
     "message": "Välimuistiin tallennus"
   },
+  "panels/network/NetworkConfigView.ts | clientHintsStatusText": {
+    "message": "Käyttäjäagentti päivitetty."
+  },
   "panels/network/NetworkConfigView.ts | custom": {
     "message": "Oma…"
   },
@@ -5978,6 +6503,9 @@
   "panels/network/NetworkDataGridNode.ts | signedexchange": {
     "message": "signed-exchange"
   },
+  "panels/network/NetworkDataGridNode.ts | timeSubtitleTooltipText": {
+    "message": "Viive (aika, jolloin vastaus saapui – alkamisaika)"
+  },
   "panels/network/NetworkDataGridNode.ts | unknown": {
     "message": "(tuntematon)"
   },
@@ -6002,14 +6530,14 @@
   "panels/network/NetworkItemView.ts | headers": {
     "message": "Otsikot"
   },
-  "panels/network/NetworkItemView.ts | headersAndRequestBody": {
-    "message": "Otsikot ja pyynnön sisältö"
-  },
   "panels/network/NetworkItemView.ts | initiator": {
     "message": "Aloittaja"
   },
   "panels/network/NetworkItemView.ts | messages": {
     "message": "Viestit"
+  },
+  "panels/network/NetworkItemView.ts | payload": {
+    "message": "Resurssi"
   },
   "panels/network/NetworkItemView.ts | preview": {
     "message": "Esikatselu"
@@ -6452,12 +6980,6 @@
   "panels/network/RequestHeadersView.ts | decoded": {
     "message": "Purettu:"
   },
-  "panels/network/RequestHeadersView.ts | empty": {
-    "message": "(tyhjä)"
-  },
-  "panels/network/RequestHeadersView.ts | formData": {
-    "message": "Lomakkeen tiedot"
-  },
   "panels/network/RequestHeadersView.ts | fromDiskCache": {
     "message": "(levyn välimuistista)"
   },
@@ -6472,6 +6994,9 @@
   },
   "panels/network/RequestHeadersView.ts | fromSignedexchange": {
     "message": "(lähde: Signed Exchange)"
+  },
+  "panels/network/RequestHeadersView.ts | fromWebBundle": {
+    "message": "(lähde: Web Bundle)"
   },
   "panels/network/RequestHeadersView.ts | general": {
     "message": "Yleiset"
@@ -6494,9 +7019,6 @@
   "panels/network/RequestHeadersView.ts | provisionalHeadersAreShownS": {
     "message": "Tilapäiset otsikot ovat näkyvillä. Poista välimuisti käytöstä nähdäksesi kaikki otsikot."
   },
-  "panels/network/RequestHeadersView.ts | queryStringParameters": {
-    "message": "Kyselymerkkijonon parametrit"
-  },
   "panels/network/RequestHeadersView.ts | recordedAttribution": {
     "message": "Attribuutio tallennettu (trigger-data): {PH1}"
   },
@@ -6511,9 +7033,6 @@
   },
   "panels/network/RequestHeadersView.ts | requestMethod": {
     "message": "Pyyntötapa"
-  },
-  "panels/network/RequestHeadersView.ts | requestPayload": {
-    "message": "Pyydä resurssia"
   },
   "panels/network/RequestHeadersView.ts | requestUrl": {
     "message": "Pyynnön URL-osoite"
@@ -6542,32 +7061,11 @@
   "panels/network/RequestHeadersView.ts | toUseThisResourceFromADifferentSite": {
     "message": "Käyttääkseen tätä toisen sivuston resurssia palvelin voi lieventää vastauksen otsikkoa, joka kuuluu eri lähteestä tulevan resurssin käytäntöön:"
   },
-  "panels/network/RequestHeadersView.ts | unableToDecodeValue": {
-    "message": "(arvon koodauksen purkaminen ei onnistu)"
-  },
-  "panels/network/RequestHeadersView.ts | viewDecoded": {
-    "message": "Näkymä purettu"
-  },
-  "panels/network/RequestHeadersView.ts | viewDecodedL": {
-    "message": "näkymä purettu"
-  },
   "panels/network/RequestHeadersView.ts | viewParsed": {
     "message": "Näytä jäsenneltynä"
   },
-  "panels/network/RequestHeadersView.ts | viewParsedL": {
-    "message": "näytä jäsennetty"
-  },
   "panels/network/RequestHeadersView.ts | viewSource": {
     "message": "Näytä lähde"
-  },
-  "panels/network/RequestHeadersView.ts | viewSourceL": {
-    "message": "näytä lähde"
-  },
-  "panels/network/RequestHeadersView.ts | viewUrlEncoded": {
-    "message": "Näytä URL-osoite koodattuna"
-  },
-  "panels/network/RequestHeadersView.ts | viewUrlEncodedL": {
-    "message": "näytä URL-osoite koodattuna"
   },
   "panels/network/RequestInitiatorView.ts | requestCallStack": {
     "message": "Pyynnön kutsupino"
@@ -6577,6 +7075,51 @@
   },
   "panels/network/RequestInitiatorView.ts | thisRequestHasNoInitiatorData": {
     "message": "Tässä pyynnössä ei ole aloittajadataa."
+  },
+  "panels/network/RequestPayloadView.ts | copyValue": {
+    "message": "Kopioi arvo"
+  },
+  "panels/network/RequestPayloadView.ts | empty": {
+    "message": "(tyhjä)"
+  },
+  "panels/network/RequestPayloadView.ts | formData": {
+    "message": "Lomakkeen tiedot"
+  },
+  "panels/network/RequestPayloadView.ts | queryStringParameters": {
+    "message": "Kyselymerkkijonon parametrit"
+  },
+  "panels/network/RequestPayloadView.ts | requestPayload": {
+    "message": "Pyydä resurssia"
+  },
+  "panels/network/RequestPayloadView.ts | showMore": {
+    "message": "Näytä lisää"
+  },
+  "panels/network/RequestPayloadView.ts | unableToDecodeValue": {
+    "message": "(arvon koodauksen purkaminen ei onnistu)"
+  },
+  "panels/network/RequestPayloadView.ts | viewDecoded": {
+    "message": "Näkymä purettu"
+  },
+  "panels/network/RequestPayloadView.ts | viewDecodedL": {
+    "message": "näkymä purettu"
+  },
+  "panels/network/RequestPayloadView.ts | viewParsed": {
+    "message": "Näytä jäsenneltynä"
+  },
+  "panels/network/RequestPayloadView.ts | viewParsedL": {
+    "message": "näytä jäsennetty"
+  },
+  "panels/network/RequestPayloadView.ts | viewSource": {
+    "message": "Näytä lähde"
+  },
+  "panels/network/RequestPayloadView.ts | viewSourceL": {
+    "message": "näytä lähde"
+  },
+  "panels/network/RequestPayloadView.ts | viewUrlEncoded": {
+    "message": "Näytä URL-osoite koodattuna"
+  },
+  "panels/network/RequestPayloadView.ts | viewUrlEncodedL": {
+    "message": "näytä URL-osoite koodattuna"
   },
   "panels/network/RequestPreviewView.ts | failedToLoadResponseData": {
     "message": "Vastausdatan lataaminen epäonnistui"
@@ -8423,6 +8966,18 @@
   "panels/settings/SettingsScreen.ts | warning": {
     "message": "VAROITUS:"
   },
+  "panels/settings/components/SyncSection.ts | preferencesSyncDisabled": {
+    "message": "Tämän asetuksen valinta edellyttää, että otat asetusten synkronoinnin käyttöön Chromessa."
+  },
+  "panels/settings/components/SyncSection.ts | settings": {
+    "message": "Avaa Asetukset"
+  },
+  "panels/settings/components/SyncSection.ts | signedIn": {
+    "message": "Kirjautuneena Chromeen tilillä:"
+  },
+  "panels/settings/components/SyncSection.ts | syncDisabled": {
+    "message": "Tämän asetuksen valinta edellyttää, että otat Chromen synkronoinnin käyttöön."
+  },
   "panels/settings/emulation/DevicesSettingsTab.ts | addCustomDevice": {
     "message": "Lisää muokattu laite..."
   },
@@ -8582,8 +9137,11 @@
   "panels/snippets/SnippetsQuickOpen.ts | noSnippetsFound": {
     "message": "Koodinpätkiä ei löytynyt."
   },
-  "panels/snippets/SnippetsQuickOpen.ts | runSnippet": {
-    "message": "Suorita koodinpätkä"
+  "panels/snippets/SnippetsQuickOpen.ts | run": {
+    "message": "Suorita"
+  },
+  "panels/snippets/SnippetsQuickOpen.ts | snippet": {
+    "message": "Koodinpätkä"
   },
   "panels/sources/AddSourceMapURLDialog.ts | add": {
     "message": "Lisää"
@@ -8627,6 +9185,9 @@
   "panels/sources/CallStackSidebarPane.ts | addScriptToIgnoreList": {
     "message": "Lisää skripti ohituslistalle"
   },
+  "panels/sources/CallStackSidebarPane.ts | callFrameWarnings": {
+    "message": "Joissakin soittokehyksissä on varoituksia"
+  },
   "panels/sources/CallStackSidebarPane.ts | callStack": {
     "message": "Kutsupino"
   },
@@ -8658,7 +9219,7 @@
     "message": "Kattavuus: –"
   },
   "panels/sources/CoveragePlugin.ts | coverageS": {
-    "message": "Kattavuus: {PH1} %"
+    "message": "Kattavuus: {PH1}"
   },
   "panels/sources/CoveragePlugin.ts | showDetails": {
     "message": "Näytä tiedot"
@@ -8801,11 +9362,11 @@
   "panels/sources/GoToLineQuickOpen.ts | noFileSelected": {
     "message": "Tiedostoa ei ole valittu."
   },
+  "panels/sources/GoToLineQuickOpen.ts | noResultsFound": {
+    "message": "Ei tuloksia"
+  },
   "panels/sources/GoToLineQuickOpen.ts | typeANumberToGoToThatLine": {
     "message": "Kirjoita sen rivin numero, jolle haluat siirtyä."
-  },
-  "panels/sources/GutterDiffPlugin.ts | localModifications": {
-    "message": "Paikalliset muokkaukset..."
   },
   "panels/sources/InplaceFormatterEditorAction.ts | format": {
     "message": "Muoto"
@@ -8918,6 +9479,15 @@
   "panels/sources/OutlineQuickOpen.ts | openAJavascriptOrCssFileToSee": {
     "message": "Avaa JavaScript- tai CSS-tiedosto, niin näet merkit"
   },
+  "panels/sources/ProfilePlugin.ts | kb": {
+    "message": "kt"
+  },
+  "panels/sources/ProfilePlugin.ts | mb": {
+    "message": "Mt"
+  },
+  "panels/sources/ProfilePlugin.ts | ms": {
+    "message": "ms"
+  },
   "panels/sources/ScopeChainSidebarPane.ts | closure": {
     "message": "Sulkeuma"
   },
@@ -9020,6 +9590,12 @@
   "panels/sources/SourcesPanel.ts | copyStringContents": {
     "message": "Kopioi merkkijonon sisältö"
   },
+  "panels/sources/SourcesPanel.ts | debuggerHidden": {
+    "message": "Virheenkorjauksen sivupalkki piilotettu"
+  },
+  "panels/sources/SourcesPanel.ts | debuggerShown": {
+    "message": "Virheenkorjauksen sivupalkki näkyvissä"
+  },
   "panels/sources/SourcesPanel.ts | dontPauseOnExceptions": {
     "message": "Älä keskeytä kohdattaessa poikkeuksia"
   },
@@ -9037,6 +9613,12 @@
   },
   "panels/sources/SourcesPanel.ts | moreOptions": {
     "message": "Lisäasetukset"
+  },
+  "panels/sources/SourcesPanel.ts | navigatorHidden": {
+    "message": "Navigoinnin sivupalkki piilotettu"
+  },
+  "panels/sources/SourcesPanel.ts | navigatorShown": {
+    "message": "Navigoinnin sivupalkki näkyvissä"
   },
   "panels/sources/SourcesPanel.ts | openInSourcesPanel": {
     "message": "Avaa lähdepaneelissa"
@@ -9230,17 +9812,20 @@
   "panels/sources/sources-meta.ts | evaluateSelectedTextInConsole": {
     "message": "Arvioi valittua tekstiä konsolissa"
   },
+  "panels/sources/sources-meta.ts | file": {
+    "message": "Tiedosto"
+  },
   "panels/sources/sources-meta.ts | filesystem": {
     "message": "Tiedostojärjestelmä"
+  },
+  "panels/sources/sources-meta.ts | goTo": {
+    "message": "Siirry"
   },
   "panels/sources/sources-meta.ts | goToAFunctionDeclarationruleSet": {
     "message": "Siirry funktion määrittelyyn/sääntöjoukkoon"
   },
   "panels/sources/sources-meta.ts | goToLine": {
     "message": "Siirry riville"
-  },
-  "panels/sources/sources-meta.ts | goToSymbol": {
-    "message": "Siirry symboliin"
   },
   "panels/sources/sources-meta.ts | incrementCssUnitBy": {
     "message": "Kasvata CSS:n yksikköä: {PH1}"
@@ -9251,14 +9836,17 @@
   "panels/sources/sources-meta.ts | jumpToPreviousEditingLocation": {
     "message": "Siirry edelliseen muokkauspaikkaan"
   },
+  "panels/sources/sources-meta.ts | line": {
+    "message": "Rivi"
+  },
   "panels/sources/sources-meta.ts | nextCallFrame": {
     "message": "Seuraava kutsukehys"
   },
   "panels/sources/sources-meta.ts | none": {
     "message": "Ei mitään"
   },
-  "panels/sources/sources-meta.ts | openFile": {
-    "message": "Avaa tiedosto"
+  "panels/sources/sources-meta.ts | open": {
+    "message": "Avaa"
   },
   "panels/sources/sources-meta.ts | pauseScriptExecution": {
     "message": "Keskeytä komentosarjan suoritus"
@@ -9349,6 +9937,9 @@
   },
   "panels/sources/sources-meta.ts | switchFile": {
     "message": "Vaihda tiedostoa"
+  },
+  "panels/sources/sources-meta.ts | symbol": {
+    "message": "Symboli"
   },
   "panels/sources/sources-meta.ts | threads": {
     "message": "Säikeet"
@@ -9502,6 +10093,9 @@
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | onIgnoreList": {
     "message": "Ohitusluettelossa"
+  },
+  "panels/timeline/TimelineFlameChartDataProvider.ts | partiallyPresentedFrame": {
+    "message": "Osittain näkyvä kehys"
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | raster": {
     "message": "Rasteri"
@@ -9745,6 +10339,12 @@
   },
   "panels/timeline/TimelineTreeView.ts | heaviestStack": {
     "message": "Raskain pino"
+  },
+  "panels/timeline/TimelineTreeView.ts | heaviestStackHidden": {
+    "message": "Raskaimman pinon sivupalkki piilotettu"
+  },
+  "panels/timeline/TimelineTreeView.ts | heaviestStackShown": {
+    "message": "Raskaimman pinon sivupalkki näkyvissä"
   },
   "panels/timeline/TimelineTreeView.ts | hideHeaviestStack": {
     "message": "Piilota raskain pino"
@@ -10838,6 +11438,18 @@
   "ui/components/data_grid/DataGrid.ts | sortBy": {
     "message": "Lajitteluperuste"
   },
+  "ui/components/diff_view/DiffView.ts | SkippingDMatchingLines": {
+    "message": "( … Ohitetaan {PH1} vastaavaa riviä …)"
+  },
+  "ui/components/diff_view/DiffView.ts | additions": {
+    "message": "Lisäys:"
+  },
+  "ui/components/diff_view/DiffView.ts | changesDiffViewer": {
+    "message": "Muutosten eronäkymä"
+  },
+  "ui/components/diff_view/DiffView.ts | deletions": {
+    "message": "Poisto:"
+  },
   "ui/components/issue_counter/IssueCounter.ts | breakingChanges": {
     "message": "{issueCount,plural, =1{# virheen aiheuttava muutos}other{# virheen aiheuttavaa muutosta}}"
   },
@@ -10913,6 +11525,24 @@
   "ui/components/linear_memory_inspector/linear_memory_inspector-meta.ts | showMemoryInspector": {
     "message": "Näytä muistin tarkastaja"
   },
+  "ui/components/panel_feedback/FeedbackButton.ts | feedback": {
+    "message": "Palaute"
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | previewFeature": {
+    "message": "Ominaisuuden ennakkoversio"
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | previewText": {
+    "message": "Tiimimme työstää ominaisuutta, ja kuulemme mielellämme palautetta."
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | previewTextFeedbackLink": {
+    "message": "Lähetä meille palautetta."
+  },
+  "ui/components/panel_feedback/PanelFeedback.ts | videoAndDocumentation": {
+    "message": "Video ja dokumentaatio"
+  },
+  "ui/components/panel_feedback/PreviewToggle.ts | previewTextFeedbackLink": {
+    "message": "Lähetä meille palautetta."
+  },
   "ui/components/request_link_icon/RequestLinkIcon.ts | clickToShowRequestInTheNetwork": {
     "message": "Klikkaa avataksesi verkon paneeli ja näyttääksesi tämän URL-osoitteen pyyntö: {url}"
   },
@@ -10930,6 +11560,9 @@
   },
   "ui/components/survey_link/SurveyLink.ts | thankYouForYourFeedback": {
     "message": "Kiitos palautteesta"
+  },
+  "ui/components/text_editor/config.ts | codeEditor": {
+    "message": "Koodieditori"
   },
   "ui/legacy/DockController.ts | close": {
     "message": "Sulje"
@@ -10979,6 +11612,18 @@
   "ui/legacy/InspectorView.ts | devToolsLanguageMissmatch": {
     "message": "DevTools on nyt saatavilla tällä kielellä: {PH1}."
   },
+  "ui/legacy/InspectorView.ts | drawer": {
+    "message": "Työkalupaneeli"
+  },
+  "ui/legacy/InspectorView.ts | drawerHidden": {
+    "message": "Vetopaneeli piilotettu"
+  },
+  "ui/legacy/InspectorView.ts | drawerShown": {
+    "message": "Vetopaneeli näkyvissä"
+  },
+  "ui/legacy/InspectorView.ts | mainToolbar": {
+    "message": "Päätyökalupalkki"
+  },
   "ui/legacy/InspectorView.ts | moreTools": {
     "message": "Lisää työkaluja"
   },
@@ -11014,6 +11659,9 @@
   },
   "ui/legacy/ListWidget.ts | saveString": {
     "message": "Tallenna"
+  },
+  "ui/legacy/RemoteDebuggingTerminatedScreen.ts | debuggingConnectionWasClosed": {
+    "message": "Virheenkorjausyhteys katkaistiin. Syy: "
   },
   "ui/legacy/RemoteDebuggingTerminatedScreen.ts | reconnectDevtools": {
     "message": "Yhdistä DevTools uudelleen"
@@ -11098,6 +11746,9 @@
   },
   "ui/legacy/TabbedPane.ts | moreTabs": {
     "message": "Lisää välilehtiä"
+  },
+  "ui/legacy/TabbedPane.ts | previewFeature": {
+    "message": "Ominaisuuden ennakkoversio"
   },
   "ui/legacy/TargetCrashedScreen.ts | devtoolsWasDisconnectedFromThe": {
     "message": "DevToolsin yhteys sivuun katkesi."
@@ -11245,6 +11896,9 @@
   },
   "ui/legacy/components/cookie_table/CookiesTable.ts | name": {
     "message": "Nimi"
+  },
+  "ui/legacy/components/cookie_table/CookiesTable.ts | opaquePartitionKey": {
+    "message": "(läpinäkymätön)"
   },
   "ui/legacy/components/cookie_table/CookiesTable.ts | session": {
     "message": "Käyttökerta"
@@ -11414,15 +12068,6 @@
   "ui/legacy/components/object_ui/CustomPreviewComponent.ts | showAsJavascriptObject": {
     "message": "Näytä JavaScript-objektina"
   },
-  "ui/legacy/components/object_ui/JavaScriptAutocomplete.ts | keys": {
-    "message": "Avaimet"
-  },
-  "ui/legacy/components/object_ui/JavaScriptAutocomplete.ts | keywords": {
-    "message": "avainsanat"
-  },
-  "ui/legacy/components/object_ui/JavaScriptAutocomplete.ts | lexicalScopeVariables": {
-    "message": "Leksikaalisen soveltamisalan muuttujat"
-  },
   "ui/legacy/components/object_ui/ObjectPropertiesSection.ts | collapseChildren": {
     "message": "Tiivistä alatasot"
   },
@@ -11510,15 +12155,6 @@
   "ui/legacy/components/perf_ui/FlameChart.ts | sSelected": {
     "message": "{PH1} valittu"
   },
-  "ui/legacy/components/perf_ui/LineLevelProfile.ts | kb": {
-    "message": "kt"
-  },
-  "ui/legacy/components/perf_ui/LineLevelProfile.ts | mb": {
-    "message": "Mt"
-  },
-  "ui/legacy/components/perf_ui/LineLevelProfile.ts | ms": {
-    "message": "ms"
-  },
   "ui/legacy/components/perf_ui/NetworkPriorities.ts | high": {
     "message": "Korkea"
   },
@@ -11567,14 +12203,17 @@
   "ui/legacy/components/perf_ui/perf_ui-meta.ts | zoom": {
     "message": "Zoomaus"
   },
+  "ui/legacy/components/quick_open/CommandMenu.ts | command": {
+    "message": "Komento"
+  },
   "ui/legacy/components/quick_open/CommandMenu.ts | noCommandsFound": {
     "message": "Komentoja ei löydy"
   },
   "ui/legacy/components/quick_open/CommandMenu.ts | oneOrMoreSettingsHaveChanged": {
     "message": "Ainakin yhtä asetusta on muutettu. Voimaantulo edellyttää päivitystä."
   },
-  "ui/legacy/components/quick_open/CommandMenu.ts | runCommand": {
-    "message": "Suorita komento"
+  "ui/legacy/components/quick_open/CommandMenu.ts | run": {
+    "message": "Suorita"
   },
   "ui/legacy/components/quick_open/FilteredListWidget.ts | noResultsFound": {
     "message": "Ei tuloksia"
@@ -11588,8 +12227,8 @@
   "ui/legacy/components/quick_open/QuickInput.ts | pressEnterToConfirmOrEscapeTo": {
     "message": "{PH1} (vahvista painamalla Enter tai peru painamalla Esc.)"
   },
-  "ui/legacy/components/quick_open/QuickOpen.ts | useTabToSwitchCommandsTypeToSeeAvailableCommands": {
-    "message": "Vaihda komentoa sarkaimen avulla. Kirjoita ?, niin näet käytettävissä olevat komennot"
+  "ui/legacy/components/quick_open/QuickOpen.ts | typeToSeeAvailableCommands": {
+    "message": "Kirjoita ?, niin näet käytettävissä olevat komennot"
   },
   "ui/legacy/components/quick_open/quick_open-meta.ts | openFile": {
     "message": "Avaa tiedosto"
@@ -11692,9 +12331,6 @@
   },
   "ui/legacy/components/source_frame/source_frame-meta.ts | tabCharacter": {
     "message": "Sarkainmerkki"
-  },
-  "ui/legacy/components/text_editor/CodeMirrorTextEditor.ts | codeEditor": {
-    "message": "Koodieditori"
   },
   "ui/legacy/components/utils/ImagePreview.ts | currentSource": {
     "message": "Nykyinen lähde:"

@@ -150,7 +150,7 @@ export class ResourceMapping implements SDK.TargetManager.SDKModelObserver<SDK.R
         uiLocation.uiSourceCode.url(), uiLocation.lineNumber, uiLocation.columnNumber);
   }
 
-  private resetForTest(target: SDK.Target.Target): void {
+  resetForTest(target: SDK.Target.Target): void {
     const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
     const info = resourceTreeModel ? this.#modelToInfo.get(resourceTreeModel) : null;
     if (info) {
@@ -184,7 +184,7 @@ class ModelInfo {
       this.#cssModel.addEventListener(
           SDK.CSSModel.Events.StyleSheetChanged,
           event => {
-            this.styleSheetChanged(event);
+            void this.styleSheetChanged(event);
           },
           this),
     ];

@@ -38,10 +38,10 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
-
-import type * as TextEditor from '../../ui/components/text_editor/text_editor.js';
+import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Emulation from '../emulation/emulation.js';
@@ -237,17 +237,18 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   private searchHighlightsVisible?: boolean;
   selectionElement?: HTMLDivElement;
   private hintElement?: HTMLElement;
+  private contentElement: HTMLElement;
 
   constructor(node: SDK.DOMModel.DOMNode, isClosingTag?: boolean) {
     // The title will be updated in onattach.
     super();
     this.nodeInternal = node;
     this.treeOutline = null;
-
-    this.gutterContainer = this.listItemElement.createChild('div', 'gutter-container');
+    this.contentElement = this.listItemElement.createChild('div');
+    this.gutterContainer = this.contentElement.createChild('div', 'gutter-container');
     this.gutterContainer.addEventListener('click', this.showContextMenu.bind(this));
     const gutterMenuIcon = UI.Icon.Icon.create('largeicon-menu', 'gutter-menu-icon');
-    this.gutterContainer.appendChild(gutterMenuIcon);
+    this.gutterContainer.append(gutterMenuIcon);
     this.decorationsElement = this.gutterContainer.createChild('div', 'hidden');
 
     this.isClosingTagInternal = isClosingTag;
@@ -267,12 +268,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     this.highlightResult = [];
 
     if (!isClosingTag) {
-      this.adornerContainer = this.listItemElement.createChild('div', 'adorner-container hidden');
+      this.adornerContainer = this.contentElement.createChild('div', 'adorner-container hidden');
       this.adorners = [];
       this.styleAdorners = [];
       this.adornersThrottler = new Common.Throttler.Throttler(100);
 
-      this.updateStyleAdorners();
+      void this.updateStyleAdorners();
 
       if (node.isAdFrameNode()) {
         const config = ElementsComponents.AdornerManager.getRegisteredAdorner(
@@ -422,8 +423,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private createSelection(): void {
-    const listItemElement = this.listItemElement;
-    if (!listItemElement) {
+    const contentElement = this.contentElement;
+    if (!contentElement) {
       return;
     }
 
@@ -431,13 +432,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       this.selectionElement = document.createElement('div');
       this.selectionElement.className = 'selection fill';
       this.selectionElement.style.setProperty('margin-left', (-this.computeLeftIndent()) + 'px');
-      listItemElement.insertBefore(this.selectionElement, listItemElement.firstChild);
+      contentElement.prepend(this.selectionElement);
     }
   }
 
   private createHint(): void {
-    if (this.listItemElement && !this.hintElement) {
-      this.hintElement = this.listItemElement.createChild('span', 'selected-hint');
+    if (this.contentElement && !this.hintElement) {
+      this.hintElement = this.contentElement.createChild('span', 'selected-hint');
       const selectedElementCommand = '$0';
       UI.Tooltip.Tooltip.install(
           this.hintElement, i18nString(UIStrings.useSInTheConsoleToReferToThis, {PH1: selectedElementCommand}));
@@ -679,8 +680,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     const isEditable = this.hasEditableNode();
     // clang-format off
     if (isEditable && !this.editing) {
-      // Eagerly load CodeMirror to avoid a delay when opening the "Edit as HTML" editor when the user actually clicks on it
-      import('../../ui/components/text_editor/text_editor.js');
       contextMenu.editSection().appendItem(i18nString(UIStrings.editAsHtml), this.editAsHTML.bind(this));
     }
     // clang-format on
@@ -758,7 +757,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         const frameOwnerFrameId = this.nodeInternal.frameOwnerFrameId();
         if (frameOwnerFrameId) {
           const frame = SDK.FrameManager.FrameManager.instance().getFrame(frameOwnerFrameId);
-          Common.Revealer.reveal(frame);
+          void Common.Revealer.reveal(frame);
         }
       });
     }
@@ -1019,16 +1018,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       this.childrenListElement.style.display = 'none';
     }
     // Append editor.
-    this.listItemElement.appendChild(this.htmlEditElement);
+    this.listItemElement.append(this.htmlEditElement);
     this.htmlEditElement.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
         event.consume(true);
       }
     });
 
-    const TextEditor = await import('../../ui/components/text_editor/text_editor.js');
-    const CodeMirror = await import('../../third_party/codemirror.next/codemirror.next.js');
-    const {html} = await CodeMirror.html();
     const editor = new TextEditor.TextEditor.TextEditor(CodeMirror.EditorState.create({
       doc: initialValue,
       extensions: [
@@ -1049,10 +1045,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           },
         ]),
         TextEditor.Config.baseConfiguration(initialValue),
-        html(),
-        TextEditor.Config.domWordWrap,
+        TextEditor.Config.closeBrackets,
+        TextEditor.Config.autocompletion,
+        CodeMirror.html.html(),
+        TextEditor.Config.domWordWrap.instance(),
         CodeMirror.EditorView.theme({
-          '.cm-editor': {maxHeight: '300px'},
+          '&.cm-editor': {maxHeight: '300px'},
           '.cm-scroller': {overflowY: 'auto'},
         }),
         CodeMirror.EditorView.domEventHandlers({
@@ -1306,15 +1304,15 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           this.childrenListElement.classList.add('shadow-root-depth-' + depth);
         }
       }
-      const highlightElement = document.createElement('span');
-      highlightElement.className = 'highlight';
-      highlightElement.appendChild(nodeInfo);
+      this.contentElement.removeChildren();
+      const highlightElement = this.contentElement.createChild('span', 'highlight');
+      highlightElement.append(nodeInfo);
       // fixme: make it clear that `this.title = x` is a setter with significant side effects
-      this.title = highlightElement;
+      this.title = this.contentElement;
       this.updateDecorations();
-      this.listItemElement.insertBefore(this.gutterContainer, this.listItemElement.firstChild);
+      this.contentElement.prepend(this.gutterContainer);
       if (!this.isClosingTagInternal && this.adornerContainer) {
-        this.listItemElement.appendChild(this.adornerContainer);
+        this.contentElement.append(this.adornerContainer);
       }
       this.highlightResult = [];
       delete this.selectionElement;
@@ -1337,7 +1335,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     /** Keep it in sync with elementsTreeOutline.css **/
-    return 12 * (depth - 2) + (this.isExpandable() ? 1 : 12);
+    return 12 * (depth - 2) + (this.isExpandable() && this.isCollapsible() ? 1 : 12);
   }
 
   updateDecorations(): void {
@@ -1351,7 +1349,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
 
-    this.decorationsThrottler.schedule(this.updateDecorationsInternal.bind(this));
+    void this.decorationsThrottler.schedule(this.updateDecorationsInternal.bind(this));
   }
 
   private updateDecorationsInternal(): Promise<void> {
@@ -1516,13 +1514,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           Components.Linkifier.Linkifier.linkifyURL(rewrittenHref, {
             text: value,
             preventClick: true,
-            className: undefined,
-            lineNumber: undefined,
-            columnNumber: undefined,
+            showColumnNumber: false,
             inlineFrameIndex: 0,
-            maxLength: undefined,
-            tabStop: undefined,
-            bypassURLTrimming: undefined,
           });
       return ImagePreviewPopover.setImageUrl(link, rewrittenHref);
     }
@@ -1732,12 +1725,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           const newNode = titleDOM.createChild('span', 'webkit-html-text-node webkit-html-js-node');
           const text = node.nodeValue();
           newNode.textContent = text.replace(/^[\n\r]+|\s+$/g, '');
-          CodeHighlighter.CodeHighlighter.highlightNode(newNode, 'text/javascript').then(updateSearchHighlight);
+          void CodeHighlighter.CodeHighlighter.highlightNode(newNode, 'text/javascript').then(updateSearchHighlight);
         } else if (node.parentNode && node.parentNode.nodeName().toLowerCase() === 'style') {
           const newNode = titleDOM.createChild('span', 'webkit-html-text-node webkit-html-css-node');
           const text = node.nodeValue();
           newNode.textContent = text.replace(/^[\n\r]+|\s+$/g, '');
-          CodeHighlighter.CodeHighlighter.highlightNode(newNode, 'text/css').then(updateSearchHighlight);
+          void CodeHighlighter.CodeHighlighter.highlightNode(newNode, 'text/css').then(updateSearchHighlight);
         } else {
           UI.UIUtils.createTextChild(titleDOM, '"');
           const textNodeElement = titleDOM.createChild('span', 'webkit-html-text-node');
@@ -1810,12 +1803,10 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     if (!this.nodeInternal.parentNode || this.nodeInternal.parentNode.nodeType() === Node.DOCUMENT_NODE) {
       return;
     }
-    this.nodeInternal.removeNode();
+    void this.nodeInternal.removeNode();
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  toggleEditAsHTML(callback?: ((arg0: boolean) => any), startEditing?: boolean): void {
+  toggleEditAsHTML(callback?: ((arg0: boolean) => void), startEditing?: boolean): void {
     if (this.editing && this.htmlEditElement) {
       this.editing.commit();
       return;
@@ -1844,7 +1835,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     const node = this.nodeInternal;
-    node.getOuterHTML().then(this.startEditingAsHTML.bind(this, commitChange, disposeCallback));
+    void node.getOuterHTML().then(this.startEditingAsHTML.bind(this, commitChange, disposeCallback));
   }
 
   private copyCSSPath(): void {
@@ -1901,7 +1892,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     this.hideSearchHighlight();
 
     const text = this.listItemElement.textContent || '';
-    const regexObject = createPlainTextSearchRegex(this.searchQuery, 'gi');
+    const regexObject = Platform.StringUtilities.createPlainTextSearchRegex(this.searchQuery, 'gi');
 
     let match = regexObject.exec(text);
     const matchRanges = [];
@@ -1921,7 +1912,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
 
   private editAsHTML(): void {
     const promise = Common.Revealer.reveal(this.node());
-    promise.then(() => {
+    void promise.then(() => {
       const action = UI.ActionRegistry.ActionRegistry.instance().action('elements.edit-as-html');
       if (!action) {
         return;
@@ -1969,7 +1960,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private updateAdorners(): void {
-    this.adornersThrottler.schedule(this.updateAdornersInternal.bind(this));
+    void this.adornersThrottler.schedule(this.updateAdornersInternal.bind(this));
   }
 
   private updateAdornersInternal(): Promise<void> {
@@ -2222,7 +2213,5 @@ export interface EditorHandles {
   commit: () => void;
   cancel: () => void;
   editor?: TextEditor.TextEditor.TextEditor;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resize: () => any;
+  resize: () => void;
 }

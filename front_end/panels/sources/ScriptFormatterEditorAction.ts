@@ -54,7 +54,7 @@ export class ScriptFormatterEditorAction implements EditorAction {
 
     if (this.isFormattableScript(uiSourceCode) && this.pathsToFormatOnLoad.has(uiSourceCode.url()) &&
         !FormatterModule.SourceFormatter.SourceFormatter.instance().hasFormatted(uiSourceCode)) {
-      this.showFormatted(uiSourceCode);
+      void this.showFormatted(uiSourceCode);
     }
   }
 
@@ -92,7 +92,7 @@ export class ScriptFormatterEditorAction implements EditorAction {
       this.editorSelected(event);
     });
     this.sourcesView.addEventListener(Events.EditorClosed, event => {
-      this.editorClosed(event);
+      void this.editorClosed(event);
     });
 
     this.button = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.prettyPrint), 'largeicon-pretty-print');
@@ -136,7 +136,7 @@ export class ScriptFormatterEditorAction implements EditorAction {
       return;
     }
     this.pathsToFormatOnLoad.add(uiSourceCode.url());
-    this.showFormatted(uiSourceCode);
+    void this.showFormatted(uiSourceCode);
   }
 
   private async showFormatted(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
@@ -147,10 +147,10 @@ export class ScriptFormatterEditorAction implements EditorAction {
     const sourceFrame = this.sourcesView.viewForFile(uiSourceCode);
     let start: number[]|number[] = [0, 0];
     if (sourceFrame instanceof SourceFrame.SourceFrame.SourceFrameImpl) {
-      const selection = sourceFrame.selection();
-      start = formatData.mapping.originalToFormatted(selection.startLine, selection.startColumn);
+      const selection = sourceFrame.textEditor.toLineColumn(sourceFrame.textEditor.state.selection.main.head);
+      start = formatData.mapping.originalToFormatted(selection.lineNumber, selection.columnNumber);
     }
-    this.sourcesView.showSourceLocation(formatData.formattedSourceCode, start[0], start[1]);
+    this.sourcesView.showSourceLocation(formatData.formattedSourceCode, {lineNumber: start[0], columnNumber: start[1]});
   }
 }
 

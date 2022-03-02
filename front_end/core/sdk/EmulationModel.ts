@@ -15,7 +15,6 @@ import {SDKModel} from './SDKModel.js';
 
 export class EmulationModel extends SDKModel<void> {
   readonly #emulationAgent: ProtocolProxyApi.EmulationApi;
-  readonly #pageAgent: ProtocolProxyApi.PageApi;
   readonly #deviceOrientationAgent: ProtocolProxyApi.DeviceOrientationApi;
   #cssModel: CSSModel|null;
   readonly #overlayModelInternal: OverlayModel|null;
@@ -31,13 +30,12 @@ export class EmulationModel extends SDKModel<void> {
   constructor(target: Target) {
     super(target);
     this.#emulationAgent = target.emulationAgent();
-    this.#pageAgent = target.pageAgent();
     this.#deviceOrientationAgent = target.deviceOrientationAgent();
     this.#cssModel = target.model(CSSModel);
     this.#overlayModelInternal = target.model(OverlayModel);
     if (this.#overlayModelInternal) {
       this.#overlayModelInternal.addEventListener(Events.InspectModeWillBeToggled, () => {
-        this.updateTouch();
+        void this.updateTouch();
       }, this);
     }
 
@@ -46,14 +44,14 @@ export class EmulationModel extends SDKModel<void> {
         async () =>
             await this.#emulationAgent.invoke_setScriptExecutionDisabled({value: disableJavascriptSetting.get()}));
     if (disableJavascriptSetting.get()) {
-      this.#emulationAgent.invoke_setScriptExecutionDisabled({value: true});
+      void this.#emulationAgent.invoke_setScriptExecutionDisabled({value: true});
     }
 
     const touchSetting = Common.Settings.Settings.instance().moduleSetting('emulation.touch');
     touchSetting.addChangeListener(() => {
       const settingValue = touchSetting.get();
 
-      this.overrideEmulateTouch(settingValue === 'force');
+      void this.overrideEmulateTouch(settingValue === 'force');
     });
 
     const idleDetectionSetting = Common.Settings.Settings.instance().moduleSetting('emulation.idleDetection');
@@ -76,6 +74,8 @@ export class EmulationModel extends SDKModel<void> {
         Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeatureColorGamut');
     const mediaFeaturePrefersColorSchemeSetting =
         Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeaturePrefersColorScheme');
+    const mediaFeatureForcedColorsSetting =
+        Common.Settings.Settings.instance().moduleSetting('emulatedCSSMediaFeatureForcedColors');
     const mediaFeaturePrefersContrastSetting =
         Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeaturePrefersContrast');
     const mediaFeaturePrefersReducedDataSetting =
@@ -90,46 +90,58 @@ export class EmulationModel extends SDKModel<void> {
       ['type', mediaTypeSetting.get()],
       ['color-gamut', mediaFeatureColorGamutSetting.get()],
       ['prefers-color-scheme', mediaFeaturePrefersColorSchemeSetting.get()],
+      ['forced-colors', mediaFeatureForcedColorsSetting.get()],
       ['prefers-contrast', mediaFeaturePrefersContrastSetting.get()],
       ['prefers-reduced-data', mediaFeaturePrefersReducedDataSetting.get()],
       ['prefers-reduced-motion', mediaFeaturePrefersReducedMotionSetting.get()],
     ]);
     mediaTypeSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('type', mediaTypeSetting.get());
-      this.updateCssMedia();
+      void this.updateCssMedia();
     });
     mediaFeatureColorGamutSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('color-gamut', mediaFeatureColorGamutSetting.get());
-      this.updateCssMedia();
+      void this.updateCssMedia();
     });
     mediaFeaturePrefersColorSchemeSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('prefers-color-scheme', mediaFeaturePrefersColorSchemeSetting.get());
-      this.updateCssMedia();
+      void this.updateCssMedia();
+    });
+    mediaFeatureForcedColorsSetting.addChangeListener(() => {
+      this.#mediaConfiguration.set('forced-colors', mediaFeatureForcedColorsSetting.get());
+      void this.updateCssMedia();
     });
     mediaFeaturePrefersContrastSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('prefers-contrast', mediaFeaturePrefersContrastSetting.get());
-      this.updateCssMedia();
+      void this.updateCssMedia();
     });
     mediaFeaturePrefersReducedDataSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('prefers-reduced-data', mediaFeaturePrefersReducedDataSetting.get());
-      this.updateCssMedia();
+      void this.updateCssMedia();
     });
     mediaFeaturePrefersReducedMotionSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('prefers-reduced-motion', mediaFeaturePrefersReducedMotionSetting.get());
-      this.updateCssMedia();
+      void this.updateCssMedia();
     });
-    this.updateCssMedia();
+    void this.updateCssMedia();
 
     const autoDarkModeSetting = Common.Settings.Settings.instance().moduleSetting('emulateAutoDarkMode');
-    autoDarkModeSetting.addChangeListener(() => this.emulateAutoDarkMode(autoDarkModeSetting.get()));
+    autoDarkModeSetting.addChangeListener(() => {
+      const enabled = autoDarkModeSetting.get();
+      mediaFeaturePrefersColorSchemeSetting.setDisabled(enabled);
+      mediaFeaturePrefersColorSchemeSetting.set(enabled ? 'dark' : '');
+      void this.emulateAutoDarkMode(enabled);
+    });
     if (autoDarkModeSetting.get()) {
-      this.emulateAutoDarkMode(autoDarkModeSetting.get());
+      mediaFeaturePrefersColorSchemeSetting.setDisabled(true);
+      mediaFeaturePrefersColorSchemeSetting.set('dark');
+      void this.emulateAutoDarkMode(true);
     }
 
     const visionDeficiencySetting = Common.Settings.Settings.instance().moduleSetting('emulatedVisionDeficiency');
     visionDeficiencySetting.addChangeListener(() => this.emulateVisionDeficiency(visionDeficiencySetting.get()));
     if (visionDeficiencySetting.get()) {
-      this.emulateVisionDeficiency(visionDeficiencySetting.get());
+      void this.emulateVisionDeficiency(visionDeficiencySetting.get());
     }
 
     const localFontsDisabledSetting = Common.Settings.Settings.instance().moduleSetting('localFontsDisabled');
@@ -272,22 +284,14 @@ export class EmulationModel extends SDKModel<void> {
     }
   }
 
-  private static parseAutoDarkModeSetting(setting: string): boolean|undefined {
-    switch (setting) {
-      case 'default':
-        return undefined;
-      case 'enabled':
-        return true;
-      case 'disabled':
-        return false;
-      default:
-        throw Error('unrecognized auto dark mode setting');
+  private async emulateAutoDarkMode(enabled: boolean): Promise<void> {
+    if (enabled) {
+      this.#mediaConfiguration.set('prefers-color-scheme', 'dark');
+      await this.updateCssMedia();
     }
-  }
-
-  private async emulateAutoDarkMode(setting: string): Promise<void> {
-    const enabled = EmulationModel.parseAutoDarkModeSetting(setting);
-    await this.#emulationAgent.invoke_setAutoDarkModeOverride({enabled});
+    // We never send `enabled: false` since that would explicitly disable
+    // autodark mode. We either enable it or clear any existing override.
+    await this.#emulationAgent.invoke_setAutoDarkModeOverride({enabled: enabled || undefined});
   }
 
   private async emulateVisionDeficiency(type: Protocol.Emulation.SetEmulatedVisionDeficiencyRequestType):
@@ -299,11 +303,11 @@ export class EmulationModel extends SDKModel<void> {
     if (!this.#cssModel) {
       return;
     }
-    this.#cssModel.setLocalFontsEnabled(!disabled);
+    void this.#cssModel.setLocalFontsEnabled(!disabled);
   }
 
   private setDisabledImageTypes(imageTypes: Protocol.Emulation.DisabledImageType[]): void {
-    this.#emulationAgent.invoke_setDisabledImageTypes({imageTypes});
+    void this.#emulationAgent.invoke_setDisabledImageTypes({imageTypes});
   }
 
   async setCPUThrottlingRate(rate: number): Promise<void> {
@@ -355,7 +359,7 @@ export class EmulationModel extends SDKModel<void> {
         {enabled: configuration.enabled, configuration: configuration.configuration});
   }
 
-  private updateCssMedia(): void {
+  private async updateCssMedia(): Promise<void> {
     // See the note above, where this.#mediaConfiguration is defined.
     const type = this.#mediaConfiguration.get('type') ?? '';
     const features = [
@@ -366,6 +370,10 @@ export class EmulationModel extends SDKModel<void> {
       {
         name: 'prefers-color-scheme',
         value: this.#mediaConfiguration.get('prefers-color-scheme') ?? '',
+      },
+      {
+        name: 'forced-colors',
+        value: this.#mediaConfiguration.get('forced-colors') ?? '',
       },
       {
         name: 'prefers-contrast',
@@ -380,7 +388,7 @@ export class EmulationModel extends SDKModel<void> {
         value: this.#mediaConfiguration.get('prefers-reduced-motion') ?? '',
       },
     ];
-    this.emulateCSSMedia(type, features);
+    return this.emulateCSSMedia(type, features);
   }
 }
 

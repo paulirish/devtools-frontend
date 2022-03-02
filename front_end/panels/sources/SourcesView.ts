@@ -84,7 +84,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.editorContainer.addEventListener(TabbedEditorContainerEvents.EditorSelected, this.editorSelected, this);
     this.editorContainer.addEventListener(TabbedEditorContainerEvents.EditorClosed, this.editorClosed, this);
 
-    this.historyManager = new EditingLocationHistoryManager(this, this.currentSourceFrame.bind(this));
+    this.historyManager = new EditingLocationHistoryManager(this);
 
     this.toolbarContainerElementInternal = this.element.createChild('div', 'sources-toolbar');
     if (!Root.Runtime.experiments.isEnabled('sourcesPrettyPrint')) {
@@ -124,9 +124,9 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       }
 
       event.returnValue = true;
-      UI.ViewManager.ViewManager.instance().showView('sources');
+      void UI.ViewManager.ViewManager.instance().showView('sources');
       for (const sourceCode of unsavedSourceCodes) {
-        Common.Revealer.reveal(sourceCode);
+        void Common.Revealer.reveal(sourceCode);
       }
     }
 
@@ -172,7 +172,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
         this.placeholderOptionArray.push({
           element: row,
           handler(): void {
-            action.execute();
+            void action.execute();
           },
         });
       }
@@ -342,7 +342,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   private updateScriptViewToolbarItems(): void {
     const view = this.visibleView();
     if (view instanceof UI.View.SimpleView) {
-      view.toolbarItems().then(items => {
+      void view.toolbarItems().then(items => {
         this.scriptViewToolbar.removeToolbarItems();
         items.map(item => this.scriptViewToolbar.appendToolbarItem(item));
       });
@@ -350,15 +350,18 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   showSourceLocation(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, lineNumber?: number, columnNumber?: number,
+      uiSourceCode: Workspace.UISourceCode.UISourceCode, location?: {lineNumber: number, columnNumber?: number}|number,
       omitFocus?: boolean, omitHighlight?: boolean): void {
-    this.historyManager.updateCurrentState();
+    const currentFrame = this.currentSourceFrame();
+    if (currentFrame) {
+      this.historyManager.updateCurrentState(
+          currentFrame.uiSourceCode(), currentFrame.textEditor.state.selection.main.head);
+    }
     this.editorContainer.showFile(uiSourceCode);
     const currentSourceFrame = this.currentSourceFrame();
-    if (currentSourceFrame && typeof lineNumber === 'number') {
-      currentSourceFrame.revealPosition(lineNumber, columnNumber, !omitHighlight);
+    if (currentSourceFrame && location) {
+      currentSourceFrame.revealPosition(location, !omitHighlight);
     }
-    this.historyManager.pushNewState();
     const visibleView = this.visibleView();
     if (!omitFocus && visibleView) {
       visibleView.focus();
@@ -382,9 +385,49 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       this.historyManager.trackSourceFrameCursorJumps(sourceFrame);
     }
 
+    uiSourceCode.addEventListener(Workspace.UISourceCode.Events.TitleChanged, this.#uiSourceCodeTitleChanged, this);
+
     const widget = (sourceFrame || sourceView as UI.Widget.Widget);
     this.sourceViewByUISourceCode.set(uiSourceCode, widget);
     return widget;
+  }
+
+  #sourceViewTypeForWidget(widget: UI.Widget.Widget): SourceViewType {
+    if (widget instanceof SourceFrame.ImageView.ImageView) {
+      return SourceViewType.ImageView;
+    }
+    if (widget instanceof SourceFrame.FontView.FontView) {
+      return SourceViewType.FontView;
+    }
+    return SourceViewType.SourceView;
+  }
+
+  #sourceViewTypeForContentType(contentType: Common.ResourceType.ResourceType): SourceViewType {
+    switch (contentType) {
+      case Common.ResourceType.resourceTypes.Image:
+        return SourceViewType.ImageView;
+      case Common.ResourceType.resourceTypes.Font:
+        return SourceViewType.FontView;
+      default:
+        return SourceViewType.SourceView;
+    }
+  }
+
+  #uiSourceCodeTitleChanged(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
+    const uiSourceCode = event.data;
+    const widget = this.sourceViewByUISourceCode.get(uiSourceCode);
+    if (widget) {
+      const contentType = uiSourceCode.contentType();
+      if (this.#sourceViewTypeForWidget(widget) !== this.#sourceViewTypeForContentType(contentType)) {
+        // Remove the exisiting editor tab and create a new one of the correct type.
+        this.removeUISourceCodes([uiSourceCode]);
+        this.showSourceLocation(uiSourceCode);
+      }
+    }
+  }
+
+  getSourceView(uiSourceCode: Workspace.UISourceCode.UISourceCode): UI.Widget.Widget|undefined {
+    return this.sourceViewByUISourceCode.get(uiSourceCode);
   }
 
   private getOrCreateSourceView(uiSourceCode: Workspace.UISourceCode.UISourceCode): UI.Widget.Widget {
@@ -392,9 +435,12 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   recycleUISourceCodeFrame(sourceFrame: UISourceCodeFrame, uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    sourceFrame.uiSourceCode().removeEventListener(
+        Workspace.UISourceCode.Events.TitleChanged, this.#uiSourceCodeTitleChanged, this);
     this.sourceViewByUISourceCode.delete(sourceFrame.uiSourceCode());
     sourceFrame.setUISourceCode(uiSourceCode);
     this.sourceViewByUISourceCode.set(uiSourceCode, sourceFrame);
+    uiSourceCode.addEventListener(Workspace.UISourceCode.Events.TitleChanged, this.#uiSourceCodeTitleChanged, this);
   }
 
   viewForFile(uiSourceCode: Workspace.UISourceCode.UISourceCode): UI.Widget.Widget {
@@ -407,6 +453,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     if (sourceView && sourceView instanceof UISourceCodeFrame) {
       (sourceView as UISourceCodeFrame).dispose();
     }
+    uiSourceCode.removeEventListener(Workspace.UISourceCode.Events.TitleChanged, this.#uiSourceCodeTitleChanged, this);
   }
 
   private editorClosed(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
@@ -440,8 +487,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       currentSourceFrame.setSearchableView(this.searchableViewInternal);
     }
 
-    this.searchableViewInternal.setReplaceable(
-        Boolean(currentSourceFrame) && (currentSourceFrame ? currentSourceFrame.canEditSource() : false));
+    this.searchableViewInternal.setReplaceable(Boolean(currentSourceFrame?.canEditSource()));
     this.searchableViewInternal.refreshSearch();
     this.updateToolbarChangedListener();
     this.updateScriptViewToolbarItems();
@@ -594,9 +640,6 @@ export type EventTypes = {
   [Events.EditorSelected]: Workspace.UISourceCode.UISourceCode,
 };
 
-/**
- * @interface
- */
 export interface EditorAction {
   getOrCreateButton(sourcesView: SourcesView): UI.Toolbar.ToolbarButton;
 }
@@ -719,4 +762,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
 
     return false;
   }
+}
+
+// eslint-disable-next-line rulesdir/const_enum
+enum SourceViewType {
+  ImageView = 'ImageView',
+  FontView = 'FontView',
+  SourceView = 'SourceView',
 }
