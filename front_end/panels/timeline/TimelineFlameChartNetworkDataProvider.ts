@@ -288,21 +288,26 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     // Draw received data.
     // This all kinda works but existing bar is network timings. and these receivedata events are blink timings. there's a delay and we'll be receiving data into the right whisker.
 
-    const darkened = this.entryColor(index).replace(/\d+%\)/, '50%, 0.4)').replace('hsl', 'hsla');
+    const darkened = this.entryColor(index).replace(/\d+%\)/, '20%, 0.4)').replace('hsl', 'hsla');
     context.fillStyle = darkened;
     const receiveDataEvents = request.children.filter(evt => evt.args?.data?.encodedDataLength && evt.name !== RecordType.ResourceFinish);
-    // let lastReceivedDataTime = headersEndTime;
-    let bytesSum = 0; // receiveDataEvents[0].args.data.encodedDataLength || 0;
-    // for (let i = 1; i < receiveDataEvents.length; i++) {
-      for (let i = 0; i < receiveDataEvents.length; i++) {
-        // const prevEvt = receiveDataEvents[i-1];
-        const evt = receiveDataEvents[i];
-        bytesSum += evt.args.data.encodedDataLength;
-        const scaledHeight = Math.min(bytesSum / request.encodedDataLength, 1) * barHeight;
-        console.log(evt.name, bytesSum / request.encodedDataLength, 'here', evt.args.data.encodedDataLength, 'totalling', bytesSum, 'out of', request.encodedDataLength, ' umwhat', scaledHeight);
-        context.fillRect(timeToPixel(evt.startTime), barY - 0.5, 3, scaledHeight);
-    }
+    const totalDataChunkLength = receiveDataEvents.reduce((sum, item) => sum + item.args?.data?.encodedDataLength || 0, 0);
+    // each "data received" event in blink gets a 'length' from a chunk.size().
+    // This number probaly includes some overhead (mojo IPC chunk metadata?) and generally likes to be 65k.
+    //  so bytesSum will generally be larger than the request's encodedDataLength. Shrug.
+    const adjFactor = totalDataChunkLength / request.encodedDataLength;
 
+    let bytesSum = receiveDataEvents[0].args.data.encodedDataLength || 0;
+    for (let i = 1; i < receiveDataEvents.length; i++) {
+        const prevEvt = receiveDataEvents[i-1];
+        const evt = receiveDataEvents[i];
+        const chunkLength = evt.args.data.encodedDataLength
+        bytesSum += chunkLength;
+        const scaledHeight = Math.min(bytesSum / request.encodedDataLength / adjFactor, 100) * (barHeight - 1);
+        // console.log(evt.name, bytesSum / request.encodedDataLength / adjFactor, 'here', chunkLength, 'totalling', bytesSum, 'out of', request.encodedDataLength, ' umwhat', scaledHeight);
+        const stepRectWidth = timeToPixel(evt.startTime) - timeToPixel(prevEvt.startTime);
+        context.fillRect(timeToPixel(prevEvt.startTime), barY, stepRectWidth, scaledHeight);
+    }
 
     return true;
   }
