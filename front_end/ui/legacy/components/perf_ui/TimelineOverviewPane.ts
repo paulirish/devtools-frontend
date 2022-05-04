@@ -36,6 +36,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import type {WindowChangedWithPositionEvent} from './OverviewGrid.js';
 import {Events as OverviewGridEvents, OverviewGrid} from './OverviewGrid.js';
 import type {Calculator} from './TimelineGrid.js';
+import {TimelineGrid} from './TimelineGrid.js';
 import timelineOverviewInfoStyles from './timelineOverviewInfo.css.js';
 
 export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
@@ -303,20 +304,10 @@ export class TimelineOverviewCalculator implements Calculator {
   }
 
   formatValue(value: number, precision?: number): string {
-    // If there are nav start times the value needs to be remapped.
-    if (this.navStartTimes) {
-      // Find the latest possible nav start time which is considered earlier
-      // than the value passed through.
-      const navStartTimes = Array.from(this.navStartTimes.values());
-      for (let i = navStartTimes.length - 1; i >= 0; i--) {
-        if (value > navStartTimes[i].startTime) {
-          value -= (navStartTimes[i].startTime - this.zeroTime());
-          break;
-        }
-      }
-    }
-
-    return i18n.TimeUtilities.preciseMillisToString(value - this.zeroTime(), precision);
+    const adjustedTime = this.navStartTimes ?
+      TimelineGrid.alignTimestampToTimeOrigin(value, Array.from(this.navStartTimes.values()), this.zeroTime()) :
+      value;
+    return i18n.TimeUtilities.preciseMillisToString(adjustedTime - this.zeroTime(), precision);
   }
 
   maximumBoundary(): number {

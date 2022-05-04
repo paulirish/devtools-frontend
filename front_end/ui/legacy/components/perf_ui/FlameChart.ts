@@ -1262,26 +1262,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const dividersData = TimelineGrid.calculateGridOffsets(this);
     const navStartTimes = Array.from(this.dataProvider.navStartTimes().values());
 
-    let navStartTimeIndex = 0;
     const drawAdjustedTime = (time: number): string => {
-      if (navStartTimes.length === 0) {
-        return this.formatValue(time, dividersData.precision);
-      }
-
-      // Track when the time crosses the boundary to the next nav start record,
-      // and when it does, move the nav start array index accordingly.
-      const hasNextNavStartTime = navStartTimes.length > navStartTimeIndex + 1;
-      if (hasNextNavStartTime && time > navStartTimes[navStartTimeIndex + 1].startTime) {
-        navStartTimeIndex++;
-      }
-
-      // Adjust the time by the nearest nav start marker's value.
-      const nearestMarker = navStartTimes[navStartTimeIndex];
-      if (nearestMarker) {
-        time -= nearestMarker.startTime - this.zeroTime();
-      }
-
-      return this.formatValue(time, dividersData.precision);
+      const adjustedTime = TimelineGrid.alignTimestampToTimeOrigin(time, navStartTimes, this.zeroTime());
+      return this.formatValue(adjustedTime, dividersData.precision);
     };
 
     TimelineGrid.drawCanvasGrid(context, dividersData);

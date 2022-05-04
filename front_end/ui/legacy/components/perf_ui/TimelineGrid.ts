@@ -33,6 +33,7 @@
  */
 
 import * as Host from '../../../../core/host/host.js';
+import type * as SDK from '../../../../core/sdk/sdk.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
 import timelineGridStyles from './timelineGrid.css.legacy.js';
@@ -57,6 +58,24 @@ export class TimelineGrid {
     this.eventDividersElement = this.gridHeaderElement.createChild('div', 'resources-event-dividers');
     this.dividersLabelBarElementInternal = this.gridHeaderElement.createChild('div', 'resources-dividers-label-bar');
     this.element.appendChild(this.gridHeaderElement);
+  }
+
+  // Adjust presentation time to be relative to closest timeOrigin (typically navStart)
+  static alignTimestampToTimeOrigin(timeValue: number, timeOrigins: SDK.TracingModel.Event[], zeroTime: number): number {
+    let timeOriginIndex = 0;
+    // Track when the time crosses the boundary to the next nav start record,
+    // and when it does, move the nav start array index accordingly.
+    const hasNextNavStartTime = timeOrigins.length > timeOriginIndex + 1;
+    if (hasNextNavStartTime && timeValue > timeOrigins[timeOriginIndex + 1].startTime) {
+      timeOriginIndex++;
+    }
+
+    // Adjust the time by the nearest nav start marker's value.
+    const nearestMarker = timeOrigins[timeOriginIndex];
+    if (nearestMarker) {
+      timeValue -= nearestMarker.startTime - zeroTime;
+    }
+    return timeValue;
   }
 
   static calculateGridOffsets(calculator: Calculator, freeZoneAtLeft?: number): DividersData {
