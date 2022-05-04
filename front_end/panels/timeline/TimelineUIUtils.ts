@@ -3185,6 +3185,8 @@ export class TimelineUIUtils {
         return i18n.i18n.lockedString('FCP');
       case recordTypes.MarkLCPCandidate:
         return i18n.i18n.lockedString('LCP');
+      case recordTypes.NavigationStart:
+        return i18n.i18n.lockedString('NS');
     }
     return null;
   }

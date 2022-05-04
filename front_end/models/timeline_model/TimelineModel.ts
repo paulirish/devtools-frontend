@@ -183,6 +183,8 @@ export class TimelineModelImpl {
       case RecordType.MarkLCPCandidate:
       case RecordType.MarkLCPInvalidate:
         return Boolean(event.args['data']['isMainFrame']);
+      case RecordType.NavigationStart:
+        return Boolean(event.args['data']['isLoadingMainFrame'] && event.args['data']['documentLoaderURL'] !== '');
       default:
         return false;
     }
