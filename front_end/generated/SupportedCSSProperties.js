@@ -14,9 +14,9 @@ export const generatedProperties = [
   {'name': '-webkit-box-orient', 'keywords': ['horizontal', 'vertical']},
   {'name': '-webkit-box-pack', 'keywords': ['start', 'center', 'end', 'justify']},
   {'name': '-webkit-box-reflect'},
-  {'longhands': ['break-after'], 'name': '-webkit-column-break-after'},
-  {'longhands': ['break-before'], 'name': '-webkit-column-break-before'},
-  {'longhands': ['break-inside'], 'name': '-webkit-column-break-inside'},
+  {'name': '-webkit-column-break-after', 'longhands': ['break-after']},
+  {'name': '-webkit-column-break-before', 'longhands': ['break-before']},
+  {'name': '-webkit-column-break-inside', 'longhands': ['break-inside']},
   {'name': '-webkit-font-smoothing', 'inherited': true},
   {'name': '-webkit-highlight', 'inherited': true},
   {'name': '-webkit-hyphenate-character', 'inherited': true},
@@ -28,18 +28,18 @@ export const generatedProperties = [
   {'name': '-webkit-line-clamp'},
   {'name': '-webkit-locale', 'inherited': true},
   {
+    'name': '-webkit-mask',
     'longhands': [
       '-webkit-mask-image', '-webkit-mask-position-x', '-webkit-mask-position-y', '-webkit-mask-size',
       '-webkit-mask-repeat-x', '-webkit-mask-repeat-y', '-webkit-mask-origin', '-webkit-mask-clip'
-    ],
-    'name': '-webkit-mask'
+    ]
   },
   {
+    'name': '-webkit-mask-box-image',
     'longhands': [
       '-webkit-mask-box-image-source', '-webkit-mask-box-image-slice', '-webkit-mask-box-image-width',
       '-webkit-mask-box-image-outset', '-webkit-mask-box-image-repeat'
-    ],
-    'name': '-webkit-mask-box-image'
+    ]
   },
   {'name': '-webkit-mask-box-image-outset'},
   {'name': '-webkit-mask-box-image-repeat'},
@@ -50,10 +50,10 @@ export const generatedProperties = [
   {'name': '-webkit-mask-composite'},
   {'name': '-webkit-mask-image'},
   {'name': '-webkit-mask-origin'},
-  {'longhands': ['-webkit-mask-position-x', '-webkit-mask-position-y'], 'name': '-webkit-mask-position'},
+  {'name': '-webkit-mask-position', 'longhands': ['-webkit-mask-position-x', '-webkit-mask-position-y']},
   {'name': '-webkit-mask-position-x'},
   {'name': '-webkit-mask-position-y'},
-  {'longhands': ['-webkit-mask-repeat-x', '-webkit-mask-repeat-y'], 'name': '-webkit-mask-repeat'},
+  {'name': '-webkit-mask-repeat', 'longhands': ['-webkit-mask-repeat-x', '-webkit-mask-repeat-y']},
   {'name': '-webkit-mask-repeat-x'},
   {'name': '-webkit-mask-repeat-y'},
   {'name': '-webkit-mask-size'},
@@ -69,8 +69,8 @@ export const generatedProperties = [
   {'name': '-webkit-text-orientation', 'inherited': true},
   {'name': '-webkit-text-security', 'inherited': true, 'keywords': ['none', 'disc', 'circle', 'square']},
   {
-    'longhands': ['-webkit-text-stroke-width', '-webkit-text-stroke-color'],
     'name': '-webkit-text-stroke',
+    'longhands': ['-webkit-text-stroke-width', '-webkit-text-stroke-color'],
     'inherited': true
   },
   {'name': '-webkit-text-stroke-color', 'inherited': true},
@@ -100,11 +100,11 @@ export const generatedProperties = [
   {'name': 'all'},
   {'name': 'anchor-name', 'keywords': ['none']},
   {
+    'name': 'animation',
     'longhands': [
       'animation-duration', 'animation-timing-function', 'animation-delay', 'animation-iteration-count',
       'animation-direction', 'animation-fill-mode', 'animation-play-state', 'animation-name', 'animation-timeline'
-    ],
-    'name': 'animation'
+    ]
   },
   {'name': 'animation-delay'},
   {'name': 'animation-direction', 'keywords': ['normal', 'reverse', 'alternate', 'alternate-reverse']},
@@ -128,11 +128,11 @@ export const generatedProperties = [
   {'name': 'backdrop-filter', 'keywords': ['none']},
   {'name': 'backface-visibility', 'keywords': ['visible', 'hidden']},
   {
+    'name': 'background',
     'longhands': [
       'background-image', 'background-position-x', 'background-position-y', 'background-size', 'background-repeat-x',
       'background-repeat-y', 'background-attachment', 'background-origin', 'background-clip', 'background-color'
-    ],
-    'name': 'background'
+    ]
   },
   {'name': 'background-attachment', 'keywords': ['scroll', 'fixed', 'local']},
   {
@@ -143,13 +143,13 @@ export const generatedProperties = [
     ]
   },
   {'name': 'background-clip', 'keywords': ['border-box', 'padding-box', 'content-box']},
-  {'keywords': ['currentcolor'], 'name': 'background-color'},
+  {'name': 'background-color', 'keywords': ['currentcolor']},
   {'name': 'background-image', 'keywords': ['auto', 'none']},
   {'name': 'background-origin', 'keywords': ['border-box', 'padding-box', 'content-box']},
-  {'longhands': ['background-position-x', 'background-position-y'], 'name': 'background-position'},
+  {'name': 'background-position', 'longhands': ['background-position-x', 'background-position-y']},
   {'name': 'background-position-x'},
   {'name': 'background-position-y'},
-  {'longhands': ['background-repeat-x', 'background-repeat-y'], 'name': 'background-repeat'},
+  {'name': 'background-repeat', 'longhands': ['background-repeat-x', 'background-repeat-y']},
   {'name': 'background-repeat-x'},
   {'name': 'background-repeat-y'},
   {'name': 'background-size', 'keywords': ['auto', 'cover', 'contain']},
@@ -157,39 +157,39 @@ export const generatedProperties = [
   {'name': 'baseline-shift', 'keywords': ['baseline', 'sub', 'super']},
   {'name': 'block-size', 'keywords': ['auto']},
   {
+    'name': 'border',
     'longhands': [
       'border-top-color', 'border-top-style', 'border-top-width', 'border-right-color', 'border-right-style',
       'border-right-width', 'border-bottom-color', 'border-bottom-style', 'border-bottom-width', 'border-left-color',
       'border-left-style', 'border-left-width', 'border-image-source', 'border-image-slice', 'border-image-width',
       'border-image-outset', 'border-image-repeat'
-    ],
-    'name': 'border'
+    ]
   },
   {
+    'name': 'border-block',
     'longhands': [
       'border-block-start-color', 'border-block-start-style', 'border-block-start-width', 'border-block-end-color',
       'border-block-end-style', 'border-block-end-width'
-    ],
-    'name': 'border-block'
+    ]
   },
-  {'longhands': ['border-block-start-color', 'border-block-end-color'], 'name': 'border-block-color'},
+  {'name': 'border-block-color', 'longhands': ['border-block-start-color', 'border-block-end-color']},
   {
-    'longhands': ['border-block-end-width', 'border-block-end-style', 'border-block-end-color'],
-    'name': 'border-block-end'
+    'name': 'border-block-end',
+    'longhands': ['border-block-end-width', 'border-block-end-style', 'border-block-end-color']
   },
   {'name': 'border-block-end-color'},
   {'name': 'border-block-end-style'},
   {'name': 'border-block-end-width'},
   {
-    'longhands': ['border-block-start-width', 'border-block-start-style', 'border-block-start-color'],
-    'name': 'border-block-start'
+    'name': 'border-block-start',
+    'longhands': ['border-block-start-width', 'border-block-start-style', 'border-block-start-color']
   },
   {'name': 'border-block-start-color'},
   {'name': 'border-block-start-style'},
   {'name': 'border-block-start-width'},
-  {'longhands': ['border-block-start-style', 'border-block-end-style'], 'name': 'border-block-style'},
-  {'longhands': ['border-block-start-width', 'border-block-end-width'], 'name': 'border-block-width'},
-  {'longhands': ['border-bottom-width', 'border-bottom-style', 'border-bottom-color'], 'name': 'border-bottom'},
+  {'name': 'border-block-style', 'longhands': ['border-block-start-style', 'border-block-end-style']},
+  {'name': 'border-block-width', 'longhands': ['border-block-start-width', 'border-block-end-width']},
+  {'name': 'border-bottom', 'longhands': ['border-bottom-width', 'border-bottom-style', 'border-bottom-color']},
   {'name': 'border-bottom-color', 'keywords': ['currentcolor']},
   {'name': 'border-bottom-left-radius'},
   {'name': 'border-bottom-right-radius'},
@@ -200,16 +200,16 @@ export const generatedProperties = [
   {'name': 'border-bottom-width', 'keywords': ['thin', 'medium', 'thick']},
   {'name': 'border-collapse', 'inherited': true, 'keywords': ['separate', 'collapse']},
   {
-    'longhands': ['border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'],
-    'name': 'border-color'
+    'name': 'border-color',
+    'longhands': ['border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color']
   },
   {'name': 'border-end-end-radius'},
   {'name': 'border-end-start-radius'},
   {
+    'name': 'border-image',
     'longhands': [
       'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'
-    ],
-    'name': 'border-image'
+    ]
   },
   {'name': 'border-image-outset'},
   {'name': 'border-image-repeat', 'keywords': ['stretch', 'repeat', 'round', 'space']},
@@ -217,30 +217,30 @@ export const generatedProperties = [
   {'name': 'border-image-source', 'keywords': ['none']},
   {'name': 'border-image-width', 'keywords': ['auto']},
   {
+    'name': 'border-inline',
     'longhands': [
       'border-inline-start-color', 'border-inline-start-style', 'border-inline-start-width', 'border-inline-end-color',
       'border-inline-end-style', 'border-inline-end-width'
-    ],
-    'name': 'border-inline'
+    ]
   },
-  {'longhands': ['border-inline-start-color', 'border-inline-end-color'], 'name': 'border-inline-color'},
+  {'name': 'border-inline-color', 'longhands': ['border-inline-start-color', 'border-inline-end-color']},
   {
-    'longhands': ['border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'],
-    'name': 'border-inline-end'
+    'name': 'border-inline-end',
+    'longhands': ['border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color']
   },
   {'name': 'border-inline-end-color'},
   {'name': 'border-inline-end-style'},
   {'name': 'border-inline-end-width'},
   {
-    'longhands': ['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color'],
-    'name': 'border-inline-start'
+    'name': 'border-inline-start',
+    'longhands': ['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color']
   },
   {'name': 'border-inline-start-color'},
   {'name': 'border-inline-start-style'},
   {'name': 'border-inline-start-width'},
-  {'longhands': ['border-inline-start-style', 'border-inline-end-style'], 'name': 'border-inline-style'},
-  {'longhands': ['border-inline-start-width', 'border-inline-end-width'], 'name': 'border-inline-width'},
-  {'longhands': ['border-left-width', 'border-left-style', 'border-left-color'], 'name': 'border-left'},
+  {'name': 'border-inline-style', 'longhands': ['border-inline-start-style', 'border-inline-end-style']},
+  {'name': 'border-inline-width', 'longhands': ['border-inline-start-width', 'border-inline-end-width']},
+  {'name': 'border-left', 'longhands': ['border-left-width', 'border-left-style', 'border-left-color']},
   {'name': 'border-left-color', 'keywords': ['currentcolor']},
   {
     'name': 'border-left-style',
@@ -248,12 +248,11 @@ export const generatedProperties = [
   },
   {'name': 'border-left-width', 'keywords': ['thin', 'medium', 'thick']},
   {
-    'longhands': [
-      'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'
-    ],
-    'name': 'border-radius'
+    'name': 'border-radius',
+    'longhands':
+        ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius']
   },
-  {'longhands': ['border-right-width', 'border-right-style', 'border-right-color'], 'name': 'border-right'},
+  {'name': 'border-right', 'longhands': ['border-right-width', 'border-right-style', 'border-right-color']},
   {'name': 'border-right-color', 'keywords': ['currentcolor']},
   {
     'name': 'border-right-style',
@@ -261,18 +260,18 @@ export const generatedProperties = [
   },
   {'name': 'border-right-width', 'keywords': ['thin', 'medium', 'thick']},
   {
-    'longhands': ['-webkit-border-horizontal-spacing', '-webkit-border-vertical-spacing'],
     'name': 'border-spacing',
+    'longhands': ['-webkit-border-horizontal-spacing', '-webkit-border-vertical-spacing'],
     'inherited': true
   },
   {'name': 'border-start-end-radius'},
   {'name': 'border-start-start-radius'},
   {
-    'keywords': ['none'],
+    'name': 'border-style',
     'longhands': ['border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style'],
-    'name': 'border-style'
+    'keywords': ['none']
   },
-  {'longhands': ['border-top-width', 'border-top-style', 'border-top-color'], 'name': 'border-top'},
+  {'name': 'border-top', 'longhands': ['border-top-width', 'border-top-style', 'border-top-color']},
   {'name': 'border-top-color', 'keywords': ['currentcolor']},
   {'name': 'border-top-left-radius'},
   {'name': 'border-top-right-radius'},
@@ -282,8 +281,8 @@ export const generatedProperties = [
   },
   {'name': 'border-top-width', 'keywords': ['thin', 'medium', 'thick']},
   {
-    'longhands': ['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width'],
-    'name': 'border-width'
+    'name': 'border-width',
+    'longhands': ['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width']
   },
   {'name': 'bottom', 'keywords': ['auto']},
   {'name': 'box-shadow', 'keywords': ['none']},
@@ -304,7 +303,7 @@ export const generatedProperties = [
   {'name': 'clip', 'keywords': ['auto']},
   {'name': 'clip-path', 'keywords': ['none']},
   {'name': 'clip-rule', 'inherited': true, 'keywords': ['nonzero', 'evenodd']},
-  {'keywords': ['currentcolor'], 'inherited': true, 'name': 'color'},
+  {'name': 'color', 'inherited': true, 'keywords': ['currentcolor']},
   {'name': 'color-interpolation', 'inherited': true, 'keywords': ['auto', 'srgb', 'linearrgb']},
   {'name': 'color-interpolation-filters', 'inherited': true, 'keywords': ['auto', 'srgb', 'linearrgb']},
   {'name': 'color-rendering', 'inherited': true, 'keywords': ['auto', 'optimizespeed', 'optimizequality']},
@@ -312,7 +311,7 @@ export const generatedProperties = [
   {'name': 'column-count', 'keywords': ['auto']},
   {'name': 'column-fill', 'keywords': ['balance', 'auto']},
   {'name': 'column-gap', 'keywords': ['normal']},
-  {'longhands': ['column-rule-width', 'column-rule-style', 'column-rule-color'], 'name': 'column-rule'},
+  {'name': 'column-rule', 'longhands': ['column-rule-width', 'column-rule-style', 'column-rule-color']},
   {'name': 'column-rule-color', 'keywords': ['currentcolor']},
   {
     'name': 'column-rule-style',
@@ -321,7 +320,7 @@ export const generatedProperties = [
   {'name': 'column-rule-width', 'keywords': ['thin', 'medium', 'thick']},
   {'name': 'column-span', 'keywords': ['none', 'all']},
   {'name': 'column-width', 'keywords': ['auto']},
-  {'longhands': ['column-width', 'column-count'], 'name': 'columns'},
+  {'name': 'columns', 'longhands': ['column-width', 'column-count']},
   {
     'name': 'contain',
     'keywords': ['none', 'strict', 'content', 'size', 'layout', 'style', 'paint', 'inline-size', 'block-size']
@@ -329,9 +328,9 @@ export const generatedProperties = [
   {'name': 'contain-intrinsic-block-size'},
   {'name': 'contain-intrinsic-height', 'keywords': ['auto', 'none']},
   {'name': 'contain-intrinsic-inline-size'},
-  {'longhands': ['contain-intrinsic-width', 'contain-intrinsic-height'], 'name': 'contain-intrinsic-size'},
+  {'name': 'contain-intrinsic-size', 'longhands': ['contain-intrinsic-width', 'contain-intrinsic-height']},
   {'name': 'contain-intrinsic-width', 'keywords': ['auto', 'none']},
-  {'longhands': ['container-name', 'container-type'], 'name': 'container'},
+  {'name': 'container', 'longhands': ['container-name', 'container-type']},
   {'name': 'container-name', 'keywords': ['none']},
   {'name': 'container-type', 'keywords': ['none', 'inline-size', 'size']},
   {'name': 'content'},
@@ -356,6 +355,7 @@ export const generatedProperties = [
   {'name': 'descent-override'},
   {'name': 'direction', 'inherited': true, 'keywords': ['ltr', 'rtl']},
   {
+    'name': 'display',
     'keywords': [
       'inline',
       'block',
@@ -380,8 +380,7 @@ export const generatedProperties = [
       'contents',
       'flow-root',
       'none'
-    ],
-    'name': 'display'
+    ]
   },
   {
     'name': 'dominant-baseline',
@@ -398,10 +397,10 @@ export const generatedProperties = [
   {'name': 'fill-opacity', 'inherited': true},
   {'name': 'fill-rule', 'inherited': true, 'keywords': ['nonzero', 'evenodd']},
   {'name': 'filter', 'keywords': ['none']},
-  {'longhands': ['flex-grow', 'flex-shrink', 'flex-basis'], 'name': 'flex'},
+  {'name': 'flex', 'longhands': ['flex-grow', 'flex-shrink', 'flex-basis']},
   {'name': 'flex-basis', 'keywords': ['auto', 'fit-content', 'min-content', 'max-content', 'content']},
   {'name': 'flex-direction', 'keywords': ['row', 'row-reverse', 'column', 'column-reverse']},
-  {'longhands': ['flex-direction', 'flex-wrap'], 'name': 'flex-flow'},
+  {'name': 'flex-flow', 'longhands': ['flex-direction', 'flex-wrap']},
   {'name': 'flex-grow'},
   {'name': 'flex-shrink'},
   {'name': 'flex-wrap', 'keywords': ['nowrap', 'wrap', 'wrap-reverse']},
@@ -409,11 +408,11 @@ export const generatedProperties = [
   {'name': 'flood-color', 'keywords': ['currentcolor']},
   {'name': 'flood-opacity'},
   {
+    'name': 'font',
     'longhands': [
       'font-style', 'font-variant-ligatures', 'font-variant-caps', 'font-variant-numeric', 'font-variant-east-asian',
       'font-weight', 'font-stretch', 'font-size', 'line-height', 'font-family'
     ],
-    'name': 'font',
     'inherited': true
   },
   {'name': 'font-display'},
@@ -421,7 +420,7 @@ export const generatedProperties = [
   {'name': 'font-feature-settings', 'inherited': true, 'keywords': ['normal']},
   {'name': 'font-kerning', 'inherited': true, 'keywords': ['auto', 'normal', 'none']},
   {'name': 'font-optical-sizing', 'inherited': true, 'keywords': ['auto', 'none']},
-  {'inherited': true, 'keywords': ['normal', 'light', 'dark'], 'name': 'font-palette'},
+  {'name': 'font-palette', 'inherited': true, 'keywords': ['normal', 'light', 'dark']},
   {
     'name': 'font-size',
     'inherited': true,
@@ -441,30 +440,30 @@ export const generatedProperties = [
   },
   {'name': 'font-style', 'inherited': true, 'keywords': ['normal', 'italic', 'oblique']},
   {
-    'longhands': ['font-synthesis-weight', 'font-synthesis-style', 'font-synthesis-small-caps'],
     'name': 'font-synthesis',
+    'longhands': ['font-synthesis-weight', 'font-synthesis-style', 'font-synthesis-small-caps'],
     'inherited': true
   },
   {'name': 'font-synthesis-small-caps', 'inherited': true, 'keywords': ['auto', 'none']},
   {'name': 'font-synthesis-style', 'inherited': true, 'keywords': ['auto', 'none']},
   {'name': 'font-synthesis-weight', 'inherited': true, 'keywords': ['auto', 'none']},
   {
-    'longhands': ['font-variant-ligatures', 'font-variant-caps', 'font-variant-numeric', 'font-variant-east-asian'],
     'name': 'font-variant',
+    'longhands': ['font-variant-ligatures', 'font-variant-caps', 'font-variant-numeric', 'font-variant-east-asian'],
     'inherited': true
   },
   {
+    'name': 'font-variant-caps',
     'inherited': true,
-    'keywords': ['normal', 'small-caps', 'all-small-caps', 'petite-caps', 'all-petite-caps', 'unicase', 'titling-caps'],
-    'name': 'font-variant-caps'
+    'keywords': ['normal', 'small-caps', 'all-small-caps', 'petite-caps', 'all-petite-caps', 'unicase', 'titling-caps']
   },
   {
+    'name': 'font-variant-east-asian',
     'inherited': true,
     'keywords': [
       'normal', 'jis78', 'jis83', 'jis90', 'jis04', 'simplified', 'traditional', 'full-width', 'proportional-width',
       'ruby'
-    ],
-    'name': 'font-variant-east-asian'
+    ]
   },
   {
     'name': 'font-variant-ligatures',
@@ -475,39 +474,39 @@ export const generatedProperties = [
     ]
   },
   {
+    'name': 'font-variant-numeric',
     'inherited': true,
     'keywords': [
       'normal', 'lining-nums', 'oldstyle-nums', 'proportional-nums', 'tabular-nums', 'diagonal-fractions',
       'stacked-fractions', 'ordinal', 'slashed-zero'
-    ],
-    'name': 'font-variant-numeric'
+    ]
   },
   {'name': 'font-variation-settings', 'inherited': true, 'keywords': ['normal']},
   {'name': 'font-weight', 'inherited': true, 'keywords': ['normal', 'bold', 'bolder', 'lighter']},
   {'name': 'forced-color-adjust', 'inherited': true, 'keywords': ['auto', 'none', 'preserve-parent-color']},
-  {'longhands': ['row-gap', 'column-gap'], 'name': 'gap'},
+  {'name': 'gap', 'longhands': ['row-gap', 'column-gap']},
   {
+    'name': 'grid',
     'longhands': [
       'grid-template-rows', 'grid-template-columns', 'grid-template-areas', 'grid-auto-flow', 'grid-auto-rows',
       'grid-auto-columns'
-    ],
-    'name': 'grid'
+    ]
   },
-  {'longhands': ['grid-row-start', 'grid-column-start', 'grid-row-end', 'grid-column-end'], 'name': 'grid-area'},
+  {'name': 'grid-area', 'longhands': ['grid-row-start', 'grid-column-start', 'grid-row-end', 'grid-column-end']},
   {'name': 'grid-auto-columns', 'keywords': ['auto', 'min-content', 'max-content']},
   {'name': 'grid-auto-flow', 'keywords': ['row', 'column']},
   {'name': 'grid-auto-rows', 'keywords': ['auto', 'min-content', 'max-content']},
-  {'longhands': ['grid-column-start', 'grid-column-end'], 'name': 'grid-column'},
+  {'name': 'grid-column', 'longhands': ['grid-column-start', 'grid-column-end']},
   {'name': 'grid-column-end', 'keywords': ['auto']},
-  {'longhands': ['column-gap'], 'name': 'grid-column-gap'},
+  {'name': 'grid-column-gap', 'longhands': ['column-gap']},
   {'name': 'grid-column-start', 'keywords': ['auto']},
-  {'longhands': ['row-gap', 'column-gap'], 'name': 'grid-gap'},
-  {'longhands': ['grid-row-start', 'grid-row-end'], 'name': 'grid-row'},
+  {'name': 'grid-gap', 'longhands': ['row-gap', 'column-gap']},
+  {'name': 'grid-row', 'longhands': ['grid-row-start', 'grid-row-end']},
   {'name': 'grid-row-end', 'keywords': ['auto']},
-  {'longhands': ['row-gap'], 'name': 'grid-row-gap'},
+  {'name': 'grid-row-gap', 'longhands': ['row-gap']},
   {'name': 'grid-row-start', 'keywords': ['auto']},
-  {'longhands': ['grid-template-rows', 'grid-template-columns', 'grid-template-areas'], 'name': 'grid-template'},
-  {'keywords': ['none'], 'name': 'grid-template-areas'},
+  {'name': 'grid-template', 'longhands': ['grid-template-rows', 'grid-template-columns', 'grid-template-areas']},
+  {'name': 'grid-template-areas', 'keywords': ['none']},
   {'name': 'grid-template-columns', 'keywords': ['none']},
   {'name': 'grid-template-rows', 'keywords': ['none']},
   {'name': 'height', 'keywords': ['auto', 'fit-content', 'min-content', 'max-content']},
@@ -521,11 +520,11 @@ export const generatedProperties = [
   {'name': 'inherits'},
   {'name': 'initial-value'},
   {'name': 'inline-size', 'keywords': ['auto']},
-  {'longhands': ['top', 'right', 'bottom', 'left'], 'name': 'inset'},
-  {'longhands': ['inset-block-start', 'inset-block-end'], 'name': 'inset-block'},
+  {'name': 'inset', 'longhands': ['top', 'right', 'bottom', 'left']},
+  {'name': 'inset-block', 'longhands': ['inset-block-start', 'inset-block-end']},
   {'name': 'inset-block-end'},
   {'name': 'inset-block-start'},
-  {'longhands': ['inset-inline-start', 'inset-inline-end'], 'name': 'inset-inline'},
+  {'name': 'inset-inline', 'longhands': ['inset-inline-start', 'inset-inline-end']},
   {'name': 'inset-inline-end'},
   {'name': 'inset-inline-start'},
   {'name': 'isolation', 'keywords': ['auto', 'isolate']},
@@ -533,15 +532,15 @@ export const generatedProperties = [
   {'name': 'justify-items'},
   {'name': 'justify-self'},
   {'name': 'left', 'keywords': ['auto']},
-  {'inherited': true, 'keywords': ['normal'], 'name': 'letter-spacing'},
+  {'name': 'letter-spacing', 'inherited': true, 'keywords': ['normal']},
   {'name': 'lighting-color', 'keywords': ['currentcolor']},
   {'name': 'line-break', 'inherited': true, 'keywords': ['auto', 'loose', 'normal', 'strict', 'anywhere']},
   {'name': 'line-gap-override'},
   {'name': 'line-height', 'inherited': true, 'keywords': ['normal']},
   {'name': 'line-height-step', 'inherited': true},
   {
-    'longhands': ['list-style-position', 'list-style-image', 'list-style-type'],
     'name': 'list-style',
+    'longhands': ['list-style-position', 'list-style-image', 'list-style-type'],
     'inherited': true
   },
   {'name': 'list-style-image', 'inherited': true, 'keywords': ['none']},
@@ -551,18 +550,18 @@ export const generatedProperties = [
     'inherited': true,
     'keywords': ['disc', 'circle', 'square', 'disclosure-open', 'disclosure-closed', 'decimal', 'none']
   },
-  {'longhands': ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'], 'name': 'margin'},
-  {'longhands': ['margin-block-start', 'margin-block-end'], 'name': 'margin-block'},
+  {'name': 'margin', 'longhands': ['margin-top', 'margin-right', 'margin-bottom', 'margin-left']},
+  {'name': 'margin-block', 'longhands': ['margin-block-start', 'margin-block-end']},
   {'name': 'margin-block-end', 'keywords': ['auto']},
   {'name': 'margin-block-start', 'keywords': ['auto']},
   {'name': 'margin-bottom', 'keywords': ['auto']},
-  {'longhands': ['margin-inline-start', 'margin-inline-end'], 'name': 'margin-inline'},
+  {'name': 'margin-inline', 'longhands': ['margin-inline-start', 'margin-inline-end']},
   {'name': 'margin-inline-end', 'keywords': ['auto']},
   {'name': 'margin-inline-start', 'keywords': ['auto']},
   {'name': 'margin-left', 'keywords': ['auto']},
   {'name': 'margin-right', 'keywords': ['auto']},
   {'name': 'margin-top', 'keywords': ['auto']},
-  {'longhands': ['marker-start', 'marker-mid', 'marker-end'], 'name': 'marker', 'inherited': true},
+  {'name': 'marker', 'longhands': ['marker-start', 'marker-mid', 'marker-end'], 'inherited': true},
   {'name': 'marker-end', 'inherited': true, 'keywords': ['none']},
   {'name': 'marker-mid', 'inherited': true, 'keywords': ['none']},
   {'name': 'marker-start', 'inherited': true, 'keywords': ['none']},
@@ -571,9 +570,9 @@ export const generatedProperties = [
   {'name': 'math-depth', 'inherited': true},
   {'name': 'math-shift', 'inherited': true, 'keywords': ['normal', 'compact']},
   {'name': 'math-style', 'inherited': true, 'keywords': ['normal', 'compact']},
-  {'keywords': ['none'], 'name': 'max-block-size'},
+  {'name': 'max-block-size', 'keywords': ['none']},
   {'name': 'max-height', 'keywords': ['none']},
-  {'keywords': ['none'], 'name': 'max-inline-size'},
+  {'name': 'max-inline-size', 'keywords': ['none']},
   {'name': 'max-width', 'keywords': ['none']},
   {'name': 'max-zoom'},
   {'name': 'min-block-size'},
@@ -593,8 +592,8 @@ export const generatedProperties = [
   {'name': 'object-position'},
   {'name': 'object-view-box', 'keywords': ['none']},
   {
-    'longhands': ['offset-position', 'offset-path', 'offset-distance', 'offset-rotate', 'offset-anchor'],
-    'name': 'offset'
+    'name': 'offset',
+    'longhands': ['offset-position', 'offset-path', 'offset-distance', 'offset-rotate', 'offset-anchor']
   },
   {'name': 'offset-anchor', 'keywords': ['auto']},
   {'name': 'offset-distance'},
@@ -606,7 +605,7 @@ export const generatedProperties = [
   {'name': 'orientation'},
   {'name': 'origin-trial-test-property', 'keywords': ['normal', 'none']},
   {'name': 'orphans', 'inherited': true},
-  {'longhands': ['outline-color', 'outline-style', 'outline-width'], 'name': 'outline'},
+  {'name': 'outline', 'longhands': ['outline-color', 'outline-style', 'outline-width']},
   {'name': 'outline-color', 'keywords': ['currentcolor']},
   {'name': 'outline-offset'},
   {
@@ -614,7 +613,7 @@ export const generatedProperties = [
     'keywords': ['none', 'hidden', 'inset', 'groove', 'outset', 'ridge', 'dotted', 'dashed', 'solid', 'double']
   },
   {'name': 'outline-width', 'keywords': ['thin', 'medium', 'thick']},
-  {'longhands': ['overflow-x', 'overflow-y'], 'name': 'overflow'},
+  {'name': 'overflow', 'longhands': ['overflow-x', 'overflow-y']},
   {'name': 'overflow-anchor', 'inherited': false, 'keywords': ['visible', 'none', 'auto']},
   {'name': 'overflow-block'},
   {'name': 'overflow-clip-margin', 'keywords': ['border-box', 'content-box', 'padding-box']},
@@ -623,35 +622,35 @@ export const generatedProperties = [
   {'name': 'overflow-x', 'keywords': ['visible', 'hidden', 'scroll', 'auto', 'overlay', 'clip']},
   {'name': 'overflow-y', 'keywords': ['visible', 'hidden', 'scroll', 'auto', 'overlay', 'clip']},
   {'name': 'override-colors'},
-  {'longhands': ['overscroll-behavior-x', 'overscroll-behavior-y'], 'name': 'overscroll-behavior'},
+  {'name': 'overscroll-behavior', 'longhands': ['overscroll-behavior-x', 'overscroll-behavior-y']},
   {'name': 'overscroll-behavior-block'},
   {'name': 'overscroll-behavior-inline'},
   {'name': 'overscroll-behavior-x', 'keywords': ['auto', 'contain', 'none']},
   {'name': 'overscroll-behavior-y', 'keywords': ['auto', 'contain', 'none']},
   {'name': 'pad'},
-  {'longhands': ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'], 'name': 'padding'},
-  {'longhands': ['padding-block-start', 'padding-block-end'], 'name': 'padding-block'},
+  {'name': 'padding', 'longhands': ['padding-top', 'padding-right', 'padding-bottom', 'padding-left']},
+  {'name': 'padding-block', 'longhands': ['padding-block-start', 'padding-block-end']},
   {'name': 'padding-block-end'},
   {'name': 'padding-block-start'},
   {'name': 'padding-bottom'},
-  {'longhands': ['padding-inline-start', 'padding-inline-end'], 'name': 'padding-inline'},
+  {'name': 'padding-inline', 'longhands': ['padding-inline-start', 'padding-inline-end']},
   {'name': 'padding-inline-end'},
   {'name': 'padding-inline-start'},
   {'name': 'padding-left'},
   {'name': 'padding-right'},
   {'name': 'padding-top'},
   {'name': 'page', 'keywords': ['auto']},
-  {'longhands': ['break-after'], 'name': 'page-break-after'},
-  {'longhands': ['break-before'], 'name': 'page-break-before'},
-  {'longhands': ['break-inside'], 'name': 'page-break-inside'},
+  {'name': 'page-break-after', 'longhands': ['break-after']},
+  {'name': 'page-break-before', 'longhands': ['break-before']},
+  {'name': 'page-break-inside', 'longhands': ['break-inside']},
   {'name': 'page-orientation'},
   {'name': 'page-transition-tag', 'keywords': ['none']},
   {'name': 'paint-order', 'inherited': true, 'keywords': ['normal', 'fill', 'stroke', 'markers']},
   {'name': 'perspective', 'keywords': ['none']},
   {'name': 'perspective-origin'},
-  {'longhands': ['align-content', 'justify-content'], 'name': 'place-content'},
-  {'longhands': ['align-items', 'justify-items'], 'name': 'place-items'},
-  {'longhands': ['align-self', 'justify-self'], 'name': 'place-self'},
+  {'name': 'place-content', 'longhands': ['align-content', 'justify-content']},
+  {'name': 'place-items', 'longhands': ['align-items', 'justify-items']},
+  {'name': 'place-self', 'longhands': ['align-self', 'justify-self']},
   {
     'name': 'pointer-events',
     'inherited': true,
@@ -670,35 +669,35 @@ export const generatedProperties = [
   {'name': 'right', 'keywords': ['auto']},
   {'name': 'rotate'},
   {'name': 'row-gap', 'keywords': ['normal']},
-  {'inherited': true, 'name': 'ruby-position'},
+  {'name': 'ruby-position', 'inherited': true},
   {'name': 'rx', 'keywords': ['auto']},
   {'name': 'ry', 'keywords': ['auto']},
   {'name': 'scale'},
   {'name': 'scroll-behavior', 'keywords': ['auto', 'smooth']},
   {'name': 'scroll-customization'},
   {
-    'longhands': ['scroll-margin-top', 'scroll-margin-right', 'scroll-margin-bottom', 'scroll-margin-left'],
-    'name': 'scroll-margin'
+    'name': 'scroll-margin',
+    'longhands': ['scroll-margin-top', 'scroll-margin-right', 'scroll-margin-bottom', 'scroll-margin-left']
   },
-  {'longhands': ['scroll-margin-block-start', 'scroll-margin-block-end'], 'name': 'scroll-margin-block'},
+  {'name': 'scroll-margin-block', 'longhands': ['scroll-margin-block-start', 'scroll-margin-block-end']},
   {'name': 'scroll-margin-block-end'},
   {'name': 'scroll-margin-block-start'},
   {'name': 'scroll-margin-bottom'},
-  {'longhands': ['scroll-margin-inline-start', 'scroll-margin-inline-end'], 'name': 'scroll-margin-inline'},
+  {'name': 'scroll-margin-inline', 'longhands': ['scroll-margin-inline-start', 'scroll-margin-inline-end']},
   {'name': 'scroll-margin-inline-end'},
   {'name': 'scroll-margin-inline-start'},
   {'name': 'scroll-margin-left'},
   {'name': 'scroll-margin-right'},
   {'name': 'scroll-margin-top'},
   {
-    'longhands': ['scroll-padding-top', 'scroll-padding-right', 'scroll-padding-bottom', 'scroll-padding-left'],
-    'name': 'scroll-padding'
+    'name': 'scroll-padding',
+    'longhands': ['scroll-padding-top', 'scroll-padding-right', 'scroll-padding-bottom', 'scroll-padding-left']
   },
-  {'longhands': ['scroll-padding-block-start', 'scroll-padding-block-end'], 'name': 'scroll-padding-block'},
+  {'name': 'scroll-padding-block', 'longhands': ['scroll-padding-block-start', 'scroll-padding-block-end']},
   {'name': 'scroll-padding-block-end', 'keywords': ['auto']},
   {'name': 'scroll-padding-block-start', 'keywords': ['auto']},
   {'name': 'scroll-padding-bottom', 'keywords': ['auto']},
-  {'longhands': ['scroll-padding-inline-start', 'scroll-padding-inline-end'], 'name': 'scroll-padding-inline'},
+  {'name': 'scroll-padding-inline', 'longhands': ['scroll-padding-inline-start', 'scroll-padding-inline-end']},
   {'name': 'scroll-padding-inline-end', 'keywords': ['auto']},
   {'name': 'scroll-padding-inline-start', 'keywords': ['auto']},
   {'name': 'scroll-padding-left', 'keywords': ['auto']},
@@ -758,9 +757,8 @@ export const generatedProperties = [
   {'name': 'text-anchor', 'inherited': true, 'keywords': ['start', 'middle', 'end']},
   {'name': 'text-combine-upright', 'inherited': true, 'keywords': ['none', 'all']},
   {
-    'longhands':
-        ['text-decoration-line', 'text-decoration-thickness', 'text-decoration-style', 'text-decoration-color'],
-    'name': 'text-decoration'
+    'name': 'text-decoration',
+    'longhands': ['text-decoration-line', 'text-decoration-thickness', 'text-decoration-style', 'text-decoration-color']
   },
   {'name': 'text-decoration-color', 'keywords': ['currentcolor']},
   {
@@ -770,7 +768,7 @@ export const generatedProperties = [
   {'name': 'text-decoration-skip-ink', 'inherited': true, 'keywords': ['none', 'auto']},
   {'name': 'text-decoration-style', 'keywords': ['solid', 'double', 'dotted', 'dashed', 'wavy']},
   {'name': 'text-decoration-thickness', 'inherited': true, 'keywords': ['auto', 'from-font']},
-  {'longhands': ['text-emphasis-style', 'text-emphasis-color'], 'name': 'text-emphasis', 'inherited': true},
+  {'name': 'text-emphasis', 'longhands': ['text-emphasis-style', 'text-emphasis-color'], 'inherited': true},
   {'name': 'text-emphasis-color', 'inherited': true, 'keywords': ['currentcolor']},
   {'name': 'text-emphasis-position', 'inherited': true},
   {'name': 'text-emphasis-style', 'inherited': true},
@@ -792,7 +790,7 @@ export const generatedProperties = [
   },
   {'name': 'text-underline-offset', 'inherited': true, 'keywords': ['auto']},
   {'name': 'text-underline-position', 'inherited': true, 'keywords': ['auto', 'from-font', 'under', 'left', 'right']},
-  {'longhands': ['toggle-root', 'toggle-trigger'], 'name': 'toggle'},
+  {'name': 'toggle', 'longhands': ['toggle-root', 'toggle-trigger']},
   {'name': 'toggle-group', 'keywords': ['none']},
   {'name': 'toggle-root', 'keywords': ['none']},
   {'name': 'toggle-trigger', 'keywords': ['none']},
@@ -807,8 +805,8 @@ export const generatedProperties = [
   {'name': 'transform-origin'},
   {'name': 'transform-style', 'keywords': ['flat', 'preserve-3d']},
   {
-    'longhands': ['transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay'],
-    'name': 'transition'
+    'name': 'transition',
+    'longhands': ['transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay']
   },
   {'name': 'transition-delay'},
   {'name': 'transition-duration'},
@@ -839,9 +837,9 @@ export const generatedProperties = [
   },
   {'name': 'widows', 'inherited': true},
   {'name': 'width', 'keywords': ['auto', 'fit-content', 'min-content', 'max-content']},
-  {'keywords': ['auto'], 'name': 'will-change'},
+  {'name': 'will-change', 'keywords': ['auto']},
   {'name': 'word-break', 'inherited': true, 'keywords': ['normal', 'break-all', 'keep-all', 'break-word']},
-  {'inherited': true, 'keywords': ['normal'], 'name': 'word-spacing'},
+  {'name': 'word-spacing', 'inherited': true, 'keywords': ['normal']},
   {'name': 'writing-mode', 'inherited': true, 'keywords': ['horizontal-tb', 'vertical-rl', 'vertical-lr']},
   {'name': 'x'},
   {'name': 'y'},

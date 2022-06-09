@@ -3,522 +3,522 @@
 // found in the LICENSE file.
 
 export const config = {
+  'metadata': {
+    'namespace': 'HTML',
+    'namespacePrefix': 'xhtml',
+    'namespaceURI': 'http://www.w3.org/1999/xhtml',
+    'attrsNullNamespace': true,
+    'export': 'CORE_EXPORT'
+  },
   'attributes': [
-    {'type': 'IDREF', 'name': 'aria-activedescendant'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-atomic'},
-    {'default': 'none', 'enum': ['inline', 'list', 'both', 'none'], 'type': 'token', 'name': 'aria-autocomplete'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-busy'},
-    {'default': 'undefined', 'enum': ['true', 'false', 'mixed', 'undefined'], 'type': 'token', 'name': 'aria-checked'},
-    {'type': 'integer', 'name': 'aria-colcount'},
-    {'type': 'integer', 'name': 'aria-colindex'},
-    {'type': 'integer', 'name': 'aria-colspan'},
-    {'type': 'IDREF_list', 'name': 'aria-controls'},
+    {'name': 'aria-activedescendant', 'type': 'IDREF'},
+    {'name': 'aria-atomic', 'default': 'false', 'type': 'boolean'},
+    {'name': 'aria-autocomplete', 'default': 'none', 'enum': ['inline', 'list', 'both', 'none'], 'type': 'token'},
+    {'name': 'aria-busy', 'default': 'false', 'type': 'boolean'},
+    {'name': 'aria-checked', 'default': 'undefined', 'enum': ['true', 'false', 'mixed', 'undefined'], 'type': 'token'},
+    {'name': 'aria-colcount', 'type': 'integer'},
+    {'name': 'aria-colindex', 'type': 'integer'},
+    {'name': 'aria-colspan', 'type': 'integer'},
+    {'name': 'aria-controls', 'type': 'IDREF_list'},
     {
+      'name': 'aria-current',
       'default': 'false',
       'enum': ['page', 'step', 'location', 'date', 'time', 'true', 'false'],
-      'type': 'token',
-      'name': 'aria-current'
+      'type': 'token'
     },
-    {'type': 'IDREF_list', 'name': 'aria-describedby'},
-    {'type': 'string', 'name': 'aria-description'},
-    {'type': 'IDREF', 'name': 'aria-details'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-disabled'},
+    {'name': 'aria-describedby', 'type': 'IDREF_list'},
+    {'name': 'aria-description', 'type': 'string'},
+    {'name': 'aria-details', 'type': 'IDREF'},
+    {'name': 'aria-disabled', 'default': 'false', 'type': 'boolean'},
     {
+      'name': 'aria-dropeffect',
       'default': 'none',
       'enum': ['copy', 'move', 'link', 'execute', 'popup', 'none'],
-      'type': 'token_list',
-      'name': 'aria-dropeffect'
+      'type': 'token_list'
     },
-    {'type': 'IDREF', 'name': 'aria-errormessage'},
-    {'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token', 'name': 'aria-expanded'},
-    {'type': 'IDREF_list', 'name': 'aria-flowto'},
-    {'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token', 'name': 'aria-grabbed'},
+    {'name': 'aria-errormessage', 'type': 'IDREF'},
+    {'name': 'aria-expanded', 'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token'},
+    {'name': 'aria-flowto', 'type': 'IDREF_list'},
+    {'name': 'aria-grabbed', 'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token'},
     {
+      'name': 'aria-haspopup',
       'default': 'false',
       'enum': ['false', 'true', 'menu', 'listbox', 'tree', 'grid', 'dialog'],
-      'type': 'token',
-      'name': 'aria-haspopup'
+      'type': 'token'
     },
-    {'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token', 'name': 'aria-hidden'},
-    {'default': 'false', 'enum': ['grammar', 'false', 'spelling', 'true'], 'type': 'token', 'name': 'aria-invalid'},
-    {'type': 'string', 'name': 'aria-keyshortcuts'},
-    {'type': 'string', 'name': 'aria-label'},
-    {'type': 'IDREF_list', 'name': 'aria-labelledby'},
-    {'type': 'IDREF_list', 'name': 'aria-labeledby'},
-    {'type': 'integer', 'name': 'aria-level'},
-    {'default': 'off', 'enum': ['off', 'polite', 'assertive'], 'type': 'token', 'name': 'aria-live'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-modal'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-multiline'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-multiselectable'},
+    {'name': 'aria-hidden', 'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token'},
+    {'name': 'aria-invalid', 'default': 'false', 'enum': ['grammar', 'false', 'spelling', 'true'], 'type': 'token'},
+    {'name': 'aria-keyshortcuts', 'type': 'string'},
+    {'name': 'aria-label', 'type': 'string'},
+    {'name': 'aria-labelledby', 'type': 'IDREF_list'},
+    {'name': 'aria-labeledby', 'type': 'IDREF_list'},
+    {'name': 'aria-level', 'type': 'integer'},
+    {'name': 'aria-live', 'default': 'off', 'enum': ['off', 'polite', 'assertive'], 'type': 'token'},
+    {'name': 'aria-modal', 'default': 'false', 'type': 'boolean'},
+    {'name': 'aria-multiline', 'default': 'false', 'type': 'boolean'},
+    {'name': 'aria-multiselectable', 'default': 'false', 'type': 'boolean'},
     {
+      'name': 'aria-orientation',
       'default': 'undefined',
       'enum': ['horizontal', 'undefined', 'vertical'],
-      'type': 'token',
-      'name': 'aria-orientation'
+      'type': 'token'
     },
-    {'type': 'IDREF_list', 'name': 'aria-owns'},
-    {'type': 'string', 'name': 'aria-placeholder'},
-    {'type': 'integer', 'name': 'aria-posinset'},
-    {'default': 'undefined', 'enum': ['true', 'false', 'mixed', 'undefined'], 'type': 'token', 'name': 'aria-pressed'},
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-readonly'},
+    {'name': 'aria-owns', 'type': 'IDREF_list'},
+    {'name': 'aria-placeholder', 'type': 'string'},
+    {'name': 'aria-posinset', 'type': 'integer'},
+    {'name': 'aria-pressed', 'default': 'undefined', 'enum': ['true', 'false', 'mixed', 'undefined'], 'type': 'token'},
+    {'name': 'aria-readonly', 'default': 'false', 'type': 'boolean'},
     {
+      'name': 'aria-relevant',
       'default': 'additions text',
       'enum': ['additions', 'removals', 'text', 'all'],
-      'type': 'token_list',
-      'name': 'aria-relevant'
+      'type': 'token_list'
     },
-    {'default': 'false', 'type': 'boolean', 'name': 'aria-required'},
-    {'type': 'string', 'name': 'aria-roledescription'},
-    {'type': 'integer', 'name': 'aria-rowcount'},
-    {'type': 'integer', 'name': 'aria-rowindex'},
-    {'type': 'integer', 'name': 'aria-rowspan'},
-    {'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token', 'name': 'aria-selected'},
-    {'type': 'integer', 'name': 'aria-setsize'},
-    {'default': 'none', 'enum': ['ascending', 'descending', 'none', 'other'], 'type': 'token', 'name': 'aria-sort'},
-    {'runtimeEnabled': 'AriaTouchPassthrough', 'type': 'boolean', 'name': 'aria-touchpassthrough'},
-    {'type': 'decimal', 'name': 'aria-valuemax'},
-    {'type': 'decimal', 'name': 'aria-valuemin'},
-    {'type': 'decimal', 'name': 'aria-valuenow'},
-    {'type': 'string', 'name': 'aria-valuetext'},
-    {'type': 'string', 'name': 'aria-virtualcontent'}
+    {'name': 'aria-required', 'default': 'false', 'type': 'boolean'},
+    {'name': 'aria-roledescription', 'type': 'string'},
+    {'name': 'aria-rowcount', 'type': 'integer'},
+    {'name': 'aria-rowindex', 'type': 'integer'},
+    {'name': 'aria-rowspan', 'type': 'integer'},
+    {'name': 'aria-selected', 'default': 'undefined', 'enum': ['true', 'false', 'undefined'], 'type': 'token'},
+    {'name': 'aria-setsize', 'type': 'integer'},
+    {'name': 'aria-sort', 'default': 'none', 'enum': ['ascending', 'descending', 'none', 'other'], 'type': 'token'},
+    {'name': 'aria-touchpassthrough', 'type': 'boolean', 'runtimeEnabled': 'AriaTouchPassthrough'},
+    {'name': 'aria-valuemax', 'type': 'decimal'},
+    {'name': 'aria-valuemin', 'type': 'decimal'},
+    {'name': 'aria-valuenow', 'type': 'decimal'},
+    {'name': 'aria-valuetext', 'type': 'string'},
+    {'name': 'aria-virtualcontent', 'type': 'string'}
   ],
   'roles': [
     {
-      'implicitValues': {'aria-atomic': 'true', 'aria-live': 'assertive'},
-      'superclasses': ['section'],
       'name': 'alert',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['section'],
+      'implicitValues': {'aria-live': 'assertive', 'aria-atomic': 'true'}
     },
-    {'superclasses': ['alert', 'dialog'], 'name': 'alertdialog', 'nameRequired': true, 'nameFrom': ['author']},
-    {'superclasses': ['structure'], 'name': 'application', 'nameRequired': true, 'nameFrom': ['author']},
+    {'name': 'alertdialog', 'nameFrom': ['author'], 'superclasses': ['alert', 'dialog'], 'nameRequired': true},
+    {'name': 'application', 'nameFrom': ['author'], 'superclasses': ['structure'], 'nameRequired': true},
     {
-      'supportedAttributes': ['aria-posinset', 'aria-setsize'],
-      'superclasses': ['document'],
       'name': 'article',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['document'],
+      'supportedAttributes': ['aria-posinset', 'aria-setsize']
     },
-    {'superclasses': ['landmark'], 'name': 'banner', 'nameFrom': ['author']},
+    {'name': 'banner', 'nameFrom': ['author'], 'superclasses': ['landmark']},
     {
       'name': 'button',
-      'nameRequired': true,
       'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-expanded', 'aria-pressed'],
       'superclasses': ['command'],
+      'supportedAttributes': ['aria-expanded', 'aria-pressed'],
+      'nameRequired': true,
       'childrenPresentational': true
     },
     {
-      'scope': 'row',
-      'supportedAttributes': ['aria-colindex', 'aria-colspan', 'aria-rowindex', 'aria-rowspan'],
-      'superclasses': ['section'],
       'name': 'cell',
-      'namefrom': ['contents', 'author']
+      'namefrom': ['contents', 'author'],
+      'scope': 'row',
+      'superclasses': ['section'],
+      'supportedAttributes': ['aria-colindex', 'aria-colspan', 'aria-rowindex', 'aria-rowspan']
     },
     {
       'name': 'checkbox',
-      'nameRequired': true,
-      'implicitValues': {'aria-checked': false},
-      'requiredAttributes': ['aria-checked'],
       'nameFrom': ['contents', 'author'],
+      'requiredAttributes': ['aria-checked'],
+      'superclasses': ['input'],
       'supportedAttributes': ['aria-readonly'],
-      'superclasses': ['input']
+      'nameRequired': true,
+      'implicitValues': {'aria-checked': false}
     },
     {
       'name': 'columnheader',
-      'nameRequired': true,
       'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-sort'],
+      'scope': ['row'],
       'superclasses': ['gridcell', 'sectionhead', 'widget'],
-      'scope': ['row']
+      'supportedAttributes': ['aria-sort'],
+      'nameRequired': true
     },
     {
       'name': 'combobox',
-      'nameRequired': true,
-      'implicitValues': {'aria-haspopup': 'listbox', 'aria-expanded': 'false'},
-      'requiredAttributes': ['aria-controls', 'aria-expanded'],
       'mustContain': ['textbox'],
       'nameFrom': ['author'],
+      'requiredAttributes': ['aria-controls', 'aria-expanded'],
+      'superclasses': ['select'],
       'supportedAttributes': ['aria-autocomplete', 'aria-readonly', 'aria-required'],
-      'superclasses': ['select']
+      'nameRequired': true,
+      'implicitValues': {'aria-expanded': 'false', 'aria-haspopup': 'listbox'}
     },
-    {'abstract': true, 'superclasses': ['widget'], 'name': 'command', 'nameFrom': ['author']},
-    {'superclasses': ['landmark'], 'name': 'complementary', 'nameFrom': ['author']},
+    {'name': 'command', 'abstract': true, 'nameFrom': ['author'], 'superclasses': ['widget']},
+    {'name': 'complementary', 'nameFrom': ['author'], 'superclasses': ['landmark']},
     {
-      'supportedAttributes': ['aria-activedescendant'],
-      'abstract': true,
-      'superclasses': ['widget'],
       'name': 'composite',
-      'nameFrom': ['author']
+      'abstract': true,
+      'nameFrom': ['author'],
+      'superclasses': ['widget'],
+      'supportedAttributes': ['aria-activedescendant']
     },
-    {'superclasses': ['landmark'], 'name': 'contentinfo', 'nameFrom': ['author']},
-    {'superclasses': ['section'], 'name': 'definition', 'nameFrom': ['author']},
-    {'superclasses': ['window'], 'name': 'dialog', 'nameRequired': true, 'nameFrom': ['author']},
-    {'superclasses': ['list'], 'name': 'directory', 'nameFrom': ['author']},
+    {'name': 'contentinfo', 'nameFrom': ['author'], 'superclasses': ['landmark']},
+    {'name': 'definition', 'nameFrom': ['author'], 'superclasses': ['section']},
+    {'name': 'dialog', 'nameFrom': ['author'], 'superclasses': ['window'], 'nameRequired': true},
+    {'name': 'directory', 'nameFrom': ['author'], 'superclasses': ['list']},
     {
-      'supportedAttributes': ['aria-expanded'],
-      'superclasses': ['structure'],
       'name': 'document',
-      'nameRequired': false,
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['structure'],
+      'supportedAttributes': ['aria-expanded'],
+      'nameRequired': false
     },
     {
-      'nameRequired': false,
-      'superclasses': ['list'],
       'name': 'feed',
+      'nameFrom': ['author'],
+      'superclasses': ['list'],
       'mustContain': ['article'],
-      'nameFrom': ['author']
+      'nameRequired': false
     },
-    {'superclasses': ['section'], 'name': 'figure', 'nameRequired': false, 'namefrom': ['author']},
-    {'superclasses': ['landmark'], 'name': 'form', 'nameFrom': ['author']},
+    {'name': 'figure', 'namefrom': ['author'], 'superclasses': ['section'], 'nameRequired': false},
+    {'name': 'form', 'nameFrom': ['author'], 'superclasses': ['landmark']},
     {
       'name': 'grid',
-      'nameRequired': true,
       'nameFrom': ['author'],
+      'superclasses': ['composite', 'table'],
       'mustContain': ['row'],
       'supportedAttributes': ['aria-level', 'aria-multiselectable', 'aria-readonly'],
-      'superclasses': ['composite', 'table']
+      'nameRequired': true
     },
     {
       'name': 'gridcell',
-      'nameRequired': true,
       'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-readonly', 'aria-required', 'aria-selected'],
+      'scope': ['row'],
       'superclasses': ['cell', 'widget'],
-      'scope': ['row']
+      'supportedAttributes': ['aria-readonly', 'aria-required', 'aria-selected'],
+      'nameRequired': true
     },
     {
-      'supportedAttributes': ['aria-activedescendant'],
-      'superclasses': ['section'],
       'name': 'group',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['section'],
+      'supportedAttributes': ['aria-activedescendant']
     },
     {
       'name': 'heading',
-      'nameRequired': true,
-      'implicitValues': {'aria-level': '2'},
       'namefrom': ['contents', 'author'],
+      'superclasses': ['sectionhead'],
       'supportedAttributes': ['aria-level'],
-      'superclasses': ['sectionhead']
+      'nameRequired': true,
+      'implicitValues': {'aria-level': '2'}
     },
     {
-      'childrenPresentational': true,
-      'superclasses': ['section'],
       'name': 'img',
-      'nameRequired': true,
-      'nameFrom': ['author']
-    },
-    {'abstract': true, 'superclasses': ['widget'], 'name': 'input', 'nameFrom': ['author']},
-    {'abstract': true, 'superclasses': ['section'], 'name': 'landmark', 'nameRequired': false, 'nameFrom': ['author']},
-    {
-      'supportedAttributes': ['aria-expanded'],
-      'superclasses': ['command'],
-      'name': 'link',
-      'nameRequired': true,
-      'nameFrom': ['contents', 'author']
-    },
-    {
-      'implicitValues': {'aria-orientation': 'vertical'},
+      'nameFrom': ['author'],
       'superclasses': ['section'],
+      'nameRequired': true,
+      'childrenPresentational': true
+    },
+    {'name': 'input', 'abstract': true, 'nameFrom': ['author'], 'superclasses': ['widget']},
+    {'name': 'landmark', 'abstract': true, 'nameFrom': ['author'], 'superclasses': ['section'], 'nameRequired': false},
+    {
+      'name': 'link',
+      'nameFrom': ['contents', 'author'],
+      'superclasses': ['command'],
+      'supportedAttributes': ['aria-expanded'],
+      'nameRequired': true
+    },
+    {
       'name': 'list',
       'mustContain': ['listitem'],
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['section'],
+      'implicitValues': {'aria-orientation': 'vertical'}
     },
     {
       'name': 'listbox',
-      'nameRequired': true,
-      'implicitValues': {'aria-orientation': 'vertical'},
       'nameFrom': ['author'],
+      'superclasses': ['select'],
       'mustContain': ['option'],
       'supportedAttributes': ['aria-multiselectable', 'aria-readonly', 'aria-required'],
-      'superclasses': ['select']
+      'nameRequired': true,
+      'implicitValues': {'aria-orientation': 'vertical'}
     },
     {
-      'scope': ['group', 'list'],
-      'supportedAttributes': ['aria-level', 'aria-posinset', 'aria-setsize'],
-      'superclasses': ['section'],
       'name': 'listitem',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['section'],
+      'scope': ['group', 'list'],
+      'supportedAttributes': ['aria-level', 'aria-posinset', 'aria-setsize']
     },
     {
-      'implicitValues': {'aria-live': 'polite'},
-      'superclasses': ['section'],
       'name': 'log',
-      'nameRequired': true,
-      'nameFrom': ['author']
-    },
-    {'superclasses': ['landmark'], 'name': 'main', 'nameFrom': ['author']},
-    {'superclasses': ['section'], 'name': 'marquee', 'nameRequired': true, 'nameFrom': ['author']},
-    {
-      'childrenPresentational': true,
+      'nameFrom': ['author'],
       'superclasses': ['section'],
+      'nameRequired': true,
+      'implicitValues': {'aria-live': 'polite'}
+    },
+    {'name': 'main', 'nameFrom': ['author'], 'superclasses': ['landmark']},
+    {'name': 'marquee', 'nameFrom': ['author'], 'superclasses': ['section'], 'nameRequired': true},
+    {
       'name': 'math',
+      'nameFrom': ['author'],
+      'superclasses': ['section'],
       'nameRequired': true,
-      'nameFrom': ['author']
-    },
-    {
-      'implicitValues': {'aria-orientation': 'vertical'},
-      'superclasses': ['select'],
-      'name': 'menu',
-      'mustContain': ['group', 'menuitemradio', 'menuitem', 'menuitemcheckbox', 'menuitemradio'],
-      'nameFrom': ['author']
-    },
-    {
-      'implicitValues': {'aria-orientation': 'horizontal'},
-      'superclasses': ['menu'],
-      'name': 'menubar',
-      'mustContain': ['menuitem', 'menuitemradio', 'menuitemcheckbox'],
-      'nameFrom': ['author']
-    },
-    {
-      'scope': ['group', 'menu', 'menubar'],
-      'superclasses': ['command'],
-      'name': 'menuitem',
-      'nameRequired': true,
-      'nameFrom': ['contents', 'author']
-    },
-    {
-      'name': 'menuitemcheckbox',
-      'nameRequired': true,
-      'implicitValues': {'aria-checked': false},
-      'nameFrom': ['contents', 'author'],
-      'superclasses': ['checkbox', 'menuitem'],
-      'childrenPresentational': true,
-      'scope': ['menu', 'menubar']
-    },
-    {
-      'name': 'menuitemradio',
-      'nameRequired': true,
-      'implicitValues': {'aria-checked': false},
-      'nameFrom': ['contents', 'author'],
-      'superclasses': ['menuitemcheckbox', 'radio'],
-      'childrenPresentational': true,
-      'scope': ['menu', 'menubar', 'group']
-    },
-    {'superclasses': ['landmark'], 'name': 'navigation', 'nameFrom': ['author']},
-    {'name': 'none', 'superclasses': ['structure']},
-    {'superclasses': ['section'], 'name': 'note', 'nameFrom': ['author']},
-    {
-      'name': 'option',
-      'nameRequired': true,
-      'implicitValues': {'aria-selected': 'false'},
-      'requiredAttributes': ['aria-selected'],
-      'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-checked', 'aria-posinset', 'aria-setsize'],
-      'superclasses': ['input'],
-      'childrenPresentational': true,
-      'scope': ['listbox']
-    },
-    {'name': 'presentation', 'superclasses': ['structure']},
-    {
-      'childrenPresentational': true,
-      'superclasses': ['range'],
-      'name': 'progressbar',
-      'nameRequired': true,
-      'nameFrom': ['author']
-    },
-    {
-      'name': 'radio',
-      'nameRequired': true,
-      'implicitValues': {'aria-checked': 'false'},
-      'requiredAttributes': ['aria-checked'],
-      'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-posinset', 'aria-setsize'],
-      'superclasses': ['input'],
       'childrenPresentational': true
     },
     {
-      'name': 'radiogroup',
-      'nameRequired': true,
+      'name': 'menu',
+      'mustContain': ['group', 'menuitemradio', 'menuitem', 'menuitemcheckbox', 'menuitemradio'],
       'nameFrom': ['author'],
+      'superclasses': ['select'],
+      'implicitValues': {'aria-orientation': 'vertical'}
+    },
+    {
+      'name': 'menubar',
+      'nameFrom': ['author'],
+      'superclasses': ['menu'],
+      'mustContain': ['menuitem', 'menuitemradio', 'menuitemcheckbox'],
+      'implicitValues': {'aria-orientation': 'horizontal'}
+    },
+    {
+      'name': 'menuitem',
+      'nameFrom': ['contents', 'author'],
+      'scope': ['group', 'menu', 'menubar'],
+      'superclasses': ['command'],
+      'nameRequired': true
+    },
+    {
+      'name': 'menuitemcheckbox',
+      'nameFrom': ['contents', 'author'],
+      'scope': ['menu', 'menubar'],
+      'superclasses': ['checkbox', 'menuitem'],
+      'nameRequired': true,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-checked': false}
+    },
+    {
+      'name': 'menuitemradio',
+      'nameFrom': ['contents', 'author'],
+      'scope': ['menu', 'menubar', 'group'],
+      'superclasses': ['menuitemcheckbox', 'radio'],
+      'nameRequired': true,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-checked': false}
+    },
+    {'name': 'navigation', 'nameFrom': ['author'], 'superclasses': ['landmark']},
+    {'name': 'none', 'superclasses': ['structure']},
+    {'name': 'note', 'nameFrom': ['author'], 'superclasses': ['section']},
+    {
+      'name': 'option',
+      'nameFrom': ['contents', 'author'],
+      'scope': ['listbox'],
+      'superclasses': ['input'],
+      'requiredAttributes': ['aria-selected'],
+      'supportedAttributes': ['aria-checked', 'aria-posinset', 'aria-setsize'],
+      'nameRequired': true,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-selected': 'false'}
+    },
+    {'name': 'presentation', 'superclasses': ['structure']},
+    {
+      'name': 'progressbar',
+      'nameFrom': ['author'],
+      'superclasses': ['range'],
+      'nameRequired': true,
+      'childrenPresentational': true
+    },
+    {
+      'name': 'radio',
+      'nameFrom': ['contents', 'author'],
+      'superclasses': ['input'],
+      'requiredAttributes': ['aria-checked'],
+      'supportedAttributes': ['aria-posinset', 'aria-setsize'],
+      'nameRequired': true,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-checked': 'false'}
+    },
+    {
+      'name': 'radiogroup',
+      'nameFrom': ['author'],
+      'superclasses': ['select'],
       'mustContain': ['radio'],
       'supportedAttributes': ['aria-readonly', 'aria-required'],
-      'superclasses': ['select']
+      'nameRequired': true
     },
     {
-      'supportedAttributes': ['aria-valuemax', 'aria-valuemin', 'aria-valuenow', 'aria-valuetext'],
-      'abstract': true,
-      'superclasses': ['widget'],
       'name': 'range',
-      'nameFrom': ['author']
+      'abstract': true,
+      'nameFrom': ['author'],
+      'superclasses': ['widget'],
+      'supportedAttributes': ['aria-valuemax', 'aria-valuemin', 'aria-valuenow', 'aria-valuetext']
     },
-    {'superclasses': ['landmark'], 'name': 'region', 'nameRequired': true, 'nameFrom': ['author']},
+    {'name': 'region', 'nameFrom': ['author'], 'superclasses': ['landmark'], 'nameRequired': true},
     {
+      'name': 'roletype',
+      'abstract': true,
       'supportedAttributes': [
         'aria-atomic',   'aria-busy',       'aria-controls',       'aria-current', 'aria-describedby', 'aria-details',
         'aria-disabled', 'aria-dropeffect', 'aria-errormessage',   'aria-flowto',  'aria-grabbed',     'aria-haspopup',
         'aria-hidden',   'aria-invalid',    'aria-keyshortcuts',   'aria-label',   'aria-labelledby',  'aria-live',
         'aria-owns',     'aria-relevant',   'aria-roledescription'
-      ],
-      'abstract': true,
-      'name': 'roletype'
+      ]
     },
     {
       'name': 'row',
       'nameFrom': ['contents', 'author'],
-      'mustContain': ['cell', 'columnheader', 'gridcell', 'rowheader'],
-      'supportedAttributes':
-          ['aria-colindex', 'aria-level', 'aria-rowindex', 'aria-selected', 'aria-setsize', 'aria-posinset'],
       'superclasses': ['group', 'widget'],
-      'scope': ['grid', 'rowgroup', 'table', 'treegrid']
+      'mustContain': ['cell', 'columnheader', 'gridcell', 'rowheader'],
+      'scope': ['grid', 'rowgroup', 'table', 'treegrid'],
+      'supportedAttributes':
+          ['aria-colindex', 'aria-level', 'aria-rowindex', 'aria-selected', 'aria-setsize', 'aria-posinset']
     },
     {
-      'scope': ['grid', 'table', 'treegrid'],
-      'superclasses': ['structure'],
       'name': 'rowgroup',
+      'nameFrom': ['contents', 'author'],
+      'superclasses': ['structure'],
       'mustContain': ['row'],
-      'nameFrom': ['contents', 'author']
+      'scope': ['grid', 'table', 'treegrid']
     },
     {
       'name': 'rowheader',
-      'nameRequired': true,
       'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-sort'],
+      'scope': ['row'],
       'superclasses': ['cell', 'gridcell', 'sectionhead'],
-      'scope': ['row']
+      'supportedAttributes': ['aria-sort'],
+      'nameRequired': true
     },
     {
       'name': 'scrollbar',
-      'nameRequired': false,
-      'implicitValues': {'aria-valuemax': '100', 'aria-valuemin': '0', 'aria-orientation': 'vertical'},
       'nameFrom': ['author'],
       'requiredAttributes': ['aria-controls', 'aria-orientation', 'aria-valuemax', 'aria-valuemin', 'aria-valuenow'],
       'superclasses': ['range'],
-      'childrenPresentational': true
+      'nameRequired': false,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-orientation': 'vertical', 'aria-valuemin': '0', 'aria-valuemax': '100'}
     },
-    {'superclasses': ['landmark'], 'name': 'search', 'nameFrom': ['author']},
-    {'superclasses': ['textbox'], 'name': 'searchbox', 'nameRequired': true, 'nameFrom': ['author']},
-    {'supportedAttributes': ['aria-expanded'], 'abstract': true, 'name': 'section', 'superclasses': ['structure']},
+    {'name': 'search', 'nameFrom': ['author'], 'superclasses': ['landmark']},
+    {'name': 'searchbox', 'nameFrom': ['author'], 'superclasses': ['textbox'], 'nameRequired': true},
+    {'name': 'section', 'abstract': true, 'superclasses': ['structure'], 'supportedAttributes': ['aria-expanded']},
     {
-      'supportedAttributes': ['aria-expanded'],
-      'abstract': true,
-      'superclasses': ['structure'],
       'name': 'sectionhead',
-      'nameFrom': ['contents', 'author']
-    },
-    {'abstract': true, 'superclasses': ['composite', 'group'], 'name': 'select', 'nameFrom': ['author']},
-    {
-      'supportedAttributes': ['aria-orientation', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'aria-valuetext'],
+      'abstract': true,
+      'nameFrom': ['contents', 'author'],
       'superclasses': ['structure'],
+      'supportedAttributes': ['aria-expanded']
+    },
+    {'name': 'select', 'abstract': true, 'nameFrom': ['author'], 'superclasses': ['composite', 'group']},
+    {
       'name': 'separator',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['structure'],
+      'supportedAttributes': ['aria-orientation', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'aria-valuetext']
     },
     {
       'name': 'slider',
-      'nameRequired': true,
-      'implicitValues': {'aria-valuemax': '100', 'aria-valuemin': '0', 'aria-orientation': 'horizontal'},
-      'requiredAttributes': ['aria-valuemax', 'aria-valuemin', 'aria-valuenow'],
       'nameFrom': ['author'],
-      'supportedAttributes': ['aria-orientation'],
+      'requiredAttributes': ['aria-valuemax', 'aria-valuemin', 'aria-valuenow'],
       'superclasses': ['input', 'range'],
-      'childrenPresentational': true
+      'supportedAttributes': ['aria-orientation'],
+      'nameRequired': true,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-orientation': 'horizontal', 'aria-valuemin': '0', 'aria-valuemax': '100'}
     },
     {
       'name': 'spinbutton',
-      'nameRequired': true,
-      'implicitValues': {'aria-valuenow': '0'},
-      'requiredAttributes': ['aria-valuemax', 'aria-valuemin', 'aria-valuenow'],
       'nameFrom': ['author'],
+      'requiredAttributes': ['aria-valuemax', 'aria-valuemin', 'aria-valuenow'],
+      'superclasses': ['composite', 'input', 'range'],
       'supportedAttributes': ['aria-required', 'aria-readonly'],
-      'superclasses': ['composite', 'input', 'range']
+      'nameRequired': true,
+      'implicitValues': {'aria-valuenow': '0'}
     },
     {
-      'implicitValues': {'aria-atomic': 'true', 'aria-live': 'polite'},
-      'superclasses': ['section'],
       'name': 'status',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['section'],
+      'implicitValues': {'aria-live': 'polite', 'aria-atomic': 'true'}
     },
-    {'abstract': true, 'name': 'structure', 'superclasses': ['roletype']},
+    {'name': 'structure', 'abstract': true, 'superclasses': ['roletype']},
     {
       'name': 'switch',
-      'nameRequired': true,
-      'implicitValues': {'aria-checked': 'false'},
       'nameFrom': ['contents', 'author'],
-      'requiredAttributes': ['aria-checked'],
       'superclasses': ['checkbox'],
-      'childrenPresentational': true
+      'requiredAttributes': ['aria-checked'],
+      'nameRequired': true,
+      'childrenPresentational': true,
+      'implicitValues': {'aria-checked': 'false'}
     },
     {
       'name': 'tab',
-      'implicitValues': {'aria-selected': 'false'},
       'nameFrom': ['contents', 'author'],
-      'supportedAttributes': ['aria-selected'],
+      'scope': ['tablist'],
       'superclasses': ['sectionhead', 'widget'],
+      'supportedAttributes': ['aria-selected'],
       'childrenPresentational': true,
-      'scope': ['tablist']
+      'implicitValues': {'aria-selected': 'false'}
     },
     {
       'name': 'table',
-      'nameRequired': true,
       'nameFrom': ['author'],
+      'superclasses': ['section'],
       'mustContain': ['row'],
       'supportedAttributes': ['aria-colcount', 'aria-rowcount'],
-      'superclasses': ['section']
+      'nameRequired': true
     },
     {
       'name': 'tablist',
-      'implicitValues': {'aria-orientation': 'horizontal'},
       'nameFrom': ['author'],
+      'superclasses': ['composite'],
       'mustContain': ['tab'],
       'supportedAttributes': ['aria-level', 'aria-multiselectable', 'aria-orientation'],
-      'superclasses': ['composite']
+      'implicitValues': {'aria-orientation': 'horizontal'}
     },
-    {'superclasses': ['section'], 'name': 'tabpanel', 'nameRequired': true, 'nameFrom': ['author']},
-    {'superclasses': ['section'], 'name': 'term', 'nameFrom': ['author']},
+    {'name': 'tabpanel', 'nameFrom': ['author'], 'superclasses': ['section'], 'nameRequired': true},
+    {'name': 'term', 'nameFrom': ['author'], 'superclasses': ['section']},
     {
+      'name': 'textbox',
+      'nameFrom': ['author'],
+      'superclasses': ['input'],
       'supportedAttributes': [
         'aria-activedescendant', 'aria-autocomplete', 'aria-multiline', 'aria-placeholder', 'aria-readonly',
         'aria-required'
       ],
-      'superclasses': ['input'],
-      'name': 'textbox',
-      'nameRequired': true,
-      'nameFrom': ['author']
+      'nameRequired': true
     },
-    {'superclasses': ['status'], 'name': 'timer', 'nameFrom': ['author']},
+    {'name': 'timer', 'nameFrom': ['author'], 'superclasses': ['status']},
     {
-      'implicitValues': {'aria-orientation': 'horizontal'},
-      'supportedAttributes': ['aria-orientation'],
-      'superclasses': ['group'],
       'name': 'toolbar',
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['group'],
+      'supportedAttributes': ['aria-orientation'],
+      'implicitValues': {'aria-orientation': 'horizontal'}
     },
-    {'superclasses': ['section'], 'name': 'tooltip', 'nameRequired': true, 'nameFrom': ['contents', 'author']},
+    {'name': 'tooltip', 'nameFrom': ['contents', 'author'], 'superclasses': ['section'], 'nameRequired': true},
     {
       'name': 'tree',
-      'nameRequired': true,
-      'implicitValues': {'aria-orientation': 'vertical'},
       'nameFrom': ['author'],
       'mustContain': ['group', 'treeitem'],
+      'superclasses': ['select'],
       'supportedAttributes': ['aria-multiselectable', 'aria-required'],
-      'superclasses': ['select']
+      'nameRequired': true,
+      'implicitValues': {'aria-orientation': 'vertical'}
     },
     {
-      'nameRequired': true,
-      'superclasses': ['grid', 'tree'],
       'name': 'treegrid',
       'mustContain': ['row'],
-      'nameFrom': ['author']
+      'nameFrom': ['author'],
+      'superclasses': ['grid', 'tree'],
+      'nameRequired': true
     },
     {
+      'name': 'treeitem',
+      'nameFrom': ['contents', 'author'],
       'scope': ['group', 'tree'],
       'superclasses': ['listitem', 'option'],
-      'name': 'treeitem',
-      'nameRequired': true,
-      'nameFrom': ['contents', 'author']
+      'nameRequired': true
     },
-    {'abstract': true, 'name': 'widget', 'superclasses': ['roletype']},
+    {'name': 'widget', 'abstract': true, 'superclasses': ['roletype']},
     {
-      'supportedAttributes': ['aria-expanded', 'aria-modal'],
-      'abstract': true,
-      'superclasses': ['roletype'],
       'name': 'window',
-      'nameFrom': ['author']
+      'abstract': true,
+      'nameFrom': ['author'],
+      'superclasses': ['roletype'],
+      'supportedAttributes': ['aria-expanded', 'aria-modal']
     }
-  ],
-  'metadata': {
-    'namespaceURI': 'http://www.w3.org/1999/xhtml',
-    'attrsNullNamespace': true,
-    'namespace': 'HTML',
-    'export': 'CORE_EXPORT',
-    'namespacePrefix': 'xhtml'
-  }
+  ]
 };
