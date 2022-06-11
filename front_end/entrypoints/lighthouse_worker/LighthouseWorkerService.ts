@@ -111,7 +111,7 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
       endTimespan = undefined;
       return result;
     }
-
+    console.log('fetching localedata');
     const locale = await fetchLocaleData(args.locales);
     const flags = args.flags;
     flags.logLevel = flags.logLevel || 'info';
@@ -135,7 +135,7 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
       // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
       return await self.runLighthouse(url, flags, config, connection);
     }
-
+    console.log('connnection');
     const {mainTargetId, mainFrameId, mainSessionId} = args.target;
     cdpConnection = new ConnectionProxy(mainSessionId);
     puppeteerConnection =
@@ -157,7 +157,7 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
       endTimespan = timespan.endTimespan;
       return;
     }
-
+    console.log('lh nav!');
     // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
     return await self.runLighthouseNavigation(url, {config, page, configContext});
   } catch (err) {

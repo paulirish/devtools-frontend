@@ -149,6 +149,7 @@ export class LighthousePanel extends UI.Panel.Panel {
   }
 
   private async onLighthouseStart(): Promise<void> {
+    console.log('button pushed');
     await this.startLighthouse();
     await this.collectLighthouseResults();
   }
