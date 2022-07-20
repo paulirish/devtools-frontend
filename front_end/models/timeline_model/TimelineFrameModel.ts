@@ -344,7 +344,7 @@ export class TimelineFrameModel {
     if (event.name === RecordType.BeginMainThreadFrame && event.args['data'] && event.args['data']['frameId']) {
       this.framePendingCommit.mainFrameId = event.args['data']['frameId'];
     }
-    if (event.name === RecordType.Paint && event.args['data']['layerId'] && TimelineData.forEvent(event).picture &&
+    if (event.name === RecordType.Paint && event.args?.data?.layerId && TimelineData.forEvent(event).picture &&
         this.target) {
       this.framePendingCommit.paints.push(new LayerPaintEvent(event, this.target));
     }

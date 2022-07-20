@@ -138,13 +138,22 @@ const UIStrings = {
   */
   prePaint: 'Pre-Paint',
   /**
+  *@description Noun for an event in the Performance panel. 'Decode font' parses
+  * and decodes a web font file right after it was downloaded.
+  */
+  decodeFont: 'Decode Font',
+  /**
   *@description Text in Timeline UIUtils of the Performance panel
   */
   updateLayer: 'Update Layer',
   /**
   *@description Text in Timeline UIUtils of the Performance panel
   */
-  updateLayerTree: 'Update Layer Tree',
+  updateLayers: 'Update Layers',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  requestMainFrameUpdate: 'Render frame (async)',
   /**
   *@description Noun for a paint event in the Performance panel. A paint event is when the browser draws pixels to the screen.
   */
@@ -173,6 +182,26 @@ const UIStrings = {
   *@description Text in Timeline UIUtils of the Performance panel
   */
   parseStylesheet: 'Parse Stylesheet',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  onReceiveResponse: 'Receive Response',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  onReceivedResponse: 'Received Response',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  onRequestComplete: 'Complete Request',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  onStartLoadingResponseBody: 'Response body started',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  requestResource: 'Create Request',
   /**
   *@description Text in Timeline UIUtils of the Performance panel
   */
@@ -1283,9 +1312,11 @@ export class TimelineUIUtils {
     eventStyles[type.PaintSetup] = new TimelineRecordStyle(i18nString(UIStrings.paintSetup), painting);
     eventStyles[type.PaintImage] = new TimelineRecordStyle(i18nString(UIStrings.paintImage), painting, true);
     eventStyles[type.UpdateLayer] = new TimelineRecordStyle(i18nString(UIStrings.updateLayer), painting, true);
-    eventStyles[type.UpdateLayerTree] = new TimelineRecordStyle(i18nString(UIStrings.updateLayerTree), rendering);
+    eventStyles[type.UpdateLayers] = new TimelineRecordStyle(i18nString(UIStrings.updateLayers), painting);
+    eventStyles[type.RequestMainFrameUpdate] = new TimelineRecordStyle(i18nString(UIStrings.requestMainFrameUpdate), rendering);
     eventStyles[type.Paint] = new TimelineRecordStyle(i18nString(UIStrings.paint), painting);
     eventStyles[type.PrePaint] = new TimelineRecordStyle(i18nString(UIStrings.prePaint), rendering);
+    eventStyles[type.DecodeFont] = new TimelineRecordStyle(i18nString(UIStrings.decodeFont), rendering);
     eventStyles[type.RasterTask] = new TimelineRecordStyle(i18nString(UIStrings.rasterizePaint), painting);
     eventStyles[type.ScrollLayer] = new TimelineRecordStyle(i18nString(UIStrings.scroll), rendering);
     eventStyles[type.CompositeLayers] = new TimelineRecordStyle(i18nString(UIStrings.compositeLayers), painting);
@@ -1293,6 +1324,11 @@ export class TimelineUIUtils {
         new TimelineRecordStyle(i18nString(UIStrings.computeIntersections), rendering);
     eventStyles[type.ParseHTML] = new TimelineRecordStyle(i18nString(UIStrings.parseHtml), loading);
     eventStyles[type.ParseAuthorStyleSheet] = new TimelineRecordStyle(i18nString(UIStrings.parseStylesheet), loading);
+    eventStyles[type.OnReceiveResponse] = new TimelineRecordStyle(i18nString(UIStrings.onReceiveResponse), loading);
+    eventStyles[type.OnReceivedResponse] = new TimelineRecordStyle(i18nString(UIStrings.onReceivedResponse), loading);
+    eventStyles[type.OnRequestComplete] = new TimelineRecordStyle(i18nString(UIStrings.onRequestComplete), loading);
+    eventStyles[type.OnStartLoadingResponseBody] = new TimelineRecordStyle(i18nString(UIStrings.onStartLoadingResponseBody), loading);
+    eventStyles[type.RequestResource] = new TimelineRecordStyle(i18nString(UIStrings.requestResource), loading);
     eventStyles[type.TimerInstall] = new TimelineRecordStyle(i18nString(UIStrings.installTimer), scripting);
     eventStyles[type.TimerRemove] = new TimelineRecordStyle(i18nString(UIStrings.removeTimer), scripting);
     eventStyles[type.TimerFire] = new TimelineRecordStyle(i18nString(UIStrings.timerFired), scripting);
@@ -1313,6 +1349,8 @@ export class TimelineUIUtils {
         new TimelineRecordStyle(i18nString(UIStrings.waitingForNetwork), idle);
     eventStyles[type.StreamingCompileScriptParsing] =
         new TimelineRecordStyle(i18nString(UIStrings.parseAndCompile), scripting);
+    eventStyles[type.StreamingCompileComplete] =
+        new TimelineRecordStyle(i18nString(UIStrings.streamingCompileTask), scripting);
     eventStyles[type.WasmStreamFromResponseCallback] =
         new TimelineRecordStyle(i18nString(UIStrings.streamingWasmResponse), scripting);
     eventStyles[type.WasmCompiledModule] = new TimelineRecordStyle(i18nString(UIStrings.compiledWasmModule), scripting);
@@ -1890,6 +1928,7 @@ export class TimelineUIUtils {
         break;
       }
 
+      case recordType.StreamingCompileComplete:
       case recordType.StreamingCompileScript: {
         const url = eventData['url'];
         if (url) {
@@ -2252,6 +2291,25 @@ export class TimelineUIUtils {
           };
           contentHelper.appendElementRow(
               i18nString(UIStrings.stylesheetUrl), Components.Linkifier.Linkifier.linkifyURL(url, options));
+        }
+        break;
+      }
+
+
+      case recordTypes.RequestResource:
+      case recordTypes.OnRequestComplete:
+      case recordTypes.OnReceivedResponse:
+      case recordTypes.OnStartLoadingResponseBody:
+      case recordTypes.OnReceiveResponse: {
+        url = event.args['url'] as Platform.DevToolsPath.UrlString;
+        if (url) {
+          const options = {
+            tabStop: true,
+            showColumnNumber: false,
+            inlineFrameIndex: 0,
+          };
+          contentHelper.appendElementRow(
+              i18nString(UIStrings.url), Components.Linkifier.Linkifier.linkifyURL(url, options));
         }
         break;
       }

@@ -1516,6 +1516,21 @@ export class TimelineModelImpl {
   }
 }
 
+/**
+ * todo:
+ * - paint should be at LocalFrameView::RunPaintLifecyclePhase level
+ * - coverage for `LayerTreeHost::DoUpdateLayers` as 'update layer' is too short
+ * - decodefont
+ * - coverage for both receive network response  handlers
+ *   - ThrottlingURLLoader::OnReceiveResponse
+ *   - WebResourceRequestSender::OnRequestComplete
+ * - cover network request making handlers
+ * - moving runtask higher? Nah. i looked and its fine.
+ * - a parent event for running async rendering cycle
+ */
+
+
+
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum RecordType {
@@ -1541,11 +1556,13 @@ export enum RecordType {
   Layout = 'Layout',
   LayoutShift = 'LayoutShift',
   UpdateLayer = 'UpdateLayer',
-  UpdateLayerTree = 'UpdateLayerTree',
+  UpdateLayers = 'UpdateLayers',
+  RequestMainFrameUpdate = 'RequestMainFrameUpdate',
   PaintSetup = 'PaintSetup',
   Paint = 'Paint',
   PaintImage = 'PaintImage',
   PrePaint = 'PrePaint',
+  DecodeFont = 'DecodeFont',
   Rasterize = 'Rasterize',
   RasterTask = 'RasterTask',
   ScrollLayer = 'ScrollLayer',
@@ -1602,6 +1619,12 @@ export enum RecordType {
   ResourceFinish = 'ResourceFinish',
   ResourceMarkAsCached = 'ResourceMarkAsCached',
 
+  OnReceiveResponse = 'ThrottlingURLLoader::OnReceiveResponse',
+  OnReceivedResponse = 'ThrottlingURLLoader::OnReceivedResponse',
+  OnRequestComplete = 'WebResourceRequestSender::OnRequestComplete',
+  OnStartLoadingResponseBody = 'WebResourceRequestSender::OnStartLoadingResponseBody',
+  RequestResource = 'ResourceFetcher::requestResource',
+
   RunMicrotasks = 'RunMicrotasks',
   FunctionCall = 'FunctionCall',
   GCEvent = 'GCEvent',
@@ -1618,6 +1641,8 @@ export enum RecordType {
   StreamingCompileScript = 'v8.parseOnBackground',
   StreamingCompileScriptWaiting = 'v8.parseOnBackgroundWaiting',
   StreamingCompileScriptParsing = 'v8.parseOnBackgroundParsing',
+  StreamingCompileComplete = 'v8.streamingCompile.complete',
+
   V8Execute = 'V8.Execute',
 
   UpdateCounters = 'UpdateCounters',
