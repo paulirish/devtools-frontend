@@ -27,9 +27,14 @@ const UIStrings = {
    */
   title: 'Deprecated Feature Used',
 
-  // Store alphabetized messages per DeprecationIssueType in this block.
   /**
-   * @description TODO(crbug.com/1318846): Description needed for translation
+   * @description We show this warning when 1) an "authorization" header is
+   *   attached to the request by scripts, 2) there is no "authorization" in
+   *   the "access-control-allow-headers" header in the response, and 3) there
+   *   is a wildcard symbol ("*") in the "access-control-allow-header" header
+   *   in the response. This is allowed now, but we're planning to reject such
+   *   responses and require responses to have an "access-control-allow-headers"
+   *   containing "authorization".
    */
   authorizationCoveredByWildcard:
       'Authorization will not be covered by the wildcard symbol (*) in CORS `Access-Control-Allow-Headers` handling.',
@@ -99,6 +104,10 @@ const UIStrings = {
    * @description Warning displayed to developers when the non-standard `Event.path` API is used to notify them that this API is deprecated.
    */
   eventPath: '`Event.path` is deprecated and will be removed. Please use `Event.composedPath()` instead.',
+  /**
+   * @description This message is shown when the deprecated Expect-CT header is present.
+   */
+  expectCTHeader: 'The `Expect-CT` header is deprecated and will be removed. Chrome requires Certificate Transparency for all publicly trusted certificates issued after April 30, 2018.',
   /**
    * @description Warning displayed to developers when the Geolocation API is used from an insecure origin (one that isn't localhost or doesn't use HTTPS) to notify them that this use is no longer supported.
    */
@@ -177,6 +186,11 @@ const UIStrings = {
    */
   openWebDatabaseInsecureContext:
       'WebSQL in non-secure contexts is deprecated and will be removed in M107. Please use Web Storage or Indexed Database.',
+  /**
+   * @description Warning displayed to developers when persistent storage type is used to notify that storage type is deprecated.
+   */
+  persistentQuotaType:
+      '`StorageType.persistent` is deprecated. Please use standardized `navigator.storage` instead.',
   /**
    * @description This issue indicates that a `<source>` element with a `<picture>` parent was using an `src` attribute, which is not valid and is ignored by the browser. The `srcset` attribute should be used instead.
    */
@@ -273,11 +287,17 @@ const UIStrings = {
   v8SharedArrayBufferConstructedInExtensionWithoutIsolation:
       'Extensions should opt into cross-origin isolation to continue using `SharedArrayBuffer`. See https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/.',
   /**
-   * @description TODO(crbug.com/1318881): Description needed for translation
+   * @description Warning displayed to developers that they are using
+   * `XMLHttpRequest` API in a way that they expect an unsupported character
+   * encoding `UTF-16` could be used in the server reply.
    */
   xhrJSONEncodingDetection: 'UTF-16 is not supported by response json in `XMLHttpRequest`',
   /**
-   * @description TODO(crbug.com/1318882): Description needed for translation
+   * @description Warning displayed to developers. It is shown when
+   * the `XMLHttpRequest` API is used in a way that it slows down the page load
+   * of the next page. The `main thread` refers to an operating systems thread
+   * used to run most of the processing of HTML documents, so please use a
+   * consistent wording.
    */
   xmlHttpRequestSynchronousInNonWorkerOutsideBeforeUnload:
       'Synchronous `XMLHttpRequest` on the main thread is deprecated because of its detrimental effects to the end user\u2019s experience. For more help, check https://xhr.spec.whatwg.org/.',
@@ -374,6 +394,11 @@ export class DeprecationIssue extends Issue {
         feature = 5726124632965120;
         milestone = 109;
         break;
+      case Protocol.Audits.DeprecationIssueType.ExpectCTHeader:
+        messageFunction = i18nLazyString(UIStrings.expectCTHeader);
+        feature = 6244547273687040;
+        milestone = 107;
+        break;
       case Protocol.Audits.DeprecationIssueType.GeolocationInsecureOrigin:
         messageFunction = i18nLazyString(UIStrings.geolocationInsecureOrigin);
         break;
@@ -411,6 +436,15 @@ export class DeprecationIssue extends Issue {
         messageFunction = i18nLazyString(UIStrings.mediaSourceDurationTruncatingBuffered);
         feature = 6107495151960064;
         break;
+      case Protocol.Audits.DeprecationIssueType.NavigateEventRestoreScroll:
+        messageFunction = i18nLazyString(
+            UIStrings.deprecatedWithReplacement, {PH1: 'navigateEvent.restoreScroll()', PH2: 'navigateEvent.scroll()'});
+        break;
+      case Protocol.Audits.DeprecationIssueType.NavigateEventTransitionWhile:
+        messageFunction = i18nLazyString(
+            UIStrings.deprecatedWithReplacement,
+            {PH1: 'navigateEvent.transitionWhile()', PH2: 'navigateEvent.intercept()'});
+        break;
       case Protocol.Audits.DeprecationIssueType.NoSysexWebMIDIWithoutPermission:
         messageFunction = i18nLazyString(UIStrings.noSysexWebMIDIWithoutPermission);
         feature = 5138066234671104;
@@ -431,6 +465,11 @@ export class DeprecationIssue extends Issue {
         messageFunction = i18nLazyString(UIStrings.openWebDatabaseInsecureContext);
         feature = 5175124599767040;
         milestone = 105;
+        break;
+      case Protocol.Audits.DeprecationIssueType.PersistentQuotaType:
+        messageFunction = i18nLazyString(UIStrings.persistentQuotaType);
+        feature = 5176235376246784;
+        milestone = 106;
         break;
       case Protocol.Audits.DeprecationIssueType.PictureSourceSrc:
         messageFunction = i18nLazyString(UIStrings.pictureSourceSrc);

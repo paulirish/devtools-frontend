@@ -2878,6 +2878,11 @@ declare namespace ProtocolProxyApi {
     invoke_clearDataForOrigin(params: Protocol.Storage.ClearDataForOriginRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Clears storage for storage key.
+     */
+    invoke_clearDataForStorageKey(params: Protocol.Storage.ClearDataForStorageKeyRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Returns all browser cookies.
      */
     invoke_getCookies(params: Protocol.Storage.GetCookiesRequest): Promise<Protocol.Storage.GetCookiesResponse>;
@@ -2913,6 +2918,11 @@ declare namespace ProtocolProxyApi {
     invoke_trackIndexedDBForOrigin(params: Protocol.Storage.TrackIndexedDBForOriginRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Registers storage key to be notified when an update occurs to its IndexedDB.
+     */
+    invoke_trackIndexedDBForStorageKey(params: Protocol.Storage.TrackIndexedDBForStorageKeyRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Unregisters origin from receiving notifications for cache storage.
      */
     invoke_untrackCacheStorageForOrigin(params: Protocol.Storage.UntrackCacheStorageForOriginRequest): Promise<Protocol.ProtocolResponseWithError>;
@@ -2921,6 +2931,11 @@ declare namespace ProtocolProxyApi {
      * Unregisters origin from receiving notifications for IndexedDB.
      */
     invoke_untrackIndexedDBForOrigin(params: Protocol.Storage.UntrackIndexedDBForOriginRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Unregisters storage key from receiving notifications for IndexedDB.
+     */
+    invoke_untrackIndexedDBForStorageKey(params: Protocol.Storage.UntrackIndexedDBForStorageKeyRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Returns the number of stored Trust Tokens per issuer for the
@@ -3056,7 +3071,7 @@ declare namespace ProtocolProxyApi {
     /**
      * Retrieves a list of available targets.
      */
-    invoke_getTargets(): Promise<Protocol.Target.GetTargetsResponse>;
+    invoke_getTargets(params: Protocol.Target.GetTargetsRequest): Promise<Protocol.Target.GetTargetsResponse>;
 
     /**
      * Sends protocol message over session with given id.
@@ -3509,6 +3524,16 @@ declare namespace ProtocolProxyApi {
      * Returns source for the script with given id.
      */
     invoke_getScriptSource(params: Protocol.Debugger.GetScriptSourceRequest): Promise<Protocol.Debugger.GetScriptSourceResponse>;
+
+    invoke_disassembleWasmModule(params: Protocol.Debugger.DisassembleWasmModuleRequest): Promise<Protocol.Debugger.DisassembleWasmModuleResponse>;
+
+    /**
+     * Disassemble the next chunk of lines for the module corresponding to the
+     * stream. If disassembly is complete, this API will invalidate the streamId
+     * and return an empty chunk. Any subsequent calls for the now invalid stream
+     * will return errors.
+     */
+    invoke_nextWasmDisassemblyChunk(params: Protocol.Debugger.NextWasmDisassemblyChunkRequest): Promise<Protocol.Debugger.NextWasmDisassemblyChunkResponse>;
 
     /**
      * This command is deprecated. Use getScriptSource instead.

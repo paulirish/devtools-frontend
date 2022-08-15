@@ -235,6 +235,9 @@ export class DebuggerPlugin extends Plugin {
     Common.Settings.Settings.instance()
         .moduleSetting('skipContentScripts')
         .addChangeListener(this.showIgnoreListInfobarIfNeeded, this);
+    Common.Settings.Settings.instance()
+        .moduleSetting('automaticallyIgnoreListKnownThirdPartyScripts')
+        .addChangeListener(this.showIgnoreListInfobarIfNeeded, this);
 
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DebuggerModel.CallFrame, this.callFrameChanged, this);
     this.liveLocationPool = new Bindings.LiveLocation.LiveLocationPool();
@@ -365,7 +368,7 @@ export class DebuggerPlugin extends Plugin {
       return;
     }
     const projectType = uiSourceCode.project().type();
-    if (!Bindings.IgnoreListManager.IgnoreListManager.instance().isIgnoreListedUISourceCode(uiSourceCode)) {
+    if (!Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(uiSourceCode.url())) {
       this.hideIgnoreListInfobar();
       return;
     }
@@ -513,7 +516,7 @@ export class DebuggerPlugin extends Plugin {
 
     if (this.uiSourceCode.project().type() === Workspace.Workspace.projectTypes.Network &&
         Common.Settings.Settings.instance().moduleSetting('jsSourceMapsEnabled').get() &&
-        !Bindings.IgnoreListManager.IgnoreListManager.instance().isIgnoreListedUISourceCode(this.uiSourceCode)) {
+        !Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(this.uiSourceCode.url())) {
       if (this.scriptFileForDebuggerModel.size) {
         const scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile =
             this.scriptFileForDebuggerModel.values().next().value;
@@ -1624,6 +1627,9 @@ export class DebuggerPlugin extends Plugin {
         .removeChangeListener(this.showIgnoreListInfobarIfNeeded, this);
     Common.Settings.Settings.instance()
         .moduleSetting('skipContentScripts')
+        .removeChangeListener(this.showIgnoreListInfobarIfNeeded, this);
+    Common.Settings.Settings.instance()
+        .moduleSetting('automaticallyIgnoreListKnownThirdPartyScripts')
         .removeChangeListener(this.showIgnoreListInfobarIfNeeded, this);
     super.dispose();
 

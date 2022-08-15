@@ -103,7 +103,7 @@ export class ElementsTreeOutline extends
   private treeElementBeingDragged?: ElementsTreeElement;
   private dragOverTreeElement?: ElementsTreeElement;
   private updateModifiedNodesTimeout?: number;
-  private topLayerContainer?: TopLayerContainer;
+  #topLayerContainerByParent: Map<UI.TreeOutline.TreeElement, TopLayerContainer> = new Map();
 
   constructor(omitRootDOMNode?: boolean, selectEnabled?: boolean, hideGutter?: boolean) {
     super();
@@ -452,6 +452,8 @@ export class ElementsTreeOutline extends
         this.appendChild(treeElement);
       }
     }
+
+    void this.createTopLayerContainer(this.rootElement(), this.rootDOMNode.domModel());
 
     if (selectedNode) {
       this.revealAndSelectNode(selectedNode, true);
@@ -1173,40 +1175,24 @@ export class ElementsTreeOutline extends
     }
 
     return new Promise<void>(resolve => {
-             treeElement.node().getChildNodes(() => {
-               populatedTreeElements.add(treeElement);
-               this.updateModifiedParentNode(treeElement.node());
-               resolve();
-             });
-           })
-        .then(() => {
-          if (treeElement.node().nodeName() === 'BODY') {
-            void this.createTopLayerContainer(treeElement);
-          }
-        });
+      treeElement.node().getChildNodes(() => {
+        populatedTreeElements.add(treeElement);
+        this.updateModifiedParentNode(treeElement.node());
+        resolve();
+      });
+    });
   }
 
-  async createTopLayerContainer(bodyElement: ElementsTreeElement): Promise<void> {
-    if (!this.topLayerContainer) {
-      this.topLayerContainer = new TopLayerContainer(bodyElement);
+  async createTopLayerContainer(parent: UI.TreeOutline.TreeElement, domModel: SDK.DOMModel.DOMModel): Promise<void> {
+    if (!parent.treeOutline || !(parent.treeOutline instanceof ElementsTreeOutline)) {
+      return;
     }
-    this.topLayerContainer.updateBody(bodyElement);
-    await this.updateTopLayerContainer();
-  }
-
-  async updateTopLayerContainer(): Promise<void> {
-    if (this.topLayerContainer) {
-      const bodyElement = this.topLayerContainer.bodyElement;
-      if (!bodyElement.children().includes(this.topLayerContainer) && !this.topLayerContainer.parent &&
-          !this.topLayerContainer.treeOutline) {
-        bodyElement.insertChild(this.topLayerContainer, bodyElement.childCount() - 1);
-      }
-      this.topLayerContainer.removeChildren();
-      const topLayerElementsExists = await this.topLayerContainer.addTopLayerElementsAsChildren();
-      if (!topLayerElementsExists) {
-        bodyElement.removeChild(this.topLayerContainer);
-      }
+    const container = new TopLayerContainer(parent.treeOutline, domModel);
+    await container.throttledUpdateTopLayerElements();
+    if (container.currentTopLayerElements.size > 0) {
+      parent.appendChild(container);
     }
+    this.#topLayerContainerByParent.set(parent, container);
   }
 
   private createElementTreeElement(node: SDK.DOMModel.DOMNode, isClosingTag?: boolean): ElementsTreeElement {
@@ -1278,6 +1264,11 @@ export class ElementsTreeOutline extends
     const afterPseudoElement = node.afterPseudoElement();
     if (afterPseudoElement) {
       visibleChildren.push(afterPseudoElement);
+    }
+
+    const backdropPseudoElement = node.backdropPseudoElement();
+    if (backdropPseudoElement) {
+      visibleChildren.push(backdropPseudoElement);
     }
 
     return visibleChildren;
@@ -1358,6 +1349,9 @@ export class ElementsTreeOutline extends
       isClosingTag?: boolean): ElementsTreeElement {
     const newElement = this.createElementTreeElement(child, isClosingTag);
     treeElement.insertChild(newElement, index);
+    if (child.nodeType() === Node.DOCUMENT_NODE) {
+      void this.createTopLayerContainer(newElement, child.domModel());
+    }
     return newElement;
   }
 
@@ -1464,7 +1458,13 @@ export class ElementsTreeOutline extends
   }
 
   private async topLayerElementsChanged(): Promise<void> {
-    await this.updateTopLayerContainer();
+    for (const [parent, container] of this.#topLayerContainerByParent) {
+      await container.throttledUpdateTopLayerElements();
+      if (container.currentTopLayerElements.size > 0 && container.parent !== parent) {
+        parent.appendChild(container);
+      }
+      container.hidden = container.currentTopLayerElements.size === 0;
+    }
   }
 
   private static treeOutlineSymbol = Symbol('treeOutline');

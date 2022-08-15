@@ -30,6 +30,7 @@
 
 import * as Common from '../../../../core/common/common.js';
 import type * as Components from '../utils/utils.js';
+import * as Root from '../../../../core/root/root.js';
 import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as LinearMemoryInspector from '../../../components/linear_memory_inspector/linear_memory_inspector.js';
@@ -222,8 +223,12 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       return;
     }
 
+    const includedWebIdlTypes = webIdlType.includes?.map(className => domPinnedProperties[className]) ?? [];
+    const includedWebIdlProps = includedWebIdlTypes.flatMap(webIdlType => Object.entries(webIdlType?.props ?? {}));
+    const webIdlProps = {...webIdlType.props, ...Object.fromEntries(includedWebIdlProps)};
+
     for (const property of properties) {
-      const webIdlProperty = webIdlType?.props?.[property.name];
+      const webIdlProperty = webIdlProps[property.name];
       if (webIdlProperty) {
         property.webIdl = {info: webIdlProperty};
       }
@@ -381,16 +386,17 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
 
   static createPropertyValueWithCustomSupport(
       value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean, parentElement?: Element,
-      linkifier?: Components.Linkifier.Linkifier): ObjectPropertyValue {
+      linkifier?: Components.Linkifier.Linkifier, variableName?: string): ObjectPropertyValue {
     if (value.customPreview()) {
       const result = (new CustomPreviewComponent(value)).element;
       result.classList.add('object-properties-section-custom-section');
       return new ObjectPropertyValue(result);
     }
-    return ObjectPropertiesSection.createPropertyValue(value, wasThrown, showPreview, parentElement, linkifier);
+    return ObjectPropertiesSection.createPropertyValue(
+        value, wasThrown, showPreview, parentElement, linkifier, variableName);
   }
 
-  static appendMemoryIcon(element: Element, obj: SDK.RemoteObject.RemoteObject): void {
+  static appendMemoryIcon(element: Element, obj: SDK.RemoteObject.RemoteObject, variableName?: string): void {
     // We show the memory icon only on ArrayBuffer, WebAssembly.Memory and DWARF memory instances.
     // TypedArrays DataViews are also supported, but showing the icon next to their
     // previews is quite a significant visual overhead, and users can easily get to
@@ -413,7 +419,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       const controller =
           LinearMemoryInspector.LinearMemoryInspectorController.LinearMemoryInspectorController.instance();
       Host.userMetrics.linearMemoryInspectorRevealedFrom(Host.UserMetrics.LinearMemoryInspectorRevealedFrom.MemoryIcon);
-      void controller.openInspectorView(obj);
+      void controller.openInspectorView(obj, undefined /* address */, variableName);
     };
 
     UI.Tooltip.Tooltip.install(memoryIcon, 'Reveal in Memory Inspector panel');
@@ -423,7 +429,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
 
   static createPropertyValue(
       value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean, parentElement?: Element,
-      linkifier?: Components.Linkifier.Linkifier): ObjectPropertyValue {
+      linkifier?: Components.Linkifier.Linkifier, variableName?: string): ObjectPropertyValue {
     let propertyValue;
     const type = value.type;
     const subtype = value.subtype;
@@ -459,7 +465,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
         propertyValue.element.textContent = description;
         UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, description);
       }
-      this.appendMemoryIcon(valueElement, value);
+      this.appendMemoryIcon(valueElement, value, variableName);
     }
 
     if (wasThrown) {
@@ -1085,7 +1091,8 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     } else if (this.property.value) {
       const showPreview = this.property.name !== '[[Prototype]]';
       this.propertyValue = ObjectPropertiesSection.createPropertyValueWithCustomSupport(
-          this.property.value, this.property.wasThrown, showPreview, this.listItemElement, this.linkifier);
+          this.property.value, this.property.wasThrown, showPreview, this.listItemElement, this.linkifier,
+          this.path() /* variableName */);
       this.valueElement = (this.propertyValue.element as HTMLElement);
     } else if (this.property.getter) {
       this.valueElement = document.createElement('span');
@@ -1118,10 +1125,12 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
       this.expandedValueElement = this.createExpandedValueElement(this.property.value);
     }
 
+    const experiment = Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.IMPORTANT_DOM_PROPERTIES);
+
     let adorner: Element|string = '';
     let container: Element;
 
-    if (this.property.webIdl?.applicable) {
+    if (this.property.webIdl?.applicable && experiment) {
       const icon = new IconButton.Icon.Icon();
       icon.data = {
         iconName: 'star_outline',
@@ -1148,7 +1157,10 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.listItemElement.removeChildren();
     this.rowContainer = (container as HTMLElement);
     this.listItemElement.appendChild(this.rowContainer);
-    this.listItemElement.dataset.webidl = this.property.webIdl?.applicable ? 'true' : 'false';
+
+    if (experiment) {
+      this.listItemElement.dataset.webidl = this.property.webIdl?.applicable ? 'true' : 'false';
+    }
   }
 
   private updatePropertyPath(): void {

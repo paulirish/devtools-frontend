@@ -120,18 +120,21 @@ export class ExperimentsSupport {
   #enabledTransiently: Set<string>;
   readonly #enabledByDefault: Set<string>;
   readonly #serverEnabled: Set<string>;
+  // Experiments in this set won't be shown to the user
+  readonly #nonConfigurable: Set<string>;
   constructor() {
     this.#experiments = [];
     this.#experimentNames = new Set();
     this.#enabledTransiently = new Set();
     this.#enabledByDefault = new Set();
     this.#serverEnabled = new Set();
+    this.#nonConfigurable = new Set();
   }
 
   allConfigurableExperiments(): Experiment[] {
     const result = [];
     for (const experiment of this.#experiments) {
-      if (!this.#enabledTransiently.has(experiment.name)) {
+      if (!this.#enabledTransiently.has(experiment.name) && !this.#nonConfigurable.has(experiment.name)) {
         result.push(experiment);
       }
     }
@@ -200,6 +203,13 @@ export class ExperimentsSupport {
     for (const experiment of experimentNames) {
       this.checkExperiment(experiment);
       this.#serverEnabled.add(experiment);
+    }
+  }
+
+  setNonConfigurableExperiments(experimentNames: string[]): void {
+    for (const experiment of experimentNames) {
+      this.checkExperiment(experiment);
+      this.#nonConfigurable.add(experiment);
     }
   }
 
@@ -293,6 +303,9 @@ export enum ExperimentName {
   INSTRUMENTATION_BREAKPOINTS = 'instrumentationBreakpoints',
   CSS_AUTHORING_HINTS = 'cssAuthoringHints',
   AUTHORED_DEPLOYED_GROUPING = 'authoredDeployedGrouping',
+  IMPORTANT_DOM_PROPERTIES = 'importantDOMProperties',
+  JUST_MY_CODE = 'justMyCode',
+  BREAKPOINT_VIEW = 'breakpointView',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

@@ -21,10 +21,12 @@ import {StyleEditorWidget} from './StyleEditorWidget.js';
 import {type StylePropertiesSection} from './StylePropertiesSection.js';
 import {CSSPropertyPrompt, StylesSidebarPane, StylesSidebarPropertyRenderer} from './StylesSidebarPane.js';
 import {getCssDeclarationAsJavascriptProperty} from './StylePropertyUtils.js';
-import {cssRuleValidatorsMap, type AuthoringHint} from './CSSRuleValidator.js';
+import {cssRuleValidatorsMap, type Hint} from './CSSRuleValidator.js';
 
 const FlexboxEditor = ElementsComponents.StylePropertyEditor.FlexboxEditor;
 const GridEditor = ElementsComponents.StylePropertyEditor.GridEditor;
+
+export const activeHints = new WeakMap<Element, Hint>();
 
 const UIStrings = {
   /**
@@ -715,26 +717,16 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       }
     }
 
-    const authoringHint = this.getAuthoringHint(this.computedStyles, this.parentsComputedStyles);
-    if (authoringHint !== null) {
-      const hintIcon = UI.Icon.Icon.create('mediumicon-info', 'hint');
-      const hintPopover =
-          new UI.PopoverHelper.PopoverHelper(hintIcon, event => this.handleHintPopoverRequest(authoringHint, event));
-      hintPopover.setHasPadding(true);
-      hintPopover.setTimeout(0, 100);
-
-      this.listItemElement.append(hintIcon);
-    }
-
-    if (!this.property.parsedOk) {
+    if (this.property.parsedOk) {
+      void this.updateFontVariationSettingsWarning();
+      this.updateAuthoringHint();
+    } else {
       // Avoid having longhands under an invalid shorthand.
       this.listItemElement.classList.add('not-parsed-ok');
 
       // Add a separate exclamation mark IMG element with a tooltip.
       this.listItemElement.insertBefore(
           StylesSidebarPane.createExclamationMark(this.property, null), this.listItemElement.firstChild);
-    } else {
-      void this.updateFontVariationSettingsWarning();
     }
 
     if (!this.property.activeInStyle()) {
@@ -766,6 +758,35 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       });
       this.listItemElement.append(copyIcon);
       this.listItemElement.insertBefore(enabledCheckboxElement, this.listItemElement.firstChild);
+    }
+  }
+
+  private updateAuthoringHint(): void {
+    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.CSS_AUTHORING_HINTS)) {
+      return;
+    }
+
+    const existingElement = this.listItemElement.querySelector('.hint');
+    if (existingElement) {
+      activeHints.delete(existingElement);
+      existingElement.parentElement?.removeChild(existingElement);
+    }
+    const propertyName = this.property.name;
+
+    if (!cssRuleValidatorsMap.has(propertyName)) {
+      return;
+    }
+
+    for (const validator of cssRuleValidatorsMap.get(propertyName) || []) {
+      const hint =
+          validator.getHint(propertyName, this.computedStyles || undefined, this.parentsComputedStyles || undefined);
+      if (hint) {
+        Host.userMetrics.cssHintShown(validator.getMetricType());
+        const hintIcon = UI.Icon.Icon.create('mediumicon-info', 'hint');
+        activeHints.set(hintIcon, hint);
+        this.listItemElement.append(hintIcon);
+        break;
+      }
     }
   }
 
@@ -815,42 +836,6 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.listItemElement.classList.add('has-warning');
     this.listItemElement.insertBefore(
         StylesSidebarPane.createExclamationMark(this.property, warnings.join(' ')), this.listItemElement.firstChild);
-  }
-
-  private getAuthoringHint(computedStyles: Map<string, string>|null, parentComputedStyles: Map<string, string>|null):
-      AuthoringHint|null {
-    const propertyName = this.property.name;
-
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.CSS_AUTHORING_HINTS) ||
-        !cssRuleValidatorsMap.has(propertyName)) {
-      return null;
-    }
-
-    for (const validator of cssRuleValidatorsMap.get(propertyName) || []) {
-      if (!validator.isRuleValid(computedStyles, parentComputedStyles)) {
-        return validator.getAuthoringHint(propertyName, this.parentsComputedStyles);
-      }
-    }
-
-    return null;
-  }
-
-  private handleHintPopoverRequest(authoringHint: AuthoringHint, event: Event): UI.PopoverHelper.PopoverRequest|null {
-    const link = event.composedPath()[0];
-    Platform.DCHECK(() => link instanceof Element, 'Link is not an instance of Element');
-
-    return {
-      box: (link as Element).boxInWindow(),
-      show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
-        const node = this.node();
-        if (!node) {
-          return false;
-        }
-        const popupElement = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(authoringHint);
-        popover.contentElement.insertAdjacentElement('beforeend', popupElement);
-        return true;
-      },
-    };
   }
 
   private mouseUp(event: MouseEvent): void {

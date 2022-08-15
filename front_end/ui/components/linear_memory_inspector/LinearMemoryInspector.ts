@@ -41,6 +41,12 @@ import {
   type LinearMemoryViewerData,
   type ResizeEvent,
 } from './LinearMemoryViewer.js';
+import {
+  LinearMemoryHighlightChipList,
+  type LinearMemoryHighlightChipListData,
+  type DeleteMemoryHighlightEvent,
+  type JumpToHighlightedMemoryEvent,
+} from './LinearMemoryHighlightChipList.js';
 import {type HighlightInfo} from './LinearMemoryViewerUtils.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -160,12 +166,11 @@ export class LinearMemoryInspector extends HTMLElement {
       throw new Error('Memory offset has to be greater or equal to zero.');
     }
 
-    if (data.highlightInfo !== undefined) {
+    if (data.highlightInfo) {
       if (data.highlightInfo.size < 0) {
         throw new Error('Object size has to be greater than or equal to zero');
       }
-      if (data.highlightInfo.startAddress > data.memoryOffset + data.memory.length ||
-          data.highlightInfo.startAddress < 0) {
+      if (data.highlightInfo.startAddress < 0 || data.highlightInfo.startAddress >= data.outerMemoryLength) {
         throw new Error('Object start address is out of bounds.');
       }
     }
@@ -196,6 +201,8 @@ export class LinearMemoryInspector extends HTMLElement {
 
     const canGoBackInHistory = this.#history.canRollback();
     const canGoForwardInHistory = this.#history.canRollover();
+
+    const highlightedMemoryAreas = this.#highlightInfo ? [this.#highlightInfo] : [];
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
@@ -206,6 +213,11 @@ export class LinearMemoryInspector extends HTMLElement {
           @addressinputchanged=${this.#onAddressChange}
           @pagenavigation=${this.#navigatePage}
           @historynavigation=${this.#navigateHistory}></${LinearMemoryNavigator.litTagName}>
+          <${LinearMemoryHighlightChipList.litTagName}
+          .data=${{highlightInfos: highlightedMemoryAreas} as LinearMemoryHighlightChipListData}
+          @jumptohighlightedmemory=${this.#onJumpToAddress}
+          @>
+          </${LinearMemoryHighlightChipList.litTagName}>
         <${LinearMemoryViewer.litTagName}
           .data=${{
             memory: this.#memory.slice(start - this.#memoryOffset,
@@ -228,7 +240,7 @@ export class LinearMemoryInspector extends HTMLElement {
           @valuetypetoggled=${this.#onValueTypeToggled}
           @valuetypemodechanged=${this.#onValueTypeModeChanged}
           @endiannesschanged=${this.#onEndiannessChanged}
-          @jumptopointeraddress=${this.#onJumpToPointerAddress}
+          @jumptopointeraddress=${this.#onJumpToAddress}
           >
         </${LinearMemoryValueInterpreter.litTagName}/>
       </div>
@@ -238,7 +250,7 @@ export class LinearMemoryInspector extends HTMLElement {
     // clang-format on
   }
 
-  #onJumpToPointerAddress(e: JumpToPointerAddressEvent): void {
+  #onJumpToAddress(e: JumpToPointerAddressEvent|JumpToHighlightedMemoryEvent): void {
     // Stop event from bubbling up, since no element further up needs the event.
     e.stopPropagation();
     this.#currentNavigatorMode = Mode.Submitted;
@@ -376,5 +388,6 @@ declare global {
     'memoryrequest': MemoryRequestEvent;
     'addresschanged': AddressChangedEvent;
     'settingschanged': SettingsChangedEvent;
+    'deletememoryhighlight': DeleteMemoryHighlightEvent;
   }
 }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as FS from 'fs';
 import * as Mocha from 'mocha';
 import * as Path from 'path';
 
@@ -14,7 +15,11 @@ import {platform, type Platform} from './helper.js';
 
 export {beforeEach} from 'mocha';
 
-export async function takeScreenshots() {
+function htmlEscape(raw: string) {
+  return raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+}
+
+export async function takeScreenshots(testName: string) {
   try {
     const {target, frontend} = getBrowserAndPages();
     const opts = {
@@ -23,13 +28,47 @@ export async function takeScreenshots() {
     const targetScreenshot = await target.screenshot(opts);
     const frontendScreenshot = await frontend.screenshot(opts);
     const prefix = 'data:image/png;base64,';
-    console.error('Target page screenshot (copy the next line and open in the browser):');
-    console.error(prefix + targetScreenshot);
-    console.error('Frontend screenshot (copy the next line and open in the browser):');
-    console.error(prefix + frontendScreenshot);
+    const screenshotFile = getEnvVar('HTML_OUTPUT_FILE');
+    if (screenshotFile) {
+      try {
+        FS.appendFileSync(
+            screenshotFile,
+            `<div><h3>${htmlEscape(testName)}</h3><p>Target page screenshot</p><p><img src="${
+                prefix + targetScreenshot}"/></p><p>Frontend screenshot</p><p><img src="${
+                prefix + frontendScreenshot}"/></p></div>\n`);
+        console.error(`Screenshots saved to "${screenshotFile}"`);
+      } catch (err) {
+        console.error(`Error saving to file "${screenshotFile}": `, err);
+      }
+    } else {
+      console.error('Target page screenshot (copy the next line and open in the browser):');
+      console.error(prefix + targetScreenshot);
+      console.error('Frontend screenshot (copy the next line and open in the browser):');
+      console.error(prefix + frontendScreenshot);
+    }
   } catch (err) {
     console.error('Error taking a screenshot', err);
   }
+}
+
+function wrapSuiteFunction(fn: (this: Mocha.Suite) => void) {
+  return function(this: Mocha.Suite): void {
+    const hookCreationHook = (hook: Mocha.Hook): void => {
+      const originalFn = hook.fn;
+      if (!originalFn) {
+        return;
+      }
+      hook.fn = function(this, args) {
+        hookTestTimeout(hook);
+        return originalFn.call(this, args);
+      };
+    };
+    this.on('beforeEach', hookCreationHook);
+    this.on('beforeAll', hookCreationHook);
+    this.on('afterEach', hookCreationHook);
+    this.on('afterAll', hookCreationHook);
+    fn.call(this);
+  };
 }
 
 export function wrapDescribe<ReturnT>(
@@ -55,7 +94,7 @@ export function wrapDescribe<ReturnT>(
     };
     const err = new Error();
 
-    return mochaFn(`${err.stack}: ${title}`, fn);
+    return mochaFn(`${err.stack}: ${title}`, wrapSuiteFunction(fn));
   } finally {
     Error.prepareStackTrace = originalFn;
   }
@@ -103,7 +142,7 @@ async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err
     console.error(`Pending async operations during failure:\n${stacks.join('\n\n')}`);
   }
   if (err && !getEnvVar('DEBUG_TEST')) {
-    await takeScreenshots();
+    await takeScreenshots(this.fullTitle());
   }
   if (done) {
     // This workaround is needed to allow timeoutHook to be async.
@@ -163,16 +202,20 @@ export function makeCustomWrappedIt(namePrefix: string = '') {
   return newMochaItFunc;
 }
 
+function hookTestTimeout(test?: Mocha.Runnable) {
+  if (test) {
+    const originalDone = test.callback;
+    test.callback = timeoutHook.bind(test, originalDone);
+    // If a timeout is already scheduled, reset it to install our new hook
+    test.resetTimeout();
+  }
+}
+
 function wrapMochaCall(
     call: Mocha.TestFunction|Mocha.PendingTestFunction|Mocha.ExclusiveTestFunction, name: string,
     callback: Mocha.Func|Mocha.AsyncFunc) {
   const test = call(name, function(done: Mocha.Done) {
-    if (test) {
-      const originalDone = test.callback;
-      test.callback = timeoutHook.bind(test, originalDone);
-      // If a timeout is already scheduled, reset it to install our new hook
-      test.resetTimeout();
-    }
+    hookTestTimeout(test);
 
     if (callback.length === 0) {
       (callback as Mocha.AsyncFunc).bind(this)().then(done, done);

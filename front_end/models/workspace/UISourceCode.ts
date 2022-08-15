@@ -71,6 +71,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   private workingCopyGetter: (() => string)|null;
   private disableEditInternal: boolean;
   private contentEncodedInternal?: boolean;
+  private isKnownThirdPartyInternal: boolean;
 
   constructor(project: Project, url: Platform.DevToolsPath.UrlString, contentType: Common.ResourceType.ResourceType) {
     super();
@@ -108,6 +109,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     this.workingCopyInternal = null;
     this.workingCopyGetter = null;
     this.disableEditInternal = false;
+    this.isKnownThirdPartyInternal = false;
   }
 
   requestMetadata(): Promise<UISourceCodeMetadata|null> {
@@ -205,11 +207,6 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
 
   contentType(): Common.ResourceType.ResourceType {
     return this.contentTypeInternal;
-  }
-
-  async contentEncoded(): Promise<boolean> {
-    await this.requestContent();
-    return this.contentEncodedInternal || false;
   }
 
   project(): Project {
@@ -399,6 +396,14 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
 
   isDirty(): boolean {
     return this.workingCopyInternal !== null || this.workingCopyGetter !== null;
+  }
+
+  isKnownThirdParty(): boolean {
+    return this.isKnownThirdPartyInternal;
+  }
+
+  markKnownThirdParty(): void {
+    this.isKnownThirdPartyInternal = true;
   }
 
   extension(): string {

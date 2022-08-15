@@ -322,6 +322,9 @@ export class MainImpl {
         'evaluateExpressionsWithSourceMaps', 'Console: Resolve variable names in expressions using source maps',
         undefined);
     Root.Runtime.experiments.register('instrumentationBreakpoints', 'Enable instrumentation breakpoints', true);
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.BREAKPOINT_VIEW, 'Enable re-designed Breakpoint Sidebar Pane in the Sources Panel',
+        true);
 
     // Dual-screen
     Root.Runtime.experiments.register(
@@ -406,6 +409,15 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.AUTHORED_DEPLOYED_GROUPING, 'Group sources into Authored and Deployed trees');
 
+    // Hide third party code (as determined by ignore lists or source maps)
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.JUST_MY_CODE, 'Hide ignore-listed code in sources tree view');
+
+    // Highlight important DOM properties in the Object Properties viewer.
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.IMPORTANT_DOM_PROPERTIES,
+        'Highlight important DOM properties in the Object Properties viewer');
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',
       'hideIssuesFeature',
@@ -414,8 +426,12 @@ export class MainImpl {
       'reportingApiDebugging',
       Root.Runtime.ExperimentName.SYNC_SETTINGS,
       Root.Runtime.ExperimentName.CSS_LAYERS,
-      Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER,
+      ...('EyeDropper' in window ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
       'lighthousePanelFR',
+    ]);
+
+    Root.Runtime.experiments.setNonConfigurableExperiments([
+      ...(!('EyeDropper' in window) ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
     ]);
 
     Root.Runtime.experiments.cleanUpStaleExperiments();

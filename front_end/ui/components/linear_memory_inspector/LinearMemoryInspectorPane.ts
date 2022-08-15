@@ -7,15 +7,16 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as UI from '../../legacy/legacy.js';
 
 import {
+  AddressChangedEvent,
   LinearMemoryInspector,
-  type AddressChangedEvent,
-  type MemoryRequestEvent,
+  MemoryRequestEvent,
+  SettingsChangedEvent,
   type Settings,
-  type SettingsChangedEvent,
 } from './LinearMemoryInspector.js';
 
 import {LinearMemoryInspectorController, type LazyUint8Array} from './LinearMemoryInspectorController.js';
 import {type HighlightInfo} from './LinearMemoryViewerUtils.js';
+import {DeleteMemoryHighlightEvent} from './LinearMemoryHighlightChipList.js';
 
 const UIStrings = {
   /**
@@ -84,14 +85,13 @@ export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMix
   getViewForTabId(tabId: string): LinearMemoryInspectorView {
     const view = this.#tabIdToInspectorView.get(tabId);
     if (!view) {
-      throw new Error(`No linear memory inspector view for given tab id: ${tabId}`);
+      throw new Error(`No linear memory inspector view for the given tab id: ${tabId}`);
     }
     return view;
   }
 
-  create(tabId: string, title: string, arrayWrapper: LazyUint8Array, address?: number, highlightInfo?: HighlightInfo):
-      void {
-    const inspectorView = new LinearMemoryInspectorView(arrayWrapper, address, highlightInfo);
+  create(tabId: string, title: string, arrayWrapper: LazyUint8Array, address?: number): void {
+    const inspectorView = new LinearMemoryInspectorView(arrayWrapper, address, tabId);
     this.#tabIdToInspectorView.set(tabId, inspectorView);
     this.#tabbedPane.appendTab(tabId, title, inspectorView, undefined, false, true);
     this.#tabbedPane.selectTab(tabId);
@@ -101,14 +101,11 @@ export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMix
     this.#tabbedPane.closeTab(tabId, false);
   }
 
-  reveal(tabId: string, address?: number, highlightInfo?: HighlightInfo): void {
+  reveal(tabId: string, address?: number): void {
     const view = this.getViewForTabId(tabId);
 
     if (address !== undefined) {
       view.updateAddress(address);
-    }
-    if (highlightInfo !== undefined) {
-      view.updateHighlightInfo(highlightInfo);
     }
     this.refreshView(tabId);
     this.#tabbedPane.selectTab(tabId);
@@ -117,11 +114,6 @@ export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMix
   refreshView(tabId: string): void {
     const view = this.getViewForTabId(tabId);
     view.refreshData();
-  }
-
-  resetHighlightInfo(tabId: string): void {
-    const view = this.getViewForTabId(tabId);
-    view.updateHighlightInfo(undefined);
   }
 
   #tabClosed(event: Common.EventTarget.EventTargetEvent<UI.TabbedPane.EventData>): void {
@@ -142,10 +134,10 @@ export type EventTypes = {
 class LinearMemoryInspectorView extends UI.Widget.VBox {
   #memoryWrapper: LazyUint8Array;
   #address: number;
-  #highlightInfo?: HighlightInfo;
+  #tabId: string;
   #inspector: LinearMemoryInspector;
   firstTimeOpen: boolean;
-  constructor(memoryWrapper: LazyUint8Array, address: number|undefined = 0, highlightInfo?: HighlightInfo) {
+  constructor(memoryWrapper: LazyUint8Array, address: number|undefined = 0, tabId: string) {
     super(false);
 
     if (address < 0 || address >= memoryWrapper.length()) {
@@ -154,18 +146,22 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
 
     this.#memoryWrapper = memoryWrapper;
     this.#address = address;
-    this.#highlightInfo = highlightInfo;
+    this.#tabId = tabId;
     this.#inspector = new LinearMemoryInspector();
-    this.#inspector.addEventListener('memoryrequest', (event: MemoryRequestEvent) => {
+    this.#inspector.addEventListener(MemoryRequestEvent.eventName, (event: MemoryRequestEvent) => {
       this.#memoryRequested(event);
     });
-    this.#inspector.addEventListener('addresschanged', (event: AddressChangedEvent) => {
+    this.#inspector.addEventListener(AddressChangedEvent.eventName, (event: AddressChangedEvent) => {
       this.updateAddress(event.data);
     });
-    this.#inspector.addEventListener('settingschanged', (event: SettingsChangedEvent) => {
+    this.#inspector.addEventListener(SettingsChangedEvent.eventName, (event: SettingsChangedEvent) => {
       // Stop event from bubbling up, since no element further up needs the event.
       event.stopPropagation();
       this.saveSettings(event.data);
+    });
+    this.#inspector.addEventListener(DeleteMemoryHighlightEvent.eventName, (event: DeleteMemoryHighlightEvent) => {
+      LinearMemoryInspectorController.instance().removeHighlight(this.#tabId, event.data);
+      this.refreshData();
     });
     this.contentElement.appendChild(this.#inspector);
     this.firstTimeOpen = true;
@@ -184,18 +180,6 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
       throw new Error('Requested address is out of bounds.');
     }
     this.#address = address;
-  }
-
-  updateHighlightInfo(highlightInfo?: HighlightInfo): void {
-    if (highlightInfo !== undefined) {
-      if (highlightInfo.startAddress < 0 || highlightInfo.startAddress >= this.#memoryWrapper.length()) {
-        throw new Error('Highlight info start address is out of bounds.');
-      }
-      if (highlightInfo.size < 0) {
-        throw new Error('Highlight size cannot be negative.');
-      }
-    }
-    this.#highlightInfo = highlightInfo;
   }
 
   refreshData(): void {
@@ -221,7 +205,7 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
         valueTypes,
         valueTypeModes,
         endianness,
-        highlightInfo: this.#highlightInfo,
+        highlightInfo: this.#getHighlightInfo(),
       };
     });
   }
@@ -238,8 +222,21 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
         address: address,
         memoryOffset: start,
         outerMemoryLength: this.#memoryWrapper.length(),
-        highlightInfo: this.#highlightInfo,
+        highlightInfo: this.#getHighlightInfo(),
       };
     });
+  }
+
+  #getHighlightInfo(): HighlightInfo|undefined {
+    const highlightInfo = LinearMemoryInspectorController.instance().getHighlightInfo(this.#tabId);
+    if (highlightInfo !== undefined) {
+      if (highlightInfo.startAddress < 0 || highlightInfo.startAddress >= this.#memoryWrapper.length()) {
+        throw new Error('HighlightInfo start address is out of bounds.');
+      }
+      if (highlightInfo.size <= 0) {
+        throw new Error('Highlight size must be a positive number.');
+      }
+    }
+    return highlightInfo;
   }
 }

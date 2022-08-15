@@ -13,7 +13,6 @@ import {
   goToResource,
   waitFor,
   waitForFunction,
-  enableExperiment,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
@@ -31,7 +30,8 @@ import {
   waitForStyleRule,
   expandSelectedNodeRecursively,
   waitForAndClickTreeElementWithPartialText,
-  getPropertiesWithHints,
+  focusCSSPropertyValue,
+  waitForCSSPropertyValue,
 } from '../helpers/elements-helpers.js';
 
 const PROPERTIES_TO_DELETE_SELECTOR = '#properties-to-delete';
@@ -1043,18 +1043,6 @@ describe('The Styles pane', async () => {
     assert.deepEqual(inspectedRules, expectedInspectedRules);
   });
 
-  it('can detect inactive CSS', async () => {
-    await enableExperiment('cssAuthoringHints');
-
-    await goToResourceAndWaitForStyleSection('elements/inactive-css-page.html');
-    await waitForStyleRule('body');
-    await waitForAndClickTreeElementWithPartialText('wrapper');
-    await waitForStyleRule('#wrapper');
-
-    const propertiesWithHints = await getPropertiesWithHints();
-    assert.deepEqual(propertiesWithHints, ['align-content']);
-  });
-
   it('can display @scope at-rules', async () => {
     await goToResourceAndWaitForStyleSection('elements/css-scope.html');
 
@@ -1066,5 +1054,68 @@ describe('The Styles pane', async () => {
     const scopeQuery = await waitFor('.query.editable', rule1PropertiesSection);
     const scopeQueryText = await scopeQuery.evaluate(node => (node as HTMLElement).innerText as string);
     assert.deepEqual(scopeQueryText, '@scope (body)', 'incorrectly displayed @supports rule');
+  });
+
+  describe('Editing', () => {
+    let frontend: puppeteer.Page;
+    let target: puppeteer.Page;
+
+    beforeEach(() => {
+      const browserAndPages = getBrowserAndPages();
+      frontend = browserAndPages.frontend;
+      target = browserAndPages.target;
+    });
+
+    async function assertBodyColor(expected: string) {
+      assert.strictEqual(
+          await target.evaluate(() => {
+            return getComputedStyle(document.body).color;
+          }),
+          expected);
+    }
+
+    async function assertIsEditing(isEditing: boolean) {
+      // .child-editing class is added by StylePropertyTreeElement when user edits a value.
+      assert.lengthOf(await frontend.$$('pierce/.child-editing'), isEditing ? 1 : 0);
+    }
+
+    const green = 'rgb(0, 255, 0)';
+    const blue = 'rgb(0, 0, 255)';
+
+    it('cancels editing if the page is reloaded', async () => {
+      await goToResourceAndWaitForStyleSection('elements/simple-body-color.html');
+      await assertBodyColor(green);
+
+      // Start editing.
+      await focusCSSPropertyValue('body', 'color');
+      await frontend.keyboard.type(blue, {delay: 100});
+      await assertBodyColor(blue);
+      await assertIsEditing(true);
+
+      // Reload and wait for styles.
+      await goToResourceAndWaitForStyleSection('elements/simple-body-color.html');
+
+      // Expect the editing to be discarded and the editing mode turned off.
+      await waitForCSSPropertyValue('body', 'color', green);
+      await assertBodyColor(green);
+      await assertIsEditing(false);
+    });
+
+    it('cancels editing on Esc', async () => {
+      await goToResourceAndWaitForStyleSection('elements/simple-body-color.html');
+      await assertBodyColor(green);
+
+      // Start editing.
+      await focusCSSPropertyValue('body', 'color');
+      await frontend.keyboard.type(blue, {delay: 100});
+      await assertBodyColor(blue);
+      await assertIsEditing(true);
+      await frontend.keyboard.press('Escape');
+
+      // Expect the editing to be discarded and the editing mode turned off.
+      await waitForCSSPropertyValue('body', 'color', green);
+      await assertBodyColor(green);
+      await assertIsEditing(false);
+    });
   });
 });

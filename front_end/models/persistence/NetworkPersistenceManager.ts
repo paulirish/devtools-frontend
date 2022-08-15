@@ -370,9 +370,8 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     await PersistenceImpl.instance().addBinding(binding);
     const uiSourceCodeOfTruth =
         this.savingForOverrides.has(networkUISourceCode) ? networkUISourceCode : fileSystemUISourceCode;
-    const [{content}, encoded] =
-        await Promise.all([uiSourceCodeOfTruth.requestContent(), uiSourceCodeOfTruth.contentEncoded()]);
-    PersistenceImpl.instance().syncContent(uiSourceCodeOfTruth, content || '', encoded);
+    const {content, isEncoded} = await uiSourceCodeOfTruth.requestContent();
+    PersistenceImpl.instance().syncContent(uiSourceCodeOfTruth, content || '', isEncoded);
   }
 
   private onUISourceCodeWorkingCopyCommitted(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
@@ -390,14 +389,13 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     }
     this.savingForOverrides.add(uiSourceCode);
     let encodedPath = this.encodedPathFromUrl(uiSourceCode.url());
-    const content = (await uiSourceCode.requestContent()).content || '';
-    const encoded = await uiSourceCode.contentEncoded();
+    const {content, isEncoded} = await uiSourceCode.requestContent();
     const lastIndexOfSlash = encodedPath.lastIndexOf('/');
     const encodedFileName = Common.ParsedURL.ParsedURL.substring(encodedPath, lastIndexOfSlash + 1);
     const rawFileName = Common.ParsedURL.ParsedURL.encodedPathToRawPathString(encodedFileName);
     encodedPath = Common.ParsedURL.ParsedURL.substr(encodedPath, 0, lastIndexOfSlash);
     if (this.projectInternal) {
-      await this.projectInternal.createFile(encodedPath, rawFileName, content, encoded);
+      await this.projectInternal.createFile(encodedPath, rawFileName, content ?? '', isEncoded);
     }
     this.fileCreatedForTest(encodedPath, rawFileName);
     this.savingForOverrides.delete(uiSourceCode);
@@ -733,13 +731,17 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
       const blob = await project.requestFileBlob(fileSystemUISourceCode);
       if (blob) {
         void interceptedRequest.continueRequestWithContent(
-            new Blob([blob], {type: mimeType}), /* encoded */ false, responseHeaders);
+            new Blob([blob], {type: mimeType}), /* encoded */ false, responseHeaders, /* isBodyOverridden */ true);
       }
+    } else if (interceptedRequest.isRedirect()) {
+      void interceptedRequest.continueRequestWithContent(
+          new Blob([], {type: mimeType}), /* encoded */ true, responseHeaders, /* isBodyOverridden */ false);
     } else {
       const responseBody = await interceptedRequest.responseBody();
       if (!responseBody.error && responseBody.content) {
         void interceptedRequest.continueRequestWithContent(
-            new Blob([responseBody.content], {type: mimeType}), /* encoded */ true, responseHeaders);
+            new Blob([responseBody.content], {type: mimeType}), /* encoded */ true, responseHeaders,
+            /* isBodyOverridden */ false);
       }
     }
   }

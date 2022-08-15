@@ -17,52 +17,49 @@ describeWithEnvironment('CSSHintDetailsView', async () => {
     });
 
     it('renders every section', async () => {
-        const hintMessage = new Elements.CSSRuleValidator.AuthoringHint(
-            'align-content',
-            Elements.CSSRuleValidator.AuthoringHintType.RULE_VALIDATION,
-            'This element has <code class="unbreakable-text"><span class="property">flex-wrap</span>: nowrap</code> rule, therefore <code class="unbreakable-text"><span class="property">align-content</span></code> has no effect.',
-            'For this property to work, please remove or change the value of <code class="unbreakable-text"><span class="property">flex-wrap</span></code> rule.',
-            true,
-        );
+      const hintMessage = new Elements.CSSRuleValidator.Hint(
+          Elements.CSSRuleValidator.HintType.INACTIVE_PROPERTY,
+          'This element has <code class="unbreakable-text"><span class="property">flex-wrap</span>: nowrap</code> rule, therefore <code class="unbreakable-text"><span class="property">align-content</span></code> has no effect.',
+          'For this property to work, please remove or change the value of <code class="unbreakable-text"><span class="property">flex-wrap</span></code> rule.',
+          'align-content',
+      );
 
-        const popupComponent = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(hintMessage);
-        renderElementIntoDOM(popupComponent);
+      const popupComponent = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(hintMessage);
+      renderElementIntoDOM(popupComponent);
 
-        assertShadowRoot(popupComponent.shadowRoot);
+      assertShadowRoot(popupComponent.shadowRoot);
 
-        const shadowRoot = popupComponent.shadowRoot;
+      const shadowRoot = popupComponent.shadowRoot;
 
-        const popupReasonRendered = shadowRoot.querySelector('.hint-popup-reason') !== null;
-        const popupPossibleFixRendered = shadowRoot.querySelector('.hint-popup-possible-fix') !== null;
-        const popupLearnMoreRendered = shadowRoot.querySelector('#learn-more') !== null;
+      const popupReasonRendered = shadowRoot.querySelector('.hint-popup-reason') !== null;
+      const popupPossibleFixRendered = shadowRoot.querySelector('.hint-popup-possible-fix') !== null;
+      const popupLearnMoreRendered = shadowRoot.querySelector('#learn-more') !== null;
 
-        assert.isTrue(popupReasonRendered);
-        assert.isTrue(popupPossibleFixRendered);
-        assert.isTrue(popupLearnMoreRendered);
+      assert.isTrue(popupReasonRendered);
+      assert.isTrue(popupPossibleFixRendered);
+      assert.isTrue(popupLearnMoreRendered);
     });
 
     it('does not render learn more', async () => {
-        const hintMessage = new Elements.CSSRuleValidator.AuthoringHint(
-            'align-content',
-            Elements.CSSRuleValidator.AuthoringHintType.RULE_VALIDATION,
-            'This element has <code class="unbreakable-text"><span class="property">flex-wrap</span>: nowrap</code> rule, therefore <code class="unbreakable-text"><span class="property">align-content</span></code> has no effect.',
-            'For this property to work, please remove or change the value of <code class="unbreakable-text"><span class="property">flex-wrap</span></code> rule.',
-            false,
-        );
+      const hint = new Elements.CSSRuleValidator.Hint(
+          Elements.CSSRuleValidator.HintType.INACTIVE_PROPERTY,
+          'This element has <code class="unbreakable-text"><span class="property">flex-wrap</span>: nowrap</code> rule, therefore <code class="unbreakable-text"><span class="property">align-content</span></code> has no effect.',
+          'For this property to work, please remove or change the value of <code class="unbreakable-text"><span class="property">flex-wrap</span></code> rule.',
+      );
 
-        const popupComponent = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(hintMessage);
-        renderElementIntoDOM(popupComponent);
+      const popupComponent = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(hint);
+      renderElementIntoDOM(popupComponent);
 
-        assertShadowRoot(popupComponent.shadowRoot);
+      assertShadowRoot(popupComponent.shadowRoot);
 
-        const shadowRoot = popupComponent.shadowRoot;
+      const shadowRoot = popupComponent.shadowRoot;
 
-        const popupReasonRendered = shadowRoot.querySelector('.hint-popup-reason') !== null;
-        const popupPossibleFixRendered = shadowRoot.querySelector('.hint-popup-possible-fix') !== null;
-        const popupLearnMoreRendered = shadowRoot.querySelector('#learn-more') !== null;
+      const popupReasonRendered = shadowRoot.querySelector('.hint-popup-reason') !== null;
+      const popupPossibleFixRendered = shadowRoot.querySelector('.hint-popup-possible-fix') !== null;
+      const popupLearnMoreRendered = shadowRoot.querySelector('#learn-more') !== null;
 
-        assert.isTrue(popupReasonRendered);
-        assert.isTrue(popupPossibleFixRendered);
-        assert.isFalse(popupLearnMoreRendered);
+      assert.isTrue(popupReasonRendered);
+      assert.isTrue(popupPossibleFixRendered);
+      assert.isFalse(popupLearnMoreRendered);
     });
 });

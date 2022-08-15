@@ -33,22 +33,19 @@ import {
 } from '../helpers/console-helpers.js';
 
 import {
-  clearSourceFilesAdded,
   getCallFrameLocations,
   getCallFrameNames,
   getNonBreakableLines,
   getValuesForScope,
-  listenForSourceFilesAdded,
   openFileInEditor,
   openSourceCodeEditorForFile,
   openSourcesPanel,
   PAUSE_ON_EXCEPTION_BUTTON,
   RESUME_BUTTON,
-  retrieveSourceFilesAdded,
   switchToCallFrame,
-  waitForAdditionalSourceFiles,
   WasmLocationLabels,
   type LabelMapping,
+  captureAddedSourceFiles,
 } from '../helpers/sources-helpers.js';
 import {expectError} from '../../conductor/events.js';
 
@@ -75,7 +72,7 @@ describe('The Debugger Language Plugins', async () => {
 
   // Load a simple wasm file and verify that the source file shows up in the file tree.
   it('can show C filenames after loading the module', async () => {
-    const {target, frontend} = getBrowserAndPages();
+    const {target} = getBrowserAndPages();
     const extension = await loadExtension(
         'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
@@ -93,12 +90,7 @@ describe('The Debugger Language Plugins', async () => {
     await goToResource(
         'extensions/wasm_module.html?module=/test/e2e/resources/extensions/global_variable.wasm&defer=1');
     await openSourcesPanel();
-    await listenForSourceFilesAdded(frontend);
-    const additionalFilesPromise = waitForAdditionalSourceFiles(frontend);
-    await target.evaluate('loadModule();');
-    await additionalFilesPromise;
-
-    const capturedFileNames = await retrieveSourceFilesAdded(frontend);
+    const capturedFileNames = await captureAddedSourceFiles(2, () => target.evaluate('loadModule();'));
     assert.deepEqual(capturedFileNames, ['/test/e2e/resources/extensions/global_variable.wasm', '/source_file.c']);
   });
 
@@ -499,7 +491,7 @@ describe('The Debugger Language Plugins', async () => {
     const text = await details.evaluate(e => e.textContent);
     assert.deepEqual(text, 'Failed to load debug file "test.wasm".');
 
-    const banners = await $$('.ignore-listed-message');
+    const banners = await $$('.call-frame-warnings-message');
     const bannerTexts = await Promise.all(banners.map(e => e.evaluate(e => e.textContent)));
     assert.include(bannerTexts, 'Some call frames have warnings');
 
@@ -569,7 +561,7 @@ describe('The Debugger Language Plugins', async () => {
     const text = await details.evaluate(e => e.textContent);
     assert.deepEqual(text, 'Failed to load debug file "test.dwo".');
 
-    const banners = await $$('.ignore-listed-message');
+    const banners = await $$('.call-frame-warnings-message');
     const bannerTexts = await Promise.all(banners.map(e => e.evaluate(e => e.textContent)));
     assert.include(bannerTexts, 'Some call frames have warnings');
 
@@ -738,6 +730,182 @@ describe('The Debugger Language Plugins', async () => {
       'member: TestTypeMember',
       'member2: TestTypeMember2',
       'describe: CustomLabel',
+      'recurse: 27',
+      'value: 26',
+    ]);
+  });
+
+  it('shows variable values with the evaluate API', async () => {
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
+    await extension.evaluate(() => {
+      class EvalPlugin {
+        private modules:
+            Map<string,
+                {rawLocationRange?: Chrome.DevTools.RawLocationRange, sourceLocation?: Chrome.DevTools.SourceLocation}>;
+        constructor() {
+          this.modules = new Map();
+        }
+
+        async addRawModule(rawModuleId: string, symbols: string, rawModule: Chrome.DevTools.RawModule) {
+          const sourceFileURL = new URL('unreachable.ll', rawModule.url || symbols).href;
+          this.modules.set(rawModuleId, {
+            rawLocationRange: {rawModuleId, startOffset: 6, endOffset: 7},
+            sourceLocation: {rawModuleId, sourceFileURL, lineNumber: 5, columnNumber: 2},
+          });
+          return [sourceFileURL];
+        }
+
+        async rawLocationToSourceLocation(rawLocation: Chrome.DevTools.RawLocation) {
+          const {rawLocationRange, sourceLocation} = this.modules.get(rawLocation.rawModuleId) || {};
+          if (rawLocationRange && sourceLocation && rawLocationRange.startOffset <= rawLocation.codeOffset &&
+              rawLocation.codeOffset < rawLocationRange.endOffset) {
+            return [sourceLocation];
+          }
+          return [];
+        }
+
+        async listVariablesInScope(_rawLocation: Chrome.DevTools.RawLocation) {
+          return [{scope: 'LOCAL', name: 'local', type: 'TestType'}];
+        }
+
+        async getScopeInfo(type: string) {
+          return {type, typeName: type};
+        }
+
+        async getTypeInfo(expression: string, _context: Chrome.DevTools.RawLocation):
+            Promise<{typeInfos: Chrome.DevTools.TypeInfo[], base: Chrome.DevTools.EvalBase}|null> {
+          if (expression === 'local') {
+            const typeInfos = [
+              {
+                typeNames: ['TestType'],
+                typeId: 'TestType',
+                members: [{name: 'member', offset: 1, typeId: 'TestTypeMember'}],
+                alignment: 0,
+                arraySize: 0,
+                size: 4,
+                canExpand: true,
+                hasValue: false,
+              },
+              {
+                typeNames: ['TestTypeMember'],
+                typeId: 'TestTypeMember',
+                members: [{name: 'member2', offset: 1, typeId: 'TestTypeMember2'}],
+                alignment: 0,
+                arraySize: 0,
+                size: 3,
+                canExpand: true,
+                hasValue: false,
+              },
+              {
+                typeNames: ['TestTypeMember2'],
+                typeId: 'TestTypeMember2',
+                members: [],
+                alignment: 0,
+                arraySize: 0,
+                size: 2,
+                canExpand: false,
+                hasValue: true,
+              },
+              {
+                typeNames: ['int'],
+                typeId: 'int',
+                members: [],
+                alignment: 0,
+                arraySize: 0,
+                size: 4,
+                canExpand: false,
+                hasValue: true,
+              },
+            ];
+            const base = {rootType: typeInfos[0], payload: undefined};
+
+            return {typeInfos, base};
+          }
+          return null;
+        }
+
+        async evaluate(expression: string, _context: Chrome.DevTools.RawLocation, _stopId: unknown):
+            Promise<Chrome.DevTools.RemoteObject|null> {
+          if (expression !== 'local') {
+            return null;
+          }
+          return {
+            type: 'object',
+            description: 'TestType',
+            objectId: 'TestType',
+            hasChildren: true,
+          };
+        }
+
+        async getProperties(objectId: string): Promise<Chrome.DevTools.PropertyDescriptor[]> {
+          if (objectId === 'TestType') {
+            return [{
+              name: 'member',
+              value: {
+                type: 'object',
+                description: 'TestTypeMember',
+                objectId: 'TestTypeMember',
+                hasChildren: true,
+              },
+            }];
+          }
+          if (objectId === 'TestTypeMember') {
+            return [{
+              name: 'member2',
+              value: {
+                type: 'object',
+                description: 'TestTypeMember2',
+                objectId: 'TestTypeMember2',
+                hasChildren: true,
+              },
+            }];
+          }
+          if (objectId === 'TestTypeMember2') {
+            return [
+              {
+                name: 'recurse',
+                value: {
+                  type: 'number',
+                  description: '27',
+                  value: 27,
+                  hasChildren: false,
+                },
+              },
+              {
+                name: 'value',
+                value: {
+                  type: 'number',
+                  description: '26',
+                  value: 26,
+                  hasChildren: false,
+                },
+              },
+            ];
+          }
+          return [];
+        }
+
+        async releaseObject(objectId: string): Promise<void> {
+          if (objectId !== 'TestType' && objectId !== 'TestTypeMember' && objectId !== 'TestTypeMember2') {
+            throw new Error(`Invalid object id ${objectId}`);
+          }
+        }
+      }
+
+      RegisterExtension(new EvalPlugin(), 'Evaluation', {language: 'WebAssembly', symbol_types: ['None']});
+    });
+
+    await openSourcesPanel();
+    await click(PAUSE_ON_EXCEPTION_BUTTON);
+    await goToResource('sources/wasm/unreachable.html');
+    await waitFor(RESUME_BUTTON);
+
+    const locals = await getValuesForScope('LOCAL', 3, 5);
+    assert.deepEqual(locals, [
+      'local: TestType',
+      'member: TestTypeMember',
+      'member2: TestTypeMember2',
       'recurse: 27',
       'value: 26',
     ]);
@@ -1047,7 +1215,7 @@ describe('The Debugger Language Plugins', async () => {
   });
 
   it('lets users manually attach debug info', async () => {
-    const {target, frontend} = getBrowserAndPages();
+    const {target} = getBrowserAndPages();
     const extension = await loadExtension(
         'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
@@ -1070,30 +1238,25 @@ describe('The Debugger Language Plugins', async () => {
     await goToResource(
         'extensions/wasm_module.html?module=/test/e2e/resources/extensions/global_variable.wasm&defer=1');
     await openSourcesPanel();
-    await listenForSourceFilesAdded(frontend);
-    const additionalFilesPromise = waitForAdditionalSourceFiles(frontend);
-    await target.evaluate('loadModule();');
-    await additionalFilesPromise;
-
-    const capturedFileNames = await retrieveSourceFilesAdded(frontend);
-    assert.deepEqual(capturedFileNames, ['/test/e2e/resources/extensions/global_variable.wasm']);
 
     {
-      await clearSourceFilesAdded(frontend);
-      const additionalFilesPromise = waitForAdditionalSourceFiles(frontend);
-      await openFileInEditor('global_variable.wasm');
+      const capturedFileNames = await captureAddedSourceFiles(1, () => target.evaluate('loadModule();'));
+      assert.deepEqual(capturedFileNames, ['/test/e2e/resources/extensions/global_variable.wasm']);
+    }
 
-      const editor = await waitForAria('Code editor');
-      await click(editor, {clickOptions: {button: 'right'}});
-      const menuItem = await waitForAria('Add DWARF debug info…');
-      await click(menuItem);
-      await waitFor('.add-source-map');
-      await typeText('foobar81');
-      await pressKey('Enter');
+    {
+      const capturedFileNames = await captureAddedSourceFiles(1, async () => {
+        await openFileInEditor('global_variable.wasm');
 
-      await additionalFilesPromise;
+        const editor = await waitForAria('Code editor');
+        await click(editor, {clickOptions: {button: 'right'}});
+        const menuItem = await waitForAria('Add DWARF debug info…');
+        await click(menuItem);
+        await waitFor('.add-source-map');
+        await typeText('foobar81');
+        await pressKey('Enter');
+      });
 
-      const capturedFileNames = await retrieveSourceFilesAdded(frontend);
       assert.deepEqual(capturedFileNames, ['/source_file.c']);
     }
   });

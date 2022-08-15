@@ -47,6 +47,10 @@ const UIStrings = {
   */
   threadS: 'Thread {PH1}',
   /**
+  *@description Text shown when rendering the User Interactions track in the Performance panel
+  */
+  userInteractions: 'User Interactions',
+  /**
   *@description Title of a worker in the timeline flame chart of the Performance panel
   *@example {https://google.com} PH1
   */
@@ -94,6 +98,18 @@ const UIStrings = {
    *@description Title of an auction worklet in the timeline flame chart of the Performance panel
    */
   unknownWorklet: 'Auction Worklet',
+
+  /**
+   *@description Title of control thread of a service process for an auction worklet in the timeline flame chart of the Performance panel
+   */
+  workletService: 'Auction Worklet Service',
+
+  /**
+   *@description Title of control thread of a service process for an auction worklet with known URL in the timeline flame chart of the Performance panel
+   * @example {https://google.com} PH1
+   */
+  workletServiceS: 'Auction Worklet Service — {PH1}',
+
 };
 const str_ = i18n.i18n.registerUIStrings('models/timeline_model/TimelineModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -232,6 +248,29 @@ export class TimelineModelImpl {
   isUserTimingEvent(event: SDK.TracingModel.Event): boolean {
     return event.categoriesString === TimelineModelImpl.Category.UserTiming;
   }
+
+  isEventTimingInteractionEvent(event: SDK.TracingModel.Event): boolean {
+    if (event.name !== RecordType.EventTiming) {
+      return false;
+    }
+    type InteractionEventData = {
+      duration?: number, interactionId: number,
+    };
+    const data = event.args.data as InteractionEventData;
+    // Filter out:
+    // 1. events without a duration, or a duration of 0
+    // 2. events without an interactionId, or with an interactionId of 0,
+    //    which indicates that it's not a "top level" interaction event and
+    //    we can therefore ignore it. This can happen with "mousedown" for
+    //    example; an interaction ID is assigned to the "pointerdown" event
+    //    as it's the "first" event to be triggered when the user clicks,
+    //    but the browser doesn't attempt to assign IDs to all subsequent
+    //    events, as that's a hard heuristic to get right.
+    const duration = data.duration || 0;
+    const interactionId = data.interactionId || 0;
+    return (duration > 0 && interactionId > 0);
+  }
+
   isParseHTMLEvent(event: SDK.TracingModel.Event): boolean {
     return event.name === RecordType.ParseHTML;
   }
@@ -350,7 +389,43 @@ export class TimelineModelImpl {
     this.processAsyncBrowserEvents(tracingModel);
     this.buildGPUEvents(tracingModel);
     this.buildLoadingEvents(tracingModel, layoutShiftEvents);
+    this.collectInteractionEvents(tracingModel);
     this.resetProcessingState();
+  }
+
+  private collectInteractionEvents(tracingModel: SDK.TracingModel.TracingModel): void {
+    const interactionEvents: SDK.TracingModel.AsyncEvent[] = [];
+    for (const process of tracingModel.sortedProcesses()) {
+      // Interactions will only appear on the Renderer processes.
+      if (process.name() !== 'Renderer') {
+        continue;
+      }
+
+      // And also only on CrRendererMain threads.
+      const rendererThread = process.threadByName('CrRendererMain');
+      if (!rendererThread) {
+        continue;
+      }
+
+      // EventTiming events are async, so we only have to check asyncEvents,
+      // and not worry about sync events.
+      for (const event of rendererThread.asyncEvents()) {
+        if (!this.isEventTimingInteractionEvent(event)) {
+          continue;
+        }
+        interactionEvents.push(event);
+      }
+    }
+    if (interactionEvents.length === 0) {
+      // No events found, so bail early and don't bother creating the track
+      // because it will be empty.
+      return;
+    }
+
+    const track = this.ensureNamedTrack(TrackType.UserInteractions);
+    track.name = UIStrings.userInteractions;
+    track.forMainFrame = true;
+    track.asyncEvents = interactionEvents;
   }
 
   private processGenericTrace(tracingModel: SDK.TracingModel.TracingModel): void {
@@ -535,7 +610,8 @@ export class TimelineModelImpl {
         } else {
           let urlForOther: Platform.DevToolsPath.UrlString|null = null;
           let workletTypeForOther: WorkletType = WorkletType.NotWorklet;
-          if (thread.name() === TimelineModelImpl.AuctionWorkletThreadName) {
+          if (thread.name() === TimelineModelImpl.AuctionWorkletThreadName ||
+              thread.name() === TimelineModelImpl.UtilityMainThreadName) {
             if (typeof workletUrl !== 'boolean') {
               urlForOther = workletUrl;
             }
@@ -822,6 +898,9 @@ export class TimelineModelImpl {
     } else if (thread.name() === TimelineModelImpl.AuctionWorkletThreadName) {
       track.url = url || Platform.DevToolsPath.EmptyUrlString;
       track.name = TimelineModelImpl.nameAuctionWorklet(workletType, url);
+    } else if (workletType !== WorkletType.NotWorklet && thread.name() === TimelineModelImpl.UtilityMainThreadName) {
+      track.url = url || Platform.DevToolsPath.EmptyUrlString;
+      track.name = url ? i18nString(UIStrings.workletServiceS, {PH1: url}) : i18nString(UIStrings.workletService);
     }
     this.tracksInternal.push(track);
 
@@ -1611,6 +1690,7 @@ export enum RecordType {
   TimeStamp = 'TimeStamp',
   ConsoleTime = 'ConsoleTime',
   UserTiming = 'UserTiming',
+  EventTiming = 'EventTiming',
 
   ResourceWillSendRequest = 'ResourceWillSendRequest',
   ResourceSendRequest = 'ResourceSendRequest',
@@ -1725,6 +1805,7 @@ export namespace TimelineModelImpl {
   export const WorkerThreadNameLegacy = 'DedicatedWorker Thread';
   export const RendererMainThreadName = 'CrRendererMain';
   export const BrowserMainThreadName = 'CrBrowserMain';
+  export const UtilityMainThreadName = 'CrUtilityMain';
   export const AuctionWorkletThreadName = 'AuctionV8HelperThread';
 
   export const DevToolsMetadataEvent = {
@@ -1830,6 +1911,7 @@ export enum TrackType {
   GPU = 'GPU',
   Experience = 'Experience',
   Other = 'Other',
+  UserInteractions = 'UserInteractions',
 }
 
 const enum WorkletType {

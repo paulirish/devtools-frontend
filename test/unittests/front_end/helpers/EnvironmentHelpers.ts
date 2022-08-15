@@ -68,6 +68,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'breakpointsActive', true),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'javaScriptDisabled', false),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'skipContentScripts', false),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'automaticallyIgnoreListKnownThirdPartyScripts', true),
     createSettingValue(
         Common.Settings.SettingCategory.DEBUGGER, 'skipStackFramesPattern', '', Common.Settings.SettingType.REGEX),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'showDetailedInspectTooltip', true),
@@ -145,6 +146,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.NETWORK, 'network_log.record-log', true, Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.SOURCES, 'network.enable-unc-loading', false,
+        Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'hideNetworkMessages', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(

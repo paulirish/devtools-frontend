@@ -18,7 +18,6 @@ describeWithEnvironment('CSSRuleValidator', async () => {
         ['flex-wrap', 'nowrap'],
         ['align-content', 'center'],
       ]),
-      parentsComputedStyles: null,
       validator: () => new Elements.CSSRuleValidator.AlignContentValidator(),
       expectedResult: false,
     },
@@ -29,7 +28,6 @@ describeWithEnvironment('CSSRuleValidator', async () => {
         ['flex-wrap', 'nowrap'],
         ['align-content', 'center'],
       ]),
-      parentsComputedStyles: null,
       validator: () => new Elements.CSSRuleValidator.AlignContentValidator(),
       expectedResult: true,
     },
@@ -45,7 +43,7 @@ describeWithEnvironment('CSSRuleValidator', async () => {
       expectedResult: false,
     },
     {
-      description: 'Passes the vlaidation when flex properties are set to flex items',
+      description: 'Passes the validation when flex properties are set to flex items',
       computedStyles: new Map<string, string>([
         ['flex', '1'],
       ]),
@@ -55,6 +53,128 @@ describeWithEnvironment('CSSRuleValidator', async () => {
       validator: () => new Elements.CSSRuleValidator.FlexItemValidator(),
       expectedResult: true,
     },
+    {
+      description: 'Passes the validation when flex container properties are set to flex container',
+      computedStyles: new Map<string, string>([
+        ['display', 'flex'],
+        ['flex-direction', 'column'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.FlexContainerValidator(),
+      expectedResult: true,
+    },
+    {
+      description: 'Reports a rule validation when flex container properties are set to non-flex container',
+      computedStyles: new Map<string, string>([
+        ['display', 'block'],
+        ['flex-direction', 'column'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.FlexContainerValidator(),
+      expectedResult: false,
+    },
+    {
+      description: 'Passes the validation when grid container properties are set to grid container',
+      computedStyles: new Map<string, string>([
+        ['display', 'grid'],
+        ['grid', '100px / 200px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.GridContainerValidator(),
+      expectedResult: true,
+    },
+    {
+      description: 'Reports a rule validation when grid container properties are set to non-grid container',
+      computedStyles: new Map<string, string>([
+        ['display', 'flex'],
+        ['grid', '100px / 200px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.GridContainerValidator(),
+      expectedResult: false,
+    },
+    {
+      description: 'Passes the validation when grid item properties are set to grid items',
+      computedStyles: new Map<string, string>([
+        ['grid', '100px / 200px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>([
+        ['display', 'grid'],
+      ]),
+      validator: () => new Elements.CSSRuleValidator.GridItemValidator(),
+      expectedResult: true,
+    },
+    {
+      description: 'Reports a rule validation when grid item properties are set to non-grid items',
+      computedStyles: new Map<string, string>([
+        ['grid', '100px / 200px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>([
+        ['display', 'flex'],
+      ]),
+      validator: () => new Elements.CSSRuleValidator.GridItemValidator(),
+      expectedResult: false,
+    },
+    {
+      description: 'Passes the validation when padding is not set to table elements',
+      computedStyles: new Map<string, string>([
+        ['display', 'block'],
+        ['padding', '15px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.PaddingValidator(),
+      expectedResult: true,
+    },
+    {
+      description: 'Reports a rule validation when padding is set to table elements',
+      computedStyles: new Map<string, string>([
+        ['display', 'table-row'],
+        ['padding', '15px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.PaddingValidator(),
+      expectedResult: false,
+    },
+    {
+      description: 'Passes the validation when top is set to non-static positioned element',
+      computedStyles: new Map<string, string>([
+        ['position', 'absolute'],
+        ['top', '20px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.PositionValidator(),
+      expectedResult: true,
+    },
+    {
+      description: 'Reports a rule validation when top is set to static positioned elements',
+      computedStyles: new Map<string, string>([
+        ['position', 'static'],
+        ['top', '20px'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.PositionValidator(),
+      expectedResult: false,
+    },
+    {
+      description: 'Passes the validation when z-index is set to non-static positioned element',
+      computedStyles: new Map<string, string>([
+        ['position', 'absolute'],
+        ['z-index', '5'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.ZIndexValidator(),
+      expectedResult: true,
+    },
+    {
+      description: 'Reports a rule validation when z-index is set to static positioned elements',
+      computedStyles: new Map<string, string>([
+        ['position', 'static'],
+        ['z-index', '5'],
+      ]),
+      parentsComputedStyles: new Map<string, string>(),
+      validator: () => new Elements.CSSRuleValidator.ZIndexValidator(),
+      expectedResult: false,
+    },
   ];
 
   before(async () => {
@@ -63,8 +183,13 @@ describeWithEnvironment('CSSRuleValidator', async () => {
 
   for (const test of tests) {
     it(test.description, () => {
-      const actualResult = test.validator().isRuleValid(test.computedStyles, test.parentsComputedStyles);
-      assert.deepEqual(actualResult, test.expectedResult);
+      const actualResult = test.validator().getHint(
+          test.validator().getApplicableProperties()[0], test.computedStyles, test.parentsComputedStyles);
+      if (test.expectedResult) {
+        assert.isUndefined(actualResult);
+      } else {
+        assert.isDefined(actualResult);
+      }
     });
   }
 });

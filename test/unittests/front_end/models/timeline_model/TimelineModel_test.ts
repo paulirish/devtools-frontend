@@ -555,6 +555,133 @@ describeWithEnvironment('TimelineModel', () => {
     ]);
   });
 
+  it('includes utility process main thread, too', () => {
+    traceWithEvents([
+      {
+        'args': {
+          'data': {
+            'host': '192.168.0.105',
+            'pid': 1538739,
+            'target': 'a1e485ff-f876-41cb-90ca-85c4b684b302',
+            'type': 'bidder',
+          },
+        },
+        'cat': 'disabled-by-default-devtools.timeline',
+        'name': 'AuctionWorkletRunningInProcess',
+        'ph': 'I',
+        'pid': 1537480,
+        's': 't',
+        'tid': 1537480,
+        'ts': 962633184323,
+        'tts': 23961306,
+      },
+      {
+        'args': {'name': 'AuctionV8HelperThread'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 7,
+        'ts': 0,
+      },
+      {
+        'args': {'name': 'CrUtilityMain'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 1,
+        'ts': 0,
+      },
+      {
+        'args': {'name': 'ThreadPoolForegroundWorker'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 15,
+        'ts': 0,
+      },
+      {
+        'args': {},
+        'cat': 'devtools.timeline,disabled-by-default-v8.gc',
+        'dur': 531,
+        'name': 'V8.GC_BACKGROUND_UNMAPPER',
+        'ph': 'X',
+        'pid': 1538739,
+        'tdur': 533,
+        'tid': 15,
+        'ts': 962632415206,
+        'tts': 165467,
+      },
+      {
+        'args': {},
+        'cat': 'devtools.timeline',
+        'dur': 531,
+        'name': 'ResourceSendRequest',
+        'ph': 'X',
+        'pid': 1538739,
+        'tdur': 533,
+        'tid': 1,
+        'ts': 962632415206,
+        'tts': 165467,
+      },
+    ] as unknown as SDK.TracingManager.EventPayload[]);
+    const trackInfo = summarizeArray(timelineModel.tracks());
+    assert.deepEqual(trackInfo, [
+      {
+        forMainFrame: false,
+        name: 'Thread 0',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 0,
+        threadName: '',
+        type: 'Other',
+        url: '',
+      },
+      {
+        forMainFrame: true,
+        name: 'CrRendererMain',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 1,
+        threadName: 'CrRendererMain',
+        type: 'MainThread',
+        url: 'https://192.168.0.105/run.html',
+      },
+      {
+        forMainFrame: false,
+        name: 'Bidder Worklet — https://192.168.0.105',
+        processId: 1538739,
+        processName: 'Service: auction_worklet.mojom.AuctionWorkletService',
+        threadId: 7,
+        threadName: 'AuctionV8HelperThread',
+        type: 'Other',
+        url: 'https://192.168.0.105',
+      },
+      {
+        forMainFrame: false,
+        name: 'Auction Worklet Service — https://192.168.0.105',
+        processId: 1538739,
+        processName: 'Service: auction_worklet.mojom.AuctionWorkletService',
+        threadId: 1,
+        threadName: 'CrUtilityMain',
+        type: 'Other',
+        url: 'https://192.168.0.105',
+      },
+      {
+        forMainFrame: false,
+        name: '',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 1,
+        threadName: 'CrRendererMain',
+        type: 'Experience',
+        url: '',
+      },
+    ]);
+  });
+
   it('handles auction worklet exit events', () => {
     traceWithEvents([
       {
@@ -708,5 +835,70 @@ describeWithEnvironment('TimelineModel', () => {
       }
       assert.deepEqual(track.events.map(event => event.name), ['RunTaskA', 'RunTaskB']);
     }
+  });
+
+  describe('#isEventTimingInteractionEvent', () => {
+    it('returns true for an event timing with a duration and interactionId', () => {
+      const event = {
+        name: 'EventTiming',
+        args: {
+          data: {
+            duration: 100,
+            interactionId: 200,
+          },
+        },
+      } as unknown as SDK.TracingModel.Event;
+      assert.isTrue(timelineModel.isEventTimingInteractionEvent(event));
+    });
+
+    it('returns false if the event has no duration', () => {
+      const event = {
+        name: 'EventTiming',
+        args: {
+          data: {
+            interactionId: 200,
+          },
+        },
+      } as unknown as SDK.TracingModel.Event;
+      assert.isFalse(timelineModel.isEventTimingInteractionEvent(event));
+    });
+
+    it('returns false if the event has no interaction ID', () => {
+      const event = {
+        name: 'EventTiming',
+        args: {
+          data: {
+            duration: 200,
+          },
+        },
+      } as unknown as SDK.TracingModel.Event;
+      assert.isFalse(timelineModel.isEventTimingInteractionEvent(event));
+    });
+
+    it('returns false if the duration is 0', () => {
+      const event = {
+        name: 'EventTiming',
+        args: {
+          data: {
+            duration: 0,
+            interactionId: 200,
+          },
+        },
+      } as unknown as SDK.TracingModel.Event;
+      assert.isFalse(timelineModel.isEventTimingInteractionEvent(event));
+    });
+
+    it('returns false if the interactionId is 0', () => {
+      const event = {
+        name: 'EventTiming',
+        args: {
+          data: {
+            duration: 100,
+            interactionId: 0,
+          },
+        },
+      } as unknown as SDK.TracingModel.Event;
+      assert.isFalse(timelineModel.isEventTimingInteractionEvent(event));
+    });
   });
 });

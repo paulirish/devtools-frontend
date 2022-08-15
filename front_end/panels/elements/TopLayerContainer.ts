@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
@@ -13,59 +14,69 @@ import {type ElementsTreeElement} from './ElementsTreeElement.js';
 
 const UIStrings = {
   /**
-   * @description Top layer is rendered closest to the user within a viewport, therefore its elements always appear on top of all other content
-   */
-  topLayer: 'top-layer',
+  *@description Link text content in Elements Tree Outline of the Elements panel. When clicked, it "reveals" the true location of an element.
+  */
+  reveal: 'reveal',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/elements/TopLayerContainer.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class TopLayerContainer extends UI.TreeOutline.TreeElement {
-  treeOutline: ElementsTreeOutline.ElementsTreeOutline|null;
+  tree: ElementsTreeOutline.ElementsTreeOutline;
   domModel: SDK.DOMModel.DOMModel;
   currentTopLayerElements: Set<ElementsTreeElement>;
-  bodyElement: ElementsTreeElement;
+  topLayerUpdateThrottler: Common.Throttler.Throttler;
 
-  constructor(bodyElement: ElementsTreeElement) {
+  constructor(tree: ElementsTreeOutline.ElementsTreeOutline, domModel: SDK.DOMModel.DOMModel) {
     super('#top-layer');
-    this.bodyElement = bodyElement;
-    this.domModel = bodyElement.node().domModel();
-    this.treeOutline = null;
+    this.tree = tree;
+    this.domModel = domModel;
     this.currentTopLayerElements = new Set();
+    this.topLayerUpdateThrottler = new Common.Throttler.Throttler(1);
   }
 
-  updateBody(bodyElement: ElementsTreeElement): void {
-    this.bodyElement = bodyElement;
+  async throttledUpdateTopLayerElements(): Promise<void> {
+    await this.topLayerUpdateThrottler.schedule(() => this.updateTopLayerElements());
   }
 
-  async addTopLayerElementsAsChildren(): Promise<boolean> {
+  async updateTopLayerElements(): Promise<void> {
+    this.removeChildren();
     this.removeCurrentTopLayerElementsAdorners();
     this.currentTopLayerElements = new Set();
+
     const newTopLayerElementsIDs = await this.domModel.getTopLayerElements();
-    if (newTopLayerElementsIDs === null) {
-      return false;
+    if (!newTopLayerElementsIDs || newTopLayerElementsIDs.length === 0) {
+      return;
     }
+
     let topLayerElementIndex = 0;
-    if (newTopLayerElementsIDs) {
-      for (const elementID of newTopLayerElementsIDs) {
-        const topLayerDOMNode = this.domModel.idToDOMNode.get(elementID);
-        // Will need to add support for backdrop in the future.
-        if (topLayerDOMNode && topLayerDOMNode.nodeName() !== '::backdrop') {
-          topLayerElementIndex++;
-          const topLayerElementShortcut = new SDK.DOMModel.DOMNodeShortcut(
-              this.domModel.target(), topLayerDOMNode.backendNodeId(), 0, topLayerDOMNode.nodeName());
-          const topLayerTreeElement = this.treeOutline?.treeElementByNode.get(topLayerDOMNode);
-          const topLayerElementRepresentation = new ElementsTreeOutline.ShortcutTreeElement(topLayerElementShortcut);
-          if (topLayerTreeElement && !this.currentTopLayerElements.has(topLayerTreeElement)) {
-            this.appendChild(topLayerElementRepresentation);
-            this.addTopLayerAdorner(topLayerTreeElement, topLayerElementRepresentation, topLayerElementIndex);
-            this.currentTopLayerElements.add(topLayerTreeElement);
-          }
+    for (let i = 0; i < newTopLayerElementsIDs.length; i++) {
+      const topLayerDOMNode = this.domModel.idToDOMNode.get(newTopLayerElementsIDs[i]);
+      if (topLayerDOMNode && topLayerDOMNode.nodeName() !== '::backdrop') {
+        const topLayerElementShortcut = new SDK.DOMModel.DOMNodeShortcut(
+            this.domModel.target(), topLayerDOMNode.backendNodeId(), 0, topLayerDOMNode.nodeName());
+        const topLayerElementRepresentation = new ElementsTreeOutline.ShortcutTreeElement(topLayerElementShortcut);
+        const topLayerTreeElement = this.tree.treeElementByNode.get(topLayerDOMNode);
+        if (!topLayerTreeElement) {
+          continue;
+        }
+
+        topLayerElementIndex++;
+        this.addTopLayerAdorner(topLayerTreeElement, topLayerElementRepresentation, topLayerElementIndex);
+        this.currentTopLayerElements.add(topLayerTreeElement);
+        this.appendChild(topLayerElementRepresentation);
+        // Add the element's backdrop if previous top layer element is a backdrop.
+        const previousTopLayerDOMNode =
+            (i > 0) ? this.domModel.idToDOMNode.get(newTopLayerElementsIDs[i - 1]) : undefined;
+        if (previousTopLayerDOMNode && previousTopLayerDOMNode.nodeName() === '::backdrop') {
+          const backdropElementShortcut = new SDK.DOMModel.DOMNodeShortcut(
+              this.domModel.target(), previousTopLayerDOMNode.backendNodeId(), 0, previousTopLayerDOMNode.nodeName());
+          const backdropElementRepresentation = new ElementsTreeOutline.ShortcutTreeElement(backdropElementShortcut);
+          topLayerElementRepresentation.appendChild(backdropElementRepresentation);
         }
       }
     }
-    return topLayerElementIndex > 0;
   }
 
   private removeCurrentTopLayerElementsAdorners(): void {
@@ -96,8 +107,8 @@ export class TopLayerContainer extends UI.TreeOutline.TreeElement {
       adorner.addInteraction(onClick, {
         isToggle: false,
         shouldPropagateOnKeydown: false,
-        ariaLabelDefault: i18nString(UIStrings.topLayer),
-        ariaLabelActive: i18nString(UIStrings.topLayer),
+        ariaLabelDefault: i18nString(UIStrings.reveal),
+        ariaLabelActive: i18nString(UIStrings.reveal),
       });
       adorner.addEventListener('mousedown', e => e.consume(), false);
     }

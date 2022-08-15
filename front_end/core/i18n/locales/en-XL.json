@@ -1397,6 +1397,9 @@
   "models/issues_manager/DeprecationIssue.ts | eventPath": {
     "message": "Event.path îś d̂ép̂ŕêćât́êd́ âńd̂ ẃîĺl̂ b́ê ŕêḿôv́êd́. P̂ĺêáŝé ûśê Event.composedPath() ín̂śt̂éâd́."
   },
+  "models/issues_manager/DeprecationIssue.ts | expectCTHeader": {
+    "message": "T̂h́ê Expect-CT h́êád̂ér̂ íŝ d́êṕr̂éĉát̂éd̂ án̂d́ ŵíl̂ĺ b̂é r̂ém̂óv̂éd̂. Ćĥŕôḿê ŕêq́ûír̂éŝ Ćêŕt̂íf̂íĉát̂é T̂ŕâńŝṕâŕêńĉý f̂ór̂ ál̂ĺ p̂úb̂ĺîćl̂ý t̂ŕûśt̂éd̂ ćêŕt̂íf̂íĉát̂éŝ íŝśûéd̂ áf̂t́êŕ Âṕr̂íl̂ 30, 2018."
+  },
   "models/issues_manager/DeprecationIssue.ts | feature": {
     "message": "Ĉh́êćk̂ t́ĥé f̂éât́ûŕê śt̂át̂úŝ ṕâǵê f́ôŕ m̂ór̂é d̂ét̂áîĺŝ."
   },
@@ -1447,6 +1450,9 @@
   },
   "models/issues_manager/DeprecationIssue.ts | openWebDatabaseInsecureContext": {
     "message": "Ŵéb̂ŚQ̂Ĺ îń n̂ón̂-śêćûŕê ćôńt̂éx̂t́ŝ íŝ d́êṕr̂éĉát̂éd̂ án̂d́ ŵíl̂ĺ b̂é r̂ém̂óv̂éd̂ ín̂ Ḿ107. P̂ĺêáŝé ûśê Ẃêb́ Ŝt́ôŕâǵê ór̂ Ín̂d́êx́êd́ D̂át̂áb̂áŝé."
+  },
+  "models/issues_manager/DeprecationIssue.ts | persistentQuotaType": {
+    "message": "StorageType.persistent îś d̂ép̂ŕêćât́êd́. P̂ĺêáŝé ûśê śt̂án̂d́âŕd̂íẑéd̂ navigator.storage ín̂śt̂éâd́."
   },
   "models/issues_manager/DeprecationIssue.ts | pictureSourceSrc": {
     "message": "<source src> ŵít̂h́ â <picture> ṕâŕêńt̂ íŝ ín̂v́âĺîd́ âńd̂ t́ĥér̂éf̂ór̂é îǵn̂ór̂éd̂. Ṕl̂éâśê úŝé <source srcset> îńŝt́êád̂."
@@ -1703,11 +1709,20 @@
   "models/timeline_model/TimelineModel.ts | unknownWorkletS": {
     "message": "Âúĉt́îón̂ Ẃôŕk̂ĺêt́ — {PH1}"
   },
+  "models/timeline_model/TimelineModel.ts | userInteractions": {
+    "message": "Ûśêŕ Îńt̂ér̂áĉt́îón̂ś"
+  },
   "models/timeline_model/TimelineModel.ts | workerS": {
     "message": "Worker — {PH1}"
   },
   "models/timeline_model/TimelineModel.ts | workerSS": {
     "message": "Worker: {PH1} — {PH2}"
+  },
+  "models/timeline_model/TimelineModel.ts | workletService": {
+    "message": "Âúĉt́îón̂ Ẃôŕk̂ĺêt́ Ŝér̂v́îćê"
+  },
+  "models/timeline_model/TimelineModel.ts | workletServiceS": {
+    "message": "Âúĉt́îón̂ Ẃôŕk̂ĺêt́ Ŝér̂v́îćê — {PH1}"
   },
   "models/workspace/UISourceCode.ts | index": {
     "message": "(îńd̂éx̂)"
@@ -3275,6 +3290,9 @@
   "panels/application/components/Prerender2.ts | EmbedderTriggeredAndSameOriginRedirected": {
     "message": "P̂ŕêŕêńd̂ér̂ín̂ǵ t̂ŕîǵĝér̂éd̂ b́ŷ Ćĥŕôḿê ín̂t́êŕn̂ál̂ (é.ĝ., Óm̂ńîb́ôx́ p̂ŕêŕêńd̂ér̂ín̂ǵ) îś ĉán̂ćêĺêd́ b̂éĉáûśê t́ĥé n̂áv̂íĝát̂íôń îś r̂éd̂ír̂éĉt́êd́ t̂ó âńôt́ĥér̂ śâḿê-ór̂íĝín̂ ṕâǵê."
   },
+  "panels/application/components/Prerender2.ts | FailToGetMemoryUsage": {
+    "message": "F̂áîĺ t̂ó ĝét̂ ḿêḿôŕŷ úŝáĝé"
+  },
   "panels/application/components/Prerender2.ts | InProgressNavigation": {
     "message": "ÎńP̂ŕôǵr̂éŝśN̂áv̂íĝát̂íôń."
   },
@@ -3295,6 +3313,9 @@
   },
   "panels/application/components/Prerender2.ts | MaxNumOfRunningPrerendersExceeded": {
     "message": "M̂áx̂ ńûḿb̂ér̂ óf̂ ṕr̂ér̂én̂d́êŕîńĝ éx̂ćêéd̂éd̂."
+  },
+  "panels/application/components/Prerender2.ts | MemoryLimitExceeded": {
+    "message": "M̂ém̂ór̂ý l̂ím̂ít̂ éx̂ćêéd̂éd̂"
   },
   "panels/application/components/Prerender2.ts | MixedContent": {
     "message": "P̂ŕêŕêńd̂ér̂ín̂ǵ îś ĉán̂ćêĺêd́ b̂ý â ḿîx́êd́ ĉón̂t́êńt̂ f́r̂ám̂é."
@@ -4818,22 +4839,25 @@
     "message": "Ŝh́ôẃ âĺl̂"
   },
   "panels/elements/CSSRuleValidator.ts | deprecatedPropertyHintPrefix": {
-    "message": "D̂ép̂ŕêćât́êd́ P̂ŕôṕêŕt̂ý"
+    "message": "D̂ép̂ŕêćât́êd́ p̂ŕôṕêŕt̂ý"
   },
-  "panels/elements/CSSRuleValidator.ts | ruleValidationHintPrefix": {
-    "message": "Îńâćt̂ív̂é r̂úl̂é"
+  "panels/elements/CSSRuleValidator.ts | inactivePropertyHintPrefix": {
+    "message": "Îńâćt̂ív̂é p̂ŕôṕêŕt̂ý"
   },
   "panels/elements/CSSRuleValidator.ts | ruleViolatedByParentElementRuleFix": {
-    "message": "P̂ĺêáŝé ĉh́âńĝé p̂ár̂én̂t́ êĺêḿêńt̂ś {EXISTING_PARENT_ELEMENT_RULE} t̂ó {TARGET_PARENT_ELEMENT_RULE} t̂ó f̂íx̂ t́ĥíŝ íŝśûé."
+    "message": "T̂ŕŷ ćĥán̂ǵîńĝ t́ĥé {EXISTING_PARENT_ELEMENT_RULE} p̂ŕôṕêŕt̂ý ôń t̂h́ê ṕâŕêńt̂ t́ô {TARGET_PARENT_ELEMENT_RULE}."
   },
   "panels/elements/CSSRuleValidator.ts | ruleViolatedByParentElementRuleReason": {
-    "message": "P̂ár̂én̂t́ êĺêḿêńt̂ h́âś {REASON_RULE_CODE} r̂úl̂é, t̂h́êŕêf́ôŕê t́ĥíŝ él̂ém̂én̂t́ŝ {AFFECTED_RULE_CODE} h́âś n̂ó êf́f̂éĉt́"
+    "message": "T̂h́ê {REASON_PROPERTY_DECLARATION_CODE} ṕr̂óp̂ér̂t́ŷ ón̂ t́ĥé p̂ár̂én̂t́ êĺêḿêńt̂ b́ŷṕâśŝéŝ t́ĥé êf́f̂éĉt́ ôf́ {AFFECTED_PROPERTY_DECLARATION_CODE}."
+  },
+  "panels/elements/CSSRuleValidator.ts | ruleViolatedBySameElementRuleChangeSuggestion": {
+    "message": "T̂ŕŷ ćĥán̂ǵîńĝ t́ĥé {EXISTING_PROPERTY_DECLARATION} p̂ŕôṕêŕt̂ý t̂ó {TARGET_PROPERTY_DECLARATION}."
   },
   "panels/elements/CSSRuleValidator.ts | ruleViolatedBySameElementRuleFix": {
-    "message": "F̂ór̂ t́ĥíŝ ṕr̂óp̂ér̂t́ŷ t́ô ẃôŕk̂, ṕl̂éâśê ŕêḿôv́ê ór̂ ćĥán̂ǵê t́ĥé v̂ál̂úê óf̂ {REASON_RULE_CODE}"
+    "message": "T̂ŕŷ ŕêḿôv́îńĝ {REASON_PROPERTY_DECLARATION_CODE} ór̂ ćĥán̂ǵîńĝ ít̂ś v̂ál̂úê."
   },
   "panels/elements/CSSRuleValidator.ts | ruleViolatedBySameElementRuleReason": {
-    "message": "T̂h́îś êĺêḿêńt̂ h́âś {REASON_RULE_CODE} r̂úl̂é, t̂h́êŕêf́ôŕê {AFFECTED_RULE_CODE} h́âś n̂ó êf́f̂éĉt́."
+    "message": "T̂h́ê {REASON_PROPERTY_DECLARATION_CODE} ṕr̂óp̂ér̂t́ŷ ón̂ t́ĥé ŝám̂é êĺêḿêńt̂ b́ŷṕâśŝéŝ t́ĥé êf́f̂éĉt́ ôf́ {AFFECTED_PROPERTY_DECLARATION_CODE}."
   },
   "panels/elements/DOMLinkifier.ts | node": {
     "message": "<n̂ód̂é>"
@@ -5309,8 +5333,8 @@
   "panels/elements/StylesSidebarPane.ts | unknownPropertyName": {
     "message": "Ûńk̂ńôẃn̂ ṕr̂óp̂ér̂t́ŷ ńâḿê"
   },
-  "panels/elements/TopLayerContainer.ts | topLayer": {
-    "message": "t̂óp̂-ĺâýêŕ"
+  "panels/elements/TopLayerContainer.ts | reveal": {
+    "message": "r̂év̂éâĺ"
   },
   "panels/emulation/DeviceModeToolbar.ts | addDevicePixelRatio": {
     "message": "Âd́d̂ d́êv́îćê ṕîx́êĺ r̂át̂íô"
@@ -5693,11 +5717,11 @@
   "panels/issues/AttributionReportingIssueDetailsView.ts | element": {
     "message": "Êĺêḿêńt̂"
   },
-  "panels/issues/AttributionReportingIssueDetailsView.ts | frame": {
-    "message": "F̂ŕâḿê"
-  },
   "panels/issues/AttributionReportingIssueDetailsView.ts | invalidHeaderValue": {
     "message": "Îńv̂ál̂íd̂ H́êád̂ér̂ V́âĺûé"
+  },
+  "panels/issues/AttributionReportingIssueDetailsView.ts | maximumConcurrentRegistrations": {
+    "message": "M̂áx̂ím̂úm̂ Ćôńĉúr̂ŕêńt̂ Ŕêǵîśt̂ŕât́îón̂ś"
   },
   "panels/issues/AttributionReportingIssueDetailsView.ts | nViolations": {
     "message": "{n, plural, =1 {# v̂íôĺât́îón̂} other {# v́îól̂át̂íôńŝ}}"
@@ -6812,8 +6836,17 @@
   "panels/network/BlockedURLsPane.ts | textPatternToBlockMatching": {
     "message": "T̂éx̂t́ p̂át̂t́êŕn̂ t́ô b́l̂óĉḱ m̂át̂ćĥín̂ǵ r̂éq̂úêśt̂ś; ûśê * f́ôŕ ŵíl̂d́ĉár̂d́"
   },
+  "panels/network/components/RequestHeadersView.ts | activeClientExperimentVariation": {
+    "message": "Âćt̂ív̂é client experiment variation IDs."
+  },
+  "panels/network/components/RequestHeadersView.ts | activeClientExperimentVariationIds": {
+    "message": "Âćt̂ív̂é client experiment variation IDs t̂h́ât́ t̂ŕîǵĝér̂ śêŕv̂ér̂-śîd́ê b́êh́âv́îór̂."
+  },
   "panels/network/components/RequestHeadersView.ts | chooseThisOptionIfTheResourceAnd": {
     "message": "Ĉh́ôóŝé t̂h́îś ôṕt̂íôń îf́ t̂h́ê ŕêśôúr̂ćê án̂d́ t̂h́ê d́ôćûḿêńt̂ ár̂é ŝér̂v́êd́ f̂ŕôḿ t̂h́ê śâḿê śît́ê."
+  },
+  "panels/network/components/RequestHeadersView.ts | decoded": {
+    "message": "D̂éĉód̂éd̂:"
   },
   "panels/network/components/RequestHeadersView.ts | fromDiskCache": {
     "message": "(f̂ŕôḿ d̂íŝḱ ĉáĉh́ê)"
@@ -6835,6 +6868,9 @@
   },
   "panels/network/components/RequestHeadersView.ts | general": {
     "message": "Ĝén̂ér̂ál̂"
+  },
+  "panels/network/components/RequestHeadersView.ts | headerOverrides": {
+    "message": "Ĥéâd́êŕ ôv́êŕr̂íd̂éŝ"
   },
   "panels/network/components/RequestHeadersView.ts | learnMore": {
     "message": "L̂éâŕn̂ ḿôŕê"
@@ -6982,6 +7018,9 @@
   },
   "panels/network/network-meta.ts | dontGroupNetworkLogItemsByFrame": {
     "message": "D̂ón̂'t́ ĝŕôúp̂ ńêt́ŵór̂ḱ l̂óĝ ít̂ém̂ś b̂ý f̂ŕâḿê"
+  },
+  "panels/network/network-meta.ts | enableUNCLoading": {
+    "message": "Âĺl̂óŵ DevTools t́ô ĺôád̂ ŕêśôúr̂ćêś, ŝúĉh́ âś ŝóûŕĉé m̂áp̂ś, f̂ŕôḿ Ŵín̂d́ôẃŝ Śĥár̂éŝ v́îá UNC p̂át̂h́ŝ. D́îśâb́l̂éd̂ b́ŷ d́êf́âúl̂t́ f̂ór̂ śêćûŕît́ŷ ŕêáŝón̂ś."
   },
   "panels/network/network-meta.ts | frame": {
     "message": "f̂ŕâḿê"
@@ -8768,6 +8807,9 @@
   "panels/protocol_monitor/ProtocolMonitor.ts | sendRawCDPCommand": {
     "message": "Ŝén̂d́ â ŕâẃ CDP ĉóm̂ḿâńd̂"
   },
+  "panels/protocol_monitor/ProtocolMonitor.ts | sendRawCDPCommandExplanation": {
+    "message": "F̂ór̂ḿât́: 'Domain.commandName' f̂ór̂ á ĉóm̂ḿâńd̂ ẃît́ĥóût́ p̂ár̂ám̂ét̂ér̂ś, ôŕ '{\"command\":\"Domain.commandName\", \"parameters\": {...}}' âś â J́ŜÓN̂ ób̂j́êćt̂ f́ôŕ â ćôḿm̂án̂d́ ŵít̂h́ p̂ár̂ám̂ét̂ér̂ś. 'cmd'/'method' âńd̂ 'args'/'params'/'arguments' ár̂é âĺŝó ŝúp̂ṕôŕt̂éd̂ áŝ ál̂t́êŕn̂át̂ív̂é k̂éŷś f̂ór̂ t́ĥé JSON ôb́ĵéĉt́."
+  },
   "panels/protocol_monitor/ProtocolMonitor.ts | session": {
     "message": "Ŝéŝśîón̂"
   },
@@ -8921,6 +8963,12 @@
   "panels/security/SecurityPanel.ts | contentWithCertificateErrors": {
     "message": "ĉón̂t́êńt̂ ẃît́ĥ ćêŕt̂íf̂íĉát̂é êŕr̂ór̂ś"
   },
+  "panels/security/SecurityPanel.ts | enabled": {
+    "message": "êńâb́l̂éd̂"
+  },
+  "panels/security/SecurityPanel.ts | encryptedClientHello": {
+    "message": "Êńĉŕŷṕt̂éd̂ Ćl̂íêńt̂H́êĺl̂ó"
+  },
   "panels/security/SecurityPanel.ts | flaggedByGoogleSafeBrowsing": {
     "message": "F̂ĺâǵĝéd̂ b́ŷ Ǵôóĝĺê Śâf́ê B́r̂óŵśîńĝ"
   },
@@ -9044,6 +9092,9 @@
   "panels/security/SecurityPanel.ts | securityOverview": {
     "message": "Ŝéĉúr̂ít̂ý ôv́êŕv̂íêẃ"
   },
+  "panels/security/SecurityPanel.ts | serverSignature": {
+    "message": "Ŝér̂v́êŕ ŝíĝńât́ûŕê"
+  },
   "panels/security/SecurityPanel.ts | showFullDetails": {
     "message": "Ŝh́ôẃ f̂úl̂ĺ d̂ét̂áîĺŝ"
   },
@@ -9145,6 +9196,9 @@
   },
   "panels/security/SecurityPanel.ts | unknownCanceled": {
     "message": "Ûńk̂ńôẃn̂ / ćâńĉél̂éd̂"
+  },
+  "panels/security/SecurityPanel.ts | unknownField": {
+    "message": "ûńk̂ńôẃn̂"
   },
   "panels/security/SecurityPanel.ts | validAndTrusted": {
     "message": "v̂ál̂íd̂ án̂d́ t̂ŕûśt̂éd̂"
@@ -9530,6 +9584,12 @@
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | addPattern": {
     "message": "Âd́d̂ ṕât́t̂ér̂ń..."
   },
+  "panels/settings/FrameworkIgnoreListSettingsTab.ts | automaticallyIgnoreListKnownThirdPartyScripts": {
+    "message": "Âút̂óm̂át̂íĉál̂ĺŷ ád̂d́ k̂ńôẃn̂ t́ĥír̂d́-p̂ár̂t́ŷ śĉŕîṕt̂ś t̂ó îǵn̂ór̂é l̂íŝt́"
+  },
+  "panels/settings/FrameworkIgnoreListSettingsTab.ts | automaticallyIgnoreListKnownThirdPartyScriptsTooltip": {
+    "message": "Âd́d̂ śôúr̂ćêś f̂ŕôḿ t̂h́ê x_google_ignoreList f́îél̂d́ f̂ŕôḿ ŝóûŕĉé m̂áp̂ś t̂ó t̂h́ê íĝńôŕê ĺîśt̂"
+  },
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | behavior": {
     "message": "B̂éĥáv̂íôŕ"
   },
@@ -9727,6 +9787,9 @@
   },
   "panels/sources/BreakpointEditDialog.ts | pauseOnlyWhenTheConditionIsTrue": {
     "message": "P̂áûśê ón̂ĺŷ ẃĥén̂ t́ĥé ĉón̂d́ît́îón̂ íŝ t́r̂úê"
+  },
+  "panels/sources/BreakpointsSidebarPane.ts | noBreakpoints": {
+    "message": "N̂ó b̂ŕêák̂ṕôín̂t́ŝ"
   },
   "panels/sources/CallStackSidebarPane.ts | addAllContentScriptsToIgnoreList": {
     "message": "Âd́d̂ ál̂ĺ ĉón̂t́êńt̂ śĉŕîṕt̂ś t̂ó îǵn̂ór̂é l̂íŝt́"
@@ -10796,6 +10859,9 @@
   "panels/timeline/TimelineFlameChartDataProvider.ts | timings": {
     "message": "T̂ím̂ín̂ǵŝ"
   },
+  "panels/timeline/TimelineFlameChartDataProvider.ts | userInteractions": {
+    "message": "Îńt̂ér̂áĉt́îón̂ś"
+  },
   "panels/timeline/TimelineFlameChartNetworkDataProvider.ts | network": {
     "message": "N̂ét̂ẃôŕk̂"
   },
@@ -11258,6 +11324,9 @@
   "panels/timeline/TimelineUIUtils.ts | event": {
     "message": "Êv́êńt̂"
   },
+  "panels/timeline/TimelineUIUtils.ts | eventTiming": {
+    "message": "Êv́êńt̂ T́îḿîńĝ"
+  },
   "panels/timeline/TimelineUIUtils.ts | evolvedClsLink": {
     "message": "êv́ôĺv̂éd̂"
   },
@@ -11368,6 +11437,9 @@
   },
   "panels/timeline/TimelineUIUtils.ts | installTimer": {
     "message": "Îńŝt́âĺl̂ T́îḿêŕ"
+  },
+  "panels/timeline/TimelineUIUtils.ts | interactionEvent": {
+    "message": "Îńt̂ér̂áĉt́îón̂ t́ŷṕê:{PH1} íd̂:{PH2}"
   },
   "panels/timeline/TimelineUIUtils.ts | invalidateLayout": {
     "message": "Îńv̂ál̂íd̂át̂é L̂áŷóût́"
@@ -12076,6 +12148,12 @@
   },
   "ui/components/linear_memory_inspector/linear_memory_inspector-meta.ts | showMemoryInspector": {
     "message": "Ŝh́ôẃ M̂ém̂ór̂ý Îńŝṕêćt̂ór̂"
+  },
+  "ui/components/linear_memory_inspector/LinearMemoryHighlightChipList.ts | deleteHighlight": {
+    "message": "D̂él̂ét̂é m̂ém̂ór̂ý ĥíĝh́l̂íĝh́t̂"
+  },
+  "ui/components/linear_memory_inspector/LinearMemoryHighlightChipList.ts | jumpToAddress": {
+    "message": "Ĵúm̂ṕ t̂ó ĥíĝh́l̂íĝh́t̂éd̂ ḿêḿôŕŷ"
   },
   "ui/components/linear_memory_inspector/LinearMemoryInspector.ts | addressHasToBeANumberBetweenSAnd": {
     "message": "Âd́d̂ŕêśŝ h́âś t̂ó b̂é â ńûḿb̂ér̂ b́êt́ŵéêń {PH1} âńd̂ {PH2}"

@@ -237,6 +237,10 @@ export namespace Accessibility {
      */
     role?: AXValue;
     /**
+     * This `Node`'s Chrome raw role.
+     */
+    chromeRole?: AXValue;
+    /**
      * The accessible name for this `Node`.
      */
     name?: AXValue;
@@ -699,6 +703,7 @@ export namespace Audits {
     ExcludeSameSiteStrict = 'ExcludeSameSiteStrict',
     ExcludeInvalidSameParty = 'ExcludeInvalidSameParty',
     ExcludeSamePartyCrossPartyContext = 'ExcludeSamePartyCrossPartyContext',
+    ExcludeDomainNonASCII = 'ExcludeDomainNonASCII',
   }
 
   export const enum CookieWarningReason {
@@ -711,6 +716,7 @@ export namespace Audits {
     WarnSameSiteLaxCrossDowngradeStrict = 'WarnSameSiteLaxCrossDowngradeStrict',
     WarnSameSiteLaxCrossDowngradeLax = 'WarnSameSiteLaxCrossDowngradeLax',
     WarnAttributeValueExceedsMaxSize = 'WarnAttributeValueExceedsMaxSize',
+    WarnDomainNonASCII = 'WarnDomainNonASCII',
   }
 
   export const enum CookieOperation {
@@ -959,9 +965,15 @@ export namespace Audits {
 
   export const enum AttributionReportingIssueType {
     PermissionPolicyDisabled = 'PermissionPolicyDisabled',
-    AttributionSourceUntrustworthyOrigin = 'AttributionSourceUntrustworthyOrigin',
-    AttributionUntrustworthyOrigin = 'AttributionUntrustworthyOrigin',
+    UntrustworthyReportingOrigin = 'UntrustworthyReportingOrigin',
+    InsecureContext = 'InsecureContext',
     InvalidHeader = 'InvalidHeader',
+    InvalidRegisterTriggerHeader = 'InvalidRegisterTriggerHeader',
+    InvalidEligibleHeader = 'InvalidEligibleHeader',
+    TooManyConcurrentRequests = 'TooManyConcurrentRequests',
+    SourceAndTriggerHeaders = 'SourceAndTriggerHeaders',
+    SourceIgnored = 'SourceIgnored',
+    TriggerIgnored = 'TriggerIgnored',
   }
 
   /**
@@ -970,7 +982,6 @@ export namespace Audits {
    */
   export interface AttributionReportingIssueDetails {
     violationType: AttributionReportingIssueType;
-    frame?: AffectedFrame;
     request?: AffectedRequest;
     violatingNodeId?: DOM.BackendNodeId;
     invalidParameter?: string;
@@ -1026,6 +1037,7 @@ export namespace Audits {
     DeprecationExample = 'DeprecationExample',
     DocumentDomainSettingWithoutOriginAgentClusterHeader = 'DocumentDomainSettingWithoutOriginAgentClusterHeader',
     EventPath = 'EventPath',
+    ExpectCTHeader = 'ExpectCTHeader',
     GeolocationInsecureOrigin = 'GeolocationInsecureOrigin',
     GeolocationInsecureOriginDeprecatedNotRemoved = 'GeolocationInsecureOriginDeprecatedNotRemoved',
     GetUserMediaInsecureOrigin = 'GetUserMediaInsecureOrigin',
@@ -1036,11 +1048,15 @@ export namespace Audits {
     LocalCSSFileExtensionRejected = 'LocalCSSFileExtensionRejected',
     MediaSourceAbortRemove = 'MediaSourceAbortRemove',
     MediaSourceDurationTruncatingBuffered = 'MediaSourceDurationTruncatingBuffered',
+    NavigateEventRestoreScroll = 'NavigateEventRestoreScroll',
+    NavigateEventTransitionWhile = 'NavigateEventTransitionWhile',
     NoSysexWebMIDIWithoutPermission = 'NoSysexWebMIDIWithoutPermission',
     NotificationInsecureOrigin = 'NotificationInsecureOrigin',
     NotificationPermissionRequestedIframe = 'NotificationPermissionRequestedIframe',
     ObsoleteWebRtcCipherSuite = 'ObsoleteWebRtcCipherSuite',
     OpenWebDatabaseInsecureContext = 'OpenWebDatabaseInsecureContext',
+    OverflowVisibleOnReplacedElement = 'OverflowVisibleOnReplacedElement',
+    PersistentQuotaType = 'PersistentQuotaType',
     PictureSourceSrc = 'PictureSourceSrc',
     PrefixedCancelAnimationFrame = 'PrefixedCancelAnimationFrame',
     PrefixedRequestAnimationFrame = 'PrefixedRequestAnimationFrame',
@@ -1105,7 +1121,6 @@ export namespace Audits {
     ClientMetadataHttpNotFound = 'ClientMetadataHttpNotFound',
     ClientMetadataNoResponse = 'ClientMetadataNoResponse',
     ClientMetadataInvalidResponse = 'ClientMetadataInvalidResponse',
-    ClientMetadataMissingPrivacyPolicyUrl = 'ClientMetadataMissingPrivacyPolicyUrl',
     DisabledInSettings = 'DisabledInSettings',
     ErrorFetchingSignin = 'ErrorFetchingSignin',
     InvalidSigninResponse = 'InvalidSigninResponse',
@@ -5850,9 +5865,14 @@ export namespace IndexedDB {
 
   export interface ClearObjectStoreRequest {
     /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
      * Security origin.
      */
-    securityOrigin: string;
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
     /**
      * Database name.
      */
@@ -5865,9 +5885,14 @@ export namespace IndexedDB {
 
   export interface DeleteDatabaseRequest {
     /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
      * Security origin.
      */
-    securityOrigin: string;
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
     /**
      * Database name.
      */
@@ -5875,7 +5900,15 @@ export namespace IndexedDB {
   }
 
   export interface DeleteObjectStoreEntriesRequest {
-    securityOrigin: string;
+    /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
+     * Security origin.
+     */
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
     databaseName: string;
     objectStoreName: string;
     /**
@@ -5886,9 +5919,14 @@ export namespace IndexedDB {
 
   export interface RequestDataRequest {
     /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
      * Security origin.
      */
-    securityOrigin: string;
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
     /**
      * Database name.
      */
@@ -5928,9 +5966,14 @@ export namespace IndexedDB {
 
   export interface GetMetadataRequest {
     /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
      * Security origin.
      */
-    securityOrigin: string;
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
     /**
      * Database name.
      */
@@ -5956,9 +5999,14 @@ export namespace IndexedDB {
 
   export interface RequestDatabaseRequest {
     /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
      * Security origin.
      */
-    securityOrigin: string;
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
     /**
      * Database name.
      */
@@ -5974,9 +6022,14 @@ export namespace IndexedDB {
 
   export interface RequestDatabaseNamesRequest {
     /**
+     * At least and at most one of securityOrigin, storageKey must be specified.
      * Security origin.
      */
-    securityOrigin: string;
+    securityOrigin?: string;
+    /**
+     * Storage key.
+     */
+    storageKey?: string;
   }
 
   export interface RequestDatabaseNamesResponse extends ProtocolResponseWithError {
@@ -7049,6 +7102,7 @@ export namespace Network {
     TextTrack = 'TextTrack',
     XHR = 'XHR',
     Fetch = 'Fetch',
+    Prefetch = 'Prefetch',
     EventSource = 'EventSource',
     WebSocket = 'WebSocket',
     Manifest = 'Manifest',
@@ -7420,6 +7474,16 @@ export namespace Network {
      * Whether the request complied with Certificate Transparency policy
      */
     certificateTransparencyCompliance: CertificateTransparencyCompliance;
+    /**
+     * The signature algorithm used by the server in the TLS server signature,
+     * represented as a TLS SignatureScheme code point. Omitted if not
+     * applicable or not known.
+     */
+    serverSignatureAlgorithm?: integer;
+    /**
+     * Whether the connection used Encrypted ClientHello
+     */
+    encryptedClientHello: boolean;
   }
 
   /**
@@ -10309,6 +10373,7 @@ export namespace Page {
     ScreenWakeLock = 'screen-wake-lock',
     Serial = 'serial',
     SharedAutofill = 'shared-autofill',
+    SharedStorage = 'shared-storage',
     StorageAccessAPI = 'storage-access-api',
     SyncXhr = 'sync-xhr',
     TrustTokenRedemption = 'trust-token-redemption',
@@ -11090,6 +11155,8 @@ export namespace Page {
     EmbedderTriggeredAndSameOriginRedirected = 'EmbedderTriggeredAndSameOriginRedirected',
     EmbedderTriggeredAndCrossOriginRedirected = 'EmbedderTriggeredAndCrossOriginRedirected',
     EmbedderTriggeredAndDestroyed = 'EmbedderTriggeredAndDestroyed',
+    MemoryLimitExceeded = 'MemoryLimitExceeded',
+    FailToGetMemoryUsage = 'FailToGetMemoryUsage',
   }
 
   export interface AddScriptToEvaluateOnLoadRequest {
@@ -12108,6 +12175,11 @@ export namespace Page {
     initiatingFrameId: FrameId;
     prerenderingUrl: string;
     finalStatus: PrerenderFinalStatus;
+    /**
+     * This is used to give users more information about the cancellation details,
+     * and this will be formatted for display.
+     */
+    reasonDetails?: string;
   }
 
   export interface LoadEventFiredEvent {
@@ -12878,6 +12950,17 @@ export namespace Storage {
     storageTypes: string;
   }
 
+  export interface ClearDataForStorageKeyRequest {
+    /**
+     * Storage key.
+     */
+    storageKey: string;
+    /**
+     * Comma separated list of StorageType to clear.
+     */
+    storageTypes: string;
+  }
+
   export interface GetCookiesRequest {
     /**
      * Browser context to use when called on the browser endpoint.
@@ -12967,6 +13050,13 @@ export namespace Storage {
     origin: string;
   }
 
+  export interface TrackIndexedDBForStorageKeyRequest {
+    /**
+     * Storage key.
+     */
+    storageKey: string;
+  }
+
   export interface UntrackCacheStorageForOriginRequest {
     /**
      * Security origin.
@@ -12979,6 +13069,13 @@ export namespace Storage {
      * Security origin.
      */
     origin: string;
+  }
+
+  export interface UntrackIndexedDBForStorageKeyRequest {
+    /**
+     * Storage key.
+     */
+    storageKey: string;
   }
 
   export interface GetTrustTokensResponse extends ProtocolResponseWithError {
@@ -13042,6 +13139,10 @@ export namespace Storage {
      */
     origin: string;
     /**
+     * Storage key to update.
+     */
+    storageKey: string;
+    /**
      * Database to update.
      */
     databaseName: string;
@@ -13059,6 +13160,10 @@ export namespace Storage {
      * Origin to update.
      */
     origin: string;
+    /**
+     * Storage key to update.
+     */
+    storageKey: string;
   }
 
   /**
@@ -13330,6 +13435,30 @@ export namespace Target {
     browserContextId?: Browser.BrowserContextID;
   }
 
+  /**
+   * A filter used by target query/discovery/auto-attach operations.
+   */
+  export interface FilterEntry {
+    /**
+     * If set, causes exclusion of mathcing targets from the list.
+     */
+    exclude?: boolean;
+    /**
+     * If not present, matches any type.
+     */
+    type?: string;
+  }
+
+  /**
+   * The entries in TargetFilter are matched sequentially against targets and
+   * the first entry that matches determines if the target is included or not,
+   * depending on the value of `exclude` field in the entry.
+   * If filter is not specified, the one assumed is
+   * [{type: "browser", exclude: true}, {type: "tab", exclude: true}, {}]
+   * (i.e. include everything but `browser` and `tab`).
+   */
+  export type TargetFilter = FilterEntry[];
+
   export interface RemoteLocation {
     host: string;
     port: integer;
@@ -13479,6 +13608,15 @@ export namespace Target {
     targetInfo: TargetInfo;
   }
 
+  export interface GetTargetsRequest {
+    /**
+     * Only targets matching filter will be reported. If filter is not specified
+     * and target discovery is currently enabled, a filter used for target discovery
+     * is used for consistency.
+     */
+    filter?: TargetFilter;
+  }
+
   export interface GetTargetsResponse extends ProtocolResponseWithError {
     /**
      * The list of targets.
@@ -13514,6 +13652,10 @@ export namespace Target {
      * and eventually retire it. See crbug.com/991325.
      */
     flatten?: boolean;
+    /**
+     * Only targets matching filter will be attached.
+     */
+    filter?: TargetFilter;
   }
 
   export interface AutoAttachRelatedRequest {
@@ -13523,6 +13665,10 @@ export namespace Target {
      * to run paused targets.
      */
     waitForDebuggerOnStart: boolean;
+    /**
+     * Only targets matching filter will be attached.
+     */
+    filter?: TargetFilter;
   }
 
   export interface SetDiscoverTargetsRequest {
@@ -13530,6 +13676,11 @@ export namespace Target {
      * Whether to discover available targets.
      */
     discover: boolean;
+    /**
+     * Only targets matching filter will be attached. If `discover` is false,
+     * `filter` must be omitted or empty.
+     */
+    filter?: TargetFilter;
   }
 
   export interface SetRemoteLocationsRequest {
@@ -14943,6 +15094,17 @@ export namespace Debugger {
     type?: BreakLocationType;
   }
 
+  export interface WasmDisassemblyChunk {
+    /**
+     * The next chunk of disassembled lines.
+     */
+    lines: string[];
+    /**
+     * The bytecode offsets describing the start of each line.
+     */
+    bytecodeOffsets: integer[];
+  }
+
   /**
    * Enum of possible script languages.
    */
@@ -15092,6 +15254,45 @@ export namespace Debugger {
      * Wasm bytecode.
      */
     bytecode?: binary;
+  }
+
+  export interface DisassembleWasmModuleRequest {
+    /**
+     * Id of the script to disassemble
+     */
+    scriptId: Runtime.ScriptId;
+  }
+
+  export interface DisassembleWasmModuleResponse extends ProtocolResponseWithError {
+    /**
+     * For large modules, return a stream from which additional chunks of
+     * disassembly can be read successively.
+     */
+    streamId?: string;
+    /**
+     * The total number of lines in the disassembly text.
+     */
+    totalNumberOfLines: integer;
+    /**
+     * The offsets of all function bodies, in the format [start1, end1,
+     * start2, end2, ...] where all ends are exclusive.
+     */
+    functionBodyOffsets: integer[];
+    /**
+     * The first chunk of disassembly.
+     */
+    chunk: WasmDisassemblyChunk;
+  }
+
+  export interface NextWasmDisassemblyChunkRequest {
+    streamId: string;
+  }
+
+  export interface NextWasmDisassemblyChunkResponse extends ProtocolResponseWithError {
+    /**
+     * The next chunk of disassembly.
+     */
+    chunk: WasmDisassemblyChunk;
   }
 
   export interface GetWasmBytecodeRequest {
