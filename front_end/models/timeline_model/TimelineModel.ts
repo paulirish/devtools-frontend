@@ -1605,6 +1605,7 @@ export enum RecordType {
   EventDispatch = 'EventDispatch',
 
   GPUTask = 'GPUTask',
+  ThreadControllerActive = 'ThreadController active',
 
   Animation = 'Animation',
   RequestMainThreadFrame = 'RequestMainThreadFrame',

@@ -68,6 +68,10 @@ const UIStrings = {
   */
   task: 'Task',
   /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
+  threadActive: 'Thread Active',
+  /**
   *@description Text for other types of items
   */
   other: 'Other',
@@ -1302,6 +1306,7 @@ export class TimelineUIUtils {
 
     const eventStyles: EventStylesMap = {};
     eventStyles[type.Task] = new TimelineRecordStyle(i18nString(UIStrings.task), other);
+    eventStyles[type.ThreadControllerActive] = new TimelineRecordStyle(i18nString(UIStrings.threadActive), other);
     eventStyles[type.Program] = new TimelineRecordStyle(i18nString(UIStrings.other), other);
     eventStyles[type.Animation] = new TimelineRecordStyle(i18nString(UIStrings.animation), rendering);
     eventStyles[type.EventDispatch] = new TimelineRecordStyle(i18nString(UIStrings.event), scripting);

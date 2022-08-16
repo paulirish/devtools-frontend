@@ -620,16 +620,17 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     for (let i = 0; i < events.length; ++i) {
       const e = events[i];
       // Skip Layout Shifts and TTI events when dealing with the main thread.
-      if (this.performanceModel) {
+      if (track && track.type === TimelineModel.TimelineModel.TrackType.MainThread && this.performanceModel) {
         const isInteractiveTime = this.performanceModel.timelineModel().isInteractiveTimeEvent(e);
         const isLayoutShift = this.performanceModel.timelineModel().isLayoutShiftEvent(e);
         const skippableEvent = isInteractiveTime || isLayoutShift;
 
-        if (track && track.type === TimelineModel.TimelineModel.TrackType.MainThread && skippableEvent) {
+        if (skippableEvent) {
           continue;
         }
       }
 
+      // TODO: This seems like dead code given the above block…
       if (this.performanceModel && this.performanceModel.timelineModel().isLayoutShiftEvent(e)) {
         // Expand layout shift events to the size of the frame in which it is situated.
         for (const frame of this.performanceModel.frames()) {

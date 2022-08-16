@@ -94,6 +94,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
       TimelineModel.TimelineModel.TimelineModelImpl.Category.Console,
       TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming,
       'devtools.timeline',
+      'base',
       disabledByDefault('devtools.timeline'),
       disabledByDefault('devtools.timeline.frame'),
       disabledByDefault('devtools.timeline.stack'),
