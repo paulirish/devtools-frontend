@@ -652,6 +652,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         }
       }
 
+      if (track && track.type === TimelineModel.TimelineModel.TrackType.MainThread) {
+        if (e.name === TimelineModel.TimelineModel.RecordType.ThreadControllerActive) continue;
+      }
+
       if (!isExtension && this.performanceModel.timelineModel().isMarkerEvent(e)) {
         this.markers.push(new TimelineFlameChartMarker(
             e.startTime, e.startTime - this.model.minimumRecordTime(), TimelineUIUtils.markerStyleForEvent(e)));

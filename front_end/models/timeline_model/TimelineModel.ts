@@ -1666,6 +1666,7 @@ export enum RecordType {
   WasmModuleCacheInvalid = 'v8.wasm.moduleCacheInvalid',
 
   FrameStartedLoading = 'FrameStartedLoading',
+  InitializeWindow = 'LocalWindowProxy::Initialize',
   CommitLoad = 'CommitLoad',
   MarkLoad = 'MarkLoad',
   MarkDOMContent = 'MarkDOMContent',

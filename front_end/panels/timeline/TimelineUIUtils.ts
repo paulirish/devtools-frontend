@@ -301,6 +301,10 @@ const UIStrings = {
   /**
   *@description Text in Timeline UIUtils of the Performance panel
   */
+  initializeWindow: 'Initialize Window',
+  /**
+  *@description Text in Timeline UIUtils of the Performance panel
+  */
   frameStartedLoading: 'Frame Started Loading',
   /**
   *@description Text in Timeline UIUtils of the Performance panel
@@ -1373,6 +1377,8 @@ export class TimelineUIUtils {
     eventStyles[type.WasmModuleCacheHit] = new TimelineRecordStyle(i18nString(UIStrings.wasmModuleCacheHit), scripting);
     eventStyles[type.WasmModuleCacheInvalid] =
         new TimelineRecordStyle(i18nString(UIStrings.wasmModuleCacheInvalid), scripting);
+    eventStyles[type.InitializeWindow] =
+        new TimelineRecordStyle(i18nString(UIStrings.initializeWindow), scripting);
     eventStyles[type.FrameStartedLoading] =
         new TimelineRecordStyle(i18nString(UIStrings.frameStartedLoading), loading, true);
     eventStyles[type.MarkLoad] = new TimelineRecordStyle(i18nString(UIStrings.onloadEvent), scripting, true);
