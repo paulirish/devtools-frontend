@@ -1595,23 +1595,6 @@ export class TimelineModelImpl {
   }
 }
 
-/**
- * todo:
- * X paint should be at LocalFrameView::RunPaintLifecyclePhase level
- *       - DefinePaints there instead. because cant move paintData higher (probably)
- * X coverage for `LayerTreeHost::DoUpdateLayers` as 'update layer' is too short
- *      - Update Layers
- * X decodefont
- * X coverage for both receive network response  handlers
- *   - ThrottlingURLLoader::OnReceiveResponse
- *   - WebResourceRequestSender::OnRequestComplete
- * X cover network request making handlers
- * X moving runtask higher? Nah. i looked and its fine.
- * - a parent event for running async rendering cycle
- */
-
-
-
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum RecordType {
@@ -1638,7 +1621,6 @@ export enum RecordType {
   LayoutShift = 'LayoutShift',
   UpdateLayer = 'UpdateLayer',
   UpdateLayers = 'UpdateLayers',
-  RequestMainFrameUpdate = 'RequestMainFrameUpdate',
   PaintSetup = 'PaintSetup',
   Paint = 'Paint',
   IssuePaint = 'IssuePaint',

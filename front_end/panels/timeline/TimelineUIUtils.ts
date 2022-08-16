@@ -151,10 +151,6 @@ const UIStrings = {
   */
   updateLayers: 'Update Layers',
   /**
-  *@description Text in Timeline UIUtils of the Performance panel
-  */
-  requestMainFrameUpdate: 'Render lifecycle',
-  /**
   *@description Noun for a paint event in the Performance panel. A paint event is when the browser draws pixels to the screen.
   */
   paint: 'Paint',
@@ -1327,7 +1323,6 @@ export class TimelineUIUtils {
     eventStyles[type.PaintImage] = new TimelineRecordStyle(i18nString(UIStrings.paintImage), painting, true);
     eventStyles[type.UpdateLayer] = new TimelineRecordStyle(i18nString(UIStrings.updateLayer), painting, true);
     eventStyles[type.UpdateLayers] = new TimelineRecordStyle(i18nString(UIStrings.updateLayers), painting);
-    eventStyles[type.RequestMainFrameUpdate] = new TimelineRecordStyle(i18nString(UIStrings.requestMainFrameUpdate), rendering);
     eventStyles[type.Paint] = new TimelineRecordStyle(i18nString(UIStrings.paint), painting);
     eventStyles[type.IssuePaint] = new TimelineRecordStyle(i18nString(UIStrings.issuePaint), painting);
     eventStyles[type.PrePaint] = new TimelineRecordStyle(i18nString(UIStrings.prePaint), rendering);
