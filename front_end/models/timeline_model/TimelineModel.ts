@@ -704,10 +704,12 @@ export class TimelineModelImpl {
     if (!thread) {
       return;
     }
-    const gpuEventName = RecordType.GPUTask;
+    const gpuEventNames = [RecordType.GPUTask, RecordType.Task, RecordType.ThreadControllerActive].map(t => t.toString());
     const track = this.ensureNamedTrack(TrackType.GPU);
     track.thread = thread;
-    track.events = thread.events().filter(event => event.name === gpuEventName);
+    track.events = Root.Runtime.experiments.isEnabled('timelineShowAllEvents')
+      ? thread.events()
+      : thread.events().filter(event => gpuEventNames.includes(event.name));
   }
 
   private buildLoadingEvents(tracingModel: SDK.TracingModel.TracingModel, events: SDK.TracingModel.Event[]): void {
