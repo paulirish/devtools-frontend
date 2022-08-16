@@ -1597,14 +1597,16 @@ export class TimelineModelImpl {
 
 /**
  * todo:
- * - paint should be at LocalFrameView::RunPaintLifecyclePhase level
- * - coverage for `LayerTreeHost::DoUpdateLayers` as 'update layer' is too short
- * - decodefont
- * - coverage for both receive network response  handlers
+ * X paint should be at LocalFrameView::RunPaintLifecyclePhase level
+ *       - DefinePaints there instead. because cant move paintData higher (probably)
+ * X coverage for `LayerTreeHost::DoUpdateLayers` as 'update layer' is too short
+ *      - Update Layers
+ * X decodefont
+ * X coverage for both receive network response  handlers
  *   - ThrottlingURLLoader::OnReceiveResponse
  *   - WebResourceRequestSender::OnRequestComplete
- * - cover network request making handlers
- * - moving runtask higher? Nah. i looked and its fine.
+ * X cover network request making handlers
+ * X moving runtask higher? Nah. i looked and its fine.
  * - a parent event for running async rendering cycle
  */
 
@@ -1639,6 +1641,7 @@ export enum RecordType {
   RequestMainFrameUpdate = 'RequestMainFrameUpdate',
   PaintSetup = 'PaintSetup',
   Paint = 'Paint',
+  IssuePaint = 'IssuePaint',
   PaintImage = 'PaintImage',
   PrePaint = 'PrePaint',
   DecodeFont = 'DecodeFont',
