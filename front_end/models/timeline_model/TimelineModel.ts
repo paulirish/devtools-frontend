@@ -704,7 +704,7 @@ export class TimelineModelImpl {
     if (!thread) {
       return;
     }
-    const gpuEventNames = [RecordType.GPUTask, RecordType.Task, RecordType.ThreadControllerActive].map(t => t.toString());
+    const gpuEventNames = [RecordType.GPUTask, RecordType.ThreadControllerActive].map(t => t.toString());
     const track = this.ensureNamedTrack(TrackType.GPU);
     track.thread = thread;
     track.events = Root.Runtime.experiments.isEnabled('timelineShowAllEvents')
