@@ -121,6 +121,7 @@ export function buildStackTraceRows(
         tabStop: Boolean(tabStops),
         inlineFrameIndex: 0,
         revealBreakpoint: previousStackFrameWasBreakpointCondition,
+        showColumnNumber: true
       });
       if (link) {
         link.addEventListener('contextmenu', populateContextMenu.bind(null, link));

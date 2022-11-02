@@ -220,7 +220,7 @@ export class TimelineJSProfileProcessor {
         if (!equalFrames(newFrame, oldFrame)) {
           break;
         }
-        // Scoot the right edge of this callFrame to the right
+        // Shift frame's end time out as we have a new sample declaring the frame is still active
         jsFramesStack[i].setEndTime(Math.max((jsFramesStack[i].endTime as number), endTime));
       }
       truncateJSStack(i, e.startTime);
