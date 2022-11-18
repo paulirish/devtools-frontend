@@ -11,6 +11,14 @@ import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 
+interface DecompressionStream extends GenericTransformStream {
+  readonly format: string;
+}
+declare const DecompressionStream: {
+  prototype: DecompressionStream,
+  new (format: string): DecompressionStream,
+};
+
 const UIStrings = {
   /**
   *@description Text in Timeline Loader of the Performance panel
@@ -87,20 +95,40 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
   static loadFromURL(url: Platform.DevToolsPath.UrlString, client: Client): TimelineLoader {
     const loader = new TimelineLoader(client);
-    const stream = new Common.StringOutputStream.StringOutputStream();
+    let stream = new Common.StringOutputStream.StringOutputStream();
     client.loadingStarted();
+
+    const ds = new DecompressionStream('gzip');
+    if (true) { // gzip
+        stream = ds.writable.getWriter();
+    }
 
     const allowRemoteFilePaths =
         Common.Settings.Settings.instance().moduleSetting('network.enable-remote-file-loading').get();
-    Host.ResourceLoader.loadAsStream(url, null, stream, finishedCallback, allowRemoteFilePaths);
+    Host.ResourceLoader.loadAsStream(url, null, stream, finishedCallback, allowRemoteFilePaths, true);
 
-    function finishedCallback(
+    async function finishedCallback(
         success: boolean, _headers: {[x: string]: string},
         errorDescription: Host.ResourceLoader.LoadErrorDescription): void {
       if (!success) {
         return loader.reportErrorAndCancelLoading(errorDescription.message);
       }
-      const txt = stream.data();
+      let txt;
+      if (true) {  // TODO: no idea what the conditional is.........
+        // const gzData = txt;
+        // const chunkSize = 500_000;  // 500kb
+        // for (let beginning = 0; beginning < gzData.length; beginning += chunkSize) {
+        //   await writer.write(gzData.slice(beginning, beginning + chunkSize));
+        // }
+        // await writer.write(stream.data());
+        // await stream.close();
+        const reader = ds.readable.getReader();
+        const { value } = await reader.read();
+        const decoder = new TextDecoder();
+        txt = decoder.decode(value);
+      } else {
+        txt = stream.data();
+      }
       const events = JSON.parse(txt);
       void loader.addEvents(events);
     }
