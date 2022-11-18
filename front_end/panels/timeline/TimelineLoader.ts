@@ -123,20 +123,41 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
         // await writer.write(stream.data());
         // await stream.close();
         const reader = ds.readable.getReader();
-        const { value } = await reader.read();
+        // const { value, done } = await reader.read();
+
+        // https://github.com/web-platform-tests/wpt/blob/master/compression/decompression-corrupt-input.tentative.any.js probably could be cleanre
+        const out = [];
+        let totalSize = 0;
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          out.push(value);
+          totalSize += value.byteLength;
+        }
+        const concatenated = new Uint8Array(totalSize);
+        let offset = 0;
+        for (const array of out) {
+          concatenated.set(array, offset);
+          offset += array.byteLength;
+        }
+        debugger;
+
         const decoder = new TextDecoder();
-        txt = decoder.decode(value);
+        txt = decoder.decode(concatenated);
       } else {
         txt = stream.data();
       }
       const events = JSON.parse(txt);
-      void loader.addEvents(events);
+      void loader.addEvents(events.traceEvents || events);
     }
 
     return loader;
   }
 
   async addEvents(events: SDK.TracingManager.EventPayload[]): Promise<void> {
+    if (!Array.isArray(events)) {
+       return this.reportErrorAndCancelLoading(i18nString(UIStrings.malformedTimelineDataUnknownJson));
+    }
     this.client?.loadingStarted();
     const eventsPerChunk = 5000;
     for (let i = 0; i < events.length; i += eventsPerChunk) {
