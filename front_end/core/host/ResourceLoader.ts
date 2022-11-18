@@ -253,8 +253,7 @@ export const loadAsStream = function(
            [x: string]: string,
          },
           arg2: LoadErrorDescription) => void),
-    allowRemoteFilePaths?: boolean,
-    isBlob?: boolean): void {
+    allowRemoteFilePaths?: boolean): void {
   const streamId = _bindOutputStream(stream);
   const parsedURL = new Common.ParsedURL.ParsedURL(url);
   if (parsedURL.isDataURL()) {
@@ -281,14 +280,10 @@ export const loadAsStream = function(
       rawHeaders.push(key + ': ' + headers[key]);
     }
   }
-  InspectorFrontendHostInstance.loadNetworkResource(url, rawHeaders.join('\r\n'), streamId, finishedCallback, isBlob);
+  InspectorFrontendHostInstance.loadNetworkResource(url, rawHeaders.join('\r\n'), streamId, finishedCallback);
 
   function finishedCallback(response: LoadNetworkResourceResult): void {
     if (callback) {
-      // const ds = new DecompressionStream('gzip');
-      // debugger;
-      // const decompressionStream = stream.pipeThrough(ds);
-      // return decompressionStream;
       const {success, description} = createErrorMessageFromResponse(response);
       callback(success, response.headers || {}, description);
     }

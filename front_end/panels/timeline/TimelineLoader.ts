@@ -98,10 +98,6 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     let stream = new Common.StringOutputStream.StringOutputStream();
     client.loadingStarted();
 
-    const ds = new DecompressionStream('gzip');
-    if (true) { // gzip
-        stream = ds.writable.getWriter();
-    }
 
     const allowRemoteFilePaths =
         Common.Settings.Settings.instance().moduleSetting('network.enable-remote-file-loading').get();
@@ -113,22 +109,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
       if (!success) {
         return loader.reportErrorAndCancelLoading(errorDescription.message);
       }
-      let txt;
-      if (true) {  // TODO: no idea what the conditional is.........
-        // const gzData = txt;
-        // const chunkSize = 500_000;  // 500kb
-        // for (let beginning = 0; beginning < gzData.length; beginning += chunkSize) {
-        //   await writer.write(gzData.slice(beginning, beginning + chunkSize));
-        // }
-        // await writer.write(stream.data());
-        // await stream.close();
-        const reader = ds.readable.getReader();
-        const { value } = await reader.read();
-        const decoder = new TextDecoder();
-        txt = decoder.decode(value);
-      } else {
-        txt = stream.data();
-      }
+      const txt = stream.data();
       const events = JSON.parse(txt);
       void loader.addEvents(events);
     }

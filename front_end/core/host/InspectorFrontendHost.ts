@@ -260,9 +260,9 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   loadNetworkResource(
-      url: string, headers: string, streamId: number, callback: (arg0: LoadNetworkResourceResult) => void, isBlob?: boolean): void {
+      url: string, headers: string, streamId: number, callback: (arg0: LoadNetworkResourceResult) => void): void {
     fetch(url)
-        .then(result => isBlob ? result.arrayBuffer() : result.text())
+        .then(result => result.text())
         .then(function(text) {
           resourceLoaderStreamWrite(streamId, text);
           callback({
