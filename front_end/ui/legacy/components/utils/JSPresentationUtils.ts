@@ -92,6 +92,7 @@ export function buildStackTraceRows(
     linkifier: Linkifier,
     tabStops: boolean|undefined,
     updateCallback?: (arg0: (StackTraceRegularRow|StackTraceAsyncRow)[]) => void,
+    showColumnNumber?: boolean|undefined,
     ): (StackTraceRegularRow|StackTraceAsyncRow)[] {
   const stackTraceRows: (StackTraceRegularRow|StackTraceAsyncRow)[] = [];
 
@@ -121,7 +122,7 @@ export function buildStackTraceRows(
         tabStop: Boolean(tabStops),
         inlineFrameIndex: 0,
         revealBreakpoint: previousStackFrameWasBreakpointCondition,
-        showColumnNumber: true
+        showColumnNumber,
       });
       if (link) {
         link.addEventListener('contextmenu', populateContextMenu.bind(null, link));
@@ -208,9 +209,10 @@ function updateHiddenRows(
 export function buildStackTracePreviewContents(
     target: SDK.Target.Target|null, linkifier: Linkifier, options: Options = {
       stackTrace: undefined,
+      showColumnNumber: false,
       tabStops: undefined,
     }): {element: HTMLElement, links: HTMLElement[]} {
-  const {stackTrace, tabStops} = options;
+  const {stackTrace, tabStops, showColumnNumber} = options;
   const element = document.createElement('span');
   element.classList.add('monospace');
   element.style.display = 'inline-block';
@@ -222,7 +224,7 @@ export function buildStackTracePreviewContents(
   }
 
   const updateCallback = renderStackTraceTable.bind(null, contentElement);
-  const stackTraceRows = buildStackTraceRows(stackTrace, target, linkifier, tabStops, updateCallback);
+  const stackTraceRows = buildStackTraceRows(stackTrace, target, linkifier, tabStops, updateCallback, showColumnNumber);
   const links = renderStackTraceTable(contentElement, stackTraceRows);
   return {element, links};
 }
@@ -274,6 +276,7 @@ function renderStackTraceTable(
 
 export interface Options {
   stackTrace: Protocol.Runtime.StackTrace|undefined;
+  showColumnNumber: boolean|undefined;
   tabStops: boolean|undefined;
 }
 

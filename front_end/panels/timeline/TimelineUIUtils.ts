@@ -1856,7 +1856,7 @@ export class TimelineUIUtils {
       contentHelper.appendTextRow(
           i18nString(UIStrings.selfTime), i18n.TimeUtilities.millisToString(event.selfTime, true));
     }
-
+    console.log('isgeneric', model.isGenericTrace());
     if (model.isGenericTrace()) {
       for (const key in event.args) {
         try {
@@ -2216,6 +2216,7 @@ export class TimelineUIUtils {
       }
 
       default: {
+        console.log('defaulttttttttttt');
         const detailsNode =
             await TimelineUIUtils.buildDetailsNodeForTraceEvent(event, model.targetByEvent(event), linkifier);
         if (detailsNode) {
@@ -2245,6 +2246,8 @@ export class TimelineUIUtils {
       // @ts-ignore TODO(crbug.com/1011811): Remove symbol usage.
       contentHelper.appendElementRow('', event[previewElementSymbol]);
     }
+
+    console.log('mkay');
 
     if (initiator || timelineData.stackTraceForSelfOrInitiator() ||
         TimelineModel.TimelineModel.InvalidationTracker.invalidationEventsFor(event)) {
@@ -2541,6 +2544,7 @@ export class TimelineUIUtils {
 
     const timelineData = TimelineModel.TimelineModel.TimelineData.forEvent(event);
     // Direct cause.
+    console.log({timelineData})
     if (timelineData.stackTrace && timelineData.stackTrace.length) {
       contentHelper.addSection(i18nString(UIStrings.callStacks));
       contentHelper.appendStackTrace(
@@ -3495,7 +3499,7 @@ export class TimelineDetailsContentHelper {
     const stackTraceElement =
         parentElement.createChild('div', 'timeline-details-view-row-value timeline-details-view-row-stack-trace');
     const callFrameContents = Components.JSPresentationUtils.buildStackTracePreviewContents(
-        this.target, this.linkifierInternal, {stackTrace, tabStops: true});
+        this.target, this.linkifierInternal, {stackTrace, tabStops: true, showColumnNumber: false});
     stackTraceElement.appendChild(callFrameContents.element);
   }
 
