@@ -262,7 +262,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   loadNetworkResource(
       url: string, headers: string, streamId: number, callback: (arg0: LoadNetworkResourceResult) => void): void {
     fetch(url)
-        .then(result => result.text())
+        .then(result => result.headers.get('content-type')?.includes('gzip') ? result.arrayBuffer() : result.text())
         .then(function(text) {
           resourceLoaderStreamWrite(streamId, text);
           callback({
@@ -274,7 +274,8 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
             urlValid: undefined,
           });
         })
-        .catch(function() {
+        .catch(function(err) {
+          console.error(err);
           callback({
             statusCode: 404,
             headers: undefined,

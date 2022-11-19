@@ -73,7 +73,7 @@ export const ResourceLoader = {};
 let _lastStreamId = 0;
 
 const _boundStreams: {
-  [x: number]: Common.StringOutputStream.OutputStream,
+  [x: number]: Common.StringOutputStream.OutputStream | WritableStreamDefaultWriter,
 } = {};
 
 const _bindOutputStream = function(stream: Common.StringOutputStream.OutputStream): number {

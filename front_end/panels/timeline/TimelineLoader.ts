@@ -100,7 +100,8 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
     const ds = new DecompressionStream('gzip');
     if (true) { // gzip
-        stream = ds.writable.getWriter();
+        const writer = ds.writable.getWriter();
+        stream = writer;
     }
 
     const allowRemoteFilePaths =
@@ -122,28 +123,56 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
         // }
         // await writer.write(stream.data());
         // await stream.close();
-        const reader = ds.readable.getReader();
-        // const { value, done } = await reader.read();
+        // const reader = ds.readable.getReader();
+
 
         // https://github.com/web-platform-tests/wpt/blob/master/compression/decompression-corrupt-input.tentative.any.js probably could be cleanre
-        const out = [];
-        let totalSize = 0;
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          out.push(value);
-          totalSize += value.byteLength;
-        }
-        const concatenated = new Uint8Array(totalSize);
-        let offset = 0;
-        for (const array of out) {
-          concatenated.set(array, offset);
-          offset += array.byteLength;
-        }
-        debugger;
+        // const out = [];
+        // let totalSize = 0;
+        // while (true) {
+        //   const { value, done } = await reader.read();
+        //   if (done) break;
+        //   out.push(value);
+        //   totalSize += value.byteLength;
+        // }
+        // const concatenated = new Uint8Array(totalSize);
+        // let offset = 0;
+        // for (const array of out) {
+        //   concatenated.set(array, offset);
+        //   offset += array.byteLength;
+        // }
+        // debugger;
+        // const decoder = new TextDecoder();
+        // txt = decoder.decode(concatenated);
 
-        const decoder = new TextDecoder();
-        txt = decoder.decode(concatenated);
+
+        // from third_party/blink/web_tests/external/wpt/webtransport/resources/webtransport-test-helpers.sub.js
+
+        // Read all chunks from |readable_stream|, decode chunks to a utf-8 string, then
+        // return the string.
+        async function read_stream_as_string(readable_stream) {
+          const decoder = new TextDecoderStream();
+          const decode_stream = readable_stream.pipeThrough(decoder);
+          const reader = decode_stream.getReader();
+
+          let chunks = '';
+          while (true) {
+            const {value: chunk, done} = await reader.read();
+            if (done) {
+              break;
+            }
+            chunks += chunk;
+          }
+          reader.releaseLock();
+          return chunks;
+        }
+
+
+        const x = await read_stream_as_string(ds.readable);
+
+        // const stream = ds.readable.pipeThrough(new TextDecoderStream());
+        // const x = await new Response(stream).text().catch(console.warn)
+        txt = x;
       } else {
         txt = stream.data();
       }
