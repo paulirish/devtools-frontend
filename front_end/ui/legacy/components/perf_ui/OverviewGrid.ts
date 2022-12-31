@@ -363,17 +363,16 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     this.setWindowPosition(0, this.parentElement.clientWidth);
   }
 
-  private getRawSliderValue(leftSlider?: boolean): number {
+  private getRawSliderValues(): number[] {
     if (!this.calculator) {
       throw new Error('No calculator to calculate boundaries');
     }
 
     const minimumValue = this.calculator.minimumBoundary();
     const valueSpan = this.calculator.maximumBoundary() - minimumValue;
-    if (leftSlider) {
-      return minimumValue + valueSpan * (this.windowLeft || 0);
-    }
-    return minimumValue + valueSpan * (this.windowRight || 0);
+    const left = minimumValue + valueSpan * (this.windowLeft || 0);
+    const right = minimumValue + valueSpan * (this.windowRight || 0);
+    return [left, right];
   }
 
   private updateResizeElementPositionValue(leftValue: number, rightValue: number): void {
@@ -393,8 +392,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     if (!this.calculator) {
       return;
     }
-    const startValue = this.calculator.formatValue(this.getRawSliderValue(/* leftSlider */ true));
-    const endValue = this.calculator.formatValue(this.getRawSliderValue(/* leftSlider */ false));
+    const [startValue, endValue] = this.getRawSliderValues().map(v => this.calculator.formatValue(v));
     UI.ARIAUtils.setAriaValueText(this.leftResizeElement, String(startValue));
     UI.ARIAUtils.setAriaValueText(this.rightResizeElement, String(endValue));
   }
@@ -408,9 +406,10 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     rawStartValue: number,
     rawEndValue: number,
   } {
+    const [rawStartValue, rawEndValue] = this.getRawSliderValues().map(v => Number(v));
     return {
-      rawStartValue: Number(this.getRawSliderValue(/* leftSlider */ true)),
-      rawEndValue: Number(this.getRawSliderValue(/* leftSlider */ false)),
+      rawStartValue,
+      rawEndValue,
     };
   }
 

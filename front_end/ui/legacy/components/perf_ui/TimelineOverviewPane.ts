@@ -242,7 +242,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     }
     const absoluteMin = this.overviewCalculator.minimumBoundary();
     const timeSpan = this.overviewCalculator.maximumBoundary() - absoluteMin;
-    const haveRecords = absoluteMin > 0;
+    const haveRecords = isFinite(absoluteMin) && absoluteMin > 0;
     const left = haveRecords && this.windowStartTime ? Math.min((this.windowStartTime - absoluteMin) / timeSpan, 1) : 0;
     const right = haveRecords && this.windowEndTime < Infinity ? (this.windowEndTime - absoluteMin) / timeSpan : 1;
     this.muteOnWindowChanged = true;

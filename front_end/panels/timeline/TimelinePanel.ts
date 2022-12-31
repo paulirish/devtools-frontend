@@ -1128,7 +1128,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (model && this.performanceModel) {
       this.performanceModel.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
       this.overviewPane.setNavStartTimes(model.timelineModel().navStartTimes());
-      this.overviewPane.setBounds(model.timelineModel().minimumRecordTime(), model.timelineModel().maximumRecordTime());
+      // this.overviewPane.setBounds(model.timelineModel().minimumRecordTime(), model.timelineModel().maximumRecordTime());
       PerfUI.LineLevelProfile.Performance.instance().reset();
       for (const profile of model.timelineModel().cpuProfiles()) {
         PerfUI.LineLevelProfile.Performance.instance().appendCPUProfile(profile);

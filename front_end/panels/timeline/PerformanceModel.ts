@@ -36,7 +36,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
         event => TimelineUIUtils.eventStyle(event).category.name);
     this.filmStripModelInternal = null;
 
-    this.windowInternal = {left: 0, right: Infinity};
+    this.windowInternal = {left: 0, right: 1};
 
     this.extensionTracingModels = [];
     this.recordStartTimeInternal = undefined;
@@ -226,7 +226,11 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   }
 
   setWindow(window: Window, animate?: boolean): void {
+    const didChange = this.windowInternal.left !== window.left || this.windowInternal.right !== window.right;
     this.windowInternal = window;
+    // if (didChange) {
+      console.log({didChange});
+    // }
     this.dispatchEventToListeners(Events.WindowChanged, {window, animate});
   }
 
