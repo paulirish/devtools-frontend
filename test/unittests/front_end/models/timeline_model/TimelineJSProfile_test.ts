@@ -114,7 +114,8 @@ describe('TimelineJSProfile', () => {
     sampleEvent3.addArgs({data: {stackTrace: [{'functionName': 'a', 'callUID': 'a', 'scriptId': 1}]}});
 
     // The presence of this (unshown) event once incorrectedly triggered an early truncateJSStack
-    const v8ParseFnEvent = new SDK.TracingModel.Event('disabled-by-default-v8.compile', 'V8.ParseFunction', SDK.TracingModel.Phase.Complete, 10, thread);
+    const v8ParseFnEvent = new SDK.TracingModel.Event(
+        'disabled-by-default-v8.compile', 'V8.ParseFunction', SDK.TracingModel.Phase.Complete, 10, thread);
     v8ParseFnEvent.setEndTime(11);
 
     const sampleEvent4 =
