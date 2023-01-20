@@ -240,6 +240,7 @@ export class TimelineJSProfileProcessor {
         if (!equalFrames(newFrame, oldFrame)) {
           break;
         }
+        // Scoot the right edge of this callFrame to the right
         jsFramesStack[i].setEndTime(Math.max((jsFramesStack[i].endTime as number), endTime));
       }
       truncateJSStack(i, e.startTime);
