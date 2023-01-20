@@ -157,7 +157,7 @@ export class TimelineJSProfileProcessor {
       e.ordinal = ++ordinal;
       if ((parent && isJSInvocationEvent(parent)) || fakeJSInvocation) {
         extractStackTrace(e);
-      } else if (e.name === RecordType.JSSample && jsFramesStack.length === 0) {
+      } else if (e.name === RecordType.JSSample && e.args?.data?.stackTrace?.length && jsFramesStack.length === 0) {
         // Force JS Samples to show up even if we are not inside a JS invocation event, because we
         // can be missing the start of JS invocation events if we start tracing half-way through.
         // Pretend we have a top-level JS invocation event.
