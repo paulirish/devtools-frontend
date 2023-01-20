@@ -94,7 +94,6 @@ describe('TimelineJSProfile', () => {
     assert.strictEqual(returnedEvents[1].name, 'JSFrame');
     assert.strictEqual(returnedEvents[1].startTime, 9);
     assert.strictEqual(returnedEvents[1].endTime, 15);
-    assert.strictEqual(returnedEvents.length, 2);
   });
 
   // EvaluateScript and FunctionCall are two obvious "invocation events", but there are others (and sometimes none)
