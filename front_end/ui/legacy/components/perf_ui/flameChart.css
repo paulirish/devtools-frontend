@@ -60,9 +60,12 @@
   background-color: var(--color-background);
   pointer-events: none;
   padding: 4px 8px;
-  white-space: nowrap;
+  white-space: pre-wrap;
   max-width: 80%;
   box-shadow: var(--drop-shadow);
+  /* remaining styles for trace event debug mode */
+  max-height: 100%;
+  overflow: auto;
 }
 
 .flame-chart-entry-info table tr td:empty {
