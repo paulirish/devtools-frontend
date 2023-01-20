@@ -108,23 +108,6 @@ export class TimelineJSProfileProcessor {
           frame1.lineNumber === frame2.lineNumber;
     }
 
-    function isJSInvocationEvent(e: SDK.TracingModel.Event): boolean {
-      switch (e.name) {
-        case RecordType.RunMicrotasks:
-        case RecordType.FunctionCall:
-        case RecordType.EvaluateScript:
-        case RecordType.EvaluateModule:
-        case RecordType.EventDispatch:
-        case RecordType.V8Execute:
-          return true;
-      }
-      // Also consider any new v8 trace events. (eg 'V8.RunMicrotasks' and 'v8.run')
-      if (e.name.startsWith('v8') || e.name.startsWith('V8')) {
-        return true;
-      }
-      return false;
-    }
-
     const jsFrameEvents: SDK.TracingModel.Event[] = [];
     const jsFramesStack: SDK.TracingModel.Event[] = [];
     const lockedJsStackDepth: number[] = [];
@@ -134,7 +117,7 @@ export class TimelineJSProfileProcessor {
      * However in some situations (workers), we don't have those trace events.
      * "fake" JSInvocations are created when we have active JSSamples but seemingly no explicit invocation.
      */
-    let fakeJSInvocation = false;
+    let isJSActive = false;
     const {showAllEvents, showRuntimeCallStats, showNativeFunctions} = config;
 
     /**
@@ -143,9 +126,9 @@ export class TimelineJSProfileProcessor {
      * or, in the fakeJSInvocation case, the JS finished and we're seeing the subsequent event.
      */
     function onStartEvent(e: SDK.TracingModel.Event): void {
-      if (fakeJSInvocation) {
+      if (isJSActive) {
         truncateJSStack((lockedJsStackDepth.pop() as number), e.startTime);
-        fakeJSInvocation = false;
+        isJSActive = false;
       }
       e.ordinal = ++ordinal;
       extractStackTrace(e);
@@ -153,15 +136,15 @@ export class TimelineJSProfileProcessor {
       lockedJsStackDepth.push(jsFramesStack.length);
     }
 
-    function onInstantEvent(e: SDK.TracingModel.Event, parent: SDK.TracingModel.Event|null): void {
+    function onInstantEvent(e: SDK.TracingModel.Event, _: SDK.TracingModel.Event|null): void {
       e.ordinal = ++ordinal;
-      if ((parent && isJSInvocationEvent(parent)) || fakeJSInvocation) {
+      if (isJSActive) {
         extractStackTrace(e);
       } else if (e.name === RecordType.JSSample && e.args?.data?.stackTrace?.length && jsFramesStack.length === 0) {
         // Force JS Samples to show up even if we are not inside a JS invocation event, because we
         // can be missing the start of JS invocation events if we start tracing half-way through.
         // Pretend we have a top-level JS invocation event.
-        fakeJSInvocation = true;
+        isJSActive = true;
         const stackDepthBefore = jsFramesStack.length;
         extractStackTrace(e);
         lockedJsStackDepth.push(stackDepthBefore);
