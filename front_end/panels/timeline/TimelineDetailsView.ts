@@ -215,6 +215,18 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     switch (this.selection.type()) {
       case TimelineSelection.Type.TraceEvent: {
         const event = (this.selection.object() as SDK.TracingModel.Event);
+
+        // When selected, copy traceEvent ts to clipboard and log the event.
+        const ts = (event.startTime * 1000).toString();
+        const textBlob = new Blob([ts], {type: 'text/plain'});
+        const cpItem = new ClipboardItem({[textBlob.type]: textBlob});
+        navigator.clipboard.write([cpItem])
+            .then(() => {
+              // eslint-disable-next-line no-console
+              console.log(event.name, `microsec ts of (${ts}) written to clipboard`, event);
+            })
+            .catch(console.warn);
+
         void TimelineUIUtils.buildTraceEventDetails(event, this.model.timelineModel(), this.detailsLinkifier, true)
             .then(fragment => this.appendDetailsTabsForTraceEventAndShowDetails(event, fragment));
         break;
