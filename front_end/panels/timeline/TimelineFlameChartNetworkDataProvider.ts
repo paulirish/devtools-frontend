@@ -313,6 +313,10 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
       div.style.color = this.colorForPriority(request.priority) || 'black';
     }
     contents.createChild('span').textContent = Platform.StringUtilities.trimMiddle(request.url, maxURLChars);
+
+    const requestClone = {...request};
+    // requestClone.children = requestClone.children.map(c => )
+    contents.createChild('span').textContent = '\n' + JSON.stringify(requestClone, null, 2).slice(0, 2000);
     return element;
   }
 
