@@ -977,6 +977,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         delete f.parent;
         delete f.target;
       });
+      delete eventClone.steps;
       // Add stringified event to the tooltip.
       title += '\n' + JSON.stringify(eventClone, null, 2).slice(0, 2000);
 
