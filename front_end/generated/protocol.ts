@@ -1015,6 +1015,8 @@ export namespace Audits {
     FormLabelForNameError = 'FormLabelForNameError',
     FormDuplicateIdForInputError = 'FormDuplicateIdForInputError',
     FormInputWithNoLabelError = 'FormInputWithNoLabelError',
+    FormAutocompleteAttributeEmptyError = 'FormAutocompleteAttributeEmptyError',
+    FormEmptyIdAndNameAttributesForInputError = 'FormEmptyIdAndNameAttributesForInputError',
   }
 
   /**
@@ -1073,6 +1075,7 @@ export namespace Audits {
     PrefixedVideoExitFullscreen = 'PrefixedVideoExitFullscreen',
     PrefixedVideoExitFullScreen = 'PrefixedVideoExitFullScreen',
     PrefixedVideoSupportsFullscreen = 'PrefixedVideoSupportsFullscreen',
+    PrivacySandboxExtensionsAPI = 'PrivacySandboxExtensionsAPI',
     RangeExpand = 'RangeExpand',
     RequestedSubresourceWithEmbeddedCredentials = 'RequestedSubresourceWithEmbeddedCredentials',
     RTCConstraintEnableDtlsSrtpFalse = 'RTCConstraintEnableDtlsSrtpFalse',
@@ -1642,7 +1645,7 @@ export namespace Browser {
      */
     query?: string;
     /**
-     * If true, retrieve delta since last call.
+     * If true, retrieve delta since last delta call.
      */
     delta?: boolean;
   }
@@ -1660,7 +1663,7 @@ export namespace Browser {
      */
     name: string;
     /**
-     * If true, retrieve delta since last call.
+     * If true, retrieve delta since last delta call.
      */
     delta?: boolean;
   }
@@ -7632,9 +7635,9 @@ export namespace Network {
    * are specified in third_party/blink/renderer/core/fetch/trust_token.idl.
    */
   export interface TrustTokenParams {
-    type: TrustTokenOperationType;
+    operation: TrustTokenOperationType;
     /**
-     * Only set for "token-redemption" type and determine whether
+     * Only set for "token-redemption" operation and determine whether
      * to request a fresh SRR or use a still valid cached SRR.
      */
     refreshPolicy: TrustTokenParamsRefreshPolicy;
@@ -9447,6 +9450,15 @@ export namespace Network {
      * available, such as in the case of HTTP/2 or QUIC.
      */
     headersText?: string;
+    /**
+     * The cookie partition key that will be used to store partitioned cookies set in this response.
+     * Only sent when partitioned cookies are enabled.
+     */
+    cookiePartitionKey?: string;
+    /**
+     * True if partitioned cookies are enabled, but the partition key is not serializeable to string.
+     */
+    cookiePartitionKeyOpaque?: boolean;
   }
 
   export const enum TrustTokenOperationDoneEventStatus {
@@ -11264,6 +11276,9 @@ export namespace Page {
     TabClosedWithoutUserGesture = 'TabClosedWithoutUserGesture',
     PrimaryMainFrameRendererProcessCrashed = 'PrimaryMainFrameRendererProcessCrashed',
     PrimaryMainFrameRendererProcessKilled = 'PrimaryMainFrameRendererProcessKilled',
+    ActivationFramePolicyNotCompatible = 'ActivationFramePolicyNotCompatible',
+    PreloadingDisabled = 'PreloadingDisabled',
+    BatterySaverEnabled = 'BatterySaverEnabled',
   }
 
   export interface AddScriptToEvaluateOnLoadRequest {

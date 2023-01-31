@@ -9,6 +9,7 @@ import * as Workspace from '../../../../../front_end/models/workspace/workspace.
 import * as SourcesComponents from '../../../../../front_end/panels/sources/components/components.js';
 import * as Sources from '../../../../../front_end/panels/sources/sources.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import type * as TextUtils from '../../../../../front_end/models/text_utils/text_utils.js';
 import {createTarget, describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
 import {createContentProviderUISourceCode, setupMockedUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
 
@@ -27,7 +28,8 @@ interface LocationTestData {
   columnNumber: number;
   enabled: boolean;
   content: string;
-  condition: string;
+  condition: Bindings.BreakpointManager.UserCondition;
+  isLogpoint: boolean;
   hoverText?: string;
 }
 
@@ -40,6 +42,7 @@ function createBreakpointLocations(testData: LocationTestData[]): Bindings.Break
     const breakpoint = sinon.createStubInstance(Bindings.BreakpointManager.Breakpoint);
     breakpoint.enabled.returns(data.enabled);
     breakpoint.condition.returns(data.condition);
+    breakpoint.isLogpoint.returns(data.isLogpoint);
     breakpoint.breakpointStorageId.returns(`${data.url}:${data.lineNumber}:${data.columnNumber}`);
     return new Bindings.BreakpointManager.BreakpointLocation(breakpoint, uiLocation);
   });
@@ -72,7 +75,8 @@ function createStubBreakpointManagerAndSettingsWithMockdata(testData: LocationTe
 
 function createLocationTestData(
     url: string, lineNumber: number, columnNumber: number, enabled: boolean = true, content: string = '',
-    condition: string = '', hoverText?: string): LocationTestData {
+    condition: Bindings.BreakpointManager.UserCondition = Bindings.BreakpointManager.EMPTY_BREAKPOINT_CONDITION,
+    isLogpoint: boolean = false, hoverText?: string): LocationTestData {
   return {
     url: url as Platform.DevToolsPath.UrlString,
     lineNumber,
@@ -80,6 +84,7 @@ function createLocationTestData(
     enabled,
     content,
     condition,
+    isLogpoint,
     hoverText,
   };
 }
@@ -212,7 +217,7 @@ describeWithEnvironment('BreakpointsSidebarController', () => {
         let type = SourcesComponents.BreakpointsView.BreakpointType.REGULAR_BREAKPOINT;
 
         if (testData.condition) {
-          if (testData.condition.startsWith(Sources.BreakpointEditDialog.LogpointPrefix)) {
+          if (testData.isLogpoint) {
             type = SourcesComponents.BreakpointsView.BreakpointType.LOGPOINT;
           } else {
             type = SourcesComponents.BreakpointsView.BreakpointType.CONDITIONAL_BREAKPOINT;
@@ -423,9 +428,10 @@ describeWithEnvironment('BreakpointsSidebarController', () => {
     });
 
     it('correctly extracts conditional breakpoints', async () => {
-      const condition = 'x < a';
+      const condition = 'x < a' as Bindings.BreakpointManager.UserCondition;
       const testData = [
-        createLocationTestData(TEST_JS_FILE, 3, 15, true /* enabled */, '', condition, condition),
+        createLocationTestData(
+            TEST_JS_FILE, 3, 15, true /* enabled */, '', condition, false /* isLogpoint */, condition),
       ];
 
       const {breakpointManager, settings} = createStubBreakpointManagerAndSettingsWithMockdata(testData);
@@ -440,11 +446,10 @@ describeWithEnvironment('BreakpointsSidebarController', () => {
     });
 
     it('correctly extracts logpoints', async () => {
-      const logDetail = 'x';
-      const condition =
-          `${Sources.BreakpointEditDialog.LogpointPrefix}${logDetail}${Sources.BreakpointEditDialog.LogpointSuffix}`;
+      const logExpression = 'x' as Bindings.BreakpointManager.UserCondition;
       const testData = [
-        createLocationTestData(TEST_JS_FILE, 3, 15, true /* enabled */, '', condition, logDetail),
+        createLocationTestData(
+            TEST_JS_FILE, 3, 15, true /* enabled */, '', logExpression, true /* isLogpoint */, logExpression),
       ];
 
       const {breakpointManager, settings} = createStubBreakpointManagerAndSettingsWithMockdata(testData);
@@ -455,7 +460,7 @@ describeWithEnvironment('BreakpointsSidebarController', () => {
       assert.lengthOf(actualViewData.groups[0].breakpointItems, 1);
       const breakpointItem = actualViewData.groups[0].breakpointItems[0];
       assert.strictEqual(breakpointItem.type, SourcesComponents.BreakpointsView.BreakpointType.LOGPOINT);
-      assert.strictEqual(breakpointItem.hoverText, logDetail);
+      assert.strictEqual(breakpointItem.hoverText, logExpression);
     });
 
     describe('breakpoint groups', () => {
@@ -524,6 +529,14 @@ describeWithEnvironment('BreakpointsSidebarController', () => {
 });
 
 describeWithRealConnection('BreakpointsSidebarController', () => {
+  const DEFAULT_BREAKPOINT:
+      [Bindings.BreakpointManager.UserCondition, boolean, boolean, Bindings.BreakpointManager.BreakpointOrigin] = [
+        Bindings.BreakpointManager.EMPTY_BREAKPOINT_CONDITION,
+        true,   // enabled
+        false,  // isLogpoint
+        Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION,
+      ];
+
   it('auto-expands if a user adds a new  breakpoint', async () => {
     const breakpointManager = Bindings.BreakpointManager.BreakpointManager.instance();
     const settings = Common.Settings.Settings.instance();
@@ -533,8 +546,7 @@ describeWithRealConnection('BreakpointsSidebarController', () => {
         {forceNew: false, breakpointManager, settings});
 
     // Add one breakpoint and collapse the tree.
-    const b1 = await breakpointManager.setBreakpoint(
-        uiSourceCode, 0, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION);
+    const b1 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
     {
       controller.expandedStateChanged(uiSourceCode.url(), false /* expanded */);
       const data = await controller.getUpdatedBreakpointViewData();
@@ -544,8 +556,7 @@ describeWithRealConnection('BreakpointsSidebarController', () => {
     }
 
     // Add a new breakpoint and check if it's expanded as expected.
-    const b2 = await breakpointManager.setBreakpoint(
-        uiSourceCode, 0, 3, '', true, Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION);
+    const b2 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 3, ...DEFAULT_BREAKPOINT);
     {
       const data = await controller.getUpdatedBreakpointViewData();
       assert.lengthOf(data.groups, 1);
@@ -568,8 +579,7 @@ describeWithRealConnection('BreakpointsSidebarController', () => {
         {forceNew: false, breakpointManager, settings});
 
     // Add one breakpoint and collapse the tree.
-    const b1 = await breakpointManager.setBreakpoint(
-        uiSourceCode, 0, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION);
+    const b1 = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
     {
       controller.expandedStateChanged(uiSourceCode.url(), false /* expanded */);
       const data = await controller.getUpdatedBreakpointViewData();
@@ -580,7 +590,8 @@ describeWithRealConnection('BreakpointsSidebarController', () => {
 
     // Add a new non-user triggered breakpoint and check if it's still collapsed.
     const b2 = await breakpointManager.setBreakpoint(
-        uiSourceCode, 0, 3, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+        uiSourceCode, 0, 3, Bindings.BreakpointManager.EMPTY_BREAKPOINT_CONDITION, true, false,
+        Bindings.BreakpointManager.BreakpointOrigin.OTHER);
     {
       const data = await controller.getUpdatedBreakpointViewData();
       assert.lengthOf(data.groups, 1);
@@ -613,13 +624,16 @@ describeWithRealConnection('BreakpointsSidebarController', () => {
       uiLocationToRawLocations:
           (_uiSourceCode: Workspace.UISourceCode.UISourceCode, _lineNumber: number,
            _columnNumber?: number) => [sdkLocation],
+      uiLocationRangeToRawLocationRanges:
+          (_uiSourceCode: Workspace.UISourceCode.UISourceCode, _textRange: TextUtils.TextRange.TextRange) => {
+            throw new Error('Not implemented');
+          },
     };
     Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().addSourceMapping(mapping);
 
     // Add one breakpoint and collapse its group.
     const b1 = await breakpointManager.setBreakpoint(
-        uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber, '', true,
-        Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION);
+        uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber, ...DEFAULT_BREAKPOINT);
     const controller = Sources.BreakpointsSidebarPane.BreakpointsSidebarController.instance(
         {forceNew: false, breakpointManager, settings: Common.Settings.Settings.instance()});
     controller.expandedStateChanged(uiSourceCode.url(), false /* expanded */);

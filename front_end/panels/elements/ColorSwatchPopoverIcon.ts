@@ -183,7 +183,7 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
       return;
     }
 
-    const color = this.swatch.getColor()?.asLegacyColor();
+    const color = this.swatch.getColor();
     const format = this.swatch.getFormat();
     if (!color || !format) {
       return;
@@ -223,7 +223,8 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
     }
 
     const colorName = this.spectrum ? this.spectrum.colorName() : undefined;
-    const text = colorName && colorName.startsWith('--') ? `var(${colorName})` : color.asString();
+    const text =
+        colorName && colorName.startsWith('--') ? `var(${colorName})` : (color.getAuthoredText() ?? color.asString());
 
     this.swatch.renderColor(color);
     const value = this.swatch.firstElementChild;

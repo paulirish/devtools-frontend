@@ -123,7 +123,8 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
     const breakpointItems = this.storage.breakpointItems(fromSourceCode.url(), fromSourceCode.contentType().name());
     for (const item of breakpointItems) {
       await this.setBreakpoint(
-          toSourceCode, item.lineNumber, item.columnNumber, item.condition, item.enabled, BreakpointOrigin.OTHER);
+          toSourceCode, item.lineNumber, item.columnNumber, item.condition, item.enabled, item.isLogpoint,
+          BreakpointOrigin.OTHER);
     }
   }
 
@@ -277,7 +278,8 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
         continue;
       }
       this.innerSetBreakpoint(
-          uiSourceCode, lineNumber, columnNumber, breakpoint.condition, breakpoint.enabled, BreakpointOrigin.OTHER);
+          uiSourceCode, lineNumber, columnNumber, breakpoint.condition, breakpoint.enabled, breakpoint.isLogpoint,
+          BreakpointOrigin.OTHER);
     }
     this.storage.unmute();
   }
@@ -306,7 +308,7 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
 
   async setBreakpoint(
       uiSourceCode: Workspace.UISourceCode.UISourceCode, lineNumber: number, columnNumber: number|undefined,
-      condition: string, enabled: boolean, origin: BreakpointOrigin): Promise<Breakpoint> {
+      condition: UserCondition, enabled: boolean, isLogpoint: boolean, origin: BreakpointOrigin): Promise<Breakpoint> {
     let uiLocation: Workspace.UISourceCode.UILocation =
         new Workspace.UISourceCode.UILocation(uiSourceCode, lineNumber, columnNumber);
     const normalizedLocation = await this.debuggerWorkspaceBinding.normalizeUILocation(uiLocation);
@@ -317,23 +319,25 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
     const breakpointLocation = BreakpointManager.breakpointLocationFromUiLocation(uiLocation);
     return this.innerSetBreakpoint(
         uiLocation.uiSourceCode, breakpointLocation.lineNumber, breakpointLocation.columnNumber, condition, enabled,
-        origin);
+        isLogpoint, origin);
   }
 
   private innerSetBreakpoint(
       uiSourceCode: Workspace.UISourceCode.UISourceCode, lineNumber: number, columnNumber: number|undefined,
-      condition: string, enabled: boolean, origin: BreakpointOrigin): Breakpoint {
+      condition: UserCondition, enabled: boolean, isLogpoint: boolean, origin: BreakpointOrigin): Breakpoint {
     const url = BreakpointManager.getScriptForInlineUiSourceCode(uiSourceCode)?.sourceURL ?? uiSourceCode.url();
     const resourceTypeName = uiSourceCode.contentType().name();
-    const storageId = Storage.computeId({url, resourceTypeName, lineNumber, columnNumber, condition, enabled});
+    const storageId =
+        Storage.computeId({url, resourceTypeName, lineNumber, columnNumber, condition, enabled, isLogpoint});
     let breakpoint = this.#breakpointByStorageId.get(storageId);
     if (breakpoint) {
-      breakpoint.updateState({...breakpoint.storageState, condition, enabled});
+      breakpoint.updateState({...breakpoint.storageState, condition, enabled, isLogpoint});
       breakpoint.addUISourceCode(uiSourceCode);
       void breakpoint.updateBreakpoint();
       return breakpoint;
     }
-    breakpoint = new Breakpoint(this, uiSourceCode, url, lineNumber, columnNumber, condition, enabled, origin);
+    breakpoint =
+        new Breakpoint(this, uiSourceCode, url, lineNumber, columnNumber, condition, enabled, isLogpoint, origin);
     this.#breakpointByStorageId.set(storageId, breakpoint);
     return breakpoint;
   }
@@ -366,72 +370,33 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   async possibleBreakpoints(
       uiSourceCode: Workspace.UISourceCode.UISourceCode,
       textRange: TextUtils.TextRange.TextRange): Promise<Workspace.UISourceCode.UILocation[]> {
-    const {pluginManager} = this.debuggerWorkspaceBinding;
-    if (pluginManager) {
-      // TODO(bmeurer): Refactor this logic, as for DWARF and sourcemaps, it doesn't make sense
-      //                to even ask V8 for possible break locations, since these are determined
-      //                from the debugging information.
-      const rawLocations = await pluginManager.uiLocationToRawLocations(uiSourceCode, textRange.startLine);
-      if (rawLocations) {
-        const uiLocations = [];
-        for (const rawLocation of rawLocations) {
-          const uiLocation = await this.debuggerWorkspaceBinding.rawLocationToUILocation(rawLocation);
-          if (uiLocation) {
-            uiLocations.push(uiLocation);
-          }
-        }
-        return uiLocations;
-      }
-    }
-    const startLocationsPromise = this.debuggerWorkspaceBinding.uiLocationToRawLocations(
-        uiSourceCode, textRange.startLine, textRange.startColumn);
-    const endLocationsPromise = DebuggerWorkspaceBinding.instance().uiLocationToRawLocations(
-        uiSourceCode, textRange.endLine, textRange.endColumn);
-    const [startLocations, endLocations] = await Promise.all([startLocationsPromise, endLocationsPromise]);
-    const endLocationByModel = new Map<SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Location>();
-    for (const location of endLocations) {
-      endLocationByModel.set(location.debuggerModel, location);
-    }
-    let startLocation: SDK.DebuggerModel.Location|null = null;
-    let endLocation: SDK.DebuggerModel.Location|null = null;
-    for (const location of startLocations) {
-      const endLocationCandidate = endLocationByModel.get(location.debuggerModel);
-      if (endLocationCandidate) {
-        startLocation = location;
-        endLocation = endLocationCandidate;
-        break;
-      }
-    }
-    if (!startLocation || !endLocation) {
-      return [];
-    }
+    const rawLocationRanges =
+        await this.debuggerWorkspaceBinding.uiLocationRangeToRawLocationRanges(uiSourceCode, textRange);
+    const breakLocationLists = await Promise.all(rawLocationRanges.map(
+        ({start, end}) => start.debuggerModel.getPossibleBreakpoints(start, end, /* restrictToFunction */ false)));
+    const breakLocations = breakLocationLists.flat();
 
-    return startLocation.debuggerModel
-        .getPossibleBreakpoints(startLocation, endLocation, /* restrictToFunction */ false)
-        .then(toUILocations.bind(this));
+    const uiLocations = new Map<string, Workspace.UISourceCode.UILocation>();
+    await Promise.all(breakLocations.map(async breakLocation => {
+      const uiLocation = await this.debuggerWorkspaceBinding.rawLocationToUILocation(breakLocation);
+      if (uiLocation === null) {
+        return;
+      }
 
-    async function toUILocations(this: BreakpointManager, locations: SDK.DebuggerModel.BreakLocation[]):
-        Promise<Workspace.UISourceCode.UILocation[]> {
-      const sortedLocationsPromises =
-          locations.map(location => this.debuggerWorkspaceBinding.rawLocationToUILocation(location));
-      const nullableLocations = await Promise.all(sortedLocationsPromises);
-      const sortedLocations =
-          (nullableLocations.filter(location => location && location.uiSourceCode === uiSourceCode) as
-           Workspace.UISourceCode.UILocation[]);
-      if (!sortedLocations.length) {
-        return [];
+      // The "canonical" UI locations don't need to be in our `uiSourceCode`.
+      if (uiLocation.uiSourceCode !== uiSourceCode) {
+        return;
       }
-      sortedLocations.sort(Workspace.UISourceCode.UILocation.comparator);
-      let lastLocation: Workspace.UISourceCode.UILocation = sortedLocations[0];
-      const result = [lastLocation];
-      for (const location of sortedLocations) {
-        if (location.id() !== lastLocation.id()) {
-          result.push(location);
-          lastLocation = location;
-        }
+
+      // Since we ask for all overlapping ranges above, we might also get breakable locations
+      // outside of the `textRange`.
+      if (!textRange.containsLocation(uiLocation.lineNumber, uiLocation.columnNumber ?? 0)) {
+        return;
       }
-      return result;
-    }
+
+      uiLocations.set(uiLocation.id(), uiLocation);
+    }));
+    return [...uiLocations.values()];
   }
 
   breakpointLocationsForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): BreakpointLocation[] {
@@ -533,8 +498,8 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
 
   constructor(
       breakpointManager: BreakpointManager, primaryUISourceCode: Workspace.UISourceCode.UISourceCode,
-      url: Platform.DevToolsPath.UrlString, lineNumber: number, columnNumber: number|undefined, condition: string,
-      enabled: boolean, origin: BreakpointOrigin) {
+      url: Platform.DevToolsPath.UrlString, lineNumber: number, columnNumber: number|undefined,
+      condition: UserCondition, enabled: boolean, isLogpoint: boolean, origin: BreakpointOrigin) {
     this.breakpointManager = breakpointManager;
     this.#origin = origin;
 
@@ -546,7 +511,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
 
     this.#modelBreakpoints = new Map();
     const resourceTypeName = primaryUISourceCode.contentType().name();
-    this.updateState({url, resourceTypeName, lineNumber, columnNumber, condition, enabled});
+    this.updateState({url, resourceTypeName, lineNumber, columnNumber, condition, enabled, isLogpoint});
     this.addUISourceCode(primaryUISourceCode);
     this.breakpointManager.targetManager.observeModels(SDK.DebuggerModel.DebuggerModel, this);
   }
@@ -705,12 +670,36 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
     this.updateState({...this.#storageState, enabled});
   }
 
-  condition(): string {
+  /**
+   * The breakpoint condition as entered by the user.
+   */
+  condition(): UserCondition {
     return this.#storageState.condition;
   }
 
-  setCondition(condition: string): void {
-    this.updateState({...this.#storageState, condition});
+  /**
+   * The breakpoint condition as it is sent to V8.
+   */
+  backendCondition(): SDK.DebuggerModel.BackendCondition {
+    let condition: string = this.condition();
+    if (condition === '') {
+      return '' as SDK.DebuggerModel.BackendCondition;
+    }
+
+    let sourceUrl = COND_BREAKPOINT_SOURCE_URL;
+    if (this.isLogpoint()) {
+      condition = `${LOGPOINT_PREFIX}${condition}${LOGPOINT_SUFFIX}`;
+      sourceUrl = LOGPOINT_SOURCE_URL;
+    }
+    return `${condition}\n\n//# sourceURL=${sourceUrl}` as SDK.DebuggerModel.BackendCondition;
+  }
+
+  setCondition(condition: UserCondition, isLogpoint: boolean): void {
+    this.updateState({...this.#storageState, condition, isLogpoint});
+  }
+
+  isLogpoint(): boolean {
+    return this.#storageState.isLogpoint;
   }
 
   get storageState(): BreakpointStorageState {
@@ -718,12 +707,13 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
   }
 
   updateState(newState: BreakpointStorageState): void {
-    // Only 'enabled' and 'condition' can change (except during initialization).
+    // Only 'enabled', 'condition' and 'isLogpoint' can change (except during initialization).
     Platform.DCHECK(
         () => !this.#storageState ||
             (this.#storageState.url === newState.url && this.#storageState.lineNumber === newState.lineNumber &&
              this.#storageState.columnNumber === newState.columnNumber));
-    if (this.#storageState?.enabled === newState.enabled && this.#storageState?.condition === newState.condition) {
+    if (this.#storageState?.enabled === newState.enabled && this.#storageState?.condition === newState.condition &&
+        this.#storageState?.isLogpoint === newState.isLogpoint) {
       return;
     }
     this.#storageState = newState;
@@ -871,7 +861,7 @@ export class ModelBreakpoint {
     }
     const lineNumber = this.#breakpoint.lineNumber();
     const columnNumber = this.#breakpoint.columnNumber();
-    const condition = this.#breakpoint.condition();
+    const condition = this.#breakpoint.backendCondition();
 
     // Calculate the new state.
     let newState: Breakpoint.State|null = null;
@@ -980,13 +970,12 @@ export class ModelBreakpoint {
     return DebuggerUpdateResult.OK;
   }
 
-  async #setBreakpointOnBackend(newState: Breakpoint.State): Promise<{
+  async #setBreakpointOnBackend({positions, condition}: Breakpoint.State): Promise<{
     breakpointIds: Protocol.Debugger.BreakpointId[],
     locations: SDK.DebuggerModel.Location[],
     serverError: boolean,
   }> {
-    const condition = this.#breakpoint.condition();
-    const results = await Promise.all(newState.positions.map(pos => {
+    const results = await Promise.all(positions.map(pos => {
       if (pos.url) {
         return this.#debuggerModel.setBreakpointByURL(pos.url, pos.lineNumber, pos.columnNumber, condition);
       }
@@ -1093,9 +1082,9 @@ export const enum BreakpointOrigin {
 export namespace Breakpoint {
   export class State {
     positions: Position[];
-    condition: string;
+    condition: SDK.DebuggerModel.BackendCondition;
 
-    constructor(positions: Position[], condition: string) {
+    constructor(positions: Position[], condition: SDK.DebuggerModel.BackendCondition) {
       this.positions = positions;
       this.condition = condition;
     }
@@ -1155,33 +1144,14 @@ class Storage {
 
   breakpointItems(url: Platform.DevToolsPath.UrlString, resourceTypeName?: string): BreakpointStorageState[] {
     const breakpoints = [];
-    let dirty = false;
     for (const breakpoint of this.breakpoints.values()) {
       if (breakpoint.url !== url) {
         continue;
       }
-      if (breakpoint.resourceTypeName !== resourceTypeName) {
-        // Automatically migrate matching breakpoints that don't have a `resourceTypeName`
-        // to the requested `resourceTypeName`, meaning breakpoints set prior to updating
-        // to this version of Chrome will adopt the resource type of the first UISourceCode
-        // with the same `url`.
-        if (breakpoint.resourceTypeName === undefined) {
-          breakpoint.resourceTypeName = resourceTypeName;
-          dirty = true;
-        } else if (resourceTypeName !== undefined) {
-          continue;
-        }
+      if (breakpoint.resourceTypeName !== resourceTypeName && resourceTypeName !== undefined) {
+        continue;
       }
       breakpoints.push(breakpoint);
-    }
-    if (dirty) {
-      // Some breakpoint keys changed, we need to recompute the
-      const breakpoints = [...this.breakpoints.values()];
-      this.breakpoints.clear();
-      for (const breakpoint of breakpoints) {
-        this.breakpoints.set(Storage.computeId(breakpoint), breakpoint);
-      }
-      this.save();
     }
     return breakpoints;
   }
@@ -1214,11 +1184,7 @@ class Storage {
     if (!url) {
       return '';
     }
-    let id: string = url;
-    if (resourceTypeName !== undefined) {
-      id += `:${resourceTypeName}`;
-    }
-    id += `:${lineNumber}`;
+    let id = `${url}:${resourceTypeName}:${lineNumber}`;
     if (columnNumber !== undefined) {
       id += `:${columnNumber}`;
     }
@@ -1227,16 +1193,25 @@ class Storage {
 }
 
 /**
+ * A breakpoint condition as entered by the user. We use the type to
+ * distinguish from {@link SDK.DebuggerModel.BackendCondition}.
+ */
+export type UserCondition = Platform.Brand.Brand<string, 'UserCondition'>;
+export const EMPTY_BREAKPOINT_CONDITION = '' as UserCondition;
+export const NEVER_PAUSE_HERE_CONDITION = 'false' as UserCondition;
+
+/**
  * All the data for a single `Breakpoint` thats stored in the settings.
  * Whenever any of these change, we need to update the settings.
  */
 interface BreakpointStorageState {
   readonly url: Platform.DevToolsPath.UrlString;
-  resourceTypeName?: string;
+  readonly resourceTypeName: string;
   readonly lineNumber: number;
   readonly columnNumber?: number;
-  readonly condition: string;
+  readonly condition: UserCondition;
   readonly enabled: boolean;
+  readonly isLogpoint: boolean;
 }
 
 export class BreakpointLocation {
@@ -1248,3 +1223,9 @@ export class BreakpointLocation {
     this.uiLocation = uiLocation;
   }
 }
+
+const LOGPOINT_PREFIX = '/** DEVTOOLS_LOGPOINT */ console.log(';
+const LOGPOINT_SUFFIX = ')';
+
+const LOGPOINT_SOURCE_URL = 'debugger://logpoint';
+const COND_BREAKPOINT_SOURCE_URL = 'debugger://breakpoint';

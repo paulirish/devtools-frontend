@@ -11,13 +11,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'b999a0bc637921a2ae55b2a966b0d8d44e9558c7',
+  'build_revision': 'b66acf0396daffd4d6767f8285063c593818fc6d',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'd843e69371f94cf20f6c130dde01a8194f3e19be',
+  'buildtools_revision': '7a0617ed04531f5a76071e7f869233d4097a4785',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'faf64f1f63a5cb3e37ed138d97aee953345ff7e9',
+  'depot_tools_revision': '94b0eb1bb51bc76d90494df87e12d82847140b5a',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '231d3578b4bf2bec1c3d306e53621430003b4bae',
@@ -28,7 +28,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:5e19d2fb166fbd4f6f32147fbb2f497091a54ad8',
+  'gn_version': 'git_revision:629f6be82956987c7ac10faf2acf0534b1667fa2',
 
   # ninja CIPD package version.
   # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
@@ -36,13 +36,13 @@ vars = {
 
   # Chromium build number for unit tests. It should be regularly updated to
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/LAST_CHANGE
-  'chromium_linux': '1094403',
+  'chromium_linux': '1099198',
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Win_x64/LAST_CHANGE
-  'chromium_win': '1094386',
+  'chromium_win': '1099170',
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Mac/LAST_CHANGE
-  'chromium_mac': '1094394',
+  'chromium_mac': '1099177',
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Mac_Arm/LAST_CHANGE
-  'chromium_mac_arm': '1094387',
+  'chromium_mac_arm': '1099175',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.

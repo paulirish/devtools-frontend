@@ -7,6 +7,7 @@ const {assert} = chai;
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import * as TextUtils from '../../../../../front_end/models/text_utils/text_utils.js';
 import {encodeSourceMap} from '../../helpers/SourceMapEncoder.js';
 
 const sourceUrlFoo = '<foo>' as Platform.DevToolsPath.UrlString;
@@ -272,13 +273,32 @@ describe('SourceMap', () => {
     assertReverseMapping(sourceMap.sourceLineMapping(sourceUrlExample, 1, 0), 3, 1);
   });
 
+  it('can parse source maps with mappings in reverse direction', () => {
+    /*
+        example.js:
+        ABCD
+
+        compiled.js:
+        DCBA
+     */
+    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, {
+      // mappings go in reversed direction.
+      mappings: 'GAAA,DAAC,DAAC,DAAC',
+      sources: ['example.js'],
+      version: 3,
+    });
+
+    assertMapping(sourceMap.findEntry(0, 0), 'example.js', 0, 3);
+    assertMapping(sourceMap.findEntry(0, 1), 'example.js', 0, 2);
+    assertMapping(sourceMap.findEntry(0, 2), 'example.js', 0, 1);
+    assertMapping(sourceMap.findEntry(0, 3), 'example.js', 0, 0);
+  });
+
   it('can parse the multiple sections format', () => {
     const mappingPayload: SDK.SourceMap.SourceMapV3 = {
-      mappings: '',
-      sources: [],
       sections: [
         {
-          offset: {line: 0, 'column': 0},
+          offset: {line: 0, column: 0},
           map: {
             mappings: 'AAAA,CAEC',
             sources: ['source1.js', 'source2.js'],
@@ -286,7 +306,7 @@ describe('SourceMap', () => {
           },
         },
         {
-          offset: {line: 2, 'column': 10},
+          offset: {line: 2, column: 10},
           map: {
             mappings: 'AAAA,CAEC',
             sources: ['source3.js'],
@@ -303,6 +323,52 @@ describe('SourceMap', () => {
     assertMapping(sourceMap.findEntry(0, 1), 'source1.js', 2, 1);
     assertMapping(sourceMap.findEntry(2, 10), 'source3.js', 0, 0);
     assertMapping(sourceMap.findEntry(2, 11), 'source3.js', 2, 1);
+  });
+
+  it('can parse source maps with ClosureScript names', () => {
+    /*
+      ------------------------------------------------------------------------------------
+      chrome_issue_611738.clj:
+      (ns devtools-sample.chrome-issue-611738)
+
+      (defmacro m []
+        `(let [generated# "value2"]))
+      ------------------------------------------------------------------------------------
+      chrome_issue_611738.cljs:
+      (ns devtools-sample.chrome-issue-611738
+      (:require-macros [devtools-sample.chrome-issue-611738 :refer [m]]))
+
+      (let [name1 "value1"]
+        (m))
+      ------------------------------------------------------------------------------------
+      chrome_issue_611738.js:
+      // Compiled by ClojureScript 1.9.89 {}
+      goog.provide('devtools_sample.chrome_issue_611738');
+      goog.require('cljs.core');
+      var name1_31466 = "value1";
+      var generated31465_31467 = "value2";
+
+      //# sourceMappingURL=chrome_issue_611738.js.map
+      ------------------------------------------------------------------------------------
+      chrome_issue_611738.js.map:
+      {"version":3,"file":"\/Users\/darwin\/code\/cljs-devtools-sample\/resources\/public\/_compiled\/demo\/devtools_sample\/chrome_issue_611738.js","sources":["chrome_issue_611738.cljs"],"lineCount":7,"mappings":";AAAA;;AAGA,kBAAA,dAAMA;AAAN,AACE,IAAAC,uBAAA;AAAA,AAAA","names":["name1","generated31465"]}
+      ------------------------------------------------------------------------------------
+    */
+    const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, {
+      version: 3,
+      sources: ['chrome_issue_611738.cljs'],
+      mappings: ';AAAA;;AAGA,kBAAA,dAAMA;AAAN,AACE,IAAAC,uBAAA;AAAA,AAAA',
+      names: ['name1', 'generated31465'],
+    });
+
+    assert.propertyVal(sourceMap.findEntry(1, 0), 'name', undefined);
+    assert.propertyVal(sourceMap.findEntry(3, 0), 'name', undefined);
+    assert.propertyVal(sourceMap.findEntry(3, 4), 'name', 'name1');
+    assert.propertyVal(sourceMap.findEntry(3, 18), 'name', undefined);
+    assert.propertyVal(sourceMap.findEntry(4, 0), 'name', undefined);
+    assert.propertyVal(sourceMap.findEntry(4, 4), 'name', 'generated31465');
+    assert.propertyVal(sourceMap.findEntry(4, 27), 'name', undefined);
+    assert.propertyVal(sourceMap.findEntry(5, 0), 'name', undefined);
   });
 
   it('resolves duplicate canonical urls', () => {
@@ -707,6 +773,20 @@ describe('SourceMap', () => {
            assert.strictEqual(sourceURLs[0], expected);
          });
     }
+
+    it('does not touch sourceURLs that conflict with the compiled URL', () => {
+      const sourceURL = 'http://localhost:12345/index.js' as Platform.DevToolsPath.UrlString;
+      const sourceMappingURL = `${sourceURL}.map` as Platform.DevToolsPath.UrlString;
+      const sourceMap = new SDK.SourceMap.SourceMap(sourceURL, sourceMappingURL, {
+        version: 3,
+        sources: [sourceURL],
+        sourcesContent: ['console.log(42)'],
+        mappings: '',
+      });
+      const sourceURLs = sourceMap.sourceURLs();
+      assert.lengthOf(sourceURLs, 1);
+      assert.strictEqual(sourceURLs[0], sourceURL);
+    });
   });
 
   describe('automatic ignore-listing', () => {
@@ -919,6 +999,170 @@ describe('SourceMap', () => {
     it('skips over first line when file starts with )]}', () => {
       const content = ')]} {"version": 2}\n' + JSON.stringify(payload);
       assert.deepEqual(parseSourceMap(content), payload);
+    });
+  });
+
+  describe('reverseMapTextRanges', () => {
+    const {SourceMap} = SDK.SourceMap;
+    const {TextRange} = TextUtils.TextRange;
+
+    it('yields an empty array for unknown source URLs', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap(['0:0 => example.js:0:0']));
+      assert.isEmpty(sourceMap.reverseMapTextRanges(sourceUrlOther, new TextRange(0, 0, 1, 1)));
+    });
+
+    it('yields a single range for trivial single-line, fully contained mappings', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '0:0 => example.js:0:0',
+                                        '0:5 => example.js:0:6',
+                                        '1:0 => other.js:0:0',
+                                        '1:8 => other.js:0:9',
+                                      ]));
+
+      const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 0, 6));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], new TextRange(0, 0, 0, 5));
+
+      const otherRanges = sourceMap.reverseMapTextRanges(sourceUrlOther, new TextRange(0, 4, 0, 7));
+      assert.lengthOf(otherRanges, 1, 'expected a single range');
+      assert.deepEqual(otherRanges[0], new TextRange(1, 0, 1, 8));
+    });
+
+    it('yields a combined range for adjacent single-line mappings', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '0:0 => example.js:0:0',
+                                        '0:5 => example.js:0:5',
+                                        '0:9 => example.js:0:9',
+                                        '5:0 => other.js:1:1',
+                                        '5:1 => other.js:1:4',
+                                        '5:8 => other.js:1:8',
+                                      ]));
+
+      const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 1, 0, 6));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], new TextRange(0, 0, 0, 9));
+
+      const otherRanges = sourceMap.reverseMapTextRanges(sourceUrlOther, new TextRange(1, 1, 1, 7));
+      assert.lengthOf(otherRanges, 1, 'expected a single range');
+      assert.deepEqual(otherRanges[0], new TextRange(5, 0, 5, 8));
+    });
+
+    it('yields a combined range for adjacent multi-line mappings', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '0:0 => example.js:0:0',
+                                        '2:5 => example.js:1:5',
+                                        '9:9 => example.js:1:9',
+                                      ]));
+
+      let exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 1, 6));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], new TextRange(0, 0, 9, 9));
+
+      exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 1, 9));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], new TextRange(0, 0, 9, 9));
+    });
+
+    it('correctly handles exact range matches', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '0:0 => example.js:0:0',
+                                        '0:1 => example.js:0:3',
+                                      ]));
+
+      const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 0, 3));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], new TextRange(0, 0, 0, 1));
+    });
+
+    it('correctly handles un-mapped prefixes in source files', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '1:2 => example.js:4:0',
+                                        '3:4 => example.js:4:5',
+                                      ]));
+
+      const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(0, 0, 4, 1));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], new TextRange(1, 2, 3, 4));
+    });
+
+    it('correctly handles un-mapped suffixes in source files', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '1:2 => example.js:4:0',
+                                        '3:4 => example.js:4:5',
+                                      ]));
+
+      let exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 0, 10, 0));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], TextRange.createUnboundedFromLocation(1, 2));
+
+      exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 1, 10, 0));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], TextRange.createUnboundedFromLocation(1, 2));
+
+      exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 5, 10, 0));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], TextRange.createUnboundedFromLocation(3, 4));
+
+      exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 8, 10, 0));
+      assert.lengthOf(exampleRanges, 1, 'expected a single range');
+      assert.deepEqual(exampleRanges[0], TextRange.createUnboundedFromLocation(3, 4));
+    });
+
+    it('correctly handles single-line mappings with holes', () => {
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '1:0 => example.js:4:0',
+                                        '1:1 => other.js:6:0',
+                                        '1:4 => example.js:4:5',
+                                        '1:5 => example.js:4:8',
+                                        '1:6 => example.js:1:0',
+                                        '1:7 => example.js:4:9',
+                                      ]));
+
+      let exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 1, 4, 6));
+      assert.lengthOf(exampleRanges, 2, 'expected two distinct ranges');
+      assert.deepEqual(exampleRanges[0], new TextRange(1, 0, 1, 1));
+      assert.deepEqual(exampleRanges[1], new TextRange(1, 4, 1, 5));
+
+      exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(4, 1, 4, 9));
+      assert.lengthOf(exampleRanges, 2, 'expected two distinct ranges');
+      assert.deepEqual(exampleRanges[0], new TextRange(1, 0, 1, 1));
+      assert.deepEqual(exampleRanges[1], new TextRange(1, 4, 1, 6));
+    });
+
+    it('correctly handles overlapping mappings', () => {
+      // This presents a really weird example, which we believe is unlikely to be relevant
+      // in practice. But just in case, this test case serves as a documentation for how
+      // DevTools will currently resolve this case: It will purely go by the reverse
+      // mapping to figure out which chunks belong together and then afterwards will
+      // try to combine mappings in the order in which the reverse mappings are sorted.
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '1:0 => example.js:1:0',
+                                        '1:4 => example.js:1:5',
+                                        '1:5 => example.js:1:8',
+                                        '2:6 => example.js:1:1',
+                                        '2:7 => example.js:1:9',
+                                      ]));
+
+      const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(1, 2, 1, 7));
+      assert.lengthOf(exampleRanges, 2, 'expected two distinct ranges');
+      assert.deepEqual(exampleRanges[0], new TextRange(1, 4, 1, 5));
+      assert.deepEqual(exampleRanges[1], new TextRange(2, 6, 2, 7));
+    });
+
+    it('correctly sorts and merges adjacent mappings even if source map is unsorted', () => {
+      // This is a slight variation of the previous test. We want to ensure that
+      // no matter how crazy the source map, we always yield a maximally merged
+      // and sorted result.
+      const sourceMap = new SourceMap(compiledUrl, sourceMapJsonUrl, encodeSourceMap([
+                                        '1:0 => example.js:1:0',
+                                        '1:5 => example.js:1:8',
+                                        '2:6 => example.js:1:1',
+                                        '2:7 => example.js:1:9',
+                                      ]));
+
+      const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(1, 0, 1, 9));
+      assert.lengthOf(exampleRanges, 1, 'expected a single maximally merged range');
+      assert.deepEqual(exampleRanges[0], new TextRange(1, 0, 2, 7));
     });
   });
 });

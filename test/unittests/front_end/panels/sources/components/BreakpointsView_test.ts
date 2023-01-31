@@ -33,6 +33,7 @@ const PAUSE_ON_UNCAUGHT_EXCEPTIONS_SELECTOR = '.pause-on-uncaught-exceptions';
 const PAUSE_ON_CAUGHT_EXCEPTIONS_SELECTOR = '.pause-on-caught-exceptions';
 const TABBABLE_SELECTOR = '[tabindex="0"]';
 const SUMMARY_SELECTOR = 'summary';
+const GROUP_DIFFERENTIATOR_SELECTOR = '.group-header-differentiator';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -295,7 +296,58 @@ describeWithEnvironment('BreakpointsView', () => {
     }
   });
 
-  it('renders breakpoints with their location', async () => {
+  it('renders breakpoint groups with a differentiator if the file names are not unique', async () => {
+    const component = new SourcesComponents.BreakpointsView.BreakpointsView();
+    renderElementIntoDOM(component);
+
+    const groupTemplate = {
+      name: 'index.js',
+      url: '' as Platform.DevToolsPath.UrlString,
+      editable: true,
+      expanded: true,
+      breakpointItems: [
+        {
+          id: '1',
+          type: SourcesComponents.BreakpointsView.BreakpointType.REGULAR_BREAKPOINT,
+          location: '234',
+          codeSnippet: 'const a = x;',
+          isHit: false,
+          status: SourcesComponents.BreakpointsView.BreakpointStatus.ENABLED,
+        },
+      ],
+    };
+
+    // Create two groups with the same file name, but different url.
+    const group1 = {...groupTemplate};
+    group1.url = 'https://google.com/lib/index.js' as Platform.DevToolsPath.UrlString;
+
+    const group2 = {...groupTemplate};
+    group2.url = 'https://google.com/src/index.js' as Platform.DevToolsPath.UrlString;
+
+    const data: SourcesComponents.BreakpointsView.BreakpointsViewData = {
+      breakpointsActive: true,
+      pauseOnUncaughtExceptions: false,
+      pauseOnCaughtExceptions: false,
+      independentPauseToggles: true,
+      groups: [
+        group1,
+        group2,
+      ],
+    };
+    component.data = data;
+    await coordinator.done();
+
+    assertShadowRoot(component.shadowRoot);
+    const groupSummaries = Array.from(component.shadowRoot.querySelectorAll(SUMMARY_SELECTOR));
+    const differentiatingPath = groupSummaries.map(group => {
+      const differentiatorElement = group.querySelector(GROUP_DIFFERENTIATOR_SELECTOR);
+      assertElement(differentiatorElement, HTMLSpanElement);
+      return differentiatorElement.textContent;
+    });
+    assert.deepEqual(differentiatingPath, ['lib/', 'src/']);
+  });
+
+  it('renders breakpoints with a differentiating path', async () => {
     const {component, data} = await renderMultipleBreakpoints();
     assertShadowRoot(component.shadowRoot);
 
@@ -439,6 +491,122 @@ describeWithEnvironment('BreakpointsView', () => {
     assertElement(editBreakpointButton, HTMLButtonElement);
 
     assert.strictEqual(editBreakpointButton.title, 'Edit condition');
+  });
+
+  describe('group checkboxes', () => {
+    async function waitForCheckboxToggledEventsWithCheckedUpdate(
+        component: SourcesComponents.BreakpointsView.BreakpointsView, numBreakpointItems: number, checked: boolean) {
+      return new Promise<void>(resolve => {
+        let numCheckboxToggledEvents = 0;
+        component.addEventListener(SourcesComponents.BreakpointsView.CheckboxToggledEvent.eventName, (e: Event) => {
+          const event = e as SourcesComponents.BreakpointsView.CheckboxToggledEvent;
+          assert.strictEqual(event.data.checked, checked);
+          ++numCheckboxToggledEvents;
+          if (numCheckboxToggledEvents === numBreakpointItems) {
+            resolve();
+          }
+        });
+      });
+    }
+    it('show a checked group checkbox if at least one breakpoint in that group is enabled', async () => {
+      const {component, data} = await renderMultipleBreakpoints();
+
+      // Make sure that at least one breakpoint is enabled.
+      data.groups[0].breakpointItems[0].status = SourcesComponents.BreakpointsView.BreakpointStatus.ENABLED;
+      component.data = data;
+      await coordinator.done();
+
+      await hover(component, SUMMARY_SELECTOR);
+
+      assertShadowRoot(component.shadowRoot);
+      const firstGroupSummary = component.shadowRoot.querySelector(SUMMARY_SELECTOR);
+      assertNotNullOrUndefined(firstGroupSummary);
+      const groupCheckbox = firstGroupSummary.querySelector('input');
+      assertElement(groupCheckbox, HTMLInputElement);
+
+      assert.isTrue(groupCheckbox.checked);
+    });
+
+    it('show an unchecked group checkbox if no breakpoint in that group is enabled', async () => {
+      const {component, data} = await renderMultipleBreakpoints();
+
+      // Make sure that all breakpoints are disabled.
+      const breakpointItems = data.groups[0].breakpointItems;
+      for (let i = 0; i < breakpointItems.length; ++i) {
+        breakpointItems[i].status = SourcesComponents.BreakpointsView.BreakpointStatus.DISABLED;
+      }
+
+      component.data = data;
+      await coordinator.done();
+
+      await hover(component, SUMMARY_SELECTOR);
+
+      assertShadowRoot(component.shadowRoot);
+      const firstGroupSummary = component.shadowRoot.querySelector(SUMMARY_SELECTOR);
+      assertNotNullOrUndefined(firstGroupSummary);
+      const groupCheckbox = firstGroupSummary.querySelector('input');
+      assertElement(groupCheckbox, HTMLInputElement);
+
+      assert.isFalse(groupCheckbox.checked);
+    });
+
+    it('disable all breakpoints on unchecking', async () => {
+      const {component, data} = await renderMultipleBreakpoints();
+
+      const numBreakpointItems = data.groups[0].breakpointItems.length;
+      assert.isTrue(numBreakpointItems > 1);
+
+      // Make sure that all breakpoints are enabled.
+      for (let i = 0; i < numBreakpointItems; ++i) {
+        data.groups[0].breakpointItems[i].status = SourcesComponents.BreakpointsView.BreakpointStatus.ENABLED;
+      }
+      component.data = data;
+      await coordinator.done();
+
+      await hover(component, SUMMARY_SELECTOR);
+
+      // Uncheck the group checkbox.
+      assertShadowRoot(component.shadowRoot);
+      const firstGroupSummary = component.shadowRoot.querySelector(SUMMARY_SELECTOR);
+      assertNotNullOrUndefined(firstGroupSummary);
+      const groupCheckbox = firstGroupSummary.querySelector('input');
+      assertElement(groupCheckbox, HTMLInputElement);
+
+      // Wait until we receive all events fired that notify us of disabled breakpoints.
+      const waitForEventPromise = waitForCheckboxToggledEventsWithCheckedUpdate(component, numBreakpointItems, false);
+
+      groupCheckbox.click();
+      await waitForEventPromise;
+    });
+
+    it('enable all breakpoints on unchecking', async () => {
+      const {component, data} = await renderMultipleBreakpoints();
+
+      const numBreakpointItems = data.groups[0].breakpointItems.length;
+      assert.isTrue(numBreakpointItems > 1);
+
+      // Make sure that all breakpoints are disabled.
+      for (let i = 0; i < numBreakpointItems; ++i) {
+        data.groups[0].breakpointItems[i].status = SourcesComponents.BreakpointsView.BreakpointStatus.DISABLED;
+      }
+      component.data = data;
+      await coordinator.done();
+
+      await hover(component, SUMMARY_SELECTOR);
+
+      // Uncheck the group checkbox.
+      assertShadowRoot(component.shadowRoot);
+      const firstGroupSummary = component.shadowRoot.querySelector(SUMMARY_SELECTOR);
+      assertNotNullOrUndefined(firstGroupSummary);
+      const groupCheckbox = firstGroupSummary.querySelector('input');
+      assertElement(groupCheckbox, HTMLInputElement);
+
+      // Wait until we receive all events fired that notify us of enabled breakpoints.
+      const waitForEventPromise = waitForCheckboxToggledEventsWithCheckedUpdate(component, numBreakpointItems, true);
+
+      groupCheckbox.click();
+      await waitForEventPromise;
+    });
   });
 
   it('only renders edit button for breakpoints in editable groups', async () => {

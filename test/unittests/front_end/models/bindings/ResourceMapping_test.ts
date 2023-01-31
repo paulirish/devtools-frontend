@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../../../../front_end/core/common/common.js';
+import * as TextUtils from '../../../../../front_end/models/text_utils/text_utils.js';
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import type * as SDKModule from '../../../../../front_end/core/sdk/sdk.js';
@@ -106,7 +107,7 @@ describeWithMockConnection('ResourceMapping', () => {
       assert.isEmpty(resourceMapping.uiLocationToJSLocations(uiSourceCode, 0, 0));
       SCRIPTS.forEach(({startLine, startColumn, endLine, endColumn}) => {
         assert.isEmpty(resourceMapping.uiLocationToJSLocations(uiSourceCode, startLine, startColumn - 1));
-        assert.isEmpty(resourceMapping.uiLocationToJSLocations(uiSourceCode, endLine, endColumn + 1));
+        assert.isEmpty(resourceMapping.uiLocationToJSLocations(uiSourceCode, endLine, endColumn));
       });
       assert.isEmpty(resourceMapping.uiLocationToJSLocations(uiSourceCode, 12, 1));
     });
@@ -127,8 +128,8 @@ describeWithMockConnection('ResourceMapping', () => {
       assert.deepEqual(resourceMapping.uiLocationToJSLocations(uiSourceCode, startLine + 1, 5), [
         debuggerModel.createRawLocationByScriptId(scriptId, 1, 5),
       ]);
-      assert.deepEqual(resourceMapping.uiLocationToJSLocations(uiSourceCode, endLine, endColumn), [
-        debuggerModel.createRawLocationByScriptId(scriptId, endLine - startLine, endColumn),
+      assert.deepEqual(resourceMapping.uiLocationToJSLocations(uiSourceCode, endLine - 1, endColumn), [
+        debuggerModel.createRawLocationByScriptId(scriptId, endLine - startLine - 1, endColumn),
       ]);
     });
 
@@ -138,10 +139,38 @@ describeWithMockConnection('ResourceMapping', () => {
       // Debugger locations in scripts without sourceURL annotations are relative to the
       // beginning of the surrounding document, so this is basically a 1-1 mapping.
       assert.strictEqual(endLine, startLine);
-      for (let column = startColumn; column <= endColumn; ++column) {
+      for (let column = startColumn; column < endColumn; ++column) {
         assert.deepEqual(resourceMapping.uiLocationToJSLocations(uiSourceCode, startLine, column), [
           debuggerModel.createRawLocationByScriptId(scriptId, startLine, column),
         ]);
+      }
+    });
+  });
+
+  describe('uiLocationRangeToRSLocationRanges', () => {
+    it('correctly reports all inline <script>s when querying the whole document', () => {
+      const rawLocationRanges = resourceMapping.uiLocationRangeToJSLocationRanges(
+          uiSourceCode, new TextUtils.TextRange.TextRange(0, 0, 14, 0));
+      assertNotNullOrUndefined(rawLocationRanges);
+      assert.lengthOf(rawLocationRanges, SCRIPTS.length);
+      for (let i = 0; i < SCRIPTS.length; ++i) {
+        let {startLine, startColumn, endLine, endColumn} = SCRIPTS[i];
+        const {scriptId, hasSourceURLComment} = SCRIPTS[i];
+        const {start, end} = rawLocationRanges[i];
+        assert.strictEqual(start.scriptId, scriptId);
+        assert.strictEqual(end.scriptId, scriptId);
+        if (hasSourceURLComment) {
+          if (endLine === startLine) {
+            endColumn -= startColumn;
+          }
+          endLine -= startLine;
+          startLine = 0;
+          startColumn = 0;
+        }
+        assert.strictEqual(start.lineNumber, startLine);
+        assert.strictEqual(start.columnNumber, startColumn);
+        assert.strictEqual(end.lineNumber, endLine);
+        assert.strictEqual(end.columnNumber, endColumn);
       }
     });
   });
@@ -187,7 +216,7 @@ describeWithMockConnection('ResourceMapping', () => {
       // Debugger locations in scripts without sourceURL annotations are relative to the
       // beginning of the surrounding document, so this is basically a 1-1 mapping.
       assert.strictEqual(endLine, startLine);
-      for (let column = startColumn; column <= endColumn; ++column) {
+      for (let column = startColumn; column < endColumn; ++column) {
         assert.deepEqual(
             resourceMapping.jsLocationToUILocation(
                 debuggerModel.createRawLocationByScriptId(scriptId, startLine, column)),

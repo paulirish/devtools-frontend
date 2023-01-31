@@ -55,7 +55,7 @@ export async function deleteConsoleMessagesFilter(frontend: puppeteer.Page) {
   await waitFor('.console-main-toolbar');
   const main = await $('.console-main-toolbar');
   await frontend.evaluate(n => {
-    const deleteButton = n.shadowRoot.querySelector('.search-cancel-button');
+    const deleteButton = n.shadowRoot?.querySelector('.search-cancel-button') as HTMLElement;
     if (deleteButton) {
       deleteButton.click();
     }
@@ -66,7 +66,7 @@ export async function filterConsoleMessages(frontend: puppeteer.Page, filter: st
   await waitFor('.console-main-toolbar');
   const main = await $('.console-main-toolbar');
   await frontend.evaluate(n => {
-    const toolbar = n.shadowRoot.querySelector('.toolbar-input-prompt.text-prompt');
+    const toolbar = n.shadowRoot?.querySelector('.toolbar-input-prompt.text-prompt') as HTMLElement;
     toolbar.focus();
   }, main);
   await pasteText(filter);
@@ -135,7 +135,7 @@ export async function getCurrentConsoleMessages(withAnchor = false, level = Leve
 
   // Get the messages from the console.
   return frontend.evaluate(selector => {
-    return Array.from(document.querySelectorAll(selector)).map(message => message.textContent);
+    return Array.from(document.querySelectorAll(selector)).map(message => message.textContent as string);
   }, selector);
 }
 
@@ -189,7 +189,7 @@ export async function getStructuredConsoleMessages() {
       const consoleMessage = wrapper.querySelector('.console-message');
       const repeatCount = wrapper.querySelector('.console-message-repeat-count');
       const stackPreviewRoot = wrapper.querySelector('.hidden > span');
-      const stackPreview = stackPreviewRoot ? stackPreviewRoot.shadowRoot.querySelector(STACK_PREVIEW_CONTAINER) : null;
+      const stackPreview = stackPreviewRoot?.shadowRoot?.querySelector(STACK_PREVIEW_CONTAINER) ?? null;
       return {
         message,
         messageClasses: consoleMessage?.className,
@@ -333,8 +333,7 @@ export async function waitForIssueButtonLabel(expectedLabel: string) {
 }
 
 export async function clickOnContextMenu(selectorForNode: string, ctxMenuItemName: string) {
-  const node = await waitFor(selectorForNode);
-  await click(node, {clickOptions: {button: 'right'}});
+  await click(selectorForNode, {clickOptions: {button: 'right'}});
   const copyButton = await waitForAria(ctxMenuItemName);
   await copyButton.click();
 }
@@ -351,7 +350,7 @@ export function checkCommandResultFunction(offset: number = 0) {
 }
 
 export async function getLastConsoleStacktrace(offset: number = 0) {
-  return (await getStructuredConsoleMessages()).at(-1 - offset)?.stackPreview;
+  return (await getStructuredConsoleMessages()).at(-1 - offset)?.stackPreview as string;
 }
 
 export async function checkCommandStacktrace(command: string, expected: string, offset: number = 0) {

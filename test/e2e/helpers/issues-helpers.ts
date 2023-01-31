@@ -5,7 +5,16 @@
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer';
 
-import {$$, click, hasClass, matchStringTable, waitFor, waitForClass, waitForFunction} from '../../shared/helper.js';
+import {
+  $$,
+  click,
+  hasClass,
+  matchStringTable,
+  waitFor,
+  waitForClass,
+  clickElement,
+  waitForFunction,
+} from '../../shared/helper.js';
 import {openPanelViaMoreTools} from './settings-helpers.js';
 
 export const CATEGORY = '.issue-category:not(.hidden-issues)';
@@ -42,7 +51,7 @@ export async function getUnhideAllIssuesBtn() {
 }
 
 export async function getHideIssuesMenuItem(): Promise<puppeteer.ElementHandle<HTMLElement>|null> {
-  const menuItem = await waitFor(`[aria-label="${HIDE_THIS_ISSUE}"]`);
+  const menuItem = await waitFor<HTMLElement>(`[aria-label="${HIDE_THIS_ISSUE}"]`);
   if (menuItem) {
     return menuItem;
   }
@@ -80,7 +89,7 @@ async function getIssueByTitleElement(issueMessageElement: puppeteer.ElementHand
   if (header) {
     const headerClassList = await header.evaluate(el => el.classList.toString());
     assert.include(headerClassList, 'header');
-    const issue = await header.evaluateHandle(el => el.parentElement.nextSibling);
+    const issue = (await header.evaluateHandle(el => el.parentElement?.nextSibling)).asElement();
     if (issue) {
       return issue as puppeteer.ElementHandle<HTMLElement>;
     }
@@ -109,7 +118,7 @@ export async function getAndExpandSpecificIssueByTitle(issueMessage: string):
     }
     return undefined;
   });
-  await click(issueMessageElement);
+  await clickElement(issueMessageElement);
   await waitFor('.message');
   return getIssueByTitleElement(issueMessageElement);
 }
@@ -159,8 +168,8 @@ export async function expandIssue() {
     await expandCategory();
   }
 
-  await waitFor(ISSUE);
-  await click(ISSUE);
+  const issue = await waitFor(ISSUE);
+  await clickElement(issue);
   await waitFor('.message');
 }
 

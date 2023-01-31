@@ -11,7 +11,6 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import {LogpointPrefix, LogpointSuffix} from './BreakpointEditDialog.js';
 import * as SourcesComponents from './components/components.js';
 
 let breakpointsSidebarPaneInstance: BreakpointsSidebarPane;
@@ -343,17 +342,17 @@ export class BreakpointsSidebarController implements UI.ContextFlavorListener.Co
   #getBreakpointTypeAndDetails(locations: Bindings.BreakpointManager.BreakpointLocation[]):
       {type: SourcesComponents.BreakpointsView.BreakpointType, hoverText?: string} {
     const breakpointWithCondition = locations.find(location => Boolean(location.breakpoint.condition()));
-    let hoverText = breakpointWithCondition?.breakpoint.condition();
-    let type = SourcesComponents.BreakpointsView.BreakpointType.REGULAR_BREAKPOINT;
-    if (breakpointWithCondition && hoverText) {
-      if (hoverText.startsWith(LogpointPrefix) && hoverText.endsWith(LogpointSuffix)) {
-        type = SourcesComponents.BreakpointsView.BreakpointType.LOGPOINT;
-        hoverText = hoverText.slice(LogpointPrefix.length, hoverText.length - LogpointSuffix.length);
-      } else {
-        type = SourcesComponents.BreakpointsView.BreakpointType.CONDITIONAL_BREAKPOINT;
-      }
+    const breakpoint = breakpointWithCondition?.breakpoint;
+    if (!breakpoint || !breakpoint.condition()) {
+      return {type: SourcesComponents.BreakpointsView.BreakpointType.REGULAR_BREAKPOINT};
     }
-    return {type, hoverText};
+
+    const condition = breakpoint.condition();
+    if (breakpoint.isLogpoint()) {
+      return {type: SourcesComponents.BreakpointsView.BreakpointType.LOGPOINT, hoverText: condition};
+    }
+
+    return {type: SourcesComponents.BreakpointsView.BreakpointType.CONDITIONAL_BREAKPOINT, hoverText: condition};
   }
 
   #getLocationsForBreakpointItem(breakpointItem: SourcesComponents.BreakpointsView.BreakpointItem):

@@ -194,3 +194,157 @@ describe('Settings instance', () => {
        });
   });
 });
+
+describe('VersionController', () => {
+  let settings: Common.Settings.Settings;
+
+  beforeEach(() => {
+    const mockStore = new MockStore();
+    const settingsStorage = new Common.Settings.SettingsStorage({}, mockStore);
+    settings = Common.Settings.Settings.instance({
+      forceNew: true,
+      syncedStorage: settingsStorage,
+      globalStorage: settingsStorage,
+      localStorage: settingsStorage,
+    });
+  });
+
+  afterEach(() => {
+    Common.Settings.Settings.removeInstance();
+  });
+
+  describe('updateVersionFrom31To32', () => {
+    it('correctly adds resourceTypeName to breakpoints', () => {
+      const versionController = new Common.Settings.VersionController();
+      const breakpointsSetting = settings.createLocalSetting('breakpoints', [
+        {url: 'webpack:///src/foo.ts', lineNumber: 4, condition: '', enabled: false},
+        {url: 'foo.js', lineNumber: 1, columnNumber: 42, condition: 'false', enabled: true},
+      ]);
+      versionController.updateVersionFrom31To32();
+      const breakpoints = breakpointsSetting.get();
+      assert.lengthOf(breakpoints, 2);
+      assert.propertyVal(breakpoints[0], 'url', 'webpack:///src/foo.ts');
+      assert.propertyVal(breakpoints[0], 'resourceTypeName', 'script');
+      assert.propertyVal(breakpoints[0], 'lineNumber', 4);
+      assert.notProperty(breakpoints[0], 'columnNumber');
+      assert.propertyVal(breakpoints[0], 'condition', '');
+      assert.propertyVal(breakpoints[0], 'enabled', false);
+      assert.propertyVal(breakpoints[1], 'url', 'foo.js');
+      assert.propertyVal(breakpoints[1], 'resourceTypeName', 'script');
+      assert.propertyVal(breakpoints[1], 'lineNumber', 1);
+      assert.propertyVal(breakpoints[1], 'columnNumber', 42);
+      assert.propertyVal(breakpoints[1], 'condition', 'false');
+      assert.propertyVal(breakpoints[1], 'enabled', true);
+    });
+  });
+
+  describe('updateVersionFrom32To33', () => {
+    it('correctly discards previously viewed files without url properties', () => {
+      const versionController = new Common.Settings.VersionController();
+      const previouslyViewedFilesSetting = settings.createLocalSetting('previouslyViewedFiles', [
+        {url: 'http://localhost:3000', scrollLineNumber: 1},
+        {scrollLineNumber: 1},
+        {},
+        {url: 'webpack:///src/foo.ts'},
+      ]);
+      versionController.updateVersionFrom32To33();
+      const previouslyViewedFiles = previouslyViewedFilesSetting.get();
+      assert.lengthOf(previouslyViewedFiles, 2);
+      assert.propertyVal(previouslyViewedFiles[0], 'url', 'http://localhost:3000');
+      assert.notProperty(previouslyViewedFiles[0], 'selectionRange');
+      assert.propertyVal(previouslyViewedFiles[0], 'scrollLineNumber', 1);
+      assert.propertyVal(previouslyViewedFiles[1], 'url', 'webpack:///src/foo.ts');
+      assert.notProperty(previouslyViewedFiles[1], 'selectionRange');
+      assert.notProperty(previouslyViewedFiles[1], 'scrollLineNumber');
+    });
+
+    it('correctly adds resourceTypeName to previously viewed files', () => {
+      const versionController = new Common.Settings.VersionController();
+      const previouslyViewedFilesSetting = settings.createLocalSetting('previouslyViewedFiles', [
+        {url: 'http://localhost:3000', scrollLineNumber: 1},
+        {url: 'webpack:///src/foo.ts'},
+      ]);
+      versionController.updateVersionFrom32To33();
+      const previouslyViewedFiles = previouslyViewedFilesSetting.get();
+      assert.lengthOf(previouslyViewedFiles, 2);
+      assert.propertyVal(previouslyViewedFiles[0], 'url', 'http://localhost:3000');
+      assert.propertyVal(previouslyViewedFiles[0], 'resourceTypeName', 'script');
+      assert.notProperty(previouslyViewedFiles[0], 'selectionRange');
+      assert.propertyVal(previouslyViewedFiles[0], 'scrollLineNumber', 1);
+      assert.propertyVal(previouslyViewedFiles[1], 'url', 'webpack:///src/foo.ts');
+      assert.propertyVal(previouslyViewedFiles[1], 'resourceTypeName', 'script');
+      assert.notProperty(previouslyViewedFiles[1], 'selectionRange');
+      assert.notProperty(previouslyViewedFiles[1], 'scrollLineNumber');
+    });
+  });
+
+  describe('updateVersionFrom33To34', () => {
+    it('correctly adds isLogpoint to breakpoints', () => {
+      const versionController = new Common.Settings.VersionController();
+      const breakpointsSetting = settings.createLocalSetting('breakpoints', [
+        {
+          url: 'webpack:///src/foo.ts',
+          lineNumber: 4,
+          resourceTypeName: 'script',
+          condition: '/** DEVTOOLS_LOGPOINT */ console.log(foo.property)',
+          enabled: true,
+        },
+        {
+          url: 'foo.js',
+          lineNumber: 1,
+          columnNumber: 42,
+          resourceTypeName: 'script',
+          condition: 'x === 42',
+          enabled: true,
+        },
+        {url: 'bar.js', lineNumber: 5, columnNumber: 1, resourceTypeName: 'script', condition: '', enabled: true},
+      ]);
+
+      versionController.updateVersionFrom33To34();
+      const breakpoints = breakpointsSetting.get();
+
+      assert.propertyVal(breakpoints[0], 'isLogpoint', true);
+      assert.propertyVal(breakpoints[1], 'isLogpoint', false);
+      assert.propertyVal(breakpoints[2], 'isLogpoint', false);
+    });
+  });
+
+  describe('updateVersionFrom34To35', () => {
+    it('removes the logpoint prefix/suffix from logpoints', () => {
+      const versionController = new Common.Settings.VersionController();
+      const breakpointsSetting =
+          settings.createLocalSetting('breakpoints', [{
+                                        url: 'webpack:///src/foo.ts',
+                                        lineNumber: 4,
+                                        resourceTypeName: 'script',
+                                        condition: '/** DEVTOOLS_LOGPOINT */ console.log(foo.property)',
+                                        enabled: true,
+                                        isLogpoint: true,
+                                      }]);
+
+      versionController.updateVersionFrom34To35();
+
+      const breakpoints = breakpointsSetting.get();
+      assert.lengthOf(breakpoints, 1);
+      assert.propertyVal(breakpoints[0], 'condition', 'foo.property');
+    });
+
+    it('leaves conditional breakpoints alone', () => {
+      const versionController = new Common.Settings.VersionController();
+      const breakpointsSetting = settings.createLocalSetting('breakpoints', [{
+                                                               url: 'webpack:///src/foo.ts',
+                                                               lineNumber: 4,
+                                                               resourceTypeName: 'script',
+                                                               condition: 'x === 42',
+                                                               enabled: true,
+                                                               isLogpoint: false,
+                                                             }]);
+
+      versionController.updateVersionFrom34To35();
+
+      const breakpoints = breakpointsSetting.get();
+      assert.lengthOf(breakpoints, 1);
+      assert.propertyVal(breakpoints[0], 'condition', 'x === 42');
+    });
+  });
+});

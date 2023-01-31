@@ -89,7 +89,7 @@ export class Linkifier implements SDK.TargetManager.Observer {
   private readonly maxLength: number;
   private readonly anchorsByTarget: Map<SDK.Target.Target, Element[]>;
   private readonly locationPoolByTarget: Map<SDK.Target.Target, Bindings.LiveLocation.LiveLocationPool>;
-  private onLiveLocationUpdate: (() => void)|undefined;
+  private onLiveLocationUpdate: (() => void);
   private useLinkDecorator: boolean;
 
   constructor(
@@ -232,12 +232,8 @@ export class Linkifier implements SDK.TargetManager.Observer {
     const createLinkOptions: _CreateLinkOptions = {
       tabStop: options?.tabStop,
     };
-    // Not initialising the anchor element with 'zero width space' (\u200b) causes a crash
-    // in the layout engine.
-    // TODO(szuend): Remove comment and workaround once the crash is fixed.
     const {link, linkInfo} = Linkifier.createLink(
-        fallbackAnchor && fallbackAnchor.textContent ? fallbackAnchor.textContent : '\u200b', className,
-        createLinkOptions);
+        fallbackAnchor && fallbackAnchor.textContent ? fallbackAnchor.textContent : '', className, createLinkOptions);
     linkInfo.enableDecorator = this.useLinkDecorator;
     linkInfo.fallback = fallbackAnchor;
 
@@ -254,8 +250,6 @@ export class Linkifier implements SDK.TargetManager.Observer {
         .then(liveLocation => {
           if (liveLocation) {
             linkInfo.liveLocation = liveLocation;
-            // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-            // @ts-expect-error
             currentOnLiveLocationUpdate();
           }
         });
@@ -297,24 +291,20 @@ export class Linkifier implements SDK.TargetManager.Observer {
       target: SDK.Target.Target|null, callFrame: Protocol.Runtime.CallFrame, options?: LinkifyOptions): HTMLElement
       |null {
     const linkifyOptions: LinkifyOptions = {
+      ...options,
       columnNumber: callFrame.columnNumber,
-      showColumnNumber: Boolean(options?.showColumnNumber),
       inlineFrameIndex: options?.inlineFrameIndex ?? 0,
-      tabStop: options?.tabStop,
-      className: options?.className,
     };
     return this.maybeLinkifyScriptLocation(
         target, callFrame.scriptId, callFrame.url as Platform.DevToolsPath.UrlString, callFrame.lineNumber,
         linkifyOptions);
   }
 
-  linkifyStackTraceTopFrame(
-      target: SDK.Target.Target|null, stackTrace: Protocol.Runtime.StackTrace, className?: string): HTMLElement {
+  linkifyStackTraceTopFrame(target: SDK.Target.Target|null, stackTrace: Protocol.Runtime.StackTrace): HTMLElement {
     console.assert(stackTrace.callFrames.length > 0);
 
     const {url, lineNumber, columnNumber} = stackTrace.callFrames[0];
     const fallbackAnchor = Linkifier.linkifyURL(url as Platform.DevToolsPath.UrlString, {
-      className,
       lineNumber,
       columnNumber,
       showColumnNumber: false,
@@ -341,10 +331,7 @@ export class Linkifier implements SDK.TargetManager.Observer {
     // All targets that can report stack traces also have a debugger model.
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
 
-    // Not initialising the anchor element with 'zero width space' (\u200b) causes a crash
-    // in the layout engine.
-    // TODO(szuend): Remove comment and workaround once the crash is fixed.
-    const {link, linkInfo} = Linkifier.createLink('\u200b', className ?? '');
+    const {link, linkInfo} = Linkifier.createLink('', '');
     linkInfo.enableDecorator = this.useLinkDecorator;
     linkInfo.fallback = fallbackAnchor;
 
@@ -357,8 +344,6 @@ export class Linkifier implements SDK.TargetManager.Observer {
             this.updateAnchor.bind(this, link, linkDisplayOptions), pool)
         .then(liveLocation => {
           linkInfo.liveLocation = liveLocation;
-          // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-          // @ts-expect-error
           currentOnLiveLocationUpdate();
         });
 
@@ -371,10 +356,7 @@ export class Linkifier implements SDK.TargetManager.Observer {
     const createLinkOptions: _CreateLinkOptions = {
       tabStop: true,
     };
-    // Not initialising the anchor element with 'zero width space' (\u200b) causes a crash
-    // in the layout engine.
-    // TODO(szuend): Remove comment and workaround once the crash is fixed.
-    const {link, linkInfo} = Linkifier.createLink('\u200b', classes || '', createLinkOptions);
+    const {link, linkInfo} = Linkifier.createLink('', classes || '', createLinkOptions);
     linkInfo.enableDecorator = this.useLinkDecorator;
 
     const pool = this.locationPoolByTarget.get(rawLocation.cssModel().target());
@@ -389,8 +371,6 @@ export class Linkifier implements SDK.TargetManager.Observer {
         .createLiveLocation(rawLocation, this.updateAnchor.bind(this, link, linkDisplayOptions), pool)
         .then(liveLocation => {
           linkInfo.liveLocation = liveLocation;
-          // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-          // @ts-expect-error
           currentOnLiveLocationUpdate();
         });
 

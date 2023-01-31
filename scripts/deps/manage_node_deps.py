@@ -41,6 +41,7 @@ LICENSES = [
 # List all DEPS here.
 DEPS = {
     "@istanbuljs/schema": "0.1.3",
+    "@puppeteer/replay": "2.7.1",
     "@types/chai": "4.3.0",
     "@types/codemirror": "0.0.108",
     "@types/estree": "0.0.50",
@@ -89,7 +90,7 @@ DEPS = {
     "postcss": "8.4.5",
     "cssnano": "5.1.14",
     "cssnano-preset-lite": "2.1.3",
-    "puppeteer": "14.0.0",
+    "puppeteer": "19.6.2",
     "recast": "0.20.5",
     "rimraf": "3.0.2",
     "rollup": "2.63.0",

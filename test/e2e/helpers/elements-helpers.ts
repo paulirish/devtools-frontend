@@ -19,6 +19,7 @@ import {
   typeText,
   waitFor,
   waitForAria,
+  clickElement,
   waitForFunction,
 } from '../../shared/helper.js';
 
@@ -48,6 +49,7 @@ export const ACTIVE_GRID_ADORNER_SELECTOR = '[aria-label="Disable grid mode"]';
 const ELEMENT_CHECKBOX_IN_LAYOUT_PANE_SELECTOR = '.elements input[type=checkbox]';
 const ELEMENT_STYLE_SECTION_SELECTOR = '[aria-label="element.style, css selector"]';
 const STYLE_QUERY_RULE_TEXT_SELECTOR = '.query-text';
+const STYLE_PROPERTIES_SELECTOR = '.tree-outline-disclosure [role="treeitem"]';
 const CSS_AUTHORING_HINTS_ICON_SELECTOR = '.hint';
 const SEARCH_BOX_SELECTOR = '.search-bar';
 const SEARCH_RESULTS_MATCHES = '.search-results-matches';
@@ -211,7 +213,7 @@ const elementWithPartialText = async (text: string) => {
 export const clickTreeElementWithPartialText = async (text: string) => {
   const handle = await elementWithPartialText(text);
   if (handle) {
-    await click(handle);
+    await clickElement(handle);
     return true;
   }
 
@@ -304,8 +306,7 @@ export const expandSelectedNodeRecursively = async () => {
   const EXPAND_RECURSIVELY = '[aria-label="Expand recursively"]';
 
   // Find the selected node, right click.
-  const selectedNode = await waitFor(SELECTED_TREE_ELEMENT_SELECTOR);
-  await click(selectedNode, {clickOptions: {button: 'right'}});
+  await click(SELECTED_TREE_ELEMENT_SELECTOR, {clickOptions: {button: 'right'}});
 
   // Wait for the 'expand recursively' option, and click it.
   await waitFor(EXPAND_RECURSIVELY);
@@ -325,7 +326,8 @@ export const removePseudoState = async (pseudoState: string) => {
   await click(`[aria-label="${pseudoState}"]`);
 };
 
-export const getComputedStylesForDomNode = async (elementSelector: string, styleAttribute: string) => {
+export const getComputedStylesForDomNode =
+    async (elementSelector: string, styleAttribute: keyof CSSStyleDeclaration) => {
   const {target} = getBrowserAndPages();
 
   return target.evaluate((elementSelector, styleAttribute) => {
@@ -350,8 +352,9 @@ export const filterComputedProperties = async (filterString: string) => {
   const initialContent = await getContentOfComputedPane();
 
   const computedPanel = await waitFor(COMPUTED_STYLES_PANEL_SELECTOR);
-  const filterInput = await waitFor('[aria-label="Filter Computed Styles"]', computedPanel);
-  await click(filterInput);
+  await click('[aria-label="Filter Computed Styles"]', {
+    root: computedPanel,
+  });
   await typeText(filterString);
   await waitForComputedPaneChange(initialContent);
 };
@@ -360,8 +363,7 @@ export const toggleShowAllComputedProperties = async () => {
   const initialContent = await getContentOfComputedPane();
 
   const computedPanel = await waitFor(COMPUTED_STYLES_PANEL_SELECTOR);
-  const showAllButton = await waitFor(COMPUTED_STYLES_SHOW_ALL_SELECTOR, computedPanel);
-  await click(showAllButton);
+  await click(COMPUTED_STYLES_SHOW_ALL_SELECTOR, {root: computedPanel});
   await waitForComputedPaneChange(initialContent);
 };
 
@@ -371,7 +373,9 @@ export const toggleGroupComputedProperties = async () => {
 
   const wasChecked = await groupCheckbox.evaluate(checkbox => (checkbox as HTMLInputElement).checked);
 
-  await click(groupCheckbox);
+  await click(COMPUTED_STYLES_GROUP_SELECTOR, {
+    root: computedPanel,
+  });
 
   if (wasChecked) {
     await waitFor('[role="tree"].alphabetical-list', computedPanel);
@@ -524,7 +528,7 @@ export const shiftClickColorSwatch = async (ruleSection: puppeteer.ElementHandle
   const swatch = await getColorSwatch(ruleSection, index);
   const {frontend} = getBrowserAndPages();
   await frontend.keyboard.down('Shift');
-  await click(swatch);
+  await clickElement(swatch);
   await frontend.keyboard.up('Shift');
 };
 
@@ -557,11 +561,10 @@ export const getCSSPropertyInRule =
   const propertyNames = await $$(CSS_PROPERTY_NAME_SELECTOR, ruleSection);
   for (const node of propertyNames) {
     const parent =
-        await node.evaluateHandle((node, name) => (name === node.textContent) ? node.parentNode : undefined, name);
-    // Note that evaluateHandle always returns a handle, even if it points to an undefined remote object, so we need to
-    // check it's defined here or continue iterating.
-    if (await parent.evaluate(n => Boolean(n))) {
-      return parent as puppeteer.ElementHandle;
+        (await node.evaluateHandle((node, name) => (name === node.textContent) ? node.parentNode : undefined, name))
+            .asElement();
+    if (parent) {
+      return parent as puppeteer.ElementHandle<HTMLElement>;
     }
   }
   return undefined;
@@ -569,8 +572,20 @@ export const getCSSPropertyInRule =
 
 export const focusCSSPropertyValue = async (selector: string, propertyName: string) => {
   await waitForStyleRule(selector);
-  const property = await getCSSPropertyInRule(selector, propertyName);
-  await click(CSS_PROPERTY_VALUE_SELECTOR, {root: property});
+  let property = await getCSSPropertyInRule(selector, propertyName);
+  // Clicking on the semicolon element to make sure we don't hit the swatch or other
+  // non-editable elements.
+  await click(CSS_PROPERTY_VALUE_SELECTOR + ' + .styles-semicolon', {root: property});
+  await waitForFunction(async () => {
+    property = await getCSSPropertyInRule(selector, propertyName);
+    const value = await $(CSS_PROPERTY_VALUE_SELECTOR, property);
+    if (!value) {
+      assert.fail(`Could not find property ${propertyName} in rule ${selector}`);
+    }
+    return await value.evaluate(node => {
+      return node.classList.contains('text-prompt') && node.hasAttribute('contenteditable');
+    });
+  });
 };
 
 /**
@@ -659,7 +674,7 @@ export async function waitForPropertyToHighlight(ruleSelector: string, propertyN
     }
     // StylePropertyHighlighter temporarily highlights the property using the Web Animations API, so the only way to
     // know it's happening is by listing all animations.
-    const animationCount = await property.evaluate(node => node.getAnimations().length);
+    const animationCount = await property.evaluate(node => (node as HTMLElement).getAnimations().length);
     return animationCount > 0;
   });
 }
@@ -742,6 +757,12 @@ export const toggleClassesPaneCheckbox = async (checkboxLabel: string) => {
   await waitForSelectedNodeChange(initialValue);
 };
 
+export const uncheckStylesPaneCheckbox = async (checkboxLabel: string) => {
+  const initialValue = await getContentOfSelectedNode();
+  await click(`.enabled-button[aria-label="${checkboxLabel}"]`);
+  await waitForSelectedNodeChange(initialValue);
+};
+
 export const assertSelectedNodeClasses = async (expectedClasses: string[]) => {
   const nodeText = await getContentOfSelectedNode();
   const match = nodeText.match(/class=\u200B"([^"]*)/);
@@ -761,15 +782,14 @@ export const toggleAccessibilityPane = async () => {
   if (!a11yPane) {
     const elementsPanel = await waitForAria('Elements panel');
     const moreTabs = await waitForAria('More tabs', elementsPanel);
-    await click(moreTabs);
+    await clickElement(moreTabs);
     a11yPane = await waitForAria('Accessibility');
   }
-  await click(a11yPane);
+  await clickElement(a11yPane);
 };
 
 export const toggleAccessibilityTree = async () => {
-  const treeToggleButton = await waitForAria('Switch to Accessibility Tree view');
-  await click(treeToggleButton);
+  await click('aria/Switch to Accessibility Tree view');
 };
 
 export const getPropertiesWithHints = async () => {
@@ -813,4 +833,10 @@ export const goToResourceAndWaitForStyleSection = async (path: string) => {
 
   // Check to make sure we have the correct node selected after opening a file.
   await waitForPartialContentOfSelectedElementsNode('<body>\u200B');
+};
+
+export const checkStyleAttributes = async (expectedStyles: string[]) => {
+  const result = await $$(STYLE_PROPERTIES_SELECTOR, undefined, 'pierce');
+  const actual = await Promise.all(result.map(e => e.evaluate(e => e.textContent?.trim())));
+  return actual.sort().join(' ') === expectedStyles.sort().join(' ');
 };

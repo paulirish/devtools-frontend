@@ -4,6 +4,7 @@
 
 import {assert} from 'chai';
 
+import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   addBreakpointForLine,
   getLineNumberElement,
@@ -16,7 +17,6 @@ import {
 import {
   $,
   assertNotNullOrUndefined,
-  click,
   enableExperiment,
   waitForFunction,
   waitFor,
@@ -24,6 +24,7 @@ import {
   type puppeteer,
   getBrowserAndPages,
   waitForMany,
+  clickElement,
 } from '../../shared/helper.js';
 
 const BREAKPOINT_VIEW_COMPONENT = 'devtools-breakpoint-view';
@@ -43,7 +44,8 @@ describe('The Breakpoints Sidebar', () => {
   });
 
   describe('for source mapped files', () => {
-    it('correctly shows the breakpoint location on reload', async () => {
+    // Flaky on mac.
+    it.skipOnPlatforms(['mac'], '[crbug.com/1409770] correctly shows the breakpoint location on reload', async () => {
       const testBreakpointContent = async (expectedFileName: string, expectedLineNumber: number) => {
         await checkFileGroupName(expectedFileName);
         await checkLineNumber(await waitFor(BREAKPOINT_ITEM_SELECTOR), expectedLineNumber);
@@ -59,7 +61,7 @@ describe('The Breakpoints Sidebar', () => {
       // Set a breakpoint on the original source.
       const breakpointLineHandle = await getLineNumberElement(setBreakpointLine);
       assertNotNullOrUndefined(breakpointLineHandle);
-      await click(breakpointLineHandle);
+      await clickElement(breakpointLineHandle);
       await waitForFunction(async () => await isBreakpointSet(expectedResolvedLineNumber));
 
       // Check if the breakpoint sidebar correctly shows the original source breakpoint.
@@ -120,7 +122,7 @@ describe('The Breakpoints Sidebar', () => {
     const slidBreakpointLine = 5;
     const breakpointLine = await getLineNumberElement(originalBreakpointLine);
     assertNotNullOrUndefined(breakpointLine);
-    await click(breakpointLine);
+    await clickElement(breakpointLine);
     await waitForFunction(async () => await isBreakpointSet(slidBreakpointLine));
 
     const breakpointView = await $(BREAKPOINT_VIEW_COMPONENT);
@@ -132,7 +134,7 @@ describe('The Breakpoints Sidebar', () => {
 
     const checkbox = await breakpointItem.$('input');
     assertNotNullOrUndefined(checkbox);
-    await click(checkbox);
+    await clickElement(checkbox);
 
     // Wait until the click has propagated: the line is updated with the new location.
     await waitForFunction(async () => await isBreakpointSet(originalBreakpointLine));

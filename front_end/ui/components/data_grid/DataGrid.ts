@@ -44,6 +44,23 @@ const UIStrings = {
    *@description A context menu item in data grids to list header options.
    */
   headerOptions: 'Header Options',
+  /**
+   *@description Text for screen reader to announce when focusing on a sortable column in data grid.
+   *@example {ascending} PH1
+   */
+  enterToSort: 'Column sort state: {PH1}. Press enter to apply sorting filter',
+  /**
+   *@description The current sort state of a column in data grid
+   */
+  sortAsc: 'ascending',
+  /**
+   *@description The current sort state of a column in data grid
+   */
+  sortDesc: 'descending',
+  /**
+   *@description The current sort state of a column in data grid
+   */
+  sortNone: 'none',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/components/data_grid/DataGrid.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -286,6 +303,24 @@ export class DataGrid extends HTMLElement {
      * focus, ensure we actually focus the cell.
      */
     this.#focusTableCellInDOM(tableCell);
+    // If it's a sortable column header, screen reader announce the information for sorting
+    if (newRowIndex === 0 && this.#columns[newColumnIndex].sortable) {
+      const localizedSortState = this.#getLocalizedSortState(this.#columns[newColumnIndex]);
+      UI.ARIAUtils.alert(i18nString(UIStrings.enterToSort, {PH1: localizedSortState || ''}));
+    }
+  }
+
+  #getLocalizedSortState(col: Column): string|undefined {
+    const currentSortLabel = this.#ariaSortForHeader(col);
+    switch (currentSortLabel) {
+      case 'ascending':
+        return UIStrings.sortAsc;
+      case 'descending':
+        return UIStrings.sortDesc;
+      case 'none':
+        return UIStrings.sortNone;
+    }
+    return undefined;
   }
 
   #onTableKeyDown(event: KeyboardEvent): void {
@@ -774,6 +809,7 @@ export class DataGrid extends HTMLElement {
                   }}
                   title=${col.title}
                   aria-sort=${LitHtml.Directives.ifDefined(this.#ariaSortForHeader(col))}
+                  role=${col.sortable ? 'button' : 'columnheader'}
                   aria-colindex=${columnIndex + 1}
                   data-row-index='0'
                   data-col-index=${columnIndex}

@@ -27,6 +27,7 @@ import {
   timeout,
   typeText,
   waitFor,
+  clickElement,
   waitForFunction,
   waitForFunctionWithTries,
 } from '../../shared/helper.js';
@@ -86,8 +87,7 @@ export async function getLineNumberElement(lineNumber: number|string) {
 }
 
 export async function doubleClickSourceTreeItem(selector: string) {
-  const item = await waitFor(selector);
-  await click(item, {clickOptions: {clickCount: 2}, maxPixelsFromLeft: 40});
+  await click(selector, {clickOptions: {clickCount: 2, offset: {x: 40, y: 10}}});
 }
 
 export async function openSourcesPanel() {
@@ -246,7 +246,7 @@ export async function addBreakpointForLine(frontend: puppeteer.Page, index: numb
   assertNotNullOrUndefined(breakpointLine);
 
   await waitForFunction(async () => !(await isBreakpointSet(index)));
-  await click(breakpointLine);
+  await clickElement(breakpointLine);
 
   await waitForFunction(async () => await isBreakpointSet(index));
 }
@@ -256,7 +256,7 @@ export async function removeBreakpointForLine(frontend: puppeteer.Page, index: n
   assertNotNullOrUndefined(breakpointLine);
 
   await waitForFunction(async () => await isBreakpointSet(index));
-  await click(breakpointLine);
+  await clickElement(breakpointLine);
   await waitForFunction(async () => !(await isBreakpointSet(index)));
 }
 
@@ -397,7 +397,7 @@ export async function waitForSourceFiles<T>(
     }
     const handler = (event: Event) => {
       const {detail} = event as CustomEvent<string>;
-      if (!detail.endsWith('/__puppeteer_evaluation_script__')) {
+      if (!detail.includes('__puppeteer_evaluation_script__')) {
         window.__sourceFileEvents.get(eventHandlerId)?.files.push(detail);
       }
     };
@@ -547,8 +547,7 @@ export async function openNestedWorkerFile(selectors: NestedFileSelector) {
 
 export async function clickOnContextMenu(selector: string, label: string) {
   // Find the selected node, right click.
-  const selectedNode = await waitFor(selector);
-  await click(selectedNode, {clickOptions: {button: 'right'}});
+  await click(selector, {clickOptions: {button: 'right'}});
 
   // Wait for the context menu option, and click it.
   const labelSelector = `[aria-label="${label}"]`;

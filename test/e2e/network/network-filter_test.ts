@@ -7,13 +7,14 @@ import {type ElementHandle} from 'puppeteer';
 
 import {
   click,
+  waitFor,
   reloadDevTools,
   typeText,
-  waitFor,
   waitForAria,
   waitForMany,
   waitForNone,
   getTestServerPort,
+  clickElement,
 } from '../../shared/helper.js';
 
 import {describe, it} from '../../shared/mocha-extensions.js';
@@ -36,7 +37,11 @@ async function checkboxIsChecked(element: ElementHandle<HTMLInputElement>): Prom
 }
 
 async function clearFilter() {
-  await click(await waitFor('.filter-input-clear-button'));
+  await click('.filter-input-container');
+  const clearFilter = await waitFor('.filter-input-clear-button');
+  if (await clearFilter.isIntersectingViewport()) {
+    await clickElement(clearFilter);
+  }
 }
 
 describe('The Network Tab', async function() {
@@ -136,7 +141,7 @@ describe('The Network Tab', async function() {
 
   it('can filter by partial URL in the log view', async () => {
     await clearFilter();
-    await typeText(`https://localhost:${getTestServerPort()}//`);
+    await typeText(`https://localhost:${getTestServerPort()}`);
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(11);
   });
@@ -164,10 +169,10 @@ describe('The Network Tab', async function() {
   });
 
   it('can invert text filters', async () => {
-    const invertCheckbox = await waitForAria('Invert');
+    const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
     await typeText('5');
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(true);
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 10);
     const output = [...RESULTS];
@@ -177,15 +182,15 @@ describe('The Network Tab', async function() {
       expect(await elementTextContent(nodes[i])).to.equal(output[i]);
     }
     // Cleanup
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
   });
 
   it('can invert regex filters', async () => {
-    const invertCheckbox = await waitForAria('Invert');
+    const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
     await typeText('/4/');
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(true);
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 10);
     const output = [...RESULTS];
@@ -195,58 +200,58 @@ describe('The Network Tab', async function() {
       expect(await elementTextContent(nodes[i])).to.equal(output[i]);
     }
     // Cleanup
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
   });
 
   it('can invert negated text filters', async () => {
-    const invertCheckbox = await waitForAria('Invert');
+    const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
     await typeText('-10');
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(true);
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(1);
     expect(await elementTextContent(nodes[0])).to.equal(RESULTS[0]);
     // Cleanup
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
   });
 
   it('can invert negated regex filters', async () => {
-    const invertCheckbox = await waitForAria('Invert');
+    const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
     await typeText('-/10/');
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(true);
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(1);
     expect(await elementTextContent(nodes[0])).to.equal(RESULTS[0]);
     // Cleanup
-    await click(invertCheckbox);
+    await clickElement(invertCheckbox);
     expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
   });
 
   it('can persist the invert checkbox', async () => {
     // Start with invert disabled, then enable it.
     {
-      const invertCheckbox = await waitForAria('Invert');
+      const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
       expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
-      await click(invertCheckbox);
+      await clickElement(invertCheckbox);
       expect(await checkboxIsChecked(invertCheckbox)).to.equal(true);
     }
     // Verify persistence when enabled.
     await reloadDevTools({queryParams: {panel: 'network'}});
     {
-      const invertCheckbox = await waitForAria('Invert');
+      const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
       expect(await checkboxIsChecked(invertCheckbox)).to.equal(true);
-      await click(invertCheckbox);
+      await clickElement(invertCheckbox);
       expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
     }
     // Verify persistence when disabled.
     await reloadDevTools({queryParams: {panel: 'network'}});
     {
-      const invertCheckbox = await waitForAria('Invert');
+      const invertCheckbox = await (await waitForAria('Invert')).toElement('input');
       expect(await checkboxIsChecked(invertCheckbox)).to.equal(false);
     }
   });

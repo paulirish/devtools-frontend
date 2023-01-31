@@ -5,8 +5,6 @@
 import {assert} from 'chai';
 
 import {
-  $textContent,
-  assertNotNullOrUndefined,
   click,
   getBrowserAndPages,
   pressKey,
@@ -29,12 +27,11 @@ describe('Live edit', async () => {
 
     await step('add two newlines to the script', async () => {
       const editorContent = await waitFor('.cm-content');
-      const markerLine = await $textContent('// Insertion marker for newline.', editorContent);
-      assertNotNullOrUndefined(markerLine);
-
       // Place the caret at the end of the marker line by clicking in the middle of the
       // line element and then pressing 'End'.
-      await click(markerLine);
+      await click('pierceShadowText/// Insertion marker for newline.', {
+        root: editorContent,
+      });
       await frontend.keyboard.press('End');
 
       await frontend.keyboard.press('Enter');

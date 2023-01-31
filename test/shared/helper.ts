@@ -47,86 +47,99 @@ switch (os.platform()) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalThis: any = global;
 
-/**
- * Returns an {x, y} position within the element identified by the selector within the root.
- * By default the position is the center of the bounding box. If the element's bounding box
- * extends beyond that of a containing element, this position may not correspond to the element.
- * In this case, specifying maxPixelsFromLeft will constrain the returned point to be close to
- * the left edge of the bounding box.
- */
-export const getElementPosition =
-    async (selector: string|puppeteer.ElementHandle, root?: puppeteer.JSHandle, maxPixelsFromLeft?: number) => {
-  const rectData = await waitForFunction(async () => {
-    let element: puppeteer.ElementHandle;
-    if (typeof selector === 'string') {
-      element = await waitFor(selector, root);
-    } else {
-      element = selector;
-    }
-
-    return element.evaluate((element: Element) => {
-      if (!element) {
-        return {};
-      }
-
-      if (!element.isConnected) {
-        return undefined;
-      }
-
-      const {left, top, width, height} = element.getBoundingClientRect();
-      return {left, top, width, height};
-    });
-  });
-
-  if (rectData.left === undefined) {
-    throw new Error(`Unable to find element with selector "${selector}"`);
-  }
-
-  let pixelsFromLeft = rectData.width * 0.5;
-  if (maxPixelsFromLeft && pixelsFromLeft > maxPixelsFromLeft) {
-    pixelsFromLeft = maxPixelsFromLeft;
-  }
-
-  return {
-    x: rectData.left + pixelsFromLeft,
-    y: rectData.top + rectData.height * 0.5,
-  };
-};
-
 export interface ClickOptions {
   root?: puppeteer.JSHandle;
-  clickOptions?: PuppeteerClickOptions;
+  clickOptions?: puppeteer.ClickOptions;
   maxPixelsFromLeft?: number;
 }
 
-interface PuppeteerClickOptions extends puppeteer.ClickOptions {
-  modifier?: 'ControlOrMeta';
+const CONTROL_OR_META = platform === 'mac' ? 'Meta' : 'Control';
+export const withControlOrMetaKey = async (action: () => Promise<void>, root = getBrowserAndPages().frontend) => {
+  await waitForFunction(async () => {
+    await root.keyboard.down(CONTROL_OR_META);
+    try {
+      await action();
+      return true;
+    } finally {
+      await root.keyboard.up(CONTROL_OR_META);
+    }
+  });
+};
+
+export const click = async(selector: string, options?: ClickOptions): Promise<puppeteer.ElementHandle> => {
+  return await performActionOnSelector(
+      selector, {root: options?.root}, element => element.click(options?.clickOptions));
+};
+
+export const hover =
+    async(selector: string, options?: {root?: puppeteer.JSHandle}): Promise<puppeteer.ElementHandle> => {
+  return await performActionOnSelector(selector, {root: options?.root}, element => element.hover());
+};
+
+type Action = (element: puppeteer.ElementHandle) => Promise<void>;
+
+async function performActionOnSelector(
+    selector: string, options: {root?: puppeteer.JSHandle}, action: Action): Promise<puppeteer.ElementHandle> {
+  // TODO(crbug.com/1410168): we should refactor waitFor to be compatible with
+  // Puppeteer's syntax for selectors.
+  const queryHandlers = new Set([
+    'pierceShadowText',
+    'pierce',
+    'aria',
+    'xpath',
+    'text',
+  ]);
+  let queryHandler = 'pierce';
+  for (const handler of queryHandlers) {
+    const prefix = handler + '/';
+    if (selector.startsWith(prefix)) {
+      queryHandler = handler;
+      selector = selector.substring(prefix.length);
+      break;
+    }
+  }
+  return waitForFunction(async () => {
+    const element = await waitFor(selector, options?.root, undefined, queryHandler);
+    try {
+      await action(element);
+      return element;
+    } catch (err) {
+      // A bit of delay to not retry too often.
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return undefined;
+  });
 }
 
-export const click = async (selector: string|puppeteer.ElementHandle, options?: ClickOptions) => {
-  const {frontend} = getBrowserAndPages();
-  const clickableElement =
-      await getElementPosition(selector, options && options.root, options && options.maxPixelsFromLeft);
+/**
+ * @deprecated This method is not able to recover from unstable DOM. Use click(selector) instead.
+ */
+export async function clickElement(element: puppeteer.ElementHandle, options?: ClickOptions): Promise<void> {
+  // Retries here just in case the element gets connected to DOM / becomes visible.
+  await waitForFunction(async () => {
+    try {
+      await element.click(options?.clickOptions);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
 
-  if (!clickableElement) {
-    throw new Error(`Unable to locate clickable element "${selector}".`);
-  }
-
-  const modifier = platform === 'mac' ? 'Meta' : 'Control';
-  if (options?.clickOptions?.modifier) {
-    await frontend.keyboard.down(modifier);
-  }
-
-  // Click on the button and wait for the console to load. The reason we use this method
-  // rather than elementHandle.click() is because the frontend attaches the behavior to
-  // a 'mousedown' event (not the 'click' event). To avoid attaching the test behavior
-  // to a specific event we instead locate the button in question and ask Puppeteer to
-  // click on it instead.
-  await frontend.mouse.click(clickableElement.x, clickableElement.y, options && options.clickOptions);
-  if (options?.clickOptions?.modifier) {
-    await frontend.keyboard.up(modifier);
-  }
-};
+/**
+ * @deprecated This method is not able to recover from unstable DOM. Use hover(selector) instead.
+ */
+export async function hoverElement(element: puppeteer.ElementHandle): Promise<void> {
+  // Retries here just in case the element gets connected to DOM / becomes visible.
+  await waitForFunction(async () => {
+    try {
+      await element.hover();
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
 
 export const doubleClick =
     async (selector: string, options?: {root?: puppeteer.JSHandle, clickOptions?: puppeteer.ClickOptions}) => {
@@ -194,7 +207,7 @@ export const $ =
     async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
   const {frontend} = getBrowserAndPages();
   const rootElement = root ? root as puppeteer.ElementHandle : frontend;
-  const element = await rootElement.$<ElementType>(`${handler}/${selector}`);
+  const element = await rootElement.$(`${handler}/${selector}`) as puppeteer.ElementHandle<ElementType>;
   return element;
 };
 
@@ -203,7 +216,7 @@ export const $$ =
     async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
   const {frontend} = getBrowserAndPages();
   const rootElement = root ? root.asElement() || frontend : frontend;
-  const elements = await rootElement.$$<ElementType>(`${handler}/${selector}`);
+  const elements = await rootElement.$$(`${handler}/${selector}`) as puppeteer.ElementHandle<ElementType>[];
   return elements;
 };
 
@@ -460,7 +473,7 @@ export const waitForAnimationFrame = async () => {
   });
 };
 
-export const activeElement = async(): Promise<puppeteer.ElementHandle> => {
+export const activeElement = async () => {
   const {frontend} = getBrowserAndPages();
 
   await waitForAnimationFrame();
@@ -470,6 +483,10 @@ export const activeElement = async(): Promise<puppeteer.ElementHandle> => {
 
     while (activeElement && activeElement.shadowRoot) {
       activeElement = activeElement.shadowRoot.activeElement;
+    }
+
+    if (!activeElement) {
+      throw new Error('No active element found');
     }
 
     return activeElement;
@@ -512,16 +529,17 @@ export const tabBackward = async (page?: puppeteer.Page) => {
   await targetPage.keyboard.up('Shift');
 };
 
+type Awaitable<T> = T|PromiseLike<T>;
+
 export const selectTextFromNodeToNode = async (
-    from: puppeteer.JSHandle|Promise<puppeteer.JSHandle>, to: puppeteer.JSHandle|Promise<puppeteer.JSHandle>,
-    direction: 'up'|'down') => {
+    from: Awaitable<puppeteer.ElementHandle>, to: Awaitable<puppeteer.ElementHandle>, direction: 'up'|'down') => {
   const {target} = getBrowserAndPages();
 
   // The clipboard api does not allow you to copy, unless the tab is focused.
   await target.bringToFront();
 
   return target.evaluate(async (from, to, direction) => {
-    const selection = from.getRootNode().getSelection();
+    const selection = (from.getRootNode() as Document).getSelection();
     const range = document.createRange();
     if (direction === 'down') {
       range.setStartBefore(from);
@@ -531,8 +549,10 @@ export const selectTextFromNodeToNode = async (
       range.setEndAfter(from);
     }
 
-    selection.removeAllRanges();
-    selection.addRange(range);
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
 
     document.execCommand('copy');
 

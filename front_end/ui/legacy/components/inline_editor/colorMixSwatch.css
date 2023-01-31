@@ -10,7 +10,6 @@
   grid: [stack] 1fr / [stack] 1fr;
   margin-left: 1px;
   margin-right: 2px;
-  vertical-align: middle;
 }
 
 /* stylelint-disable */
@@ -34,6 +33,6 @@
 .swatch-mix {
   box-shadow: none;
   justify-self: end;
-  mask: radial-gradient(circle at 0% center, rgb(0 0 0) 50%, rgb(0 0 0 / 0%) calc(50% + 1px));
-  -webkit-mask: radial-gradient(circle at 0% center, rgb(0 0 0) 50%, rgb(0 0 0 / 0%) calc(50% + 1px));
+  mask: radial-gradient(circle at 0% center, rgb(0 0 0) 50%, rgb(0 0 0 / 0%) calc(50% + 0.5px));
+  -webkit-mask: radial-gradient(circle at 0% center, rgb(0 0 0) 50%, rgb(0 0 0 / 0%) calc(50% + 0.5px));
 }

@@ -89,9 +89,11 @@ describeWithLocale('ColorSwatch', () => {
 
   it('accepts a custom color format', () => {
     const swatch = createSwatch('red', Common.Color.Format.RGB);
-    assertSwatch(swatch, {colorTextInSlot: 'rgb(255 0 0)'});
+    assertSwatch(swatch, {colorTextInSlot: 'red'});
 
-    swatch.renderColor(new Common.Color.Legacy([1, .5, .2, .5], Common.Color.Format.HSLA), Common.Color.Format.RGB);
+    swatch.renderColor(
+        new Common.Color.Legacy([1, .5, .2, .5], Common.Color.Format.RGBA).as(Common.Color.Format.HSL),
+        Common.Color.Format.RGBA);
     assertSwatch(swatch, {colorTextInSlot: 'rgb(255 128 51 / 50%)'});
   });
 
@@ -166,19 +168,6 @@ describeWithLocale('ColorSwatch', () => {
     swatch.removeEventListener(InlineEditor.ColorSwatch.ColorChangedEvent.eventName, onClick);
   });
 
-  it('shows a circular color swatch for a wide gamut color', () => {
-    const swatch = createSwatch(Common.Color.parse('lch(1 1 1)') as Common.Color.Color);
-    assertNotNullOrUndefined(swatch.shadowRoot);
-
-    // It should have `circular` and `read-only` classes
-    const swatchEl = swatch.shadowRoot.querySelector('.color-swatch.circular.read-only');
-    // It should have 'circular' class
-    const innerSwatchEl = swatch.shadowRoot.querySelector('.color-swatch-inner.circular');
-
-    assertNotNullOrUndefined(swatchEl);
-    assertNotNullOrUndefined(innerSwatchEl);
-  });
-
   it('produces a color conversion menu', () => {
     const menuEntries: string[] = [];
     sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
@@ -226,6 +215,31 @@ describeWithLocale('ColorSwatch', () => {
       'lch(54.29 106.85 40.86 / 0.5)',
       'oklch(0.63 0.26 29.23 / 0.5)',
       'lab(54.29 80.82 69.9 / 0.5)',
+      'oklab(0.63 0.22 0.13 / 0.5)',
+      'color(srgb 1 0 0 / 0.5)',
+      'color(srgb-linear 1 0 0 / 0.5)',
+      'color(display-p3 0.92 0.2 0.14 / 0.5)',
+      'color(a98-rgb 0.86 0 0 / 0.5)',
+      'color(prophoto-rgb 0.7 0.28 0.1 / 0.5)',
+      'color(rec2020 0.79 0.23 0.07 / 0.5)',
+      'color(xyz 0.41 0.21 0.02 / 0.5)',
+      'color(xyz-d50 0.44 0.22 0.01 / 0.5)',
+      'color(xyz-d65 0.41 0.21 0.02 / 0.5)',
+    ]);
+
+    // With alpha:
+    menuEntries.splice(0);
+    swatch.renderColor('lab(54.29 80.82 69.9 / 0.5)');
+    dispatchClickEvent(target, {shiftKey: true});
+
+    assert.deepEqual(menuEntries, [
+      '#ff000080',
+      'rgb(255 0 0 / 50%)',
+      'hsl(360deg 100% 50% / 50%)',
+      'hwb(360deg 0% 0% / 50%)',
+      'lch(54.29 106.85 40.86 / 0.5)',
+      'oklch(0.63 0.26 29.23 / 0.5)',
+      //  'lab(54.29 80.82 69.9 / 0.5)',
       'oklab(0.63 0.22 0.13 / 0.5)',
       'color(srgb 1 0 0 / 0.5)',
       'color(srgb-linear 1 0 0 / 0.5)',

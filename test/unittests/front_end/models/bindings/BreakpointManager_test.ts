@@ -2,33 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
+import * as Common from '../../../../../front_end/core/common/common.js';
+import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import * as Root from '../../../../../front_end/core/root/root.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
-import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
-import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
-import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
-import * as Common from '../../../../../front_end/core/common/common.js';
+import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as TextUtils from '../../../../../front_end/models/text_utils/text_utils.js';
+import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 
-import {createTarget} from '../../helpers/EnvironmentHelpers.js';
-import {MockProtocolBackend} from '../../helpers/MockScopeChain.js';
-import {
-  dispatchEvent,
-  describeWithMockConnection,
-  registerListenerOnOutgoingMessage,
-} from '../../helpers/MockConnection.js';
-import {
-  createContentProviderUISourceCode,
-  createFileSystemUISourceCode,
-} from '../../helpers/UISourceCodeHelpers.js';
-import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
-import {TestPlugin} from '../../helpers/LanguagePluginHelpers.js';
 import {type Chrome} from '../../../../../extension-api/ExtensionAPI.js';
-import {setupPageResourceLoaderForSourceMap} from '../../helpers/SourceMapHelpers.js';
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as Persistence from '../../../../../front_end/models/persistence/persistence.js';
+import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {TestPlugin} from '../../helpers/LanguagePluginHelpers.js';
+import {
+  describeWithMockConnection,
+  dispatchEvent,
+  registerListenerOnOutgoingMessage,
+  setMockConnectionResponseHandler,
+} from '../../helpers/MockConnection.js';
+import {MockProtocolBackend} from '../../helpers/MockScopeChain.js';
+import {setupPageResourceLoaderForSourceMap} from '../../helpers/SourceMapHelpers.js';
+import {createContentProviderUISourceCode, createFileSystemUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
 
-describeWithMockConnection('BreakpointManager (mock backend)', () => {
+const {assert} = chai;
+
+describeWithMockConnection('BreakpointManager', () => {
   const URL_HTML = 'http://site/index.html' as Platform.DevToolsPath.UrlString;
   const INLINE_SCRIPT_START = 41;
   const BREAKPOINT_SCRIPT_LINE = 1;
@@ -51,6 +51,14 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     startColumn: 0,
     hasSourceURL: false,
   };
+
+  const DEFAULT_BREAKPOINT:
+      [Bindings.BreakpointManager.UserCondition, boolean, boolean, Bindings.BreakpointManager.BreakpointOrigin] = [
+        Bindings.BreakpointManager.EMPTY_BREAKPOINT_CONDITION,
+        true,   // enabled
+        false,  // isLogpoint
+        Bindings.BreakpointManager.BreakpointOrigin.OTHER,
+      ];
 
   let target: SDK.Target.Target;
   let backend: MockProtocolBackend;
@@ -98,6 +106,58 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     return uiLocation?.uiSourceCode ?? null;
   }
 
+  describe('possibleBreakpoints', () => {
+    it('correctly asks the back-end for breakable positions', async () => {
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      assertNotNullOrUndefined(debuggerModel);
+
+      // Create an inline script and get a UI source code instance for it.
+      const script = await backend.addScript(target, scriptDescription, null);
+      const {scriptId} = script;
+      const uiSourceCode = await uiSourceCodeFromScript(debuggerModel, script);
+      assertNotNullOrUndefined(uiSourceCode);
+
+      function getPossibleBreakpointsStub(_request: Protocol.Debugger.GetPossibleBreakpointsRequest):
+          Protocol.Debugger.GetPossibleBreakpointsResponse {
+        return {
+          locations: [
+            {scriptId, lineNumber: 0, columnNumber: 4},
+            {scriptId, lineNumber: 0, columnNumber: 8},
+          ],
+          getError() {
+            return undefined;
+          },
+        };
+      }
+      const getPossibleBreakpoints = sinon.spy(getPossibleBreakpointsStub);
+      setMockConnectionResponseHandler('Debugger.getPossibleBreakpoints', getPossibleBreakpoints);
+
+      const uiTextRange = new TextUtils.TextRange.TextRange(0, 0, 1, 0);
+      const possibleBreakpoints = await breakpointManager.possibleBreakpoints(uiSourceCode, uiTextRange);
+
+      assert.lengthOf(possibleBreakpoints, 2);
+      assert.strictEqual(possibleBreakpoints[0].uiSourceCode, uiSourceCode);
+      assert.strictEqual(possibleBreakpoints[0].lineNumber, 0);
+      assert.strictEqual(possibleBreakpoints[0].columnNumber, 4);
+      assert.strictEqual(possibleBreakpoints[1].uiSourceCode, uiSourceCode);
+      assert.strictEqual(possibleBreakpoints[1].lineNumber, 0);
+      assert.strictEqual(possibleBreakpoints[1].columnNumber, 8);
+      assert.isTrue(getPossibleBreakpoints.calledOnceWith(sinon.match({
+        start: {
+          scriptId,
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+        end: {
+          scriptId,
+          lineNumber: 1,
+          columnNumber: 0,
+        },
+        restrictToFunction: false,
+      })));
+    });
+  });
+
   describe('Breakpoints', () => {
     it('are removed and kept in storage after a back-end error', async () => {
       // Simulates a back-end error.
@@ -117,8 +177,8 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       backend.setBreakpointByUrlToFail(URL, BREAKPOINT_SCRIPT_LINE);
 
       // Set the breakpoint.
-      const breakpoint = await breakpointManager.setBreakpoint(
-          uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      const breakpoint =
+          await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
 
       const removedSpy = sinon.spy(breakpoint, 'remove');
       await breakpoint.updateBreakpoint();
@@ -129,14 +189,54 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     });
   });
 
+  describe('Breakpoint#backendCondition()', () => {
+    function createBreakpoint(condition: string, isLogpoint: boolean): Bindings.BreakpointManager.Breakpoint {
+      const {uiSourceCode} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
+      return new Bindings.BreakpointManager.Breakpoint(
+          breakpointManager, uiSourceCode, URL, 5, undefined, condition as Bindings.BreakpointManager.UserCondition,
+          /* enabled */ true, isLogpoint, Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION);
+    }
+
+    it('wraps logpoints in console.log', () => {
+      const breakpoint = createBreakpoint('x', /* isLogpoint */ true);
+
+      assert.include(breakpoint.backendCondition(), 'console.log(x)');
+    });
+
+    it('leaves conditional breakpoints alone', () => {
+      const breakpoint = createBreakpoint('x === 42', /* isLogpoint */ false);
+
+      // Split of sourceURL.
+      const lines = breakpoint.backendCondition().split('\n');
+      assert.strictEqual(lines[0], 'x === 42');
+    });
+
+    it('has a sourceURL for logpoints', () => {
+      const breakpoint = createBreakpoint('x', /* isLogpoint */ true);
+
+      assert.include(breakpoint.backendCondition(), '//# sourceURL=');
+    });
+
+    it('has a sourceURL for conditional breakpoints', () => {
+      const breakpoint = createBreakpoint('x === 42', /* isLogpoint */ false);
+
+      assert.include(breakpoint.backendCondition(), '//# sourceURL=');
+    });
+
+    it('has no sourceURL for normal breakpoints', () => {
+      const breakpoint = createBreakpoint('', /* isLogpoint */ false);
+
+      assert.notInclude(breakpoint.backendCondition(), '//# sourceURL=');
+    });
+  });
+
   it('allows awaiting the restoration of breakpoints', async () => {
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assertNotNullOrUndefined(debuggerModel);
 
     const {uiSourceCode, project} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, 0, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
 
     // Make sure that we await all updates that are triggered by adding the model.
     await breakpoint.updateBreakpoint();
@@ -183,8 +283,7 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     assertNotNullOrUndefined(debuggerModel);
 
     const {uiSourceCode, project} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, 13, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 13, 0, ...DEFAULT_BREAKPOINT);
 
     // Make sure that we await all updates that are triggered by adding the model.
     await breakpoint.updateBreakpoint();
@@ -239,8 +338,7 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       ],
     });
 
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, 13, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 13, 0, ...DEFAULT_BREAKPOINT);
     await breakpoint.updateBreakpoint();
 
     // Retrieve the ModelBreakpoint that is linked to our DebuggerModel.
@@ -273,8 +371,8 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     const breakpointResponder = backend.responderToBreakpointByUrlRequest(URL, BREAKPOINT_SCRIPT_LINE);
 
     // Set the breakpoint.
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint =
+        await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
     // Concurrently, enforce update of the breakpoint in the debugger.
@@ -322,8 +420,8 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     const breakpointResponder = backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE);
 
     // Set the breakpoint.
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint =
+        await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
     // Concurrently, enforce update of the breakpoint in the debugger.
@@ -361,8 +459,8 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     const breakpointResponder = backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE);
 
     // Set the breakpoint on the front-end/model side.
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint =
+        await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
     assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [uiSourceCode]);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
@@ -478,8 +576,7 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       const resolvedBreakpointLine = 1;
 
       // Set the breakpoint on the file system uiSourceCode.
-      await breakpointManager.setBreakpoint(
-          fileSystem.uiSourceCode, breakpointLine, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      await breakpointManager.setBreakpoint(fileSystem.uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
 
       // Add the script.
       const script = await backend.addScript(target, scriptDescription, null);
@@ -535,8 +632,7 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       assertNotNullOrUndefined(uiSourceCode);
 
       // Set the breakpoint on the front-end/model side.
-      const breakpoint = await breakpointManager.setBreakpoint(
-          uiSourceCode, breakpointLine, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, breakpointLine)({
@@ -623,8 +719,8 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       assert.strictEqual(uiSourceCode.project().type(), Workspace.Workspace.projectTypes.Debugger);
 
       // Set the breakpoint on the front-end/model side. The line number is relative to the v8 script.
-      const breakpoint = await breakpointManager.setBreakpoint(
-          uiSourceCode, BREAKPOINT_SCRIPT_LINE, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      const breakpoint =
+          await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 0, ...DEFAULT_BREAKPOINT);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE)({
@@ -730,8 +826,8 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       assert.strictEqual(uiSourceCode.project().type(), Workspace.Workspace.projectTypes.Network);
 
       // Set the breakpoint on the front-end/model side of the html uiSourceCode.
-      const breakpoint = await breakpointManager.setBreakpoint(
-          uiSourceCode, INLINE_BREAKPOINT_RAW_LINE, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      const breakpoint =
+          await breakpointManager.setBreakpoint(uiSourceCode, INLINE_BREAKPOINT_RAW_LINE, 0, ...DEFAULT_BREAKPOINT);
 
       // Set the breakpoint response for our upcoming request to set a breakpoint on the raw location.
       void backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE)({
@@ -837,8 +933,7 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       assertNotNullOrUndefined(uiSourceCode);
 
       // Set the breakpoint on the front-end/model side.
-      const breakpoint = await breakpointManager.setBreakpoint(
-          uiSourceCode, 0, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, 0)({
@@ -980,8 +1075,7 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
       assertNotNullOrUndefined(uiSourceCode);
 
       // Set the breakpoint on the front-end/model side.
-      const breakpoint = await breakpointManager.setBreakpoint(
-          uiSourceCode, 0, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+      const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, 0)({
@@ -1124,13 +1218,11 @@ describeWithMockConnection('BreakpointManager (mock backend)', () => {
     assertNotNullOrUndefined(uiSourceCode);
 
     // Set the breakpoint on the front-end/model side.
-    const breakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, 0, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
 
     // This breakpoint will slide to lineNumber: 0, columnNumber: 0 and thus
     // clash with the previous breakpoint.
-    const slidingBreakpoint = await breakpointManager.setBreakpoint(
-        uiSourceCode, 2, 0, '', true, Bindings.BreakpointManager.BreakpointOrigin.OTHER);
+    const slidingBreakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 2, 0, ...DEFAULT_BREAKPOINT);
 
     // Wait until both breakpoints have run their updates.
     await breakpoint.refreshInDebugger();
@@ -1153,6 +1245,10 @@ function createFakeScriptMapping(
     uiLocationToRawLocations:
         (_uiSourceCode: Workspace.UISourceCode.UISourceCode, _lineNumber: number,
          _columnNumber?: number) => [sdkLocation],
+    uiLocationRangeToRawLocationRanges:
+        (_uiSourceCode: Workspace.UISourceCode.UISourceCode, _textRange: TextUtils.TextRange.TextRange) => {
+          throw new Error('Not implemented');
+        },
   };
   return mapping;
 }
