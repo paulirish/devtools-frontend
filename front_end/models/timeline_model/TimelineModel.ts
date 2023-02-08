@@ -1019,7 +1019,7 @@ export class TimelineModelImpl {
           continue;
         }
 
-        if (asyncEvent.hasCategory(TimelineModelImpl.Category.UserTiming)) {
+        if (asyncEvent.hasCategory(TimelineModelImpl.Category.UserTiming) || asyncEvent.name === RecordType.LongTaskTracker) {
           group(TrackType.Timings).push(asyncEvent);
           continue;
         }
@@ -1027,6 +1027,10 @@ export class TimelineModelImpl {
         if (asyncEvent.name === RecordType.Animation) {
           group(TrackType.Animation).push(asyncEvent);
           continue;
+        }
+        // If we have other async events, show them in Experience track.
+        if (Root.Runtime.experiments.isEnabled('timelineShowAllEvents')) {
+          group(TrackType.Animation).push(asyncEvent);
         }
       }
     }
@@ -1688,6 +1692,7 @@ export enum RecordType {
   ResourceFinish = 'ResourceFinish',
   ResourceMarkAsCached = 'ResourceMarkAsCached',
 
+  LongTaskTracker = 'LongTaskTracker',
   RunMicrotasks = 'RunMicrotasks',
   FunctionCall = 'FunctionCall',
   GCEvent = 'GCEvent',

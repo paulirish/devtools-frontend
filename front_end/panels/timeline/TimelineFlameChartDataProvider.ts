@@ -861,6 +861,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       'domComplete',
       'loadEventStart',
       'loadEventEnd',
+      'commitNavigationEnd',
     ];
     const IgnoreNames = [...ResourceTimingNames, ...NavTimingNames];
     for (const track of this.model.tracks()) {
