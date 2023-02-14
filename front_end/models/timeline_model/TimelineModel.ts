@@ -695,7 +695,7 @@ export class TimelineModelImpl {
   private processAsyncBrowserEvents(tracingModel: SDK.TracingModel.TracingModel): void {
     const browserMain = SDK.TracingModel.TracingModel.browserMainThread(tracingModel);
     if (browserMain) {
-      this.processAsyncEvents(browserMain, [{from: 0, to: Infinity}]);
+      this.processAsyncEvents(browserMain, [{from: 0, to: Infinity}], false /* isMainThread */);
     }
   }
 
@@ -976,7 +976,7 @@ export class TimelineModelImpl {
         this.inspectedTargetEventsInternal.push(event);
       }
     }
-    this.processAsyncEvents(thread, ranges);
+    this.processAsyncEvents(thread, ranges, isMainThread);
   }
 
   private fixNegativeDuration(event: SDK.TracingModel.Event, child: SDK.TracingModel.Event): void {
@@ -992,7 +992,7 @@ export class TimelineModelImpl {
   private processAsyncEvents(thread: SDK.TracingModel.Thread, ranges: {
     from: number,
     to: number,
-  }[]): void {
+  }[], isMainThread: boolean): void {
     const asyncEvents = thread.asyncEvents();
     const groups = new Map<TrackType, SDK.TracingModel.AsyncEvent[]>();
 
@@ -1019,7 +1019,8 @@ export class TimelineModelImpl {
           continue;
         }
 
-        if (asyncEvent.hasCategory(TimelineModelImpl.Category.UserTiming) || asyncEvent.name === RecordType.LongTaskTracker) {
+        if (asyncEvent.hasCategory(TimelineModelImpl.Category.UserTiming) ||
+            (asyncEvent.name === RecordType.LongTaskTracker && isMainThread)) {
           group(TrackType.Timings).push(asyncEvent);
           continue;
         }

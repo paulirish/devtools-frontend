@@ -572,6 +572,8 @@ export class Event {
     if (payload.bind_id) {
       event.bind_id = payload.bind_id;
     }
+    event.pid = payload.pid;
+    event.tid = payload.tid;
 
     return event;
   }
