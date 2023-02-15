@@ -119,7 +119,8 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   }
 
   setModel(model: PerformanceModel|null, track: TimelineModel.TimelineModel.Track|null): void {
-    if (this.model !== model) {
+    const isUpdatedModel = this.model !== model;
+    if (isUpdatedModel) {
       if (this.model) {
         this.model.removeEventListener(Events.WindowChanged, this.onWindowChanged, this);
       }
@@ -130,12 +131,15 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     }
     this.track = track;
     this.tabbedPane.closeTabs([Tab.PaintProfiler, Tab.LayerViewer], false);
-    for (const view of this.rangeDetailViews.values()) {
-      view.setModel(model, track);
-    }
     this.lazyPaintProfilerView = null;
     this.lazyLayersView = null;
-    this.setSelection(null);
+    // Set model and initialize topdown/bottomup/eventlog
+    if (isUpdatedModel) {
+      for (const view of this.rangeDetailViews.values()) {
+        view.setModel(model, track);
+      }
+      this.setSelection(null);  // Focus details on overall trace.
+    }
 
     // Add TBT info to the footer.
     this.additionalMetricsToolbar.removeToolbarItems();
