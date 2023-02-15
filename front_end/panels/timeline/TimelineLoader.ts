@@ -114,7 +114,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
         Common.Settings.Settings.instance().moduleSetting('network.enable-remote-file-loading').get();
     Host.ResourceLoader.loadAsStream(url, null, stream, finishedCallback, allowRemoteFilePaths);
 
-    function finishedCallback(
+    async function finishedCallback(
         success: boolean, _headers: {[x: string]: string},
         errorDescription: Host.ResourceLoader.LoadErrorDescription): void {
       if (!success) {
@@ -122,6 +122,12 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
       }
       const txt = stream.data();
       const trace = JSON.parse(txt);
+      if (Array.isArray(trace.nodes)) {
+        loader.state = State.LoadingCPUProfileFormat;
+        loader.buffer = txt;
+        await loader.close();
+        return;
+      }
       const events = Array.isArray(trace.traceEvents) ? trace.traceEvents : trace;
       void loader.addEvents(events);
     }
