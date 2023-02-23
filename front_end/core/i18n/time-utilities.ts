@@ -54,9 +54,6 @@ export const millisToString = function(ms: number, higherResolution?: boolean): 
     return '0';
   }
 
-  if (higherResolution && ms < 0.1) {
-    return i18nString(UIStrings.fmms, {PH1: (ms * 1000).toFixed(0)});
-  }
   if (higherResolution && ms < 1000) {
     return i18nString(UIStrings.fms, {PH1: (ms).toFixed(2)});
   }
