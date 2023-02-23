@@ -292,6 +292,7 @@
   overflow: hidden;
   padding-right: 10px;
   display: inline-block;
+  vertical-align: top;
 }
 
 .timeline-details-warning {
