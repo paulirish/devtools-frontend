@@ -177,6 +177,7 @@ export class TracingModel {
   }
 
   private addEvent(payload: EventPayload): void {
+
     this.#allEventsPayload.push(payload);
     let process = this.#processById.get(payload.pid);
     if (!process) {

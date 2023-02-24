@@ -64,6 +64,14 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     this.jsonTokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(this.writeBalancedJSON.bind(this), true);
   }
 
+  /**
+   * This class handles loading traces from file and URL. Also Lighthouse panel
+   * It also handles loading cpuprofiles from file, url and console.profileEnd()
+   *
+   * Meanwhile, the normal trace recording flow bypasses TimelineLoader entirely,
+   * as it's handled from  TracingManager => TimelineController.
+   */
+
   static async loadFromFile(file: File, client: Client): Promise<TimelineLoader> {
     const loader = new TimelineLoader(client, /* shouldSaveTraceEventsToFile= */ true);
     const fileReader = new Bindings.FileUtils.ChunkedFileReader(file, TransferChunkLengthBytes);

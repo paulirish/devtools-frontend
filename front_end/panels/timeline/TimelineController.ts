@@ -216,7 +216,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
     // There might be a significant delay in the beginning of timeline recording
     // caused by starting CPU profiler, that needs to traverse JS heap to collect
     // all the functions data.
-    await SDK.TargetManager.TargetManager.instance().suspendAllTargets('performance-timeline');
+    // await SDK.TargetManager.TargetManager.instance().suspendAllTargets('performance-timeline');
     if (enableJSSampling && Root.Runtime.Runtime.queryParam('timelineTracingJSProfileDisabled')) {
       await this.startProfilingOnAllModels();
     }
@@ -243,7 +243,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
 
   private async finalizeTrace(): Promise<void> {
     this.injectCpuProfileEvents();
-    await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
+    // await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
     this.tracingModel.tracingComplete();
     await this.client.loadingComplete(this.tracingModel);
     this.client.loadingCompleteForTest();

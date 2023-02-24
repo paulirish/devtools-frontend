@@ -261,11 +261,11 @@ export class RenderCoordinator extends EventTarget {
       try {
         await Promise.race([
           Promise.all(readers),
-          new Promise((_, reject) => {
-            window.setTimeout(
-                () => reject(new Error(`Readers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)),
-                DEADLOCK_TIMEOUT);
-          }),
+          // new Promise((_, reject) => {
+          //   window.setTimeout(
+          //       () => reject(new Error(`Readers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)),
+          //       DEADLOCK_TIMEOUT);
+          // }),
         ]);
       } catch (err) {
         this.rejectAll(frame.readers, err);
@@ -282,11 +282,11 @@ export class RenderCoordinator extends EventTarget {
       try {
         await Promise.race([
           Promise.all(writers),
-          new Promise((_, reject) => {
-            window.setTimeout(
-                () => reject(new Error(`Writers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)),
-                DEADLOCK_TIMEOUT);
-          }),
+          // new Promise((_, reject) => {
+          //   window.setTimeout(
+          //       () => reject(new Error(`Writers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)),
+          //       DEADLOCK_TIMEOUT);
+          // }),
         ]);
       } catch (err) {
         this.rejectAll(frame.writers, err);
