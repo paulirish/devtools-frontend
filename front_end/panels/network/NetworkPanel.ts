@@ -940,7 +940,7 @@ export class FilmStripRecorder implements SDK.TracingManager.TracingManagerClien
     if (this.tracingModel) {
       this.tracingModel.dispose();
     }
-    this.tracingModel = new SDK.TracingModel.TracingModel(new Bindings.TempFile.TempFileBackingStorage());
+    this.tracingModel = new SDK.TracingModel.TracingModel();
     void this.tracingManager.start(this, '-*,disabled-by-default-devtools.screenshot', '');
 
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.FilmStripStartedRecording);

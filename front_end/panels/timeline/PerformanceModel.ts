@@ -232,8 +232,9 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     if (!this.tracingModelInternal) {
       throw 'call setTracingModel before accessing PerformanceModel';
     }
-    const backingStorage = (this.tracingModelInternal.backingStorage() as Bindings.TempFile.TempFileBackingStorage);
-    return backingStorage.writeToStream(stream);
+    // this.tracingModelInternal.allRawEvents
+    // throw those to stream.
+    console.log('TODO');
   }
 
   setWindow(window: Window, animate?: boolean): void {

@@ -39,7 +39,6 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineLoader.ts', UI
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   private client: Client|null;
-  private readonly backingStorage: Bindings.TempFile.TempFileBackingStorage;
   private tracingModel: SDK.TracingModel.TracingModel|null;
   private canceledCallback: (() => void)|null;
   private state: State;
@@ -52,8 +51,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   constructor(client: Client, shouldSaveTraceEventsToFile: boolean, title?: string) {
     this.client = client;
 
-    this.backingStorage = new Bindings.TempFile.TempFileBackingStorage();
-    this.tracingModel = new SDK.TracingModel.TracingModel(this.backingStorage, shouldSaveTraceEventsToFile, title);
+    this.tracingModel = new SDK.TracingModel.TracingModel(title);
 
     this.canceledCallback = null;
     this.state = State.Initial;
@@ -100,10 +98,6 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     try {
       const events = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.buildTraceProfileFromCpuProfile(
           profile, /* tid */ 1, /* injectPageEvent */ true);
-
-      loader.backingStorage.appendString(JSON.stringify(profile));
-      loader.backingStorage.finishWriting();
-
       window.setTimeout(async () => {
         void loader.addEvents(events);
       });
@@ -145,7 +139,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
   async addEvents(events: SDK.TracingManager.EventPayload[]): Promise<void> {
     this.client?.loadingStarted();
-    const eventsPerChunk = 5000;
+    const eventsPerChunk = 15_000;
     for (let i = 0; i < events.length; i += eventsPerChunk) {
       const chunk = events.slice(i, i + eventsPerChunk);
       (this.tracingModel as SDK.TracingModel.TracingModel).addEvents(chunk);
@@ -157,7 +151,6 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
   cancel(): void {
     this.tracingModel = null;
-    this.backingStorage.reset();
     if (this.client) {
       this.client.loadingComplete(null);
       this.client = null;

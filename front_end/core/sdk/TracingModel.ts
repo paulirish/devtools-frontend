@@ -12,8 +12,6 @@ type IgnoreListArgs = {
 };
 
 export class TracingModel {
-  #backingStorageInternal: BackingStorage;
-  readonly #shouldSaveToFile: boolean;
   readonly #title: string|undefined;
   #firstWritePending: boolean;
   readonly #processById: Map<string|number, Process>;
@@ -29,9 +27,8 @@ export class TracingModel {
   readonly #mainFrameNavStartTimes: Map<string, Event>;
   readonly #allEventsPayload: EventPayload[] = [];
 
-  constructor(backingStorage: BackingStorage, shouldSaveToFile = true, title?: string) {
-    this.#backingStorageInternal = backingStorage;
-    this.#shouldSaveToFile = shouldSaveToFile;
+  constructor(title?: string) {
+
     this.#title = title;
     // Avoid extra reset of the storage as it's expensive.
     this.#firstWritePending = true;
@@ -137,11 +134,6 @@ export class TracingModel {
 
   tracingComplete(): void {
     this.processPendingAsyncEvents();
-    if (this.#shouldSaveToFile) {
-      this.#backingStorageInternal.appendString(this.#firstWritePending ? '[]' : ']');
-      this.#backingStorageInternal.finishWriting();
-      this.#firstWritePending = false;
-    }
     for (const process of this.#processById.values()) {
       for (const thread of process.threads.values()) {
         thread.tracingComplete();
@@ -150,9 +142,6 @@ export class TracingModel {
   }
 
   dispose(): void {
-    if (!this.#firstWritePending && this.#shouldSaveToFile) {
-      this.#backingStorageInternal.reset();
-    }
   }
 
   adjustTime(offset: number): void {
@@ -186,22 +175,6 @@ export class TracingModel {
     }
 
     const phase = Phase;
-
-    let backingStorage: (() => Promise<string|null>)|null = null;
-    if (this.#shouldSaveToFile) {
-      const eventsDelimiter = ',\n';
-      this.#backingStorageInternal.appendString(this.#firstWritePending ? '[' : eventsDelimiter);
-      this.#firstWritePending = false;
-      const stringPayload = JSON.stringify(payload);
-      const isAccessible = payload.ph === phase.SnapshotObject;
-      const keepStringsLessThan = 10000;
-      if (isAccessible && stringPayload.length > keepStringsLessThan) {
-        backingStorage = this.#backingStorageInternal.appendAccessibleString(stringPayload);
-      } else {
-        this.#backingStorageInternal.appendString(stringPayload);
-      }
-    }
-
     const timestamp = payload.ts / 1000;
     // We do allow records for unrelated threads to arrive out-of-order,
     // so there's a chance we're getting records from the past.
@@ -257,7 +230,6 @@ export class TracingModel {
     if (TracingModel.isAsyncPhase(payload.ph)) {
       this.#asyncEvents.push((event as AsyncEvent));
     }
-    event.setBackingStorage(backingStorage);
     if (event.hasCategory(DevToolsMetadataEventCategory)) {
       this.#devToolsMetadataEventsInternal.push(event);
     }
@@ -450,10 +422,6 @@ export class TracingModel {
     console.assert(false, 'Invalid async event phase');
   }
 
-  backingStorage(): BackingStorage {
-    return this.#backingStorageInternal;
-  }
-
   title(): string|undefined {
     return this.#title;
   }
@@ -517,19 +485,6 @@ export const LegacyTopLevelEventCategory = 'toplevel';
 
 export const DevToolsMetadataEventCategory = 'disabled-by-default-devtools.timeline';
 export const DevToolsTimelineEventCategory = 'disabled-by-default-devtools.timeline';
-
-export abstract class BackingStorage {
-  appendString(_string: string): void {
-  }
-
-  abstract appendAccessibleString(string: string): () => Promise<string|null>;
-
-  finishWriting(): void {
-  }
-
-  reset(): void {
-  }
-}
 
 export class Event {
   categoriesString: string;
@@ -614,9 +569,6 @@ export class Event {
     }
     this.setEndTime(endEvent.startTime);
   }
-
-  setBackingStorage(_backingStorage: (() => Promise<string|null>)|null): void {
-  }
 }
 
 /**
@@ -674,13 +626,11 @@ export class PayloadEvent extends Event {
 }
 
 export class ObjectSnapshot extends PayloadEvent {
-  #backingStorage: (() => Promise<string|null>)|null;
   #objectPromiseInternal: Promise<ObjectSnapshot|null>|null;
 
   private constructor(
       category: string|undefined, name: string, startTime: number, thread: Thread, rawPayload: EventPayload) {
     super(category, name, Phase.SnapshotObject, startTime, thread, rawPayload);
-    this.#backingStorage = null;
     this.#objectPromiseInternal = null;
   }
 
@@ -706,24 +656,8 @@ export class ObjectSnapshot extends PayloadEvent {
       callback((snapshot as ObjectSnapshot));
       return;
     }
-    const storage = this.#backingStorage;
-    if (storage) {
-      storage().then(onRead, callback.bind(null, null));
-    }
-
-    function onRead(result: string|null): void {
-      if (!result) {
-        callback(null);
-        return;
-      }
-      try {
-        const payload = JSON.parse(result);
-        callback(payload['args']['snapshot']);
-      } catch (e) {
-        Common.Console.Console.instance().error('Malformed event data in backing storage');
-        callback(null);
-      }
-    }
+    console.error('data reqursted from backing storage', this);
+    callback(null);
   }
 
   objectPromise(): Promise<ObjectSnapshot|null> {
@@ -731,14 +665,6 @@ export class ObjectSnapshot extends PayloadEvent {
       this.#objectPromiseInternal = new Promise(this.requestObject.bind(this));
     }
     return this.#objectPromiseInternal;
-  }
-
-  setBackingStorage(backingStorage: (() => Promise<string|null>)|null): void {
-    if (!backingStorage) {
-      return;
-    }
-    this.#backingStorage = backingStorage;
-    this.args = {};
   }
 }
 

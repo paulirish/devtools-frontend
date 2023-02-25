@@ -990,7 +990,7 @@ export class CallTreeTimelineTreeView extends AggregatedTimelineTreeView {
 
   buildTree(): TimelineModel.TimelineProfileTree.Node {
     const grouping = this.groupBySetting.get();
-    return this.buildTopDownTree(false, this.groupingFunction(grouping));
+  return this.buildTopDownTree(false, this.groupingFunction(grouping));
   }
 }
 

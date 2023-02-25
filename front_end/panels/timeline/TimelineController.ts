@@ -57,8 +57,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
     this.performanceModel.setMainTarget(target);
     this.client = client;
 
-    const backingStorage = new Bindings.TempFile.TempFileBackingStorage();
-    this.tracingModel = new SDK.TracingModel.TracingModel(backingStorage);
+    this.tracingModel = new SDK.TracingModel.TracingModel();
 
     this.extensionSessions = [];
     SDK.TargetManager.TargetManager.instance().observeModels(SDK.CPUProfilerModel.CPUProfilerModel, this);
