@@ -7,7 +7,8 @@ import type * as Handlers from '../handlers/handlers.js';
 
 export type MessageToWorker = {
   action: 'PARSE',
-  events: readonly Types.TraceEvents.TraceEventData[],
+  events?: readonly Types.TraceEvents.TraceEventData[],
+  eventsStr?: string,
   freshRecording: boolean,
 }|{
   action: 'RESET',
@@ -15,7 +16,8 @@ export type MessageToWorker = {
 
 export type MessageFromWorker = {
   message: 'PARSE_COMPLETE',
-  data: Handlers.Types.HandlerData<typeof Handlers.ModelHandlers>|null,
+  data?: Handlers.Types.HandlerData<typeof Handlers.ModelHandlers>|null,
+  dataStr?: string,
 }|{
   message: 'PARSE_UPDATE',
   index: number,

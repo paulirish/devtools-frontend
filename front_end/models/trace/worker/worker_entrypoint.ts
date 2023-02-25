@@ -59,8 +59,10 @@ self.onmessage = async function(event: MessageEvent): Promise<void> {
   switch (message.action) {
     case 'PARSE': {
       try {
-        await processor.parse(event.data.events, event.data.freshRecording);
-        sendMessage({message: 'PARSE_COMPLETE', data: processor.data});
+        const events = event.data.events || JSON.parse(event.data.eventsStr);
+        await processor.parse(events, event.data.freshRecording);
+        const dataStr = JSON.stringify(processor.data);
+        sendMessage({message: 'PARSE_COMPLETE', dataStr});
       } catch (error) {
         sendMessage({message: 'PARSE_ERROR', error});
       } finally {

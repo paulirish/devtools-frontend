@@ -39,7 +39,7 @@ export class Model extends EventTarget {
   #sendParseMessageToWorker(events: readonly Types.TraceEvents.TraceEventData[], freshRecording: boolean): void {
     this.#sendMessageToTraceWorker({
       action: 'PARSE',
-      events,
+      eventsStr: JSON.stringify(events),
       freshRecording,
     });
   }
@@ -107,7 +107,8 @@ export class Model extends EventTarget {
         const eventFromWorker = event.data as Worker.Types.MessageFromWorker;
         switch (eventFromWorker.message) {
           case 'PARSE_COMPLETE': {
-            this.#parsingComplete(file, event.data.data);
+            const data = event.data.data ?? JSON.parse(event.data.dataStr);
+            this.#parsingComplete(file, data);
             // Store the file in our list of traces. We can only do this once we
             // know that there have been no errors during the parsing stage.
             this.#traces.push(file);
