@@ -27,19 +27,19 @@ export class TraceProcessor<ModelHandlers extends {[key: string]: Handlers.Types
     EventTarget {
   readonly #traceHandlers: {[key: string]: Handlers.Types.TraceEventHandler};
   #pauseDuration: number;
-  #pauseFrequencyMs: number;
+  #eventsPerChunk: number;
   #status = Status.IDLE;
 
   static create(): TraceProcessor<typeof Handlers.ModelHandlers> {
     return new TraceProcessor(Handlers.ModelHandlers);
   }
 
-  private constructor(traceHandlers: ModelHandlers, {pauseDuration = 20, pauseFrequencyMs = 100} = {}) {
+  private constructor(traceHandlers: ModelHandlers, {pauseDuration = 20, eventsPerChunk = 15_000} = {}) {
     super();
 
     this.#traceHandlers = traceHandlers;
     this.#pauseDuration = pauseDuration;
-    this.#pauseFrequencyMs = pauseFrequencyMs;
+    this.#eventsPerChunk = eventsPerChunk;
   }
 
   reset(): void {
@@ -74,7 +74,7 @@ export class TraceProcessor<ModelHandlers extends {[key: string]: Handlers.Types
     // main thread to avoid blocking execution. It uses `dispatchEvent` to
     // provide status update events, and other various bits of config like the
     // pause duration and frequency.
-    const traceEventIterator = new TraceEventIterator(traceEvents, this.#pauseDuration, this.#pauseFrequencyMs);
+    const traceEventIterator = new TraceEventIterator(traceEvents, this.#pauseDuration, this.#eventsPerChunk);
 
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
@@ -180,19 +180,18 @@ type IteratorStatusUpdateItem = {
 };
 
 class TraceEventIterator {
-  #time: number;
+  #eventCount: number;
 
   constructor(
       private traceEvents: readonly Types.TraceEvents.TraceEventData[], private pauseDuration: number,
-      private pauseFrequencyMs: number) {
-    this.#time = performance.now();
+      private eventsPerChunk: number) {
+    this.#eventCount = 0;
   }
 
   async * [Symbol.asyncIterator](): AsyncGenerator<IteratorItem, void, void> {
     for (let i = 0, length = this.traceEvents.length; i < length; i++) {
       // Every so often we take a break just to render.
-      if (performance.now() - this.#time > this.pauseFrequencyMs) {
-        this.#time = performance.now();
+      if (++this.#eventCount % this.eventsPerChunk === 0) {
         // Take the opportunity to provide status update events.
         yield {kind: IteratorItemType.STATUS_UPDATE, data: {index: i, total: length}};
         // Wait for rendering before resuming.
