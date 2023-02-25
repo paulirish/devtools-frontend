@@ -228,18 +228,72 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return filmStripFrame && filmStripFrame.timestamp - frame.endTime < 10 ? filmStripFrame : null;
   }
 
+
   async save(writable: FileSystemWritableFileStream): Promise<void> {
     if (!this.tracingModelInternal) {
       throw 'call setTracingModel before accessing PerformanceModel';
     }
 
+    /**
+     * Generates a JSON representation of an array of objects with the objects
+     * printed one per line for a more readable (but not too verbose) version.
+     */
+    function* arrayOfObjectsJsonGenerator(arrayOfObjects: readonly SDK.TracingManager.EventPayload[]): IterableIterator<string> {
+      const ITEMS_PER_ITERATION = 500;
+
+      // Stringify and emit items separately to avoid a giant string in memory.
+      yield '[\n';
+      if (arrayOfObjects.length > 0) {
+        const itemsIterator = arrayOfObjects[Symbol.iterator]();
+        // Emit first item manually to avoid a trailing comma.
+        const firstItem = itemsIterator.next().value;
+        yield `  ${JSON.stringify(firstItem)}`;
+
+        let itemsRemaining = ITEMS_PER_ITERATION;
+        let itemsJSON = '';
+        for (const item of itemsIterator) {
+          itemsJSON += `,\n  ${JSON.stringify(item)}`;
+          itemsRemaining--;
+          if (itemsRemaining === 0) {
+            yield itemsJSON;
+            itemsRemaining = ITEMS_PER_ITERATION;
+            itemsJSON = '';
+          }
+        }
+        yield itemsJSON;
+      }
+      yield '\n]';
+    }
+
+    /**
+     * Generates a JSON representation of traceData line-by-line for a nicer printed
+     * version with one trace event per line.
+     */
+    function* traceJsonGenerator(traceEvents:readonly SDK.TracingManager.EventPayload[], metadata: any): IterableIterator<string> {
+      yield '{\n';
+
+      yield '"traceEvents": ';
+      yield* arrayOfObjectsJsonGenerator(traceEvents);
+
+      // Emit the rest of the object (usually just `metadata`, if anything).
+      for (const [key, value] of Object.entries(metadata)) {
+        yield `,\n"${key}": ${JSON.stringify(value, null, 2)}`;
+      }
+
+      yield '}\n';
+    }
+
+    const traceEvents = this.tracingModelInternal.allRawEvents();
+    const metadata = {
+      recordStartTime: this.recordStartTimeInternal
+    };
+    const formattedTraceIter = traceJsonGenerator(traceEvents, {metadata});
+    const traceAsString = Array.from(formattedTraceIter).join('');
     const encoder = new TextEncoder();
-    const buffer = encoder.encode(JSON.stringify({
-      traceEvents: this.tracingModelInternal.allRawEvents(),
-      // metadata
-    }));
+    const buffer = encoder.encode(traceAsString);
     await writable.write(buffer);
   }
+
 
   setWindow(window: Window, animate?: boolean): void {
     this.windowInternal = window;
