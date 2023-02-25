@@ -34,7 +34,7 @@ export class TraceProcessor<ModelHandlers extends {[key: string]: Handlers.Types
     return new TraceProcessor(Handlers.ModelHandlers);
   }
 
-  private constructor(traceHandlers: ModelHandlers, {pauseDuration = 20, eventsPerChunk = 15_000} = {}) {
+  private constructor(traceHandlers: ModelHandlers, {pauseDuration = 0, eventsPerChunk = 15_000} = {}) {
     super();
 
     this.#traceHandlers = traceHandlers;
