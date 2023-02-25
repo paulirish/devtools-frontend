@@ -75,6 +75,21 @@ import {UIDevtoolsController} from './UIDevtoolsController.js';
 import {UIDevtoolsUtils} from './UIDevtoolsUtils.js';
 import type * as Protocol from '../../generated/protocol.js';
 
+declare global {
+  interface FileSystemWritableFileStream extends WritableStream {
+    write(data: unknown): Promise<void>;
+    close(): Promise<void>;
+  }
+
+  interface FileSystemHandle {
+    createWritable(): Promise<FileSystemWritableFileStream>;
+  }
+
+  interface Window {
+    showSaveFilePicker(opts: unknown): Promise<FileSystemHandle>;
+  }
+}
+
 const UIStrings = {
   /**
    *@description Text that appears when user drag and drop something (for example, a file) in Timeline Panel of the Performance panel
@@ -706,25 +721,27 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (isNode) {
       fileName = `CPU-${now}.cpuprofile` as Platform.DevToolsPath.RawPathString;
     } else {
-      fileName = `Profile-${now}.json` as Platform.DevToolsPath.RawPathString;
-    }
-    const stream = new Bindings.FileUtils.FileOutputStream();
-
-    const accepted = await stream.open(fileName);
-    if (!accepted) {
-      return;
+      fileName = `Trace-${now}.json` as Platform.DevToolsPath.RawPathString;
     }
 
-    const error = (await performanceModel.save(stream) as {
-      message: string,
-      name: string,
-      code: number,
-    } | null);
-    if (!error) {
-      return;
+    try {
+     const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+      });
+
+      const writable = await handle.createWritable();
+      await performanceModel.save(writable);
+
+      await writable.close();
+    } catch (error) {
+      console.error(error.stack);
+      // If the user aborts the action no need to report it, otherwise do.
+      if (error.name === 'AbortError') {
+        return;
+      }
+      Common.Console.Console.instance().error(
+          i18nString(UIStrings.failedToSaveTimelineSSS, {PH1: error.message, PH2: error.name, PH3: error.code}));
     }
-    Common.Console.Console.instance().error(
-        i18nString(UIStrings.failedToSaveTimelineSSS, {PH1: error.message, PH2: error.name, PH3: error.code}));
   }
 
   async showHistory(): Promise<void> {

@@ -228,13 +228,17 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return filmStripFrame && filmStripFrame.timestamp - frame.endTime < 10 ? filmStripFrame : null;
   }
 
-  save(stream: Common.StringOutputStream.OutputStream): Promise<DOMError|null> {
+  async save(writable: FileSystemWritableFileStream): Promise<void> {
     if (!this.tracingModelInternal) {
       throw 'call setTracingModel before accessing PerformanceModel';
     }
-    // this.tracingModelInternal.allRawEvents
-    // throw those to stream.
-    console.log('TODO');
+
+    const encoder = new TextEncoder();
+    const buffer = encoder.encode(JSON.stringify({
+      traceEvents: this.tracingModelInternal.allRawEvents(),
+      // metadata
+    }));
+    await writable.write(buffer);
   }
 
   setWindow(window: Window, animate?: boolean): void {
