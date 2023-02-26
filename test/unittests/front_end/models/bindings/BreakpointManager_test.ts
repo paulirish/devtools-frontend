@@ -196,6 +196,7 @@ describeWithMockConnection('BreakpointManager', () => {
       // Set the breakpoint.
       const breakpoint =
           await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       const removedSpy = sinon.spy(breakpoint, 'remove');
       await breakpoint.updateBreakpoint();
@@ -203,6 +204,28 @@ describeWithMockConnection('BreakpointManager', () => {
       // Breakpoint was removed and is kept in storage.
       assert.isTrue(breakpoint.getIsRemoved());
       assert.isTrue(removedSpy.calledWith(true));
+    });
+
+    it('are only set if the uiSourceCode is still valid (not removed)', async () => {
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      assertNotNullOrUndefined(debuggerModel);
+
+      // Add a script.
+      const script = await backend.addScript(target, scriptDescription, null);
+      const uiSourceCode = await uiSourceCodeFromScript(debuggerModel, script);
+      assertNotNullOrUndefined(uiSourceCode);
+
+      // Remove the project (and thus the uiSourceCode).
+      Workspace.Workspace.WorkspaceImpl.instance().removeProject(uiSourceCode.project());
+
+      // Set the breakpoint.
+      const breakpoint =
+          await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+
+      // We should not expect any breakpoints to be set.
+      assert.isUndefined(breakpoint);
+      const breakLocations = breakpointManager.allBreakpointLocations();
+      assert.lengthOf(breakLocations, 0);
     });
   });
 
@@ -254,6 +277,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
     const {uiSourceCode, project} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Make sure that we await all updates that are triggered by adding the model.
     await breakpoint.updateBreakpoint();
@@ -301,6 +325,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
     const {uiSourceCode, project} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 13, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Make sure that we await all updates that are triggered by adding the model.
     await breakpoint.updateBreakpoint();
@@ -356,6 +381,7 @@ describeWithMockConnection('BreakpointManager', () => {
     });
 
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 13, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
     await breakpoint.updateBreakpoint();
 
     // Retrieve the ModelBreakpoint that is linked to our DebuggerModel.
@@ -390,6 +416,7 @@ describeWithMockConnection('BreakpointManager', () => {
     // Set the breakpoint.
     const breakpoint =
         await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
     // Concurrently, enforce update of the breakpoint in the debugger.
@@ -439,6 +466,7 @@ describeWithMockConnection('BreakpointManager', () => {
     // Set the breakpoint.
     const breakpoint =
         await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
     // Concurrently, enforce update of the breakpoint in the debugger.
@@ -478,6 +506,7 @@ describeWithMockConnection('BreakpointManager', () => {
     // Set the breakpoint on the front-end/model side.
     const breakpoint =
         await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
     assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [uiSourceCode]);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
@@ -626,6 +655,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Set the breakpoint on the front-end/model side.
       const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, breakpointLine)({
@@ -714,6 +744,7 @@ describeWithMockConnection('BreakpointManager', () => {
       // Set the breakpoint on the front-end/model side. The line number is relative to the v8 script.
       const breakpoint =
           await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE)({
@@ -821,6 +852,7 @@ describeWithMockConnection('BreakpointManager', () => {
       // Set the breakpoint on the front-end/model side of the html uiSourceCode.
       const breakpoint =
           await breakpointManager.setBreakpoint(uiSourceCode, INLINE_BREAKPOINT_RAW_LINE, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request to set a breakpoint on the raw location.
       void backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE)({
@@ -915,6 +947,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Set the breakpoint on the front-end/model side.
       const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, 0)({
@@ -1057,6 +1090,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Set the breakpoint on the front-end/model side.
       const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, 0)({
@@ -1193,10 +1227,12 @@ describeWithMockConnection('BreakpointManager', () => {
 
     // Set the breakpoint on the front-end/model side.
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // This breakpoint will slide to lineNumber: 0, columnNumber: 0 and thus
     // clash with the previous breakpoint.
     const slidingBreakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 2, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(slidingBreakpoint);
 
     // Wait until both breakpoints have run their updates.
     await breakpoint.refreshInDebugger();
@@ -1205,6 +1241,61 @@ describeWithMockConnection('BreakpointManager', () => {
     // The first breakpoint is kept on a clash, the second one should be removed.
     assert.isFalse(breakpoint.isRemoved);
     assert.isTrue(slidingBreakpoint.isRemoved);
+  });
+
+  it('Breakpoint does not keep file system source code alive after file system removal', async () => {
+    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    const breakpointLine = 0;
+    const resolvedBreakpointLine = 1;
+
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const persistence =
+        Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance(
+        {forceNew: true, workspace: Workspace.Workspace.WorkspaceImpl.instance()});
+
+    // Create a file system project and source code.
+    const fileName = Common.ParsedURL.ParsedURL.extractName(scriptDescription.url);
+    const fileSystemPath = 'file://path/to/filesystem' as Platform.DevToolsPath.UrlString;
+    const fileSystemFileUrl = fileSystemPath + '/' + fileName as Platform.DevToolsPath.UrlString;
+    const {uiSourceCode: fileSystemUiSourceCode, project} = createFileSystemFileForPersistenceTests(
+        {fileSystemFileUrl, fileSystemPath}, scriptDescription.url, scriptDescription.content, target);
+
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    assertNotNullOrUndefined(debuggerModel);
+
+    // Add the same script via the debugger protocol.
+    const bindingCreatedPromise = persistence.once(Persistence.Persistence.Events.BindingCreated);
+    const script = await backend.addScript(target, scriptDescription, null);
+    const uiSourceCode = await uiSourceCodeFromScript(debuggerModel, script);
+    await bindingCreatedPromise;
+    assertNotNullOrUndefined(uiSourceCode);
+
+    // Set the breakpoint on the (network) script.
+    void backend.responderToBreakpointByUrlRequest(URL, breakpointLine)({
+      breakpointId: 'BREAK_ID' as Protocol.Debugger.BreakpointId,
+      locations: [
+        {
+          scriptId: script.scriptId,
+          lineNumber: resolvedBreakpointLine,
+          columnNumber: 0,
+        },
+      ],
+    });
+    await breakpointManager.setBreakpoint(uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
+
+    // Remove the file system project.
+    const bindingRemovedPromise = persistence.once(Persistence.Persistence.Events.BindingRemoved);
+    project.dispose();
+    // Make sure the binding is removed.
+    await bindingRemovedPromise;
+
+    // After this, the breakpoint manager should not refer to the file system source code anymore, but
+    // the file system breakpoint location should be in the storage.
+    assert.isEmpty(breakpointManager.breakpointLocationsForUISourceCode(fileSystemUiSourceCode));
+    assert.strictEqual(breakpointManager.storage.breakpointItems(fileSystemUiSourceCode.url()).length, 1);
+
+    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
   });
 
   describe('can correctly set breakpoints for all pre-registered targets', () => {
@@ -1261,21 +1352,18 @@ describeWithMockConnection('BreakpointManager', () => {
           sinon.stub(Bindings.BreakpointManager.Breakpoint.prototype, 'modelAdded').callsFake((() => {}));
 
       // Set the breakpoint on the main target, but note that the debugger won't be updated.
-      breakpoint = await breakpointManager.setBreakpoint(mainUiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      const bp = await breakpointManager.setBreakpoint(mainUiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(bp);
+      breakpoint = bp;
 
       // Now restore the actual behavior of 'modelAdded'.
       modelAddedStub.restore();
     });
 
-    // TODO(crbug.com/1415258): Update outcomes as soon as the bug is fixed (see comments).
     it('if the target whose uiSourceCode was used for breakpoint setting is handled last', async () => {
       // Handle setting breakpoint on the worker first.
-      //
-      // Note: Capturing the status quo right now.
-      // We would normally expect the request for breakpoint to be set on the compiled file, not
-      // on the original source file. Change the request from 'ORIGINAL_SCRIPT_SOURCE_URL' to 'URL'.
       breakpoint.modelAdded(workerScript.debuggerModel);
-      await backend.responderToBreakpointByUrlRequest(ORIGINAL_SCRIPT_SOURCE_URL, 0)({
+      await backend.responderToBreakpointByUrlRequest(URL, 0)({
         breakpointId: 'WORKER_ID' as Protocol.Debugger.BreakpointId,
         locations: [
           {
@@ -1301,11 +1389,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       await waitForBreakpointLocationsAdded();
 
-      // Note: Capturing the status quo right now.
-      // We would normally expect both the worker's and the main target's
-      // uiSourceCode to appear here.
-      // Change '[mainUiSourceCode]' to '[mainUiSourceCode, workerUiSourceCode]'.
-      assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [mainUiSourceCode]);
+      assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [mainUiSourceCode, workerUiSourceCode]);
 
       const mainBoundLocations = breakpointManager.breakpointLocationsForUISourceCode(mainUiSourceCode);
       assert.strictEqual(1, mainBoundLocations.length);
@@ -1314,7 +1398,6 @@ describeWithMockConnection('BreakpointManager', () => {
       assert.strictEqual(1, workerBoundLocations.length);
     });
 
-    // TODO(crbug.com/1415258): Update outcomes as soon as the bug is fixed (see comments).
     it('if the target whose uiSourceCode was used for breakpoint setting is handled first', async () => {
       // Handle setting breakpoint on the main target first.
       breakpoint.modelAdded(mainScript.debuggerModel);
@@ -1344,11 +1427,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       await waitForBreakpointLocationsAdded();
 
-      // Note: Capturing the status quo right now.
-      // We would normally expect both the worker's and the main target's
-      // uiSourceCode to appear here.
-      // Change '[mainUiSourceCode]' to '[mainUiSourceCode, workerUiSourceCode]'.
-      assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [mainUiSourceCode]);
+      assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [mainUiSourceCode, workerUiSourceCode]);
 
       const mainBoundLocations = breakpointManager.breakpointLocationsForUISourceCode(mainUiSourceCode);
       assert.strictEqual(1, mainBoundLocations.length);

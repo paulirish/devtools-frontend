@@ -5,12 +5,17 @@
 const {assert} = chai;
 
 import * as Platform from '../../../../../front_end/core/platform/platform.js';
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
 
 import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
-import {loadTraceEventsLegacyEventPayload} from '../../helpers/TraceHelpers.js';
-import {DevToolsTimelineCategory, FakeStorage, makeEventWithStubbedThread} from '../../helpers/TimelineHelpers.js';
+import {
+  DevToolsTimelineCategory,
+  FakeStorage,
+  makeFakeSDKEventFromPayload,
+  traceModelFromTraceFile,
+} from '../../helpers/TimelineHelpers.js';
 
 // Various events listing processes and threads used by all the tests.
 const preamble = [
@@ -151,6 +156,25 @@ const preamble = [
   },
 ];
 
+interface FakeLayoutShiftProperties {
+  startTime: number;
+  hadRecentInput: boolean;
+  weightedScoreDelta?: number;
+}
+
+function makeFakeLayoutShift(properties: FakeLayoutShiftProperties): SDK.TracingModel.Event {
+  const fakeLayoutShift = {
+    args: {
+      data: {
+        had_recent_input: properties.hadRecentInput,
+        weighted_score_delta: properties.weightedScoreDelta,
+      },
+    },
+    startTime: properties.startTime,
+  } as unknown as SDK.TracingModel.Event;
+
+  return fakeLayoutShift;
+}
 class TrackSummary {
   name: string = '';
   type: TimelineModel.TimelineModel.TrackType = TimelineModel.TimelineModel.TrackType.Other;
@@ -187,20 +211,6 @@ describeWithEnvironment('TimelineModel', () => {
     const tracingModel = new SDK.TracingModel.TracingModel(new FakeStorage());
     const timelineModel = new TimelineModel.TimelineModel.TimelineModelImpl();
     tracingModel.addEvents((preamble as unknown as SDK.TracingManager.EventPayload[]).concat(events));
-    tracingModel.tracingComplete();
-    timelineModel.setEvents(tracingModel);
-    return {
-      tracingModel,
-      timelineModel,
-    };
-  }
-
-  async function traceModelFromTraceFile(file: string): Promise<
-      {tracingModel: SDK.TracingModel.TracingModel, timelineModel: TimelineModel.TimelineModel.TimelineModelImpl}> {
-    const events = await loadTraceEventsLegacyEventPayload(file);
-    const tracingModel = new SDK.TracingModel.TracingModel(new FakeStorage());
-    const timelineModel = new TimelineModel.TimelineModel.TimelineModelImpl();
-    tracingModel.addEvents(events);
     tracingModel.tracingComplete();
     timelineModel.setEvents(tracingModel);
     return {
@@ -268,8 +278,6 @@ describeWithEnvironment('TimelineModel', () => {
           pid: 1537729,  // the Renderer Thread
           tid: 1,        // CrRendererMain
           id: '1234',
-          bind_id: '1234',
-          s: '',
           ts: 10,
           dur: 500,
           scope: 'scope',
@@ -293,8 +301,6 @@ describeWithEnvironment('TimelineModel', () => {
           pid: 1537729,  // the Renderer Thread
           tid: 1,        // CrRendererMain
           id: '1234',
-          bind_id: '1234',
-          s: '',
           ts: 10,
           dur: 500,
           scope: 'scope',
@@ -318,8 +324,6 @@ describeWithEnvironment('TimelineModel', () => {
           pid: 1537729,  // the Renderer Thread
           tid: 1,        // CrRendererMain
           id: '1234',
-          bind_id: '1234',
-          s: '',
           ts: 10,
           dur: 500,
           scope: 'scope',
@@ -352,23 +356,21 @@ describeWithEnvironment('TimelineModel', () => {
       // Note: exact trace does not matter here, but we need a real one so all the metadata is set correctly on the TimelineModel
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
 
-      const timestampEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const timestampEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.TimeStamp,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
       });
       assert.isTrue(timelineModel.isMarkerEvent(timestampEvent));
     });
     it('is true for a Mark First Paint event that is on the main frame', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markFirstPaintEventOnMainFrame = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markFirstPaintEventOnMainFrame = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFirstPaint,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           frame: timelineModel.mainFrameID(),
           data: {},
@@ -379,12 +381,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is true for a Mark FCP event that is on the main frame', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markFCPEventOnMainFrame = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markFCPEventOnMainFrame = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFCP,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           frame: timelineModel.mainFrameID(),
           data: {},
@@ -395,12 +396,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is false for a Mark FCP event that is not on the main frame', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markFCPEventOnOtherFrame = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markFCPEventOnOtherFrame = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFCP,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           frame: 'not-main-frame',
           data: {},
@@ -411,12 +411,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is false for a Mark First Paint event that is not on the main frame', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markFirstPaintEventOnOtherFrame = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markFirstPaintEventOnOtherFrame = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFirstPaint,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           frame: 'not-main-frame',
           data: {},
@@ -427,12 +426,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is true for a MarkDOMContent event is set to isMainFrame', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markDOMContentEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markDOMContentEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isMainFrame: true,
@@ -444,12 +442,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is true for a MarkDOMContent event that set to isOutermostMainFrame', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markDOMContentEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markDOMContentEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isOutermostMainFrame: true,
@@ -461,12 +458,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is false for a MarkDOMContent event that set to isOutermostMainFrame=false', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markDOMContentEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markDOMContentEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isOutermostMainFrame: false,
@@ -478,12 +474,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is false for a MarkDOMContent event that set to isMainFrame=false', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markDOMContentEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markDOMContentEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isMainFrame: false,
@@ -495,12 +490,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is true for a MarkLoad event that set to isMainFrame=true', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markLoadEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markLoadEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkLoad,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isMainFrame: true,
@@ -512,12 +506,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is true for a MarkLCPCandidate event that set to isOutermostMainFrame=true', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markLCPCandidateEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markLCPCandidateEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkLCPCandidate,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isOutermostMainFrame: true,
@@ -529,12 +522,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is true for a MarkLCPInvalidate event that set to isOutermostMainFrame=true', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const markLCPInvalidateEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const markLCPInvalidateEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkLCPInvalidate,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
-        threadId: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         args: {
           data: {
             isOutermostMainFrame: true,
@@ -546,11 +538,11 @@ describeWithEnvironment('TimelineModel', () => {
 
     it('is false for some unrelated event that is never a marker such as an animation', async () => {
       const {timelineModel} = await traceModelFromTraceFile('slow-interaction-button-click.json.gz');
-      const animationEvent = makeEventWithStubbedThread({
-        categories: DevToolsTimelineCategory,
+      const animationEvent = makeFakeSDKEventFromPayload({
+        categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.Animation,
-        phase: SDK.TracingModel.Phase.Complete,
-        startTime: 1,
+        ph: SDK.TracingModel.Phase.Complete,
+        ts: 1,
         threadId: 1,
       });
       assert.isFalse(timelineModel.isMarkerEvent(animationEvent));
@@ -1136,17 +1128,6 @@ describeWithEnvironment('TimelineModel', () => {
         'tid': 1537480,
         'ts': 962633199669,
       },
-      // This last event is out of range.
-      {
-        'args': {},
-        'cat': 'disabled-by-default-devtools.timeline',
-        'dur': 10,
-        'name': 'RunTaskC',
-        'ph': 'X',
-        'pid': 1538739,
-        'tid': 7,
-        'ts': 962633199670,
-      },
     ] as unknown as SDK.TracingManager.EventPayload[]);
     const trackInfo = summarizeArray(timelineModel.tracks());
     assert.deepEqual(trackInfo, [
@@ -1197,7 +1178,12 @@ describeWithEnvironment('TimelineModel', () => {
       if (track.name !== 'Bidder Worklet — https://192.168.0.105') {
         continue;
       }
-      assert.deepEqual(track.events.map(event => event.name), ['RunTaskA', 'RunTaskB']);
+      assert.deepEqual(track.events.map(event => event.name), [
+        'thread_name',  // Metadata event for this worklet
+        // Tasks within this worklet
+        'RunTaskA',
+        'RunTaskB',
+      ]);
     }
   });
 
@@ -1352,5 +1338,213 @@ describeWithEnvironment('TimelineModel', () => {
         'durationTime2',
       ]);
     });
+  });
+
+  describe('style invalidations', () => {
+    /**
+     * This helper function is very confusing without context. It is designed
+     * to work on a trace generated from
+     * https://github.com/ChromeDevTools/performance-stories/tree/main/style-invalidations.
+     * Those examples are triggered by the user clicking on a button to initiate
+     * certain invalidations that we want to test. However, the act of clicking on
+     * the button also triggers an invalidation which we do not necessarily want to
+     * include in our results. So, instead we look for the invalidations triggered
+     * by the test function that was invoked when we clicked the button. Therefore,
+     * this function looks through the trace for all UpdateLayoutTree events, and
+     * looks for one where the function in the stack trace matches what's expected.
+     * We then return all invalidations for that main event.
+     **/
+    async function invalidationsFromTestFunction(
+        timelineModel: TimelineModel.TimelineModel.TimelineModelImpl,
+        testFunctionName: string): Promise<TimelineModel.TimelineModel.InvalidationTrackingEvent[]> {
+      let mainTrack: TimelineModel.TimelineModel.Track|null = null;
+      for (const track of timelineModel.tracks()) {
+        if (track.type === TimelineModel.TimelineModel.TrackType.MainThread && track.forMainFrame) {
+          mainTrack = track;
+        }
+      }
+      assertNotNullOrUndefined(mainTrack);
+      const rootLayoutUpdateEvent = mainTrack.events.find(event => {
+        return event.name === TimelineModel.TimelineModel.RecordType.UpdateLayoutTree &&
+            event.args.beginData?.stackTrace?.[0].functionName === testFunctionName;
+      });
+      assertNotNullOrUndefined(rootLayoutUpdateEvent);
+      const invalidationsForEvent =
+          TimelineModel.TimelineModel.InvalidationTracker.invalidationEventsFor(rootLayoutUpdateEvent);
+      assertNotNullOrUndefined(invalidationsForEvent);
+      return invalidationsForEvent;
+    }
+
+    function invalidationToBasicObject(invalidation: TimelineModel.TimelineModel.InvalidationTrackingEvent) {
+      return {
+        reason: invalidation.cause.reason,
+        nodeName: invalidation.nodeName,
+      };
+    }
+
+    it('detects the correct invalidations for a class name being changed', async () => {
+      const {timelineModel} = await traceModelFromTraceFile('invalidate-style-class-name-change.json.gz');
+      const invalidations = await invalidationsFromTestFunction(timelineModel, 'testFuncs.changeClassNameAndDisplay');
+      // In this trace there are three nodes impacted by the class name change:
+      // the two test divs, and the button, which gains the :active pseudo
+      // class
+      assert.deepEqual(invalidations.map(invalidationToBasicObject), [
+        {
+          reason: 'PseudoClass',
+          nodeName: 'BUTTON id=\'changeClassNameAndDisplay\'',
+        },
+        {
+          reason: 'Element has pending invalidation list',
+          nodeName: 'DIV id=\'testElementOne\' class=\'red\'',
+        },
+        {
+          reason: 'Element has pending invalidation list',
+          nodeName: 'DIV id=\'testElementTwo\' class=\'red\'',
+        },
+      ]);
+    });
+
+    it('detects the correct invalidations for an attribute being changed', async () => {
+      const {timelineModel} = await traceModelFromTraceFile('style-invalidation-change-attribute.json.gz');
+      const invalidations = await invalidationsFromTestFunction(timelineModel, 'testFuncs.changeAttributeAndDisplay');
+      // In this trace there are three nodes impacted by the attribute change:
+      // the two test divs, and the button, which gains the :active pseudo
+      // class when clicked.
+      // However, the two test divs have two invalidations each: one for the attribute, and one for having a pending invalidation list
+      assert.deepEqual(invalidations.map(invalidationToBasicObject), [
+        {
+          reason: 'PseudoClass',
+          nodeName: 'BUTTON id=\'changeAttributeAndDisplay\'',
+        },
+        {
+          reason: 'Attribute',
+          nodeName: 'DIV id=\'testElementFour\'',
+        },
+        {
+          reason: 'Attribute',
+          nodeName: 'DIV id=\'testElementFive\'',
+        },
+        {
+          reason: 'Element has pending invalidation list',
+          nodeName: 'DIV id=\'testElementFour\'',
+        },
+        {
+          reason: 'Element has pending invalidation list',
+          nodeName: 'DIV id=\'testElementFive\'',
+        },
+      ]);
+    });
+    it('detects the correct invalidations for an ID being changed', async () => {
+      const {timelineModel} = await traceModelFromTraceFile('style-invalidation-change-id.json.gz');
+      const invalidations = await invalidationsFromTestFunction(timelineModel, 'testFuncs.changeIdAndDisplay');
+      // In this trace there are three nodes impacted by the ID change:
+      // the two test divs, and the button, which gains the :active pseudo
+      // class
+      assert.deepEqual(invalidations.map(invalidationToBasicObject), [
+        {
+          reason: 'PseudoClass',
+          nodeName: 'BUTTON id=\'changeIdAndDisplay\'',
+        },
+        {
+          reason: 'Element has pending invalidation list',
+          nodeName: 'DIV id=\'testElementFour\'',
+        },
+        {
+          reason: 'Element has pending invalidation list',
+          nodeName: 'DIV id=\'testElementFive\'',
+        },
+      ]);
+    });
+  });
+
+  describe('network events on the track', () => {
+    it('provides the expected set of events', async () => {
+      const {timelineModel} = await traceModelFromTraceFile('lcp-images.json.gz');
+      const requests = timelineModel.networkRequests();
+      const urls = requests.map(request => request.url);
+      assert.deepEqual(urls, [
+        'https://b2607f8b04800100000289cb1c0a82ba72253000000000000000001.proxy.googlers.com/lcp-large-image/',
+        'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,800',
+        'https://b2607f8b04800100000289cb1c0a82ba72253000000000000000001.proxy.googlers.com/lcp-large-image/app.css',
+        'https://via.placeholder.com/50.jpg',
+        'https://via.placeholder.com/3000.jpg',
+      ]);
+    });
+  });
+});
+
+describe('groupLayoutShiftsIntoClusters', () => {
+  it('does not include layout shifts that have recent user input', () => {
+    const shiftWithUserInput = makeFakeLayoutShift({
+      hadRecentInput: true,
+      weightedScoreDelta: 0.01,
+      startTime: 2000,
+    });
+    const layoutShifts: SDK.TracingModel.Event[] = [shiftWithUserInput];
+    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
+    assert.isUndefined(shiftWithUserInput.args.data._current_cluster_id);
+  });
+
+  it('does not include layout shifts that have no weighted_score_delta', () => {
+    const shiftWithNoWeightedScore = makeFakeLayoutShift({
+      hadRecentInput: false,
+      weightedScoreDelta: undefined,
+      startTime: 2000,
+    });
+    const layoutShifts: SDK.TracingModel.Event[] = [shiftWithNoWeightedScore];
+    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
+    assert.isUndefined(shiftWithNoWeightedScore.args.data._current_cluster_id);
+  });
+
+  it('correctly combines events that are within the same session', () => {
+    const shiftOne = makeFakeLayoutShift({
+      hadRecentInput: false,
+      weightedScoreDelta: 0.01,
+      startTime: 2000,
+    });
+
+    const shiftTwo = makeFakeLayoutShift({
+      hadRecentInput: false,
+      weightedScoreDelta: 0.02,
+      startTime: shiftOne.startTime + 100,
+    });
+    const layoutShifts: SDK.TracingModel.Event[] = [shiftOne, shiftTwo];
+    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
+
+    assert.strictEqual(shiftOne.args.data._current_cluster_id, 1);
+    assert.strictEqual(shiftTwo.args.data._current_cluster_id, 1);
+    assert.strictEqual(shiftOne.args.data._current_cluster_score, 0.03);
+    assert.strictEqual(shiftTwo.args.data._current_cluster_score, 0.03);
+  });
+
+  it('correctly splits events into multiple clusters', () => {
+    const shiftOne = makeFakeLayoutShift({
+      hadRecentInput: false,
+      weightedScoreDelta: 0.01,
+      startTime: 2000,
+    });
+
+    const shiftTwo = makeFakeLayoutShift({
+      hadRecentInput: false,
+      weightedScoreDelta: 0.02,
+      startTime: shiftOne.startTime + 100,
+    });
+
+    const shiftThree = makeFakeLayoutShift({
+      hadRecentInput: false,
+      weightedScoreDelta: 0.05,
+      startTime: 10000,
+    });
+
+    const layoutShifts: SDK.TracingModel.Event[] = [shiftOne, shiftTwo, shiftThree];
+    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
+
+    assert.strictEqual(shiftOne.args.data._current_cluster_id, 1);
+    assert.strictEqual(shiftTwo.args.data._current_cluster_id, 1);
+    assert.strictEqual(shiftOne.args.data._current_cluster_score, 0.03);
+    assert.strictEqual(shiftTwo.args.data._current_cluster_score, 0.03);
+
+    assert.strictEqual(shiftThree.args.data._current_cluster_id, 2);
+    assert.strictEqual(shiftThree.args.data._current_cluster_score, 0.05);
   });
 });

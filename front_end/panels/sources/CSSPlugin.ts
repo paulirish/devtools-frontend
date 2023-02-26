@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -252,6 +253,7 @@ function createCSSTooltip(active: ActiveTooltip): CodeMirror.Tooltip {
         spectrum.addEventListener(ColorPicker.Spectrum.Events.SizeChanged, () => view.requestMeasure());
         spectrum.setColor(active.color, active.color.format());
         widget = spectrum;
+        Host.userMetrics.colorPickerOpenedFrom(Host.UserMetrics.ColorPickerOpenedFrom.SourcesPanel);
       } else {
         const spectrum = new InlineEditor.BezierEditor.BezierEditor(active.curve);
         widget = spectrum;
@@ -285,6 +287,7 @@ function createCSSTooltip(active: ActiveTooltip): CodeMirror.Tooltip {
       widget.element.addEventListener('mousedown', event => event.consume());
       return {
         dom,
+        resize: false,
         offset: {x: -8, y: 0},
         mount: (): void => {
           widget.focus();

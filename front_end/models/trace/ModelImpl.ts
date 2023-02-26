@@ -126,6 +126,11 @@ export class Model extends EventTarget {
             this.dispatchEvent(new ModelUpdateEvent({type: ModelUpdateType.TRACE, data: data}));
             break;
           }
+          case 'CONSOLE_DEBUG': {
+            // eslint-disable-next-line no-console
+            console[eventFromWorker.method]('[from TraceWorker]', ...eventFromWorker.args);
+            break;
+          }
           default:
             Platform.assertNever(eventFromWorker, `Unexpected event from the trace worker ${eventFromWorker}`);
         }
@@ -133,7 +138,11 @@ export class Model extends EventTarget {
     });
   }
 
-  traceParsedData(index: number): Handlers.Types.TraceParseData|null {
+  /**
+   * Returns the parsed trace data indexed by the order in which it was stored.
+   * If no index is given, the last stored parsed data is returned.
+   */
+  traceParsedData(index: number = this.#traces.length - 1): Handlers.Types.TraceParseData|null {
     if (!this.#traces[index]) {
       return null;
     }

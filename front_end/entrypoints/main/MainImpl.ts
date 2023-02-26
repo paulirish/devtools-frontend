@@ -313,8 +313,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timelineAsConsoleProfileResultPanel', 'View console.profile() results in the Performance panel for Node.js',
         true);
-    Root.Runtime.experiments.register(
-        'timelineDoNotSkipSystemNodesOfCpuProfile', 'View system nodes of CPUProfile in the Performance panel', true);
 
     // Debugging
     Root.Runtime.experiments.register(
@@ -422,6 +420,7 @@ export class MainImpl {
       'sourcesPrettyPrint',
       Root.Runtime.ExperimentName.DISABLE_COLOR_FORMAT_SETTING,
       Root.Runtime.ExperimentName.BREAKPOINT_VIEW,
+      Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
     ]);
 
     Root.Runtime.experiments.setNonConfigurableExperiments([

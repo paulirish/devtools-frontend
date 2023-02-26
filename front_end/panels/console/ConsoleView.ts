@@ -302,7 +302,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   private readonly linkifier: Components.Linkifier.Linkifier;
   private consoleMessages: ConsoleViewMessage[];
   private consoleGroupStarts: ConsoleGroupViewMessage[];
-  private readonly consoleHistorySetting: Common.Settings.Setting<string[]>;
   private prompt: ConsolePrompt;
   private immediatelyFilterMessagesForTest?: boolean;
   private maybeDirtyWhileMuted?: boolean;
@@ -526,8 +525,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
     this.consoleMessages = [];
     this.consoleGroupStarts = [];
 
-    this.consoleHistorySetting = Common.Settings.Settings.instance().createLocalSetting('consoleHistory', []);
-
     this.prompt = new ConsolePrompt();
     this.prompt.show(this.promptElement);
     this.prompt.element.addEventListener('keydown', this.promptKeyDown.bind(this), true);
@@ -542,8 +539,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
 
     this.consoleHistoryAutocompleteSetting.addChangeListener(this.consoleHistoryAutocompleteChanged, this);
 
-    const historyData = this.consoleHistorySetting.get();
-    this.prompt.history().setHistoryData(historyData);
     this.consoleHistoryAutocompleteChanged();
 
     this.updateFilterStatus();
@@ -629,8 +624,7 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   }
 
   clearHistory(): void {
-    this.consoleHistorySetting.set([]);
-    this.prompt.history().setHistoryData([]);
+    this.prompt.history().clear();
   }
 
   private consoleHistoryAutocompleteChanged(): void {
@@ -1348,7 +1342,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   private commandEvaluated(event: Common.EventTarget.EventTargetEvent<SDK.ConsoleModel.CommandEvaluatedEvent>): void {
     const {data} = event;
     this.prompt.history().pushHistoryItem(data.commandMessage.messageText);
-    this.consoleHistorySetting.set(this.prompt.history().historyData().slice(-persistedHistorySize));
     this.printResult(data.result, data.commandMessage, data.exceptionDetails);
   }
 
@@ -1550,8 +1543,6 @@ globalThis.Console = globalThis.Console || {};
 // @ts-ignore exported for Tests.js
 globalThis.Console.ConsoleView = ConsoleView;
 
-const persistedHistorySize = 300;
-
 export class ConsoleViewFilter {
   private readonly filterChanged: () => void;
   messageLevelFiltersSetting: Common.Settings.Setting<LevelsMask>;
@@ -1701,8 +1692,9 @@ export class ConsoleViewFilter {
 
     const contextMenu = new UI.ContextMenu.ContextMenu(mouseEvent, {
       useSoftMenu: true,
-      x: this.levelMenuButton.element.totalOffsetLeft(),
-      y: this.levelMenuButton.element.totalOffsetTop() + (this.levelMenuButton.element as HTMLElement).offsetHeight,
+      x: this.levelMenuButton.element.getBoundingClientRect().left,
+      y: this.levelMenuButton.element.getBoundingClientRect().top +
+          (this.levelMenuButton.element as HTMLElement).offsetHeight,
     });
     contextMenu.headerSection().appendItem(
         i18nString(UIStrings.default), () => setting.set(ConsoleFilter.defaultLevelsFilterValue()));

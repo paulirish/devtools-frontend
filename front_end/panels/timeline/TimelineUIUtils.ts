@@ -1260,9 +1260,10 @@ export class TimelineUIUtils {
     // Event types used to display CPU Profile.
     eventStyles[type.JSRoot] = new TimelineRecordStyle(i18nString(UIStrings.jsRoot), idle, /* hidden*/ true);
     eventStyles[type.JSFrame] = new TimelineRecordStyle(i18nString(UIStrings.jsFrame), scripting);
-    eventStyles[type.JSIdleFrame] = new TimelineRecordStyle(i18nString(UIStrings.jsIdleFrame), idle);
+    eventStyles[type.JSIdleFrame] = new TimelineRecordStyle(i18nString(UIStrings.jsIdleFrame), idle, /* hidden*/ true);
     // System nodes shoulde be other type. See categories() function in this file (TimelineUIUtils.ts).
-    eventStyles[type.JSSystemFrame] = new TimelineRecordStyle(i18nString(UIStrings.jsSystemFrame), other);
+    eventStyles[type.JSSystemFrame] =
+        new TimelineRecordStyle(i18nString(UIStrings.jsSystemFrame), other, /* hidden*/ true);
 
     eventStyles[type.RequestAnimationFrame] =
         new TimelineRecordStyle(i18nString(UIStrings.requestAnimationFrame), scripting);
@@ -2765,7 +2766,7 @@ export class TimelineUIUtils {
     return eventDivider;
   }
 
-  private static visibleTypes(): string[] {
+  static visibleTypes(): string[] {
     const eventStyles = TimelineUIUtils.initEventStyles();
     const result = [];
     for (const name in eventStyles) {
@@ -2936,17 +2937,6 @@ export class TimelineUIUtils {
         'https://developers.google.com/web/fundamentals/performance/rendering/', i18nString(UIStrings.jank));
     return i18n.i18n.getFormatLocalizedString(
         str_, UIStrings.sLongFrameTimesAreAnIndicationOf, {PH1: durationText, PH2: link});
-  }
-
-  static createFillStyle(
-      context: CanvasRenderingContext2D, width: number, height: number, color0: string, color1: string,
-      color2: string): CanvasGradient {
-    const gradient = context.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, color0);
-    gradient.addColorStop(0.25, color1);
-    gradient.addColorStop(0.75, color1);
-    gradient.addColorStop(1, color2);
-    return gradient;
   }
 
   static quadWidth(quad: number[]): number {
@@ -3525,48 +3515,4 @@ export interface TimelineMarkerStyle {
   dashStyle: number[];
   tall: boolean;
   lowPriority: boolean;
-}
-
-export function assignLayoutShiftsToClusters(layoutShifts: readonly SDK.TracingModel.Event[]): void {
-  const gapTimeInMs = 1000;
-  const limitTimeInMs = 5000;
-  let firstTimestamp = Number.NEGATIVE_INFINITY;
-  let previousTimestamp = Number.NEGATIVE_INFINITY;
-  let currentClusterId = 0;
-  let currentClusterScore = 0;
-  let currentCluster = new Set<SDK.TracingModel.Event>();
-
-  for (const event of layoutShifts) {
-    if (event.args['data']['had_recent_input'] || event.args['data']['weighted_score_delta'] === undefined) {
-      continue;
-    }
-
-    if (event.startTime - firstTimestamp > limitTimeInMs || event.startTime - previousTimestamp > gapTimeInMs) {
-      // This means the event does not fit into the current session/cluster, so we need to start a new cluster.
-      firstTimestamp = event.startTime;
-
-      // Update all the layout shifts we found in this cluster to associate them with the cluster.
-      for (const layoutShift of currentCluster) {
-        layoutShift.args['data']['_current_cluster_score'] = currentClusterScore;
-        layoutShift.args['data']['_current_cluster_id'] = currentClusterId;
-      }
-
-      // Increment the cluster ID and reset the data.
-      currentClusterId += 1;
-      currentClusterScore = 0;
-      currentCluster = new Set();
-    }
-
-    // Store the timestamp of the previous layout shift.
-    previousTimestamp = event.startTime;
-    // Update the score of the current cluster and store this event in that cluster
-    currentClusterScore += event.args['data']['weighted_score_delta'];
-    currentCluster.add(event);
-  }
-
-  // The last cluster we find may not get closed out - so if not, update all the shifts that we associate with it.
-  for (const layoutShift of currentCluster) {
-    layoutShift.args['data']['_current_cluster_score'] = currentClusterScore;
-    layoutShift.args['data']['_current_cluster_id'] = currentClusterId;
-  }
 }

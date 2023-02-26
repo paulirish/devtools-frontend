@@ -11243,9 +11243,11 @@ export namespace Page {
   }
 
   /**
-   * List of Prefetch status, which refers to PreloadingTriggeringOutcome.
+   * Preloading status values, see also PreloadingTriggeringOutcome. This
+   * status is shared by prefetchStatusUpdated and prerenderStatusUpdated.
    */
-  export const enum PrefetchStatus {
+  export const enum PreloadingStatus {
+    Pending = 'Pending',
     Running = 'Running',
     Ready = 'Ready',
     Success = 'Success',
@@ -12295,7 +12297,20 @@ export namespace Page {
      */
     initiatingFrameId: FrameId;
     prefetchUrl: string;
-    status: PrefetchStatus;
+    status: PreloadingStatus;
+  }
+
+  /**
+   * TODO(crbug/1384419): Create a dedicated domain for preloading.
+   * Fired when a prerender attempt is updated.
+   */
+  export interface PrerenderStatusUpdatedEvent {
+    /**
+     * The frame id of the frame initiating prerender.
+     */
+    initiatingFrameId: FrameId;
+    prerenderingUrl: string;
+    status: PreloadingStatus;
   }
 
   export interface LoadEventFiredEvent {
@@ -15353,6 +15368,46 @@ export namespace DeviceAccess {
   export interface DeviceRequestPromptedEvent {
     id: RequestId;
     devices: PromptDevice[];
+  }
+}
+
+export namespace Preload {
+
+  /**
+   * Unique id
+   */
+  export type RuleSetId = OpaqueIdentifier<string, 'Protocol.Preload.RuleSetId'>;
+
+  /**
+   * Corresponds to SpeculationRuleSet
+   */
+  export interface RuleSet {
+    id: RuleSetId;
+    /**
+     * Identifies a document which the rule set is associated with.
+     */
+    loaderId: Network.LoaderId;
+    /**
+     * Source text of JSON representing the rule set. If it comes from
+     * <script> tag, it is the textContent of the node. Note that it is
+     * a JSON for valid case.
+     *
+     * See also:
+     * - https://wicg.github.io/nav-speculation/speculation-rules.html
+     * - https://github.com/WICG/nav-speculation/blob/main/triggers.md
+     */
+    sourceText: string;
+  }
+
+  /**
+   * Upsert. Currently, it is only emitted when a rule set added.
+   */
+  export interface RuleSetUpdatedEvent {
+    ruleSet: RuleSet;
+  }
+
+  export interface RuleSetRemovedEvent {
+    id: RuleSetId;
   }
 }
 

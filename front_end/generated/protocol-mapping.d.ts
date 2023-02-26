@@ -411,6 +411,11 @@ export namespace ProtocolMapping {
      * Fired when a prefetch attempt is updated.
      */
     'Page.prefetchStatusUpdated': [Protocol.Page.PrefetchStatusUpdatedEvent];
+    /**
+     * TODO(crbug/1384419): Create a dedicated domain for preloading.
+     * Fired when a prerender attempt is updated.
+     */
+    'Page.prerenderStatusUpdated': [Protocol.Page.PrerenderStatusUpdatedEvent];
     'Page.loadEventFired': [Protocol.Page.LoadEventFiredEvent];
     /**
      * Fired when same-document navigation happens, e.g. due to history API usage or anchor navigation.
@@ -634,6 +639,11 @@ export namespace ProtocolMapping {
      * selectPrompt or cancelPrompt command.
      */
     'DeviceAccess.deviceRequestPrompted': [Protocol.DeviceAccess.DeviceRequestPromptedEvent];
+    /**
+     * Upsert. Currently, it is only emitted when a rule set added.
+     */
+    'Preload.ruleSetUpdated': [Protocol.Preload.RuleSetUpdatedEvent];
+    'Preload.ruleSetRemoved': [Protocol.Preload.RuleSetRemovedEvent];
     /**
      * Fired when breakpoint is resolved to an actual script and location.
      */
@@ -4068,6 +4078,14 @@ export namespace ProtocolMapping {
      */
     'DeviceAccess.cancelPrompt': {
       paramsType: [Protocol.DeviceAccess.CancelPromptRequest];
+      returnType: void;
+    };
+    'Preload.enable': {
+      paramsType: [];
+      returnType: void;
+    };
+    'Preload.disable': {
+      paramsType: [];
       returnType: void;
     };
     /**

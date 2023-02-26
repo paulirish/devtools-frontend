@@ -253,10 +253,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private numPaletteRowsShown: number;
   private selectedColorPalette!: Common.Settings.Setting<string>;
   private customPaletteSetting!: Common.Settings.Setting<Palette>;
-  private colorOffset?: {
-    left: number,
-    top: number,
-  };
+  private colorOffset?: DOMRect;
   private closeButton?: UI.Toolbar.ToolbarButton;
   private paletteContainerMutable?: boolean;
   private eyeDropperExperimentEnabled?: boolean;
@@ -489,7 +486,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     function positionColor(this: Spectrum, event: Event): void {
       const hsva = this.hsv.slice() as Common.ColorUtils.Color4D;
       const colorPosition = getUpdatedColorPosition(this.colorDragElement, event);
-      this.colorOffset = this.colorElement.totalOffset();
+      this.colorOffset = this.colorElement.getBoundingClientRect();
       hsva[1] = Platform.NumberUtilities.clamp((colorPosition.x - this.colorOffset.left) / this.dragWidth, 0, 1);
       hsva[2] = Platform.NumberUtilities.clamp(1 - (colorPosition.y - this.colorOffset.top) / this.dragHeight, 0, 1);
       this.innerSetColor(hsva, '', undefined /* colorName */, undefined, ChangeSource.Other);
@@ -542,7 +539,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private dragStart(this: Spectrum, callback: (arg0: Event) => void, event: Event): boolean {
-    this.colorOffset = this.colorElement.totalOffset();
+    this.colorOffset = this.colorElement.getBoundingClientRect();
     callback(event);
     return true;
   }
@@ -746,8 +743,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private slotIndexForEvent(event: Event): number {
     const mouseEvent = event as MouseEvent;
-    const localX = mouseEvent.pageX - this.paletteContainer.totalOffsetLeft();
-    const localY = mouseEvent.pageY - this.paletteContainer.totalOffsetTop();
+    const localX = mouseEvent.pageX - this.paletteContainer.getBoundingClientRect().left;
+    const localY = mouseEvent.pageY - this.paletteContainer.getBoundingClientRect().top;
     const col = Math.min(localX / COLOR_CHIP_SIZE | 0, ITEMS_PER_PALETTE_ROW - 1);
     const row = (localY / COLOR_CHIP_SIZE) | 0;
     return Math.min(row * ITEMS_PER_PALETTE_ROW + col, this.customPaletteSetting.get().colors.length - 1);
@@ -755,7 +752,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private isDraggingToBin(event: Event): boolean {
     const mouseEvent = event as MouseEvent;
-    return mouseEvent.pageX > this.deleteIconToolbar.element.totalOffsetLeft();
+    return mouseEvent.pageX > this.deleteIconToolbar.element.getBoundingClientRect().left;
   }
 
   private paletteDragStart(event: Event): boolean {
@@ -774,8 +771,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private paletteDrag(event: Event): void {
     const mouseEvent = event as MouseEvent;
-    if (mouseEvent.pageX < this.paletteContainer.totalOffsetLeft() ||
-        mouseEvent.pageY < this.paletteContainer.totalOffsetTop()) {
+    if (mouseEvent.pageX < this.paletteContainer.getBoundingClientRect().left ||
+        mouseEvent.pageY < this.paletteContainer.getBoundingClientRect().top) {
       return;
     }
     if (!this.dragElement || this.dragHotSpotX === undefined || this.dragHotSpotY === undefined) {
@@ -791,11 +788,11 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     const dragElementTransform =
         'translateX(' + (offsetX - this.dragHotSpotX) + 'px) translateY(' + (offsetY - this.dragHotSpotY) + 'px)';
     this.dragElement.style.transform = isDeleting ? dragElementTransform + ' scale(0.8)' : dragElementTransform;
-    const children = Array.prototype.slice.call(this.paletteContainer.children);
+    const children = [...this.paletteContainer.children];
     const index = children.indexOf(this.dragElement);
-    const swatchOffsets = new Map<Element, {left: number, top: number}>();
+    const swatchOffsets = new Map<Element, DOMRect>();
     for (const swatch of children) {
-      swatchOffsets.set(swatch, swatch.totalOffset());
+      swatchOffsets.set(swatch, swatch.getBoundingClientRect());
     }
 
     if (index !== newIndex) {
@@ -807,7 +804,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         continue;
       }
       const before = swatchOffsets.get(swatch);
-      const after = swatch.totalOffset();
+      const after = swatch.getBoundingClientRect();
       if (before && (before.left !== after.left || before.top !== after.top)) {
         swatch.animate(
             [
@@ -1263,6 +1260,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     await contextMenu.show(event, (format: Common.Color.Format) => {
       const newColor = this.color.as(format);
       this.innerSetColor(newColor, undefined, undefined, format, ChangeSource.Other);
+      Host.userMetrics.colorConvertedFrom(Host.UserMetrics.ColorConvertedFrom.ColorPicker);
     });
     this.isFormatPickerShown = false;
   }

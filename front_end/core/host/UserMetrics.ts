@@ -321,6 +321,21 @@ export class UserMetrics {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.LighthouseModeRun, type, LighthouseModeRun.MaxValue);
   }
+
+  colorConvertedFrom(type: ColorConvertedFrom): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ColorConvertedFrom, type, ColorConvertedFrom.MaxValue);
+  }
+
+  colorPickerOpenedFrom(type: ColorPickerOpenedFrom): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ColorPickerOpenedFrom, type, ColorPickerOpenedFrom.MaxValue);
+  }
+
+  cssPropertyDocumentation(type: CSSPropertyDocumentation): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.CSSPropertyDocumentation, type, CSSPropertyDocumentation.MaxValue);
+  }
 }
 
 /**
@@ -722,7 +737,6 @@ export enum DevtoolsExperiments {
   'timelineAsConsoleProfileResultPanel' = 67,
   'preloadingStatusPanel' = 68,
   'disableColorFormatSetting' = 69,
-  'timelineDoNotSkipSystemNodesOfCpuProfile' = 70,
   // Increment this when new experiments are added.
   'MaxValue' = 71,
 }
@@ -741,6 +755,25 @@ export const enum BreakpointEditDialogRevealedFrom {
   LineGutterContextMenu = 3,
   KeyboardShortcut = 4,
   MaxValue = 5,
+}
+
+export const enum ColorConvertedFrom {
+  ColorSwatch = 0,
+  ColorPicker = 1,
+  MaxValue = 2,
+}
+
+export const enum ColorPickerOpenedFrom {
+  SourcesPanel = 0,
+  StylesPane = 1,
+  MaxValue = 2,
+}
+
+export const enum CSSPropertyDocumentation {
+  Shown = 0,
+  ToggledOn = 1,
+  ToggledOff = 2,
+  MaxValue = 3,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again
