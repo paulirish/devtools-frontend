@@ -109,7 +109,8 @@ export class TimelineJSProfileProcessor {
      * However in some situations (workers), we don't have those trace events.
      * "fake" JSInvocations are created when we have active JSSamples but seemingly no explicit invocation.
      */
-    let fakeJSInvocation = false;
+    let jsInvocationDepth = 0;
+    let isWithinFakeJSInvocation = false;
     const {showAllEvents, showRuntimeCallStats, showNativeFunctions} = config;
 
     /**
@@ -118,9 +119,12 @@ export class TimelineJSProfileProcessor {
      * or, in the fakeJSInvocation case, the JS finished and we're seeing the subsequent event.
      */
     function onStartEvent(e: SDK.TracingModel.Event): void {
-      if (fakeJSInvocation) {
+      if (isWithinFakeJSInvocation) {
         truncateJSStack((lockedJsStackDepth.pop() as number), e.startTime);
-        fakeJSInvocation = false;
+        isWithinFakeJSInvocation = false;
+      }
+      if (isJSInvocationEvent(e)) {
+        jsInvocationDepth++;
       }
       e.ordinal = ++ordinal;
       extractStackTrace(e);
@@ -130,7 +134,7 @@ export class TimelineJSProfileProcessor {
 
     function onInstantEvent(e: SDK.TracingModel.Event, parent: SDK.TracingModel.Event|null): void {
       e.ordinal = ++ordinal;
-      if ((parent && isJSInvocationEvent(parent)) || fakeJSInvocation) {
+      if ((parent && jsInvocationDepth) || isWithinFakeJSInvocation) {
         extractStackTrace(e);
       } else if (
           (e.name === RecordType.JSSample || e.name === RecordType.JSSystemSample ||
@@ -139,7 +143,7 @@ export class TimelineJSProfileProcessor {
         // Force JS Samples to show up even if we are not inside a JS invocation event, because we
         // can be missing the start of JS invocation events if we start tracing half-way through.
         // Pretend we have a top-level JS invocation event.
-        fakeJSInvocation = true;
+        isWithinFakeJSInvocation = true;
         const stackDepthBefore = jsFramesStack.length;
         extractStackTrace(e);
         lockedJsStackDepth.push(stackDepthBefore);
@@ -147,6 +151,9 @@ export class TimelineJSProfileProcessor {
     }
 
     function onEndEvent(e: SDK.TracingModel.Event): void {
+      if (isJSInvocationEvent(e)) {
+        jsInvocationDepth--;
+      }
       truncateJSStack((lockedJsStackDepth.pop() as number), (e.endTime as number));
     }
 
