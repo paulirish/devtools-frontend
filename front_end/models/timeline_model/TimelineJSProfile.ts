@@ -79,8 +79,11 @@ export class TimelineJSProfileProcessor {
     showNativeFunctions: boolean,
   }): SDK.TracingModel.Event[] {
     function equalFrames(frame1: Protocol.Runtime.CallFrame, frame2: Protocol.Runtime.CallFrame): boolean {
-      return frame1.scriptId === frame2.scriptId && frame1.functionName === frame2.functionName &&
+      const bool1 = frame1.scriptId === frame2.scriptId && frame1.functionName === frame2.functionName &&
           frame1.lineNumber === frame2.lineNumber;
+      const bool2 = frame1.callUID === frame2.callUID;
+      if (bool1 !== bool2) { debugger }
+      return bool1;
     }
 
     function isJSInvocationEvent(e: SDK.TracingModel.Event): boolean {
@@ -179,10 +182,9 @@ export class TimelineJSProfileProcessor {
       jsFramesStack.length = depth;
     }
 
-    function showNativeName(name: string): boolean {
-      return showRuntimeCallStats && Boolean(TimelineJSProfileProcessor.nativeGroup(name));
-    }
-
+    /** Filter out native v8 functions unless RuntimeCallStats experiment is on.
+     * showNativeFunctionsInJSProfile is on by default, so those are typically kept.
+     */
     function filterStackFrames(stack: Protocol.Runtime.CallFrame[]): void {
       if (showAllEvents) {
         return;
@@ -197,7 +199,7 @@ export class TimelineJSProfileProcessor {
           continue;
         }
         const isNativeRuntimeFrame = TimelineJSProfileProcessor.isNativeRuntimeFrame(frame);
-        if (isNativeRuntimeFrame && !showNativeName(frame.functionName)) {
+        if (isNativeRuntimeFrame && !showRuntimeCallStats) {
           continue;
         }
         const nativeFrameName =
@@ -211,6 +213,11 @@ export class TimelineJSProfileProcessor {
       stack.length = j;
     }
 
+    /**
+     * Pull out the current JS stack, selectively remove some native call frames,
+     * scoot the right edge of active frames to the right
+     *
+     */
     function extractStackTrace(e: SDK.TracingModel.Event): void {
       const callFrames: Protocol.Runtime.CallFrame[] =
           (e.name === RecordType.JSSample || e.name === RecordType.JSSystemSample ||
@@ -241,6 +248,10 @@ export class TimelineJSProfileProcessor {
           case RecordType.JSSystemSample:
             jsFrameType = RecordType.JSSystemFrame;
             break;
+          case RecordType.JSSample:
+            break;
+          default:
+            debugger;
         }
         const jsFrameEvent = new SDK.TracingModel.ConstructedEvent(
             SDK.TracingModel.DevToolsTimelineEventCategory, jsFrameType, SDK.TracingModel.Phase.Complete, e.startTime,

@@ -188,7 +188,14 @@ export class TimelineModelImpl {
       if (SDK.TracingModel.TracingModel.isAsyncPhase(e.phase) || SDK.TracingModel.TracingModel.isFlowPhase(e.phase)) {
         continue;
       }
+      // hypothesiss: callFrames doesnt include program, but program sticks around in jsFramesStack
+      // off by 1?
+      // program is retained in jsStack but.. its not really stackworthy.
+      if (e.startTime === 79940810.195) {
+        debugger;
+      }
       let last: SDK.TracingModel.Event = stack[stack.length - 1];
+      // Has the previous span ended?
       while (last && last.endTime !== undefined && last.endTime <= e.startTime) {
         stack.pop();
         onEndEvent(last);
