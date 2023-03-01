@@ -281,6 +281,11 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
         (event.args.data.priority as Protocol.Network.ResourcePriority));
     div.style.color = this.#colorForPriority(event.args.data.priority) || 'black';
     contents.createChild('span').textContent = Platform.StringUtilities.trimMiddle(event.args.data.url, maxURLChars);
+
+    // Debug mode: add trace event details to tooltip.
+    const requestClone = {...event};
+    contents.createChild('span').textContent = '\n' + JSON.stringify(requestClone, null, 2).slice(0, 2000);
+
     return element;
   }
 

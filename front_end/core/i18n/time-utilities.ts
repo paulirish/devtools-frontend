@@ -6,11 +6,6 @@ import {getLocalizedString, registerUIStrings} from './i18nImpl.js';
 
 const UIStrings = {
   /**
-   *@description μs is the short form of micro-seconds and the placeholder is a number
-   *@example {2} PH1
-   */
-  fmms: '{PH1} μs',
-  /**
    *@description ms is the short form of milli-seconds and the placeholder is a decimal number
    *@example {2.14} PH1
    */
@@ -54,9 +49,6 @@ export const millisToString = function(ms: number, higherResolution?: boolean): 
     return '0';
   }
 
-  if (higherResolution && ms < 0.1) {
-    return i18nString(UIStrings.fmms, {PH1: (ms * 1000).toFixed(0)});
-  }
   if (higherResolution && ms < 1000) {
     return i18nString(UIStrings.fms, {PH1: (ms).toFixed(2)});
   }

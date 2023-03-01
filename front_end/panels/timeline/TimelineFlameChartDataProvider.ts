@@ -910,6 +910,22 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         title += ` - ${url} [${range}]`;
       }
 
+      // Remove circular references so we can stringify it.
+      const eventClone = {...event};
+      delete eventClone?.children;
+      delete eventClone?.parent;
+      delete eventClone?.thread;
+      delete eventClone.args?.data?.children;
+      delete eventClone.args?.data?.parent;
+      eventClone.args?.data?.stackTrace?.forEach(f => {
+        delete f.children;
+        delete f.parent;
+        delete f.target;
+      });
+      delete eventClone.steps;
+      // Add stringified event to the tooltip.
+      title += '\n' + JSON.stringify(eventClone, null, 2).slice(0, 2000);
+
     } else if (entryType === EntryType.Frame) {
       const frame = (this.entryData[entryIndex] as TimelineModel.TimelineFrameModel.TimelineFrame);
       time = i18n.TimeUtilities.preciseMillisToString(frame.duration, 1);
@@ -926,6 +942,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       } else {
         title = i18nString(UIStrings.frame);
       }
+
+      // Add stringified frame to the tooltip.
+      title += '\n' + JSON.stringify(frame, null, 2).slice(0, 2000);
+
     } else {
       return null;
     }

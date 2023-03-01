@@ -1773,6 +1773,14 @@ export class TimelineUIUtils {
           detailsText = null;
         } else {
           details = this.linkifyTopCallFrame(event, target, linkifier, isFreshRecording);
+          if (!Object.keys(event.args).length) {
+            return details;
+          }
+
+          details = details ?? document.createElement('span');
+          const omg = document.createElement('tt');
+          omg.textContent = Object.keys(event.args).length ? JSON.stringify(event.args, null, 2) : '';
+          details.append(omg);
         }
         break;
       }
@@ -1970,8 +1978,15 @@ export class TimelineUIUtils {
 
     if (detailed && !Number.isNaN(duration || 0)) {
       contentHelper.appendTextRow(
-          i18nString(UIStrings.totalTime), i18n.TimeUtilities.millisToString(duration || 0, true));
-      contentHelper.appendTextRow(i18nString(UIStrings.selfTime), i18n.TimeUtilities.millisToString(selfTime, true));
+          [
+            i18nString(UIStrings.selfTime),
+            i18nString(UIStrings.totalTime),
+          ].join(' / '),
+          [
+            i18n.TimeUtilities.millisToString(duration || 0, true),
+            i18n.TimeUtilities.millisToString(selfTime, true),
+          ].join(' / '),
+      );
     }
 
     if (model.isGenericTrace()) {
