@@ -53,6 +53,7 @@ import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import {ActiveFilters} from './ActiveFilters.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
+import * as Components from './components/components.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
 import {IsolateSelector} from './IsolateSelector.js';
@@ -1310,6 +1311,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
     const reloadButton =
         UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButtonForId('timeline.record-reload'));
+
+    const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
+    centered.appendChild(pageMetrics);
 
     centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
         str_, UIStrings.clickTheRecordButtonSOrHitSTo, {PH1: recordButton, PH2: recordKey}));
