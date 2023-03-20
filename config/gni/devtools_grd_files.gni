@@ -1432,6 +1432,8 @@ grd_files_debug_sources = [
   "front_end/panels/timeline/WebVitalsTimelineUtils.js",
   "front_end/panels/timeline/components/WebVitalsLane.js",
   "front_end/panels/timeline/components/WebVitalsTimeline.js",
+  "front_end/panels/timeline/components/CurrentPageMetrics.js",
+  "front_end/panels/timeline/components/getMetricsInPage.js",
   "front_end/panels/timeline/components/WebVitalsTooltip.css.js",
   "front_end/panels/timeline/components/WebVitalsTooltip.js",
   "front_end/panels/timeline/historyToolbarButton.css.js",
