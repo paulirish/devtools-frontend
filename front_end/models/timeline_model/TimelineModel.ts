@@ -2543,30 +2543,30 @@ export class InvalidationTracker {
 }
 
 export class TimelineAsyncEventTracker {
-  private readonly initiatorByType: Map<RecordType, Map<RecordType, SDK.TracingModel.Event>>;
+  private readonly initiatorMapsByRecordType: Map<RecordType, Map<RecordType, SDK.TracingModel.Event>>;
   constructor() {
     TimelineAsyncEventTracker.initialize();
-    this.initiatorByType = new Map();
-    if (TimelineAsyncEventTracker.asyncEvents) {
-      for (const initiator of TimelineAsyncEventTracker.asyncEvents.keys()) {
-        this.initiatorByType.set(initiator, new Map());
+    this.initiatorMapsByRecordType = new Map();
+    if (TimelineAsyncEventTracker.asyncEventInfo) {
+      for (const initiator of TimelineAsyncEventTracker.asyncEventInfo.keys()) {
+        this.initiatorMapsByRecordType.set(initiator, new Map());
       }
     }
   }
 
   private static initialize(): void {
-    if (TimelineAsyncEventTracker.asyncEvents) {
+    if (TimelineAsyncEventTracker.asyncEventInfo) {
       return;
     }
 
     const events = new Map<RecordType, {
-      causes: RecordType[],
+      subsequents: RecordType[],
       joinBy: string,
     }>();
 
-    events.set(RecordType.TimerInstall, {causes: [RecordType.TimerFire], joinBy: 'timerId'});
+    events.set(RecordType.TimerInstall, {subsequents: [RecordType.TimerFire], joinBy: 'timerId'});
     events.set(RecordType.ResourceSendRequest, {
-      causes: [
+      subsequents: [
         RecordType.ResourceMarkAsCached,
         RecordType.ResourceReceiveResponse,
         RecordType.ResourceReceivedData,
@@ -2574,10 +2574,10 @@ export class TimelineAsyncEventTracker {
       ],
       joinBy: 'requestId',
     });
-    events.set(RecordType.RequestAnimationFrame, {causes: [RecordType.FireAnimationFrame], joinBy: 'id'});
-    events.set(RecordType.RequestIdleCallback, {causes: [RecordType.FireIdleCallback], joinBy: 'id'});
+    events.set(RecordType.RequestAnimationFrame, {subsequents: [RecordType.FireAnimationFrame], joinBy: 'id'});
+    events.set(RecordType.RequestIdleCallback, {subsequents: [RecordType.FireIdleCallback], joinBy: 'id'});
     events.set(RecordType.WebSocketCreate, {
-      causes: [
+      subsequents: [
         RecordType.WebSocketSendHandshakeRequest,
         RecordType.WebSocketReceiveHandshakeResponse,
         RecordType.WebSocketDestroy,
@@ -2591,7 +2591,7 @@ export class TimelineAsyncEventTracker {
       };
 /*
     events.set('BeginFrame', {
-      causes: [
+      subsequents: [
         'PipelineReporter',
         'Graphics.Pipeline',
         'Scheduler::BeginFrame',
@@ -2605,35 +2605,39 @@ export class TimelineAsyncEventTracker {
       joinBy: frameSequenceJoiner,
     });
     */
-   events.set('BeginFrame', {causes: ['PipelineReporter'], joinBy: frameSequenceJoiner});
-   events.set('PipelineReporter', {causes: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
-   events.set('Graphics.Pipeline', {causes: ['Scheduler::BeginFrame'], joinBy: frameSequenceJoiner});
-   events.set('Scheduler::BeginFrame', {causes: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner});
-   events.set('Scheduler::BeginImplFrame', {causes: ['ProxyImpl::ScheduledActionSendBeginMainFrame'], joinBy: frameSequenceJoiner});
-   events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {causes: ['DrawFrame'], joinBy: frameSequenceJoiner}); // todo. link to mainthread instead.
-   events.set('DrawFrame', {causes: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner}); // todo. link to mainthread instead.
+   events.set('BeginFrame', {subsequents: ['PipelineReporter'], joinBy: frameSequenceJoiner});
+   events.set('PipelineReporter', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
+   events.set('Graphics.Pipeline', {subsequents: ['Scheduler::BeginFrame'], joinBy: frameSequenceJoiner});
+   events.set('Scheduler::BeginFrame', {subsequents: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner});
+   events.set('Scheduler::BeginImplFrame', {subsequents: ['ProxyImpl::ScheduledActionSendBeginMainFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {subsequents: ['ProxyMain::BeginMainFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
+  //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
+   events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
+  //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
+   events.set('DrawFrame', {subsequents: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner});
 
 
-    TimelineAsyncEventTracker.asyncEvents = events;
-    TimelineAsyncEventTracker.typeToInitiator = new Map();
+    TimelineAsyncEventTracker.asyncEventInfo = events;
+    TimelineAsyncEventTracker.typeToInitiatorType = new Map();
     for (const entry of events) {
-      const types = entry[1].causes;
+      const types = entry[1].subsequents;
       for (const currentType of types) {
-        TimelineAsyncEventTracker.typeToInitiator.set(currentType, entry[0]);
+        TimelineAsyncEventTracker.typeToInitiatorType.set(currentType, entry[0]);
       }
     }
   }
 
   processEvent(event: SDK.TracingModel.Event): void {
-    if (!TimelineAsyncEventTracker.typeToInitiator || !TimelineAsyncEventTracker.asyncEvents) {
+    if (!TimelineAsyncEventTracker.typeToInitiatorType || !TimelineAsyncEventTracker.asyncEventInfo) {
       return;
     }
-    let initiatorType: RecordType|undefined = TimelineAsyncEventTracker.typeToInitiator.get((event.name as RecordType));
-    const isInitiator = !initiatorType;
+    let initiatorType: RecordType|undefined = TimelineAsyncEventTracker.typeToInitiatorType.get((event.name as RecordType));
+    const isInitiator = !initiatorType; // Isn't denoted a subsequent event type, at least. So it's *possibly* an initiatorType
     if (!initiatorType) {
       initiatorType = (event.name as RecordType);
     }
-    const initiatorInfo = TimelineAsyncEventTracker.asyncEvents.get(initiatorType);
+    const initiatorInfo = TimelineAsyncEventTracker.asyncEventInfo.get(initiatorType);
     if (!initiatorInfo) {
       return;
     }
@@ -2641,23 +2645,23 @@ export class TimelineAsyncEventTracker {
     if (!id) {
       return;
     }
-    const initiatorMap: Map<RecordType, SDK.TracingModel.Event>|undefined = this.initiatorByType.get(initiatorType);
-    if (initiatorMap) {
+    const initiatorMapFromIdToEvent: Map<RecordType, SDK.TracingModel.Event>|undefined = this.initiatorMapsByRecordType.get(initiatorType);
+    if (initiatorMapFromIdToEvent) {
       if (isInitiator) {
-        initiatorMap.set(id, event);
+        initiatorMapFromIdToEvent.set(id, event);
         return;
       }
-      const initiator = initiatorMap.get(id);
+      const initiatorEvent = initiatorMapFromIdToEvent.get(id);
       const timelineData = TimelineData.forEvent(event);
-      timelineData.setInitiator(initiator ? initiator : null);
-      if (!timelineData.frameId && initiator) {
-        timelineData.frameId = TimelineModelImpl.eventFrameId(initiator);
+      timelineData.setInitiator(initiatorEvent ? initiatorEvent : null);
+      if (!timelineData.frameId && initiatorEvent) {
+        timelineData.frameId = TimelineModelImpl.eventFrameId(initiatorEvent);
       }
     }
   }
 
-  private static asyncEvents: Map<RecordType, {causes: RecordType[], joinBy: string}>|null = null;
-  private static typeToInitiator: Map<RecordType, RecordType>|null = null;
+  private static asyncEventInfo: Map<RecordType, {subsequents: RecordType[], joinBy: string}>|null = null;
+  private static typeToInitiatorType: Map<RecordType, RecordType>|null = null;
 }
 
 export class TimelineData {
