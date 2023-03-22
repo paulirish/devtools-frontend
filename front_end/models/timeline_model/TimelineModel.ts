@@ -2585,22 +2585,25 @@ export class TimelineAsyncEventTracker {
       joinBy: 'identifier',
     });
 
+    // all except noted are on compositor thread
+    const frameSequenceJoiner = e => {
+        return e.args.frameSeqId || e.args.args?.sequence_number || e.args.frame_sequence || e.args.chrome_frame_reporter?.frame_sequence || e.args.begin_frame_id;
+      };
+
     events.set('BeginFrame', {
       causes: [
-        'Graphics.Pipeline',
-        'ProxyImpl::ScheduledActionSendBeginMainFrame',
-        'ProxyMain::BeginMainFrame',
-        'Scheduler::BeginImplFrame',
-        'Scheduler::BeginFrame',
-        'DisplayScheduler::BeginFrame',
-        'DrawFrame',
-        'Commit',
         'PipelineReporter',
+        'Graphics.Pipeline',
+        'Scheduler::BeginFrame',
+        'Scheduler::BeginImplFrame',
+        'ProxyImpl::ScheduledActionSendBeginMainFrame',
+        'ProxyMain::BeginMainFrame', // mainthread
+        'Commit', // mainthread
+        'DrawFrame',
+        'DisplayScheduler::BeginFrame',
       ],
-      joinBy: e => {
-        return e.args.frameSeqId || e.args.args?.sequence_number || e.args.frame_sequence || e.args.chrome_frame_reporter?.frame_sequence || e.args.begin_frame_id;
-      }
-    })
+      joinBy: frameSequenceJoiner,
+    });
 
     TimelineAsyncEventTracker.asyncEvents = events;
     TimelineAsyncEventTracker.typeToInitiator = new Map();
