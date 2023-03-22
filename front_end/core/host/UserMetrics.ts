@@ -260,6 +260,11 @@ export class UserMetrics {
     });
   }
 
+  recordingAssertion(value: RecordingAssertion): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.RecordingAssertion, value, RecordingAssertion.MaxValue);
+  }
+
   recordingToggled(value: RecordingToggled): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.RecordingToggled, value, RecordingToggled.MaxValue);
@@ -320,6 +325,21 @@ export class UserMetrics {
   lighthouseModeRun(type: LighthouseModeRun): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.LighthouseModeRun, type, LighthouseModeRun.MaxValue);
+  }
+
+  colorConvertedFrom(type: ColorConvertedFrom): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ColorConvertedFrom, type, ColorConvertedFrom.MaxValue);
+  }
+
+  colorPickerOpenedFrom(type: ColorPickerOpenedFrom): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ColorPickerOpenedFrom, type, ColorPickerOpenedFrom.MaxValue);
+  }
+
+  cssPropertyDocumentation(type: CSSPropertyDocumentation): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.CSSPropertyDocumentation, type, CSSPropertyDocumentation.MaxValue);
   }
 }
 
@@ -399,7 +419,12 @@ export enum Action {
   CaptureTestProtocolClicked = 57,
   BreakpointRemovedFromRemoveButton = 58,
   BreakpointGroupExpandedStateChanged = 59,
-  MaxValue = 60,
+  HeaderOverrideFileCreated = 60,
+  HeaderOverrideEnableEditingClicked = 61,
+  HeaderOverrideHeaderAdded = 62,
+  HeaderOverrideHeaderEdited = 63,
+  HeaderOverrideHeaderRemoved = 64,
+  MaxValue = 65,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -681,11 +706,9 @@ export enum DevtoolsExperiments {
   'applyCustomStylesheet' = 0,
   'captureNodeCreationStacks' = 1,
   'sourcesPrettyPrint' = 2,
-  'inputEventsOnTimelineOverview' = 10,
   'liveHeapProfile' = 11,
   'protocolMonitor' = 13,
   'developerResourcesView' = 15,
-  'recordCoverageWithPerformanceTracing' = 16,
   'samplingHeapProfilerTimeline' = 17,
   'showOptionToExposeInternalsInHeapSnapshot' = 18,
   'sourceOrderViewer' = 20,
@@ -694,7 +717,6 @@ export enum DevtoolsExperiments {
   'timelineInvalidationTracking' = 26,
   'timelineShowAllEvents' = 27,
   'timelineV8RuntimeCallStats' = 28,
-  'timelineReplayEvent' = 30,
   'wasmDWARFDebugging' = 31,
   'dualScreenSupport' = 32,
   'keyboardShortcutEditor' = 35,
@@ -718,13 +740,14 @@ export enum DevtoolsExperiments {
   'authoredDeployedGrouping' = 63,
   'importantDOMProperties' = 64,
   'justMyCode' = 65,
-  'breakpointView' = 66,
   'timelineAsConsoleProfileResultPanel' = 67,
   'preloadingStatusPanel' = 68,
   'disableColorFormatSetting' = 69,
-  'timelineDoNotSkipSystemNodesOfCpuProfile' = 70,
+  'outermostTargetSelector' = 71,
+  'jsProfilerTemporarilyEnable' = 72,
+
   // Increment this when new experiments are added.
-  'MaxValue' = 71,
+  'MaxValue' = 73,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -743,6 +766,25 @@ export const enum BreakpointEditDialogRevealedFrom {
   MaxValue = 5,
 }
 
+export const enum ColorConvertedFrom {
+  ColorSwatch = 0,
+  ColorPicker = 1,
+  MaxValue = 2,
+}
+
+export const enum ColorPickerOpenedFrom {
+  SourcesPanel = 0,
+  StylesPane = 1,
+  MaxValue = 2,
+}
+
+export const enum CSSPropertyDocumentation {
+  Shown = 0,
+  ToggledOn = 1,
+  ToggledOff = 2,
+  MaxValue = 3,
+}
+
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum IssueExpanded {
@@ -752,7 +794,8 @@ export enum IssueExpanded {
   HeavyAd = 3,
   ContentSecurityPolicy = 4,
   Other = 5,
-  MaxValue = 6,
+  Generic = 6,
+  MaxValue = 7,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -843,7 +886,18 @@ export enum IssueCreated {
   'ClientHintIssue::MetaTagAllowListInvalidOrigin' = 61,
   'ClientHintIssue::MetaTagModifiedHTML' = 62,
   'CorsIssue::PreflightAllowPrivateNetworkError' = 63,
-  MaxValue = 64,
+  'GenericIssue::CrossOriginPortalPostMessageError' = 64,
+  'GenericIssue::LabelForNameError' = 65,
+  'GenericIssue::DuplicateIdForInputError' = 66,
+  'GenericIssue::InputWithNoLabelError' = 67,
+  'GenericIssue::AutocompleteAttributeEmptyError' = 68,
+  'GenericIssue::EmptyIdAndNameAttributesForInputError' = 69,
+  'GenericIssue::AriaLabelledByToNonExistingId' = 70,
+  'GenericIssue::InputAssignedAutocompleteValueToIdOrNameAttributeError' = 71,
+  'GenericIssue::LabelHasNeitherForNorNestedInput' = 72,
+  'GenericIssue::LabelForMatchesNonExistingIdError' = 73,
+  'GenericIssue::HasPasswordFieldWithoutUsernameFieldError' = 74,
+  MaxValue = 75,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -1004,6 +1058,15 @@ export enum RecordingToggled {
 
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
+export enum RecordingAssertion {
+  AssertionAdded = 1,
+  PropertyAssertionEdited = 2,
+  AttributeAssertionEdited = 3,
+  MaxValue = 4,
+}
+
+// TODO(crbug.com/1167717): Make this a const enum again
+// eslint-disable-next-line rulesdir/const_enum
 export enum RecordingReplayFinished {
   Success = 1,
   TimeoutErrorSelectors = 2,
@@ -1027,7 +1090,8 @@ export enum RecordingReplaySpeed {
 export enum RecordingReplayStarted {
   ReplayOnly = 1,
   ReplayWithPerformanceTracing = 2,
-  MaxValue = 3,
+  ReplayViaExtension = 3,
+  MaxValue = 4,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -1132,7 +1196,8 @@ export enum CSSHintType {
   ZIndex = 10,
   Sizing = 11,
   FlexOrGridItem = 12,
-  MaxValue = 13,
+  FontVariationSettings = 13,
+  MaxValue = 14,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

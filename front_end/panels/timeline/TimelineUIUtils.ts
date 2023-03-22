@@ -39,9 +39,11 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import * as TraceEngine from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+
 import type * as Protocol from '../../generated/protocol.js';
 import invalidationsTreeStyles from './invalidationsTree.css.js';
 // eslint-disable-next-line rulesdir/es_modules_import
@@ -95,6 +97,11 @@ const UIStrings = {
    *@description Text in Timeline UIUtils of the Performance panel
    */
   drawFrame: 'Draw Frame',
+  /**
+   *@description Noun for an event in the Performance panel. This marks time
+   spent in an operation that only happens when the profiler is active.
+   */
+  profilingOverhead: 'Profiling Overhead',
   /**
    *@description The process the browser uses to determine a target element for a
    *pointer event. Typically, this is determined by considering the pointer's
@@ -360,9 +367,21 @@ const UIStrings = {
    */
   minorGc: 'Minor GC',
   /**
-   *@description Event category in the Performance panel for time spent to execute JavaScript
+   *@description Event category in the Performance panel for root node in CPUProfile
+   */
+  jsRoot: 'JS Root',
+  /**
+   *@description Event category in the Performance panel for JavaScript nodes in CPUProfile
    */
   jsFrame: 'JS Frame',
+  /**
+   *@description Event category in the Performance panel for idle nodes in CPUProfile
+   */
+  jsIdleFrame: 'JS Idle Frame',
+  /**
+   *@description Event category in the Performance panel for system nodes in CPUProfile
+   */
+  jsSystemFrame: 'JS System Frame',
   /**
    *@description Text for the request animation frame event
    */
@@ -419,10 +438,6 @@ const UIStrings = {
    *@description Event category in the Performance panel for time spent in the GPU
    */
   gpu: 'GPU',
-  /**
-   *@description Text in Timeline UIUtils of the Performance panel
-   */
-  inputLatency: 'Input Latency',
   /**
    *@description Event category in the Performance panel for time spent to perform Garbage Collection for the Document Object Model
    */
@@ -784,10 +799,6 @@ const UIStrings = {
    *@description Label for Cumulative Layout records, indicating where they moved to
    */
   movedTo: 'Moved to',
-  /**
-   *@description Text in Timeline UIUtils of the Performance panel
-   */
-  timeWaitingForMainThread: 'Time Waiting for Main Thread',
   /**
    *@description Text in Timeline UIUtils of the Performance panel
    */
@@ -1158,6 +1169,7 @@ export class TimelineUIUtils {
     const eventStyles: EventStylesMap = {};
     eventStyles[type.Task] = new TimelineRecordStyle(i18nString(UIStrings.task), other);
     eventStyles[type.Program] = new TimelineRecordStyle(i18nString(UIStrings.other), other);
+    eventStyles[type.StartProfiling] = new TimelineRecordStyle(UIStrings.profilingOverhead, other);
     eventStyles[type.Animation] = new TimelineRecordStyle(i18nString(UIStrings.animation), rendering);
     eventStyles[type.EventDispatch] = new TimelineRecordStyle(i18nString(UIStrings.event), scripting);
     eventStyles[type.RequestMainThreadFrame] =
@@ -1238,7 +1250,15 @@ export class TimelineUIUtils {
     eventStyles[type.GCEvent] = new TimelineRecordStyle(i18nString(UIStrings.gcEvent), scripting);
     eventStyles[type.MajorGC] = new TimelineRecordStyle(i18nString(UIStrings.majorGc), scripting);
     eventStyles[type.MinorGC] = new TimelineRecordStyle(i18nString(UIStrings.minorGc), scripting);
+
+    // Event types used to display CPU Profile.
+    eventStyles[type.JSRoot] = new TimelineRecordStyle(i18nString(UIStrings.jsRoot), idle, /* hidden*/ true);
     eventStyles[type.JSFrame] = new TimelineRecordStyle(i18nString(UIStrings.jsFrame), scripting);
+    eventStyles[type.JSIdleFrame] = new TimelineRecordStyle(i18nString(UIStrings.jsIdleFrame), idle, /* hidden*/ true);
+    // System nodes shoulde be other type. See categories() function in this file (TimelineUIUtils.ts).
+    eventStyles[type.JSSystemFrame] =
+        new TimelineRecordStyle(i18nString(UIStrings.jsSystemFrame), other, /* hidden*/ true);
+
     eventStyles[type.RequestAnimationFrame] =
         new TimelineRecordStyle(i18nString(UIStrings.requestAnimationFrame), scripting);
     eventStyles[type.CancelAnimationFrame] =
@@ -1259,7 +1279,6 @@ export class TimelineUIUtils {
     eventStyles[type.DecodeImage] = new TimelineRecordStyle(i18nString(UIStrings.imageDecode), painting);
     eventStyles[type.ResizeImage] = new TimelineRecordStyle(i18nString(UIStrings.imageResize), painting);
     eventStyles[type.GPUTask] = new TimelineRecordStyle(i18nString(UIStrings.gpu), categories['gpu']);
-    eventStyles[type.LatencyInfo] = new TimelineRecordStyle(i18nString(UIStrings.inputLatency), scripting);
 
     eventStyles[type.GCCollectGarbage] = new TimelineRecordStyle(i18nString(UIStrings.domGc), scripting);
 
@@ -1315,20 +1334,20 @@ export class TimelineUIUtils {
     appendObjectProperties(traceEvent.args, 2);
     return regExp.test(tokens.join('|'));
 
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function appendObjectProperties(object: any, depth: number): void {
+    interface ContentObject {
+      [x: string]: number|string|ContentObject;
+    }
+    function appendObjectProperties(object: ContentObject, depth: number): void {
       if (!depth) {
         return;
       }
       for (const key in object) {
         const value = object[key];
-        const type = typeof value;
-        if (type === 'string') {
+        if (typeof value === 'string') {
           tokens.push(value);
-        } else if (type === 'number') {
+        } else if (typeof value === 'number') {
           tokens.push(String(value));
-        } else if (type === 'object') {
+        } else if (typeof value === 'object' && value !== null) {
           appendObjectProperties(value, depth - 1);
         }
       }
@@ -1355,6 +1374,7 @@ export class TimelineUIUtils {
     }
 
     let result: TimelineRecordStyle = eventStyles[event.name];
+    // If there's no defined RecordStyle for this event, define as other & hidden.
     if (!result) {
       result = new TimelineRecordStyle(event.name, TimelineUIUtils.categories()['other'], true);
       eventStyles[event.name] = result;
@@ -1363,7 +1383,7 @@ export class TimelineUIUtils {
   }
 
   static eventColor(event: SDK.TracingModel.Event): string {
-    if (event.name === TimelineModel.TimelineModel.RecordType.JSFrame) {
+    if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {
         return TimelineUIUtils.colorForId(frame.url);
@@ -1387,7 +1407,7 @@ export class TimelineUIUtils {
   static eventTitle(event: SDK.TracingModel.Event): string {
     const recordType = TimelineModel.TimelineModel.RecordType;
     const eventData = event.args['data'];
-    if (event.name === recordType.JSFrame) {
+    if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       return TimelineUIUtils.frameDisplayName(eventData);
     }
 
@@ -1475,7 +1495,10 @@ export class TimelineUIUtils {
           detailsText = eventData.url + ':' + (eventData.lineNumber + 1) + ':' + (eventData.columnNumber + 1);
         }
         break;
+      case recordType.JSRoot:
       case recordType.JSFrame:
+      case recordType.JSIdleFrame:
+      case recordType.JSSystemFrame:
         detailsText = TimelineUIUtils.frameDisplayName(eventData);
         break;
       case recordType.EventDispatch:
@@ -1640,7 +1663,10 @@ export class TimelineUIUtils {
         break;
       }
 
+      case recordType.JSRoot:
       case recordType.FunctionCall:
+      case recordType.JSIdleFrame:
+      case recordType.JSSystemFrame:
       case recordType.JSFrame: {
         details = document.createElement('span');
         UI.UIUtils.createTextChild(details, TimelineUIUtils.frameDisplayName(eventData));
@@ -1736,16 +1762,19 @@ export class TimelineUIUtils {
     return UI.Fragment.html`<div>${UI.XLink.XLink.create(link, i18nString(UIStrings.learnMore))} about ${name}.</div>`;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static buildConsumeCacheDetails(eventData: any, contentHelper: TimelineDetailsContentHelper): void {
-    if ('consumedCacheSize' in eventData) {
+  static buildConsumeCacheDetails(
+      eventData: {
+        consumedCacheSize?: number,
+        cacheRejected?: boolean,
+      },
+      contentHelper: TimelineDetailsContentHelper): void {
+    if (typeof eventData.consumedCacheSize === 'number') {
       contentHelper.appendTextRow(
           i18nString(UIStrings.compilationCacheStatus), i18nString(UIStrings.scriptLoadedFromCache));
       contentHelper.appendTextRow(
           i18nString(UIStrings.compilationCacheSize),
-          Platform.NumberUtilities.bytesToString(eventData['consumedCacheSize']));
-    } else if (eventData && 'cacheRejected' in eventData && eventData['cacheRejected']) {
+          Platform.NumberUtilities.bytesToString(eventData.consumedCacheSize));
+    } else if ('cacheRejected' in eventData && eventData['cacheRejected']) {
       // Version mismatch or similar.
       contentHelper.appendTextRow(
           i18nString(UIStrings.compilationCacheStatus), i18nString(UIStrings.failedToLoadScriptFromCache));
@@ -1857,7 +1886,10 @@ export class TimelineUIUtils {
         break;
       }
 
+      case recordTypes.JSRoot:
       case recordTypes.JSFrame:
+      case recordTypes.JSIdleFrame:
+      case recordTypes.JSSystemFrame:
       case recordTypes.FunctionCall: {
         const detailsNode =
             await TimelineUIUtils.buildDetailsNodeForTraceEvent(event, model.targetByEvent(event), linkifier);
@@ -2090,7 +2122,7 @@ export class TimelineUIUtils {
       }
 
       case recordTypes.Animation: {
-        if (event.phase === SDK.TracingModel.Phase.NestableAsyncInstant) {
+        if (event.phase === TraceEngine.Types.TraceEvents.Phase.ASYNC_NESTABLE_INSTANT) {
           contentHelper.appendTextRow(i18nString(UIStrings.state), eventData['state']);
         }
         break;
@@ -2200,12 +2232,6 @@ export class TimelineUIUtils {
         }
         break;
       }
-    }
-
-    if (timelineData.timeWaitingForMainThread) {
-      contentHelper.appendTextRow(
-          i18nString(UIStrings.timeWaitingForMainThread),
-          i18n.TimeUtilities.millisToString(timelineData.timeWaitingForMainThread, true));
     }
 
     for (let i = 0; i < timelineData.backendNodeIds.length; ++i) {
@@ -2681,7 +2707,7 @@ export class TimelineUIUtils {
         total[categoryName] = (total[categoryName] || 0) + nextEvent.selfTime;
       }
     }
-    if (SDK.TracingModel.TracingModel.isAsyncPhase(event.phase)) {
+    if (TraceEngine.Types.TraceEvents.isAsyncPhase(event.phase)) {
       if (event.endTime) {
         let aggregatedTotal = 0;
         for (const categoryName in total) {
@@ -2743,7 +2769,7 @@ export class TimelineUIUtils {
     return eventDivider;
   }
 
-  private static visibleTypes(): string[] {
+  static visibleTypes(): string[] {
     const eventStyles = TimelineUIUtils.initEventStyles();
     const result = [];
     for (const name in eventStyles) {
@@ -2914,17 +2940,6 @@ export class TimelineUIUtils {
         'https://developers.google.com/web/fundamentals/performance/rendering/', i18nString(UIStrings.jank));
     return i18n.i18n.getFormatLocalizedString(
         str_, UIStrings.sLongFrameTimesAreAnIndicationOf, {PH1: durationText, PH2: link});
-  }
-
-  static createFillStyle(
-      context: CanvasRenderingContext2D, width: number, height: number, color0: string, color1: string,
-      color2: string): CanvasGradient {
-    const gradient = context.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, color0);
-    gradient.addColorStop(0.25, color1);
-    gradient.addColorStop(0.75, color1);
-    gradient.addColorStop(1, color2);
-    return gradient;
   }
 
   static quadWidth(quad: number[]): number {
@@ -3503,48 +3518,4 @@ export interface TimelineMarkerStyle {
   dashStyle: number[];
   tall: boolean;
   lowPriority: boolean;
-}
-
-export function assignLayoutShiftsToClusters(layoutShifts: readonly SDK.TracingModel.Event[]): void {
-  const gapTimeInMs = 1000;
-  const limitTimeInMs = 5000;
-  let firstTimestamp = Number.NEGATIVE_INFINITY;
-  let previousTimestamp = Number.NEGATIVE_INFINITY;
-  let currentClusterId = 0;
-  let currentClusterScore = 0;
-  let currentCluster = new Set<SDK.TracingModel.Event>();
-
-  for (const event of layoutShifts) {
-    if (event.args['data']['had_recent_input'] || event.args['data']['weighted_score_delta'] === undefined) {
-      continue;
-    }
-
-    if (event.startTime - firstTimestamp > limitTimeInMs || event.startTime - previousTimestamp > gapTimeInMs) {
-      // This means the event does not fit into the current session/cluster, so we need to start a new cluster.
-      firstTimestamp = event.startTime;
-
-      // Update all the layout shifts we found in this cluster to associate them with the cluster.
-      for (const layoutShift of currentCluster) {
-        layoutShift.args['data']['_current_cluster_score'] = currentClusterScore;
-        layoutShift.args['data']['_current_cluster_id'] = currentClusterId;
-      }
-
-      // Increment the cluster ID and reset the data.
-      currentClusterId += 1;
-      currentClusterScore = 0;
-      currentCluster = new Set();
-    }
-
-    // Store the timestamp of the previous layout shift.
-    previousTimestamp = event.startTime;
-    // Update the score of the current cluster and store this event in that cluster
-    currentClusterScore += event.args['data']['weighted_score_delta'];
-    currentCluster.add(event);
-  }
-
-  // The last cluster we find may not get closed out - so if not, update all the shifts that we associate with it.
-  for (const layoutShift of currentCluster) {
-    layoutShift.args['data']['_current_cluster_score'] = currentClusterScore;
-    layoutShift.args['data']['_current_cluster_id'] = currentClusterId;
-  }
 }

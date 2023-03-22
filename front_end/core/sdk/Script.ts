@@ -33,7 +33,7 @@ import type * as Platform from '../../core/platform/platform.js';
 import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 
-import {Location, type DebuggerModel} from './DebuggerModel.js';
+import {Location, type DebuggerModel, COND_BREAKPOINT_SOURCE_URL, LOGPOINT_SOURCE_URL} from './DebuggerModel.js';
 import {type FrameAssociated} from './FrameAssociated.js';
 import {type PageResourceLoadInitiator} from './PageResourceLoader.js';
 import {ResourceTreeModel} from './ResourceTreeModel.js';
@@ -52,6 +52,11 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('core/sdk/Script.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+let scriptCacheInstance: {
+  cache: Map<string, WeakRef<Promise<TextUtils.ContentProvider.DeferredContent>>>,
+  registry: FinalizationRegistry<string>,
+}|null = null;
 
 export class Script implements TextUtils.ContentProvider.ContentProvider, FrameAssociated {
   debuggerModel: DebuggerModel;
@@ -242,19 +247,53 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
 
   requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
     if (!this.#contentPromise) {
-      this.#contentPromise = (async(): Promise<TextUtils.ContentProvider.DeferredContent> => {
-        if (!this.scriptId) {
-          return {content: null, error: i18nString(UIStrings.scriptRemovedOrDeleted), isEncoded: false};
+      const fileSizeToCache = 65535;  // We won't bother cacheing files under 64K
+      if (this.hash && !this.#isLiveEditInternal && this.contentLength > fileSizeToCache) {
+        // For large files that aren't live edits and have a hash, we keep a content-addressed cache
+        // so we don't need to load multiple copies or disassemble wasm modules multiple times.
+        if (!scriptCacheInstance) {
+          // Initialize script cache singleton. Add a finalizer for removing keys from the map.
+          scriptCacheInstance = {
+            cache: new Map(),
+            registry: new FinalizationRegistry(hashCode => scriptCacheInstance?.cache.delete(hashCode)),
+          };
         }
-        try {
-          return this.isWasm() ? await this.loadWasmContent() : await this.loadTextContent();
-        } catch (err) {
-          // TODO(bmeurer): Propagate errors as exceptions / rejections.
-          return {content: null, error: i18nString(UIStrings.unableToFetchScriptSource), isEncoded: false};
+        // This key should be sufficient to identify scripts that are known to have the same content.
+        const fullHash = [
+          this.#language,
+          this.contentLength,
+          this.lineOffset,
+          this.columnOffset,
+          this.endLine,
+          this.endColumn,
+          this.#codeOffsetInternal,
+          this.hash,
+        ].join(':');
+        const cachedContentPromise = scriptCacheInstance.cache.get(fullHash)?.deref();
+        if (cachedContentPromise) {
+          this.#contentPromise = cachedContentPromise;
+        } else {
+          this.#contentPromise = this.requestContentInternal();
+          scriptCacheInstance.cache.set(fullHash, new WeakRef(this.#contentPromise));
+          scriptCacheInstance.registry.register(this.#contentPromise, fullHash);
         }
-      })();
+      } else {
+        this.#contentPromise = this.requestContentInternal();
+      }
     }
     return this.#contentPromise;
+  }
+
+  private async requestContentInternal(): Promise<TextUtils.ContentProvider.DeferredContent> {
+    if (!this.scriptId) {
+      return {content: null, error: i18nString(UIStrings.scriptRemovedOrDeleted), isEncoded: false};
+    }
+    try {
+      return this.isWasm() ? await this.loadWasmContent() : await this.loadTextContent();
+    } catch (err) {
+      // TODO(bmeurer): Propagate errors as exceptions / rejections.
+      return {content: null, error: i18nString(UIStrings.unableToFetchScriptSource), isEncoded: false};
+    }
   }
 
   async getWasmBytecode(): Promise<ArrayBuffer> {
@@ -355,6 +394,13 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
     // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
     // @ts-expect-error
     return this[frameIdSymbol];
+  }
+
+  /**
+   * @returns true, iff this script originates from a breakpoint/logpoint condition
+   */
+  get isBreakpointCondition(): boolean {
+    return [COND_BREAKPOINT_SOURCE_URL, LOGPOINT_SOURCE_URL].includes(this.sourceURL);
   }
 
   createPageResourceLoadInitiator(): PageResourceLoadInitiator {

@@ -18,6 +18,11 @@ const UIStrings = {
    *@description Text in Filtered UISource Code List Provider of the Sources panel
    */
   noFilesFound: 'No files found',
+  /**
+   *@description Name of an item that is on the ignore list
+   *@example {compile.html} PH1
+   */
+  sIgnoreListed: '{PH1} (ignore listed)',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/FilteredUISourceCodeListProvider.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -26,7 +31,7 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
   private defaultScores: Map<Workspace.UISourceCode.UISourceCode, number>|null;
   private scorer: FilePathScoreFunction;
   private uiSourceCodes: Workspace.UISourceCode.UISourceCode[];
-  private readonly uiSourceCodeUrls: Set<string>;
+  private readonly uiSourceCodeIds: Set<string>;
   private query!: string;
   constructor() {
     super();
@@ -36,7 +41,7 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
     this.scorer = new FilePathScoreFunction('');
 
     this.uiSourceCodes = [];
-    this.uiSourceCodeUrls = new Set();
+    this.uiSourceCodeIds = new Set();
   }
 
   private projectRemoved(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
@@ -47,13 +52,13 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
 
   private populate(skipProject?: Workspace.Workspace.Project): void {
     this.uiSourceCodes = [];
-    this.uiSourceCodeUrls.clear();
+    this.uiSourceCodeIds.clear();
     for (const project of Workspace.Workspace.WorkspaceImpl.instance().projects()) {
       if (project !== skipProject && this.filterProject(project)) {
         for (const uiSourceCode of project.uiSourceCodes()) {
           if (this.filterUISourceCode(uiSourceCode)) {
             this.uiSourceCodes.push(uiSourceCode);
-            this.uiSourceCodeUrls.add(uiSourceCode.url());
+            this.uiSourceCodeIds.add(uiSourceCode.canononicalScriptId());
           }
         }
       }
@@ -61,7 +66,7 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
   }
 
   private filterUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
-    if (this.uiSourceCodeUrls.has(uiSourceCode.url())) {
+    if (this.uiSourceCodeIds.has(uiSourceCode.canononicalScriptId())) {
       return false;
     }
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.JUST_MY_CODE) &&
@@ -118,9 +123,16 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
     }
 
     let contentTypeBonus = 0;
-    if (uiSourceCode.contentType().isFromSourceMap()) {
+    if (uiSourceCode.contentType().isFromSourceMap() && !uiSourceCode.isKnownThirdParty()) {
       contentTypeBonus = 100;
-      // Maybe also have a bonus for being a script?
+    }
+    if (uiSourceCode.contentType().isScript()) {
+      // Bonus points for being a script if it is not ignore-listed. Note
+      // that ignore listing logic does not apply to non-scripts.
+      if (!Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
+              uiSourceCode)) {
+        contentTypeBonus += 50;
+      }
     }
 
     const fullDisplayName = uiSourceCode.fullDisplayName();
@@ -134,10 +146,19 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
     const indexes: number[] = [];
     new FilePathScoreFunction(query).calculateScore(fullDisplayName, indexes);
     const fileNameIndex = fullDisplayName.lastIndexOf('/');
+    const isIgnoreListed =
+        Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(uiSourceCode);
+    let tooltipText = fullDisplayName;
+
+    if (isIgnoreListed) {
+      titleElement.parentElement?.classList.add('is-ignore-listed');
+      tooltipText = i18nString(UIStrings.sIgnoreListed, {PH1: tooltipText});
+    }
 
     titleElement.textContent = uiSourceCode.displayName() + (this.queryLineNumberAndColumnNumber || '');
     this.renderSubtitleElement(subtitleElement, fullDisplayName.substring(0, fileNameIndex + 1));
-    UI.Tooltip.Tooltip.install((subtitleElement as HTMLElement), fullDisplayName);
+    UI.Tooltip.Tooltip.install((subtitleElement as HTMLElement), tooltipText);
+
     const ranges = [];
     for (let i = 0; i < indexes.length; ++i) {
       ranges.push({offset: indexes[i], length: 1});
@@ -201,7 +222,7 @@ export class FilteredUISourceCodeListProvider extends QuickOpen.FilteredListWidg
       return;
     }
     this.uiSourceCodes.push(uiSourceCode);
-    this.uiSourceCodeUrls.add(uiSourceCode.url());
+    this.uiSourceCodeIds.add(uiSourceCode.canononicalScriptId());
     this.refresh();
   }
 

@@ -364,11 +364,8 @@ export class DebuggerModel extends SDKModel<EventTypes> {
 
   private pauseOnExceptionStateChanged(): void {
     const pauseOnCaughtEnabled = Common.Settings.Settings.instance().moduleSetting('pauseOnCaughtException').get();
-    const breakpointViewExperimentEnabled =
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW);
     let state: Protocol.Debugger.SetPauseOnExceptionsRequestState;
 
-    if (breakpointViewExperimentEnabled) {
       const pauseOnUncaughtEnabled =
           Common.Settings.Settings.instance().moduleSetting('pauseOnUncaughtException').get();
       if (pauseOnCaughtEnabled && pauseOnUncaughtEnabled) {
@@ -380,15 +377,6 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       } else {
         state = Protocol.Debugger.SetPauseOnExceptionsRequestState.None;
       }
-    } else {
-      if (!Common.Settings.Settings.instance().moduleSetting('pauseOnExceptionEnabled').get()) {
-        state = Protocol.Debugger.SetPauseOnExceptionsRequestState.None;
-      } else if (pauseOnCaughtEnabled) {
-        state = Protocol.Debugger.SetPauseOnExceptionsRequestState.All;
-      } else {
-        state = Protocol.Debugger.SetPauseOnExceptionsRequestState.Uncaught;
-      }
-    }
     void this.agent.invoke_setPauseOnExceptions({state});
   }
 
@@ -1516,8 +1504,17 @@ interface PausedOnInstrumentationData {
   scriptId: Protocol.Runtime.ScriptId;
 }
 
+export const enum BreakpointType {
+  LOGPOINT = 'LOGPOINT',
+  CONDITIONAL_BREAKPOINT = 'CONDITIONAL_BREAKPOINT',
+  REGULAR_BREAKPOINT = 'REGULAR_BREAKPOINT',
+}
+
 /**
  * A breakpoint condition as sent to V8. This helps distinguish
  * the breakpoint condition as it is entered by the user.
  */
 export type BackendCondition = Platform.Brand.Brand<string, 'BackendCondition'>;
+
+export const LOGPOINT_SOURCE_URL = 'debugger://logpoint';
+export const COND_BREAKPOINT_SOURCE_URL = 'debugger://breakpoint';

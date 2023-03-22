@@ -102,31 +102,31 @@ describeWithMockConnection('ResourceTreeModel', () => {
     dispatchEvent(target, 'Page.frameNavigated', frameNavigatedEvent());
     dispatchEvent(
         target,
-        'Page.prerenderAttemptCompleted',
+        'Preload.prerenderAttemptCompleted',
         {
           'initiatingFrameId': 'main',
           'prerenderingUrl': 'http://example.com/page.html',
-          'finalStatus': Protocol.Page.PrerenderFinalStatus.TriggerDestroyed,
+          'finalStatus': Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
         },
     );
     dispatchEvent(
         target,
-        'Page.prerenderAttemptCompleted',
+        'Preload.prerenderAttemptCompleted',
         {
           'initiatingFrameId': 'next',
           'prerenderingUrl': 'http://example.com/page.html',
-          'finalStatus': Protocol.Page.PrerenderFinalStatus.ClientCertRequested,
+          'finalStatus': Protocol.Preload.PrerenderFinalStatus.ClientCertRequested,
         },
     );
     assertNotNullOrUndefined(resourceTreeModel);
     assertNotNullOrUndefined(resourceTreeModel.mainFrame);
     assert.strictEqual(
-        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Page.PrerenderFinalStatus.TriggerDestroyed);
+        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed);
     dispatchEvent(target, 'Page.frameNavigated', frameNavigatedEvent(undefined, 'next'));
     assertNotNullOrUndefined(resourceTreeModel);
     assertNotNullOrUndefined(resourceTreeModel.mainFrame);
     assert.strictEqual(
-        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Page.PrerenderFinalStatus.ClientCertRequested);
+        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.ClientCertRequested);
   });
   describe('prerender event before getResourceTree', () => {
     let resolveGetResourceTree: () => void;
@@ -141,11 +141,11 @@ describeWithMockConnection('ResourceTreeModel', () => {
       const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
       dispatchEvent(
           target,
-          'Page.prerenderAttemptCompleted',
+          'Preload.prerenderAttemptCompleted',
           {
             'initiatingFrameId': 'main',
             'prerenderingUrl': 'http://example.com/page.html',
-            'finalStatus': Protocol.Page.PrerenderFinalStatus.TriggerDestroyed,
+            'finalStatus': Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
           },
       );
       assertNotNullOrUndefined(resourceTreeModel);
@@ -156,7 +156,7 @@ describeWithMockConnection('ResourceTreeModel', () => {
       });
       assertNotNullOrUndefined(resourceTreeModel.mainFrame);
       assert.strictEqual(
-          resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Page.PrerenderFinalStatus.TriggerDestroyed);
+          resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed);
     });
   });
 
@@ -178,11 +178,11 @@ describeWithMockConnection('ResourceTreeModel', () => {
     });
     dispatchEvent(
         target,
-        'Page.prerenderAttemptCompleted',
+        'Preload.prerenderAttemptCompleted',
         {
           'initiatingFrameId': 'main',
           'prerenderingUrl': 'http://example.com/page.html',
-          'finalStatus': Protocol.Page.PrerenderFinalStatus.MojoBinderPolicy,
+          'finalStatus': Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
           'disallowedApiMethod': 'device.mojom.GamepadMonitor',
         },
     );
@@ -190,7 +190,7 @@ describeWithMockConnection('ResourceTreeModel', () => {
     assertNotNullOrUndefined(resourceTreeModel);
     assertNotNullOrUndefined(resourceTreeModel.mainFrame);
     assert.strictEqual(
-        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Page.PrerenderFinalStatus.MojoBinderPolicy);
+        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy);
     assert.strictEqual(resourceTreeModel.mainFrame.prerenderDisallowedApiMethod, 'device.mojom.GamepadMonitor');
   });
 
@@ -278,9 +278,9 @@ describeWithMockConnection('ResourceTreeModel', () => {
 
     dispatchEvent(mainFrameTarget, 'Page.frameNavigated', frameNavigatedEvent());
     dispatchEvent(subframeTarget, 'Page.frameNavigated', frameNavigatedEvent('parentId'));
-    assert.isTrue(getResourceTeeModel(mainFrameTarget).mainFrame?.isTopFrame());
+    assert.isTrue(getResourceTeeModel(mainFrameTarget).mainFrame?.isOutermostFrame());
     assertNotNullOrUndefined(getResourceTeeModel(subframeTarget));
-    assert.isFalse(getResourceTeeModel(subframeTarget).mainFrame?.isTopFrame());
+    assert.isFalse(getResourceTeeModel(subframeTarget).mainFrame?.isOutermostFrame());
   });
 
   it('identifies not top frame with tab target', async () => {
@@ -290,8 +290,72 @@ describeWithMockConnection('ResourceTreeModel', () => {
 
     dispatchEvent(mainFrameTarget, 'Page.frameNavigated', frameNavigatedEvent());
     dispatchEvent(subframeTarget, 'Page.frameNavigated', frameNavigatedEvent('parentId'));
-    assert.isTrue(getResourceTeeModel(mainFrameTarget).mainFrame?.isTopFrame());
+    assert.isTrue(getResourceTeeModel(mainFrameTarget).mainFrame?.isOutermostFrame());
     assertNotNullOrUndefined(getResourceTeeModel(subframeTarget));
-    assert.isFalse(getResourceTeeModel(subframeTarget).mainFrame?.isTopFrame());
+    assert.isFalse(getResourceTeeModel(subframeTarget).mainFrame?.isOutermostFrame());
+  });
+
+  it('emits PrimaryPageChanged event upon prerender activation', async () => {
+    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const childTargetManager = tabTarget.model(SDK.ChildTargetManager.ChildTargetManager);
+    assertNotNullOrUndefined(childTargetManager);
+
+    const targetId = 'target_id' as Protocol.Target.TargetID;
+    const targetInfo = {
+      targetId,
+      type: 'page',
+      title: 'title',
+      url: 'http://example.com/prerendered.html',
+      attached: true,
+      canAccessOpener: false,
+      subtype: 'prerender',
+    };
+    childTargetManager.targetCreated({targetInfo});
+    await childTargetManager.attachedToTarget(
+        {sessionId: 'session_id' as Protocol.Target.SessionID, targetInfo, waitingForDebugger: false});
+
+    const prerenderTarget = SDK.TargetManager.TargetManager.instance().targetById(targetId);
+    assertNotNullOrUndefined(prerenderTarget);
+    const resourceTreeModel = prerenderTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assertNotNullOrUndefined(resourceTreeModel);
+
+    const primaryPageChangedEvents:
+        {frame: SDK.ResourceTreeModel.ResourceTreeFrame, type: SDK.ResourceTreeModel.PrimaryPageChangeType}[] = [];
+    resourceTreeModel.addEventListener(
+        SDK.ResourceTreeModel.Events.PrimaryPageChanged, event => primaryPageChangedEvents.push(event.data));
+
+    const frame = resourceTreeModel.frameAttached('frame_id' as Protocol.Page.FrameId, null);
+    childTargetManager.targetInfoChanged({targetInfo: {...targetInfo, subtype: undefined}});
+
+    assert.strictEqual(primaryPageChangedEvents.length, 1);
+    assert.strictEqual(primaryPageChangedEvents[0].frame, frame);
+    assert.strictEqual(primaryPageChangedEvents[0].type, SDK.ResourceTreeModel.PrimaryPageChangeType.Activation);
+  });
+
+  it('emits PrimaryPageChanged event only upon navigation of the primary frame', async () => {
+    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const mainFrameTarget = createTarget({parentTarget: tabTarget});
+    const subframeTarget = createTarget({parentTarget: mainFrameTarget});
+    const prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+
+    const primaryPageChangedEvents:
+        {frame: SDK.ResourceTreeModel.ResourceTreeFrame, type: SDK.ResourceTreeModel.PrimaryPageChangeType}[] = [];
+
+    [getResourceTeeModel(mainFrameTarget), getResourceTeeModel(subframeTarget), getResourceTeeModel(prerenderTarget)]
+        .forEach(resourceTreeModel => {
+          resourceTreeModel.addEventListener(
+              SDK.ResourceTreeModel.Events.PrimaryPageChanged, event => primaryPageChangedEvents.push(event.data));
+        });
+
+    dispatchEvent(mainFrameTarget, 'Page.frameNavigated', frameNavigatedEvent());
+    assert.strictEqual(primaryPageChangedEvents.length, 1);
+    assert.strictEqual(primaryPageChangedEvents[0].frame.id, 'main');
+    assert.strictEqual(primaryPageChangedEvents[0].type, SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation);
+
+    dispatchEvent(subframeTarget, 'Page.frameNavigated', frameNavigatedEvent('main', 'child'));
+    assert.strictEqual(primaryPageChangedEvents.length, 1);
+
+    dispatchEvent(prerenderTarget, 'Page.frameNavigated', frameNavigatedEvent());
+    assert.strictEqual(primaryPageChangedEvents.length, 1);
   });
 });

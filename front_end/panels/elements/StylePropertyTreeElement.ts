@@ -44,16 +44,6 @@ const UIStrings = {
    */
   openColorPickerS: 'Open color picker. {PH1}',
   /**
-   *@description The warning text shown in Elements panel when font-variation-settings don't match allowed values
-   *@example {wdth} PH1
-   *@example {100} PH2
-   *@example {10} PH3
-   *@example {20} PH4
-   *@example {Arial} PH5
-   */
-  valueForSettingSSIsOutsideThe:
-      'Value for setting “{PH1}” {PH2} is outside the supported range [{PH3}, {PH4}] for font-family “{PH5}”.',
-  /**
    *@description Context menu item for style property in edit mode
    */
   togglePropertyAndContinueEditing: 'Toggle property and continue editing',
@@ -286,13 +276,63 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     return swatch;
   }
 
-  private processAnimationName(text: string): Node {
-    const swatch = new InlineEditor.LinkSwatch.AnimationNameSwatch();
-    UI.UIUtils.createTextChild(swatch, text);
-    const isDefined = Boolean(this.matchedStylesInternal.keyframes().find(kf => kf.name().text === text));
-    swatch.data = {text, isDefined, onLinkActivate: this.handleAnimationNameDefinitionActivate.bind(this)};
+  private processAnimationName(animationNamePropertyText: string): Node {
+    const animationNames = animationNamePropertyText.split(',').map(name => name.trim());
+    const contentChild = document.createElement('span');
+    for (let i = 0; i < animationNames.length; i++) {
+      const animationName = animationNames[i];
+      const swatch = new InlineEditor.LinkSwatch.AnimationNameSwatch();
+      UI.UIUtils.createTextChild(swatch, animationName);
+      const isDefined = Boolean(this.matchedStylesInternal.keyframes().find(kf => kf.name().text === animationName));
+      swatch.data = {
+        text: animationName,
+        isDefined,
+        onLinkActivate: this.handleAnimationNameDefinitionActivate.bind(this),
+      };
+      contentChild.appendChild(swatch);
 
-    return swatch;
+      if (i !== animationNames.length - 1) {
+        contentChild.appendChild(document.createTextNode(', '));
+      }
+    }
+
+    return contentChild;
+  }
+
+  private processAnimation(animationPropertyValue: string): Node {
+    const animationNameProperty =
+        this.property.getLonghandProperties().find(longhand => longhand.name === 'animation-name');
+    if (!animationNameProperty) {
+      return document.createTextNode(animationPropertyValue);
+    }
+
+    const animationNames = animationNameProperty.value.split(',').map(name => name.trim());
+    const cssAnimationModel =
+        InlineEditor.CSSAnimationModel.CSSAnimationModel.parse(animationPropertyValue, animationNames);
+    const contentChild = document.createElement('span');
+    for (let i = 0; i < cssAnimationModel.parts.length; i++) {
+      const part = cssAnimationModel.parts[i];
+      switch (part.type) {
+        case InlineEditor.CSSAnimationModel.PartType.Text:
+          contentChild.appendChild(document.createTextNode(part.value));
+          break;
+        case InlineEditor.CSSAnimationModel.PartType.EasingFunction:
+          contentChild.appendChild(this.processBezier(part.value));
+          break;
+        case InlineEditor.CSSAnimationModel.PartType.AnimationName:
+          contentChild.appendChild(this.processAnimationName(part.value));
+          break;
+        case InlineEditor.CSSAnimationModel.PartType.Variable:
+          contentChild.appendChild(this.processVar(part.value));
+          break;
+      }
+
+      if (cssAnimationModel.parts[i + 1]?.value !== ',' && i !== cssAnimationModel.parts.length - 1) {
+        contentChild.appendChild(document.createTextNode(' '));
+      }
+    }
+
+    return contentChild;
   }
 
   private processColor(text: string, valueChild?: Node|null): Node {
@@ -813,6 +853,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     if (this.property.parsedOk) {
       propertyRenderer.setVarHandler(this.processVar.bind(this));
       propertyRenderer.setAnimationNameHandler(this.processAnimationName.bind(this));
+      propertyRenderer.setAnimationHandler(this.processAnimation.bind(this));
       propertyRenderer.setColorHandler(this.processColor.bind(this));
       propertyRenderer.setColorMixHandler(this.processColorMix.bind(this));
       propertyRenderer.setBezierHandler(this.processBezier.bind(this));
@@ -878,7 +919,6 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     if (this.property.parsedOk) {
-      void this.updateFontVariationSettingsWarning();
       this.updateAuthoringHint();
     } else {
       // Avoid having longhands under an invalid shorthand.
@@ -887,6 +927,13 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       // Add a separate exclamation mark IMG element with a tooltip.
       this.listItemElement.insertBefore(
           StylesSidebarPane.createExclamationMark(this.property, null), this.listItemElement.firstChild);
+
+      // When the property is valid but the property value is invalid,
+      // add line-through only to the property value.
+      const invalidPropertyValue = SDK.CSSMetadata.cssMetadata().isCSSPropertyName(this.property.name);
+      if (invalidPropertyValue) {
+        this.listItemElement.classList.add('invalid-property-value');
+      }
     }
 
     if (!this.property.activeInStyle()) {
@@ -938,68 +985,31 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
 
+    // Different rules apply to SVG nodes altogether. We currently don't have SVG-specific hints.
+    if (this.node()?.isSVGNode()) {
+      return;
+    }
+
+    const cssModel = this.parentPaneInternal.cssModel();
+    const fontFaces = cssModel?.fontFaces() || [];
+
     const localName = this.node()?.localName();
     for (const validator of cssRuleValidatorsMap.get(propertyName) || []) {
       const hint = validator.getHint(
           propertyName, this.computedStyles || undefined, this.parentsComputedStyles || undefined,
-          localName?.toLowerCase());
+          localName?.toLowerCase(), fontFaces);
       if (hint) {
         Host.userMetrics.cssHintShown(validator.getMetricType());
+        const wrapper = document.createElement('span');
+        wrapper.classList.add('hint-wrapper');
         const hintIcon = UI.Icon.Icon.create('mediumicon-info', 'hint');
+        wrapper.append(hintIcon);
         activeHints.set(hintIcon, hint);
-        this.listItemElement.append(hintIcon);
+        this.listItemElement.append(wrapper);
         this.listItemElement.classList.add('inactive-property');
         break;
       }
     }
-  }
-
-  private async updateFontVariationSettingsWarning(): Promise<void> {
-    if (this.property.name !== 'font-variation-settings') {
-      return;
-    }
-    const value = this.property.value;
-    const cssModel = this.parentPaneInternal.cssModel();
-    if (!cssModel) {
-      return;
-    }
-    const computedStyleModel = this.parentPaneInternal.computedStyleModel();
-    const styles = await computedStyleModel.fetchComputedStyle();
-    if (!styles) {
-      return;
-    }
-    const fontFamily = styles.computedStyle.get('font-family');
-    if (!fontFamily) {
-      return;
-    }
-    const fontFamilies = new Set<string>(SDK.CSSPropertyParser.parseFontFamily(fontFamily));
-    const matchingFontFaces = cssModel.fontFaces().filter(f => fontFamilies.has(f.getFontFamily()));
-    const variationSettings = SDK.CSSPropertyParser.parseFontVariationSettings(value);
-    const warnings = [];
-    for (const elementSetting of variationSettings) {
-      for (const font of matchingFontFaces) {
-        const fontSetting = font.getVariationAxisByTag(elementSetting.tag);
-        if (!fontSetting) {
-          continue;
-        }
-        if (elementSetting.value < fontSetting.minValue || elementSetting.value > fontSetting.maxValue) {
-          warnings.push(i18nString(UIStrings.valueForSettingSSIsOutsideThe, {
-            PH1: elementSetting.tag,
-            PH2: elementSetting.value,
-            PH3: fontSetting.minValue,
-            PH4: fontSetting.maxValue,
-            PH5: font.getFontFamily(),
-          }));
-        }
-      }
-    }
-
-    if (!warnings.length) {
-      return;
-    }
-    this.listItemElement.classList.add('has-warning');
-    this.listItemElement.insertBefore(
-        StylesSidebarPane.createExclamationMark(this.property, warnings.join(' ')), this.listItemElement.firstChild);
   }
 
   private mouseUp(event: MouseEvent): void {
@@ -1399,7 +1409,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     const keyboardEvent = (event as KeyboardEvent);
     const target = (keyboardEvent.target as HTMLElement);
     const keyChar = String.fromCharCode(keyboardEvent.charCode);
-    const selectionLeftOffset = target.selectionLeftOffset();
+    const selectionLeftOffset = this.#selectionLeftOffset(target);
     const isFieldInputTerminated =
         (context.isEditingName ? keyChar === ':' :
                                  keyChar === ';' && selectionLeftOffset !== null &&
@@ -1410,6 +1420,27 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       void this.editingCommitted(target.textContent || '', context, 'forward');
       return;
     }
+  }
+
+  /** @returns Selection offset relative to `element` */
+  #selectionLeftOffset(element: HTMLElement): number|null {
+    const selection = element.getComponentSelection();
+    if (!selection?.containsNode(element, true)) {
+      return null;
+    }
+
+    let leftOffset = selection.anchorOffset;
+    let node: ChildNode|(Node | null) = selection.anchorNode;
+
+    while (node !== element) {
+      while (node?.previousSibling) {
+        node = node.previousSibling;
+        leftOffset += node.textContent?.length ?? 0;
+      }
+      node = node?.parentNodeOrShadowHost() ?? null;
+    }
+
+    return leftOffset;
   }
 
   private async applyFreeFlowStyleTextEdit(context: Context): Promise<void> {

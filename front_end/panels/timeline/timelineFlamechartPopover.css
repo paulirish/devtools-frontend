@@ -14,7 +14,7 @@
 }
 
 .timeline-flamechart-popover span.timeline-info-network-time {
-  color: var(--color-primary);
+  color: var(--color-primary-old);
 }
 
 .timeline-flamechart-popover span.timeline-info-time {

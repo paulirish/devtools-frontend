@@ -18,7 +18,6 @@ import {
   getPendingEvents,
   getTestServerPort,
   goToResource,
-  isEnabledExperiment,
   pasteText,
   platform,
   pressKey,
@@ -30,6 +29,7 @@ import {
   clickElement,
   waitForFunction,
   waitForFunctionWithTries,
+  waitForAria,
 } from '../../shared/helper.js';
 
 export const ACTIVE_LINE = '.CodeMirror-activeline > pre > span';
@@ -51,11 +51,8 @@ export const MORE_TABS_SELECTOR = '[aria-label="More tabs"]';
 const OVERRIDES_TAB_SELECTOR = '[aria-label="Overrides"]';
 export const ENABLE_OVERRIDES_SELECTOR = '[aria-label="Select folder for overrides"]';
 const CLEAR_CONFIGURATION_SELECTOR = '[aria-label="Clear configuration"]';
-const BREAKPOINT_VIEW_PAUSE_ON_UNCAUGHT_SELECTOR = '.pause-on-uncaught-exceptions';
-const PAUSE_ON_EXCEPTION_BUTTON = '[aria-label="Pause on exceptions"]';
-export const PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR =
-    `${PAUSE_ON_EXCEPTION_BUTTON},${BREAKPOINT_VIEW_PAUSE_ON_UNCAUGHT_SELECTOR}`;
-export const BREAKPOINT_ITEM_SELECTOR = '.breakpoint-item,.breakpoint-entry';
+export const PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR = '.pause-on-uncaught-exceptions';
+export const BREAKPOINT_ITEM_SELECTOR = '.breakpoint-item';
 
 export async function toggleNavigatorSidebar(frontend: puppeteer.Page) {
   const modifierKey = platform === 'mac' ? 'Meta' : 'Control';
@@ -195,20 +192,15 @@ export async function getSelectedSource(): Promise<string> {
 }
 
 export async function getBreakpointHitLocation() {
-  if (await isEnabledExperiment('breakpointView')) {
-    const breakpointHitHandle = await waitFor('.breakpoint-item.hit');
-    const locationHandle = await waitFor('.location', breakpointHitHandle);
-    const locationText = await locationHandle.evaluate(location => location.textContent);
+  const breakpointHitHandle = await waitFor('.breakpoint-item.hit');
+  const locationHandle = await waitFor('.location', breakpointHitHandle);
+  const locationText = await locationHandle.evaluate(location => location.textContent);
 
-    const groupHandle = await breakpointHitHandle.evaluateHandle(x => x.parentElement);
-    const groupHeaderTitleHandle = await waitFor('.group-header-title', groupHandle);
-    const groupHeaderTitle = await groupHeaderTitleHandle?.evaluate(header => header.textContent);
+  const groupHandle = await breakpointHitHandle.evaluateHandle(x => x.parentElement);
+  const groupHeaderTitleHandle = await waitFor('.group-header-title', groupHandle);
+  const groupHeaderTitle = await groupHeaderTitleHandle?.evaluate(header => header.textContent);
 
-    return `${groupHeaderTitle}:${locationText}`;
-  }
-  const breakpointHandle = await $('label', await waitFor('.breakpoint-hit'));
-  const breakpointLocation = await breakpointHandle?.evaluate(label => label.textContent);
-  return breakpointLocation;
+  return `${groupHeaderTitle}:${locationText}`;
 }
 
 export async function getOpenSources() {
@@ -258,6 +250,26 @@ export async function removeBreakpointForLine(frontend: puppeteer.Page, index: n
   await waitForFunction(async () => await isBreakpointSet(index));
   await clickElement(breakpointLine);
   await waitForFunction(async () => !(await isBreakpointSet(index)));
+}
+
+export async function addLogpointForLine(index: number, condition: string) {
+  const {frontend} = getBrowserAndPages();
+  const breakpointLine = await getLineNumberElement(index);
+  assertNotNullOrUndefined(breakpointLine);
+
+  await waitForFunction(async () => !(await isBreakpointSet(index)));
+  await clickElement(breakpointLine, {clickOptions: {button: 'right'}});
+
+  await click('aria/Add logpoint…');
+
+  const editDialog = await waitFor('.sources-edit-breakpoint-dialog');
+  const conditionEditor = await waitForAria('Code editor', editDialog);
+  await conditionEditor.focus();
+
+  await typeText(condition);
+  await frontend.keyboard.press('Enter');
+
+  await waitForFunction(async () => await isBreakpointSet(index));
 }
 
 export async function isBreakpointSet(lineNumber: number|string) {
@@ -506,6 +518,13 @@ export async function readSourcesTreeView(): Promise<string[]> {
   return results.map(item => item.replace(/localhost:[0-9]+/, 'localhost:XXXX'));
 }
 
+export async function readIgnoreListedSources(): Promise<string[]> {
+  const items = await $$('.navigator-folder-tree-item.is-ignore-listed,.navigator-file-tree-item.is-ignore-listed');
+  const promises = items.map(handle => handle.evaluate(el => el.textContent as string));
+  const results = await Promise.all(promises);
+  return results.map(item => item.replace(/localhost:[0-9]+/, 'localhost:XXXX'));
+}
+
 async function hasPausedEvents(frontend: puppeteer.Page): Promise<boolean> {
   const events = await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
   return Boolean(events && events.length);
@@ -550,7 +569,7 @@ export async function clickOnContextMenu(selector: string, label: string) {
   await click(selector, {clickOptions: {button: 'right'}});
 
   // Wait for the context menu option, and click it.
-  const labelSelector = `[aria-label="${label}"]`;
+  const labelSelector = `.soft-context-menu > [aria-label="${label}"]`;
   await waitFor(labelSelector);
   await click(labelSelector);
 }
@@ -792,4 +811,8 @@ export async function retrieveCodeMirrorEditorContent(): Promise<Array<string>> 
   const editor = await waitFor('[aria-label="Code editor"]');
   return await editor.evaluate(
       node => [...node.querySelectorAll('.cm-line')].map(node => node.textContent || '') || []);
+}
+
+export async function waitForLines(lineCount: number): Promise<void> {
+  await waitFor(new Array(lineCount).fill('.cm-line').join(' ~ '));
 }

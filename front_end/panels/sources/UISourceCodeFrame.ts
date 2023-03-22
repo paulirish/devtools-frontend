@@ -170,7 +170,8 @@ export class UISourceCodeFrame extends
       this.unloadUISourceCode();
       this.uiSourceCodeInternal = uiSourceCode;
       if (uiSourceCode.workingCopy() !== this.textEditor.state.doc.toString()) {
-        void this.setContent(uiSourceCode.workingCopy());
+        // This call is only asynchronous if we fall back for wasm disassembly.
+        void this.setDeferredContent(uiSourceCode.workingCopyContent());
       } else {
         this.reloadPlugins();
       }
@@ -319,12 +320,12 @@ export class UISourceCodeFrame extends
     if (this.muteSourceCodeEvents) {
       return;
     }
-    this.maybeSetContent(this.uiSourceCodeInternal.workingCopy());
+    this.maybeSetContent(this.uiSourceCodeInternal.workingCopyContent());
   }
 
   private onWorkingCopyCommitted(): void {
     if (!this.muteSourceCodeEvents) {
-      this.maybeSetContent(this.uiSourceCode().workingCopy());
+      this.maybeSetContent(this.uiSourceCode().workingCopyContent());
     }
     this.contentCommitted();
     this.updateStyle();
@@ -341,7 +342,7 @@ export class UISourceCodeFrame extends
   }
 
   private onTitleChanged(): void {
-    this.updateLanguageMode().then(() => this.reloadPlugins(), console.error);
+    this.updateLanguageMode('').then(() => this.reloadPlugins(), console.error);
   }
 
   private loadPlugins(): void {
@@ -386,9 +387,9 @@ export class UISourceCodeFrame extends
     this.setEditable(this.canEditSourceInternal());
   }
 
-  private maybeSetContent(content: string): void {
-    if (this.textEditor.state.doc.toString() !== content) {
-      void this.setContent(content);
+  private maybeSetContent(content: TextUtils.ContentProvider.DeferredContent): void {
+    if (this.textEditor.state.doc.toString() !== content.content) {
+      void this.setDeferredContent(content);
     }
   }
 
@@ -449,7 +450,7 @@ export class UISourceCodeFrame extends
     const rightToolbarItems = [];
     for (const plugin of this.plugins) {
       leftToolbarItems.push(...plugin.leftToolbarItems());
-      rightToolbarItems.push(...await plugin.rightToolbarItems());
+      rightToolbarItems.push(...plugin.rightToolbarItems());
     }
 
     if (!rightToolbarItems.length) {

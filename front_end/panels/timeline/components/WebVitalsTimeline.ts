@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
+import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 import {WebVitalsEventLane, WebVitalsTimeboxLane} from './WebVitalsLane.js';
-import {type WebVitalsTooltip} from './WebVitalsTooltip.js';
+import {WebVitalsTooltip} from './WebVitalsTooltip.js';
 
 const UIStrings = {
   /**
@@ -98,7 +98,7 @@ interface WebVitalsTimelineData {
   lcps?: WebVitalsLCPEvent[];
   layoutShifts?: WebVitalsLayoutShiftEvent[];
   longTasks?: WebVitalsTimelineTask[];
-  mainFrameNavigations?: number[];
+  primaryPageChanges?: number[];
   maxDuration?: number;
 }
 
@@ -139,7 +139,7 @@ export function assertInstanceOf<T>(instance: any, constructor: Constructor<T>):
 export class WebVitalsTimeline extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-timeline-webvitals`;
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #mainFrameNavigations: readonly number[] = [];
+  #primaryPageChanges: readonly number[] = [];
   #startTime = 0;
   #duration = 1000;
   #maxDuration = 1000;
@@ -182,7 +182,8 @@ export class WebVitalsTimeline extends HTMLElement {
     this.#layoutShiftsLane = new WebVitalsEventLane(this, i18nString(UIStrings.ls), _ => MarkerType.Bad);
     this.#longTasksLane = new WebVitalsTimeboxLane(this, i18nString(UIStrings.longTasks), this.#getLongTaskOverlay);
 
-    this.#overlay = document.createElement('devtools-timeline-webvitals-tooltip');
+    // Refer to the component by its static tag name to ensure the import is not dropped at compilation time.
+    this.#overlay = document.createElement(WebVitalsTooltip.litTagName.value as 'devtools-timeline-webvitals-tooltip');
     this.#overlay.style.position = 'absolute';
     this.#overlay.style.visibility = 'hidden';
 
@@ -193,7 +194,7 @@ export class WebVitalsTimeline extends HTMLElement {
     this.#startTime = data.startTime || this.#startTime;
     this.#duration = data.duration || this.#duration;
     this.#maxDuration = data.maxDuration || this.#maxDuration;
-    this.#mainFrameNavigations = data.mainFrameNavigations || this.#mainFrameNavigations;
+    this.#primaryPageChanges = data.primaryPageChanges || this.#primaryPageChanges;
 
     if (data.fcps) {
       this.#fcpLane.setEvents(data.fcps);
@@ -329,7 +330,7 @@ export class WebVitalsTimeline extends HTMLElement {
   }
 
   #getMarkerTypeForFCPEvent(event: WebVitalsFCPEvent): MarkerType {
-    const t = this.getTimeSinceLastMainFrameNavigation(event.timestamp);
+    const t = this.getTimeSinceLastPrimaryPageChange(event.timestamp);
     if (t <= FCP_GOOD_TIMING) {
       return MarkerType.Good;
     }
@@ -340,7 +341,7 @@ export class WebVitalsTimeline extends HTMLElement {
   }
 
   #getMarkerTypeForLCPEvent(event: WebVitalsLCPEvent): MarkerType {
-    const t = this.getTimeSinceLastMainFrameNavigation(event.timestamp);
+    const t = this.getTimeSinceLastPrimaryPageChange(event.timestamp);
     if (t <= LCP_GOOD_TIMING) {
       return MarkerType.Good;
     }
@@ -433,7 +434,7 @@ export class WebVitalsTimeline extends HTMLElement {
     `;
   }
 
-  #renderMainFrameNavigations(markers: readonly number[]): void {
+  #renderPrimaryPageChanges(markers: readonly number[]): void {
     this.#context.save();
     this.#context.strokeStyle = 'blue';
     this.#context.beginPath();
@@ -445,10 +446,10 @@ export class WebVitalsTimeline extends HTMLElement {
     this.#context.restore();
   }
 
-  getTimeSinceLastMainFrameNavigation(time: number): number {
+  getTimeSinceLastPrimaryPageChange(time: number): number {
     let i = 0, prev = 0;
-    while (i < this.#mainFrameNavigations.length && this.#mainFrameNavigations[i] <= time) {
-      prev = this.#mainFrameNavigations[i];
+    while (i < this.#primaryPageChanges.length && this.#primaryPageChanges[i] <= time) {
+      prev = this.#primaryPageChanges[i];
       i++;
     }
     return time - prev;
@@ -473,7 +474,7 @@ export class WebVitalsTimeline extends HTMLElement {
 
     // Render the WebVitals label.
     this.#context.save();
-    this.#context.font = '11px ' + Host.Platform.fontFamily();
+    this.#context.font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
     const text = this.#context.measureText('Web Vitals');
     const height = text.actualBoundingBoxAscent - text.actualBoundingBoxDescent;
     this.#context.fillStyle = '#202124';
@@ -492,7 +493,7 @@ export class WebVitalsTimeline extends HTMLElement {
     this.#longTasksLane.render();
     this.#context.restore();
 
-    this.#renderMainFrameNavigations(this.#mainFrameNavigations);
+    this.#renderPrimaryPageChanges(this.#primaryPageChanges);
   }
 
   #scheduleRender(): void {

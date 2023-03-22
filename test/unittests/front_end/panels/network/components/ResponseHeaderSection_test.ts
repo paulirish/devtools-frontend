@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../../../../front_end/core/host/host.js';
 import * as SDK from '../../../../../../front_end/core/sdk/sdk.js';
 import * as Protocol from '../../../../../../front_end/generated/protocol.js';
 import * as NetworkComponents from '../../../../../../front_end/panels/network/components/components.js';
@@ -14,6 +15,7 @@ import {
 } from '../../../helpers/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
 import {setUpEnvironment} from '../../../helpers/OverridesHelpers.js';
+
 import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
 import {createWorkspaceProject} from '../../../helpers/OverridesHelpers.js';
 import * as Workspace from '../../../../../../front_end/models/workspace/workspace.js';
@@ -21,6 +23,7 @@ import type * as Persistence from '../../../../../../front_end/models/persistenc
 import * as Root from '../../../../../../front_end/core/root/root.js';
 import * as Common from '../../../../../../front_end/core/common/common.js';
 import * as NetworkForward from '../../../../../../front_end/panels/network/forward/forward.js';
+import {recordedMetricsContain, resetRecordedMetrics} from '../../../helpers/UserMetricsHelpers.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -169,12 +172,12 @@ function isRowFocused(
 
 describeWithEnvironment('ResponseHeaderSection', () => {
   before(() => {
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
   });
 
   beforeEach(async () => {
     await setUpEnvironment();
+    resetRecordedMetrics();
   });
 
   it('renders detailed reason for blocked requests', async () => {
@@ -460,6 +463,9 @@ describeWithEnvironment('ResponseHeaderSection', () => {
       ],
     }];
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeaderEdited));
   });
 
   it('can handle tab-character in header value', async () => {
@@ -518,6 +524,9 @@ describeWithEnvironment('ResponseHeaderSection', () => {
       ],
     }];
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeaderEdited));
   });
 
   it('can remove header overrides', async () => {
@@ -576,6 +585,9 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     }];
     assert.strictEqual(spy.callCount, 1);
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeaderRemoved));
 
     rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
     assert.strictEqual(rows.length, 3);
@@ -633,6 +645,9 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const expected: Persistence.NetworkPersistenceManager.HeaderOverride[] = [];
     assert.strictEqual(spy.callCount, 1);
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeaderRemoved));
   });
 
   it('can handle non-breaking spaces when removing header overrides', async () => {
@@ -734,6 +749,10 @@ describeWithEnvironment('ResponseHeaderSection', () => {
       ],
     }];
     assert.isTrue(spy.getCall(-1).calledWith(JSON.stringify(expected, null, 2)));
+
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeaderAdded));
 
     editHeaderRow(component, 1, HeaderAttribute.HeaderName, 'foo');
     expected = [{
@@ -1125,22 +1144,22 @@ describeWithEnvironment('ResponseHeaderSection', () => {
         'https://www.example.com/index.html' as Platform.DevToolsPath.UrlString, '' as Platform.DevToolsPath.UrlString,
         null, null, null);
     request.responseHeaders = [
-      {name: 'cache-control', value: 'max-age=600'},
-      {name: 'z-header', value: 'zzz'},
+      {name: 'Cache-Control', value: 'max-age=600'},
+      {name: 'Z-Header', value: 'zzz'},
     ];
     request.originalResponseHeaders = [
-      {name: 'set-cookie', value: 'bar=original'},
-      {name: 'set-cookie', value: 'foo=original'},
-      {name: 'set-cookie', value: 'malformed'},
-      {name: 'cache-control', value: 'max-age=600'},
-      {name: 'z-header', value: 'zzz'},
+      {name: 'Set-Cookie', value: 'bar=original'},
+      {name: 'Set-Cookie', value: 'foo=original'},
+      {name: 'Set-Cookie', value: 'malformed'},
+      {name: 'Cache-Control', value: 'max-age=600'},
+      {name: 'Z-header', value: 'zzz'},
     ];
     request.setCookieHeaders = [
-      {name: 'set-cookie', value: 'bar=original'},
-      {name: 'set-cookie', value: 'foo=overridden'},
-      {name: 'set-cookie', value: 'user=12345'},
-      {name: 'set-cookie', value: 'malformed'},
-      {name: 'set-cookie', value: 'wrong format'},
+      {name: 'Set-Cookie', value: 'bar=original'},
+      {name: 'Set-Cookie', value: 'foo=overridden'},
+      {name: 'Set-Cookie', value: 'user=12345'},
+      {name: 'Set-Cookie', value: 'malformed'},
+      {name: 'Set-Cookie', value: 'wrong format'},
     ];
 
     const headerOverridesFileContent = `[
@@ -1205,5 +1224,64 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'bar=edited');
     expected[0].headers.push({name: 'set-cookie', value: 'bar=edited'});
     assert.isTrue(spy.getCall(-1).calledWith(JSON.stringify(expected, null, 2)));
+  });
+
+  it('ignores capitalisation of the `set-cookie` header when marking as overridden', async () => {
+    const request = {
+      sortedResponseHeaders: [
+        {name: 'set-cookie', value: 'user=123'},
+      ],
+      blockedResponseCookies: () => [],
+      wasBlocked: () => false,
+      originalResponseHeaders: [
+        {name: 'Set-Cookie', value: 'user=123'},
+      ],
+      setCookieHeaders: [],
+      url: () => 'https://www.example.com/',
+      getAssociatedData: () => null,
+      setAssociatedData: () => {},
+    } as unknown as SDK.NetworkRequest.NetworkRequest;
+
+    const component = await renderResponseHeaderSection(request);
+    assertShadowRoot(component.shadowRoot);
+    const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
+
+    assertShadowRoot(rows[0].shadowRoot);
+    assert.strictEqual(rows[0].shadowRoot.querySelector('.header-name')?.textContent?.trim(), 'set-cookie:');
+    assert.strictEqual(rows[0].shadowRoot.querySelector('.header-value')?.textContent?.trim(), 'user=123');
+    assert.strictEqual(rows[0].shadowRoot.querySelector('.row')?.classList.contains('header-overridden'), false);
+  });
+
+  it('does not mark unset headers (which cause the request to be blocked) as overridden', async () => {
+    const request = {
+      sortedResponseHeaders: [
+        {name: 'abc', value: 'def'},
+      ],
+      blockedResponseCookies: () => [],
+      wasBlocked: () => true,
+      blockedReason: () => Protocol.Network.BlockedReason.CoepFrameResourceNeedsCoepHeader,
+      originalResponseHeaders: [
+        {name: 'abc', value: 'def'},
+      ],
+      setCookieHeaders: [],
+      url: () => 'https://www.example.com/',
+      getAssociatedData: () => null,
+      setAssociatedData: () => {},
+    } as unknown as SDK.NetworkRequest.NetworkRequest;
+
+    const component = await renderResponseHeaderSection(request);
+    assertShadowRoot(component.shadowRoot);
+    const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
+
+    const checkRow = (shadowRoot: ShadowRoot, headerName: string, headerValue: string, isOverride: boolean): void => {
+      assert.deepEqual(getCleanTextContentFromElements(shadowRoot, '.header-name'), [headerName]);
+      assert.strictEqual(shadowRoot.querySelector('.header-value')?.textContent?.trim(), headerValue);
+      assert.strictEqual(shadowRoot.querySelector('.row')?.classList.contains('header-overridden'), isOverride);
+    };
+
+    assertShadowRoot(rows[0].shadowRoot);
+    checkRow(rows[0].shadowRoot, 'abc:', 'def', false);
+    assertShadowRoot(rows[1].shadowRoot);
+    checkRow(rows[1].shadowRoot, 'not-setcross-origin-embedder-policy:', '', false);
   });
 });

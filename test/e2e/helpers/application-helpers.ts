@@ -79,10 +79,18 @@ export async function clearStorageItems() {
 }
 
 export async function selectStorageItemAtIndex(index: number) {
-  const dataGridNodes = await $$('.storage-view .data-grid-data-grid-node:not(.creation-node)');
-  await dataGridNodes[index].click();
-  throw new Error('This helper is flaky and should not be used.');
-  // TODO(crbug.com/1369995) This helper is flaky, grid nodes might go away after the selector and before the click.
+  await waitForFunction(async () => {
+    try {
+      const dataGridNodes = await $$('.storage-view .data-grid-data-grid-node:not(.creation-node)');
+      await dataGridNodes[index].click();
+    } catch (error) {
+      if (error.message === 'Node is detached from document') {
+        return false;
+      }
+      throw error;
+    }
+    return true;
+  });
 }
 
 export async function deleteSelectedStorageItem() {
@@ -108,18 +116,23 @@ export async function selectCookieByName(name: string) {
 
 export async function waitForQuotaUsage(p: (quota: number) => boolean) {
   await waitForFunction(async () => {
-    const storageRow = await waitFor('.quota-usage-row');
-    const quotaString = await storageRow.evaluate(el => el.textContent || '');
-    const [usedQuotaText, modifier] =
-        quotaString.replace(/^\D*([\d.]+)\D*(kM?)B.used.out.of\D*\d+\D*.?B.*$/, '$1 $2').split(' ');
-    let usedQuota = Number.parseInt(usedQuotaText, 10);
-    if (modifier === 'k') {
-      usedQuota *= 1000;
-    } else if (modifier === 'M') {
-      usedQuota *= 1000000;
-    }
+    const usedQuota = await getQuotaUsage();
     return p(usedQuota);
   });
+}
+
+export async function getQuotaUsage() {
+  const storageRow = await waitFor('.quota-usage-row');
+  const quotaString = await storageRow.evaluate(el => el.textContent || '');
+  const [usedQuotaText, modifier] =
+      quotaString.replace(/^\D*([\d.]+)\D*(kM?)B.used.out.of\D*\d+\D*.?B.*$/, '$1 $2').split(' ');
+  let usedQuota = Number.parseInt(usedQuotaText, 10);
+  if (modifier === 'k') {
+    usedQuota *= 1000;
+  } else if (modifier === 'M') {
+    usedQuota *= 1000000;
+  }
+  return usedQuota;
 }
 
 export async function getPieChartLegendRows() {

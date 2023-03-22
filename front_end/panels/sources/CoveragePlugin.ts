@@ -55,7 +55,7 @@ export class CoveragePlugin extends Plugin {
       void UI.ViewManager.ViewManager.instance().showView('coverage');
     });
 
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainFrameTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (mainTarget) {
       this.model = mainTarget.model(Coverage.CoverageModel.CoverageModel);
       if (this.model) {
@@ -110,7 +110,7 @@ export class CoveragePlugin extends Plugin {
     }
   }
 
-  async rightToolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
+  rightToolbarItems(): UI.Toolbar.ToolbarItem[] {
     return [this.infoInToolbar];
   }
 

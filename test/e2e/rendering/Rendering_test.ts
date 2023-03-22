@@ -20,10 +20,11 @@ describe('Rendering pane', () => {
     const expected = [
       'No emulation',
       'Blurred vision',
-      'Protanopia',
-      'Deuteranopia',
-      'Tritanopia',
-      'Achromatopsia',
+      'Reduced contrast',
+      'Protanopia (no red)',
+      'Deuteranopia (no green)',
+      'Tritanopia (no blue)',
+      'Achromatopsia (no color)',
     ].join('');
     assert.deepEqual(actual, expected);
   });

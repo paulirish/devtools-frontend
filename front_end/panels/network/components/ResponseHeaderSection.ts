@@ -265,6 +265,9 @@ export class ResponseHeaderSection extends HTMLElement {
 
     const actualHeaders = new Map<Platform.StringUtilities.LowerCaseString, string[]>();
     for (const header of this.#headerDetails) {
+      if (header.headerNotSet) {
+        continue;
+      }
       const headerValues = actualHeaders.get(header.name);
       if (headerValues) {
         headerValues.push(header.value || '');
@@ -306,7 +309,7 @@ export class ResponseHeaderSection extends HTMLElement {
     // and don't treat all 'set-cookie' headers as a single unit.
     this.#headerEditors.filter(header => header.name === 'set-cookie').forEach(header => {
       if (this.#request?.originalResponseHeaders.find(
-              originalHeader => originalHeader.name === 'set-cookie' &&
+              originalHeader => Platform.StringUtilities.toLowerCaseString(originalHeader.name) === 'set-cookie' &&
                   compareHeaders(originalHeader.value, header.value)) === undefined) {
         header.isOverride = true;
       }
@@ -320,6 +323,7 @@ export class ResponseHeaderSection extends HTMLElement {
     }
     const index = Number(target.dataset.index);
     this.#updateOverrides(event.headerName, event.headerValue, index);
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.HeaderOverrideHeaderEdited);
   }
 
   #fileNameFromUrl(url: Platform.DevToolsPath.UrlString): Platform.DevToolsPath.RawPathString {
@@ -366,6 +370,7 @@ export class ResponseHeaderSection extends HTMLElement {
     this.#commitOverrides();
     this.#headerEditors[index].isDeleted = true;
     this.#render();
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.HeaderOverrideHeaderRemoved);
   }
 
   #updateOverrides(headerName: Platform.StringUtilities.LowerCaseString, headerValue: string, index: number): void {
@@ -469,6 +474,7 @@ export class ResponseHeaderSection extends HTMLElement {
     const rows = this.#shadow.querySelectorAll<HeaderSectionRow>('devtools-header-section-row');
     const [lastRow] = Array.from(rows).slice(-1);
     lastRow?.focus();
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.HeaderOverrideHeaderAdded);
   }
 
   #render(): void {
@@ -483,9 +489,7 @@ export class ResponseHeaderSection extends HTMLElement {
     // clang-format off
     render(html`
       ${headerDescriptors.map((header, index) => html`
-        <${HeaderSectionRow.litTagName} .data=${{
-          header: header,
-        } as HeaderSectionRowData} @headeredited=${this.#onHeaderEdited} @headerremoved=${this.#onHeaderRemoved} @enableheaderediting=${this.#onEnableHeaderEditingClick} data-index=${index}></${HeaderSectionRow.litTagName}>
+        <${HeaderSectionRow.litTagName} .data=${{header} as HeaderSectionRowData} @headeredited=${this.#onHeaderEdited} @headerremoved=${this.#onHeaderRemoved} @enableheaderediting=${this.#onEnableHeaderEditingClick} data-index=${index}></${HeaderSectionRow.litTagName}>
       `)}
       ${this.#headersAreOverrideable ? html`
         <${Buttons.Button.Button.litTagName}
@@ -506,6 +510,7 @@ export class ResponseHeaderSection extends HTMLElement {
     if (!this.#request) {
       return;
     }
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.HeaderOverrideEnableEditingClicked);
     const requestUrl = this.#request.url();
     const networkPersistanceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
     if (networkPersistanceManager.project()) {

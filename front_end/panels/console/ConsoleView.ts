@@ -302,7 +302,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   private readonly linkifier: Components.Linkifier.Linkifier;
   private consoleMessages: ConsoleViewMessage[];
   private consoleGroupStarts: ConsoleGroupViewMessage[];
-  private readonly consoleHistorySetting: Common.Settings.Setting<string[]>;
   private prompt: ConsolePrompt;
   private immediatelyFilterMessagesForTest?: boolean;
   private maybeDirtyWhileMuted?: boolean;
@@ -526,8 +525,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
     this.consoleMessages = [];
     this.consoleGroupStarts = [];
 
-    this.consoleHistorySetting = Common.Settings.Settings.instance().createLocalSetting('consoleHistory', []);
-
     this.prompt = new ConsolePrompt();
     this.prompt.show(this.promptElement);
     this.prompt.element.addEventListener('keydown', this.promptKeyDown.bind(this), true);
@@ -542,8 +539,6 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
 
     this.consoleHistoryAutocompleteSetting.addChangeListener(this.consoleHistoryAutocompleteChanged, this);
 
-    const historyData = this.consoleHistorySetting.get();
-    this.prompt.history().setHistoryData(historyData);
     this.consoleHistoryAutocompleteChanged();
 
     this.updateFilterStatus();
@@ -564,15 +559,15 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
     this.messagesElement.addEventListener('touchend', this.updateStickToBottomOnPointerUp.bind(this), false);
     this.messagesElement.addEventListener('touchcancel', this.updateStickToBottomOnPointerUp.bind(this), false);
 
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
-        SDK.ConsoleModel.Events.ConsoleCleared, this.consoleCleared, this);
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
-        SDK.ConsoleModel.Events.MessageAdded, this.onConsoleMessageAdded, this);
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
-        SDK.ConsoleModel.Events.MessageUpdated, this.onConsoleMessageUpdated, this);
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
-        SDK.ConsoleModel.Events.CommandEvaluated, this.commandEvaluated, this);
-    SDK.ConsoleModel.ConsoleModel.instance().messages().forEach(this.addConsoleMessage, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.ConsoleCleared, this.consoleCleared, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, this.onConsoleMessageAdded, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageUpdated, this.onConsoleMessageUpdated, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.CommandEvaluated, this.commandEvaluated, this);
+    SDK.ConsoleModel.ConsoleModel.allMessagesUnordered().forEach(this.addConsoleMessage, this);
 
     const issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
     this.issueToolbarThrottle = new Common.Throttler.Throttler(100);
@@ -603,7 +598,7 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   }
 
   static clearConsole(): void {
-    SDK.ConsoleModel.ConsoleModel.instance().requestClearMessages();
+    SDK.ConsoleModel.ConsoleModel.requestClearMessages();
   }
 
   private onFilterChanged(): void {
@@ -629,8 +624,7 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   }
 
   clearHistory(): void {
-    this.consoleHistorySetting.set([]);
-    this.prompt.history().setHistoryData([]);
+    this.prompt.history().clear();
   }
 
   private consoleHistoryAutocompleteChanged(): void {
@@ -1097,7 +1091,7 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
   }
 
   private async saveConsole(): Promise<void> {
-    const url = (SDK.TargetManager.TargetManager.instance().mainFrameTarget() as SDK.Target.Target).inspectedURL();
+    const url = (SDK.TargetManager.TargetManager.instance().primaryPageTarget() as SDK.Target.Target).inspectedURL();
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(url);
     const filename =
         Platform.StringUtilities.sprintf('%s-%d.log', parsedURL ? parsedURL.host : 'console', Date.now()) as
@@ -1342,13 +1336,12 @@ export class ConsoleView extends UI.Widget.VBox implements UI.SearchableView.Sea
           result.runtimeModel(), exceptionDetails, SDK.ConsoleModel.FrontendMessageType.Result, undefined, undefined);
     }
     message.setOriginatingMessage(originatingConsoleMessage);
-    SDK.ConsoleModel.ConsoleModel.instance().addMessage(message);
+    result.runtimeModel().target().model(SDK.ConsoleModel.ConsoleModel)?.addMessage(message);
   }
 
   private commandEvaluated(event: Common.EventTarget.EventTargetEvent<SDK.ConsoleModel.CommandEvaluatedEvent>): void {
     const {data} = event;
     this.prompt.history().pushHistoryItem(data.commandMessage.messageText);
-    this.consoleHistorySetting.set(this.prompt.history().historyData().slice(-persistedHistorySize));
     this.printResult(data.result, data.commandMessage, data.exceptionDetails);
   }
 
@@ -1550,8 +1543,6 @@ globalThis.Console = globalThis.Console || {};
 // @ts-ignore exported for Tests.js
 globalThis.Console.ConsoleView = ConsoleView;
 
-const persistedHistorySize = 300;
-
 export class ConsoleViewFilter {
   private readonly filterChanged: () => void;
   messageLevelFiltersSetting: Common.Settings.Setting<LevelsMask>;
@@ -1701,8 +1692,9 @@ export class ConsoleViewFilter {
 
     const contextMenu = new UI.ContextMenu.ContextMenu(mouseEvent, {
       useSoftMenu: true,
-      x: this.levelMenuButton.element.totalOffsetLeft(),
-      y: this.levelMenuButton.element.totalOffsetTop() + (this.levelMenuButton.element as HTMLElement).offsetHeight,
+      x: this.levelMenuButton.element.getBoundingClientRect().left,
+      y: this.levelMenuButton.element.getBoundingClientRect().top +
+          (this.levelMenuButton.element as HTMLElement).offsetHeight,
     });
     contextMenu.headerSection().appendItem(
         i18nString(UIStrings.default), () => setting.set(ConsoleFilter.defaultLevelsFilterValue()));

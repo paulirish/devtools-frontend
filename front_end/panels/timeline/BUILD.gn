@@ -22,9 +22,10 @@ generate_css("css_files") {
 devtools_module("timeline") {
   sources = [
     "CLSLinkifier.ts",
+    "CompatibilityTracksAppender.ts",
     "CountersGraph.ts",
     "EventsTimelineTreeView.ts",
-    "ExtensionTracingSession.ts",
+    "InteractionsTrackAppender.ts",
     "PerformanceModel.ts",
     "TimelineController.ts",
     "TimelineDetailsView.ts",
@@ -40,6 +41,7 @@ devtools_module("timeline") {
     "TimelinePanel.ts",
     "TimelineTreeView.ts",
     "TimelineUIUtils.ts",
+    "TimingsTrackAppender.ts",
     "UIDevtoolsController.ts",
     "UIDevtoolsUtils.ts",
     "WebVitalsTimelineUtils.ts",
@@ -57,6 +59,7 @@ devtools_module("timeline") {
     "../../panels/layer_viewer:bundle",
     "../../panels/mobile_throttling:bundle",
     "../../panels/profiler:bundle",
+    "../../ui/components/panel_feedback:bundle",
     "../../ui/legacy/components/data_grid:bundle",
     "../../ui/legacy/components/perf_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
@@ -77,6 +80,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
+    "../../../test/unittests/front_end/helpers",
     "../../../test/unittests/front_end/panels/timeline/*",
     "../../entrypoints/*",
     "../../ui/components/docs/performance_panel/*",

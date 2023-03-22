@@ -92,7 +92,7 @@ const makeFrame = (): SDK.ResourceTreeModel.ResourceTreeFrame => {
       },
     ]),
     getPermissionsPolicyState: () => null,
-    prerenderFinalStatus: Protocol.Page.PrerenderFinalStatus.MojoBinderPolicy,
+    prerenderFinalStatus: Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
     prerenderDisallowedApiMethod: 'device.mojom.GamepadMonitor',
   } as unknown as SDK.ResourceTreeModel.ResourceTreeFrame;
   return newFrame;
@@ -119,7 +119,7 @@ describeWithRealConnection('FrameDetailsView', () => {
 
   it('renders report keys and values', async () => {
     const targetManager = SDK.TargetManager.TargetManager.instance();
-    const target = targetManager.mainTarget();
+    const target = targetManager.rootTarget();
     assertNotNullOrUndefined(target);
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
     assertNotNullOrUndefined(debuggerModel);
@@ -204,7 +204,7 @@ describeWithRealConnection('FrameDetailsView', () => {
 
   it('renders report keys and values with on-going prerendering', async () => {
     const targetManager = SDK.TargetManager.TargetManager.instance();
-    const target = targetManager.mainTarget();
+    const target = targetManager.rootTarget();
     assertNotNullOrUndefined(target);
 
     const frame = makeFrame();

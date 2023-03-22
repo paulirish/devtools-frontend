@@ -150,7 +150,7 @@ export class BackForwardCacheViewWrapper extends UI.ThrottledWidget.ThrottledWid
     super(true, 1000);
     this.#bfcacheView = bfcacheView;
     this.#getMainResourceTreeModel()?.addEventListener(
-        SDK.ResourceTreeModel.Events.MainFrameNavigated, this.update, this);
+        SDK.ResourceTreeModel.Events.PrimaryPageChanged, this.update, this);
     this.#getMainResourceTreeModel()?.addEventListener(
         SDK.ResourceTreeModel.Events.BackForwardCacheDetailsUpdated, this.update, this);
     this.contentElement.classList.add('overflow-auto');
@@ -163,7 +163,7 @@ export class BackForwardCacheViewWrapper extends UI.ThrottledWidget.ThrottledWid
   }
 
   #getMainResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel|null {
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainFrameTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     return mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel) || null;
   }
 
@@ -226,7 +226,7 @@ export class BackForwardCacheView extends HTMLElement {
   }
 
   async #waitAndGoBackInHistory(delay: number): Promise<void> {
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainFrameTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     const resourceTreeModel = mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
     const historyResults = await resourceTreeModel?.navigationHistory();
     if (!resourceTreeModel || !historyResults) {
@@ -249,7 +249,7 @@ export class BackForwardCacheView extends HTMLElement {
   async #navigateAwayAndBack(): Promise<void> {
     // Checking BFCache Compatibility
 
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainFrameTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     const resourceTreeModel = mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
     const historyResults = await resourceTreeModel?.navigationHistory();
     if (!resourceTreeModel || !historyResults) {
@@ -352,7 +352,7 @@ export class BackForwardCacheView extends HTMLElement {
     }
 
     const frameTreeData = this.#buildFrameTreeDataRecursive(explanationTree, {blankCount: 1});
-    // Override the icon for the top frame.
+    // Override the icon for the outermost frame.
     frameTreeData.node.treeNodeData.iconName = 'frame-icon';
     let title = '';
     // The translation pipeline does not support nested plurals. We avoid this

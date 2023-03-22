@@ -339,6 +339,11 @@ export const NativeFunctions = [
     receivers: ['ReadonlyArray','Array']
   },
   {
+    name: 'concat',
+    signatures: [['inputs','axis']],
+    receivers: ['MLGraphBuilder']
+  },
+  {
     name: 'indexOf',
     signatures: [['searchString','?position']],
     receivers: ['String']
@@ -1288,7 +1293,7 @@ export const NativeFunctions = [
   {
     name: 'delete',
     signatures: [['name']],
-    receivers: ['FormData','URLSearchParams','StorageBucketManager']
+    receivers: ['FormData','StorageBucketManager']
   },
   {
     name: 'delete',
@@ -1299,6 +1304,11 @@ export const NativeFunctions = [
     name: 'delete',
     signatures: [['query'],['key']],
     receivers: ['IDBObjectStore']
+  },
+  {
+    name: 'delete',
+    signatures: [['name','?ignored']],
+    receivers: ['URLSearchParams']
   },
   {
     name: 'delete',
@@ -1363,7 +1373,7 @@ export const NativeFunctions = [
   {
     name: 'has',
     signatures: [['name']],
-    receivers: ['FormData','URLSearchParams']
+    receivers: ['FormData']
   },
   {
     name: 'has',
@@ -1374,6 +1384,11 @@ export const NativeFunctions = [
     name: 'has',
     signatures: [['keyId']],
     receivers: ['MediaKeyStatusMap']
+  },
+  {
+    name: 'has',
+    signatures: [['name','?ignored']],
+    receivers: ['URLSearchParams']
   },
   {
     name: 'has',
@@ -3189,28 +3204,16 @@ export const NativeFunctions = [
   },
   {
     name: 'getEntries',
-    signatures: [['?includeFrames']],
+    signatures: [['?options']],
     receivers: ['Performance']
   },
   {
     name: 'getEntriesByName',
-    signatures: [['name','?type'],['name','?entryType','?includeFrames']],
-    receivers: ['Performance']
-  },
-  {
-    name: 'getEntriesByName',
-    signatures: [['name','?type'],['name','?entryType']],
-    receivers: ['PerformanceObserverEntryList']
+    signatures: [['name','?type'],['name','?entryType']]
   },
   {
     name: 'getEntriesByType',
-    signatures: [['type'],['entryType','?includeFrames']],
-    receivers: ['Performance']
-  },
-  {
-    name: 'getEntriesByType',
-    signatures: [['type'],['entryType']],
-    receivers: ['PerformanceObserverEntryList']
+    signatures: [['type'],['entryType']]
   },
   {
     name: 'mark',
@@ -3701,6 +3704,11 @@ export const NativeFunctions = [
     receivers: ['SyncManager']
   },
   {
+    name: 'register',
+    signatures: [['configURL']],
+    receivers: ['IdentityProvider']
+  },
+  {
     name: 'getNotifications',
     signatures: [['?filter']]
   },
@@ -3717,6 +3725,11 @@ export const NativeFunctions = [
     name: 'unregister',
     signatures: [['tag']],
     receivers: ['PeriodicSyncManager']
+  },
+  {
+    name: 'unregister',
+    signatures: [['configURL']],
+    receivers: ['IdentityProvider']
   },
   {
     name: 'appendBuffer',
@@ -5339,6 +5352,11 @@ export const NativeFunctions = [
     receivers: ['AbortSignal']
   },
   {
+    name: 'any',
+    signatures: [['signals','?init']],
+    receivers: ['TaskSignal']
+  },
+  {
     name: 'replaceAll',
     signatures: [['searchValue','replaceValue'],['searchValue','replacer']]
   },
@@ -6175,10 +6193,6 @@ export const NativeFunctions = [
     signatures: [['type','?eventInitDict']]
   },
   {
-    name: 'PopoverToggleEvent',
-    signatures: [['type','?eventInitDict']]
-  },
-  {
     name: 'ProgressEvent',
     signatures: [['type','?eventInitDict']]
   },
@@ -6193,6 +6207,10 @@ export const NativeFunctions = [
   {
     name: 'initTextEvent',
     signatures: [['?type','?bubbles','?cancelable','?view','?data']]
+  },
+  {
+    name: 'ToggleEvent',
+    signatures: [['type','?eventInitDict']]
   },
   {
     name: 'TouchEvent',
@@ -6367,8 +6385,16 @@ export const NativeFunctions = [
     signatures: [['event']]
   },
   {
+    name: 'setReportEventDataForAutomaticBeacons',
+    signatures: [['event']]
+  },
+  {
     name: 'FencedFrameConfig',
     signatures: [['url']]
+  },
+  {
+    name: 'setSharedStorageContext',
+    signatures: [['contextString']]
   },
   {
     name: 'FormDataEvent',
@@ -6376,7 +6402,7 @@ export const NativeFunctions = [
   },
   {
     name: 'FormData',
-    signatures: [['?form']]
+    signatures: [['?form','?submitter']]
   },
   {
     name: 'Option',
@@ -6687,8 +6713,8 @@ export const NativeFunctions = [
     signatures: [['scriptURL','?options']]
   },
   {
-    name: 'setTrustToken',
-    signatures: [['trustToken']]
+    name: 'setPrivateToken',
+    signatures: [['privateToken']]
   },
   {
     name: 'joinAdInterestGroup',
@@ -6708,11 +6734,11 @@ export const NativeFunctions = [
   },
   {
     name: 'deprecatedURNToURL',
-    signatures: [['uuid_url','?send_reports']]
+    signatures: [['urn_or_config','?send_reports']]
   },
   {
     name: 'deprecatedReplaceInURN',
-    signatures: [['uuid_url','replacements']]
+    signatures: [['urn_or_config','replacements']]
   },
   {
     name: 'createAdRequest',
@@ -6938,6 +6964,10 @@ export const NativeFunctions = [
   {
     name: 'DeviceOrientationEvent',
     signatures: [['type','?eventInitDict']]
+  },
+  {
+    name: 'TCPServerSocket',
+    signatures: [['localAddress','?options']]
   },
   {
     name: 'TCPSocket',
@@ -7260,15 +7290,25 @@ export const NativeFunctions = [
   },
   {
     name: 'OverconstrainedError',
-    signatures: [['constraint','message']]
+    signatures: [['constraint','?message']]
+  },
+  {
+    name: 'compute',
+    signatures: [['graph','inputs','outputs']],
+    receivers: ['MLContext']
+  },
+  {
+    name: 'compute',
+    signatures: [['inputs']],
+    receivers: ['MLModel']
+  },
+  {
+    name: 'computeSync',
+    signatures: [['graph','inputs','outputs']]
   },
   {
     name: 'MLModelLoader',
     signatures: [['context']]
-  },
-  {
-    name: 'compute',
-    signatures: [['inputs']]
   },
   {
     name: 'createContext',
@@ -7327,15 +7367,23 @@ export const NativeFunctions = [
     signatures: [['input','?options']]
   },
   {
-    name: 'softmax',
-    signatures: [['input']]
-  },
-  {
     name: 'sigmoid',
     signatures: [['?input']]
   },
   {
-    name: 'buildAsync',
+    name: 'transpose',
+    signatures: [['input','?options']]
+  },
+  {
+    name: 'softmax',
+    signatures: [['input']]
+  },
+  {
+    name: 'build',
+    signatures: [['outputs']]
+  },
+  {
+    name: 'buildSync',
     signatures: [['outputs']]
   },
   {
@@ -7499,8 +7547,8 @@ export const NativeFunctions = [
     signatures: [['track']]
   },
   {
-    name: 'setOfferedRtpHeaderExtensions',
-    signatures: [['headerExtensionsToOffer']]
+    name: 'setHeaderExtensionsToNegotiate',
+    signatures: [['extensions']]
   },
   {
     name: 'RTCSessionDescription',
@@ -7544,23 +7592,11 @@ export const NativeFunctions = [
   },
   {
     name: 'queryUsageAndQuota',
-    signatures: [['storageType','?usageCallback','?errorCallback']],
-    receivers: ['DeprecatedStorageInfo']
-  },
-  {
-    name: 'queryUsageAndQuota',
-    signatures: [['usageCallback','?errorCallback']],
-    receivers: ['DeprecatedStorageQuota']
+    signatures: [['usageCallback','?errorCallback']]
   },
   {
     name: 'requestQuota',
-    signatures: [['storageType','newQuotaInBytes','?quotaCallback','?errorCallback']],
-    receivers: ['DeprecatedStorageInfo']
-  },
-  {
-    name: 'requestQuota',
-    signatures: [['newQuotaInBytes','?quotaCallback','?errorCallback']],
-    receivers: ['DeprecatedStorageQuota']
+    signatures: [['newQuotaInBytes','?quotaCallback','?errorCallback']]
   },
   {
     name: 'DOMError',
@@ -8087,6 +8123,10 @@ export const NativeFunctions = [
   {
     name: 'getBindGroupLayout',
     signatures: [['index']]
+  },
+  {
+    name: 'GPUPipelineError',
+    signatures: [['message','options']]
   },
   {
     name: 'setBindGroup',

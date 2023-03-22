@@ -621,14 +621,6 @@
       valid_type: "bool",
     },
 
-    // - tree_scoped_value: true
-    // Whether the property takes a tree-scoped reference as its value.
-    // https://drafts.csswg.org/css-scoping/#css-tree-scoped-reference
-    tree_scoped_value: {
-      default: false,
-      valid_type: "bool",
-    },
-
     // Whether changing this property is so independent that we can apply
     // a change to them incrementally on top of the old style. This happens
     // only when inline style is changed. Conceptually, this could be a blocklist,
@@ -663,6 +655,17 @@
     // we should fix all of these and remove the flag.
     idempotent: {
       default: true,
+      valid_type: "bool",
+    },
+
+    // If true, this property will accept a CSSNumericLiteralValue
+    // (created by a fast-path parser), with no restrictions on range.
+    // (NaN and infinities will be sent through the normal ParseSingleValue
+    // path.) A typical case is the properties that can accept an alpha value;
+    // percent values will take the slow paths, but simple numbers will be sent
+    // directly through.
+    accepts_numeric_literal: {
+      default: false,
       valid_type: "bool",
     },
 
@@ -768,7 +771,7 @@
       ],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       valid_for_keyframe: false,
-      runtime_flag: "CSSScrollTimeline",
+      runtime_flag: "CSSAnimationDelayStartEnd",
     },
     {
       name: "animation-delay-start",
@@ -782,7 +785,7 @@
       valid_for_marker: true,
       is_animation_property: true,
       valid_for_keyframe: false,
-      runtime_flag: "CSSScrollTimeline",
+      runtime_flag: "CSSAnimationDelayStartEnd",
     },
     {
       name: "animation-delay-end",
@@ -796,7 +799,7 @@
       valid_for_marker: true,
       is_animation_property: true,
       valid_for_keyframe: false,
-      runtime_flag: "CSSScrollTimeline",
+      runtime_flag: "CSSAnimationDelayStartEnd",
     },
     {
       name: "animation-direction",
@@ -1593,6 +1596,20 @@
       valid_for_position_fallback: true,
     },
     {
+      name: "anchor-default",
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal" ],
+      include_paths: ["third_party/blink/renderer/core/style/scoped_css_name.h"],
+      type_name: "ScopedCSSName",
+      wrapper_pointer_name: "Persistent",
+      default_value: "nullptr",
+      field_group: "*",
+      field_template: "external",
+      converter: "ConvertAnchorDefault",
+      keywords: ["none"],
+      typedom_types: ["Keyword"],
+      runtime_flag: "CSSAnchorPositioning",
+    },
+    {
       name: "anchor-name",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal" ],
       include_paths: ["third_party/blink/renderer/core/style/scoped_css_name.h"],
@@ -1609,8 +1626,8 @@
     {
       name: "anchor-scroll",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal" ],
-      include_paths: ["third_party/blink/renderer/core/style/anchor_scroll_value.h"],
-      type_name: "AnchorScrollValue",
+      include_paths: ["third_party/blink/renderer/core/style/anchor_specifier_value.h"],
+      type_name: "AnchorSpecifierValue",
       wrapper_pointer_name: "Persistent",
       default_value: "nullptr",
       field_group: "*",
@@ -2731,6 +2748,7 @@
       default_value: "1",
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "fill-rule",
@@ -2854,6 +2872,7 @@
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
       supports_incremental_style: true,
+      accepts_numeric_literal: true,
     },
     {
       name: "grid-auto-columns",
@@ -3296,6 +3315,7 @@
       field_group: "svg->inherited_resources",
       field_template: "pointer",
       type_name: "StyleSVGResource",
+      include_paths: ["third_party/blink/renderer/core/style/style_svg_resource.h"],
       wrapper_pointer_name: "scoped_refptr",
       default_value: "nullptr",
       name_for_methods: "MarkerEndResource",
@@ -3310,6 +3330,7 @@
       field_group: "svg->inherited_resources",
       field_template: "pointer",
       type_name: "StyleSVGResource",
+      include_paths: ["third_party/blink/renderer/core/style/style_svg_resource.h"],
       wrapper_pointer_name: "scoped_refptr",
       default_value: "nullptr",
       name_for_methods: "MarkerMidResource",
@@ -3324,6 +3345,7 @@
       field_group: "svg->inherited_resources",
       field_template: "pointer",
       type_name: "StyleSVGResource",
+      include_paths: ["third_party/blink/renderer/core/style/style_svg_resource.h"],
       wrapper_pointer_name: "scoped_refptr",
       default_value: "nullptr",
       name_for_methods: "MarkerStartResource",
@@ -3574,6 +3596,7 @@
       valid_for_first_line: true,
       valid_for_cue: true,
       supports_incremental_style: true,
+      accepts_numeric_literal: true,
     },
     {
       name: "order",
@@ -4405,6 +4428,7 @@
       type_name: "float",
       computed_style_custom_functions: ["setter"],
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "shape-margin",
@@ -4488,6 +4512,7 @@
       default_value: "1",
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "stroke",
@@ -4586,6 +4611,7 @@
       default_value: "1",
       converter: "ConvertAlpha",
       typedom_types: ["Number"],
+      accepts_numeric_literal: true,
     },
     {
       name: "stroke-width",
@@ -4663,6 +4689,16 @@
       keywords: ["start", "middle", "end"],
       default_value: "start",
       typedom_types: ["Keyword"],
+    },
+    {
+      name: "text-box-trim",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      field_group: "box",
+      field_template: "keyword",
+      default_value: "normal",
+      keywords: ["normal", "start", "end", "both"],
+      typedom_types: ["Keyword"],
+      runtime_flag: "CSSTextBoxTrim",
     },
     {
       name: "text-combine-upright",
@@ -4872,9 +4908,9 @@
       field_group: "*",
       field_size: 4,
       field_template: "primitive",
-      default_value: "kTextUnderlinePositionAuto",
-      name_for_methods: "TextUnderlinePosition",
-      type_name: "unsigned",
+      default_value: "TextUnderlinePosition::kAuto",
+      getter: "GetTextUnderlinePosition",
+      type_name: "TextUnderlinePosition",
       converter: "ConvertTextUnderlinePosition",
       keywords: ["auto", "from-font", "under", "left", "right"],
       typedom_types: ["Keyword"],
@@ -5300,6 +5336,7 @@
       field_template: "primitive",
       default_value: "0.0f",
       type_name: "float",
+      accepts_numeric_literal: true,
     },
     {
       name: "-webkit-box-ordinal-group",
@@ -5845,7 +5882,7 @@
       inherited: true,
       field_group: "*",
       field_template: "keyword",
-      keywords: ["auto", "none", "text", "all"],
+      keywords: ["auto", "none", "text", "all", "contain"],
       typedom_types: ["Keyword"],
       default_value: "auto",
     },
@@ -5854,14 +5891,30 @@
       property_methods: ["CSSValueFromComputedStyleInternal"],
       independent: false,  // Actually true, but setting it to false saves a precious bit in ComputedStyleBase.
       inherited: true,
-      field_template: "bitset_keyword",
+      // This property is "keyword" but use "primitive" to use `EWhiteSpace` defined manually.
+      field_template: "primitive",
+      field_size: 4,  // Ensure this is in sync with `kEWhiteSpaceBits`.
+      include_paths: ["third_party/blink/renderer/core/css/white_space.h"],
       keywords: [
-        "normal", "pre", "pre-wrap", "pre-line", "nowrap", "-webkit-nowrap", "break-spaces"
+        "normal", "pre", "pre-wrap", "pre-line", "nowrap", "break-spaces"
       ],
+      style_builder_custom_functions: ["initial", "inherit", "value"],
       typedom_types: ["Keyword"],
-      default_value: "normal",
+      default_value: "EWhiteSpace::kNormal",
       valid_for_cue: true,
       valid_for_marker: true,
+    },
+    {
+      name: "text-wrap",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      inherited: true,
+      field_template: "keyword",
+      keywords: ["wrap", "balance"],
+      default_value: "wrap",
+      typedom_types: ["Keyword"],
+      valid_for_cue: true,
+      valid_for_marker: true,
+      runtime_flag: "CSSTextWrap",
     },
     {
       name: "widows",
@@ -6552,11 +6605,25 @@
       valid_for_keyframe: false,
     },
     {
-      // Variant of the "animation" shorthand which includes new longhands from
-      // Scroll-Linked Animations.
-      // https://drafts.csswg.org/scroll-animations-1/
-      name: "-alternative-animation",
+      // Variant of the "animation" shorthand which includes the
+      // animation-timeline longhand.
+      name: "-alternative-animation-with-timeline",
       alternative_of: "animation",
+      longhands: [
+        "animation-duration", "animation-timing-function",
+        "animation-delay", "animation-iteration-count", "animation-direction",
+        "animation-fill-mode", "animation-play-state", "animation-name",
+        "animation-timeline"
+      ],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      valid_for_keyframe: false,
+      runtime_flag: 'CSSScrollTimeline',
+    },
+    {
+      // Variant of the "animation" shorthand which includes the
+      // animation-delay-start and animation-delay-end longhands.
+      name: "-alternative-animation-with-delay-start-end",
+      alternative_of: "-alternative-animation-with-timeline",
       longhands: [
         "animation-duration", "animation-timing-function",
         "animation-delay-start", "animation-delay-end",
@@ -6566,7 +6633,7 @@
       ],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       valid_for_keyframe: false,
-      runtime_flag: 'CSSScrollTimeline',
+      runtime_flag: 'CSSAnimationDelayStartEnd',
     },
     {
       name: "animation-range",
@@ -7676,10 +7743,16 @@
       // -webkit-animation directly to animation's alternative, because we have
       // to remember the -webkit-ness of the property to enable legacy parsing
       // behavior. (See CSSParserLocalContext::UseAliasParsing).
-      name: "-webkit-alternative-animation",
-      alias_for: "-alternative-animation",
+      name: "-webkit-alternative-animation-with-timeline",
+      alias_for: "-alternative-animation-with-timeline",
       alternative_of: "-webkit-animation",
       runtime_flag: "CSSScrollTimeline",
+    },
+    {
+      name: "-webkit-alternative-animation-with-delay-start-end",
+      alias_for: "-alternative-animation-with-delay-start-end",
+      alternative_of: "-webkit-alternative-animation-with-timeline",
+      runtime_flag: "CSSAnimationDelayStartEnd",
     },
     {
       name: "-webkit-animation-delay",
@@ -7689,7 +7762,7 @@
       name: "-webkit-alternative-animation-delay",
       alias_for: "-alternative-animation-delay",
       alternative_of: "-webkit-animation-delay",
-      runtime_flag: "CSSScrollTimeline",
+      runtime_flag: "CSSAnimationDelayStartEnd",
     },
     {
       name: "-webkit-animation-direction",

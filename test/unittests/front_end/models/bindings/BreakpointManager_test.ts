@@ -24,7 +24,9 @@ import {
 } from '../../helpers/MockConnection.js';
 import {MockProtocolBackend} from '../../helpers/MockScopeChain.js';
 import {setupPageResourceLoaderForSourceMap} from '../../helpers/SourceMapHelpers.js';
-import {createContentProviderUISourceCode, createFileSystemUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
+import {createContentProviderUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
+import {createFileSystemFileForPersistenceTests} from '../../helpers/PersistenceHelpers.js';
+import {encodeSourceMap} from '../../helpers/SourceMapEncoder.js';
 
 const {assert} = chai;
 
@@ -60,13 +62,26 @@ describeWithMockConnection('BreakpointManager', () => {
         Bindings.BreakpointManager.BreakpointOrigin.OTHER,
       ];
 
+  // For tests with source maps.
+  const ORIGINAL_SCRIPT_SOURCES_CONTENT = 'function foo() {\n  console.log(\'Hello\');\n}\n';
+  const COMPILED_SCRIPT_SOURCES_CONTENT = 'function foo(){console.log("Hello")}';
+  const SOURCE_MAP_URL = 'https://site/script.js.map' as Platform.DevToolsPath.UrlString;
+  const ORIGINAL_SCRIPT_SOURCE_URL = 'https://site/original-script.js' as Platform.DevToolsPath.UrlString;
+
+  // Created with `terser -m -o script.min.js --source-map "includeSources;url=script.min.js.map" original-script.js`
+  const sourceMapContent = JSON.stringify({
+    'version': 3,
+    'names': ['foo', 'console', 'log'],
+    'sources': ['/original-script.js'],
+    'sourcesContent': [ORIGINAL_SCRIPT_SOURCES_CONTENT],
+    'mappings': 'AAAA,SAASA,MACPC,QAAQC,IAAI,QACd',
+  });
+
   let target: SDK.Target.Target;
   let backend: MockProtocolBackend;
   let breakpointManager: Bindings.BreakpointManager.BreakpointManager;
   let debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding;
   beforeEach(async () => {
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.BREAKPOINT_VIEW, '', true);
-
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const targetManager = SDK.TargetManager.TargetManager.instance();
     const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
@@ -179,6 +194,7 @@ describeWithMockConnection('BreakpointManager', () => {
       // Set the breakpoint.
       const breakpoint =
           await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       const removedSpy = sinon.spy(breakpoint, 'remove');
       await breakpoint.updateBreakpoint();
@@ -186,6 +202,28 @@ describeWithMockConnection('BreakpointManager', () => {
       // Breakpoint was removed and is kept in storage.
       assert.isTrue(breakpoint.getIsRemoved());
       assert.isTrue(removedSpy.calledWith(true));
+    });
+
+    it('are only set if the uiSourceCode is still valid (not removed)', async () => {
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      assertNotNullOrUndefined(debuggerModel);
+
+      // Add a script.
+      const script = await backend.addScript(target, scriptDescription, null);
+      const uiSourceCode = await uiSourceCodeFromScript(debuggerModel, script);
+      assertNotNullOrUndefined(uiSourceCode);
+
+      // Remove the project (and thus the uiSourceCode).
+      Workspace.Workspace.WorkspaceImpl.instance().removeProject(uiSourceCode.project());
+
+      // Set the breakpoint.
+      const breakpoint =
+          await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+
+      // We should not expect any breakpoints to be set.
+      assert.isUndefined(breakpoint);
+      const breakLocations = breakpointManager.allBreakpointLocations();
+      assert.lengthOf(breakLocations, 0);
     });
   });
 
@@ -237,6 +275,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
     const {uiSourceCode, project} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Make sure that we await all updates that are triggered by adding the model.
     await breakpoint.updateBreakpoint();
@@ -284,6 +323,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
     const {uiSourceCode, project} = createContentProviderUISourceCode({url: URL, mimeType: 'text/javascript'});
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 13, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Make sure that we await all updates that are triggered by adding the model.
     await breakpoint.updateBreakpoint();
@@ -339,6 +379,7 @@ describeWithMockConnection('BreakpointManager', () => {
     });
 
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 13, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
     await breakpoint.updateBreakpoint();
 
     // Retrieve the ModelBreakpoint that is linked to our DebuggerModel.
@@ -373,6 +414,7 @@ describeWithMockConnection('BreakpointManager', () => {
     // Set the breakpoint.
     const breakpoint =
         await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
     // Concurrently, enforce update of the breakpoint in the debugger.
@@ -422,6 +464,7 @@ describeWithMockConnection('BreakpointManager', () => {
     // Set the breakpoint.
     const breakpoint =
         await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
     // Concurrently, enforce update of the breakpoint in the debugger.
@@ -461,6 +504,7 @@ describeWithMockConnection('BreakpointManager', () => {
     // Set the breakpoint on the front-end/model side.
     const breakpoint =
         await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 2, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
     assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [uiSourceCode]);
 
     // Await the breakpoint request at the mock backend and send a CDP response once the request arrives.
@@ -540,43 +584,19 @@ describeWithMockConnection('BreakpointManager', () => {
     });
 
     async function testBreakpointMovedOnInstrumentationBreak(
-        fileSystemDescription: {fileSystemPath: string, url: string, content: string, type?: string}) {
+        fileSystemPath: Platform.DevToolsPath.UrlString, fileSystemFileUrl: Platform.DevToolsPath.UrlString,
+        content: string, type?: string) {
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       assertNotNullOrUndefined(debuggerModel);
-      const mimeType = 'text/javascript';
-      const mainFrameId = 'main' as Protocol.Page.FrameId;
 
-      // Create resource that is required for binding the file system uiSourceCode and the
-      // network uiSourceCode.
-      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-      assertNotNullOrUndefined(resourceTreeModel);
-
-      const resource = new SDK.Resource.Resource(
-          resourceTreeModel, null, scriptDescription.url, scriptDescription.url, mainFrameId, null,
-          Common.ResourceType.ResourceType.fromMimeType('text/javascript'), mimeType, null,
-          scriptDescription.content.length);
-      const frame = resourceTreeModel.frameForId(mainFrameId);
-      assertNotNullOrUndefined(frame);
-
-      frame.addResource(resource);
-
-      // Create the file system uiSourceCode with the same metadata as the script's resource file.
-      const metadata = new Workspace.UISourceCode.UISourceCodeMetadata(resource.lastModified(), resource.contentSize());
-      const fileSystem = createFileSystemUISourceCode({
-        url: fileSystemDescription.url as Platform.DevToolsPath.UrlString,
-        content: fileSystemDescription.content,
-        fileSystemPath: fileSystemDescription.fileSystemPath,
-        mimeType,
-        metadata,
-        autoMapping: true,
-        type: fileSystemDescription.type,
-      });
+      const {uiSourceCode: fileSystemUiSourceCode, project} = createFileSystemFileForPersistenceTests(
+          {fileSystemFileUrl, fileSystemPath, type: type}, scriptDescription.url, content, target);
 
       const breakpointLine = 0;
       const resolvedBreakpointLine = 1;
 
       // Set the breakpoint on the file system uiSourceCode.
-      await breakpointManager.setBreakpoint(fileSystem.uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
+      await breakpointManager.setBreakpoint(fileSystemUiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
 
       // Add the script.
       const script = await backend.addScript(target, scriptDescription, null);
@@ -613,7 +633,7 @@ describeWithMockConnection('BreakpointManager', () => {
       assert.strictEqual(resolvedBreakpointLine, reloadedBoundLocations[0].uiLocation.lineNumber);
       assert.strictEqual(0, reloadedBoundLocations[0].uiLocation.columnNumber);
 
-      fileSystem.project.dispose();
+      project.dispose();
     }
 
     it('can restore breakpoints in scripts', async () => {
@@ -633,6 +653,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Set the breakpoint on the front-end/model side.
       const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, breakpointLine)({
@@ -721,6 +742,7 @@ describeWithMockConnection('BreakpointManager', () => {
       // Set the breakpoint on the front-end/model side. The line number is relative to the v8 script.
       const breakpoint =
           await breakpointManager.setBreakpoint(uiSourceCode, BREAKPOINT_SCRIPT_LINE, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE)({
@@ -828,6 +850,7 @@ describeWithMockConnection('BreakpointManager', () => {
       // Set the breakpoint on the front-end/model side of the html uiSourceCode.
       const breakpoint =
           await breakpointManager.setBreakpoint(uiSourceCode, INLINE_BREAKPOINT_RAW_LINE, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request to set a breakpoint on the raw location.
       void backend.responderToBreakpointByUrlRequest(URL_HTML, INLINE_BREAKPOINT_RAW_LINE)({
@@ -905,35 +928,24 @@ describeWithMockConnection('BreakpointManager', () => {
     });
 
     it('can restore breakpoints in source mapped scripts', async () => {
-      const sourcesContent = 'function foo() {\n  console.log(\'Hello\');\n}\n';
-      const sourceMapUrl = 'https://site/script.js.map' as Platform.DevToolsPath.UrlString;
-      const sourceURL = 'https://site/original-script.js' as Platform.DevToolsPath.UrlString;
-
-      // Created with `terser -m -o script.min.js --source-map "includeSources;url=script.min.js.map" original-script.js`
-      const sourceMapContent = JSON.stringify({
-        'version': 3,
-        'names': ['foo', 'console', 'log'],
-        'sources': ['/original-script.js'],
-        'sourcesContent': [sourcesContent],
-        'mappings': 'AAAA,SAASA,MACPC,QAAQC,IAAI,QACd',
-      });
       setupPageResourceLoaderForSourceMap(sourceMapContent);
 
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       assertNotNullOrUndefined(debuggerModel);
 
       // Add script with source map.
-      const scriptInfo = {url: URL, content: sourcesContent};
-      const sourceMapInfo = {url: sourceMapUrl, content: sourceMapContent};
+      const scriptInfo = {url: URL, content: COMPILED_SCRIPT_SOURCES_CONTENT};
+      const sourceMapInfo = {url: SOURCE_MAP_URL, content: sourceMapContent};
       const script = await backend.addScript(target, scriptInfo, sourceMapInfo);
 
       // Get the uiSourceCode for the original source.
       const uiSourceCode = await debuggerWorkspaceBinding.uiSourceCodeForSourceMapSourceURLPromise(
-          debuggerModel, sourceURL, script.isContentScript());
+          debuggerModel, ORIGINAL_SCRIPT_SOURCE_URL, script.isContentScript());
       assertNotNullOrUndefined(uiSourceCode);
 
       // Set the breakpoint on the front-end/model side.
       const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, 0)({
@@ -975,7 +987,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Get the uiSourceCode for the original source.
       const reloadedUiSourceCode = await debuggerWorkspaceBinding.uiSourceCodeForSourceMapSourceURLPromise(
-          reloadedDebuggerModel, sourceURL, reloadedScript.isContentScript());
+          reloadedDebuggerModel, ORIGINAL_SCRIPT_SOURCE_URL, reloadedScript.isContentScript());
       assertNotNullOrUndefined(uiSourceCode);
 
       const unboundLocation = breakpointManager.breakpointLocationsForUISourceCode(reloadedUiSourceCode);
@@ -1076,6 +1088,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Set the breakpoint on the front-end/model side.
       const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(breakpoint);
 
       // Set the breakpoint response for our upcoming request.
       void backend.responderToBreakpointByUrlRequest(URL, 0)({
@@ -1155,35 +1168,26 @@ describeWithMockConnection('BreakpointManager', () => {
       const workspace = Workspace.Workspace.WorkspaceImpl.instance();
       Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
       const fileName = Common.ParsedURL.ParsedURL.extractName(scriptDescription.url);
-      const fileSystemPath = 'file://path/to/filesystem';
 
-      const fileSystemResourceDescription = {
-        url: fileSystemPath + '/' + fileName,
-        fileSystemPath,
-        content: scriptDescription.content,
-      };
+      const fileSystemPath = 'file://path/to/filesystem' as Platform.DevToolsPath.UrlString;
+      const fileSystemFileUrl = fileSystemPath + '/' + fileName as Platform.DevToolsPath.UrlString;
 
-      await testBreakpointMovedOnInstrumentationBreak(fileSystemResourceDescription);
+      await testBreakpointMovedOnInstrumentationBreak(fileSystemPath, fileSystemFileUrl, scriptDescription.content);
     });
 
     it('can move breakpoints to network files that are set in override files', async () => {
-      Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '', true);
-
       const workspace = Workspace.Workspace.WorkspaceImpl.instance();
       SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
       Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
       Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance(
           {forceNew: true, workspace: Workspace.Workspace.WorkspaceImpl.instance()});
 
-      const fileSystemPath = 'file://path/to/overrides';
-      const fileSystemResourceDescription = {
-        url: fileSystemPath + '/site/script.js',
-        fileSystemPath,
-        content: scriptDescription.content,
-        type: 'overrides',
-      };
+      const fileSystemPath = 'file://path/to/overrides' as Platform.DevToolsPath.UrlString;
+      const fielSystemFileUrl = fileSystemPath + '/site/script.js' as Platform.DevToolsPath.UrlString;
+      const type = 'overrides';
+      const content = '';
 
-      await testBreakpointMovedOnInstrumentationBreak(fileSystemResourceDescription);
+      await testBreakpointMovedOnInstrumentationBreak(fileSystemPath, fielSystemFileUrl, content, type);
     });
   });
 
@@ -1219,10 +1223,12 @@ describeWithMockConnection('BreakpointManager', () => {
 
     // Set the breakpoint on the front-end/model side.
     const breakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
 
     // This breakpoint will slide to lineNumber: 0, columnNumber: 0 and thus
     // clash with the previous breakpoint.
     const slidingBreakpoint = await breakpointManager.setBreakpoint(uiSourceCode, 2, 0, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(slidingBreakpoint);
 
     // Wait until both breakpoints have run their updates.
     await breakpoint.refreshInDebugger();
@@ -1231,6 +1237,284 @@ describeWithMockConnection('BreakpointManager', () => {
     // The first breakpoint is kept on a clash, the second one should be removed.
     assert.isFalse(breakpoint.isRemoved);
     assert.isTrue(slidingBreakpoint.isRemoved);
+  });
+
+  it('Breakpoint does not keep file system source code alive after file system removal', async () => {
+    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+    const breakpointLine = 0;
+    const resolvedBreakpointLine = 1;
+
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const persistence =
+        Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance(
+        {forceNew: true, workspace: Workspace.Workspace.WorkspaceImpl.instance()});
+
+    // Create a file system project and source code.
+    const fileName = Common.ParsedURL.ParsedURL.extractName(scriptDescription.url);
+    const fileSystemPath = 'file://path/to/filesystem' as Platform.DevToolsPath.UrlString;
+    const fileSystemFileUrl = fileSystemPath + '/' + fileName as Platform.DevToolsPath.UrlString;
+    const {uiSourceCode: fileSystemUiSourceCode, project} = createFileSystemFileForPersistenceTests(
+        {fileSystemFileUrl, fileSystemPath}, scriptDescription.url, scriptDescription.content, target);
+
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    assertNotNullOrUndefined(debuggerModel);
+
+    // Add the same script via the debugger protocol.
+    const bindingCreatedPromise = persistence.once(Persistence.Persistence.Events.BindingCreated);
+    const script = await backend.addScript(target, scriptDescription, null);
+    const uiSourceCode = await uiSourceCodeFromScript(debuggerModel, script);
+    await bindingCreatedPromise;
+    assertNotNullOrUndefined(uiSourceCode);
+
+    // Set the breakpoint on the (network) script.
+    void backend.responderToBreakpointByUrlRequest(URL, breakpointLine)({
+      breakpointId: 'BREAK_ID' as Protocol.Debugger.BreakpointId,
+      locations: [
+        {
+          scriptId: script.scriptId,
+          lineNumber: resolvedBreakpointLine,
+          columnNumber: 0,
+        },
+      ],
+    });
+    await breakpointManager.setBreakpoint(uiSourceCode, breakpointLine, 0, ...DEFAULT_BREAKPOINT);
+
+    // Remove the file system project.
+    const bindingRemovedPromise = persistence.once(Persistence.Persistence.Events.BindingRemoved);
+    project.dispose();
+    // Make sure the binding is removed.
+    await bindingRemovedPromise;
+
+    // After this, the breakpoint manager should not refer to the file system source code anymore, but
+    // the file system breakpoint location should be in the storage.
+    assert.isEmpty(breakpointManager.breakpointLocationsForUISourceCode(fileSystemUiSourceCode));
+    assert.strictEqual(breakpointManager.storage.breakpointItems(fileSystemUiSourceCode.url()).length, 1);
+
+    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
+  });
+
+  describe('can correctly set breakpoints for all pre-registered targets', () => {
+    let mainUiSourceCode: Workspace.UISourceCode.UISourceCode;
+    let workerUiSourceCode: Workspace.UISourceCode.UISourceCode;
+
+    let workerScript: SDK.Script.Script;
+    let mainScript: SDK.Script.Script;
+
+    let breakpoint: Bindings.BreakpointManager.Breakpoint;
+
+    function waitForBreakpointLocationsAdded() {
+      let twoBreakpointLocationsCallback: () => void;
+      const twoBreakpointLocationsAddedPromise = new Promise<void>(resolve => {
+        twoBreakpointLocationsCallback = resolve;
+      });
+      breakpointManager.addEventListener(Bindings.BreakpointManager.Events.BreakpointAdded, () => {
+        if (breakpointManager.allBreakpointLocations().length === 2) {
+          twoBreakpointLocationsCallback();
+        }
+      });
+      return twoBreakpointLocationsAddedPromise;
+    }
+
+    beforeEach(async () => {
+      setupPageResourceLoaderForSourceMap(sourceMapContent);
+
+      // Create a worker target.
+      const workerTarget = createTarget({name: 'worker'});
+
+      // Add script with source map.
+      const scriptInfo = {url: URL, content: COMPILED_SCRIPT_SOURCES_CONTENT};
+      const sourceMapInfo = {url: SOURCE_MAP_URL, content: sourceMapContent};
+      mainScript = await backend.addScript(target, scriptInfo, sourceMapInfo);
+      workerScript = await backend.addScript(workerTarget, scriptInfo, sourceMapInfo);
+
+      // Get the uiSourceCode for the original source in the main target.
+      mainUiSourceCode = await debuggerWorkspaceBinding.uiSourceCodeForSourceMapSourceURLPromise(
+          mainScript.debuggerModel, ORIGINAL_SCRIPT_SOURCE_URL, mainScript.isContentScript());
+      assertNotNullOrUndefined(mainUiSourceCode);
+
+      // Get the uiSourceCode for the original source in the worker target.
+      workerUiSourceCode = await debuggerWorkspaceBinding.uiSourceCodeForSourceMapSourceURLPromise(
+          workerScript.debuggerModel, ORIGINAL_SCRIPT_SOURCE_URL, workerScript.isContentScript());
+      assertNotNullOrUndefined(mainUiSourceCode);
+
+      // Stub the 'modelAdded' function that is called in the Breakpoint prototype.
+      // The 'modelAdded' will kick off updating the debugger of each target
+      // as soon as a new breakpoint was created.
+      // By stubbing it and ignoring what should be done,
+      // we can manually call 'modelAdded' in the order that we want,
+      // and thus control which target is taken care of first.
+      const modelAddedStub =
+          sinon.stub(Bindings.BreakpointManager.Breakpoint.prototype, 'modelAdded').callsFake((() => {}));
+
+      // Set the breakpoint on the main target, but note that the debugger won't be updated.
+      const bp = await breakpointManager.setBreakpoint(mainUiSourceCode, 0, 0, ...DEFAULT_BREAKPOINT);
+      assertNotNullOrUndefined(bp);
+      breakpoint = bp;
+
+      // Now restore the actual behavior of 'modelAdded'.
+      modelAddedStub.restore();
+    });
+
+    it('if the target whose uiSourceCode was used for breakpoint setting is handled last', async () => {
+      // Handle setting breakpoint on the worker first.
+      breakpoint.modelAdded(workerScript.debuggerModel);
+      await backend.responderToBreakpointByUrlRequest(URL, 0)({
+        breakpointId: 'WORKER_ID' as Protocol.Debugger.BreakpointId,
+        locations: [
+          {
+            scriptId: workerScript.scriptId,
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+        ],
+      });
+
+      // Handle setting breakpoint on the main target next.
+      breakpoint.modelAdded(mainScript.debuggerModel);
+      await backend.responderToBreakpointByUrlRequest(URL, 0)({
+        breakpointId: 'MAIN_BREAK_ID' as Protocol.Debugger.BreakpointId,
+        locations: [
+          {
+            scriptId: mainScript.scriptId,
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+        ],
+      });
+
+      await waitForBreakpointLocationsAdded();
+
+      assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [mainUiSourceCode, workerUiSourceCode]);
+
+      const mainBoundLocations = breakpointManager.breakpointLocationsForUISourceCode(mainUiSourceCode);
+      assert.strictEqual(1, mainBoundLocations.length);
+
+      const workerBoundLocations = breakpointManager.breakpointLocationsForUISourceCode(workerUiSourceCode);
+      assert.strictEqual(1, workerBoundLocations.length);
+    });
+
+    it('if the target whose uiSourceCode was used for breakpoint setting is handled first', async () => {
+      // Handle setting breakpoint on the main target first.
+      breakpoint.modelAdded(mainScript.debuggerModel);
+      await backend.responderToBreakpointByUrlRequest(URL, 0)({
+        breakpointId: 'MAIN_BREAK_ID' as Protocol.Debugger.BreakpointId,
+        locations: [
+          {
+            scriptId: mainScript.scriptId,
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+        ],
+      });
+
+      // Handle setting breakpoint on the worker next.
+      breakpoint.modelAdded(workerScript.debuggerModel);
+      await backend.responderToBreakpointByUrlRequest(URL, 0)({
+        breakpointId: 'WORKER_ID' as Protocol.Debugger.BreakpointId,
+        locations: [
+          {
+            scriptId: workerScript.scriptId,
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+        ],
+      });
+
+      await waitForBreakpointLocationsAdded();
+
+      assert.deepEqual(Array.from(breakpoint.getUiSourceCodes()), [mainUiSourceCode, workerUiSourceCode]);
+
+      const mainBoundLocations = breakpointManager.breakpointLocationsForUISourceCode(mainUiSourceCode);
+      assert.strictEqual(1, mainBoundLocations.length);
+
+      const workerBoundLocations = breakpointManager.breakpointLocationsForUISourceCode(workerUiSourceCode);
+      assert.strictEqual(1, workerBoundLocations.length);
+    });
+  });
+
+  describe('supports modern Web development workflows', () => {
+    it('supports webpack code splitting', async () => {
+      // This is basically the "Shared code with webpack entry point code-splitting" scenario
+      // outlined in http://go/devtools-source-identities, where two routes (`route1.ts` and
+      // `route2.ts`) share some common code (`shared.ts`), and webpack is configured to spit
+      // out a dedicated bundle for each route (`route1.js` and `route2.js`). The demo can be
+      // found at https://devtools-source-identities.glitch.me/webpack-code-split/ for further
+      // reference.
+      const sourceRoot = 'webpack:///src';
+
+      // Load the script and source map for the first route.
+      const route1ScriptInfo = {
+        url: 'http://example.com/route1.js',
+        content: 'function f(x){}\nf(1)',
+      };
+      const route1SourceMapInfo = {
+        url: `${route1ScriptInfo.url}.map`,
+        content: encodeSourceMap(['0:0 => shared.ts:0:0', '1:0 => route1.ts:0:0'], sourceRoot),
+      };
+      const [firstSharedUISourceCode, route1Script] = await Promise.all([
+        debuggerWorkspaceBinding.waitForUISourceCodeAdded(
+            `${sourceRoot}/shared.ts` as Platform.DevToolsPath.UrlString, target),
+        backend.addScript(target, route1ScriptInfo, route1SourceMapInfo),
+      ]);
+
+      // Set a breakpoint in `shared.ts`.
+      await Promise.all([
+        backend.responderToBreakpointByUrlRequest(route1ScriptInfo.url, 0)({
+          breakpointId: 'ROUTE1_JS_BREAK_INITIAL_ID' as Protocol.Debugger.BreakpointId,
+          locations: [
+            {
+              scriptId: route1Script.scriptId,
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+          ],
+        }),
+        breakpointManager.setBreakpoint(firstSharedUISourceCode, 0, 0, ...DEFAULT_BREAKPOINT),
+      ]);
+
+      // Now inject a second route that also references `shared.ts`, which should trigger
+      // removal of the original breakpoint in `route1.js`.
+      const route2ScriptInfo = {
+        url: 'http://example.com/route2.js',
+        content: 'function f(x){}\nf(2)',
+      };
+      const route2SourceMapInfo = {
+        url: `${route2ScriptInfo.url}.map`,
+        content: encodeSourceMap(['0:0 => shared.ts:0:0', '1:0 => route2.ts:0:0'], sourceRoot),
+      };
+      const route1SetBreakpointByUrlRequest = backend.responderToBreakpointByUrlRequest(route1ScriptInfo.url, 0);
+      const route2SetBreakpointByUrlRequest = backend.responderToBreakpointByUrlRequest(route2ScriptInfo.url, 0);
+      const [, route2Script] = await Promise.all([
+        backend.breakpointRemovedPromise('ROUTE1_JS_BREAK_INITIAL_ID' as Protocol.Debugger.BreakpointId),
+        backend.addScript(target, route2ScriptInfo, route2SourceMapInfo),
+      ]);
+
+      // Now the BreakpointManager should migrate the breakpoints from the
+      // first `shared.ts` to the second `shared.ts`.
+      await Promise.all([
+        route1SetBreakpointByUrlRequest({
+          breakpointId: 'ROUTE1_JS_BREAK_ID' as Protocol.Debugger.BreakpointId,
+          locations: [
+            {
+              scriptId: route1Script.scriptId,
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+          ],
+        }),
+        route2SetBreakpointByUrlRequest({
+          breakpointId: 'ROUTE2_JS_BREAK_ID' as Protocol.Debugger.BreakpointId,
+          locations: [
+            {
+              scriptId: route2Script.scriptId,
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+          ],
+        }),
+      ]);
+    });
   });
 });
 

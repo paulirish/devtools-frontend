@@ -226,8 +226,8 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
             .html`<a class="devtools-link" role="link" tabindex="0" href="chrome://serviceworker-internals" target="_blank" style="display: inline; cursor: pointer;">${
                 i18nString(UIStrings.seeAllRegistrations)}</a>`;
     self.onInvokeElement(seeOthers, event => {
-      const mainTarget = SDK.TargetManager.TargetManager.instance().mainTarget();
-      mainTarget && mainTarget.targetAgent().invoke_createTarget({url: 'chrome://serviceworker-internals?devtools'});
+      const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
+      rootTarget && rootTarget.targetAgent().invoke_createTarget({url: 'chrome://serviceworker-internals?devtools'});
       event.consume(true);
     });
     othersSectionRow.appendChild(seeOthers);
@@ -277,7 +277,7 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
   }
 
   modelAdded(serviceWorkerManager: SDK.ServiceWorkerManager.ServiceWorkerManager): void {
-    if (serviceWorkerManager.target() !== SDK.TargetManager.TargetManager.instance().mainFrameTarget()) {
+    if (serviceWorkerManager.target() !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
       return;
     }
     this.manager = serviceWorkerManager;

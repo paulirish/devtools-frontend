@@ -5,6 +5,13 @@
 export const generatedProperties = [
  {
   "longhands": [
+   "animation-delay-start",
+   "animation-delay-end"
+  ],
+  "name": "-alternative-animation-delay"
+ },
+ {
+  "longhands": [
    "animation-duration",
    "animation-timing-function",
    "animation-delay-start",
@@ -16,14 +23,21 @@ export const generatedProperties = [
    "animation-name",
    "animation-timeline"
   ],
-  "name": "-alternative-animation"
+  "name": "-alternative-animation-with-delay-start-end"
  },
  {
   "longhands": [
-   "animation-delay-start",
-   "animation-delay-end"
+   "animation-duration",
+   "animation-timing-function",
+   "animation-delay",
+   "animation-iteration-count",
+   "animation-direction",
+   "animation-fill-mode",
+   "animation-play-state",
+   "animation-name",
+   "animation-timeline"
   ],
-  "name": "-alternative-animation-delay"
+  "name": "-alternative-animation-with-timeline"
  },
  {
   "inherited": true,
@@ -355,6 +369,12 @@ export const generatedProperties = [
  },
  {
   "name": "all"
+ },
+ {
+  "keywords": [
+   "none"
+  ],
+  "name": "anchor-default"
  },
  {
   "keywords": [
@@ -3142,6 +3162,15 @@ export const generatedProperties = [
   "name": "text-anchor"
  },
  {
+  "keywords": [
+   "normal",
+   "start",
+   "end",
+   "both"
+  ],
+  "name": "text-box-trim"
+ },
+ {
   "inherited": true,
   "keywords": [
    "none",
@@ -3300,6 +3329,14 @@ export const generatedProperties = [
   "name": "text-underline-position"
  },
  {
+  "inherited": true,
+  "keywords": [
+   "wrap",
+   "balance"
+  ],
+  "name": "text-wrap"
+ },
+ {
   "longhands": [
    "toggle-root",
    "toggle-trigger"
@@ -3441,7 +3478,8 @@ export const generatedProperties = [
    "auto",
    "none",
    "text",
-   "all"
+   "all",
+   "contain"
   ],
   "name": "user-select"
  },
@@ -3502,7 +3540,6 @@ export const generatedProperties = [
    "pre-wrap",
    "pre-line",
    "nowrap",
-   "-webkit-nowrap",
    "break-spaces"
   ],
   "name": "white-space"
@@ -3674,6 +3711,11 @@ export const generatedPropertyValues = {
    "after-edge",
    "text-after-edge",
    "hanging"
+  ]
+ },
+ "anchor-default": {
+  "values": [
+   "none"
   ]
  },
  "anchor-name": {
@@ -5178,6 +5220,14 @@ export const generatedPropertyValues = {
    "end"
   ]
  },
+ "text-box-trim": {
+  "values": [
+   "normal",
+   "start",
+   "end",
+   "both"
+  ]
+ },
  "text-combine-upright": {
   "values": [
    "none",
@@ -5281,6 +5331,12 @@ export const generatedPropertyValues = {
    "right"
   ]
  },
+ "text-wrap": {
+  "values": [
+   "wrap",
+   "balance"
+  ]
+ },
  "toggle-group": {
   "values": [
    "none"
@@ -5378,7 +5434,8 @@ export const generatedPropertyValues = {
    "auto",
    "none",
    "text",
-   "all"
+   "all",
+   "contain"
   ]
  },
  "vector-effect": {
@@ -5416,7 +5473,6 @@ export const generatedPropertyValues = {
    "pre-wrap",
    "pre-line",
    "nowrap",
-   "-webkit-nowrap",
    "break-spaces"
   ]
  },
@@ -5509,12 +5565,16 @@ export const generatedAliasesFor = new Map([
   "align-self"
  ],
  [
-  "-webkit-alternative-animation",
-  "-alternative-animation"
- ],
- [
   "-webkit-alternative-animation-delay",
   "-alternative-animation-delay"
+ ],
+ [
+  "-webkit-alternative-animation-with-delay-start-end",
+  "-alternative-animation-with-delay-start-end"
+ ],
+ [
+  "-webkit-alternative-animation-with-timeline",
+  "-alternative-animation-with-timeline"
  ],
  [
   "-webkit-animation",

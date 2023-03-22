@@ -841,8 +841,8 @@ export class ToolbarMenuButton extends ToolbarButton {
     }
     const contextMenu = new ContextMenu(event, {
       useSoftMenu: this.useSoftMenu,
-      x: this.element.totalOffsetLeft(),
-      y: this.element.totalOffsetTop() + this.element.offsetHeight,
+      x: this.element.getBoundingClientRect().left,
+      y: this.element.getBoundingClientRect().top + this.element.offsetHeight,
     });
     this.contextMenuHandler(contextMenu);
     void contextMenu.show();
@@ -1103,7 +1103,7 @@ export function registerToolbarItem(registration: ToolbarItemRegistration): void
 
 function getRegisteredToolbarItems(): ToolbarItemRegistration[] {
   return registeredToolbarItems.filter(
-      item => Root.Runtime.Runtime.isDescriptorEnabled({experiment: undefined, condition: item.condition}));
+      item => Root.Runtime.Runtime.isDescriptorEnabled({experiment: item.experiment, condition: item.condition}));
 }
 
 export interface ToolbarItemRegistration {
@@ -1114,6 +1114,7 @@ export interface ToolbarItemRegistration {
   actionId?: string;
   condition?: string;
   loadItem?: (() => Promise<Provider>);
+  experiment?: string;
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

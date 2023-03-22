@@ -70,6 +70,14 @@ const UIStrings = {
    */
   doNotAutocompleteFromHistory: 'Do not autocomplete from history',
   /**
+   * @description Title of a setting under the Console category that controls whether to accept autocompletion with Enter.
+   */
+  autocompleteOnEnter: 'Accept autocomplete suggestion on Enter',
+  /**
+   * @description Title of a setting under the Console category that controls whether to accept autocompletion with Enter.
+   */
+  doNotAutocompleteOnEnter: 'Do not accept autocomplete suggestion on Enter',
+  /**
    *@description Title of a setting under the Console category that can be invoked through the Command Menu
    */
   groupSimilarMessagesInConsole: 'Group similar messages in console',
@@ -98,9 +106,9 @@ const UIStrings = {
    */
   doNotEagerlyEvaluateConsole: 'Do not eagerly evaluate console prompt text',
   /**
-   *@description Title of a setting under the Console category in Settings
+   *@description Allows code that is executed in the console to do things that usually are only allowed if triggered by a user action
    */
-  evaluateTriggersUserActivation: 'Evaluate triggers user activation',
+  evaluateTriggersUserActivation: 'Treat code evaluation as user action',
   /**
    *@description Title of a setting under the Console category that can be invoked through the Command Menu
    */
@@ -112,11 +120,11 @@ const UIStrings = {
   /**
    * @description Title of a setting under the Console category in Settings that controls whether `console.trace()` messages appear expanded by default.
    */
-  expandConsoleTraceMessagesByDefault: 'Expand `console.trace()` messages by default',
+  expandConsoleTraceMessagesByDefault: 'Automatically expand `console.trace()` messages',
   /**
    * @description Title of a setting under the Console category in Settings that controls whether `console.trace()` messages appear collapsed by default.
    */
-  collapseConsoleTraceMessagesByDefault: 'Collapse `console.trace()` messages by default',
+  collapseConsoleTraceMessagesByDefault: 'Do not automatically expand `console.trace()` messages',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/console/console-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -304,6 +312,25 @@ Common.Settings.registerSettingExtension({
     {
       value: false,
       title: i18nLazyString(UIStrings.doNotAutocompleteFromHistory),
+    },
+  ],
+});
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.CONSOLE,
+  storageType: Common.Settings.SettingStorageType.Synced,
+  title: i18nLazyString(UIStrings.autocompleteOnEnter),
+  settingName: 'consoleAutocompleteOnEnter',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: false,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.autocompleteOnEnter),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotAutocompleteOnEnter),
     },
   ],
 });

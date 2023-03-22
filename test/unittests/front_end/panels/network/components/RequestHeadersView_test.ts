@@ -27,6 +27,7 @@ import {describeWithMockConnection} from '../../../helpers/MockConnection.js';
 import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
 import {createFileSystemUISourceCode} from '../../../helpers/UISourceCodeHelpers.js';
 import {createWorkspaceProject, setUpEnvironment} from '../../../helpers/OverridesHelpers.js';
+import {recordedMetricsContain, resetRecordedMetrics} from '../../../helpers/UserMetricsHelpers.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -107,9 +108,9 @@ describeWithMockConnection('RequestHeadersView', () => {
   let component: HTMLElement|null|undefined = null;
 
   beforeEach(() => {
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
     setUpEnvironment();
+    resetRecordedMetrics();
   });
 
   afterEach(async () => {
@@ -433,6 +434,42 @@ describeWithMockConnection('RequestHeadersView', () => {
     await coordinator.done();
 
     checkRow(headerRow.shadowRoot, 'foo:', 'bar', true);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideEnableEditingClicked));
+  });
+
+  it('records metrics when a new \'.headers\' file is created', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId, 'https://www.example.com/' as Platform.DevToolsPath.UrlString,
+        '' as Platform.DevToolsPath.UrlString, null, null, null);
+    request.responseHeaders = [
+      {name: 'foo', value: 'bar'},
+    ];
+    await createWorkspaceProject('file:///path/to/overrides' as Platform.DevToolsPath.UrlString, []);
+
+    component = await renderHeadersComponent(request);
+    assertShadowRoot(component.shadowRoot);
+    const responseHeaderSection = component.shadowRoot.querySelector('devtools-response-header-section');
+    assertElement(responseHeaderSection, HTMLElement);
+    assertShadowRoot(responseHeaderSection.shadowRoot);
+    const headerRow = responseHeaderSection.shadowRoot.querySelector('devtools-header-section-row');
+    assertElement(headerRow, HTMLElement);
+    assertShadowRoot(headerRow.shadowRoot);
+
+    const pencilButton = headerRow.shadowRoot.querySelector('.enable-editing');
+    assertElement(pencilButton, HTMLElement);
+
+    assert.isFalse(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideFileCreated));
+
+    pencilButton.click();
+    await coordinator.done();
+
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideFileCreated));
   });
 });
 

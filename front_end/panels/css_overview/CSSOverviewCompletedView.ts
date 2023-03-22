@@ -22,7 +22,7 @@ import {
   type PopulateNodesEventNodes,
   type PopulateNodesEventNodeTypes,
 } from './CSSOverviewController.js';
-import {CSSOverviewSidebarPanel, SidebarEvents} from './CSSOverviewSidebarPanel.js';
+import {CSSOverviewSidebarPanel, SidebarEvents, type ItemSelectedEvent} from './CSSOverviewSidebarPanel.js';
 import {type UnusedDeclaration} from './CSSOverviewUnusedDeclarations.js';
 
 const UIStrings = {
@@ -305,14 +305,19 @@ export class CSSOverviewCompletedView extends UI.Panel.PanelWithSidebar {
     this.#domModel = domModel;
   }
 
-  #sideBarItemSelected(event: Common.EventTarget.EventTargetEvent<string>): void {
+  #sideBarItemSelected(event: Common.EventTarget.EventTargetEvent<ItemSelectedEvent>): void {
     const {data} = event;
-    const section = (this.#fragment as UI.Fragment.Fragment).$(data);
+    const section = (this.#fragment as UI.Fragment.Fragment).$(data.id);
     if (!section) {
       return;
     }
 
     section.scrollIntoView();
+    // Set focus for keyboard invoked event
+    if (!data.isMouseEvent) {
+      const focusableElement: HTMLElement|null = section.querySelector('button, [tabindex="0"]');
+      focusableElement?.focus();
+    }
   }
 
   #sideBarReset(): void {
@@ -739,13 +744,15 @@ export class CSSOverviewCompletedView extends UI.Panel.PanelWithSidebar {
 
     const showAPCA = Root.Runtime.experiments.isEnabled('APCA');
 
-    const blockFragment = UI.Fragment.Fragment.build`<li>
-      <button
-        title="${i18nString(UIStrings.textColorSOverSBackgroundResults, {
+    const title = i18nString(UIStrings.textColorSOverSBackgroundResults, {
       PH1: color,
       PH2: backgroundColor,
       PH3: issues.length,
-    })}"
+    });
+
+    const blockFragment = UI.Fragment.Fragment.build`<li>
+      <button
+        title="${title}" aria-label="${title}"
         data-type="contrast" data-key="${key}" data-section="contrast" class="block" $="color">
         Text
       </button>
@@ -794,8 +801,9 @@ export class CSSOverviewCompletedView extends UI.Panel.PanelWithSidebar {
 
   #colorsToFragment(section: string, color: string): UI.Fragment.Fragment|undefined {
     const blockFragment = UI.Fragment.Fragment.build`<li>
-      <button data-type="color" data-color="${color}" data-section="${section}" class="block" $="color"></button>
-      <div class="block-title color-text" title=${color}>${color}</div>
+      <button title=${color} data-type="color" data-color="${color}"
+        data-section="${section}" class="block" $="color"></button>
+      <div class="block-title color-text">${color}</div>
     </li>`;
 
     const block = (blockFragment.$('color') as HTMLElement);

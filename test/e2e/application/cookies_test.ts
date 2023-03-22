@@ -14,6 +14,7 @@ import {
   waitForFunction,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
+import {assertMatchesJSONSnapshot} from '../../shared/snapshots.js';
 import {
   clearStorageItems,
   clearStorageItemsFilter,
@@ -51,24 +52,7 @@ describe('The Application Tab', async () => {
     await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
 
     const dataGridRowValues = await getStorageItemsData(['name', 'value']);
-    assert.deepEqual(dataGridRowValues, [
-      {
-        name: 'urlencoded',
-        value: 'Hello%2BWorld!',
-      },
-      {
-        name: '__Host-foo3',
-        value: 'bar',
-      },
-      {
-        name: 'foo2',
-        value: 'bar',
-      },
-      {
-        name: 'foo',
-        value: 'bar',
-      },
-    ]);
+    assertMatchesJSONSnapshot(dataGridRowValues);
   });
 
   it('shows a preview of the cookie value (crbug.com/462370)', async () => {
@@ -132,7 +116,7 @@ describe('The Application Tab', async () => {
       return previewValue === 'Hello%2BWorld!';
     });
 
-    await click('[aria-label="Show URL decoded"]');
+    await click('[aria-label="Show URL-decoded"]');
 
     await waitForFunction(async () => {
       const previewValueNode = await waitFor('.cookie-preview-widget-cookie-value');

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Host from '../../../core/host/host.js';
 import type * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {
   assertInstanceOf,
@@ -34,7 +34,7 @@ abstract class WebVitalsLane {
       good: styles.getPropertyValue('--lighthouse-green'),
       medium: styles.getPropertyValue('--lighthouse-orange'),
       bad: styles.getPropertyValue('--lighthouse-red'),
-      frame: styles.getPropertyValue('--color-primary'),
+      frame: styles.getPropertyValue('--color-primary-old'),
       textPrimary: styles.getPropertyValue('--color-text-primary'),
       textSecondary: styles.getPropertyValue('--color-text-secondary'),
       background: styles.getPropertyValue('--color-background'),
@@ -58,7 +58,7 @@ abstract class WebVitalsLane {
     const upperCaseLabel = label.toLocaleUpperCase();
     this.context.save();
 
-    this.context.font = '9px ' + Host.Platform.fontFamily();
+    this.context.font = '9px ' + PerfUI.Font.getFontFamilyForCanvas();
     const text = this.context.measureText(upperCaseLabel);
     const height = text.actualBoundingBoxAscent - text.actualBoundingBoxDescent;
     this.context.fillStyle = this.theme.background50;
@@ -125,7 +125,7 @@ export class WebVitalsEventLane extends WebVitalsLane {
 
   #measureLabel(label: string): TextMetrics {
     this.context.save();
-    this.context.font = '11px ' + Host.Platform.fontFamily();
+    this.context.font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
     const textMetrics = this.context.measureText(label);
     this.context.restore();
     return textMetrics;
@@ -133,7 +133,7 @@ export class WebVitalsEventLane extends WebVitalsLane {
 
   #measureTimestamp(timestamp: string): TextMetrics {
     this.context.save();
-    this.context.font = '11px ' + Host.Platform.fontFamily();
+    this.context.font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
     const textMetrics = this.context.measureText(timestamp);
     this.context.restore();
     return textMetrics;
@@ -141,7 +141,7 @@ export class WebVitalsEventLane extends WebVitalsLane {
 
   #getMarker(event: Event): Marker {
     const markerType = this.#getMarkerType(event);
-    const timestamp = this.timeline.getTimeSinceLastMainFrameNavigation(event.timestamp);
+    const timestamp = this.timeline.getTimeSinceLastPrimaryPageChange(event.timestamp);
     const timestampLabel = i18n.TimeUtilities.preciseMillisToString(timestamp, 1);
     const timestampMetrics = this.#measureTimestamp(timestampLabel);
     const widthIncludingLabel = 10 + 5 + this.#labelMetrics.width + 5;
@@ -159,7 +159,7 @@ export class WebVitalsEventLane extends WebVitalsLane {
 
   #renderLabel(position: number, label: string, textMetrics: TextMetrics): void {
     this.context.save();
-    this.context.font = '11px ' + Host.Platform.fontFamily();
+    this.context.font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
     const height = textMetrics.actualBoundingBoxAscent - textMetrics.actualBoundingBoxDescent;
     this.context.fillStyle = this.theme.textPrimary;
     this.context.fillText(
@@ -170,7 +170,7 @@ export class WebVitalsEventLane extends WebVitalsLane {
 
   #renderTimestamp(position: number, textWidth: number, timestamp: string, textMetrics: TextMetrics): void {
     this.context.save();
-    this.context.font = '11px ' + Host.Platform.fontFamily();
+    this.context.font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
     const height = textMetrics.actualBoundingBoxAscent - textMetrics.actualBoundingBoxDescent;
     this.context.fillStyle = this.theme.textSecondary;
     this.context.fillText(

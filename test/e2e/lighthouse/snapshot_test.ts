@@ -21,11 +21,16 @@ import {
 // This test will fail (by default) in headful mode, as the target page never gets painted.
 // To resolve this when debugging, just make sure the target page is visible during the lighthouse run.
 
-describe('Snapshot', async function() {
+describe.skipOnParallel('Snapshot', async function() {
   // The tests in this suite are particularly slow
-  this.timeout(60_000);
+  if (this.timeout() !== 0) {
+    this.timeout(60_000);
+  }
 
   beforeEach(() => {
+    // https://github.com/GoogleChrome/lighthouse/issues/14572
+    expectError(/Request CacheStorage\.requestCacheNames failed/);
+
     // https://bugs.chromium.org/p/chromium/issues/detail?id=1357791
     expectError(/Protocol Error: the message with wrong session id/);
     expectError(/Protocol Error: the message with wrong session id/);
@@ -66,16 +71,16 @@ describe('Snapshot', async function() {
     assert.strictEqual(lhr.gatherMode, 'snapshot');
 
     assert.deepStrictEqual(artifacts.ViewportDimensions, {
-      innerHeight: 640,
-      innerWidth: 360,
-      outerHeight: 640,
-      outerWidth: 360,
-      devicePixelRatio: 3,
+      innerHeight: 823,
+      innerWidth: 412,
+      outerHeight: 823,
+      outerWidth: 412,
+      devicePixelRatio: 1.75,
     });
 
     const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr);
-    assert.strictEqual(auditResults.length, 73);
-    assert.strictEqual(erroredAudits.length, 0);
+    assert.strictEqual(auditResults.length, 71);
+    assert.deepStrictEqual(erroredAudits, []);
     assert.deepStrictEqual(failedAudits.map(audit => audit.id), [
       'document-title',
       'html-has-lang',

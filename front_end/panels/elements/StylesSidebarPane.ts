@@ -71,6 +71,8 @@ import {
 import * as LayersWidget from './LayersWidget.js';
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 
+import {WebCustomData} from './WebCustomData.js';
+
 const UIStrings = {
   /**
    *@description No matches element text content in Styles Sidebar Pane of the Elements panel
@@ -228,6 +230,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   private readonly boundOnScroll: (event: Event) => void;
 
   private readonly imagePreviewPopover: ImagePreviewPopover;
+  #webCustomData?: WebCustomData;
   #hintPopoverHelper: UI.PopoverHelper.PopoverHelper;
   activeCSSAngle: InlineEditor.CSSAngle.CSSAngle|null;
   #urlToChangeTracker: Map<Platform.DevToolsPath.UrlString, ChangeTracker> = new Map();
@@ -235,8 +238,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   #updateAbortController?: AbortController;
   #updateComputedStylesAbortController?: AbortController;
 
-  static instance(): StylesSidebarPane {
-    if (!stylesSidebarPaneInstance) {
+  static instance(opts?: {forceNew: boolean}): StylesSidebarPane {
+    if (!stylesSidebarPaneInstance || opts?.forceNew) {
       stylesSidebarPaneInstance = new StylesSidebarPane();
     }
     return stylesSidebarPaneInstance;
@@ -303,33 +306,65 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
     this.activeCSSAngle = null;
 
-    this.#hintPopoverHelper = new UI.PopoverHelper.PopoverHelper(this.contentElement, event => {
-      const icon = event.composedPath()[0] as Element;
-
-      if (!icon) {
-        return null;
-      }
-
-      if (!icon.matches('.hint')) {
-        return null;
-      }
-
-      const hint = activeHints.get(icon);
-
-      if (!hint) {
-        return null;
-      }
-
-      return {
-        box: icon.boxInWindow(),
-        show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
-          const popupElement = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(hint);
-          popover.contentElement.appendChild(popupElement);
-          return true;
-        },
-      };
+    const showDocumentationSetting =
+        Common.Settings.Settings.instance().moduleSetting('showCSSPropertyDocumentationOnHover');
+    showDocumentationSetting.addChangeListener(event => {
+      const metricType = Boolean(event.data) ? Host.UserMetrics.CSSPropertyDocumentation.ToggledOn :
+                                               Host.UserMetrics.CSSPropertyDocumentation.ToggledOff;
+      Host.userMetrics.cssPropertyDocumentation(metricType);
     });
-    this.#hintPopoverHelper.setTimeout(200);
+    if (showDocumentationSetting.get()) {
+      this.#webCustomData = WebCustomData.create();
+    }
+
+    this.#hintPopoverHelper = new UI.PopoverHelper.PopoverHelper(this.contentElement, event => {
+      const hoveredNode = event.composedPath()[0] as Element;
+
+      if (!hoveredNode) {
+        return null;
+      }
+
+      if (hoveredNode.matches('.hint')) {
+        const hint = activeHints.get(hoveredNode);
+
+        if (hint) {
+          return {
+            box: hoveredNode.boxInWindow(),
+            show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
+              const popupElement = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView(hint);
+              popover.contentElement.appendChild(popupElement);
+              return true;
+            },
+          };
+        }
+      }
+
+      if (showDocumentationSetting.get() && hoveredNode.matches('.webkit-css-property')) {
+        if (!this.#webCustomData) {
+          this.#webCustomData = WebCustomData.create();
+        }
+
+        const cssPropertyName = hoveredNode.textContent;
+        const cssProperty = cssPropertyName && this.#webCustomData.findCssProperty(cssPropertyName);
+
+        if (cssProperty) {
+          return {
+            box: hoveredNode.boxInWindow(),
+            show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
+              const popupElement = new ElementsComponents.CSSPropertyDocsView.CSSPropertyDocsView(cssProperty);
+              popover.contentElement.appendChild(popupElement);
+              Host.userMetrics.cssPropertyDocumentation(Host.UserMetrics.CSSPropertyDocumentation.Shown);
+              return true;
+            },
+          };
+        }
+      }
+
+      return null;
+    });
+
+    this.#hintPopoverHelper.setDisableOnClick(true);
+    this.#hintPopoverHelper.setTimeout(300);
     this.#hintPopoverHelper.setHasPadding(true);
   }
 
@@ -2060,6 +2095,7 @@ export class StylesSidebarPropertyRenderer {
   private angleHandler: ((arg0: string) => Node)|null;
   private lengthHandler: ((arg0: string) => Node)|null;
   private animationNameHandler: ((data: string) => Node)|null;
+  private animationHandler: ((data: string) => Node)|null;
 
   constructor(rule: SDK.CSSRule.CSSRule|null, node: SDK.DOMModel.DOMNode|null, name: string, value: string) {
     this.rule = rule;
@@ -2076,6 +2112,7 @@ export class StylesSidebarPropertyRenderer {
     this.animationNameHandler = null;
     this.angleHandler = null;
     this.lengthHandler = null;
+    this.animationHandler = null;
   }
 
   setColorHandler(handler: (arg0: string) => Node): void {
@@ -2108,6 +2145,10 @@ export class StylesSidebarPropertyRenderer {
 
   setAnimationNameHandler(handler: (arg0: string) => Node): void {
     this.animationNameHandler = handler;
+  }
+
+  setAnimationHandler(handler: (arg0: string) => Node): void {
+    this.animationHandler = handler;
   }
 
   setAngleHandler(handler: (arg0: string) => Node): void {
@@ -2146,6 +2187,12 @@ export class StylesSidebarPropertyRenderer {
 
     if (this.gridHandler && metadata.isGridAreaDefiningProperty(this.propertyName)) {
       valueElement.appendChild(this.gridHandler(this.propertyValue, this.propertyName));
+      valueElement.normalize();
+      return valueElement;
+    }
+
+    if (this.animationHandler && (this.propertyName === 'animation' || this.propertyName === '-webkit-animation')) {
+      valueElement.appendChild(this.animationHandler(this.propertyValue));
       valueElement.normalize();
       return valueElement;
     }

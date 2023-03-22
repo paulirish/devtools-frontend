@@ -12,11 +12,6 @@ describe('GPUHandler', () => {
     TraceModel.Handlers.ModelHandlers.GPU.initialize();
   });
 
-  afterEach(() => {
-    TraceModel.Handlers.ModelHandlers.Meta.reset();
-    TraceModel.Handlers.ModelHandlers.GPU.reset();
-  });
-
   it('finds all the GPU Tasks for the main GPU Thread', async () => {
     const events = await loadEventsFromTraceFile('threejs-gpu.json.gz');
 

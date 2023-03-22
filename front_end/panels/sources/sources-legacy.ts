@@ -16,7 +16,6 @@ Sources.AddSourceMapURLDialog = SourcesModule.AddSourceMapURLDialog.AddSourceMap
 
 /** @constructor */
 Sources.BreakpointEditDialog = SourcesModule.BreakpointEditDialog.BreakpointEditDialog;
-Sources.BreakpointEditDialog.BreakpointType = SourcesModule.BreakpointEditDialog.BreakpointType;
 
 /** @constructor */
 Sources.CallStackSidebarPane = SourcesModule.CallStackSidebarPane.CallStackSidebarPane;
@@ -68,13 +67,6 @@ Sources.GoToLineQuickOpen = SourcesModule.GoToLineQuickOpen.GoToLineQuickOpen;
 
 /** @constructor */
 Sources.InplaceFormatterEditorAction = SourcesModule.InplaceFormatterEditorAction.InplaceFormatterEditorAction;
-
-/** @constructor */
-Sources.JavaScriptBreakpointsSidebarPane =
-    SourcesModule.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane;
-
-Sources.JavaScriptBreakpointsSidebarPane.retrieveLocationForElement =
-    SourcesModule.JavaScriptBreakpointsSidebarPane.retrieveLocationForElement;
 
 /** @constructor */
 Sources.NavigatorView = SourcesModule.NavigatorView.NavigatorView;

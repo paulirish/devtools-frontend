@@ -98,6 +98,12 @@ declare namespace ProtocolProxyApi {
 
     Media: MediaApi;
 
+    DeviceAccess: DeviceAccessApi;
+
+    Preload: PreloadApi;
+
+    FedCm: FedCmApi;
+
     Debugger: DebuggerApi;
 
     HeapProfiler: HeapProfilerApi;
@@ -190,6 +196,12 @@ declare namespace ProtocolProxyApi {
     WebAuthn: WebAuthnDispatcher;
 
     Media: MediaDispatcher;
+
+    DeviceAccess: DeviceAccessDispatcher;
+
+    Preload: PreloadDispatcher;
+
+    FedCm: FedCmDispatcher;
 
     Debugger: DebuggerDispatcher;
 
@@ -649,13 +661,13 @@ declare namespace ProtocolProxyApi {
 
     /**
      * Stop tracking rule usage and return the list of rules that were used since last call to
-     * `takeCoverageDelta` (or since start of coverage instrumentation)
+     * `takeCoverageDelta` (or since start of coverage instrumentation).
      */
     invoke_stopRuleUsageTracking(): Promise<Protocol.CSS.StopRuleUsageTrackingResponse>;
 
     /**
      * Obtain list of rules that became used since last call to this method (or since start of coverage
-     * instrumentation)
+     * instrumentation).
      */
     invoke_takeCoverageDelta(): Promise<Protocol.CSS.TakeCoverageDeltaResponse>;
 
@@ -668,7 +680,7 @@ declare namespace ProtocolProxyApi {
   export interface CSSDispatcher {
     /**
      * Fires whenever a web font is updated.  A non-empty font parameter indicates a successfully loaded
-     * web font
+     * web font.
      */
     fontsUpdated(params: Protocol.CSS.FontsUpdatedEvent): void;
 
@@ -841,6 +853,7 @@ declare namespace ProtocolProxyApi {
 
     /**
      * Returns the root DOM node (and optionally the subtree) to the caller.
+     * Implicitly enables the DOM domain events for the current target.
      */
     invoke_getDocument(params: Protocol.DOM.GetDocumentRequest): Promise<Protocol.DOM.GetDocumentResponse>;
 
@@ -1521,7 +1534,7 @@ declare namespace ProtocolProxyApi {
     invoke_requestData(params: Protocol.IndexedDB.RequestDataRequest): Promise<Protocol.IndexedDB.RequestDataResponse>;
 
     /**
-     * Gets metadata of an object store
+     * Gets metadata of an object store.
      */
     invoke_getMetadata(params: Protocol.IndexedDB.GetMetadataRequest): Promise<Protocol.IndexedDB.GetMetadataResponse>;
 
@@ -2354,6 +2367,9 @@ declare namespace ProtocolProxyApi {
 
     invoke_getInstallabilityErrors(): Promise<Protocol.Page.GetInstallabilityErrorsResponse>;
 
+    /**
+     * Deprecated because it's not guaranteed that the returned icon is in fact the one used for PWA installation.
+     */
     invoke_getManifestIcons(): Promise<Protocol.Page.GetManifestIconsResponse>;
 
     /**
@@ -2574,6 +2590,12 @@ declare namespace ProtocolProxyApi {
     invoke_setSPCTransactionMode(params: Protocol.Page.SetSPCTransactionModeRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Extensions for Custom Handlers API:
+     * https://html.spec.whatwg.org/multipage/system-state.html#rph-automation
+     */
+    invoke_setRPHRegistrationMode(params: Protocol.Page.SetRPHRegistrationModeRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Generates a report for testing.
      */
     invoke_generateTestReport(params: Protocol.Page.GenerateTestReportRequest): Promise<Protocol.ProtocolResponseWithError>;
@@ -2693,11 +2715,6 @@ declare namespace ProtocolProxyApi {
      * when bfcache navigation fails.
      */
     backForwardCacheNotUsed(params: Protocol.Page.BackForwardCacheNotUsedEvent): void;
-
-    /**
-     * Fired when a prerender attempt is completed.
-     */
-    prerenderAttemptCompleted(params: Protocol.Page.PrerenderAttemptCompletedEvent): void;
 
     loadEventFired(params: Protocol.Page.LoadEventFiredEvent): void;
 
@@ -3558,6 +3575,88 @@ declare namespace ProtocolProxyApi {
      * list of player ids and all events again.
      */
     playersCreated(params: Protocol.Media.PlayersCreatedEvent): void;
+
+  }
+
+  export interface DeviceAccessApi {
+    /**
+     * Enable events in this domain.
+     */
+    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Disable events in this domain.
+     */
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Select a device in response to a DeviceAccess.deviceRequestPrompted event.
+     */
+    invoke_selectPrompt(params: Protocol.DeviceAccess.SelectPromptRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Cancel a prompt in response to a DeviceAccess.deviceRequestPrompted event.
+     */
+    invoke_cancelPrompt(params: Protocol.DeviceAccess.CancelPromptRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface DeviceAccessDispatcher {
+    /**
+     * A device request opened a user prompt to select a device. Respond with the
+     * selectPrompt or cancelPrompt command.
+     */
+    deviceRequestPrompted(params: Protocol.DeviceAccess.DeviceRequestPromptedEvent): void;
+
+  }
+
+  export interface PreloadApi {
+    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface PreloadDispatcher {
+    /**
+     * Upsert. Currently, it is only emitted when a rule set added.
+     */
+    ruleSetUpdated(params: Protocol.Preload.RuleSetUpdatedEvent): void;
+
+    ruleSetRemoved(params: Protocol.Preload.RuleSetRemovedEvent): void;
+
+    /**
+     * Fired when a prerender attempt is completed.
+     */
+    prerenderAttemptCompleted(params: Protocol.Preload.PrerenderAttemptCompletedEvent): void;
+
+    /**
+     * Fired when a prefetch attempt is updated.
+     */
+    prefetchStatusUpdated(params: Protocol.Preload.PrefetchStatusUpdatedEvent): void;
+
+    /**
+     * Fired when a prerender attempt is updated.
+     */
+    prerenderStatusUpdated(params: Protocol.Preload.PrerenderStatusUpdatedEvent): void;
+
+    /**
+     * Send a list of sources for all preloading attempts.
+     */
+    preloadingAttemptSourcesUpdated(params: Protocol.Preload.PreloadingAttemptSourcesUpdatedEvent): void;
+
+  }
+
+  export interface FedCmApi {
+    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_selectAccount(params: Protocol.FedCm.SelectAccountRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_dismissDialog(params: Protocol.FedCm.DismissDialogRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface FedCmDispatcher {
+    dialogShown(params: Protocol.FedCm.DialogShownEvent): void;
 
   }
 

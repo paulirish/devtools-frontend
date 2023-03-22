@@ -259,7 +259,7 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
 
   constructor() {
     super(true);
-    SDK.TargetManager.TargetManager.instance().observeModels(SDK.WebAuthnModel.WebAuthnModel, this);
+    SDK.TargetManager.TargetManager.instance().observeModels(SDK.WebAuthnModel.WebAuthnModel, this, {scoped: true});
 
     this.contentElement.classList.add('webauthn-pane');
 
@@ -273,9 +273,8 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
     this.#updateVisibility(false);
   }
 
-  static instance(opts = {forceNew: false}): WebauthnPaneImpl {
-    const {forceNew} = opts;
-    if (!webauthnPaneImplInstance || forceNew) {
+  static instance(opts?: {forceNew: boolean}): WebauthnPaneImpl {
+    if (!webauthnPaneImplInstance || opts?.forceNew) {
       webauthnPaneImplInstance = new WebauthnPaneImpl();
     }
 
@@ -283,13 +282,13 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
   }
 
   modelAdded(model: SDK.WebAuthnModel.WebAuthnModel): void {
-    if (model.target() === SDK.TargetManager.TargetManager.instance().mainFrameTarget()) {
+    if (model.target() === model.target().outermostTarget()) {
       this.#model = model;
     }
   }
 
   modelRemoved(model: SDK.WebAuthnModel.WebAuthnModel): void {
-    if (model.target() === SDK.TargetManager.TargetManager.instance().mainFrameTarget()) {
+    if (model.target() === model.target().outermostTarget()) {
       this.#model = undefined;
     }
   }
@@ -573,7 +572,8 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
     this.residentKeyCheckbox.classList.add('authenticator-option-checkbox');
     residentKeyGroup.appendChild(this.#residentKeyCheckboxLabel);
 
-    this.#userVerificationCheckboxLabel = UI.UIUtils.CheckboxLabel.create('Supports user verification', false);
+    this.#userVerificationCheckboxLabel =
+        UI.UIUtils.CheckboxLabel.create(i18nString(UIStrings.supportsUserVerification), false);
     this.#userVerificationCheckboxLabel.textElement.classList.add('authenticator-option-label');
     userVerificationGroup.appendChild(this.#userVerificationCheckboxLabel.textElement);
     this.#userVerificationCheckbox = this.#userVerificationCheckboxLabel.checkboxElement;

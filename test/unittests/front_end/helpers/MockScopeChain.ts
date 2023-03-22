@@ -19,6 +19,7 @@ interface ScriptDescription {
   startColumn?: number;
   isContentScript?: boolean;
   embedderName?: string;
+  executionContextId?: number;
 }
 
 interface SetBreakpointByUrlResponse {
@@ -51,7 +52,6 @@ export class MockProtocolBackend {
       forceNew: true,
       loadOverride: async (url: string) => this.#loadSourceMap(url),
       maxConcurrentLoads: 1,
-      loadTimeout: 2000,
     });
   }
 
@@ -128,7 +128,7 @@ export class MockProtocolBackend {
       startColumn,
       endLine,
       endColumn,
-      executionContextId: 1,
+      executionContextId: scriptDescription?.executionContextId ?? 1,
       executionContextAuxData: {isDefault: !scriptDescription.isContentScript},
       hash: '',
       hasSourceURL: Boolean(scriptDescription.hasSourceURL),

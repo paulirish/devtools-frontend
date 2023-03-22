@@ -19,7 +19,29 @@ const UIStrings = {
    *@description Title for cross-origin portal post message error
    */
   crossOriginPortalPostMessage: 'Portals - Same-origin communication channels',
+
+  /**
+   *@description title for autofill documentation page
+   */
+  howDoesAutofillWorkPageTitle: 'How does autofill work?',
+
+  /**
+   *@description title for label form elements usage example page
+   */
+  labelFormlementsPageTitle: 'The label elements',
+
+  /**
+   *@description title for input form elements usage example page
+   */
+  inputFormElementPageTitle: 'The form input element',
+
+  /**
+   *@description title for autocomplete attribute documentation page.
+   */
+  autocompleteAttributePageTitle: 'HTML attribute: autocomplete',
+
 };
+
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/GenericIssue.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
@@ -90,12 +112,105 @@ export const genericFormLabelForNameError = {
   }],
 };
 
+export const genericFormInputWithNoLabelError = {
+  file: 'genericFormInputWithNoLabelError.md',
+  links: [],
+};
+
+export const genericFormAutocompleteAttributeEmptyError = {
+  file: 'genericFormAutocompleteAttributeEmptyError.md',
+  links: [],
+};
+
+export const genericFormDuplicateIdForInputError = {
+  file: 'genericFormDuplicateIdForInputError.md',
+  links: [{
+    link: 'https://web.dev/learn/forms/autofill/#how-does-autofill-work',
+    linkTitle: i18nLazyString(UIStrings.howDoesAutofillWorkPageTitle),
+  }],
+};
+
+export const genericFormAriaLabelledByToNonExistingId = {
+  file: 'genericFormAriaLabelledByToNonExistingId.md',
+  links: [{
+    link: 'https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label',
+    linkTitle: i18nLazyString(UIStrings.labelFormlementsPageTitle),
+  }],
+};
+
+export const genericFormEmptyIdAndNameAttributesForInputError = {
+  file: 'genericFormEmptyIdAndNameAttributesForInputError.md',
+  links: [{
+    link: 'https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input',
+    linkTitle: i18nLazyString(UIStrings.inputFormElementPageTitle),
+  }],
+};
+
+export const genericFormInputAssignedAutocompleteValueToIdOrNameAttributeError = {
+  file: 'genericFormInputAssignedAutocompleteValueToIdOrNameAttributeError.md',
+  links: [{
+    link: 'https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete#values',
+    linkTitle: i18nLazyString(UIStrings.autocompleteAttributePageTitle),
+  }],
+};
+
+export const genericFormLabelForMatchesNonExistingIdError = {
+  file: 'genericFormLabelForMatchesNonExistingIdError.md',
+  links: [{
+    link: 'https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label',
+    linkTitle: i18nLazyString(UIStrings.labelFormlementsPageTitle),
+  }],
+};
+
+export const genericFormLabelHasNeitherForNorNestedInput = {
+  file: 'genericFormLabelHasNeitherForNorNestedInput.md',
+  links: [{
+    link: 'https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label',
+    linkTitle: i18nLazyString(UIStrings.labelFormlementsPageTitle),
+  }],
+};
+
 const issueDescriptions: Map<Protocol.Audits.GenericIssueErrorType, LazyMarkdownIssueDescription> = new Map([
   [Protocol.Audits.GenericIssueErrorType.CrossOriginPortalPostMessageError, genericCrossOriginPortalPostMessageError],
   [Protocol.Audits.GenericIssueErrorType.FormLabelForNameError, genericFormLabelForNameError],
+  [Protocol.Audits.GenericIssueErrorType.FormInputWithNoLabelError, genericFormInputWithNoLabelError],
+  [
+    Protocol.Audits.GenericIssueErrorType.FormAutocompleteAttributeEmptyError,
+    genericFormAutocompleteAttributeEmptyError,
+  ],
+  [Protocol.Audits.GenericIssueErrorType.FormDuplicateIdForInputError, genericFormDuplicateIdForInputError],
+  [Protocol.Audits.GenericIssueErrorType.FormAriaLabelledByToNonExistingId, genericFormAriaLabelledByToNonExistingId],
+  [
+    Protocol.Audits.GenericIssueErrorType.FormEmptyIdAndNameAttributesForInputError,
+    genericFormEmptyIdAndNameAttributesForInputError,
+  ],
+  [
+    Protocol.Audits.GenericIssueErrorType.FormInputAssignedAutocompleteValueToIdOrNameAttributeError,
+    genericFormInputAssignedAutocompleteValueToIdOrNameAttributeError,
+  ],
+  [
+    Protocol.Audits.GenericIssueErrorType.FormLabelForMatchesNonExistingIdError,
+    genericFormLabelForMatchesNonExistingIdError,
+  ],
+  [
+    Protocol.Audits.GenericIssueErrorType.FormLabelHasNeitherForNorNestedInput,
+    genericFormLabelHasNeitherForNorNestedInput,
+  ],
 ]);
 
 const issueTypes: Map<Protocol.Audits.GenericIssueErrorType, IssueKind> = new Map([
   [Protocol.Audits.GenericIssueErrorType.CrossOriginPortalPostMessageError, IssueKind.Improvement],
   [Protocol.Audits.GenericIssueErrorType.FormLabelForNameError, IssueKind.PageError],
+  [Protocol.Audits.GenericIssueErrorType.FormInputWithNoLabelError, IssueKind.Improvement],
+  [Protocol.Audits.GenericIssueErrorType.FormAutocompleteAttributeEmptyError, IssueKind.PageError],
+  [Protocol.Audits.GenericIssueErrorType.FormDuplicateIdForInputError, IssueKind.PageError],
+  [Protocol.Audits.GenericIssueErrorType.FormAriaLabelledByToNonExistingId, IssueKind.Improvement],
+  [Protocol.Audits.GenericIssueErrorType.FormEmptyIdAndNameAttributesForInputError, IssueKind.Improvement],
+  [
+    Protocol.Audits.GenericIssueErrorType.FormInputAssignedAutocompleteValueToIdOrNameAttributeError,
+    IssueKind.Improvement,
+  ],
+  [Protocol.Audits.GenericIssueErrorType.FormLabelForMatchesNonExistingIdError, IssueKind.PageError],
+  [Protocol.Audits.GenericIssueErrorType.FormLabelHasNeitherForNorNestedInput, IssueKind.Improvement],
+
 ]);

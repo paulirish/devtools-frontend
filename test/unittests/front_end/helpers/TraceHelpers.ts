@@ -1,9 +1,14 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import type * as SDK from '../../../../front_end/core/sdk/sdk.js';
+import * as SDK from '../../../../front_end/core/sdk/sdk.js';
 import * as TraceModel from '../../../../front_end/models/trace/trace.js';
+import type * as TimelineModel from '../../../../front_end/models/timeline_model/timeline_model.js';
+import * as Timeline from '../../../../front_end/panels/timeline/timeline.js';
+import * as PerfUI from '../../../../front_end/ui/legacy/components/perf_ui/perf_ui.js';
+import {initializeGlobalVars} from './EnvironmentHelpers.js';
 
+import {FakeStorage} from './TimelineHelpers.js';
 interface CompressionStream extends ReadableWritablePair<Uint8Array, Uint8Array> {}
 interface DecompressionStream extends ReadableWritablePair<Uint8Array, Uint8Array> {}
 declare const CompressionStream: {
@@ -67,8 +72,16 @@ export async function loadTraceFileFromURL(url: URL): Promise<TraceModel.TraceMo
   return contents;
 }
 export async function loadTraceFileFromFixtures(name: string): Promise<TraceModel.TraceModel.TraceFileContents> {
-  const url = new URL(`/fixtures/traces/${name}`, window.location.origin);
-  return loadTraceFileFromURL(url);
+  const urlForTest = new URL(`/fixtures/traces/${name}`, window.location.origin);
+  const urlForComponentExample = new URL(`/test/unittests/fixtures/traces/${name}`, window.location.origin);
+  try {
+    // Attempt to fetch file from unit test server.
+    return await loadTraceFileFromURL(urlForTest);
+  } catch (e) {
+    // If file wasn't found on test server, attempt a fetch from
+    // component server.
+    return await loadTraceFileFromURL(urlForComponentExample);
+  }
 }
 
 export async function loadEventsFromTraceFile(name: string):
@@ -93,13 +106,13 @@ async function generateModelDataForTraceFile(name: string, emulateFreshRecording
   const traceEvents = await loadEventsFromTraceFile(name);
 
   return new Promise((resolve, reject) => {
-    const model = new TraceModel.TraceModel.Model();
+    const model = TraceModel.TraceModel.Model.createWithAllHandlers();
     model.addEventListener(TraceModel.TraceModel.ModelUpdateEvent.eventName, (event: Event) => {
       const {data} = event as TraceModel.TraceModel.ModelUpdateEvent;
 
       // When we receive the final update from the model, update the recording
       // state back to waiting.
-      if (TraceModel.TraceModel.isModelUpdateEventDataGlobal(data) && data.data === 'done') {
+      if (TraceModel.TraceModel.isModelUpdateDataComplete(data)) {
         const metadata = model.metadata(0);
         const traceParsedData = model.traceParsedData(0);
         if (metadata && traceParsedData) {
@@ -115,7 +128,7 @@ async function generateModelDataForTraceFile(name: string, emulateFreshRecording
       }
     });
 
-    void model.parse(traceEvents, {}, emulateFreshRecording).catch(e => console.error(e));
+    void model.parse(traceEvents, {metadata: {}, isFreshRecording: emulateFreshRecording}).catch(e => console.error(e));
   });
 }
 
@@ -140,6 +153,116 @@ export async function loadModelDataFromTraceFile(name: string): Promise<TraceMod
   return trace;
 }
 
+// This mock class is used for instancing a flame chart in the helpers.
+// Its implementation is empty because the methods aren't used by the
+// helpers, only the mere definition.
+class MockFlameChartDelegate implements PerfUI.FlameChart.FlameChartDelegate {
+  windowChanged(_startTime: number, _endTime: number, _animate: boolean): void {
+  }
+  updateRangeSelection(_startTime: number, _endTime: number): void {
+  }
+  updateSelectedGroup(_flameChart: PerfUI.FlameChart.FlameChart, _group: PerfUI.FlameChart.Group|null): void {
+  }
+}
+
+/**
+ * Draws a set of tracks track in the flame chart using the new system.
+ * For this to work, every track that will be rendered must have a
+ * corresponding track appender registered in the
+ * CompatibilityTracksAppender.
+ *
+ * @param traceFileName The name of the trace file to be loaded into the
+ * flame chart.
+ * @param trackAppenderNames A Set with the names of the tracks to be
+ * rendered. For example, Set("Timings").
+ * @returns a flame chart element and its corresponding data provider.
+ */
+export async function getMainFlameChartWithTracks(
+    traceFileName: string, trackAppenderNames: Set<Timeline.CompatibilityTracksAppender.TrackAppenderName>): Promise<{
+  flameChart: PerfUI.FlameChart.FlameChart,
+  dataProvider: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider,
+}> {
+  await initializeGlobalVars();
+
+  const {traceParsedData, performanceModel} = await allModelsFromFile(traceFileName);
+
+  const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+  // The data provider still needs a reference to the legacy model to
+  // work properly.
+  dataProvider.setModel(performanceModel, traceParsedData);
+  const tracksAppender = dataProvider.compatibilityTracksAppenderInstance();
+  tracksAppender.setVisibleTracks(trackAppenderNames);
+  dataProvider.buildFromTrackAppenders(trackAppenderNames);
+  const delegate = new MockFlameChartDelegate();
+  const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
+  const minTime = TraceModel.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
+  const maxTime = TraceModel.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.max);
+  flameChart.setWindowTimes(minTime, maxTime);
+  flameChart.markAsRoot();
+  flameChart.update();
+  return {flameChart, dataProvider};
+}
+/**
+ * Draws a track in the flame chart using the legacy system. For this to work,
+ * a codepath to append the track must be available in the implementation of
+ * TimelineFlameChartDataProvider.appendLegacyTrackData.
+ *
+ * @param traceFileName The name of the trace file to be loaded to the flame
+ * chart.
+ * @param trackType the legacy "type" of the track to be rendered. For
+ * example: "GPU"
+ * @returns a flame chart element and its corresponding data provider.
+ */
+export async function getMainFlameChartWithLegacyTrack(
+    traceFileName: string, trackType: TimelineModel.TimelineModel.TrackType): Promise<{
+  flameChart: PerfUI.FlameChart.FlameChart,
+  dataProvider: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider,
+}> {
+  await initializeGlobalVars();
+
+  const {traceParsedData, performanceModel, timelineModel} = await allModelsFromFile(traceFileName);
+
+  const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+  // The data provider still needs a reference to the legacy model to
+  // work properly.
+  dataProvider.setModel(performanceModel, traceParsedData);
+  const track = timelineModel.tracks().find(track => track.type === trackType);
+  if (!track) {
+    throw new Error(`Legacy track with of type ${trackType} not found in timeline model.`);
+  }
+  dataProvider.appendLegacyTrackData(track, /* expanded */ true);
+  const delegate = new MockFlameChartDelegate();
+  const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
+  const minTime = TraceModel.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
+  const maxTime = TraceModel.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.max);
+  flameChart.setWindowTimes(minTime, maxTime);
+  flameChart.markAsRoot();
+  flameChart.update();
+  return {flameChart, dataProvider};
+}
+
+export async function allModelsFromFile(file: string): Promise<{
+  tracingModel: SDK.TracingModel.TracingModel,
+  timelineModel: TimelineModel.TimelineModel.TimelineModelImpl,
+  performanceModel: Timeline.PerformanceModel.PerformanceModel,
+  traceParsedData: TraceModel.Handlers.Types.TraceParseData,
+}> {
+  const traceParsedData = await loadModelDataFromTraceFile(file);
+  const events = await loadTraceEventsLegacyEventPayload(file);
+  const tracingModel = new SDK.TracingModel.TracingModel(new FakeStorage());
+  const performanceModel = new Timeline.PerformanceModel.PerformanceModel();
+  tracingModel.addEvents(events);
+  tracingModel.tracingComplete();
+  await performanceModel.setTracingModel(tracingModel);
+  const timelineModel = performanceModel.timelineModel();
+  return {
+    tracingModel,
+    timelineModel,
+    performanceModel,
+    traceParsedData,
+  };
+}
+
 // We create here a cross-test base trace event. It is assumed that each
 // test will import this default event and copy-override properties at will.
 export const defaultTraceEvent: TraceModel.Types.TraceEvents.TraceEventData = {
@@ -148,7 +271,7 @@ export const defaultTraceEvent: TraceModel.Types.TraceEvents.TraceEventData = {
   pid: TraceModel.Types.TraceEvents.ProcessID(0),
   ts: TraceModel.Types.Timing.MicroSeconds(0),
   cat: 'test',
-  ph: TraceModel.Types.TraceEvents.TraceEventPhase.METADATA,
+  ph: TraceModel.Types.TraceEvents.Phase.METADATA,
 };
 
 /**
@@ -266,7 +389,7 @@ export function makeCompleteEvent(
     args: {},
     cat,
     name,
-    ph: TraceModel.Types.TraceEvents.TraceEventPhase.COMPLETE,
+    ph: TraceModel.Types.TraceEvents.Phase.COMPLETE,
     pid: TraceModel.Types.TraceEvents.ProcessID(pid),
     tid: TraceModel.Types.TraceEvents.ThreadID(tid),
     ts: TraceModel.Types.Timing.MicroSeconds(ts),
@@ -294,7 +417,7 @@ export function makeInstantEvent(
     args: {},
     cat,
     name,
-    ph: TraceModel.Types.TraceEvents.TraceEventPhase.INSTANT,
+    ph: TraceModel.Types.TraceEvents.Phase.INSTANT,
     pid: TraceModel.Types.TraceEvents.ProcessID(pid),
     tid: TraceModel.Types.TraceEvents.ThreadID(tid),
     ts: TraceModel.Types.Timing.MicroSeconds(ts),

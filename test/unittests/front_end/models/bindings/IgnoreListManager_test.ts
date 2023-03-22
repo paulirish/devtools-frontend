@@ -12,6 +12,8 @@ import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 
+import {createContentProviderUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
+
 const {assert} = chai;
 
 // Same as in IgnoreListManager.ts.
@@ -120,8 +122,7 @@ describeWithMockConnection('IgnoreListManager', () => {
     const forceNew = true;
     const target = createTarget();
     const targetManager = target.targetManager();
-    SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew, maxConcurrentLoads: 1, loadOverride: null, loadTimeout: 2000});
+    SDK.PageResourceLoader.PageResourceLoader.instance({forceNew, maxConcurrentLoads: 1, loadOverride: null});
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
     const debuggerWorkspaceBinding =
@@ -448,5 +449,18 @@ describeWithMockConnection('IgnoreListManager', () => {
 
     assert.isTrue(ignoreListManager.enableIgnoreListing);
     assert.isTrue(ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(thirdPartyUiSourceCode));
+  });
+
+  describe('isUserOrSourceMapIgnoreListedUISourceCode', () => {
+    it('ignores UISourceCodes that are marked', () => {
+      const {uiSourceCode} = createContentProviderUISourceCode({
+        url: 'debugger://foo' as Platform.DevToolsPath.UrlString,
+        projectType: Workspace.Workspace.projectTypes.Debugger,
+        mimeType: 'text/javascript',
+      });
+      uiSourceCode.markAsUnconditionallyIgnoreListed();
+
+      assert.isTrue(ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(uiSourceCode));
+    });
   });
 });

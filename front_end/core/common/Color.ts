@@ -676,7 +676,8 @@ export interface Color {
   isGamutClipped(): boolean;
 }
 
-const EPSILON = 0.001;
+const EPSILON = 0.01;
+const WIDE_RANGE_EPSILON = 1;  // For comparisons on channels with a wider range than [0,1]
 function equals(a: number[], b: number[], accuracy?: number): boolean;
 function equals(a: number|null, b: number|null, accuracy?: number): boolean;
 function equals(a: number|null|number[], b: number|null|number[], accuracy = EPSILON): boolean {
@@ -697,7 +698,7 @@ function equals(a: number|null|number[], b: number|null|number[], accuracy = EPS
   if (a === null || b === null) {
     return a === b;
   }
-  return Math.abs(a - b) <= accuracy;
+  return Math.abs(a - b) < accuracy;
 }
 function lessOrEquals(a: number, b: number, accuracy = EPSILON): boolean {
   return a - b <= accuracy;
@@ -792,7 +793,7 @@ export class Lab implements Color {
   constructor(l: number, a: number, b: number, alpha: number|null, authoredText?: string|undefined) {
     this.#rawParams = [l, a, b];
     this.l = clamp(l, {min: 0, max: 100});
-    if (equals(this.l, 0) || equals(this.l, 100)) {
+    if (equals(this.l, 0, WIDE_RANGE_EPSILON) || equals(this.l, 100, WIDE_RANGE_EPSILON)) {
       a = b = 0;
     }
     this.a = a;
@@ -808,7 +809,8 @@ export class Lab implements Color {
   }
   equal(color: Color): boolean {
     const lab = color.as(Format.LAB);
-    return equals(lab.l, this.l) && equals(lab.a, this.a) && equals(lab.b, this.b) && equals(lab.alpha, this.alpha);
+    return equals(lab.l, this.l, WIDE_RANGE_EPSILON) && equals(lab.a, this.a) && equals(lab.b, this.b) &&
+        equals(lab.alpha, this.alpha);
   }
   format(): Format {
     return Format.LAB;
@@ -826,7 +828,7 @@ export class Lab implements Color {
     const alpha = this.alpha === null || equals(this.alpha, 1) ?
         '' :
         ` / ${Platform.StringUtilities.stringifyWithPrecision(this.alpha)}`;
-    return `lab(${Platform.StringUtilities.stringifyWithPrecision(l)} ${
+    return `lab(${Platform.StringUtilities.stringifyWithPrecision(l, 0)} ${
         Platform.StringUtilities.stringifyWithPrecision(
             a)} ${Platform.StringUtilities.stringifyWithPrecision(b)}${alpha})`;
   }
@@ -928,7 +930,7 @@ export class LCH implements Color {
   constructor(l: number, c: number, h: number, alpha: number|null, authoredText?: string|undefined) {
     this.#rawParams = [l, c, h];
     this.l = clamp(l, {min: 0, max: 100});
-    c = equals(this.l, 0) || equals(this.l, 100) ? 0 : c;
+    c = equals(this.l, 0, WIDE_RANGE_EPSILON) || equals(this.l, 100, WIDE_RANGE_EPSILON) ? 0 : c;
     this.c = clamp(c, {min: 0});
     h = equals(c, 0) ? 0 : h;
     this.h = normalizeHue(h);
@@ -943,7 +945,8 @@ export class LCH implements Color {
   }
   equal(color: Color): boolean {
     const lch = color.as(Format.LCH);
-    return equals(lch.l, this.l) && equals(lch.c, this.c) && equals(lch.h, this.h) && equals(lch.alpha, this.alpha);
+    return equals(lch.l, this.l, WIDE_RANGE_EPSILON) && equals(lch.c, this.c) && equals(lch.h, this.h) &&
+        equals(lch.alpha, this.alpha);
   }
   format(): Format {
     return Format.LCH;
@@ -961,7 +964,7 @@ export class LCH implements Color {
     const alpha = this.alpha === null || equals(this.alpha, 1) ?
         '' :
         ` / ${Platform.StringUtilities.stringifyWithPrecision(this.alpha)}`;
-    return `lch(${Platform.StringUtilities.stringifyWithPrecision(l)} ${
+    return `lch(${Platform.StringUtilities.stringifyWithPrecision(l, 0)} ${
         Platform.StringUtilities.stringifyWithPrecision(
             c)} ${Platform.StringUtilities.stringifyWithPrecision(h)}${alpha})`;
   }
@@ -981,7 +984,11 @@ export class LCH implements Color {
   isGamutClipped(): boolean {
     return false;
   }
-
+  // See "powerless" component definitions in
+  // https://www.w3.org/TR/css-color-4/#specifying-lab-lch
+  isHuePowerless(): boolean {
+    return equals(this.c, 0);
+  }
   static fromSpec(spec: ColorParameterSpec, text: string): LCH|null {
     const L = parsePercentage(spec[0], [0, 100]) ?? parseNumber(spec[0]);
     if (L === null) {
@@ -1442,7 +1449,8 @@ export class ColorFunction implements Color {
    * @param parametersText Inside of the `color()` function. ex, `display-p3 0.1 0.2 0.3 / 0%`
    * @returns `Color` object
    */
-  static fromSpec(authoredText: string, parametersText: string): ColorFunction|null {
+  static fromSpec(authoredText: string, parametersWithAlphaText: string): ColorFunction|null {
+    const [parametersText, alphaText] = parametersWithAlphaText.split('/', 2);
     const parameters = parametersText.trim().split(/\s+/);
     const [colorSpaceText, ...remainingParams] = parameters;
     const colorSpace = getColorSpace(colorSpaceText);
@@ -1452,53 +1460,34 @@ export class ColorFunction implements Color {
     }
 
     // `color(<color-space>)` is a valid syntax
-    if (remainingParams.length === 0) {
+    if (remainingParams.length === 0 && alphaText === undefined) {
       return new ColorFunction(colorSpace, 0, 0, 0, null, authoredText);
     }
 
     // Check if it contains `/ <alpha>` part, if so, it should be at the end
-    const alphaSeparatorIndex = remainingParams.indexOf('/');
-    const containsAlpha = alphaSeparatorIndex !== -1;
-    if (containsAlpha && alphaSeparatorIndex !== remainingParams.length - 2) {
+    if (remainingParams.length === 0 && alphaText !== undefined && alphaText.trim().split(/\s+/).length > 1) {
       // Invalid syntax: like `color(<space> / <alpha> <number>)`
       return null;
     }
 
-    if (containsAlpha) {
-      // Since we know that the last value is <alpha>
-      // we can safely remove the alpha separator
-      // and only leave the numbers (if given correctly)
-      remainingParams.splice(alphaSeparatorIndex, 1);
-    }
-
-    // `color` cannot contain more than 4 parameters when there is alpha
-    // and cannot contain more than 3 parameters when there isn't alpha
-    const maxLength = containsAlpha ? 4 : 3;
-    if (remainingParams.length > maxLength) {
+    // `color` cannot contain more than 3 parameters without alpha
+    if (remainingParams.length > 3) {
       return null;
     }
 
     // Replace `none`s with 0s
-    const nonesReplacesParams = remainingParams.map(param => param === 'none' ? '0' : param);
+    const nonesReplacedParams = remainingParams.map(param => param === 'none' ? '0' : param);
 
     // At this point, we know that all the values are there so we can
     // safely try to parse all the values as number or percentage
-    const values = nonesReplacesParams.map(param => parsePercentOrNumber(param, [0, 1]));
+    const values = nonesReplacedParams.map(param => parsePercentOrNumber(param, [0, 1]));
     const containsNull = values.includes(null);
     // At least one value is malformatted (not a number or percentage)
     if (containsNull) {
       return null;
     }
 
-    let alphaValue = 1;
-    if (containsAlpha) {
-      // We know that `alphaValue` exists at this point.
-      // See the above lines for deciding on `containsAlpha`.
-      alphaValue = values[values.length - 1] as number;
-      // We get rid of the `alpha` from the list
-      // so that all the values map to `r, g, b` from the start
-      values.pop();
-    }
+    const alphaValue = alphaText ? parsePercentOrNumber(alphaText, [0, 1]) ?? 1 : 1;
 
     // Depending on the color space
     // this either reflects `rgb` parameters in that color space
@@ -1825,6 +1814,10 @@ export class HWB implements Color {
 
 type LegacyColor = Format.Nickname|Format.HEX|Format.ShortHEX|Format.HEXA|Format.ShortHEXA|Format.RGB|Format.RGBA;
 
+function toRgbValue(value: number): number {
+  return Math.round(value * 255);
+}
+
 export class Legacy implements Color {
   readonly #rawParams: Color3D;
   #rgbaInternal: Color4D;
@@ -2008,10 +2001,6 @@ export class Legacy implements Color {
       format = this.#formatInternal;
     }
 
-    function toRgbValue(value: number): number {
-      return Math.round(value * 255);
-    }
-
     function toHexValue(value: number): string {
       const hex = Math.round(value * 255).toString(16);
       return hex.length === 1 ? '0' + hex : hex;
@@ -2083,7 +2072,9 @@ export class Legacy implements Color {
     return this.#stringify(format, ...this.#rawParams);
   }
   isGamutClipped(): boolean {
-    return !equals(this.#rawParams, [this.#rgbaInternal[0], this.#rgbaInternal[1], this.#rgbaInternal[2]]);
+    return !equals(
+        this.#rawParams.map(toRgbValue),
+        [this.#rgbaInternal[0], this.#rgbaInternal[1], this.#rgbaInternal[2]].map(toRgbValue), WIDE_RANGE_EPSILON);
   }
 
   rgba(): Color4D {
@@ -2156,7 +2147,10 @@ export class Legacy implements Color {
 
   equal(other: Color): boolean {
     const legacy = other.as(this.#formatInternal);
-    return this.#rgbaInternal.every((v, i) => equals(v, legacy.#rgbaInternal[i]));
+    return equals(toRgbValue(this.#rgbaInternal[0]), toRgbValue(legacy.#rgbaInternal[0]), WIDE_RANGE_EPSILON) &&
+        equals(toRgbValue(this.#rgbaInternal[1]), toRgbValue(legacy.#rgbaInternal[1]), WIDE_RANGE_EPSILON) &&
+        equals(toRgbValue(this.#rgbaInternal[2]), toRgbValue(legacy.#rgbaInternal[2]), WIDE_RANGE_EPSILON) &&
+        equals(this.#rgbaInternal[3], legacy.#rgbaInternal[3]);
   }
 }
 

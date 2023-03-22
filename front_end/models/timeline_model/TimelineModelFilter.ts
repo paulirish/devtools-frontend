@@ -6,10 +6,8 @@ import type * as SDK from '../../core/sdk/sdk.js';
 
 import {RecordType, TimelineModelImpl} from './TimelineModel.js';
 
-export class TimelineModelFilter {
-  accept(_event: SDK.TracingModel.Event): boolean {
-    return true;
-  }
+export abstract class TimelineModelFilter {
+  abstract accept(_event: SDK.TracingModel.Event): boolean;
 }
 
 export class TimelineVisibleEventsFilter extends TimelineModelFilter {
@@ -29,9 +27,6 @@ export class TimelineVisibleEventsFilter extends TimelineModelFilter {
     }
     if (event.hasCategory(TimelineModelImpl.Category.UserTiming)) {
       return RecordType.UserTiming;
-    }
-    if (event.hasCategory(TimelineModelImpl.Category.LatencyInfo)) {
-      return RecordType.LatencyInfo;
     }
     return event.name as RecordType;
   }

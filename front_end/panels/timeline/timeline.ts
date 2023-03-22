@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 import * as CLSLinkifier from './CLSLinkifier.js';
+import * as CompatibilityTracksAppender from './CompatibilityTracksAppender.js';
 import * as CountersGraph from './CountersGraph.js';
 import * as EventsTimelineTreeView from './EventsTimelineTreeView.js';
-import * as ExtensionTracingSession from './ExtensionTracingSession.js';
+import * as InteractionsTrackAppender from './InteractionsTrackAppender.js';
 import * as PerformanceModel from './PerformanceModel.js';
 import * as TimelineController from './TimelineController.js';
 import * as TimelineDetailsView from './TimelineDetailsView.js';
@@ -21,14 +22,16 @@ import * as TimelinePaintProfilerView from './TimelinePaintProfilerView.js';
 import * as TimelinePanel from './TimelinePanel.js';
 import * as TimelineTreeView from './TimelineTreeView.js';
 import * as TimelineUIUtils from './TimelineUIUtils.js';
+import * as TimingsTrackAppender from './TimingsTrackAppender.js';
 import * as UIDevtoolsController from './UIDevtoolsController.js';
 import * as UIDevtoolsUtils from './UIDevtoolsUtils.js';
 
 export {
   CLSLinkifier,
+  CompatibilityTracksAppender,
   CountersGraph,
   EventsTimelineTreeView,
-  ExtensionTracingSession,
+  InteractionsTrackAppender,
   PerformanceModel,
   TimelineController,
   TimelineDetailsView,
@@ -44,6 +47,7 @@ export {
   TimelinePanel,
   TimelineTreeView,
   TimelineUIUtils,
+  TimingsTrackAppender,
   UIDevtoolsController,
   UIDevtoolsUtils,
 };

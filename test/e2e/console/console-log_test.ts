@@ -6,12 +6,18 @@ import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer';
 
 import {
+  $,
+  $$,
   activeElement,
   activeElementAccessibleName,
   activeElementTextContent,
+  assertNotNullOrUndefined,
+  click,
   getBrowserAndPages,
   tabBackward,
   tabForward,
+  waitFor,
+  waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
@@ -23,8 +29,14 @@ import {
   getStructuredConsoleMessages,
   navigateToConsoleTab,
   showVerboseMessages,
+  typeIntoConsoleAndWaitForResult,
+  waitForConsoleInfoMessageAndClickOnLink,
   waitForLastConsoleMessageToHaveContent,
 } from '../helpers/console-helpers.js';
+import {
+  addLogpointForLine,
+  openSourceCodeEditorForFile,
+} from '../helpers/sources-helpers.js';
 
 /* eslint-disable no-console */
 
@@ -400,6 +412,111 @@ describe('The Console Tab', async () => {
       // Check that the 'BG' text has no bakcground image.
       const textsAndStyles = await getConsoleMessageTextChunksWithStyle(frontend, ['backgroundImage']);
       assert.deepEqual(textsAndStyles, [[['PRE', ''], ['BG', '']]]);
+    });
+  });
+
+  describe('message anchor', () => {
+    it('opens the breakpoint edit dialog for logpoint messages', async () => {
+      const {target} = getBrowserAndPages();
+      await openSourceCodeEditorForFile('logpoint.js', 'logpoint.html');
+      await addLogpointForLine(3, 'x');
+      await target.evaluate('triggerLogpoint(42)');
+
+      await navigateToConsoleTab();
+      await waitForConsoleInfoMessageAndClickOnLink();
+
+      await waitFor('.sources-edit-breakpoint-dialog');
+    });
+  });
+
+  describe('for memory objects', () => {
+    const MEMORY_ICON_SELECTOR = '[aria-label="Reveal in Memory Inspector panel"]';
+
+    it('shows one memory icon to open memory inspector for ArrayBuffers (description)', async () => {
+      const {frontend} = getBrowserAndPages();
+      await navigateToConsoleTab();
+      await typeIntoConsoleAndWaitForResult(frontend, 'new ArrayBuffer(10)');
+
+      // We expect one memory icon directly next to the description.
+      let memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 1);
+
+      // Expand the object, and wait until it has completely expanded and the last property is shown.
+      await click('.console-object');
+      await waitForElementWithTextContent('[[ArrayBufferData]]');
+
+      // We still expect only to see one memory icon.
+      memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 1);
+    });
+
+    it('shows two memory icons to open memory inspector for a TypedArray (description, buffer)', async () => {
+      const {frontend} = getBrowserAndPages();
+      await navigateToConsoleTab();
+      await typeIntoConsoleAndWaitForResult(frontend, 'new Uint8Array(10)');
+
+      // We expect one memory icon directly next to the description.
+      let memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 1);
+
+      // Expand the object, and wait until it has completely expanded and the last property is shown.
+      await click('.console-object');
+      await waitForElementWithTextContent('[[Prototype]]');
+
+      // We expect to see in total two memory icons: one for the buffer, one next to the description.
+      memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 2);
+
+      // Confirm that the second memory icon is next to the `buffer`.
+      const arrayBufferProperty = await waitFor('.object-value-arraybuffer');
+      const arrayBufferMemoryIcon = await $(MEMORY_ICON_SELECTOR, arrayBufferProperty);
+      assertNotNullOrUndefined(arrayBufferMemoryIcon);
+    });
+
+    it('shows two memory icons to open memory inspector for a DataView (description, buffer)', async () => {
+      const {frontend} = getBrowserAndPages();
+      await navigateToConsoleTab();
+      await typeIntoConsoleAndWaitForResult(frontend, 'new DataView(new Uint8Array(10).buffer)');
+
+      // We expect one memory icon directly next to the description.
+      let memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 1);
+
+      // Expand the object, and wait until it has completely expanded and the last property is shown.
+      await click('.console-object');
+      await waitForElementWithTextContent('[[Prototype]]');
+
+      // We expect to see in total two memory icons: one for the buffer, one next to the description.
+      memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 2);
+
+      // Confirm that the second memory icon is next to the `buffer`.
+      const arrayBufferProperty = await waitFor('.object-value-arraybuffer');
+      const arrayBufferMemoryIcon = await $(MEMORY_ICON_SELECTOR, arrayBufferProperty);
+      assertNotNullOrUndefined(arrayBufferMemoryIcon);
+    });
+
+    it('shows two memory icons to open memory inspector for WebAssembly memory (description, buffer)', async () => {
+      const {frontend} = getBrowserAndPages();
+      await navigateToConsoleTab();
+      await typeIntoConsoleAndWaitForResult(frontend, 'new WebAssembly.Memory({initial: 10})');
+
+      // We expect one memory icon directly next to the description.
+      let memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 1);
+
+      // Expand the object, and wait until it has completely expanded and the last property is shown.
+      await click('.console-object');
+      await waitForElementWithTextContent('[[Prototype]]');
+
+      // We expect to see in total two memory icons: one for the buffer, one next to the description.
+      memoryIcons = await $$(MEMORY_ICON_SELECTOR);
+      assert.lengthOf(memoryIcons, 2);
+
+      // Confirm that the second memory icon is next to the `buffer`.
+      const arrayBufferProperty = await waitFor('.object-value-arraybuffer');
+      const arrayBufferMemoryIcon = await $(MEMORY_ICON_SELECTOR, arrayBufferProperty);
+      assertNotNullOrUndefined(arrayBufferMemoryIcon);
     });
   });
 });

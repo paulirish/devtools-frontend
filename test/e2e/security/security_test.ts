@@ -14,7 +14,7 @@ import {
   securityTabExists,
 } from '../helpers/security-helpers.js';
 
-describe('The Security Panel', async () => {
+describe('The Security Panel', async function() {
   it('is open by default when devtools initializes', async () => {
     await navigateToSecurityTab();
   });

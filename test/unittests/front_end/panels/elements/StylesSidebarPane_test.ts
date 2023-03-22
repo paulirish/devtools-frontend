@@ -63,10 +63,10 @@ describeWithRealConnection('StylesSidebarPane', async () => {
 
     uiSourceCode.setWorkingCopy('.rule{display:block}');
 
-    const stylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance();
+    const stylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance({forceNew: true});
     await stylesSidebarPane.trackURLForChanges(URL);
     const targetManager = SDK.TargetManager.TargetManager.instance();
-    const target = targetManager.mainTarget();
+    const target = targetManager.rootTarget();
     assertNotNullOrUndefined(target);
 
     const resourceURL = () => URL;
@@ -158,6 +158,17 @@ describeWithEnvironment('StylesSidebarPropertyRenderer', () => {
        assert.isTrue(colorHandler.called);
        assert.isFalse(bezierHandler.called);
      });
+
+  it('runs animation handler for animation property', () => {
+    const renderer =
+        new Elements.StylesSidebarPane.StylesSidebarPropertyRenderer(null, null, 'animation', 'example 5s');
+    renderer.setAnimationHandler(() => document.createTextNode(nodeContents));
+
+    const nodeContents = 'nodeContents';
+
+    const node = renderer.renderValue();
+    assert.deepEqual(node.textContent, nodeContents);
+  });
 });
 
 describe('IdleCallbackManager', () => {

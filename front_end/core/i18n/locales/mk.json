@@ -224,9 +224,6 @@
   "core/i18n/time-utilities.ts | fs": {
     "message": "{PH1} с."
   },
-  "core/sdk/CPUProfileDataModel.ts | devtoolsCpuProfileParserIsFixing": {
-    "message": "DevTools: анализаторот на профилот на CPU поправа {PH1} примероци што недостасуваат."
-  },
   "core/sdk/CPUProfilerModel.ts | profileD": {
     "message": "Профил {PH1}"
   },
@@ -238,6 +235,9 @@
   },
   "core/sdk/CompilerSourceMappingContentProvider.ts | couldNotLoadContentForSS": {
     "message": "Не може да се вчитаат содржините за {PH1} ({PH2})"
+  },
+  "core/sdk/ConsoleModel.ts | bfcacheNavigation": {
+    "message": "Навигацијата до {PH1} е вратена од кешот за движење наназад и нанапред (погледнете на https://web.dev/bfcache/)"
   },
   "core/sdk/ConsoleModel.ts | failedToSaveToTempVariable": {
     "message": "Не успеа да се зачува како привремена променлива."
@@ -551,9 +551,6 @@
   "core/sdk/OverlayModel.ts | pausedInDebugger": {
     "message": "Паузирано во отстранувачот на грешки"
   },
-  "core/sdk/PageResourceLoader.ts | loadCanceledDueToLoadTimeout": {
-    "message": "Вчитувањето е откажано бидејќи времето за вчитување истече"
-  },
   "core/sdk/PageResourceLoader.ts | loadCanceledDueToReloadOf": {
     "message": "Вчитувањето е откажано поради повторното вчитување на испитаната страница"
   },
@@ -617,14 +614,8 @@
   "core/sdk/ServiceWorkerManager.ts | stopping": {
     "message": "се сопира"
   },
-  "core/sdk/SourceMap.ts | couldNotLoadContentForSS": {
-    "message": "Не може да се вчитаат содржините за {PH1}: {PH2}"
-  },
-  "core/sdk/SourceMap.ts | couldNotParseContentForSS": {
-    "message": "Содржините не може да се анализираат за {PH1}: {PH2}"
-  },
   "core/sdk/sdk-meta.ts | achromatopsia": {
-    "message": "Ахроматопсија"
+    "message": "Ахроматопсија (непрепознавање бои)"
   },
   "core/sdk/sdk-meta.ts | blurredVision": {
     "message": "Замаглен вид"
@@ -633,7 +624,7 @@
     "message": "Снимај несинхронизирани траги за напластување"
   },
   "core/sdk/sdk-meta.ts | deuteranopia": {
-    "message": "Девтеранопија"
+    "message": "Девтеранопија (непрепознавање зелена боја)"
   },
   "core/sdk/sdk-meta.ts | disableAsyncStackTraces": {
     "message": "Оневозможи несинхронизирани stack trace"
@@ -696,7 +687,7 @@
     "message": "Емулирај нагласена страница"
   },
   "core/sdk/sdk-meta.ts | emulateAchromatopsia": {
-    "message": "Емулирај ахроматопсија"
+    "message": "Емулација на ахроматопсија (непрепознавање бои)"
   },
   "core/sdk/sdk-meta.ts | emulateAutoDarkMode": {
     "message": "Емулирај автоматски темен режим"
@@ -720,13 +711,16 @@
     "message": "Емулирај тип елемент на екран на CSS"
   },
   "core/sdk/sdk-meta.ts | emulateDeuteranopia": {
-    "message": "Емулирај девтеранопија"
+    "message": "Емулација на девтеранопија (непрепознавање зелена боја)"
   },
   "core/sdk/sdk-meta.ts | emulateProtanopia": {
-    "message": "Емулирај протанопија"
+    "message": "Емулација на протанопија (непрепознавање црвена боја)"
+  },
+  "core/sdk/sdk-meta.ts | emulateReducedContrast": {
+    "message": "Емулација на намален контраст"
   },
   "core/sdk/sdk-meta.ts | emulateTritanopia": {
-    "message": "Емулирај тританопија"
+    "message": "Емулација на тританопија (непрепознавање сина боја)"
   },
   "core/sdk/sdk-meta.ts | emulateVisionDeficiencies": {
     "message": "Емулирај проблеми со видот"
@@ -795,10 +789,13 @@
     "message": "печатење"
   },
   "core/sdk/sdk-meta.ts | protanopia": {
-    "message": "Протанопија"
+    "message": "Протанопија (непрепознавање црвена боја)"
   },
   "core/sdk/sdk-meta.ts | query": {
     "message": "барање"
+  },
+  "core/sdk/sdk-meta.ts | reducedContrast": {
+    "message": "Намален контраст"
   },
   "core/sdk/sdk-meta.ts | screen": {
     "message": "екран"
@@ -846,7 +843,7 @@
     "message": "Прикажи големини на ленти"
   },
   "core/sdk/sdk-meta.ts | tritanopia": {
-    "message": "Тританопија"
+    "message": "Тританопија (непрепознавање сина боја)"
   },
   "entrypoints/inspector_main/InspectorMain.ts | javascriptIsDisabled": {
     "message": "JavaScript е оневозможена"
@@ -1049,6 +1046,12 @@
   "entrypoints/main/MainImpl.ts | undockIntoSeparateWindow": {
     "message": "Поништи го закотвувањето во посебен прозорец"
   },
+  "entrypoints/main/OutermostTargetSelector.ts | targetNotSelected": {
+    "message": "Страница: не е избрано"
+  },
+  "entrypoints/main/OutermostTargetSelector.ts | targetS": {
+    "message": "Страница: {PH1}"
+  },
   "entrypoints/main/main-meta.ts | asAuthored": {
     "message": "Поставено од корисникот"
   },
@@ -1068,7 +1071,7 @@
     "message": "Формат на бои:"
   },
   "entrypoints/main/main-meta.ts | colorFormatSettingDisabled": {
-    "message": "Поставкава е застарена бидејќи е некомпатибилна со простори со модерни бои. За да ја овозможите повторно, може да го оневозможите соодветниот експеримент."
+    "message": "Поставкава е застарена затоа што е некомпатибилна со простори со модерни бои. За да ја овозможите повторно, оневозможете го соодветниот експеримент."
   },
   "entrypoints/main/main-meta.ts | darkCapital": {
     "message": "Темна"
@@ -1247,6 +1250,168 @@
   "entrypoints/worker_app/WorkerMain.ts | main": {
     "message": "Главна"
   },
+  "generated/Deprecation.ts | AuthorizationCoveredByWildcard": {
+    "message": "Овластувањето нема да биде покриено со симболот за џокер (*) во ракувањето на Access-Control-Allow-Headers со CORS."
+  },
+  "generated/Deprecation.ts | CSSSelectorInternalMediaControlsOverlayCastButton": {
+    "message": "За да се оневозможи стандардната интеграција на Cast, треба да се користи атрибутот disableRemotePlayback наместо избирачот -internal-media-controls-overlay-cast-button."
+  },
+  "generated/Deprecation.ts | CanRequestURLHTTPContainingNewline": {
+    "message": "Барањата на ресурси чии URL-адреси содржеле и отстранети знаци за празно место \\(n|r|t) и знаци за „помало од“ (<) се блокирани. Отстранете ги знаците за нови редови и кодирајте ги знаците за „помало од“ од местата како што се вредностите на атрибути на елементи со цел да се вчитаат ресурсиве."
+  },
+  "generated/Deprecation.ts | ChromeLoadTimesConnectionInfo": {
+    "message": "chrome.loadTimes() не се поддржува. Наместо тоа, користете го стандардизираниот API: Navigation Timing 2."
+  },
+  "generated/Deprecation.ts | ChromeLoadTimesFirstPaintAfterLoadTime": {
+    "message": "chrome.loadTimes() не се поддржува. Наместо тоа, користете го стандардизираниот API: Paint Timing."
+  },
+  "generated/Deprecation.ts | ChromeLoadTimesWasAlternateProtocolAvailable": {
+    "message": "chrome.loadTimes() не се поддржува. Наместо тоа, користете стандардизиран API: nextHopProtocol во Navigation Timing 2."
+  },
+  "generated/Deprecation.ts | CookieWithTruncatingChar": {
+    "message": "Колачињата што содржат знак \\(0|r|n) ќе бидат отфрлени наместо скратени."
+  },
+  "generated/Deprecation.ts | CrossOriginAccessBasedOnDocumentDomain": {
+    "message": "Олеснувањето на правилото за исто потекло со поставување document.domain не се поддржува и ќе биде стандардно оневозможено. Предупредувањево за неподдржување е за пристап од вкрстено потекло што е овозможен со поставување document.domain."
+  },
+  "generated/Deprecation.ts | CrossOriginWindowAlert": {
+    "message": "Активирањето window.alert од iframes со вкрстено потекло не се поддржува и ќе биде отстрането во иднина."
+  },
+  "generated/Deprecation.ts | CrossOriginWindowConfirm": {
+    "message": "Активирањето window.confirm од iframes со вкрстено потекло не се поддржува и ќе биде отстрането во иднина."
+  },
+  "generated/Deprecation.ts | DocumentDomainSettingWithoutOriginAgentClusterHeader": {
+    "message": "Олеснувањето на правилото за исто потекло со поставување document.domain не се поддржува и ќе биде стандардно оневозможено. За да продолжите со користење на функцијава, откажете се од збирови агенти со клуч за потекло со испраќање заглавје Origin-Agent-Cluster: ?0 заедно со HTTP-одговорот за документот и рамките. Видете на https://developer.chrome.com/blog/immutable-document-domain/ за повеќе детали."
+  },
+  "generated/Deprecation.ts | EventPath": {
+    "message": "Event.path не се поддржува и ќе биде отстранет. Наместо тоа, користете Event.composedPath()."
+  },
+  "generated/Deprecation.ts | ExpectCTHeader": {
+    "message": "Заглавието Expect-CT не се поддржува и ќе биде отстрането. Chrome бара транспарентност на сертификатите за сите јавно доверени сертификати издадени по 30 април 2018 година."
+  },
+  "generated/Deprecation.ts | GeolocationInsecureOrigin": {
+    "message": "getCurrentPosition() и watchPosition() веќе не функционираат на небезбедни потекла. За да ја користите функцијава, размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
+  },
+  "generated/Deprecation.ts | GeolocationInsecureOriginDeprecatedNotRemoved": {
+    "message": "getCurrentPosition() и watchPosition() не се поддржуваат на небезбедни потекла. За да ја користите функцијава, размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
+  },
+  "generated/Deprecation.ts | GetUserMediaInsecureOrigin": {
+    "message": "getUserMedia() веќе не функционира на небезбедни потекла. За да ја користите функцијава, размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
+  },
+  "generated/Deprecation.ts | HostCandidateAttributeGetter": {
+    "message": "RTCPeerConnectionIceErrorEvent.hostCandidate не се поддржува. Наместо тоа, користете RTCPeerConnectionIceErrorEvent.address или RTCPeerConnectionIceErrorEvent.port."
+  },
+  "generated/Deprecation.ts | IdentityInCanMakePaymentEvent": {
+    "message": "Потеклото на трговец и произволните податоци од случајот на услужен работник canmakepayment не се поддржани и ќе се отстранат: topOrigin, paymentRequestOrigin, methodData, modifiers."
+  },
+  "generated/Deprecation.ts | InsecurePrivateNetworkSubresourceRequest": {
+    "message": "Веб-сајтот побара подресурс од мрежа до која можеше да пристапи само поради привилегираната мрежна положба на нејзините корисници. Овие барања откриваат уреди и услуги на интернет што не се јавни, зголемувајќи го ризикот за напад со фалсификат на барање од повеќе сајтови (CSRF) и/или протекување на податоците. За да ги ублажи овие ризици, Chrome не поддржува барања до подресурси што не се јавни кога се иницирани од небезбедни контексти и ќе започне да ги блокира."
+  },
+  "generated/Deprecation.ts | LocalCSSFileExtensionRejected": {
+    "message": "CSS не може да се вчита од URL-адреси на file:, освен ако не завршуваат со екстензијата на датотека .css."
+  },
+  "generated/Deprecation.ts | MediaSourceAbortRemove": {
+    "message": "Користењето на SourceBuffer.abort() за да се прекине отстранувањето на асинхрониот опсег на remove() не се поддржува поради промена на спецификацијата. Поддршката ќе се отстрани во иднина. Наместо тоа, треба да го слушате настанот updateend. abort() е наменето само за прекинување на асинхроните аудиовизуелни содржини или за ресетирање на состојбата на анализаторот."
+  },
+  "generated/Deprecation.ts | MediaSourceDurationTruncatingBuffered": {
+    "message": "Поставувањето на MediaSource.duration под највисокиот временски печат за презентација за кои било кодирани рамки во привремена меморија не се поддржува поради промена на спецификацијата. Поддршката за имплицитно отстранување на скратените аудиовизуелни содржини во привремената меморија ќе биде отстрането во иднина. Наместо тоа, треба да изведете експлицитно remove(newDuration, oldDuration) на сите sourceBuffers, каде што newDuration < oldDuration."
+  },
+  "generated/Deprecation.ts | NoSysexWebMIDIWithoutPermission": {
+    "message": "Web MIDI ќе бара дозвола за користење дури и ако sysex не е наведен во MIDIOptions."
+  },
+  "generated/Deprecation.ts | NonStandardDeclarativeShadowDOM": {
+    "message": "Постариот, нестандардизиран атрибут shadowroot не се поддржува. Наместо тоа, користете го новиот, стандардизиран атрибут shadowrootmode."
+  },
+  "generated/Deprecation.ts | NotificationInsecureOrigin": {
+    "message": "API за известувања веќе не може да се користи од небезбедни потекла. Размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
+  },
+  "generated/Deprecation.ts | NotificationPermissionRequestedIframe": {
+    "message": "Веќе не може да се бара дозвола за API за известувања од iframe со вкрстено потекло. Наместо тоа, размислете да побарате дозвола од рамка од највисоко ниво или отворете нов прозорец."
+  },
+  "generated/Deprecation.ts | ObsoleteCreateImageBitmapImageOrientationNone": {
+    "message": "Опцијата imageOrientation: 'none' во createImageBitmap не се поддржува. Наместо тоа, користете createImageBitmap со опција {imageOrientation: \"from-image\"}."
+  },
+  "generated/Deprecation.ts | ObsoleteWebRtcCipherSuite": {
+    "message": "Вашиот партнер преговара со застарена верзија на (D)TLS. Проверете со партнерот за да го поправи ова."
+  },
+  "generated/Deprecation.ts | OverflowVisibleOnReplacedElement": {
+    "message": "Одредувањето overflow: visible на ознаки img, video и canvas може да предизвика да произведат визуелни содржини надвор од границите на елементот. Видете на https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md."
+  },
+  "generated/Deprecation.ts | PaymentInstruments": {
+    "message": "paymentManager.instruments не се поддржува. Наместо тоа, користете го инсталирање точно на време за ракувачите со плаќања."
+  },
+  "generated/Deprecation.ts | PaymentRequestCSPViolation": {
+    "message": "Вашиот повик за PaymentRequest ја заобиколи директивата за connect-src на Content-Security-Policy (CSP). Ова заобиколување не се поддржува. Додајте идентификатор на начинот на плаќање од API на PaymentRequest (во полето supportedMethods) на вашата директива за connect-src од CSP."
+  },
+  "generated/Deprecation.ts | PersistentQuotaType": {
+    "message": "StorageType.persistent не се поддржува. Наместо тоа, користете стандардизиран navigator.storage."
+  },
+  "generated/Deprecation.ts | PictureSourceSrc": {
+    "message": "<source src> со надредена <picture> е неважечки и затоа се игнорира. Наместо тоа, користете <source srcset>."
+  },
+  "generated/Deprecation.ts | PrefixedCancelAnimationFrame": {
+    "message": "webkitCancelAnimationFrame зависи од продавачот. Наместо тоа, користете го стандардниот метод cancelAnimationFrame."
+  },
+  "generated/Deprecation.ts | PrefixedRequestAnimationFrame": {
+    "message": "webkitRequestAnimationFrame зависи од продавачот. Наместо тоа, користете го стандардниот метод requestAnimationFrame."
+  },
+  "generated/Deprecation.ts | PrefixedVideoDisplayingFullscreen": {
+    "message": "HTMLVideoElement.webkitDisplayingFullscreen не се поддржува. Наместо тоа, користете Document.fullscreenElement."
+  },
+  "generated/Deprecation.ts | PrefixedVideoEnterFullScreen": {
+    "message": "HTMLVideoElement.webkitEnterFullScreen() не се поддржува. Наместо тоа, користете Element.requestFullscreen()."
+  },
+  "generated/Deprecation.ts | PrefixedVideoEnterFullscreen": {
+    "message": "HTMLVideoElement.webkitEnterFullscreen() не се поддржува. Наместо тоа, користете Element.requestFullscreen()."
+  },
+  "generated/Deprecation.ts | PrefixedVideoExitFullScreen": {
+    "message": "HTMLVideoElement.webkitExitFullScreen() не се поддржува. Наместо тоа, користете Document.exitFullscreen()."
+  },
+  "generated/Deprecation.ts | PrefixedVideoExitFullscreen": {
+    "message": "HTMLVideoElement.webkitExitFullscreen() не се поддржува. Наместо тоа, користете Document.exitFullscreen()."
+  },
+  "generated/Deprecation.ts | PrefixedVideoSupportsFullscreen": {
+    "message": "HTMLVideoElement.webkitSupportsFullscreen не се поддржува. Наместо тоа, користете Document.fullscreenEnabled."
+  },
+  "generated/Deprecation.ts | PrivacySandboxExtensionsAPI": {
+    "message": "API chrome.privacy.websites.privacySandboxEnabled нема да се поддржува, но ќе остане активен за компатибилност со постари верзии до изданието M113. Наместо тоа, користете chrome.privacy.websites.topicsEnabled, chrome.privacy.websites.fledgeEnabled и chrome.privacy.websites.adMeasurementEnabled. Погледнете на https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled."
+  },
+  "generated/Deprecation.ts | RTCConstraintEnableDtlsSrtpFalse": {
+    "message": "Ограничувањето DtlsSrtpKeyAgreement е отстрането. Назначивте вредност „false“ за ограничувањево, што се интерпретира како обид за користење на отстранетиот метод за SDES key negotiation. Оваа функционалност е отстранета. Наместо тоа, користете услуга што поддржува DTLS key negotiation."
+  },
+  "generated/Deprecation.ts | RTCConstraintEnableDtlsSrtpTrue": {
+    "message": "Ограничувањето DtlsSrtpKeyAgreement е отстрането. Назначивте вредност „true“ за ограничувањево, којашто немаше никакво влијание, но може да го отстраните ограничувањево заради уредност."
+  },
+  "generated/Deprecation.ts | RTCPeerConnectionGetStatsLegacyNonCompliant": {
+    "message": "getStats() според повратен повик не се поддржува и ќе се отстрани. Наместо тоа, кристете getStats() што се придржува до спецификациите."
+  },
+  "generated/Deprecation.ts | RangeExpand": {
+    "message": "Range.expand() не се поддржува. Наместо тоа, користете Selection.modify()."
+  },
+  "generated/Deprecation.ts | RequestedSubresourceWithEmbeddedCredentials": {
+    "message": "Барањата на подресурси чии URL-адреси содржат вметнати акредитиви (на пр., https://user:pass@host/) се блокирани."
+  },
+  "generated/Deprecation.ts | RtcpMuxPolicyNegotiate": {
+    "message": "Опцијата rtcpMuxPolicy не се поддржува и ќе биде отстранета."
+  },
+  "generated/Deprecation.ts | SharedArrayBufferConstructedWithoutIsolation": {
+    "message": "SharedArrayBuffer ќе бара изолација со вркстено потекло. Видете на https://developer.chrome.com/blog/enabling-shared-array-buffer/ за повеќе детали."
+  },
+  "generated/Deprecation.ts | TextToSpeech_DisallowedByAutoplay": {
+    "message": "speechSynthesis.speak() без активирање од корисникот не се поддржува и ќе биде отстрането."
+  },
+  "generated/Deprecation.ts | V8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
+    "message": "Екстензиите треба да прифатат изолација со вкрстено потекло за да продолжат со користење на SharedArrayBuffer. Видете на https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/."
+  },
+  "generated/Deprecation.ts | XHRJSONEncodingDetection": {
+    "message": "UTF-16 не е подржано со одговор json во XMLHttpRequest"
+  },
+  "generated/Deprecation.ts | XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
+    "message": "Синхронизираното XMLHttpRequest на главната низа не се поддржува поради неговите штетни ефекти врз доживувањето на крајниот корисник. За повеќе помош, проверете на https://xhr.spec.whatwg.org/."
+  },
+  "generated/Deprecation.ts | XRSupportsSession": {
+    "message": "supportsSession() не се поддржува. Наместот тоа, користете isSessionSupported() и проверете ја решената булова вредност."
+  },
   "models/bindings/ContentProviderBasedProject.ts | unknownErrorLoadingFile": {
     "message": "Непозната грешка при вчитувањето на датотеката"
   },
@@ -1276,6 +1441,12 @@
   },
   "models/bindings/IgnoreListManager.ts | addAllContentScriptsToIgnoreList": {
     "message": "Додајте ги сите содржински скрипти во списокот со игнорирани"
+  },
+  "models/bindings/IgnoreListManager.ts | addAllThirdPartyScriptsToIgnoreList": {
+    "message": "Додајте ги сите скрипти од трети страни во списокот со игнорирани"
+  },
+  "models/bindings/IgnoreListManager.ts | addDirectoryToIgnoreList": {
+    "message": "Додајте директориум во списокот со игнорирани"
   },
   "models/bindings/IgnoreListManager.ts | addScriptToIgnoreList": {
     "message": "Додајте скрипта во списокот со игнорирани"
@@ -1376,161 +1547,32 @@
   "models/issues_manager/CrossOriginEmbedderPolicyIssue.ts | samesiteAndSameorigin": {
     "message": "Ист сајт и исто потекло"
   },
-  "models/issues_manager/DeprecationIssue.ts | authorizationCoveredByWildcard": {
-    "message": "Овластувањето нема да биде покриено со симболот за џокер (*) во ракувањето на Access-Control-Allow-Headers со CORS."
-  },
-  "models/issues_manager/DeprecationIssue.ts | canRequestURLHTTPContainingNewline": {
-    "message": "Барањата на ресурси чии URL-адреси содржеле и отстранети знаци за празно место \\(n|r|t) и знаци за „помало од“ (<) се блокирани. Отстранете ги знаците за нови редови и кодирајте ги знаците за „помало од“ од местата како што се вредностите на атрибути на елементи со цел да се вчитаат ресурсиве."
-  },
-  "models/issues_manager/DeprecationIssue.ts | chromeLoadTimesConnectionInfo": {
-    "message": "chrome.loadTimes() не се поддржува. Наместо тоа, користете го стандардизираниот API: Navigation Timing 2."
-  },
-  "models/issues_manager/DeprecationIssue.ts | chromeLoadTimesFirstPaintAfterLoadTime": {
-    "message": "chrome.loadTimes() не се поддржува. Наместо тоа, користете го стандардизираниот API: Paint Timing."
-  },
-  "models/issues_manager/DeprecationIssue.ts | chromeLoadTimesWasAlternateProtocolAvailable": {
-    "message": "chrome.loadTimes() не се поддржува. Наместо тоа, користете стандардизиран API: nextHopProtocol во Navigation Timing 2."
-  },
-  "models/issues_manager/DeprecationIssue.ts | cookieWithTruncatingChar": {
-    "message": "Колачињата што содржат знак \\(0|r|n) ќе бидат отфрлени наместо скратени."
-  },
-  "models/issues_manager/DeprecationIssue.ts | crossOriginAccessBasedOnDocumentDomain": {
-    "message": "Олеснувањето на правилото за исто потекло со поставување document.domain не се поддржува и ќе биде стандардно оневозможено. Предупредувањево за неподдржување е за пристап од вкрстено потекло што е овозможен со поставување document.domain."
-  },
-  "models/issues_manager/DeprecationIssue.ts | crossOriginWindowApi": {
-    "message": "Вклучувањето на {PH1} од iframes со вкрстено потекло не се поддржува и ќе биде отстрането во иднина."
-  },
-  "models/issues_manager/DeprecationIssue.ts | cssSelectorInternalMediaControlsOverlayCastButton": {
-    "message": "За да се оневозможи стандардната интеграција на Cast, треба да се користи атрибутот disableRemotePlayback наместо избирачот -internal-media-controls-overlay-cast-button."
-  },
-  "models/issues_manager/DeprecationIssue.ts | deprecatedWithReplacement": {
-    "message": "{PH1} не се поддржува. Наместо тоа, користете {PH2}."
-  },
-  "models/issues_manager/DeprecationIssue.ts | deprecationExample": {
-    "message": "Ова е пример на преведена порака за проблем во врска со неподдржување."
-  },
-  "models/issues_manager/DeprecationIssue.ts | documentDomainSettingWithoutOriginAgentClusterHeader": {
-    "message": "Олеснувањето на правилото за исто потекло со поставување document.domain не се поддржува и ќе биде стандардно оневозможено. За да продолжите со користење на функцијава, откажете се од збирови агенти со клуч за потекло со испраќање заглавје Origin-Agent-Cluster: ?0 заедно со HTTP-одговорот за документот и рамките. Видете на https://developer.chrome.com/blog/immutable-document-domain/ за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | eventPath": {
-    "message": "Event.path не се поддржува и ќе биде отстранет. Наместо тоа, користете Event.composedPath()."
-  },
-  "models/issues_manager/DeprecationIssue.ts | expectCTHeader": {
-    "message": "Заглавието Expect-CT не се поддржува и ќе биде отстрането. Chrome бара транспарентност на сертификатите за сите јавно доверени сертификати издадени по 30 април 2018 година."
-  },
   "models/issues_manager/DeprecationIssue.ts | feature": {
     "message": "Проверете ја страницата со статусот на функцијата за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | geolocationInsecureOrigin": {
-    "message": "getCurrentPosition() и watchPosition() веќе не функционираат на небезбедни потекла. За да ја користите функцијава, размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | geolocationInsecureOriginDeprecatedNotRemoved": {
-    "message": "getCurrentPosition() и watchPosition() не се поддржуваат на небезбедни потекла. За да ја користите функцијава, размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | getUserMediaInsecureOrigin": {
-    "message": "getUserMedia() веќе не функционира на небезбедни потекла. За да ја користите функцијава, размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | hostCandidateAttributeGetter": {
-    "message": "RTCPeerConnectionIceErrorEvent.hostCandidate не се поддржува. Наместо тоа, користете RTCPeerConnectionIceErrorEvent.address или RTCPeerConnectionIceErrorEvent.port."
-  },
-  "models/issues_manager/DeprecationIssue.ts | identityInCanMakePaymentEvent": {
-    "message": "Потеклото на трговец и произволните податоци од случајот на услужен работник canmakepayment не се поддржани и ќе се отстранат: topOrigin, paymentRequestOrigin, methodData, modifiers."
-  },
-  "models/issues_manager/DeprecationIssue.ts | insecurePrivateNetworkSubresourceRequest": {
-    "message": "Веб-сајтот побара подресурс од мрежа до која можеше да пристапи само поради привилегираната мрежна положба на нејзините корисници. Овие барања откриваат уреди и услуги на интернет што не се јавни, зголемувајќи го ризикот за напад со фалсификат на барање од повеќе сајтови (CSRF) и/или протекување на податоците. За да ги ублажи овие ризици, Chrome не поддржува барања до подресурси што не се јавни кога се иницирани од небезбедни контексти и ќе започне да ги блокира."
-  },
-  "models/issues_manager/DeprecationIssue.ts | localCSSFileExtensionRejected": {
-    "message": "CSS не може да се вчита од URL-адреси на file:, освен ако не завршуваат со екстензијата на датотека .css."
-  },
-  "models/issues_manager/DeprecationIssue.ts | mediaSourceAbortRemove": {
-    "message": "Користењето на SourceBuffer.abort() за да се прекине отстранувањето на асинхрониот опсег на remove() не се поддржува поради промена на спецификацијата. Поддршката ќе се отстрани во иднина. Наместо тоа, треба да го слушате настанот updateend. abort() е наменето само за прекинување на асинхроните аудиовизуелни содржини или за ресетирање на состојбата на анализаторот."
-  },
-  "models/issues_manager/DeprecationIssue.ts | mediaSourceDurationTruncatingBuffered": {
-    "message": "Поставувањето на MediaSource.duration под највисокиот временски печат за презентација за кои било кодирани рамки во привремена меморија не се поддржува поради промена на спецификацијата. Поддршката за имплицитно отстранување на скратените аудиовизуелни содржини во привремената меморија ќе биде отстрането во иднина. Наместо тоа, треба да изведете експлицитно remove(newDuration, oldDuration) на сите sourceBuffers, каде што newDuration < oldDuration."
   },
   "models/issues_manager/DeprecationIssue.ts | milestone": {
     "message": "Оваа промена ќе стапи во сила во верзијата со главен број {milestone}."
   },
-  "models/issues_manager/DeprecationIssue.ts | noSysexWebMIDIWithoutPermission": {
-    "message": "Web MIDI ќе бара дозвола за користење дури и ако sysex не е наведен во MIDIOptions."
-  },
-  "models/issues_manager/DeprecationIssue.ts | notificationInsecureOrigin": {
-    "message": "API за известувања веќе не може да се користи од небезбедни потекла. Размислете да ја префрлите апликацијата на безбедно потекло, како што е HTTPS. Видете на https://goo.gle/chrome-insecure-origins за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | notificationPermissionRequestedIframe": {
-    "message": "Веќе не може да се бара дозвола за API за известувања од iframe со вкрстено потекло. Наместо тоа, размислете да побарате дозвола од рамка од највисоко ниво или отворете нов прозорец."
-  },
-  "models/issues_manager/DeprecationIssue.ts | obsoleteWebRtcCipherSuite": {
-    "message": "Вашиот партнер преговара со застарена верзија на (D)TLS. Проверете со партнерот за да го поправи ова."
-  },
-  "models/issues_manager/DeprecationIssue.ts | openWebDatabaseInsecureContext": {
-    "message": "WebSQL во небезбедни контексти не се поддржува и ќе биде отстрането наскоро. Користете капацитет на прелистувач или индексирана база на податоци."
-  },
-  "models/issues_manager/DeprecationIssue.ts | overflowVisibleOnReplacedElement": {
-    "message": "Одредувањето overflow: visible на ознаки img, video и canvas може да предизвика да произведат визуелни содржини надвор од границите на елементот. Видете на https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md."
-  },
-  "models/issues_manager/DeprecationIssue.ts | paymentInstruments": {
-    "message": "paymentManager.instruments не се поддржува. Наместо тоа, користете го инсталирање точно на време за ракувачите со плаќања."
-  },
-  "models/issues_manager/DeprecationIssue.ts | paymentRequestCSPViolation": {
-    "message": "Вашиот повик за PaymentRequest ја заобиколи директивата за connect-src на Content-Security-Policy (CSP). Ова заобиколување не се поддржува. Додајте идентификатор на начинот на плаќање од API на PaymentRequest (во полето supportedMethods) на вашата директива за connect-src од CSP."
-  },
-  "models/issues_manager/DeprecationIssue.ts | persistentQuotaType": {
-    "message": "StorageType.persistent не се поддржува. Наместо тоа, користете стандардизиран navigator.storage."
-  },
-  "models/issues_manager/DeprecationIssue.ts | pictureSourceSrc": {
-    "message": "<source src> со надредена <picture> е неважечки и затоа се игнорира. Наместо тоа, користете <source srcset>."
-  },
-  "models/issues_manager/DeprecationIssue.ts | prefixedStorageInfo": {
-    "message": "window.webkitStorageInfo не се поддржува. Наместо тоа, користете стандардизиран navigator.storage."
-  },
-  "models/issues_manager/DeprecationIssue.ts | requestedSubresourceWithEmbeddedCredentials": {
-    "message": "Барањата на подресурси чии URL-адреси содржат вметнати акредитиви (на пр., https://user:pass@host/) се блокирани."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcConstraintEnableDtlsSrtpFalse": {
-    "message": "Ограничувањето DtlsSrtpKeyAgreement е отстрането. Назначивте вредност „false“ за ограничувањево, што се интерпретира како обид за користење на отстранетиот метод за SDES key negotiation. Оваа функционалност е отстранета. Наместо тоа, користете услуга што поддржува DTLS key negotiation."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcConstraintEnableDtlsSrtpTrue": {
-    "message": "Ограничувањето DtlsSrtpKeyAgreement е отстрането. Назначивте вредност „true“ за ограничувањево, којашто немаше никакво влијание, но може да го отстраните ограничувањево заради уредност."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcPeerConnectionComplexPlanBSdpUsingDefaultSdpSemantics": {
-    "message": "Complex Plan B SDP е откриено. Овој дијалект на Session Description Protocol веќе не се поддржува. Наместо тоа, користете Unified Plan SDP."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcPeerConnectionSdpSemanticsPlanB": {
-    "message": "Plan B SDP semantics, којашто се користи при конструирање RTCPeerConnection со {sdpSemantics:'plan-b'}, е застарена, нестандардна верзија од Session Description Protocol што е трајно отстранета од веб-платформата. Сѐ уште е достапна при создавањето со IS_FUCHSIA, но ќе ја избришеме што е можно поскоро. Не потпирајте се на неа. Видете на https://crbug.com/1302249 за статус."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcpMuxPolicyNegotiate": {
-    "message": "Опцијата rtcpMuxPolicy не се поддржува и ќе биде отстранета."
-  },
-  "models/issues_manager/DeprecationIssue.ts | sharedArrayBufferConstructedWithoutIsolation": {
-    "message": "SharedArrayBuffer ќе бара изолација со вркстено потекло. Видете на https://developer.chrome.com/blog/enabling-shared-array-buffer/ за повеќе детали."
-  },
-  "models/issues_manager/DeprecationIssue.ts | textToSpeech_DisallowedByAutoplay": {
-    "message": "speechSynthesis.speak() без активирање од корисникот не се поддржува и ќе биде отстрането."
-  },
   "models/issues_manager/DeprecationIssue.ts | title": {
     "message": "Се користи неподдржана функција"
-  },
-  "models/issues_manager/DeprecationIssue.ts | v8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
-    "message": "Екстензиите треба да прифатат изолација со вкрстено потекло за да продолжат со користење на SharedArrayBuffer. Видете на https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/."
-  },
-  "models/issues_manager/DeprecationIssue.ts | vendorSpecificApi": {
-    "message": "{PH1} е конкретен метод за продавач. Наместо тоа, користете го стандардниот метод {PH2}."
-  },
-  "models/issues_manager/DeprecationIssue.ts | xhrJSONEncodingDetection": {
-    "message": "UTF-16 не е подржано со одговор json во XMLHttpRequest"
-  },
-  "models/issues_manager/DeprecationIssue.ts | xmlHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
-    "message": "Синхронизираното XMLHttpRequest на главната низа не се поддржува поради неговите штетни ефекти врз доживувањето на крајниот корисник. За повеќе помош, проверете на https://xhr.spec.whatwg.org/."
-  },
-  "models/issues_manager/DeprecationIssue.ts | xrSupportsSession": {
-    "message": "supportsSession() не се поддржува. Наместот тоа, користете isSessionSupported() и проверете ја решената булова вредност."
   },
   "models/issues_manager/FederatedAuthRequestIssue.ts | fedCm": {
     "message": "API за Federated Credential Management"
   },
+  "models/issues_manager/GenericIssue.ts | autocompleteAttributePageTitle": {
+    "message": "HTML-атрибут: автоматско довршување"
+  },
   "models/issues_manager/GenericIssue.ts | crossOriginPortalPostMessage": {
     "message": "Портали - Канали за комуникација со исто потекло"
+  },
+  "models/issues_manager/GenericIssue.ts | howDoesAutofillWorkPageTitle": {
+    "message": "Како функционира автоматското пополнување?"
+  },
+  "models/issues_manager/GenericIssue.ts | inputFormElementPageTitle": {
+    "message": "Елемент за внесување во формуларот"
+  },
+  "models/issues_manager/GenericIssue.ts | labelFormlementsPageTitle": {
+    "message": "Елементи на етикетата"
   },
   "models/issues_manager/HeavyAdIssue.ts | handlingHeavyAdInterventions": {
     "message": "Интервенции при справувањето со тешки реклами"
@@ -2313,7 +2355,7 @@
     "message": "Манифестот не содржи поле за „name“ или „short_name“"
   },
   "panels/application/AppManifestView.ts | manifestDoesNotContainASuitable": {
-    "message": "Манифестот не содржи соодветна икона - потребен е формат PNG или SVG од најмалку {PH1} пиксели, атрибутот „sizes“ мора да е поставен, а атрибутот „purpose“, ако е поставен, мора да вклучува „any“."
+    "message": "Манифестот не содржи соодветна икона - потребен е формат PNG, SVG или WebP од најмалку {PH1} пиксели, атрибутот за sizes мора да е поставен, а атрибутот за purpose, ако е поставен, мора да вклучува „any“."
   },
   "panels/application/AppManifestView.ts | manifestSpecifies": {
     "message": "Манифестот го одредува „prefer_related_applications: точно“"
@@ -2337,7 +2379,7 @@
     "message": "Не е обезбеден ID за Play Store"
   },
   "panels/application/AppManifestView.ts | noSuppliedIconIsAtLeastSpxSquare": {
-    "message": "Ниту една обезбедена икона нема најмалку {PH1} квадратни пиксели во форматите PNG или SVG, со непоставен атрибут за намена или поставен на „any“."
+    "message": "Ниту една обезбедена икона нема најмалку {PH1} квадратни пиксели во форматите PNG, SVG или WebP, со непоставен атрибут за намена или поставен на „any“."
   },
   "panels/application/AppManifestView.ts | note": {
     "message": "Забелешка:"
@@ -2368,12 +2410,6 @@
   },
   "panels/application/AppManifestView.ts | presentation": {
     "message": "Презентација"
-  },
-  "panels/application/AppManifestView.ts | primaryIconasUsedByChrome": {
-    "message": "Примарна икона што ја користи Chrome"
-  },
-  "panels/application/AppManifestView.ts | primaryManifestIconFromS": {
-    "message": "Икона за примарен манифест од {PH1}"
   },
   "panels/application/AppManifestView.ts | protocolHandlers": {
     "message": "Ракувачи на протоколи"
@@ -2444,21 +2480,6 @@
   "panels/application/AppManifestView.ts | themeColor": {
     "message": "Боја на темата"
   },
-  "panels/application/ApplicationPanelCacheSection.ts | backForwardCache": {
-    "message": "Кеш за движење наназад и нанапред"
-  },
-  "panels/application/ApplicationPanelCacheSection.ts | cacheStorage": {
-    "message": "Капацитет за кеш"
-  },
-  "panels/application/ApplicationPanelCacheSection.ts | delete": {
-    "message": "Избриши"
-  },
-  "panels/application/ApplicationPanelCacheSection.ts | refreshCaches": {
-    "message": "Освежи ги кешовите"
-  },
-  "panels/application/ApplicationPanelPreloadingSection.ts | prefetchingAndPrerendering": {
-    "message": "Претходно преземање и прикажување"
-  },
   "panels/application/ApplicationPanelSidebar.ts | appManifest": {
     "message": "Манифест на апликацијата"
   },
@@ -2473,9 +2494,6 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | beforeInvokeAlert": {
     "message": "{PH1}: активирајте за да лизгате до оваа секција во манифестот"
-  },
-  "panels/application/ApplicationPanelSidebar.ts | cache": {
-    "message": "Кеш"
   },
   "panels/application/ApplicationPanelSidebar.ts | clear": {
     "message": "Избриши"
@@ -2551,6 +2569,9 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | worker": {
     "message": "работник"
+  },
+  "panels/application/BackForwardCacheTreeElement.ts | backForwardCache": {
+    "message": "Кеш за движење наназад и нанапред"
   },
   "panels/application/BackgroundServiceView.ts | backgroundFetch": {
     "message": "Преземање во заднина"
@@ -2843,11 +2864,23 @@
   "panels/application/OpenedWindowDetailsView.ts | yes": {
     "message": "Да"
   },
+  "panels/application/PreloadingTreeElement.ts | prefetchingAndPrerendering": {
+    "message": "Претходно преземање и прикажување"
+  },
   "panels/application/ReportingApiReportsView.ts | clickToDisplayBody": {
     "message": "Кликнете на која било пријава за се прикажат нејзините содржини"
   },
   "panels/application/ReportingApiTreeElement.ts | reportingApi": {
     "message": "API за пријавување"
+  },
+  "panels/application/ServiceWorkerCacheTreeElement.ts | cacheStorage": {
+    "message": "Капацитет за кеш"
+  },
+  "panels/application/ServiceWorkerCacheTreeElement.ts | delete": {
+    "message": "Избриши"
+  },
+  "panels/application/ServiceWorkerCacheTreeElement.ts | refreshCaches": {
+    "message": "Освежи ги кешовите"
   },
   "panels/application/ServiceWorkerCacheViews.ts | cache": {
     "message": "Кеш"
@@ -3330,7 +3363,7 @@
     "message": "Користени се API што не ги исполнуваат условите."
   },
   "panels/application/components/BackForwardCacheStrings.ts | injectedJavascript": {
-    "message": "IPages во коишто е вметнат JavaScript преку екстензии во моментов не ги исполнуваат условите за кешот за движење наназад и нанапред."
+    "message": "Страниците во коишто е вметнат JavaScript преку екстензии во моментов не ги исполнуваат условите за кешот за движење наназад и нанапред."
   },
   "panels/application/components/BackForwardCacheStrings.ts | injectedStyleSheet": {
     "message": "Страниците во коишто е вметнат StyleSheet преку екстензии во моментов не ги исполнуваат условите за кешот за движење наназад и нанапред."
@@ -4037,6 +4070,9 @@
   "panels/application/components/SharedStorageMetadataView.ts | origin": {
     "message": "Потекло"
   },
+  "panels/application/components/SharedStorageMetadataView.ts | resetBudget": {
+    "message": "Ресетирај го буџетот"
+  },
   "panels/application/components/SharedStorageMetadataView.ts | sharedStorage": {
     "message": "Споделен простор"
   },
@@ -4061,53 +4097,44 @@
   "panels/application/components/TrustTokensView.ts | storedTokenCount": {
     "message": "Број на складирани токени"
   },
-  "panels/application/preloading/PreloadingView.ts | clearNotOngoing": {
-    "message": "Исчисти што не е тековно"
+  "panels/application/preloading/PreloadingView.ts | validityValid": {
+    "message": "Важечко"
   },
-  "panels/application/preloading/PreloadingView.ts | statusActivated": {
-    "message": "Активирано"
+  "panels/application/preloading/PreloadingView.ts | warningDetailPreloadingDisabledByFeatureFlag": {
+    "message": "Вчитувањето однапред е присилно овозможено бидејќи се отворени „Алатките за програмери“. Кога „Алатките за програмери“ се затворени, претходното прикажување ќе биде оневозможено бидејќи сесијава на прелистувач е дел од контролна група што се користи за споредување на изведбите."
   },
-  "panels/application/preloading/PreloadingView.ts | statusDiscarded": {
-    "message": "Отфрлено"
+  "panels/application/preloading/PreloadingView.ts | warningDetailPrerenderingDisabledByFeatureFlag": {
+    "message": "Претходното прикажување е присилно овозможено бидејќи се отворени „Алатките за програмери“. Кога „Алатките за програмери“ се затворени, претходното прикажување ќе биде оневозможено бидејќи сесијава на прелистувач е дел од контролна група што се користи за споредување на изведбите."
   },
-  "panels/application/preloading/PreloadingView.ts | statusPrerendering": {
-    "message": "Претходно прикажување"
+  "panels/application/preloading/PreloadingView.ts | warningTitlePreloadingDisabledByFeatureFlag": {
+    "message": "Вчитувањето однапред е оневозможено, но е присилно овозможено сега"
   },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsBasicInformation": {
-    "message": "Основни податоци"
-  },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsStartedAt": {
-    "message": "Започна во"
+  "panels/application/preloading/PreloadingView.ts | warningTitlePrerenderingDisabledByFeatureFlag": {
+    "message": "Претходното прикажување е оневозможено, но е присилно овозможено сега"
   },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsStatus": {
     "message": "Статус"
   },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsTrigger": {
-    "message": "Активатор"
-  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | selectAnElementForMoreDetails": {
     "message": "Изберете елемент за повеќе детали"
-  },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | statusActivated": {
-    "message": "Активирано"
-  },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | statusDiscarded": {
-    "message": "Отфрлено"
-  },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | statusPrerendering": {
-    "message": "Претходно прикажување"
-  },
-  "panels/application/preloading/components/PreloadingGrid.ts | startedAt": {
-    "message": "Започна во"
   },
   "panels/application/preloading/components/PreloadingGrid.ts | status": {
     "message": "Статус"
   },
-  "panels/application/preloading/components/PreloadingGrid.ts | trigger": {
-    "message": "Активатор"
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsDetailedInformation": {
+    "message": "Детални податоци"
   },
-  "panels/application/preloading/components/PreloadingGrid.ts | type": {
-    "message": "Тип"
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsSource": {
+    "message": "Извор"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsValidity": {
+    "message": "Важност"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | validityValid": {
+    "message": "Важечко"
+  },
+  "panels/application/preloading/components/RuleSetGrid.ts | validity": {
+    "message": "Важност"
   },
   "panels/browser_debugger/CategorizedBreakpointsSidebarPane.ts | breakpointHit": {
     "message": "достигната е точката на прекин"
@@ -4481,6 +4508,9 @@
   "panels/console/ConsoleViewMessage.ts | clearAllMessagesWithS": {
     "message": "Избриши ги сите пораки со {PH1}"
   },
+  "panels/console/ConsoleViewMessage.ts | cndBreakpoint": {
+    "message": "Условна точка на прекин"
+  },
   "panels/console/ConsoleViewMessage.ts | console": {
     "message": "Конзола"
   },
@@ -4510,6 +4540,9 @@
   },
   "panels/console/ConsoleViewMessage.ts | interventionS": {
     "message": "[Intervention] {PH1}"
+  },
+  "panels/console/ConsoleViewMessage.ts | logpoint": {
+    "message": "Точка за евиденција"
   },
   "panels/console/ConsoleViewMessage.ts | repeatS": {
     "message": "{n,plural, =1{Се повтори еднаш}one{Се повтори # пат}other{Се повтори # пати}}"
@@ -4557,7 +4590,7 @@
     "message": "Избриши ја историјата на конзолата"
   },
   "panels/console/console-meta.ts | collapseConsoleTraceMessagesByDefault": {
-    "message": "Стандардно собирај пораки од типот console.trace()"
+    "message": "Не проширувај ги пораките console.trace() автоматски"
   },
   "panels/console/console-meta.ts | console": {
     "message": "Конзола"
@@ -4590,7 +4623,7 @@
     "message": "Процената ја активира активацијата од корисникот"
   },
   "panels/console/console-meta.ts | expandConsoleTraceMessagesByDefault": {
-    "message": "Стандардно проширувај пораки од типот console.trace()"
+    "message": "Проширувај ги пораките console.trace() автоматски"
   },
   "panels/console/console-meta.ts | groupSimilarMessagesInConsole": {
     "message": "Групирај ги сличните пораки во конзолата"
@@ -4743,7 +4776,7 @@
     "message": "Филтер за URL"
   },
   "panels/coverage/coverage-meta.ts | coverage": {
-    "message": "Покриеност"
+    "message": "Опфатеност"
   },
   "panels/coverage/coverage-meta.ts | instrumentCoverage": {
     "message": "Покриеност на инструментот"
@@ -5051,9 +5084,6 @@
   "panels/elements/ElementsPanel.ts | findByStringSelectorOrXpath": {
     "message": "Најдете според низа, избирач или XPath"
   },
-  "panels/elements/ElementsPanel.ts | frame": {
-    "message": "Кадар"
-  },
   "panels/elements/ElementsPanel.ts | hideComputedStylesSidebar": {
     "message": "Сокриј ја страничната лента за пресметани стилови"
   },
@@ -5354,9 +5384,6 @@
   "panels/elements/StylePropertyTreeElement.ts | togglePropertyAndContinueEditing": {
     "message": "Вклучи/исклучи својство и продолжи со менување"
   },
-  "panels/elements/StylePropertyTreeElement.ts | valueForSettingSSIsOutsideThe": {
-    "message": "Вредноста за поставката „{PH1}“ {PH2} е надвор од поддржаниот опсег [{PH3}, {PH4}] за семејството фонтови „{PH5}“."
-  },
   "panels/elements/StylePropertyTreeElement.ts | viewComputedValue": {
     "message": "Прикажи ја пресметаната вредност"
   },
@@ -5436,6 +5463,12 @@
     "message": "Прикажи значки"
   },
   "panels/elements/components/CSSHintDetailsView.ts | learnMore": {
+    "message": "Дознајте повеќе"
+  },
+  "panels/elements/components/CSSPropertyDocsView.ts | dontShow": {
+    "message": "Не прикажувај"
+  },
+  "panels/elements/components/CSSPropertyDocsView.ts | learnMore": {
     "message": "Дознајте повеќе"
   },
   "panels/elements/components/ElementsBreadcrumbs.ts | breadcrumbs": {
@@ -5530,6 +5563,9 @@
   },
   "panels/elements/elements-meta.ts | selectAnElementInThePageTo": {
     "message": "Изберете елемент на страницата за да го испитате"
+  },
+  "panels/elements/elements-meta.ts | showCSSDocumentationTooltip": {
+    "message": "Прикажи совет за алатка на документација за CSS"
   },
   "panels/elements/elements-meta.ts | showComputedStyles": {
     "message": "Прикажи пресметани стилови"
@@ -8984,6 +9020,18 @@
   "panels/profiler/ProfilesPanel.ts | clearAllProfiles": {
     "message": "Избриши ги сите профили"
   },
+  "panels/profiler/ProfilesPanel.ts | deprecationWarnMsg": {
+    "message": "Таблава нема да се поддржува во претстојната верзија. Користете ја „Таблата за изведба“ за евидентирање ЦПУ-профили на JavaScript."
+  },
+  "panels/profiler/ProfilesPanel.ts | feedback": {
+    "message": "Повратни информации"
+  },
+  "panels/profiler/ProfilesPanel.ts | goToPerformancePanel": {
+    "message": "Одете во „Таблата за изведба“"
+  },
+  "panels/profiler/ProfilesPanel.ts | learnMore": {
+    "message": "Дознајте повеќе"
+  },
   "panels/profiler/ProfilesPanel.ts | load": {
     "message": "Вчитај…"
   },
@@ -9029,6 +9077,9 @@
   "panels/protocol_monitor/ProtocolMonitor.ts | documentation": {
     "message": "Документација"
   },
+  "panels/protocol_monitor/ProtocolMonitor.ts | elapsedTime": {
+    "message": "Изминато време"
+  },
   "panels/protocol_monitor/ProtocolMonitor.ts | filter": {
     "message": "Филтер"
   },
@@ -9052,6 +9103,9 @@
   },
   "panels/protocol_monitor/ProtocolMonitor.ts | save": {
     "message": "Зачувај"
+  },
+  "panels/protocol_monitor/ProtocolMonitor.ts | selectTarget": {
+    "message": "Изберете цел"
   },
   "panels/protocol_monitor/ProtocolMonitor.ts | sendRawCDPCommand": {
     "message": "Испрати необработена наредба CDP"
@@ -9888,7 +9942,7 @@
     "message": "Додаден е ред за бренд"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | architecture": {
-    "message": "Архитектура"
+    "message": "Архитектура (Sec-CH-UA-Arch)"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | architecturePlaceholder": {
     "message": "Архитектура (на пр. x86)"
@@ -9903,13 +9957,13 @@
     "message": "Бренд: {PH1}"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandProperties": {
-    "message": "Детали за брендот"
+    "message": "Својства на корисник-агент"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandVersionAriaLabel": {
     "message": "Верзија {PH1}"
   },
-  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brands": {
-    "message": "Брендови"
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandVersionPlaceholder": {
+    "message": "Верзија (на пр., 87.0.4280.88)"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | deleteTooltip": {
     "message": "Избриши"
@@ -9918,16 +9972,19 @@
     "message": "Избришан е редот за бренд"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | deviceModel": {
-    "message": "Модел на уредот"
+    "message": "Модел на уред (Sec-CH-UA-Model)"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | deviceProperties": {
     "message": "Детали за уредот"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | fullBrowserVersion": {
-    "message": "Целосна верзија на прелистувачот"
+    "message": "Целосна верзија на прелистувачот (Sec-CH-UA-Full-Browser-Version)"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | fullBrowserVersionPlaceholder": {
     "message": "Целосна верзија на прелистувачот (на пр., 87.0.4280.88)"
+  },
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | fullVersionList": {
+    "message": "Список со целосни верзии (Sec-CH-UA-Full-Version-List)"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | mobileCheckboxLabel": {
     "message": "Мобилен"
@@ -9936,7 +9993,7 @@
     "message": "Не може да се претстави како низа со структурирани заглавија."
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | platformLabel": {
-    "message": "Платформа"
+    "message": "Платформа (Sec-CH-UA-Platform/Sec-CH-UA-Platform-Version)"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | platformPlaceholder": {
     "message": "Платформа (на пр. Android)"
@@ -9947,6 +10004,9 @@
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | platformVersion": {
     "message": "Верзија на платформата"
   },
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | significantBrandVersionPlaceholder": {
+    "message": "Значителна верзија (на пр., 87)"
+  },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | title": {
     "message": "Совети за клиент на корисник-агент"
   },
@@ -9956,8 +10016,8 @@
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | userAgentClientHintsInfo": {
     "message": "Советите за клиент на корисник-агент се алтернатива на низата за корисник-агент за идентификување на прелистувачот и уредот на поструктуриран начин со подобра приватност. Кликнете на копчето за да дознаете повеќе."
   },
-  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | version": {
-    "message": "Верзија"
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | useragent": {
+    "message": "Корисник-агент (Sec-CH-UA)"
   },
   "panels/settings/emulation/emulation-meta.ts | devices": {
     "message": "Уреди"
@@ -10030,6 +10090,9 @@
   },
   "panels/sources/BreakpointEditDialog.ts | expressionToCheckBeforePausingEg": {
     "message": "Израз за проверка пред паузирање, на пр. x > 5"
+  },
+  "panels/sources/BreakpointEditDialog.ts | learnMoreOnBreakpointTypes": {
+    "message": "Дознајте повеќе: типови точки на прекин"
   },
   "panels/sources/BreakpointEditDialog.ts | logAMessageToConsoleDoNotBreak": {
     "message": "Евидентирајте порака во конзолата, без прелом"
@@ -10349,6 +10412,9 @@
   "panels/sources/NavigatorView.ts | sFromSourceMap": {
     "message": "{PH1} (од изворната карта)"
   },
+  "panels/sources/NavigatorView.ts | sIgnoreListed": {
+    "message": "{PH1} (список со игнорирани)"
+  },
   "panels/sources/NavigatorView.ts | searchInAllFiles": {
     "message": "Пребарај во сите датотеки"
   },
@@ -10373,11 +10439,11 @@
   "panels/sources/ProfilePlugin.ts | ms": {
     "message": "ms"
   },
-  "panels/sources/ResourceOriginPlugin.ts | providedViaDebugInfoByS": {
-    "message": "(обезбедено преку информациите за отстранување грешки од {PH1})"
+  "panels/sources/ResourceOriginPlugin.ts | fromS": {
+    "message": "(Од {PH1})"
   },
   "panels/sources/ResourceOriginPlugin.ts | sourceMappedFromS": {
-    "message": "(изворот е мапиран од {PH1})"
+    "message": "(Изворот е мапиран од {PH1})"
   },
   "panels/sources/ScopeChainSidebarPane.ts | closure": {
     "message": "Затворање"
@@ -10997,9 +11063,6 @@
   "panels/timeline/TimelineDetailsView.ts | totalBlockingTimeSmss": {
     "message": "Вкупно време на блокирање: {PH1}ms{PH2}"
   },
-  "panels/timeline/TimelineEventOverview.ts | coverage": {
-    "message": "ПОКРИЕНОСТ"
-  },
   "panels/timeline/TimelineEventOverview.ts | cpu": {
     "message": "CPU"
   },
@@ -11071,12 +11134,6 @@
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | thread": {
     "message": "Низа"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | threadS": {
-    "message": "Низа {PH1}"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | timings": {
-    "message": "Времиња"
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | userInteractions": {
     "message": "Интеракции"
@@ -11168,9 +11225,6 @@
   "panels/timeline/TimelinePanel.ts | close": {
     "message": "Затвори"
   },
-  "panels/timeline/TimelinePanel.ts | coverage": {
-    "message": "Покриеност"
-  },
   "panels/timeline/TimelinePanel.ts | cpu": {
     "message": "CPU:"
   },
@@ -11221,9 +11275,6 @@
   },
   "panels/timeline/TimelinePanel.ts | received": {
     "message": "Примено"
-  },
-  "panels/timeline/TimelinePanel.ts | recordCoverageWithPerformance": {
-    "message": "Снимај ја покриеноста со трага за изведба"
   },
   "panels/timeline/TimelinePanel.ts | recordingFailed": {
     "message": "Неуспешно снимање"
@@ -11642,9 +11693,6 @@
   "panels/timeline/TimelineUIUtils.ts | initiator": {
     "message": "Иницијатор"
   },
-  "panels/timeline/TimelineUIUtils.ts | inputLatency": {
-    "message": "Латентност на внесување"
-  },
   "panels/timeline/TimelineUIUtils.ts | installTimer": {
     "message": "Тајмер за инсталирање"
   },
@@ -11665,6 +11713,15 @@
   },
   "panels/timeline/TimelineUIUtils.ts | jsFrame": {
     "message": "JS-кадар"
+  },
+  "panels/timeline/TimelineUIUtils.ts | jsIdleFrame": {
+    "message": "Неактивна рамка на JS"
+  },
+  "panels/timeline/TimelineUIUtils.ts | jsRoot": {
+    "message": "Потекло на JS"
+  },
+  "panels/timeline/TimelineUIUtils.ts | jsSystemFrame": {
+    "message": "Системска рамка на JS"
   },
   "panels/timeline/TimelineUIUtils.ts | largestContentfulPaint": {
     "message": "Најголемо вчитување на содржините"
@@ -11809,6 +11866,9 @@
   },
   "panels/timeline/TimelineUIUtils.ts | producedCacheSize": {
     "message": "Големина на произведениот кеш"
+  },
+  "panels/timeline/TimelineUIUtils.ts | profilingOverhead": {
+    "message": "Време поминато на профилирање"
   },
   "panels/timeline/TimelineUIUtils.ts | range": {
     "message": "Опсег"
@@ -12007,9 +12067,6 @@
   },
   "panels/timeline/TimelineUIUtils.ts | timeSpentInRendering": {
     "message": "Време поминато во обработка"
-  },
-  "panels/timeline/TimelineUIUtils.ts | timeWaitingForMainThread": {
-    "message": "Време на чекање за главната низа"
   },
   "panels/timeline/TimelineUIUtils.ts | timeout": {
     "message": "Времето истече"
@@ -12320,14 +12377,35 @@
   "panels/webauthn/webauthn-meta.ts | webauthn": {
     "message": "WebAuthn"
   },
+  "ui/components/data_grid/DataGrid.ts | enterToSort": {
+    "message": "Состојба на подредување колона: {PH1}. Притиснете Enter за да се примени филтерот за подредување"
+  },
   "ui/components/data_grid/DataGrid.ts | headerOptions": {
     "message": "Опции за заглавието"
   },
   "ui/components/data_grid/DataGrid.ts | resetColumns": {
     "message": "Ресетирај ги колоните"
   },
+  "ui/components/data_grid/DataGrid.ts | sortAsc": {
+    "message": "растечки редослед"
+  },
   "ui/components/data_grid/DataGrid.ts | sortBy": {
     "message": "Подреди според"
+  },
+  "ui/components/data_grid/DataGrid.ts | sortDesc": {
+    "message": "опаѓачки редослед"
+  },
+  "ui/components/data_grid/DataGrid.ts | sortNone": {
+    "message": "нема"
+  },
+  "ui/components/data_grid/DataGridController.ts | sortInAscendingOrder": {
+    "message": "{PH1} е подредена по растечки редослед"
+  },
+  "ui/components/data_grid/DataGridController.ts | sortInDescendingOrder": {
+    "message": "{PH1} е подредена по опаѓачки редослед"
+  },
+  "ui/components/data_grid/DataGridController.ts | sortingCanceled": {
+    "message": "Подредувањето на {PH1} е откажано"
   },
   "ui/components/diff_view/DiffView.ts | SkippingDMatchingLines": {
     "message": "( … Се прескокнуваат {PH1} редови што се совпаѓаат … )"
@@ -12754,6 +12832,9 @@
   },
   "ui/legacy/components/color_picker/ContrastDetails.ts | useSuggestedColorStoFixLow": {
     "message": "Користи ја предложената боја {PH1} за поправка на нискиот контраст"
+  },
+  "ui/legacy/components/color_picker/FormatPickerContextMenu.ts | colorClippedTooltipText": {
+    "message": "Бојава беше приспособена да се совпаѓа со опсегот на форматот. Актуелниот резултат беше {PH1}"
   },
   "ui/legacy/components/color_picker/Spectrum.ts | addToPalette": {
     "message": "Додајте во палетата"

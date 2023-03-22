@@ -355,6 +355,9 @@ export class DebuggerPlugin extends Plugin {
     if (this.missingDebugInfoBar) {
       this.attachInfobar(this.missingDebugInfoBar);
     }
+    if (this.sourceMapInfobar) {
+      this.attachInfobar(this.sourceMapInfobar);
+    }
     if (!this.muted) {
       void this.refreshBreakpoints();
     }
@@ -941,7 +944,7 @@ export class DebuggerPlugin extends Plugin {
     const functionOffsetPromise = this.#rawLocationToEditorOffset(callFrame.functionLocation(), url);
     const executionOffsetPromise = this.#rawLocationToEditorOffset(callFrame.location(), url);
     const [functionOffset, executionOffset] = await Promise.all([functionOffsetPromise, executionOffsetPromise]);
-    if (!functionOffset || !executionOffset) {
+    if (!functionOffset || !executionOffset || !this.editor) {
       return null;
     }
 
@@ -960,7 +963,7 @@ export class DebuggerPlugin extends Plugin {
     }
 
     const variablesByLine = getVariableValuesByLine(scopeMappings, variableNames);
-    if (!variablesByLine) {
+    if (!variablesByLine || !this.editor) {
       return null;
     }
 

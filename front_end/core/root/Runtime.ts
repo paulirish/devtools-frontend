@@ -25,7 +25,7 @@ export function getRemoteBase(location: string = self.location.toString()): {
     return null;
   }
 
-  return {base: `${url.origin}/remote/serve_file/${version[1]}/`, version: version[1]};
+  return {base: `devtools://devtools/remote/serve_file/${version[1]}/`, version: version[1]};
 }
 
 export class Runtime {
@@ -292,7 +292,6 @@ export enum ExperimentName {
   CSS_OVERVIEW = 'cssOverview',
   LIVE_HEAP_PROFILE = 'liveHeapProfile',
   DEVELOPER_RESOURCES_VIEW = 'developerResourcesView',
-  TIMELINE_REPLAY_EVENT = 'timelineReplayEvent',
   CSP_VIOLATIONS_VIEW = 'cspViolationsView',
   WASM_DWARF_DEBUGGING = 'wasmDWARFDebugging',
   ALL = '*',
@@ -308,9 +307,10 @@ export enum ExperimentName {
   AUTHORED_DEPLOYED_GROUPING = 'authoredDeployedGrouping',
   IMPORTANT_DOM_PROPERTIES = 'importantDOMProperties',
   JUST_MY_CODE = 'justMyCode',
-  BREAKPOINT_VIEW = 'breakpointView',
   PRELOADING_STATUS_PANEL = 'preloadingStatusPanel',
   DISABLE_COLOR_FORMAT_SETTING = 'disableColorFormatSetting',
+  TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL = 'timelineAsConsoleProfileResultPanel',
+  OUTERMOST_TARGET_SELECTOR = 'outermostTargetSelector',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

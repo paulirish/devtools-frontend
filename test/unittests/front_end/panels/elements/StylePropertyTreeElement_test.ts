@@ -35,6 +35,7 @@ const mockMatchedStyles = {
       computedValue: mockVariableMap[param],
     };
   },
+  keyframes: () => [],
 } as unknown as SDK.CSSMatchedStyles.CSSMatchedStyles;
 
 const mockCssProperty = {} as unknown as SDK.CSSProperty.CSSProperty;
@@ -46,7 +47,7 @@ describeWithRealConnection('StylePropertyTreeElement', async () => {
   beforeEach(async () => {
     Elements = await import('../../../../../front_end/panels/elements/elements.js');
 
-    mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance();
+    mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance({forceNew: true});
   });
 
   describe('updateTitle', () => {
@@ -141,6 +142,35 @@ describeWithRealConnection('StylePropertyTreeElement', async () => {
            assert.isNull(colorMixSwatch);
          });
     });
+
+    describe('animation-name swatch', () => {
+      it('should be rendered for animation-name declaration', () => {
+        const cssAnimationNameProperty = new SDK.CSSProperty.CSSProperty(
+            mockCssStyleDeclaration, 0, 'animation-name', 'first-keyframe', true, false, true, false, '', undefined);
+        const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement(
+            mockStylesSidebarPane, mockMatchedStyles, cssAnimationNameProperty, false, false, false, true);
+
+        stylePropertyTreeElement.updateTitle();
+
+        const animationNameSwatch =
+            stylePropertyTreeElement.valueElement?.querySelector('devtools-animation-name-swatch');
+        assert.isNotNull(animationNameSwatch);
+      });
+
+      it('should two swatches be rendered for animation-name declaration that contains two keyframe references', () => {
+        const cssAnimationNameProperty = new SDK.CSSProperty.CSSProperty(
+            mockCssStyleDeclaration, 0, 'animation-name', 'first-keyframe, second-keyframe', true, false, true, false,
+            '', undefined);
+        const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement(
+            mockStylesSidebarPane, mockMatchedStyles, cssAnimationNameProperty, false, false, false, true);
+
+        stylePropertyTreeElement.updateTitle();
+
+        const animationNameSwatches =
+            stylePropertyTreeElement.valueElement?.querySelectorAll('devtools-animation-name-swatch');
+        assert.strictEqual(animationNameSwatches?.length, 2);
+      });
+    });
   });
 
   it('applies the new style when the color format is changed', async () => {
@@ -201,6 +231,62 @@ describeWithRealConnection('StylePropertyTreeElement', async () => {
       verifySection(expectedClipboardSectionItemsLabels, clipboardSection.items);
       verifySection(expectedDefaultSectionItemsLabels, defaultSection.items);
       verifySection(expectedFooterSectionItemsLabels, footerSection.items);
+    });
+  });
+
+  describe('CSS hints', () => {
+    let Elements: typeof ElementsModule;
+    let mockStylesSidebarPane: ElementsModule.StylesSidebarPane.StylesSidebarPane;
+
+    beforeEach(async () => {
+      Elements = await import('../../../../../front_end/panels/elements/elements.js');
+      mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance({forceNew: true});
+    });
+
+    it('should create a hint for inline elements', () => {
+      sinon.stub(mockStylesSidebarPane, 'node').returns({
+        localName() {
+          return 'span';
+        },
+        isSVGNode() {
+          return false;
+        },
+      } as SDK.DOMModel.DOMNode);
+      const cssPropertyWidth = new SDK.CSSProperty.CSSProperty(
+          mockCssStyleDeclaration, 0, 'width', '100px', true, false, true, false, '', undefined);
+      const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement(
+          mockStylesSidebarPane, mockMatchedStyles, cssPropertyWidth, false, false, false, true);
+      stylePropertyTreeElement.setComputedStyles(new Map([
+        ['width', '100px'],
+        ['display', 'inline'],
+      ]));
+      stylePropertyTreeElement.updateAuthoringHint();
+      assert(
+          stylePropertyTreeElement.listItemElement.classList.contains('inactive-property'),
+          'CSS hint was not rendered.');
+    });
+
+    it('should not create a hint for SVG elements', () => {
+      sinon.stub(mockStylesSidebarPane, 'node').returns({
+        localName() {
+          return 'rect';
+        },
+        isSVGNode() {
+          return true;
+        },
+      } as SDK.DOMModel.DOMNode);
+      const cssPropertyWidth = new SDK.CSSProperty.CSSProperty(
+          mockCssStyleDeclaration, 0, 'width', '100px', true, false, true, false, '', undefined);
+      const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement(
+          mockStylesSidebarPane, mockMatchedStyles, cssPropertyWidth, false, false, false, true);
+      stylePropertyTreeElement.setComputedStyles(new Map([
+        ['width', '100px'],
+        ['display', 'inline'],
+      ]));
+      stylePropertyTreeElement.updateAuthoringHint();
+      assert(
+          !stylePropertyTreeElement.listItemElement.classList.contains('inactive-property'),
+          'CSS hint was rendered unexpectedly.');
     });
   });
 });

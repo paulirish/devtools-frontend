@@ -10,6 +10,8 @@ import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scop
 
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
+const resolveNamesTimeout = 500;
+
 export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private mainTargetInternal: SDK.Target.Target|null;
   private tracingModelInternal: SDK.TracingModel.TracingModel|null;
@@ -18,11 +20,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   private readonly frameModelInternal: TimelineModel.TimelineFrameModel.TimelineFrameModel;
   private filmStripModelInternal: SDK.FilmStripModel.FilmStripModel|null;
   private windowInternal: Window;
-  private readonly extensionTracingModels: {
-    title: string,
-    model: SDK.TracingModel.TracingModel,
-    timeOffset: number,
-  }[];
+  private willResolveNames = false;
   private recordStartTimeInternal?: number;
 
   constructor() {
@@ -38,7 +36,6 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
 
     this.windowInternal = {left: 0, right: Infinity};
 
-    this.extensionTracingModels = [];
     this.recordStartTimeInternal = undefined;
   }
 
@@ -86,11 +83,6 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     this.frameModelInternal.addTraceEvents(
         this.mainTargetInternal, this.timelineModelInternal.inspectedTargetEvents(), threadData);
 
-    for (const entry of this.extensionTracingModels) {
-      entry.model.adjustTime(
-          this.tracingModelInternal.minimumRecordTime() + (entry.timeOffset / 1000) -
-          (this.recordStartTimeInternal as number));
-    }
     this.autoWindowTimes();
   }
 
@@ -143,24 +135,22 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     }
   }
 
-  async #onAttachedSourceMap(
-      event: Common.EventTarget.EventTargetEvent<{client: SDK.Script.Script, sourceMap: SDK.SourceMap.SourceMap}>):
-      Promise<void> {
-    if (!this.#cpuProfileNodes().some(node => node.scriptId === event.data.client.scriptId)) {
-      return;
+  async #onAttachedSourceMap(): Promise<void> {
+    if (!this.willResolveNames) {
+      this.willResolveNames = true;
+      // Resolving names triggers a repaint of the flame chart. Instead of attempting to resolve
+      // names every time a source map is attached, wait for some time once the first source map is
+      // attached. This way we allow for other source maps to be parsed before attempting a name
+      // resolving using the available source maps. Otherwise the UI is blocked when the number
+      // of source maps is particularly large.
+      setTimeout(this.resolveNamesAndUpdate.bind(this), resolveNamesTimeout);
     }
-    await this.#resolveNamesFromCPUProfile();
-    this.dispatchEventToListeners(Events.NamesResolved);
   }
 
-  addExtensionEvents(title: string, model: SDK.TracingModel.TracingModel, timeOffset: number): void {
-    this.extensionTracingModels.push({model: model, title: title, timeOffset: timeOffset});
-    if (!this.tracingModelInternal) {
-      return;
-    }
-    model.adjustTime(
-        this.tracingModelInternal.minimumRecordTime() + (timeOffset / 1000) - (this.recordStartTimeInternal as number));
-    this.dispatchEventToListeners(Events.ExtensionDataAdded);
+  async resolveNamesAndUpdate(): Promise<void> {
+    this.willResolveNames = false;
+    await this.#resolveNamesFromCPUProfile();
+    this.dispatchEventToListeners(Events.NamesResolved);
   }
 
   tracingModel(): SDK.TracingModel.TracingModel {
@@ -193,19 +183,9 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.frameModelInternal;
   }
 
-  extensionInfo(): {
-    title: string,
-    model: SDK.TracingModel.TracingModel,
-  }[] {
-    return this.extensionTracingModels;
-  }
-
   dispose(): void {
     if (this.tracingModelInternal) {
       this.tracingModelInternal.dispose();
-    }
-    for (const extensionEntry of this.extensionTracingModels) {
-      extensionEntry.model.dispose();
     }
   }
 
@@ -287,7 +267,6 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum Events {
-  ExtensionDataAdded = 'ExtensionDataAdded',
   WindowChanged = 'WindowChanged',
   NamesResolved = 'NamesResolved',
 }
@@ -297,7 +276,6 @@ export interface WindowChangedEvent {
 }
 
 export type EventTypes = {
-  [Events.ExtensionDataAdded]: void,
   [Events.WindowChanged]: WindowChangedEvent,
   [Events.NamesResolved]: void,
 };

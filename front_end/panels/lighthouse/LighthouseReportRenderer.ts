@@ -69,7 +69,7 @@ export class LighthouseReportRenderer {
 
     function getStandaloneReportHTML(): string {
       // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
-      return Lighthouse.ReportGenerator.generateReportHtml(lhr);
+      return Lighthouse.ReportGenerator.ReportGenerator.generateReportHtml(lhr);
     }
 
     const reportEl = LighthouseReport.renderReport(lhr, {
@@ -106,7 +106,7 @@ export class LighthouseReportRenderer {
   }
 
   static async waitForMainTargetLoad(): Promise<void> {
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainFrameTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (!mainTarget) {
       return;
     }
@@ -118,7 +118,7 @@ export class LighthouseReportRenderer {
   }
 
   static async linkifyNodeDetails(el: Element): Promise<void> {
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainFrameTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (!mainTarget) {
       return;
     }

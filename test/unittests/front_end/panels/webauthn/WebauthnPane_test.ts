@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {
   describeWithMockConnection,
-  dispatchEvent,
-  setMockConnectionResponseHandler,
 } from '../../helpers/MockConnection.js';
 
 import type * as WebauthnModule from '../../../../../front_end/panels/webauthn/webauthn.js';
@@ -23,7 +22,7 @@ describeWithMockConnection('WebAuthn pane', () => {
   });
 
   it('disables the large blob checkbox if resident key is disabled', () => {
-    const panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance();
+    const panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance({forceNew: true});
     const largeBlob = panel.largeBlobCheckbox;
     const residentKeys = panel.residentKeyCheckbox;
 
@@ -58,12 +57,21 @@ describeWithMockConnection('WebAuthn pane', () => {
     assert.isFalse(largeBlob.checked);
   });
 
-  const tests = (targetFactory: () => SDK.Target.Target) => {
-    it('adds an authenticator with large blob option', done => {
-      const target = targetFactory();
-      const panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance();
-      panel.modelAdded(new SDK.WebAuthnModel.WebAuthnModel(target));
+  const tests = (targetFactory: () => SDK.Target.Target, inScope: boolean) => {
+    let target: SDK.Target.Target;
+    let model: SDK.WebAuthnModel.WebAuthnModel;
+    let panel: WebauthnModule.WebauthnPane.WebauthnPaneImpl;
+    beforeEach(() => {
+      target = targetFactory();
+      if (inScope) {
+        SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+      }
+      model = target.model(SDK.WebAuthnModel.WebAuthnModel) as SDK.WebAuthnModel.WebAuthnModel;
+      assertNotNullOrUndefined(model);
+      panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance({forceNew: true});
+    });
 
+    it('adds an authenticator with large blob option', async () => {
       const largeBlob = panel.largeBlobCheckbox;
       const residentKeys = panel.residentKeyCheckbox;
 
@@ -74,22 +82,18 @@ describeWithMockConnection('WebAuthn pane', () => {
       residentKeys.checked = true;
       largeBlob.checked = true;
 
-      setMockConnectionResponseHandler('WebAuthn.addVirtualAuthenticator', params => {
-        assert.isTrue(params.options.hasLargeBlob);
-        assert.isTrue(params.options.hasResidentKey);
-        done();
-        return {
-          authenticatorId: 'test',
-        };
-      });
+      const addAuthenticator = sinon.stub(model, 'addAuthenticator');
       panel.addAuthenticatorButton?.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.strictEqual(addAuthenticator.called, inScope);
+      if (inScope) {
+        const options = addAuthenticator.firstCall.firstArg;
+        assert.isTrue(options.hasLargeBlob);
+        assert.isTrue(options.hasResidentKey);
+      }
     });
 
-    it('adds an authenticator without the large blob option', done => {
-      const target = targetFactory();
-      const panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance();
-      panel.modelAdded(new SDK.WebAuthnModel.WebAuthnModel(target));
-
+    it('adds an authenticator without the large blob option', async () => {
       const largeBlob = panel.largeBlobCheckbox;
       const residentKeys = panel.residentKeyCheckbox;
 
@@ -100,33 +104,28 @@ describeWithMockConnection('WebAuthn pane', () => {
       residentKeys.checked = true;
       largeBlob.checked = false;
 
-      setMockConnectionResponseHandler('WebAuthn.addVirtualAuthenticator', params => {
-        assert.isFalse(params.options.hasLargeBlob);
-        assert.isTrue(params.options.hasResidentKey);
-        done();
-        return {
-          authenticatorId: 'test',
-        };
-      });
+      const addAuthenticator = sinon.stub(model, 'addAuthenticator');
       panel.addAuthenticatorButton?.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.strictEqual(addAuthenticator.called, inScope);
+      if (inScope) {
+        const options = addAuthenticator.firstCall.firstArg;
+        assert.isFalse(options.hasLargeBlob);
+        assert.isTrue(options.hasResidentKey);
+      }
     });
 
     it('lists and removes credentials', async () => {
-      const target = targetFactory();
-      const panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance({forceNew: true});
       const authenticatorId = 'authenticator-1' as Protocol.WebAuthn.AuthenticatorId;
-      const model = new SDK.WebAuthnModel.WebAuthnModel(target);
-      panel.modelAdded(model);
 
       // Add an authenticator.
-      const authenticatorAdded = new Promise<void>(resolve => {
-        setMockConnectionResponseHandler('WebAuthn.addVirtualAuthenticator', () => {
-          window.setTimeout(resolve);
-          return {authenticatorId};
-        });
-      });
+      const addAuthenticator = sinon.stub(model, 'addAuthenticator').resolves(authenticatorId);
       panel.addAuthenticatorButton?.click();
-      await authenticatorAdded;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.strictEqual(addAuthenticator.called, inScope);
+      if (!inScope) {
+        return;
+      }
 
       // Verify a data grid appeared with a single row to show there is no data.
       const dataGrid = panel.dataGrids.get(authenticatorId);
@@ -147,14 +146,10 @@ describeWithMockConnection('WebAuthn pane', () => {
         userHandle: 'morgan',
         signCount: 1,
       };
-      const credentialAdded = new Promise<void>(resolve => {
-        model.addEventListener(SDK.WebAuthnModel.Events.CredentialAdded, () => resolve());
-      });
-      dispatchEvent(target, 'WebAuthn.credentialAdded', {
+      model.dispatchEventToListeners(SDK.WebAuthnModel.Events.CredentialAdded, {
         authenticatorId,
         credential,
       });
-      await credentialAdded;
 
       // Verify the credential appeared and the empty row was removed.
       assert.strictEqual(dataGrid.rootNode().children.length, 1);
@@ -163,38 +158,30 @@ describeWithMockConnection('WebAuthn pane', () => {
       assert.strictEqual(credentialNode.data, credential);
 
       // Remove the credential.
-      const credentialRemoved = new Promise<void>(resolve => {
-        setMockConnectionResponseHandler('WebAuthn.removeCredential', request => {
-          assert.strictEqual(request.authenticatorId, authenticatorId);
-          assert.strictEqual(request.credentialId, credential.credentialId);
-          resolve();
-          return {};
-        });
-      });
+      const removeCredential = sinon.stub(model, 'removeCredential').resolves();
       dataGrid.element.querySelectorAll('button')[1].click();
       assert.strictEqual(dataGrid.rootNode().children.length, 1);
       emptyNode = dataGrid.rootNode().children[0];
       assert.isOk(emptyNode);
       assert.deepEqual(emptyNode.data, {});
-      await credentialRemoved;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.isTrue(removeCredential.called);
+
+      assert.strictEqual(removeCredential.firstCall.firstArg, authenticatorId);
+      assert.strictEqual(removeCredential.firstCall.lastArg, credential.credentialId);
     });
 
     it('updates credentials', async () => {
-      const target = targetFactory();
-      const panel = Webauthn.WebauthnPane.WebauthnPaneImpl.instance({forceNew: true});
       const authenticatorId = 'authenticator-1' as Protocol.WebAuthn.AuthenticatorId;
-      const model = new SDK.WebAuthnModel.WebAuthnModel(target);
-      panel.modelAdded(model);
 
       // Add an authenticator.
-      const authenticatorAdded = new Promise<void>(resolve => {
-        setMockConnectionResponseHandler('WebAuthn.addVirtualAuthenticator', () => {
-          window.setTimeout(resolve);
-          return {authenticatorId};
-        });
-      });
+      const addAuthenticator = sinon.stub(model, 'addAuthenticator').resolves(authenticatorId);
       panel.addAuthenticatorButton?.click();
-      await authenticatorAdded;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.strictEqual(addAuthenticator.called, inScope);
+      if (!inScope) {
+        return;
+      }
 
       // Add a credential.
       const credential = {
@@ -204,14 +191,10 @@ describeWithMockConnection('WebAuthn pane', () => {
         userHandle: 'morgan',
         signCount: 1,
       };
-      const credentialAdded = new Promise<void>(resolve => {
-        model.addEventListener(SDK.WebAuthnModel.Events.CredentialAdded, () => resolve());
-      });
-      dispatchEvent(target, 'WebAuthn.credentialAdded', {
+      model.dispatchEventToListeners(SDK.WebAuthnModel.Events.CredentialAdded, {
         authenticatorId,
         credential,
       });
-      await credentialAdded;
 
       // Verify the credential appeared.
       const dataGrid = panel.dataGrids.get(authenticatorId);
@@ -232,14 +215,10 @@ describeWithMockConnection('WebAuthn pane', () => {
         userHandle: 'morgan',
         signCount: 2,
       };
-      const credentialUpdated = new Promise<void>(resolve => {
-        model.addEventListener(SDK.WebAuthnModel.Events.CredentialAsserted, () => resolve());
-      });
-      dispatchEvent(target, 'WebAuthn.credentialAsserted', {
+      model.dispatchEventToListeners(SDK.WebAuthnModel.Events.CredentialAsserted, {
         authenticatorId,
         credential: updatedCredential,
       });
-      await credentialUpdated;
 
       // Verify the credential was updated.
       assert.strictEqual(dataGrid.rootNode().children.length, 1);
@@ -253,14 +232,10 @@ describeWithMockConnection('WebAuthn pane', () => {
         userHandle: 'alex',
         signCount: 1,
       };
-      const anotherCredentialUpdated = new Promise<void>(resolve => {
-        model.addEventListener(SDK.WebAuthnModel.Events.CredentialAsserted, () => resolve());
-      });
-      dispatchEvent(target, 'WebAuthn.credentialAsserted', {
+      model.dispatchEventToListeners(SDK.WebAuthnModel.Events.CredentialAsserted, {
         authenticatorId,
         credential: anotherCredential,
       });
-      await anotherCredentialUpdated;
 
       // Verify the credential was unchanged.
       assert.strictEqual(dataGrid.rootNode().children.length, 1);
@@ -268,10 +243,16 @@ describeWithMockConnection('WebAuthn pane', () => {
     });
   };
 
-  describe('without tab target', () => tests(() => createTarget()));
-  describe('with tab target', () => tests(() => {
-                                const tabTarget = createTarget({type: SDK.Target.Type.Tab});
-                                createTarget({parentTarget: tabTarget, subtype: 'prerender'});
-                                return createTarget({parentTarget: tabTarget});
-                              }));
+  describe('without tab target in scope', () => tests(() => createTarget(), true));
+  describe('without tab target out of scope', () => tests(() => createTarget(), false));
+  describe('with tab target in scope', () => tests(() => {
+                                         const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+                                         createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+                                         return createTarget({parentTarget: tabTarget});
+                                       }, true));
+  describe('with tab target out of scope', () => tests(() => {
+                                             const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+                                             createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+                                             return createTarget({parentTarget: tabTarget});
+                                           }, false));
 });

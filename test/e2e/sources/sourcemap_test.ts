@@ -5,6 +5,7 @@
 import {assert} from 'chai';
 
 import {
+  $$,
   click,
   clickElement,
   enableExperiment,
@@ -57,17 +58,6 @@ describe('The Sources Tab', async function() {
   if (this.timeout() !== 0) {
     this.timeout(10000);
   }
-
-  it('sets multiple breakpoints in case of code-splitting', async () => {
-    const {target, frontend} = getBrowserAndPages();
-    await openSourceCodeEditorForFile('sourcemap-codesplit.ts', 'sourcemap-codesplit.html');
-    await addBreakpointForLine(frontend, 3);
-
-    for (let i = 0; i < 2; ++i) {
-      const scriptLocation = await retrieveTopCallFrameScriptLocation(`functions[${i}]();`, target);
-      assert.deepEqual(scriptLocation, 'sourcemap-codesplit.ts:3');
-    }
-  });
 
   it('steps over a source line mapping to a range with several statements', async () => {
     const {target, frontend} = getBrowserAndPages();
@@ -440,12 +430,72 @@ describe('The Sources Tab', async function() {
 
     await step('Check origin of source-mapped JavaScript', async () => {
       await openFileInEditor('sourcemap-origin.js');
-      await waitFor('.toolbar-item > .devtools-link[title$="sourcemap-origin.min.js"]');
+      const link = await waitFor('.toolbar-item .devtools-link');
+      const linkText = await link.evaluate(({textContent}) => textContent);
+      assert.strictEqual(linkText, 'sourcemap-origin.min.js');
     });
 
     await step('Check origin of source-mapped SASS', async () => {
       await openFileInEditor('sourcemap-origin.scss');
-      await waitFor('.toolbar-item > .devtools-link[title$="sourcemap-origin.css"]');
+      const link = await waitFor('.toolbar-item .devtools-link');
+      const linkText = await link.evaluate(({textContent}) => textContent);
+      assert.strictEqual(linkText, 'sourcemap-origin.css');
+    });
+
+    await step('Check origin of source-mapped JavaScript with URL clash', async () => {
+      await openFileInEditor('sourcemap-origin.clash.js');
+      const link = await waitFor('.toolbar-item .devtools-link');
+      const linkText = await link.evaluate(({textContent}) => textContent);
+      assert.strictEqual(linkText, 'sourcemap-origin.clash.js');
+    });
+  });
+
+  describe('can deal with code-splitting', () => {
+    it('sets multiple breakpoints in case of code-splitting', async () => {
+      const {target, frontend} = getBrowserAndPages();
+      await openSourceCodeEditorForFile('sourcemap-codesplit.ts', 'sourcemap-codesplit.html');
+      await addBreakpointForLine(frontend, 3);
+
+      for (let i = 0; i < 2; ++i) {
+        const scriptLocation = await retrieveTopCallFrameScriptLocation(`functions[${i}]();`, target);
+        assert.deepEqual(scriptLocation, 'sourcemap-codesplit.ts:3');
+      }
+    });
+
+    it('restores breakpoints correctly in case of code-splitting (crbug.com/1412033)', async () => {
+      const {target, frontend} = getBrowserAndPages();
+
+      // Load the initial setup with only one script pointing to `codesplitting-bar.ts`...
+      await openSourceCodeEditorForFile('codesplitting-bar.ts', 'codesplitting.html');
+
+      // ...and set a breakpoint inside `bar()`.
+      await addBreakpointForLine(frontend, 2);
+
+      // Now load the second script pointing to `codesplitting-bar.ts`...
+      await target.evaluate('addSecond();');
+
+      // ...wait for the new origin to be listed...
+      const linkTexts = await waitForFunction(async () => {
+        const links = await $$('.toolbar-item .devtools-link');
+        const linkTexts = await Promise.all(links.map(node => node.evaluate(({textContent}) => textContent)));
+        if (linkTexts.length === 1 && linkTexts[0] === 'codesplitting-first.js') {
+          return undefined;
+        }
+        return linkTexts;
+      });
+      assert.sameMembers(linkTexts, ['codesplitting-first.js', 'codesplitting-second.js']);
+
+      // ...and eventually wait for the breakpoint to be restored in line 2.
+      await waitForFunction(async () => await isBreakpointSet(2));
+
+      // Eventually we should stop on the breakpoint in the `codesplitting-second.js`.
+      await waitForFunction(() => {
+        return Promise.race([
+          target.evaluate('second()').then(() => false),
+          waitFor(PAUSE_INDICATOR_SELECTOR).then(() => true),
+        ]);
+      });
+      await click(RESUME_BUTTON);
     });
   });
 

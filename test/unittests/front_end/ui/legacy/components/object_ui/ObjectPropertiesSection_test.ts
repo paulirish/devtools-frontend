@@ -17,12 +17,13 @@ import {createTarget} from '../../../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../../../helpers/MockConnection.js';
 import {type Chrome} from '../../../../../../../extension-api/ExtensionAPI.js';
 import {TestPlugin} from '../../../../helpers/LanguagePluginHelpers.js';
+import * as LinearMemoryInspector from '../../../../../../../front_end/ui/components/linear_memory_inspector/linear_memory_inspector.js';
 
 describeWithRealConnection('ObjectPropertiesSection', () => {
   async function setupTreeOutline(
       code: string, accessorPropertiesOnly: boolean, generatePreview: boolean, nonIndexedPropertiesOnly?: boolean) {
     const targetManager = SDK.TargetManager.TargetManager.instance();
-    const target = targetManager.mainTarget();
+    const target = targetManager.rootTarget();
     assertNotNullOrUndefined(target);
     const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
     assertNotNullOrUndefined(runtimeModel);
@@ -216,7 +217,7 @@ describeWithRealConnection('ObjectPropertiesSection', () => {
 
 describeWithMockConnection('ObjectPropertiesSection', () => {
   it('appends a memory icon for allowed remote object types', () => {
-    const subtypesForIcon = ['webassemblymemory', 'arraybuffer'];
+    const subtypesForIcon = LinearMemoryInspector.LinearMemoryInspectorController.ACCEPTED_MEMORY_TYPES;
     for (const subtype of subtypesForIcon) {
       const remoteObj = {
         type: 'object',
@@ -229,21 +230,6 @@ describeWithMockConnection('ObjectPropertiesSection', () => {
       assert.isTrue(div.hasChildNodes());
       const icon = div.getElementsByClassName('devtools-icon');
       assert.isNotNull(icon);
-    }
-  });
-
-  it('skips appending a memory icon for other remote object types', () => {
-    const subtypesToSkip = ['dataview', 'typedarray'];
-    for (const subtype of subtypesToSkip) {
-      const remoteObj = {
-        type: 'object',
-        subtype: subtype,
-      } as SDK.RemoteObject.RemoteObject;
-
-      const div = document.createElement('div');
-      assert.isFalse(div.hasChildNodes());
-      ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.appendMemoryIcon(div, remoteObj);
-      assert.isFalse(div.hasChildNodes());
     }
   });
 

@@ -4,6 +4,8 @@
 
 import {assert} from 'chai';
 
+import type * as puppeteer from 'puppeteer';
+
 import {
   $$,
   $,
@@ -17,7 +19,6 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
   waitForNoElementsWithTextContent,
-  type puppeteer,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
@@ -36,7 +37,7 @@ import {
   waitUntilRetainerChainSatisfies,
 } from '../helpers/memory-helpers.js';
 
-describe('The Memory Panel', async function() {
+describe.skipOnParallel('The Memory Panel', async function() {
   // These tests render large chunks of data into DevTools and filter/search
   // through it. On bots with less CPU power, these can fail because the
   // rendering takes a long time, so we allow a much larger timeout.
@@ -60,18 +61,14 @@ describe('The Memory Panel', async function() {
     assert.strictEqual(heapSnapShots.length, 2);
   });
 
-  // Flaky on linux and mac.
-  it.skip('[crbug.com/1377772] Shows a DOM node and its JS wrapper as a single node', async () => {
+  it('Shows a DOM node and its JS wrapper as a single node', async () => {
     await goToResource('memory/detached-node.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('leaking');
     await waitForSearchResultNumber(4);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-function');
-      return el !== null && await el.evaluate(el => el.textContent === 'leaking()');
-    });
+    await findSearchResult('leaking()');
     await waitForRetainerChain([
       'Detached V8EventListener',
       'Detached EventListener',
@@ -83,9 +80,8 @@ describe('The Memory Panel', async function() {
     ]);
   });
 
-  // Flaky test
-  it.skipOnPlatforms(
-      ['mac', 'linux'], '[crbug.com/1134602] Correctly retains the path for event listeners', async () => {
+  it(
+      'Correctly retains the path for event listeners', async () => {
         await goToResource('memory/event-listeners.html');
         await step('taking a heap snapshot', async () => {
           await navigateToMemoryTab();
@@ -98,10 +94,7 @@ describe('The Memory Panel', async function() {
         });
 
         await step('selecting the search result that we need', async () => {
-          await findSearchResult(async p => {
-            const el = await p.$(':scope > td > div > .object-value-function');
-            return el !== null && await el.evaluate(el => el.textContent === 'myEventListener()');
-          });
+          await findSearchResult('myEventListener()');
         });
 
         await step('waiting for retainer chain', async () => {
@@ -113,7 +106,6 @@ describe('The Memory Panel', async function() {
             'HTMLBodyElement',
             'HTMLHtmlElement',
             'HTMLDocument',
-            'Window',
           ]);
         });
       });
@@ -177,10 +169,7 @@ describe('The Memory Panel', async function() {
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('Retainer');
     await waitForSearchResultNumber(8);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-object');
-      return el !== null && await el.evaluate(el => el.textContent === 'Retainer');
-    });
+    await findSearchResult('Retainer');
     // The following line checks two things: That the property 'aUniqueName'
     // in the iframe is retaining the Retainer class object, and that the
     // iframe window is not detached.
@@ -197,10 +186,7 @@ describe('The Memory Panel', async function() {
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('leaking');
     await waitForSearchResultNumber(4);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-string');
-      return el !== null && await el.evaluate(el => el.textContent === '"leaking"');
-    });
+    await findSearchResult('\"leaking\"');
 
     await waitForFunction(async () => {
       // Wait for all the rows of the data-grid to load.

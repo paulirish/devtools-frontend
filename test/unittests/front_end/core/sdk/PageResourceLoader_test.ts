@@ -45,7 +45,7 @@ describeWithLocale('PageResourceLoader', () => {
 
   it('loads resources correctly', async () => {
     const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: load, maxConcurrentLoads: 500, loadTimeout: 30000});
+        {forceNew: true, loadOverride: load, maxConcurrentLoads: 500});
     const loading = [
       loader.loadResource(foo1Url, initiator),
       loader.loadResource(foo2Url, initiator),
@@ -63,8 +63,8 @@ describeWithLocale('PageResourceLoader', () => {
   });
 
   it('deals with page reloads correctly', async () => {
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: load, maxConcurrentLoads: 1, loadTimeout: 30000});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: load, maxConcurrentLoads: 1});
     const loading = [
       loader.loadResource(foo1Url, initiator).catch(e => e.message),
       loader.loadResource(foo2Url, initiator).catch(e => e.message),
@@ -72,12 +72,15 @@ describeWithLocale('PageResourceLoader', () => {
     ];
     assert.deepEqual(loader.getNumberOfResources(), {loading: 3, queued: 2, resources: 3});
 
-    loader.onMainFrameNavigated({
+    loader.onPrimaryPageChanged({
       data: {
-        isTopFrame() {
-          return true;
-        },
-      } as SDK.ResourceTreeModel.ResourceTreeFrame,
+        frame: {
+          isOutermostFrame() {
+            return true;
+          },
+        } as SDK.ResourceTreeModel.ResourceTreeFrame,
+        type: SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation,
+      },
     });
     assert.deepEqual(loader.getNumberOfResources(), {loading: 3, queued: 0, resources: 0});
 
@@ -88,34 +91,9 @@ describeWithLocale('PageResourceLoader', () => {
     assert.deepEqual(results[2], 'Load canceled due to reload of inspected page');
   });
 
-  it('handles the load timeout correctly', async () => {
-    const load = (url: string): Promise<LoadResult> => {
-      return new Promise(resolve => loads.push({url, resolve}));
-    };
-
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: load, maxConcurrentLoads: 2, loadTimeout: 30});
-    const loading = [
-      loader.loadResource(foo1Url, initiator).catch(e => e.message),
-      loader.loadResource(foo2Url, initiator).catch(e => e.message),
-      loader.loadResource(foo3Url, initiator).catch(e => e.message),
-    ];
-    assert.deepEqual(loader.getNumberOfResources(), {loading: 3, queued: 1, resources: 3});
-
-    const results = await Promise.all(loading);
-    assert.deepEqual(loads.map(x => x.url), ['foo1', 'foo2', 'foo3']);
-    const resources = Array.from(loader.getResourcesLoaded().values());
-    assert.isTrue(resources.every(x => !x.success), 'All resources should have failed to load');
-    assert.isTrue(
-        results.every(x => x === 'Load canceled due to load timeout'),
-        'All loads should have a exceeded the load timeout');
-    assert.deepEqual(loader.getNumberOfResources(), {loading: 0, queued: 0, resources: 3});
-    loads.forEach(l => l.resolve && l.resolve({} as LoadResult));
-  });
-
   it('respects the max concurrent loads', async () => {
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: load, maxConcurrentLoads: 2, loadTimeout: 30});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: load, maxConcurrentLoads: 2});
     const loading = [
       loader.loadResource(foo1Url, initiator),
       loader.loadResource(foo2Url, initiator),
@@ -139,8 +117,8 @@ describeWithEnvironment('PageResourceLoader', () => {
       return;
     }
 
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: null, maxConcurrentLoads: 1, loadTimeout: 30_000});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: null, maxConcurrentLoads: 1});
 
     const message =
         await loader
@@ -151,8 +129,8 @@ describeWithEnvironment('PageResourceLoader', () => {
   });
 
   it('blocks remote file paths with the default setting', async () => {
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: null, maxConcurrentLoads: 1, loadTimeout: 30_000});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: null, maxConcurrentLoads: 1});
 
     const message =
         await loader.loadResource('file://host/source-map.js.map' as Platform.DevToolsPath.UrlString, initiator)
@@ -166,8 +144,8 @@ describeWithEnvironment('PageResourceLoader', () => {
       return;
     }
 
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: null, maxConcurrentLoads: 1, loadTimeout: 30_000});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: null, maxConcurrentLoads: 1});
 
     const message =
         await loader
@@ -178,8 +156,8 @@ describeWithEnvironment('PageResourceLoader', () => {
   });
 
   it('allows remote file paths with the setting enabled', async () => {
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: null, maxConcurrentLoads: 1, loadTimeout: 30_000});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: null, maxConcurrentLoads: 1});
     sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource')
         .callsFake((_url, _headers, streamId, callback) => {
           Host.ResourceLoader.streamWrite(streamId, 'content of the source map');
@@ -198,8 +176,8 @@ describeWithEnvironment('PageResourceLoader', () => {
       return;
     }
 
-    const loader = SDK.PageResourceLoader.PageResourceLoader.instance(
-        {forceNew: true, loadOverride: null, maxConcurrentLoads: 1, loadTimeout: 30_000});
+    const loader =
+        SDK.PageResourceLoader.PageResourceLoader.instance({forceNew: true, loadOverride: null, maxConcurrentLoads: 1});
     sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'loadNetworkResource')
         .callsFake((_url, _headers, streamId, callback) => {
           Host.ResourceLoader.streamWrite(streamId, 'content of the source map');

@@ -172,9 +172,9 @@
   color: inherit;
 }
 
-.network-log-grid.data-grid:focus tr.selected,
-.network-log-grid.data-grid:focus tr.selected .network-cell-subtitle,
-.network-log-grid.data-grid:focus tr.selected .network-dim-cell {
+.network-log-grid.data-grid:focus-within tr.selected,
+.network-log-grid.data-grid:focus-within tr.selected .network-cell-subtitle,
+.network-log-grid.data-grid:focus-within tr.selected .network-dim-cell {
   color: var(--legacy-selection-fg-color);
 }
 
@@ -383,6 +383,16 @@
 
 .network-frame-group-badge {
   margin-right: 4px;
+}
+
+.network-override-marker {
+  /* Color matches the purple dot in the mediumicon-file-sync icon. */
+  background: rgb(175 75 246); /* stylelint-disable-line plugin/use_theme_colors */
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  margin-right: 3px;
 }
 
 @media (forced-colors: active) {

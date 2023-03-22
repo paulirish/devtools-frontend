@@ -29,7 +29,6 @@
  */
 
 import * as Common from '../../../../core/common/common.js';
-import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import type * as SDK from '../../../../core/sdk/sdk.js';
@@ -41,6 +40,7 @@ import {ChartViewport, type ChartViewportDelegate} from './ChartViewport.js';
 
 import {TimelineGrid, type Calculator} from './TimelineGrid.js';
 import flameChartStyles from './flameChart.css.legacy.js';
+import {DEFAULT_FONT_SIZE, getFontFamilyForCanvas} from './Font.js';
 
 const UIStrings = {
   /**
@@ -134,11 +134,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private entryColorsCache?: string[]|null;
   private visibleLevelHeights?: Uint32Array;
   private totalTime?: number;
+  #font: string;
 
   constructor(
       dataProvider: FlameChartDataProvider, flameChartDelegate: FlameChartDelegate,
       groupExpansionSetting?: Common.Settings.Setting<GroupExpansionState>) {
     super(true);
+    this.#font = `${DEFAULT_FONT_SIZE} ${getFontFamilyForCanvas()}`;
     this.registerRequiredCSS(flameChartStyles);
     this.contentElement.classList.add('flame-chart-main-pane');
     this.groupExpansionSetting = groupExpansionSetting;
@@ -932,7 +934,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     const context = (this.canvas.getContext('2d') as CanvasRenderingContext2D);
     context.save();
-    context.font = groups[group].style.font;
+    context.font = this.#font;
     const right = this.headerLeftPadding + this.labelWidthForGroup(context, groups[group]);
     context.restore();
     if (x > right) {
@@ -962,9 +964,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (!timelineData) {
       return;
     }
-
-    const visibleLevelOffsets = this.visibleLevelOffsets ? this.visibleLevelOffsets : new Uint32Array();
-
     const width = this.offsetWidth;
     const height = this.offsetHeight;
     const context = (this.canvas.getContext('2d') as CanvasRenderingContext2D);
@@ -975,16 +974,162 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.fillStyle = 'rgba(0, 0, 0, 0)';
     context.fillRect(0, 0, width, height);
     context.translate(0, -top);
-    const defaultFont = '11px ' + Host.Platform.fontFamily();
-    context.font = defaultFont;
+    context.font = this.#font;
 
+    const {markerIndices, colorBuckets, titleIndices} = this.getDrawableData(context, timelineData);
+
+    context.save();
+    this.forEachGroupInViewport((offset, index, group, isFirst, groupHeight) => {
+      if (this.isGroupFocused(index)) {
+        context.fillStyle =
+            ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
+        context.fillRect(0, offset, width, groupHeight - group.style.padding);
+      }
+    });
+    context.restore();
+
+    for (const [color, {indexes}] of colorBuckets) {
+      this.drawGenericEvents(context, timelineData, color, indexes);
+      this.drawLongTaskRegions(context, timelineData, color, indexes);
+    }
+
+    this.drawMarkers(context, timelineData, markerIndices);
+
+    this.drawEventTitles(context, timelineData, titleIndices, width);
+    context.restore();
+
+    this.drawGroupHeaders(width, height);
+    this.drawFlowEvents(context, width, height);
+    this.drawMarkerLines();
+    const dividersData = TimelineGrid.calculateGridOffsets(this);
+    const navStartTimes = Array.from(this.dataProvider.navStartTimes().values());
+
+    let navStartTimeIndex = 0;
+    const drawAdjustedTime = (time: number): string => {
+      if (navStartTimes.length === 0) {
+        return this.formatValue(time, dividersData.precision);
+      }
+
+      // Track when the time crosses the boundary to the next nav start record,
+      // and when it does, move the nav start array index accordingly.
+      const hasNextNavStartTime = navStartTimes.length > navStartTimeIndex + 1;
+      if (hasNextNavStartTime && time > navStartTimes[navStartTimeIndex + 1].startTime) {
+        navStartTimeIndex++;
+      }
+
+      // Adjust the time by the nearest nav start marker's value.
+      const nearestMarker = navStartTimes[navStartTimeIndex];
+      if (nearestMarker) {
+        time -= nearestMarker.startTime - this.zeroTime();
+      }
+
+      return this.formatValue(time, dividersData.precision);
+    };
+
+    TimelineGrid.drawCanvasGrid(context, dividersData);
+    if (this.rulerEnabled) {
+      TimelineGrid.drawCanvasHeaders(context, dividersData, drawAdjustedTime, 3, HeaderHeight);
+    }
+
+    this.updateElementPosition(this.highlightElement, this.highlightedEntryIndex);
+    this.updateElementPosition(this.selectedElement, this.selectedEntryIndex);
+    this.updateMarkerHighlight();
+  }
+
+  /**
+   * Draws generic flame chart events, that is, the plain rectangles that fill several parts
+   * in the timeline like the Main Thread flamechart and the timings track.
+   * Drawn on a color by color basis to minimize the amount of times context.style is switched.
+   */
+  private drawGenericEvents(
+      context: CanvasRenderingContext2D, timelineData: TimelineData, color: string, indexes: number[]): void {
+    const {entryTotalTimes, entryStartTimes, entryLevels} = timelineData;
+    context.save();
+    context.beginPath();
+    for (let i = 0; i < indexes.length; ++i) {
+      const entryIndex = indexes[i];
+      const duration = entryTotalTimes[entryIndex];
+      if (isNaN(duration)) {
+        continue;
+      }
+      const entryStartTime = entryStartTimes[entryIndex];
+      const barX = this.timeToPositionClipped(entryStartTime);
+      const barLevel = entryLevels[entryIndex];
+      const barHeight = this.levelHeight(barLevel);
+      const barY = this.levelToOffset(barLevel);
+      const barRight = this.timeToPositionClipped(entryStartTime + duration);
+      const barWidth = Math.max(barRight - barX, 1);
+      context.rect(barX, barY, barWidth - 0.4, barHeight - 1);
+    }
+    context.fillStyle = color;
+    context.fill();
+    context.restore();
+  }
+
+  /**
+   * Marks the portion of long tasks where the 50ms threshold was exceeded.
+   */
+  private drawLongTaskRegions(
+      context: CanvasRenderingContext2D, timelineData: TimelineData, color: string, indexes: number[]): void {
+    const {entryTotalTimes, entryStartTimes, entryLevels} = timelineData;
+    let mainThreadTopLevel = -1;
+
+    // Find the main thread so that we can mark tasks longer than 50ms.
+    if ('groups' in timelineData && Array.isArray(timelineData.groups)) {
+      const mainThread = timelineData.groups.find(group => {
+        if (!group.track) {
+          return false;
+        }
+        return group.track.name === 'CrRendererMain';
+      });
+
+      if (mainThread) {
+        mainThreadTopLevel = mainThread.startLevel;
+      }
+    }
+
+    context.save();
+    context.beginPath();
+    for (let i = 0; i < indexes.length; ++i) {
+      const entryIndex = indexes[i];
+      const duration = entryTotalTimes[entryIndex];
+      const showLongDurations = entryLevels[entryIndex] === mainThreadTopLevel;
+
+      if (!showLongDurations) {
+        continue;
+      }
+
+      if (isNaN(duration) || duration < 50) {
+        continue;
+      }
+      const entryStartTime = entryStartTimes[entryIndex];
+      const barX = this.timeToPositionClipped(entryStartTime + 50);
+      const barLevel = entryLevels[entryIndex];
+      const barHeight = this.levelHeight(barLevel);
+      const barY = this.levelToOffset(barLevel);
+      const barRight = this.timeToPositionClipped(entryStartTime + duration);
+      const barWidth = Math.max(barRight - barX, 1);
+      context.rect(barX, barY, barWidth - 0.4, barHeight - 1);
+    }
     const candyStripePattern = context.createPattern(this.candyStripeCanvas, 'repeat');
 
-    const entryTotalTimes = timelineData.entryTotalTimes;
-    const entryStartTimes = timelineData.entryStartTimes;
-    const entryLevels = timelineData.entryLevels;
-    const timeToPixel = this.chartViewport.timeToPixel();
+    if (candyStripePattern) {
+      context.fillStyle = candyStripePattern;
+      context.fill();
+    }
+    context.restore();
+  }
 
+  /**
+   * Preprocess the data to be drawn to speed the rendering time.
+   * Especifically:
+   *  - Groups events into color buckets.
+   *  - Discards non visible events.
+   *  - Gathers marker events (LCP, FCP, DCL, etc.).
+   *  - Gathers event titles that should be rendered.
+   */
+  private getDrawableData(context: CanvasRenderingContext2D, timelineData: TimelineData):
+      {colorBuckets: Map<string, {indexes: number[]}>, titleIndices: number[], markerIndices: number[]} {
     // These are the event indexes of events that we are drawing onto the timeline that:
     // 1) have text within them
     // 2) are visually wide enough in pixels to make it worth rendering the text.
@@ -993,6 +1138,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // These point to events that represent single points in the timeline, most
     // often an event such as DCL/LCP.
     const markerIndices: number[] = [];
+    const {entryTotalTimes, entryStartTimes} = timelineData;
+
+    const height = this.offsetHeight;
+    const top = this.chartViewport.scrollOffset();
+    const visibleLevelOffsets = this.visibleLevelOffsets ? this.visibleLevelOffsets : new Uint32Array();
 
     const textPadding = this.textPadding;
     // How wide in pixels / long in duration an event needs to be to make it
@@ -1003,24 +1153,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const minVisibleBarLevel = Math.max(
         Platform.ArrayUtilities.upperBound(visibleLevelOffsets, top, Platform.ArrayUtilities.DEFAULT_COMPARATOR) - 1,
         0);
-    this.markerPositions.clear();
-
-    let mainThreadTopLevel = -1;
-
-    // Find the main thread so that we can mark tasks longer than 50ms.
-    if ('groups' in timelineData && Array.isArray(timelineData.groups)) {
-      const mainThread = timelineData.groups.find(group => {
-        if (!group.track) {
-          return false;
-        }
-
-        return group.track.name === 'CrRendererMain';
-      });
-
-      if (mainThread) {
-        mainThreadTopLevel = mainThread.startLevel;
-      }
-    }
 
     // As we parse each event, we bucket them into groups based on the color we
     // will render them with. The key of this map will be a color, and all
@@ -1087,164 +1219,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         }
       }
     }
-
-    context.save();
-    this.forEachGroupInViewport((offset, index, group, isFirst, groupHeight) => {
-      if (this.isGroupFocused(index)) {
-        context.fillStyle =
-            ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
-        context.fillRect(0, offset, width, groupHeight - group.style.padding);
-      }
-    });
-    context.restore();
-
-    for (const [color, {indexes}] of colorBuckets) {
-      context.beginPath();
-      for (let i = 0; i < indexes.length; ++i) {
-        const entryIndex = indexes[i];
-        const duration = entryTotalTimes[entryIndex];
-        if (isNaN(duration)) {
-          continue;
-        }
-        const entryStartTime = entryStartTimes[entryIndex];
-        const barX = this.timeToPositionClipped(entryStartTime);
-        const barLevel = entryLevels[entryIndex];
-        const barHeight = this.levelHeight(barLevel);
-        const barY = this.levelToOffset(barLevel);
-        const barRight = this.timeToPositionClipped(entryStartTime + duration);
-        const barWidth = Math.max(barRight - barX, 1);
-        context.rect(barX, barY, barWidth - 0.4, barHeight - 1);
-      }
-      context.fillStyle = color;
-      context.fill();
-
-      // Draw long task regions.
-      context.beginPath();
-      for (let i = 0; i < indexes.length; ++i) {
-        const entryIndex = indexes[i];
-        const duration = entryTotalTimes[entryIndex];
-        const showLongDurations = entryLevels[entryIndex] === mainThreadTopLevel;
-
-        if (!showLongDurations) {
-          continue;
-        }
-
-        if (isNaN(duration) || duration < 50) {
-          continue;
-        }
-
-        const entryStartTime = entryStartTimes[entryIndex];
-        const barX = this.timeToPositionClipped(entryStartTime + 50);
-        const barLevel = entryLevels[entryIndex];
-        const barHeight = this.levelHeight(barLevel);
-        const barY = this.levelToOffset(barLevel);
-        const barRight = this.timeToPositionClipped(entryStartTime + duration);
-        const barWidth = Math.max(barRight - barX, 1);
-        context.rect(barX, barY, barWidth - 0.4, barHeight - 1);
-      }
-
-      if (candyStripePattern) {
-        context.fillStyle = candyStripePattern;
-        context.fill();
-      }
-    }
-
-    context.textBaseline = 'alphabetic';
-    context.beginPath();
-    let lastMarkerLevel = -1;
-    let lastMarkerX: number = -Infinity;
-    // Markers are sorted top to bottom, right to left.
-    for (let m = markerIndices.length - 1; m >= 0; --m) {
-      const entryIndex = markerIndices[m];
-      const title = this.dataProvider.entryTitle(entryIndex);
-      if (!title) {
-        continue;
-      }
-      const entryStartTime = entryStartTimes[entryIndex];
-      const level = entryLevels[entryIndex];
-      if (lastMarkerLevel !== level) {
-        lastMarkerX = -Infinity;
-      }
-      const x = Math.max(this.chartViewport.timeToPosition(entryStartTime), lastMarkerX);
-      const y = this.levelToOffset(level);
-      const h = this.levelHeight(level);
-      const padding = 4;
-      const width = Math.ceil(UI.UIUtils.measureTextWidth(context, title)) + 2 * padding;
-      lastMarkerX = x + width + 1;
-      lastMarkerLevel = level;
-      this.markerPositions.set(entryIndex, {x, width});
-      context.fillStyle = this.dataProvider.entryColor(entryIndex);
-      context.fillRect(x, y, width, h - 1);
-      context.fillStyle = 'white';
-      context.fillText(title, x + padding, y + h - this.textBaseline);
-    }
-    context.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-    context.stroke();
-
-    for (let i = 0; i < titleIndices.length; ++i) {
-      const entryIndex = titleIndices[i];
-      const entryStartTime = entryStartTimes[entryIndex];
-      const barX = this.timeToPositionClipped(entryStartTime);
-      const barRight = Math.min(this.timeToPositionClipped(entryStartTime + entryTotalTimes[entryIndex]), width) + 1;
-      const barWidth = barRight - barX;
-      const barLevel = entryLevels[entryIndex];
-      const barY = this.levelToOffset(barLevel);
-      let text = this.dataProvider.entryTitle(entryIndex);
-      if (text && text.length) {
-        context.font = this.dataProvider.entryFont(entryIndex) || defaultFont;
-        text = UI.UIUtils.trimTextMiddle(context, text, barWidth - 2 * textPadding);
-      }
-      const unclippedBarX = this.chartViewport.timeToPosition(entryStartTime);
-      const barHeight = this.levelHeight(barLevel);
-      if (this.dataProvider.decorateEntry(
-              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel)) {
-        continue;
-      }
-      if (!text || !text.length) {
-        continue;
-      }
-      context.fillStyle = this.dataProvider.textColor(entryIndex);
-      context.fillText(text, barX + textPadding, barY + barHeight - this.textBaseline);
-    }
-
-    context.restore();
-
-    this.drawGroupHeaders(width, height);
-    this.drawFlowEvents(context, width, height);
-    this.drawMarkers();
-    const dividersData = TimelineGrid.calculateGridOffsets(this);
-    const navStartTimes = Array.from(this.dataProvider.navStartTimes().values());
-
-    let navStartTimeIndex = 0;
-    const drawAdjustedTime = (time: number): string => {
-      if (navStartTimes.length === 0) {
-        return this.formatValue(time, dividersData.precision);
-      }
-
-      // Track when the time crosses the boundary to the next nav start record,
-      // and when it does, move the nav start array index accordingly.
-      const hasNextNavStartTime = navStartTimes.length > navStartTimeIndex + 1;
-      if (hasNextNavStartTime && time > navStartTimes[navStartTimeIndex + 1].startTime) {
-        navStartTimeIndex++;
-      }
-
-      // Adjust the time by the nearest nav start marker's value.
-      const nearestMarker = navStartTimes[navStartTimeIndex];
-      if (nearestMarker) {
-        time -= nearestMarker.startTime - this.zeroTime();
-      }
-
-      return this.formatValue(time, dividersData.precision);
-    };
-
-    TimelineGrid.drawCanvasGrid(context, dividersData);
-    if (this.rulerEnabled) {
-      TimelineGrid.drawCanvasHeaders(context, dividersData, drawAdjustedTime, 3, HeaderHeight);
-    }
-
-    this.updateElementPosition(this.highlightElement, this.highlightedEntryIndex);
-    this.updateElementPosition(this.selectedElement, this.selectedEntryIndex);
-    this.updateMarkerHighlight();
+    return {colorBuckets, titleIndices, markerIndices};
   }
 
   private drawGroupHeaders(width: number, height: number): void {
@@ -1269,8 +1244,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.save();
     context.scale(ratio, ratio);
     context.translate(0, -top);
-    const defaultFont = '11px ' + Host.Platform.fontFamily();
-    context.font = defaultFont;
+    context.font = this.#font;
 
     context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--color-background');
     this.forEachGroupInViewport((offset, index, group) => {
@@ -1316,7 +1290,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     context.save();
     this.forEachGroupInViewport((offset, index, group) => {
-      context.font = group.style.font;
+      context.font = this.#font;
       if (this.isGroupCollapsible(index) && !group.expanded || group.style.shareHeaderLine) {
         const width = this.labelWidthForGroup(context, group) + 2;
         if (this.isGroupFocused(index)) {
@@ -1385,6 +1359,88 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       context.lineTo(arrowHeight - arrowCenterOffset, 0);
       context.restore();
     }
+  }
+
+  /**
+   * Draws page load events in the Timings track (LCP, FCP, DCL, etc.)
+   */
+  private drawMarkers(context: CanvasRenderingContext2D, timelineData: TimelineData, markerIndices: number[]): void {
+    const {entryStartTimes, entryLevels} = timelineData;
+    this.markerPositions.clear();
+    context.textBaseline = 'alphabetic';
+    context.save();
+    context.beginPath();
+    let lastMarkerLevel = -1;
+    let lastMarkerX: number = -Infinity;
+    // Markers are sorted top to bottom, right to left.
+    for (let m = markerIndices.length - 1; m >= 0; --m) {
+      const entryIndex = markerIndices[m];
+      const title = this.dataProvider.entryTitle(entryIndex);
+      if (!title) {
+        continue;
+      }
+      const entryStartTime = entryStartTimes[entryIndex];
+      const level = entryLevels[entryIndex];
+      if (lastMarkerLevel !== level) {
+        lastMarkerX = -Infinity;
+      }
+      const x = Math.max(this.chartViewport.timeToPosition(entryStartTime), lastMarkerX);
+      const y = this.levelToOffset(level);
+      const h = this.levelHeight(level);
+      const padding = 4;
+      const width = Math.ceil(UI.UIUtils.measureTextWidth(context, title)) + 2 * padding;
+      lastMarkerX = x + width + 1;
+      lastMarkerLevel = level;
+      this.markerPositions.set(entryIndex, {x, width});
+      context.fillStyle = this.dataProvider.entryColor(entryIndex);
+      context.fillRect(x, y, width, h - 1);
+      context.fillStyle = 'white';
+      context.fillText(title, x + padding, y + h - this.textBaseline);
+    }
+    context.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+    context.stroke();
+    context.restore();
+  }
+
+  /**
+   * Draws the titles of trace events in the timeline. Also calls `decorateEntry` on the data
+   * provider, which can do any custom drawing on the corresponding entry's area (e.g. draw screenshots
+   * in the Performance Panel timeline).
+   */
+  private drawEventTitles(
+      context: CanvasRenderingContext2D, timelineData: TimelineData, titleIndices: number[], width: number): void {
+    const timeToPixel = this.chartViewport.timeToPixel();
+    const textPadding = this.textPadding;
+    context.save();
+    context.beginPath();
+    const {entryStartTimes, entryLevels, entryTotalTimes} = timelineData;
+    for (let i = 0; i < titleIndices.length; ++i) {
+      const entryIndex = titleIndices[i];
+      const entryStartTime = entryStartTimes[entryIndex];
+      const barX = this.timeToPositionClipped(entryStartTime);
+      const barRight = Math.min(this.timeToPositionClipped(entryStartTime + entryTotalTimes[entryIndex]), width) + 1;
+      const barWidth = barRight - barX;
+      const barLevel = entryLevels[entryIndex];
+      const barY = this.levelToOffset(barLevel);
+      let text = this.dataProvider.entryTitle(entryIndex);
+      if (text && text.length) {
+        context.font = this.#font;
+        text = UI.UIUtils.trimTextMiddle(context, text, barWidth - 2 * textPadding);
+      }
+      const unclippedBarX = this.chartViewport.timeToPosition(entryStartTime);
+      const barHeight = this.levelHeight(barLevel);
+      if (this.dataProvider.decorateEntry(
+              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel)) {
+        continue;
+      }
+      if (!text || !text.length) {
+        continue;
+      }
+      context.fillStyle = this.dataProvider.textColor(entryIndex);
+      context.fillText(text, barX + textPadding, barY + barHeight - this.textBaseline);
+    }
+
+    context.restore();
   }
 
   private forEachGroup(callback: (arg0: number, arg1: number, arg2: Group, arg3: boolean, arg4: number) => void): void {
@@ -1586,7 +1642,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.restore();
   }
 
-  private drawMarkers(): void {
+  /**
+   * Draws the vertical dashed lines in the timeline marking where the "Marker" events
+   * happened in time.
+   */
+  private drawMarkerLines(): void {
     const timelineData = this.timelineData();
     if (!timelineData) {
       return;
@@ -1852,7 +1912,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return Platform.NumberUtilities.clamp(this.chartViewport.timeToPosition(time), 0, this.offsetWidth);
   }
 
-  private levelToOffset(level: number): number {
+  /**
+   * Returns the amount of pixels a level is vertically offset in the.
+   * flame chart.
+   */
+  levelToOffset(level: number): number {
     if (!this.visibleLevelOffsets) {
       throw new Error('No visible level offsets');
     }
@@ -2027,26 +2091,13 @@ export interface Group {
   startLevel: number;
   expanded?: boolean;
   selectable?: boolean;
-  style: {
-    height: number,
-    padding: number,
-    collapsible: boolean,
-    font: string,
-    color: string,
-    backgroundColor: string,
-    nestingLevel: number,
-    itemsHeight?: number,
-    shareHeaderLine?: boolean,
-    useFirstLineForOverview?: boolean,
-    useDecoratorsForOverview?: boolean,
-  };
+  style: GroupStyle;
   track?: TimelineModel.TimelineModel.Track|null;
 }
 export interface GroupStyle {
   height: number;
   padding: number;
   collapsible: boolean;
-  font: string;
   color: string;
   backgroundColor: string;
   nestingLevel: number;
