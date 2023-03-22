@@ -328,6 +328,7 @@ export class TimelineModelImpl {
   }
 
   static globalEventId(event: SDK.TracingModel.Event, field: string): string {
+    if (typeof field === 'function') return field(event);
     const data = event.args['data'] || event.args['beginData'];
     const id = data && data[field];
     if (!id) {
@@ -2583,6 +2584,23 @@ export class TimelineAsyncEventTracker {
       ],
       joinBy: 'identifier',
     });
+
+    events.set('BeginFrame', {
+      causes: [
+        'Graphics.Pipeline',
+        'ProxyImpl::ScheduledActionSendBeginMainFrame',
+        'ProxyMain::BeginMainFrame',
+        'Scheduler::BeginImplFrame',
+        'Scheduler::BeginFrame',
+        'DisplayScheduler::BeginFrame',
+        'DrawFrame',
+        'Commit',
+        'PipelineReporter',
+      ],
+      joinBy: e => {
+        return e.args.frameSeqId || e.args.args?.sequence_number || e.args.frame_sequence || e.args.chrome_frame_reporter?.frame_sequence || e.args.begin_frame_id;
+      }
+    })
 
     TimelineAsyncEventTracker.asyncEvents = events;
     TimelineAsyncEventTracker.typeToInitiator = new Map();
