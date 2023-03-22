@@ -1107,6 +1107,11 @@ export class TimelineModelImpl {
         group(TrackType.Animation).push(asyncEvent);
         continue;
       }
+      // hax
+      if (asyncEvent.name === 'PipelineReporter' && asyncEvent.args.chrome_frame_reporter?.state === 'STATE_PRESENTED_ALL') {
+        group(TrackType.Animation).push(asyncEvent);
+        continue;
+      }
     }
 
     for (const [type, events] of groups) {
@@ -2605,17 +2610,19 @@ export class TimelineAsyncEventTracker {
       joinBy: frameSequenceJoiner,
     });
     */
-   events.set('BeginFrame', {subsequents: ['PipelineReporter'], joinBy: frameSequenceJoiner});
-   events.set('PipelineReporter', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
-   events.set('Graphics.Pipeline', {subsequents: ['Scheduler::BeginFrame'], joinBy: frameSequenceJoiner});
-   events.set('Scheduler::BeginFrame', {subsequents: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner});
-   events.set('Scheduler::BeginImplFrame', {subsequents: ['ProxyImpl::ScheduledActionSendBeginMainFrame'], joinBy: frameSequenceJoiner});
-  //  events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {subsequents: ['ProxyMain::BeginMainFrame'], joinBy: frameSequenceJoiner});
+   events.set('ProxyMain::BeginMainFrame', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+
+  //  events.set('BeginFrame', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
+  // //  events.set('PipelineReporter', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner}); // async b? so its awkward
+  //  events.set('Graphics.Pipeline', {subsequents: ['Scheduler::BeginFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('Scheduler::BeginFrame', {subsequents: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('Scheduler::BeginImplFrame', {subsequents: ['ProxyImpl::ScheduledActionSendBeginMainFrame'], joinBy: frameSequenceJoiner});
+  // //  events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {subsequents: ['ProxyMain::BeginMainFrame'], joinBy: frameSequenceJoiner});
+  // //  events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
+  // //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
   //  events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
   //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
-   events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
-  //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
-   events.set('DrawFrame', {subsequents: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('DrawFrame', {subsequents: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner});
 
 
     TimelineAsyncEventTracker.asyncEventInfo = events;
@@ -2646,6 +2653,11 @@ export class TimelineAsyncEventTracker {
       return;
     }
     const initiatorMapFromIdToEvent: Map<RecordType, SDK.TracingModel.Event>|undefined = this.initiatorMapsByRecordType.get(initiatorType);
+
+    if (id === 232813) {
+      const instEv = initiatorMapFromIdToEvent?.get(id);
+      console.log({name: event.name, start: event.startTime - 235510170.514, event, isInitiator, initiatorInfo, instEvName: instEv?.name, initiatorEvent: instEv})
+    }
     if (initiatorMapFromIdToEvent) {
       if (isInitiator) {
         initiatorMapFromIdToEvent.set(id, event);
