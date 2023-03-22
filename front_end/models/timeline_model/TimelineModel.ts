@@ -2589,7 +2589,7 @@ export class TimelineAsyncEventTracker {
     const frameSequenceJoiner = e => {
         return e.args.frameSeqId || e.args.args?.sequence_number || e.args.frame_sequence || e.args.chrome_frame_reporter?.frame_sequence || e.args.begin_frame_id;
       };
-
+/*
     events.set('BeginFrame', {
       causes: [
         'PipelineReporter',
@@ -2604,6 +2604,15 @@ export class TimelineAsyncEventTracker {
       ],
       joinBy: frameSequenceJoiner,
     });
+    */
+   events.set('BeginFrame', {causes: ['PipelineReporter'], joinBy: frameSequenceJoiner});
+   events.set('PipelineReporter', {causes: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
+   events.set('Graphics.Pipeline', {causes: ['Scheduler::BeginFrame'], joinBy: frameSequenceJoiner});
+   events.set('Scheduler::BeginFrame', {causes: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner});
+   events.set('Scheduler::BeginImplFrame', {causes: ['ProxyImpl::ScheduledActionSendBeginMainFrame'], joinBy: frameSequenceJoiner});
+   events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {causes: ['DrawFrame'], joinBy: frameSequenceJoiner}); // todo. link to mainthread instead.
+   events.set('DrawFrame', {causes: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner}); // todo. link to mainthread instead.
+
 
     TimelineAsyncEventTracker.asyncEvents = events;
     TimelineAsyncEventTracker.typeToInitiator = new Map();
