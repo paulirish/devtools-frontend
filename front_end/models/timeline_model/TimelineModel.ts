@@ -781,6 +781,14 @@ export class TimelineModelImpl {
     const browserMain = SDK.TracingModel.TracingModel.browserMainThread(tracingModel);
     if (browserMain) {
       browserMain.events().forEach(this.processBrowserEvent, this);
+
+      if (Root.Runtime.experiments.isEnabled('timelineShowAllEvents')) {
+        // const track = this.ensureNamedTrack(TrackType.Browser);
+        // track.thread = browserMain;
+        // track.events = browserMain.events();
+        this.processThreadEvents(tracingModel, browserMain, false /* maybe */, false, false, WorkletType.NotWorklet, null);
+
+      }
     }
   }
 
@@ -792,18 +800,24 @@ export class TimelineModelImpl {
   }
 
   private buildGPUEvents(tracingModel: SDK.TracingModel.TracingModel): void {
-    const thread =
+    const gpuMainThread =
         tracingModel.getThreadByName('Gpu', 'CrGpuMain') || tracingModel.getThreadByName('GPU Process', 'CrGpuMain');
-    if (!thread) {
-      return;
-    }
+    const gpuVizThread = tracingModel.getThreadByName('Gpu', 'VizCompositorThread') || tracingModel.getThreadByName('GPU Process', 'VizCompositorThread');
 
-    const gpuEventName = RecordType.GPUTask;
-    const track = this.ensureNamedTrack(TrackType.GPU);
-    track.thread = thread;
-    track.events = Root.Runtime.experiments.isEnabled('timelineShowAllEvents') ?
-        thread.events() :
-        thread.events().filter(event => event.name === gpuEventName);
+    for (const thread of [gpuMainThread, gpuVizThread]) {
+
+      if (!thread) {
+        return;
+      }
+
+      const gpuEventName = RecordType.GPUTask;
+      const track = this.ensureNamedTrack(TrackType.GPU);
+      track.thread = thread;
+      track.name = thread.name();
+      track.events = Root.Runtime.experiments.isEnabled('timelineShowAllEvents') ?
+          thread.events() :
+          thread.events().filter(event => event.name === gpuEventName);
+    }
   }
 
   private buildLoadingEvents(tracingModel: SDK.TracingModel.TracingModel, layoutShiftEvents: SDK.TracingModel.Event[]):
@@ -2025,6 +2039,7 @@ export enum TrackType {
   MainThread = 'MainThread',
   Worker = 'Worker',
   Animation = 'Animation',
+  Browser = 'Browser',
   Timings = 'Timings',
   Console = 'Console',
   Raster = 'Raster',
@@ -2610,7 +2625,13 @@ export class TimelineAsyncEventTracker {
       joinBy: frameSequenceJoiner,
     });
     */
-   events.set('ProxyMain::BeginMainFrame', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+
+   /* weirdly this kinda works cuz a lot of these are parents of eachother. if that didnt conveniently happen.. we'd need to refactor the root/subsequent thing over here */
+  // we can't match from main to compositor cuz we process Main thread first. ideally wed like.. run compositor stuff before mainthread or something.
+   events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+   events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {subsequents: ['ProxyMain::BeginMainFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+   events.set('Scheduler::BeginFrame', {subsequents: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+   events.set('BeginFrame', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
 
   //  events.set('BeginFrame', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
   // //  events.set('PipelineReporter', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner}); // async b? so its awkward

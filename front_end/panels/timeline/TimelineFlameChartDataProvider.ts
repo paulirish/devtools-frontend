@@ -505,8 +505,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           return 9;
         case TimelineModel.TimelineModel.TrackType.Other:
           return 10;
+        case TimelineModel.TimelineModel.TrackType.Browser:
+          return 11;
         default:
-          return -1;
+          return 15;
       }
     };
 

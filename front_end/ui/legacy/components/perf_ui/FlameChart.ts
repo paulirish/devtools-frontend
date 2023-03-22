@@ -1582,8 +1582,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.scale(ratio, ratio);
     context.translate(0, -top);
 
-    context.fillStyle = '#7f5050';
-    context.strokeStyle = '#7f5050';
+    context.fillStyle = '#00ff15';
+    context.strokeStyle = '#00ff15';
     const td = this.timelineData();
     if (!td) {
       return;
@@ -1592,7 +1592,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const endIndex = Platform.ArrayUtilities.lowerBound(
         td.flowStartTimes, this.chartViewport.windowRightTime(), Platform.ArrayUtilities.DEFAULT_COMPARATOR);
 
-    context.lineWidth = 0.5;
+    context.lineWidth = 0.8;
     for (let i = 0; i < endIndex; ++i) {
       if (!td.flowEndTimes[i] || td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
         continue;
