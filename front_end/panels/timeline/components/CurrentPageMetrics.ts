@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 import type * as Common from '../../../core/common/common.js';
+import {RuntimeModel} from '../../../core/sdk/RuntimeModel.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import * as ProtocolProxyApi from '../../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import {getMetricsInPage} from './getMetricsInPage.js';
+
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -19,6 +22,8 @@ declare global {
 const PAGE_METRICS_CODE_TO_EVALUATE = `
   // Evaluated in an IIFE to avoid polluting the global scope of the page we're evaluating.
   (function() {
+      if (typeof __chromium_devtools_metrics_reporter !== 'function') console.warn('ruhroh');
+
       async function getData() {
         ${getMetricsInPage.toString()}
         const result = await getMetricsInPage()
@@ -35,7 +40,7 @@ export class CurrentPageMetrics extends HTMLElement {
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
 
-  #currentPageMetrics = null;
+  #currentPageMetrics = [];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
 
@@ -47,6 +52,15 @@ export class CurrentPageMetrics extends HTMLElement {
       return;
     }
     console.log('we have a main target.');
+
+    const runtimeModel = this.#mainTarget.model(RuntimeModel);
+    runtimeModel?.bindingCalled;
+
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
+
+    await runtimeModel?.addBinding({name: '__chromium_devtools_metrics_reporter'});
+
     const frameTreeResponse = await mainTarget.pageAgent().invoke_getFrameTree();
     const mainFrameID = frameTreeResponse.frameTree.frame.id;
     this.#mainFrameID = mainFrameID;
@@ -59,9 +73,23 @@ export class CurrentPageMetrics extends HTMLElement {
   }
 
   async disconnectedCallback(): Promise<void> {
+    SDK.TargetManager.TargetManager.instance().removeModelListener(
+        SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
+
     const resourceTreeModel = this.#getResourceTreeModel();
     await resourceTreeModel.setLifecycleEventsEnabled(false);
     resourceTreeModel.removeEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
+  }
+
+
+  #onBindingCalled(event: ProtocolProxyApi.RuntimeApi.BindingCalledEvent): void {
+    const {data} = event;
+    if (data.name !== '__chromium_devtools_metrics_reporter')
+      return;
+    const obj = JSON.parse(event.data.payload);
+    this.#currentPageMetrics.push(obj)
+    console.log('binding', obj);
+    this.#render();
   }
 
   #onPageLifecycleEvent(event: Common.EventTarget.EventTargetEvent<{frameId: Protocol.Page.FrameId, name: string}>):
@@ -95,7 +123,7 @@ export class CurrentPageMetrics extends HTMLElement {
 
     console.log('eva', evaluationResult, evaluationResult.getError());
 
-    this.#currentPageMetrics = evaluationResult.result.value;
+    // this.#currentPageMetrics = evaluationResult.result.value;
     this.#render();
   }
 
@@ -122,7 +150,8 @@ export class CurrentPageMetrics extends HTMLElement {
 
 
   #renderPageMetrics(): LitHtml.TemplateResult {
-    if (!this.#currentPageMetrics) return LitHtml.html``;
+    if (!this.#currentPageMetrics.length)
+      return LitHtml.html``;
     return LitHtml.html`<p>${JSON.stringify(this.#currentPageMetrics)}</p>`
   }
 }
