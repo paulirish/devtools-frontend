@@ -151,6 +151,7 @@ export async function getMetricsInPage() {
         presentationTime: adjustedPresentationTime,
       };
       // TODO: this is broken, if we have not had any interactions then this will never resolve, because the callback never gets called. We should upate the code to log the interactions into some array, rather than execute only on callback?
+      // ORRRRRRRRRRR use runtime.addbinding to use events from page to this side.
       resolve();
     });
   }));

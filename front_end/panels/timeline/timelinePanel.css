@@ -586,3 +586,6 @@
 devtools-feedback-button {
   float: right;
 }
+devtools-timeline-current-page-metrics {
+  overflow-wrap: break-word;
+}
