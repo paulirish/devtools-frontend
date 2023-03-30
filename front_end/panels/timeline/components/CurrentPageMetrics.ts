@@ -34,6 +34,7 @@ export class CurrentPageMetrics extends HTMLElement {
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
 
+  #currentPageMetrics = null;
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
 
@@ -85,7 +86,15 @@ export class CurrentPageMetrics extends HTMLElement {
       awaitPromise: true,
       expression: PAGE_METRICS_CODE_TO_EVALUATE,
     });
+    const err = evaluationResult.getError();
+    if (err) {
+      return console.error(err);
+    }
+
     console.log('eva', evaluationResult, evaluationResult.getError());
+
+    this.#currentPageMetrics = evaluationResult.result.value;
+    this.#render();
   }
 
   #getResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel {
@@ -103,8 +112,16 @@ export class CurrentPageMetrics extends HTMLElement {
     // clang-format off
     LitHtml.render(LitHtml.html`<button @click=${(): void => {
       void this.#getPageMetrics();
-    }}>click me to re-evaluate</button>`, this.#shadow, {host: this});
+    }}>click me to re-evaluate</button>
+      ${this.#renderPageMetrics()}
+    `, this.#shadow, {host: this});
     // clang-format on
+  }
+
+
+  #renderPageMetrics(): LitHtml.TemplateResult {
+    if (!this.#currentPageMetrics) return LitHtml.html``;
+    return LitHtml.html`<p>${JSON.stringify(this.#currentPageMetrics)}</p>`
   }
 }
 
