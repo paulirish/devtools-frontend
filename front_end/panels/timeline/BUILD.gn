@@ -62,6 +62,7 @@ devtools_module("timeline") {
     "../../panels/profiler:bundle",
     "../../ui/components/panel_feedback:bundle",
     # "../../ui/components/code_highlighter:bundle", # pagemetrics showing
+    "../../panels/media:bundle", # ticking flamechart
     "../../ui/legacy/components/data_grid:bundle",
     "../../ui/legacy/components/perf_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
