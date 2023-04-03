@@ -3,10 +3,19 @@
 // found in the LICENSE file.
 
 import type * as Common from '../../../core/common/common.js';
+import {RuntimeModel} from '../../../core/sdk/RuntimeModel.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import * as ProtocolProxyApi from '../../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {
+  ColdColorScheme,
+  type Event,
+  type EventProperties,
+  HotColorScheme,
+  TickingFlameChart,
+} from '../../media/TickingFlameChart.js';
 
 import {getMetricsInPage} from './getMetricsInPage.js';
 
@@ -26,11 +35,45 @@ const PAGE_METRICS_CODE_TO_EVALUATE = `
   })();
 `;
 
+
+export class PlayerEventsTimeline extends TickingFlameChart {
+  private normalizedTimestamp: number;
+  private playbackStatusLastEvent: Event|null;
+  private audioBufferingStateEvent: Event|null;
+  private videoBufferingStateEvent: Event|null;
+
+  constructor() {
+    super();
+
+    this.addGroup('somegroup', 2);
+    this.addGroup('okay', 2);  // video on top, audio on bottom
+
+    this.playbackStatusLastEvent = null;
+    this.audioBufferingStateEvent = null;
+    this.videoBufferingStateEvent = null;
+    setTimeout(() => this.addEvent(200), 500);
+    setTimeout(() => this.addEvent(200), 1000);
+    setTimeout(() => this.addEvent(200), 1500);
+    setTimeout(() => this.addEvent(200), 2000);
+  }
+
+  private addEvent(normalizedTime: number): void {
+    this.startEvent({
+      level: 0,
+      startTime: normalizedTime,
+      name: 'Play',
+    } as EventProperties);
+  }
+}
+
 export class CurrentPageMetrics extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-timeline-current-page-metrics`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
+  readonly timelineView = new PlayerEventsTimeline();
+
+
 
   #currentPerfEntries: Array<{payload: PerformanceEventTiming}> = [];
   #mainTarget: SDK.Target.Target|null = null;
@@ -127,9 +170,24 @@ export class CurrentPageMetrics extends HTMLElement {
   }
 
   #render(): void {
-    const list =
-        this.#currentPerfEntries.map(m => LitHtml.html`<li><b>${m.entryType}</b>: <small>${JSON.stringify(m)}</small>`);
-    LitHtml.render(LitHtml.html`<ul>${list}</ul>`, this.#shadow, {host: this});
+    globalThis.tv = this.timelineView;
+    this.timelineView.element.style.height = '200px';
+    this.#shadow.appendChild(this.timelineView.element);
+    this.timelineView.show();
+    // clang-format off
+    LitHtml.render(LitHtml.html`<button @click=${(): void => {
+      void this.#invokePerfObserver();
+    }}>click me to re-evaluate</button>
+      ${this.#renderPageMetrics()}
+    `, this.#shadow, {host: this});
+    // clang-format on
+  }
+
+
+  #renderPageMetrics(): LitHtml.TemplateResult {
+    if (!this.#currentPerfEntries.length)
+      return LitHtml.html``;
+    return LitHtml.html`<p>${JSON.stringify(this.#currentPerfEntries)}</p>`
   }
 }
 
