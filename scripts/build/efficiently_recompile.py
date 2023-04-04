@@ -19,7 +19,7 @@ ROOT_DIRECTORY = path.join(path.dirname(path.abspath(__file__)), '..', '..')
 def recompile(ninja_build_name, ninja_target_name):
     ninja_proc = subprocess.Popen([
         'autoninja.bat' if os.name == 'nt' else 'autoninja', '-C',
-        'out/{}'.format(ninja_build_name), ninja_target_name
+        'out/{}'.format(ninja_build_name), 'front_end', ninja_target_name
     ],
                                   cwd=ROOT_DIRECTORY)
 

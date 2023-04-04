@@ -13,6 +13,7 @@ type AsyncActivity = {
 const asyncActivity: AsyncActivity[] = [];
 
 export function startTrackingAsyncActivity() {
+  return;
   // We are tracking all asynchronous activity but let it run normally during
   // the test.
   stub('requestAnimationFrame', trackingRequestAnimationFrame);

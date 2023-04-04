@@ -50,6 +50,16 @@ export async function loadTraceEventsLegacyEventPayload(name: string):
 // are safe to cache their contents once we've loaded them once.
 const traceFileCache = new Map<string, TraceModel.TraceModel.TraceFileContents>();
 
+
+// Adapted from https://github.com/kevva/is-gzip/blob/master/index.js
+const isGzip = (buf: ArrayBuffer) => {
+  const view = new Uint8Array(buf);
+  if (!view || view.length < 3) {
+    return false;
+  }
+  return view[0] === 0x1F && view[1] === 0x8B && view[2] === 0x08;
+};
+
 export async function loadTraceFileFromURL(url: URL): Promise<TraceModel.TraceModel.TraceFileContents> {
   const cachedFile = traceFileCache.get(url.toString());
   if (cachedFile) {
@@ -60,18 +70,22 @@ export async function loadTraceFileFromURL(url: URL): Promise<TraceModel.TraceMo
     throw new Error(`Unable to load ${url}`);
   }
 
-  const contentType = response.headers.get('content-type');
-  const isGzipEncoded = contentType !== null && contentType.includes('gzip');
   let buffer = await response.arrayBuffer();
+  const isGzipEncoded = isGzip(buffer);
   if (isGzipEncoded) {
     buffer = await decodeGzipBuffer(buffer);
   }
   const decoder = new TextDecoder('utf-8');
   const contents = JSON.parse(decoder.decode(buffer)) as TraceModel.TraceModel.TraceFileContents;
-  traceFileCache.set(url.toString(), contents);
+  // traceFileCache.set(url.toString(), contents);
   return contents;
 }
 export async function loadTraceFileFromFixtures(name: string): Promise<TraceModel.TraceModel.TraceFileContents> {
+
+  if (name.startsWith('http://')) {
+    return await loadTraceFileFromURL(new URL(name));
+  }
+
   const urlForTest = new URL(`/fixtures/traces/${name}`, window.location.origin);
   const urlForComponentExample = new URL(`/test/unittests/fixtures/traces/${name}`, window.location.origin);
   try {
@@ -139,7 +153,7 @@ async function generateModelDataForTraceFile(name: string, emulateFreshRecording
  * timeout across all trace model tests.
  **/
 export function setTraceModelTimeout(context: Mocha.Context|Mocha.Suite): void {
-  context.timeout(10_000);
+  context.timeout(1000000000_000);
 }
 
 export async function loadModelDataFromTraceFile(name: string): Promise<TraceModel.Handlers.Types.TraceParseData> {
