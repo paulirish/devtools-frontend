@@ -86,7 +86,8 @@ describeWithMockConnection('BackForwardCacheViewWrapper', () => {
       assertNotNullOrUndefined(resourceTreeModel);
       assertNotNullOrUndefined(resourceTreeModel.mainFrame);
       resourceTreeModel.dispatchEventToListeners(
-          SDK.ResourceTreeModel.Events.MainFrameNavigated, resourceTreeModel.mainFrame);
+          SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          {frame: resourceTreeModel.mainFrame, type: SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation});
 
       const data = await new Promise(resolve => sinon.stub(view, 'data').set(resolve));
       assert.deepStrictEqual(data, {frame: resourceTreeModel.mainFrame});
@@ -219,7 +220,7 @@ describeWithEnvironment('BackForwardCacheView', () => {
           {
             treeNodeData: {
               text: '(2) https://www.example.com',
-              iconName: 'frame-icon',
+              iconName: 'frame',
             },
             children: [
               {
@@ -230,7 +231,7 @@ describeWithEnvironment('BackForwardCacheView', () => {
               {
                 treeNodeData: {
                   text: '(1) https://www.example.com/frame.html',
-                  iconName: 'frame-embedded-icon',
+                  iconName: 'iframe',
                 },
                 children: [
                   {

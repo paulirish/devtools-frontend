@@ -26,25 +26,23 @@ describe('UserInteractions', function() {
     });
   });
 
-  describe('parsing', () => {
-    it('returns all user interactions', async () => {
-      const traceEvents = await loadEventsFromTraceFile('slow-interaction-button-click.json.gz');
-      for (const event of traceEvents) {
-        TraceModel.Handlers.ModelHandlers.UserInteractions.handleEvent(event);
+  it('returns all user interactions', async () => {
+    const traceEvents = await loadEventsFromTraceFile('slow-interaction-button-click.json.gz');
+    for (const event of traceEvents) {
+      TraceModel.Handlers.ModelHandlers.UserInteractions.handleEvent(event);
+    }
+
+    const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
+    const clicks = data.allEvents.filter(event => {
+      if (!event.args.data) {
+        return false;
       }
 
-      const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
-      const clicks = data.allEvents.filter(event => {
-        if (!event.args.data) {
-          return false;
-        }
-
-        return event.args.data.type === 'click';
-      });
-
-      assert.strictEqual(data.allEvents.length, 58);
-      assert.strictEqual(clicks.length, 1);
+      return event.args.data.type === 'click';
     });
+
+    assert.strictEqual(data.allEvents.length, 58);
+    assert.strictEqual(clicks.length, 1);
   });
 
   describe('interactions', () => {
@@ -65,17 +63,25 @@ describe('UserInteractions', function() {
       assert.strictEqual(data.interactionEvents.length, 3);
     });
 
-    it('sets the `dur` key on each event', async () => {
+    it('identifies the longest interaction', async () => {
+      await processTrace('slow-interaction-keydown.json.gz');
+      const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
+      assert.lengthOf(data.interactionEvents, 5);
+
+      const expectedLongestEvent = data.interactionEvents.find(event => {
+        return event.type === 'keydown' && event.interactionId === 7378;
+      });
+      assert.isNotNull(expectedLongestEvent);
+      assert.strictEqual(data.longestInteractionEvent, expectedLongestEvent);
+    });
+
+    it('sets the `dur` key on each event by finding the begin and end events and subtracting the ts', async () => {
       await processTrace('slow-interaction-button-click.json.gz');
       const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
-      assert.deepEqual(data.interactionEvents.map(i => i.dur), [
-        // pointerdown
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(32)),
-        // pointerup
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(136)),
-        // click
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(136)),
-      ]);
+      for (const syntheticEvent of data.interactionEvents) {
+        assert.strictEqual(
+            syntheticEvent.dur, syntheticEvent.args.data.endEvent.ts - syntheticEvent.args.data.beginEvent.ts);
+      }
     });
 
     it('gets the right interaction IDs for each interaction', async () => {
@@ -104,18 +110,147 @@ describe('UserInteractions', function() {
         // keyup from typing character
         7378,
       ]);
-      assert.deepEqual(data.interactionEvents.map(i => i.dur), [
-        // pointerdown
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(16)),
-        // pointerup
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(8)),
-        // click
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(8)),
-        // keydown
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(160)),
-        // keyup
-        TraceModel.Helpers.Timing.millisecondsToMicroseconds(TraceModel.Types.Timing.MilliSeconds(32)),
-      ]);
+    });
+
+    describe('collapsing nested interactions', () => {
+      function makeFakeInteraction(type: string, options: {startTime: number, endTime: number, interactionId: number}):
+          TraceModel.Types.TraceEvents.SyntheticInteractionEvent {
+        const event = {
+          name: 'EventTiming',
+          type,
+          ts: TraceModel.Types.Timing.MicroSeconds(options.startTime),
+          dur: TraceModel.Types.Timing.MicroSeconds(options.endTime - options.startTime),
+          interactionId: options.interactionId,
+        };
+
+        return event as unknown as TraceModel.Types.TraceEvents.SyntheticInteractionEvent;
+      }
+
+      const {removeNestedInteractions} = TraceModel.Handlers.ModelHandlers.UserInteractions;
+
+      it('removes interactions that have the same end time but are not the first event in that block', () => {
+        /**
+         * ========A=============
+         *   ===========B========
+         *   ===========C========
+         *         =====D========
+         */
+        const eventA = makeFakeInteraction('pointerdown', {startTime: 0, endTime: 10, interactionId: 1});
+        const eventB = makeFakeInteraction('pointerdown', {startTime: 2, endTime: 10, interactionId: 2});
+        const eventC = makeFakeInteraction('pointerdown', {startTime: 4, endTime: 10, interactionId: 3});
+        const eventD = makeFakeInteraction('pointerdown', {startTime: 6, endTime: 10, interactionId: 4});
+        const result = removeNestedInteractions([eventA, eventB, eventC, eventD]);
+        assert.deepEqual(result, [eventA]);
+      });
+
+      it('only collapses events of the same type', () => {
+        /**
+         * Here we should collapse B, because A is bigger and of the same type.
+         * Similarly, we should collapse D, because C is bigger and of the same type.
+         * But C should remain visible, because it is a pointer event, not a key event,
+         * and therefore does not get collapsed into A.
+         * ========A=[keydown]====
+         *   =======B=[keyup]=====
+         *    ====C=[pointerdown]=
+         *         =D=[pointerup]=
+         */
+        const eventA = makeFakeInteraction('keydown', {startTime: 0, endTime: 10, interactionId: 1});
+        const eventB = makeFakeInteraction('keyup', {startTime: 2, endTime: 10, interactionId: 2});
+        const eventC = makeFakeInteraction('pointerdown', {startTime: 4, endTime: 10, interactionId: 3});
+        const eventD = makeFakeInteraction('pointerup', {startTime: 6, endTime: 10, interactionId: 4});
+        const result = removeNestedInteractions([eventA, eventB, eventC, eventD]);
+        assert.deepEqual(result, [eventA, eventC]);
+      });
+
+      it('does not remove interactions that overlap but have a different end time', () => {
+        /**
+         * ========A=============
+         *   ===========B========
+         *   ===========C========
+         *         =====D================
+         */
+        const eventA = makeFakeInteraction('pointerdown', {startTime: 0, endTime: 10, interactionId: 1});
+        const eventB = makeFakeInteraction('pointerdown', {startTime: 2, endTime: 10, interactionId: 2});
+        const eventC = makeFakeInteraction('pointerdown', {startTime: 4, endTime: 10, interactionId: 3});
+        const eventD = makeFakeInteraction('pointerdown', {startTime: 6, endTime: 20, interactionId: 4});
+        const result = removeNestedInteractions([eventA, eventB, eventC, eventD]);
+        assert.deepEqual(result, [eventA, eventD]);
+      });
+
+      it('correctly identifies nested events when their parent overlaps with multiple events', () => {
+        /**
+         * Here although it does not look like it on first glance, C is nested
+         * within B and should therefore be hidden. Similarly, D is nested within A and
+         * so should be hidden.
+         *
+         * ========A====== ======C====
+         *   ===========B=============
+         *   ======D======
+         */
+        const eventA = makeFakeInteraction('pointerdown', {startTime: 0, endTime: 5, interactionId: 1});
+        const eventB = makeFakeInteraction('pointerdown', {startTime: 2, endTime: 20, interactionId: 2});
+        const eventC = makeFakeInteraction('pointerdown', {startTime: 10, endTime: 20, interactionId: 3});
+        const eventD = makeFakeInteraction('pointerdown', {startTime: 2, endTime: 5, interactionId: 3});
+        const result = removeNestedInteractions([eventA, eventB, eventC, eventD]);
+        assert.deepEqual(result, [eventA, eventB]);
+      });
+
+      it('returns the events in timestamp order', () => {
+        /**
+         * None of the events below overlap at all, this test makes sure that the order of events does not change.
+         */
+        const eventA = makeFakeInteraction('pointerdown', {startTime: 0, endTime: 5, interactionId: 1});
+        const eventB = makeFakeInteraction('pointerdown', {startTime: 10, endTime: 20, interactionId: 2});
+        const eventC = makeFakeInteraction('pointerdown', {startTime: 30, endTime: 40, interactionId: 3});
+        const eventD = makeFakeInteraction('pointerdown', {startTime: 50, endTime: 60, interactionId: 4});
+        const result = removeNestedInteractions([eventA, eventB, eventC, eventD]);
+        assert.deepEqual(result, [eventA, eventB, eventC, eventD]);
+      });
+
+      it('can remove nested interactions in a real trace', async () => {
+        await processTrace('nested-interactions.json.gz');
+        const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
+
+        const visibleEventInteractionIds = data.interactionEventsWithNoNesting.map(event => {
+          return `${event.type}:${event.interactionId}`;
+        });
+
+        // Note: it is very hard to explain in comments all these assertions, so
+        // it is highly recommended that you load the trace file above into
+        // DevTools to look at the timeline whilst working on this test.
+
+        /**
+         * This is a block of events with identical end times, so only the
+         * first should be kept:
+         * =====[keydown 3579]====
+         *    ==[keydown 3558]====
+         *       =[keyup 3558]====
+         **/
+        assert.isTrue(visibleEventInteractionIds.includes('keydown:3579'));
+        assert.isFalse(visibleEventInteractionIds.includes('keydown:3558'));
+        assert.isFalse(visibleEventInteractionIds.includes('keyup:3558'));
+
+        /** This is a slightly offset block of events:
+         * ====[keydown 3572]=====
+         *    =[keydown 3565]=====
+         *          ====[keydown 3586]========
+         * In this test we want to make sure that 3565 is collapsed, but the
+         * others are not.
+         **/
+        assert.isTrue(visibleEventInteractionIds.includes('keydown:3572'));
+        assert.isTrue(visibleEventInteractionIds.includes('keydown:3586'));
+        assert.isFalse(visibleEventInteractionIds.includes('keydown:3565'));
+
+        /** This is a block of events that have offset overlaps:
+         * ====[keydown 3614]=====  =====[keydown 3621]======
+         *       =====[keydown 3628]=========================
+         * In this test we want to make sure that 3621 is collapsed as it fits
+         * iwthin 3628, but 3614 is not collapsed.
+         **/
+        assert.isTrue(visibleEventInteractionIds.includes('keydown:3614'));
+        assert.isTrue(visibleEventInteractionIds.includes('keydown:3628'));
+        assert.isFalse(visibleEventInteractionIds.includes('keydown:3621'));
+      });
     });
   });
 });

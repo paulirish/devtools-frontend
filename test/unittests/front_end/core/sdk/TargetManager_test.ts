@@ -116,6 +116,22 @@ describeWithMockConnection('TargetManager', () => {
     assert.isTrue(observer.modelAdded.calledWith(resourceTreeModel(subtarget1)));
   });
 
+  it('calls second observers even if the first is changing the scope', () => {
+    const target1 = createTarget();
+    const target2 = createTarget();
+    targetManager.setScopeTarget(target1);
+    const observer1 = sinon.stub(new SDK.TargetManager.SDKModelObserver<SDK.ResourceTreeModel.ResourceTreeModel>());
+    observer1.modelRemoved.callsFake(() => targetManager.setScopeTarget(target2));
+    const observer2 = sinon.spy(new SDK.TargetManager.SDKModelObserver<SDK.RuntimeModel.RuntimeModel>());
+
+    targetManager.observeModels(SDK.ResourceTreeModel.ResourceTreeModel, observer1, {scoped: true});
+    targetManager.observeModels(SDK.RuntimeModel.RuntimeModel, observer2, {scoped: true});
+
+    target1.dispose('YOLO!');
+    assert.isTrue(observer1.modelRemoved.calledOnce);
+    assert.isTrue(observer2.modelRemoved.calledOnce);
+  });
+
   it('allows listening to models in scope', () => {
     const WillReloadPage = SDK.ResourceTreeModel.Events.WillReloadPage;
     const listener = sinon.spy();
@@ -155,10 +171,6 @@ describeWithMockConnection('TargetManager', () => {
     targetManager.observeTargets(targetObserver, {scoped: true});
     targetManager.observeModels(SDK.ResourceTreeModel.ResourceTreeModel, modelObserver, {scoped: true});
 
-    assert.isFalse(targetObserver.targetAdded.called);
-    assert.isFalse(modelObserver.modelAdded.called);
-
-    targetManager.setScopeTarget(target1);
     assert.isTrue(targetObserver.targetAdded.calledOnceWith(target1));
     assert.isTrue(modelObserver.modelAdded.calledOnce);
     assert.isFalse(targetObserver.targetRemoved.called);
@@ -185,6 +197,19 @@ describeWithMockConnection('TargetManager', () => {
     assert.isFalse(modelObserver.modelAdded.calledOnce);
     assert.isTrue(targetObserver.targetRemoved.calledOnceWith(target1));
     assert.isTrue(modelObserver.modelRemoved.called);
+
+    targetObserver.targetAdded.resetHistory();
+    targetObserver.targetRemoved.resetHistory();
+    modelObserver.modelAdded.resetHistory();
+    modelObserver.modelRemoved.resetHistory();
+
+    const target3 = createTarget();
+    assert.isFalse(targetObserver.targetAdded.called);
+    assert.isFalse(modelObserver.modelAdded.called);
+
+    targetManager.setScopeTarget(target3);
+    assert.isTrue(targetObserver.targetAdded.called);
+    assert.isTrue(modelObserver.modelAdded.called);
   });
 
   it('short-cicuits setting the same scope target', () => {

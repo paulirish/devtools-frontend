@@ -306,17 +306,14 @@ select {
   display: none;
 }
 
-.gutter-menu-icon {
+.gutter-container > devtools-icon {
   display: block;
   visibility: hidden;
-  transform: rotate(-90deg) scale(0.8);
-  background-color: var(--color-background);
   position: relative;
-  left: -7px;
-  top: -3px;
+  left: -1px;
 }
 
-.elements-disclosure li.selected .gutter-container:not(.has-decorations) .gutter-menu-icon {
+.elements-disclosure li.selected .gutter-container:not(.has-decorations) > devtools-icon {
   visibility: visible;
 }
 /** Guide line */
@@ -326,6 +323,8 @@ li.hovered:not(.always-parent) + ol.children,
 li.selected:not(.always-parent) + ol.children {
   background: linear-gradient(to right, var(--override-indentation-level-border-color), var(--override-indentation-level-border-color) 0.5px, transparent 0);
   background-position-x: 5px;
+  background-size: 0.5px 100%;
+  background-repeat: no-repeat;
 }
 
 li.selected:not(.always-parent) + ol.children {
@@ -358,7 +357,14 @@ li.hovered:not(.always-parent) + ol.children:not(.shadow-root) {
     border: 1px solid Highlight !important; /* stylelint-disable-line declaration-no-important */
   }
 
-  .gutter-menu-icon {
+  .gutter-container > devtools-icon {
     forced-color-adjust: none;
   }
+}
+
+.violating-element {
+  background-image: var(--image-file-errorWave);
+  background-repeat: repeat-x;
+  background-position: bottom;
+  padding-bottom: 1px;
 }

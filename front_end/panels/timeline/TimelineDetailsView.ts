@@ -8,6 +8,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import type * as TraceEngine from '../../models/trace/trace.js';
 
 import {EventsTimelineTreeView} from './EventsTimelineTreeView.js';
 
@@ -15,7 +16,8 @@ import {Events, type PerformanceModel} from './PerformanceModel.js';
 import {TimelineLayersView} from './TimelineLayersView.js';
 import {TimelinePaintProfilerView} from './TimelinePaintProfilerView.js';
 
-import {TimelineSelection, type TimelineModeViewDelegate} from './TimelinePanel.js';
+import {type TimelineModeViewDelegate} from './TimelinePanel.js';
+import {SelectionType, TimelineSelection} from './TimelineSelection.js';
 
 import {BottomUpTimelineTreeView, CallTreeTimelineTreeView, type TimelineTreeView} from './TimelineTreeView.js';
 import {TimelineDetailsContentHelper, TimelineUIUtils} from './TimelineUIUtils.js';
@@ -81,6 +83,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   private lazyLayersView?: TimelineLayersView|null;
   private preferredTabId?: string;
   private selection?: TimelineSelection|null;
+  #traceEngineData: TraceEngine.TraceModel.PartialTraceParseDataDuringMigration|null = null;
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -118,7 +121,9 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     this.tabbedPane.addEventListener(UI.TabbedPane.Events.TabSelected, this.tabSelected, this);
   }
 
-  setModel(model: PerformanceModel|null, track: TimelineModel.TimelineModel.Track|null): void {
+  setModel(
+      model: PerformanceModel|null, traceEngineData: TraceEngine.TraceModel.PartialTraceParseDataDuringMigration|null,
+      track: TimelineModel.TimelineModel.Track|null): void {
     if (this.model !== model) {
       if (this.model) {
         this.model.removeEventListener(Events.WindowChanged, this.onWindowChanged, this);
@@ -128,10 +133,11 @@ export class TimelineDetailsView extends UI.Widget.VBox {
         this.model.addEventListener(Events.WindowChanged, this.onWindowChanged, this);
       }
     }
+    this.#traceEngineData = traceEngineData;
     this.track = track;
     this.tabbedPane.closeTabs([Tab.PaintProfiler, Tab.LayerViewer], false);
     for (const view of this.rangeDetailViews.values()) {
-      view.setModel(model, track);
+      view.setModel(model, track, traceEngineData);
     }
     this.lazyPaintProfilerView = null;
     this.lazyLayersView = null;
@@ -213,13 +219,15 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       return;
     }
     switch (this.selection.type()) {
-      case TimelineSelection.Type.TraceEvent: {
+      case SelectionType.SDKTraceEvent: {
         const event = (this.selection.object() as SDK.TracingModel.Event);
-        void TimelineUIUtils.buildTraceEventDetails(event, this.model.timelineModel(), this.detailsLinkifier, true)
+        void TimelineUIUtils
+            .buildTraceEventDetails(
+                event, this.model.timelineModel(), this.detailsLinkifier, true, this.#traceEngineData)
             .then(fragment => this.appendDetailsTabsForTraceEventAndShowDetails(event, fragment));
         break;
       }
-      case TimelineSelection.Type.Frame: {
+      case SelectionType.Frame: {
         const frame = (this.selection.object() as TimelineModel.TimelineFrameModel.TimelineFrame);
         const filmStripFrame = this.model.filmStripModelFrame(frame);
         this.setContent(TimelineUIUtils.generateDetailsContentForFrame(frame, filmStripFrame));
@@ -232,13 +240,13 @@ export class TimelineDetailsView extends UI.Widget.VBox {
         }
         break;
       }
-      case TimelineSelection.Type.NetworkRequest: {
+      case SelectionType.NetworkRequest: {
         const request = (this.selection.object() as TimelineModel.TimelineModel.NetworkRequest);
         void TimelineUIUtils.buildNetworkRequestDetails(request, this.model.timelineModel(), this.detailsLinkifier)
             .then(this.setContent.bind(this));
         break;
       }
-      case TimelineSelection.Type.Range: {
+      case SelectionType.Range: {
         this.updateSelectedRangeStats(this.selection.startTime(), this.selection.endTime());
         break;
       }
@@ -310,7 +318,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     if (!this.model || !this.track) {
       return;
     }
-    const aggregatedStats = TimelineUIUtils.statsForTimeRange(this.track.syncEvents(), startTime, endTime);
+    const aggregatedStats = TimelineUIUtils.statsForTimeRange(this.track.eventsForTreeView(), startTime, endTime);
     const startOffset = startTime - this.model.timelineModel().minimumRecordTime();
     const endOffset = endTime - this.model.timelineModel().minimumRecordTime();
 

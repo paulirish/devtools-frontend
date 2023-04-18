@@ -11,10 +11,13 @@ import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Logs from '../../../../../front_end/models/logs/logs.js';
 import * as HAR from '../../../../../front_end/models/har/har.js';
+import * as Coordinator from '../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
-import {createTarget, stubNoopSettings} from '../../helpers/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../helpers/MockConnection.js';
+import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {describeWithMockConnection, dispatchEvent} from '../../helpers/MockConnection.js';
+
+const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 describeWithMockConnection('NetworkLogView', () => {
   const tests = (targetFactory: () => SDK.Target.Target) => {
@@ -22,21 +25,48 @@ describeWithMockConnection('NetworkLogView', () => {
     let networkLogView: Network.NetworkLogView.NetworkLogView;
 
     beforeEach(() => {
-      stubNoopSettings();
+      const dummyStorage = new Common.Settings.SettingsStorage({});
+
+      for (const settingName of ['networkColorCodeResourceTypes', 'network.group-by-frame']) {
+        Common.Settings.registerSettingExtension({
+          settingName,
+          settingType: Common.Settings.SettingType.BOOLEAN,
+          defaultValue: false,
+        });
+      }
+      Common.Settings.Settings.instance({
+        forceNew: true,
+        syncedStorage: dummyStorage,
+        globalStorage: dummyStorage,
+        localStorage: dummyStorage,
+      });
       sinon.stub(UI.ShortcutRegistry.ShortcutRegistry, 'instance').returns({
         shortcutTitleForAction: () => {},
         shortcutsForAction: () => [],
       } as unknown as UI.ShortcutRegistry.ShortcutRegistry);
-      networkLogView = createNetworkLogView();
+      Logs.NetworkLog.NetworkLog.instance();
       target = targetFactory();
     });
 
     let nextId = 0;
     function createNetworkRequest(
-        url: string, options: {requestHeaders?: SDK.NetworkRequest.NameValue[], finished?: boolean}) {
-      const request = SDK.NetworkRequest.NetworkRequest.create(
-          `request${++nextId}` as Protocol.Network.RequestId, url as Platform.DevToolsPath.UrlString,
-          '' as Platform.DevToolsPath.UrlString, null, null, null);
+        url: string,
+        options: {requestHeaders?: SDK.NetworkRequest.NameValue[], finished?: boolean, target?: SDK.Target.Target}):
+        SDK.NetworkRequest.NetworkRequest {
+      const effectiveTarget = options.target || target;
+      const networkManager = effectiveTarget.model(SDK.NetworkManager.NetworkManager);
+      assertNotNullOrUndefined(networkManager);
+      let request: SDK.NetworkRequest.NetworkRequest|undefined;
+      const onRequestStarted = (event: Common.EventTarget.EventTargetEvent<SDK.NetworkManager.RequestStartedEvent>) => {
+        request = event.data.request;
+      };
+      networkManager.addEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
+      dispatchEvent(
+          effectiveTarget, 'Network.requestWillBeSent',
+          {requestId: `request${++nextId}`, loaderId: 'loaderId', request: {url}} as unknown as
+              Protocol.Network.RequestWillBeSentEvent);
+      networkManager.removeEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
+      assertNotNullOrUndefined(request);
       request.requestMethod = 'GET';
       if (options.requestHeaders) {
         request.setRequestHeaders(options.requestHeaders);
@@ -68,45 +98,130 @@ describeWithMockConnection('NetworkLogView', () => {
           Common.Settings.Settings.instance().createSetting('networkLogLargeRows', false));
     }
 
-    it('adds dividers on main frame load events', async () => {
-      const addEventDividers = sinon.spy(networkLogView.columns(), 'addEventDividers');
+    const tests = (inScope: boolean) => () => {
+      beforeEach(() => {
+        networkLogView = createNetworkLogView();
+        SDK.TargetManager.TargetManager.instance().setScopeTarget(inScope ? target : null);
+      });
 
-      networkLogView.setRecording(true);
+      it('adds dividers on main frame load events', async () => {
+        const addEventDividers = sinon.spy(networkLogView.columns(), 'addEventDividers');
 
-      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-      assertNotNullOrUndefined(resourceTreeModel);
-      resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.Load, {resourceTreeModel, loadTime: 5});
-      resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.DOMContentLoaded, 6);
-      assert.isTrue(addEventDividers.calledTwice);
-      assert.isTrue(addEventDividers.getCall(0).calledWith([5], 'network-load-divider'));
-      assert.isTrue(addEventDividers.getCall(1).calledWith([6], 'network-dcl-divider'));
-    });
+        networkLogView.setRecording(true);
 
-    it('can export all as HAR', async () => {
-      const harWriterWrite = sinon.stub(HAR.Writer.Writer, 'write').resolves();
-      const URL_HOST = 'example.com';
-      target.setInspectedURL(`http://${URL_HOST}/foo` as Platform.DevToolsPath.UrlString);
-      const FILENAME = `${URL_HOST}.har` as Platform.DevToolsPath.RawPathString;
-      const fileManager = Workspace.FileManager.FileManager.instance();
-      const fileManagerSave =
-          sinon.stub(fileManager, 'save').withArgs(FILENAME, '', true).resolves({fileSystemPath: FILENAME});
-      const fileManagerClose = sinon.stub(fileManager, 'close');
+        const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+        assertNotNullOrUndefined(resourceTreeModel);
+        resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.Load, {resourceTreeModel, loadTime: 5});
+        resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.DOMContentLoaded, 6);
+        if (inScope) {
+          assert.isTrue(addEventDividers.calledTwice);
+          assert.isTrue(addEventDividers.getCall(0).calledWith([5], 'network-load-divider'));
+          assert.isTrue(addEventDividers.getCall(1).calledWith([6], 'network-dcl-divider'));
+        } else {
+          assert.isFalse(addEventDividers.called);
+        }
+      });
 
-      const FINISHED_REQUEST_1 = createNetworkRequest('http://example.com/', {finished: true});
-      const FINISHED_REQUEST_2 = createNetworkRequest('http://example.com/favicon.ico', {finished: true});
-      const UNFINISHED_REQUEST = createNetworkRequest('http://example.com/background.bmp', {finished: false});
-      sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'requests').returns([
-        FINISHED_REQUEST_1,
-        FINISHED_REQUEST_2,
-        UNFINISHED_REQUEST,
-      ]);
-      await networkLogView.exportAll();
+      it('can export all as HAR', async () => {
+        SDK.TargetManager.TargetManager.instance().setScopeTarget(inScope ? target : null);
+        const harWriterWrite = sinon.stub(HAR.Writer.Writer, 'write').resolves();
+        const URL_HOST = 'example.com';
+        target.setInspectedURL(`http://${URL_HOST}/foo` as Platform.DevToolsPath.UrlString);
+        const FILENAME = `${URL_HOST}.har` as Platform.DevToolsPath.RawPathString;
+        const fileManager = Workspace.FileManager.FileManager.instance();
+        const fileManagerSave =
+            sinon.stub(fileManager, 'save').withArgs(FILENAME, '', true).resolves({fileSystemPath: FILENAME});
+        const fileManagerClose = sinon.stub(fileManager, 'close');
 
-      assert.isTrue(
-          harWriterWrite.calledOnceWith(sinon.match.any, [FINISHED_REQUEST_1, FINISHED_REQUEST_2], sinon.match.any));
-      assert.isTrue(fileManagerSave.calledOnce);
-      assert.isTrue(fileManagerClose.calledOnce);
-    });
+        const FINISHED_REQUEST_1 = createNetworkRequest('http://example.com/', {finished: true});
+        const FINISHED_REQUEST_2 = createNetworkRequest('http://example.com/favicon.ico', {finished: true});
+        const UNFINISHED_REQUEST = createNetworkRequest('http://example.com/background.bmp', {finished: false});
+        sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'requests').returns([
+          FINISHED_REQUEST_1,
+          FINISHED_REQUEST_2,
+          UNFINISHED_REQUEST,
+        ]);
+        await networkLogView.exportAll();
+
+        if (inScope) {
+          assert.isTrue(harWriterWrite.calledOnceWith(
+              sinon.match.any, [FINISHED_REQUEST_1, FINISHED_REQUEST_2], sinon.match.any));
+          assert.isTrue(fileManagerSave.calledOnce);
+          assert.isTrue(fileManagerClose.calledOnce);
+        } else {
+          assert.isFalse(harWriterWrite.called);
+          assert.isFalse(fileManagerSave.called);
+          assert.isFalse(fileManagerClose.called);
+        }
+      });
+
+      it('shows summary toolbar with content', () => {
+        target.setInspectedURL('http://example.com/' as Platform.DevToolsPath.UrlString);
+        const request = createNetworkRequest('http://example.com/', {finished: true});
+        request.endTime = 0.669414;
+        request.setIssueTime(0.435136, 0.435136);
+        request.setResourceType(Common.ResourceType.resourceTypes.Document);
+
+        networkLogView.setRecording(true);
+        const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+        assertNotNullOrUndefined(resourceTreeModel);
+        resourceTreeModel.dispatchEventToListeners(
+            SDK.ResourceTreeModel.Events.Load, {resourceTreeModel, loadTime: 0.686191});
+        resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.DOMContentLoaded, 0.683709);
+        networkLogView.markAsRoot();
+        networkLogView.show(document.body);
+
+        const toolbar = networkLogView.summaryToolbar();
+        const textElements = toolbar.element.shadowRoot?.querySelectorAll('.toolbar-text');
+        assertNotNullOrUndefined(textElements);
+        const textContents = [...textElements].map(item => item.textContent);
+        if (inScope) {
+          assert.deepEqual(textContents, [
+            '1 requests',
+            '0\u00a0B transferred',
+            '0\u00a0B resources',
+            'Finish: 234\u00a0ms',
+            'DOMContentLoaded: 249\u00a0ms',
+            'Load: 251\u00a0ms',
+          ]);
+        } else {
+          assert.strictEqual(textElements.length, 0);
+        }
+        networkLogView.detach();
+      });
+    };
+    describe('in scope', tests(true));
+    describe('out of scope', tests(false));
+
+    const handlesSwitchingScope = (preserveLog: boolean) => async () => {
+      Common.Settings.Settings.instance().moduleSetting('network_log.preserve-log').set(preserveLog);
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+      const anotherTarget = createTarget();
+      const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+      assertNotNullOrUndefined(networkManager);
+      const request1 = createNetworkRequest('url1', {target});
+      const request2 = createNetworkRequest('url2', {target});
+      const request3 = createNetworkRequest('url3', {target: anotherTarget});
+      networkLogView = createNetworkLogView();
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      await coordinator.done();
+
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()), [request1, request2]);
+
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
+      await coordinator.done();
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()),
+          preserveLog ? [request1, request2, request3] : [request3]);
+
+      networkLogView.detach();
+    };
+
+    it('replaces requests when switching scope with preserve log off', handlesSwitchingScope(false));
+    it('appends requests when switching scope with preserve log on', handlesSwitchingScope(true));
   };
 
   describe('without tab target', () => tests(createTarget));

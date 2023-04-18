@@ -236,15 +236,17 @@ export class RequestTrustTokensReport extends HTMLElement {
 }
 
 const SUCCESS_ICON_DATA: IconButton.Icon.IconWithName = {
-  color: 'rgb(12, 164, 12)',
-  iconName: 'ic_checkmark_16x16',
-  width: '12px',
+  color: 'var(--icon-checkmark-green)',
+  iconName: 'check-circle',
+  width: '16px',
+  height: '16px',
 };
 
 const FAILURE_ICON_DATA: IconButton.Icon.IconWithName = {
-  color: '',
-  iconName: 'error_icon',
-  width: '12px',
+  color: 'var(--icon-error)',
+  iconName: 'cross-circle-filled',
+  width: '16px',
+  height: '16px',
 };
 
 export function statusConsideredSuccess(status: Protocol.Network.TrustTokenOperationDoneEventStatus): boolean {

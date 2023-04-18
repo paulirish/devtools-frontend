@@ -243,6 +243,15 @@ describe('Color', () => {
     assertNotNullOrUndefined(colorOne);
     deepCloseTo(colorOne.rgba(), [1, 1, 1, 0.5], colorSpaceConversionTolerance);
 
+    const colorTwo = parseAndAssertNotNull('color(srgb 100% 100% 100%/50%)');
+    deepCloseTo(colorTwo?.rgba(), [1, 1, 1, 0.5], colorSpaceConversionTolerance);
+
+    const colorThree = parseAndAssertNotNull('color(srgb 100% 100% 100%/ 50%)');
+    deepCloseTo(colorThree?.rgba(), [1, 1, 1, 0.5], colorSpaceConversionTolerance);
+
+    const colorFour = parseAndAssertNotNull('color(srgb 100% 100% 100% /50%)');
+    deepCloseTo(colorFour?.rgba(), [1, 1, 1, 0.5], colorSpaceConversionTolerance);
+
     // Does not parse invalid syntax
     const invalidSyntaxes = [
       // Not known color space
@@ -726,6 +735,8 @@ describe('Color', () => {
     function stub<Fn extends keyof typeof Common.ColorConverter.ColorConverter>(
         fn: Fn, input: Code, output: Code): void {
       const result = sinon.stub(Common.ColorConverter.ColorConverter, fn);
+      // TODO(crbug.com/1412307): Figure out why tsc 5.0 stopped infering the function signature correctly.
+      // @ts-expect-error
       result.callsFake((a: number, b: number, c: number): [number, number, number] => {
         assert.deepEqual([a, b, c], [input, 0, 0], `Conversion function ${fn} called with the wrong arguments`);
         return [output, 0, 0];
@@ -811,8 +822,12 @@ describe('Color', () => {
 
     assert.isTrue(Color.parse('hsl(-120deg 130% 50%)')?.isGamutClipped());
     assert.deepEqual(Color.parse('hsl(-120deg 130% 50%)')?.asString(), 'hsl(240deg 100% 50%)');
-    assert.isFalse(Color.parse('hwb(-120deg -130% 50%)')?.isGamutClipped());
-    assert.deepEqual(Color.parse('hwb(-120deg -130% 50%)')?.asString(), 'hwb(240deg 0% 50%)');
+    assert.isTrue(Color.parse('hwb(-120deg -130% 50%)')?.isGamutClipped());
+    assert.deepEqual(Color.parse('hwb(-120deg -130% -50%)')?.asString(), 'hwb(240deg 0% 0%)');
+    assert.isTrue(Color.parse('hwb(-120deg 0% 150%)')?.isGamutClipped());
+    assert.deepEqual(Color.parse('hwb(-120deg 0% 150%)')?.asString(), 'hwb(0deg 0% 100%)');
+    assert.isTrue(Color.parse('hwb(-120deg 130% 0%)')?.isGamutClipped());
+    assert.deepEqual(Color.parse('hwb(-120deg 130% 0%)')?.asString(), 'hwb(0deg 100% 0%)');
 
     assert.isFalse(Color.parse('lch(110 -70 -70)')?.isGamutClipped());
     assert.deepEqual(Color.parse('lch(110 70 -70)')?.asString(), 'lch(100 0 0)');

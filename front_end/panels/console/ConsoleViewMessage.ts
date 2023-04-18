@@ -523,7 +523,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     const contentElement = toggleElement.createChild('div', 'console-message-stack-trace-wrapper');
 
     const messageElement = this.buildMessage();
-    const icon = UI.Icon.Icon.create('smallicon-triangle-right', 'console-message-expand-icon');
+    const icon = UI.Icon.Icon.create('triangle-right', 'console-message-expand-icon');
     const clickableElement = contentElement.createChild('div');
     UI.ARIAUtils.setExpanded(clickableElement, false);
     clickableElement.appendChild(icon);
@@ -542,7 +542,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
         contentElement, `${messageElement.textContent} ${i18nString(UIStrings.stackMessageCollapsed)}`);
     UI.ARIAUtils.markAsGroup(stackTraceElement);
     this.expandTrace = (expand: boolean): void => {
-      icon.setIconType(expand ? 'smallicon-triangle-down' : 'smallicon-triangle-right');
+      icon.setIconType(expand ? 'triangle-down' : 'triangle-right');
       stackTraceElement.classList.toggle('hidden', !expand);
       const stackTableState =
           expand ? i18nString(UIStrings.stackMessageExpanded) : i18nString(UIStrings.stackMessageCollapsed);
@@ -708,6 +708,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     if (includePreview && obj.preview) {
       titleElement.classList.add('console-object-preview');
       this.previewFormatter.appendObjectPreview(titleElement, obj.preview, false /* isEntry */);
+      ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.appendMemoryIcon(titleElement, obj);
     } else if (obj.type === 'function') {
       const functionElement = titleElement.createChild('span');
       void ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.formatObjectAsFunction(obj, functionElement, false);
@@ -1252,13 +1253,16 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       this.messageIcon = null;
     }
 
+    let color = '';
     let iconName = '';
     let accessibleName = '';
     if (this.message.level === Protocol.Log.LogEntryLevel.Warning) {
-      iconName = 'warning_icon';
+      color = 'var(--icon-warning)';
+      iconName = 'warning-filled';
       accessibleName = i18nString(UIStrings.warning);
     } else if (this.message.level === Protocol.Log.LogEntryLevel.Error) {
-      iconName = 'error_icon';
+      color = 'var(--icon-error)';
+      iconName = 'cross-circle-filled';
       accessibleName = i18nString(UIStrings.error);
     } else if (this.message.originatesFromLogpoint) {
       iconName = 'console-logpoint';
@@ -1274,9 +1278,9 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     this.messageIcon = new IconButton.Icon.Icon();
     this.messageIcon.data = {
       iconName,
-      color: '',
-      width: '10px',
-      height: '10px',
+      color,
+      width: '14px',
+      height: '14px',
     };
     this.messageIcon.classList.add('message-level-icon');
     if (this.contentElementInternal) {
@@ -1709,7 +1713,7 @@ export class ConsoleGroupViewMessage extends ConsoleViewMessage {
   private setCollapsed(collapsed: boolean): void {
     this.collapsedInternal = collapsed;
     if (this.expandGroupIcon) {
-      this.expandGroupIcon.setIconType(this.collapsedInternal ? 'smallicon-triangle-right' : 'smallicon-triangle-down');
+      this.expandGroupIcon.setIconType(this.collapsedInternal ? 'triangle-right' : 'triangle-down');
     }
     this.onToggle.call(null);
   }
@@ -1734,7 +1738,7 @@ export class ConsoleGroupViewMessage extends ConsoleViewMessage {
     let element: HTMLElement|null = this.elementInternal || null;
     if (!element) {
       element = super.toMessageElement();
-      const iconType = this.collapsedInternal ? 'smallicon-triangle-right' : 'smallicon-triangle-down';
+      const iconType = this.collapsedInternal ? 'triangle-right' : 'triangle-down';
       this.expandGroupIcon = UI.Icon.Icon.create(iconType, 'expand-group-icon');
       // Intercept focus to avoid highlight on click.
       this.contentElement().tabIndex = -1;
@@ -1797,8 +1801,10 @@ export class ConsoleCommand extends ConsoleViewMessage {
     const newContentElement = document.createElement('div');
     this.setContentElement(newContentElement);
     newContentElement.classList.add('console-user-command');
-    const icon = UI.Icon.Icon.create('smallicon-user-command', 'command-result-icon');
-    newContentElement.appendChild(icon);
+    const userCommandIcon = new IconButton.Icon.Icon();
+    userCommandIcon.data = {iconName: 'chevron-right', color: 'var(--icon-default)', width: '16px', height: '16px'};
+    userCommandIcon.classList.add('command-result-icon');
+    newContentElement.appendChild(userCommandIcon);
 
     elementToMessage.set(newContentElement, this);
     this.formattedCommand = document.createElement('span');
@@ -1828,7 +1834,9 @@ export class ConsoleCommandResult extends ConsoleViewMessage {
     if (!element.classList.contains('console-user-command-result')) {
       element.classList.add('console-user-command-result');
       if (this.consoleMessage().level === Protocol.Log.LogEntryLevel.Info) {
-        const icon = UI.Icon.Icon.create('smallicon-command-result', 'command-result-icon');
+        const icon = new IconButton.Icon.Icon();
+        icon.data = {iconName: 'chevron-left-dot', color: 'var(--icon-default)', width: '16px', height: '16px'};
+        icon.classList.add('command-result-icon');
         element.insertBefore(icon, element.firstChild);
       }
     }

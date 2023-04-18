@@ -18,7 +18,7 @@ appendComponent({
 appendComponent({
   clickHandler: (): void => {},
   groups: [
-    {iconName: 'survey_feedback_icon', iconColor: 'var(--color-primary)', text: 'Test'},
+    {iconName: 'survey_feedback_icon', iconColor: 'var(--color-primary-old)', text: 'Test'},
     {iconName: 'warning_icon', iconColor: '', text: '1'},
   ],
 });
@@ -26,23 +26,23 @@ appendComponent({
 appendComponent({
   clickHandler: (): void => {},
   groups: [
-    {iconName: 'issue-exclamation-icon', iconColor: 'yellow', text: '23', iconHeight: '2ex', iconWidth: '2ex'},
-    {iconName: 'issue-text-icon', iconColor: 'blue', text: '1'},
+    {iconName: 'issue-exclamation-filled', iconColor: 'yellow', text: '23', iconHeight: '2ex', iconWidth: '2ex'},
+    {iconName: 'issue-text-filled', iconColor: 'blue', text: '1'},
   ],
 });
 
 appendComponent({
   groups: [
-    {iconName: 'issue-exclamation-icon', iconColor: 'yellow', text: '23'},
-    {iconName: 'issue-text-icon', iconColor: 'blue', text: '1'},
+    {iconName: 'issue-exclamation-filled', iconColor: 'yellow', text: '23'},
+    {iconName: 'issue-text-filled', iconColor: 'blue', text: '1'},
   ],
 });
 
 appendComponent({
   clickHandler: (): void => {},
   groups: [
-    {iconName: 'issue-exclamation-icon', iconColor: 'yellow', text: '23'},
-    {iconName: 'issue-text-icon', iconColor: 'blue', text: '1'},
+    {iconName: 'issue-exclamation-filled', iconColor: 'yellow', text: '23'},
+    {iconName: 'issue-text-filled', iconColor: 'blue', text: '1'},
   ],
   trailingText: 'Issues',
 });
@@ -50,8 +50,8 @@ appendComponent({
 appendComponent({
   clickHandler: (): void => {},
   groups: [
-    {iconName: 'issue-exclamation-icon', iconColor: 'yellow', text: '23'},
-    {iconName: 'issue-text-icon', iconColor: 'blue', text: '1'},
+    {iconName: 'issue-exclamation-filled', iconColor: 'yellow', text: '23'},
+    {iconName: 'issue-text-filled', iconColor: 'blue', text: '1'},
   ],
   leadingText: 'Issues:',
 });
@@ -59,8 +59,8 @@ appendComponent({
 appendComponent({
   clickHandler: (): void => {},
   groups: [
-    {iconName: 'issue-exclamation-icon', iconColor: 'yellow', text: '23'},
-    {iconName: 'issue-text-icon', iconColor: 'blue', text: '1'},
+    {iconName: 'issue-exclamation-filled', iconColor: 'yellow', text: '23'},
+    {iconName: 'issue-text-filled', iconColor: 'blue', text: '1'},
   ],
   leadingText: 'Issues:',
   compact: true,

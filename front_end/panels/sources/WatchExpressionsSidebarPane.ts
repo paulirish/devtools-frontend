@@ -110,12 +110,11 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     this.watchExpressionsSetting =
         Common.Settings.Settings.instance().createLocalSetting<string[]>('watchExpressions', []);
 
-    this.addButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addWatchExpression), 'largeicon-add');
+    this.addButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addWatchExpression), 'plus');
     this.addButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       void this.addButtonClicked();
     });
-    this.refreshButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refreshWatchExpressions), 'largeicon-refresh');
+    this.refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refreshWatchExpressions), 'refresh');
     this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.update, this);
 
     this.contentElement.classList.add('watch-expressions');
@@ -461,7 +460,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   private createWatchExpressionHeader(
       expressionValue?: SDK.RemoteObject.RemoteObject, exceptionDetails?: Protocol.Runtime.ExceptionDetails): Element {
     const headerElement = this.element.createChild('div', 'watch-expression-header');
-    const deleteButton = UI.Icon.Icon.create('smallicon-cross', 'watch-expression-delete-button');
+    const deleteButton = UI.Icon.Icon.create('cross', 'watch-expression-delete-button');
     this.resizeObserver = new ResizeObserver(entries => {
       entries.forEach(entry => {
         // 55 serves as a width threshold here (in px)

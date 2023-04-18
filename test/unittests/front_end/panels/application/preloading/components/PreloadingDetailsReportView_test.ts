@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as SDK from '../../../../../../../front_end/core/sdk/sdk.js';
+import type * as Platform from '../../../../../../../front_end/core/platform/platform.js';
+
 import * as Protocol from '../../../../../../../front_end/generated/protocol.js';
 import * as PreloadingComponents from '../../../../../../../front_end/panels/application/preloading/components/components.js';
+import * as SDK from '../../../../../../../front_end/core/sdk/sdk.js';
 import * as Coordinator from '../../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import * as ReportView from '../../../../../../../front_end/ui/components/report_view/report_view.js';
-import type * as Platform from '../../../../../../../front_end/core/platform/platform.js';
 import {
   assertShadowRoot,
   getCleanTextContentFromElements,
@@ -17,8 +18,6 @@ import {
 import {describeWithEnvironment} from '../../../../helpers/EnvironmentHelpers.js';
 
 const {assert} = chai;
-
-type PrerenderingAttempt = SDK.PrerenderingModel.PrerenderingAttempt;
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -51,19 +50,35 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
   });
 
   it('renders prerendering details', async () => {
-    const startedAt = new Date('2006-01-02T15:04:05Z');
     const url = 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString;
-    const data: PrerenderingAttempt = {
-      prerenderingAttemptId: 'id',
-      startedAt: startedAt.getTime(),
-      trigger: {
-        kind: 'PrerenderingTriggerSpecRules',
-        rule: {
-          'prerender': [{'source': 'list', 'urls': [url]}],
+    const data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData = {
+      preloadingAttempt: {
+        key: {
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          action: Protocol.Preload.SpeculationAction.Prerender,
+          url,
+          targetHint: undefined,
         },
+        status: SDK.PreloadingModel.PreloadingStatus.Running,
+        ruleSetIds: ['ruleSetId'] as Protocol.Preload.RuleSetId[],
+        nodeIds: [1] as Protocol.DOM.BackendNodeId[],
       },
-      url,
-      status: SDK.PrerenderingModel.PrerenderingStatus.Prerendering,
+      ruleSets: [
+        {
+          id: 'ruleSetId' as Protocol.Preload.RuleSetId,
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          sourceText: `
+{
+  "prefetch": [
+    {
+      "source": "list",
+      "urls": ["/subresource.js"]
+    }
+  ]
+}
+`,
+        },
+      ],
     };
 
     const component = await renderPreloadingDetailsReportView(data);
@@ -73,27 +88,44 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
-      ['Started at', startedAt.toLocaleString()],
-      ['Trigger', 'Speculation Rules'],
-      ['Status', 'Prerendering'],
+      ['Action', 'prerender'],
+      ['Status', 'Preloading is running.'],
+      ['Rule set', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
     ]);
   });
 
+  // TODO(https://crbug.com/1317959): Add cancelled reason once
+  // finalStatus and disallowedApiMethod added to prerenderStatusUpdated.
   it('renders prerendering details with cancelled reason', async () => {
-    const startedAt = new Date('2006-01-02T15:04:05Z');
     const url = 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString;
-    const data: PrerenderingAttempt = {
-      prerenderingAttemptId: 'id',
-      startedAt: startedAt.getTime(),
-      trigger: {
-        kind: 'PrerenderingTriggerSpecRules',
-        rule: {
-          'prerender': [{'source': 'list', 'urls': [url]}],
+    const data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData = {
+      preloadingAttempt: {
+        key: {
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          action: Protocol.Preload.SpeculationAction.Prerender,
+          url,
+          targetHint: undefined,
         },
+        status: SDK.PreloadingModel.PreloadingStatus.Failure,
+        ruleSetIds: ['ruleSetId'] as Protocol.Preload.RuleSetId[],
+        nodeIds: [1] as Protocol.DOM.BackendNodeId[],
       },
-      url,
-      status: SDK.PrerenderingModel.PrerenderingStatus.Discarded,
-      discardedReason: Protocol.Page.PrerenderFinalStatus.MojoBinderPolicy,
+      ruleSets: [
+        {
+          id: 'ruleSetId' as Protocol.Preload.RuleSetId,
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          sourceText: `
+{
+  "prefetch": [
+    {
+      "source": "list",
+      "urls": ["/subresource.js"]
+    }
+  ]
+}
+`,
+        },
+      ],
     };
 
     const component = await renderPreloadingDetailsReportView(data);
@@ -103,10 +135,9 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', url],
-      ['Started at', startedAt.toLocaleString()],
-      ['Trigger', 'Speculation Rules'],
-      ['Status', 'Discarded'],
-      ['Discarded reason', Protocol.Page.PrerenderFinalStatus.MojoBinderPolicy],
+      ['Action', 'prerender'],
+      ['Status', 'Preloading failed.'],
+      ['Rule set', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
     ]);
   });
 });

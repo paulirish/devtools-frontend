@@ -46,7 +46,7 @@ import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Emulation from '../emulation/emulation.js';
-
+import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as ElementsComponents from './components/components.js';
 import {canGetJSPath, cssPath, jsPath, xPath} from './DOMPath.js';
 import {ElementsPanel} from './ElementsPanel.js';
@@ -243,6 +243,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   selectionElement?: HTMLDivElement;
   private hintElement?: HTMLElement;
   private contentElement: HTMLElement;
+  #elementIssues: Map<string, IssuesManager.GenericIssue.GenericIssue> = new Map();
 
   readonly tagTypeContext: TagTypeContext;
 
@@ -254,7 +255,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     this.contentElement = this.listItemElement.createChild('div');
     this.gutterContainer = this.contentElement.createChild('div', 'gutter-container');
     this.gutterContainer.addEventListener('click', this.showContextMenu.bind(this));
-    const gutterMenuIcon = UI.Icon.Icon.create('largeicon-menu', 'gutter-menu-icon');
+    const gutterMenuIcon = new IconButton.Icon.Icon();
+    gutterMenuIcon.data = {
+      color: 'var(--icon-default)',
+      iconName: 'dots-horizontal',
+      height: '16px',
+      width: '16px',
+    };
     this.gutterContainer.append(gutterMenuIcon);
     this.decorationsElement = this.gutterContainer.createChild('div', 'hidden');
 
@@ -416,6 +423,39 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         this.listItemElement.classList.add('hovered');
       } else {
         this.listItemElement.classList.remove('hovered');
+      }
+    }
+  }
+
+  addIssue(newIssue: IssuesManager.GenericIssue.GenericIssue): void {
+    if (this.#elementIssues.has(newIssue.primaryKey())) {
+      return;
+    }
+
+    this.#elementIssues.set(newIssue.primaryKey(), newIssue);
+    this.#applyIssueStyleAndTooltip(newIssue);
+  }
+
+  #applyIssueStyleAndTooltip(issue: IssuesManager.GenericIssue.GenericIssue): void {
+    const issueDetails = issue.details();
+
+    if (issueDetails.violatingNodeAttribute) {
+      this.#highlightViolatingAttr(issueDetails.violatingNodeAttribute);
+    } else {
+      this.#highlightTagAsViolating();
+    }
+  }
+
+  #highlightTagAsViolating(): void {
+    this.listItemElement.getElementsByClassName('webkit-html-tag-name')[0].classList.add('violating-element');
+  }
+
+  #highlightViolatingAttr(name: string): void {
+    const tag = this.listItemElement.getElementsByClassName('webkit-html-tag')[0];
+    const attributes = tag.getElementsByClassName('webkit-html-attribute');
+    for (const attribute of attributes) {
+      if (attribute.getElementsByClassName('webkit-html-attribute-name')[0].textContent === name) {
+        attribute.getElementsByClassName('webkit-html-attribute-name')[0].classList.add('violating-element');
       }
     }
   }
@@ -1337,6 +1377,11 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         this.createSelection();
         this.createHint();
       }
+
+      // If there is an issue with this node, make sure to update it.
+      for (const issue of this.#elementIssues.values()) {
+        this.#applyIssueStyleAndTooltip(issue);
+      }
     }
 
     this.highlightSearchResultsInternal();
@@ -1979,8 +2024,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
 
   adornSlot({name}: {name: string}, context: OpeningTagContext): Adorners.Adorner.Adorner {
     const linkIcon = new IconButton.Icon.Icon();
-    linkIcon
-        .data = {iconName: 'ic_show_node_16x16', color: 'var(--color-text-disabled)', width: '12px', height: '12px'};
+    linkIcon.data = {iconName: 'select-element', color: 'var(--icon-default)', width: '14px', height: '14px'};
     const slotText = document.createElement('span');
     slotText.textContent = name;
     const adornerContent = document.createElement('span');

@@ -82,17 +82,23 @@ export function wrapDescribe<ReturnT>(
       if (stackTraces.length < 3) {
         return '<unknown>';
       }
-      const filename = stackTraces[2].getFileName();
-      if (!filename) {
-        return '<unknown>';
+      let fallback: string|undefined;
+      for (let i = 2; i < stackTraces.length; ++i) {
+        const filename = stackTraces[i].getFileName();
+        if (!filename) {
+          return fallback ?? '<unknown>';
+        }
+        const parsedPath = Path.parse(filename);
+        const directories = parsedPath.dir.split(Path.sep);
+        const index = directories.lastIndexOf('e2e');
+        if (index >= 0) {
+          return Path.join(...directories.slice(index + 1), `${parsedPath.name}.ts`);
+        }
+        if (!fallback) {
+          fallback = parsedPath.name;
+        }
       }
-      const parsedPath = Path.parse(filename);
-      const directories = parsedPath.dir.split(Path.sep);
-      const index = directories.lastIndexOf('e2e');
-      if (index < 0) {
-        return parsedPath.name;
-      }
-      return Path.join(...directories.slice(index + 1), `${parsedPath.name}.ts`);
+      return fallback;
     };
     const err = new Error();
 
@@ -120,6 +126,14 @@ describe.skipOnPlatforms = function(platforms: Array<Platform>, name: string, fn
     wrapDescribe(Mocha.describe.skip, name, fn);
   } else {
     describe(name, fn);
+  }
+};
+
+describe.skipOnParallel = function(name: string, fn: (this: Mocha.Suite) => void) {
+  if (process.env.JOBS !== '1') {
+    wrapDescribe(Mocha.describe.skip, `[sequential] ${name}`, fn);
+  } else {
+    describe(`[sequential] ${name}`, fn);
   }
 };
 
@@ -190,6 +204,14 @@ export function makeCustomWrappedIt(namePrefix: string = '') {
       wrapMochaCall(Mocha.it.skip, name, callback);
     } else {
       it(name, callback);
+    }
+  };
+
+  newMochaItFunc.skipOnParallel = function(name: string, callback: Mocha.Func|Mocha.AsyncFunc) {
+    if (process.env.JOBS !== '1') {
+      wrapMochaCall(Mocha.it.skip, `[sequential] ${name}`, callback);
+    } else {
+      newMochaItFunc(`[sequential] ${name}`, callback);
     }
   };
 

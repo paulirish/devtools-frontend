@@ -5,7 +5,6 @@
 import {assert} from 'chai';
 
 import {
-  enableExperiment,
   getBrowserAndPages,
   goToResource,
   waitForFunction,
@@ -27,10 +26,6 @@ const goToResourceAndWaitForStyleSection = async (path: string) => {
 };
 
 describe('CSS hints in the Styles panel', async () => {
-  beforeEach(async () => {
-    await enableExperiment('cssAuthoringHints');
-  });
-
   it('can detect inactive CSS', async () => {
     await goToResourceAndWaitForStyleSection('elements/inactive-css-page.html');
     await waitForStyleRule('body');
@@ -51,8 +46,7 @@ describe('CSS hints in the Styles panel', async () => {
     assert.deepEqual(propertiesWithHints, []);
   });
 
-  // Flaky on windows.
-  it.skipOnPlatforms(['win32'], '[crbug.com/1377773] updates the hint if the styles are edited', async () => {
+  it('updates the hint if the styles are edited', async () => {
     await goToResourceAndWaitForStyleSection('elements/inactive-css-page.html');
     await waitForStyleRule('body');
     await waitForAndClickTreeElementWithPartialText('wrapper');

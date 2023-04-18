@@ -94,6 +94,10 @@
   color: var(--color-text-primary);
 }
 
+.styles-section .try-rule-selector-element {
+  color: var(--color-text-disabled);
+}
+
 .styles-section .style-properties {
   margin: 0;
   padding: 2px 4px 0 0;
@@ -104,6 +108,14 @@
 
 .styles-section.matched-styles .style-properties {
   padding-left: 0;
+}
+
+.nesting-symbol.implicit {
+  color: var(--color-text-disabled);
+}
+
+.nesting-symbol:hover {
+  color: var(--color-text-primary);
 }
 
 @keyframes styles-element-state-pane-slidein {
@@ -227,7 +239,7 @@
 .sidebar-pane-section-toolbar {
   position: absolute;
   right: 0;
-  bottom: -5px;
+  bottom: -1px;
   z-index: 0;
 }
 

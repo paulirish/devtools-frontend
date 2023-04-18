@@ -6,9 +6,10 @@ const {assert} = chai;
 
 import * as Platform from '../../../../../front_end/core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import type * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
-
+import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
 import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
 import {
   DevToolsTimelineCategory,
@@ -16,6 +17,8 @@ import {
   makeFakeSDKEventFromPayload,
   traceModelFromTraceFile,
 } from '../../helpers/TimelineHelpers.js';
+import {allModelsFromFile} from '../../helpers/TraceHelpers.js';
+import {StubbedThread} from '../../helpers/TimelineHelpers.js';
 
 // Various events listing processes and threads used by all the tests.
 const preamble = [
@@ -274,7 +277,7 @@ describeWithEnvironment('TimelineModel', () => {
       const {timelineModel} = traceWithEvents([
         {
           cat: 'devtools.timeline',
-          ph: 'b',
+          ph: TraceEngine.Types.TraceEvents.Phase.ASYNC_NESTABLE_START,
           pid: 1537729,  // the Renderer Thread
           tid: 1,        // CrRendererMain
           id: '1234',
@@ -297,7 +300,7 @@ describeWithEnvironment('TimelineModel', () => {
         // Has an interactionId of 0, so should NOT be included.
         {
           cat: 'devtools.timeline',
-          ph: 'b',
+          ph: TraceEngine.Types.TraceEvents.Phase.ASYNC_NESTABLE_START,
           pid: 1537729,  // the Renderer Thread
           tid: 1,        // CrRendererMain
           id: '1234',
@@ -320,7 +323,7 @@ describeWithEnvironment('TimelineModel', () => {
         // Has an duration of 0, so should NOT be included.
         {
           cat: 'devtools.timeline',
-          ph: 'b',
+          ph: TraceEngine.Types.TraceEvents.Phase.ASYNC_NESTABLE_START,
           pid: 1537729,  // the Renderer Thread
           tid: 1,        // CrRendererMain
           id: '1234',
@@ -359,7 +362,7 @@ describeWithEnvironment('TimelineModel', () => {
       const timestampEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.TimeStamp,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
       });
       assert.isTrue(timelineModel.isMarkerEvent(timestampEvent));
@@ -369,7 +372,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markFirstPaintEventOnMainFrame = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFirstPaint,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           frame: timelineModel.mainFrameID(),
@@ -384,7 +387,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markFCPEventOnMainFrame = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFCP,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           frame: timelineModel.mainFrameID(),
@@ -399,7 +402,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markFCPEventOnOtherFrame = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFCP,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           frame: 'not-main-frame',
@@ -414,7 +417,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markFirstPaintEventOnOtherFrame = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkFirstPaint,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           frame: 'not-main-frame',
@@ -429,7 +432,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markDOMContentEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -445,7 +448,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markDOMContentEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -461,7 +464,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markDOMContentEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -477,7 +480,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markDOMContentEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkDOMContent,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -493,7 +496,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markLoadEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkLoad,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -509,7 +512,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markLCPCandidateEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkLCPCandidate,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -525,7 +528,7 @@ describeWithEnvironment('TimelineModel', () => {
       const markLCPInvalidateEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.MarkLCPInvalidate,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         args: {
           data: {
@@ -541,11 +544,171 @@ describeWithEnvironment('TimelineModel', () => {
       const animationEvent = makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name: TimelineModel.TimelineModel.RecordType.Animation,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
         threadId: 1,
       });
       assert.isFalse(timelineModel.isMarkerEvent(animationEvent));
+    });
+  });
+  describe('Track.syncLikeEvents', () => {
+    let nestableAsyncEvents: SDK.TracingModel.AsyncEvent[];
+    let nonNestableAsyncEvents: SDK.TracingModel.AsyncEvent[];
+    let syncEvents: SDK.TracingModel.PayloadEvent[];
+    const tracingModel = new SDK.TracingModel.TracingModel(new FakeStorage());
+    const process = new SDK.TracingModel.Process(tracingModel, 1);
+    const thread = new SDK.TracingModel.Thread(process, 1);
+    const nestableAsyncEventPayloads = [
+      {
+        'cat': 'blink.console',
+        'id': '0x10bd3fa3',
+        'name': 'first console time',
+        'ph': 'b',
+        'ts': 59624383131,
+      },
+      {
+        'cat': 'blink.console',
+        'id': '0xf9950a85',
+        'name': 'second console time',
+        'ph': 'b',
+        'ts': 59624483145,
+      },
+      {
+        'cat': 'blink.console',
+        'id': '0xf9950a85',
+        'name': 'second console time',
+        'ph': 'e',
+        'ts': 59624983227,
+      },
+      {
+        'cat': 'blink.console',
+        'id': '0x10bd3fa3',
+        'name': 'first console time',
+        'ph': 'e',
+        'ts': 59625983390,
+      },
+      {
+        'cat': 'blink.console',
+        'id': '0xfbe4a4a7',
+        'name': 'third console time',
+        'ph': 'b',
+        'ts': 59625983458,
+      },
+      {
+        'cat': 'blink.console',
+        'id': '0xfbe4a4a7',
+        'name': 'third console time',
+        'ph': 'e',
+        'ts': 59626783430,
+      },
+    ] as unknown as SDK.TracingManager.EventPayload[];
+
+    const nonNestableAsyncEventPayloads = [
+      {
+        'cat': 'blink.user_timing',
+        'id': '0x10bd3fa3',
+        'name': 'MyMark',
+        'ph': 'b',
+        'ts': 62263114030,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'id': '0xf9950a85',
+        'name': 'MyOtherMark',
+        'ph': 'b',
+        'ts': 62263414138,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'id': '0x10bd3fa3',
+        'name': 'MyMark',
+        'ph': 'e',
+        'ts': 62263614198,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'id': '0xfbe4a4a7',
+        'name': 'Zuck',
+        'ph': 'b',
+        'ts': 62263714283,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'id': '0xfbe4a4a7',
+        'name': 'Zuck',
+        'ph': 'e',
+        'ts': 62264214398,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'id': '0xf9950a85',
+        'name': 'MyOtherMark',
+        'ph': 'e',
+        'ts': 62264414198,
+      },
+    ] as unknown as SDK.TracingManager.EventPayload[];
+
+    const syncEventPayloads = [
+      {
+        'cat': 'blink.user_timing',
+        'name': 'myMark',
+        'ph': 'R',
+        'ts': 62263114056,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'name': 'myOtherMark',
+        'ph': 'R',
+        'ts': 62263414150,
+      },
+      {
+        'cat': 'blink.user_timing',
+        'name': 'zuck',
+        'ph': 'R',
+        'ts': 62263714292,
+      },
+    ] as unknown as SDK.TracingManager.EventPayload[];
+
+    function buildAsyncEvents(asyncPayloads: SDK.TracingManager.EventPayload[]): SDK.TracingModel.AsyncEvent[] {
+      const builtEvents = new Map<string, SDK.TracingModel.AsyncEvent>();
+      for (const payload of asyncPayloads) {
+        let beginEvent = builtEvents.get(payload.id);
+        const event = new SDK.TracingModel.AsyncEvent(SDK.TracingModel.PayloadEvent.fromPayload(payload, thread));
+        if (!beginEvent) {
+          beginEvent = new SDK.TracingModel.AsyncEvent(event);
+          builtEvents.set(payload.id, beginEvent);
+        } else {
+          beginEvent.addStep(event);
+        }
+      }
+      return [...builtEvents.values()];
+    }
+    beforeEach(() => {
+      nestableAsyncEvents = buildAsyncEvents(nestableAsyncEventPayloads);
+      nonNestableAsyncEvents = buildAsyncEvents(nonNestableAsyncEventPayloads);
+      syncEvents = syncEventPayloads.map(payload => SDK.TracingModel.PayloadEvent.fromPayload(payload, thread));
+    });
+    it('returns sync and async events if async events can be organized in a tree structure', () => {
+      const track = new TimelineModel.TimelineModel.Track();
+      track.asyncEvents = nestableAsyncEvents;
+      track.events = syncEvents;
+      const syncLikeEvents = track.eventsForTreeView();
+      assert.strictEqual(syncLikeEvents.length, nestableAsyncEvents.length + syncEvents.length);
+      const syncLikeEventIds = syncLikeEvents.map(e => e.id);
+      for (const event of [...nestableAsyncEvents, ...syncEvents]) {
+        assert.isTrue(syncLikeEventIds.includes(event.id));
+      }
+    });
+    it('returns sync events only if the async event cannot be organized in a tree structure', () => {
+      const track = new TimelineModel.TimelineModel.Track();
+      track.asyncEvents = nonNestableAsyncEvents;
+      track.events = syncEvents;
+      const syncLikeEvents = track.eventsForTreeView();
+      assert.strictEqual(syncLikeEvents.length, syncEvents.length);
+      const syncLikeEventIds = syncLikeEvents.map(e => e.id);
+      for (const event of [...syncEvents]) {
+        assert.isTrue(syncLikeEventIds.includes(event.id));
+      }
     });
   });
 
@@ -1038,6 +1201,100 @@ describeWithEnvironment('TimelineModel', () => {
     ]);
   });
 
+  it('includes utility process main thread w/M11+ name, too', () => {
+    const {timelineModel} = traceWithEvents([
+      {
+        'args': {
+          'data': {
+            'host': '192.168.0.105',
+            'pid': 1538739,
+            'target': 'a1e485ff-f876-41cb-90ca-85c4b684b302',
+            'type': 'bidder',
+          },
+        },
+        'cat': 'disabled-by-default-devtools.timeline',
+        'name': 'AuctionWorkletRunningInProcess',
+        'ph': 'I',
+        'pid': 1537480,
+        's': 't',
+        'tid': 1537480,
+        'ts': 962633184323,
+        'tts': 23961306,
+      },
+      {
+        'args': {'name': 'AuctionV8HelperThread'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 7,
+        'ts': 0,
+      },
+      {
+        'args': {'name': 'auction_worklet.CrUtilityMain'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 1,
+        'ts': 0,
+      },
+    ] as unknown as SDK.TracingManager.EventPayload[]);
+    const trackInfo = summarizeArray(timelineModel.tracks());
+    assert.deepEqual(trackInfo, [
+      {
+        forMainFrame: false,
+        name: 'Thread 0',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 0,
+        threadName: '',
+        type: 'Other',
+        url: '',
+      },
+      {
+        forMainFrame: true,
+        name: 'CrRendererMain',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 1,
+        threadName: 'CrRendererMain',
+        type: 'MainThread',
+        url: 'https://192.168.0.105/run.html',
+      },
+      {
+        forMainFrame: false,
+        name: 'Auction Worklet Service — https://192.168.0.105',
+        processId: 1538739,
+        processName: 'Service: auction_worklet.mojom.AuctionWorkletService',
+        threadId: 1,
+        threadName: 'auction_worklet.CrUtilityMain',
+        type: 'Other',
+        url: 'https://192.168.0.105',
+      },
+      {
+        forMainFrame: false,
+        name: 'Bidder Worklet — https://192.168.0.105',
+        processId: 1538739,
+        processName: 'Service: auction_worklet.mojom.AuctionWorkletService',
+        threadId: 7,
+        threadName: 'AuctionV8HelperThread',
+        type: 'Other',
+        url: 'https://192.168.0.105',
+      },
+      {
+        forMainFrame: false,
+        name: '',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 1,
+        threadName: 'CrRendererMain',
+        type: 'Experience',
+        url: '',
+      },
+    ]);
+  });
+
   it('handles auction worklet exit events', () => {
     const {timelineModel} = traceWithEvents([
       {
@@ -1307,13 +1564,29 @@ describeWithEnvironment('TimelineModel', () => {
         if (track.type !== TimelineModel.TimelineModel.TrackType.Timings) {
           continue;
         }
-        for (const event of track.syncEvents()) {
+        for (const event of track.eventsForTreeView()) {
+          if (event.phase !== TraceEngine.Types.TraceEvents.Phase.MARK) {
+            continue;
+          }
           userTimingPerformanceMarkNames.push(event.name);
         }
       }
       assert.deepEqual(
           userTimingPerformanceMarkNames,
-          ['nested-a', 'nested-b', 'nested-c', 'nested-d', 'durationTimeTotal', 'durationTime1', 'durationTime2'],
+          [
+            'nested-a-start',
+            'nested-b-start',
+            'nested-b-end',
+            'nested-c-start',
+            'nested-d-start',
+            'nested-d-end',
+            'nested-c-end',
+            'nested-a-end',
+            'startTime1',
+            'endTime1',
+            'startTime2',
+            'endTime2',
+          ],
       );
     });
 
@@ -1546,5 +1819,67 @@ describe('groupLayoutShiftsIntoClusters', () => {
 
     assert.strictEqual(shiftThree.args.data._current_cluster_id, 2);
     assert.strictEqual(shiftThree.args.data._current_cluster_score, 0.05);
+  });
+});
+
+describeWithEnvironment('TimelineData', () => {
+  function getAllTracingModelPayloadEvents(tracingModel: SDK.TracingModel.TracingModel):
+      SDK.TracingModel.PayloadEvent[] {
+    const allSDKEvents = tracingModel.sortedProcesses().flatMap(process => {
+      return process.sortedThreads().flatMap(thread => thread.events().filter(SDK.TracingModel.eventHasPayload));
+    });
+    allSDKEvents.sort((eventA, eventB) => {
+      if (eventA.startTime > eventB.startTime) {
+        return 1;
+      }
+      if (eventB.startTime > eventA.startTime) {
+        return -1;
+      }
+      return 0;
+    });
+    return allSDKEvents;
+  }
+
+  it('stores data for an SDK.TracingModel.PayloadEvent using the raw payload as the key', async () => {
+    const data = await allModelsFromFile('web-dev.json.gz');
+    const allSDKEvents = getAllTracingModelPayloadEvents(data.tracingModel);
+    // The exact event we use is not important, so let's use the first LCP event.
+    const lcpSDKEvent =
+        allSDKEvents.find(event => event.name === TimelineModel.TimelineModel.RecordType.MarkLCPCandidate);
+    if (!lcpSDKEvent) {
+      throw new Error('Could not find SDK Event.');
+    }
+    const dataForEvent = TimelineModel.TimelineModel.TimelineData.forEvent(lcpSDKEvent);
+    dataForEvent.backendNodeIds.push(123 as Protocol.DOM.BackendNodeId);
+
+    // Now find the same event from the new engine
+    const lcpNewEngineEvent = data.traceParsedData.PageLoadMetrics.allMarkerEvents.find(event => {
+      return TraceEngine.Types.TraceEvents.isTraceEventLargestContentfulPaintCandidate(event);
+    });
+    if (!lcpNewEngineEvent) {
+      throw new Error('Could not find LCP New engine event.');
+    }
+    // Make sure we got the matching events.
+    assert.strictEqual(lcpNewEngineEvent, lcpSDKEvent.rawPayload());
+
+    assert.strictEqual(
+        TimelineModel.TimelineModel.TimelineData.forEvent(lcpSDKEvent).backendNodeIds,
+        TimelineModel.TimelineModel.TimelineData.forTraceEventData(lcpNewEngineEvent).backendNodeIds,
+    );
+  });
+
+  it('stores data for a constructed event using the event as the key', async () => {
+    const thread = StubbedThread.make(1);
+    // None of the details here matter, we just need some constructed event.
+    const fakeConstructedEvent = new SDK.TracingModel.ConstructedEvent(
+        'blink.user_timing',
+        'some-test-event',
+        TraceEngine.Types.TraceEvents.Phase.INSTANT,
+        100,
+        thread,
+    );
+    const dataForEvent = TimelineModel.TimelineModel.TimelineData.forEvent(fakeConstructedEvent);
+    dataForEvent.backendNodeIds.push(123 as Protocol.DOM.BackendNodeId);
+    assert.strictEqual(dataForEvent, TimelineModel.TimelineModel.TimelineData.forEvent(fakeConstructedEvent));
   });
 });

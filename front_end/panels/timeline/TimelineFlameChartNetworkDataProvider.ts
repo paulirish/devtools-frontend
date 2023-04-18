@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 
@@ -17,7 +16,7 @@ import * as Protocol from '../../generated/protocol.js';
 
 import {type PerformanceModel} from './PerformanceModel.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
-import {TimelineSelection} from './TimelinePanel.js';
+import {SelectionType, TimelineSelection} from './TimelineSelection.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
@@ -57,7 +56,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
   private lastSelection?: Selection;
   private priorityToValue?: Map<string, number>;
   constructor() {
-    this.font = '11px ' + Host.Platform.fontFamily();
+    this.font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
     this.setModel(null);
     this.style = {
       padding: 4,
@@ -145,7 +144,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
       return this.lastSelection.entryIndex;
     }
 
-    if (selection.type() !== TimelineSelection.Type.NetworkRequest) {
+    if (selection.type() !== SelectionType.NetworkRequest) {
       return -1;
     }
     const request = (selection.object() as TimelineModel.TimelineModel.NetworkRequest);

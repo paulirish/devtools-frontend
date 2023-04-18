@@ -9,6 +9,7 @@ import * as Root from '../../../../front_end/core/root/root.js';
 import * as SDK from '../../../../front_end/core/sdk/sdk.js';
 import type * as Protocol from '../../../../front_end/generated/protocol.js';
 import * as Bindings from '../../../../front_end/models/bindings/bindings.js';
+import * as Logs from '../../../../front_end/models/logs/logs.js';
 import * as Persistence from '../../../../front_end/models/persistence/persistence.js';
 import * as Workspace from '../../../../front_end/models/workspace/workspace.js';
 import * as IssuesManager from '../../../../front_end/models/issues_manager/issues_manager.js';
@@ -30,13 +31,15 @@ function initializeTargetManagerIfNecessary(): SDK.TargetManager.TargetManager {
 
 let uniqueTargetId = 0;
 
-export function createTarget({id, name, type = SDK.Target.Type.Frame, parentTarget, subtype}: {
-  id?: Protocol.Target.TargetID,
-  name?: string,
-  type?: SDK.Target.Type,
-  parentTarget?: SDK.Target.Target,
-  subtype?: string,
-} = {}) {
+export function createTarget(
+    {id, name, type = SDK.Target.Type.Frame, parentTarget, subtype, url = 'http://example.com'}: {
+      id?: Protocol.Target.TargetID,
+      name?: string,
+      type?: SDK.Target.Type,
+      parentTarget?: SDK.Target.Target,
+      subtype?: string,
+      url?: string,
+    } = {}) {
   if (!id) {
     if (!uniqueTargetId++) {
       id = 'test' as Protocol.Target.TargetID;
@@ -48,7 +51,7 @@ export function createTarget({id, name, type = SDK.Target.Type.Frame, parentTarg
   return targetManager.createTarget(
       id, name ?? id, type, parentTarget ? parentTarget : null, /* sessionId=*/ parentTarget ? id : undefined,
       /* suspended=*/ false,
-      /* connection=*/ undefined, {subtype} as Protocol.Target.TargetInfo);
+      /* connection=*/ undefined, {targetId: id, url, subtype} as Protocol.Target.TargetInfo);
 }
 
 function createSettingValue(
@@ -68,6 +71,7 @@ export function stubNoopSettings() {
       setTitle: () => {},
       title: () => {},
       asRegExp: () => {},
+      type: () => Common.Settings.SettingType.BOOLEAN,
     }),
     moduleSetting: () => ({
       get: () => [],
@@ -78,6 +82,7 @@ export function stubNoopSettings() {
       setTitle: () => {},
       title: () => {},
       asRegExp: () => {},
+      type: () => Common.Settings.SettingType.BOOLEAN,
     }),
   } as unknown as Common.Settings.Settings);
 }
@@ -96,11 +101,10 @@ const REGISTERED_EXPERIMENTS = [
   'ignoreListJSFramesOnTimeline',
   'instrumentationBreakpoints',
   'cssTypeComponentLength',
-  'recordCoverageWithPerformanceTracing',
   'timelineEventInitiators',
-  'inputEventsOnTimelineOverview',
   'timelineAsConsoleProfileResultPanel',
   'headerOverrides',
+  'highlightErrorsElementsPanel',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -216,6 +220,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.CONSOLE, 'consoleHistoryAutocomplete', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
+        Common.Settings.SettingCategory.CONSOLE, 'consoleAutocompleteOnEnter', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'preserveConsoleLog', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'consoleEagerEval', false, Common.Settings.SettingType.BOOLEAN),
@@ -269,11 +276,12 @@ export async function deinitializeGlobalVars() {
   }
   // Remove instances.
   await deinitializeGlobalLocaleVars();
+  Logs.NetworkLog.NetworkLog.removeInstance();
   SDK.TargetManager.TargetManager.removeInstance();
-  SDK.ConsoleModel.ConsoleModel.removeInstance();
   targetManager = null;
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
+  Common.Console.Console.removeInstance();
   Workspace.Workspace.WorkspaceImpl.removeInstance();
   Bindings.IgnoreListManager.IgnoreListManager.removeInstance();
   Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.removeInstance();

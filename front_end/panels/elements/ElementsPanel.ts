@@ -45,8 +45,10 @@ import elementsPanelStyles from './elementsPanel.css.js';
 import type * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
 
 import {AccessibilityTreeView} from './AccessibilityTreeView.js';
+import {type AXTreeNodeData} from './AccessibilityTreeUtils.js';
 import * as ElementsComponents from './components/components.js';
 import {ComputedStyleWidget} from './ComputedStyleWidget.js';
 
@@ -258,7 +260,8 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
 
     crumbsContainer.id = 'elements-crumbs';
     if (this.domTreeButton) {
-      this.accessibilityTreeView = new AccessibilityTreeView(this.domTreeButton);
+      this.accessibilityTreeView =
+          new AccessibilityTreeView(this.domTreeButton, new TreeOutline.TreeOutline.TreeOutline<AXTreeNodeData>());
     }
     this.breadcrumbs = new ElementsComponents.ElementsBreadcrumbs.ElementsBreadcrumbs();
     this.breadcrumbs.addEventListener('breadcrumbsnodeselected', event => {
@@ -277,14 +280,12 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     this.updateSidebarPosition();
 
     this.cssStyleTrackerByCSSModel = new Map();
-    SDK.TargetManager.TargetManager.instance().observeModels(SDK.DOMModel.DOMModel, this);
+    SDK.TargetManager.TargetManager.instance().observeModels(SDK.DOMModel.DOMModel, this, {scoped: true});
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.NameChanged, event => this.targetNameChanged(event.data));
     Common.Settings.Settings.instance()
         .moduleSetting('showUAShadowDOM')
         .addChangeListener(this.showUAShadowDOMChanged.bind(this));
-    SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DOMModel.DOMModel, SDK.DOMModel.Events.DocumentUpdated, this.documentUpdatedEvent, this);
     Extensions.ExtensionServer.ExtensionServer.instance().addEventListener(
         Extensions.ExtensionServer.Events.SidebarPaneAdded, this.extensionSidebarPaneAdded, this);
     this.currentSearchResultIndex = -1;  // -1 represents the initial invalid state
@@ -365,7 +366,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
       treeOutline.setWordWrap(Common.Settings.Settings.instance().moduleSetting('domWordWrap').get());
       treeOutline.addEventListener(ElementsTreeOutline.Events.SelectedNodeChanged, this.selectedNodeChanged, this);
       treeOutline.addEventListener(ElementsTreeOutline.Events.ElementsTreeUpdated, this.updateBreadcrumbIfNeeded, this);
-      new ElementsTreeElementHighlighter(treeOutline);
+      new ElementsTreeElementHighlighter(treeOutline, new Common.Throttler.Throttler(100));
       this.treeOutlines.add(treeOutline);
     }
     treeOutline.wireToDOMModel(domModel);
@@ -379,9 +380,11 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     if (this.domTreeContainer.hasFocus()) {
       treeOutline.focus();
     }
+    domModel.addEventListener(SDK.DOMModel.Events.DocumentUpdated, this.documentUpdatedEvent, this);
   }
 
   modelRemoved(domModel: SDK.DOMModel.DOMModel): void {
+    domModel.removeEventListener(SDK.DOMModel.Events.DocumentUpdated, this.documentUpdatedEvent, this);
     const treeOutline = ElementsTreeOutline.forDOMModel(domModel);
     if (!treeOutline) {
       return;
@@ -446,7 +449,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
       }
     }
 
-    const domModels = SDK.TargetManager.TargetManager.instance().models(SDK.DOMModel.DOMModel);
+    const domModels = SDK.TargetManager.TargetManager.instance().models(SDK.DOMModel.DOMModel, {scoped: true});
     for (const domModel of domModels) {
       if (domModel.parentModel()) {
         continue;
@@ -649,7 +652,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     this.searchConfig = searchConfig;
 
     const showUAShadowDOM = Common.Settings.Settings.instance().moduleSetting('showUAShadowDOM').get();
-    const domModels = SDK.TargetManager.TargetManager.instance().models(SDK.DOMModel.DOMModel);
+    const domModels = SDK.TargetManager.TargetManager.instance().models(SDK.DOMModel.DOMModel, {scoped: true});
     const promises = domModels.map(domModel => domModel.performSearch(whitespaceTrimmedQuery, showUAShadowDOM));
     void Promise.all(promises).then(resultCounts => {
       this.searchResults = [];

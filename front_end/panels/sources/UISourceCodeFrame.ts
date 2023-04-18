@@ -79,7 +79,7 @@ export class UISourceCodeFrame extends
   private readonly errorPopoverHelper: UI.PopoverHelper.PopoverHelper;
 
   constructor(uiSourceCode: Workspace.UISourceCode.UISourceCode) {
-    super(workingCopy);
+    super(() => this.workingCopy());
     this.uiSourceCodeInternal = uiSourceCode;
 
     this.muteSourceCodeEvents = false;
@@ -102,13 +102,13 @@ export class UISourceCodeFrame extends
     this.errorPopoverHelper.setTimeout(100, 100);
 
     this.initializeUISourceCode();
+  }
 
-    async function workingCopy(): Promise<TextUtils.ContentProvider.DeferredContent> {
-      if (uiSourceCode.isDirty()) {
-        return {content: uiSourceCode.workingCopy(), isEncoded: false};
-      }
-      return uiSourceCode.requestContent();
+  private async workingCopy(): Promise<TextUtils.ContentProvider.DeferredContent> {
+    if (this.uiSourceCodeInternal.isDirty()) {
+      return {content: this.uiSourceCodeInternal.workingCopy(), isEncoded: false};
     }
+    return this.uiSourceCodeInternal.requestContent();
   }
 
   protected editorConfiguration(doc: string): CodeMirror.Extension {
@@ -163,14 +163,14 @@ export class UISourceCodeFrame extends
   setUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
     const loaded = uiSourceCode.contentLoaded() ? Promise.resolve() : uiSourceCode.requestContent();
     const startUISourceCode = this.uiSourceCodeInternal;
-    loaded.then(() => {
+    loaded.then(async () => {
       if (this.uiSourceCodeInternal !== startUISourceCode) {
         return;
       }
       this.unloadUISourceCode();
       this.uiSourceCodeInternal = uiSourceCode;
       if (uiSourceCode.workingCopy() !== this.textEditor.state.doc.toString()) {
-        void this.setContent(uiSourceCode.workingCopy());
+        await this.setDeferredContent(Promise.resolve(uiSourceCode.workingCopyContent()));
       } else {
         this.reloadPlugins();
       }
@@ -199,17 +199,12 @@ export class UISourceCodeFrame extends
         this.uiSourceCodeInternal, this.boundOnBindingChanged);
     this.installMessageAndDecorationListeners();
     this.updateStyle();
-    if (Root.Runtime.experiments.isEnabled('sourcesPrettyPrint')) {
-      // TODO(crbug.com/1382752): We need to find a better way to design the in-place
-      // vs pretty-print formatting layering. For now this is basically the inverse of
-      // the condition for in-place formatting.
-      const uiSourceCode = this.uiSourceCodeInternal;
-      const canPrettyPrint = FormatterActions.FORMATTABLE_MEDIA_TYPES.includes(this.contentType) &&
-          !uiSourceCode.project().canSetFileContent() &&
-          Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode) === null;
-      const autoPrettyPrint = !uiSourceCode.contentType().isFromSourceMap();
-      this.setCanPrettyPrint(canPrettyPrint, autoPrettyPrint);
-    }
+    const canPrettyPrint = FormatterActions.FORMATTABLE_MEDIA_TYPES.includes(this.contentType) &&
+        !this.uiSourceCodeInternal.project().canSetFileContent() &&
+        Persistence.Persistence.PersistenceImpl.instance().binding(this.uiSourceCodeInternal) === null;
+    const autoPrettyPrint = Root.Runtime.experiments.isEnabled('sourcesPrettyPrint') &&
+        !this.uiSourceCodeInternal.contentType().isFromSourceMap();
+    this.setCanPrettyPrint(canPrettyPrint, autoPrettyPrint);
   }
 
   wasShown(): void {
@@ -319,12 +314,12 @@ export class UISourceCodeFrame extends
     if (this.muteSourceCodeEvents) {
       return;
     }
-    this.maybeSetContent(this.uiSourceCodeInternal.workingCopy());
+    this.maybeSetContent(this.uiSourceCodeInternal.workingCopyContent());
   }
 
   private onWorkingCopyCommitted(): void {
     if (!this.muteSourceCodeEvents) {
-      this.maybeSetContent(this.uiSourceCode().workingCopy());
+      this.maybeSetContent(this.uiSourceCode().workingCopyContent());
     }
     this.contentCommitted();
     this.updateStyle();
@@ -386,9 +381,9 @@ export class UISourceCodeFrame extends
     this.setEditable(this.canEditSourceInternal());
   }
 
-  private maybeSetContent(content: string): void {
-    if (this.textEditor.state.doc.toString() !== content) {
-      void this.setContent(content);
+  private maybeSetContent(content: TextUtils.ContentProvider.DeferredContent): void {
+    if (this.textEditor.state.doc.toString() !== content.content) {
+      void this.setDeferredContent(Promise.resolve(content));
     }
   }
 
@@ -514,15 +509,15 @@ export class UISourceCodeFrame extends
 
 function getIconDataForLevel(level: Workspace.UISourceCode.Message.Level): IconButton.Icon.IconData {
   if (level === Workspace.UISourceCode.Message.Level.Error) {
-    return {color: '', width: '12px', height: '12px', iconName: 'error_icon'};
+    return {color: 'var(--icon-error)', width: '16px', height: '14px', iconName: 'cross-circle-filled'};
   }
   if (level === Workspace.UISourceCode.Message.Level.Warning) {
-    return {color: '', width: '12px', height: '12px', iconName: 'warning_icon'};
+    return {color: 'var(--icon-warning)', width: '18px', height: '14px', iconName: 'warning-filled'};
   }
   if (level === Workspace.UISourceCode.Message.Level.Issue) {
-    return {color: 'var(--issue-color-yellow)', width: '12px', height: '12px', iconName: 'issue-exclamation-icon'};
+    return {color: 'var(--icon-warning)', width: '17px', height: '14px', iconName: 'issue-exclamation-filled'};
   }
-  return {color: '', width: '12px', height: '12px', iconName: 'error_icon'};
+  return {color: 'var(--icon-error)', width: '16px', height: '14px', iconName: 'cross-circle-filled'};
 }
 
 function getBubbleTypePerLevel(level: Workspace.UISourceCode.Message.Level): string {
@@ -761,6 +756,9 @@ function countDuplicates(messages: RowMessage[]): number[] {
 function renderMessage(message: RowMessage, count: number): HTMLElement {
   const element = document.createElement('div');
   element.classList.add('text-editor-row-message');
+  element.style.display = 'flex';
+  element.style.alignItems = 'center';
+  element.style.gap = '4px';
 
   if (count === 1) {
     const icon = element.appendChild(new IconButton.Icon.Icon());
@@ -772,6 +770,7 @@ function renderMessage(message: RowMessage, count: number): HTMLElement {
         document.createElement('span', {is: 'dt-small-bubble'}) as UI.UIUtils.DevToolsSmallBubble;
     repeatCountElement.textContent = String(count);
     repeatCountElement.classList.add('text-editor-row-message-repeat-count');
+    repeatCountElement.style.flexShrink = '0';
     element.appendChild(repeatCountElement);
     repeatCountElement.type = getBubbleTypePerLevel(message.level());
   }
@@ -801,6 +800,11 @@ const rowMessageTheme = CodeMirror.EditorView.baseTheme({
       verticalAlign: 'text-bottom',
       marginLeft: '2px',
     },
+  },
+
+  '.cm-messageIcon-issue, .cm-messageIcon-error': {
+    marginTop: '-1px',
+    marginBottom: '-1px',
   },
 });
 

@@ -25,9 +25,8 @@ describe('Flexbox Editor', async function() {
     await waitForCSSPropertyValue('#target', 'display', 'flex');
   });
 
-  // Flaky test
-  it.skipOnPlatforms(
-      ['win32', 'linux'], '[crbug.com/1340492] can be opened and flexbox styles can be edited', async () => {
+  it(
+      'can be opened and flexbox styles can be edited', async () => {
         await clickStylePropertyEditorButton('Open flexbox editor', 'devtools-flexbox-editor');
 
         // Clicking once sets the value.
@@ -43,11 +42,9 @@ describe('Flexbox Editor', async function() {
         assert.isUndefined(property);
       });
 
-  // Flaky on Windows and Linux bots
-  it.skipOnPlatforms(
-      ['win32', 'linux'], '[crbug.com/1342534] can be opened for flexbox styles with !important', async () => {
-        await editCSSProperty('#target', 'display', 'flex !important');
-        await waitForCSSPropertyValue('#target', 'display', 'flex !important');
-        await clickStylePropertyEditorButton('Open flexbox editor', 'devtools-flexbox-editor');
-      });
+  it('can be opened for flexbox styles with !important', async () => {
+    await editCSSProperty('#target', 'display', 'flex !important');
+    await waitForCSSPropertyValue('#target', 'display', 'flex !important');
+    await clickStylePropertyEditorButton('Open flexbox editor', 'devtools-flexbox-editor');
+  });
 });

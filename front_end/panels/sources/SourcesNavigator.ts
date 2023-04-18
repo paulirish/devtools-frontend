@@ -136,7 +136,7 @@ export class NetworkNavigatorView extends NavigatorView {
   }
 
   private inspectedURLChanged(event: Common.EventTarget.EventTargetEvent<SDK.Target.Target>): void {
-    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().scopeTarget();
     if (event.data !== mainTarget) {
       return;
     }
@@ -152,7 +152,7 @@ export class NetworkNavigatorView extends NavigatorView {
   }
 
   uiSourceCodeAdded(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
-    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().scopeTarget();
     const inspectedURL = mainTarget && mainTarget.inspectedURL();
     if (!inspectedURL) {
       return;
@@ -269,7 +269,7 @@ export class OverridesNavigatorView extends NavigatorView {
       this.toolbar.appendToolbarItem(enableCheckbox);
 
       this.toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator(true));
-      const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearConfiguration), 'largeicon-clear');
+      const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearConfiguration), 'clear');
       clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
         project.remove();
       });
@@ -277,7 +277,7 @@ export class OverridesNavigatorView extends NavigatorView {
       return;
     }
     const title = i18nString(UIStrings.selectFolderForOverrides);
-    const setupButton = new UI.Toolbar.ToolbarButton(title, 'largeicon-add', title);
+    const setupButton = new UI.Toolbar.ToolbarButton(title, 'plus', title);
     setupButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       void this.setupNewWorkspace();
     }, this);
@@ -342,8 +342,8 @@ export class SnippetsNavigatorView extends NavigatorView {
   `);
 
     const toolbar = new UI.Toolbar.Toolbar('navigator-toolbar');
-    const newButton = new UI.Toolbar.ToolbarButton(
-        i18nString(UIStrings.newSnippet), 'largeicon-add', i18nString(UIStrings.newSnippet));
+    const newButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.newSnippet), 'plus', i18nString(UIStrings.newSnippet));
     newButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       void this.create(
           Snippets.ScriptSnippetFileSystem.findSnippetsProject(), '' as Platform.DevToolsPath.EncodedPathString);

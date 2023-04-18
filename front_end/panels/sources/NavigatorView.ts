@@ -187,9 +187,6 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private groupByFolder?: any;
-
-  #throttler: Throttle;
-
   constructor(enableAuthoredGrouping?: boolean) {
     super(true);
 
@@ -208,14 +205,6 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     this.rootNode.populate();
 
     this.frameNodes = new Map();
-
-    const throttleTimeout = 500;
-    const forceFlushTaskCount = 250;
-    const forceFlushUpToSourceCodeCount = 10;
-    this.#throttler = makeThrottler(
-        throttleTimeout,
-        pending =>
-            pending.length >= forceFlushTaskCount || this.uiSourceCodeNodes.size < forceFlushUpToSourceCodeCount);
 
     this.contentElement.addEventListener('contextmenu', this.handleContextMenu.bind(this), false);
     UI.ShortcutRegistry.ShortcutRegistry.instance().addShortcutListener(
@@ -511,7 +500,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
     const folderNode =
         this.folderNode(uiSourceCode, project, target, frame, uiSourceCode.origin(), path, isFromSourceMap);
-    const uiSourceCodeNode = new NavigatorUISourceCodeTreeNode(this, uiSourceCode, frame, this.#throttler);
+    const uiSourceCodeNode = new NavigatorUISourceCodeTreeNode(this, uiSourceCode, frame);
     const existingNode = folderNode.child(uiSourceCodeNode.id);
     if (existingNode && existingNode instanceof NavigatorUISourceCodeTreeNode) {
       this.uiSourceCodeNodes.set(uiSourceCode, existingNode);
@@ -745,7 +734,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     }
 
     const rootOrDeployed = this.rootOrDeployedNode();
-    if (target === SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
+    if (target === SDK.TargetManager.TargetManager.instance().scopeTarget()) {
       return rootOrDeployed;
     }
 
@@ -1186,31 +1175,24 @@ export class NavigatorFolderTreeElement extends UI.TreeOutline.TreeElement {
     this.navigatorView = navigatorView;
     this.hoverCallback = hoverCallback;
 
-    let iconType = 'largeicon-navigator-folder';
-    let legacyIcon = true;
+    let iconType = 'folder';
 
     if (type === Types.Domain) {
-      iconType = 'largeicon-navigator-domain';
+      iconType = 'cloud';
     } else if (type === Types.Frame) {
-      iconType = 'largeicon-navigator-frame';
+      iconType = 'frame';
     } else if (type === Types.Worker) {
-      iconType = 'largeicon-navigator-worker';
+      iconType = 'gears';
     } else if (type === Types.Authored) {
-      iconType = 'ic_sources_authored';
-      legacyIcon = false;
+      iconType = 'code';
     } else if (type === Types.Deployed) {
-      iconType = 'ic_sources_deployed';
-      legacyIcon = false;
+      iconType = 'deployed';
     }
 
-    if (legacyIcon) {
-      this.setLeadingIcons([UI.Icon.Icon.create(iconType, 'icon')]);
-    } else {
-      const icon = new IconButton.Icon.Icon();
-      const iconPath = new URL(`../../Images/${iconType}.svg`, import.meta.url).toString();
-      icon.data = {iconPath: iconPath, color: 'var(--override-folder-tree-item-color)', width: '18px'};
-      this.setLeadingIcons([icon]);
-    }
+    const icon = new IconButton.Icon.Icon();
+    const iconPath = new URL(`../../Images/${iconType}.svg`, import.meta.url).toString();
+    icon.data = {iconPath: iconPath, color: 'var(--override-folder-tree-item-color)', width: '20px', height: '20px'};
+    this.setLeadingIcons([icon]);
   }
 
   async onpopulate(): Promise<void> {
@@ -1291,15 +1273,13 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
 
   constructor(
       navigatorView: NavigatorView, uiSourceCode: Workspace.UISourceCode.UISourceCode, title: string,
-      node: NavigatorUISourceCodeTreeNode, throttle: Throttle) {
+      node: NavigatorUISourceCodeTreeNode) {
     super('', false);
     this.nodeType = Types.File;
     this.node = node;
     this.title = title;
     this.listItemElement.classList.add(
         'navigator-' + uiSourceCode.contentType().name() + '-tree-item', 'navigator-file-tree-item');
-    this.#setPendingDisplay();
-    throttle(() => this.#unsetPendingDisplay());
     this.tooltip = uiSourceCode.url();
     UI.ARIAUtils.setAccessibleName(this.listItemElement, `${uiSourceCode.name()}, ${this.nodeType}`);
     Common.EventTarget.fireEvent('source-tree-file-added', uiSourceCode.fullDisplayName());
@@ -1308,53 +1288,39 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
     this.updateIcon();
   }
 
-  #setPendingDisplay(): void {
-    this.listItemElement.classList.add('pending-display');
-  }
-
-  #unsetPendingDisplay(): void {
-    this.listItemElement.classList.remove('pending-display');
-  }
-
   updateIcon(): void {
-    const appendFileSyncIconWithBadge = (iconType: string, badgeIsPurple = true): HTMLSpanElement => {
-      const container = document.createElement('span');
-      container.classList.add('icon-stack');
-      const icon = UI.Icon.Icon.create(iconType, 'icon');
-      const badge = UI.Icon.Icon.create('badge-navigator-file-sync', 'icon-badge');
-      // TODO(allada) This does not play well with dark theme. Add an actual icon and use it.
-      if (badgeIsPurple) {
-        badge.style.filter = 'hue-rotate(160deg)';
-      }
-      container.appendChild(icon);
-      container.appendChild(badge);
-      this.setLeadingIcons([(container as UI.Icon.Icon)]);
-      return container;
-    };
-
     const binding = Persistence.Persistence.PersistenceImpl.instance().binding(this.uiSourceCodeInternal);
+    let iconType = 'document';
+    let iconStyles: string[] = [];
     if (binding) {
-      const iconType = Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(binding.fileSystem) ?
-          'largeicon-navigator-snippet' :
-          'largeicon-navigator-file-sync';
+      if (Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(binding.fileSystem)) {
+        iconType = 'snippet';
+      }
       const badgeIsPurple = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project() ===
           binding.fileSystem.project();
-      const container = appendFileSyncIconWithBadge(iconType, badgeIsPurple);
-      UI.Tooltip.Tooltip.install(
-          container, Persistence.PersistenceUtils.PersistenceUtils.tooltipForUISourceCode(this.uiSourceCodeInternal));
+      iconStyles = badgeIsPurple ? ['sync', 'sync-purple'] : ['sync'];
     } else if (
         this.uiSourceCodeInternal.url().endsWith(Persistence.NetworkPersistenceManager.HEADERS_FILENAME) &&
         Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance()
             .hasMatchingNetworkUISourceCodeForHeaderOverridesFile(this.uiSourceCodeInternal)) {
-      appendFileSyncIconWithBadge('largeicon-navigator-file-sync');
+      iconStyles = ['sync', 'sync-purple'];
     } else {
-      let iconType = 'largeicon-navigator-file';
       if (Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(this.uiSourceCodeInternal)) {
-        iconType = 'largeicon-navigator-snippet';
+        iconType = 'snippet';
       }
-      const defaultIcon = UI.Icon.Icon.create(iconType, 'icon');
-      this.setLeadingIcons([defaultIcon]);
     }
+
+    const icon = new IconButton.Icon.Icon();
+    const iconPath = new URL(`../../Images/${iconType}.svg`, import.meta.url).toString();
+    icon.data = {iconPath: iconPath, color: 'var(--override-file-tree-item-color)', width: '20px', height: '20px'};
+    for (const style of iconStyles) {
+      icon.classList.add(style);
+    }
+    if (binding) {
+      UI.Tooltip.Tooltip.install(
+          icon, Persistence.PersistenceUtils.PersistenceUtils.tooltipForUISourceCode(this.uiSourceCodeInternal));
+    }
+    this.setLeadingIcons([icon]);
   }
 
   updateAccessibleName(): void {
@@ -1572,10 +1538,9 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
   treeElement: NavigatorSourceTreeElement|null;
   private eventListeners: Common.EventTarget.EventDescriptor[];
   private readonly frameInternal: SDK.ResourceTreeModel.ResourceTreeFrame|null;
-
   constructor(
       navigatorView: NavigatorView, uiSourceCode: Workspace.UISourceCode.UISourceCode,
-      frame: SDK.ResourceTreeModel.ResourceTreeFrame|null, private throttler: Throttle) {
+      frame: SDK.ResourceTreeModel.ResourceTreeFrame|null) {
     super(navigatorView, 'UISourceCode:' + uiSourceCode.canononicalScriptId(), Types.File);
     this.uiSourceCodeInternal = uiSourceCode;
     this.treeElement = null;
@@ -1596,8 +1561,7 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
       return this.treeElement;
     }
 
-    this.treeElement =
-        new NavigatorSourceTreeElement(this.navigatorView, this.uiSourceCodeInternal, '', this, this.throttler);
+    this.treeElement = new NavigatorSourceTreeElement(this.navigatorView, this.uiSourceCodeInternal, '', this);
     this.updateTitle();
 
     const updateTitleBound = this.updateTitle.bind(this, undefined);
@@ -1947,39 +1911,4 @@ export class NavigatorGroupTreeNode extends NavigatorTreeNode {
       this.treeElement.title = this.title;
     }
   }
-}
-
-// Export auxiliary types for tests.
-export type ThrottleTask = () => void;
-export type Throttle = (task: ThrottleTask) => void;
-export interface TimeoutControlForTest {
-  setTimeout(callback: () => void, timeout: number): number;
-  clearTimeout(id: number|undefined): void;
-}
-
-// Export for tests.
-export function makeThrottler(
-    duration: number, condition: (pending: ThrottleTask[]) => boolean,
-    timeoutControl: TimeoutControlForTest = window): Throttle {
-  const tasks: ThrottleTask[] = [];
-  let timeout: number|undefined = undefined;
-
-  function flush(): void {
-    const taskCount = tasks.length;
-    tasks.forEach(task => task());
-    // Assert that the task handlers did not add more tasks.
-    console.assert(tasks.length === taskCount);
-    tasks.length = 0;
-    timeoutControl.clearTimeout(timeout);
-    timeout = undefined;
-  }
-
-  return (task: ThrottleTask) => {
-    tasks.push(task);
-    if (condition(tasks)) {
-      flush();
-    } else if (timeout === undefined) {
-      timeout = timeoutControl.setTimeout(flush, duration);
-    }
-  };
 }

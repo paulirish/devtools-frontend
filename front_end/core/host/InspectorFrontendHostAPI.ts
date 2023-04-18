@@ -300,7 +300,7 @@ export interface InspectorFrontendHostAPI {
 }
 
 export interface ContextMenuDescriptor {
-  type: string;
+  type: 'checkbox'|'item'|'separator'|'subMenu';
   id?: number;
   label?: string;
   enabled?: boolean;
@@ -370,6 +370,7 @@ export enum EnumeratedHistogram {
   LinearMemoryInspectorTarget = 'DevTools.LinearMemoryInspector.Target',
   Language = 'DevTools.Language',
   SyncSetting = 'DevTools.SyncSetting',
+  RecordingAssertion = 'DevTools.RecordingAssertion',
   RecordingCodeToggled = 'DevTools.RecordingCodeToggled',
   RecordingCopiedToClipboard = 'DevTools.RecordingCopiedToClipboard',
   RecordingEdited = 'DevTools.RecordingEdited',

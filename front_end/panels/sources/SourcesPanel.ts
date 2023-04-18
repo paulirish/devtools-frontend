@@ -116,14 +116,6 @@ const UIStrings = {
    */
   hideIgnoreListed: 'Hide ignore-listed sources',
   /**
-   *@description Text for pausing the debugger on exceptions
-   */
-  pauseOnExceptions: 'Pause on exceptions',
-  /**
-   *@description Text in Sources Panel of the Sources panel
-   */
-  dontPauseOnExceptions: 'Don\'t pause on exceptions',
-  /**
    *@description Tooltip text that appears when hovering over the largeicon play button in the Sources Panel of the Sources panel
    */
   resumeWithAllPausesBlockedForMs: 'Resume with all pauses blocked for 500 ms',
@@ -301,10 +293,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.updateSidebarPosition();
 
     void this.updateDebuggerButtonsAndStatus();
-    this.pauseOnExceptionEnabledChanged();
-    Common.Settings.Settings.instance()
-        .moduleSetting('pauseOnExceptionEnabled')
-        .addChangeListener(this.pauseOnExceptionEnabledChanged, this);
 
     this.liveLocationPool = new Bindings.LiveLocation.LiveLocationPool();
 
@@ -585,9 +573,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     const previewIcon = new IconButton.Icon.Icon();
     previewIcon.data = {
-      iconName: 'ic_preview_feature',
-      color: 'var(--icon-color)',
-      width: '14px',
+      iconName: 'experiment',
+      color: 'var(--icon-default)',
+      width: '16px',
     };
     menuSection.appendCheckboxItem(
         menuItem, toggleExperiment, Root.Runtime.experiments.isEnabled(experiment), false, previewIcon);
@@ -650,16 +638,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
             callFrame.location(), this.executionLineChanged.bind(this), this.liveLocationPool);
   }
 
-  private pauseOnExceptionEnabledChanged(): void {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW)) {
-      const enabled = Common.Settings.Settings.instance().moduleSetting('pauseOnExceptionEnabled').get();
-      const button = (this.pauseOnExceptionButton as UI.Toolbar.ToolbarToggle);
-      button.setToggled(enabled);
-      button.setTitle(enabled ? i18nString(UIStrings.dontPauseOnExceptions) : i18nString(UIStrings.pauseOnExceptions));
-      this.debugToolbarDrawer.classList.toggle('expanded', enabled);
-    }
-  }
-
   private async updateDebuggerButtonsAndStatus(): Promise<void> {
     const currentTarget = UI.Context.Context.instance().flavor(SDK.Target.Target);
     const currentDebuggerModel = currentTarget ? currentTarget.model(SDK.DebuggerModel.DebuggerModel) : null;
@@ -719,14 +697,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
         break;
       }
     }
-  }
-
-  private togglePauseOnExceptions(): void {
-    Common.Settings.Settings.instance()
-        .moduleSetting('pauseOnExceptionEnabled')
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-        // @ts-expect-error
-        .set(!(this.pauseOnExceptionButton).toggled());
   }
 
   runSnippet(): void {
@@ -857,10 +827,10 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const debugToolbar = new UI.Toolbar.Toolbar('scripts-debug-toolbar');
 
     const longResumeButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'largeicon-play');
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'play');
     longResumeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.longResume, this);
-    const terminateExecutionButton = new UI.Toolbar.ToolbarButton(
-        i18nString(UIStrings.terminateCurrentJavascriptCall), 'largeicon-terminate-execution');
+    const terminateExecutionButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.terminateCurrentJavascriptCall), 'stop');
     terminateExecutionButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.terminateExecution, this);
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createLongPressActionButton(
         this.togglePauseAction, [terminateExecutionButton, longResumeButton], []));
@@ -872,13 +842,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     debugToolbar.appendSeparator();
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.toggleBreakpointsActiveAction));
-
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW)) {
-      this.pauseOnExceptionButton = new UI.Toolbar.ToolbarToggle('', 'largeicon-pause-on-exceptions');
-      this.pauseOnExceptionButton.addEventListener(
-          UI.Toolbar.ToolbarButton.Events.Click, this.togglePauseOnExceptions, this);
-      debugToolbar.appendToolbarItem(this.pauseOnExceptionButton);
-    }
 
     return debugToolbar;
   }
@@ -985,7 +948,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     contextMenu.debugSection().appendItem(
         i18nString(UIStrings.storeSAsGlobalVariable, {PH1: String(copyContextMenuTitle)}),
-        () => SDK.ConsoleModel.ConsoleModel.instance().saveToTempVariable(executionContext, remoteObject));
+        () => executionContext?.target()
+                  .model(SDK.ConsoleModel.ConsoleModel)
+                  ?.saveToTempVariable(executionContext, remoteObject));
 
     const ctxMenuClipboardSection = contextMenu.clipboardSection();
     const inspectorFrontendHost = Host.InspectorFrontendHost.InspectorFrontendHostInstance;
@@ -1417,11 +1382,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
           const {state: editorState} = frame.textEditor;
           let text = editorState.sliceDoc(editorState.selection.main.from, editorState.selection.main.to);
           const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
-          if (executionContext) {
-            const message = SDK.ConsoleModel.ConsoleModel.instance().addCommandMessage(executionContext, text);
+          const consoleModel = executionContext?.target().model(SDK.ConsoleModel.ConsoleModel);
+          if (executionContext && consoleModel) {
+            const message = consoleModel.addCommandMessage(executionContext, text);
             text = ObjectUI.JavaScriptREPL.JavaScriptREPL.wrapObjectLiteral(text);
-            void SDK.ConsoleModel.ConsoleModel.instance().evaluateCommandInConsole(
-                executionContext, message, text, /* useCommandLineAPI */ true);
+            void consoleModel.evaluateCommandInConsole(executionContext, message, text, /* useCommandLineAPI */ true);
           }
         }
         return true;

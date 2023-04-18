@@ -31,6 +31,7 @@
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {AnchorBehavior, GlassPane, MarginBehavior, PointerEventsBehavior, SizeBehavior} from './GlassPane.js';
@@ -215,7 +216,9 @@ export class SoftContextMenu {
     menuItemElement.classList.add('soft-context-menu-item');
     menuItemElement.tabIndex = -1;
     ARIAUtils.markAsMenuItem(menuItemElement);
-    const checkMarkElement = Icon.create('smallicon-checkmark', 'checkmark');
+    const checkMarkElement = new IconButton.Icon.Icon();
+    checkMarkElement.data = {iconName: 'checkmark', color: 'var(--icon-default)', width: '14px', height: '14px'};
+    checkMarkElement.classList.add('checkmark');
     menuItemElement.appendChild(checkMarkElement);
     if (!item.checked) {
       checkMarkElement.style.opacity = '0';
@@ -294,8 +297,9 @@ export class SoftContextMenu {
     });
 
     // Occupy the same space on the left in all items.
-    const checkMarkElement = Icon.create('smallicon-checkmark', 'soft-context-menu-item-checkmark');
-    checkMarkElement.classList.add('checkmark');
+    const checkMarkElement = new IconButton.Icon.Icon();
+    checkMarkElement.data = {iconName: 'checkmark', color: 'var(--icon-default)', width: '14px', height: '14px'};
+    checkMarkElement.classList.add('checkmark', 'soft-context-menu-item-checkmark');
     menuItemElement.appendChild(checkMarkElement);
     checkMarkElement.style.opacity = '0';
 
@@ -308,7 +312,7 @@ export class SoftContextMenu {
       ARIAUtils.markAsHidden(subMenuArrowElement);
       subMenuArrowElement.textContent = '\u25B6';  // BLACK RIGHT-POINTING TRIANGLE
     } else {
-      const subMenuArrowElement = Icon.create('smallicon-triangle-right', 'soft-context-menu-item-submenu-arrow');
+      const subMenuArrowElement = Icon.create('triangle-right', 'soft-context-menu-item-submenu-arrow');
       menuItemElement.appendChild(subMenuArrowElement);
     }
 
@@ -582,7 +586,7 @@ export class SoftContextMenu {
   }
 }
 export interface SoftContextMenuDescriptor {
-  type: string;
+  type: 'checkbox'|'item'|'separator'|'subMenu';
   id?: number;
   label?: string;
   enabled?: boolean;

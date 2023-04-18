@@ -11,7 +11,9 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 import {Category, IsLong} from './TimelineFilters.js';
 
-import {TimelineSelection, type TimelineModeViewDelegate} from './TimelinePanel.js';
+import {type TimelineModeViewDelegate} from './TimelinePanel.js';
+
+import {SelectionType, type TimelineSelection} from './TimelineSelection.js';
 import {TimelineTreeView} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
@@ -60,7 +62,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
 
   updateContents(selection: TimelineSelection): void {
     super.updateContents(selection);
-    if (selection.type() === TimelineSelection.Type.TraceEvent) {
+    if (selection.type() === SelectionType.SDKTraceEvent) {
       const event = (selection.object() as SDK.TracingModel.Event);
       this.selectEvent(event, true);
     }
@@ -142,7 +144,8 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     if (!model) {
       return false;
     }
-    void TimelineUIUtils.buildTraceEventDetails(traceEvent, model.timelineModel(), this.linkifier, false)
+    void TimelineUIUtils
+        .buildTraceEventDetails(traceEvent, model.timelineModel(), this.linkifier, false, this.traceParseData())
         .then(fragment => this.detailsView.element.appendChild(fragment));
     return true;
   }

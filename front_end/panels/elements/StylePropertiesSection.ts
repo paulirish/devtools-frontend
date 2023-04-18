@@ -201,7 +201,6 @@ export class StylePropertiesSection {
     this.selectorElement.textContent = this.headerText();
     selectorContainer.appendChild(this.selectorElement);
     this.selectorElement.addEventListener('mouseenter', this.onMouseEnterSelector.bind(this), false);
-    this.selectorElement.addEventListener('mousemove', event => event.consume(), false);
     this.selectorElement.addEventListener('mouseleave', this.onMouseOutSelector.bind(this), false);
 
     const openBrace = selectorContainer.createChild('span', 'sidebar-pane-open-brace');
@@ -213,7 +212,7 @@ export class StylePropertiesSection {
     closeBrace.textContent = '}';
 
     if (this.styleInternal.parentRule) {
-      const newRuleButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.insertStyleRuleBelow), 'largeicon-add');
+      const newRuleButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.insertStyleRuleBelow), 'plus');
       newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onNewRuleClick, this);
       newRuleButton.element.tabIndex = -1;
       if (!this.newStyleRuleToolbar) {
@@ -227,7 +226,7 @@ export class StylePropertiesSection {
     if (Root.Runtime.experiments.isEnabled('fontEditor') && this.editable) {
       this.fontEditorToolbar = new UI.Toolbar.Toolbar('sidebar-pane-section-toolbar', this.innerElement);
       this.fontEditorSectionManager = new FontEditorSectionManager(this.parentPane.swatchPopoverHelper(), this);
-      this.fontEditorButton = new UI.Toolbar.ToolbarButton('Font Editor', 'largeicon-font-editor');
+      this.fontEditorButton = new UI.Toolbar.ToolbarButton('Font Editor', 'custom-typography');
       this.fontEditorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
         this.onFontEditorButtonClicked();
       }, this);
@@ -1041,51 +1040,62 @@ export class StylePropertiesSection {
       return;
     }
 
-    const fragment = this.hoverableSelectorsMode ? this.renderHoverableSelectors(selectorTexts, matchingSelectors) :
-                                                   this.renderSimplifiedSelectors(selectorTexts, matchingSelectors);
+    const fragment = StylePropertiesSection.renderSelectors(
+        selectorTexts, matchingSelectors, this.elementToSelectorIndex, rule.nestingSelectors);
     this.selectorElement.removeChildren();
     this.selectorElement.appendChild(fragment);
     this.markSelectorHighlights();
   }
 
-  private renderHoverableSelectors(selectors: string[], matchingSelectors: boolean[]): DocumentFragment {
+  static renderSelectors(
+      selectors: string[], matchingSelectors: boolean[], elementToSelectorIndex: WeakMap<Element, number>,
+      nestingSelectors?: string[]): DocumentFragment {
     const fragment = document.createDocumentFragment();
-    for (let i = 0; i < selectors.length; ++i) {
+    let hasNestingSymbol = false;
+    for (const [i, selector] of selectors.entries()) {
       if (i) {
         UI.UIUtils.createTextChild(fragment, ', ');
       }
-      fragment.appendChild(this.createSelectorElement(selectors[i], matchingSelectors[i], i));
-    }
-    return fragment;
-  }
+      const selectorElement = document.createElement('span');
+      selectorElement.classList.add('simple-selector');
+      selectorElement.classList.toggle('selector-matches', matchingSelectors[i]);
+      elementToSelectorIndex.set(selectorElement, i);
 
-  private createSelectorElement(text: string, isMatching: boolean, navigationIndex?: number): Element {
-    const element = document.createElement('span');
-    element.classList.add('simple-selector');
-    element.classList.toggle('selector-matches', isMatching);
-    if (typeof navigationIndex === 'number') {
-      this.elementToSelectorIndex.set(element, navigationIndex);
-    }
-    element.textContent = text;
-    return element;
-  }
-
-  private renderSimplifiedSelectors(selectors: string[], matchingSelectors: boolean[]): DocumentFragment {
-    const fragment = document.createDocumentFragment();
-    let currentMatching = false;
-    let text = '';
-    for (let i = 0; i < selectors.length; ++i) {
-      if (currentMatching !== matchingSelectors[i] && text) {
-        fragment.appendChild(this.createSelectorElement(text, currentMatching));
-        text = '';
+      if (nestingSelectors && selector.includes('&')) {
+        hasNestingSymbol = true;
+        const segments = selector.split('&');
+        for (const [segmentIndex, segment] of segments.entries()) {
+          if (segment) {
+            selectorElement.append(segment);
+          }
+          if (segmentIndex < segments.length - 1) {
+            selectorElement.append(this.createNestingSymbol(nestingSelectors));
+          }
+        }
+      } else {
+        selectorElement.textContent = selectors[i];
       }
-      currentMatching = matchingSelectors[i];
-      text += selectors[i] + (i === selectors.length - 1 ? '' : ', ');
+
+      fragment.append(selectorElement);
     }
-    if (text) {
-      fragment.appendChild(this.createSelectorElement(text, currentMatching));
+
+    if (nestingSelectors && !hasNestingSymbol) {
+      const implicitNestingSymbol = this.createNestingSymbol(nestingSelectors);
+      implicitNestingSymbol.classList.add('implicit');
+      fragment.prepend(implicitNestingSymbol, ' ');
     }
     return fragment;
+  }
+
+  static createNestingSymbol(nestingSelectors: string[]): HTMLElement {
+    const nestingElement = document.createElement('span');
+    nestingElement.textContent = '&';
+    nestingElement.classList.add('nesting-symbol');
+    // Selector list (.cl1, .cl2) is internally treated as :is(...) for specificity calculation.
+    const computedNestingSelectors =
+        nestingSelectors.reverse().map(selector => (selector.includes(',') ? `:is(${selector})` : selector)).join(' ');
+    nestingElement.dataset.nestingSelectors = computedNestingSelectors;
+    return nestingElement;
   }
 
   markSelectorHighlights(): void {
@@ -1653,6 +1663,22 @@ export class KeyframePropertiesSection extends StylePropertiesSection {
   }
 
   highlight(): void {
+  }
+}
+
+export class TryRuleSection extends StylePropertiesSection {
+  constructor(
+      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number, computedStyles: Map<string, string>|null,
+      parentsComputedStyles: Map<string, string>|null) {
+    super(stylesPane, matchedStyles, style, sectionIdx, computedStyles, parentsComputedStyles);
+    this.selectorElement.className = 'try-rule-selector-element';
+    // Disables clicking on the selector element for `@try` rules.
+    this.selectorElement.addEventListener('click', ev => ev.stopPropagation(), true);
+  }
+
+  headerText(): string {
+    return '@try';
   }
 }
 

@@ -18,7 +18,6 @@ import {
   getPendingEvents,
   getTestServerPort,
   goToResource,
-  isEnabledExperiment,
   pasteText,
   platform,
   pressKey,
@@ -52,11 +51,8 @@ export const MORE_TABS_SELECTOR = '[aria-label="More tabs"]';
 const OVERRIDES_TAB_SELECTOR = '[aria-label="Overrides"]';
 export const ENABLE_OVERRIDES_SELECTOR = '[aria-label="Select folder for overrides"]';
 const CLEAR_CONFIGURATION_SELECTOR = '[aria-label="Clear configuration"]';
-const BREAKPOINT_VIEW_PAUSE_ON_UNCAUGHT_SELECTOR = '.pause-on-uncaught-exceptions';
-const PAUSE_ON_EXCEPTION_BUTTON = '[aria-label="Pause on exceptions"]';
-export const PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR =
-    `${PAUSE_ON_EXCEPTION_BUTTON},${BREAKPOINT_VIEW_PAUSE_ON_UNCAUGHT_SELECTOR}`;
-export const BREAKPOINT_ITEM_SELECTOR = '.breakpoint-item,.breakpoint-entry';
+export const PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR = '.pause-on-uncaught-exceptions';
+export const BREAKPOINT_ITEM_SELECTOR = '.breakpoint-item';
 
 export async function toggleNavigatorSidebar(frontend: puppeteer.Page) {
   const modifierKey = platform === 'mac' ? 'Meta' : 'Control';
@@ -196,20 +192,15 @@ export async function getSelectedSource(): Promise<string> {
 }
 
 export async function getBreakpointHitLocation() {
-  if (await isEnabledExperiment('breakpointView')) {
-    const breakpointHitHandle = await waitFor('.breakpoint-item.hit');
-    const locationHandle = await waitFor('.location', breakpointHitHandle);
-    const locationText = await locationHandle.evaluate(location => location.textContent);
+  const breakpointHitHandle = await waitFor('.breakpoint-item.hit');
+  const locationHandle = await waitFor('.location', breakpointHitHandle);
+  const locationText = await locationHandle.evaluate(location => location.textContent);
 
-    const groupHandle = await breakpointHitHandle.evaluateHandle(x => x.parentElement);
-    const groupHeaderTitleHandle = await waitFor('.group-header-title', groupHandle);
-    const groupHeaderTitle = await groupHeaderTitleHandle?.evaluate(header => header.textContent);
+  const groupHandle = await breakpointHitHandle.evaluateHandle(x => x.parentElement);
+  const groupHeaderTitleHandle = await waitFor('.group-header-title', groupHandle);
+  const groupHeaderTitle = await groupHeaderTitleHandle?.evaluate(header => header.textContent);
 
-    return `${groupHeaderTitle}:${locationText}`;
-  }
-  const breakpointHandle = await $('label', await waitFor('.breakpoint-hit'));
-  const breakpointLocation = await breakpointHandle?.evaluate(label => label.textContent);
-  return breakpointLocation;
+  return `${groupHeaderTitle}:${locationText}`;
 }
 
 export async function getOpenSources() {
@@ -555,6 +546,14 @@ export async function stepIn() {
   await waitFor(PAUSE_INDICATOR_SELECTOR);
 }
 
+export async function stepOver() {
+  const {frontend} = getBrowserAndPages();
+  await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
+  await frontend.keyboard.press('F10');
+  await waitForFunction(() => hasPausedEvents(frontend));
+  await waitFor(PAUSE_INDICATOR_SELECTOR);
+}
+
 export async function stepOut() {
   const {frontend} = getBrowserAndPages();
   await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
@@ -578,7 +577,7 @@ export async function clickOnContextMenu(selector: string, label: string) {
   await click(selector, {clickOptions: {button: 'right'}});
 
   // Wait for the context menu option, and click it.
-  const labelSelector = `[aria-label="${label}"]`;
+  const labelSelector = `.soft-context-menu > [aria-label="${label}"]`;
   await waitFor(labelSelector);
   await click(labelSelector);
 }
@@ -698,6 +697,7 @@ export async function enableLocalOverrides() {
 }
 
 export type LabelMapping = {
+  label: string,
   moduleOffset: number,
   bytecode: number,
   sourceLine: number,
@@ -747,7 +747,14 @@ export class WasmLocationLabels {
       const labelColumn = m.originalColumn as number;
       const sourceLine = labels.get(`${m.source}:${labelLine}:${labelColumn}`);
       assertNotNullOrUndefined(sourceLine);
-      entry.push({moduleOffset: m.generatedColumn, bytecode: m.bytecodeOffset, sourceLine, labelLine, labelColumn});
+      entry.push({
+        label: m.source,
+        moduleOffset: m.generatedColumn,
+        bytecode: m.bytecodeOffset,
+        sourceLine,
+        labelLine,
+        labelColumn,
+      });
     }
     return new WasmLocationLabels(source, wasm, mappings);
   }
@@ -820,4 +827,8 @@ export async function retrieveCodeMirrorEditorContent(): Promise<Array<string>> 
   const editor = await waitFor('[aria-label="Code editor"]');
   return await editor.evaluate(
       node => [...node.querySelectorAll('.cm-line')].map(node => node.textContent || '') || []);
+}
+
+export async function waitForLines(lineCount: number): Promise<void> {
+  await waitFor(new Array(lineCount).fill('.cm-line').join(' ~ '));
 }

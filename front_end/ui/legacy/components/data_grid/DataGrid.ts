@@ -1271,7 +1271,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (!icon) {
       return;
     }
-    icon.setIconType(sortOrder === Order.Ascending ? 'smallicon-triangle-up' : 'smallicon-triangle-down');
+    icon.setIconType(sortOrder === Order.Ascending ? 'triangle-up' : 'triangle-down');
 
     this.dispatchEventToListeners(Events.SortingChanged);
   }
@@ -1957,6 +1957,13 @@ export class DataGridNode<T> {
         if (this.leftPadding) {
           cell.style.setProperty('padding-left', this.leftPadding + 'px');
         }
+      }
+
+      // Allow accessibility tool to identify the editable cell and display context menu
+      const editableCell = this.dataGrid.columns[columnId].editable;
+      if (editableCell) {
+        cell.tabIndex = 0;
+        cell.ariaHasPopup = 'true';
       }
     }
 

@@ -48,7 +48,12 @@ import {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
 
 import {DOMModel, type DOMNode} from './DOMModel.js';
 
-import {Events as ResourceTreeModelEvents, ResourceTreeModel, type ResourceTreeFrame} from './ResourceTreeModel.js';
+import {
+  Events as ResourceTreeModelEvents,
+  ResourceTreeModel,
+  type ResourceTreeFrame,
+  type PrimaryPageChangeType,
+} from './ResourceTreeModel.js';
 
 import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
@@ -85,7 +90,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     this.#resourceTreeModel = target.model(ResourceTreeModel);
     if (this.#resourceTreeModel) {
       this.#resourceTreeModel.addEventListener(
-          ResourceTreeModelEvents.MainFrameNavigated, this.onMainFrameNavigated, this);
+          ResourceTreeModelEvents.PrimaryPageChanged, this.onPrimaryPageChanged, this);
     }
     target.registerCSSDispatcher(new CSSDispatcher(this));
     if (!target.suspended()) {
@@ -302,10 +307,19 @@ export class CSSModel extends SDKModel<EventTypes> {
       return null;
     }
 
-    return new CSSMatchedStyles(
-        this, (node as DOMNode), response.inlineStyle || null, response.attributesStyle || null,
-        response.matchedCSSRules || [], response.pseudoElements || [], response.inherited || [],
-        response.inheritedPseudoElements || [], response.cssKeyframesRules || [], response.parentLayoutNodeId);
+    return new CSSMatchedStyles({
+      cssModel: this,
+      node: (node as DOMNode),
+      inlinePayload: response.inlineStyle || null,
+      attributesPayload: response.attributesStyle || null,
+      matchedPayload: response.matchedCSSRules || [],
+      pseudoPayload: response.pseudoElements || [],
+      inheritedPayload: response.inherited || [],
+      inheritedPseudoPayload: response.inheritedPseudoElements || [],
+      animationsPayload: response.cssKeyframesRules || [],
+      parentLayoutNodeId: response.parentLayoutNodeId,
+      positionFallbackRules: response.cssPositionFallbackRules || [],
+    });
   }
 
   async getClassNames(styleSheetId: Protocol.CSS.StyleSheetId): Promise<string[]> {
@@ -681,14 +695,16 @@ export class CSSModel extends SDKModel<EventTypes> {
     }
   }
 
-  private async onMainFrameNavigated(event: Common.EventTarget.EventTargetEvent<ResourceTreeFrame>): Promise<void> {
+  private async onPrimaryPageChanged(
+      event: Common.EventTarget.EventTargetEvent<{frame: ResourceTreeFrame, type: PrimaryPageChangeType}>):
+      Promise<void> {
     // If the main frame was restored from the back-forward cache, the order of CDP
     // is different from the regular navigations. In this case, events about CSS
     // stylesheet has already been received and they are mixed with the previous page
     // stylesheets. Therefore, we re-enable the CSS agent to get fresh events.
     // For the regular navigations, we can just clear the local data because events about
     // stylesheets will arrive later.
-    if (event.data.backForwardCacheDetails.restoredFromCache) {
+    if (event.data.frame.backForwardCacheDetails.restoredFromCache) {
       await this.suspendModel();
       await this.resumeModel();
     } else {

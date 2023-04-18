@@ -101,6 +101,7 @@ class CSSValue {
 
 export class CSSStyleRule extends CSSRule {
   selectors!: CSSValue[];
+  nestingSelectors?: string[];
   media: CSSMedia[];
   containerQueries: CSSContainerQuery[];
   supports: CSSSupports[];
@@ -108,9 +109,9 @@ export class CSSStyleRule extends CSSRule {
   layers: CSSLayer[];
   wasUsed: boolean;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSRule, wasUsed?: boolean) {
-    // TODO(crbug.com/1011811): Replace with spread operator or better types once Closure is gone.
     super(cssModel, {origin: payload.origin, style: payload.style, styleSheetId: payload.styleSheetId});
     this.reinitializeSelectors(payload.selectorList);
+    this.nestingSelectors = payload.nestingSelectors;
     this.media = payload.media ? CSSMedia.parseMediaArrayPayload(cssModel, payload.media) : [];
     this.containerQueries = payload.containerQueries ?
         CSSContainerQuery.parseContainerQueriesPayload(cssModel, payload.containerQueries) :
@@ -230,7 +231,6 @@ export class CSSKeyframesRule {
 export class CSSKeyframeRule extends CSSRule {
   #keyText!: CSSValue;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSKeyframeRule) {
-    // TODO(crbug.com/1011811): Replace with spread operator or better types once Closure is gone.
     super(cssModel, {origin: payload.origin, style: payload.style, styleSheetId: payload.styleSheetId});
     this.reinitializeKey(payload.keyText);
   }
@@ -266,5 +266,24 @@ export class CSSKeyframeRule extends CSSRule {
       throw 'Keyframe key is not editable';
     }
     return this.cssModelInternal.setKeyframeKey(styleSheetId, range, newKeyText);
+  }
+}
+
+export class CSSPositionFallbackRule {
+  readonly #name: CSSValue;
+  readonly #tryRules: CSSRule[];
+  constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSPositionFallbackRule) {
+    this.#name = new CSSValue(payload.name);
+    this.#tryRules = payload.tryRules.map(
+        tryRule =>
+            new CSSRule(cssModel, {origin: tryRule.origin, style: tryRule.style, styleSheetId: tryRule.styleSheetId}));
+  }
+
+  name(): CSSValue {
+    return this.#name;
+  }
+
+  tryRules(): CSSRule[] {
+    return this.#tryRules;
   }
 }

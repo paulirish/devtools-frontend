@@ -276,8 +276,8 @@ export class RequestHeadersComponent extends HTMLElement {
         } as IconButton.Icon.IconData}>
       </${IconButton.Icon.Icon.litTagName}>` : html`
       <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
-          iconName: 'file_icon',
-          color: 'var(--color-text-primary)',
+          iconName: 'document',
+          color: 'var(--icon-default)',
           width: '12px',
           height: '12px',
         } as IconButton.Icon.IconData}>
@@ -293,11 +293,23 @@ export class RequestHeadersComponent extends HTMLElement {
       }
     };
 
+    // Disabled until https://crbug.com/1079231 is fixed.
+    // clang-format off
     return html`
+      <x-link href="https://goo.gle/devtools-override" class="link devtools-link">
+        <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
+            iconName: 'help',
+            color: 'var(--icon-link)',
+            width: '16px',
+            height: '16px',
+          } as IconButton.Icon.IconData}>
+        </${IconButton.Icon.Icon.litTagName}
+      ></x-link>
       <x-link @click=${revealHeadersFile} class="link devtools-link" title=${UIStrings.revealHeaderOverrides}>
         ${fileIcon}${i18nString(UIStrings.headerOverrides)}
       </x-link>
     `;
+    // clang-format on
   }
 
   #getHeaderOverridesFileUrl(): Platform.DevToolsPath.UrlString {

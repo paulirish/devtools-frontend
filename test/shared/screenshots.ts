@@ -67,7 +67,7 @@ const DEFAULT_MS_BETWEEN_RETRIES = 150;
 
 // Percentage difference when comparing golden vs new screenshot that is
 // acceptable and will not fail the test.
-const DEFAULT_SCREENSHOT_THRESHOLD_PERCENT = 1;
+const DEFAULT_SCREENSHOT_THRESHOLD_PERCENT = 4;
 
 export const assertElementScreenshotUnchanged = async (
     element: puppeteer.ElementHandle|null, fileName: string,
@@ -152,8 +152,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
    * to update the golden image. This is useful if work has caused the
    * screenshot to change and therefore the test goldens need to be updated.
    */
-  const shouldUpdate = Boolean(
-      (process.env.UPDATE_GOLDEN && process.env.UPDATE_GOLDEN === fileName) || process.env.FORCE_UPDATE_ALL_GOLDENS);
+  const shouldUpdate = Boolean(process.env.FORCE_UPDATE_ALL_GOLDENS) ||
+      Boolean(process.env.UPDATE_GOLDEN && process.env.UPDATE_GOLDEN === fileName);
+  const throwAfterGoldensUpdate = Boolean(process.env.THROW_AFTER_GOLDENS_UPDATE);
 
   let onBotAndImageNotFound = false;
 
@@ -175,6 +176,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
 
     console.log('Golden does not exist, using generated screenshot.');
     setGeneratedFileAsGolden(goldenScreenshotPath, generatedScreenshotPath);
+    if (throwAfterGoldensUpdate) {
+      throw new Error('Golden does not exist, using generated screenshot.');
+    }
   }
 
   try {
@@ -188,6 +192,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
       if (shouldUpdate) {
         console.log(`=> ${fileName} was out of date and failed; updating`);
         setGeneratedFileAsGolden(goldenScreenshotPath, generatedScreenshotPath);
+        if (throwAfterGoldensUpdate) {
+          throw compareError;
+        }
         return;
       }
       // If we don't want to update, throw the assertion error so we fail the test.

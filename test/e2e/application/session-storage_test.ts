@@ -22,8 +22,7 @@ describe('The Application Tab', async () => {
     DOMAIN_SELECTOR = `${SESSION_STORAGE_SELECTOR} + ol > [aria-label="https://localhost:${getTestServerPort()}/"]`;
   });
 
-  // Reland after chromium checkout on CQ updates
-  it.skip('[crbug.com/1347831] shows Session Storage keys and values', async () => {
+  it('shows Session Storage keys and values', async () => {
     const {target} = getBrowserAndPages();
 
     await step('navigate to session-storage resource and open Application tab', async () => {
@@ -50,8 +49,7 @@ describe('The Application Tab', async () => {
     });
   });
 
-  // Flaky test
-  it.skip('[crbug.com/1369995] can delete selected items', async () => {
+  it('can delete selected items', async () => {
     const {target} = getBrowserAndPages();
 
     await navigateToApplicationTab(target, 'session-storage');

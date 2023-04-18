@@ -227,7 +227,7 @@
   margin-right: 3px;
 }
 
-.network-log-grid.data-grid:focus-within .data-grid-data-grid-node.selected img.icon {
+.network-log-grid.data-grid:focus-within .data-grid-data-grid-node.selected div.icon:not(.image) {
   filter: brightness(0) invert(1);
 }
 
@@ -244,8 +244,8 @@
 
 .network-log-grid.data-grid.small .icon {
   margin-top: 0;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .image-network-icon-preview {
@@ -383,6 +383,16 @@
 
 .network-frame-group-badge {
   margin-right: 4px;
+}
+
+.network-override-marker {
+  /* Color matches the purple dot in the mediumicon-file-sync icon. */
+  background: rgb(175 75 246); /* stylelint-disable-line plugin/use_theme_colors */
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  margin-right: 3px;
 }
 
 @media (forced-colors: active) {

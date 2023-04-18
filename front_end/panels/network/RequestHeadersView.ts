@@ -44,6 +44,7 @@ import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as ClientVariations from '../../third_party/chromium/client-variations/client-variations.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import objectPropertiesSectionStyles from '../../ui/legacy/components/object_ui/objectPropertiesSection.css.js';
 // eslint-disable-next-line rulesdir/es_modules_import
@@ -499,11 +500,14 @@ export class RequestHeadersView extends UI.Widget.VBox {
       UI.Tooltip.Tooltip.install(statusCodeImage, this.request.statusCode + ' ' + this.request.statusText);
 
       if (this.request.statusCode < 300 || this.request.statusCode === 304) {
-        statusCodeImage.type = 'smallicon-green-ball';
+        statusCodeImage
+            .data = {iconName: 'checkmark', color: 'var(--icon-checkmark-green)', width: '14px', height: '14px'};
       } else if (this.request.statusCode < 400) {
-        statusCodeImage.type = 'smallicon-orange-ball';
+        statusCodeImage
+            .data = {iconName: 'warning-filled', color: 'var(--icon-warning)', width: '14px', height: '14px'};
       } else {
-        statusCodeImage.type = 'smallicon-red-ball';
+        statusCodeImage
+            .data = {iconName: 'cross-circle-filled', color: 'var(--icon-error)', width: '14px', height: '14px'};
       }
 
       requestMethodElement.title = this.formatHeader(i18nString(UIStrings.requestMethod), this.request.requestMethod);
@@ -550,8 +554,11 @@ export class RequestHeadersView extends UI.Widget.VBox {
     if (overrideable && this.#workspace.uiSourceCodeForURL(this.#getHeaderOverridesFileUrl())) {
       const overridesSetting: Common.Settings.Setting<boolean> =
           Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled');
-      const icon = overridesSetting.get() ? UI.Icon.Icon.create('mediumicon-file-sync', 'purple-dot') :
-                                            UI.Icon.Icon.create('mediumicon-file');
+      const icon = new IconButton.Icon.Icon();
+      icon.data = {iconName: 'document', color: 'var(--icon-default)', width: '16px', height: '16px'};
+      if (overridesSetting.get()) {
+        icon.classList.add('purple-dot');
+      }
       const button = container.createChild('button', 'link devtools-link headers-link');
       button.appendChild(icon);
       button.addEventListener('click', this.#revealHeadersFile.bind(this));
@@ -604,8 +611,8 @@ export class RequestHeadersView extends UI.Widget.VBox {
       const cautionElement = document.createElement('div');
       cautionElement.classList.add('request-headers-caution');
       UI.Tooltip.Tooltip.install(cautionElement, cautionTitle);
-      (cautionElement.createChild('span', '', 'dt-icon-label') as UI.UIUtils.DevToolsIconLabel).type =
-          'smallicon-warning';
+      (cautionElement.createChild('span', '', 'dt-icon-label') as UI.UIUtils.DevToolsIconLabel)
+          .data = {iconName: 'warning-filled', color: 'var(--icon-warning)', width: '14px', height: '14px'};
       cautionElement.createChild('div', 'caution').textContent = cautionText;
       const cautionTreeElement = new UI.TreeOutline.TreeElement(cautionElement);
 
