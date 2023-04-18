@@ -1101,15 +1101,39 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       void this.drawScreenshot(entryIndex, context, barX, barY, barWidth, barHeight);
       return true;
     }
+    if (data.name === 'EventTiming' ) {
+      paintWarningDecoration(barX, barWidth, 'overline');
+    }
 
     if (entryType === entryTypes.Event) {
       const event = (data as SDK.TracingModel.Event);
-      if (TimelineModel.TimelineModel.TimelineData.forEvent(event).warning) {
-        paintWarningDecoration(barX, barWidth - 1.5);
+      const eventData = TimelineModel.TimelineModel.TimelineData.forEvent(event);
+      if (eventData.warning) {
+        paintWarningDecoration(barX, barWidth - 1.5, event.name === 'EventTiming' ? 'overline' : 'triangle');
       }
     }
 
-    function paintWarningDecoration(x: number, width: number): void {
+    function paintWarningDecoration(x: number, width: number, warningStyle: string): void {
+      if (warningStyle === 'overline') {
+        // input delay style
+        context.fillStyle = 'hsla(0, 70%, 60%, 1)';
+        context.fillRect(barX, barY + barHeight - 3, barWidth - 1.5, 2);
+
+
+        // outline style
+        // context.save();
+        // context.strokeStyle = 'red';
+        // context.lineWidth = 1;
+        // context.beginPath();
+        // context.moveTo(x, barY);
+        // context.lineTo(x + width - 1, barY);
+        // // context.moveTo(x + width, barY + barHeight);
+        // // context.lineTo(x, barY + barHeight);
+        // context.stroke();
+        // context.restore();
+        return;
+      }
+
       const /** @const */ triangleSize = 8;
       context.save();
       context.beginPath();

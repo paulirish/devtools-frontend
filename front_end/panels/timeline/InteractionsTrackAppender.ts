@@ -122,6 +122,9 @@ export class InteractionsTrackAppender implements TrackAppender {
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < interactions.length; ++i) {
       const event = interactions[i];
+      if (event === this.#traceParsedData.UserInteractions.longestInteractionEvent) {
+        event.args.data.warning = 'overline';
+      }
       const startTime = event.ts;
       let level;
       // look vertically for the first level where this event fits,

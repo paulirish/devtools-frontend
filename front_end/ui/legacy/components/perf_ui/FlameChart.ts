@@ -1068,6 +1068,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   /**
    * Marks the portion of long tasks where the 50ms threshold was exceeded.
+   * TODO: This should be ran more like paintWarningDecoration() within TimelineFlameChartDataProvider.decorateEntry()
    */
   private drawLongTaskRegions(
       context: CanvasRenderingContext2D, timelineData: TimelineData, color: string, indexes: number[]): void {
