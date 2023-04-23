@@ -73,6 +73,8 @@ import type * as Protocol from '../../generated/protocol.js';
 import {traceJsonGenerator} from './SaveFileFormatter.js';
 
 import {TimelineSelection} from './TimelineSelection.js';
+import { TickingFlameChart } from '../media/TickingFlameChart.js';
+import { PlayerEventsTimeline } from './components/CurrentPageMetrics.js';
 
 const UIStrings = {
   /**
@@ -314,6 +316,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private saveButton!: UI.Toolbar.ToolbarButton;
   private statusPane!: StatusPane|null;
   private landingPage!: UI.Widget.Widget;
+  private landingPageTimeline!: TickingFlameChart;
   private loader?: TimelineLoader;
   private showScreenshotsToolbarCheckbox?: UI.Toolbar.ToolbarItem;
   private showMemoryToolbarCheckbox?: UI.Toolbar.ToolbarItem;
@@ -383,6 +386,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.overviewControls = [];
 
     this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container fill');
+
+    const liveTimelineEl = this.timelinePane.element.createChild('div', 'vbox');
+    liveTimelineEl.id = 'live-timeline';
+    // liveTimelineEl.append()
+
+    this.landingPageTimeline = new PlayerEventsTimeline();
+    // this.landingPageTimeline.show(liveTimelineEl);
+    // setTimeout(_ => {
+      this.landingPageTimeline.show(liveTimelineEl);
+    // }, 1000);
 
     this.createFileSelector();
 
@@ -1112,56 +1125,59 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       return;
     }
 
-    function encloseWithTag(tagName: string, contents: string): HTMLElement {
-      const e = document.createElement(tagName);
-      e.textContent = contents;
-      return e;
-    }
+    // function encloseWithTag(tagName: string, contents: string): HTMLElement {
+    //   const e = document.createElement(tagName);
+    //   e.textContent = contents;
+    //   return e;
+    // }
 
-    const learnMoreNode = UI.XLink.XLink.create(
-        'https://developer.chrome.com/docs/devtools/evaluate-performance/', i18nString(UIStrings.learnmore));
+    // const learnMoreNode = UI.XLink.XLink.create(
+    //     'https://developer.chrome.com/docs/devtools/evaluate-performance/', i18nString(UIStrings.learnmore));
 
-    const recordKey = encloseWithTag(
-        'b',
-        UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.toggle-recording')[0].title());
-    const reloadKey = encloseWithTag(
-        'b', UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.record-reload')[0].title());
-    const navigateNode = encloseWithTag('b', i18nString(UIStrings.wasd));
+    // const recordKey = encloseWithTag(
+    //     'b',
+    //     UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.toggle-recording')[0].title());
+    // const reloadKey = encloseWithTag(
+    //     'b', UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.record-reload')[0].title());
+    // const navigateNode = encloseWithTag('b', i18nString(UIStrings.wasd));
 
     this.landingPage = new UI.Widget.VBox();
     this.landingPage.contentElement.classList.add('timeline-landing-page', 'fill');
     const centered = this.landingPage.contentElement.createChild('div');
 
-    const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
-    const reloadButton =
-        UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButtonForId('timeline.record-reload'));
+    // this.landingPage.contentElement.classList.add('timeline-landing-page', 'fill');
+    // const centered = this.landingPage.contentElement.createChild('div');
 
-    const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
-    centered.appendChild(pageMetrics);
+    // const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
+    // const reloadButton =
+    //     UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButtonForId('timeline.record-reload'));
 
-    centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.clickTheRecordButtonSOrHitSTo, {PH1: recordButton, PH2: recordKey}));
+    // const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
+    // centered.appendChild(pageMetrics);
 
-    centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.clickTheReloadButtonSOrHitSTo, {PH1: reloadButton, PH2: reloadKey}));
+    // centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
+    //     str_, UIStrings.clickTheRecordButtonSOrHitSTo, {PH1: recordButton, PH2: recordKey}));
 
-    centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.afterRecordingSelectAnAreaOf, {PH1: navigateNode, PH2: learnMoreNode}));
+    // centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
+    //     str_, UIStrings.clickTheReloadButtonSOrHitSTo, {PH1: reloadButton, PH2: reloadKey}));
 
-    if (isNode) {
-      const previewSection = new PanelFeedback.PanelFeedback.PanelFeedback();
-      previewSection.data = {
-        feedbackUrl: 'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548' as Platform.DevToolsPath.UrlString,
-        quickStartUrl: 'https://developer.chrome.com/blog/js-profiler-deprecation/' as Platform.DevToolsPath.UrlString,
-        quickStartLinkText: i18nString(UIStrings.learnmore),
-      };
-      centered.appendChild(previewSection);
-      const feedbackButton = new PanelFeedback.FeedbackButton.FeedbackButton();
-      feedbackButton.data = {
-        feedbackUrl: 'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548' as Platform.DevToolsPath.UrlString,
-      };
-      centered.appendChild(feedbackButton);
-    }
+    // centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
+    //     str_, UIStrings.afterRecordingSelectAnAreaOf, {PH1: navigateNode, PH2: learnMoreNode}));
+
+    // if (isNode) {
+    //   const previewSection = new PanelFeedback.PanelFeedback.PanelFeedback();
+    //   previewSection.data = {
+    //     feedbackUrl: 'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548' as Platform.DevToolsPath.UrlString,
+    //     quickStartUrl: 'https://developer.chrome.com/blog/js-profiler-deprecation/' as Platform.DevToolsPath.UrlString,
+    //     quickStartLinkText: i18nString(UIStrings.learnmore),
+    //   };
+    //   centered.appendChild(previewSection);
+    //   const feedbackButton = new PanelFeedback.FeedbackButton.FeedbackButton();
+    //   feedbackButton.data = {
+    //     feedbackUrl: 'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548' as Platform.DevToolsPath.UrlString,
+    //   };
+    //   centered.appendChild(feedbackButton);
+    // }
 
     this.landingPage.show(this.statusPaneContainer);
   }
