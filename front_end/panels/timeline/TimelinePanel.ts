@@ -314,6 +314,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private saveButton!: UI.Toolbar.ToolbarButton;
   private statusPane!: StatusPane|null;
   private landingPage!: UI.Widget.Widget;
+  private landingSplitWidget!: UI.SplitWidget.SplitWidget;
   private loader?: TimelineLoader;
   private showScreenshotsToolbarCheckbox?: UI.Toolbar.ToolbarItem;
   private showMemoryToolbarCheckbox?: UI.Toolbar.ToolbarItem;
@@ -382,7 +383,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.overviewPane.show(topPaneElement);
     this.overviewControls = [];
 
-    this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container fill');
+    this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container vbox');
 
     this.createFileSelector();
 
@@ -1108,7 +1109,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private showLandingPage(): void {
     if (this.landingPage) {
-      this.landingPage.show(this.statusPaneContainer);
+      this.landingSplitWidget.show(this.statusPaneContainer);
       return;
     }
 
@@ -1128,16 +1129,24 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         'b', UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.record-reload')[0].title());
     const navigateNode = encloseWithTag('b', i18nString(UIStrings.wasd));
 
+
     this.landingPage = new UI.Widget.VBox();
+    const landingPageMetrics = new UI.Widget.VBox();
+    const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
+    landingPageMetrics.contentElement.appendChild(pageMetrics);
+
+    this.landingSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'timelineLandingSplitViewState');
+    this.landingSplitWidget.setMainWidget(this.landingPage);
+    this.landingSplitWidget.setSidebarWidget(landingPageMetrics);
+
     this.landingPage.contentElement.classList.add('timeline-landing-page', 'fill');
     const centered = this.landingPage.contentElement.createChild('div');
+
 
     const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
     const reloadButton =
         UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButtonForId('timeline.record-reload'));
 
-    const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
-    centered.appendChild(pageMetrics);
 
     centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
         str_, UIStrings.clickTheRecordButtonSOrHitSTo, {PH1: recordButton, PH2: recordKey}));
@@ -1163,7 +1172,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       centered.appendChild(feedbackButton);
     }
 
-    this.landingPage.show(this.statusPaneContainer);
+    this.landingSplitWidget.show(this.statusPaneContainer);
   }
 
   private hideLandingPage(): void {

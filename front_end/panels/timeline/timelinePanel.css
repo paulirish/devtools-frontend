@@ -76,9 +76,8 @@
 
 .timeline.panel .status-pane-container {
   z-index: 1000;
-  display: flex;
-  align-items: center;
   pointer-events: none;
+  flex: 1;
 }
 
 .timeline.panel .status-pane-container.tinted {
@@ -603,6 +602,7 @@
 
 .timeline.panel .status-pane-container > div {
   pointer-events: auto;
+  flex: 1;
 }
 
 .timeline-landing-page > div > p {
