@@ -80,10 +80,14 @@ export class LighthouseReportRenderer {
       onPrintOverride,
       getStandaloneReportHTML,
     });
-    reportEl.classList.add('lh-devtools');
+    for (const el of reportEl.querySelectorAll('.lh-vars')) {
+      el.classList.add('lh-vars--devtools');
+    }
 
     const updateDarkModeIfNecessary = (): void => {
-      reportEl.classList.toggle('lh-dark', ThemeSupport.ThemeSupport.instance().themeName() === 'dark');
+      for (const el of reportEl.querySelectorAll('.lh-vars')) {
+        el.classList.toggle('lh-vars--dark', ThemeSupport.ThemeSupport.instance().themeName() === 'dark');
+      }
     };
     ThemeSupport.ThemeSupport.instance().addEventListener(
         ThemeSupport.ThemeChangeEvent.eventName, updateDarkModeIfNecessary);

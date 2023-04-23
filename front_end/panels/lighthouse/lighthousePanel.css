@@ -10,8 +10,6 @@
 }
 
 .lh-root {
-  --report-menu-width: 0;
-
   user-select: text;
 }
 /* for View Trace button */
@@ -51,6 +49,6 @@ button.view-trace {
   flex: 1 1 auto;
 }
 
-.lh-devtools .lh-element-screenshot__overlay {
+.lh-vars--devtools .lh-element-screenshot__overlay {
   position: absolute;
 }
