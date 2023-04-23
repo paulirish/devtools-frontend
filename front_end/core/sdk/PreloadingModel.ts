@@ -15,7 +15,6 @@ import {
   ResourceTreeModel,
   type ResourceTreeFrame,
 } from './ResourceTreeModel.js';
-import {assertNotNullOrUndefined} from '../platform/platform.js';
 
 export interface WithId<I, V> {
   id: I;
@@ -52,7 +51,7 @@ export class PreloadingModel extends SDKModel<EventTypes> {
         ResourceTreeModel, ResourceTreeModelEvents.PrimaryPageChanged, this.onPrimaryPageChanged, this);
   }
 
-  dispose(): void {
+  override dispose(): void {
     super.dispose();
 
     TargetManager.instance().removeModelListener(
@@ -213,26 +212,38 @@ export class PreloadingModel extends SDKModel<EventTypes> {
   }
 
   onPreloadingAttemptSourcesUpdated(event: Protocol.Preload.PreloadingAttemptSourcesUpdatedEvent): void {
-    // We expect that Preload.ruleSetUpdated is followed by Preload.preloadingAttemptSourcesUpdated.
-    assertNotNullOrUndefined(this.currentDocument());
-    // It is more robust if Preload.preloadingAttemptSourcesUpdated has loadingId.
-    //
-    // TODO(https://crbug.com/1410709): Consider to add loadingId to
-    // Preload.preloadingAttemptSourcesUpdated.
-    this.currentDocument()?.sources.update(event.preloadingAttemptSources);
+    const loaderId = event.loaderId;
+    this.ensureDocumentPreloadingData(loaderId);
+
+    const document = this.documents.get(loaderId);
+    if (document === undefined) {
+      return;
+    }
+
+    document.sources.update(event.preloadingAttemptSources);
+    document.preloadingAttempts.maybeRegisterNotTriggered(document.sources);
+    this.dispatchEventToListeners(Events.ModelUpdated);
   }
 
   onPrefetchStatusUpdated(event: Protocol.Preload.PrefetchStatusUpdatedEvent): void {
     const loaderId = event.key.loaderId;
     this.ensureDocumentPreloadingData(loaderId);
-    this.documents.get(loaderId)?.preloadingAttempts.upsert(event);
+    const attempt = {
+      key: event.key,
+      status: convertPreloadingStatus(event.status),
+    };
+    this.documents.get(loaderId)?.preloadingAttempts.upsert(attempt);
     this.dispatchEventToListeners(Events.ModelUpdated);
   }
 
   onPrerenderStatusUpdated(event: Protocol.Preload.PrerenderStatusUpdatedEvent): void {
     const loaderId = event.key.loaderId;
     this.ensureDocumentPreloadingData(loaderId);
-    this.documents.get(loaderId)?.preloadingAttempts.upsert(event);
+    const attempt = {
+      key: event.key,
+      status: convertPreloadingStatus(event.status),
+    };
+    this.documents.get(loaderId)?.preloadingAttempts.upsert(attempt);
     this.dispatchEventToListeners(Events.ModelUpdated);
   }
 }
@@ -330,18 +341,60 @@ class RuleSetRegistry {
   }
 }
 
+// Protocol.Preload.PreloadingStatus|'NotTriggered'
+//
+// A renderer sends SpeculationCandidate to the browser process and the
+// browser process checks eligibilities, and starts PreloadingAttempt.
+//
+// In the frontend, "NotTriggered" is used to denote that a
+// PreloadingAttempt is waiting for at trigger event (eg:
+// mousedown/mouseover). All PreloadingAttempts will start off as
+// "NotTriggered", but "eager" preloading attempts (attempts not
+// actually waiting for any trigger) will be processed by the browser
+// immediately, and will not stay in this state for long.
+//
+// TODO(https://crbug.com/1384419): Add NotEligible.
+export const enum PreloadingStatus {
+  NotTriggered = 'NotTriggered',
+  Pending = 'Pending',
+  Running = 'Running',
+  Ready = 'Ready',
+  Success = 'Success',
+  Failure = 'Failure',
+  NotSupported = 'NotSupported',
+}
+
+function convertPreloadingStatus(status: Protocol.Preload.PreloadingStatus): PreloadingStatus {
+  switch (status) {
+    case Protocol.Preload.PreloadingStatus.Pending:
+      return PreloadingStatus.Pending;
+    case Protocol.Preload.PreloadingStatus.Running:
+      return PreloadingStatus.Running;
+    case Protocol.Preload.PreloadingStatus.Ready:
+      return PreloadingStatus.Ready;
+    case Protocol.Preload.PreloadingStatus.Success:
+      return PreloadingStatus.Success;
+    case Protocol.Preload.PreloadingStatus.Failure:
+      return PreloadingStatus.Failure;
+    case Protocol.Preload.PreloadingStatus.NotSupported:
+      return PreloadingStatus.NotSupported;
+  }
+
+  throw new Error('unreachable');
+}
+
 export type PreloadingAttemptId = string;
 
 export interface PreloadingAttempt {
   key: Protocol.Preload.PreloadingAttemptKey;
-  status: Protocol.Preload.PreloadingStatus;
+  status: PreloadingStatus;
   ruleSetIds: Protocol.Preload.RuleSetId[];
   nodeIds: Protocol.DOM.BackendNodeId[];
 }
 
 export interface PreloadingAttemptInternal {
   key: Protocol.Preload.PreloadingAttemptKey;
-  status: Protocol.Preload.PreloadingStatus;
+  status: PreloadingStatus;
 }
 
 function makePreloadingAttemptId(key: Protocol.Preload.PreloadingAttemptKey): PreloadingAttemptId {
@@ -420,6 +473,20 @@ class PreloadingAttemptRegistry {
     this.map.set(id, attempt);
   }
 
+  maybeRegisterNotTriggered(sources: SourceRegistry): void {
+    for (const [id, {key}] of sources.entries()) {
+      if (this.map.get(id) !== undefined) {
+        continue;
+      }
+
+      const attempt = {
+        key,
+        status: PreloadingStatus.NotTriggered,
+      };
+      this.map.set(id, attempt);
+    }
+  }
+
   mergePrevious(prev: PreloadingAttemptRegistry): void {
     for (const [id, attempt] of this.map.entries()) {
       prev.map.set(id, attempt);
@@ -432,6 +499,10 @@ class PreloadingAttemptRegistry {
 class SourceRegistry {
   private map: Map<PreloadingAttemptId, Protocol.Preload.PreloadingAttemptSource> =
       new Map<PreloadingAttemptId, Protocol.Preload.PreloadingAttemptSource>();
+
+  entries(): IterableIterator<[PreloadingAttemptId, Protocol.Preload.PreloadingAttemptSource]> {
+    return this.map.entries();
+  }
 
   isEmpty(): boolean {
     return this.map.size === 0;

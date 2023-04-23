@@ -80,7 +80,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/network/components/ResponseHead
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
-const plusIconUrl = new URL('../../../Images/plus_icon.svg', import.meta.url).toString();
+const plusIconUrl = new URL('../../../Images/plus.svg', import.meta.url).toString();
 
 export const RESPONSE_HEADER_SECTION_DATA_KEY = 'ResponseHeaderSection';
 
@@ -166,7 +166,7 @@ export class ResponseHeaderSection extends HTMLElement {
 
     const blockedResponseCookies = this.#request.blockedResponseCookies();
     const blockedCookieLineToReasons = new Map<string, Protocol.Network.SetCookieBlockedReason[]>(
-        blockedResponseCookies?.map(c => [c.cookieLine, c.blockedReasons]));
+        blockedResponseCookies?.map(c => [c.cookieLine.replace(/\s/g, ' '), c.blockedReasons]));
     for (const header of this.#headerDetails) {
       if (header.name === 'set-cookie' && header.value) {
         const matchingBlockedReasons = blockedCookieLineToReasons.get(header.value);

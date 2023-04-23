@@ -14,24 +14,16 @@ import {
   type HighlightedEntryInfo,
   type TrackAppenderName,
 } from './CompatibilityTracksAppender.js';
-import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Common from '../../core/common/common.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 
 const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   interactions: 'Interactions',
-  /**
-   * @description Text in the Performance panel to show how long was spent in a particular part of the code.
-   * The first placeholder is the total time taken for this node and all children, the second is the self time
-   * (time taken in this node, without children included).
-   *@example {10ms} PH1
-   *@example {10ms} PH2
-   */
-  sSelfS: '{PH1} (self {PH2})',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/InteractionsTrackAppender.ts', UIStrings);
@@ -65,7 +57,7 @@ export class InteractionsTrackAppender implements TrackAppender {
           max: 55,
           count: undefined,
         },
-        {min: 70, max: 100, count: 6}, 50, 0.7);
+        {min: 70, max: 100, count: 6}, 90, 0.7);
     this.#flameChartData = flameChartData;
     this.#traceParsedData = traceParsedData;
     this.#entryData = entryData;
@@ -75,7 +67,7 @@ export class InteractionsTrackAppender implements TrackAppender {
 
   /**
    * Appends into the flame chart data the data corresponding to the
-   * timings track.
+   * interactions track.
    * @param level the horizontal level of the flame chart events where
    * the track's events will start being appended.
    * @param expanded wether the track should be rendered expanded.
@@ -92,7 +84,7 @@ export class InteractionsTrackAppender implements TrackAppender {
 
   /**
    * Adds into the flame chart data the header corresponding to the
-   * timings track. A header is added in the shape of a group in the
+   * interactions track. A header is added in the shape of a group in the
    * flame chart data. A group has a predefined style and a reference
    * to the definition of the legacy track (which should be removed
    * in the future).
@@ -101,48 +93,24 @@ export class InteractionsTrackAppender implements TrackAppender {
    */
   #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
     const trackIsCollapsible = this.#traceParsedData.UserInteractions.interactionEvents.length > 0;
-    const style: PerfUI.FlameChart.GroupStyle = {
-      padding: 4,
-      height: 17,
-      collapsible: trackIsCollapsible,
-      color: ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary'),
-      backgroundColor: ThemeSupport.ThemeSupport.instance().getComputedValue('--color-background'),
-      nestingLevel: 0,
-      shareHeaderLine: true,
-      useFirstLineForOverview: true,
-    };
-    const group = ({
-      startLevel: currentLevel,
-      name: i18nString(UIStrings.interactions),
-      style: style,
-      selectable: true,
-      expanded,
-    } as PerfUI.FlameChart.Group);
+    const style = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
+    const group = buildTrackHeader(
+        currentLevel, i18nString(UIStrings.interactions), style, /* selectable= */ true, expanded, this.#legacyTrack);
     this.#flameChartData.groups.push(group);
-    group.track = this.#legacyTrack;
   }
 
   /**
-   * Adds into the flame chart data the trace events corresponding to
-   * user timings (performance.measure and performance.mark). These are
-   * taken straight from the UserTimings handler.
-   * @param currentLevel the flame chart level from which user timings will
-   * be appended.
-   * @returns the next level after the last occupied by the appended
-   * timings (the first available level to append more data).
-   */
-  /**
    * Adds into the flame chart data the trace events dispatched by the
-   * performace.measure API. These events are taken from the UserTimings
+   * performace.measure API. These events are taken from the UserInteractions
    * handler.
-   * @param currentLevel the flame chart level from which timings will
+   * @param currentLevel the flame chart level from which interactions will
    * be appended.
    * @returns the next level after the last occupied by the appended
-   * timings (the first available level to append more data).
+   * interactions (the first available level to append more data).
    */
 
   #appendInteractionsAtLevel(currentLevel: number): number {
-    const interactions = this.#traceParsedData.UserInteractions.interactionEvents;
+    const interactions = this.#traceParsedData.UserInteractions.interactionEventsWithNoNesting;
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < interactions.length; ++i) {
       const event = interactions[i];
@@ -152,6 +120,7 @@ export class InteractionsTrackAppender implements TrackAppender {
       // that is, where it wouldn't overlap with other events.
       for (level = 0; level < lastUsedTimeByLevel.length && lastUsedTimeByLevel[level] > startTime; ++level) {
       }
+
       this.#appendEventAtLevel(event, currentLevel + level);
       const endTime = event.ts + (event.dur || 0);
       lastUsedTimeByLevel[level] = endTime;
@@ -167,14 +136,18 @@ export class InteractionsTrackAppender implements TrackAppender {
    * @returns the position occupied by the new event in the entryData
    * array, which contains all the events in the timeline.
    */
-  #appendEventAtLevel(event: TraceEngine.Types.TraceEvents.TraceEventData, level: number): number {
+  #appendEventAtLevel(syntheticEvent: TraceEngine.Types.TraceEvents.SyntheticInteractionEvent, level: number): number {
     this.#compatibilityBuilder.registerTrackForLevel(level, this);
     const index = this.#entryData.length;
-    this.#entryData.push(event);
+
+    // Although the event is a SyntheticInteractionEvent, it extends
+    // TraceEventData, so we can safely push it onto entryData.
+    this.#entryData.push(syntheticEvent);
     this.#legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
     this.#flameChartData.entryLevels[index] = level;
-    this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-    const msDuration = event.dur || TraceEngine.Types.Timing.MicroSeconds(0);
+    this.#flameChartData.entryStartTimes[index] =
+        TraceEngine.Helpers.Timing.microSecondsToMilliseconds(syntheticEvent.ts);
+    const msDuration = syntheticEvent.dur || TraceEngine.Types.Timing.MicroSeconds(0);
     this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(msDuration);
     return index;
   }
@@ -190,17 +163,21 @@ export class InteractionsTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    return this.#colorGenerator.colorForID(this.titleForEvent(event));
+    let idForColorGeneration = this.titleForEvent(event);
+    if (TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(event)) {
+      // Append the ID so that we vary the colours, ensuring that two events of
+      // the same type are coloured differently.
+      idForColorGeneration += event.interactionId;
+    }
+    return this.#colorGenerator.colorForID(idForColorGeneration);
   }
 
   /**
    * Gets the title an event added by this appender should be rendered with.
    */
   titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    if (TraceEngine.Handlers.ModelHandlers.UserInteractions.eventIsInteractionEvent(event)) {
-      let eventText = event.args.data?.type || 'Interaction';
-      eventText += ` id:${event.interactionId}`;
-      return eventText;
+    if (TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(event)) {
+      return event.type;
     }
     return event.name;
   }
@@ -211,19 +188,6 @@ export class InteractionsTrackAppender implements TrackAppender {
    */
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
-    const totalTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
-        (event.dur || 0) as TraceEngine.Types.Timing.MicroSeconds);
-    const selfTime = totalTime;
-    if (totalTime === TraceEngine.Types.Timing.MilliSeconds(0)) {
-      return {title, formattedTime: ''};
-    }
-    const minSelfTimeSignificance = 1e-6;
-    const time = Math.abs(totalTime - selfTime) > minSelfTimeSignificance && selfTime > minSelfTimeSignificance ?
-        i18nString(UIStrings.sSelfS, {
-          PH1: i18n.TimeUtilities.millisToString(totalTime, true),
-          PH2: i18n.TimeUtilities.millisToString(selfTime, true),
-        }) :
-        i18n.TimeUtilities.millisToString(totalTime, true);
-    return {title, formattedTime: time};
+    return {title, formattedTime: getFormattedTime(event.dur)};
   }
 }

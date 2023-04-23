@@ -29,6 +29,10 @@ const UIStrings = {
    */
   validitySomeRulesInvalid: 'Some rules invalid',
   /**
+   *@description Text in grid and details: Preloading attempt is not yet triggered.
+   */
+  statusNotTriggered: 'Not triggered',
+  /**
    *@description Text in grid and details: Preloading attempt is eligible but pending.
    */
   statusPending: 'Pending',
@@ -84,22 +88,24 @@ class PreloadingUIUtils {
   static status({status}: SDK.PreloadingModel.PreloadingAttempt): string {
     // See content/public/browser/preloading.h PreloadingAttemptOutcome.
     switch (status) {
-      case Protocol.Preload.PreloadingStatus.Pending:
+      case SDK.PreloadingModel.PreloadingStatus.NotTriggered:
+        return i18nString(UIStrings.statusNotTriggered);
+      case SDK.PreloadingModel.PreloadingStatus.Pending:
         return i18nString(UIStrings.statusPending);
-      case Protocol.Preload.PreloadingStatus.Running:
+      case SDK.PreloadingModel.PreloadingStatus.Running:
         return i18nString(UIStrings.statusRunning);
-      case Protocol.Preload.PreloadingStatus.Ready:
+      case SDK.PreloadingModel.PreloadingStatus.Ready:
         return i18nString(UIStrings.statusReady);
-      case Protocol.Preload.PreloadingStatus.Success:
+      case SDK.PreloadingModel.PreloadingStatus.Success:
         return i18nString(UIStrings.statusSuccess);
-      case Protocol.Preload.PreloadingStatus.Failure:
+      case SDK.PreloadingModel.PreloadingStatus.Failure:
         return i18nString(UIStrings.statusFailure);
       // NotSupported is used to handle unreachable case. For example,
       // there is no code path for
       // PreloadingTriggeringOutcome::kTriggeredButPending in prefetch,
       // which is mapped to NotSupported. So, we regard it as an
       // internal error.
-      case Protocol.Preload.PreloadingStatus.NotSupported:
+      case SDK.PreloadingModel.PreloadingStatus.NotSupported:
         return i18n.i18n.lockedString('Internal error');
     }
   }
@@ -134,12 +140,9 @@ interface FeatureFlags {
 // Context switching is managed by scoped target. This class handles
 // switching events and holds PreloadingModel of current context.
 //
-// Note that switching at the timing of activation implies that view is
-// almost cleared automatically. This behavior is aligned to one of
-// PreloadingModel.onPrimaryPageChanged.
-//
-// TODO(https://crbug.com/1410709): Consider to add handing over logic
-// to support non volatile history.
+// Note that switching at the timing of activation triggers handing over
+// from the old model to the new model. See
+// PreloadingMoedl.onPrimaryPageChanged.
 class PreloadingModelProxy implements SDK.TargetManager.SDKModelObserver<SDK.PreloadingModel.PreloadingModel> {
   private readonly view: PreloadingView;
   model: SDK.PreloadingModel.PreloadingModel;
@@ -156,6 +159,11 @@ class PreloadingModelProxy implements SDK.TargetManager.SDKModelObserver<SDK.Pre
   }
 
   modelAdded(model: SDK.PreloadingModel.PreloadingModel): void {
+    // Ignore models/targets of non-outermost frames like iframe/FencedFrames.
+    if (model.target().outermostTarget() !== model.target()) {
+      return;
+    }
+
     this.model.removeEventListener(SDK.PreloadingModel.Events.ModelUpdated, this.view.render, this.view);
     this.model = model;
     this.model.addEventListener(SDK.PreloadingModel.Events.ModelUpdated, this.view.render, this.view);
@@ -273,7 +281,7 @@ export class PreloadingView extends UI.Widget.VBox {
     return vsplit;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
 
     this.registerCSSFiles([emptyWidgetStyles, preloadingViewStyles]);

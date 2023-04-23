@@ -7,34 +7,95 @@ const {assert} = chai;
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as IssuesManager from '../../../../../front_end/models/issues_manager/issues_manager.js';
 
-import {createFakeSetting, describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
+import {createFakeSetting, createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {describeWithMockConnection, dispatchEvent} from '../../helpers/MockConnection.js';
 import {mkInspectorCspIssue, StubIssue, ThirdPartyStubIssue} from './StubIssue.js';
-import {MockIssuesModel} from './MockIssuesModel.js';
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 
-describeWithEnvironment('IssuesManager', () => {
+describeWithMockConnection('IssuesManager', () => {
+  let target: SDK.Target.Target;
+  let model: SDK.IssuesModel.IssuesModel;
+
+  beforeEach(() => {
+    target = createTarget();
+    const maybeModel = target.model(SDK.IssuesModel.IssuesModel);
+    assertNotNullOrUndefined(maybeModel);
+    model = maybeModel;
+  });
+
   it('collects issues from an issues model', () => {
-    const issue1 = new StubIssue('StubIssue1', ['id1', 'id2'], []);
-    const mockModel = new MockIssuesModel([issue1]) as unknown as SDK.IssuesModel.IssuesModel;
     const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
-    issuesManager.modelAdded(mockModel);
 
     const dispatchedIssues: IssuesManager.Issue.Issue[] = [];
     issuesManager.addEventListener(
         IssuesManager.IssuesManager.Events.IssueAdded, event => dispatchedIssues.push(event.data.issue));
 
-    mockModel.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: mockModel, inspectorIssue: mkInspectorCspIssue('url1')});
-    mockModel.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: mockModel, inspectorIssue: mkInspectorCspIssue('url2')});
+    model.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+    model.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url2')});
 
     const expected = ['ContentSecurityPolicyIssue::kURLViolation', 'ContentSecurityPolicyIssue::kURLViolation'];
     assert.deepStrictEqual(dispatchedIssues.map(i => i.code()), expected);
 
-    // The `issue1` should not be present, as it was present before the IssuesManager
-    // was instantiated.
     const issueCodes = Array.from(issuesManager.issues()).map(r => r.code());
     assert.deepStrictEqual(issueCodes, expected);
   });
+
+  function getBlockedUrl(issue: IssuesManager.Issue.Issue): string|undefined {
+    const cspIssue = issue as IssuesManager.ContentSecurityPolicyIssue.ContentSecurityPolicyIssue;
+    return cspIssue.details().blockedURL;
+  }
+
+  it('filter out-of-scope issues', () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+
+    const dispatchedIssues: IssuesManager.Issue.Issue[] = [];
+    issuesManager.addEventListener(
+        IssuesManager.IssuesManager.Events.IssueAdded, event => dispatchedIssues.push(event.data.issue));
+
+    model.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+    const anotherTarget = createTarget();
+    const anotherModel = anotherTarget.model(SDK.IssuesModel.IssuesModel);
+    assertNotNullOrUndefined(anotherModel);
+    anotherModel.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: anotherModel, inspectorIssue: mkInspectorCspIssue('url2')});
+
+    const expected = ['url1'];
+    assert.deepStrictEqual(dispatchedIssues.map(getBlockedUrl), expected);
+
+    assert.deepStrictEqual(Array.from(issuesManager.issues()).map(getBlockedUrl), expected);
+
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
+    assert.deepStrictEqual(Array.from(issuesManager.issues()).map(getBlockedUrl), ['url2']);
+  });
+
+  const updatesOnPrimaryPageChange = (primary: boolean) => () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+
+    model.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+    assert.strictEqual(issuesManager.numberOfIssues(), 1);
+
+    const FRAME = {
+      id: 'main',
+      loaderId: 'test',
+      url: 'http://example.com',
+      securityOrigin: 'http://example.com',
+      mimeType: 'text/html',
+    };
+    if (primary) {
+      dispatchEvent(target, 'Page.frameNavigated', {frame: FRAME});
+    } else {
+      const prerenderTarget = createTarget({subtype: 'prerender'});
+      dispatchEvent(prerenderTarget, 'Page.frameNavigated', {frame: FRAME});
+    }
+    assert.strictEqual(issuesManager.numberOfIssues(), primary ? 0 : 1);
+  };
+
+  it('clears issues after primary page navigation', updatesOnPrimaryPageChange(true));
+  it('does not clear issues after non-primary page navigation', updatesOnPrimaryPageChange(false));
 
   it('filters third-party issues when the third-party issues setting is false, includes them otherwise', () => {
     const issues = [
@@ -46,8 +107,6 @@ describeWithEnvironment('IssuesManager', () => {
 
     const showThirdPartyIssuesSetting = createFakeSetting('third party flag', false);
     const issuesManager = new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting);
-    const mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
-    issuesManager.modelAdded(mockModel);
 
     const firedIssueAddedEventCodes: string[] = [];
     issuesManager.addEventListener(
@@ -55,7 +114,7 @@ describeWithEnvironment('IssuesManager', () => {
         event => firedIssueAddedEventCodes.push(event.data.issue.code()));
 
     for (const issue of issues) {
-      issuesManager.addIssue(mockModel, issue);
+      issuesManager.addIssue(model, issue);
     }
 
     let issueCodes = Array.from(issuesManager.issues()).map(i => i.code());
@@ -73,19 +132,18 @@ describeWithEnvironment('IssuesManager', () => {
     const issue2 = new StubIssue('StubIssue1', ['id2'], [], IssuesManager.Issue.IssueKind.Improvement);
     const issue3 = new StubIssue('StubIssue1', ['id3'], [], IssuesManager.Issue.IssueKind.BreakingChange);
 
-    const mockModel = new MockIssuesModel([issue1]) as unknown as SDK.IssuesModel.IssuesModel;
     const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
-    issuesManager.modelAdded(mockModel);
 
-    issuesManager.addIssue(mockModel, issue1);
-    issuesManager.addIssue(mockModel, issue2);
-    issuesManager.addIssue(mockModel, issue3);
+    issuesManager.addIssue(model, issue1);
+    issuesManager.addIssue(model, issue2);
+    issuesManager.addIssue(model, issue3);
 
     assert.deepStrictEqual(issuesManager.numberOfIssues(), 3);
     assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.Improvement), 2);
     assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.BreakingChange), 1);
     assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.PageError), 0);
   });
+
   describe('instance', () => {
     it('throws an Error if its not the first instance created with "ensureFirst" set', () => {
       IssuesManager.IssuesManager.IssuesManager.instance();
@@ -94,9 +152,7 @@ describeWithEnvironment('IssuesManager', () => {
       assert.throws(() => IssuesManager.IssuesManager.IssuesManager.instance({forceNew: false, ensureFirst: true}));
     });
   });
-});
 
-describeWithEnvironment('IssuesManager', () => {
   it('hides issues added after setting has been initialised', () => {
     const issues = [
       new StubIssue('HiddenStubIssue1', [], []),
@@ -109,8 +165,6 @@ describeWithEnvironment('IssuesManager', () => {
     const showThirdPartyIssuesSetting = createFakeSetting('third party flag', true);
     const issuesManager =
         new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting, hideIssueByCodeSetting);
-    const mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
-    issuesManager.modelAdded(mockModel);
 
     const hiddenIssues: string[] = [];
     issuesManager.addEventListener(IssuesManager.IssuesManager.Events.IssueAdded, event => {
@@ -129,7 +183,7 @@ describeWithEnvironment('IssuesManager', () => {
     });
 
     for (const issue of issues) {
-      issuesManager.addIssue(mockModel, issue);
+      issuesManager.addIssue(model, issue);
     }
 
     assert.deepStrictEqual(hiddenIssues, ['HiddenStubIssue1', 'HiddenStubIssue2']);
@@ -147,8 +201,6 @@ describeWithEnvironment('IssuesManager', () => {
     const showThirdPartyIssuesSetting = createFakeSetting('third party flag', true);
     const issuesManager =
         new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting, hideIssueByCodeSetting);
-    const mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
-    issuesManager.modelAdded(mockModel);
 
     let hiddenIssues: string[] = [];
     issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FullUpdateRequired, () => {
@@ -160,7 +212,7 @@ describeWithEnvironment('IssuesManager', () => {
       }
     });
     for (const issue of issues) {
-      issuesManager.addIssue(mockModel, issue);
+      issuesManager.addIssue(model, issue);
     }
     // Setting is updated by clicking on "hide issue".
     hideIssueByCodeSetting.set({
@@ -187,10 +239,8 @@ describeWithEnvironment('IssuesManager', () => {
     const showThirdPartyIssuesSetting = createFakeSetting('third party flag', true);
     const issuesManager =
         new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting, hideIssueByCodeSetting);
-    const mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
-    issuesManager.modelAdded(mockModel);
     for (const issue of issues) {
-      issuesManager.addIssue(mockModel, issue);
+      issuesManager.addIssue(model, issue);
     }
     hideIssueByCodeSetting.set({
       'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
@@ -238,10 +288,8 @@ describeWithEnvironment('IssuesManager', () => {
     const showThirdPartyIssuesSetting = createFakeSetting('third party flag', true);
     const issuesManager =
         new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting, hideIssueByCodeSetting);
-    const mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
-    issuesManager.modelAdded(mockModel);
     for (const issue of issues) {
-      issuesManager.addIssue(mockModel, issue);
+      issuesManager.addIssue(model, issue);
     }
     hideIssueByCodeSetting.set({
       'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
@@ -262,4 +310,14 @@ describeWithEnvironment('IssuesManager', () => {
     assert.deepStrictEqual(
         UnhiddenIssues, ['HiddenStubIssue1', 'HiddenStubIssue2', 'UnhiddenStubIssue1', 'UnhiddenStubIssue2']);
   });
+
+  it('send update event on scope change', async () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+
+    const updateRequired = issuesManager.once(IssuesManager.IssuesManager.Events.FullUpdateRequired);
+    const anotherTarget = createTarget();
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
+    await updateRequired;
+  });
+
 });

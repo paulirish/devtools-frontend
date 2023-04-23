@@ -347,7 +347,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     this.cookieListTreeElement.setLink(
         'https://developer.chrome.com/docs/devtools/storage/cookies/?utm_source=devtools' as
         Platform.DevToolsPath.UrlString);
-    const cookieIcon = UI.Icon.Icon.create('mediumicon-cookie', 'resource-tree-item');
+    const cookieIcon = UI.Icon.Icon.create('cookie', 'resource-tree-item');
     this.cookieListTreeElement.setLeadingIcons([cookieIcon]);
     storageTreeElement.appendChild(this.cookieListTreeElement);
 
@@ -527,7 +527,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     this.resetWithFrames();
   }
 
-  focus(): void {
+  override focus(): void {
     this.sidebarTree.focus();
   }
 
@@ -913,7 +913,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
       delete this.previousHoveredElement;
     }
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.sidebarTree.registerCSSFiles([resourcesSidebarStyles]);
   }
@@ -944,17 +944,17 @@ export class BackgroundServiceTreeElement extends ApplicationPanelTreeElement {
   private getIconType(): string {
     switch (this.serviceName) {
       case Protocol.BackgroundService.ServiceName.BackgroundFetch:
-        return 'mediumicon-fetch';
+        return 'arrow-up-down';
       case Protocol.BackgroundService.ServiceName.BackgroundSync:
-        return 'mediumicon-sync';
+        return 'sync';
       case Protocol.BackgroundService.ServiceName.PushMessaging:
-        return 'mediumicon-cloud';
+        return 'cloud';
       case Protocol.BackgroundService.ServiceName.Notifications:
-        return 'mediumicon-bell';
+        return 'bell';
       case Protocol.BackgroundService.ServiceName.PaymentHandler:
-        return 'mediumicon-payment';
+        return 'credit-card';
       case Protocol.BackgroundService.ServiceName.PeriodicBackgroundSync:
-        return 'mediumicon-schedule';
+        return 'watch';
       default:
         console.error(`Service ${this.serviceName} does not have a dedicated icon`);
         return 'table';
@@ -969,11 +969,11 @@ export class BackgroundServiceTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return `background-service://${this.serviceName}` as Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     this.selectedInternal = true;
 
@@ -1003,18 +1003,18 @@ export class DatabaseTreeElement extends ApplicationPanelTreeElement {
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'database://' + encodeURI(this.database.name) as Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     this.sidebar.showDatabase(this.database);
     Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.web_sql]);
     return false;
   }
 
-  onexpand(): void {
+  override onexpand(): void {
     void this.updateChildren();
   }
 
@@ -1041,12 +1041,12 @@ export class DatabaseTableTreeElement extends ApplicationPanelTreeElement {
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'database://' + encodeURI(this.database.name) + '/' + encodeURI(this.tableName) as
         Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     this.sidebar.showDatabase(this.database, this.tableName);
     Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.web_sql]);
@@ -1059,15 +1059,15 @@ export class ServiceWorkersTreeElement extends ApplicationPanelTreeElement {
 
   constructor(storagePanel: ResourcesPanel) {
     super(storagePanel, i18n.i18n.lockedString('Service Workers'), false);
-    const icon = UI.Icon.Icon.create('mediumicon-service-worker', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('gears', 'resource-tree-item');
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'service-workers://' as Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new ServiceWorkersView();
@@ -1082,7 +1082,7 @@ export class AppManifestTreeElement extends ApplicationPanelTreeElement {
   private view: AppManifestView;
   constructor(storagePanel: ResourcesPanel) {
     super(storagePanel, i18nString(UIStrings.manifest), true);
-    const icon = UI.Icon.Icon.create('mediumicon-manifest', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('document', 'resource-tree-item');
     this.setLeadingIcons([icon]);
     self.onInvokeElement(this.listItemElement, this.onInvoke.bind(this));
     const emptyView = new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noManifestDetected));
@@ -1096,11 +1096,11 @@ export class AppManifestTreeElement extends ApplicationPanelTreeElement {
     this.view.contentElement.addEventListener('manifestDetection', handleExpansion);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'manifest://' as Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     this.showView(this.view);
     Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.app_manifest]);
@@ -1133,7 +1133,7 @@ export class ManifestChildTreeElement extends ApplicationPanelTreeElement {
   #sectionFieldElement: HTMLElement;
   constructor(storagePanel: ResourcesPanel, element: Element, childTitle: string, fieldElement: HTMLElement) {
     super(storagePanel, childTitle, false);
-    const icon = UI.Icon.Icon.create('mediumicon-manifest', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('document', 'resource-tree-item');
     this.setLeadingIcons([icon]);
     this.#sectionElement = element;
     this.#sectionFieldElement = fieldElement;
@@ -1143,7 +1143,7 @@ export class ManifestChildTreeElement extends ApplicationPanelTreeElement {
         this.listItemElement, i18nString(UIStrings.beforeInvokeAlert, {PH1: this.listItemElement.title}));
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'manifest://' + this.title as Platform.DevToolsPath.UrlString;
   }
 
@@ -1183,11 +1183,11 @@ export class ClearStorageTreeElement extends ApplicationPanelTreeElement {
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'clear-storage://' as Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new StorageView();
@@ -1237,7 +1237,7 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
     }
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -1332,11 +1332,11 @@ export class IDBDatabaseTreeElement extends ApplicationPanelTreeElement {
     this.model.addEventListener(IndexedDBModelEvents.DatabaseNamesRefreshed, this.refreshIndexedDB, this);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'indexedDB://' + this.databaseId.storageKey + '/' + this.databaseId.name as Platform.DevToolsPath.UrlString;
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -1397,7 +1397,7 @@ export class IDBDatabaseTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.database) {
       return false;
@@ -1446,12 +1446,12 @@ export class IDBObjectStoreTreeElement extends ApplicationPanelTreeElement {
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'indexedDB://' + this.databaseId.storageKey + '/' + this.databaseId.name + '/' + this.objectStore.name as
         Platform.DevToolsPath.UrlString;
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -1533,7 +1533,7 @@ export class IDBObjectStoreTreeElement extends ApplicationPanelTreeElement {
     this.tooltip = tooltipString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view =
@@ -1583,7 +1583,7 @@ export class IDBIndexTreeElement extends ApplicationPanelTreeElement {
     this.refreshObjectStore = refreshObjectStore;
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'indexedDB://' + this.databaseId.storageKey + '/' + this.databaseId.name + '/' + this.objectStore.name +
         '/' + this.index.name as Platform.DevToolsPath.UrlString;
   }
@@ -1624,7 +1624,7 @@ export class IDBIndexTreeElement extends ApplicationPanelTreeElement {
     this.tooltip = tooltipLines.join('\n');
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new IDBDataView(this.model, this.databaseId, this.objectStore, this.index, this.refreshObjectStore);
@@ -1651,19 +1651,19 @@ export class DOMStorageTreeElement extends ApplicationPanelTreeElement {
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'storage://' + this.domStorage.storageKey + '/' + (this.domStorage.isLocalStorage ? 'local' : 'session') as
         Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.dom_storage]);
     this.resourcesPanel.showDOMStorage(this.domStorage);
     return false;
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -1684,11 +1684,11 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
     this.target = frame.resourceTreeModel().target();
     this.cookieDomainInternal = cookieDomain;
     this.tooltip = i18nString(UIStrings.cookiesUsedByFramesFromS, {PH1: cookieDomain});
-    const icon = UI.Icon.Icon.create('mediumicon-cookie', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('cookie', 'resource-tree-item');
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'cookies://' + this.cookieDomainInternal as Platform.DevToolsPath.UrlString;
   }
 
@@ -1696,7 +1696,7 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
     return this.cookieDomainInternal;
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -1708,7 +1708,7 @@ export class CookieTreeElement extends ApplicationPanelTreeElement {
     void contextMenu.show();
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     this.resourcesPanel.showCookies(this.target, this.cookieDomainInternal);
     Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.cookies]);
@@ -1999,12 +1999,12 @@ export class FrameTreeElement extends ApplicationPanelTreeElement {
     this.view = null;
   }
 
-  getIconTypeForFrame(frame: SDK.ResourceTreeModel.ResourceTreeFrame): 'mediumicon-frame-blocked'|'mediumicon-frame'|
-      'mediumicon-frame-embedded-blocked'|'mediumicon-frame-embedded' {
+  getIconTypeForFrame(frame: SDK.ResourceTreeModel.ResourceTreeFrame): 'frame-crossed'|'frame'|'iframe-crossed'|
+      'iframe' {
     if (frame.isOutermostFrame()) {
-      return frame.unreachableUrl() ? 'mediumicon-frame-blocked' : 'mediumicon-frame';
+      return frame.unreachableUrl() ? 'frame-crossed' : 'frame';
     }
-    return frame.unreachableUrl() ? 'mediumicon-frame-embedded-blocked' : 'mediumicon-frame-embedded';
+    return frame.unreachableUrl() ? 'iframe-crossed' : 'iframe';
   }
 
   async frameNavigated(frame: SDK.ResourceTreeModel.ResourceTreeFrame): Promise<void> {
@@ -2055,7 +2055,7 @@ export class FrameTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     // This is used to persist over reloads/navigation which frame was selected.
     // A frame's title can change on DevTools refresh, so we resort to using
     // the URL instead (even though it is not guaranteed to be unique).
@@ -2065,7 +2065,7 @@ export class FrameTreeElement extends ApplicationPanelTreeElement {
     return 'frame://' + encodeURI(this.frame.url) as Platform.DevToolsPath.UrlString;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new ApplicationComponents.FrameDetailsView.FrameDetailsView(this.frame);
@@ -2162,7 +2162,7 @@ export class FrameTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  appendChild(
+  override appendChild(
       treeElement: UI.TreeOutline.TreeElement,
       comparator: ((arg0: UI.TreeOutline.TreeElement, arg1: UI.TreeOutline.TreeElement) => number)|
       undefined = FrameTreeElement.presentationOrderCompare): void {
@@ -2207,7 +2207,7 @@ export class FrameResourceTreeElement extends ApplicationPanelTreeElement {
     this.tooltip = resource.url;
     resourceToFrameResourceTreeElement.set(this.resource, this);
 
-    const icon = UI.Icon.Icon.create('mediumicon-manifest', 'navigator-file-tree-item');
+    const icon = UI.Icon.Icon.create('document', 'navigator-file-tree-item');
     icon.classList.add('navigator-' + resource.resourceType().name() + '-tree-item');
     this.setLeadingIcons([icon]);
   }
@@ -2216,7 +2216,7 @@ export class FrameResourceTreeElement extends ApplicationPanelTreeElement {
     return resourceToFrameResourceTreeElement.get(resource);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return this.resource.url;
   }
 
@@ -2234,7 +2234,7 @@ export class FrameResourceTreeElement extends ApplicationPanelTreeElement {
     return this.previewPromise;
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (this.resource.isGenerated) {
       this.panel.showCategoryView(i18nString(UIStrings.theContentOfThisDocumentHasBeen), null);
@@ -2245,12 +2245,12 @@ export class FrameResourceTreeElement extends ApplicationPanelTreeElement {
     return false;
   }
 
-  ondblclick(_event: Event): boolean {
+  override ondblclick(_event: Event): boolean {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(this.resource.url);
     return false;
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.draggable = true;
     this.listItemElement.addEventListener('dragstart', this.ondragstart.bind(this), false);
@@ -2296,7 +2296,7 @@ class FrameWindowTreeElement extends ApplicationPanelTreeElement {
   }
 
   updateIcon(canAccessOpener: boolean): void {
-    const iconType = canAccessOpener ? 'mediumicon-frame-opened' : 'mediumicon-frame';
+    const iconType = canAccessOpener ? 'popup' : 'frame';
     const icon = UI.Icon.Icon.create(iconType);
     this.setLeadingIcons([icon]);
   }
@@ -2321,7 +2321,7 @@ class FrameWindowTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new OpenedWindowDetailsView(this.targetInfo, this.isWindowClosed);
@@ -2333,7 +2333,7 @@ class FrameWindowTreeElement extends ApplicationPanelTreeElement {
     return false;
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return this.targetInfo.url as Platform.DevToolsPath.UrlString;
   }
 }
@@ -2346,11 +2346,11 @@ class WorkerTreeElement extends ApplicationPanelTreeElement {
     super(storagePanel, targetInfo.title || targetInfo.url || i18nString(UIStrings.worker), false);
     this.targetInfo = targetInfo;
     this.view = null;
-    const icon = UI.Icon.Icon.create('mediumicon-service-worker', 'navigator-file-tree-item');
+    const icon = UI.Icon.Icon.create('gears', 'navigator-file-tree-item');
     this.setLeadingIcons([icon]);
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new WorkerDetailsView(this.targetInfo);
@@ -2362,7 +2362,7 @@ class WorkerTreeElement extends ApplicationPanelTreeElement {
     return false;
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return this.targetInfo.url as Platform.DevToolsPath.UrlString;
   }
 }

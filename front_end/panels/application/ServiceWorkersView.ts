@@ -462,7 +462,7 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
   private updateListVisibility(): void {
     this.contentElement.classList.toggle('service-worker-list-empty', this.sections.size === 0);
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([
       serviceWorkersViewStyles,
@@ -612,7 +612,11 @@ export class Section {
     link.tabIndex = 0;
     name.appendChild(link);
     if (this.registration.errors.length) {
-      const errorsLabel = UI.UIUtils.createIconLabel(String(this.registration.errors.length), 'smallicon-error');
+      const errorsLabel = UI.UIUtils.createIconLabel({
+        title: String(this.registration.errors.length),
+        iconName: 'cross-circle-filled',
+        color: 'var(--icon-error)',
+      });
       errorsLabel.classList.add('devtools-link', 'link');
       errorsLabel.tabIndex = 0;
       UI.ARIAUtils.setAccessibleName(

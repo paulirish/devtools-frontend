@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 import * as CurrentPageMetrics from './CurrentPageMetrics.js';
-import * as WebVitalsTimeline from './WebVitalsTimeline.js';
 
 export {
   CurrentPageMetrics,
-  WebVitalsTimeline,
 };

@@ -62,18 +62,21 @@ const str_ = i18n.i18n.registerUIStrings('panels/network/components/HeaderSectio
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const trashIconUrl = new URL('../../../Images/bin.svg', import.meta.url).toString();
-const editIconUrl = new URL('../../../Images/edit-icon.svg', import.meta.url).toString();
+const editIconUrl = new URL('../../../Images/edit.svg', import.meta.url).toString();
 
 export const isValidHeaderName = (headerName: string): boolean => {
   return /^[a-z0-9_\-]+$/i.test(headerName);
 };
 
 export const compareHeaders = (first: string|null|undefined, second: string|null|undefined): boolean => {
-  // Replaces non-breaking spaces(NBSPs) with regular spaces.
-  // When working with contenteditables, their content can contain (non-obvious) NBSPs.
-  // It would be tricky to get rid of NBSPs during editing and saving, so we just
-  // handle them after reading them in.
-  return first?.replaceAll('\xa0', ' ') === second?.replaceAll('\xa0', ' ');
+  // Replaces all whitespace characters with regular spaces.
+  // When working with contenteditables, their content can contain (non-obvious)
+  // non-breaking spaces (NBSPs). It would be tricky to get rid of NBSPs during
+  // editing and saving, so we just handle them after reading them in.
+  // Tab characters are invalid in headers (and DevTools shows a warning for
+  // them), the replacement here ensures that headers containing tabs are not
+  // incorrectly marked as being overridden.
+  return first?.replaceAll(/\s/g, ' ') === second?.replaceAll(/\s/g, ' ');
 };
 
 export class HeaderEditedEvent extends Event {
@@ -225,8 +228,8 @@ export class HeaderSectionRow extends HTMLElement {
           .size=${Buttons.Button.Size.TINY}
           .iconUrl=${editIconUrl}
           .variant=${Buttons.Button.Variant.ROUND}
-          .iconWidth=${'13px'}
-          .iconHeight=${'13px'}
+          .iconWidth=${'16px'}
+          .iconHeight=${'16px'}
           @click=${(): void => {
             this.dispatchEvent(new EnableHeaderEditingEvent());
           }}
@@ -258,7 +261,7 @@ export class HeaderSectionRow extends HTMLElement {
     // clang-format on
   }
 
-  focus(): void {
+  override focus(): void {
     requestAnimationFrame(() => {
       const editableName = this.#shadow.querySelector<HTMLElement>('.header-name devtools-editable-span');
       editableName?.focus();
@@ -329,10 +332,10 @@ export class HeaderSectionRow extends HTMLElement {
       return html`
         <div class="devtools-link" @click=${blockedDetails.reveal}>
           <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
-            iconName: 'issue-exclamation-icon',
-            color: 'var(--issue-color-yellow)',
-            width: '16px',
-            height: '16px',
+            iconName: 'issue-exclamation-filled',
+            color: 'var(--icon-warning)',
+            width: '20px',
+            height: '20px',
           } as IconButton.Icon.IconData}>
           </${IconButton.Icon.Icon.litTagName}
           >${i18nString(UIStrings.learnMoreInTheIssuesTab)}
@@ -436,7 +439,7 @@ export class HeaderSectionRow extends HTMLElement {
   #onHeaderValueEdit(event: Event): void {
     const editable = event.target as EditableSpan;
     const isEdited =
-        this.#header?.originalValue !== undefined && (this.#header?.originalValue || '') !== editable.value;
+        this.#header?.originalValue !== undefined && !compareHeaders(this.#header?.originalValue || '', editable.value);
     if (this.#isHeaderValueEdited !== isEdited) {
       this.#isHeaderValueEdited = isEdited;
       if (this.#header) {

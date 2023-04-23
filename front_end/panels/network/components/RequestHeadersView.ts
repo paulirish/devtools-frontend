@@ -119,7 +119,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
     this.contentElement.appendChild(this.#requestHeadersComponent);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.#request.addEventListener(SDK.NetworkRequest.Events.RemoteAddressChanged, this.#refreshHeadersView, this);
     this.#request.addEventListener(SDK.NetworkRequest.Events.FinishedLoading, this.#refreshHeadersView, this);
     this.#request.addEventListener(SDK.NetworkRequest.Events.RequestHeadersChanged, this.#refreshHeadersView, this);
@@ -128,7 +128,7 @@ export class RequestHeadersView extends UI.Widget.VBox {
     this.#refreshHeadersView();
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.#request.removeEventListener(SDK.NetworkRequest.Events.RemoteAddressChanged, this.#refreshHeadersView, this);
     this.#request.removeEventListener(SDK.NetworkRequest.Events.FinishedLoading, this.#refreshHeadersView, this);
     this.#request.removeEventListener(SDK.NetworkRequest.Events.RequestHeadersChanged, this.#refreshHeadersView, this);
@@ -276,8 +276,8 @@ export class RequestHeadersComponent extends HTMLElement {
         } as IconButton.Icon.IconData}>
       </${IconButton.Icon.Icon.litTagName}>` : html`
       <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
-          iconName: 'file_icon',
-          color: 'var(--color-text-primary)',
+          iconName: 'document',
+          color: 'var(--icon-default)',
           width: '12px',
           height: '12px',
         } as IconButton.Icon.IconData}>
@@ -298,8 +298,8 @@ export class RequestHeadersComponent extends HTMLElement {
     return html`
       <x-link href="https://goo.gle/devtools-override" class="link devtools-link">
         <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
-            iconName: 'help_outline',
-            color: 'var(--color-primary-old)',
+            iconName: 'help',
+            color: 'var(--icon-link)',
             width: '16px',
             height: '16px',
           } as IconButton.Icon.IconData}>

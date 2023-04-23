@@ -7,9 +7,12 @@ import("../../../../../third_party/typescript/typescript.gni")
 ts_library("timeline") {
   testonly = true
   sources = [
+    "EventTypeHelpers_test.ts",
+    "SaveFileFormatter_test.ts",
     "SourceMaps_test.ts",
     "TimelineFlameChartView_test.ts",
     "TimelineHistoryManager_test.ts",
+    "TimelineSelection_test.ts",
     "TimelineUIUtils_test.ts",
   ]
 

@@ -307,10 +307,19 @@ export class CSSModel extends SDKModel<EventTypes> {
       return null;
     }
 
-    return new CSSMatchedStyles(
-        this, (node as DOMNode), response.inlineStyle || null, response.attributesStyle || null,
-        response.matchedCSSRules || [], response.pseudoElements || [], response.inherited || [],
-        response.inheritedPseudoElements || [], response.cssKeyframesRules || [], response.parentLayoutNodeId);
+    return new CSSMatchedStyles({
+      cssModel: this,
+      node: (node as DOMNode),
+      inlinePayload: response.inlineStyle || null,
+      attributesPayload: response.attributesStyle || null,
+      matchedPayload: response.matchedCSSRules || [],
+      pseudoPayload: response.pseudoElements || [],
+      inheritedPayload: response.inherited || [],
+      inheritedPseudoPayload: response.inheritedPseudoElements || [],
+      animationsPayload: response.cssKeyframesRules || [],
+      parentLayoutNodeId: response.parentLayoutNodeId,
+      positionFallbackRules: response.cssPositionFallbackRules || [],
+    });
   }
 
   async getClassNames(styleSheetId: Protocol.CSS.StyleSheetId): Promise<string[]> {
@@ -590,6 +599,18 @@ export class CSSModel extends SDKModel<EventTypes> {
 
   styleSheetAdded(header: Protocol.CSS.CSSStyleSheetHeader): void {
     console.assert(!this.#styleSheetIdToHeader.get(header.styleSheetId));
+    if (header.loadingFailed) {
+      // When the stylesheet fails to load, treat it as a constructed stylesheet. Failed sheets can still be modified
+      // from JS, in which case CSS.styleSheetChanged events are sent. So as to not confuse CSSModel clients we don't
+      // just discard the failed sheet here. Treating the failed sheet as a constructed stylesheet lets us keep track
+      // of it cleanly.
+      header.hasSourceURL = false;
+      header.isConstructed = true;
+      header.isInline = false;
+      header.isMutable = false;
+      header.sourceURL = '';
+      header.sourceMapURL = undefined;
+    }
     const styleSheetHeader = new CSSStyleSheetHeader(this, header);
     this.#styleSheetIdToHeader.set(header.styleSheetId, styleSheetHeader);
     const url = styleSheetHeader.resourceURL();
@@ -718,14 +739,14 @@ export class CSSModel extends SDKModel<EventTypes> {
     this.#fontFaces.clear();
   }
 
-  async suspendModel(): Promise<void> {
+  override async suspendModel(): Promise<void> {
     this.#isEnabled = false;
     await this.agent.invoke_disable();
     this.resetStyleSheets();
     this.resetFontFaces();
   }
 
-  async resumeModel(): Promise<void> {
+  override async resumeModel(): Promise<void> {
     return this.enable();
   }
 
@@ -804,7 +825,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     }
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.disableCSSPropertyTracker();
     super.dispose();
     this.#sourceMapManager.dispose();

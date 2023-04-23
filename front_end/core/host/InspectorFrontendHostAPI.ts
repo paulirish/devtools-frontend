@@ -300,7 +300,7 @@ export interface InspectorFrontendHostAPI {
 }
 
 export interface ContextMenuDescriptor {
-  type: string;
+  type: 'checkbox'|'item'|'separator'|'subMenu';
   id?: number;
   label?: string;
   enabled?: boolean;
@@ -388,4 +388,6 @@ export enum EnumeratedHistogram {
   ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
+  InlineScriptParsed = 'DevTools.InlineScriptParsed',
+  VMInlineScriptTypeShown = 'DevTools.VMInlineScriptShown',
 }

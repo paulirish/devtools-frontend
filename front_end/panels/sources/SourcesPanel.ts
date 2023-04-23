@@ -394,7 +394,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     return this.pausedInternal || false;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     UI.Context.Context.instance().setFlavor(SourcesPanel, this);
     this.registerCSSFiles([sourcesPanelStyles]);
     super.wasShown();
@@ -406,7 +406,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.editorView.setMainWidget(this.sourcesViewInternal);
   }
 
-  willHide(): void {
+  override willHide(): void {
     super.willHide();
     UI.Context.Context.instance().setFlavor(SourcesPanel, null);
     if (WrapperView.isShowing()) {
@@ -435,13 +435,13 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     return true;
   }
 
-  onResize(): void {
+  override onResize(): void {
     if (Common.Settings.Settings.instance().moduleSetting('sidebarPosition').get() === 'auto') {
       this.element.window().requestAnimationFrame(this.updateSidebarPosition.bind(this));
     }  // Do not force layout.
   }
 
-  searchableView(): UI.SearchableView.SearchableView {
+  override searchableView(): UI.SearchableView.SearchableView {
     return this.sourcesViewInternal.searchableView();
   }
 
@@ -573,9 +573,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     const previewIcon = new IconButton.Icon.Icon();
     previewIcon.data = {
-      iconName: 'ic_preview_feature',
-      color: 'var(--icon-color)',
-      width: '14px',
+      iconName: 'experiment',
+      color: 'var(--icon-default)',
+      width: '16px',
     };
     menuSection.appendCheckboxItem(
         menuItem, toggleExperiment, Root.Runtime.experiments.isEnabled(experiment), false, previewIcon);
@@ -827,10 +827,10 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const debugToolbar = new UI.Toolbar.Toolbar('scripts-debug-toolbar');
 
     const longResumeButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'largeicon-play');
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'play');
     longResumeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.longResume, this);
-    const terminateExecutionButton = new UI.Toolbar.ToolbarButton(
-        i18nString(UIStrings.terminateCurrentJavascriptCall), 'largeicon-terminate-execution');
+    const terminateExecutionButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.terminateCurrentJavascriptCall), 'stop');
     terminateExecutionButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.terminateExecution, this);
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createLongPressActionButton(
         this.togglePauseAction, [terminateExecutionButton, longResumeButton], []));
@@ -1424,7 +1424,7 @@ export class WrapperView extends UI.Widget.VBox {
     return Boolean(wrapperViewInstance) && wrapperViewInstance.isShowing();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     if (!SourcesPanel.instance().isShowing()) {
       this.showViewInWrapper();
     } else {
@@ -1433,7 +1433,7 @@ export class WrapperView extends UI.Widget.VBox {
     SourcesPanel.updateResizerAndSidebarButtons(SourcesPanel.instance());
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.InspectorView.InspectorView.instance().setDrawerMinimized(false);
     queueMicrotask(() => {
       SourcesPanel.updateResizerAndSidebarButtons(SourcesPanel.instance());

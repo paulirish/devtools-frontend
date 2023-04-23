@@ -149,7 +149,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
     this.update();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.update();
     this.registerCSSFiles([classesPaneWidgetStyles]);
@@ -360,7 +360,6 @@ export class ClassNamePrompt extends UI.TextPrompt.TextPrompt {
         text: completion,
         title: undefined,
         subtitle: undefined,
-        iconType: undefined,
         priority: undefined,
         isSecondary: undefined,
         subtitleRenderer: undefined,

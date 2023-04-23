@@ -138,7 +138,7 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
     if (typeof item === 'string') {
       UI.ARIAUtils.setLevel(itemElement, 1);
       itemElement.classList.add('keybinds-category-header');
-      itemElement.textContent = item;
+      itemElement.textContent = UI.ActionRegistration.getLocalizedActionCategory(item);
     } else {
       const listItem = new ShortcutListItem(item, this, item === this.editingItem);
       itemElement = listItem.element;
@@ -213,6 +213,8 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
   }
 
   startEditing(action: UI.ActionRegistration.Action): void {
+    this.list.selectItem(action);
+
     if (this.editingItem) {
       this.stopEditing(this.editingItem);
     }
@@ -248,7 +250,7 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
 
     const items: KeybindsItem[] = [];
 
-    let currentCategory: string;
+    let currentCategory: UI.ActionRegistration.ActionCategory;
     actions.forEach(action => {
       if (action.id() === 'elements.toggle-element-search') {
         return;
@@ -280,12 +282,12 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
     }
   }
 
-  willHide(): void {
+  override willHide(): void {
     if (this.editingItem) {
       this.stopEditing(this.editingItem);
     }
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([keybindsSettingsTabStyles]);
   }
@@ -345,7 +347,7 @@ export class ShortcutListItem {
 
   private createEmptyInfo(): void {
     if (UI.ShortcutRegistry.ShortcutRegistry.instance().actionHasDefaultShortcut(this.item.id())) {
-      const icon = UI.Icon.Icon.create('largeicon-shortcut-changed', 'keybinds-modified');
+      const icon = UI.Icon.Icon.create('keyboard-pen', 'keybinds-modified');
       UI.ARIAUtils.setAccessibleName(icon, i18nString(UIStrings.shortcutModified));
       this.element.appendChild(icon);
     }
@@ -405,7 +407,7 @@ export class ShortcutListItem {
     }
     let icon: UI.Icon.Icon;
     if (shortcut.type !== UI.KeyboardShortcut.Type.UnsetShortcut && !shortcut.isDefault()) {
-      icon = UI.Icon.Icon.create('largeicon-shortcut-changed', 'keybinds-modified');
+      icon = UI.Icon.Icon.create('keyboard-pen', 'keybinds-modified');
       UI.ARIAUtils.setAccessibleName(icon, i18nString(UIStrings.shortcutModified));
       this.element.appendChild(icon);
     }
@@ -539,6 +541,10 @@ export class ShortcutListItem {
     }
     const disabledDefaults = UI.ShortcutRegistry.ShortcutRegistry.instance().disabledDefaultsForAction(this.item.id());
     disabledDefaults.forEach(shortcut => {
+      if (this.shortcuts.includes(shortcut)) {
+        return;
+      }
+
       this.shortcuts.push(shortcut);
       this.editedShortcuts.set(shortcut, shortcut.descriptors);
     });
@@ -603,4 +609,4 @@ export class ShortcutListItem {
   }
 }
 
-export type KeybindsItem = string|UI.ActionRegistration.Action;
+export type KeybindsItem = UI.ActionRegistration.ActionCategory|UI.ActionRegistration.Action;

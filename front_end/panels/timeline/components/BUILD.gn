@@ -9,14 +9,10 @@ import("../../../../scripts/build/ninja/generate_css.gni")
 import("../../visibility.gni")
 
 generate_css("css_files") {
-  sources = [ "WebVitalsTooltip.css" ]
 }
 
 devtools_module("components") {
   sources = [
-    "WebVitalsLane.ts",
-    "WebVitalsTimeline.ts",
-    "WebVitalsTooltip.ts",
     "CurrentPageMetrics.ts",
     "getMetricsInPage.js"
   ]
@@ -50,7 +46,6 @@ devtools_entrypoint("bundle") {
     ":*",
     "../:*",
     "../../../../test/unittests/front_end/panels/timeline/components/*",
-    "../../../ui/components/docs/webvitals/*",
   ]
 
   visibility += devtools_panels_visibility
