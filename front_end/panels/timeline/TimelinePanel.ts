@@ -40,6 +40,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import type * as Protocol from '../../generated/protocol.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
@@ -49,16 +50,18 @@ import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedbac
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import {TickingFlameChart} from '../media/TickingFlameChart.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import {ActiveFilters} from './ActiveFilters.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
 import * as Components from './components/components.js';
+import {PlayerEventsTimeline} from './components/CurrentPageMetrics.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
 import {IsolateSelector} from './IsolateSelector.js';
 import {PerformanceModel} from './PerformanceModel.js';
-import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
+import {cpuprofileJsonGenerator, traceJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
 import {NodeNamesUpdated, SourceMapsResolver} from './SourceMapsResolver.js';
 import {type Client, TimelineController} from './TimelineController.js';
 import {TimelineFlameChartView} from './TimelineFlameChartView.js';
@@ -66,7 +69,7 @@ import {TimelineHistoryManager} from './TimelineHistoryManager.js';
 import {TimelineLoader} from './TimelineLoader.js';
 import {TimelineMiniMap} from './TimelineMiniMap.js';
 import timelinePanelStyles from './timelinePanel.css.js';
-import {TimelineSelection} from './TimelineSelection.js';
+import {TimelineSelection, TimelineSelection} from './TimelineSelection.js';
 import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
@@ -296,6 +299,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private saveButton!: UI.Toolbar.ToolbarButton;
   private statusPane!: StatusPane|null;
   private landingPage!: UI.Widget.Widget;
+  private landingPageTimeline!: TickingFlameChart;
   private loader?: TimelineLoader;
   private showScreenshotsToolbarCheckbox?: UI.Toolbar.ToolbarItem;
   private showMemoryToolbarCheckbox?: UI.Toolbar.ToolbarItem;
@@ -390,6 +394,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.#minimapComponent.show(topPaneElement);
 
     this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container fill');
+
+    const liveTimelineEl = this.timelinePane.element.createChild('div', 'vbox');
+    liveTimelineEl.id = 'live-timeline';
+    // liveTimelineEl.append()
+
+    this.landingPageTimeline = new PlayerEventsTimeline();
+    // this.landingPageTimeline.show(liveTimelineEl);
+    // setTimeout(_ => {
+    this.landingPageTimeline.show(liveTimelineEl);
+    // }, 1000);
 
     this.createFileSelector();
 
@@ -1287,57 +1301,57 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       return;
     }
 
-    function encloseWithTag(tagName: string, contents: string): HTMLElement {
-      const e = document.createElement(tagName);
-      e.textContent = contents;
-      return e;
-    }
+    // function encloseWithTag(tagName: string, contents: string): HTMLElement {
+    //   const e = document.createElement(tagName);
+    //   e.textContent = contents;
+    //   return e;
+    // }
 
-    const learnMoreNode = UI.XLink.XLink.create(
-        'https://developer.chrome.com/docs/devtools/evaluate-performance/', i18nString(UIStrings.learnmore), undefined,
-        undefined, 'learn-more');
+    // const learnMoreNode = UI.XLink.XLink.create(
+    //     'https://developer.chrome.com/docs/devtools/evaluate-performance/', i18nString(UIStrings.learnmore), undefined,
+    //     undefined, 'learn-more');
 
-    const recordKey = encloseWithTag(
-        'b',
-        UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.toggle-recording')[0].title());
-    const reloadKey = encloseWithTag(
-        'b', UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.record-reload')[0].title());
-    const navigateNode = encloseWithTag('b', i18nString(UIStrings.wasd));
+    // const recordKey = encloseWithTag(
+    //     'b',
+    //     UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.toggle-recording')[0].title());
+    // const reloadKey = encloseWithTag(
+    //     'b', UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.record-reload')[0].title());
+    // const navigateNode = encloseWithTag('b', i18nString(UIStrings.wasd));
 
     this.landingPage = new UI.Widget.VBox();
     this.landingPage.contentElement.classList.add('timeline-landing-page', 'fill');
     const centered = this.landingPage.contentElement.createChild('div');
 
-    const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
-    const reloadButton =
-        UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButtonForId('timeline.record-reload'));
+    // this.landingPage.contentElement.classList.add('timeline-landing-page', 'fill');
+    // const centered = this.landingPage.contentElement.createChild('div');
 
-    const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
-    centered.appendChild(pageMetrics);
+    // const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
+    // const reloadButton =
+    //     UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButtonForId('timeline.record-reload'));
 
-    centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.clickTheRecordButtonSOrHitSTo, {PH1: recordButton, PH2: recordKey}));
+    // const pageMetrics = new Components.CurrentPageMetrics.CurrentPageMetrics();
+    // centered.appendChild(pageMetrics);
 
-    centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.clickTheReloadButtonSOrHitSTo, {PH1: reloadButton, PH2: reloadKey}));
+    // centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
+    //     str_, UIStrings.clickTheRecordButtonSOrHitSTo, {PH1: recordButton, PH2: recordKey}));
 
-    centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.afterRecordingSelectAnAreaOf, {PH1: navigateNode, PH2: learnMoreNode}));
+    // centered.createChild('p').appendChild(i18n.i18n.getFormatLocalizedString(
+    //     str_, UIStrings.clickTheReloadButtonSOrHitSTo, {PH1: reloadButton, PH2: reloadKey}));
 
-    if (isNode) {
-      const previewSection = new PanelFeedback.PanelFeedback.PanelFeedback();
-      previewSection.data = {
-        feedbackUrl: 'https://crbug.com/1354548' as Platform.DevToolsPath.UrlString,
-        quickStartUrl: 'https://goo.gle/js-profiler-deprecation' as Platform.DevToolsPath.UrlString,
-        quickStartLinkText: i18nString(UIStrings.learnmore),
-      };
-      centered.appendChild(previewSection);
-      const feedbackButton = new PanelFeedback.FeedbackButton.FeedbackButton();
-      feedbackButton.data = {
-        feedbackUrl: 'https://crbug.com/1354548' as Platform.DevToolsPath.UrlString,
-      };
-      centered.appendChild(feedbackButton);
-    }
+    // if (isNode) {
+    //   const previewSection = new PanelFeedback.PanelFeedback.PanelFeedback();
+    //   previewSection.data = {
+    //     feedbackUrl: 'https://crbug.com/1354548' as Platform.DevToolsPath.UrlString,
+    //     quickStartUrl: 'https://goo.gle/js-profiler-deprecation' as Platform.DevToolsPath.UrlString,
+    //     quickStartLinkText: i18nString(UIStrings.learnmore),
+    //   };
+    //   centered.appendChild(previewSection);
+    //   const feedbackButton = new PanelFeedback.FeedbackButton.FeedbackButton();
+    //   feedbackButton.data = {
+    //     feedbackUrl: 'https://crbug.com/1354548' as Platform.DevToolsPath.UrlString,
+    //   };
+    //   centered.appendChild(feedbackButton);
+    // }
 
     this.landingPage.show(this.statusPaneContainer);
   }

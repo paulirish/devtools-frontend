@@ -170,10 +170,9 @@ export class CurrentPageMetrics extends HTMLElement {
   }
 
   #render(): void {
-    globalThis.tv = this.timelineView;
-    this.timelineView.element.style.height = '200px';
-    this.#shadow.appendChild(this.timelineView.element);
-    this.timelineView.show();
+    // globalThis.tv = this.timelineView;
+    // this.timelineView.element.style.height = '200px';
+    // this.timelineView.show();
     // clang-format off
     LitHtml.render(LitHtml.html`<button @click=${(): void => {
       void this.#invokePerfObserver();
@@ -181,6 +180,7 @@ export class CurrentPageMetrics extends HTMLElement {
       ${this.#renderPageMetrics()}
     `, this.#shadow, {host: this});
     // clang-format on
+    // this.#shadow.appendChild(this.timelineView.element);
   }
 
 

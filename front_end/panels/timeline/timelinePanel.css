@@ -53,6 +53,10 @@
   border-bottom: 1px solid var(--sys-color-divider);
 }
 
+#live-timeline {
+  flex: 1;
+}
+
 #timeline-overview-grid {
   background-color: var(--sys-color-cdt-base-container);
 }
@@ -79,6 +83,7 @@
   display: flex;
   align-items: center;
   pointer-events: none;
+  display: none;
 }
 
 .timeline.panel .status-pane-container.tinted {
