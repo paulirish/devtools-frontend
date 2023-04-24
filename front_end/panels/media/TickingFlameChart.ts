@@ -363,7 +363,7 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
   private bounds: Bounds;
   private readonly liveEvents: Set<number>;
   private eventMap: Map<number, Event>;
-  private readonly timelineDataInternal: PerfUI.FlameChart.TimelineData;
+  private timelineDataInternal: PerfUI.FlameChart.TimelineData;
   private maxLevel: number;
 
   constructor(initialBounds: Bounds, updateMaxTime: (arg0: number) => void) {
@@ -385,6 +385,10 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
 
     // The current sum of all group heights.
     this.maxLevel = 0;
+
+    setInterval(() => {
+      this.updateTimelineData();
+    }, 5000);
   }
 
   /**
@@ -427,6 +431,40 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
 
     this.eventMap.set(event.id, event);
     return event;
+  }
+
+  private updateTimelineData(): void {
+    if (!this.timelineDataInternal) {
+      return;
+    }
+    const lastTimeByLevel = [];
+    let maxLevel = 0;
+    for (let i = 0; i < [...this.eventMap.values()].length; ++i) {
+      const event = [...this.eventMap.values()][i]; // so so dumb.
+      const startTime = event.startTime;
+      // const startTime = (this.startTime as number);
+      const endTime = event.startTime + event.duration;
+      // const visible = beginTime < windowEndTime && r.endTime > windowStartTime;
+      // if (!visible) {
+      //   this.timelineDataInternal.entryLevels[i] = -1;
+      //   continue;
+      // }
+      while (lastTimeByLevel.length && lastTimeByLevel[lastTimeByLevel.length - 1] <= startTime) {
+        lastTimeByLevel.pop();
+      }
+      this.timelineDataInternal.entryLevels[i] = lastTimeByLevel.length;
+      lastTimeByLevel.push(endTime);
+      maxLevel = Math.max(maxLevel, lastTimeByLevel.length);
+    }
+    for (let i = 0; i < [...this.eventMap.values()].length; ++i) {
+      if (this.timelineDataInternal.entryLevels[i] === -1) {
+        this.timelineDataInternal.entryLevels[i] = maxLevel;
+      }
+    }
+    this.timelineDataInternal = new PerfUI.FlameChart.TimelineData(
+        this.timelineDataInternal.entryLevels, this.timelineDataInternal.entryTotalTimes,
+        this.timelineDataInternal.entryStartTimes, this.timelineDataInternal.groups);
+    this.maxLevel = maxLevel;
   }
 
   private setLive(index: number): number {

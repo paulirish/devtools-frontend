@@ -47,27 +47,58 @@ export class PlayerEventsTimeline extends TickingFlameChart {
   private audioBufferingStateEvent: Event|null;
   private videoBufferingStateEvent: Event|null;
 
+  private currentPageMetrics: CurrentPageMetrics;
+
   constructor() {
     super();
+
+    this.currentPageMetrics = new CurrentPageMetrics();
+    const onEventBound = this.onEvent.bind(this);
+    setTimeout(() => {
+      this.currentPageMetrics.init(onEventBound);
+    }, 1000); // lol. so bad.
 
     this.addGroup('somegroup', 2);
     this.addGroup('okay', 2);  // video on top, audio on bottom
 
+
     this.playbackStatusLastEvent = null;
     this.audioBufferingStateEvent = null;
     this.videoBufferingStateEvent = null;
-    setTimeout(() => this.addEvent(200), 500);
-    setTimeout(() => this.addEvent(200), 1000);
-    setTimeout(() => this.addEvent(200), 1500);
-    setTimeout(() => this.addEvent(200), 2000);
+
+
+     this.startEvent({
+      level: 0,
+      startTime: 0,
+      duration: 0,
+      name: `Time Origin`,
+    });
+
+    // setTimeout(() => this.addPlayEvent(200), 500);
+    // setTimeout(() => this.addPlayEvent(200), 1000);
+    // setTimeout(() => this.addPlayEvent(200), 1500);
+    // setTimeout(() => this.addPlayEvent(200), 2000);
   }
 
-  private addEvent(normalizedTime: number): void {
+  private addPlayEvent(normalizedTime: number): void {
     this.startEvent({
       level: 0,
       startTime: normalizedTime,
       name: 'Play',
     } as EventProperties);
+  }
+
+  onEvent(item: any): void {
+    console.log('its an item', item);
+    const payload = item.payload;
+    if (!payload) return;
+
+    this.startEvent({
+      level: 0,
+      startTime: payload.startTime,
+      duration: payload.duration,
+      name: `${payload.entryType} ${payload.name}`,
+    });
   }
 }
 
@@ -83,18 +114,18 @@ export class CurrentPageMetrics extends HTMLElement {
   #currentPageMetrics = [];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
+  onEventBound: any;
 
-  async connectedCallback(): Promise<void> {
+  async init(onEventBound: (item:any) => void): Promise<void> {
     const mainTarget = (SDK.TargetManager.TargetManager.instance().primaryPageTarget());
     this.#mainTarget = mainTarget;
+    this.onEventBound = onEventBound;
     if (!mainTarget) {
       console.log('could not get main target');
       return;
     }
 
     const runtimeModel = this.#mainTarget.model(RuntimeModel);
-    runtimeModel?.bindingCalled;
-
     SDK.TargetManager.TargetManager.instance().addModelListener(
       SDK.RuntimeModel.RuntimeModel,
       SDK.RuntimeModel.Events.BindingCalled,
@@ -103,7 +134,6 @@ export class CurrentPageMetrics extends HTMLElement {
     );
 
     await runtimeModel?.addBinding({name: '__chromium_devtools_metrics_reporter'});
-
     const frameTreeResponse = await mainTarget.pageAgent().invoke_getFrameTree();
     const mainFrameID = frameTreeResponse.frameTree.frame.id;
     this.#mainFrameID = mainFrameID;
@@ -111,11 +141,13 @@ export class CurrentPageMetrics extends HTMLElement {
     const resourceTreeModel = this.#getResourceTreeModel();
     resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
     await resourceTreeModel.setLifecycleEventsEnabled(true);
+
+    this.#getPageMetrics();
     // TODO: listen to the page URL changing and run the code again?
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    // void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
-  async disconnectedCallback(): Promise<void> {
+  async reset(): Promise<void> { // todo hook this up to something.
 
     SDK.TargetManager.TargetManager.instance().removeModelListener(
       SDK.RuntimeModel.RuntimeModel,
@@ -135,7 +167,7 @@ export class CurrentPageMetrics extends HTMLElement {
     if (data.name !== '__chromium_devtools_metrics_reporter') return;
     const obj = JSON.parse(event.data.payload);
     this.#currentPageMetrics.push(obj)
-    console.log('binding', obj);
+    this.onEventBound(obj);
     this.#render();
   }
 
@@ -170,8 +202,9 @@ export class CurrentPageMetrics extends HTMLElement {
 
     console.log('eva', evaluationResult, evaluationResult.getError());
 
+
     // this.#currentPageMetrics = evaluationResult.result.value;
-    this.#render();
+    // this.#render();
   }
 
   #getResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel {

@@ -42,7 +42,7 @@ async function getMetricsInPage() {
           resetStyle,
           scoreToStyle(entry.duration));
 
-        __chromium_devtools_metrics_reporter(JSON.stringify({ interaction: entry.toJSON() }));
+        __chromium_devtools_metrics_reporter(JSON.stringify({ payload: entry.toJSON() }));
       }
     });
 
@@ -59,8 +59,21 @@ async function getMetricsInPage() {
   // LCP
   new PerformanceObserver(entryList => {
     for (const entry of entryList.getEntries()) {
-      console.log({ lcpEntry: entry });
-      __chromium_devtools_metrics_reporter(JSON.stringify({ lcp: entry.toJSON() }));
+      __chromium_devtools_metrics_reporter(JSON.stringify({ payload: entry.toJSON() }));
     }
   }).observe({ type: 'largest-contentful-paint', buffered: true });
+
+
+    new PerformanceObserver(entryList => {
+    for (const entry of entryList.getEntries()) {
+      __chromium_devtools_metrics_reporter(JSON.stringify({ payload: entry.toJSON() }));
+    }
+  }).observe({ type: 'navigation', buffered: true });
+
+
+    new PerformanceObserver(entryList => {
+    for (const entry of entryList.getEntries()) {
+      __chromium_devtools_metrics_reporter(JSON.stringify({ payload: entry.toJSON() }));
+    }
+  }).observe({ type: 'resource', buffered: true });
 }
