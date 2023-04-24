@@ -42,27 +42,59 @@ export class PlayerEventsTimeline extends TickingFlameChart {
   private audioBufferingStateEvent: Event|null;
   private videoBufferingStateEvent: Event|null;
 
+  private currentPageMetrics: CurrentPageMetrics;
+
   constructor() {
     super();
+
+    this.currentPageMetrics = new CurrentPageMetrics();
+    const onEventBound = this.onEvent.bind(this);
+    setTimeout(() => {
+      this.currentPageMetrics.init(onEventBound);
+    }, 1000);  // lol. so bad.
 
     this.addGroup('somegroup', 2);
     this.addGroup('okay', 2);  // video on top, audio on bottom
 
+
     this.playbackStatusLastEvent = null;
     this.audioBufferingStateEvent = null;
     this.videoBufferingStateEvent = null;
-    setTimeout(() => this.addEvent(200), 500);
-    setTimeout(() => this.addEvent(200), 1000);
-    setTimeout(() => this.addEvent(200), 1500);
-    setTimeout(() => this.addEvent(200), 2000);
+
+
+    this.startEvent({
+      level: 0,
+      startTime: 0,
+      duration: 0,
+      name: `Time Origin`,
+    });
+
+    // setTimeout(() => this.addPlayEvent(200), 500);
+    // setTimeout(() => this.addPlayEvent(200), 1000);
+    // setTimeout(() => this.addPlayEvent(200), 1500);
+    // setTimeout(() => this.addPlayEvent(200), 2000);
   }
 
-  private addEvent(normalizedTime: number): void {
+  private addPlayEvent(normalizedTime: number): void {
     this.startEvent({
       level: 0,
       startTime: normalizedTime,
       name: 'Play',
     } as EventProperties);
+  }
+
+  onEvent(item: any): void {
+    console.log('its an item', item);
+    const payload = item.payload;
+    if (!payload)
+      return;
+
+    this.startEvent({
+      level: 0,
+      startTime: payload.startTime,
+      duration: payload.duration,
+      name: `${payload.entryType} ${payload.name}`,
+    });
   }
 }
 
@@ -78,6 +110,7 @@ export class CurrentPageMetrics extends HTMLElement {
   #currentPerfEntries: Array<{payload: PerformanceEventTiming}> = [];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
+  onEventBound: any;
 
   constructor() {
     super();
@@ -88,6 +121,8 @@ export class CurrentPageMetrics extends HTMLElement {
     await wait(500);  // HACK. need something better for waiting for target reference
 
     const mainTarget = (SDK.TargetManager.TargetManager.instance().primaryPageTarget());
+    this.#mainTarget = mainTarget;
+    this.onEventBound = onEventBound;
     if (!mainTarget) {
       // eslint-disable-next-line no-console
       console.log('could not get main target');
@@ -100,7 +135,6 @@ export class CurrentPageMetrics extends HTMLElement {
         SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
 
     await runtimeModel?.addBinding({name: '__chromium_devtools_metrics_reporter'});
-
     const frameTreeResponse = await mainTarget.pageAgent().invoke_getFrameTree();
     this.#mainFrameID = frameTreeResponse.frameTree.frame.id;
 
@@ -132,6 +166,7 @@ export class CurrentPageMetrics extends HTMLElement {
     if (!this.#currentPerfEntries.find(m => entry.startTime === m.startTime && entry.name === m.name)) {
       this.#currentPerfEntries.push(entry);
     }
+    this.onEventBound(entry);
     this.#render();
   }
 
