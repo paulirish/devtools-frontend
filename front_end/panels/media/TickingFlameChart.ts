@@ -208,6 +208,10 @@ export class TickingFlameChart extends UI.Widget.VBox {
 
     // Delegate doesn't do much for now.
     this.delegate = new TickingFlameChartDelegate();
+    this.delegate.windowChanged = (startTime: number, endTime: number, animate: boolean) => {
+      console.log({startTime, endTime, animate});
+      this.dataProvider.bounds = new Bounds(startTime, endTime)
+    }
 
     // Chart settings.
     this.chartGroupExpansionSetting =
@@ -349,6 +353,7 @@ class TickingFlameChartDelegate implements PerfUI.FlameChart.FlameChartDelegate 
   }
 
   windowChanged(_windowStartTime: number, _windowEndTime: number, _animate: boolean): void {
+
   }
 
   updateRangeSelection(_startTime: number, _endTime: number): void {
@@ -365,6 +370,8 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
   private eventMap: Map<number, Event>;
   private timelineDataInternal: PerfUI.FlameChart.TimelineData;
   private maxLevel: number;
+  windowStart: number;
+  windowEnd: number;
 
   constructor(initialBounds: Bounds, updateMaxTime: (arg0: number) => void) {
     // do _not_ call this method from within this class - only for passing to events.
