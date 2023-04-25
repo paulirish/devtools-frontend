@@ -137,6 +137,10 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     return;
   }
 
+  if (Types.TraceEvents.isProcessName(event) && (event.args.name === 'Gpu' || event.args.name === 'GPU Process')) {
+    gpuProcessId = event.pid;
+    return;
+  }
 
   if (Types.TraceEvents.isThreadName(event) && event.args.name === 'CrGpuMain') {
     gpuThreadId = event.tid;

@@ -10,24 +10,72 @@ import {loadEventsFromTraceFile, setTraceModelTimeout, traceFilenames} from '../
 
 const wait = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 
+// flagged as problematic before.
+const knownBad = `
+trace_full_trace_with_animations_slow_machine.json.gz
+lantern-traces/unthrottled-assets/www_t_online_de.trace.json
+clsartifacts/0021/defaultPass.trace.json
+clsartifacts/045/defaultPass.trace.json
+clsartifacts/080/defaultPass.trace.json
+clsartifacts/044/defaultPass.trace.json
+clsartifacts/0013/defaultPass.trace.json
+tracecafe-stored-traces/traces/aNErDEVsVP
+tracecafe-stored-traces/traces/KDY70t1SCW
+tracecafe-stored-traces/traces/PBOCPCjQFF
+tracecafe-stored-traces/traces/dB2iaQRTWg
+tracecafe-stored-traces/traces/gWhf8rl75C
+tracecafe-stored-traces/traces/n9RDopu6ps
+lantern-data/https---www-ning-com--mobile-unthrottled-6-trace.json
+lantern-data/https---en-softonic-com-mobile-unthrottled-4-trace.json
+lantern-data/https---www-mlb-com--mobile-unthrottled-7-trace.json
+lantern-data/https---birdsarentreal-com-mobile-unthrottled-4-trace.json
+lantern-data/https---www-irs-gov--mobile-unthrottled-7-trace.json
+lh-fixtures/devtools-homepage-w-screenshots-trace.json
+lh-fixtures/progressive-app-m60.json
+lh-fixtures/progressive-app.json
+lh-fixtures/tracingstarted-after-navstart.json
+lh-fixtures/site-with-redirect.json
+lh-fixtures/load.json
+Profile-20211014T091602.json
+arizona-framedestroyed.json
+adobe-oom-traces/Venus_full_stack_trace_during_save_operation.json
+pauliirsh-enhancedtrace.devtools.json
+trace_Fri_Aug_07_2020_11.09.00_AM.json
+trace_editgallery.json.gz
+blah.json.gz
+tracecafe-stored-traces/traces/yWdmByAM1Q
+tracecafe-stored-traces/traces/ghAXmOs106
+`.trim().split('\n');
 
 // cd ~/Downloads/traces && server --cors
 const urlPrefix = 'http://localhost:9435/'
 
 describe('TraceProcessor', async function() {
   setTraceModelTimeout(this);
+  let failures = [];
+  this.afterEach(() => {
+    console.log('bad ones', failures);
+    failures = [];
+  });
 
   it.only('can use a trace processor', async () => {
     const processor = TraceModel.Processor.TraceProcessor.createWithAllHandlers();
+
+
+    const oneThousandTraces =  traceFilenames().sort(() => 0.5 - Math.random()) // shuffled
+    const oneKFiltered = oneThousandTraces.filter(t => !knownBad.includes(t));
+
+    console.log('bad', knownBad.length, '1k', oneThousandTraces.length, oneKFiltered.length);
+
     const filenames = [
-      'basic.json.gz',
-      ... traceFilenames().map(f => `${urlPrefix}${f.trim()}`)
-      ];
-    const bad = [];
+      // TODO: include all of ./test/unittests/fixtures/traces/
+      ...knownBad,
+      ...oneKFiltered,
+      ].map(f => `${urlPrefix}${f.trim()}`)
+
     for (const filename of filenames) {
       await parseAndLog(filename);
     }
-    console.log('bad ones', bad);
 
     await wait(10000000);
 
@@ -38,7 +86,7 @@ describe('TraceProcessor', async function() {
         file = await loadEventsFromTraceFile(filename);
       } catch (e) {
         console.error('❌ JSON FAILURE WITH', filename, e );
-        bad.push(filename);
+        failures.push(filename);
         file = undefined;
         processor.reset();
         return;
@@ -50,7 +98,7 @@ describe('TraceProcessor', async function() {
         await processor.parse(file);
       } catch(e) {
         console.error('❌ PARSE FAILURE WITH', filename, e );
-        bad.push(filename);
+        failures.push(filename);
         file = undefined;
         processor.reset();
         // throw e;

@@ -152,7 +152,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     for (const handler of sortedHandlers) {
       await handler.finalize?.();
     }
-    traceEventIterator = undefined;
+    traceEventIterator = undefined; // Free memory
   }
 
   get data(): Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>|null {
