@@ -46,16 +46,16 @@ export class FrameGroupNode extends NetworkGroupNode {
     this.frame = frame;
   }
 
-  displayName(): string {
+  override displayName(): string {
     return new Common.ParsedURL.ParsedURL(this.frame.url).domain() || this.frame.name || '<iframe>';
   }
 
-  renderCell(cell: HTMLElement, columnId: string): void {
+  override renderCell(cell: HTMLElement, columnId: string): void {
     super.renderCell(cell, columnId);
     const columnIndex = (this.dataGrid as DataGrid.DataGrid.DataGridImpl<unknown>).indexOfVisibleColumn(columnId);
     if (columnIndex === 0) {
       const name = this.displayName();
-      cell.appendChild(UI.Icon.Icon.create('largeicon-navigator-frame', 'network-frame-group-icon'));
+      cell.appendChild(UI.Icon.Icon.create('frame', 'network-frame-group-icon'));
       UI.UIUtils.createTextChild(cell, name);
       UI.Tooltip.Tooltip.install(cell, name);
       this.setCellAccessibleName(cell.textContent || '', cell, columnId);

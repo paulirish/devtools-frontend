@@ -1261,7 +1261,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       iconName = 'warning-filled';
       accessibleName = i18nString(UIStrings.warning);
     } else if (this.message.level === Protocol.Log.LogEntryLevel.Error) {
-      color = 'var(--icon-error-small)';
+      color = 'var(--icon-error)';
       iconName = 'cross-circle-filled';
       accessibleName = i18nString(UIStrings.error);
     } else if (this.message.originatesFromLogpoint) {
@@ -1722,7 +1722,7 @@ export class ConsoleGroupViewMessage extends ConsoleViewMessage {
     return this.collapsedInternal;
   }
 
-  maybeHandleOnKeyDown(event: KeyboardEvent): boolean {
+  override maybeHandleOnKeyDown(event: KeyboardEvent): boolean {
     const focusedChildIndex = this.focusedChildIndex();
     if (focusedChildIndex === -1) {
       if ((event.key === 'ArrowLeft' && !this.collapsedInternal) ||
@@ -1734,7 +1734,7 @@ export class ConsoleGroupViewMessage extends ConsoleViewMessage {
     return super.maybeHandleOnKeyDown(event);
   }
 
-  toMessageElement(): HTMLElement {
+  override toMessageElement(): HTMLElement {
     let element: HTMLElement|null = this.elementInternal || null;
     if (!element) {
       element = super.toMessageElement();
@@ -1752,7 +1752,7 @@ export class ConsoleGroupViewMessage extends ConsoleViewMessage {
     return element;
   }
 
-  showRepeatCountElement(): void {
+  override showRepeatCountElement(): void {
     super.showRepeatCountElement();
     if (this.repeatCountElement && this.expandGroupIcon) {
       this.repeatCountElement.insertBefore(this.expandGroupIcon, this.repeatCountElement.firstChild);
@@ -1793,7 +1793,7 @@ export class ConsoleCommand extends ConsoleViewMessage {
     this.formattedCommand = null;
   }
 
-  contentElement(): HTMLElement {
+  override contentElement(): HTMLElement {
     const contentElement = this.getContentElement();
     if (contentElement) {
       return contentElement;
@@ -1801,8 +1801,10 @@ export class ConsoleCommand extends ConsoleViewMessage {
     const newContentElement = document.createElement('div');
     this.setContentElement(newContentElement);
     newContentElement.classList.add('console-user-command');
-    const icon = UI.Icon.Icon.create('smallicon-user-command', 'command-result-icon');
-    newContentElement.appendChild(icon);
+    const userCommandIcon = new IconButton.Icon.Icon();
+    userCommandIcon.data = {iconName: 'chevron-right', color: 'var(--icon-default)', width: '16px', height: '16px'};
+    userCommandIcon.classList.add('command-result-icon');
+    newContentElement.appendChild(userCommandIcon);
 
     elementToMessage.set(newContentElement, this);
     this.formattedCommand = document.createElement('span');
@@ -1827,12 +1829,14 @@ export class ConsoleCommand extends ConsoleViewMessage {
 }
 
 export class ConsoleCommandResult extends ConsoleViewMessage {
-  contentElement(): HTMLElement {
+  override contentElement(): HTMLElement {
     const element = super.contentElement();
     if (!element.classList.contains('console-user-command-result')) {
       element.classList.add('console-user-command-result');
       if (this.consoleMessage().level === Protocol.Log.LogEntryLevel.Info) {
-        const icon = UI.Icon.Icon.create('smallicon-command-result', 'command-result-icon');
+        const icon = new IconButton.Icon.Icon();
+        icon.data = {iconName: 'chevron-left-dot', color: 'var(--icon-default)', width: '16px', height: '16px'};
+        icon.classList.add('command-result-icon');
         element.insertBefore(icon, element.firstChild);
       }
     }
@@ -1852,14 +1856,14 @@ export class ConsoleTableMessageView extends ConsoleViewMessage {
     this.dataGrid = null;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     if (this.dataGrid) {
       this.dataGrid.updateWidths();
     }
     super.wasShown();
   }
 
-  onResize(): void {
+  override onResize(): void {
     if (!this.isVisible()) {
       return;
     }
@@ -1868,7 +1872,7 @@ export class ConsoleTableMessageView extends ConsoleViewMessage {
     }
   }
 
-  contentElement(): HTMLElement {
+  override contentElement(): HTMLElement {
     const contentElement = this.getContentElement();
     if (contentElement) {
       return contentElement;
@@ -1977,7 +1981,7 @@ export class ConsoleTableMessageView extends ConsoleViewMessage {
     return formattedMessage;
   }
 
-  approximateFastHeight(): number {
+  override approximateFastHeight(): number {
     const table = this.message.parameters && this.message.parameters[0];
     if (table && typeof table !== 'string' && table.preview) {
       return defaultConsoleRowHeight * table.preview.properties.length;

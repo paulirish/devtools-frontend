@@ -79,6 +79,10 @@
   user-select: none;
 }
 
+.styles-section .styles-section-subtitle devtools-icon {
+  margin-bottom: -4px;
+}
+
 .styles-section .styles-section-subtitle .devtools-link {
   color: var(--color-text-primary);
   text-decoration-color: hsl(0deg 0% 60%);
@@ -92,6 +96,10 @@
 .styles-section .simple-selector.selector-matches,
 .styles-section.keyframe-key {
   color: var(--color-text-primary);
+}
+
+.styles-section .try-rule-selector-element {
+  color: var(--color-text-disabled);
 }
 
 .styles-section .style-properties {
@@ -235,7 +243,7 @@
 .sidebar-pane-section-toolbar {
   position: absolute;
   right: 0;
-  bottom: -5px;
+  bottom: -1px;
   z-index: 0;
 }
 

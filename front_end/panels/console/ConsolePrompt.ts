@@ -10,6 +10,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Formatter from '../../models/formatter/formatter.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -39,7 +40,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
   private requestPreviewBound: () => Promise<void>;
   private requestPreviewCurrent = 0;
   private readonly innerPreviewElement: HTMLElement;
-  private readonly promptIcon: UI.Icon.Icon;
+  private readonly promptIcon: IconButton.Icon.Icon;
   private readonly iconThrottler: Common.Throttler.Throttler;
   private readonly eagerEvalSetting: Common.Settings.Setting<boolean>;
   private previewRequestForTest: Promise<void>|null;
@@ -64,12 +65,17 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     this.formatter = new ObjectUI.RemoteObjectPreviewFormatter.RemoteObjectPreviewFormatter();
     this.requestPreviewBound = this.requestPreview.bind(this);
     this.innerPreviewElement = this.eagerPreviewElement.createChild('div', 'console-eager-inner-preview');
-    this.eagerPreviewElement.appendChild(UI.Icon.Icon.create('smallicon-command-result', 'preview-result-icon'));
+    const previewIcon = new IconButton.Icon.Icon();
+    previewIcon.data = {iconName: 'chevron-left-dot', color: 'var(--icon-default)', width: '16px', height: '16px'};
+    previewIcon.classList.add('preview-result-icon');
+    this.eagerPreviewElement.appendChild(previewIcon);
 
     const editorContainerElement = this.element.createChild('div', 'console-prompt-editor-container');
     this.element.appendChild(this.eagerPreviewElement);
 
-    this.promptIcon = UI.Icon.Icon.create('smallicon-text-prompt', 'console-prompt-icon');
+    this.promptIcon = new IconButton.Icon.Icon();
+    this.promptIcon.data = {iconName: 'chevron-right', color: 'var(--icon-action)', width: '16px', height: '16px'};
+    this.promptIcon.classList.add('console-prompt-icon');
     this.element.appendChild(this.promptIcon);
     this.iconThrottler = new Common.Throttler.Throttler(0);
 
@@ -188,12 +194,12 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([consolePromptStyles]);
   }
 
-  willHide(): void {
+  override willHide(): void {
     if (this.highlightingNode) {
       this.highlightingNode = false;
       SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
@@ -245,6 +251,13 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
         },
       },
       {
+        key: 'Ctrl-Enter',
+        run: (): boolean => {
+          void this.handleEnter(/* forceEvaluate */ true);
+          return true;
+        },
+      },
+      {
         key: 'Enter',
         run: (): boolean => {
           void this.handleEnter();
@@ -255,13 +268,19 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     ];
   }
 
-  private async enterWillEvaluate(): Promise<boolean> {
-    const {state} = this.editor;
-    return state.doc.length > 0 && await TextEditor.JavaScript.isExpressionComplete(state.doc.toString());
+  private async enterWillEvaluate(forceEvaluate?: boolean): Promise<boolean> {
+    const {doc, selection} = this.editor.state;
+    if (!doc.length) {
+      return false;
+    }
+    if (forceEvaluate || selection.main.head < doc.length) {
+      return true;
+    }
+    return await TextEditor.JavaScript.isExpressionComplete(doc.toString());
   }
 
-  private async handleEnter(): Promise<void> {
-    if (await this.enterWillEvaluate()) {
+  private async handleEnter(forceEvaluate?: boolean): Promise<void> {
+    if (await this.enterWillEvaluate(forceEvaluate)) {
       this.appendCommand(this.text(), true);
       TextEditor.JavaScript.closeArgumentsHintsTooltip(this.editor.editor, this.#argumentHintsState);
       this.editor.dispatch({
@@ -330,7 +349,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
   }
 
-  focus(): void {
+  override focus(): void {
     this.editor.focus();
   }
 

@@ -90,6 +90,8 @@ export interface TraceEventArgs {
 
 export interface TraceEventArgsData {
   stackTrace?: TraceEventCallFrame[];
+  navigationId?: string;
+  frame?: string;
 }
 
 export interface TraceEventCallFrame {
@@ -129,7 +131,8 @@ export interface TraceEventProfileChunk extends TraceEventSample {
   name: 'ProfileChunk';
   id: ProfileID;
   args: TraceEventArgs&{
-    data: TraceEventArgsData & {
+    // `data` is only missing in "fake" traces
+    data?: TraceEventArgsData & {
       cpuProfile?: TraceEventPartialProfile,
       timeDeltas?: MicroSeconds[],
     },
@@ -165,6 +168,7 @@ export interface TraceEventDispatch extends TraceEventComplete {
 
 export interface TraceEventEventTiming extends TraceEventData {
   ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
+  id: string;
   args: TraceEventArgs&{
     frame: string,
     data?: TraceEventArgsData&{
@@ -176,6 +180,13 @@ export interface TraceEventEventTiming extends TraceEventData {
       interactionId?: number, type: string,
     },
   };
+}
+
+export interface TraceEventEventTimingBegin extends TraceEventEventTiming {
+  ph: Phase.ASYNC_NESTABLE_START;
+}
+export interface TraceEventEventTimingEnd extends TraceEventEventTiming {
+  ph: Phase.ASYNC_NESTABLE_END;
 }
 
 export interface TraceEventGPUTask extends TraceEventComplete {
@@ -417,8 +428,8 @@ export interface TraceEventTracingStartedInBrowser extends TraceEventInstant {
   args: TraceEventArgs&{
     data?: TraceEventArgsData & {
       frameTreeNodeId: number,
-      frames: TraceFrame[],
-      persistentIds: boolean,
+      // Frames can only missing in "fake" traces
+      frames?: TraceFrame[], persistentIds: boolean,
     },
   };
 }
@@ -492,27 +503,55 @@ export type TraceImpactedNode = {
   /* eslint-enable @typescript-eslint/naming-convention */
 };
 
+type LayoutShiftData = TraceEventArgsData&{
+  // These keys come from the trace data, so we have to use underscores.
+  /* eslint-disable @typescript-eslint/naming-convention */
+  cumulative_score: number,
+  frame_max_distance: number,
+  had_recent_input: boolean,
+  impacted_nodes: TraceImpactedNode[] | undefined,
+  is_main_frame: boolean,
+  overall_max_distance: number,
+  region_rects: TraceRect[],
+  score: number,
+  weighted_score_delta: number,
+  /* eslint-enable @typescript-eslint/naming-convention */
+};
 // These keys come from the trace data, so we have to use underscores.
 export interface TraceEventLayoutShift extends TraceEventInstant {
   name: 'LayoutShift';
   normalized?: boolean;
   args: TraceEventArgs&{
     frame: string,
-    data?: TraceEventArgsData&{
-      // These keys come from the trace data, so we have to use underscores.
-      /* eslint-disable @typescript-eslint/naming-convention */
-      cumulative_score: number,
-      frame_max_distance: number,
-      had_recent_input: boolean,
-      impacted_nodes: TraceImpactedNode[]|undefined,
-      is_main_frame: boolean,
-      overall_max_distance: number,
-      region_rects: TraceRect[],
-      score: number,
-      weighted_score_delta: number,
-      /* eslint-enable @typescript-eslint/naming-convention */
+    data?: LayoutShiftData,
+  };
+}
+
+interface LayoutShiftSessionWindowData {
+  // The sum of the weighted score of all the shifts
+  // that belong to a session window.
+  cumulativeWindowScore: number;
+  // A consecutive generated in the frontend to
+  // to identify a session window.
+  id: number;
+}
+export interface LayoutShiftParsedData {
+  screenshotSource?: string;
+  timeFromNavigation?: MicroSeconds;
+  // The sum of the weighted scores of the shifts that
+  // belong to a session window up until this shift
+  // (inclusive).
+  cumulativeWeightedScoreInWindow: number;
+  sessionWindowData: LayoutShiftSessionWindowData;
+}
+export interface SyntheticLayoutShift extends TraceEventLayoutShift {
+  args: TraceEventArgs&{
+    frame: string,
+    data?: LayoutShiftData&{
+      rawEvent: TraceEventLayoutShift,
     },
   };
+  parsedData: LayoutShiftParsedData;
 }
 
 export type Priorty = 'Low'|'High'|'VeryHigh'|'Highest';
@@ -740,6 +779,30 @@ export interface TraceEventSyntheticConsoleTiming extends TraceEventSyntheticNes
   };
 }
 
+export interface SyntheticInteractionEvent extends TraceEventSyntheticNestableAsyncEvent {
+  // InteractionID and type are available within the beginEvent's data, but we
+  // put them on the top level for ease of access.
+  interactionId: number;
+  type: string;
+  // This is equivalent to startEvent.ts;
+  ts: MicroSeconds;
+  // This duration can be calculated via endEvent.ts - startEvent.ts, but we do
+  // that and put it here to make it easier. This also makes these events
+  // consistent with real events that have a dur field.
+  dur: MicroSeconds;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      beginEvent: TraceEventEventTimingBegin,
+      endEvent: TraceEventEventTimingEnd,
+    },
+  };
+}
+
+export function isSyntheticInteractionEvent(event: TraceEventData): event is SyntheticInteractionEvent {
+  return Boolean(
+      'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
+}
+
 class ProfileIdTag {
   readonly #profileIdTag: (symbol|undefined);
 }
@@ -891,6 +954,14 @@ export function isTraceEventEventTiming(traceEventData: TraceEventData): traceEv
   return traceEventData.name === 'EventTiming';
 }
 
+export function isTraceEventEventTimingEnd(traceEventData: TraceEventData): traceEventData is TraceEventEventTimingEnd {
+  return isTraceEventEventTiming(traceEventData) && traceEventData.ph === Phase.ASYNC_NESTABLE_END;
+}
+export function isTraceEventEventTimingStart(traceEventData: TraceEventData):
+    traceEventData is TraceEventEventTimingBegin {
+  return isTraceEventEventTiming(traceEventData) && traceEventData.ph === Phase.ASYNC_NESTABLE_START;
+}
+
 export function isTraceEventGPUTask(traceEventData: TraceEventData): traceEventData is TraceEventGPUTask {
   return traceEventData.name === 'GPUTask';
 }
@@ -1014,4 +1085,11 @@ export function isTraceEventAsyncPhase(traceEventData: TraceEventData): boolean 
     Phase.ASYNC_STEP_PAST,
   ]);
   return asyncPhases.has(traceEventData.ph);
+}
+
+export function isSyntheticLayoutShift(traceEventData: TraceEventData): traceEventData is SyntheticLayoutShift {
+  if (!isTraceEventLayoutShift(traceEventData) || !traceEventData.args.data) {
+    return false;
+  }
+  return 'rawEvent' in traceEventData.args.data;
 }

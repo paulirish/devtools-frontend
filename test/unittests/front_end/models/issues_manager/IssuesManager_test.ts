@@ -8,9 +8,10 @@ import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as IssuesManager from '../../../../../front_end/models/issues_manager/issues_manager.js';
 
 import {createFakeSetting, createTarget} from '../../helpers/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../helpers/MockConnection.js';
+import {describeWithMockConnection, dispatchEvent} from '../../helpers/MockConnection.js';
 import {mkInspectorCspIssue, StubIssue, ThirdPartyStubIssue} from './StubIssue.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import * as Protocol from '../../../../../front_end/generated/protocol.js';
 
 describeWithMockConnection('IssuesManager', () => {
   let target: SDK.Target.Target;
@@ -41,6 +42,61 @@ describeWithMockConnection('IssuesManager', () => {
     const issueCodes = Array.from(issuesManager.issues()).map(r => r.code());
     assert.deepStrictEqual(issueCodes, expected);
   });
+
+  function getBlockedUrl(issue: IssuesManager.Issue.Issue): string|undefined {
+    const cspIssue = issue as IssuesManager.ContentSecurityPolicyIssue.ContentSecurityPolicyIssue;
+    return cspIssue.details().blockedURL;
+  }
+
+  it('filter out-of-scope issues', () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+
+    const dispatchedIssues: IssuesManager.Issue.Issue[] = [];
+    issuesManager.addEventListener(
+        IssuesManager.IssuesManager.Events.IssueAdded, event => dispatchedIssues.push(event.data.issue));
+
+    model.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+    const anotherTarget = createTarget();
+    const anotherModel = anotherTarget.model(SDK.IssuesModel.IssuesModel);
+    assertNotNullOrUndefined(anotherModel);
+    anotherModel.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: anotherModel, inspectorIssue: mkInspectorCspIssue('url2')});
+
+    const expected = ['url1'];
+    assert.deepStrictEqual(dispatchedIssues.map(getBlockedUrl), expected);
+
+    assert.deepStrictEqual(Array.from(issuesManager.issues()).map(getBlockedUrl), expected);
+
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
+    assert.deepStrictEqual(Array.from(issuesManager.issues()).map(getBlockedUrl), ['url2']);
+  });
+
+  const updatesOnPrimaryPageChange = (primary: boolean) => () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+
+    model.dispatchEventToListeners(
+        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+    assert.strictEqual(issuesManager.numberOfIssues(), 1);
+
+    const FRAME = {
+      id: 'main',
+      loaderId: 'test',
+      url: 'http://example.com',
+      securityOrigin: 'http://example.com',
+      mimeType: 'text/html',
+    };
+    if (primary) {
+      dispatchEvent(target, 'Page.frameNavigated', {frame: FRAME});
+    } else {
+      const prerenderTarget = createTarget({subtype: 'prerender'});
+      dispatchEvent(prerenderTarget, 'Page.frameNavigated', {frame: FRAME});
+    }
+    assert.strictEqual(issuesManager.numberOfIssues(), primary ? 0 : 1);
+  };
+
+  it('clears issues after primary page navigation', updatesOnPrimaryPageChange(true));
+  it('does not clear issues after non-primary page navigation', updatesOnPrimaryPageChange(false));
 
   it('filters third-party issues when the third-party issues setting is false, includes them otherwise', () => {
     const issues = [
@@ -254,5 +310,61 @@ describeWithMockConnection('IssuesManager', () => {
     issuesManager.unhideAllIssues();
     assert.deepStrictEqual(
         UnhiddenIssues, ['HiddenStubIssue1', 'HiddenStubIssue2', 'UnhiddenStubIssue1', 'UnhiddenStubIssue2']);
+  });
+
+  it('send update event on scope change', async () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+
+    const updateRequired = issuesManager.once(IssuesManager.IssuesManager.Events.FullUpdateRequired);
+    const anotherTarget = createTarget();
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
+    await updateRequired;
+  });
+
+  it('clears BounceTrackingIssue only on user-initiated navigation', () => {
+    const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
+    const issue = {
+      code: Protocol.Audits.InspectorIssueCode.BounceTrackingIssue,
+      details: {
+        bounceTrackingIssueDetails: {
+          trackingSites: ['example_1.test'],
+        },
+      },
+    };
+
+    model.dispatchEventToListeners(SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: issue});
+    assert.strictEqual(issuesManager.numberOfIssues(), 1);
+
+    dispatchEvent(target, 'Network.requestWillBeSent', {
+      requestId: 'requestId1',
+      loaderId: 'loaderId1',
+      request: {url: 'http://example.com'},
+      hasUserGesture: false,
+    } as unknown as Protocol.Network.RequestWillBeSentEvent);
+    const frame1 = {
+      id: 'main',
+      loaderId: 'loaderId1',
+      url: 'http://example.com',
+      securityOrigin: 'http://example.com',
+      mimeType: 'text/html',
+    };
+    dispatchEvent(target, 'Page.frameNavigated', {frame: frame1});
+    assert.strictEqual(issuesManager.numberOfIssues(), 1);
+
+    dispatchEvent(target, 'Network.requestWillBeSent', {
+      requestId: 'requestId2',
+      loaderId: 'loaderId2',
+      request: {url: 'http://example.com/page'},
+      hasUserGesture: true,
+    } as unknown as Protocol.Network.RequestWillBeSentEvent);
+    const frame2 = {
+      id: 'main',
+      loaderId: 'loaderId2',
+      url: 'http://example.com/page',
+      securityOrigin: 'http://example.com',
+      mimeType: 'text/html',
+    };
+    dispatchEvent(target, 'Page.frameNavigated', {frame: frame2});
+    assert.strictEqual(issuesManager.numberOfIssues(), 0);
   });
 });

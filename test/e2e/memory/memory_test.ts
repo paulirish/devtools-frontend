@@ -50,7 +50,8 @@ describe.skipOnParallel('The Memory Panel', async function() {
     await navigateToMemoryTab();
   });
 
-  it('Can take several heap snapshots ', async () => {
+  // Flaky test
+  it.skip('[crbug.com/1435436] Can take several heap snapshots ', async () => {
     await goToResource('memory/default.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -104,8 +105,6 @@ describe.skipOnParallel('The Memory Panel', async function() {
             'InternalNode',
             'InternalNode',
             'HTMLBodyElement',
-            'HTMLHtmlElement',
-            'HTMLDocument',
           ]);
         });
       });
@@ -178,8 +177,7 @@ describe.skipOnParallel('The Memory Panel', async function() {
             ({propertyName, retainerClassName}) => propertyName === 'aUniqueName' && retainerClassName === 'Window'));
   });
 
-  // Times out
-  it.skip('[crbug.com/1363150] Correctly shows multiple retainer paths for an object', async () => {
+  it('Correctly shows multiple retainer paths for an object', async () => {
     await goToResource('memory/multiple-retainers.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();

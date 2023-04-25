@@ -39,7 +39,6 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Bindings from '../../models/bindings/bindings.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedback.js';
@@ -70,6 +69,9 @@ import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
 import {UIDevtoolsUtils} from './UIDevtoolsUtils.js';
 import type * as Protocol from '../../generated/protocol.js';
+import {traceJsonGenerator} from './SaveFileFormatter.js';
+
+import {TimelineSelection} from './TimelineSelection.js';
 
 const UIStrings = {
   /**
@@ -93,10 +95,6 @@ const UIStrings = {
    */
   memory: 'Memory',
   /**
-   *@description Text in Timeline for the Web Vitals lane
-   */
-  webVitals: 'Web Vitals',
-  /**
    *@description Text to clear content
    */
   clear: 'Clear',
@@ -116,10 +114,6 @@ const UIStrings = {
    *@description Text in Timeline Panel of the Performance panel
    */
   showMemoryTimeline: 'Show memory timeline',
-  /**
-   *@description Text in Timeline for the Web Vitals lane checkbox
-   */
-  showWebVitals: 'Show Web Vitals',
   /**
    *@description Tooltip text that appears when hovering over the largeicon settings gear in show settings pane setting in timeline panel of the performance panel
    */
@@ -148,9 +142,8 @@ const UIStrings = {
    *@description Text in Timeline Panel of the Performance panel
    *@example {wrong format} PH1
    *@example {ERROR_FILE_NOT_FOUND} PH2
-   *@example {2} PH3
    */
-  failedToSaveTimelineSSS: 'Failed to save timeline: {PH1} ({PH2}, {PH3})',
+  failedToSaveTimelineSS: 'Failed to save timeline: {PH1} ({PH2})',
   /**
    *@description Text in Timeline Panel of the Performance panel
    */
@@ -262,6 +255,24 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let timelinePanelInstance: TimelinePanel;
 let isNode: boolean;
 
+// TypeScript will presumably get these types at some stage, and when it
+// does these temporary types should be removed.
+// TODO: Remove types when available in TypeScript.
+declare global {
+  interface FileSystemWritableFileStream extends WritableStream {
+    write(data: unknown): Promise<void>;
+    close(): Promise<void>;
+  }
+
+  interface FileSystemHandle {
+    createWritable(): Promise<FileSystemWritableFileStream>;
+  }
+
+  interface Window {
+    showSaveFilePicker(opts: unknown): Promise<FileSystemHandle>;
+  }
+}
+
 export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineModeViewDelegate {
   private readonly dropTarget: UI.DropTarget.DropTarget;
   private readonly recordingOptionUIControls: UI.Toolbar.ToolbarItem[];
@@ -284,9 +295,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private showMemorySetting: Common.Settings.Setting<any>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private showWebVitalsSetting: Common.Settings.Setting<any>;
   private readonly panelToolbar: UI.Toolbar.Toolbar;
   private readonly panelRightToolbar: UI.Toolbar.Toolbar;
   private readonly timelinePane: UI.Widget.VBox;
@@ -308,12 +316,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private loader?: TimelineLoader;
   private showScreenshotsToolbarCheckbox?: UI.Toolbar.ToolbarItem;
   private showMemoryToolbarCheckbox?: UI.Toolbar.ToolbarItem;
-  private showWebVitalsToolbarCheckbox?: UI.Toolbar.ToolbarItem;
   private networkThrottlingSelect?: UI.Toolbar.ToolbarComboBox;
   private cpuThrottlingSelect?: UI.Toolbar.ToolbarComboBox;
   private fileSelectorElement?: HTMLInputElement;
   private selection?: TimelineSelection|null;
   #traceEngineModel: TraceEngine.TraceModel.Model<typeof TraceEngine.TraceModel.ENABLED_TRACE_HANDLERS>;
+  // Tracks the index of the trace that the user is currently viewing.
+  #traceEngineActiveTraceIndex = -1;
   constructor() {
     super('timeline');
     this.#traceEngineModel = TraceEngine.TraceModel.Model.createWithRequiredHandlersForMigration();
@@ -352,10 +361,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.showMemorySetting.setTitle(i18nString(UIStrings.memory));
     this.showMemorySetting.addChangeListener(this.onModeChanged, this);
 
-    this.showWebVitalsSetting = Common.Settings.Settings.instance().createSetting('timelineWebVitals', false);
-    this.showWebVitalsSetting.setTitle(i18nString(UIStrings.webVitals));
-    this.showWebVitalsSetting.addChangeListener(this.onWebVitalsChanged, this);
-
     const timelineToolbarContainer = this.element.createChild('div', 'timeline-toolbar-container');
     this.panelToolbar = new UI.Toolbar.Toolbar('timeline-main-toolbar', timelineToolbarContainer);
     this.panelToolbar.makeWrappable(true);
@@ -393,7 +398,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.searchableViewInternal.hideWidget();
 
     this.onModeChanged();
-    this.onWebVitalsChanged();
     this.populateToolbar();
     this.showLandingPage();
     this.updateTimelineControls();
@@ -428,11 +432,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     return timelinePanelInstance;
   }
 
-  searchableView(): UI.SearchableView.SearchableView|null {
+  override searchableView(): UI.SearchableView.SearchableView|null {
     return this.searchableViewInternal;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     UI.Context.Context.instance().setFlavor(TimelinePanel, this);
     this.registerCSSFiles([timelinePanelStyles]);
@@ -440,7 +444,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     Host.userMetrics.panelLoaded('timeline', 'DevTools.Launch.Timeline');
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.Context.Context.instance().setFlavor(TimelinePanel, null);
     this.historyManager.cancelIfShowing();
   }
@@ -493,17 +497,17 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // Record
     this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
     this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.recordReloadAction));
-    this.clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'largeicon-clear');
+    this.clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'clear');
     this.clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => this.onClearButton());
     this.panelToolbar.appendToolbarItem(this.clearButton);
 
     // Load / Save
-    this.loadButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.loadProfile), 'largeicon-load');
+    this.loadButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.loadProfile), 'import');
     this.loadButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceImported);
       this.selectFileToLoad();
     });
-    this.saveButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.saveProfile), 'largeicon-download');
+    this.saveButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.saveProfile), 'download');
     this.saveButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
       void this.saveToFile();
@@ -530,12 +534,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.createSettingCheckbox(this.showMemorySetting, i18nString(UIStrings.showMemoryTimeline));
     this.panelToolbar.appendToolbarItem(this.showMemoryToolbarCheckbox);
 
-    if (!isNode) {
-      this.showWebVitalsToolbarCheckbox =
-          this.createSettingCheckbox(this.showWebVitalsSetting, i18nString(UIStrings.showWebVitals));
-      this.panelToolbar.appendToolbarItem(this.showWebVitalsToolbarCheckbox);
-    }
-
     // GC
     this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('components.collect-garbage'));
 
@@ -550,7 +548,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.showSettingsPaneSetting =
         Common.Settings.Settings.instance().createSetting('timelineShowSettingsToolbar', false);
     this.showSettingsPaneButton = new UI.Toolbar.ToolbarSettingToggle(
-        this.showSettingsPaneSetting, 'largeicon-settings-gear', i18nString(UIStrings.captureSettings));
+        this.showSettingsPaneSetting, 'gear', i18nString(UIStrings.captureSettings), 'gear-filled');
     SDK.NetworkManager.MultitargetNetworkManager.instance().addEventListener(
         SDK.NetworkManager.MultitargetNetworkManager.Events.ConditionsChanged, this.updateShowSettingsToolbarButton,
         this);
@@ -645,30 +643,40 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       return;
     }
 
-    const now = Platform.DateUtilities.toISO8601Compact(new Date());
+    const traceEvents = this.#traceEngineModel.traceEvents(this.#traceEngineActiveTraceIndex);
+    const metadata = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex);
+    if (!traceEvents) {
+      return;
+    }
+
+    const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
     let fileName: Platform.DevToolsPath.RawPathString;
     if (isNode) {
-      fileName = `CPU-${now}.cpuprofile` as Platform.DevToolsPath.RawPathString;
+      fileName = `CPU-${traceStart}.cpuprofile` as Platform.DevToolsPath.RawPathString;
     } else {
-      fileName = `Profile-${now}.json` as Platform.DevToolsPath.RawPathString;
-    }
-    const stream = new Bindings.FileUtils.FileOutputStream();
-
-    const accepted = await stream.open(fileName);
-    if (!accepted) {
-      return;
+      fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
     }
 
-    const error = (await performanceModel.save(stream) as {
-      message: string,
-      name: string,
-      code: number,
-    } | null);
-    if (!error) {
-      return;
+    try {
+      const handler = await window.showSaveFilePicker({
+        suggestedName: fileName,
+      });
+      const encoder = new TextEncoder();
+      const formattedTraceIter = traceJsonGenerator(traceEvents, metadata);
+      const traceAsString = Array.from(formattedTraceIter).join('');
+      const buffer = encoder.encode(traceAsString);
+      const writable = await handler.createWritable();
+      await writable.write(buffer);
+      await writable.close();
+    } catch (error) {
+      console.error(error.stack);
+      if (error.name === 'AbortError') {
+        // The user cancelled the action, so this is not an error we need to report.
+        return;
+      }
+      Common.Console.Console.instance().error(
+          i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
     }
-    Common.Console.Console.instance().error(
-        i18nString(UIStrings.failedToSaveTimelineSSS, {PH1: error.message, PH2: error.name, PH3: error.code}));
   }
 
   async showHistory(): Promise<void> {
@@ -731,10 +739,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.updateOverviewControls();
     this.doResize();
     this.select(null);
-  }
-
-  private onWebVitalsChanged(): void {
-    this.flameChart.toggleWebVitalsLane();
   }
 
   private updateSettingsPaneVisibility(): void {
@@ -1232,11 +1236,15 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     try {
       // Run the new engine in parallel with the parsing done in the performanceModel
       await Promise.all([
-        this.performanceModel.setTracingModel(tracingModel),
-        this.#executeNewTraceEngine(tracingModel, recordingIsFresh),
+        this.performanceModel.setTracingModel(tracingModel, recordingIsFresh),
+        this.#executeNewTraceEngine(tracingModel, recordingIsFresh, this.performanceModel.recordStartTime()),
       ]);
       const traceParsedData = this.#traceEngineModel.traceParsedData();
       this.setModel(this.performanceModel, exclusiveFilter, traceParsedData);
+      // This code path is only executed when a new trace is recorded/imported,
+      // so we know that the active index will be the size of the model because
+      // the newest trace will be automatically set to active.
+      this.#traceEngineActiveTraceIndex = this.#traceEngineModel.size() - 1;
 
       if (this.statusPane) {
         this.statusPane.remove();
@@ -1264,9 +1272,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * impact the main thread, as we `void` it to ensure we don't want for the
    * parsing to complete.
    **/
-  async #executeNewTraceEngine(tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean): Promise<void> {
+  async #executeNewTraceEngine(
+      tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean, recordStartTime?: number): Promise<void> {
     const shouldGatherMetadata = isFreshRecording && !isNode;
-    const metadata = shouldGatherMetadata ? await SDK.TraceSDKServices.getMetadataForFreshRecording() : undefined;
+    const metadata =
+        shouldGatherMetadata ? await SDK.TraceSDKServices.getMetadataForFreshRecording(recordStartTime) : undefined;
 
     return this.#traceEngineModel.parse(
         // OPP's data layer uses `EventPayload` as the type to represent raw JSON from the trace.
@@ -1343,21 +1353,21 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private frameForSelection(selection: TimelineSelection): TimelineModel.TimelineFrameModel.TimelineFrame|null {
-    switch (selection.type()) {
-      case TimelineSelection.Type.Frame:
-        return selection.object() as TimelineModel.TimelineFrameModel.TimelineFrame;
-      case TimelineSelection.Type.Range:
-        return null;
-      case TimelineSelection.Type.TraceEvent:
-        if (!this.performanceModel) {
-          return null;
-        }
-        return this.performanceModel.frameModel().getFramesWithinWindow(
-            selection.endTimeInternal, selection.endTimeInternal)[0];
-      default:
-        console.assert(false, 'Should never be reached');
-        return null;
+    if (TimelineSelection.isFrameObject(selection.object)) {
+      return selection.object;
     }
+    if (TimelineSelection.isRangeSelection(selection.object) ||
+        TimelineSelection.isNetworkRequestSelection(selection.object)) {
+      return null;
+    }
+    if (TimelineSelection.isTraceEventSelection(selection.object)) {
+      if (!this.performanceModel) {
+        return null;
+      }
+      return this.performanceModel.frameModel().getFramesWithinWindow(selection.endTime, selection.endTime)[0];
+    }
+    console.assert(false, 'Should never be reached');
+    return null;
   }
 
   jumpToFrame(offset: number): true|undefined {
@@ -1455,65 +1465,6 @@ export enum State {
 export const rowHeight = 18;
 
 export const headerHeight = 20;
-
-export class TimelineSelection {
-  private readonly typeInternal: string;
-  private readonly startTimeInternal: number;
-  readonly endTimeInternal: number;
-  private readonly objectInternal: Object|null;
-
-  constructor(type: string, startTime: number, endTime: number, object?: Object) {
-    this.typeInternal = type;
-    this.startTimeInternal = startTime;
-    this.endTimeInternal = endTime;
-    this.objectInternal = object || null;
-  }
-
-  static fromFrame(frame: TimelineModel.TimelineFrameModel.TimelineFrame): TimelineSelection {
-    return new TimelineSelection(TimelineSelection.Type.Frame, frame.startTime, frame.endTime, frame);
-  }
-
-  static fromNetworkRequest(request: TimelineModel.TimelineModel.NetworkRequest): TimelineSelection {
-    return new TimelineSelection(
-        TimelineSelection.Type.NetworkRequest, request.startTime, request.endTime || request.startTime, request);
-  }
-
-  static fromTraceEvent(event: SDK.TracingModel.Event): TimelineSelection {
-    return new TimelineSelection(
-        TimelineSelection.Type.TraceEvent, event.startTime, event.endTime || (event.startTime + 1), event);
-  }
-
-  static fromRange(startTime: number, endTime: number): TimelineSelection {
-    return new TimelineSelection(TimelineSelection.Type.Range, startTime, endTime);
-  }
-
-  type(): string {
-    return this.typeInternal;
-  }
-
-  object(): Object|null {
-    return this.objectInternal;
-  }
-
-  startTime(): number {
-    return this.startTimeInternal;
-  }
-
-  endTime(): number {
-    return this.endTimeInternal;
-  }
-}
-
-export namespace TimelineSelection {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Type {
-    Frame = 'Frame',
-    NetworkRequest = 'NetworkRequest',
-    TraceEvent = 'TraceEvent',
-    Range = 'Range',
-  }
-}
 export interface TimelineModeViewDelegate {
   select(selection: TimelineSelection|null): void;
   selectEntryAtTime(events: SDK.TracingModel.Event[]|null, time: number): void;
@@ -1638,7 +1589,7 @@ export class StatusPane extends UI.Widget.VBox {
     this.element.classList.toggle('small-dialog', isSmallDialog);
     this.contentElement.classList.toggle('small-dialog', isSmallDialog);
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([timelineStatusDialogStyles]);
   }

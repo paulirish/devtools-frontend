@@ -101,9 +101,11 @@ const REGISTERED_EXPERIMENTS = [
   'ignoreListJSFramesOnTimeline',
   'instrumentationBreakpoints',
   'cssTypeComponentLength',
+  'stylesPaneCSSChanges',
   'timelineEventInitiators',
   'timelineAsConsoleProfileResultPanel',
   'headerOverrides',
+  'highlightErrorsElementsPanel',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {

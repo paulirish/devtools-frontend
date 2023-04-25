@@ -14,7 +14,7 @@ import type * as TimelineModel from '../../../../../../front_end/models/timeline
 const {assert} = chai;
 
 function initTrackAppender(
-    flameChartData: PerfUI.FlameChart.TimelineData, traceParsedData: TraceModel.Handlers.Types.TraceParseData,
+    flameChartData: PerfUI.FlameChart.FlameChartTimelineData, traceParsedData: TraceModel.Handlers.Types.TraceParseData,
     entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     timelineModel: TimelineModel.TimelineModel.TimelineModelImpl):
@@ -27,14 +27,14 @@ function initTrackAppender(
 describeWithEnvironment('InteractionsTrackAppender', () => {
   async function renderTrackAppender(trace: string): Promise<{
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
-    flameChartData: PerfUI.FlameChart.TimelineData,
+    flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
     interactionsTrackAppender: Timeline.InteractionsTrackAppender.InteractionsTrackAppender,
     entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[],
     traceParsedData: Readonly<TraceModel.TraceModel.PartialTraceParseDataDuringMigration>,
   }> {
     const entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[] = [];
     const entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[] = [];
-    const flameChartData = new PerfUI.FlameChart.TimelineData([], [], [], []);
+    const flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
     const traceParsedData = await loadModelDataFromTraceFile(trace);
     const timelineModel = (await traceModelFromTraceFile(trace)).timelineModel;
     const interactionsTrackAppender =
@@ -53,18 +53,22 @@ describeWithEnvironment('InteractionsTrackAppender', () => {
   describe('appendTrackAtLevel', () => {
     it('marks all levels used by the track with the `TrackAppender` type', async () => {
       const {entryTypeByLevel} = await renderTrackAppender('slow-interaction-button-click.json.gz');
-      // There are enough events to fill two levels of track.
-      const levelCount = 2;
-      assert.strictEqual(entryTypeByLevel.length, levelCount);
-      const allEntriesAreTrackAppender =
-          entryTypeByLevel.every(type => type === Timeline.TimelineFlameChartDataProvider.EntryType.TrackAppender);
-      assert.isTrue(allEntriesAreTrackAppender);
+      // All events fit on the top level
+      assert.strictEqual(entryTypeByLevel.length, 1);
+      assert.deepEqual(entryTypeByLevel, [
+        Timeline.TimelineFlameChartDataProvider.EntryType.TrackAppender,
+      ]);
     });
 
     it('takes over no levels if there are no interactions', async () => {
       // animation trace has no interactions in it.
       const {entryTypeByLevel} = await renderTrackAppender('animation.json.gz');
       assert.strictEqual(entryTypeByLevel.length, 0);
+    });
+
+    it('only shows the top level interactions', async () => {
+      const {entryData, traceParsedData} = await renderTrackAppender('nested-interactions.json.gz');
+      assert.strictEqual(entryData.length, traceParsedData.UserInteractions.interactionEventsWithNoNesting.length);
     });
 
     it('creates a flamechart group', async () => {
@@ -76,7 +80,7 @@ describeWithEnvironment('InteractionsTrackAppender', () => {
     it('adds all interactions with the correct start times', async () => {
       const {flameChartData, traceParsedData, entryData} =
           await renderTrackAppender('slow-interaction-button-click.json.gz');
-      const events = traceParsedData.UserInteractions.interactionEvents;
+      const events = traceParsedData.UserInteractions.interactionEventsWithNoNesting;
       for (const event of events) {
         const markerIndex = entryData.indexOf(event);
         assert.isDefined(markerIndex);
@@ -89,7 +93,7 @@ describeWithEnvironment('InteractionsTrackAppender', () => {
     it('adds total times correctly', async () => {
       const {flameChartData, traceParsedData, entryData} =
           await renderTrackAppender('slow-interaction-button-click.json.gz');
-      const events = traceParsedData.UserInteractions.interactionEvents;
+      const events = traceParsedData.UserInteractions.interactionEventsWithNoNesting;
       for (const event of events) {
         const markerIndex = entryData.indexOf(event);
         assert.isDefined(markerIndex);
@@ -105,7 +109,7 @@ describeWithEnvironment('InteractionsTrackAppender', () => {
         await renderTrackAppender('slow-interaction-button-click.json.gz');
     const firstInteraction = traceParsedData.UserInteractions.interactionEvents[0];
     const title = interactionsTrackAppender.titleForEvent(firstInteraction);
-    assert.strictEqual(title, 'pointerdown id:1540');
+    assert.strictEqual(title, 'pointerdown');
   });
 
   it('highlightedEntryInfo returns the correct information', async () => {
@@ -114,6 +118,6 @@ describeWithEnvironment('InteractionsTrackAppender', () => {
     const firstInteraction = traceParsedData.UserInteractions.interactionEvents[0];
     const highlightedEntryInfo = interactionsTrackAppender.highlightedEntryInfo(firstInteraction);
     // The i18n encondes spaces using the u00A0 unicode character.
-    assert.strictEqual(highlightedEntryInfo.formattedTime, ('32.00\u00A0ms'));
+    assert.strictEqual(highlightedEntryInfo.formattedTime, ('31.72\u00A0ms'));
   });
 });

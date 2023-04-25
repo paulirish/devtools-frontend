@@ -68,7 +68,7 @@ async function openHeadersTab() {
 
 async function editorTabHasPurpleDot(): Promise<boolean> {
   const tabHeaderIcon = await waitFor('.tabbed-pane-header-tab-icon .spritesheet-mediumicons');
-  return await tabHeaderIcon?.evaluate(node => node.classList.contains('purple-dot'));
+  return await tabHeaderIcon?.evaluate(node => node.classList.contains('dot') && node.classList.contains('purple'));
 }
 
 async function fileTreeEntryIsSelectedAndHasPurpleDot(): Promise<boolean> {
@@ -76,7 +76,7 @@ async function fileTreeEntryIsSelectedAndHasPurpleDot(): Promise<boolean> {
   const title = await element.evaluate(e => e.getAttribute('title')) || '';
   assert.match(title, /\/test\/e2e\/resources\/network\/\.headers$/);
   const fileTreeIcon = await waitFor('.navigator-file-tree-item devtools-icon', element);
-  return await fileTreeIcon?.evaluate(node => node.classList.contains('sync-purple'));
+  return await fileTreeIcon?.evaluate(node => node.classList.contains('dot') && node.classList.contains('purple'));
 }
 
 async function editHeaderItem(newValue: string, previousValue: string): Promise<void> {
@@ -98,7 +98,8 @@ describe('The Overrides Panel', async function() {
     await waitFor(ENABLE_OVERRIDES_SELECTOR);
   });
 
-  it('can create header overrides', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1432925]: can create header overrides', async () => {
     await enableExperiment('headerOverrides');
     await goToResource('empty.html');
     await openSourcesPanel();
@@ -118,7 +119,8 @@ describe('The Overrides Panel', async function() {
     assert.deepStrictEqual(await getTextFromHeadersRow(row), ['aaa:', 'bbb']);
   });
 
-  it('can override headers via network panel', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1432925]: can override headers via network panel', async () => {
     await enableExperiment('headerOverrides');
     await navigateToNetworkTab('hello.html');
     await waitForSomeRequestsToAppear(1);

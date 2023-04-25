@@ -143,7 +143,6 @@ export class StylePropertiesSection {
   private readonly elementToSelectorIndex: WeakMap<Element, number>;
   navigable: boolean|null|undefined;
   protected readonly selectorRefElement: HTMLElement;
-  private readonly selectorContainer: HTMLDivElement;
   private hoverableSelectorsMode: boolean;
   private isHiddenInternal: boolean;
 
@@ -195,6 +194,7 @@ export class StylePropertiesSection {
     this.innerElement.appendChild(this.showAllButton);
 
     const selectorContainer = document.createElement('div');
+    selectorContainer.classList.add('selector-container');
     this.selectorElement = document.createElement('span');
     UI.ARIAUtils.setAccessibleName(this.selectorElement, i18nString(UIStrings.cssSelector));
     this.selectorElement.classList.add('selector');
@@ -205,14 +205,12 @@ export class StylePropertiesSection {
 
     const openBrace = selectorContainer.createChild('span', 'sidebar-pane-open-brace');
     openBrace.textContent = ' {';
-    selectorContainer.addEventListener('mousedown', this.handleEmptySpaceMouseDown.bind(this), false);
-    selectorContainer.addEventListener('click', this.handleSelectorContainerClick.bind(this), false);
 
     const closeBrace = this.innerElement.createChild('div', 'sidebar-pane-closing-brace');
     closeBrace.textContent = '}';
 
     if (this.styleInternal.parentRule) {
-      const newRuleButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.insertStyleRuleBelow), 'largeicon-add');
+      const newRuleButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.insertStyleRuleBelow), 'plus');
       newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onNewRuleClick, this);
       newRuleButton.element.tabIndex = -1;
       if (!this.newStyleRuleToolbar) {
@@ -226,7 +224,7 @@ export class StylePropertiesSection {
     if (Root.Runtime.experiments.isEnabled('fontEditor') && this.editable) {
       this.fontEditorToolbar = new UI.Toolbar.Toolbar('sidebar-pane-section-toolbar', this.innerElement);
       this.fontEditorSectionManager = new FontEditorSectionManager(this.parentPane.swatchPopoverHelper(), this);
-      this.fontEditorButton = new UI.Toolbar.ToolbarButton('Font Editor', 'largeicon-font-editor');
+      this.fontEditorButton = new UI.Toolbar.ToolbarButton('Font Editor', 'custom-typography');
       this.fontEditorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
         this.onFontEditorButtonClicked();
       }, this);
@@ -275,7 +273,6 @@ export class StylePropertiesSection {
     this.updateQueryList();
     this.updateRuleOrigin();
     this.titleElement.appendChild(selectorContainer);
-    this.selectorContainer = selectorContainer;
 
     if (this.navigable) {
       this.element.classList.add('navigable');
@@ -1107,22 +1104,6 @@ export class StylePropertiesSection {
     }
   }
 
-  private checkWillCancelEditing(): boolean {
-    const willCauseCancelEditing = this.willCauseCancelEditing;
-    this.willCauseCancelEditing = false;
-    return willCauseCancelEditing;
-  }
-
-  private handleSelectorContainerClick(event: Event): void {
-    if (this.checkWillCancelEditing() || !this.editable) {
-      return;
-    }
-    if (event.target === this.selectorContainer) {
-      this.addNewBlankProperty(0).startEditing();
-      event.consume(true);
-    }
-  }
-
   addNewBlankProperty(index: number|undefined = this.propertiesTreeOutline.rootElement().childCount()):
       StylePropertyTreeElement {
     const property = this.styleInternal.newBlankProperty(index);
@@ -1137,7 +1118,19 @@ export class StylePropertiesSection {
   }
 
   private handleEmptySpaceClick(event: Event): void {
-    if (!this.editable || this.element.hasSelection() || this.checkWillCancelEditing() || this.selectedSinceMouseDown) {
+    // `this.willCauseCancelEditing` is a hacky way to understand whether we should
+    // create a new property or not on empty space click.
+    // For empty space clicks, the order of events are:
+    // when there isn't an edit operation going on:
+    //     * empty space mousedown -> empty space click
+    // when there is an edit operation going on:
+    //     * empty space mousedown -> text prompt blur -> empty space click
+    // text prompt blur sets the `isEditingStyle` to be `false` in parent pane.
+    // If we check `isEditingStyle` inside empty space click handler, it will
+    // always say `false` and will always cause a new blank property to be added.
+    // Because of this, we're checking and saving whether there is an ongoing
+    // edit operation inside empty space mousedown handler.
+    if (!this.editable || this.element.hasSelection() || this.willCauseCancelEditing || this.selectedSinceMouseDown) {
       return;
     }
 
@@ -1152,6 +1145,9 @@ export class StylePropertiesSection {
     const treeElement = deepTarget && UI.TreeOutline.TreeElement.getTreeElementBylistItemNode(deepTarget);
     if (treeElement && treeElement instanceof StylePropertyTreeElement) {
       this.addNewBlankProperty(treeElement.property.index + 1).startEditing();
+    } else if (
+        target.classList.contains('selector-container') || target.classList.contains('styles-section-subtitle')) {
+      this.addNewBlankProperty(0).startEditing();
     } else {
       this.addNewBlankProperty().startEditing();
     }
@@ -1542,7 +1538,7 @@ export class BlankStylePropertiesSection extends StylePropertiesSection {
     return !this.normal;
   }
 
-  editingSelectorCommitted(
+  override editingSelectorCommitted(
       element: Element, newContent: string, oldContent: string, context: Context|undefined,
       moveDirection: string): void {
     if (!this.isBlank) {
@@ -1593,7 +1589,7 @@ export class BlankStylePropertiesSection extends StylePropertiesSection {
     }
   }
 
-  editingSelectorCancelled(): void {
+  override editingSelectorCancelled(): void {
     this.parentPane.setUserOperation(false);
     if (!this.isBlank) {
       super.editingSelectorCancelled();
@@ -1620,14 +1616,14 @@ export class KeyframePropertiesSection extends StylePropertiesSection {
     this.selectorElement.className = 'keyframe-key';
   }
 
-  headerText(): string {
+  override headerText(): string {
     if (this.styleInternal.parentRule instanceof SDK.CSSRule.CSSKeyframeRule) {
       return this.styleInternal.parentRule.key().text;
     }
     return '';
   }
 
-  setHeaderText(rule: SDK.CSSRule.CSSRule, newContent: string): Promise<void> {
+  override setHeaderText(rule: SDK.CSSRule.CSSRule, newContent: string): Promise<void> {
     function updateSourceRanges(this: KeyframePropertiesSection, success: boolean): void {
       if (!success) {
         return;
@@ -1645,29 +1641,45 @@ export class KeyframePropertiesSection extends StylePropertiesSection {
     return rule.setKeyText(newContent).then(updateSourceRanges.bind(this));
   }
 
-  isPropertyInherited(_propertyName: string): boolean {
+  override isPropertyInherited(_propertyName: string): boolean {
     return false;
   }
 
-  isPropertyOverloaded(_property: SDK.CSSProperty.CSSProperty): boolean {
+  override isPropertyOverloaded(_property: SDK.CSSProperty.CSSProperty): boolean {
     return false;
   }
 
-  markSelectorHighlights(): void {
+  override markSelectorHighlights(): void {
   }
 
-  markSelectorMatches(): void {
+  override markSelectorMatches(): void {
     if (this.styleInternal.parentRule instanceof SDK.CSSRule.CSSKeyframeRule) {
       this.selectorElement.textContent = this.styleInternal.parentRule.key().text;
     }
   }
 
-  highlight(): void {
+  override highlight(): void {
+  }
+}
+
+export class TryRuleSection extends StylePropertiesSection {
+  constructor(
+      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number, computedStyles: Map<string, string>|null,
+      parentsComputedStyles: Map<string, string>|null) {
+    super(stylesPane, matchedStyles, style, sectionIdx, computedStyles, parentsComputedStyles);
+    this.selectorElement.className = 'try-rule-selector-element';
+    // Disables clicking on the selector element for `@try` rules.
+    this.selectorElement.addEventListener('click', ev => ev.stopPropagation(), true);
+  }
+
+  override headerText(): string {
+    return '@try';
   }
 }
 
 export class HighlightPseudoStylePropertiesSection extends StylePropertiesSection {
-  isPropertyInherited(_propertyName: string): boolean {
+  override isPropertyInherited(_propertyName: string): boolean {
     // For highlight pseudos, all valid properties are treated as inherited.
     // Note that the meaning is reversed in this context; the result of
     // returning false here is that properties of inherited pseudos will never

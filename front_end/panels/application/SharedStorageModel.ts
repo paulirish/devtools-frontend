@@ -115,7 +115,7 @@ export class SharedStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implem
     this.#enabled = false;
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.disable();
   }
 
@@ -222,6 +222,12 @@ export class SharedStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implem
   }
 
   interestGroupAccessed(_event: Protocol.Storage.InterestGroupAccessedEvent): void {
+  }
+
+  storageBucketCreatedOrUpdated(_event: Protocol.Storage.StorageBucketCreatedOrUpdatedEvent): void {
+  }
+
+  storageBucketDeleted(_event: Protocol.Storage.StorageBucketDeletedEvent): void {
   }
 }
 

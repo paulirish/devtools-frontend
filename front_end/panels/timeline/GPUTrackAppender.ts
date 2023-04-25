@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as i18n from '../../core/i18n/i18n.js';
+import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 
 import {
   type TrackAppender,
@@ -10,29 +12,18 @@ import {
   type CompatibilityTracksAppender,
   type HighlightedEntryInfo,
 } from './CompatibilityTracksAppender.js';
-import * as i18n from '../../core/i18n/i18n.js';
-import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
-import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
-
 import {
   EntryType,
   InstantEventVisibleDurationMs,
   type TimelineFlameChartEntry,
 } from './TimelineFlameChartDataProvider.js';
+import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 
 const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   gpu: 'GPU',
-  /**
-   * @description Text in the Performance panel to show how long was spent in a particular part of the code.
-   * The first placeholder is the total time taken for this node and all children, the second is the self time
-   * (time taken in this node, without children included).
-   *@example {10ms} PH1
-   *@example {10ms} PH2
-   */
-  sSelfS: '{PH1} (self {PH2})',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/GPUTrackAppender.ts', UIStrings);
@@ -42,7 +33,7 @@ export class GPUTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'GPU';
 
   #compatibilityBuilder: CompatibilityTracksAppender;
-  #flameChartData: PerfUI.FlameChart.TimelineData;
+  #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
   #traceParsedData: Readonly<TraceEngine.TraceModel.PartialTraceParseDataDuringMigration>;
   #entryData: TimelineFlameChartEntry[];
   // TODO(crbug.com/1416533)
@@ -54,7 +45,7 @@ export class GPUTrackAppender implements TrackAppender {
   #legacyTrack: TimelineModel.TimelineModel.Track|null;
 
   constructor(
-      compatibilityBuilder: CompatibilityTracksAppender, flameChartData: PerfUI.FlameChart.TimelineData,
+      compatibilityBuilder: CompatibilityTracksAppender, flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
       traceParsedData: TraceEngine.TraceModel.PartialTraceParseDataDuringMigration,
       entryData: TimelineFlameChartEntry[], legacyEntryTypeByLevel: EntryType[],
       legacyTrack?: TimelineModel.TimelineModel.Track) {
@@ -94,52 +85,47 @@ export class GPUTrackAppender implements TrackAppender {
    * @param expanded wether the track should be rendered expanded.
    */
   #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
-    const trackIsCollapsible = this.#traceParsedData.GPU.mainGPUThreadTasks.length > 0;
-
-    const style: PerfUI.FlameChart.GroupStyle = {
-      padding: 4,
-      height: 17,
-      collapsible: trackIsCollapsible,
-      color: ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary'),
-      backgroundColor: ThemeSupport.ThemeSupport.instance().getComputedValue('--color-background'),
-      nestingLevel: 0,
-      shareHeaderLine: false,
-      useFirstLineForOverview: false,
-    };
-    const group =
-        ({startLevel: currentLevel, name: i18nString(UIStrings.gpu), style: style, selectable: true, expanded} as
-         PerfUI.FlameChart.Group);
+    const style = buildGroupStyle({shareHeaderLine: false});
+    const group = buildTrackHeader(
+        currentLevel, i18nString(UIStrings.gpu), style, /* selectable= */ true, expanded, this.#legacyTrack);
     this.#flameChartData.groups.push(group);
-    group.track = this.#legacyTrack;
   }
 
   /**
    * Adds into the flame chart data the trace events corresponding to
    * user GPU Tasks. These are taken straight from the GPU handler.
-   * @param currentLevel the flame chart level from which user timings will
+   * @param trackStartLevel the flame chart level from which GPU events will
    * be appended.
    * @returns the next level after the last occupied by the appended
-   * timings (the first available level to append more data).
+   * GPU tasks (the first available level to append next track).
    */
-  #appendGPUsAtLevel(currentLevel: number): number {
+  #appendGPUsAtLevel(trackStartLevel: number): number {
     const gpuEvents = this.#traceParsedData.GPU.mainGPUThreadTasks;
-    const lastUsedTimeByLevel: number[] = [];
+
+    const openEvents = [];
+    let maxStackDepth = 0;
     for (let i = 0; i < gpuEvents.length; ++i) {
       const event = gpuEvents[i];
-      const startTime = event.ts;
-      let level;
-      // look vertically for the first level where this event fits,
-      // that is, where it wouldn't overlap with other events.
-      for (level = 0; level < lastUsedTimeByLevel.length && lastUsedTimeByLevel[level] > startTime; ++level) {
+      while (openEvents.length) {
+        const lastOpenEvent = openEvents[openEvents.length - 1];
+        const lastOpenEventEndTime = lastOpenEvent.ts + (lastOpenEvent.dur || 0);
+        if (lastOpenEventEndTime <= event.ts) {
+          openEvents.pop();
+        } else {
+          break;
+        }
       }
-      this.#appendEventAtLevel(event, currentLevel + level);
-      const endTime = event.ts + (event.dur || 0);
-      lastUsedTimeByLevel[level] = endTime;
+
+      const level = trackStartLevel + openEvents.length;
+      this.#appendEventAtLevel(event, level);
+
+      maxStackDepth = Math.max(maxStackDepth, openEvents.length + 1);
+      openEvents.push(event);
     }
-    this.#legacyEntryTypeByLevel.length = currentLevel + lastUsedTimeByLevel.length;
-    // Set the entry type to TrackAppender for all the levels occupied by the appended timings.
-    this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, currentLevel);
-    return currentLevel + lastUsedTimeByLevel.length;
+
+    this.#legacyEntryTypeByLevel.length = trackStartLevel + maxStackDepth;
+    this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
+    return trackStartLevel + maxStackDepth;
   }
 
   /**
@@ -194,19 +180,6 @@ export class GPUTrackAppender implements TrackAppender {
    */
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
-    const totalTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
-        (event.dur || 0) as TraceEngine.Types.Timing.MicroSeconds);
-    const selfTime = totalTime;
-    if (totalTime === TraceEngine.Types.Timing.MilliSeconds(0)) {
-      return {title, formattedTime: ''};
-    }
-    const minSelfTimeSignificance = 1e-6;
-    const time = Math.abs(totalTime - selfTime) > minSelfTimeSignificance && selfTime > minSelfTimeSignificance ?
-        i18nString(UIStrings.sSelfS, {
-          PH1: i18n.TimeUtilities.millisToString(totalTime, true),
-          PH2: i18n.TimeUtilities.millisToString(selfTime, true),
-        }) :
-        i18n.TimeUtilities.millisToString(totalTime, true);
-    return {title, formattedTime: time};
+    return {title, formattedTime: getFormattedTime(event.dur)};
   }
 }

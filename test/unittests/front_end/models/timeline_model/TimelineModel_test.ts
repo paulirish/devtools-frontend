@@ -6,10 +6,10 @@ const {assert} = chai;
 
 import * as Platform from '../../../../../front_end/core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import type * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
-
 import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
 import {
   DevToolsTimelineCategory,
@@ -17,6 +17,8 @@ import {
   makeFakeSDKEventFromPayload,
   traceModelFromTraceFile,
 } from '../../helpers/TimelineHelpers.js';
+import {allModelsFromFile} from '../../helpers/TraceHelpers.js';
+import {StubbedThread} from '../../helpers/TimelineHelpers.js';
 
 // Various events listing processes and threads used by all the tests.
 const preamble = [
@@ -157,25 +159,6 @@ const preamble = [
   },
 ];
 
-interface FakeLayoutShiftProperties {
-  startTime: number;
-  hadRecentInput: boolean;
-  weightedScoreDelta?: number;
-}
-
-function makeFakeLayoutShift(properties: FakeLayoutShiftProperties): SDK.TracingModel.Event {
-  const fakeLayoutShift = {
-    args: {
-      data: {
-        had_recent_input: properties.hadRecentInput,
-        weighted_score_delta: properties.weightedScoreDelta,
-      },
-    },
-    startTime: properties.startTime,
-  } as unknown as SDK.TracingModel.Event;
-
-  return fakeLayoutShift;
-}
 class TrackSummary {
   name: string = '';
   type: TimelineModel.TimelineModel.TrackType = TimelineModel.TimelineModel.TrackType.Other;
@@ -690,7 +673,7 @@ describeWithEnvironment('TimelineModel', () => {
       const track = new TimelineModel.TimelineModel.Track();
       track.asyncEvents = nestableAsyncEvents;
       track.events = syncEvents;
-      const syncLikeEvents = track.syncLikeEvents();
+      const syncLikeEvents = track.eventsForTreeView();
       assert.strictEqual(syncLikeEvents.length, nestableAsyncEvents.length + syncEvents.length);
       const syncLikeEventIds = syncLikeEvents.map(e => e.id);
       for (const event of [...nestableAsyncEvents, ...syncEvents]) {
@@ -701,7 +684,7 @@ describeWithEnvironment('TimelineModel', () => {
       const track = new TimelineModel.TimelineModel.Track();
       track.asyncEvents = nonNestableAsyncEvents;
       track.events = syncEvents;
-      const syncLikeEvents = track.syncLikeEvents();
+      const syncLikeEvents = track.eventsForTreeView();
       assert.strictEqual(syncLikeEvents.length, syncEvents.length);
       const syncLikeEventIds = syncLikeEvents.map(e => e.id);
       for (const event of [...syncEvents]) {
@@ -1199,6 +1182,100 @@ describeWithEnvironment('TimelineModel', () => {
     ]);
   });
 
+  it('includes utility process main thread w/M11+ name, too', () => {
+    const {timelineModel} = traceWithEvents([
+      {
+        'args': {
+          'data': {
+            'host': '192.168.0.105',
+            'pid': 1538739,
+            'target': 'a1e485ff-f876-41cb-90ca-85c4b684b302',
+            'type': 'bidder',
+          },
+        },
+        'cat': 'disabled-by-default-devtools.timeline',
+        'name': 'AuctionWorkletRunningInProcess',
+        'ph': 'I',
+        'pid': 1537480,
+        's': 't',
+        'tid': 1537480,
+        'ts': 962633184323,
+        'tts': 23961306,
+      },
+      {
+        'args': {'name': 'AuctionV8HelperThread'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 7,
+        'ts': 0,
+      },
+      {
+        'args': {'name': 'auction_worklet.CrUtilityMain'},
+        'cat': '__metadata',
+        'name': 'thread_name',
+        'ph': 'M',
+        'pid': 1538739,
+        'tid': 1,
+        'ts': 0,
+      },
+    ] as unknown as SDK.TracingManager.EventPayload[]);
+    const trackInfo = summarizeArray(timelineModel.tracks());
+    assert.deepEqual(trackInfo, [
+      {
+        forMainFrame: false,
+        name: 'Thread 0',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 0,
+        threadName: '',
+        type: 'Other',
+        url: '',
+      },
+      {
+        forMainFrame: true,
+        name: 'CrRendererMain',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 1,
+        threadName: 'CrRendererMain',
+        type: 'MainThread',
+        url: 'https://192.168.0.105/run.html',
+      },
+      {
+        forMainFrame: false,
+        name: 'Auction Worklet Service — https://192.168.0.105',
+        processId: 1538739,
+        processName: 'Service: auction_worklet.mojom.AuctionWorkletService',
+        threadId: 1,
+        threadName: 'auction_worklet.CrUtilityMain',
+        type: 'Other',
+        url: 'https://192.168.0.105',
+      },
+      {
+        forMainFrame: false,
+        name: 'Bidder Worklet — https://192.168.0.105',
+        processId: 1538739,
+        processName: 'Service: auction_worklet.mojom.AuctionWorkletService',
+        threadId: 7,
+        threadName: 'AuctionV8HelperThread',
+        type: 'Other',
+        url: 'https://192.168.0.105',
+      },
+      {
+        forMainFrame: false,
+        name: '',
+        processId: 1537729,
+        processName: 'Renderer',
+        threadId: 1,
+        threadName: 'CrRendererMain',
+        type: 'Experience',
+        url: '',
+      },
+    ]);
+  });
+
   it('handles auction worklet exit events', () => {
     const {timelineModel} = traceWithEvents([
       {
@@ -1468,7 +1545,7 @@ describeWithEnvironment('TimelineModel', () => {
         if (track.type !== TimelineModel.TimelineModel.TrackType.Timings) {
           continue;
         }
-        for (const event of track.syncLikeEvents()) {
+        for (const event of track.eventsForTreeView()) {
           if (event.phase !== TraceEngine.Types.TraceEvents.Phase.MARK) {
             continue;
           }
@@ -1648,115 +1725,66 @@ describeWithEnvironment('TimelineModel', () => {
       ]);
     });
   });
+});
 
+describeWithEnvironment('TimelineData', () => {
   function getAllTracingModelPayloadEvents(tracingModel: SDK.TracingModel.TracingModel):
       SDK.TracingModel.PayloadEvent[] {
     const allSDKEvents = tracingModel.sortedProcesses().flatMap(process => {
       return process.sortedThreads().flatMap(thread => thread.events().filter(SDK.TracingModel.eventHasPayload));
     });
+    allSDKEvents.sort((eventA, eventB) => {
+      if (eventA.startTime > eventB.startTime) {
+        return 1;
+      }
+      if (eventB.startTime > eventA.startTime) {
+        return -1;
+      }
+      return 0;
+    });
     return allSDKEvents;
   }
 
-  it('marks an LCP event on the main thread as an LCP Candidate Event', async () => {
-    const {timelineModel, tracingModel} = await traceModelFromTraceFile('lcp-images.json.gz');
-    const allSDKEvents = getAllTracingModelPayloadEvents(tracingModel);
-    const firstLCPEvent = allSDKEvents.find(event => {
-      return event.name === TimelineModel.TimelineModel.RecordType.MarkLCPCandidate;
-    });
-
-    if (!firstLCPEvent) {
-      throw new Error('Could not find LCP event');
+  it('stores data for an SDK.TracingModel.PayloadEvent using the raw payload as the key', async () => {
+    const data = await allModelsFromFile('web-dev.json.gz');
+    const allSDKEvents = getAllTracingModelPayloadEvents(data.tracingModel);
+    // The exact event we use is not important, so let's use the first LCP event.
+    const lcpSDKEvent =
+        allSDKEvents.find(event => event.name === TimelineModel.TimelineModel.RecordType.MarkLCPCandidate);
+    if (!lcpSDKEvent) {
+      throw new Error('Could not find SDK Event.');
     }
-    assert.isTrue(timelineModel.isLCPCandidateEvent(firstLCPEvent));
-  });
+    const dataForEvent = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(lcpSDKEvent);
+    dataForEvent.backendNodeIds.push(123 as Protocol.DOM.BackendNodeId);
 
-  it('does not mark an LCP event on another frame as an LCP Candidate Event', async () => {
-    const {timelineModel, tracingModel} = await traceModelFromTraceFile('multiple-navigations-with-iframes.json.gz');
-    const mainFrameID = timelineModel.mainFrameID();
-    const allSDKEvents = getAllTracingModelPayloadEvents(tracingModel);
-
-    const firstLCPEventNotOnMainFrame = allSDKEvents.find(event => {
-      return event.name === TimelineModel.TimelineModel.RecordType.MarkLCPCandidate && event.args.frame !== mainFrameID;
+    // Now find the same event from the new engine
+    const lcpNewEngineEvent = data.traceParsedData.PageLoadMetrics.allMarkerEvents.find(event => {
+      return TraceEngine.Types.TraceEvents.isTraceEventLargestContentfulPaintCandidate(event);
     });
-    if (!firstLCPEventNotOnMainFrame) {
-      throw new Error('Could not find LCP event');
+    if (!lcpNewEngineEvent) {
+      throw new Error('Could not find LCP New engine event.');
     }
-    assert.isFalse(timelineModel.isLCPCandidateEvent(firstLCPEventNotOnMainFrame));
-  });
-});
+    // Make sure we got the matching events.
+    assert.strictEqual(lcpNewEngineEvent, lcpSDKEvent.rawPayload());
 
-describe('groupLayoutShiftsIntoClusters', () => {
-  it('does not include layout shifts that have recent user input', () => {
-    const shiftWithUserInput = makeFakeLayoutShift({
-      hadRecentInput: true,
-      weightedScoreDelta: 0.01,
-      startTime: 2000,
-    });
-    const layoutShifts: SDK.TracingModel.Event[] = [shiftWithUserInput];
-    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
-    assert.isUndefined(shiftWithUserInput.args.data._current_cluster_id);
+    assert.strictEqual(
+        TimelineModel.TimelineModel.EventOnTimelineData.forEvent(lcpSDKEvent).backendNodeIds,
+        TimelineModel.TimelineModel.EventOnTimelineData.forEvent(lcpNewEngineEvent).backendNodeIds,
+    );
   });
 
-  it('does not include layout shifts that have no weighted_score_delta', () => {
-    const shiftWithNoWeightedScore = makeFakeLayoutShift({
-      hadRecentInput: false,
-      weightedScoreDelta: undefined,
-      startTime: 2000,
-    });
-    const layoutShifts: SDK.TracingModel.Event[] = [shiftWithNoWeightedScore];
-    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
-    assert.isUndefined(shiftWithNoWeightedScore.args.data._current_cluster_id);
-  });
-
-  it('correctly combines events that are within the same session', () => {
-    const shiftOne = makeFakeLayoutShift({
-      hadRecentInput: false,
-      weightedScoreDelta: 0.01,
-      startTime: 2000,
-    });
-
-    const shiftTwo = makeFakeLayoutShift({
-      hadRecentInput: false,
-      weightedScoreDelta: 0.02,
-      startTime: shiftOne.startTime + 100,
-    });
-    const layoutShifts: SDK.TracingModel.Event[] = [shiftOne, shiftTwo];
-    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
-
-    assert.strictEqual(shiftOne.args.data._current_cluster_id, 1);
-    assert.strictEqual(shiftTwo.args.data._current_cluster_id, 1);
-    assert.strictEqual(shiftOne.args.data._current_cluster_score, 0.03);
-    assert.strictEqual(shiftTwo.args.data._current_cluster_score, 0.03);
-  });
-
-  it('correctly splits events into multiple clusters', () => {
-    const shiftOne = makeFakeLayoutShift({
-      hadRecentInput: false,
-      weightedScoreDelta: 0.01,
-      startTime: 2000,
-    });
-
-    const shiftTwo = makeFakeLayoutShift({
-      hadRecentInput: false,
-      weightedScoreDelta: 0.02,
-      startTime: shiftOne.startTime + 100,
-    });
-
-    const shiftThree = makeFakeLayoutShift({
-      hadRecentInput: false,
-      weightedScoreDelta: 0.05,
-      startTime: 10000,
-    });
-
-    const layoutShifts: SDK.TracingModel.Event[] = [shiftOne, shiftTwo, shiftThree];
-    TimelineModel.TimelineModel.assignLayoutShiftsToClusters(layoutShifts);
-
-    assert.strictEqual(shiftOne.args.data._current_cluster_id, 1);
-    assert.strictEqual(shiftTwo.args.data._current_cluster_id, 1);
-    assert.strictEqual(shiftOne.args.data._current_cluster_score, 0.03);
-    assert.strictEqual(shiftTwo.args.data._current_cluster_score, 0.03);
-
-    assert.strictEqual(shiftThree.args.data._current_cluster_id, 2);
-    assert.strictEqual(shiftThree.args.data._current_cluster_score, 0.05);
+  it('stores data for a constructed event using the event as the key', async () => {
+    const thread = StubbedThread.make(1);
+    // None of the details here matter, we just need some constructed event.
+    const fakeConstructedEvent = new SDK.TracingModel.ConstructedEvent(
+        'blink.user_timing',
+        'some-test-event',
+        TraceEngine.Types.TraceEvents.Phase.INSTANT,
+        100,
+        thread,
+    );
+    const dataForEvent = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(fakeConstructedEvent);
+    dataForEvent.backendNodeIds.push(123 as Protocol.DOM.BackendNodeId);
+    assert.strictEqual(dataForEvent, TimelineModel.TimelineModel.EventOnTimelineData.forEvent(fakeConstructedEvent));
   });
 });

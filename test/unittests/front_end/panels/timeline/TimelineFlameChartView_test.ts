@@ -11,8 +11,8 @@ import {allModelsFromFile} from '../../helpers/TraceHelpers.js';
 const {assert} = chai;
 
 class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegate {
-  selection: Timeline.TimelinePanel.TimelineSelection|null = null;
-  select(selection: Timeline.TimelinePanel.TimelineSelection|null): void {
+  selection: Timeline.TimelineSelection.TimelineSelection|null = null;
+  select(selection: Timeline.TimelineSelection.TimelineSelection|null): void {
     this.selection = selection;
   }
   selectEntryAtTime(_events: SDK.TracingModel.Event[]|null, _time: number): void {
@@ -51,12 +51,10 @@ describeWithEnvironment('TimelineFlameChartView', () => {
 
     function assertSelectionName(name: string) {
       const selection = mockViewDelegate.selection;
-      assert.isNotNull(selection);
-      assert.strictEqual(selection?.type(), 'TraceEvent');
-      const object = selection?.object?.();
-      if (!object || !('name' in object)) {
-        throw new Error('Trace event not found or did not have a name.');
+      if (!selection || !Timeline.TimelineSelection.TimelineSelection.isTraceEventSelection(selection.object)) {
+        throw new Error('Selection is not present or not a Trace Event');
       }
+      const object = selection.object;
       assert.strictEqual(object.name, name);
     }
   });

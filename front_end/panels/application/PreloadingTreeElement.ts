@@ -29,14 +29,14 @@ export class PreloadingTreeElement extends ApplicationPanelTreeElement {
   constructor(resourcesPanel: ResourcesPanel) {
     super(resourcesPanel, i18nString(UIStrings.prefetchingAndPrerendering), false);
 
-    const icon = UI.Icon.Icon.create('mediumicon-fetch', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('arrow-up-down', 'resource-tree-item');
     this.setLeadingIcons([icon]);
     this.#selectedInternal = false;
 
     // TODO(https://crbug.com/1384419): Set link
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     return 'preloading://' as Platform.DevToolsPath.UrlString;
   }
 
@@ -49,7 +49,7 @@ export class PreloadingTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  onselect(selectedByUser?: boolean): boolean {
+  override onselect(selectedByUser?: boolean): boolean {
     super.onselect(selectedByUser);
     this.#selectedInternal = true;
 

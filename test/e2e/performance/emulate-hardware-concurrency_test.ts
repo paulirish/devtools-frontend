@@ -42,7 +42,7 @@ describe('The Performance panel', () => {
 
     // Check for the warning icon on the tab header
     const tabHeader = await waitForAria('Performance');
-    const tabIcon = await waitFor('.smallicon-warning', tabHeader);
+    const tabIcon = await waitFor('devtools-icon', tabHeader);
     {
       const tooltipText = await tabIcon.evaluate(e => e.getAttribute('title'));
       assert.deepEqual(tooltipText, 'Hardware concurrency override is enabled');
@@ -53,7 +53,7 @@ describe('The Performance panel', () => {
         await waitForAria('- Hardware concurrency override is enabled') as puppeteer.ElementHandle<HTMLElement>;
     const gearColor = await gear.evaluate(
         e => e.firstElementChild && getComputedStyle(e.firstElementChild).getPropertyValue('background-color'));
-    assert.deepEqual(gearColor, 'rgb(217, 48, 37)');
+    assert.deepEqual(gearColor, 'rgb(220, 54, 46)');
 
     // Check that the concurrency input shows the correct value:
     const input = await waitForAria('Value of navigator.hardwareConcurrency');

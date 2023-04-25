@@ -218,6 +218,22 @@ export class UserMetrics {
         EnumeratedHistogram.DeveloperResourceScheme, developerResourceScheme, DeveloperResourceScheme.MaxValue);
   }
 
+  inlineScriptParsed(inlineScriptType: VMInlineScriptType): void {
+    if (inlineScriptType >= VMInlineScriptType.MaxValue) {
+      return;
+    }
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.InlineScriptParsed, inlineScriptType, VMInlineScriptType.MaxValue);
+  }
+
+  vmInlineScriptContentShown(inlineScriptType: VMInlineScriptType): void {
+    if (inlineScriptType >= VMInlineScriptType.MaxValue) {
+      return;
+    }
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.VMInlineScriptTypeShown, inlineScriptType, VMInlineScriptType.MaxValue);
+  }
+
   linearMemoryInspectorRevealedFrom(linearMemoryInspectorRevealedFrom: LinearMemoryInspectorRevealedFrom): void {
     if (linearMemoryInspectorRevealedFrom >= LinearMemoryInspectorRevealedFrom.MaxValue) {
       return;
@@ -432,7 +448,8 @@ export enum Action {
   BreakpointsInFileRemovedFromContextMenu = 70,
   BreakpointsInFileCheckboxToggled = 71,
   BreakpointsInFileEnabledDisabledFromContextMenu = 72,
-  MaxValue = 73,
+  BreakpointConditionEditedFromSidebar = 73,
+  MaxValue = 74,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -751,9 +768,10 @@ export enum DevtoolsExperiments {
   'disableColorFormatSetting' = 69,
   'outermostTargetSelector' = 71,
   'jsProfilerTemporarilyEnable' = 72,
+  'highlightErrorsElementsPanel' = 73,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 73,
+  'MaxValue' = 74,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -769,7 +787,8 @@ export const enum BreakpointEditDialogRevealedFrom {
   BreakpointMarkerContextMenu = 2,
   LineGutterContextMenu = 3,
   KeyboardShortcut = 4,
-  MaxValue = 5,
+  Linkifier = 5,
+  MaxValue = 6,
 }
 
 export const enum ColorConvertedFrom {
@@ -953,6 +972,12 @@ export enum LinearMemoryInspectorTarget {
   TypedArray = 3,
   WebAssemblyMemory = 4,
   MaxValue = 5,
+}
+
+export const enum VMInlineScriptType {
+  MODULE_SCRIPT = 0,
+  CLASSIC_SCRIPT = 1,
+  MaxValue = 2,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */

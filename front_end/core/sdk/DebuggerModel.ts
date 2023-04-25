@@ -695,6 +695,14 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     this.registerScript(script);
     this.dispatchEventToListeners(Events.ParsedScriptSource, script);
 
+    if (script.isInlineScript() && !script.hasSourceURL) {
+      if (script.isModule) {
+        Host.userMetrics.inlineScriptParsed(Host.UserMetrics.VMInlineScriptType.MODULE_SCRIPT);
+      } else {
+        Host.userMetrics.inlineScriptParsed(Host.UserMetrics.VMInlineScriptType.CLASSIC_SCRIPT);
+      }
+    }
+
     if (script.sourceMapURL && !hasSyntaxError) {
       this.#sourceMapManagerInternal.attachSourceMap(script, script.sourceURL, script.sourceMapURL);
     }
@@ -886,7 +894,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     return !error;
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.#sourceMapManagerInternal.dispose();
     if (this.#debuggerId) {
       _debuggerIdToModel.delete(this.#debuggerId);
@@ -902,11 +910,11 @@ export class DebuggerModel extends SDKModel<EventTypes> {
         .removeChangeListener(this.asyncStackTracesStateChanged, this);
   }
 
-  async suspendModel(): Promise<void> {
+  override async suspendModel(): Promise<void> {
     await this.disableDebugger();
   }
 
-  async resumeModel(): Promise<void> {
+  override async resumeModel(): Promise<void> {
     await this.enableDebugger();
   }
 
@@ -1128,7 +1136,7 @@ export class BreakLocation extends Location {
     }
   }
 
-  static fromPayload(debuggerModel: DebuggerModel, payload: Protocol.Debugger.BreakLocation): BreakLocation {
+  static override fromPayload(debuggerModel: DebuggerModel, payload: Protocol.Debugger.BreakLocation): BreakLocation {
     return new BreakLocation(debuggerModel, payload.scriptId, payload.lineNumber, payload.columnNumber, payload.type);
   }
 }

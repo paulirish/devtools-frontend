@@ -32,7 +32,7 @@ import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import type * as SDK from '../../../../core/sdk/sdk.js';
-import type * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
+import * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -129,7 +129,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private visibleLevelOffsets?: Uint32Array|null;
   private visibleLevels?: Uint16Array|null;
   private groupOffsets?: Uint32Array|null;
-  private rawTimelineData?: TimelineData|null;
+  private rawTimelineData?: FlameChartTimelineData|null;
   private forceDecorationCache?: Int8Array|null;
   private entryColorsCache?: string[]|null;
   private visibleLevelHeights?: Uint32Array;
@@ -209,7 +209,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     });
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.hideHighlight();
   }
 
@@ -319,7 +319,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateHighlight();
   }
 
-  private timelineData(): TimelineData|null {
+  private timelineData(): FlameChartTimelineData|null {
     if (!this.dataProvider) {
       return null;
     }
@@ -991,6 +991,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     for (const [color, {indexes}] of colorBuckets) {
       this.drawGenericEvents(context, timelineData, color, indexes);
       this.drawLongTaskRegions(context, timelineData, color, indexes);
+      this.drawLongInteractionsCandyStripes(context, timelineData, indexes);
     }
 
     this.drawMarkers(context, timelineData, markerIndices);
@@ -1042,7 +1043,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * Drawn on a color by color basis to minimize the amount of times context.style is switched.
    */
   private drawGenericEvents(
-      context: CanvasRenderingContext2D, timelineData: TimelineData, color: string, indexes: number[]): void {
+      context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData, color: string, indexes: number[]): void {
     const {entryTotalTimes, entryStartTimes, entryLevels} = timelineData;
     context.save();
     context.beginPath();
@@ -1069,8 +1070,68 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   /**
    * Marks the portion of long tasks where the 50ms threshold was exceeded.
    */
+  private drawLongInteractionsCandyStripes(
+      context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData, indexes: number[]): void {
+    const {entryTotalTimes, entryStartTimes, entryLevels} = timelineData;
+
+    const levelsOfInteractionsTrack: number[] = [];
+    for (let i = 0; i < timelineData.groups.length; i++) {
+      const group = timelineData.groups[i];
+      // TODO(crbug.com/1434297): It is messy to reach in like this and find
+      // the group and then the interactions.
+      // The attached bug proposes a generic way to do this where we can avoid
+      // reaching into the data at the FlameChart level and provide information
+      // on decorations in TimelineData.
+      const isInteractions = group.track?.type === TimelineModel.TimelineModel.TrackType.UserInteractions;
+      if (!isInteractions) {
+        continue;
+      }
+
+      levelsOfInteractionsTrack.push(group.startLevel);
+      if (timelineData.groups[i + 1]) {
+        const nextGroupStart = timelineData.groups[i + 1].startLevel;
+        for (let j = group.startLevel + 1; j < nextGroupStart; j++) {
+          levelsOfInteractionsTrack.push(j);
+        }
+      }
+      if (!this.timelineLevels) {
+        return;
+      }
+    }
+
+    context.save();
+    context.beginPath();
+    for (let i = 0; i < indexes.length; ++i) {
+      const entryIndex = indexes[i];
+      const duration = entryTotalTimes[entryIndex];
+      const isInteraction = levelsOfInteractionsTrack.includes(entryLevels[entryIndex]);
+      if (!isInteraction || duration <= 200) {
+        // We only highlight the part of the interaction that is over 200ms, so if this event is not 200ms+ in length, nothing to highlight.
+        continue;
+      }
+      const entryStartTime = entryStartTimes[entryIndex];
+      const barX = this.timeToPositionClipped(entryStartTime + 200);
+      const barLevel = entryLevels[entryIndex];
+      const barHeight = this.levelHeight(barLevel);
+      const barY = this.levelToOffset(barLevel);
+      const barRight = this.timeToPositionClipped(entryStartTime + duration);
+      const barWidth = Math.max(barRight - barX, 1);
+      context.rect(barX, barY, barWidth - 0.4, barHeight - 1);
+    }
+    const candyStripePattern = context.createPattern(this.candyStripeCanvas, 'repeat');
+    if (candyStripePattern) {
+      context.fillStyle = candyStripePattern;
+      context.fill();
+    }
+
+    context.restore();
+  }
+
+  /**
+   * Marks the portion of long tasks where the 50ms threshold was exceeded.
+   */
   private drawLongTaskRegions(
-      context: CanvasRenderingContext2D, timelineData: TimelineData, color: string, indexes: number[]): void {
+      context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData, color: string, indexes: number[]): void {
     const {entryTotalTimes, entryStartTimes, entryLevels} = timelineData;
     let mainThreadTopLevel = -1;
 
@@ -1128,7 +1189,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    *  - Gathers marker events (LCP, FCP, DCL, etc.).
    *  - Gathers event titles that should be rendered.
    */
-  private getDrawableData(context: CanvasRenderingContext2D, timelineData: TimelineData):
+  private getDrawableData(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData):
       {colorBuckets: Map<string, {indexes: number[]}>, titleIndices: number[], markerIndices: number[]} {
     // These are the event indexes of events that we are drawing onto the timeline that:
     // 1) have text within them
@@ -1364,7 +1425,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   /**
    * Draws page load events in the Timings track (LCP, FCP, DCL, etc.)
    */
-  private drawMarkers(context: CanvasRenderingContext2D, timelineData: TimelineData, markerIndices: number[]): void {
+  private drawMarkers(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData, markerIndices: number[]):
+      void {
     const {entryStartTimes, entryLevels} = timelineData;
     this.markerPositions.clear();
     context.textBaseline = 'alphabetic';
@@ -1408,7 +1470,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * in the Performance Panel timeline).
    */
   private drawEventTitles(
-      context: CanvasRenderingContext2D, timelineData: TimelineData, titleIndices: number[], width: number): void {
+      context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData, titleIndices: number[],
+      width: number): void {
     const timeToPixel = this.chartViewport.timeToPixel();
     const textPadding = this.textPadding;
     context.save();
@@ -1694,7 +1757,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.viewportElement.appendChild(element);
   }
 
-  private processTimelineData(timelineData: TimelineData|null): void {
+  private processTimelineData(timelineData: FlameChartTimelineData|null): void {
     if (!timelineData) {
       this.timelineLevels = null;
       this.visibleLevelOffsets = null;
@@ -1941,7 +2004,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.chartViewport.setContentHeight(height);
   }
 
-  onResize(): void {
+  override onResize(): void {
     this.scheduleUpdate();
   }
 
@@ -2004,7 +2067,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 export const HeaderHeight = 15;
 export const MinimalTimeWindowMs = 0.5;
 
-export class TimelineData {
+export class FlameChartTimelineData {
   entryLevels: number[]|Uint16Array;
   entryTotalTimes: number[]|Float32Array;
   entryStartTimes: number[]|Float64Array;
@@ -2015,7 +2078,7 @@ export class TimelineData {
   flowEndTimes: number[];
   flowEndLevels: number[];
   selectedGroup: Group|null;
-  constructor(
+  private constructor(
       entryLevels: number[]|Uint16Array, entryTotalTimes: number[]|Float32Array, entryStartTimes: number[]|Float64Array,
       groups: Group[]|null) {
     this.entryLevels = entryLevels;
@@ -2029,6 +2092,24 @@ export class TimelineData {
     this.flowEndLevels = [];
     this.selectedGroup = null;
   }
+
+  static create(data: {
+    entryLevels: FlameChartTimelineData['entryLevels'],
+    entryTotalTimes: FlameChartTimelineData['entryTotalTimes'],
+    entryStartTimes: FlameChartTimelineData['entryStartTimes'],
+    groups: FlameChartTimelineData['groups']|null,
+  }): FlameChartTimelineData {
+    return new FlameChartTimelineData(data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups);
+  }
+
+  static createEmpty(): FlameChartTimelineData {
+    return new FlameChartTimelineData(
+        [],  // entry levels: what level on the timeline is an event on?,
+        [],  // entry total times: the total duration of an event,
+        [],  // entry start times: the start time of a given event
+        [],  // groups: a list of flame chart groups, which roughly correlate to each individual track
+    );
+  }
 }
 
 export interface FlameChartDataProvider {
@@ -2040,7 +2121,7 @@ export interface FlameChartDataProvider {
 
   maxStackDepth(): number;
 
-  timelineData(): TimelineData|null;
+  timelineData(): FlameChartTimelineData|null;
 
   prepareHighlightedEntryInfo(entryIndex: number): Element|null;
 
@@ -2073,9 +2154,35 @@ export interface FlameChartMarker {
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum Events {
+  /**
+   * Emitted when the <canvas> element of the FlameChart is focused by the user.
+   **/
   CanvasFocused = 'CanvasFocused',
+  /**
+   * Emitted when an event is selected by either mouse click, or hitting
+   * <enter> on the keyboard - e.g. the same actions that would invoke a
+   * <button> element.
+   *
+   * Will be emitted with a number which is the index of the entry that has
+   * been selected, or -1 if no entry is selected (e.g the user has clicked
+   * away from any events)
+   */
   EntryInvoked = 'EntryInvoked',
+  /**
+   * Emitted when an event is selected via keyboard navigation using the arrow
+   * keys.
+   *
+   * Will be emitted with a number which is the index of the entry that has
+   * been selected, or -1 if no entry is selected.
+   */
   EntrySelected = 'EntrySelected',
+  /**
+   * Emitted when an event is hovered over with the mouse.
+   *
+   * Will be emitted with a number which is the index of the entry that has
+   * been hovered on, or -1 if no entry is selected (the user has moved their
+   * mouse off the event)
+   */
   EntryHighlighted = 'EntryHighlighted',
 }
 
@@ -2094,6 +2201,7 @@ export interface Group {
   style: GroupStyle;
   track?: TimelineModel.TimelineModel.Track|null;
 }
+
 export interface GroupStyle {
   height: number;
   padding: number;

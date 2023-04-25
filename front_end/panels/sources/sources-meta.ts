@@ -715,7 +715,7 @@ UI.ActionRegistration.registerActionExtension({
     return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.runSnippet),
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_PLAY,
+  iconClass: UI.ActionRegistration.IconClass.PLAY,
   contextTypes() {
     return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
   },
@@ -1204,7 +1204,7 @@ if (!Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
       const Sources = await loadSourcesModule();
       return Sources.SourcesNavigator.ActionDelegate.instance();
     },
-    iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_ADD,
+    iconClass: UI.ActionRegistration.IconClass.PLUS,
     title: i18nLazyString(UIStrings.addFolderToWorkspace),
     condition: Root.Runtime.ConditionName.NOT_SOURCES_HIDE_ADD_FOLDER,
   });
@@ -1690,7 +1690,7 @@ Common.Settings.registerSettingExtension({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1699,7 +1699,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_TOP,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1708,7 +1708,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_BOTTOM,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1717,7 +1717,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_TABS,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1897,7 +1897,8 @@ UI.ContextMenu.registerItem({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '@',
-  iconName: 'ic_command_go_to_symbol',
+  iconName: 'symbol',
+  iconWidth: '16px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.OutlineQuickOpen.OutlineQuickOpen();
@@ -1908,7 +1909,8 @@ QuickOpen.FilteredListWidget.registerProvider({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: ':',
-  iconName: 'ic_command_go_to_line',
+  iconName: 'colon',
+  iconWidth: '20px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.GoToLineQuickOpen.GoToLineQuickOpen();
@@ -1919,7 +1921,8 @@ QuickOpen.FilteredListWidget.registerProvider({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '',
-  iconName: 'ic_command_open_file',
+  iconName: 'document',
+  iconWidth: '16px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.OpenFileQuickOpen.OpenFileQuickOpen();

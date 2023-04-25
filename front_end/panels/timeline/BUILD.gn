@@ -21,13 +21,16 @@ generate_css("css_files") {
 
 devtools_module("timeline") {
   sources = [
+    "AppenderUtils.ts",
     "CLSLinkifier.ts",
     "CompatibilityTracksAppender.ts",
     "CountersGraph.ts",
     "EventsTimelineTreeView.ts",
     "GPUTrackAppender.ts",
     "InteractionsTrackAppender.ts",
+    "LayoutShiftsTrackAppender.ts",
     "PerformanceModel.ts",
+    "SaveFileFormatter.ts",
     "TimelineController.ts",
     "TimelineDetailsView.ts",
     "TimelineEventOverview.ts",
@@ -40,12 +43,12 @@ devtools_module("timeline") {
     "TimelineLoader.ts",
     "TimelinePaintProfilerView.ts",
     "TimelinePanel.ts",
+    "TimelineSelection.ts",
     "TimelineTreeView.ts",
     "TimelineUIUtils.ts",
     "TimingsTrackAppender.ts",
     "UIDevtoolsController.ts",
     "UIDevtoolsUtils.ts",
-    "WebVitalsTimelineUtils.ts",
   ]
 
   deps = [
@@ -66,7 +69,6 @@ devtools_module("timeline") {
     "../../ui/legacy/components/utils:bundle",
     "../../ui/legacy/theme_support:bundle",
     "../../ui/lit-html:bundle",
-    "./components:bundle",
   ]
 }
 

@@ -10,6 +10,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -23,6 +24,7 @@ import {
 import * as ElementsComponents from './components/components.js';
 import {ElementsPanel} from './ElementsPanel.js';
 import {StyleEditorWidget} from './StyleEditorWidget.js';
+
 import {type StylePropertiesSection} from './StylePropertiesSection.js';
 import {CSSPropertyPrompt, StylesSidebarPane, StylesSidebarPropertyRenderer} from './StylesSidebarPane.js';
 import {getCssDeclarationAsJavascriptProperty} from './StylePropertyUtils.js';
@@ -281,13 +283,13 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     const contentChild = document.createElement('span');
     for (let i = 0; i < animationNames.length; i++) {
       const animationName = animationNames[i];
-      const swatch = new InlineEditor.LinkSwatch.AnimationNameSwatch();
+      const swatch = new InlineEditor.LinkSwatch.LinkSwatch();
       UI.UIUtils.createTextChild(swatch, animationName);
       const isDefined = Boolean(this.matchedStylesInternal.keyframes().find(kf => kf.name().text === animationName));
       swatch.data = {
         text: animationName,
         isDefined,
-        onLinkActivate: this.handleAnimationNameDefinitionActivate.bind(this),
+        onLinkActivate: () => this.parentPaneInternal.jumpToSectionBlock(`@keyframes ${animationName}`),
       };
       contentChild.appendChild(swatch);
 
@@ -331,6 +333,22 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         contentChild.appendChild(document.createTextNode(' '));
       }
     }
+
+    return contentChild;
+  }
+
+  private processPositionFallback(propertyText: string): Node {
+    const contentChild = document.createElement('span');
+    const swatch = new InlineEditor.LinkSwatch.LinkSwatch();
+    UI.UIUtils.createTextChild(swatch, propertyText);
+    const isDefined =
+        Boolean(this.matchedStylesInternal.positionFallbackRules().find(pf => pf.name().text === propertyText));
+    swatch.data = {
+      text: propertyText,
+      isDefined,
+      onLinkActivate: () => this.parentPaneInternal.jumpToSectionBlock(`@position-fallback ${propertyText}`),
+    };
+    contentChild.appendChild(swatch);
 
     return contentChild;
   }
@@ -475,10 +493,6 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     return this.processColor(computedValue, varSwatch);
   }
 
-  private handleAnimationNameDefinitionActivate(animationName: string): void {
-    this.parentPaneInternal.jumpToSectionBlock(`@keyframes ${animationName}`);
-  }
-
   private handleVarDefinitionActivate(variableName: string): void {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.CustomPropertyLinkClicked);
     this.parentPaneInternal.jumpToProperty(variableName);
@@ -504,13 +518,13 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private processBezier(text: string): Node {
-    if (!this.editable() || !UI.Geometry.CubicBezier.parse(text)) {
+    if (!this.editable() || !InlineEditor.AnimationTimingModel.AnimationTimingModel.parse(text)) {
       return document.createTextNode(text);
     }
     const swatchPopoverHelper = this.parentPaneInternal.swatchPopoverHelper();
     const swatch = InlineEditor.Swatches.BezierSwatch.create();
     swatch.setBezierText(text);
-    new BezierPopoverIcon(this, swatchPopoverHelper, swatch);
+    new BezierPopoverIcon({treeElement: this, swatchPopoverHelper, swatch});
     return swatch;
   }
 
@@ -749,7 +763,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     return this.#propertyTextFromSource !== property.propertyText || this.parentPane().isPropertyChanged(property);
   }
 
-  async onpopulate(): Promise<void> {
+  override async onpopulate(): Promise<void> {
     // Only populate once and if this property is a shorthand.
     if (this.childCount() || !this.isShorthand) {
       return;
@@ -783,7 +797,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     }
   }
 
-  onattach(): void {
+  override onattach(): void {
     this.updateTitle();
 
     this.listItemElement.addEventListener('mousedown', event => {
@@ -807,11 +821,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.listItemElement.addEventListener('contextmenu', this.handleCopyContextMenuEvent.bind(this));
   }
 
-  onexpand(): void {
+  override onexpand(): void {
     this.updateExpandElement();
   }
 
-  oncollapse(): void {
+  override oncollapse(): void {
     this.updateExpandElement();
   }
 
@@ -820,9 +834,9 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
     if (this.expanded) {
-      this.expandElement.setIconType('smallicon-triangle-down');
+      this.expandElement.setIconType('triangle-down');
     } else {
-      this.expandElement.setIconType('smallicon-triangle-right');
+      this.expandElement.setIconType('triangle-right');
     }
   }
 
@@ -843,7 +857,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   private innerUpdateTitle(): void {
     this.updateState();
     if (this.isExpandable()) {
-      this.expandElement = UI.Icon.Icon.create('smallicon-triangle-right', 'expand-icon');
+      this.expandElement = UI.Icon.Icon.create('triangle-right', 'expand-icon');
     } else {
       this.expandElement = null;
     }
@@ -862,6 +876,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       propertyRenderer.setGridHandler(this.processGrid.bind(this));
       propertyRenderer.setAngleHandler(this.processAngle.bind(this));
       propertyRenderer.setLengthHandler(this.processLength.bind(this));
+      propertyRenderer.setPositionFallbackHandler(this.processPositionFallback.bind(this));
     }
 
     this.listItemElement.removeChildren();
@@ -956,7 +971,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
             enabledCheckboxElement, `${this.nameElement.textContent} ${this.valueElement.textContent}`);
       }
 
-      const copyIcon = UI.Icon.Icon.create('largeicon-copy', 'copy');
+      const copyIcon = UI.Icon.Icon.create('copy', 'copy');
       UI.Tooltip.Tooltip.install(copyIcon, i18nString(UIStrings.copyDeclaration));
       copyIcon.addEventListener('click', () => {
         const propertyText = `${this.property.name}: ${this.property.value};`;
@@ -998,7 +1013,9 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         Host.userMetrics.cssHintShown(validator.getMetricType());
         const wrapper = document.createElement('span');
         wrapper.classList.add('hint-wrapper');
-        const hintIcon = UI.Icon.Icon.create('mediumicon-info', 'hint');
+        const hintIcon = new IconButton.Icon.Icon();
+        hintIcon.data = {iconName: 'info', color: 'var(--icon-default)', width: '14px', height: '14px'};
+        hintIcon.classList.add('hint');
         wrapper.append(hintIcon);
         activeHints.set(hintIcon, hint);
         this.listItemElement.append(wrapper);
@@ -1781,11 +1798,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.styleTextAppliedForTest();
   }
 
-  ondblclick(): boolean {
+  override ondblclick(): boolean {
     return true;  // handled
   }
 
-  isEventWithinDisclosureTriangle(event: Event): boolean {
+  override isEventWithinDisclosureTriangle(event: Event): boolean {
     return event.target === this.expandElement;
   }
 }

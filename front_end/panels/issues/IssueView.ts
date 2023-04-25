@@ -27,6 +27,7 @@ import {AffectedHeavyAdView} from './AffectedHeavyAdView.js';
 import {AffectedItem, AffectedResourcesView, extractShortPath} from './AffectedResourcesView.js';
 import {AffectedSharedArrayBufferIssueDetailsView} from './AffectedSharedArrayBufferIssueDetailsView.js';
 import {AffectedSourcesView} from './AffectedSourcesView.js';
+import {AffectedTrackingSitesView} from './AffectedTrackingSitesView.js';
 import {AffectedTrustedWebActivityIssueDetailsView} from './AffectedTrustedWebActivityIssueDetailsView.js';
 import {CorsIssueDetailsView} from './CorsIssueDetailsView.js';
 import {GenericIssueDetailsView} from './GenericIssueDetailsView.js';
@@ -221,7 +222,7 @@ class AffectedMixedContentView extends AffectedResourcesView {
 export class IssueView extends UI.TreeOutline.TreeElement {
   #issue: AggregatedIssue;
   #description: IssuesManager.MarkdownIssueDescription.IssueDescription;
-  toggleOnClick: boolean;
+  override toggleOnClick: boolean;
   affectedResources: UI.TreeOutline.TreeElement;
   readonly #affectedResourceViews: AffectedResourcesView[];
   #aggregatedIssuesCount: HTMLElement|null;
@@ -261,6 +262,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
       new AffectedDocumentsInQuirksModeView(this, this.#issue),
       new AttributionReportingIssueDetailsView(this, this.#issue),
       new AffectedRawCookieLinesView(this, this.#issue),
+      new AffectedTrackingSitesView(this, this.#issue),
     ];
     this.#hiddenIssuesMenu = new Components.HideIssuesMenu.HideIssuesMenu();
     this.#aggregatedIssuesCount = null;
@@ -295,7 +297,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
     return this.#description.title;
   }
 
-  onattach(): void {
+  override onattach(): void {
     if (!this.#contentCreated) {
       this.createContent();
       return;
@@ -347,7 +349,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
     this.listItemElement.appendChild(header);
   }
 
-  onexpand(): void {
+  override onexpand(): void {
     Host.userMetrics.issuesPanelIssueExpanded(this.#issue.getCategory());
 
     if (this.#needsUpdateOnExpand) {
