@@ -78,15 +78,15 @@ describe('TraceProcessor', async function() {
       ...oneKFiltered,
       ].map(f => `${urlPrefix}${f.trim()}`)
 
-    // for (const filename of filenames) {
-    //   await parseAndLog(filename);
-    // }
-
-    for (let i = 0; i < oomTraces.length; i++) {
-      const filename = `${urlPrefix}${oomTraces[i]}`;
+    for (const filename of filenames) {
       await parseAndLog(filename);
-      if (i + 1 === oomTraces.length) i = -1; // infinite loop lol.
     }
+
+    // for (let i = 0; i < oomTraces.length; i++) {
+    //   const filename = `${urlPrefix}${oomTraces[i]}`;
+    //   await parseAndLog(filename);
+    //   if (i + 1 === oomTraces.length) i = -1; // infinite loop lol.
+    // }
 
     await wait(10000000);
 
