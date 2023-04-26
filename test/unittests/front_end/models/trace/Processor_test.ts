@@ -47,6 +47,13 @@ tracecafe-stored-traces/traces/yWdmByAM1Q
 tracecafe-stored-traces/traces/ghAXmOs106
 `.trim().split('\n');
 
+
+const oomTraces = [
+  "adobe-oom-traces/aide_128k_debug_stack.json",
+  "adobe-oom-traces/aide_blkSize_128k.json",
+  "adobe-oom-traces/Venus_full_stack_trace_during_save_operation.json",
+  ];
+
 // cd ~/Downloads/traces && server --cors
 const urlPrefix = 'http://localhost:9435/'
 
@@ -65,16 +72,20 @@ describe('TraceProcessor', async function() {
     const oneThousandTraces =  traceFilenames().sort(() => 0.5 - Math.random()) // shuffled
     const oneKFiltered = oneThousandTraces.filter(t => !knownBad.includes(t));
 
-    console.log('bad', knownBad.length, '1k', oneThousandTraces.length, oneKFiltered.length);
-
     const filenames = [
       // TODO: include all of ./test/unittests/fixtures/traces/
       ...knownBad,
       ...oneKFiltered,
       ].map(f => `${urlPrefix}${f.trim()}`)
 
-    for (const filename of filenames) {
+    // for (const filename of filenames) {
+    //   await parseAndLog(filename);
+    // }
+
+    for (let i = 0; i < oomTraces.length; i++) {
+      const filename = `${urlPrefix}${oomTraces[i]}`;
       await parseAndLog(filename);
+      if (i + 1 === oomTraces.length) i = -1; // infinite loop lol.
     }
 
     await wait(10000000);

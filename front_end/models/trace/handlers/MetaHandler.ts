@@ -167,7 +167,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     traceStartedTime = event.ts;
 
     if (!event.args.data) {
-      throw new Error('No frames found in trace data');
+      throw new Error('No frames data found in TracingStartedInBrowser');
     }
 
     for (const frame of (event.args.data.frames ?? [])) {

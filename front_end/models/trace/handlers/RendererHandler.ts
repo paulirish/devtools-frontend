@@ -63,7 +63,7 @@ const getOrCreateRendererThread = (process: RendererProcess, tid: Types.TraceEve
 export function reset(): void {
   processes.clear();
   traceEventToNode.clear();
-  allRendererEvents.length = 0;
+  allRendererEvents.length = 0; // TODO: needs to be cleared properly
   handlerState = HandlerState.UNINITIALIZED;
 }
 

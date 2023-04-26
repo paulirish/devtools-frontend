@@ -49,7 +49,7 @@ let handlerState = HandlerState.UNINITIALIZED;
 
 export function reset(): void {
   syntheticEvents.length = 0;
-  performanceMeasureEvents.length = 0;
+  performanceMeasureEvents.length = 0; // TODO: this doesnt' clear memory.
   performanceMarkEvents.length = 0;
   consoleTimings.length = 0;
   timestampEvents.length = 0;
