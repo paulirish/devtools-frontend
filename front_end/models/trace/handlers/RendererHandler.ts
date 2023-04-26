@@ -17,7 +17,7 @@ import * as Types from '../types/types.js';
 
 const processes = new Map<Types.TraceEvents.ProcessID, RendererProcess>();
 const traceEventToNode = new Map<RendererEvent, RendererEventNode>();
-const allRendererEvents: RendererEvent[] = [];
+let allRendererEvents: RendererEvent[] = [];
 
 let handlerState = HandlerState.UNINITIALIZED;
 
@@ -63,7 +63,7 @@ const getOrCreateRendererThread = (process: RendererProcess, tid: Types.TraceEve
 export function reset(): void {
   processes.clear();
   traceEventToNode.clear();
-  allRendererEvents.length = 0; // TODO: needs to be cleared properly
+  allRendererEvents = []; // TODO: needs to be cleared properly
   handlerState = HandlerState.UNINITIALIZED;
 }
 

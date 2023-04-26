@@ -180,6 +180,10 @@ module.exports = function(config) {
     basePath: ROOT_DIRECTORY,
     autoWatchBatchDelay: 3000,
 
+    browserDisconnectTimeout: 15_000,
+    browserNoActivityTimeout: 120_000,
+    pingTimeout: 15_000,
+
     files: [
       // Ensure the test setup goes first because Karma registers with Mocha in file order, and the hooks in the test_setup
       // must be set before any other hooks in order to ensure all tests get the same environment.

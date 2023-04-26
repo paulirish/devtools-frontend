@@ -13,14 +13,14 @@ import {HandlerState} from './types.js';
  * See UserTimings.md in this directory for some handy documentation on
  * UserTimings and the trace events we parse currently.
  **/
-const syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
-const performanceMeasureEvents: (Types.TraceEvents.TraceEventPerformanceMeasureBegin|
+let syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
+let performanceMeasureEvents: (Types.TraceEvents.TraceEventPerformanceMeasureBegin|
                                  Types.TraceEvents.TraceEventPerformanceMeasureEnd)[] = [];
-const performanceMarkEvents: Types.TraceEvents.TraceEventPerformanceMark[] = [];
+let performanceMarkEvents: Types.TraceEvents.TraceEventPerformanceMark[] = [];
 
-const consoleTimings: (Types.TraceEvents.TraceEventConsoleTimeBegin|Types.TraceEvents.TraceEventConsoleTimeEnd)[] = [];
+let consoleTimings: (Types.TraceEvents.TraceEventConsoleTimeBegin|Types.TraceEvents.TraceEventConsoleTimeEnd)[] = [];
 
-const timestampEvents: Types.TraceEvents.TraceEventTimeStamp[] = [];
+let timestampEvents: Types.TraceEvents.TraceEventTimeStamp[] = [];
 
 export interface UserTimingsData {
   /**
@@ -48,11 +48,11 @@ export interface UserTimingsData {
 let handlerState = HandlerState.UNINITIALIZED;
 
 export function reset(): void {
-  syntheticEvents.length = 0;
-  performanceMeasureEvents.length = 0; // TODO: this doesnt' clear memory.
-  performanceMarkEvents.length = 0;
-  consoleTimings.length = 0;
-  timestampEvents.length = 0;
+  syntheticEvents = [];
+  performanceMeasureEvents = []; // TODO: this doesnt' clear memory.
+  performanceMarkEvents = [];
+  consoleTimings = [];
+  timestampEvents = [];
   handlerState = HandlerState.INITIALIZED;
 }
 
