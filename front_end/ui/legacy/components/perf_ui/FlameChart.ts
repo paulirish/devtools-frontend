@@ -33,7 +33,6 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import type * as SDK from '../../../../core/sdk/sdk.js';
 import type * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -1085,7 +1084,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       for (const decoration of decorationsForEvent) {
         const duration = entryTotalTimes[entryIndex];
         if (decoration.type === 'CANDY') {
-          const candyStripeStartTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(decoration.startAtTime);
+          const candyStripeStartTime = decoration.startAtTime;
           if (duration < candyStripeStartTime) {
             // If the duration of the event is less than the start time to draw the candy stripes, then we have no stripes to draw.
             continue;
@@ -2074,7 +2073,7 @@ export type FlameChartDecoration = {
   // We often only want to highlight problem parts of events, so this time sets
   // the minimum time at which the candystriping will start. If you want to
   // candystripe the entire event, set this to 0.
-  startAtTime: TraceEngine.Types.Timing.MicroSeconds,
+  startAtTime: number,
 };
 
 export class FlameChartTimelineData {

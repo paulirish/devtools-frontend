@@ -114,7 +114,7 @@ describeWithEnvironment('InteractionsTrackAppender', () => {
     const entryIndex = entryData.indexOf(longInteraction);
     const decorationsForEntry = flameChartData.entryDecorations[entryIndex];
     assert.deepEqual(
-        decorationsForEntry, [{type: 'CANDY', startAtTime: TraceEngine.Types.Timing.MicroSeconds(200_000)}]);
+        decorationsForEntry, [{type: 'CANDY', startAtTime: TraceEngine.Types.Timing.MilliSeconds(200)}]);
   });
 
   it('does not candy-stripe interactions less than 200ms', async () => {

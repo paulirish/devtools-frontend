@@ -7,7 +7,6 @@ import * as TraceHelpers from '../../../../../test/unittests/front_end/helpers/T
 import * as PerfUI from '../../../legacy/components/perf_ui/perf_ui.js';
 import * as ComponentSetup from '../../helpers/helpers.js';
 import type * as Platform from '../../../../core/platform/platform.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
 import {FakeProvider} from './FlameChartHelpers.js';
 
 await EnvironmentHelpers.initializeGlobalVars();
@@ -67,13 +66,13 @@ function renderExample2() {
         entryDecorations: [
           [{
             type: 'CANDY',
-            startAtTime: TraceEngine.Types.Timing.MicroSeconds(50_000),
+            startAtTime: 50,
           }],
           [/* No decorations for the event with index 1 */],
           [
             {
               type: 'CANDY',
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(50_000),
+              startAtTime: 50,
             },
           ],
         ],
