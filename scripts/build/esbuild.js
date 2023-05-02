@@ -31,6 +31,7 @@ require('esbuild')
       outfile,
       bundle: true,
       format: 'esm',
+      sourcemap: true,
       platform: 'browser',
       plugins: [plugin],
     })

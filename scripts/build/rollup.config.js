@@ -39,7 +39,7 @@ export default commandLineArgs => ({
   context: 'self',
   output: [{
     format: 'esm',
-    sourcemap: Boolean(commandLineArgs.configSourcemaps),
+    sourcemap: true,
   }],
   plugins: [
     minifyHTML({
