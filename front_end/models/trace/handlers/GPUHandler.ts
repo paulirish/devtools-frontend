@@ -37,10 +37,12 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('GPU Handler is not initialized');
   }
-
-  if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
-    return;
-  }
+  if (event.pid !== 83819 && event.tid !== 259) return;
+  // const {gpuProcessId, gpuThreadId} = metaHandlerData();
+  // if (event.pid !== gpuProcessId) return;
+  // if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
+  //   return;
+  // }
 
   Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
 }
