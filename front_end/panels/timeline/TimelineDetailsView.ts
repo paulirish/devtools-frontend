@@ -246,7 +246,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       this.setContent(networkDetails);
     } else if (TimelineSelection.isTraceEventSelection(selectionObject)) {
       const event = selectionObject;
-      const traceEventDetails = await TimelineUIUtils.buildTraceEventDetails(
+      const traceEventDetails = await TimelineUIUtils.buildDetailsForTraceEvent(
           event, this.model.timelineModel(), this.detailsLinkifier, true, this.#traceEngineData);
       this.appendDetailsTabsForTraceEventAndShowDetails(event, traceEventDetails);
     } else if (TimelineSelection.isFrameObject(selectionObject)) {

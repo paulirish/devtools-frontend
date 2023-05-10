@@ -1549,7 +1549,7 @@ export class TimelineUIUtils {
     return ThemeSupport.ThemeSupport.instance().getComputedValue(cssVarName);
   }
 
-  static async buildDetailsTextForTraceEvent(event: TraceEngine.Legacy.Event|
+  static async buildDetailsCellTextForTraceEvent(event: TraceEngine.Legacy.Event|
                                              TraceEngine.Types.TraceEvents.TraceEventData): Promise<string|null> {
     const recordType = TimelineModel.TimelineModel.RecordType;
     let detailsText;
@@ -1620,12 +1620,15 @@ export class TimelineUIUtils {
 
       case recordType.StreamingCompileScript:
       case recordType.BackgroundDeserialize:
-      case recordType.XHRReadyStateChange:
+      // case recordType.XHRReadyStateChange:
       case recordType.XHRLoad: {
         const url = eventData['url'];
         if (url) {
           detailsText = Bindings.ResourceUtils.displayNameForURL(url);
         }
+        // contentHelper.appendStackTrace(
+        //   stackLabel || i18nString(UIStrings.stackTrace),
+        //   TimelineUIUtils.stackTraceFromCallFrames(timelineData.stackTrace));
         break;
       }
       case recordType.TimeStamp:
@@ -1669,14 +1672,14 @@ export class TimelineUIUtils {
                 event, TimelineModel.TimelineModel.TimelineModelImpl.Category.Console)) {
           detailsText = null;
         } else {
-          detailsText = await linkifyTopCallFrameAsText();
+          detailsText = await linkifyTopStackTraceFrameAsText();
         }
         break;
     }
 
     return detailsText;
 
-    async function linkifyTopCallFrameAsText(): Promise<string|null> {
+    async function linkifyTopStackTraceFrameAsText(): Promise<string|null> {
       const frame = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).topFrame();
       if (!frame) {
         return null;
@@ -1686,34 +1689,34 @@ export class TimelineUIUtils {
     }
   }
 
-  static async buildDetailsNodeForTraceEvent(
+  static async buildDetailsCellForTraceEvent(
       event: TraceEngine.Legacy.CompatibleTraceEvent, target: SDK.Target.Target|null,
       linkifier: LegacyComponents.Linkifier.Linkifier, isFreshRecording = false): Promise<Node|null> {
     const recordType = TimelineModel.TimelineModel.RecordType;
     let details: HTMLElement|HTMLSpanElement|(Element | null)|Text|null = null;
     let detailsText;
     const eventData = event.args['data'];
+    detailsText = await TimelineUIUtils.buildDetailsCellTextForTraceEvent(event);
     switch (event.name) {
-      case recordType.GCEvent:
-      case recordType.MajorGC:
-      case recordType.MinorGC:
-      case recordType.EventDispatch:
-      case recordType.Paint:
-      case recordType.Animation:
-      case recordType.EmbedderCallback:
-      case recordType.ParseHTML:
-      case recordType.WasmStreamFromResponseCallback:
-      case recordType.WasmCompiledModule:
-      case recordType.WasmModuleCacheHit:
-      case recordType.WasmCachedModule:
-      case recordType.WasmModuleCacheInvalid:
-      case recordType.WebSocketCreate:
-      case recordType.WebSocketSendHandshakeRequest:
-      case recordType.WebSocketReceiveHandshakeResponse:
-      case recordType.WebSocketDestroy: {
-        detailsText = await TimelineUIUtils.buildDetailsTextForTraceEvent(event);
-        break;
-      }
+      // case recordType.GCEvent:
+      // case recordType.MajorGC:
+      // case recordType.MinorGC:
+      // case recordType.EventDispatch:
+      // case recordType.Paint:
+      // case recordType.Animation:
+      // case recordType.EmbedderCallback:
+      // case recordType.ParseHTML:
+      // case recordType.WasmStreamFromResponseCallback:
+      // case recordType.WasmCompiledModule:
+      // case recordType.WasmModuleCacheHit:
+      // case recordType.WasmCachedModule:
+      // case recordType.WasmModuleCacheInvalid:
+      // case recordType.WebSocketCreate:
+      // case recordType.WebSocketSendHandshakeRequest:
+      // case recordType.WebSocketReceiveHandshakeResponse:
+      // case recordType.WebSocketDestroy: {
+      //   break;
+      // }
 
       case recordType.PaintImage:
       case recordType.DecodeImage:
@@ -1853,8 +1856,13 @@ export class TimelineUIUtils {
       tabStop: true,
     };
     if (isFreshRecording) {
-      return linkifier.linkifyScriptLocation(
+      const devToolsLinkEl = linkifier.linkifyScriptLocation(
           target, scriptId, url as Platform.DevToolsPath.UrlString, lineNumber, options);
+      // Starting with `functionName @ linkifiedUrl:line:col` append ` (hostname)`
+      const spanEl = document.createElement('span');
+      const parsedURL = new Common.ParsedURL.ParsedURL(url);
+      spanEl.append(devToolsLinkEl, ` (${parsedURL.host})`);
+      return spanEl;
     }
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(url as Platform.DevToolsPath.UrlString, options);
   }
@@ -1928,7 +1936,7 @@ export class TimelineUIUtils {
     }
   }
 
-  static async buildTraceEventDetails(
+  static async buildDetailsForTraceEvent(
       event: TraceEngine.Legacy.CompatibleTraceEvent,
       model: TimelineModel.TimelineModel.TimelineModelImpl,
       linkifier: LegacyComponents.Linkifier.Linkifier,
@@ -2043,6 +2051,7 @@ export class TimelineUIUtils {
       return contentHelper.fragment;
     }
 
+    // TODO(paulirish): Instead of showing details based on trace event name, lets show details based on what's attached. More future compatible.
     switch (event.name) {
       case recordTypes.GCEvent:
       case recordTypes.MajorGC:
@@ -2058,7 +2067,7 @@ export class TimelineUIUtils {
       case recordTypes.JSIdleFrame:
       case recordTypes.JSSystemFrame:
       case recordTypes.FunctionCall: {
-        const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
+        const detailsNode = await TimelineUIUtils.buildDetailsCellForTraceEvent(
             event, model.targetByEvent(event), linkifier, model.isFreshRecording());
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.function), detailsNode);
@@ -2355,7 +2364,7 @@ export class TimelineUIUtils {
       }
 
       case recordTypes.EventTiming: {
-        const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
+        const detailsNode = await TimelineUIUtils.buildDetailsCellForTraceEvent(
             event, model.targetByEvent(event), linkifier, model.isFreshRecording());
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);
@@ -2419,7 +2428,7 @@ export class TimelineUIUtils {
       }
 
       default: {
-        const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
+        const detailsNode = await TimelineUIUtils.buildDetailsCellForTraceEvent(
             event, model.targetByEvent(event), linkifier, model.isFreshRecording());
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);

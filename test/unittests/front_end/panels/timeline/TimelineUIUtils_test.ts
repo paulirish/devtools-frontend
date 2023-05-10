@@ -59,7 +59,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       },
     });
     assert.strictEqual(
-        'test.js:1:1', await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(event));
+        'test.js:1:1', await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsCellTextForTraceEvent(event));
   });
 
   it('creates top frame location text as a fallback', async function() {
@@ -83,7 +83,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
     const data = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event);
     data.stackTrace = event.args.data.stackTrace;
     assert.strictEqual(
-        'test.js:1:1', await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(event));
+        'test.js:1:1', await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsCellTextForTraceEvent(event));
   });
 
   describe('script location as an URL', function() {
@@ -106,7 +106,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
     it('makes the script location of a call frame a full URL when the inspected target is not the same the call frame was taken from (e.g. a loaded file)',
        async function() {
          target.setInspectedURL('https://not-google.com' as Platform.DevToolsPath.UrlString);
-         const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForTraceEvent(
+         const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsCellForTraceEvent(
              event, target, new Components.Linkifier.Linkifier());
          if (!node) {
            throw new Error('Node was unexpectedly null');
@@ -117,7 +117,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
     it('makes the script location of a call frame a script name when the inspected target is the one the call frame was taken from',
        async function() {
          target.setInspectedURL('https://google.com' as Platform.DevToolsPath.UrlString);
-         const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForTraceEvent(
+         const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsCellForTraceEvent(
              event, target, new Components.Linkifier.Linkifier());
          if (!node) {
            throw new Error('Node was unexpectedly null');
@@ -408,7 +408,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
     it('shows the interaction ID for EventTiming events that have an interaction ID', async function() {
       const data = await TraceLoader.allModels(this, 'slow-interaction-button-click.json.gz');
       const interactionEvent = data.traceParsedData.UserInteractions.interactionEventsWithNoNesting[0];
-      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsForTraceEvent(
           interactionEvent,
           data.timelineModel,
           new Components.Linkifier.Linkifier(),
@@ -438,7 +438,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
         throw new Error('Could not find LayoutShift event.');
       }
 
-      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsForTraceEvent(
           layoutShift,
           data.timelineModel,
           new Components.Linkifier.Linkifier(),
