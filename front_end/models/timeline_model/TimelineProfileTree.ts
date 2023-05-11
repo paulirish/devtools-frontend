@@ -170,6 +170,7 @@ export class TopDownNode extends Node {
       let node = children.get(id);
       if (!node) {
         node = new TopDownNode(id, e, self);
+        root?.eventToNode.set(e, node);
         node.groupId = groupId;
         children.set(id, node);
       }
@@ -237,6 +238,7 @@ export class TopDownRootNode extends TopDownNode {
   readonly doNotAggregate: boolean|undefined;
   override totalTime: number;
   override selfTime: number;
+  eventToNode: Map<TopDownNode, SDK.TracingModel.CompatibleTraceEvent>
 
   constructor(
       events: (SDK.TracingModel.CompatibleTraceEvent)[], filters: TimelineModelFilter[], startTime: number,
@@ -252,6 +254,7 @@ export class TopDownRootNode extends TopDownNode {
     this.doNotAggregate = doNotAggregate;
     this.totalTime = endTime - startTime;
     this.selfTime = this.totalTime;
+    this.eventToNode = new Map();
   }
 
   override children(): ChildrenCache {
