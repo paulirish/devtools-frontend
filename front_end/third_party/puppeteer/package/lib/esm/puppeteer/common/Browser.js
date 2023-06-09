@@ -484,16 +484,23 @@ export class CDPBrowserContext extends BrowserContext {
      * You can find them using {@link Target.page | the target page}.
      */
     async pages() {
-        const pages = await Promise.all(this.targets()
+        const pagePromises = this.targets()
             .filter(target => {
             var _a;
+            // return (
+            // target.type() === 'page' ||
+            // (target.type() === 'other' &&
+            //   this.#browser._getIsPageTargetCallback()?.(
+            //     target._getTargetInfo()
+            //   ))
             return (target.type() === 'page' ||
                 (target.type() === 'other' &&
                     ((_a = __classPrivateFieldGet(this, _CDPBrowserContext_browser, "f")._getIsPageTargetCallback()) === null || _a === void 0 ? void 0 : _a(target._getTargetInfo()))));
         })
             .map(target => {
             return target.page();
-        }));
+        });
+        const pages = await Promise.all(pagePromises);
         return pages.filter((page) => {
             return !!page;
         });

@@ -112,15 +112,25 @@ export class Target {
      */
     async page() {
         var _a;
+        console.log('targetinfo', __classPrivateFieldGet(this, _Target_targetInfo, "f"));
         if (this._isPageTargetCallback(__classPrivateFieldGet(this, _Target_targetInfo, "f")) && !__classPrivateFieldGet(this, _Target_pagePromise, "f")) {
+          console.log('session', (__classPrivateFieldGet(this, _Target_session, "f")));
             __classPrivateFieldSet(this, _Target_pagePromise, (__classPrivateFieldGet(this, _Target_session, "f")
                 ? Promise.resolve(__classPrivateFieldGet(this, _Target_session, "f"))
                 : __classPrivateFieldGet(this, _Target_sessionFactory, "f").call(this, true)).then(client => {
                 var _a;
-                return CDPPage._create(client, this, __classPrivateFieldGet(this, _Target_ignoreHTTPSErrors, "f"), (_a = __classPrivateFieldGet(this, _Target_defaultViewport, "f")) !== null && _a !== void 0 ? _a : null, __classPrivateFieldGet(this, _Target_screenshotTaskQueue, "f"));
+                console.log('creating for ', __classPrivateFieldGet(this, _Target_targetInfo, "f"));
+                const x =  CDPPage._create(client, this, __classPrivateFieldGet(this, _Target_ignoreHTTPSErrors, "f"), (_a = __classPrivateFieldGet(this, _Target_defaultViewport, "f")) !== null && _a !== void 0 ? _a : null, __classPrivateFieldGet(this, _Target_screenshotTaskQueue, "f"));
+                console.log('creatED for ', __classPrivateFieldGet(this, _Target_targetInfo, "f"));
+                return x;
+
             }), "f");
         }
-        return (_a = (await __classPrivateFieldGet(this, _Target_pagePromise, "f"))) !== null && _a !== void 0 ? _a : null;
+
+        console.log('???', __classPrivateFieldGet(this, _Target_targetInfo, "f"), __classPrivateFieldGet(this, _Target_pagePromise, "f"));
+        const umm = (_a = (await __classPrivateFieldGet(this, _Target_pagePromise, "f"))) !== null && _a !== void 0 ? _a : null;
+        console.log('great', __classPrivateFieldGet(this, _Target_targetInfo, "f"));
+        return umm;
     }
     /**
      * If the target is not of type `"service_worker"` or `"shared_worker"`, returns `null`.

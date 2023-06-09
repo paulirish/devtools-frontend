@@ -993,7 +993,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
   }
 
   setConsoleGroup(group: ConsoleGroupViewMessage): void {
-    console.assert(this.consoleGroupInternal === null);
+    if (this.consoleGroupInternal !== null) return;
     this.consoleGroupInternal = group;
   }
 

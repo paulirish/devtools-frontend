@@ -147,7 +147,7 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
       targetFilterCallback: targetInfo =>
           !targetInfo.url.match(/^https:\/\/i0.devtools-frontend/) && !targetInfo.url.match(/^devtools:\/\//),
       // Lighthouse can only audit normal pages.
-      isPageTargetCallback: targetInfo => targetInfo.type === 'page',
+      isPageTargetCallback: targetInfo => { console.log('ispagetarget', targetInfo); return targetInfo.type === 'page'},
     });
     const {page} = puppeteerHandle;
     const configContext = {
