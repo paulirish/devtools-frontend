@@ -99,7 +99,7 @@ export class PuppeteerConnectionHelper {
         isPageTargetCallback,
     );
 
-    const [, browser] = await Promise.all([
+    const [somanysessions, browser] = await Promise.all([
       Promise.all(targetIdsForAutoAttachEmulation.map(
           targetId => puppeteerConnection._createSession({targetId}, /* emulateAutoAttach= */ true))),
       browserPromise,
