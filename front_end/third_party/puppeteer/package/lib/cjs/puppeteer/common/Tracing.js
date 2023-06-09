@@ -29,8 +29,8 @@ exports.Tracing = void 0;
  * limitations under the License.
  */
 const assert_js_1 = require("../util/assert.js");
-const util_js_1 = require("./util.js");
 const ErrorLike_js_1 = require("../util/ErrorLike.js");
+const util_js_1 = require("./util.js");
 /**
  * The Tracing class exposes the tracing audit interface.
  * @remarks
@@ -118,7 +118,7 @@ class Tracing {
             try {
                 const readable = await (0, util_js_1.getReadableFromProtocolStream)(__classPrivateFieldGet(this, _Tracing_client, "f"), event.stream);
                 const buffer = await (0, util_js_1.getReadableAsBuffer)(readable, __classPrivateFieldGet(this, _Tracing_path, "f"));
-                resolve(buffer !== null && buffer !== void 0 ? buffer : undefined);
+                resolve(buffer ?? undefined);
             }
             catch (error) {
                 if ((0, ErrorLike_js_1.isErrorLike)(error)) {

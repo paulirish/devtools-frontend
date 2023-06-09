@@ -25,7 +25,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _Browser_process, _Browser_closeCallback, _Browser_connection;
+var _Browser_process, _Browser_closeCallback, _Browser_connection, _Browser_defaultViewport;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Browser = void 0;
 const Browser_js_1 = require("../../api/Browser.js");
@@ -34,42 +34,45 @@ const BrowserContext_js_1 = require("./BrowserContext.js");
  * @internal
  */
 class Browser extends Browser_js_1.Browser {
-    /**
-     * @internal
-     */
+    static async create(opts) {
+        // TODO: await until the connection is established.
+        try {
+            await opts.connection.send('session.new', {});
+        }
+        catch { }
+        await opts.connection.send('session.subscribe', {
+            events: Browser.subscribeModules,
+        });
+        return new Browser(opts);
+    }
     constructor(opts) {
         super();
         _Browser_process.set(this, void 0);
         _Browser_closeCallback.set(this, void 0);
         _Browser_connection.set(this, void 0);
+        _Browser_defaultViewport.set(this, void 0);
         __classPrivateFieldSet(this, _Browser_process, opts.process, "f");
         __classPrivateFieldSet(this, _Browser_closeCallback, opts.closeCallback, "f");
         __classPrivateFieldSet(this, _Browser_connection, opts.connection, "f");
-    }
-    /**
-     * @internal
-     */
-    static async create(opts) {
-        // TODO: await until the connection is established.
-        (await opts.connection.send('session.new', {}));
-        return new Browser(opts);
+        __classPrivateFieldSet(this, _Browser_defaultViewport, opts.defaultViewport, "f");
     }
     async close() {
-        var _a;
-        await ((_a = __classPrivateFieldGet(this, _Browser_closeCallback, "f")) === null || _a === void 0 ? void 0 : _a.call(null));
         __classPrivateFieldGet(this, _Browser_connection, "f").dispose();
+        await __classPrivateFieldGet(this, _Browser_closeCallback, "f")?.call(null);
     }
     isConnected() {
         return !__classPrivateFieldGet(this, _Browser_connection, "f").closed;
     }
     process() {
-        var _a;
-        return (_a = __classPrivateFieldGet(this, _Browser_process, "f")) !== null && _a !== void 0 ? _a : null;
+        return __classPrivateFieldGet(this, _Browser_process, "f") ?? null;
     }
     async createIncognitoBrowserContext(_options) {
-        return new BrowserContext_js_1.BrowserContext(__classPrivateFieldGet(this, _Browser_connection, "f"));
+        return new BrowserContext_js_1.BrowserContext(__classPrivateFieldGet(this, _Browser_connection, "f"), {
+            defaultViewport: __classPrivateFieldGet(this, _Browser_defaultViewport, "f"),
+        });
     }
 }
+_Browser_process = new WeakMap(), _Browser_closeCallback = new WeakMap(), _Browser_connection = new WeakMap(), _Browser_defaultViewport = new WeakMap();
+Browser.subscribeModules = ['browsingContext', 'network', 'log'];
 exports.Browser = Browser;
-_Browser_process = new WeakMap(), _Browser_closeCallback = new WeakMap(), _Browser_connection = new WeakMap();
 //# sourceMappingURL=Browser.js.map

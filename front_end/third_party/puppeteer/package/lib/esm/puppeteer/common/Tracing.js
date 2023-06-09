@@ -26,8 +26,8 @@ var _Tracing_client, _Tracing_recording, _Tracing_path;
  * limitations under the License.
  */
 import { assert } from '../util/assert.js';
-import { getReadableAsBuffer, getReadableFromProtocolStream } from './util.js';
 import { isErrorLike } from '../util/ErrorLike.js';
+import { getReadableAsBuffer, getReadableFromProtocolStream } from './util.js';
 /**
  * The Tracing class exposes the tracing audit interface.
  * @remarks
@@ -115,7 +115,7 @@ export class Tracing {
             try {
                 const readable = await getReadableFromProtocolStream(__classPrivateFieldGet(this, _Tracing_client, "f"), event.stream);
                 const buffer = await getReadableAsBuffer(readable, __classPrivateFieldGet(this, _Tracing_path, "f"));
-                resolve(buffer !== null && buffer !== void 0 ? buffer : undefined);
+                resolve(buffer ?? undefined);
             }
             catch (error) {
                 if (isErrorLike(error)) {
