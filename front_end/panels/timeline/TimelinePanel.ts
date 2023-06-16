@@ -1136,6 +1136,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private showLandingPage(): void {
+    this.updateSettingsPaneVisibility();
     if (this.landingPage) {
       this.landingPage.show(this.statusPaneContainer);
       return;
@@ -1194,6 +1195,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private hideLandingPage(): void {
     this.landingPage.detach();
+
+    // Hide pane settings in trace view to conserve UI space, but preserve underlying setting.
+    this.showSettingsPaneButton.setToggled(false);
+    this.settingsPane.hideWidget();
   }
 
   async loadingStarted(): Promise<void> {
