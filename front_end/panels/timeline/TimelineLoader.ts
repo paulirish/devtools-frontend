@@ -107,7 +107,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     loader.state = State.LoadingCPUProfileFormat;
     loader.buffer = JSON.stringify(profile);
     window.setTimeout(async () => {
-      void loader.close(); // defer to the parseCPUProfileFormat call in finalizeTrace
+      void loader.close();  // defer to the parseCPUProfileFormat call in finalizeTrace
     });
     return loader;
   }

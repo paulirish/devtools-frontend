@@ -687,8 +687,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // TODO(crbug.com/1456818): Extract this logic and add more tests.
       let traceAsString;
       if (isCpuProfile) {
-          // TODO(crbug.com/1456799): This will be cleaner when the CPUProfileHandler is done, and we can fetch
-          // the data directly from the new traceEngine
+        // TODO(crbug.com/1456799): This will be cleaner when the CPUProfileHandler is done, and we can fetch
+        // the data directly from the new traceEngine
         const profileEventData = traceEvents.find(e => e.name === 'CpuProfile')?.args?.data;
         const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
         if (profile) {
@@ -1280,7 +1280,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // Run the new engine in parallel with the parsing done in the performanceModel
       await Promise.all([
         this.performanceModel.setTracingModel(tracingModel, recordingIsFresh),
-        this.#executeNewTraceEngine(tracingModel, recordingIsFresh, isCpuProfile, this.performanceModel.recordStartTime()),
+        this.#executeNewTraceEngine(
+            tracingModel, recordingIsFresh, isCpuProfile, this.performanceModel.recordStartTime()),
       ]);
       const traceParsedData = this.#traceEngineModel.traceParsedData();
       this.filmStripModel = new SDK.FilmStripModel.FilmStripModel(tracingModel);
@@ -1317,7 +1318,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * parsing to complete.
    **/
   async #executeNewTraceEngine(
-      tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean, isCpuProfile: boolean, recordStartTime?: number): Promise<void> {
+      tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean, isCpuProfile: boolean,
+      recordStartTime?: number): Promise<void> {
     const shouldGatherMetadata = isFreshRecording && !isCpuProfile;
     const metadata =
         shouldGatherMetadata ? await SDK.TraceSDKServices.getMetadataForFreshRecording(recordStartTime) : {};

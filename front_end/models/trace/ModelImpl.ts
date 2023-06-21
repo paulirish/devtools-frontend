@@ -250,7 +250,7 @@ export interface TraceFileMetaData {
   networkThrottling?: string;
   cpuThrottling?: number;
   hardwareConcurrency?: number;
-  via?: string; // Where the data originated
+  via?: string;  // Where the data originated
 }
 
 export type TraceFileContents = TraceFile|Types.TraceEvents.TraceEventData[];
