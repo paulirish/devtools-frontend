@@ -49,7 +49,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   private client: Client|null;
   private tracingModel: SDK.TracingModel.TracingModel|null;
   private canceledCallback: (() => void)|null;
-  private state: State;
+  state: State;
   private buffer: string;
   private firstRawChunk: boolean;
   private firstChunk: boolean;

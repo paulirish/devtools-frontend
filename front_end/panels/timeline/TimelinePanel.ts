@@ -64,7 +64,7 @@ import {
 } from './TimelineEventOverview.js';
 import {TimelineFlameChartView} from './TimelineFlameChartView.js';
 import {TimelineHistoryManager} from './TimelineHistoryManager.js';
-import {TimelineLoader} from './TimelineLoader.js';
+import {TimelineLoader, State as LoaderState} from './TimelineLoader.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
 import {UIDevtoolsUtils} from './UIDevtoolsUtils.js';
@@ -1262,6 +1262,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       tracingModel: SDK.TracingModel.TracingModel|null,
       exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null): Promise<void> {
     this.#traceEngineModel.reset();
+
+    const isCpuProfile = this.loader?.state === LoaderState.LoadingCPUProfileFormat;
     delete this.loader;
 
     // If the user just recorded this trace via the record UI, the state will
@@ -1285,7 +1287,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // Run the new engine in parallel with the parsing done in the performanceModel
       await Promise.all([
         this.performanceModel.setTracingModel(tracingModel, recordingIsFresh),
-        this.#executeNewTraceEngine(tracingModel, recordingIsFresh, this.performanceModel.recordStartTime()),
+        this.#executeNewTraceEngine(tracingModel, recordingIsFresh, isCpuProfile, this.performanceModel.recordStartTime()),
       ]);
       const traceParsedData = this.#traceEngineModel.traceParsedData();
       this.filmStripModel = new SDK.FilmStripModel.FilmStripModel(tracingModel);
@@ -1322,8 +1324,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * parsing to complete.
    **/
   async #executeNewTraceEngine(
-      tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean, recordStartTime?: number): Promise<void> {
-    const shouldGatherMetadata = isFreshRecording && !isNode;
+      tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean, isCpuProfile: boolean, recordStartTime?: number): Promise<void> {
+    const shouldGatherMetadata = isFreshRecording && !isCpuProfile;
     const metadata =
         shouldGatherMetadata ? await SDK.TraceSDKServices.getMetadataForFreshRecording(recordStartTime) : undefined;
 
