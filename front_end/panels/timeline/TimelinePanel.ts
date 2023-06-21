@@ -687,15 +687,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // TODO(crbug.com/1456818): Extract this logic and add more tests.
       let traceAsString;
       if (isCpuProfile) {
+          // TODO(crbug.com/1456799): This will be cleaner when the CPUProfileHandler is done, and we can fetch
+          // the data directly from the new traceEngine
         const profileEventData = traceEvents.find(e => e.name === 'CpuProfile')?.args?.data;
         const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
         if (profile) {
-          // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
-          // cpuprofile from trace events when loading a file.
-          // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
-          // And there is where the old saving logic saves the cpuprofile.
-          // This will be solved when the CPUProfileHandler is done. Then we can directly get it
-          // from the new traceEngine
           traceAsString = cpuprofileJsonGenerator(profile as Protocol.Profiler.Profile);
         }
       } else {
