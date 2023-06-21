@@ -16,7 +16,7 @@ import {TraceProcessor, TraceParseProgressEvent} from './Processor.js';
 
 export interface ParseConfig {
   metadata?: TraceFileMetaData;
-  isFreshRecording?: boolean;
+  isFreshRecording?: boolean;  // Unused but will eventually be consumed by UIUtils Linkifier,e tc.
 }
 
 /**
@@ -250,6 +250,7 @@ export interface TraceFileMetaData {
   networkThrottling?: string;
   cpuThrottling?: number;
   hardwareConcurrency?: number;
+  via?: string; // Where the data originated
 }
 
 export type TraceFileContents = TraceFile|Types.TraceEvents.TraceEventData[];

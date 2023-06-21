@@ -194,7 +194,7 @@ export async function normalizedImpactedNodesForLayoutShift(
 }
 
 export async function getMetadataForFreshRecording(recordStartTime?: number):
-    Promise<TraceEngine.TraceModel.TraceFileMetaData|undefined> {
+    Promise<TraceEngine.TraceModel.TraceFileMetaData> {
   try {
     const cpuThrottlingManager = CPUThrottlingManager.instance();
 
@@ -233,7 +233,7 @@ export async function getMetadataForFreshRecording(recordStartTime?: number):
   } catch {
     // If anything went wrong, it does not really matter. The impact is that we
     // will not save the metadata when we save the trace to disk, but that is
-    // not really important, so just return undefined and move on
-    return undefined;
+    // not really important, so just return empty object and move on
+    return {};
   }
 }

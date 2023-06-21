@@ -670,8 +670,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
 
     const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
+    const isCpuProfile = metadata?.via === 'profile';
     let fileName: Platform.DevToolsPath.RawPathString;
-    if (isNode) {
+    if (isCpuProfile) {
       fileName = `CPU-${traceStart}.cpuprofile` as Platform.DevToolsPath.RawPathString;
     } else {
       fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
@@ -685,20 +686,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
       // TODO(crbug.com/1456818): Extract this logic and add more tests.
       let traceAsString;
-      if (isNode) {
-        const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
-        if (!profileEvent || !profileEvent.args?.data) {
-          return;
-        }
-        const profileEventData = profileEvent.args?.data;
-        if (profileEventData.hasOwnProperty('cpuProfile')) {
+      if (isCpuProfile) {
+        const profileEventData = traceEvents.find(e => e.name === 'CpuProfile')?.args?.data;
+        const profile = (profileEventData as any).cpuProfile;
+        if (profile) {
           // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
           // cpuprofile from trace events when loading a file.
           // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
           // And there is where the old saving logic saves the cpuprofile.
           // This will be solved when the CPUProfileHandler is done. Then we can directly get it
           // from the new traceEngine
-          const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
           traceAsString = cpuprofileJsonGenerator(profile as Protocol.Profiler.Profile);
         }
       } else {
@@ -1327,7 +1324,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       tracingModel: SDK.TracingModel.TracingModel, isFreshRecording: boolean, isCpuProfile: boolean, recordStartTime?: number): Promise<void> {
     const shouldGatherMetadata = isFreshRecording && !isCpuProfile;
     const metadata =
-        shouldGatherMetadata ? await SDK.TraceSDKServices.getMetadataForFreshRecording(recordStartTime) : undefined;
+        shouldGatherMetadata ? await SDK.TraceSDKServices.getMetadataForFreshRecording(recordStartTime) : {};
+    metadata.via = isCpuProfile ? 'profile' : 'trace';
 
     return this.#traceEngineModel.parse(
         // OPP's data layer uses `EventPayload` as the type to represent raw JSON from the trace.
