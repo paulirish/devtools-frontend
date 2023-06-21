@@ -75,12 +75,14 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     const fileReader = new Bindings.FileUtils.ChunkedFileReader(file, TransferChunkLengthBytes);
     loader.canceledCallback = fileReader.cancel.bind(fileReader);
     loader.totalSize = file.size;
-    const success = await fileReader.read(loader);
-    if (!success && fileReader.error()) {
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      loader.reportErrorAndCancelLoading((fileReader.error() as any).message);
-    }
+    setTimeout(async () => {
+      const success = await fileReader.read(loader);
+      if (!success && fileReader.error()) {
+        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        loader.reportErrorAndCancelLoading((fileReader.error() as any).message);
+      }
+    });
     return loader;
   }
 
@@ -102,19 +104,11 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
   static loadFromCpuProfile(profile: Protocol.Profiler.Profile|null, client: Client, title?: string): TimelineLoader {
     const loader = new TimelineLoader(client, title);
-
-    try {
-      const events = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.createFakeTraceFromCpuProfile(
-          profile, /* tid */ 1, /* injectPageEvent */ true);
-
-      loader.filter = TimelineLoader.getCpuProfileFilter();
-
-      window.setTimeout(async () => {
-        void loader.addEvents(events);
-      });
-    } catch (e) {
-      console.error(e.stack);
-    }
+    loader.state = State.LoadingCPUProfileFormat;
+    loader.buffer = JSON.stringify(profile);
+    window.setTimeout(async () => {
+      void loader.close(); // defer to the parseCPUProfileFormat call in finalizeTrace
+    });
     return loader;
   }
 

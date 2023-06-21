@@ -688,7 +688,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       let traceAsString;
       if (isCpuProfile) {
         const profileEventData = traceEvents.find(e => e.name === 'CpuProfile')?.args?.data;
-        const profile = (profileEventData as any).cpuProfile;
+        const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
         if (profile) {
           // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
           // cpuprofile from trace events when loading a file.
