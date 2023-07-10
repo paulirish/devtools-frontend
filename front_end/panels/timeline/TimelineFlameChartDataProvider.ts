@@ -51,6 +51,9 @@ import {TimelineSelection} from './TimelineSelection.js';
 
 import {TimelineUIUtils, type TimelineCategory} from './TimelineUIUtils.js';
 
+
+const wait = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
+
 const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
@@ -663,7 +666,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return result;
   }
 
-  private appendSyncEvents(
+  async private appendSyncEvents(
       track: TimelineModel.TimelineModel.Track|null, events: TraceEngine.Legacy.Event[], title: string|null,
       style: PerfUI.FlameChart.GroupStyle|null, entryType: EntryType, selectable: boolean,
       expanded?: boolean): PerfUI.FlameChart.Group|null {
@@ -682,6 +685,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       group.track = track;
     }
     for (let i = 0; i < events.length; ++i) {
+      if (i % 100_000 === 0) {
+        console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));
+        await wait(0);
+      }
       const event = events[i];
       const {duration: eventDuration} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
       // TODO(crbug.com/1386091) this check should happen at the model level.
@@ -780,7 +787,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
     const lastUsedTimeByLevel: number[] = [];
     let group: PerfUI.FlameChart.Group|null = null;
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const asyncEvent = events[i];
       if (!this.legacyPerformanceModel || !this.legacyPerformanceModel.isVisible(asyncEvent)) {
         continue;

@@ -399,6 +399,8 @@ async function requestHandler(request, response) {
   }
 }
 
+const traceFolder = path.resolve(path.join(process.cwd(), 'test/unittests/fixtures/traces/'));
+
 function createTracesIndexFile(traceFilenames) {
   function pageFunction() {
     const origin = new URL(location.href).origin;
@@ -420,6 +422,8 @@ function createTracesIndexFile(traceFilenames) {
       }
     });
   }
+
+  console.log('Showing traces from', traceFolder);
 
   // clang-format off
   return `<!doctype html>
@@ -491,7 +495,7 @@ function createTracesIndexFile(traceFilenames) {
  * @param {string|null} filePath
  */
 async function handleTracesModeRequest(request, response, filePath) {
-  const traceFolder = path.resolve(path.join(process.cwd(), 'test/unittests/fixtures/traces/'));
+
   if (filePath === '/') {
     const traceFilenames = fs.readdirSync(traceFolder).filter(f => f.includes('json'));
     const html = createTracesIndexFile(traceFilenames);

@@ -114,7 +114,7 @@ export class NetworkTrackAppender implements TrackAppender {
     }
     const lastTimeByLevel = [];
     let maxLevel = 0;
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const event = events[i];
       const startTime = event.ts;
       const endTime = event.ts + (event.dur || 0);
@@ -162,7 +162,7 @@ export class NetworkTrackAppender implements TrackAppender {
     }
     const lastTimeByLevel = [];
     let maxLevel = 0;
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const event = events[i];
       const beginTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
       const eventEndTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
@@ -179,7 +179,7 @@ export class NetworkTrackAppender implements TrackAppender {
       lastTimeByLevel.push(eventEndTime);
       maxLevel = Math.max(maxLevel, lastTimeByLevel.length);
     }
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       // -1 means this event is invisible.
       if (this.#flameChartData.entryLevels[i] === -1) {
         // The maxLevel is an invisible level.

@@ -278,7 +278,7 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
 
     for (const track of this.model.timelineModel().tracks()) {
       const events = track.events;
-      for (let i = 0; i < events.length; ++i) {
+      for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
         if (!TimelineModel.TimelineModel.EventOnTimelineData.forEvent(events[i]).warning) {
           continue;
         }

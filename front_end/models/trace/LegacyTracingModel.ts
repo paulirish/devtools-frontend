@@ -107,7 +107,7 @@ export class TracingModel {
   }
 
   addEvents(events: readonly EventPayload[]): void {
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       this.addEvent(events[i]);
     }
   }

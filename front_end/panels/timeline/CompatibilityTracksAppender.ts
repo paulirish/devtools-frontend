@@ -383,7 +383,7 @@ export class CompatibilityTracksAppender {
       events: readonly TraceEngine.Types.TraceEvents.TraceEventData[], trackStartLevel: number,
       appender: TrackAppender): number {
     const lastUsedTimeByLevel: number[] = [];
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const event = events[i];
       const eventAsLegacy = this.getLegacyEvent(event);
       // Default styles are globally defined for each event name. Some

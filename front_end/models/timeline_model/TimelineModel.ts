@@ -1482,7 +1482,7 @@ export class TimelineModelImpl {
       RecordType.ResourceMarkAsCached,
     ]);
     const events = this.inspectedTargetEvents();
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const e = events[i];
       if (!resourceTypes.has(e.name)) {
         continue;

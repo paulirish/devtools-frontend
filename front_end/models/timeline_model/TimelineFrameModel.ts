@@ -275,7 +275,7 @@ export class TimelineFrameModel {
     this.target = target;
     let j = 0;
     this.currentProcessMainThread = threadData.length && threadData[0].thread || null;
-    for (let i = 0; i < events.length; ++i) {
+    for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       while (j + 1 < threadData.length && threadData[j + 1].time <= events[i].startTime) {
         this.currentProcessMainThread = threadData[++j].thread;
       }
