@@ -1,6 +1,6 @@
 {
   "name": "@puppeteer/replay",
-  "version": "2.12.3",
+  "version": "2.13.2",
   "description": "Replay is a library which provides an API to replay and stringify recordings created using Chrome DevTools Recorder](https://developer.chrome.com/docs/devtools/recorder/)",
   "main": "lib/cjs/main.cjs",
   "types": "lib/main.d.ts",
@@ -25,7 +25,7 @@
     "doc": "docs"
   },
   "engines": {
-    "node": ">=14"
+    "node": ">=16.3.0"
   },
   "scripts": {
     "test": "npm run build:testserver && cross-env TS_NODE_PROJECT=test/tsconfig.json mocha --config .mocharc.cjs",
@@ -76,8 +76,8 @@
     "mime": "3.0.0",
     "mocha": "10.1.0",
     "prettier": "2.7.1",
-    "puppeteer": "20.8.0",
-    "puppeteer-core": "20.8.0",
+    "puppeteer": "20.8.3",
+    "puppeteer-core": "20.8.3",
     "rimraf": "3.0.2",
     "rollup": "3.2.2",
     "rollup-plugin-dts": "5.0.0",

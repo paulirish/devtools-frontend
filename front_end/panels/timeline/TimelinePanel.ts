@@ -53,15 +53,8 @@ import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 import {Events, PerformanceModel, type WindowChangedEvent} from './PerformanceModel.js';
 
 import {TimelineController, type Client} from './TimelineController.js';
+import {TimelineMiniMap} from './TimelineMiniMap.js';
 
-import {
-  TimelineEventOverviewCPUActivity,
-  TimelineEventOverviewMemory,
-  TimelineEventOverviewNetwork,
-  TimelineEventOverviewResponsiveness,
-  TimelineFilmStripOverview,
-  type TimelineEventOverview,
-} from './TimelineEventOverview.js';
 import {TimelineFlameChartView} from './TimelineFlameChartView.js';
 import {TimelineHistoryManager} from './TimelineHistoryManager.js';
 import {TimelineLoader} from './TimelineLoader.js';
@@ -289,17 +282,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly captureLayersAndPicturesSetting: Common.Settings.Setting<any>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private showScreenshotsSetting: Common.Settings.Setting<any>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private showMemorySetting: Common.Settings.Setting<any>;
+  private showScreenshotsSetting: Common.Settings.Setting<boolean>;
+  private showMemorySetting: Common.Settings.Setting<boolean>;
   private readonly panelToolbar: UI.Toolbar.Toolbar;
   private readonly panelRightToolbar: UI.Toolbar.Toolbar;
   private readonly timelinePane: UI.Widget.VBox;
-  private readonly overviewPane: PerfUI.TimelineOverviewPane.TimelineOverviewPane;
-  private overviewControls: TimelineEventOverview[];
+  readonly #minimapComponent = new TimelineMiniMap();
   private readonly statusPaneContainer: HTMLElement;
   private readonly flameChart: TimelineFlameChartView;
   private readonly searchableViewInternal: UI.SearchableView.SearchableView;
@@ -321,6 +309,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private fileSelectorElement?: HTMLInputElement;
   private selection?: TimelineSelection|null;
   private primaryPageTargetPromiseCallback = (_target: SDK.Target.Target): void => {};
+  // Note: this is technically unused, but we need it to define the promiseCallback function above.
   private primaryPageTargetPromise = new Promise<SDK.Target.Target>(res => {
     this.primaryPageTargetPromiseCallback = res;
   });
@@ -380,12 +369,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const topPaneElement = this.timelinePane.element.createChild('div', 'hbox');
     topPaneElement.id = 'timeline-overview-panel';
 
-    // Create top overview component.
-    this.overviewPane = new PerfUI.TimelineOverviewPane.TimelineOverviewPane('timeline');
-    this.overviewPane.addEventListener(
+    this.#minimapComponent.show(topPaneElement);
+    this.#minimapComponent.addEventListener(
         PerfUI.TimelineOverviewPane.Events.WindowChanged, this.onOverviewWindowChanged.bind(this));
-    this.overviewPane.show(topPaneElement);
-    this.overviewControls = [];
 
     this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container fill');
 
@@ -493,14 +479,15 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!this.performanceModel) {
       return;
     }
-    const left = event.data.startTime;
-    const right = event.data.endTime;
+
+    const left = (event.data.startTime > 0) ? event.data.startTime : this.performanceModel.minimumRecordTime();
+    const right = Number.isFinite(event.data.endTime) ? event.data.endTime : this.performanceModel.maximumRecordTime();
     this.performanceModel.setWindow({left, right}, /* animate */ true);
   }
 
   private onModelWindowChanged(event: Common.EventTarget.EventTargetEvent<WindowChangedEvent>): void {
     const window = event.data.window;
-    this.overviewPane.setWindowTimes(window.left, window.right);
+    this.#minimapComponent.setWindowTimes(window.left, window.right);
   }
 
   private setState(state: State): void {
@@ -761,25 +748,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private updateOverviewControls(): void {
-    this.overviewControls = [];
-    this.overviewControls.push(new TimelineEventOverviewResponsiveness());
-    this.overviewControls.push(new TimelineEventOverviewCPUActivity());
-    this.overviewControls.push(new TimelineEventOverviewNetwork());
-
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
-    if (this.showScreenshotsSetting.get() && traceParsedData) {
-      const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(traceParsedData);
-      if (filmStrip.frames.length) {
-        this.overviewControls.push(new TimelineFilmStripOverview(filmStrip));
-      }
-    }
-    if (this.showMemorySetting.get()) {
-      this.overviewControls.push(new TimelineEventOverviewMemory());
-    }
-    for (const control of this.overviewControls) {
-      control.setModel(this.performanceModel);
-    }
-    this.overviewPane.setOverviewControls(this.overviewControls);
+
+    this.#minimapComponent.updateControls({
+      performanceModel: this.performanceModel,
+      traceParsedData,
+      settings: {
+        showScreenshots: this.showScreenshotsSetting.get(),
+        showMemory: this.showMemorySetting.get(),
+      },
+    });
   }
 
   private onModeChanged(): void {
@@ -836,12 +814,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!this.controller) {
       return Platform.DevToolsPath.EmptyUrlString;
     }
-    const mainTarget = this.controller.mainTarget();
+
     // target.inspectedURL is reliably populated, however it lacks any url #hash
-    const inspectedURL = mainTarget.inspectedURL();
+    const inspectedURL = this.controller.primaryPageTarget.inspectedURL();
 
     // We'll use the navigationHistory to acquire the current URL including hash
-    const resourceTreeModel = mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    const resourceTreeModel = this.controller.primaryPageTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
     const navHistory = resourceTreeModel && await resourceTreeModel.navigationHistory();
     if (!resourceTreeModel || !navHistory) {
       return inspectedURL;
@@ -858,8 +836,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         reject('Could not find TimelineController');
         return;
       }
-      const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
-      const resourceModel = target?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      const target = this.controller.primaryPageTarget;
+      const resourceModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
       if (!resourceModel) {
         reject('Could not load resourceModel');
         return;
@@ -898,11 +876,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
       this.showRecordingStarted();
 
-      const mainTarget = (SDK.TargetManager.TargetManager.instance().rootTarget() as SDK.Target.Target);
+      const primaryPageTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+      if (!primaryPageTarget) {
+        throw new Error('Could not load primary page target.');
+      }
       if (UIDevtoolsUtils.isUiDevTools()) {
-        this.controller = new UIDevtoolsController(mainTarget, this);
+        this.controller = new UIDevtoolsController(primaryPageTarget, this);
       } else {
-        this.controller = new TimelineController(mainTarget, this);
+        this.controller = new TimelineController(primaryPageTarget, this);
       }
       this.setUIControlsEnabled(false);
       this.hideLandingPage();
@@ -1008,6 +989,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.controller.dispose();
       this.controller = null;
     }
+    // Ensure we resume all targets, otherwise DevTools remains unresponsive in the event of an error.
+    void SDK.TargetManager.TargetManager.instance().resumeAllTargets();
   }
 
   private onSuspendStateChanged(): void {
@@ -1097,22 +1080,21 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.setModel(model, traceParsedData);
 
     this.updateOverviewControls();
-    this.overviewPane.reset();
+    this.#minimapComponent.reset();
     if (model && this.performanceModel) {
       this.performanceModel.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
-      this.overviewPane.setNavStartTimes(model.timelineModel().navStartTimes());
-      this.overviewPane.setBounds(model.timelineModel().minimumRecordTime(), model.timelineModel().maximumRecordTime());
+      this.#minimapComponent.setNavStartTimes(model.timelineModel().navStartTimes());
+      this.#minimapComponent.setBounds(
+          model.timelineModel().minimumRecordTime(), model.timelineModel().maximumRecordTime());
       PerfUI.LineLevelProfile.Performance.instance().reset();
       for (const profile of model.timelineModel().cpuProfiles()) {
         PerfUI.LineLevelProfile.Performance.instance().appendCPUProfile(profile.cpuProfileData, profile.target);
       }
       this.setMarkers(model.timelineModel());
       this.flameChart.setSelection(null);
-      this.overviewPane.setWindowTimes(model.window().left, model.window().right);
+      this.#minimapComponent.setWindowTimes(model.window().left, model.window().right);
     }
-    for (const control of this.overviewControls) {
-      control.setModel(model);
-    }
+    this.updateOverviewControls();
     if (this.flameChart) {
       this.flameChart.resizeToPreferredHeights();
     }
@@ -1125,8 +1107,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // 1. Navigated to about:blank
       // 2. Initiated tracing.
       // We therefore now should navigate back to the original URL that the user wants to profile.
-      const target = this.controller.mainTarget();
-      const resourceModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      const resourceModel = this.controller?.primaryPageTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
       if (!resourceModel) {
         this.recordingFailed('Could not navigate to original URL');
         return;
@@ -1262,7 +1243,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   async loadingComplete(
       tracingModel: TraceEngine.Legacy.TracingModel|null,
       exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null): Promise<void> {
-    this.#traceEngineModel.reset();
+    this.#traceEngineModel.resetProcessor();
     delete this.loader;
 
     // If the user just recorded this trace via the record UI, the state will
@@ -1305,6 +1286,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       }
 
       const traceData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
+      if (!traceData) {
+        throw new Error(`Could not get trace data at index ${this.#traceEngineActiveTraceIndex}`);
+      }
       // We store the Performance Model and the index of the active trace.
       // However we also pass in the full trace data because we use it to build
       // the preview overview thumbnail of the trace that gets shown in the UI.
@@ -1313,7 +1297,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           legacyModel: this.performanceModel,
           traceParseDataIndex: this.#traceEngineActiveTraceIndex,
         },
-        filmStripForPreview: traceData ? TraceEngine.Extras.FilmStrip.fromTraceData(traceData) : null,
+        filmStripForPreview: TraceEngine.Extras.FilmStrip.fromTraceData(traceData),
+        traceParsedData: traceData,
       });
     } catch (error) {
       this.recordingFailed(error.message);
@@ -1391,7 +1376,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     for (const navStartTimeEvent of timelineModel.navStartTimes().values()) {
       markers.set(navStartTimeEvent.startTime, TimelineUIUtils.createEventDivider(navStartTimeEvent, zeroTime));
     }
-    this.overviewPane.setMarkers(markers);
+    this.#minimapComponent.setMarkers(markers);
   }
 
   private async loadEventFired(
@@ -1399,7 +1384,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           .EventTargetEvent<{resourceTreeModel: SDK.ResourceTreeModel.ResourceTreeModel, loadTime: number}>):
       Promise<void> {
     if (this.state !== State.Recording || !this.recordingPageReload || !this.controller ||
-        this.controller.mainTarget() !== event.data.resourceTreeModel.target()) {
+        this.controller.primaryPageTarget !== event.data.resourceTreeModel.target()) {
       return;
     }
     const controller = this.controller;

@@ -949,6 +949,9 @@ export class NetworkRequestNode extends NetworkNode {
       case 'priority': {
         const priority = this.requestInternal.priority();
         this.setTextAndTitle(cell, priority ? PerfUI.NetworkPriorities.uiLabelForNetworkPriority(priority) : '');
+        const initialPriority = this.requestInternal.initialPriority();
+        this.appendSubtitle(
+            cell, initialPriority ? PerfUI.NetworkPriorities.uiLabelForNetworkPriority(initialPriority) : '');
         break;
       }
       case 'connectionid': {
@@ -1039,7 +1042,7 @@ export class NetworkRequestNode extends NetworkNode {
   }
 
   private renderPrimaryCell(cell: HTMLElement, columnId: string, text?: string): void {
-    const columnIndex = (this.dataGrid as DataGrid.DataGrid.DataGridImpl<unknown>).indexOfVisibleColumn(columnId);
+    const columnIndex = (this.dataGrid as DataGrid.DataGrid.DataGridImpl<unknown>)?.indexOfVisibleColumn(columnId) | 0;
     const isFirstCell = (columnIndex === 0);
     if (isFirstCell) {
       const leftPadding = this.leftPadding ? this.leftPadding + 'px' : '';
@@ -1054,8 +1057,15 @@ export class NetworkRequestNode extends NetworkNode {
         this.parentView().dispatchEventToListeners(Events.RequestActivated, {showPanel: true});
       });
       cell.addEventListener('focus', () => this.parentView().resetFocus());
-      let iconElement;
-      if (this.requestInternal.resourceType() === Common.ResourceType.resourceTypes.Image) {
+      let iconElement: HTMLElement;
+      const type = this.requestInternal.resourceType();
+      if (this.isFailed()) {
+        const iconData = {
+          iconName: 'cross-circle-filled',
+          color: 'var(--icon-error)',
+        };
+        iconElement = setIcon(iconData, type.title());
+      } else if (this.requestInternal.resourceType() === Common.ResourceType.resourceTypes.Image) {
         const previewImage = document.createElement('img');
         previewImage.classList.add('image-network-icon-preview');
         previewImage.alt = this.requestInternal.resourceType().title();
@@ -1065,15 +1075,8 @@ export class NetworkRequestNode extends NetworkNode {
         iconElement.classList.add('image');
         iconElement.appendChild(previewImage);
       } else {
-        const iconData = iconDataForResourceType(this.requestInternal.resourceType());
-        iconElement = document.createElement('div');
-        iconElement.title = this.requestInternal.resourceType().title();
-        iconElement.style.setProperty(
-            '-webkit-mask',
-            `url('${
-                new URL(`../../Images/${iconData.iconName}.svg`, import.meta.url)
-                    .toString()}')  no-repeat center /99%`);
-        iconElement.style.setProperty('background-color', iconData.color);
+        const iconData = iconDataForResourceType(type);
+        iconElement = setIcon(iconData, type.title());
       }
       iconElement.classList.add('icon');
 
@@ -1083,13 +1086,12 @@ export class NetworkRequestNode extends NetworkNode {
     if (columnId === 'name') {
       const webBundleInnerRequestInfo = this.requestInternal.webBundleInnerRequestInfo();
       if (webBundleInnerRequestInfo) {
-        const secondIconElement = document.createElement('div');
+        const iconData = {
+          iconName: 'bundle',
+          color: 'var(--icon-info)',
+        };
+        const secondIconElement = setIcon(iconData, i18nString(UIStrings.webBundleInnerRequest));
         secondIconElement.classList.add('icon');
-        secondIconElement.title = i18nString(UIStrings.webBundleInnerRequest);
-        secondIconElement.style.setProperty(
-            '-webkit-mask',
-            `url('${new URL('../../Images/bundle.svg', import.meta.url).toString()}')  no-repeat center /99%`);
-        secondIconElement.style.setProperty('background-color', 'var(--icon-info)');
 
         const networkManager = SDK.NetworkManager.NetworkManager.forRequest(this.requestInternal);
         if (webBundleInnerRequestInfo.bundleRequestId && networkManager) {
@@ -1111,6 +1113,17 @@ export class NetworkRequestNode extends NetworkNode {
       }
     } else if (text) {
       UI.UIUtils.createTextChild(cell, text);
+    }
+
+    function setIcon(iconData: {iconName: string, color: string}, title: string): HTMLElement {
+      const iconElement = document.createElement('div');
+      iconElement.title = title;
+      iconElement.style.setProperty(
+          '-webkit-mask',
+          `url('${
+              new URL(`../../Images/${iconData.iconName}.svg`, import.meta.url).toString()}')  no-repeat center /99%`);
+      iconElement.style.setProperty('background-color', iconData.color);
+      return iconElement;
     }
   }
 

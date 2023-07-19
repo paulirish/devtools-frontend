@@ -27,7 +27,6 @@ import {
   setLegacyNavigation,
   setThrottlingMethod,
   setToolbarCheckboxWithText,
-  unregisterAllServiceWorkers,
   waitForResult,
 } from '../helpers/lighthouse-helpers.js';
 
@@ -62,9 +61,7 @@ describe('Navigation', async function() {
   });
 
   afterEach(async function() {
-    await unregisterAllServiceWorkers();
-
-    const {frontend} = await getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     frontend.off('console', consoleListener);
 
     if (this.currentTest?.isFailed()) {
@@ -113,7 +110,7 @@ describe('Navigation', async function() {
           assert.strictEqual(numNavigations, 6);
         }
 
-        assert.strictEqual(lhr.lighthouseVersion, '10.3.0');
+        assert.strictEqual(lhr.lighthouseVersion, '10.4.0');
         assert.match(lhr.finalUrl, /^https:\/\/localhost:[0-9]+\/test\/e2e\/resources\/lighthouse\/hello.html/);
 
         assert.strictEqual(lhr.configSettings.throttlingMethod, 'simulate');
@@ -133,7 +130,7 @@ describe('Navigation', async function() {
         });
 
         const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr);
-        assert.strictEqual(auditResults.length, 177);
+        assert.strictEqual(auditResults.length, 185);
         assert.deepStrictEqual(erroredAudits, []);
         assert.deepStrictEqual(failedAudits.map(audit => audit.id), [
           'service-worker',
@@ -222,7 +219,7 @@ describe('Navigation', async function() {
         ];
 
         const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, flakyAudits);
-        assert.strictEqual(auditResults.length, 154);
+        assert.strictEqual(auditResults.length, 162);
         assert.deepStrictEqual(erroredAudits, []);
         assert.deepStrictEqual(failedAudits.map(audit => audit.id), [
           'service-worker',

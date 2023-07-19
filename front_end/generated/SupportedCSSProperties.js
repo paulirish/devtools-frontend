@@ -136,10 +136,6 @@ export const generatedProperties = [
  },
  {
   "inherited": true,
-  "name": "-webkit-highlight"
- },
- {
-  "inherited": true,
   "keywords": [
    "auto",
    "loose",
@@ -393,12 +389,6 @@ export const generatedProperties = [
    "none"
   ],
   "name": "anchor-name"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "anchor-scroll"
  },
  {
   "longhands": [
@@ -2773,6 +2763,12 @@ export const generatedProperties = [
   "name": "position-fallback"
  },
  {
+  "keywords": [
+   "normal"
+  ],
+  "name": "position-fallback-bounds"
+ },
+ {
   "name": "prefix"
  },
  {
@@ -3068,13 +3064,9 @@ export const generatedProperties = [
  {
   "longhands": [
    "scroll-timeline-name",
-   "scroll-timeline-axis",
-   "scroll-timeline-attachment"
+   "scroll-timeline-axis"
   ],
   "name": "scroll-timeline"
- },
- {
-  "name": "scroll-timeline-attachment"
  },
  {
   "name": "scroll-timeline-axis"
@@ -3510,7 +3502,10 @@ export const generatedProperties = [
  },
  {
   "keywords": [
+   "content-box",
+   "border-box",
    "fill-box",
+   "stroke-box",
    "view-box"
   ],
   "name": "transform-box"
@@ -3533,6 +3528,9 @@ export const generatedProperties = [
    "transition-delay"
   ],
   "name": "transition"
+ },
+ {
+  "name": "transition-animation-type"
  },
  {
   "name": "transition-delay"
@@ -3611,13 +3609,9 @@ export const generatedProperties = [
  {
   "longhands": [
    "view-timeline-name",
-   "view-timeline-axis",
-   "view-timeline-attachment"
+   "view-timeline-axis"
   ],
   "name": "view-timeline"
- },
- {
-  "name": "view-timeline-attachment"
  },
  {
   "name": "view-timeline-axis"
@@ -3683,13 +3677,6 @@ export const generatedProperties = [
    "auto"
   ],
   "name": "will-change"
- },
- {
-  "inherited": true,
-  "keywords": [
-   "normal"
-  ],
-  "name": "word-boundary-detection"
  },
  {
   "inherited": true,
@@ -3847,11 +3834,6 @@ export const generatedPropertyValues = {
   ]
  },
  "anchor-name": {
-  "values": [
-   "none"
-  ]
- },
- "anchor-scroll": {
   "values": [
    "none"
   ]
@@ -5151,6 +5133,11 @@ export const generatedPropertyValues = {
    "none"
   ]
  },
+ "position-fallback-bounds": {
+  "values": [
+   "normal"
+  ]
+ },
  "quotes": {
   "values": [
    "auto",
@@ -5580,7 +5567,10 @@ export const generatedPropertyValues = {
  },
  "transform-box": {
   "values": [
+   "content-box",
+   "border-box",
    "fill-box",
+   "stroke-box",
    "view-box"
   ]
  },
@@ -5686,11 +5676,6 @@ export const generatedPropertyValues = {
  "will-change": {
   "values": [
    "auto"
-  ]
- },
- "word-boundary-detection": {
-  "values": [
-   "normal"
   ]
  },
  "word-break": {

@@ -6,12 +6,12 @@ const {assert} = chai;
 
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 
-import {loadEventsFromTraceFile, setTraceModelTimeout} from '../../../helpers/TraceHelpers.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 async function handleEventsFromTraceFile(context: Mocha.Context|Mocha.Suite|null, name: string):
     Promise<TraceModel.Handlers.ModelHandlers.Samples.SamplesHandlerData> {
-  const traceEvents = await loadEventsFromTraceFile(context, name);
+  const traceEvents = await TraceLoader.rawEvents(context, name);
   TraceModel.Handlers.ModelHandlers.Meta.reset();
   TraceModel.Handlers.ModelHandlers.Samples.reset();
 
@@ -30,13 +30,11 @@ async function handleEventsFromTraceFile(context: Mocha.Context|Mocha.Suite|null
 }
 
 describeWithEnvironment('SamplesHandler', function() {
-  setTraceModelTimeout(this);
-
   it('finds all the profiles in a real world recording', async () => {
     const data = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
-    // The same process id is shared across profiles in the profiled
+    // The same thread id is shared across profiles in the profiled
     // processes.
-    const profileId = TraceModel.Types.TraceEvents.ProfileID('0x1');
+    const threadId = TraceModel.Types.TraceEvents.ThreadID(1);
     const firstProcessId = TraceModel.Types.TraceEvents.ProcessID(2236123);
     const secondProcessId = TraceModel.Types.TraceEvents.ProcessID(2154214);
     const thirdProcessId = TraceModel.Types.TraceEvents.ProcessID(2236084);
@@ -45,19 +43,20 @@ describeWithEnvironment('SamplesHandler', function() {
 
     const profilesFirstProcess = data.profilesInProcess.get(firstProcessId);
     assert.strictEqual(profilesFirstProcess?.size, 1);
-    assert.isDefined(profilesFirstProcess?.get(profileId));
+    assert.isDefined(profilesFirstProcess?.get(threadId));
 
     const profilesSecondProcess = data.profilesInProcess.get(secondProcessId);
     assert.strictEqual(profilesSecondProcess?.size, 1);
-    assert.isDefined(profilesSecondProcess?.get(profileId));
+    assert.isDefined(profilesSecondProcess?.get(threadId));
 
     const profilesThirdProcess = data.profilesInProcess.get(thirdProcessId);
     assert.strictEqual(profilesThirdProcess?.size, 1);
-    assert.isDefined(profilesThirdProcess?.get(profileId));
+    assert.isDefined(profilesThirdProcess?.get(threadId));
   });
   describe('profile calls building', () => {
     const pid = TraceModel.Types.TraceEvents.ProcessID(0);
     const id = TraceModel.Types.TraceEvents.ProfileID('0');
+    const tid = TraceModel.Types.TraceEvents.ThreadID(1);
 
     function makeProfileChunkEvent(
         nodes: {
@@ -110,7 +109,7 @@ describeWithEnvironment('SamplesHandler', function() {
         args: {data: {startTime: TraceModel.Types.Timing.MicroSeconds(0)}},
         cat: '',
         pid,
-        tid: TraceModel.Types.TraceEvents.ThreadID(1),
+        tid,
         ts: TraceModel.Types.Timing.MicroSeconds(0),
         ph: TraceModel.Types.TraceEvents.Phase.SAMPLE,
       };
@@ -150,7 +149,7 @@ describeWithEnvironment('SamplesHandler', function() {
       }
       await TraceModel.Handlers.ModelHandlers.Samples.finalize();
       const data = TraceModel.Handlers.ModelHandlers.Samples.data();
-      const calls = data.profilesInProcess.get(pid)?.get(id)?.profileCalls;
+      const calls = data.profilesInProcess.get(pid)?.get(tid)?.profileCalls;
       const expectedResult = [
         {id: A, ts: 0, dur: 154, selfTime: 58, children: [B, D]},
         {id: B, ts: 1, dur: 27, selfTime: 9, children: [C]},
@@ -171,10 +170,10 @@ describeWithEnvironment('SamplesHandler', function() {
     it('can build profile calls from a CPU profile coming from a real world trace', async () => {
       const data = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
 
-      const profileId = TraceModel.Types.TraceEvents.ProfileID('0x1');
+      const threadId = TraceModel.Types.TraceEvents.ThreadID(1);
       const firstProcessId = TraceModel.Types.TraceEvents.ProcessID(2236123);
       const profilesFirstProcess = data.profilesInProcess.get(firstProcessId);
-      const calls = profilesFirstProcess?.get(profileId)?.profileCalls.slice(0, 5);
+      const calls = profilesFirstProcess?.get(threadId)?.profileCalls.slice(0, 5);
       const expectedResult = [
         {'id': 2, 'dur': 392, 'ts': 643496962681, 'selfTime': 392, 'children': []},
         {'id': 4, 'dur': 682, 'ts': 643496963073, 'selfTime': 160, 'children': [5]},
@@ -199,7 +198,7 @@ describeWithEnvironment('SamplesHandler', function() {
       const profileById = data.profilesInProcess.values().next().value;
       assert.strictEqual(profileById.size, 1);
       const cpuProfileData = profileById.values().next().value as TraceModel.Handlers.ModelHandlers.Samples.ProfileData;
-      const cpuProfile = cpuProfileData.profile;
+      const cpuProfile = cpuProfileData.rawProfile;
       assert.deepEqual(Object.keys(cpuProfile), ['startTime', 'endTime', 'nodes', 'samples', 'timeDeltas', 'lines']);
       assert.strictEqual(cpuProfile.nodes.length, 153);
       assert.strictEqual(cpuProfile.startTime, 287510826176);
@@ -207,6 +206,23 @@ describeWithEnvironment('SamplesHandler', function() {
       assert.strictEqual(cpuProfile.samples?.length, 39471);
       assert.strictEqual(cpuProfile.samples?.length, cpuProfile.timeDeltas?.length);
       assert.strictEqual(cpuProfile.samples?.length, cpuProfile.lines?.length);
+    });
+  });
+  describe('CPU Profile parsing', () => {
+    it('generates a parsed CPU profile from a trace file', async () => {
+      const data = await handleEventsFromTraceFile(this, 'recursive-blocking-js.json.gz');
+      assert.strictEqual(data.profilesInProcess.size, 1);
+      const profileById = data.profilesInProcess.values().next().value;
+      assert.strictEqual(profileById.size, 1);
+      const cpuProfileData = profileById.values().next().value as TraceModel.Handlers.ModelHandlers.Samples.ProfileData;
+      const parsedProfile = cpuProfileData.parsedProfile;
+      assert.strictEqual(parsedProfile.nodes()?.length, 153);
+      assert.strictEqual(parsedProfile.gcNode?.id, 36);
+      assert.strictEqual(parsedProfile.programNode?.id, 2);
+      assert.strictEqual(parsedProfile.profileStartTime, 287510835.138);
+      assert.strictEqual(parsedProfile.profileEndTime, 287515908.9025441);
+      assert.strictEqual(parsedProfile.maxDepth, 14);
+      assert.strictEqual(parsedProfile.samples?.length, 39471);
     });
   });
 });

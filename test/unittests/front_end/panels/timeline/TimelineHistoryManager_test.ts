@@ -5,7 +5,7 @@
 import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import {describeWithEnvironment, registerNoopActions} from '../../helpers/EnvironmentHelpers.js';
-import {allModelsFromFile} from '../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
@@ -22,7 +22,7 @@ describeWithEnvironment('TimelineHistoryManager', function() {
 
   it('can select from multiple parsed data objects', async () => {
     // Add two parsed data objects to the history manager.
-    const firstFileModels = await allModelsFromFile(this, 'slow-interaction-button-click.json.gz');
+    const firstFileModels = await TraceLoader.allModels(this, 'slow-interaction-button-click.json.gz');
     historyManager.addRecording(
         {
           data: {
@@ -30,16 +30,18 @@ describeWithEnvironment('TimelineHistoryManager', function() {
             traceParseDataIndex: 1,
           },
           filmStripForPreview: null,
+          traceParsedData: firstFileModels.traceParsedData,
         },
     );
 
-    const secondFileModels = await allModelsFromFile(this, 'slow-interaction-keydown.json.gz');
+    const secondFileModels = await TraceLoader.allModels(this, 'slow-interaction-keydown.json.gz');
     historyManager.addRecording({
       data: {
         legacyModel: secondFileModels.performanceModel,
         traceParseDataIndex: 2,
       },
       filmStripForPreview: null,
+      traceParsedData: secondFileModels.traceParsedData,
     });
 
     // Make sure the correct model tuples (legacy and new engine) are returned when

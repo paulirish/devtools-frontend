@@ -8,7 +8,9 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as Menus from '../../../ui/components/menus/menus.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as ElementsComponents from '../../elements/components/components.js';
 import * as RecorderComponents from '../../recorder/components/components.js';
 
 import editorWidgetStyles from './JSONEditor.css.js';
@@ -22,31 +24,47 @@ declare global {
   }
 }
 
-interface ArrayParameter {
-  type: 'array';
+const enum ParameterType {
+  String = 'string',
+  Number = 'number',
+  Boolean = 'boolean',
+  Array = 'array',
+  Object = 'object',
+}
+
+interface BaseParameter {
   optional: boolean;
+  name: string;
+  typeRef?: string;
+  description: string;
+}
+
+interface ArrayParameter extends BaseParameter {
+  type: ParameterType.Array;
   value: Parameter[];
-  name: string;
-  typeRef?: string;
 }
 
-interface NonArrayParameter {
-  type: 'string'|'number'|'boolean';
-  optional: boolean;
-  value: string|boolean|number|undefined;
-  name: string;
-  typeRef?: string;
+interface NumberParameter extends BaseParameter {
+  type: ParameterType.Number;
+  value?: number;
 }
 
-interface ObjectParameter {
-  type: 'object';
-  optional: boolean;
+interface StringParameter extends BaseParameter {
+  type: ParameterType.String;
+  value?: string;
+}
+
+interface BooleanParameter extends BaseParameter {
+  type: ParameterType.Boolean;
+  value?: boolean;
+}
+
+interface ObjectParameter extends BaseParameter {
+  type: ParameterType.Object;
   value: Parameter[];
-  name: string;
-  typeRef?: string;
 }
 
-export type Parameter = ArrayParameter|NonArrayParameter|ObjectParameter;
+export type Parameter = ArrayParameter|NumberParameter|StringParameter|BooleanParameter|ObjectParameter;
 
 export interface Command {
   command: string;
@@ -58,6 +76,7 @@ interface Type {
   name: string;
   type: string;
   optional: boolean;
+  description: string;
 }
 /**
  * Parents should listen for this event and register the listeners provided by
@@ -73,16 +92,31 @@ export class SubmitEditorEvent extends Event {
   }
 }
 
+const splitDescription = (description: string): [string, string] => {
+  // If the description is too long we make the UI a bit better by highlighting the first sentence
+  // which contains the most informations.
+  // The number 150 has been chosen arbitrarily
+  if (description.length > 150) {
+    const [firstSentence, restOfDescription] = description.split('.');
+    // To make the UI nicer, we add a dot at the end of the first sentence.
+    firstSentence + '.';
+    return [firstSentence, restOfDescription];
+  }
+  return [description, ''];
+};
+
 @customElement('devtools-json-editor')
 export class JSONEditor extends LitElement {
   static override styles = [editorWidgetStyles];
-  @property() declare protocolMethodWithParametersMap: Map<string, Parameter[]>;
-  @property() declare protocolTypesMap: Map<string, Type[]>;
+  @property()
+  declare metadataByCommand: Map<string, {parameters: Parameter[], description: string, replyArgs: string[]}>;
+  @property() declare typesByName: Map<string, Type[]>;
   @property() declare targetManager;
   @state() declare parameters: Parameter[];
   @state() command: string = '';
   @state() targetId?: string;
 
+  #hintPopoverHelper?: UI.PopoverHelper.PopoverHelper;
   constructor() {
     super();
     this.parameters = [];
@@ -100,6 +134,78 @@ export class JSONEditor extends LitElement {
     });
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.#hintPopoverHelper = new UI.PopoverHelper.PopoverHelper(this, event => this.#handlePopoverDescriptions(event));
+    this.#hintPopoverHelper.setDisableOnClick(true);
+    this.#hintPopoverHelper.setTimeout(300);
+    this.#hintPopoverHelper.setHasPadding(true);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.#hintPopoverHelper?.hidePopover();
+    this.#hintPopoverHelper?.dispose();
+  }
+
+  #handlePopoverDescriptions(event: MouseEvent):
+      {box: AnchorBox, show: (popover: UI.GlassPane.GlassPane) => Promise<boolean>}|null {
+    const hintElement = event.composedPath()[0] as HTMLElement;
+    const elementData = this.#getDescriptionAndTypeForElement(hintElement);
+    if (!elementData?.description) {
+      return null;
+    }
+    const [head, tail] = splitDescription(elementData.description);
+    const type = elementData.type;
+    const replyArgs = elementData.replyArgs;
+    let popupContent = '';
+    // replyArgs and type cannot get into conflict because replyArgs is attached to a command and type to a parameter
+    if (replyArgs) {
+      popupContent = tail + `Returns: ${replyArgs}<br>`;
+    } else if (type) {
+      popupContent = tail + `<br>Type: ${type}<br>`;
+    } else {
+      popupContent = tail;
+    }
+
+    return {
+      box: hintElement.boxInWindow(),
+      show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
+        const popupElement = new ElementsComponents.CSSHintDetailsView.CSSHintDetailsView({
+          'getMessage': (): string => `<code><span>${head}</span></code>`,
+          'getPossibleFixMessage': (): string => popupContent,
+          'getLearnMoreLink': (): string =>
+              `https://chromedevtools.github.io/devtools-protocol/tot/${this.command.split('.')[0]}/`,
+        });
+        popover.contentElement.appendChild(popupElement);
+        return true;
+      },
+    };
+  }
+
+  #getDescriptionAndTypeForElement(hintElement: HTMLElement):
+      {description: string, type?: ParameterType, replyArgs?: string[]}|undefined {
+    if (hintElement.matches('.command')) {
+      const metadata = this.metadataByCommand.get(this.command);
+      if (metadata) {
+        return {description: metadata.description, replyArgs: metadata.replyArgs};
+      }
+    }
+    if (hintElement.matches('.parameter')) {
+      const id = hintElement.dataset.paramid;
+      if (!id) {
+        return;
+      }
+      const realParamId = id.split('.');
+      const {parameter} = this.#getChildByPath(realParamId);
+      if (!parameter.description) {
+        return;
+      }
+      return {description: parameter.description, type: parameter.type};
+    }
+    return;
+  }
+
   #copyToClipboard(): void {
     const commandJson = JSON.stringify({command: this.command, parameters: this.getParameters()});
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(commandJson);
@@ -115,28 +221,34 @@ export class JSONEditor extends LitElement {
 
   getParameters(): {[key: string]: unknown} {
     const formatParameterValue = (parameter: Parameter): unknown => {
-      if (parameter.type === 'number') {
-        return Number(parameter.value);
+      if (!parameter.value) {
+        return;
       }
-      if (parameter.type === 'boolean') {
-        return Boolean(parameter.value);
-      }
-      if (parameter.type === 'object') {
-        const nestedParameters: {[key: string]: unknown} = {};
-        for (const subParameter of parameter.value) {
-          nestedParameters[subParameter.name] = formatParameterValue(subParameter);
+      switch (parameter.type) {
+        case 'number': {
+          return Number(parameter.value);
         }
-        return nestedParameters;
-      }
-      if (parameter.type === 'array') {
-        const nestedParameters = [];
-        for (const subParameter of parameter.value) {
-          nestedParameters.push(formatParameterValue(subParameter));
+        case 'boolean': {
+          return Boolean(parameter.value);
         }
-        return nestedParameters;
+        case 'object': {
+          const nestedParameters: {[key: string]: unknown} = {};
+          for (const subParameter of parameter.value) {
+            nestedParameters[subParameter.name] = formatParameterValue(subParameter);
+          }
+          return nestedParameters;
+        }
+        case 'array': {
+          const nestedArrayParameters = [];
+          for (const subParameter of parameter.value) {
+            nestedArrayParameters.push(formatParameterValue(subParameter));
+          }
+          return nestedArrayParameters;
+        }
+        default: {
+          return parameter.value;
+        }
       }
-
-      return parameter.value;
     };
 
     const formattedParameters: {[key: string]: unknown} = {};
@@ -147,27 +259,38 @@ export class JSONEditor extends LitElement {
   }
 
   populateParametersForCommand(): void {
-    const commandParameters = this.protocolMethodWithParametersMap.get(this.command);
-
+    const commandParameters = this.metadataByCommand.get(this.command)?.parameters;
     if (!commandParameters) {
       return;
     }
     this.parameters = commandParameters.map((parameter: Parameter) => {
       if (parameter.type === 'object') {
-        const typeInfos = this.protocolTypesMap.get(parameter.typeRef as string) ?? [];
+        const typeInfos = this.typesByName.get(parameter.typeRef as string) ?? [];
         return {
           optional: parameter.optional,
           type: parameter.type,
+          description: parameter.description,
           typeRef: parameter.typeRef,
           value: typeInfos.map(type => {
             const param: Parameter = {
               optional: type.optional,
               type: this.#isParameterSupported(parameter) ? type.type : 'string',
               name: type.name,
+              description: type.description,
               value: undefined,
             } as Parameter;
             return param;
           }),
+          name: parameter.name,
+        };
+      }
+      if (parameter.type === 'array') {
+        return {
+          optional: parameter.optional,
+          type: parameter.type,
+          description: parameter.description,
+          typeRef: parameter.typeRef,
+          value: [],
           name: parameter.name,
         };
       }
@@ -177,6 +300,7 @@ export class JSONEditor extends LitElement {
         typeRef: this.#isParameterSupported(parameter) ? parameter.typeRef : 'string',
         value: parameter.value || undefined,
         name: parameter.name,
+        description: parameter.description,
       } as Parameter;
     });
   }
@@ -249,10 +373,7 @@ export class JSONEditor extends LitElement {
     if (parameter.type !== 'array' || !parameter.typeRef) {
       return;
     }
-    if (!parameter.value) {
-      parameter.value = [];
-    }
-    const typeInfos = this.protocolTypesMap.get(parameter.typeRef as string) ?? [];
+    const typeInfos = this.typesByName.get(parameter.typeRef as string) ?? [];
     parameter.value.push({
       optional: true,
       type: this.#isTypePrimitive(parameter.typeRef) ? parameter.typeRef : 'object',
@@ -303,16 +424,15 @@ export class JSONEditor extends LitElement {
             .position=${Dialogs.Dialog.DialogVerticalPosition.BOTTOM}
             .buttonTitle=${targetLabel}
           >
-          ${repeat(
-              this.targetManager.targets(),
-              target => {
-                return LitHtml.html`<${Menus.Menu.MenuItem.litTagName}
-                .value=${target.id()}
-              >
-                  ${this.#computeTargetLabel(target)}
-              </${Menus.Menu.MenuItem.litTagName}>`;
-            },
-            )}
+          ${repeat(this.targetManager.targets(), target => {
+          return LitHtml.html`
+                <${Menus.Menu.MenuItem.litTagName}
+                  .value=${target.id()}>
+                    ${this.#computeTargetLabel(target)}
+                </${Menus.Menu.MenuItem.litTagName}>
+              `;
+        },
+    )}
           </${Menus.SelectMenu.SelectMenu.litTagName}>
     </div>
   `;
@@ -322,21 +442,6 @@ export class JSONEditor extends LitElement {
   #onTargetSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
     this.targetId = event.itemValue as string;
     this.requestUpdate();
-  }
-
-  #renderCommandRow(): LitHtml.TemplateResult|undefined {
-    // clang-format off
-    return html`<div class="row attribute padded">
-      <div>command<span class="separator">:</span></div>
-      <devtools-recorder-input
-        .disabled=${false}
-        .options=${[...this.protocolMethodWithParametersMap.keys()]}
-        .value=${this.command}
-        .placeholder=${'Enter your command...'}
-        @blur=${this.#handleCommandInputBlur}
-      ></devtools-recorder-input>
-    </div>`;
-    // clang-format on
   }
 
   #renderInlineButton(opts: {
@@ -358,66 +463,12 @@ export class JSONEditor extends LitElement {
   }
 
   /**
-   * Renders the line with the word "parameter" in red. As opposed to the renderParametersRow method,
-   * it does not render the value of a parameter.
-   */
-  #renderParameterRow(): LitHtml.TemplateResult|undefined {
-    // clang-format off
-    return html`<div class="row attribute padded">
-      <div>parameters<span class="separator">:</span></div>
-    </div>`;
-    // clang-format on
-  }
-
-  #renderParametersHelper(options: {
-    id: string,
-    value: Parameter['value'],
-    optional: boolean,
-    handleDelete?: () => void,
-    handleInputOnBlur?: (event: Event) => void,
-    handleAdd?: () => void, key: string,
-  }): LitHtml.TemplateResult|undefined {
-    const classes = {colorBlue: options.optional};
-    const handleAdd = options.handleAdd;
-    // clang-format off
-    return html`
-      <div class="row">
-          <div class=${classMap(classes)}>${options.key}<span class="separator">:</span></div>
-          ${handleAdd ? html`
-          ${this.#renderInlineButton({
-            title: 'Add parameter',
-            iconName: 'plus',
-            onClick: handleAdd,
-            classMap: {deleteButton: true},
-          })}
-        `: nothing}
-          ${!handleAdd && options.handleInputOnBlur ? html`
-          <devtools-recorder-input
-            .disabled=${false}
-            data-paramId=${options.id}
-            .value=${live(options.value ?? '')}
-            .placeholder=${'Enter your parameter...'}
-            @blur=${options.handleInputOnBlur}
-          ></devtools-recorder-input>` : nothing}
-
-          ${options.handleDelete ? html`
-            ${this.#renderInlineButton({
-                  title: 'Delete',
-                  iconName: 'minus',
-                  onClick: options.handleDelete,
-                  classMap: {deleteButton: true},
-            })}` : nothing}
-      </div>
-    `;
-    // clang-format on
-  }
-
-  /**
    * Renders the parameters list corresponding to a specific CDP command.
    */
   #renderParameters(parameters: Parameter[], id?: string, parentParameter?: Parameter, parentParameterId?: string):
       LitHtml.TemplateResult|undefined {
     parameters.sort((a, b) => Number(a.optional) - Number(b.optional));
+
     // clang-format off
     return html`
       <ul>
@@ -427,25 +478,39 @@ export class JSONEditor extends LitElement {
           const handleInputOnBlur = (event: Event): void => {
             this.#handleParameterInputBlur(event);
           };
+          const classes = { colorBlue: parameter.optional, parameter: true };
           return html`
-            <li class="row">
-              ${this.#renderParametersHelper({
-                  id: parameterId,
-                  value: parameter.value,
-                  optional: parameter.optional,
-                  handleAdd: parameter.type === 'array' ? () : void => {
-                    this.#handleAddArrayParameter(parameterId);
-                  }: undefined,
-                  handleDelete: parameter.optional ? () : void => {
-                    this.#handleDeleteArrayParameter(parameterId);
-                  }: undefined,
-                  handleInputOnBlur: parameter.type !== 'object' ? handleInputOnBlur: undefined,
-                  key: parameter.name,
-                })}
-            </li>
-            ${this.#renderParameters(subparameters, id, parameter, parameterId)}
-          `;
-        })}
+                <li class="row">
+                  <div class="row">
+                    <div class=${classMap(classes)} data-paramId=${parameterId}>${parameter.name}<span class="separator">:</span></div>
+                    ${parameter.type === 'array' ? html`
+                    ${this.#renderInlineButton({
+                        title: 'Add parameter',
+                        iconName: 'plus',
+                        onClick: () => this.#handleAddArrayParameter(parameterId),
+                        classMap: { deleteButton: true },
+                      })}
+                  `: nothing}
+                    ${parameter.type !== 'array' && parameter.type !== 'object' ? html`
+                    <devtools-recorder-input
+                      data-paramId=${parameterId}
+                      .value=${live(parameter.value ?? '')}
+                      .placeholder=${'Enter your parameter...'}
+                      @blur=${handleInputOnBlur}
+                    ></devtools-recorder-input>` : nothing}
+
+                    ${parameter.optional ? html`
+                      ${this.#renderInlineButton({
+                          title: 'Delete',
+                          iconName: 'minus',
+                          onClick: () => this.#handleDeleteArrayParameter(parameterId),
+                          classMap: { deleteButton: true },
+                        })}` : nothing}
+                  </div>
+                </li>
+                ${this.#renderParameters(subparameters, id, parameter, parameterId)}
+              `;
+          })}
       </ul>
     `;
     // clang-format on
@@ -456,9 +521,19 @@ export class JSONEditor extends LitElement {
     return html`
     <div class="wrapper">
       ${this.#renderTargetSelectorRow()}
-      ${this.#renderCommandRow()}
+      <div class="row attribute padded">
+        <div class="command">command<span class="separator">:</span></div>
+        <devtools-recorder-input
+          .options=${[...this.metadataByCommand.keys()]}
+          .value=${this.command}
+          .placeholder=${'Enter your command...'}
+          @blur=${this.#handleCommandInputBlur}
+        ></devtools-recorder-input>
+      </div>
       ${this.parameters.length ? html`
-        ${this.#renderParameterRow()}
+      <div class="row attribute padded">
+        <div>parameters<span class="separator">:</span></div>
+      </div>
         ${this.#renderParameters(this.parameters)}
       ` : nothing}
     </div>

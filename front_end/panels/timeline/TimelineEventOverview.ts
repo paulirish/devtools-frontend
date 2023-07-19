@@ -30,7 +30,6 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Protocol from '../../generated/protocol.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -62,7 +61,7 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineEventOverview.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class TimelineEventOverview extends PerfUI.TimelineOverviewPane.TimelineOverviewBase {
+export abstract class TimelineEventOverview extends PerfUI.TimelineOverviewPane.TimelineOverviewBase {
   protected model: PerformanceModel|null;
   constructor(id: string, title: string|null) {
     super();
@@ -87,46 +86,63 @@ export class TimelineEventOverview extends PerfUI.TimelineOverviewPane.TimelineO
   }
 }
 
+const HIGH_NETWORK_PRIORITIES = new Set<TraceEngine.Types.TraceEvents.Priority>([
+  'VeryHigh',
+  'High',
+  'Medium',
+]);
+
 export class TimelineEventOverviewNetwork extends TimelineEventOverview {
-  constructor() {
+  #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+  constructor(traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData) {
     super('network', i18nString(UIStrings.net));
+    this.#traceParsedData = traceParsedData;
   }
 
   override update(): void {
     super.update();
-    if (!this.model) {
+    this.#renderWithTraceParsedData();
+  }
+
+  #renderWithTraceParsedData(): void {
+    if (!this.#traceParsedData) {
       return;
     }
-    const timelineModel = this.model.timelineModel();
-    const bandHeight = this.height() / 2;
-    const timeOffset = timelineModel.minimumRecordTime();
-    const timeSpan = timelineModel.maximumRecordTime() - timeOffset;
+
+    // Because the UI is in milliseconds, we work with milliseconds through
+    // this function to get the right scale and sizing
+    const traceBoundsMilli = TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
+
+    // We draw two paths, so each can take up half the height
+    const pathHeight = this.height() / 2;
+
     const canvasWidth = this.width();
-    const scale = canvasWidth / timeSpan;
+    const scale = canvasWidth / traceBoundsMilli.range;
+
+    // We draw network requests in two chunks:
+    // Requests with a priority of Medium or higher go onto the first path
+    // Other requests go onto the second path.
     const highPath = new Path2D();
     const lowPath = new Path2D();
-    const highPrioritySet = new Set([
-      Protocol.Network.ResourcePriority.VeryHigh,
-      Protocol.Network.ResourcePriority.High,
-      Protocol.Network.ResourcePriority.Medium,
-    ]);
-    for (const request of timelineModel.networkRequests()) {
-      const path = highPrioritySet.has(request.priority) ? highPath : lowPath;
-      const s = Math.max(Math.floor((request.startTime - timeOffset) * scale), 0);
-      const e = Math.min(Math.ceil((request.endTime - timeOffset) * scale + 1), canvasWidth);
-      path.rect(s, 0, e - s, bandHeight - 1);
+
+    for (const request of this.#traceParsedData.NetworkRequests.byTime) {
+      const path = HIGH_NETWORK_PRIORITIES.has(request.args.data.priority) ? highPath : lowPath;
+      const {startTime, endTime} = TraceEngine.Helpers.Timing.eventTimingsMilliSeconds(request);
+      const rectStart = Math.max(Math.floor((startTime - traceBoundsMilli.min) * scale), 0);
+      const rectEnd = Math.min(Math.ceil((endTime - traceBoundsMilli.min) * scale + 1), canvasWidth);
+
+      path.rect(rectStart, 0, rectEnd - rectStart, pathHeight - 1);
     }
+
     const ctx = this.context();
     ctx.save();
+    // Draw the high path onto the canvas.
     ctx.fillStyle = 'hsl(214, 60%, 60%)';
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ctx.fill((highPath as any));
-    ctx.translate(0, bandHeight);
+    ctx.fill(highPath);
+    // Now jump down by the height of the high path, and then draw the low path.
+    ctx.translate(0, pathHeight);
     ctx.fillStyle = 'hsl(214, 80%, 80%)';
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ctx.fill((lowPath as any));
+    ctx.fill(lowPath);
     ctx.restore();
   }
 }
@@ -250,8 +266,12 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
 }
 
 export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
-  constructor() {
+  // WIP as part of crbug.com/1464206
+  // eslint-disable-next-line no-unused-private-class-members
+  #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+  constructor(traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData) {
     super('responsiveness', null);
+    this.#traceParsedData = traceParsedData;
   }
 
   override update(): void {
@@ -264,17 +284,9 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
     const timeOffset = this.model.timelineModel().minimumRecordTime();
     const timeSpan = this.model.timelineModel().maximumRecordTime() - timeOffset;
     const scale = this.width() / timeSpan;
-    const frames = this.model.frames();
     const ctx = this.context();
     const fillPath = new Path2D();
     const markersPath = new Path2D();
-    for (let i = 0; i < frames.length; ++i) {
-      const frame = frames[i];
-      if (!frame.hasWarnings()) {
-        continue;
-      }
-      paintWarningDecoration(frame.startTime, frame.duration);
-    }
 
     for (const track of this.model.timelineModel().tracks()) {
       const events = track.events;
@@ -329,6 +341,14 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
       return;
     }
 
+    if (this.height() === 0) {
+      // Height of 0 causes the maths below to get off and generate very large
+      // negative numbers that cause an extremely long loop when attempting to
+      // draw images by frame. Rather than that, let's warn and exist early.
+      console.warn('TimelineFilmStrip could not be drawn as its canvas height is 0');
+      return;
+    }
+
     const drawGeneration = Symbol('drawGeneration');
     this.drawGeneration = drawGeneration;
     void this.imageByFrame(frames[0]).then(image => {
@@ -357,7 +377,7 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
   }
 
   private drawFrames(imageWidth: number, imageHeight: number): void {
-    if (!imageWidth || !this.model) {
+    if (!imageWidth) {
       return;
     }
     if (!this.#filmStrip || this.#filmStrip.frames.length < 1) {

@@ -11,13 +11,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '194f8687fe2afcd97b2109a4ef3d4e47f4db3f2e',
+  'build_revision': '00557a04e481e4d74bba57e7350aaee9fdf7842a',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
   'buildtools_revision': '1cc82962cb50a35f6008b25a165782c568edac27',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '247429efd9e04d492ff5fe756818661d7feb7889',
+  'depot_tools_revision': '60b21dd19301b13eaf7c9069ac191f95f84ca6e9',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '692caf90eaa861010d9ef7b5023d96db12c06ecc',
@@ -28,7 +28,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:1de45d1a11cc9f8cb5c75a031386151e1c384847',
+  'gn_version': 'git_revision:fae280eabe5d31accc53100137459ece19a7a295',
 
   # ninja CIPD package version.
   # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
@@ -36,13 +36,18 @@ vars = {
 
   # Chromium build number for unit tests. It should be regularly updated to
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/LAST_CHANGE
-  'chromium_linux': '1166454',
+  'chromium_linux': '1172285',
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Win_x64/LAST_CHANGE
-  'chromium_win': '1166392',
+  'chromium_win': '1172263',
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Mac/LAST_CHANGE
-  'chromium_mac': '1166444',
+  'chromium_mac': '1172279',
   # the content of https://commondatastorage.googleapis.com/chromium-browser-snapshots/Mac_Arm/LAST_CHANGE
-  'chromium_mac_arm': '1166440',
+  'chromium_mac_arm': '1172271',
+
+  # Chrome version used for tests. It should be regularly updated to
+  # match the Canary version listed here:
+  # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
+  'chrome': '117.0.5895.0',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -251,7 +256,7 @@ hooks = [
     'action': [ 'python3',
                 'scripts/deps/download_chromium.py',
                 'https://commondatastorage.googleapis.com/chromium-browser-snapshots/Win_x64/' + Var('chromium_win') + '/chrome-win.zip',
-                'third_party/chrome',
+                'third_party/chromium',
                 'chrome-win/chrome.exe',
                 Var('chromium_win'),
     ],
@@ -263,7 +268,7 @@ hooks = [
     'action': [ 'python3',
                 'scripts/deps/download_chromium.py',
                 'https://commondatastorage.googleapis.com/chromium-browser-snapshots/Mac/' + Var('chromium_mac') + '/chrome-mac.zip',
-                'third_party/chrome',
+                'third_party/chromium',
                 'chrome-mac/Chromium.app/Contents',
                 Var('chromium_mac'),
     ],
@@ -275,7 +280,7 @@ hooks = [
     'action': [ 'python3',
                 'scripts/deps/download_chromium.py',
                 'https://commondatastorage.googleapis.com/chromium-browser-snapshots/Mac_Arm/' + Var('chromium_mac_arm') + '/chrome-mac.zip',
-                'third_party/chrome',
+                'third_party/chromium',
                 'chrome-mac/Chromium.app/Contents',
                 Var('chromium_mac_arm'),
     ],
@@ -287,11 +292,62 @@ hooks = [
     'action': [ 'python3',
                 'scripts/deps/download_chromium.py',
                 'https://commondatastorage.googleapis.com/chromium-browser-snapshots/Linux_x64/' + Var('chromium_linux') + '/chrome-linux.zip',
-                'third_party/chrome',
+                'third_party/chromium',
                 'chrome-linux/chrome',
                 Var('chromium_linux'),
     ],
   },
+
+  # Pull Chrome binaries from CfT buckets.
+  {
+    'name': 'download_chrome_win',
+    'pattern': '.',
+    'condition': 'host_os == "win" and build_with_chromium == False',
+    'action': [ 'python3',
+                'scripts/deps/download_chrome.py',
+                'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/win64/chrome-win64.zip',
+                'third_party/chrome',
+                'chrome-win64/chrome.exe',
+                Var('chrome'),
+    ],
+  },
+  {
+    'name': 'download_chrome_mac',
+    'pattern': '.',
+    'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu != "arm64"',
+    'action': [ 'python3',
+                'scripts/deps/download_chrome.py',
+                'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/mac-x64/chrome-mac-x64.zip',
+                'third_party/chrome',
+                'chrome-mac-x64/Google Chrome for Testing.app/Contents',
+                Var('chrome'),
+    ],
+  },
+  {
+    'name': 'download_chrome_mac',
+    'pattern': '.',
+    'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64"',
+    'action': [ 'python3',
+                'scripts/deps/download_chrome.py',
+                'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/mac-arm64/chrome-mac-arm64.zip',
+                'third_party/chrome',
+                'chrome-mac-arm64/Google Chrome for Testing.app/Contents',
+                Var('chrome'),
+    ],
+  },
+  {
+    'name': 'download_chrome_linux',
+    'pattern': '.',
+    'condition': 'host_os == "linux" and build_with_chromium == False',
+    'action': [ 'python3',
+                'scripts/deps/download_chrome.py',
+                'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/linux64/chrome-linux64.zip',
+                'third_party/chrome',
+                'chrome-linux64/chrome',
+                Var('chrome'),
+    ],
+  },
+
   {
     # Update LASTCHANGE for build script timestamps
     'name': 'lastchange',

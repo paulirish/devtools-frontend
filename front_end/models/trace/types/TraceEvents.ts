@@ -167,6 +167,23 @@ export interface TraceEventDispatch extends TraceEventComplete {
   };
 }
 
+export interface TraceEventBegin extends TraceEventData {
+  ph: Phase.BEGIN;
+}
+
+export interface TraceEventEnd extends TraceEventData {
+  ph: Phase.END;
+}
+
+/**
+ * This denotes a complete event created from a pair of begin and end
+ * events. For practicality, instead of always having to look for the
+ * end event corresponding to a begin event, we create a synthetic
+ * complete event that comprises the data of both from the beginning in
+ * the RendererHandler.
+ */
+export type TraceEventSyntheticCompleteEvent = TraceEventComplete;
+
 export interface TraceEventEventTiming extends TraceEventData {
   ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
   id: string;
@@ -250,7 +267,7 @@ export interface TraceEventSyntheticNetworkRequest extends TraceEventComplete {
       mimeType: string,
       pathname: string,
       search: string,
-      priority: string,
+      priority: Priority,
       protocol: string,
       redirects: TraceEventSyntheticNetworkRedirect[],
       renderBlocking: RenderBlocking,
@@ -434,7 +451,7 @@ export interface TraceEventInstant extends TraceEventData {
   s: TraceEventScope;
 }
 
-export type TraceEventRendererData = TraceEventInstant|TraceEventComplete;
+export type TraceEventRendererEvent = TraceEventInstant|TraceEventComplete;
 
 export interface TraceEventTracingStartedInBrowser extends TraceEventInstant {
   name: 'TracingStartedInBrowser';
@@ -567,7 +584,7 @@ export interface SyntheticLayoutShift extends TraceEventLayoutShift {
   parsedData: LayoutShiftParsedData;
 }
 
-export type Priority = 'Low'|'High'|'VeryHigh'|'Highest';
+export type Priority = 'Low'|'High'|'Medium'|'VeryHigh'|'Highest';
 export type RenderBlocking = 'blocking'|'non_blocking'|'in_body_parser_blocking'|'potentially_blocking';
 export interface TraceEventResourceSendRequest extends TraceEventInstant {
   name: 'ResourceSendRequest';
@@ -824,6 +841,13 @@ export interface SyntheticInteractionEvent extends TraceEventSyntheticNestableAs
   };
 }
 
+export interface TraceEventSyntheticProfileCall extends TraceEventComplete {
+  callFrame: Protocol.Runtime.CallFrame;
+  nodeId: Protocol.integer;
+  selfTime: MicroSeconds;
+  children: TraceEventSyntheticProfileCall[];
+}
+
 export function isSyntheticInteractionEvent(event: TraceEventData): event is SyntheticInteractionEvent {
   return Boolean(
       'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
@@ -869,6 +893,14 @@ export function isTraceEventComplete(event: TraceEventData): event is TraceEvent
   return event.ph === Phase.COMPLETE;
 }
 
+export function isTraceEventBegin(event: TraceEventData): event is TraceEventBegin {
+  return event.ph === Phase.BEGIN;
+}
+
+export function isTraceEventEnd(event: TraceEventData): event is TraceEventEnd {
+  return event.ph === Phase.END;
+}
+
 export function isTraceEventDispatch(event: TraceEventData): event is TraceEventDispatch {
   return event.name === 'EventDispatch';
 }
@@ -877,7 +909,7 @@ export function isTraceEventInstant(event: TraceEventData): event is TraceEventI
   return event.ph === Phase.INSTANT;
 }
 
-export function isTraceEventRendererEvent(event: TraceEventData): event is TraceEventRendererData {
+export function isTraceEventRendererEvent(event: TraceEventData): event is TraceEventRendererEvent {
   return isTraceEventInstant(event) || isTraceEventComplete(event);
 }
 
@@ -1125,4 +1157,96 @@ export function isSyntheticLayoutShift(traceEventData: TraceEventData): traceEve
     return false;
   }
   return 'rawEvent' in traceEventData.args.data;
+}
+
+export function isProfileCall(event: TraceEventData): event is TraceEventSyntheticProfileCall {
+  return 'callFrame' in event;
+}
+
+export const enum KnownEventName {
+  /* Task/Other */
+  Program = 'Program',
+  RunTask = 'RunTask',
+  AsyncTask = 'AsyncTask',
+  /* Load */
+  XHRLoad = 'XHRLoad',
+  XHRReadyStateChange = 'XHRReadyStateChange',
+  /* Parse */
+  ParseHTML = 'ParseHTML',
+  ParseCSS = 'ParseAuthorStyleSheet',
+  /* V8 */
+  CompileScript = 'V8.CompileScript',
+  CompileCode = 'V8.CompileCode',
+  CompileModule = 'V8.CompileModule',
+  Optimize = 'V8.OptimizeCode',
+  WasmStreamFromResponseCallback = 'v8.wasm.streamFromResponseCallback',
+  WasmCompiledModule = 'v8.wasm.compiledModule',
+  WasmCachedModule = 'v8.wasm.cachedModule',
+  WasmModuleCacheHit = 'v8.wasm.moduleCacheHit',
+  WasmModuleCacheInvalid = 'v8.wasm.moduleCacheInvalid',
+  /* Js */
+  RunMicrotasks = 'RunMicrotasks',
+  ProfileCall = 'ProfileCall',
+  EvaluateScript = 'EvaluateScript',
+  FunctionCall = 'FunctionCall',
+  EventDispatch = 'EventDispatch',
+  EvaluateModule = 'v8.evaluateModule',
+  RequestMainThreadFrame = 'RequestMainThreadFrame',
+  RequestAnimationFrame = 'RequestAnimationFrame',
+  CancelAnimationFrame = 'CancelAnimationFrame',
+  FireAnimationFrame = 'FireAnimationFrame',
+  RequestIdleCallback = 'RequestIdleCallback',
+  CancelIdleCallback = 'CancelIdleCallback',
+  FireIdleCallback = 'FireIdleCallback',
+  TimerInstall = 'TimerInstall',
+  TimerRemove = 'TimerRemove',
+  TimerFire = 'TimerFire',
+  WebSocketCreate = 'WebSocketCreate',
+  WebSocketSendHandshake = 'WebSocketSendHandshakeRequest',
+  WebSocketReceiveHandshake = 'WebSocketReceiveHandshakeResponse',
+  WebSocketDestroy = 'WebSocketDestroy',
+  CryptoDoEncrypt = 'DoEncrypt',
+  CryptoDoEncryptReply = 'DoEncryptReply',
+  CryptoDoDecrypt = 'DoDecrypt',
+  CryptoDoDecryptReply = 'DoDecryptReply',
+  CryptoDoDigest = 'DoDigest',
+  CryptoDoDigestReply = 'DoDigestReply',
+  CryptoDoSign = 'DoSign',
+  CryptoDoSignReply = 'DoSignReply',
+  CryptoDoVerify = 'DoVerify',
+  CryptoDoVerifyReply = 'DoVerifyReply',
+  V8Execute = 'V8.Execute',
+
+  /* Gc */
+  GC = 'GCEvent',
+  DOMGC = 'BlinkGC.AtomicPhase',
+  IncrementalGCMarking = 'V8.GCIncrementalMarking',
+  MajorGC = 'MajorGC',
+  MinorGC = 'MinorGC',
+  /* Layout (a.k.a "Rendering") */
+  ScheduleStyleRecalculation = 'ScheduleStyleRecalculation',
+  RecalculateStyles = 'RecalculateStyles',
+  Layout = 'Layout',
+  UpdateLayoutTree = 'UpdateLayoutTree',
+  InvalidateLayout = 'InvalidateLayout',
+  LayoutInvalidationTracking = 'LayoutInvalidationTracking',
+  ComputeIntersections = 'ComputeIntersections',
+  HitTest = 'HitTest',
+  PrePaint = 'PrePaint',
+  /* Paint */
+  ScrollLayer = 'ScrollLayer',
+  UpdateLayer = 'UpdateLayer',
+  PaintSetup = 'PaintSetup',
+  Paint = 'Paint',
+  PaintImage = 'PaintImage',
+  Commit = 'Commit',
+  CompositeLayers = 'CompositeLayers',
+  RasterTask = 'RasterTask',
+  ImageDecodeTask = 'ImageDecodeTask',
+  ImageUploadTask = 'ImageUploadTask',
+  DecodeImage = 'Decode Image',
+  ResizeImage = 'Resize Image',
+  DrawLazyPixelRef = 'Draw LazyPixelRef',
+  DecodeLazyPixelRef = 'Decode LazyPixelRef',
+  GPUTask = 'GPUTask',
 }
