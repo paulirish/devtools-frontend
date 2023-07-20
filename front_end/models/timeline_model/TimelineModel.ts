@@ -2543,6 +2543,7 @@ function getOrCreateEventData(event: TraceEngine.Legacy.ConstructedEvent|
 let eventToData =
     new Map<TraceEngine.Legacy.ConstructedEvent|TraceEngine.Types.TraceEvents.TraceEventData, EventOnTimelineData>();
 let eventToInvalidation = new WeakMap();
+let eventDataLookup;
 
 export interface InvalidationCause {
   reason: string;

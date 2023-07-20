@@ -158,6 +158,7 @@ export class CountersGraph extends UI.Widget.VBox {
       this.counterUI[i].reset();
     }
     this.scheduleRefresh();
+    return;
     for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const event = events[i];
       if (event.name !== TimelineModel.TimelineModel.RecordType.UpdateCounters) {

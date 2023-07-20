@@ -107,9 +107,12 @@ export class TracingModel {
   }
 
   addEvents(events: readonly EventPayload[]): void {
+
+    console.time('legacytracingmodel addEvents');
     for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       this.addEvent(events[i]);
     }
+    console.timeEnd('legacytracingmodel addEvents');
   }
 
   tracingComplete(): void {

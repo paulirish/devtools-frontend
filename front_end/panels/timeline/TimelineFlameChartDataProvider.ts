@@ -662,7 +662,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return result;
   }
 
-  async private appendSyncEvents(
+  private appendSyncEvents(
       track: TimelineModel.TimelineModel.Track|null, events: TraceEngine.Legacy.Event[], title: string|null,
       style: PerfUI.FlameChart.GroupStyle|null, entryType: EntryType, selectable: boolean,
       expanded?: boolean): PerfUI.FlameChart.Group|null {
@@ -680,10 +680,18 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       group = this.appendHeader((title as string), (style as PerfUI.FlameChart.GroupStyle), selectable, expanded);
       group.track = track;
     }
+    console.log("OMG THE BIG LOOP")
+    // it gest slow because the events include a refernece to the thread.
+
     for (let i = 0; i < events.length; ++i) {
-      if (i % 100_000 === 0) {
+      if (i && i % 100_000 === 0) {
         console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));
-        await wait(0);
+        // await wait(100);
+      }
+      if (events.length > 5_000 && (i / events.length >= 0.20)) {
+        // console.warn('early quit')
+        continue;
+        // return;
       }
       const event = events[i];
       const {duration: eventDuration} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
@@ -1171,7 +1179,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     timelineData.entryLevels[index] = level;
     timelineData.entryTotalTimes[index] = event.duration || InstantEventVisibleDurationMs;
     timelineData.entryStartTimes[index] = event.startTime;
-    this.#indexForEvent.set(event, index);
+    // this.#indexForEvent.set(event, index);
     return index;
   }
 
@@ -1274,7 +1282,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       if (!initiator || !event) {
         break;
       }
-      const eventIndex = (this.#indexForEvent.get(event) as number);
+      const eventIndex = (this.#indexForEvent.get(event) as number); // TODO, unbreak this
       const initiatorIndex = (this.#indexForEvent.get(initiator) as number);
       td.flowStartTimes.push(initiator.endTime || initiator.startTime);
       td.flowStartLevels.push(td.entryLevels[initiatorIndex]);

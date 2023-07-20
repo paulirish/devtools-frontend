@@ -383,6 +383,8 @@ export class CompatibilityTracksAppender {
       events: readonly TraceEngine.Types.TraceEvents.TraceEventData[], trackStartLevel: number,
       appender: TrackAppender): number {
     const lastUsedTimeByLevel: number[] = [];
+
+    console.time('compatappender appendEventsAtLevel');
     for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
       const event = events[i];
       const eventAsLegacy = this.getLegacyEvent(event);
@@ -398,6 +400,8 @@ export class CompatibilityTracksAppender {
       const level = getEventLevel(event, lastUsedTimeByLevel);
       this.appendEventAtLevel(event, trackStartLevel + level, appender);
     }
+
+    console.timeEnd('compatappender appendEventsAtLevel');
 
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);

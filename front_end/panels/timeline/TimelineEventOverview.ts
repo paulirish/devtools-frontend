@@ -279,6 +279,9 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
     if (!this.model) {
       return;
     }
+
+    return; // Nahhhhhhhhh eff this.
+
     const height = this.height();
 
     const timeOffset = this.model.timelineModel().minimumRecordTime();
@@ -288,6 +291,7 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
     const fillPath = new Path2D();
     const markersPath = new Path2D();
 
+    console.time('TimelineEventOverviewResponsiveness update');
     for (const track of this.model.timelineModel().tracks()) {
       const events = track.events;
       for (let i = 0; i < events.length; ++i) {  if (i % 100_000 === 0) console.log((i / events.length).toLocaleString("en-US", {style: "percent", minimumFractionDigits: 2}));;
@@ -300,6 +304,7 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
         }
       }
     }
+    console.timeEnd('TimelineEventOverviewResponsiveness update');
 
     ctx.fillStyle = 'hsl(0, 80%, 90%)';
     ctx.strokeStyle = 'red';

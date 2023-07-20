@@ -1079,7 +1079,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
     this.flameChart.setModel(model, traceParsedData);
 
-    this.updateOverviewControls();
+    // this.updateOverviewControls(); // dont need it twice......
     this.#minimapComponent.reset();
     if (model && this.performanceModel) {
       this.performanceModel.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
