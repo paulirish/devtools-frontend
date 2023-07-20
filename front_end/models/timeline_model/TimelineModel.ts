@@ -2532,10 +2532,12 @@ export class EventOnTimelineData {
 
 function getOrCreateEventData(event: TraceEngine.Legacy.ConstructedEvent|
                               TraceEngine.Types.TraceEvents.TraceEventData): EventOnTimelineData {
-  let data = eventToData.get(event);
-  if (!data) {
+  let data;
+  if (!eventToData.has(event)) {
     data = new EventOnTimelineData();
     eventToData.set(event, data);
+  } else {
+    data = eventToData.get(event);
   }
   return data;
 }
