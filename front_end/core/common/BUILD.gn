@@ -47,6 +47,7 @@ devtools_module("common") {
   deps = [
     ":ColorUtils",
     "../../core/i18n:bundle",
+    "../../core/host:bundle",
     "../../core/platform:bundle",
     "../../core/root:bundle",
   ]
