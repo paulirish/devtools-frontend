@@ -79,6 +79,20 @@ export function isCustomDevtoolsFrontend(): boolean {
   return _isCustomDevtoolsFrontend;
 }
 
+let _hasLocalStorage: boolean;
+
+export function hasLocalStorage(): boolean {
+  if (typeof _hasLocalStorage === 'undefined') {
+    try {
+      _hasLocalStorage = !!window.localStorage
+    } catch (e) {
+      _hasLocalStorage = false;
+    }
+  }
+  return _hasLocalStorage;
+}
+
+
 let _fontFamily: string;
 
 export function fontFamily(): string {

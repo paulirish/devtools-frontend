@@ -34,6 +34,7 @@ import * as Root from '../root/root.js';
 import {Format, type Color} from './Color.js';
 import {Console} from './Console.js';
 import {type GenericEvents, type EventDescriptor, type EventTargetEvent} from './EventTarget.js';
+import {Platform as HostPlatform} from '../host/host.js'
 import {ObjectWrapper} from './Object.js';
 import {
   getLocalizedSettingsCategory,
@@ -807,7 +808,7 @@ export class VersionController {
 
   private updateVersionFrom9To10(): void {
     // This one is localStorage specific, which is fine.
-    if (!window.localStorage) {
+    if (!HostPlatform.hasLocalStorage()) {
       return;
     }
     for (const key in window.localStorage) {
@@ -1221,7 +1222,7 @@ export class VersionController {
       'workspaceExcludedFolders',
       'xhrBreakpoints',
     ]);
-    if (!window.localStorage) {
+    if (!HostPlatform.hasLocalStorage()) {
       return;
     }
 

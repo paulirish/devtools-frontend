@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Platform from '../platform/platform.js';
+import * as HostPlatform from '../host/Platform.js';
 
 const queryParamsObject = new URLSearchParams(location.search);
 
@@ -60,7 +61,7 @@ export class Runtime {
   } {
     try {
       return JSON.parse(
-                 self.localStorage && self.localStorage['experiments'] ? self.localStorage['experiments'] : '{}') as {
+                 HostPlatform.hasLocalStorage() && self.localStorage['experiments'] ? self.localStorage['experiments'] : '{}') as {
         [x: string]: boolean,
       };
     } catch (e) {
@@ -146,7 +147,7 @@ export class ExperimentsSupport {
   }
 
   private setExperimentsSetting(value: Object): void {
-    if (!self.localStorage) {
+    if (!HostPlatform.hasLocalStorage()) {
       return;
     }
     self.localStorage['experiments'] = JSON.stringify(value);

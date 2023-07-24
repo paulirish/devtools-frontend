@@ -232,7 +232,7 @@ export class MainImpl {
     }
 
     let localStorage;
-    if (!Host.InspectorFrontendHost.isUnderTest() && window.localStorage) {
+    if (!Host.InspectorFrontendHost.isUnderTest() && Host.Platform.hasLocalStorage()) {
       const localbackingStore: Common.Settings.SettingsBackingStore = {
         ...Common.Settings.NOOP_STORAGE,
         clear: () => window.localStorage.clear(),

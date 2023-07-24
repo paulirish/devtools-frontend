@@ -35,6 +35,7 @@ import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
+import * as HostPlatform from './Platform.js';
 
 import {
   EventDescriptors,
@@ -344,6 +345,9 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
     const prefs: {
       [x: string]: string,
     } = {};
+    if (!HostPlatform.hasLocalStorage()) {
+      callback(prefs);
+    }
     for (const name in window.localStorage) {
       prefs[name] = window.localStorage[name];
     }
