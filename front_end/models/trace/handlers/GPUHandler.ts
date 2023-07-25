@@ -38,9 +38,11 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     throw new Error('GPU Handler is not initialized');
   }
 
-  if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
-    return;
-  }
+  // with this ocmmented out.. add every event ever. def overkill
+
+  // if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
+  //   return;
+  // }
 
   Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
 }
@@ -54,6 +56,7 @@ export async function finalize(): Promise<void> {
   const gpuThreadsForProcess = eventsInProcessThread.get(gpuProcessId);
   if (gpuThreadsForProcess && gpuThreadId) {
     mainGPUThreadTasks = gpuThreadsForProcess.get(gpuThreadId) || [];
+    mainGPUThreadTasks.sort((event1, event2) => event1.ts - event2.ts);
   }
   handlerState = HandlerState.FINALIZED;
 }

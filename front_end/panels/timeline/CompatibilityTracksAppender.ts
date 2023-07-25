@@ -8,6 +8,7 @@ import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Common from '../../core/common/common.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import {ThreadAppender} from './ThreadAppender.js';
+import * as Root from '../../core/root/root.js';
 
 import {
   type TimelineFlameChartEntry,
@@ -438,7 +439,8 @@ export class CompatibilityTracksAppender {
       const eventAsLegacy = this.getLegacyEvent(event);
       // Default styles are globally defined for each event name. Some
       // events are hidden by default.
-      const eventIsVisible = eventAsLegacy &&
+      const eventIsVisible = Root.Runtime.experiments.isEnabled('timelineShowAllEvents') ? true :
+      eventAsLegacy &&
           visibleNames.has(TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(eventAsLegacy));
       if (!eventIsVisible) {
         continue;
