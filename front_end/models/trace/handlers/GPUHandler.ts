@@ -38,9 +38,11 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     throw new Error('GPU Handler is not initialized');
   }
 
-  if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
-    return;
-  }
+  // with this ocmmented out.. add every event ever. def overkill
+
+  // if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
+  //   return;
+  // }
 
   Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
 }
