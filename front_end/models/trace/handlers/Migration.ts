@@ -8,7 +8,7 @@ import * as Memory from './MemoryHandler.js';
 import * as NetworkRequests from './NetworkRequestsHandler.js';
 import * as PageLoadMetrics from './PageLoadMetricsHandler.js';
 import * as Screenshots from './ScreenshotsHandler.js';
-import * as UberFramesHandler from './UberFramesHandlerHandler.js';
+import * as UberFrames from './UberFramesHandler.js';
 import * as UserInteractions from './UserInteractionsHandler.js';
 import * as UserTimings from './UserTimingsHandler.js';
 import * as Warnings from './WarningsHandler.js';

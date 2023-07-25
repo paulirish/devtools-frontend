@@ -13,30 +13,48 @@ import * as Types from '../types/types.js';
 const eventsInProcessThread =
     new Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventSnapshot[]>>();
 
-let snapshots: Types.TraceEvents.TraceEventSnapshot[] = [];
+let relevantEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 export function reset(): void {
   eventsInProcessThread.clear();
-  snapshots.length = 0;
+  relevantEvts.length = 0;
 }
 
+
+const someStuff  = {
+  CompositeLayers : 'CompositeLayers',
+  RasterTask : 'RasterTask',
+  ImageDecodeTask : 'ImageDecodeTask',
+  ImageUploadTask : 'ImageUploadTask',
+  DecodeImage : 'Decode Image',
+  ResizeImage : 'Resize Image',
+  DrawLazyPixelRef : 'Draw LazyPixelRef',
+  DecodeLazyPixelRef : 'Decode LazyPixelRef',
+};
+const someRelevantTraceEventTypes = Object.values(someStuff);
+
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
-  if (event.ph !== Types.TraceEvents.Phase.OBJECT_SNAPSHOT || event.name !== 'Screenshot') {
-    return;
+
+  if (
+    event.name === 'Screenshot'
+    || Types.TraceEvents.isTraceEventGPUTask(event)
+    || someRelevantTraceEventTypes.some(type => event.name === type)
+  ) {
+    relevantEvts.push(event);
+    Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
   }
 
-  Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
 }
 
 export async function finalize(): Promise<void> {
   const {browserProcessId, browserThreadId} = metaHandlerData();
   const browserThreads = eventsInProcessThread.get(browserProcessId);
-  if (browserThreads) {
-    snapshots = browserThreads.get(browserThreadId) || [];
-  }
+  // if (browserThreads) {
+  //   relevantEvts = browserThreads.get(browserThreadId) || [];
+  // }
 }
 
 export function data(): Types.TraceEvents.TraceEventSnapshot[] {
-  return [...snapshots];
+  return [...relevantEvts];
 }
 
 export function deps(): TraceEventHandlerName[] {
