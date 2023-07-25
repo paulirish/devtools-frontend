@@ -53,8 +53,8 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFrames.relevantEvts;
-    const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
+    const uberFrameEvts = this.#traceParsedData.UberFrames;
+    // const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
 
     if (uberFrameEvts.length === 0) {
       return trackStartLevel;
@@ -62,7 +62,7 @@ export class UberFramesTrackAppender implements TrackAppender {
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
     let newLevel;
     newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, trackStartLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
+    // newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
     return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
   }
 

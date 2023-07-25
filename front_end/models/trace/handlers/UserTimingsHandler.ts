@@ -184,15 +184,7 @@ export async function finalize(): Promise<void> {
     };
     syntheticEvents.push(event);
   }
-  syntheticEvents.sort((event1, event2) => {
-    if (event1.ts > event2.ts) {
-      return 1;
-    }
-    if (event2.ts > event1.ts) {
-      return -1;
-    }
-    return 0;
-  });
+  syntheticEvents.sort((event1, event2) => event1.ts - event2.ts);
   handlerState = HandlerState.FINALIZED;
 }
 

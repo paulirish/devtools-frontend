@@ -20,10 +20,13 @@ let relevantEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 let asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 const syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
 
-export interface UberFramesData {
-  relevantEvts: readonly Types.TraceEvents.TraceEventData[],
-  syntheticEvents: readonly Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[];
-}
+// export interface UberFramesData {
+//   relevantEvts: readonly Types.TraceEvents.TraceEventData[],
+//   syntheticEvents: readonly Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[];
+// }
+
+
+export type UberFramesData = readonly Types.TraceEvents.TraceEventData[];
 
 export function reset(): void {
   eventsInProcessThread.clear();
@@ -163,7 +166,7 @@ export function data(): UberFramesData {
   if (handlerState !== HandlerState.FINALIZED) {
     throw new Error('UberFrames handler is not finalized');
   }
-  return {relevantEvts, syntheticEvents}
+  return [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts);
 
 }
 
