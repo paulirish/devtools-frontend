@@ -20,14 +20,14 @@ const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
-  timings: 'Timings',
+  timings: 'UberFrames',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class UberFramesTrackAppender implements TrackAppender {
-  readonly appenderName: TrackAppenderName = 'Timings';
+  readonly appenderName: TrackAppenderName = 'UberFrames';
 
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
@@ -53,22 +53,14 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const allMarkerEvents = this.#traceParsedData.PageLoadMetrics.allMarkerEvents;
-    const performanceMarks = this.#traceParsedData.UserTimings.performanceMarks;
-    const performanceMeasures = this.#traceParsedData.UserTimings.performanceMeasures;
-    const timestampEvents = this.#traceParsedData.UserTimings.timestampEvents;
-    const consoleTimings = this.#traceParsedData.UserTimings.consoleTimings;
+    const uberFrameEvts = this.#traceParsedData.UberFrames;
 
-    if (allMarkerEvents.length === 0 && performanceMarks.length === 0 && performanceMeasures.length === 0 &&
-        timestampEvents.length === 0 && consoleTimings.length === 0) {
+    if (uberFrameEvts.length === 0) {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    let newLevel = this.#appendMarkersAtLevel(trackStartLevel);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMarks, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMeasures, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(timestampEvents, newLevel, this);
-    return this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+    let newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, trackStartLevel, this);
+    return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
   }
 
   /**
