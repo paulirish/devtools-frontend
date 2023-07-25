@@ -32,6 +32,7 @@ import * as TimelineSelection from './TimelineSelection.js';
 import * as TimelineTreeView from './TimelineTreeView.js';
 import * as TimelineUIUtils from './TimelineUIUtils.js';
 import * as TimingsTrackAppender from './TimingsTrackAppender.js';
+import * as UberFramesTrackAppender from './UberFramesTrackAppender.js';
 import * as UIDevtoolsController from './UIDevtoolsController.js';
 import * as UIDevtoolsUtils from './UIDevtoolsUtils.js';
 
@@ -66,6 +67,7 @@ export {
   TimelineTreeView,
   TimelineUIUtils,
   TimingsTrackAppender,
+  UberFramesTrackAppender,
   UIDevtoolsController,
   UIDevtoolsUtils,
 };
