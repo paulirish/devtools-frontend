@@ -30,13 +30,22 @@ const someStuff  = {
   DrawLazyPixelRef : 'Draw LazyPixelRef',
   DecodeLazyPixelRef : 'Decode LazyPixelRef',
 };
-const someRelevantTraceEventTypes = Object.values(someStuff);
+const someRelevantTraceEventTypes = [
+  ... Object.values(someStuff),
+  'MainFrame.NotifyReadyToCommitOnImpl',
+  'MainFrame.CommitComplete',
+  'RasterizerTaskImpl::RunOnWorkerThread',
+  'LayerTreeHostImpl::FinishCommit',
+  'TileManager::FlushAndIssueSignals',
+  'ProxyImpl::ScheduledActionDraw',
+];
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
   if (
     event.name === 'Screenshot'
     || Types.TraceEvents.isTraceEventGPUTask(event)
+    || event.cat === 'blink.user_timing'
     || someRelevantTraceEventTypes.some(type => event.name === type)
   ) {
     relevantEvts.push(event);

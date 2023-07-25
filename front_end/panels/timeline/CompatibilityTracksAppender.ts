@@ -14,6 +14,7 @@ import {
   InstantEventVisibleDurationMs,
 } from './TimelineFlameChartDataProvider.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
+import {UberFramesTrackAppender} from './UberFramesTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
@@ -76,7 +77,7 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Timings', 'Interactions', 'GPU', 'LayoutShifts'] as const;
+export const TrackNames = ['Timings', 'Interactions', 'GPU', 'LayoutShifts', 'UberFrames'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -102,6 +103,7 @@ export class CompatibilityTracksAppender {
   #legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl;
   #legacyEntryTypeByLevel: EntryType[];
   #timingsTrackAppender: TimingsTrackAppender;
+  #uberFramesTrackAppender: UberFramesTrackAppender;
   #interactionsTrackAppender: InteractionsTrackAppender;
   #gpuTrackAppender: GPUTrackAppender;
   #layoutShiftsTrackAppender: LayoutShiftsTrackAppender;
@@ -137,6 +139,10 @@ export class CompatibilityTracksAppender {
     this.#timingsTrackAppender =
         new TimingsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
+
+    this.#uberFramesTrackAppender =
+        new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
+    this.#allTrackAppenders.push(this.#uberFramesTrackAppender);
 
     this.#interactionsTrackAppender =
         new InteractionsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
@@ -175,6 +181,10 @@ export class CompatibilityTracksAppender {
 
   timingsTrackAppender(): TimingsTrackAppender {
     return this.#timingsTrackAppender;
+  }
+
+  uberFramesTrackAppender(): UberFramesTrackAppender {
+    return this.#uberFramesTrackAppender;
   }
 
   interactionsTrackAppender(): InteractionsTrackAppender {

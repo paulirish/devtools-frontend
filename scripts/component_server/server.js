@@ -330,7 +330,7 @@ async function requestHandler(request, response) {
       console.error(`Path ${fullPath} is outside the DevTools Frontend root dir.`);
       process.exit(1);
     }
-
+    console.log({fullPath});
     const fileExists = await checkFileExists(fullPath);
 
     if (!fileExists) {
