@@ -19,6 +19,7 @@ ts_library("handlers") {
     "RendererHandler_test.ts",
     "SamplesHandler_test.ts",
     "ScreenshotsHandler_test.ts",
+    "UberFramesHandler_test.ts",
     "UserInteractionsHandler_test.ts",
     "UserTimingsHandler_test.ts",
     "WarningsHandler_test.ts",
