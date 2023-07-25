@@ -52,9 +52,19 @@ const someStuff  = {
   ResizeImage : 'Resize Image',
   DrawLazyPixelRef : 'Draw LazyPixelRef',
   DecodeLazyPixelRef : 'Decode LazyPixelRef',
+
+
+  BeginFrame: 'BeginFrame',
+  NeedsBeginFrameChanged: 'NeedsBeginFrameChanged',
+  BeginMainThreadFrame: 'BeginMainThreadFrame',
+  ActivateLayerTree: 'ActivateLayerTree',
+  DrawFrame: 'DrawFrame',
+  DroppedFrame: 'DroppedFrame',
 };
 const someRelevantTraceEventTypes = [
+
   ... Object.values(someStuff),
+
   'MainFrame.NotifyReadyToCommitOnImpl',
   'MainFrame.CommitComplete',
   'RasterizerTaskImpl::RunOnWorkerThread',
@@ -64,7 +74,24 @@ const someRelevantTraceEventTypes = [
   'PipelineReporter',
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
   'Frame',
-  'SendBeginMainFrameToCommit'
+  'SendBeginMainFrameToCommit',
+
+  'BeginFrame',
+  'DroppedFrame',
+  'RequestMainFrame',
+  'BeginMainThreadFrame',
+  'CompositeLayer',
+  'Commit',
+  'ActivateLayerTree',
+  'DrawFrame',
+
+  'BeginImplFrameToSendBeginMainFrame',
+  'EndCommitToActivation',
+  'Swap',
+  'SwapBuffers', // the gpu one
+
+
+
 ];
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
