@@ -7,6 +7,7 @@ import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Common from '../../core/common/common.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import * as Root from '../../core/root/root.js';
 
 import {
   type TimelineFlameChartEntry,
@@ -399,7 +400,8 @@ export class CompatibilityTracksAppender {
       // Default styles are globally defined for each event name. Some
       // events are hidden by default.
       const visibleNames = new Set(TimelineUIUtils.visibleTypes());
-      const eventIsVisible = eventAsLegacy &&
+      const eventIsVisible = Root.Runtime.experiments.isEnabled('timelineShowAllEvents') ? true :
+      eventAsLegacy &&
           visibleNames.has(TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(eventAsLegacy));
       if (!eventIsVisible) {
         continue;
