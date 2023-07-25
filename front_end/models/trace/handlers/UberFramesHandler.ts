@@ -19,7 +19,7 @@ const eventsInProcessThread =
 let relevantEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 let gpuEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 let asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
-const syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
+let syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
 
 // export interface UberFramesData {
 //   relevantEvts: readonly Types.TraceEvents.TraceEventData[],
@@ -160,15 +160,16 @@ export async function finalize(): Promise<void> {
     };
     syntheticEvents.push(event);
   }
-  syntheticEvents.sort((event1, event2) => {
-    if (event1.ts > event2.ts) {
-      return 1;
-    }
-    if (event2.ts > event1.ts) {
-      return -1;
-    }
-    return 0;
+  // drop pipelinereporter that werent presented. or browser process.
+  syntheticEvents = syntheticEvents.filter(e => {
+    if (e.name !== 'PipelineReporter') return true;
+    return topLevelRendererIds.has(e.pid) &&
+      e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== "FORKED" &&
+      e.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL';
   });
+
+
+  syntheticEvents.sort((event1, event2) => event1.ts - event2.ts);
   handlerState = HandlerState.FINALIZED;
 }
 

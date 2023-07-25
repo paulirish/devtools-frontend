@@ -886,6 +886,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       const highlightedEntryInfo = this.compatibilityTracksAppender.highlightedEntryInfo(event, eventLevel);
       title = highlightedEntryInfo.title;
       time = highlightedEntryInfo.formattedTime;
+
+      // Add stringified frame to the tooltip.
+      title += '\n' + JSON.stringify(event, null, 2).slice(0, 2000);
+
     } else if (entryType === EntryType.Event) {
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
       const totalTime = event.duration;
