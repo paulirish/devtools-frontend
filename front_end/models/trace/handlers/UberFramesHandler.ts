@@ -85,7 +85,7 @@ const someRelevantTraceEventTypes = [
   'ActivateLayerTree',
   'DrawFrame',
 
-  'BeginImplFrameToSendBeginMainFrame',
+  // 'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
   'EndCommitToActivation',
   'Swap',
   'SwapBuffers', // the gpu one
@@ -94,7 +94,7 @@ const someRelevantTraceEventTypes = [
   'Scheduler::BeginImplFrame',
   'Graphics.Pipeline',
 
-  'EventLatency', // mocny said these are complicated.
+  // 'EventLatency', // mocny said these are complicated.
 
 ];
 

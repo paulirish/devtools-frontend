@@ -141,8 +141,13 @@ export class CompatibilityTracksAppender {
         new TimingsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
 
+    const uberFramesColorGenerator = new Common.Color.Generator(
+        /* hueSpace= */ {min: 0, max: 359, count: undefined},
+        /* satSpace= */ {min: 70, max: 100, count: undefined},
+        /* lightnessSpace= */ 50,
+        /* alphaSpace= */ 0.7);
     this.#uberFramesTrackAppender =
-        new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
+        new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#uberFramesTrackAppender);
 
     this.#interactionsTrackAppender =

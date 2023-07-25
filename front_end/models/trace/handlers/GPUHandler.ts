@@ -56,6 +56,7 @@ export async function finalize(): Promise<void> {
   const gpuThreadsForProcess = eventsInProcessThread.get(gpuProcessId);
   if (gpuThreadsForProcess && gpuThreadId) {
     mainGPUThreadTasks = gpuThreadsForProcess.get(gpuThreadId) || [];
+    mainGPUThreadTasks.sort((event1, event2) => event1.ts - event2.ts);
   }
   handlerState = HandlerState.FINALIZED;
 }
