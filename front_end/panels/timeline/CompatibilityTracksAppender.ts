@@ -409,6 +409,7 @@ export class CompatibilityTracksAppender {
 
       const level = getEventLevel(event, lastUsedTimeByLevel);
       this.appendEventAtLevel(event, trackStartLevel + level, appender);
+      lastUsedTimeByLevel[level] =  event.ts + (event.dur || 0); // endTime
     }
 
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
