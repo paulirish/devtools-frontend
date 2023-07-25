@@ -17,6 +17,7 @@ const eventsInProcessThread =
 
 // these types are wrong
 let relevantEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
+let gpuEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 let asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 const syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
 
@@ -31,6 +32,7 @@ export type UberFramesData = readonly Types.TraceEvents.TraceEventData[];
 export function reset(): void {
   eventsInProcessThread.clear();
   relevantEvts.length = 0;
+  gpuEvents.length = 0;
   syntheticEvents.length = 0;
   asyncEvts.length = 0;
 
@@ -67,9 +69,11 @@ const someRelevantTraceEventTypes = [
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
-  if (
+  if (Types.TraceEvents.isTraceEventGPUTask(event)) {
+    gpuEvents.push(event);
+    Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
+  } else if (
     event.name === 'Screenshot'
-    || Types.TraceEvents.isTraceEventGPUTask(event)
     || event.cat === 'blink.user_timing'
     || someRelevantTraceEventTypes.some(type => event.name === type)
   ) {
@@ -89,6 +93,12 @@ export async function finalize(): Promise<void> {
   // if (browserThreads) {
   //   relevantEvts = browserThreads.get(browserThreadId) || [];
   // }
+
+  const {gpuProcessId, gpuThreadId, topLevelRendererIds} = metaHandlerData();
+  // This cuts down GPU Task count .. 33% of what it was.
+  const ourRendererGPUTasks = gpuEvents.filter(e => topLevelRendererIds.has(e.args.data.renderer_pid));
+  relevantEvts = [... relevantEvts, ... ourRendererGPUTasks];
+
 
 
   if (handlerState !== HandlerState.INITIALIZED) {
