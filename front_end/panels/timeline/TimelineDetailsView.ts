@@ -41,10 +41,6 @@ const UIStrings = {
    */
   eventLog: 'Event Log',
   /**
-   *@description Text that is usually a hyperlink to more documentation
-   */
-  learnMore: 'Learn more',
-  /**
    *@description Title of the Layers tool
    */
   layers: 'Layers',
