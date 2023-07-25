@@ -123,11 +123,14 @@ export class UberFramesTrackAppender implements TrackAppender {
    * Gets the title an event added by this appender should be rendered with.
    */
   titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    const frameSeqId = event.args.frameSeqId ?? event.args.frame_sequence ??
-    event.args.begin_frame_id ??
-    event.args.args?.sequence_number ??
-    event.args?.data?.beginEvent?.args?.data?.sequence_number ??
-    event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ?? '';
+    const frameSeqId =
+      event.args.frameSeqId ??
+      event.args.frame_sequence ??
+      event.args.begin_frame_id ??
+      event.args.args?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.data?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
+      '';
 
     if (frameSeqId) return `${event.name} ${frameSeqId % 1000}`;
     return event.name;

@@ -89,8 +89,12 @@ const someRelevantTraceEventTypes = [
   'EndCommitToActivation',
   'Swap',
   'SwapBuffers', // the gpu one
+  'Scheduler::BeginFrame',
+  'DisplayScheduler::BeginFrame',
+  'Scheduler::BeginImplFrame',
+  'Graphics.Pipeline',
 
-
+  'EventLatency', // mocny said these are complicated.
 
 ];
 
@@ -120,6 +124,8 @@ export async function finalize(): Promise<void> {
   // if (browserThreads) {
   //   relevantEvts = browserThreads.get(browserThreadId) || [];
   // }
+
+  // TODO: somehow exclude PipelineReporter events that are perfectly nested. (end ts's are often identical in these cases.)
 
   const {gpuProcessId, gpuThreadId, topLevelRendererIds} = metaHandlerData();
   // This cuts down GPU Task count .. 33% of what it was.
