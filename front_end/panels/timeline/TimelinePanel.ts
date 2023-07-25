@@ -767,6 +767,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private updateSettingsPaneVisibility(): void {
+    if (isNode) {
+      return;
+    }
     if (this.showSettingsPaneSetting.get()) {
       this.settingsPane.showWidget();
     } else {
@@ -1197,8 +1200,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.landingPage.detach();
 
     // Hide pane settings in trace view to conserve UI space, but preserve underlying setting.
-    this.showSettingsPaneButton.setToggled(false);
-    this.settingsPane.hideWidget();
+    this.showSettingsPaneButton?.setToggled(false);
+    this.settingsPane?.hideWidget();
   }
 
   async loadingStarted(): Promise<void> {
