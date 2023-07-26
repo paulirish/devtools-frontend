@@ -30,6 +30,9 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/object_ui/RemoteObjectPreviewFormatter.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const formatter = Intl.NumberFormat(undefined, { maximumFractionDigits: 20});
+const log10 = Math.log(10);
+
 export class RemoteObjectPreviewFormatter {
   private static objectPropertyComparator(a: Protocol.Runtime.PropertyPreview, b: Protocol.Runtime.PropertyPreview):
       number {
@@ -262,6 +265,14 @@ export class RemoteObjectPreviewFormatter {
     return this.renderPropertyPreview(property.type, (property.subtype as string), property.name, property.value);
   }
 
+  // https://stackoverflow.com/a/22885197
+  private getSignificantDigitCount(numberStr: string):number {
+    let n = Math.abs(parseInt(numberStr.replace('.', ''), 10)); // remove decimal and make positive
+    if (n === 0) {return 0;}
+    while (n !== 0 && n % 10 === 0) {n /= 10;} // kill the 0s at the end of n
+    return Math.floor(Math.log(n) / log10) + 1; // get number of digits
+  }
+
   renderPropertyPreview(type: string, subtype?: string, className?: string|null, description?: string): HTMLElement {
     const span = document.createElement('span');
     span.classList.add('object-value-' + (subtype || type));
@@ -290,6 +301,22 @@ export class RemoteObjectPreviewFormatter {
 
     if (type === 'string') {
       UI.UIUtils.createTextChildren(span, Platform.StringUtilities.formatAsJSLiteral(description));
+      return span;
+    }
+
+    // thousands separators:
+    if (type === 'number') {
+      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#parameters:~:text=1%20to%2021%3B-,the%20default%20is%2021,-.
+      const count = this.getSignificantDigitCount(description);
+      // In practice it gets rounded to 17 before now.   the = 17 might be bad
+      if (count <= 17) {
+        const parts = formatter.formatToParts(parseFloat(description));
+        parts.filter(p => p.type === 'group').forEach(p => { p.value = '_';});
+        const reformatted = parts.map(p => p.value).join('');
+        UI.UIUtils.createTextChildren(span, reformatted);
+      } else {
+        span.textContent = description;
+      }
       return span;
     }
 
