@@ -105,7 +105,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
   } else if (
     event.name === 'Screenshot'
-    || event.cat === 'blink.user_timing'
+    // || event.cat === 'blink.user_timing'
     || someRelevantTraceEventTypes.some(type => event.name === type)
   ) {
     if (event.ph === 'b' || event.ph === 'e') {

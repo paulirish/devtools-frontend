@@ -63,6 +63,7 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Eve
   }
 
   async getHardwareConcurrency(): Promise<number> {
+    return 31;
     const target = TargetManager.instance().primaryPageTarget();
     const existingCallback = this.#pendingMainTargetPromise;
 
