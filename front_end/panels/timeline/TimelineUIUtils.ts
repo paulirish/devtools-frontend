@@ -1384,6 +1384,8 @@ export class TimelineUIUtils {
   }
 
   static eventColor(event: SDK.TracingModel.Event): string {
+    if (event.omg === 2) return 'red';
+
     if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {

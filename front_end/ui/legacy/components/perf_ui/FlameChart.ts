@@ -1593,10 +1593,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         td.flowStartTimes, this.chartViewport.windowRightTime(), Platform.ArrayUtilities.DEFAULT_COMPARATOR);
 
     context.lineWidth = 0.8;
+
+    // This loop just paints the flow data that was populated via `buildFlowForInitiator()`
     for (let i = 0; i < endIndex; ++i) {
-      if (!td.flowEndTimes[i] || td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
-        continue;
-      }
+      // if (!td.flowEndTimes[i] || td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
+      //   continue;
+      // }
       const startX = this.chartViewport.timeToPosition(td.flowStartTimes[i]);
       const endX = this.chartViewport.timeToPosition(td.flowEndTimes[i]);
       const startLevel = td.flowStartLevels[i];

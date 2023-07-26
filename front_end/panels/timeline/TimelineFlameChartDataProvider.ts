@@ -1275,6 +1275,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       if (!event) {
         return null;
       }
+      let initiator = TimelineModel.TimelineModel.TimelineData.forEvent(event).initiator();
+      let i = 1;
+      while (initiator) {
+        console.log(new Array(i).fill('-').join(''), initiator);
+        i++;
+        initiator = TimelineModel.TimelineModel.TimelineData.forEvent(event).initiator();
+      }
       timelineSelection = TimelineSelection.fromTraceEvent(event);
     } else if (entryType === EntryType.Frame) {
       timelineSelection =
