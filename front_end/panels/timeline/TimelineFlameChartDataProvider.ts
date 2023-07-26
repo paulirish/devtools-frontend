@@ -1227,6 +1227,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     let timelineSelection: TimelineSelection|null = null;
     const entry = this.entryData[entryIndex];
     if (entry && this.isEntryRegularEvent(entry)) {
+
+      // adding this here for debug logging
       let initiator = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(entry).initiator();
       let i = 1;
       while (initiator) {
@@ -1234,6 +1236,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         i++;
         initiator = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(initiator).initiator();
       }
+
+
       timelineSelection = TimelineSelection.fromTraceEvent(entry);
     } else if (entryType === EntryType.Frame) {
       timelineSelection =

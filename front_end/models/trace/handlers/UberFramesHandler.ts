@@ -71,10 +71,13 @@ const someRelevantTraceEventTypes = [
   'LayerTreeHostImpl::FinishCommit',
   'TileManager::FlushAndIssueSignals',
   'ProxyImpl::ScheduledActionDraw',
-  'PipelineReporter',
+
+  // LONG ones
+  // 'PipelineReporter',
+  // 'SendBeginMainFrameToCommit',
+
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
   'Frame',
-  'SendBeginMainFrameToCommit',
 
   'BeginFrame',
   'DroppedFrame',

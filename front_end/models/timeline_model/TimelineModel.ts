@@ -2196,10 +2196,10 @@ export class TimelineAsyncEventTracker {
     if (TimelineAsyncEventTracker.asyncEventInfo) {
       return;
     }
-
+    // key: root event (root of the initiator chain) type
     const events = new Map<RecordType, {
-      subsequents: RecordType[],
-      joinBy: string,
+      subsequents: RecordType[], // Any event types that should match up to the root
+      joinBy: string, // mechanism of matching
     }>();
 
     events.set(RecordType.TimerInstall, {subsequents: [RecordType.TimerFire], joinBy: 'timerId'});
@@ -2266,10 +2266,9 @@ export class TimelineAsyncEventTracker {
 
     TimelineAsyncEventTracker.asyncEventInfo = events;
     TimelineAsyncEventTracker.typeToInitiatorType = new Map();
-    for (const entry of events) {
-      const types = entry[1].subsequents;
-      for (const currentType of types) {
-        TimelineAsyncEventTracker.typeToInitiatorType.set(currentType, entry[0]);
+    for (const [rootType, {subsequents}] of events) {
+      for (const currentType of subsequents) {
+        TimelineAsyncEventTracker.typeToInitiatorType.set(currentType, rootType);
       }
     }
   }
