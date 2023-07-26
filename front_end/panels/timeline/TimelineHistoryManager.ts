@@ -332,7 +332,7 @@ export class TimelineHistoryManager {
       const timelineOverviewComponent = overview.constructor(traceParsedData);
       timelineOverviewComponent.setCanvasSize(previewWidth, overview.height);
       timelineOverviewComponent.setModel(performanceModel);
-      timelineOverviewComponent.update();
+      // timelineOverviewComponent.update();
       const sourceContext = timelineOverviewComponent.context();
       const imageData = sourceContext.getImageData(0, 0, sourceContext.canvas.width, sourceContext.canvas.height);
       if (ctx) {
