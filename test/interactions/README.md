@@ -39,20 +39,20 @@ The first time this test runs, it will create a new stored image in `test/intera
 
 We store golden screenshots on 3 platforms: Mac, Linux and Windows. Rather than require a developer to have access to all 3, we are able to run and use screenshots generated from the CQ bots.
 
-Note: you must be a Google employee to follow this process.
+Note: you must be a Google employee to follow this process, and a member of [g/devtools-dev](http://g/devtools-dev).
 
 Once you have generated your screenshot locally on your platform, you should upload your CL and trigger a dry-run. This will fail due to missing screenshots, but once it is complete we can then fetch the screenshots from the server.
 
 First, authenticate (using your Google corp credentials):
 
-```
+```sh
 # Run this in the devtools-frontend repository
 ./third_party/depot_tools/gsutil.py config
 ```
 
 And then call the script to update the golden screenshots:
 
-```
+```sh
 ./scripts/tools/update_goldens_v2.py
 ```
 
@@ -62,7 +62,7 @@ This will fetch any relevant screenshots locally. You can then commit these and 
 
 When you need to update a screenshot because you have purposefully changed the UI, you need to run the interactions tests with a flag:
 
-```
+```sh
 FORCE_UPDATE_ALL_GOLDENS=1 npm run auto-interactionstest
 ```
 
