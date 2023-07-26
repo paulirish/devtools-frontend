@@ -700,7 +700,10 @@ export class Process extends NamedObject {
   }
 
   sortedThreads(): Thread[] {
-    return NamedObject.sort([...this.threads.values()]);
+    const threads  = [...this.threads.values()];
+    const compositorthread = threads.find(t => t.idInternal === 41475);
+    const restofThreads = threads.filter(t => t !== compositorthread);
+    return [compositorthread || [], ... NamedObject.sort(threads)].flat();
   }
 }
 

@@ -42,6 +42,7 @@ import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
+import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Protocol from '../../generated/protocol.js';
@@ -1983,8 +1984,8 @@ export class TimelineUIUtils {
             i18nString(UIStrings.totalTime),
           ].join(' / '),
           [
-            i18n.TimeUtilities.millisToString(duration || 0, true),
-            i18n.TimeUtilities.millisToString(selfTime, true),
+            i18n.TimeUtilities.millisToString(event.selfTime, true),
+            i18n.TimeUtilities.millisToString(event.duration || 0, true),
           ].join(' / '),
       );
     }
@@ -2396,6 +2397,26 @@ export class TimelineUIUtils {
         TimelineModel.TimelineModel.InvalidationTracker.invalidationEventsFor(event)) {
       TimelineUIUtils.generateCauses(event, model.targetByEvent(event), relatedNodesMap, contentHelper);
     }
+
+    // trace event args.
+    contentHelper.addSection('Trace event args');
+    const argsContainer = document.createElement('div');
+    const shadowRoot = argsContainer.attachShadow({mode: 'open'});
+    shadowRoot.adoptedStyleSheets = [CodeHighlighter.Style.default];
+    const argsEl = shadowRoot.createChild('div') as HTMLDivElement;
+    argsEl.classList.add('traceargs');
+    // I cant figure out styles and shadow dom. nastyhack.
+    argsEl.style.cssText = `
+      font-family: var(--monospace-font-family);
+      font-size: var(--monospace-font-size) !important;
+      white-space: pre-wrap;
+      line-height: 1;
+      display: inline-block;
+    `
+    const argsTxt = Object.keys(event.args).length ? JSON.stringify(event.args, null, 2) : '';
+    argsEl.textContent = argsTxt.replace(/{\n  /, '{ ');
+    void CodeHighlighter.CodeHighlighter.highlightNode(argsEl, 'text/javascript');
+    contentHelper.appendElementRow('', argsContainer);
 
     const stats: {
       [x: string]: number,

@@ -303,6 +303,7 @@ export class TimelineModelImpl {
   }
 
   static globalEventId(event: TraceEngine.Legacy.Event, field: string): string {
+    if (typeof field === 'function') return field(event);
     const data = event.args['data'] || event.args['beginData'];
     const id = data && data[field];
     if (!id) {
@@ -661,6 +662,14 @@ export class TimelineModelImpl {
     const browserMain = TraceEngine.Legacy.TracingModel.browserMainThread(tracingModel);
     if (browserMain) {
       browserMain.events().forEach(this.processBrowserEvent, this);
+
+      if (Root.Runtime.experiments.isEnabled('timelineShowAllEvents')) {
+        // const track = this.ensureNamedTrack(TrackType.Browser);
+        // track.thread = browserMain;
+        // track.events = browserMain.events();
+        this.processThreadEvents(tracingModel, browserMain, false /* maybe */, false, false, WorkletType.NotWorklet, null);
+
+      }
     }
   }
 
@@ -942,6 +951,16 @@ export class TimelineModelImpl {
       const asyncEvent = asyncEvents[i];
 
       if (asyncEvent.name === RecordType.Animation) {
+        group(TrackType.Animation).push(asyncEvent);
+        continue;
+      }
+      // hax
+      if (asyncEvent.name === 'PipelineReporter' && asyncEvent.args.chrome_frame_reporter?.state === 'STATE_PRESENTED_ALL') {
+        group(TrackType.Animation).push(asyncEvent);
+        continue;
+      }
+      // hax
+      if (asyncEvent.name === 'PipelineReporter' && asyncEvent.args.chrome_frame_reporter?.state === 'STATE_PRESENTED_ALL') {
         group(TrackType.Animation).push(asyncEvent);
         continue;
       }
@@ -1807,6 +1826,7 @@ export enum TrackType {
   MainThread = 'MainThread',
   Worker = 'Worker',
   Animation = 'Animation',
+  Browser = 'Browser',
   Raster = 'Raster',
   Experience = 'Experience',
   Other = 'Other',
@@ -2161,30 +2181,30 @@ export class InvalidationTracker {
 }
 
 export class TimelineAsyncEventTracker {
-  private readonly initiatorByType: Map<RecordType, Map<RecordType, TraceEngine.Legacy.Event>>;
+  private readonly initiatorMapsByRecordType: Map<RecordType, Map<RecordType, TraceEngine.Legacy.Event>>;
   constructor() {
     TimelineAsyncEventTracker.initialize();
-    this.initiatorByType = new Map();
-    if (TimelineAsyncEventTracker.asyncEvents) {
-      for (const initiator of TimelineAsyncEventTracker.asyncEvents.keys()) {
-        this.initiatorByType.set(initiator, new Map());
+    this.initiatorMapsByRecordType = new Map();
+    if (TimelineAsyncEventTracker.asyncEventInfo) {
+      for (const initiator of TimelineAsyncEventTracker.asyncEventInfo.keys()) {
+        this.initiatorMapsByRecordType.set(initiator, new Map());
       }
     }
   }
 
   private static initialize(): void {
-    if (TimelineAsyncEventTracker.asyncEvents) {
+    if (TimelineAsyncEventTracker.asyncEventInfo) {
       return;
     }
 
     const events = new Map<RecordType, {
-      causes: RecordType[],
+      subsequents: RecordType[],
       joinBy: string,
     }>();
 
-    events.set(RecordType.TimerInstall, {causes: [RecordType.TimerFire], joinBy: 'timerId'});
+    events.set(RecordType.TimerInstall, {subsequents: [RecordType.TimerFire], joinBy: 'timerId'});
     events.set(RecordType.ResourceSendRequest, {
-      causes: [
+      subsequents: [
         RecordType.ResourceMarkAsCached,
         RecordType.ResourceReceiveResponse,
         RecordType.ResourceReceivedData,
@@ -2192,10 +2212,10 @@ export class TimelineAsyncEventTracker {
       ],
       joinBy: 'requestId',
     });
-    events.set(RecordType.RequestAnimationFrame, {causes: [RecordType.FireAnimationFrame], joinBy: 'id'});
-    events.set(RecordType.RequestIdleCallback, {causes: [RecordType.FireIdleCallback], joinBy: 'id'});
+    events.set(RecordType.RequestAnimationFrame, {subsequents: [RecordType.FireAnimationFrame], joinBy: 'id'});
+    events.set(RecordType.RequestIdleCallback, {subsequents: [RecordType.FireIdleCallback], joinBy: 'id'});
     events.set(RecordType.WebSocketCreate, {
-      causes: [
+      subsequents: [
         RecordType.WebSocketSendHandshakeRequest,
         RecordType.WebSocketReceiveHandshakeResponse,
         RecordType.WebSocketDestroy,
@@ -2203,26 +2223,67 @@ export class TimelineAsyncEventTracker {
       joinBy: 'identifier',
     });
 
-    TimelineAsyncEventTracker.asyncEvents = events;
-    TimelineAsyncEventTracker.typeToInitiator = new Map();
+    // all except noted are on compositor thread
+    const frameSequenceJoiner = e => {
+        return e.args.frameSeqId || e.args.args?.sequence_number || e.args.frame_sequence || e.args.chrome_frame_reporter?.frame_sequence || e.args.begin_frame_id;
+      };
+/*
+    events.set('BeginFrame', {
+      subsequents: [
+        'PipelineReporter',
+        'Graphics.Pipeline',
+        'Scheduler::BeginFrame',
+        'Scheduler::BeginImplFrame',
+        'ProxyImpl::ScheduledActionSendBeginMainFrame',
+        'ProxyMain::BeginMainFrame', // mainthread
+        'Commit', // mainthread
+        'DrawFrame',
+        'DisplayScheduler::BeginFrame',
+      ],
+      joinBy: frameSequenceJoiner,
+    });
+    */
+
+   /* weirdly this kinda works cuz a lot of these are parents of eachother. if that didnt conveniently happen.. we'd need to refactor the root/subsequent thing over here */
+  // we can't match from main to compositor cuz we process Main thread first. ideally wed like.. run compositor stuff before mainthread or something.
+   events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+   events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {subsequents: ['ProxyMain::BeginMainFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+   events.set('Scheduler::BeginFrame', {subsequents: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+   events.set('BeginFrame', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner}); // hack to see if crossthread works
+
+  //  events.set('BeginFrame', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner});
+  // //  events.set('PipelineReporter', {subsequents: ['Graphics.Pipeline'], joinBy: frameSequenceJoiner}); // async b? so its awkward
+  //  events.set('Graphics.Pipeline', {subsequents: ['Scheduler::BeginFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('Scheduler::BeginFrame', {subsequents: ['Scheduler::BeginImplFrame'], joinBy: frameSequenceJoiner});
+  //  events.set('Scheduler::BeginImplFrame', {subsequents: ['ProxyImpl::ScheduledActionSendBeginMainFrame'], joinBy: frameSequenceJoiner});
+  // //  events.set('ProxyImpl::ScheduledActionSendBeginMainFrame', {subsequents: ['ProxyMain::BeginMainFrame'], joinBy: frameSequenceJoiner});
+  // //  events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
+  // //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
+  //  events.set('ProxyMain::BeginMainFrame', {subsequents: ['Commit'], joinBy: frameSequenceJoiner}); // this is main
+  //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
+  //  events.set('DrawFrame', {subsequents: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner});
+
+
+    TimelineAsyncEventTracker.asyncEventInfo = events;
+    TimelineAsyncEventTracker.typeToInitiatorType = new Map();
     for (const entry of events) {
-      const types = entry[1].causes;
+      const types = entry[1].subsequents;
       for (const currentType of types) {
-        TimelineAsyncEventTracker.typeToInitiator.set(currentType, entry[0]);
+        TimelineAsyncEventTracker.typeToInitiatorType.set(currentType, entry[0]);
       }
     }
   }
 
   processEvent(event: TraceEngine.Legacy.Event): void {
-    if (!TimelineAsyncEventTracker.typeToInitiator || !TimelineAsyncEventTracker.asyncEvents) {
+    if (!TimelineAsyncEventTracker.typeToInitiatorType || !TimelineAsyncEventTracker.asyncEventInfo) {
       return;
     }
-    let initiatorType: RecordType|undefined = TimelineAsyncEventTracker.typeToInitiator.get((event.name as RecordType));
-    const isInitiator = !initiatorType;
+    let initiatorType: RecordType|undefined = TimelineAsyncEventTracker.typeToInitiatorType.get((event.name as RecordType));
+    const isInitiator = !initiatorType; // Isn't denoted a subsequent event type, at least. So it's *possibly* an initiatorType
     if (!initiatorType) {
       initiatorType = (event.name as RecordType);
     }
-    const initiatorInfo = TimelineAsyncEventTracker.asyncEvents.get(initiatorType);
+    const initiatorInfo = TimelineAsyncEventTracker.asyncEventInfo.get(initiatorType);
     if (!initiatorInfo) {
       return;
     }
@@ -2230,23 +2291,28 @@ export class TimelineAsyncEventTracker {
     if (!id) {
       return;
     }
-    const initiatorMap: Map<RecordType, TraceEngine.Legacy.Event>|undefined = this.initiatorByType.get(initiatorType);
-    if (initiatorMap) {
+    const initiatorMapFromIdToEvent: Map<RecordType, TraceEngine.Legacy.Event>|undefined = this.initiatorMapsByRecordType.get(initiatorType);
+
+    if (id === 232813) {
+      const instEv = initiatorMapFromIdToEvent?.get(id);
+      console.log({name: event.name, start: event.startTime - 235510170.514, event, isInitiator, initiatorInfo, instEvName: instEv?.name, initiatorEvent: instEv})
+    }
+    if (initiatorMapFromIdToEvent) {
       if (isInitiator) {
-        initiatorMap.set(id, event);
+        initiatorMapFromIdToEvent.set(id, event);
         return;
       }
-      const initiator = initiatorMap.get(id);
+      const initiatorEvent = initiatorMapFromIdToEvent.get(id);
       const timelineData = EventOnTimelineData.forEvent(event);
-      timelineData.setInitiator(initiator ? initiator : null);
-      if (!timelineData.frameId && initiator) {
-        timelineData.frameId = TimelineModelImpl.eventFrameId(initiator);
+      timelineData.setInitiator(initiatorEvent ? initiatorEvent : null);
+      if (!timelineData.frameId && initiatorEvent) {
+        timelineData.frameId = TimelineModelImpl.eventFrameId(initiatorEvent);
       }
     }
   }
 
-  private static asyncEvents: Map<RecordType, {causes: RecordType[], joinBy: string}>|null = null;
-  private static typeToInitiator: Map<RecordType, RecordType>|null = null;
+  private static asyncEventInfo: Map<RecordType, {subsequents: RecordType[], joinBy: string}>|null = null;
+  private static typeToInitiatorType: Map<RecordType, RecordType>|null = null;
 }
 
 export class EventOnTimelineData {
