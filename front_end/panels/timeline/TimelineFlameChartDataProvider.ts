@@ -1227,12 +1227,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     let timelineSelection: TimelineSelection|null = null;
     const entry = this.entryData[entryIndex];
     if (entry && this.isEntryRegularEvent(entry)) {
-      let initiator = TimelineModel.TimelineModel.TimelineData.forEvent(event).initiator();
+      let initiator = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(entry).initiator();
       let i = 1;
       while (initiator) {
         console.log(new Array(i).fill('-').join(''), initiator);
         i++;
-        initiator = TimelineModel.TimelineModel.TimelineData.forEvent(event).initiator();
+        initiator = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(initiator).initiator();
       }
       timelineSelection = TimelineSelection.fromTraceEvent(entry);
     } else if (entryType === EntryType.Frame) {
