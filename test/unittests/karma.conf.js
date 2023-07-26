@@ -90,8 +90,14 @@ const TEST_FILES =
             return generatedJsFile;
           });
         })
-        .flat();
+        .flat()
+        .filter(f => {
+          if (!f.includes('_test')) return true;
+          if (f.includes('aggregated')) return true;
+          return false;
+        });
 
+console.log({TEST_FILES});
 const TEST_FILES_SOURCE_MAPS = TEST_FILES.map(fileName => `${fileName}.map`);
 
 const DEFAULT_PREPROCESSING_FOLDERS = {

@@ -65,6 +65,7 @@ def run_tests(chrome_binary, target, no_text_coverage, no_html_coverage,
     if (mocha_fgrep is not None):
         print('Using Mocha --fgrep flag ' + mocha_fgrep)
         env['MOCHA_FGREP'] = mocha_fgrep
+    print(exec_command)
     exit_code = test_helpers.popen(exec_command, cwd=cwd, env=env)
     if exit_code == 1:
         return True

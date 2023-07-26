@@ -153,7 +153,9 @@ export class TraceLoader {
       performanceModel,
       traceParsedData: traceEngineData.traceParsedData,
     };
-    allModelsCache.set(name, result);
+    if (typeof name === 'string') {
+      allModelsCache.set(name, result);
+    }
     return result;
   }
 }

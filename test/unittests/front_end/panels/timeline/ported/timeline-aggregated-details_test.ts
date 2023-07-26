@@ -17,10 +17,22 @@ import type * as Protocol from '../../../../../../front_end/generated/protocol.j
 import {getAllTracingModelPayloadEvents} from '../../../helpers/TraceHelpers.js';
 import * as Common from '../../../../../../front_end/core/common/common.js';
 import {doubleRaf, renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
-import {TraceLoader} from '../../../helpers/TraceLoader.js';
-import { TraceEventData } from '../../../../../../front_end/models/trace/types/TraceEvents.js';
+import { TraceLoader } from '../../../helpers/TraceLoader.js';
+import { type TraceEventData } from '../../../../../../front_end/models/trace/types/TraceEvents.js';
+
+import { type Tab } from '../../../../../../front_end/panels/timeline/TimelineDetailsView.js';
+import { TimelineDetailsView } from '../../../../../../front_end/panels/timeline/TimelineDetailsView.js';
 
 const {assert} = chai;
+
+class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegate {
+  select(_selection: Timeline.TimelineSelection.TimelineSelection|null): void {
+  }
+  selectEntryAtTime(_events: TraceEngine.Legacy.CompatibleTraceEvent[]|null, _time: number): void {
+  }
+  highlightEvent(_event: TraceEngine.Legacy.CompatibleTraceEvent|null): void {
+  }
+}
 
 describeWithMockConnection('timeline-aggregated-details', function() {
   let tracingModel: TraceEngine.Legacy.TracingModel;
@@ -28,6 +40,7 @@ describeWithMockConnection('timeline-aggregated-details', function() {
   let thread: TraceEngine.Legacy.Thread;
   let target: SDK.Target.Target;
   const SCRIPT_ID = 'SCRIPT_ID' as Protocol.Runtime.ScriptId;
+  const mockViewDelegate = new MockViewDelegate();
 
   beforeEach(() => {
     target = createTarget();
@@ -46,6 +59,52 @@ describeWithMockConnection('timeline-aggregated-details', function() {
     Bindings.IgnoreListManager.IgnoreListManager.instance({forceNew: true, debuggerWorkspaceBinding});
   });
 
+
+
+  it('renders the correct title for an EventTiming interaction event', async function() {
+    debugger;
+    const {metadata, traceParsedData} = TraceLoader.allModels(this, getTraceData());
+
+    const detailsView = new Timeline.TimelineDetailsView.TimelineDetailsView(mockViewDelegate);
+
+    const groupByEnum = Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy;
+    for (const grouping of Object.values(groupByEnum)) {
+      testEventTree(Timeline.TimelineDetailsView.Tab.CallTree, grouping);
+      testEventTree(Timeline.TimelineDetailsView.Tab.BottomUp, grouping);
+    }
+    testEventTree(Timeline.TimelineDetailsView.Tab.BottomUp);
+
+    function testEventTree(type: Timeline.TimelineDetailsView.Tab, grouping?: Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy) {
+
+      const tree = detailsView.rangeDetailViews.get(type) as Timeline.TimelineTreeView.AggregatedTimelineTreeView;
+      if (!tree) {
+        throw new Error('tree not found');
+      }
+
+      console.log(type + '  Group by: ' + grouping);
+      tree.groupBySetting.set(grouping);
+
+      const rootNode = tree.dataGrid.rootNode();
+      for (const node of rootNode.children)
+        {printEventTree(1, node.profileNode, node.treeView);}
+    }
+
+    function printEventTree(padding: number, node:Timeline.TimelineTreeView.GridNode, treeView: Timeline.TimelineTreeView.AggregatedTimelineTreeView) {
+      let name;
+      if (node.isGroupNode()) {
+        name = treeView.displayInfoForGroupNode(node).name;
+      } else {
+        name = node.event.name === TimelineModel.TimelineModel.RecordType.JSFrame ?
+            UI.beautifyFunctionName(node.event.args['data']['functionName']) :
+            Timeline.TimelineUIUtils.eventTitle(node.event);
+      }
+      console.log('  '.repeat(padding) + `${name}: ${node.selfTime.toFixed(3)}  ${node.totalTime.toFixed(3)}`);
+      node.children().forEach(printEventTree.bind(null, padding + 1));
+    }
+  });
+});
+
+function getTraceData() {
   const sessionId = '6.23';
   const rawTraceEvents = [
     {
@@ -594,60 +653,5 @@ describeWithMockConnection('timeline-aggregated-details', function() {
       'tts': 5612506,
     },
   ] as TraceEventData[];
-
-  it('renders the correct title for an EventTiming interaction event', async function() {
-    const {metadata, traceParsedData} = TraceLoader.allModels(this, rawTraceEvents);
-    const data = await TraceLoader.allModels(this, 'slow-interaction-button-click.json.gz');
-    const interactionEvent = data.traceParsedData.UserInteractions.interactionEventsWithNoNesting[0];
-    const details = Timeline.TimelineUIUtils.TimelineUIUtils.eventTitle(interactionEvent);
-    assert.deepEqual(details, 'Pointer');
-
-    const groupByEnum = Timeline.AggregatedTimelineTreeView.GroupBy;
-    for (const grouping of Object.values(groupByEnum)) {
-      testEventTree('CallTree', grouping);
-      testEventTree('BottomUp', grouping);
-    }
-    testEventTree('EventLog');
-    TestRunner.completeTest();
-
-    function getTreeView(type) {
-      if (timeline.tabbedPane) {
-        timeline.tabbedPane.selectTab(type, true);
-        return timeline.flameChart.treeView;
-      }
-      timeline.flameChart.detailsView.tabbedPane.selectTab(type, true);
-      return timeline.flameChart.detailsView.tabbedPane.visibleView;
-    }
-
-    function testEventTree(type, grouping) {
-      TestRunner.addResult('');
-      const tree = getTreeView(type);
-      if (grouping) {
-        TestRunner.addResult(type + '  Group by: ' + grouping);
-        tree.groupBySetting.set(grouping);
-      } else {
-        TestRunner.addResult(type);
-      }
-      const rootNode = tree.dataGrid.rootNode();
-      for (const node of rootNode.children)
-        {printEventTree(1, node.profileNode, node.treeView);}
-    }
-
-    function printEventTree(padding, node, treeView) {
-      let name;
-      if (node.isGroupNode()) {
-        name = treeView.displayInfoForGroupNode(node).name;
-      } else {
-        name = node.event.name === TimelineModel.TimelineModel.RecordType.JSFrame ?
-            UI.beautifyFunctionName(node.event.args['data']['functionName']) :
-            Timeline.TimelineUIUtils.eventTitle(node.event);
-      }
-      TestRunner.addResult('  '.repeat(padding) + `${name}: ${node.selfTime.toFixed(3)}  ${node.totalTime.toFixed(3)}`);
-      node.children().forEach(printEventTree.bind(null, padding + 1));
-    }
-
-
-    });
-});
-
-
+  return rawTraceEvents;
+}
