@@ -54,9 +54,7 @@ describe('The Lighthouse start view', async () => {
     const disabled = await isGenerateReportButtonDisabled();
     const helpText = await getHelpText();
     assert.isTrue(disabled, 'The Generate Report button should be disabled');
-    assert.strictEqual(
-        helpText,
-        'Can only audit HTTP/HTTPS pages and Chrome extensions. Navigate to a different page to start an audit.');
+    assert.strictEqual(helpText, 'Can only audit pages on HTTP or HTTPS. Navigate to a different page.');
   });
 
   // Broken on non-debug runs
@@ -68,8 +66,7 @@ describe('The Lighthouse start view', async () => {
     assert.isTrue(disabled, 'The Generate Report button should be disabled');
   });
 
-  // Flaky on mac
-  it.skipOnPlatforms(['mac'], '[crbug.com/1418624] displays warning if important data may affect performance', async () => {
+  it('displays warning if important data may affect performance', async () => {
     // e2e tests in application/ create websql and indexeddb items and don't clean up after themselves
     await clearSiteData();
 

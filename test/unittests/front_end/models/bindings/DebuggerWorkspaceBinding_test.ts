@@ -28,6 +28,7 @@ describeWithMockConnection('DebuggerWorkspaceBinding', () => {
   });
 
   it('can wait for a uiSourceCode if it is not yet available', async () => {
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
     const scriptUrl = 'http://script-host/script.js' as Platform.DevToolsPath.UrlString;
     const scriptInfo = {url: scriptUrl, content: 'console.log(1);', startLine: 0, startColumn: 0, hasSourceURL: false};
 

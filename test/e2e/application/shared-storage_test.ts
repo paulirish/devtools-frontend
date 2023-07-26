@@ -11,6 +11,7 @@ import {
   getBrowserAndPages,
   getTestServerPort,
   goToResource,
+  renderCoordinatorQueueEmpty,
   step,
   waitFor,
 } from '../../shared/helper.js';
@@ -30,7 +31,7 @@ import {
   getInnerTextOfDataGridCells,
 } from '../helpers/datagrid-helpers.js';
 
-const SHARED_STORAGE_SELECTOR = '[aria-label="Shared Storage"].parent';
+const SHARED_STORAGE_SELECTOR = '[aria-label="Shared storage"].parent';
 let DOMAIN: string;
 let DOMAIN_SELECTOR: string;
 
@@ -116,6 +117,7 @@ describe('The Application Tab', async () => {
     await step('open the domain storage', async () => {
       await doubleClickSourceTreeItem(SHARED_STORAGE_SELECTOR);
       await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
+      await renderCoordinatorQueueEmpty();
     });
 
     await step('check that storage data values are correct', async () => {

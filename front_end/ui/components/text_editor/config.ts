@@ -6,6 +6,7 @@ import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as WindowBoundsService from '../../../services/window_bounds/window_bounds.js';
 import * as CM from '../../../third_party/codemirror.next/codemirror.next.js';
+import * as UI from '../../legacy/legacy.js';
 import * as CodeHighlighter from '../code_highlighter/code_highlighter.js';
 import * as Icon from '../icon_button/icon_button.js';
 
@@ -18,6 +19,13 @@ const UIStrings = {
    *@description Label text for the editor
    */
   codeEditor: 'Code editor',
+  /**
+   *@description Aria alert to read the suggestion for the suggestion box when typing in text editor
+   *@example {name} PH1
+   *@example {2} PH2
+   *@example {5} PH3
+   */
+  sSuggestionSOfS: '{PH1}, suggestion {PH2} of {PH3}',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/components/text_editor/config.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -121,10 +129,34 @@ function moveCompletionSelectionIfNotConservative(
     }
     if (view.state.field(conservativeCompletion, false)) {
       view.dispatch({effects: disableConservativeCompletion.of(null)});
+      announceSelectedCompletionInfo(view);
       return true;
     }
-    return CM.moveCompletionSelection(forward, by)(view);
+    const moveSelectionResult = CM.moveCompletionSelection(forward, by)(view);
+    announceSelectedCompletionInfo(view);
+    return moveSelectionResult;
   };
+}
+
+function moveCompletionSelectionBackwardWrapper(): ((view: CM.EditorView) => boolean) {
+  return view => {
+    if (CM.completionStatus(view.state) !== 'active') {
+      return false;
+    }
+    CM.moveCompletionSelection(false)(view);
+    announceSelectedCompletionInfo(view);
+    return true;
+  };
+}
+
+function announceSelectedCompletionInfo(view: CM.EditorView): void {
+  const ariaMessage = i18nString(UIStrings.sSuggestionSOfS, {
+    PH1: CM.selectedCompletion(view.state)?.label || '',
+    PH2: (CM.selectedCompletionIndex(view.state) || 0) + 1,
+    PH3: CM.currentCompletions(view.state).length,
+  });
+
+  UI.ARIAUtils.alert(ariaMessage);
 }
 
 export const autocompletion = new DynamicSetting<boolean>(
@@ -145,9 +177,9 @@ export const autocompletion = new DynamicSetting<boolean>(
            {key: 'Ctrl-Space', run: CM.startCompletion},
            {key: 'Escape', run: CM.closeCompletion},
            {key: 'ArrowDown', run: moveCompletionSelectionIfNotConservative(true)},
-           {key: 'ArrowUp', run: CM.moveCompletionSelection(false)},
+           {key: 'ArrowUp', run: moveCompletionSelectionBackwardWrapper()},
            {mac: 'Ctrl-n', run: moveCompletionSelectionIfNotConservative(true)},
-           {mac: 'Ctrl-p', run: CM.moveCompletionSelection(false)},
+           {mac: 'Ctrl-p', run: moveCompletionSelectionBackwardWrapper()},
            {key: 'PageDown', run: CM.moveCompletionSelection(true, 'page')},
            {key: 'PageUp', run: CM.moveCompletionSelection(false, 'page')},
            {key: 'Enter', run: acceptCompletionIfNotConservative},
@@ -163,9 +195,9 @@ export const codeFolding = DynamicSetting.bool('textEditorCodeFolding', [
       icon.setAttribute('class', open ? 'cm-foldGutterElement' : 'cm-foldGutterElement cm-foldGutterElement-folded');
       icon.data = {
         iconName,
-        color: 'var(--color-text-secondary)',
-        width: '12px',
-        height: '12px',
+        color: 'var(--icon-fold-marker)',
+        width: '14px',
+        height: '14px',
       };
       return icon;
     },
@@ -280,8 +312,10 @@ const baseKeymap = CM.keymap.of([
   {key: 'Ctrl-m', run: CM.cursorMatchingBracket, shift: CM.selectMatchingBracket},
   {key: 'Mod-/', run: CM.toggleComment},
   {key: 'Mod-d', run: CM.selectNextOccurrence},
-  {key: 'Alt-ArrowLeft', mac: 'Ctrl-ArrowLeft', run: CM.cursorSubwordBackward, shift: CM.selectSubwordBackward},
-  {key: 'Alt-ArrowRight', mac: 'Ctrl-ArrowRight', run: CM.cursorSubwordForward, shift: CM.selectSubwordForward},
+  {key: 'Alt-ArrowLeft', mac: 'Ctrl-ArrowLeft', run: CM.cursorSyntaxLeft, shift: CM.selectSyntaxLeft},
+  {key: 'Alt-ArrowRight', mac: 'Ctrl-ArrowRight', run: CM.cursorSyntaxRight, shift: CM.selectSyntaxRight},
+  {key: 'Ctrl-ArrowLeft', mac: 'Alt-ArrowLeft', run: CM.cursorSubwordBackward, shift: CM.selectSubwordBackward},
+  {key: 'Ctrl-ArrowRight', mac: 'Alt-ArrowRight', run: CM.cursorSubwordForward, shift: CM.selectSubwordForward},
   ...CM.standardKeymap,
   ...CM.historyKeymap,
 ]);
@@ -375,7 +409,7 @@ class CompletionHint extends CM.WidgetType {
     super();
   }
 
-  eq(other: CompletionHint): boolean {
+  override eq(other: CompletionHint): boolean {
     return this.text === other.text;
   }
 

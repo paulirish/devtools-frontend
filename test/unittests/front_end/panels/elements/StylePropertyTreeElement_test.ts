@@ -35,6 +35,7 @@ const mockMatchedStyles = {
       computedValue: mockVariableMap[param],
     };
   },
+  keyframes: () => [],
 } as unknown as SDK.CSSMatchedStyles.CSSMatchedStyles;
 
 const mockCssProperty = {} as unknown as SDK.CSSProperty.CSSProperty;
@@ -46,7 +47,7 @@ describeWithRealConnection('StylePropertyTreeElement', async () => {
   beforeEach(async () => {
     Elements = await import('../../../../../front_end/panels/elements/elements.js');
 
-    mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance();
+    mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance({forceNew: true});
   });
 
   describe('updateTitle', () => {
@@ -141,6 +142,35 @@ describeWithRealConnection('StylePropertyTreeElement', async () => {
            assert.isNull(colorMixSwatch);
          });
     });
+
+    describe('animation-name', () => {
+      it('should link-swatch be rendered for animation-name declaration', () => {
+        const cssAnimationNameProperty = new SDK.CSSProperty.CSSProperty(
+            mockCssStyleDeclaration, 0, 'animation-name', 'first-keyframe', true, false, true, false, '', undefined);
+        const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement(
+            mockStylesSidebarPane, mockMatchedStyles, cssAnimationNameProperty, false, false, false, true);
+
+        stylePropertyTreeElement.updateTitle();
+
+        const animationNameSwatch = stylePropertyTreeElement.valueElement?.querySelector('devtools-link-swatch');
+        assert.isNotNull(animationNameSwatch);
+      });
+
+      it('should two link-swatches be rendered for animation-name declaration that contains two keyframe references',
+         () => {
+           const cssAnimationNameProperty = new SDK.CSSProperty.CSSProperty(
+               mockCssStyleDeclaration, 0, 'animation-name', 'first-keyframe, second-keyframe', true, false, true,
+               false, '', undefined);
+           const stylePropertyTreeElement = new Elements.StylePropertyTreeElement.StylePropertyTreeElement(
+               mockStylesSidebarPane, mockMatchedStyles, cssAnimationNameProperty, false, false, false, true);
+
+           stylePropertyTreeElement.updateTitle();
+
+           const animationNameSwatches =
+               stylePropertyTreeElement.valueElement?.querySelectorAll('devtools-link-swatch');
+           assert.strictEqual(animationNameSwatches?.length, 2);
+         });
+    });
   });
 
   it('applies the new style when the color format is changed', async () => {
@@ -210,7 +240,7 @@ describeWithRealConnection('StylePropertyTreeElement', async () => {
 
     beforeEach(async () => {
       Elements = await import('../../../../../front_end/panels/elements/elements.js');
-      mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance();
+      mockStylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance({forceNew: true});
     });
 
     it('should create a hint for inline elements', () => {

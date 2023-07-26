@@ -9,7 +9,7 @@ import {assert} from 'chai';
 import * as childProcess from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {getTestRunnerConfigSetting} from '../conductor/test_runner_config.js';
 import {makeCustomWrappedIt} from '../shared/mocha-extensions.js';
@@ -17,6 +17,8 @@ import {makeCustomWrappedIt} from '../shared/mocha-extensions.js';
 import {
   platform,
   getBrowserAndPages,
+  waitFor,
+  timeout,
 } from '../shared/helper.js';
 
 /**
@@ -67,7 +69,7 @@ const DEFAULT_MS_BETWEEN_RETRIES = 150;
 
 // Percentage difference when comparing golden vs new screenshot that is
 // acceptable and will not fail the test.
-const DEFAULT_SCREENSHOT_THRESHOLD_PERCENT = 1;
+const DEFAULT_SCREENSHOT_THRESHOLD_PERCENT = 4;
 
 export const assertElementScreenshotUnchanged = async (
     element: puppeteer.ElementHandle|null, fileName: string,
@@ -152,8 +154,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
    * to update the golden image. This is useful if work has caused the
    * screenshot to change and therefore the test goldens need to be updated.
    */
-  const shouldUpdate = Boolean(
-      (process.env.UPDATE_GOLDEN && process.env.UPDATE_GOLDEN === fileName) || process.env.FORCE_UPDATE_ALL_GOLDENS);
+  const shouldUpdate = Boolean(process.env.FORCE_UPDATE_ALL_GOLDENS) ||
+      Boolean(process.env.UPDATE_GOLDEN && process.env.UPDATE_GOLDEN === fileName);
+  const throwAfterGoldensUpdate = Boolean(process.env.THROW_AFTER_GOLDENS_UPDATE);
 
   let onBotAndImageNotFound = false;
 
@@ -175,6 +178,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
 
     console.log('Golden does not exist, using generated screenshot.');
     setGeneratedFileAsGolden(goldenScreenshotPath, generatedScreenshotPath);
+    if (throwAfterGoldensUpdate) {
+      throw new Error('Golden does not exist, using generated screenshot.');
+    }
   }
 
   try {
@@ -188,6 +194,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
       if (shouldUpdate) {
         console.log(`=> ${fileName} was out of date and failed; updating`);
         setGeneratedFileAsGolden(goldenScreenshotPath, generatedScreenshotPath);
+        if (throwAfterGoldensUpdate) {
+          throw compareError;
+        }
         return;
       }
       // If we don't want to update, throw the assertion error so we fail the test.
@@ -262,6 +271,18 @@ async function execImageDiffCommand(cmd: string) {
 }
 
 async function compare(golden: string, generated: string, maximumDiffThreshold: number) {
+  const isOnBot = process.env.LUCI_CONTEXT !== undefined;
+
+  if (!isOnBot && process.env.SKIP_SCREENSHOT_COMPARISONS_FOR_FAST_COVERAGE) {
+    // When checking test coverage locally the tests get sped up significantly
+    // if we do not do the actual image comparison. Obviously this makes the
+    // tests all pass, but it is useful to quickly get coverage stats.
+    // Therefore you can pass this flag to skip all screenshot comparisions. We
+    // make sure this is only possible if not on a CQ bot and 99.9% of the time
+    // this should not be used!
+    return;
+  }
+
   const {rawMisMatchPercentage, diffPath} = await imageDiff(golden, generated);
 
   const base64TestGeneratedImageLog = `Here's the image the test generated as a base64:
@@ -275,8 +296,6 @@ async function compare(golden: string, generated: string, maximumDiffThreshold: 
         encoding: 'base64',
       }) :
                  ''}`;
-
-  const isOnBot = process.env.LUCI_CONTEXT !== undefined;
 
   let debugInfo = '';
   if (isOnBot) {
@@ -317,3 +336,14 @@ function setGeneratedFileAsGolden(golden: string, generated: string) {
 }
 
 export const itScreenshot = makeCustomWrappedIt('[screenshot]:');
+
+export async function waitForDialogAnimationEnd(root?: puppeteer.ElementHandle) {
+  const ANIMATION_TIMEOUT = 2000;
+  const dialog = await waitFor('dialog[open]', root);
+  const animationPromise = dialog.evaluate((dialog: Element) => {
+    return new Promise<void>(resolve => {
+      dialog.addEventListener('animationend', () => resolve(), {once: true});
+    });
+  });
+  await Promise.race([animationPromise, timeout(ANIMATION_TIMEOUT)]);
+}

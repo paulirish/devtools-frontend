@@ -6,17 +6,15 @@ const {assert} = chai;
 
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 import {
-  loadEventsFromTraceFile,
-  getEventFor,
   getEventsIn,
   getRootAt,
+  makeBeginEvent,
   makeCompleteEvent,
-  makeCompleteEventInMilliseconds,
+  makeEndEvent,
   makeInstantEvent,
   prettyPrint,
-  setTraceModelTimeout,
-
 } from '../../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 const MAIN_FRAME_PID = 2154214;
 const SUB_FRAME_PID = 2236065;
@@ -24,37 +22,14 @@ const SUB_FRAME_PID_2 = 2236084;
 const SUB_FRAME_PID_3 = 2236123;
 
 async function handleEventsFromTraceFile(
-    file: string, handleSamples = false): Promise<TraceModel.Handlers.ModelHandlers.Renderer.RendererHandlerData> {
-  const traceEvents = await loadEventsFromTraceFile(file);
-  TraceModel.Handlers.ModelHandlers.Meta.reset();
-  TraceModel.Handlers.ModelHandlers.Samples.reset();
-  TraceModel.Handlers.ModelHandlers.Renderer.reset();
-
-  TraceModel.Handlers.ModelHandlers.Meta.initialize();
-  TraceModel.Handlers.ModelHandlers.Samples.initialize();
-  TraceModel.Handlers.ModelHandlers.Renderer.initialize();
-
-  for (const event of traceEvents) {
-    TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
-    // Samples processing might take significant time, so by default don't
-    // handle sample events.
-    if (handleSamples) {
-      TraceModel.Handlers.ModelHandlers.Samples.handleEvent(event);
-    }
-    TraceModel.Handlers.ModelHandlers.Renderer.handleEvent(event);
-  }
-
-  await TraceModel.Handlers.ModelHandlers.Meta.finalize();
-  await TraceModel.Handlers.ModelHandlers.Samples.finalize();
-  await TraceModel.Handlers.ModelHandlers.Renderer.finalize();
-
-  return TraceModel.Handlers.ModelHandlers.Renderer.data();
+    context: Mocha.Suite|Mocha.Context|null, file: string): Promise<TraceModel.Handlers.Types.TraceParseData> {
+  const traceData = await TraceLoader.traceEngine(context, file);
+  return traceData;
 }
 
 describe('RendererHandler', function() {
-  setTraceModelTimeout(this);
   it('finds all the renderers in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     assert.strictEqual(renderers.processes.size, 4);
 
     const pids = [...renderers.processes].map(([pid]) => pid);
@@ -96,7 +71,7 @@ describe('RendererHandler', function() {
   });
 
   it('finds all the main frame threads in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(MAIN_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const names = [...frame.threads].map(([, thread]) => thread.name).sort();
@@ -116,7 +91,7 @@ describe('RendererHandler', function() {
   });
 
   it('finds all the sub frame threads in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(SUB_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const names = [...frame.threads].map(([, thread]) => thread.name).sort();
@@ -132,7 +107,7 @@ describe('RendererHandler', function() {
   });
 
   it('finds all the roots on the main frame\'s main thread in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(MAIN_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const thread = [...frame.threads.values()].find(thread => thread.name === 'CrRendererMain');
@@ -170,7 +145,7 @@ describe('RendererHandler', function() {
   });
 
   it('finds all the roots on the sub frame\'s main thread in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(SUB_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const thread = [...frame.threads.values()].find(thread => thread.name === 'CrRendererMain');
@@ -184,12 +159,11 @@ describe('RendererHandler', function() {
       assert(false, 'Main thread has no tree of events');
       return;
     }
-
-    assert.deepEqual([...tree.roots], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18]);
+    assert.deepEqual([...tree.roots], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19]);
   });
 
   it('builds a hierarchy for the main frame\'s main thread in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(MAIN_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const thread = [...frame.threads.values()].find(thread => thread.name === 'CrRendererMain');
@@ -204,14 +178,14 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const isRoot = (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEventNode) => node.depth === 0;
-    const isInstant = (event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent) =>
+    const isRoot = (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode) => node.depth === 0;
+    const isInstant = (event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
         TraceModel.Types.TraceEvents.isTraceEventInstant(event);
-    const isLong = (event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent) =>
+    const isLong = (event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
         TraceModel.Types.TraceEvents.isTraceEventComplete(event) && event.dur > 1000;
     const isIncluded =
-        (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEventNode,
-         event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent) =>
+        (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
+         event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
             !isRoot(node) || (isInstant(event) || isLong(event));
 
     assert.strictEqual(prettyPrint(thread, tree.roots, isIncluded), `
@@ -236,10 +210,10 @@ describe('RendererHandler', function() {
   -EventDispatch (readystatechange) [0.008ms]
   -EventDispatch (DOMContentLoaded) [0.035ms]
   -UpdateLayoutTree [0.373ms]
-    -InvalidateLayout [I]
+    -InvalidateLayout [0ms]
 -RunTask [2.675ms]
   -Layout [0.854ms]
-    -InvalidateLayout [I]
+    -InvalidateLayout [0ms]
     -Layout [0.302ms]
       -UpdateLayoutTree [0.149ms]
   -Paint [0.203ms]
@@ -249,7 +223,7 @@ describe('RendererHandler', function() {
   -EventDispatch (visibilitychange) [0.038ms]
   -EventDispatch (webkitvisibilitychange) [0.009ms]
   -EventDispatch (unload) [0.004ms]
-  -ScheduleStyleRecalculation [I]
+  -ScheduleStyleRecalculation [0ms]
 ..............
 -RunTask [1.231ms]
   -UpdateLayoutTree [0.093ms]
@@ -269,11 +243,11 @@ describe('RendererHandler', function() {
   -EventDispatch (mousemove) [0.018ms]
   -HitTest [0.022ms]
   -HitTest [0.002ms]
-  -ScheduleStyleRecalculation [I]
+  -ScheduleStyleRecalculation [0ms]
   -EventDispatch (mousedown) [0.018ms]
   -UpdateLayoutTree [0.146ms]
   -HitTest [0.016ms]
-  -ScheduleStyleRecalculation [I]
+  -ScheduleStyleRecalculation [0ms]
   -UpdateLayoutTree [0.031ms]
   -EventDispatch (focus) [0.014ms]
   -EventDispatch (focusin) [0.005ms]
@@ -281,7 +255,7 @@ describe('RendererHandler', function() {
 .....
 -RunTask [1.034ms]
   -HitTest [0.038ms]
-  -ScheduleStyleRecalculation [I]
+  -ScheduleStyleRecalculation [0ms]
   -EventDispatch (mouseup) [0.016ms]
   -EventDispatch (click) [0.44ms]
     -EventDispatch (beforeunload) [0.009ms]
@@ -304,11 +278,11 @@ describe('RendererHandler', function() {
   -EventDispatch (readystatechange) [0.007ms]
   -EventDispatch (DOMContentLoaded) [0.005ms]
   -UpdateLayoutTree [0.301ms]
-    -InvalidateLayout [I]
+    -InvalidateLayout [0ms]
 .
 -RunTask [1.897ms]
   -Layout [0.44ms]
-    -InvalidateLayout [I]
+    -InvalidateLayout [0ms]
   -Paint [0.289ms]
 ..................................
 -RunTask [1.304ms]
@@ -316,12 +290,12 @@ describe('RendererHandler', function() {
   -EventDispatch (visibilitychange) [0.009ms]
   -EventDispatch (webkitvisibilitychange) [0.004ms]
   -EventDispatch (unload) [0.015ms]
-  -ScheduleStyleRecalculation [I]
+  -ScheduleStyleRecalculation [0ms]
 ......................................................................................................................`);
   });
 
   it('builds a hierarchy for the sub frame\'s main thread in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(SUB_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const thread = [...frame.threads.values()].find(thread => thread.name === 'CrRendererMain');
@@ -350,8 +324,9 @@ describe('RendererHandler', function() {
 -RunTask [0.078ms]
 -RunTask [0.043ms]
 -RunTask [0.077ms]
-  -ScheduleStyleRecalculation [I]
+  -ScheduleStyleRecalculation [0ms]
 -RunTask [0.415ms]
+-RunTask [0ms]
 -EventDispatch (pagehide) [0.012ms]
 -EventDispatch (visibilitychange) [0.007ms]
 -EventDispatch (webkitvisibilitychange) [0.016ms]
@@ -359,7 +334,7 @@ describe('RendererHandler', function() {
   });
 
   it('has some correct known roots for the main frame\'s main thread in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(MAIN_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const thread = [...frame.threads.values()].find(thread => thread.name === 'CrRendererMain');
@@ -374,7 +349,7 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const event0 = getEventFor(thread, getRootAt(thread, 0));
+    const event0 = getRootAt(thread, 0).entry;
     assert.deepEqual(event0 as unknown, {
       'args': {},
       'cat': 'disabled-by-default-devtools.timeline',
@@ -386,11 +361,10 @@ describe('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822363,
       'tts': 291450,
-      'totalTime': 132,
       'selfTime': 132,
     });
 
-    const event1 = getEventFor(thread, getRootAt(thread, 1));
+    const event1 = getRootAt(thread, 1).entry;
     assert.deepEqual(event1 as unknown, {
       'args': {},
       'cat': 'disabled-by-default-devtools.timeline',
@@ -402,11 +376,10 @@ describe('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822500,
       'tts': 291586,
-      'totalTime': 4,
       'selfTime': 4,
     });
 
-    const eventLast = getEventFor(thread, getRootAt(thread, tree.roots.size - 1));
+    const eventLast = getRootAt(thread, tree.roots.size - 1).entry;
     assert.deepEqual(eventLast as unknown, {
       'args': {},
       'cat': 'disabled-by-default-devtools.timeline',
@@ -418,13 +391,12 @@ describe('RendererHandler', function() {
       'tid': 1,
       'ts': 643499551460,
       'tts': 949032,
-      'totalTime': 67,
       'selfTime': 67,
     });
   });
 
   it('has some correct known roots for the sub frame\'s main thread in a real world profile', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const frame = renderers.processes.get(TraceModel.Types.TraceEvents.ProcessID(SUB_FRAME_PID)) as
         TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess;
     const thread = [...frame.threads.values()].find(thread => thread.name === 'CrRendererMain');
@@ -439,7 +411,7 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const event0 = getEventFor(thread, getRootAt(thread, 0));
+    const event0 = getRootAt(thread, 0).entry;
     assert.deepEqual(event0 as unknown, {
       'args': {},
       'cat': 'disabled-by-default-devtools.timeline',
@@ -451,11 +423,10 @@ describe('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822099,
       'tts': 62157,
-      'totalTime': 130,
       'selfTime': 130,
     });
 
-    const event1 = getEventFor(thread, getRootAt(thread, 1));
+    const event1 = getRootAt(thread, 1).entry;
     assert.deepEqual(event1 as unknown, {
       'args': {},
       'cat': 'disabled-by-default-devtools.timeline',
@@ -467,11 +438,10 @@ describe('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822234,
       'tts': 62291,
-      'totalTime': 5,
       'selfTime': 5,
     });
 
-    const eventLast = getEventFor(thread, getRootAt(thread, tree.roots.size - 1));
+    const eventLast = getRootAt(thread, tree.roots.size - 1).entry;
     assert.deepEqual(eventLast as unknown, {
       'args': {'data': {'type': 'unload'}},
       'cat': 'devtools.timeline',
@@ -483,7 +453,6 @@ describe('RendererHandler', function() {
       'tid': 1,
       'ts': 643494154134,
       'tts': 63878,
-      'totalTime': 7,
       'selfTime': 7,
     });
   });
@@ -581,7 +550,7 @@ describe('RendererHandler', function() {
 
     assert.strictEqual(tree.maxDepth, 3, 'Got the correct tree max depth');
 
-    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? data[n.eventIndex] : null);
+    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? n.entry : null);
     assert.deepEqual(rootsEvents.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
       {'name': 'E', 'ts': 11, 'dur': 3},
@@ -594,13 +563,13 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes, data);
+    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfA.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'B', 'ts': 1, 'dur': 3},
       {'name': 'D', 'ts': 5, 'dur': 3},
     ]);
 
-    const childrenOfE = getEventsIn(nodeE.childrenIds.values(), tree.nodes, data);
+    const childrenOfE = getEventsIn(nodeE.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfE, []);
 
     const nodeB = tree.nodes.get([...nodeA.childrenIds][0]);
@@ -610,12 +579,12 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfB = getEventsIn(nodeB.childrenIds.values(), tree.nodes, data);
+    const childrenOfB = getEventsIn(nodeB.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfB.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'C', 'ts': 2, 'dur': 1},
     ]);
 
-    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes, data);
+    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfD, []);
 
     const nodeC = tree.nodes.get([...nodeB.childrenIds][0]);
@@ -624,7 +593,7 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfC = getEventsIn(nodeC.childrenIds.values(), tree.nodes, data);
+    const childrenOfC = getEventsIn(nodeC.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfC, []);
   });
 
@@ -648,7 +617,7 @@ describe('RendererHandler', function() {
 
     assert.strictEqual(tree.maxDepth, 2, 'Got the correct tree max depth');
 
-    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? data[n.eventIndex] : null);
+    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? n.entry : null);
     assert.deepEqual(rootsEvents.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
     ]);
@@ -659,7 +628,7 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes, data);
+    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfA.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'D', 'ts': 5, 'dur': 3},
     ]);
@@ -670,7 +639,7 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes, data);
+    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfD, []);
   });
 
@@ -693,7 +662,7 @@ describe('RendererHandler', function() {
 
     assert.strictEqual(tree.maxDepth, 3, 'Got the correct tree max depth');
 
-    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? data[n.eventIndex] : null);
+    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? n.entry : null);
     assert.deepEqual(rootsEvents.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
       {'name': 'E', 'ts': 10, 'dur': 3},
@@ -706,13 +675,13 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes, data);
+    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfA.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'B', 'ts': 0, 'dur': 3},
       {'name': 'D', 'ts': 3, 'dur': 3},
     ]);
 
-    const childrenOfE = getEventsIn(nodeE.childrenIds.values(), tree.nodes, data);
+    const childrenOfE = getEventsIn(nodeE.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfE, []);
 
     const nodeB = tree.nodes.get([...nodeA.childrenIds][0]);
@@ -722,12 +691,12 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfB = getEventsIn(nodeB.childrenIds.values(), tree.nodes, data);
+    const childrenOfB = getEventsIn(nodeB.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfB.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'C', 'ts': 2, 'dur': 1},
     ]);
 
-    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes, data);
+    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfD, []);
 
     const nodeC = tree.nodes.get([...nodeB.childrenIds][0]);
@@ -736,7 +705,7 @@ describe('RendererHandler', function() {
       return;
     }
 
-    const childrenOfC = getEventsIn(nodeC.childrenIds.values(), tree.nodes, data);
+    const childrenOfC = getEventsIn(nodeC.childrenIds.values(), tree.nodes);
     assert.deepEqual(childrenOfC, []);
   });
 
@@ -752,7 +721,7 @@ describe('RendererHandler', function() {
       makeCompleteEvent('D', 3, 3),   // 3..6 (starts when B finishes)
       makeCompleteEvent('C', 2, 1),   // 2..3 (finishes when B finishes)
       makeCompleteEvent('E', 10, 3),  // 10..13 (starts when A finishes)
-    ] as TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent[];
+    ] as TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry[];
 
     TraceModel.Helpers.Trace.sortTraceEventsInPlace(data);
     const tree = TraceModel.Handlers.ModelHandlers.Renderer.treify(data, {filter: {has: () => true}});
@@ -763,16 +732,16 @@ describe('RendererHandler', function() {
       assert(false, 'Root nodes were not found');
       return;
     }
-    const taskA = data[nodeA.eventIndex];
-    const taskE = data[nodeE.eventIndex];
+    const taskA = nodeA.entry;
+    const taskE = nodeE.entry;
     const nodeD = tree.nodes.get([...nodeA.childrenIds][1]);
     const nodeB = tree.nodes.get([...nodeA.childrenIds][0]);
     if (!nodeB || !nodeD) {
       assert(false, 'Child nodes were not found');
       return;
     }
-    const taskD = data[nodeD.eventIndex];
-    const taskB = data[nodeB.eventIndex];
+    const taskD = nodeD.entry;
+    const taskB = nodeB.entry;
 
     const nodeC = tree.nodes.get([...nodeB.childrenIds][0]);
 
@@ -780,9 +749,9 @@ describe('RendererHandler', function() {
       assert(false, 'Child nodes were not found');
       return;
     }
-    const taskC = data[nodeC.eventIndex];
+    const taskC = nodeC.entry;
 
-    const taskCTotalTime = taskC.totalTime;
+    const taskCTotalTime = taskC.dur;
     if (taskCTotalTime === undefined) {
       assert.fail('Total time for task was not found');
       return;
@@ -790,7 +759,7 @@ describe('RendererHandler', function() {
     assert.strictEqual(taskCTotalTime, TraceModel.Types.Timing.MicroSeconds(1));
     assert.strictEqual(taskC.selfTime, taskCTotalTime);
 
-    const taskBTotalTime = taskB.totalTime;
+    const taskBTotalTime = taskB.dur;
     if (taskBTotalTime === undefined) {
       assert.fail('Total time for task was not found');
       return;
@@ -798,7 +767,7 @@ describe('RendererHandler', function() {
     assert.strictEqual(taskBTotalTime, TraceModel.Types.Timing.MicroSeconds(3));
     assert.strictEqual(taskB.selfTime, TraceModel.Types.Timing.MicroSeconds(taskBTotalTime - taskCTotalTime));
 
-    const taskDTotalTime = taskD.totalTime;
+    const taskDTotalTime = taskD.dur;
     if (taskDTotalTime === undefined) {
       assert.fail('Total time for task was not found');
       return;
@@ -806,7 +775,7 @@ describe('RendererHandler', function() {
     assert.strictEqual(taskDTotalTime, TraceModel.Types.Timing.MicroSeconds(3));
     assert.strictEqual(taskD.selfTime, taskDTotalTime);
 
-    const taskATotalTime = taskA.totalTime;
+    const taskATotalTime = taskA.dur;
     if (taskATotalTime === undefined) {
       assert.fail('Total time for task was not found');
       return;
@@ -815,150 +784,13 @@ describe('RendererHandler', function() {
     assert.strictEqual(
         taskA.selfTime, TraceModel.Types.Timing.MicroSeconds(taskATotalTime - taskBTotalTime - taskDTotalTime));
 
-    const taskETotalTime = taskE.totalTime;
+    const taskETotalTime = taskE.dur;
     if (taskETotalTime === undefined) {
       assert.fail('Total time for task was not found');
       return;
     }
     assert.strictEqual(taskETotalTime, TraceModel.Types.Timing.MicroSeconds(3));
     assert.strictEqual(taskD.selfTime, taskETotalTime);
-  });
-
-  it('sets the last InvalidateLayout as the initator of a Layout event', async () => {
-    /**
-     * |---------- Task A ------------||--------- Task B -----------|
-     *   |--SSR--|                        |-- IL --||-- Layout --|
-     * SSR = ScheduleStyleRecalculation
-     * RS = RecalculateStyles
-     * IL = InvalidateLayout
-     * L = Layout
-     */
-    const data = [
-      makeCompleteEventInMilliseconds('A', 0, 10_000),  // 0..10
-      makeCompleteEventInMilliseconds(
-          TraceModel.Handlers.Types.KnownEventName.ScheduleStyleRecalculation, 1_000, 2_000),                 // 1..3
-      makeCompleteEventInMilliseconds('B', 10_000, 8_000),                                                    // 10..18
-      makeCompleteEventInMilliseconds(TraceModel.Handlers.Types.KnownEventName.InvalidateLayout, 11_000, 0),  // 11
-      makeCompleteEventInMilliseconds(TraceModel.Handlers.Types.KnownEventName.Layout, 12_000, 5_000),        // 12..17
-    ] as TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent[];
-
-    TraceModel.Helpers.Trace.sortTraceEventsInPlace(data);
-    const tree = TraceModel.Handlers.ModelHandlers.Renderer.treify(data, {filter: {has: () => true}});
-
-    const nodeB = tree.nodes.get([...tree.roots][1]);
-    if (!nodeB) {
-      assert(false, 'Root nodes were not found');
-      return;
-    }
-
-    const layoutNode = tree.nodes.get([...nodeB.childrenIds][1]);
-    if (!layoutNode) {
-      assert(false, 'Child nodes were not found');
-      return;
-    }
-    const layoutTask = data[layoutNode.eventIndex];
-    assert.deepEqual(layoutTask.initiator, data[3]);
-  });
-
-  it('sets the last ScheduleStyleRecalculation as the initiator of a Layout event if the last InvalidateLayout was before the last RecalculateStyles',
-     async () => {
-       /**
-        * |---------------------------- Task A ----------------------------|
-        *       |-- IL --|   |--SSR--|   |--RS--|  |-- Layout --|
-        * SSR = ScheduleStyleRecalculation
-        * RS = RecalculateStyles
-        * IL = InvalidateLayout
-        * L = Layout
-        */
-       const data = [
-         makeCompleteEventInMilliseconds('A', 0, 10_000),                                                       // 0..10
-         makeCompleteEventInMilliseconds(TraceModel.Handlers.Types.KnownEventName.InvalidateLayout, 1_000, 0),  // 1
-         makeCompleteEventInMilliseconds(
-             TraceModel.Handlers.Types.KnownEventName.ScheduleStyleRecalculation, 2_000, 1_000),  // 2 .. 3
-         makeCompleteEventInMilliseconds(
-             TraceModel.Handlers.Types.KnownEventName.RecalculateStyles, 4_000, 1_000),                   // 4 .. 5
-         makeCompleteEventInMilliseconds(TraceModel.Handlers.Types.KnownEventName.Layout, 6_000, 1_000),  // 6 .. 7
-       ] as TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent[];
-
-       TraceModel.Helpers.Trace.sortTraceEventsInPlace(data);
-       const tree = TraceModel.Handlers.ModelHandlers.Renderer.treify(data, {filter: {has: () => true}});
-
-       const nodeA = tree.nodes.get([...tree.roots][0]);
-       if (!nodeA) {
-         assert(false, 'Root nodes were not found');
-         return;
-       }
-
-       const layoutNode = tree.nodes.get([...nodeA.childrenIds][3]);
-       if (!layoutNode) {
-         assert(false, 'Child nodes were not found');
-         return;
-       }
-       const layoutTask = data[layoutNode.eventIndex];
-       assert.deepEqual(layoutTask.initiator, data[2]);
-     });
-
-  it('sets the last ScheduleStyleRecalculation as the initiatior of a RecalculateStyles event', async () => {
-    /**
-     * |---------------------------- Task A ----------------------------|
-     *       |-- IL --|   |--SSR--|   |--RS--|  |-- Layout --|
-     * SSR = ScheduleStyleRecalculation
-     * RS = RecalculateStyles
-     * IL = InvalidateLayout
-     * L = Layout
-     */
-    const data = [
-      makeCompleteEventInMilliseconds('A', 0, 10_000),                                                       // 0..10
-      makeCompleteEventInMilliseconds(TraceModel.Handlers.Types.KnownEventName.InvalidateLayout, 1_000, 0),  // 1
-      makeCompleteEventInMilliseconds(
-          TraceModel.Handlers.Types.KnownEventName.ScheduleStyleRecalculation, 2_000, 1_000),  // 2 .. 3
-      makeCompleteEventInMilliseconds(
-          TraceModel.Handlers.Types.KnownEventName.RecalculateStyles, 4_000, 1_000),                   // 4 .. 5
-      makeCompleteEventInMilliseconds(TraceModel.Handlers.Types.KnownEventName.Layout, 6_000, 1_000),  // 6 .. 7
-    ] as TraceModel.Handlers.ModelHandlers.Renderer.RendererEvent[];
-
-    TraceModel.Helpers.Trace.sortTraceEventsInPlace(data);
-    const tree = TraceModel.Handlers.ModelHandlers.Renderer.treify(data, {filter: {has: () => true}});
-
-    const nodeA = tree.nodes.get([...tree.roots][0]);
-    if (!nodeA) {
-      assert(false, 'Root nodes were not found');
-      return;
-    }
-
-    const layoutNode = tree.nodes.get([...nodeA.childrenIds][2]);
-    if (!layoutNode) {
-      assert(false, 'Child nodes were not found');
-      return;
-    }
-    const layoutTask = data[layoutNode.eventIndex];
-    assert.deepEqual(layoutTask.initiator, data[2]);
-  });
-
-  it('can sanitize multiple processes', async () => {
-    const processes = new Map([
-      [
-        TraceModel.Types.TraceEvents.ProcessID(0),
-        {
-          url: null,
-          isOnMainFrame: false,
-          threads: new Map(),
-        } as TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess,
-      ],
-      [
-        TraceModel.Types.TraceEvents.ProcessID(1),
-        {
-          url: 'http://what.com',
-          isOnMainFrame: true,
-          threads: new Map(),
-        } as TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess,
-      ],
-    ]);
-
-    TraceModel.Handlers.ModelHandlers.Renderer.sanitizeProcesses(processes);
-
-    assert.strictEqual(processes.size, 1, 'Didn\'t remove the bad process');
-    assert.strictEqual([...processes.values()][0].url, ('http://what.com'), 'Removed the correct process');
   });
 
   it('can process multiple processes', async () => {
@@ -996,7 +828,7 @@ describe('RendererHandler', function() {
           isOnMainFrame: true,
           threads: new Map([[
             TraceModel.Types.TraceEvents.ThreadID(1),
-            {name: 'Foo', events: data1},
+            {name: 'Foo', entries: data1},
           ]]),
         } as TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess,
       ],
@@ -1007,7 +839,7 @@ describe('RendererHandler', function() {
           isOnMainFrame: false,
           threads: new Map([[
             TraceModel.Types.TraceEvents.ThreadID(3),
-            {name: 'Bar', events: data2},
+            {name: 'Bar', entries: data2},
           ]]),
         } as TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess,
       ],
@@ -1026,13 +858,13 @@ describe('RendererHandler', function() {
     assert.strictEqual(firstThread.tree.maxDepth, 3, 'Got the correct tree max depth for the first thread');
     assert.strictEqual(secondThread.tree.maxDepth, 3, 'Got the correct tree max depth for the second thread');
 
-    const firstRoots = getEventsIn(firstThread.tree.roots.values(), firstThread.tree.nodes, firstThread.events);
+    const firstRoots = getEventsIn(firstThread.tree.roots.values(), firstThread.tree.nodes);
     assert.deepEqual(firstRoots.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
       {'name': 'E', 'ts': 11, 'dur': 3},
     ]);
 
-    const secondRoots = getEventsIn(secondThread.tree.roots.values(), secondThread.tree.nodes, secondThread.events);
+    const secondRoots = getEventsIn(secondThread.tree.roots.values(), secondThread.tree.nodes);
     assert.deepEqual(secondRoots.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'F', 'ts': 0, 'dur': 3},
       {'name': 'G', 'ts': 3, 'dur': 10},
@@ -1040,7 +872,7 @@ describe('RendererHandler', function() {
   });
 
   it('can assign origins to processes', async () => {
-    const metadata = TraceModel.Handlers.ModelHandlers.Meta.data();
+    const {Meta: metadata} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const processes:
         Map<TraceModel.Types.TraceEvents.ProcessID, TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess> =
             new Map();
@@ -1057,7 +889,7 @@ describe('RendererHandler', function() {
   });
 
   it('can assign main frame flags to processes', async () => {
-    const metadata = TraceModel.Handlers.ModelHandlers.Meta.data();
+    const {Meta: metadata} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     const processes:
         Map<TraceModel.Types.TraceEvents.ProcessID, TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess> =
             new Map();
@@ -1074,7 +906,8 @@ describe('RendererHandler', function() {
   });
 
   it('can assign thread names to threads in processes', async () => {
-    const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = TraceModel.Handlers.ModelHandlers.Meta.data();
+    const {Meta: metadata} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
+    const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metadata;
     const processes:
         Map<TraceModel.Types.TraceEvents.ProcessID, TraceModel.Handlers.ModelHandlers.Renderer.RendererProcess> =
             new Map();
@@ -1138,71 +971,110 @@ describe('RendererHandler', function() {
   });
 
   it('populates the map of trace events to tree nodes', async () => {
-    const renderers = await handleEventsFromTraceFile('multiple-navigations-with-iframes.json.gz');
-    assert.strictEqual(renderers.traceEventToNode.size, 2564);
+    const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
+    assert.strictEqual(renderers.traceEventToNode.size, 2578);
   });
+  describe('Synthetic complete events', () => {
+    async function handleEvents(traceEvents: TraceModel.Types.TraceEvents.TraceEventData[]):
+        Promise<TraceModel.Handlers.ModelHandlers.Renderer.RendererHandlerData> {
+      TraceModel.Handlers.ModelHandlers.Renderer.reset();
+      TraceModel.Handlers.ModelHandlers.Meta.reset();
+      TraceModel.Handlers.ModelHandlers.Samples.reset();
+      TraceModel.Handlers.ModelHandlers.Meta.initialize();
+      TraceModel.Handlers.ModelHandlers.Samples.initialize();
+      TraceModel.Handlers.ModelHandlers.Renderer.initialize();
 
-  describe('buildHotFunctionsStackTracesForTask', () => {
-    it('correctly assigns the function call stacks to a long task', async () => {
-      // TODO: re-write this so that we can pull out a long task without relying on Insights to get it.
-      const rendererData = await handleEventsFromTraceFile('slow-interaction-button-click.json.gz', true);
-      const longTask = rendererData.allRendererEvents.find(event => {
-        return event.name === 'RunTask' && event.dur === 115766;
-      });
-      if (!longTask || !longTask.dur) {
-        assert.fail('Failed to find the expected long task');
-        return;
+      for (const event of traceEvents) {
+        TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+        TraceModel.Handlers.ModelHandlers.Renderer.handleEvent(event);
       }
-      const {processes} = TraceModel.Handlers.ModelHandlers.Samples.data();
-      const thread = processes.get(longTask.pid)?.threads.get(longTask.tid);
-      const calls = thread?.calls;
-      const taskStart = longTask.ts;
-      const taskEnd = TraceModel.Types.Timing.MicroSeconds(longTask.ts + (longTask.dur || 0));
-      if (!calls) {
-        assert.fail('Could not get calls for a task.');
-        return;
-      }
-      const hotFunctionsFromSamples =
-          TraceModel.Handlers.ModelHandlers.Samples.getAllHotFunctionsBetweenTimestamps(calls, taskStart, taskEnd, 0)
-              .slice(0, 10);
-      if (!longTask.hotFunctionsStackTraces) {
-        assert.fail('Could not get hot functions for a task.');
-        return;
-      }
-      // Compare the Samples data with the data assigned to the trace event.
-      assert.isNotNull(longTask.hotFunctionsStackTraces);
-      assert.strictEqual(longTask.hotFunctionsStackTraces.length, hotFunctionsFromSamples?.length);
-      assert.isAtMost(longTask.hotFunctionsStackTraces.length, 10);
 
-      // Compare the stack trace of each hot function.
-      for (let i = 0; i < longTask.hotFunctionsStackTraces.length; i++) {
-        // The stack trace of this function.
-        const stackTrace = longTask.hotFunctionsStackTraces[i];
-        let nodeId = hotFunctionsFromSamples[i].stackFrame.nodeId;
-        let callFrame = thread?.tree?.nodes.get(nodeId)?.callFrame;
-        if (!callFrame) {
-          assert.fail('Could not get a function\'s call frame.');
-          return;
-        }
-        // Move up on the assigned stack trace comparing frame by frame
-        // with the original data.
-        for (let j = 0; j < stackTrace.length; j++) {
-          assert.strictEqual(JSON.stringify(stackTrace[j]), JSON.stringify(callFrame));
-          if (j === stackTrace.length - 1) {
-            // We have reached the bottom of the stack trace, so there are no parent nodes left.
-            continue;
-          }
-          // Move up on the stack trace by getting this node's parent.
-          const parentId = thread?.tree?.nodes.get(nodeId)?.parentId;
-          const parentCallFrame = parentId && thread?.tree?.nodes.get(parentId)?.callFrame;
-          if (!parentCallFrame) {
-            assert.fail('Could not get a function\'s call frame.');
-            return;
-          }
-          nodeId = parentId;
-          callFrame = parentCallFrame;
-        }
+      await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+      await TraceModel.Handlers.ModelHandlers.Samples.finalize();
+      await TraceModel.Handlers.ModelHandlers.Renderer.finalize();
+      return TraceModel.Handlers.ModelHandlers.Renderer.data();
+    }
+    let defaultTraceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
+    const pid = TraceModel.Types.TraceEvents.ProcessID(28274);
+    const tid = TraceModel.Types.TraceEvents.ThreadID(775);
+    beforeEach(async () => {
+      defaultTraceEvents = await TraceLoader.rawEvents(this, 'basic.json.gz');
+    });
+
+    afterEach(() => {
+      TraceModel.Handlers.ModelHandlers.Renderer.reset();
+      TraceModel.Handlers.ModelHandlers.Meta.reset();
+      TraceModel.Handlers.ModelHandlers.Samples.reset();
+    });
+
+    it('builds a hierarchy using begin and end trace events', async () => {
+      // |------------- RunTask -------------||-- RunTask --|
+      //  |-- RunMicrotasks --||-- Layout --|
+      //   |- FunctionCall -|
+      const traceEvents = [
+        ...defaultTraceEvents, makeBeginEvent('RunTask', 0, '*', pid, tid),  // 0..10
+        makeBeginEvent('RunMicrotasks', 1, '*', pid, tid),                   // 1..4
+        makeBeginEvent('FunctionCall', 2, '*', pid, tid),                    // 2..3
+        makeEndEvent('FunctionCall', 3, '*', pid, tid),                      // 2..3
+        makeEndEvent('RunMicrotasks', 4, '*', pid, tid),                     // 1..4
+        makeBeginEvent('Layout', 5, '*', pid, tid),                          // 5..8
+        makeEndEvent('Layout', 8, '*', pid, tid),                            // 5..8
+        makeEndEvent('RunTask', 10, '*', pid, tid),                          // 0..10
+        makeBeginEvent('RunTask', 11, '*', pid, tid),                        // 11..14
+        makeEndEvent('RunTask', 14, '*', pid, tid),                          // 11..14
+      ];
+
+      const data = await handleEvents(traceEvents);
+
+      assert.strictEqual(data.allRendererEvents.length, 7);
+      assert.strictEqual(data.processes.size, 1);
+      const [process] = data.processes.values();
+      assert.strictEqual(process.threads.size, 1);
+      const [thread] = process.threads.values();
+      assert.strictEqual(thread.tree?.roots.size, 2);
+      assert.strictEqual(thread.tree?.nodes.size, 5);
+      if (!thread.tree) {
+        return;
       }
+      assert.strictEqual(prettyPrint(thread, thread.tree.roots), `
+-RunTask [0.01ms]
+  -RunMicrotasks [0.003ms]
+    -FunctionCall [0.001ms]
+  -Layout [0.003ms]
+-RunTask [0.003ms]`);
+    });
+    it('builds a hierarchy using complete, begin and end trace events', async () => {
+      // |------------- RunTask -------------|
+      //  |-- RunMicrotasks --||-- Layout --|
+      //   |- FunctionCall -|
+
+      const traceEvents = [
+        ...defaultTraceEvents, makeBeginEvent('RunTask', 0, '*', pid, tid),  // 0..10
+        makeBeginEvent('RunMicrotasks', 1, '*', pid, tid),                   // 1..4
+        makeCompleteEvent('FunctionCall', 2, 1, '*', pid, tid),              // 2..3
+        makeEndEvent('RunMicrotasks', 4, '*', pid, tid),                     // 1..4
+        makeBeginEvent('Layout', 5, '*', pid, tid),                          // 5..8
+        makeEndEvent('Layout', 8, '*', pid, tid),                            // 5..8
+        makeEndEvent('RunTask', 10, '*', pid, tid),                          // 0..10
+      ];
+
+      const data = await handleEvents(traceEvents);
+
+      assert.strictEqual(data.allRendererEvents.length, 6);
+      assert.strictEqual(data.processes.size, 1);
+      const [process] = data.processes.values();
+      assert.strictEqual(process.threads.size, 1);
+      const [thread] = process.threads.values();
+      assert.strictEqual(thread.tree?.roots.size, 1);
+      assert.strictEqual(thread.tree?.nodes.size, 4);
+      if (!thread.tree) {
+        return;
+      }
+      assert.strictEqual(prettyPrint(thread, thread.tree.roots), `
+-RunTask [0.01ms]
+  -RunMicrotasks [0.003ms]
+    -FunctionCall [0.001ms]
+  -Layout [0.003ms]`);
     });
   });
 });

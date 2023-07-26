@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Protocol from '../../../../../../../front_end/generated/protocol.js';
+import * as Protocol from '../../../../../../../front_end/generated/protocol.js';
 import * as PreloadingComponents from '../../../../../../../front_end/panels/application/preloading/components/components.js';
 import * as Coordinator from '../../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import * as ReportView from '../../../../../../../front_end/ui/components/report_view/report_view.js';
@@ -59,6 +59,7 @@ describeWithEnvironment('RuleSetDetailsReportView', async () => {
   ]
 }
 `,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
     };
 
     const component = await renderRuleSetDetailsReportView(data);
@@ -68,6 +69,37 @@ describeWithEnvironment('RuleSetDetailsReportView', async () => {
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['Validity', 'Valid'],
+      ['Location', '<script>'],
+      ['Source', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
+    ]);
+  });
+
+  it('renders rule set from Speculation-Rules HTTP header', async () => {
+    const data: Protocol.Preload.RuleSet = {
+      id: 'ruleSetId:1' as Protocol.Preload.RuleSetId,
+      loaderId: 'loaderId:1' as Protocol.Network.LoaderId,
+      sourceText: `
+{
+  "prefetch": [
+    {
+      "source": "list",
+      "urls": ["/subresource.js"]
+    }
+  ]
+}
+`,
+      url: 'https://example.com/speculationrules.json',
+      requestId: 'reqeustId' as Protocol.Network.RequestId,
+    };
+
+    const component = await renderRuleSetDetailsReportView(data);
+    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+
+    const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
+    const values = getCleanTextContentFromElements(report, 'devtools-report-value');
+    assert.deepEqual(zip2(keys, values), [
+      ['Validity', 'Valid'],
+      ['Location', 'https://example.com/speculationrules.json'],
       ['Source', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
     ]);
   });
@@ -82,6 +114,9 @@ describeWithEnvironment('RuleSetDetailsReportView', async () => {
     {
       "source": "list",
 `,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+      errorType: Protocol.Preload.RuleSetErrorType.SourceIsNotJsonObject,
+      errorMessage: 'Line: 6, column: 1, Syntax error.',
     };
 
     const component = await renderRuleSetDetailsReportView(data);
@@ -90,10 +125,41 @@ describeWithEnvironment('RuleSetDetailsReportView', async () => {
     const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
-      // Currently, all rule sets that appear in DevTools are valid.
-      // TODO(https://crbug.com/1384419): Add property `validity` to the CDP.
-      ['Validity', 'Valid'],
+      ['Validity', 'Invalid; source is not a JSON object'],
+      ['Error', 'Line: 6, column: 1, Syntax error.'],
+      ['Location', '<script>'],
       ['Source', '{"prefetch": [{"source": "list",'],
+    ]);
+  });
+
+  it('renders invalid rule set', async () => {
+    const data: Protocol.Preload.RuleSet = {
+      id: 'ruleSetId:1' as Protocol.Preload.RuleSetId,
+      loaderId: 'loaderId:1' as Protocol.Network.LoaderId,
+      sourceText: `
+{
+  "prefetch": [
+    {
+      "source": "list"
+    }
+  ]
+}
+`,
+      backendNodeId: 1 as Protocol.DOM.BackendNodeId,
+      errorType: Protocol.Preload.RuleSetErrorType.InvalidRulesSkipped,
+      errorMessage: 'A list rule must have a "urls" array.',
+    };
+
+    const component = await renderRuleSetDetailsReportView(data);
+    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+
+    const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
+    const values = getCleanTextContentFromElements(report, 'devtools-report-value');
+    assert.deepEqual(zip2(keys, values), [
+      ['Validity', 'Some rules are invalid and ignored'],
+      ['Error', 'A list rule must have a "urls" array.'],
+      ['Location', '<script>'],
+      ['Source', '{"prefetch":[{"source":"list"}]}'],
     ]);
   });
 });

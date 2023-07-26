@@ -7,7 +7,6 @@ import {assert} from 'chai';
 import {
   $$,
   assertNotNullOrUndefined,
-  enableExperiment,
   getBrowserAndPages,
   goToResource,
   waitFor,
@@ -35,9 +34,9 @@ describe('Hide issues menu', async () => {
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     const hideIssuesMenu = await getHideIssuesMenu();
-    const menuDisplay =
-        await hideIssuesMenu.evaluate(node => window.getComputedStyle(node as HTMLElement).getPropertyValue('display'));
-    assert.strictEqual(menuDisplay, 'none');
+    const menuDisplay = await hideIssuesMenu.evaluate(
+        node => window.getComputedStyle(node as HTMLElement).getPropertyValue('visibility'));
+    assert.strictEqual(menuDisplay, 'hidden');
   });
 
   it('should become visible on hovering over the issue header', async () => {
@@ -61,13 +60,13 @@ describe('Hide issues menu', async () => {
     const issueHeader = await getIssueHeaderByTitle(issueTitle);
     assertNotNullOrUndefined(issueHeader);
     const hideIssuesMenu = await getHideIssuesMenu();
-    let menuDisplay =
-        await hideIssuesMenu.evaluate(node => window.getComputedStyle(node as HTMLElement).getPropertyValue('display'));
-    assert.strictEqual(menuDisplay, 'none');
+    let menuDisplay = await hideIssuesMenu.evaluate(
+        node => window.getComputedStyle(node as HTMLElement).getPropertyValue('visibility'));
+    assert.strictEqual(menuDisplay, 'hidden');
     await issueHeader.hover();
-    menuDisplay =
-        await hideIssuesMenu.evaluate(node => window.getComputedStyle(node as HTMLElement).getPropertyValue('display'));
-    assert.strictEqual(menuDisplay, 'block');
+    menuDisplay = await hideIssuesMenu.evaluate(
+        node => window.getComputedStyle(node as HTMLElement).getPropertyValue('visibility'));
+    assert.strictEqual(menuDisplay, 'visible');
   });
 
   it('should open a context menu upon clicking', async () => {
@@ -191,10 +190,6 @@ describe('Hide issues menu', async () => {
 });
 
 describe('After enabling grouping by IssueKind, Hide issues menu', async () => {
-  beforeEach(async () => {
-    await enableExperiment('groupAndHideIssuesByKind');
-  });
-
   it('should be appended to the issue kinds group header', async () => {
     await goToResource('elements/element-reveal-inline-issue.html');
     await navigateToIssuesTab();

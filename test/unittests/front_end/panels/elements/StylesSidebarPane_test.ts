@@ -4,13 +4,8 @@
 
 import type * as ElementsModule from '../../../../../front_end/panels/elements/elements.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
-import {createFileSystemUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
 import {describeWithRealConnection} from '../../helpers/RealConnection.js';
-import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
-import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
-import type * as Platform from '../../../../../front_end/core/platform/platform.js';
-import type * as Protocol from '../../../../../front_end/generated/protocol.js';
-import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as Protocol from '../../../../../front_end/generated/protocol.js';
 import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
 
 const {assert} = chai;
@@ -52,56 +47,40 @@ describeWithRealConnection('StylesSidebarPane', async () => {
         'https://abc.com/*/?q=*%2F#hash');
   });
 
-  it('tracks property changes with formatting', async () => {
-    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-    const URL = 'file:///tmp/example.html' as Platform.DevToolsPath.UrlString;
-    const {uiSourceCode, project} = createFileSystemUISourceCode({
-      url: URL,
-      content: '.rule{display:none}',
-      mimeType: 'text/css',
+  describe('rebuildSectionsForMatchedStyleRulesForTest', () => {
+    it('should add @position-fallback section to the end', async () => {
+      const stylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance({forceNew: true});
+      const matchedStyles = new SDK.CSSMatchedStyles.CSSMatchedStyles({
+        cssModel: stylesSidebarPane.cssModel() as SDK.CSSModel.CSSModel,
+        node: stylesSidebarPane.node() as SDK.DOMModel.DOMNode,
+        inlinePayload: null,
+        attributesPayload: null,
+        matchedPayload: [],
+        pseudoPayload: [],
+        inheritedPayload: [],
+        inheritedPseudoPayload: [],
+        animationsPayload: [],
+        parentLayoutNodeId: undefined,
+        positionFallbackRules: [{
+          name: {text: '--compass'},
+          tryRules: [{
+            origin: Protocol.CSS.StyleSheetOrigin.Regular,
+            style: {
+              cssProperties: [{name: 'bottom', value: 'anchor(--anchor-name bottom)'}],
+              shorthandEntries: [],
+            },
+          }],
+        }],
+      });
+
+      const sectionBlocks =
+          await stylesSidebarPane.rebuildSectionsForMatchedStyleRulesForTest(matchedStyles, new Map(), new Map());
+
+      assert.strictEqual(sectionBlocks.length, 2);
+      assert.strictEqual(sectionBlocks[1].titleElement()?.textContent, '@position-fallback --compass');
+      assert.strictEqual(sectionBlocks[1].sections.length, 1);
+      assert.instanceOf(sectionBlocks[1].sections[0], Elements.StylePropertiesSection.TryRuleSection);
     });
-
-    uiSourceCode.setWorkingCopy('.rule{display:block}');
-
-    const stylesSidebarPane = Elements.StylesSidebarPane.StylesSidebarPane.instance();
-    await stylesSidebarPane.trackURLForChanges(URL);
-    const targetManager = SDK.TargetManager.TargetManager.instance();
-    const target = targetManager.rootTarget();
-    assertNotNullOrUndefined(target);
-
-    const resourceURL = () => URL;
-    const cssModel = new SDK.CSSModel.CSSModel(target);
-    cssModel.styleSheetHeaderForId = () => ({
-      lineNumberInSource: (line: number) => line,
-      columnNumberInSource: (_line: number, column: number) => column,
-      cssModel: () => cssModel,
-      resourceURL,
-      isConstructedByNew: () => false,
-    } as unknown as SDK.CSSStyleSheetHeader.CSSStyleSheetHeader);
-
-    const cssWorkspaceBinding = Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance();
-    cssWorkspaceBinding.modelAdded(cssModel);
-    cssWorkspaceBinding.addSourceMapping({
-      rawLocationToUILocation: (loc: SDK.CSSModel.CSSLocation) => new Workspace.UISourceCode.UILocation(
-          uiSourceCode as Workspace.UISourceCode.UISourceCode, loc.lineNumber, loc.columnNumber),
-      uiLocationToRawLocations: (_: Workspace.UISourceCode.UILocation): SDK.CSSModel.CSSLocation[] => [],
-    });
-
-    const cssProperty = {
-      ownerStyle: {
-        type: SDK.CSSStyleDeclaration.Type.Regular,
-        styleSheetId: 'STYLE_SHEET_ID' as Protocol.CSS.StyleSheetId,
-        cssModel: () => cssModel,
-        parentRule: {resourceURL},
-      },
-      nameRange: () => ({startLine: 0, startColumn: '.rule{'.length}),
-    } as unknown as SDK.CSSProperty.CSSProperty;
-
-    assert.isTrue(stylesSidebarPane.isPropertyChanged(cssProperty));
-
-    Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().modelRemoved(cssModel);
-    workspace.removeProject(project);
-    await stylesSidebarPane.trackURLForChanges(URL);  // Clean up diff subscription
   });
 });
 
@@ -158,6 +137,28 @@ describeWithEnvironment('StylesSidebarPropertyRenderer', () => {
        assert.isTrue(colorHandler.called);
        assert.isFalse(bezierHandler.called);
      });
+
+  it('runs animation handler for animation property', () => {
+    const renderer =
+        new Elements.StylesSidebarPane.StylesSidebarPropertyRenderer(null, null, 'animation', 'example 5s');
+    renderer.setAnimationHandler(() => document.createTextNode(nodeContents));
+
+    const nodeContents = 'nodeContents';
+
+    const node = renderer.renderValue();
+    assert.deepEqual(node.textContent, nodeContents);
+  });
+
+  it('runs positionFallbackHandler for position-fallback property', () => {
+    const nodeContents = 'nodeContents';
+    const renderer =
+        new Elements.StylesSidebarPane.StylesSidebarPropertyRenderer(null, null, 'position-fallback', '--compass');
+    renderer.setPositionFallbackHandler(() => document.createTextNode(nodeContents));
+
+    const node = renderer.renderValue();
+
+    assert.deepEqual(node.textContent, nodeContents);
+  });
 });
 
 describe('IdleCallbackManager', () => {
@@ -171,7 +172,7 @@ describe('IdleCallbackManager', () => {
   it('schedules callbacks in order', async () => {
     // Override the default timeout with a very short one
     class QuickIdleCallbackManager extends Elements.StylesSidebarPane.IdleCallbackManager {
-      protected scheduleIdleCallback(_: number): void {
+      protected override scheduleIdleCallback(_: number): void {
         super.scheduleIdleCallback(1);
       }
     }

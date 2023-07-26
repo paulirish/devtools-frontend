@@ -224,9 +224,6 @@
   "core/i18n/time-utilities.ts | fs": {
     "message": "{PH1} sek."
   },
-  "core/sdk/CPUProfileDataModel.ts | devtoolsCpuProfileParserIsFixing": {
-    "message": "DevTools: CPU profilio analizavimo įrankis tvarko tiek trūkstamų pavyzdžių: {PH1}."
-  },
   "core/sdk/CPUProfilerModel.ts | profileD": {
     "message": "{PH1} profilis"
   },
@@ -238,6 +235,9 @@
   },
   "core/sdk/CompilerSourceMappingContentProvider.ts | couldNotLoadContentForSS": {
     "message": "Nepavyko įkelti {PH1} turinio ({PH2})"
+  },
+  "core/sdk/ConsoleModel.ts | bfcacheNavigation": {
+    "message": "Naršymas adresu {PH1} atkurtas iš ilgalaikio viso puslapio saugojimo talpykloje (žr. adresu https://web.dev/bfcache/)"
   },
   "core/sdk/ConsoleModel.ts | failedToSaveToTempVariable": {
     "message": "Nepavyko išsaugoti laikino kintamojo."
@@ -551,9 +551,6 @@
   "core/sdk/OverlayModel.ts | pausedInDebugger": {
     "message": "Pristabdyta derintuvėje"
   },
-  "core/sdk/PageResourceLoader.ts | loadCanceledDueToLoadTimeout": {
-    "message": "Įkėlimas atšauktas dėl pasibaigusio įkėlimo skirtojo laiko"
-  },
   "core/sdk/PageResourceLoader.ts | loadCanceledDueToReloadOf": {
     "message": "Įkėlimas atšauktas dėl iš naujo įkelto patikrinto puslapio"
   },
@@ -618,7 +615,7 @@
     "message": "stabdoma"
   },
   "core/sdk/sdk-meta.ts | achromatopsia": {
-    "message": "Achromatopsija"
+    "message": "Achromatopsija (nematomos jokios spalvos)"
   },
   "core/sdk/sdk-meta.ts | blurredVision": {
     "message": "Sulietas vaizdas"
@@ -627,7 +624,7 @@
     "message": "Asinchroniškų dėklo pėdsakų fiksavimas"
   },
   "core/sdk/sdk-meta.ts | deuteranopia": {
-    "message": "Deuteranopija"
+    "message": "Deuteranopija (nematoma žalia spalva)"
   },
   "core/sdk/sdk-meta.ts | disableAsyncStackTraces": {
     "message": "Asinchroniškų dėklo pėdsakų išjungimas"
@@ -690,7 +687,7 @@
     "message": "Suaktyvinto puslapio emuliacija"
   },
   "core/sdk/sdk-meta.ts | emulateAchromatopsia": {
-    "message": "Achromatopsijos emuliacija"
+    "message": "Achromatopsijos emuliacija (nematomos spalvos)"
   },
   "core/sdk/sdk-meta.ts | emulateAutoDarkMode": {
     "message": "Imituoti automatinį tamsų režimą"
@@ -714,13 +711,16 @@
     "message": "CSS kalbos ekrano medijos tipo emuliacija"
   },
   "core/sdk/sdk-meta.ts | emulateDeuteranopia": {
-    "message": "Deuteranopijos emuliacija"
+    "message": "Deuteranopijos emuliacija (nematoma žalia spalva)"
   },
   "core/sdk/sdk-meta.ts | emulateProtanopia": {
-    "message": "Protanopijos emuliacija"
+    "message": "Protanopijos emuliacija (nematoma raudona spalva)"
+  },
+  "core/sdk/sdk-meta.ts | emulateReducedContrast": {
+    "message": "Emuliuoti sumažintą kontrastą"
   },
   "core/sdk/sdk-meta.ts | emulateTritanopia": {
-    "message": "Tritanopijos emuliacija"
+    "message": "Tritanopijos emuliacija (nematoma mėlyna spalva)"
   },
   "core/sdk/sdk-meta.ts | emulateVisionDeficiencies": {
     "message": "Regėjimo sutrikimų emuliacija"
@@ -780,7 +780,7 @@
     "message": "Nėra emuliacijos"
   },
   "core/sdk/sdk-meta.ts | pauseOnExceptions": {
-    "message": "Pristabdyti taikant išimtis"
+    "message": "Pristabdyti radus išimčių"
   },
   "core/sdk/sdk-meta.ts | preserveLogUponNavigation": {
     "message": "Išsaugoti žurnalą prieš naršant"
@@ -789,10 +789,13 @@
     "message": "spausdinti"
   },
   "core/sdk/sdk-meta.ts | protanopia": {
-    "message": "Protanopija"
+    "message": "Protanopija (nematoma raudona spalva)"
   },
   "core/sdk/sdk-meta.ts | query": {
     "message": "užklausa"
+  },
+  "core/sdk/sdk-meta.ts | reducedContrast": {
+    "message": "Sumažintas kontrastas"
   },
   "core/sdk/sdk-meta.ts | screen": {
     "message": "tikrinti"
@@ -840,7 +843,7 @@
     "message": "Pėdsakų dydžių rodymas"
   },
   "core/sdk/sdk-meta.ts | tritanopia": {
-    "message": "Tritanopija"
+    "message": "Tritanopija (nematoma mėlyna spalva)"
   },
   "entrypoints/inspector_main/InspectorMain.ts | javascriptIsDisabled": {
     "message": "„JavaScript“ išjungtas"
@@ -984,7 +987,7 @@
     "message": "žymėti"
   },
   "entrypoints/inspector_main/inspector_main-meta.ts | reloadPage": {
-    "message": "Puslapio įkėlimas iš naujo"
+    "message": "Įkelti puslapį iš naujo"
   },
   "entrypoints/inspector_main/inspector_main-meta.ts | rendering": {
     "message": "Pateikimas"
@@ -1062,7 +1065,7 @@
     "message": "Spalvų formatas:"
   },
   "entrypoints/main/main-meta.ts | colorFormatSettingDisabled": {
-    "message": "Šis nustatymas nebenaudojamas, nes yra nesuderinamas su moderniomis spalvų erdvėmis. Jei norite jį iš naujo įgalinti, galite išjungti atitinkamą eksperimentą."
+    "message": "Šis nustatymas nebeteikiamas, nes yra nesuderinamas su moderniomis spalvų erdvėmis. Jei norite įgalinti jį iš naujo, išjunkite atitinkamą eksperimentą."
   },
   "entrypoints/main/main-meta.ts | darkCapital": {
     "message": "Tamsi"
@@ -1241,6 +1244,183 @@
   "entrypoints/worker_app/WorkerMain.ts | main": {
     "message": "Pagrindinis"
   },
+  "generated/Deprecation.ts | AuthorizationCoveredByWildcard": {
+    "message": "Prieigos teisė nebus įtraukta naudojant pakaitos simbolį (*) vykdant CORS funkcijos „Access-Control-Allow-Headers“ apdorojimą."
+  },
+  "generated/Deprecation.ts | CSSSelectorInternalMediaControlsOverlayCastButton": {
+    "message": "Norint išjungti numatytąjį „Cast“ integravimą turėtų būti naudojamas „disableRemotePlayback“ atributas vietoj „-internal-media-controls-overlay-cast-button“ parinkiklio."
+  },
+  "generated/Deprecation.ts | CanRequestURLHTTPContainingNewline": {
+    "message": "Šaltinių užklausos, kurių URL buvo pašalintų matomų tarpų „\\(n|r|t)“ simbolių ir simbolių „mažiau ne“ („<“), yra užblokuotos. Pašalinkite naujas eilutes ir užkoduokite simbolius „mažiau nei“ tokiose vietose kaip elementų atributų vertės, kad įkeltumėte šiuos šaltinius."
+  },
+  "generated/Deprecation.ts | ChromeLoadTimesConnectionInfo": {
+    "message": "Funkcijos „chrome.loadTimes()“ teikimas nutrauktas; vietoj jos naudokite standartizuotą API: „2 naršymo laiko žymės“."
+  },
+  "generated/Deprecation.ts | ChromeLoadTimesFirstPaintAfterLoadTime": {
+    "message": "Funkcijos „chrome.loadTimes()“ teikimas nutrauktas; vietoj jos naudokite standartizuotą API: „Vizualizavimo laiko žymės“."
+  },
+  "generated/Deprecation.ts | ChromeLoadTimesWasAlternateProtocolAvailable": {
+    "message": "Funkcijos „chrome.loadTimes()“ teikimas nutrauktas; vietoj jos naudokite standartizuotą API: „nextHopProtocol“ skiltyje „2 naršymo laiko žymės“."
+  },
+  "generated/Deprecation.ts | CookieWithTruncatingChar": {
+    "message": "Slapukai, kuriuose yra „\\(0|r|n)“ simbolis, bus atmesti, o ne sutrumpinti."
+  },
+  "generated/Deprecation.ts | CrossOriginAccessBasedOnDocumentDomain": {
+    "message": "To paties šaltinio politikos apribojimų atlaisvinimo nustatant „document.domain“ funkcijos teikimas nutrauktas ir ji bus išjungta pagal numatytuosius nustatymus. Šis teikimo nutraukimo perspėjimas skirtas skirtingų šaltinių prieigai, kuri buvo įgalinta nustačius „document.domain“."
+  },
+  "generated/Deprecation.ts | CrossOriginWindowAlert": {
+    "message": "Funkcijos „window.alert“ suaktyvinimo iš skirtingų šaltinių „iframe“ teikimas nutrauktas ir ateityje ji bus pašalinta."
+  },
+  "generated/Deprecation.ts | CrossOriginWindowConfirm": {
+    "message": "Funkcijos „window.confirm“ suaktyvinimo iš skirtingų šaltinių „iframe“ teikimas nutrauktas ir ateityje ji bus pašalinta."
+  },
+  "generated/Deprecation.ts | DOMMutationEvents": {
+    "message": "DOM pakeitimų įvykių, įskaitant „DOMSubtreeModified“, „DOMNodeInserted“, „DOMNodeRemoved“, „DOMNodeRemovedFromDocument“, „DOMNodeInsertedIntoDocument“ ir „DOMCharacterDataModified“, teikimas nutrauktas (https://w3c.github.io/uievents/#legacy-event-types) ir jie bus pašalinti. Vietoj jų naudokite „MutationObserver“."
+  },
+  "generated/Deprecation.ts | DataUrlInSvgUse": {
+    "message": "Duomenų palaikymas: SVG elemento <use> URL teikimas nutrauktas ir jis ateityje bus pašalintas."
+  },
+  "generated/Deprecation.ts | DocumentDomainSettingWithoutOriginAgentClusterHeader": {
+    "message": "To paties šaltinio politikos apribojimų atlaisvinimo nustatant „document.domain“ funkcijos teikimas nutrauktas ir ji bus išjungta pagal numatytuosius nustatymus. Jei norite toliau naudoti šią funkciją, atsisakykite šaltiniu pagrįstų priemonės grupių siųsdami „Origin-Agent-Cluster: ?0“ antraštę su HTTP atsaku dokumentui ir rėmeliams. Jei reikia išsamesnės informacijos, žr. https://developer.chrome.com/blog/immutable-document-domain/."
+  },
+  "generated/Deprecation.ts | ExpectCTHeader": {
+    "message": "„Expect-CT“ antraštės teikimas nutrauktas ir ji bus pašalinta. „Chrome“ reikalauja visų viešai pateikiamų sertifikatų, išduotų po 2018 m. balandžio 30 d., sertifikato skaidrumo."
+  },
+  "generated/Deprecation.ts | GeolocationInsecureOrigin": {
+    "message": "„getCurrentPosition()“ ir „watchPosition()“ nebeveikia nesaugiuose šaltiniuose. Jei norite naudoti šią funkciją, turite apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
+  },
+  "generated/Deprecation.ts | GeolocationInsecureOriginDeprecatedNotRemoved": {
+    "message": "Funkcijų „getCurrentPosition()“ ir „watchPosition()“ teikimas nutrauktas nesaugiuose šaltiniuose. Jei norite naudoti šią funkciją, turite apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
+  },
+  "generated/Deprecation.ts | GetUserMediaInsecureOrigin": {
+    "message": "„getUserMedia()“ nebeveikia nesaugiuose šaltiniuose. Jei norite naudoti šią funkciją, turite apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
+  },
+  "generated/Deprecation.ts | HostCandidateAttributeGetter": {
+    "message": "„RTCPeerConnectionIceErrorEvent.hostCandidate“ teikimas nutrauktas. Vietoj jos naudokite funkciją „RTCPeerConnectionIceErrorEvent.address“ arba „RTCPeerConnectionIceErrorEvent.port“."
+  },
+  "generated/Deprecation.ts | IdentityInCanMakePaymentEvent": {
+    "message": "Prekybininko šaltinio ir atsitiktinių duomenų iš „canmakepayment“ pagalbinio „JavaScript“ failo įvykio teikimas nutrauktas ir jie bus pašalinti: topOrigin, paymentRequestOrigin, methodData, modifiers."
+  },
+  "generated/Deprecation.ts | InsecurePrivateNetworkSubresourceRequest": {
+    "message": "Svetainė pateikė papildomo šaltinio užklausą iš tinklo, kurį ji galėtų pasiekti tik dėl savo naudotojų privilegijuotosios tinklo pozicijos. Šiose užklausose parodomi ne vieši įrenginiai ir serveriai internete, todėl padidėja užklausos iš trečiosios šalies svetainės klastojimo (angl. „cross-site request forgery“, CSRF) atakos ir (arba) informacijos nutekėjimo rizika. Siekdama sumažinti šią riziką, „Chrome“ nutraukia užklausų ne viešiems papildomiems šaltiniams teikimą, kai jos inicijuojamos iš nesaugios aplinkos, ir pradės jas blokuoti."
+  },
+  "generated/Deprecation.ts | InterestGroupDailyUpdateUrl": {
+    "message": "„InterestGroups“ laukas „dailyUpdateUrl“, perduotas „joinAdInterestGroup()“, pervardytas į „updateUrl“, kad tiksliau atspindėtų jo elgseną."
+  },
+  "generated/Deprecation.ts | LocalCSSFileExtensionRejected": {
+    "message": "CSS kalbos negalima įkelti iš „file:“ URL, nebent jie baigiasi „.css“ failo plėtiniu."
+  },
+  "generated/Deprecation.ts | MediaSourceAbortRemove": {
+    "message": "„SourceBuffer.abort()“ naudojimas siekiant nutraukti „remove()“ nesinchronizuoto diapazono pašalinimą nutrauktas dėl specifikacijos pakeitimo. Ateityje palaikymas bus pašalintas. Turėtumėte klausytis updateend įvykio. „abort()“ skirtas naudoti tik norint nutraukti nesinchronizuotos medijos pridėjimą arba iš naujo nustatyti analizavimo įrankio būseną."
+  },
+  "generated/Deprecation.ts | MediaSourceDurationTruncatingBuffered": {
+    "message": "„MediaSource.duration“ nustatymas žemiau nei bet kurio į buferį įrašyto užkoduoto rėmelio aukščiausia pristatymo laiko žymė nutrauktas dėl specifikacijos pakeitimo. Sutrumpintos į buferį įrašytos medijos numatomo pašalinimo palaikymas ateityje bus pašalintas. Vietoj to turėtumėte atlikti aiškų „remove(newDuration, oldDuration)“ visuose „sourceBuffers“, kur „newDuration < oldDuration“."
+  },
+  "generated/Deprecation.ts | NoSysexWebMIDIWithoutPermission": {
+    "message": "Žiniatinklio MIDI prašys naudojimo leidimo, net jei sistemos išskirtinis pranešimas nenurodytas funkcijoje „MIDIOptions“."
+  },
+  "generated/Deprecation.ts | NonStandardDeclarativeShadowDOM": {
+    "message": "Senesnis, nestandartinis „shadowroot“ atributas nebenaudojamas ir M119 *neveiks*. Vietoj jo naudokite naują, standartizuotą atributą „shadowrootmode“."
+  },
+  "generated/Deprecation.ts | NotificationInsecureOrigin": {
+    "message": "Pranešimų API nebegalima naudoti iš nesaugių šaltinių. Turėtumėte apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
+  },
+  "generated/Deprecation.ts | NotificationPermissionRequestedIframe": {
+    "message": "Pranešimų API leidimo užklausų nebegalima teikti iš skirtingų šaltinių „iframe“. Vietoj to turėtumėte apsvarstyti galimybę teikti leidimo užklausą iš aukščiausio lygio rėmelio arba atidaryti naują langą."
+  },
+  "generated/Deprecation.ts | ObsoleteCreateImageBitmapImageOrientationNone": {
+    "message": "Parinktis „imageOrientation: 'none'“, esanti „createImageBitmap“, nebeteikiama. Vietoj jos naudokite „createImageBitmap“ su parinktimi „{imageOrientation: 'from-image'}“."
+  },
+  "generated/Deprecation.ts | ObsoleteWebRtcCipherSuite": {
+    "message": "Jūsų partneris derasi dėl pasenusios (D)TLS versijos. Susisiekite su partneriu, kad tai sutvarkytumėte."
+  },
+  "generated/Deprecation.ts | OverflowVisibleOnReplacedElement": {
+    "message": "Žymose „img“, „video“ ir „canvas“ nurodžius „overflow: visible“, vaizdo turinys gali būti sukurtas už elemento ribų. Žr. https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md."
+  },
+  "generated/Deprecation.ts | PaymentInstruments": {
+    "message": "„paymentManager.instruments“ teikimas nutrauktas. Mokėjimų doroklėms naudokite tiesioginį diegimą."
+  },
+  "generated/Deprecation.ts | PaymentRequestCSPViolation": {
+    "message": "„PaymentRequest“ iškvietimas apėjo turinio apsaugos politikos (CSP) direktyvą „connect-src“. Šis apėjimas nebenaudojamas. Pridėkite mokėjimo metodo identifikatorių iš „PaymentRequest“ API (lauke „supportedMethods“) prie CSP direktyvos „connect-src“."
+  },
+  "generated/Deprecation.ts | PersistentQuotaType": {
+    "message": "„StorageType.persistent“ teikimas nutrauktas. Vietoj to naudokite standartizuotą „navigator.storage“."
+  },
+  "generated/Deprecation.ts | PictureSourceSrc": {
+    "message": "Elementas „<source src>“ su „<picture>“ aukštesniuoju elementu netinkamas, todėl jo nepaisoma. Vietoj jo naudokite „<source srcset>“."
+  },
+  "generated/Deprecation.ts | PrefixedCancelAnimationFrame": {
+    "message": "„webkitCancelAnimationFrame“ priklauso nuo konkretaus paslaugų teikėjo. Vietoj jo naudokite įprastą metodą „cancelAnimationFrame“."
+  },
+  "generated/Deprecation.ts | PrefixedRequestAnimationFrame": {
+    "message": "„webkitRequestAnimationFrame“ priklauso nuo konkretaus paslaugų teikėjo. Vietoj jo naudokite įprastą metodą „requestAnimationFrame“."
+  },
+  "generated/Deprecation.ts | PrefixedVideoDisplayingFullscreen": {
+    "message": "„HTMLVideoElement.webkitDisplayingFullscreen“ nebeteikiama. Vietoj jos naudokite „Document.fullscreenElement“."
+  },
+  "generated/Deprecation.ts | PrefixedVideoEnterFullScreen": {
+    "message": "„HTMLVideoElement.webkitEnterFullScreen()“ nebeteikiama. Vietoj jos naudokite „Element.requestFullscreen()“."
+  },
+  "generated/Deprecation.ts | PrefixedVideoEnterFullscreen": {
+    "message": "„HTMLVideoElement.webkitEnterFullscreen()“ nebeteikiama. Vietoj jos naudokite „Element.requestFullscreen()“."
+  },
+  "generated/Deprecation.ts | PrefixedVideoExitFullScreen": {
+    "message": "„HTMLVideoElement.webkitExitFullScreen()“ nebeteikiama. Vietoj jos naudokite „Document.exitFullscreen()“."
+  },
+  "generated/Deprecation.ts | PrefixedVideoExitFullscreen": {
+    "message": "„HTMLVideoElement.webkitExitFullscreen()“ nebeteikiama. Vietoj jos naudokite „Document.exitFullscreen()“."
+  },
+  "generated/Deprecation.ts | PrefixedVideoSupportsFullscreen": {
+    "message": "„HTMLVideoElement.webkitSupportsFullscreen“ nebeteikiama. Vietoj jos naudokite „Document.fullscreenEnabled“."
+  },
+  "generated/Deprecation.ts | PrivacySandboxExtensionsAPI": {
+    "message": "Nutrauksime API „chrome.privacy.websites.privacySandboxEnabled“ teikimą, bet ji liks aktyvi, kad būtų užtikrintas atgalinis suderinamumas, kol bus išleista M113 versija. Dabar naudokite „chrome.privacy.websites.topicsEnabled“, „chrome.privacy.websites.fledgeEnabled“ ir „chrome.privacy.websites.adMeasurementEnabled“. Žr. https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled."
+  },
+  "generated/Deprecation.ts | RTCConstraintEnableDtlsSrtpFalse": {
+    "message": "Apribojimas „DtlsSrtpKeyAgreement“ pašalintas. Nurodėte šio apribojimo „false“ vertę, kuri interpretuojama kaip bandymas naudoti pašalintą „SDES key negotiation“ metodą. Ši funkcija pašalinta; vietoj jos naudokite paslaugą, kuri palaiko „DTLS key negotiation“."
+  },
+  "generated/Deprecation.ts | RTCConstraintEnableDtlsSrtpTrue": {
+    "message": "Apribojimas „DtlsSrtpKeyAgreement“ pašalintas. Nurodėte šio apribojimo „true“ vertę, kuri neturėjo jokio poveikio, bet galite pašalinti šį apribojimą, kad būtų tvarkingiau."
+  },
+  "generated/Deprecation.ts | RTCPeerConnectionGetStatsLegacyNonCompliant": {
+    "message": "Atskambinimo parinktis „getStats()“ nebeteikiama ir bus pašalinta. Vietoj jos naudokite specifikaciją atitinkančią parinktį „getStats()“."
+  },
+  "generated/Deprecation.ts | RangeExpand": {
+    "message": "„Range.expand()“ nebeteikiama. Vietoj jos naudokite „Selection.modify()“."
+  },
+  "generated/Deprecation.ts | RequestedSubresourceWithEmbeddedCredentials": {
+    "message": "Papildomų šaltinių užklausos, kurių URL yra įterptų prisijungimo duomenų (pvz., „https://user:pass@host/“), yra užblokuotos."
+  },
+  "generated/Deprecation.ts | RtcpMuxPolicyNegotiate": {
+    "message": "„rtcpMuxPolicy“ parinkties teikimas nutrauktas ir ji bus pašalinta."
+  },
+  "generated/Deprecation.ts | SharedArrayBufferConstructedWithoutIsolation": {
+    "message": "Funkcijai „SharedArrayBuffer“ reikalinga apsauga nuo subjektų iš kitų domenų. Jei reikia išsamesnės informacijos, žr. https://developer.chrome.com/blog/enabling-shared-array-buffer/."
+  },
+  "generated/Deprecation.ts | TextToSpeech_DisallowedByAutoplay": {
+    "message": "Funkcijos „speechSynthesis.speak()“ be naudotojo suaktyvinimo teikimas nutrauktas ir ji bus pašalinta."
+  },
+  "generated/Deprecation.ts | V8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
+    "message": "Plėtiniams reikia pasirinkti apsaugą nuo subjektų iš kitų domenų, norint toliau naudoti „SharedArrayBuffer“. Žr. https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/."
+  },
+  "generated/Deprecation.ts | WebSQL": {
+    "message": "Žiniatinklio SQL teikimas nutrauktas. Naudokite „SQLite WebAssembly“ arba indeksuotą duomenų bazę"
+  },
+  "generated/Deprecation.ts | WindowPlacementPermissionDescriptorUsed": {
+    "message": "Leidimų deskriptoriaus „window-placement“ teikimas nutrauktas. Verčiau naudokite „window-management“. Daugiau pagalbos ieškokite https://bit.ly/window-placement-rename."
+  },
+  "generated/Deprecation.ts | WindowPlacementPermissionPolicyParsed": {
+    "message": "Leidimų politika „window-placement“ nebenaudojama. Verčiau naudokite „window-management“. Daugiau pagalbos ieškokite https://bit.ly/window-placement-rename."
+  },
+  "generated/Deprecation.ts | XHRJSONEncodingDetection": {
+    "message": "UTF-16 nepalaikomas atsako JSON naudojant funkciją „XMLHttpRequest“"
+  },
+  "generated/Deprecation.ts | XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
+    "message": "Sinchroninės funkcijos „XMLHttpRequest“ pagrindinėje grupėje teikimas nutrauktas dėl jos žalingo poveikio galutinio naudotojo funkcijoms. Jei reikia daugiau pagalbos, žr. https://xhr.spec.whatwg.org/."
+  },
+  "generated/Deprecation.ts | XRSupportsSession": {
+    "message": "Funkcijos „supportsSession()“ teikimas nutrauktas. Vietoj jos naudokite funkciją „isSessionSupported()“ ir patikrinkite priskirtą loginę vertę."
+  },
   "models/bindings/ContentProviderBasedProject.ts | unknownErrorLoadingFile": {
     "message": "Įkeliant failą įvyko nežinoma klaida"
   },
@@ -1269,7 +1449,7 @@
     "message": "[{PH1}] Įkeliami {PH2} derinimo simboliai (per {PH3})..."
   },
   "models/bindings/IgnoreListManager.ts | addAllContentScriptsToIgnoreList": {
-    "message": "Pridėti visus turinio scenarijus prie nepaisomų elementų sąrašo"
+    "message": "Pridėti visus plėtinių scenarijus prie nepaisomų elementų sąrašo"
   },
   "models/bindings/IgnoreListManager.ts | addAllThirdPartyScriptsToIgnoreList": {
     "message": "Pridėti visus trečiųjų šalių scenarijus prie nepaisomų elementų sąrašo"
@@ -1331,6 +1511,9 @@
   "models/har/Writer.ts | writingFile": {
     "message": "Įrašomas failas…"
   },
+  "models/issues_manager/BounceTrackingIssue.ts | bounceTrackingMitigations": {
+    "message": "Peradresavimų stebėjimo sumažėjimai"
+  },
   "models/issues_manager/ClientHintIssue.ts | clientHintsInfrastructure": {
     "message": "Kliento nurodymų infrastruktūra"
   },
@@ -1376,167 +1559,35 @@
   "models/issues_manager/CrossOriginEmbedderPolicyIssue.ts | samesiteAndSameorigin": {
     "message": "„Same-Site“ ir „Same-Origin“"
   },
-  "models/issues_manager/DeprecationIssue.ts | authorizationCoveredByWildcard": {
-    "message": "Prieigos teisė nebus įtraukta naudojant pakaitos simbolį (*) vykdant CORS funkcijos „Access-Control-Allow-Headers“ apdorojimą."
-  },
-  "models/issues_manager/DeprecationIssue.ts | canRequestURLHTTPContainingNewline": {
-    "message": "Šaltinių užklausos, kurių URL buvo pašalintų matomų tarpų „\\(n|r|t)“ simbolių ir simbolių „mažiau ne“ („<“), yra užblokuotos. Pašalinkite naujas eilutes ir užkoduokite simbolius „mažiau nei“ tokiose vietose kaip elementų atributų vertės, kad įkeltumėte šiuos šaltinius."
-  },
-  "models/issues_manager/DeprecationIssue.ts | chromeLoadTimesConnectionInfo": {
-    "message": "Funkcijos „chrome.loadTimes()“ teikimas nutrauktas; vietoj jos naudokite standartizuotą API: „2 naršymo laiko žymės“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | chromeLoadTimesFirstPaintAfterLoadTime": {
-    "message": "Funkcijos „chrome.loadTimes()“ teikimas nutrauktas; vietoj jos naudokite standartizuotą API: „Vizualizavimo laiko žymės“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | chromeLoadTimesWasAlternateProtocolAvailable": {
-    "message": "Funkcijos „chrome.loadTimes()“ teikimas nutrauktas; vietoj jos naudokite standartizuotą API: „nextHopProtocol“ skiltyje „2 naršymo laiko žymės“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | cookieWithTruncatingChar": {
-    "message": "Slapukai, kuriuose yra „\\(0|r|n)“ simbolis, bus atmesti, o ne sutrumpinti."
-  },
-  "models/issues_manager/DeprecationIssue.ts | crossOriginAccessBasedOnDocumentDomain": {
-    "message": "To paties šaltinio politikos apribojimų atlaisvinimo nustatant „document.domain“ funkcijos teikimas nutrauktas ir ji bus išjungta pagal numatytuosius nustatymus. Šis teikimo nutraukimo perspėjimas skirtas skirtingų šaltinių prieigai, kuri buvo įgalinta nustačius „document.domain“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | crossOriginWindowApi": {
-    "message": "Funkcijos „{PH1}“ suaktyvinimo iš skirtingų šaltinių „iframe“ teikimas nutrauktas ir ateityje ji bus pašalinta."
-  },
-  "models/issues_manager/DeprecationIssue.ts | cssSelectorInternalMediaControlsOverlayCastButton": {
-    "message": "Norint išjungti numatytąjį „Cast“ integravimą turėtų būti naudojamas „disableRemotePlayback“ atributas vietoj „-internal-media-controls-overlay-cast-button“ parinkiklio."
-  },
-  "models/issues_manager/DeprecationIssue.ts | deprecatedWithReplacement": {
-    "message": "Funkcijos „{PH1}“ teikimas nutrauktas. Vietoj jos naudokite funkciją „{PH2}“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | deprecationExample": {
-    "message": "Tai yra išversto teikimo nutraukimo problemos pranešimo pavyzdys."
-  },
-  "models/issues_manager/DeprecationIssue.ts | documentDomainSettingWithoutOriginAgentClusterHeader": {
-    "message": "To paties šaltinio politikos apribojimų atlaisvinimo nustatant „document.domain“ funkcijos teikimas nutrauktas ir ji bus išjungta pagal numatytuosius nustatymus. Jei norite toliau naudoti šią funkciją, atsisakykite šaltiniu pagrįstų priemonės grupių siųsdami „Origin-Agent-Cluster: ?0“ antraštę su HTTP atsaku dokumentui ir rėmeliams. Jei reikia išsamesnės informacijos, žr. https://developer.chrome.com/blog/immutable-document-domain/."
-  },
-  "models/issues_manager/DeprecationIssue.ts | eventPath": {
-    "message": "Funkcijos „Event.path“ teikimas nutrauktas ir ji bus pašalinta. Vietoj jos naudokite funkciją „Event.composedPath()“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | expectCTHeader": {
-    "message": "„Expect-CT“ antraštės teikimas nutrauktas ir ji bus pašalinta. „Chrome“ reikalauja visų viešai pateikiamų sertifikatų, išduotų po 2018 m. balandžio 30 d., sertifikato skaidrumo."
-  },
   "models/issues_manager/DeprecationIssue.ts | feature": {
     "message": "Jei reikia daugiau išsamios informacijos, žr. funkcijų būsenos puslapį."
-  },
-  "models/issues_manager/DeprecationIssue.ts | geolocationInsecureOrigin": {
-    "message": "„getCurrentPosition()“ ir „watchPosition()“ nebeveikia nesaugiuose šaltiniuose. Jei norite naudoti šią funkciją, turite apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
-  },
-  "models/issues_manager/DeprecationIssue.ts | geolocationInsecureOriginDeprecatedNotRemoved": {
-    "message": "Funkcijų „getCurrentPosition()“ ir „watchPosition()“ teikimas nutrauktas nesaugiuose šaltiniuose. Jei norite naudoti šią funkciją, turite apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
-  },
-  "models/issues_manager/DeprecationIssue.ts | getUserMediaInsecureOrigin": {
-    "message": "„getUserMedia()“ nebeveikia nesaugiuose šaltiniuose. Jei norite naudoti šią funkciją, turite apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
-  },
-  "models/issues_manager/DeprecationIssue.ts | hostCandidateAttributeGetter": {
-    "message": "„RTCPeerConnectionIceErrorEvent.hostCandidate“ teikimas nutrauktas. Vietoj jos naudokite funkciją „RTCPeerConnectionIceErrorEvent.address“ arba „RTCPeerConnectionIceErrorEvent.port“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | identityInCanMakePaymentEvent": {
-    "message": "Prekybininko šaltinio ir atsitiktinių duomenų iš „canmakepayment“ pagalbinio „JavaScript“ failo įvykio teikimas nutrauktas ir jie bus pašalinti: topOrigin, paymentRequestOrigin, methodData, modifiers."
-  },
-  "models/issues_manager/DeprecationIssue.ts | insecurePrivateNetworkSubresourceRequest": {
-    "message": "Svetainė pateikė papildomo šaltinio užklausą iš tinklo, kurį ji galėtų pasiekti tik dėl savo naudotojų privilegijuotosios tinklo pozicijos. Šiose užklausose parodomi ne vieši įrenginiai ir serveriai internete, todėl padidėja užklausos iš trečiosios šalies svetainės klastojimo (angl. „cross-site request forgery“, CSRF) atakos ir (arba) informacijos nutekėjimo rizika. Siekdama sumažinti šią riziką, „Chrome“ nutraukia užklausų ne viešiems papildomiems šaltiniams teikimą, kai jos inicijuojamos iš nesaugios aplinkos, ir pradės jas blokuoti."
-  },
-  "models/issues_manager/DeprecationIssue.ts | localCSSFileExtensionRejected": {
-    "message": "CSS kalbos negalima įkelti iš „file:“ URL, nebent jie baigiasi „.css“ failo plėtiniu."
-  },
-  "models/issues_manager/DeprecationIssue.ts | mediaSourceAbortRemove": {
-    "message": "„SourceBuffer.abort()“ naudojimas siekiant nutraukti „remove()“ nesinchronizuoto diapazono pašalinimą nutrauktas dėl specifikacijos pakeitimo. Ateityje palaikymas bus pašalintas. Turėtumėte klausytis updateend įvykio. „abort()“ skirtas naudoti tik norint nutraukti nesinchronizuotos medijos pridėjimą arba iš naujo nustatyti analizavimo įrankio būseną."
-  },
-  "models/issues_manager/DeprecationIssue.ts | mediaSourceDurationTruncatingBuffered": {
-    "message": "„MediaSource.duration“ nustatymas žemiau nei bet kurio į buferį įrašyto užkoduoto rėmelio aukščiausia pristatymo laiko žymė nutrauktas dėl specifikacijos pakeitimo. Sutrumpintos į buferį įrašytos medijos numatomo pašalinimo palaikymas ateityje bus pašalintas. Vietoj to turėtumėte atlikti aiškų „remove(newDuration, oldDuration)“ visuose „sourceBuffers“, kur „newDuration < oldDuration“."
   },
   "models/issues_manager/DeprecationIssue.ts | milestone": {
     "message": "Šis pakeitimas įsigalios paskelbus pagrindinės versijos numerį {milestone}."
   },
-  "models/issues_manager/DeprecationIssue.ts | noSysexWebMIDIWithoutPermission": {
-    "message": "Žiniatinklio MIDI prašys naudojimo leidimo, net jei sistemos išskirtinis pranešimas nenurodytas funkcijoje „MIDIOptions“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | notificationInsecureOrigin": {
-    "message": "Pranešimų API nebegalima naudoti iš nesaugių šaltinių. Turėtumėte apsvarstyti galimybę perjungti programą į saugų šaltinį, pvz., HTTPS. Jei reikia išsamesnės informacijos, žr. https://goo.gle/chrome-insecure-origins."
-  },
-  "models/issues_manager/DeprecationIssue.ts | notificationPermissionRequestedIframe": {
-    "message": "Pranešimų API leidimo užklausų nebegalima teikti iš skirtingų šaltinių „iframe“. Vietoj to turėtumėte apsvarstyti galimybę teikti leidimo užklausą iš aukščiausio lygio rėmelio arba atidaryti naują langą."
-  },
-  "models/issues_manager/DeprecationIssue.ts | obsoleteCreateImageBitmAPImageOrientationNone": {
-    "message": "Parinktis „imageOrientation: \"none\"“, esanti „createImageBitmap“, nebenaudojama. Vietoje to naudokite „createImageBitmap“ su parinktimi {imageOrientation: \"from-image\"}."
-  },
-  "models/issues_manager/DeprecationIssue.ts | obsoleteWebRtcCipherSuite": {
-    "message": "Jūsų partneris derasi dėl pasenusios (D)TLS versijos. Susisiekite su partneriu, kad tai sutvarkytumėte."
-  },
-  "models/issues_manager/DeprecationIssue.ts | openWebDatabaseInsecureContext": {
-    "message": "„WebSQL“ nesaugiame kontekste nebenaudojamas ir netrukus bus pašalintas. Naudokite žiniatinklio saugyklą arba indeksuotą duomenų bazę."
-  },
-  "models/issues_manager/DeprecationIssue.ts | overflowVisibleOnReplacedElement": {
-    "message": "Žymose „img“, „video“ ir „canvas“ nurodžius „overflow: visible“, vaizdo turinys gali būti sukurtas už elemento ribų. Žr. https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md."
-  },
-  "models/issues_manager/DeprecationIssue.ts | paymentInstruments": {
-    "message": "„paymentManager.instruments“ teikimas nutrauktas. Mokėjimų doroklėms naudokite tiesioginį diegimą."
-  },
-  "models/issues_manager/DeprecationIssue.ts | paymentRequestCSPViolation": {
-    "message": "„PaymentRequest“ iškvietimas apėjo turinio apsaugos politikos (CSP) direktyvą „connect-src“. Šis apėjimas nebenaudojamas. Pridėkite mokėjimo metodo identifikatorių iš „PaymentRequest“ API (lauke „supportedMethods“) prie CSP direktyvos „connect-src“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | persistentQuotaType": {
-    "message": "„StorageType.persistent“ teikimas nutrauktas. Vietoj to naudokite standartizuotą „navigator.storage“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | pictureSourceSrc": {
-    "message": "Elementas „<source src>“ su „<picture>“ aukštesniuoju elementu netinkamas, todėl jo nepaisoma. Vietoj jo naudokite „<source srcset>“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | prefixedStorageInfo": {
-    "message": "„window.webkitStorageInfo“ teikimas nutrauktas. Vietoj to naudokite standartizuotą „navigator.storage“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | privacySandboxExtensionsAPI": {
-    "message": "Nebenaudosime API chrome.privacy.websites.privacySandboxEnabled, bet ji liks aktyvi, kad būtų užtikrintas atgalinis suderinamumas, kol bus išleista M113 versija. Dabar naudokite chrome.privacy.websites.topicsEnabled, chrome.privacy.websites.fledgeEnabled ir chrome.privacy.websites.adMeasurementEnabled. Žr. https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled."
-  },
-  "models/issues_manager/DeprecationIssue.ts | requestedSubresourceWithEmbeddedCredentials": {
-    "message": "Papildomų šaltinių užklausos, kurių URL yra įterptų prisijungimo duomenų (pvz., „https://user:pass@host/“), yra užblokuotos."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcConstraintEnableDtlsSrtpFalse": {
-    "message": "Apribojimas „DtlsSrtpKeyAgreement“ pašalintas. Nurodėte šio apribojimo „false“ vertę, kuri interpretuojama kaip bandymas naudoti pašalintą „SDES key negotiation“ metodą. Ši funkcija pašalinta; vietoj jos naudokite paslaugą, kuri palaiko „DTLS key negotiation“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcConstraintEnableDtlsSrtpTrue": {
-    "message": "Apribojimas „DtlsSrtpKeyAgreement“ pašalintas. Nurodėte šio apribojimo „true“ vertę, kuri neturėjo jokio poveikio, bet galite pašalinti šį apribojimą, kad būtų tvarkingiau."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcPeerConnectionComplexPlanBSdpUsingDefaultSdpSemantics": {
-    "message": "Aptikta „Complex Plan B SDP“. Šis „Session Description Protocol“ dialektas nebepalaikomas. Vietoj jo naudokite „Unified Plan SDP“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcPeerConnectionSdpSemanticsPlanB": {
-    "message": "„Plan B SDP semantics“, kuris naudojamas kuriant „RTCPeerConnection“, naudojant „{sdpSemantics:'plan-b'}“, yra pasenusi nestandartinė „Session Description Protocol“ versija, kuri buvo visam laikui ištrinta iš žiniatinklio platformos. Ji vis dar pasiekiama, jei kuriama naudojant „IS_FUCHSIA“, bet ketiname ją kuo greičiau ištrinti. Nebenaudokite jos. Būseną žr. adresu https://crbug.com/1302249."
-  },
-  "models/issues_manager/DeprecationIssue.ts | rtcpMuxPolicyNegotiate": {
-    "message": "„rtcpMuxPolicy“ parinkties teikimas nutrauktas ir ji bus pašalinta."
-  },
-  "models/issues_manager/DeprecationIssue.ts | sharedArrayBufferConstructedWithoutIsolation": {
-    "message": "Funkcijai „SharedArrayBuffer“ reikalinga apsauga nuo subjektų iš kitų domenų. Jei reikia išsamesnės informacijos, žr. https://developer.chrome.com/blog/enabling-shared-array-buffer/."
-  },
-  "models/issues_manager/DeprecationIssue.ts | textToSpeech_DisallowedByAutoplay": {
-    "message": "Funkcijos „speechSynthesis.speak()“ be naudotojo suaktyvinimo teikimas nutrauktas ir ji bus pašalinta."
-  },
   "models/issues_manager/DeprecationIssue.ts | title": {
     "message": "Naudojama funkcija, kurios teikimas nutrauktas"
-  },
-  "models/issues_manager/DeprecationIssue.ts | v8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
-    "message": "Plėtiniams reikia pasirinkti apsaugą nuo subjektų iš kitų domenų, norint toliau naudoti „SharedArrayBuffer“. Žr. https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/."
-  },
-  "models/issues_manager/DeprecationIssue.ts | vendorSpecificApi": {
-    "message": "Funkcija „{PH1}“ yra konkretaus paslaugų teikėjo. Vietoj jos naudokite įprastą funkciją „{PH2}“."
-  },
-  "models/issues_manager/DeprecationIssue.ts | xhrJSONEncodingDetection": {
-    "message": "UTF-16 nepalaikomas atsako JSON naudojant funkciją „XMLHttpRequest“"
-  },
-  "models/issues_manager/DeprecationIssue.ts | xmlHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
-    "message": "Sinchroninės funkcijos „XMLHttpRequest“ pagrindinėje grupėje teikimas nutrauktas dėl jos žalingo poveikio galutinio naudotojo funkcijoms. Jei reikia daugiau pagalbos, žr. https://xhr.spec.whatwg.org/."
-  },
-  "models/issues_manager/DeprecationIssue.ts | xrSupportsSession": {
-    "message": "Funkcijos „supportsSession()“ teikimas nutrauktas. Vietoj jos naudokite funkciją „isSessionSupported()“ ir patikrinkite priskirtą loginę vertę."
   },
   "models/issues_manager/FederatedAuthRequestIssue.ts | fedCm": {
     "message": "Sietinio prisijungimo duomenų valdymo API"
   },
+  "models/issues_manager/FederatedAuthUserInfoRequestIssue.ts | fedCmUserInfo": {
+    "message": "Sietinio prisijungimo duomenų valdymo naudotojo informacijos API"
+  },
+  "models/issues_manager/GenericIssue.ts | autocompleteAttributePageTitle": {
+    "message": "HTML atributas: automatinis užbaigimas"
+  },
   "models/issues_manager/GenericIssue.ts | crossOriginPortalPostMessage": {
     "message": "Portalai – vieno šaltinio ryšio kanalai"
+  },
+  "models/issues_manager/GenericIssue.ts | howDoesAutofillWorkPageTitle": {
+    "message": "Kaip veikia automatinis pildymas?"
+  },
+  "models/issues_manager/GenericIssue.ts | inputFormElementPageTitle": {
+    "message": "Formos įvesties elementas"
+  },
+  "models/issues_manager/GenericIssue.ts | labelFormlementsPageTitle": {
+    "message": "Etiketės elementai"
   },
   "models/issues_manager/HeavyAdIssue.ts | handlingHeavyAdInterventions": {
     "message": "Sudėtingų skelbimų intervencijų apdorojimas"
@@ -1565,17 +1616,11 @@
   "models/issues_manager/MixedContentIssue.ts | preventingMixedContent": {
     "message": "Neleidžiamas įvairus turinys"
   },
-  "models/issues_manager/NavigatorUserAgentIssue.ts | userAgentReduction": {
-    "message": "Naudotojo priemonės eilutės sumažinimas"
-  },
   "models/issues_manager/QuirksModeIssue.ts | documentCompatibilityMode": {
     "message": "Dokumentų suderinamumo režimas"
   },
   "models/issues_manager/SharedArrayBufferIssue.ts | enablingSharedArrayBuffer": {
     "message": "SharedArrayBuffer įgalinimas"
-  },
-  "models/issues_manager/TrustedWebActivityIssue.ts | changesToQualityCriteriaForPwas": {
-    "message": "LŽP, naudojančių patikimą žiniatinklio veiklą, kokybės kriterijų pakeitimai"
   },
   "models/logs/NetworkLog.ts | anonymous": {
     "message": "<anoniminis>"
@@ -1732,9 +1777,6 @@
   },
   "models/timeline_model/TimelineModel.ts | unknownWorkletS": {
     "message": "Aukciono darbų blokas – {PH1}"
-  },
-  "models/timeline_model/TimelineModel.ts | userInteractions": {
-    "message": "Naudotojo sąveikos"
   },
   "models/timeline_model/TimelineModel.ts | workerS": {
     "message": "Worker – {PH1}"
@@ -2336,9 +2378,6 @@
   "panels/application/AppManifestView.ts | newNoteUrl": {
     "message": "Naujų užrašų URL"
   },
-  "panels/application/AppManifestView.ts | noMatchingServiceWorkerDetected": {
-    "message": "Nerasta atitinkančio service worker. Gali reikėti iš naujo įkelti puslapį arba patikrinti, ar dabartinio puslapio service worker apima aprašo aprėptį ir pradžios URL."
-  },
   "panels/application/AppManifestView.ts | noPlayStoreIdProvided": {
     "message": "Nepateiktas „Play“ parduotuvės ID"
   },
@@ -2374,12 +2413,6 @@
   },
   "panels/application/AppManifestView.ts | presentation": {
     "message": "Pristatymas"
-  },
-  "panels/application/AppManifestView.ts | primaryIconasUsedByChrome": {
-    "message": "Pagrindinė „Chrome“ naudojama piktograma"
-  },
-  "panels/application/AppManifestView.ts | primaryManifestIconFromS": {
-    "message": "Pagrindinė aprašo piktograma iš {PH1}"
   },
   "panels/application/AppManifestView.ts | protocolHandlers": {
     "message": "Protokolo doroklės"
@@ -2449,9 +2482,6 @@
   },
   "panels/application/AppManifestView.ts | themeColor": {
     "message": "Temos spalva"
-  },
-  "panels/application/ApplicationPanelPreloadingSection.ts | prefetchingAndPrerendering": {
-    "message": "Gavimas ir pateikimas iš anksto"
   },
   "panels/application/ApplicationPanelSidebar.ts | appManifest": {
     "message": "Programos aprašas"
@@ -2624,6 +2654,9 @@
   "panels/application/BackgroundServiceView.ts | timestamp": {
     "message": "Laiko žymė"
   },
+  "panels/application/BounceTrackingMitigationsTreeElement.ts | bounceTrackingMitigations": {
+    "message": "Peradresavimų stebėjimo sumažėjimai"
+  },
   "panels/application/CookieItemsView.ts | clearAllCookies": {
     "message": "Išvalyti visus slapukus"
   },
@@ -2732,9 +2765,6 @@
   "panels/application/IndexedDBViews.ts | keyString": {
     "message": "Raktas"
   },
-  "panels/application/IndexedDBViews.ts | loading": {
-    "message": "Įkeliama…"
-  },
   "panels/application/IndexedDBViews.ts | objectStores": {
     "message": "Objektų parduotuvės"
   },
@@ -2749,9 +2779,6 @@
   },
   "panels/application/IndexedDBViews.ts | refreshDatabase": {
     "message": "Atnaujinti duomenų bazę"
-  },
-  "panels/application/IndexedDBViews.ts | securityOrigin": {
-    "message": "Saugos šaltinis"
   },
   "panels/application/IndexedDBViews.ts | showNextPage": {
     "message": "Rodyti kitą puslapį"
@@ -2836,6 +2863,9 @@
   },
   "panels/application/OpenedWindowDetailsView.ts | yes": {
     "message": "Taip"
+  },
+  "panels/application/PreloadingTreeElement.ts | thisPage": {
+    "message": "Šis puslapis"
   },
   "panels/application/ReportingApiReportsView.ts | clickToDisplayBody": {
     "message": "Spustelėkite bet kurią ataskaitą, jei norite peržiūrėti jos turinį"
@@ -3062,11 +3092,11 @@
   "panels/application/StorageItemsView.ts | refreshedStatus": {
     "message": "Lentelė atnaujinta"
   },
+  "panels/application/StorageView.ts | SiteDataCleared": {
+    "message": "Svetainės duomenys išvalyti"
+  },
   "panels/application/StorageView.ts | application": {
     "message": "Programa"
-  },
-  "panels/application/StorageView.ts | cache": {
-    "message": "Talpykla"
   },
   "panels/application/StorageView.ts | cacheStorage": {
     "message": "Talpyklos saugykla"
@@ -3103,6 +3133,9 @@
   },
   "panels/application/StorageView.ts | numberMustBeNonNegative": {
     "message": "Skaičius negali būti neigiamas"
+  },
+  "panels/application/StorageView.ts | numberMustBeSmaller": {
+    "message": "Skaičius turi būti mažesnis nei {PH1}"
   },
   "panels/application/StorageView.ts | other": {
     "message": "Kita"
@@ -3147,7 +3180,7 @@
     "message": "Žiniatinklio SQL"
   },
   "panels/application/TrustTokensTreeElement.ts | trustTokens": {
-    "message": "Patikimi prieigos raktai"
+    "message": "Privatūs prieigos raktai"
   },
   "panels/application/application-meta.ts | application": {
     "message": "Programa"
@@ -3181,9 +3214,6 @@
   },
   "panels/application/components/BackForwardCacheStrings.ts | appBanner": {
     "message": "Puslapiams, kurie pateikė „AppBanner“ užklausą, šiuo metu negalima taikyti ilgalaikio viso puslapio saugojimo talpykloje funkcijos."
-  },
-  "panels/application/components/BackForwardCacheStrings.ts | authorizationHeader": {
-    "message": "Ilgalaikio viso puslapio saugojimo talpykloje funkcija išjungta dėl palaikymo užklausos."
   },
   "panels/application/components/BackForwardCacheStrings.ts | backForwardCacheDisabled": {
     "message": "Ilgalaikio viso puslapio saugojimo talpykloje funkcija išjungta taikant žymas. Jei norite įgalinti ją vietiniu mastu šiame įrenginyje, apsilankykite adresu chrome://flags/#back-forward-cache."
@@ -3250,6 +3280,9 @@
   },
   "panels/application/components/BackForwardCacheStrings.ts | contentWebUSB": {
     "message": "Puslapiams, kuriuose naudojama „WebUSB“ API, negalima taikyti ilgalaikio viso puslapio saugojimo talpykloje funkcijos."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | cookieDisabled": {
+    "message": "Ilgalaikio viso puslapio saugojimo talpykloje funkcija išjungta, nes slapukai išjungti puslapyje, kuriame naudojama „Cache-Control: no-store“."
   },
   "panels/application/components/BackForwardCacheStrings.ts | dedicatedWorkerOrWorklet": {
     "message": "Puslapiams, kuriuose naudojamas skirtasis scenarijus arba scenarijaus dalis, šiuo metu negalima taikyti ilgalaikio viso puslapio saugojimo talpykloje funkcijos."
@@ -3336,10 +3369,13 @@
     "message": "Puslapiams, kuriuose įterpta „JavaScript“ naudojant plėtinius, šiuo metu negalima taikyti ilgalaikio viso puslapio saugojimo talpykloje funkcijos."
   },
   "panels/application/components/BackForwardCacheStrings.ts | injectedStyleSheet": {
-    "message": "Puslapiams, kuriuose įterptas stiliaus aprašas naudojant plėtinius, šiuo metu negalima taikyti ilgalaikio viso puslapio saugojimo talpykloje funkcijos."
+    "message": "Puslapiams, kuriuose įterpta „StyleSheet“ naudojant plėtinius, šiuo metu negalima taikyti ilgalaikio viso puslapio saugojimo talpykloje funkcijos."
   },
   "panels/application/components/BackForwardCacheStrings.ts | internalError": {
     "message": "Vidinė klaida."
+  },
+  "panels/application/components/BackForwardCacheStrings.ts | jsNetworkRequestReceivedCacheControlNoStoreResource": {
+    "message": "Ilgalaikio viso puslapio saugojimo talpykloje funkcija išjungta, nes kai kurios „JavaScript“ tinklo užklausos gavo šaltinį su antrašte „Cache-Control: no-store“."
   },
   "panels/application/components/BackForwardCacheStrings.ts | keepaliveRequest": {
     "message": "Ilgalaikio viso puslapio saugojimo talpykloje funkcija išjungta dėl palaikymo užklausos."
@@ -3586,6 +3622,27 @@
   },
   "panels/application/components/BackForwardCacheView.ts | url": {
     "message": "URL"
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | bounceTrackingMitigationsTitle": {
+    "message": "Peradresavimų stebėjimo sumažėjimai"
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | checkingPotentialTrackers": {
+    "message": "Tikrinama, ar yra galimų peradresavimų stebėjimo svetainių."
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | forceRun": {
+    "message": "Priverstinai paleisti"
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | learnMore": {
+    "message": "Sužinokite daugiau: peradresavimų stebėjimo sumažėjimai"
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | noPotentialBounceTrackersIdentified": {
+    "message": "Nebuvo išvalyta jokių potencialių peradresavimų stebėjimo svetainių būsena. Nė vienas iš jų nebuvo nustatytas, neįgalinti peradresavimų stebėjimo sumažinimai arba neužblokuoti trečiųjų šalių slapukai."
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | runningMitigations": {
+    "message": "Vykdoma"
+  },
+  "panels/application/components/BounceTrackingMitigationsView.ts | stateDeletedFor": {
+    "message": "Buvo ištrinta toliau nurodytų svetainių būsena."
   },
   "panels/application/components/EndpointsGrid.ts | noEndpointsToDisplay": {
     "message": "Nėra galutinių taškų, kuriuos būtų galima rodyti"
@@ -4022,23 +4079,14 @@
   "panels/application/components/SharedStorageMetadataView.ts | creation": {
     "message": "Sukūrimo laikas"
   },
-  "panels/application/components/SharedStorageMetadataView.ts | entries": {
-    "message": "Įrašai"
-  },
   "panels/application/components/SharedStorageMetadataView.ts | entropyBudget": {
     "message": "Neperprantamų rėmelių entropijos likutis"
-  },
-  "panels/application/components/SharedStorageMetadataView.ts | metadata": {
-    "message": "Metaduomenys"
   },
   "panels/application/components/SharedStorageMetadataView.ts | notYetCreated": {
     "message": "Dar nesukurta"
   },
   "panels/application/components/SharedStorageMetadataView.ts | numEntries": {
     "message": "Įrašų skaičius"
-  },
-  "panels/application/components/SharedStorageMetadataView.ts | origin": {
-    "message": "Šaltinis"
   },
   "panels/application/components/SharedStorageMetadataView.ts | resetBudget": {
     "message": "Iš naujo nustatyti biudžetą"
@@ -4049,83 +4097,287 @@
   "panels/application/components/StackTrace.ts | cannotRenderStackTrace": {
     "message": "Nepavyksta pateikti dėklo pėdsako"
   },
+  "panels/application/components/StackTrace.ts | showLess": {
+    "message": "Rodyti mažiau"
+  },
   "panels/application/components/StackTrace.ts | showSMoreFrames": {
     "message": "{n,plural, =1{Rodyti dar # rėmelį}one{Rodyti dar # rėmelį}few{Rodyti dar # rėmelius}many{Rodyti dar # rėmelio}other{Rodyti dar # rėmelių}}"
   },
+  "panels/application/components/StorageMetadataView.ts | bucketName": {
+    "message": "Segmento pavadinimas"
+  },
+  "panels/application/components/StorageMetadataView.ts | durability": {
+    "message": "Patvarumas"
+  },
+  "panels/application/components/StorageMetadataView.ts | expiration": {
+    "message": "Galiojimo pabaigos data"
+  },
+  "panels/application/components/StorageMetadataView.ts | isOpaque": {
+    "message": "Neskaidrus"
+  },
+  "panels/application/components/StorageMetadataView.ts | isThirdParty": {
+    "message": "Yra trečioji šalis"
+  },
+  "panels/application/components/StorageMetadataView.ts | loading": {
+    "message": "Įkeliama…"
+  },
+  "panels/application/components/StorageMetadataView.ts | no": {
+    "message": "Ne"
+  },
+  "panels/application/components/StorageMetadataView.ts | none": {
+    "message": "Nėra"
+  },
+  "panels/application/components/StorageMetadataView.ts | opaque": {
+    "message": "(neskaidru)"
+  },
+  "panels/application/components/StorageMetadataView.ts | origin": {
+    "message": "Šaltinis"
+  },
+  "panels/application/components/StorageMetadataView.ts | persistent": {
+    "message": "Nuolatinis"
+  },
+  "panels/application/components/StorageMetadataView.ts | quota": {
+    "message": "Kvota"
+  },
+  "panels/application/components/StorageMetadataView.ts | topLevelSite": {
+    "message": "Aukščiausio lygio svetainė"
+  },
+  "panels/application/components/StorageMetadataView.ts | yes": {
+    "message": "Taip"
+  },
+  "panels/application/components/StorageMetadataView.ts | yesBecauseAncestorChainHasCrossSite": {
+    "message": "Taip, nes kilmės grandinėje yra trečiosios šalies šaltinis"
+  },
+  "panels/application/components/StorageMetadataView.ts | yesBecauseKeyIsOpaque": {
+    "message": "Taip, nes saugyklos raktas nepermatomas"
+  },
+  "panels/application/components/StorageMetadataView.ts | yesBecauseOriginNotInTopLevelSite": {
+    "message": "Taip, nes šaltinis yra ne aukščiausio lygio svetainė"
+  },
+  "panels/application/components/StorageMetadataView.ts | yesBecauseTopLevelIsOpaque": {
+    "message": "Taip, nes aukščiausio lygio svetainė yra nepermatoma"
+  },
   "panels/application/components/TrustTokensView.ts | allStoredTrustTokensAvailableIn": {
-    "message": "Visi išsaugoti patikimi prieigos raktai pasiekiami šiame naršyklės objekte."
+    "message": "Visi saugomi privatūs prieigos raktai pasiekiami šiame naršyklės objekte."
   },
   "panels/application/components/TrustTokensView.ts | deleteTrustTokens": {
-    "message": "Ištrinti visus saugomus patikimus prieigos raktus, išduotus {PH1}."
+    "message": "Ištrinkite visus {PH1} išduotus saugomus privačius prieigos raktus."
   },
   "panels/application/components/TrustTokensView.ts | issuer": {
     "message": "Išdavėjas"
   },
   "panels/application/components/TrustTokensView.ts | noTrustTokensStored": {
-    "message": "Šiuo metu nesaugoma jokių patikimumo prieigos raktų."
+    "message": "Šiuo metu nesaugomi jokie privatūs prieigos raktai."
   },
   "panels/application/components/TrustTokensView.ts | storedTokenCount": {
     "message": "Išsaugotų prieigos raktų skaičius"
   },
-  "panels/application/preloading/PreloadingView.ts | clearNotOngoing": {
-    "message": "Ištrinti nevykstančius"
+  "panels/application/components/TrustTokensView.ts | trustTokens": {
+    "message": "Privatūs prieigos raktai"
   },
-  "panels/application/preloading/PreloadingView.ts | statusActivated": {
-    "message": "Suaktyvinta"
+  "panels/application/preloading/PreloadingView.ts | extensionSettings": {
+    "message": "Plėtinių nustatymai"
   },
-  "panels/application/preloading/PreloadingView.ts | statusDiscarded": {
-    "message": "Atmesta"
+  "panels/application/preloading/PreloadingView.ts | preloadingPageSettings": {
+    "message": "Išankstinio įkėlimo puslapių nustatymai"
   },
-  "panels/application/preloading/PreloadingView.ts | statusPrerendering": {
-    "message": "Pateikimas iš anksto"
+  "panels/application/preloading/PreloadingView.ts | statusFailure": {
+    "message": "Nepavyko"
   },
-  "panels/application/preloading/PreloadingView.ts | warningDetailPreloadingDisabledByFeatureFlag": {
-    "message": "Išankstinis įkėlimas priverstinai įgalintas, nes kūrėjo įrankiai atidaryti. Kai kūrėjo įrankiai uždaryti, pateikimas iš anksto išjungiamas, nes šis naršyklės seansas priklauso sulaikymo grupei, naudojamai našumui palyginti."
+  "panels/application/preloading/PreloadingView.ts | statusNotTriggered": {
+    "message": "Nesuaktyvinta"
   },
-  "panels/application/preloading/PreloadingView.ts | warningDetailPrerenderingDisabledByFeatureFlag": {
-    "message": "Pateikimas iš anksto priverstinai įgalintas, nes kūrėjo įrankiai atidaryti. Kai kūrėjo įrankiai uždaryti, pateikimas iš anksto išjungiamas, nes šis naršyklės seansas priklauso sulaikymo grupei, naudojamai našumui palyginti."
+  "panels/application/preloading/PreloadingView.ts | statusPending": {
+    "message": "Laukiama"
   },
-  "panels/application/preloading/PreloadingView.ts | warningTitlePreloadingDisabledByFeatureFlag": {
-    "message": "Išankstinis įkėlimas buvo išjungtas, bet dabar jis yra priverstinai įgalintas"
+  "panels/application/preloading/PreloadingView.ts | statusReady": {
+    "message": "Parengta"
   },
-  "panels/application/preloading/PreloadingView.ts | warningTitlePrerenderingDisabledByFeatureFlag": {
-    "message": "Pateikimas iš anksto buvo išjungtas, bet dabar jis yra priverstinai įgalintas"
+  "panels/application/preloading/PreloadingView.ts | statusRunning": {
+    "message": "Vykdoma"
   },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsBasicInformation": {
-    "message": "Bendroji informacija"
+  "panels/application/preloading/PreloadingView.ts | statusSuccess": {
+    "message": "Pavyko"
   },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsStartedAt": {
-    "message": "Prasidėjo"
+  "panels/application/preloading/PreloadingView.ts | validityInvalid": {
+    "message": "Netinkamas"
+  },
+  "panels/application/preloading/PreloadingView.ts | validitySomeRulesInvalid": {
+    "message": "Kai kurios taisyklės netinkamos"
+  },
+  "panels/application/preloading/PreloadingView.ts | validityValid": {
+    "message": "Tinkama"
+  },
+  "panels/application/preloading/PreloadingView.ts | warningDetailPreloadingDisabledByBatterysaver": {
+    "message": "Išankstinis įkėlimas išjungtas dėl operacinės sistemos Akumuliatoriaus tausojimo priemonės režimo."
+  },
+  "panels/application/preloading/PreloadingView.ts | warningDetailPreloadingDisabledByDatasaver": {
+    "message": "Išankstinis įkėlimas išjungtas dėl operacinės sistemos Duomenų taupymo priemonės režimo."
+  },
+  "panels/application/preloading/PreloadingView.ts | warningDetailPreloadingStateDisabled": {
+    "message": "Išankstinis įkėlimas išjungtas dėl naudotojo nustatymų arba plėtinio. Eikite adresu {PH1}, kad sužinotumėte daugiau, arba eikite adresu {PH2}, kad išjungtumėte plėtinį."
+  },
+  "panels/application/preloading/PreloadingView.ts | warningTitlePreloadingStateDisabled": {
+    "message": "Išankstinis įkėlimas išjungtas"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailedStatusFailure": {
+    "message": "Nepavyko įkelti iš anksto."
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailedStatusNotTriggered": {
+    "message": "Išankstinio įkėlimo bandymas dar nesuaktyvintas."
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailedStatusPending": {
+    "message": "Išankstinis įkėlimas tinkamas, bet laukiama."
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailedStatusReady": {
+    "message": "Išankstinis įkėlimas baigtas ir rezultatas paruoštas kitai navigacijai."
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailedStatusRunning": {
+    "message": "Vykdomas išankstinis įkėlimas."
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailedStatusSuccess": {
+    "message": "Išankstinis įkėlimas baigtas ir naudojamas navigacijai."
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsAction": {
+    "message": "Veiksmas"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsDetailedInformation": {
+    "message": "Išsami informacija"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsFailureReason": {
+    "message": "Trikties priežastis"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsRuleSet": {
+    "message": "Taisyklių rinkinys"
   },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsStatus": {
     "message": "Būsena"
   },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsTrigger": {
-    "message": "Aktyviklis"
-  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | selectAnElementForMoreDetails": {
     "message": "Pasirinkite elementą, apie kurį norite gauti išsamios informacijos"
   },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | statusActivated": {
-    "message": "Suaktyvinta"
-  },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | statusDiscarded": {
-    "message": "Atmesta"
-  },
-  "panels/application/preloading/components/PreloadingDetailsReportView.ts | statusPrerendering": {
-    "message": "Pateikimas iš anksto"
-  },
-  "panels/application/preloading/components/PreloadingGrid.ts | startedAt": {
-    "message": "Prasidėjo"
+  "panels/application/preloading/components/PreloadingGrid.ts | action": {
+    "message": "Veiksmas"
   },
   "panels/application/preloading/components/PreloadingGrid.ts | status": {
     "message": "Būsena"
   },
-  "panels/application/preloading/components/PreloadingGrid.ts | trigger": {
-    "message": "Aktyviklis"
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchEvicted": {
+    "message": "Išankstinis gavimas buvo atmestas dėl naujesnio išankstinio gavimo, nes įgalinta |kPrefetchNewLimits|"
   },
-  "panels/application/preloading/components/PreloadingGrid.ts | type": {
-    "message": "Tipas"
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchFailedIneligibleRedirect": {
+    "message": "Išankstinis gavimas buvo peradresuotas, bet peradresavimo URL netinkamas gauti iš anksto."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchFailedInvalidRedirect": {
+    "message": "Išankstinis gavimas buvo peradresuotas, bet dėl peradresavimo kilo problema."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchFailedMIMENotSupported": {
+    "message": "Iš anksto gauti nepavyko, nes nepalaikoma atsako antraštė „Turinio tipas“."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchFailedNetError": {
+    "message": "Nepavyko gauti iš anksto dėl tinklo klaidos."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchFailedNon2XX": {
+    "message": "Nepavyko iš anksto gauti dėl ne 2xx HTTP atsako būsenos kodo."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchFailedPerPageLimitExceeded": {
+    "message": "Išankstinis gavimas nebuvo atliktas, nes inicijuojamame puslapyje jau vykdoma per daug išankstinių gavimų."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchIneligibleRetryAfter": {
+    "message": "Pateiktas ankstesnio išankstinio gavimo šaltinyje HTTP 503 atsakymas su antrašte „Bandyti dar kartą“, kuris dar galioja."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchIsPrivacyDecoy": {
+    "message": "URL nebuvo tinkamas gauti iš anksto, nes buvo registruotas to šaltinio pagalbinis „JavaScript“ failas arba kelių svetainių slapukai, bet išankstinis gavimas vis tiek buvo pateiktas tinkle ir nebuvo naudojamas, siekiant maskuoti, kad naudotojas anksčiau sąveikavo su šaltiniu."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchIsStale": {
+    "message": "Praėjo per daug laiko tarp išankstinio gavimo ir naudojimo, todėl išankstinis gavimas buvo atmestas."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleBatterySaverEnabled": {
+    "message": "Išankstinis gavimas nebuvo atliktas, nes buvo įgalintas Akumuliatoriaus tausojimo priemonės nustatymas."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleBrowserContextOffTheRecord": {
+    "message": "Išankstinis gavimas nebuvo atliktas, nes naršyklė veikia inkognito arba svečio režimu."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleDataSaverEnabled": {
+    "message": "Išankstinis gavimas nebuvo atliktas, nes operacinė sistema veikia Duomenų taupymo priemonės režimu."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleExistingProxy": {
+    "message": "URL negalima iš anksto gauti, nes numatytajame tinklo kontekste jis sukonfigūruotas naudoti tarpinį serverį."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleHostIsNonUnique": {
+    "message": "URL nebuvo tinkamas gauti iš anksto, nes jo priegloba nėra unikali (pvz., ne viešai perduodamas IP adresas ar prieglobos serverio pavadinimas, kuris nėra valdomas registro), bet išankstinis gavimas turėjo būti vykdomas per tarpinį serverį."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleNonDefaultStoragePartition": {
+    "message": "URL buvo netinkamas gauti iš anksto, nes jame naudojamas ne numatytasis saugyklos skaidinys."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligiblePreloadingDisabled": {
+    "message": "Išankstinis gavimas nebuvo atliktas, nes buvo išjungtas išankstinis įkėlimas."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleSameSiteCrossOriginPrefetchRequiredProxy": {
+    "message": "URL nebuvo galima gauti iš anksto, nes numatytojo tinklo konteksto negalima sukonfigūruoti naudoti išankstinio gavimo tarpinį serverį pagal tos pačios svetainės kelių šaltinių išankstinio gavimo užklausą."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleSchemeIsNotHttps": {
+    "message": "URL buvo netinkamas gauti iš anksto, nes jo schema nebuvo „https:“."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleUserHasCookies": {
+    "message": "URL nebuvo tinkamas gauti iš anksto, nes jis buvo keliose svetainėse, bet naudotojas turėjo to šaltinio slapukų."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotEligibleUserHasServiceWorker": {
+    "message": "URL nebuvo tinkamas gauti iš anksto, nes buvo registruotas to šaltinio pagalbinis „JavaScript“ failas, kuris šiuo metu nepalaikomas."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotUsedCookiesChanged": {
+    "message": "Išankstinis gavimas nebuvo naudojamas, nes tai buvo išankstinis gavimas keliose svetainėse ir vykdant išankstinį gavimą buvo pridėta šio URL slapukų, todėl iš anksto gautas atsakymas dabar pasenęs."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchNotUsedProbeFailed": {
+    "message": "Interneto paslaugų teikėjas arba tinklo administratorius užblokavo išankstinį gavimą."
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchProxyNotAvailable": {
+    "message": "Bandant nustatyti iš anksto gaunamą tarpinį serverį įvyko tinklo klaida."
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | buttonClickToRevealInElementsPanel": {
+    "message": "Spustelėkite, kad būtų rodoma elementų skydelyje"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | buttonClickToRevealInNetworkPanel": {
+    "message": "Spustelėkite, kad būtų rodoma tinklo skydelyje"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsDetailedInformation": {
+    "message": "Išsami informacija"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsError": {
+    "message": "Klaida"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsLocation": {
+    "message": "Vietovė"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsSource": {
+    "message": "Šaltinis"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | detailsValidity": {
+    "message": "Galiojimas"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | validityInvalid": {
+    "message": "Netinkama; šaltinis nėra JSON objektas"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | validitySomeRulesInvalid": {
+    "message": "Kai kurios taisyklės netinkamos ir jų nepaisoma"
+  },
+  "panels/application/preloading/components/RuleSetDetailsReportView.ts | validityValid": {
+    "message": "Tinkama"
+  },
+  "panels/application/preloading/components/RuleSetGrid.ts | location": {
+    "message": "Vietovė"
+  },
+  "panels/application/preloading/components/RuleSetGrid.ts | validity": {
+    "message": "Galiojimas"
+  },
+  "panels/application/preloading/components/UsedPreloadingView.ts | prefetchUsed": {
+    "message": "Šiame puslapyje naudojami iš anksto gauti šaltiniai (iš viso: {PH1})"
+  },
+  "panels/application/preloading/components/UsedPreloadingView.ts | preloadingUsedForThisPage": {
+    "message": "Šiam puslapiui naudotas išankstinis įkėlimas"
+  },
+  "panels/application/preloading/components/UsedPreloadingView.ts | prerenderUsed": {
+    "message": "Šis puslapis buvo pateiktas iš anksto"
   },
   "panels/browser_debugger/CategorizedBreakpointsSidebarPane.ts | breakpointHit": {
     "message": "atskaitos taško įvykis"
@@ -4361,6 +4613,9 @@
   "panels/console/ConsoleView.ts | consoleCleared": {
     "message": "Pultas išvalytas"
   },
+  "panels/console/ConsoleView.ts | consolePasteBlocked": {
+    "message": "Kodo įklijavimas šiame puslapyje užblokuotas. Įklijavus kodą kūrėjo įrankiuose, atakų vykdytojai gali perimti jūsų paskyrą."
+  },
   "panels/console/ConsoleView.ts | consoleSettings": {
     "message": "Pulto nustatymai"
   },
@@ -4499,6 +4754,9 @@
   "panels/console/ConsoleViewMessage.ts | clearAllMessagesWithS": {
     "message": "Išvalyti visus pranešimus paspaudus {PH1}"
   },
+  "panels/console/ConsoleViewMessage.ts | cndBreakpoint": {
+    "message": "Sąlyginis stabdos taškas"
+  },
   "panels/console/ConsoleViewMessage.ts | console": {
     "message": "Valdymo pultas"
   },
@@ -4528,6 +4786,9 @@
   },
   "panels/console/ConsoleViewMessage.ts | interventionS": {
     "message": "[Intervention] {PH1}"
+  },
+  "panels/console/ConsoleViewMessage.ts | logpoint": {
+    "message": "Žurnalo vieta"
   },
   "panels/console/ConsoleViewMessage.ts | repeatS": {
     "message": "{n,plural, =1{Pakartota # kartą}one{Pakartota # kartą}few{Pakartota # kartus}many{Pakartota # karto}other{Pakartota # kartų}}"
@@ -4568,6 +4829,9 @@
   "panels/console/console-meta.ts | autocompleteFromHistory": {
     "message": "Automatinis užbaigimas pagal istoriją"
   },
+  "panels/console/console-meta.ts | autocompleteOnEnter": {
+    "message": "Automatinio užbaigimo pasiūlymo priėmimas paspaudus „Enter“"
+  },
   "panels/console/console-meta.ts | clearConsole": {
     "message": "Išvalyti pultą"
   },
@@ -4575,7 +4839,7 @@
     "message": "Pulto istorijos valymas"
   },
   "panels/console/console-meta.ts | collapseConsoleTraceMessagesByDefault": {
-    "message": "Sutraukti console.trace() pranešimus pagal numatytuosius nustatymus"
+    "message": "Neišskleisti „console.trace()“ pranešimų automatiškai"
   },
   "panels/console/console-meta.ts | console": {
     "message": "Valdymo pultas"
@@ -4585,6 +4849,9 @@
   },
   "panels/console/console-meta.ts | doNotAutocompleteFromHistory": {
     "message": "Nebaigti automatiškai iš istorijos"
+  },
+  "panels/console/console-meta.ts | doNotAutocompleteOnEnter": {
+    "message": "Automatinio užbaigimo pasiūlymo nepriėmimas paspaudus „Enter“"
   },
   "panels/console/console-meta.ts | doNotEagerlyEvaluateConsole": {
     "message": "Atidžiai nevertinti pulto raginimo teksto"
@@ -4605,10 +4872,10 @@
     "message": "Atidžiai įvertinti pulto raginimo tekstą"
   },
   "panels/console/console-meta.ts | evaluateTriggersUserActivation": {
-    "message": "Įvertinti naudotojo veiklos aktyviklius"
+    "message": "Kodo įvertinimą laikykite naudotojo veiksmu"
   },
   "panels/console/console-meta.ts | expandConsoleTraceMessagesByDefault": {
-    "message": "Išskleisti console.trace() pranešimus pagal numatytuosius nustatymus"
+    "message": "Automatiškai išskleisti „console.trace()“ pranešimus"
   },
   "panels/console/console-meta.ts | groupSimilarMessagesInConsole": {
     "message": "Grupuoti panašius pranešimus pulte"
@@ -4712,8 +4979,14 @@
   "panels/coverage/CoverageListView.ts | usageVisualization": {
     "message": "Naudojimo vizualizacija"
   },
+  "panels/coverage/CoverageView.ts | activationNoCapture": {
+    "message": "Nepavyko užfiksuoti aprėpties informacijos, nes puslapis buvo iš anksto pateiktas fone."
+  },
   "panels/coverage/CoverageView.ts | all": {
     "message": "Viskas"
+  },
+  "panels/coverage/CoverageView.ts | bfcacheNoCapture": {
+    "message": "Nepavyko užfiksuoti aprėpties informacijos, nes puslapis buvo pateiktas iš ilgalaikio viso puslapio saugojimo talpykloje."
   },
   "panels/coverage/CoverageView.ts | chooseCoverageGranularityPer": {
     "message": "Pasirinkti aprėpties detalumą: pagal funkciją – žemas valdymo laipsnis, pagal bloką – žymus valdymas."
@@ -4754,6 +5027,9 @@
   "panels/coverage/CoverageView.ts | perFunction": {
     "message": "Pagal funkciją"
   },
+  "panels/coverage/CoverageView.ts | reloadPrompt": {
+    "message": "Spustelėkite įkėlimo iš naujo mygtuką {PH1}, kad įkeltumėte iš naujo ir gautumėte aprėptį."
+  },
   "panels/coverage/CoverageView.ts | sOfSSUsedSoFarSUnused": {
     "message": "Iki šiol naudojama {PH1} iš {PH2} ({PH3} proc.), nenaudojama {PH4}."
   },
@@ -4765,6 +5041,9 @@
   },
   "panels/coverage/coverage-meta.ts | instrumentCoverage": {
     "message": "Priemonės aprėptis"
+  },
+  "panels/coverage/coverage-meta.ts | reloadPage": {
+    "message": "Įkelti puslapį iš naujo"
   },
   "panels/coverage/coverage-meta.ts | showCoverage": {
     "message": "Rodyti aprėptį"
@@ -4886,6 +5165,9 @@
   "panels/css_overview/CSSOverviewSidebarPanel.ts | clearOverview": {
     "message": "Išvalyti apžvalgą"
   },
+  "panels/css_overview/CSSOverviewSidebarPanel.ts | cssOverviewPanelSidebar": {
+    "message": "CSS kalbos apžvalgos skydelio šoninė juosta"
+  },
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | bottomAppliedToAStatically": {
     "message": "Bottom vertės pritaikytos statinės pozicijos elementui"
   },
@@ -4968,13 +5250,13 @@
     "message": "URL"
   },
   "panels/developer_resources/DeveloperResourcesView.ts | enableLoadingThroughTarget": {
-    "message": "Įgalinti įkėlimą taikant"
+    "message": "Įkelti per svetainę"
   },
   "panels/developer_resources/DeveloperResourcesView.ts | enterTextToSearchTheUrlAndError": {
     "message": "Įveskite URL ir klaidų stulpelių paieškos tekstą"
   },
   "panels/developer_resources/DeveloperResourcesView.ts | loadHttpsDeveloperResources": {
-    "message": "Įkelti HTTP(S) kūrėjo šaltinius naudojant patikrintą tikslą"
+    "message": "Įkelkite HTTP(S) kūrėjo šaltinius per svetainę, kurią tikrinate, o ne naudodami kūrėjo įrankius"
   },
   "panels/developer_resources/DeveloperResourcesView.ts | resources": {
     "message": "{n,plural, =1{# šaltinis}one{# šaltinis}few{# šaltiniai}many{# šaltinio}other{# šaltinių}}"
@@ -4987,6 +5269,9 @@
   },
   "panels/developer_resources/developer_resources-meta.ts | showDeveloperResources": {
     "message": "Rodyti kūrėjų šaltinius"
+  },
+  "panels/elements/CSSRuleValidator.ts | fontVariationSettingsWarning": {
+    "message": "Nustatymo „{PH1}“ {PH2} vertė nepatenka į palaikomų verčių diapazoną [{PH3}, {PH4}], taikomą šriftų šeimai „{PH5}“."
   },
   "panels/elements/CSSRuleValidator.ts | ruleViolatedByParentElementRuleFix": {
     "message": "Pabandykite pirminiame elemente pakeisti nuosavybę „{EXISTING_PARENT_ELEMENT_RULE}“ į „{TARGET_PARENT_ELEMENT_RULE}“."
@@ -5068,9 +5353,6 @@
   },
   "panels/elements/ElementsPanel.ts | findByStringSelectorOrXpath": {
     "message": "Ieškoti pagal eilutę, parinkiklį arba XPath"
-  },
-  "panels/elements/ElementsPanel.ts | frame": {
-    "message": "Rėmelis"
   },
   "panels/elements/ElementsPanel.ts | hideComputedStylesSidebar": {
     "message": "Slėpti apskaičiuotų stilių šoninę juostą"
@@ -5372,9 +5654,6 @@
   "panels/elements/StylePropertyTreeElement.ts | togglePropertyAndContinueEditing": {
     "message": "Perjungti nuosavybę ir toliau redaguoti"
   },
-  "panels/elements/StylePropertyTreeElement.ts | valueForSettingSSIsOutsideThe": {
-    "message": "Nustatymo „{PH1}“ {PH2} vertė nepatenka į palaikomų verčių diapazoną [{PH3}, {PH4}], taikomą šriftų šeimai „{PH5}“."
-  },
   "panels/elements/StylePropertyTreeElement.ts | viewComputedValue": {
     "message": "Žr. apskaičiuotą vertę"
   },
@@ -5388,7 +5667,7 @@
     "message": "Nukopijuota į iškarpinę"
   },
   "panels/elements/StylesSidebarPane.ts | copyAllCSSChanges": {
-    "message": "Kopijuokite visus CSS kalbos pakeitimus"
+    "message": "Kopijuoti CSS kalbos pakeitimus"
   },
   "panels/elements/StylesSidebarPane.ts | cssPropertyName": {
     "message": "CSS nuosavybės pavadinimas: {PH1}"
@@ -5432,6 +5711,9 @@
   "panels/elements/StylesSidebarPane.ts | pseudoSElement": {
     "message": "Fiktyvus ::{PH1} elementas"
   },
+  "panels/elements/StylesSidebarPane.ts | specificity": {
+    "message": "Specifiškumas: {PH1}"
+  },
   "panels/elements/StylesSidebarPane.ts | toggleRenderingEmulations": {
     "message": "Perjungti įprastas pateikimo emuliacijas"
   },
@@ -5454,6 +5736,12 @@
     "message": "Ženklelių rodymas"
   },
   "panels/elements/components/CSSHintDetailsView.ts | learnMore": {
+    "message": "Sužinokite daugiau"
+  },
+  "panels/elements/components/CSSPropertyDocsView.ts | dontShow": {
+    "message": "Nerodyti"
+  },
+  "panels/elements/components/CSSPropertyDocsView.ts | learnMore": {
     "message": "Sužinokite daugiau"
   },
   "panels/elements/components/ElementsBreadcrumbs.ts | breadcrumbs": {
@@ -5548,6 +5836,9 @@
   },
   "panels/elements/elements-meta.ts | selectAnElementInThePageTo": {
     "message": "Norimo tikrinti elemento puslapyje pasirinkimas"
+  },
+  "panels/elements/elements-meta.ts | showCSSDocumentationTooltip": {
+    "message": "Rodyti CSS dokumentų patarimą"
   },
   "panels/elements/elements-meta.ts | showComputedStyles": {
     "message": "Rodyti apskaičiuotus stilius"
@@ -5924,29 +6215,14 @@
   "panels/issues/AffectedSourcesView.ts | nSources": {
     "message": "{n,plural, =1{# šaltinis}one{# šaltinis}few{# šaltiniai}many{# šaltinio}other{# šaltinių}}"
   },
-  "panels/issues/AffectedTrustedWebActivityIssueDetailsView.ts | nResources": {
-    "message": "{n,plural, =1{# šaltinis}one{# šaltinis}few{# šaltiniai}many{# šaltinio}other{# šaltinių}}"
-  },
-  "panels/issues/AffectedTrustedWebActivityIssueDetailsView.ts | packageName": {
-    "message": "Paketo pavadinimas"
-  },
-  "panels/issues/AffectedTrustedWebActivityIssueDetailsView.ts | packageSignature": {
-    "message": "Paketo parašas"
-  },
-  "panels/issues/AffectedTrustedWebActivityIssueDetailsView.ts | statusCode": {
-    "message": "Būsenos kodas"
-  },
-  "panels/issues/AffectedTrustedWebActivityIssueDetailsView.ts | url": {
-    "message": "URL"
+  "panels/issues/AffectedTrackingSitesView.ts | nTrackingSites": {
+    "message": "{n,plural, =1{Viena potencialiai stebima svetainė}one{# potencialiai stebima svetainė}few{# potencialiai stebimos svetainės}many{# potencialiai stebimos svetainės}other{# potencialiai stebimų svetainių}}"
   },
   "panels/issues/AttributionReportingIssueDetailsView.ts | element": {
     "message": "Elementas"
   },
   "panels/issues/AttributionReportingIssueDetailsView.ts | invalidHeaderValue": {
     "message": "Netinkama antraštės vertė"
-  },
-  "panels/issues/AttributionReportingIssueDetailsView.ts | maximumConcurrentRegistrations": {
-    "message": "Didžiausias vienu metu vykstančių registracijų skaičius"
   },
   "panels/issues/AttributionReportingIssueDetailsView.ts | nViolations": {
     "message": "{n,plural, =1{# pažeidimas}one{# pažeidimas}few{# pažeidimai}many{# pažeidimo}other{# pažeidimų}}"
@@ -6157,9 +6433,6 @@
   },
   "panels/issues/IssuesPane.ts | samesiteCookie": {
     "message": "„SameSite“ slapukas"
-  },
-  "panels/issues/IssuesPane.ts | trustedWebActivity": {
-    "message": "Patikima žiniatinklio veikla"
   },
   "panels/issues/components/HideIssuesMenu.ts | tooltipTitle": {
     "message": "Problemų slėpimas"
@@ -6389,8 +6662,8 @@
   "panels/lighthouse/LighthouseController.ts | bestPractices": {
     "message": "Geriausia praktika"
   },
-  "panels/lighthouse/LighthouseController.ts | canOnlyAuditHttphttpsPagesAnd": {
-    "message": "Gali tikrinti tik HTTP ir HTTPS puslapius bei „Chrome“ plėtinius. Eikite į kitą puslapį, kur galima pradėti tikrinti."
+  "panels/lighthouse/LighthouseController.ts | canOnlyAuditHttphttpsPages": {
+    "message": "Galima tikrinti tik HTTP arba HTTPS puslapius. Eikite į kitą puslapį."
   },
   "panels/lighthouse/LighthouseController.ts | clearStorage": {
     "message": "Išvalyti saugyklą"
@@ -6899,9 +7172,6 @@
   "panels/mobile_throttling/ThrottlingManager.ts | hardwareConcurrencyIsEnabled": {
     "message": "Įgalintas aparatinės įrangos vienalaikiškumo nepaisymas"
   },
-  "panels/mobile_throttling/ThrottlingManager.ts | hardwareConcurrencyValue": {
-    "message": "Navigator.hardwareConcurrency vertė"
-  },
   "panels/mobile_throttling/ThrottlingManager.ts | noThrottling": {
     "message": "Duomenų srautas neribojamas"
   },
@@ -7160,6 +7430,9 @@
   "panels/network/NetworkDataGridNode.ts | finished": {
     "message": "Baigta"
   },
+  "panels/network/NetworkDataGridNode.ts | hasOverriddenHeaders": {
+    "message": "Užklausoje yra nepaisomų antraščių"
+  },
   "panels/network/NetworkDataGridNode.ts | level": {
     "message": "1 lygis"
   },
@@ -7305,10 +7578,10 @@
     "message": "Laikas"
   },
   "panels/network/NetworkItemView.ts | trustTokenOperationDetails": {
-    "message": "Patikimo prieigos rakto išsami veikimo informacija"
+    "message": "Privataus prieigos rakto išsami operacijos informacija"
   },
   "panels/network/NetworkItemView.ts | trustTokens": {
-    "message": "Patikimi prieigos raktai"
+    "message": "Privatūs prieigos raktai"
   },
   "panels/network/NetworkItemView.ts | websocketMessages": {
     "message": "„WebSocket“ pranešimai"
@@ -7594,9 +7867,6 @@
   },
   "panels/network/NetworkPanel.ts | captureScreenshotsWhenLoadingA": {
     "message": "Užfiksuoti ekrano kopijas įkeliant puslapį"
-  },
-  "panels/network/NetworkPanel.ts | clear": {
-    "message": "Išvalyti"
   },
   "panels/network/NetworkPanel.ts | close": {
     "message": "Uždaryti"
@@ -8264,6 +8534,9 @@
   "panels/network/components/RequestTrustTokensView.ts | success": {
     "message": "Pavyko"
   },
+  "panels/network/components/RequestTrustTokensView.ts | theKeysForThisPSTIssuerAreUnavailable": {
+    "message": "Šio PST išdavėjo raktai nepasiekiami. Gali būti, kad išdavėją reikia užregistruoti vykdant „Chrome“ registracijos procesą."
+  },
   "panels/network/components/RequestTrustTokensView.ts | theOperationFailedForAnUnknown": {
     "message": "Operacija nepavyko dėl nežinomos priežasties."
   },
@@ -8308,6 +8581,9 @@
   },
   "panels/network/components/WebBundleInfoView.ts | bundledResource": {
     "message": "Į grupę įtrauktas šaltinis"
+  },
+  "panels/network/network-meta.ts | clear": {
+    "message": "Išvalyti tinklo žurnalą"
   },
   "panels/network/network-meta.ts | colorCode": {
     "message": "spalvos kodas"
@@ -9002,6 +9278,21 @@
   "panels/profiler/ProfilesPanel.ts | clearAllProfiles": {
     "message": "Išvalyti visus profilius"
   },
+  "panels/profiler/ProfilesPanel.ts | deprecationWarnMsg": {
+    "message": "Šis skydelis būsimoje versijoje bus nebeteikiamas. „JavaScript“ centrinio procesoriaus profiliams įrašyti naudokite našumo skydelį."
+  },
+  "panels/profiler/ProfilesPanel.ts | enableThisPanelTemporarily": {
+    "message": "Laikinai įgalinti šį skydelį"
+  },
+  "panels/profiler/ProfilesPanel.ts | feedback": {
+    "message": "Atsiliepimai"
+  },
+  "panels/profiler/ProfilesPanel.ts | goToPerformancePanel": {
+    "message": "Eikite į puslapį „Našumo skydelis“"
+  },
+  "panels/profiler/ProfilesPanel.ts | learnMore": {
+    "message": "Sužinokite daugiau"
+  },
   "panels/profiler/ProfilesPanel.ts | load": {
     "message": "Įkelti…"
   },
@@ -9041,14 +9332,26 @@
   "panels/profiler/profiler-meta.ts | stopRecordingHeapAllocations": {
     "message": "Stabdyti atminties paskirstymų įrašymą"
   },
+  "panels/protocol_monitor/ProtocolMonitor.ts | CDPCommandEditorHidden": {
+    "message": "CDP komandų redagavimo priemonė paslėpta"
+  },
+  "panels/protocol_monitor/ProtocolMonitor.ts | CDPCommandEditorShown": {
+    "message": "CDP komandų redagavimo priemonė rodoma"
+  },
   "panels/protocol_monitor/ProtocolMonitor.ts | clearAll": {
     "message": "Išvalyti viską"
   },
   "panels/protocol_monitor/ProtocolMonitor.ts | documentation": {
     "message": "Dokumentacija"
   },
+  "panels/protocol_monitor/ProtocolMonitor.ts | elapsedTime": {
+    "message": "Likęs laikas"
+  },
   "panels/protocol_monitor/ProtocolMonitor.ts | filter": {
     "message": "Filtruoti"
+  },
+  "panels/protocol_monitor/ProtocolMonitor.ts | hideCDPCommandEditor": {
+    "message": "Slėpti CDP komandų redagavimo priemonę"
   },
   "panels/protocol_monitor/ProtocolMonitor.ts | method": {
     "message": "Metodas"
@@ -9083,6 +9386,9 @@
   "panels/protocol_monitor/ProtocolMonitor.ts | session": {
     "message": "Seansas"
   },
+  "panels/protocol_monitor/ProtocolMonitor.ts | showCDPCommandEditor": {
+    "message": "Rodyti CDP komandų redagavimo priemonę"
+  },
   "panels/protocol_monitor/ProtocolMonitor.ts | target": {
     "message": "Tikslas"
   },
@@ -9097,6 +9403,360 @@
   },
   "panels/protocol_monitor/protocol_monitor-meta.ts | showProtocolMonitor": {
     "message": "Rodyti protokolo stebėjimo priemonę"
+  },
+  "panels/recorder/RecorderController.ts | continueReplay": {
+    "message": "Tęsti"
+  },
+  "panels/recorder/RecorderController.ts | copyShortcut": {
+    "message": "Kopijuoti įrašą arba pasirinktą veiksmą"
+  },
+  "panels/recorder/RecorderController.ts | createRecording": {
+    "message": "Kurti naują įrašą"
+  },
+  "panels/recorder/RecorderController.ts | deleteRecording": {
+    "message": "Ištrinti įrašą"
+  },
+  "panels/recorder/RecorderController.ts | export": {
+    "message": "Eksportavimas"
+  },
+  "panels/recorder/RecorderController.ts | exportRecording": {
+    "message": "Eksportuoti"
+  },
+  "panels/recorder/RecorderController.ts | exportViaExtensions": {
+    "message": "Eksportavimas naudojant plėtinius"
+  },
+  "panels/recorder/RecorderController.ts | getExtensions": {
+    "message": "Gauti plėtinių…"
+  },
+  "panels/recorder/RecorderController.ts | importRecording": {
+    "message": "Importuoti įrašą"
+  },
+  "panels/recorder/RecorderController.ts | replayRecording": {
+    "message": "Pakartoti įrašą"
+  },
+  "panels/recorder/RecorderController.ts | sendFeedback": {
+    "message": "Siųsti atsiliepimą"
+  },
+  "panels/recorder/RecorderController.ts | startStopRecording": {
+    "message": "Pradėti arba sustabdyti įrašymą"
+  },
+  "panels/recorder/RecorderController.ts | stepOverReplay": {
+    "message": "Atlikti vieną veiksmą"
+  },
+  "panels/recorder/RecorderController.ts | toggleCode": {
+    "message": "Perjungti kodo rodinį"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | cancelRecording": {
+    "message": "Atšaukti įrašymą"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | createRecording": {
+    "message": "Kurti naują įrašą"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | includeNecessarySelectors": {
+    "message": "Turite pasirinkti CSS, „Pierce“ arba „XPath“ kaip vieną iš parinkčių. Garantuojamas tik šių parinkiklių įrašymas, nes ARIA ir teksto parinkikliai negali būti unikalūs."
+  },
+  "panels/recorder/components/CreateRecordingView.ts | recordingName": {
+    "message": "Įrašo pavadinimas"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | recordingNameIsRequired": {
+    "message": "Būtina nurodyti įrašo pavadinimą"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorAttribute": {
+    "message": "Parinkiklio atributas"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorTypeARIA": {
+    "message": "ARIA"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorTypeCSS": {
+    "message": "CSS kalba"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorTypePierce": {
+    "message": "Pierce"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorTypeText": {
+    "message": "Tekstas"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorTypeXPath": {
+    "message": "XPath"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | selectorTypes": {
+    "message": "Parinkiklio tipai, skirti naudoti įrašant"
+  },
+  "panels/recorder/components/CreateRecordingView.ts | startRecording": {
+    "message": "Pradėti įrašymą"
+  },
+  "panels/recorder/components/ExtensionView.ts | closeView": {
+    "message": "Uždaryti"
+  },
+  "panels/recorder/components/ExtensionView.ts | extension": {
+    "message": "Naršyklės plėtinio pateiktas turinys"
+  },
+  "panels/recorder/components/RecordingListView.ts | createRecording": {
+    "message": "Kurti naują įrašą"
+  },
+  "panels/recorder/components/RecordingListView.ts | deleteRecording": {
+    "message": "Ištrinti įrašą"
+  },
+  "panels/recorder/components/RecordingListView.ts | openRecording": {
+    "message": "Atidaryti įrašą"
+  },
+  "panels/recorder/components/RecordingListView.ts | playRecording": {
+    "message": "Leisti įrašą"
+  },
+  "panels/recorder/components/RecordingListView.ts | savedRecordings": {
+    "message": "Išsaugoti įrašai"
+  },
+  "panels/recorder/components/RecordingView.ts | addAssertion": {
+    "message": "Pridėti teiginį"
+  },
+  "panels/recorder/components/RecordingView.ts | cancelReplay": {
+    "message": "Atšaukti pakartojimą"
+  },
+  "panels/recorder/components/RecordingView.ts | default": {
+    "message": "Numatytasis"
+  },
+  "panels/recorder/components/RecordingView.ts | desktop": {
+    "message": "Stalinis kompiuteris"
+  },
+  "panels/recorder/components/RecordingView.ts | download": {
+    "message": "Atsisiuntimas: {value}"
+  },
+  "panels/recorder/components/RecordingView.ts | editReplaySettings": {
+    "message": "Redaguoti pakartojimo nustatymus"
+  },
+  "panels/recorder/components/RecordingView.ts | editTitle": {
+    "message": "Redaguoti pavadinimą"
+  },
+  "panels/recorder/components/RecordingView.ts | endRecording": {
+    "message": "Baigti įrašymą"
+  },
+  "panels/recorder/components/RecordingView.ts | environment": {
+    "message": "Aplinka"
+  },
+  "panels/recorder/components/RecordingView.ts | hideCode": {
+    "message": "Slėpti kodą"
+  },
+  "panels/recorder/components/RecordingView.ts | latency": {
+    "message": "Delsa: {value} ms"
+  },
+  "panels/recorder/components/RecordingView.ts | mobile": {
+    "message": "Įrašyta mobiliuoju įrenginiu"
+  },
+  "panels/recorder/components/RecordingView.ts | network": {
+    "message": "Tinklas"
+  },
+  "panels/recorder/components/RecordingView.ts | performancePanel": {
+    "message": "Našumo skydelis"
+  },
+  "panels/recorder/components/RecordingView.ts | recording": {
+    "message": "Įrašoma…"
+  },
+  "panels/recorder/components/RecordingView.ts | recordingIsBeingStopped": {
+    "message": "Stabdomas įrašymas…"
+  },
+  "panels/recorder/components/RecordingView.ts | replaySettings": {
+    "message": "Pakartojimo nustatymai"
+  },
+  "panels/recorder/components/RecordingView.ts | requiredTitleError": {
+    "message": "Būtina nurodyti pavadinimą"
+  },
+  "panels/recorder/components/RecordingView.ts | screenshotForSection": {
+    "message": "Šios skilties ekrano kopija"
+  },
+  "panels/recorder/components/RecordingView.ts | showCode": {
+    "message": "Rodyti kodą"
+  },
+  "panels/recorder/components/RecordingView.ts | timeout": {
+    "message": "Skirtas laikas: {value} ms"
+  },
+  "panels/recorder/components/RecordingView.ts | timeoutExplanation": {
+    "message": "Skirto laiko nustatymas (milisekundėmis) taikomas kiekvienam veiksmui iš naujo paleidžiant įrašą. Pvz., jei per pasirinktą skirtą laiką puslapyje nerodomas DOM elementas, kurį identifikuoja CSS kalbos parinkiklis, nepavyksta pakartoti pateikiant klaidą."
+  },
+  "panels/recorder/components/RecordingView.ts | timeoutLabel": {
+    "message": "Skirtas laikas"
+  },
+  "panels/recorder/components/RecordingView.ts | upload": {
+    "message": "Įkėlimas: {value}"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplayExtremelySlowButtonLabel": {
+    "message": "Nepaprastai lėtas pakartojimas"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplayExtremelySlowItemLabel": {
+    "message": "Nepaprastai lėtai"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplayNormalButtonLabel": {
+    "message": "Pakartoti"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplayNormalItemLabel": {
+    "message": "Įprastai (numatytasis)"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplaySlowButtonLabel": {
+    "message": "Lėtas pakartojimas"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplaySlowItemLabel": {
+    "message": "Lėtai"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplayVerySlowButtonLabel": {
+    "message": "Labai lėtas pakartojimas"
+  },
+  "panels/recorder/components/ReplayButton.ts | ReplayVerySlowItemLabel": {
+    "message": "Labai lėtai"
+  },
+  "panels/recorder/components/ReplayButton.ts | extensionGroup": {
+    "message": "Plėtiniai"
+  },
+  "panels/recorder/components/ReplayButton.ts | speedGroup": {
+    "message": "Sparta"
+  },
+  "panels/recorder/components/StartView.ts | createRecording": {
+    "message": "Kurti naują įrašą"
+  },
+  "panels/recorder/components/StartView.ts | header": {
+    "message": "Visų naudotojo atliekamų veiksmų našumo įvertinimas"
+  },
+  "panels/recorder/components/StartView.ts | quickStart": {
+    "message": "Sparčioji pradžia: sužinokite, kaip veikia naujas prie kūrėjo įrankių pateikiamas garso įrašytuvo skydelis"
+  },
+  "panels/recorder/components/StartView.ts | step1": {
+    "message": "Įrašyti dažnus naudotojo atliekamus veiksmus svetainėje ar programoje"
+  },
+  "panels/recorder/components/StartView.ts | step2": {
+    "message": "Pakartokite įrašą, kad patikrintumėte, ar srautas veikia"
+  },
+  "panels/recorder/components/StartView.ts | step3": {
+    "message": "Sugeneruokite išsamų našumo pėdsaką arba eksportuokite „Puppeteer“ scenarijų, kad išbandytumėte"
+  },
+  "panels/recorder/components/StepEditor.ts | addAttribute": {
+    "message": "Pridėti „{attributeName}“"
+  },
+  "panels/recorder/components/StepEditor.ts | addFrameIndex": {
+    "message": "Pridėti kadrų indeksą kadrų medyje"
+  },
+  "panels/recorder/components/StepEditor.ts | addSelector": {
+    "message": "Pridėti parinkiklį"
+  },
+  "panels/recorder/components/StepEditor.ts | addSelectorPart": {
+    "message": "Pridėti parinkiklio dalį"
+  },
+  "panels/recorder/components/StepEditor.ts | deleteRow": {
+    "message": "Ištrinti eilutę"
+  },
+  "panels/recorder/components/StepEditor.ts | notSaved": {
+    "message": "Neišsaugota: {error}"
+  },
+  "panels/recorder/components/StepEditor.ts | removeFrameIndex": {
+    "message": "Pašalinti kadrų indeksą"
+  },
+  "panels/recorder/components/StepEditor.ts | removeSelector": {
+    "message": "Pašalinti parinkiklį"
+  },
+  "panels/recorder/components/StepEditor.ts | removeSelectorPart": {
+    "message": "Pašalinti parinkiklio dalį"
+  },
+  "panels/recorder/components/StepEditor.ts | selectorPicker": {
+    "message": "Pasirinkite elementą puslapyje, kad atnaujintumėte parinkiklius"
+  },
+  "panels/recorder/components/StepEditor.ts | unknownActionType": {
+    "message": "Nežinomas veiksmo tipas."
+  },
+  "panels/recorder/components/StepView.ts | addBreakpoint": {
+    "message": "Pridėti stabdos tašką"
+  },
+  "panels/recorder/components/StepView.ts | addStepAfter": {
+    "message": "Pridėti veiksmą po"
+  },
+  "panels/recorder/components/StepView.ts | addStepBefore": {
+    "message": "Pridėti veiksmą prieš"
+  },
+  "panels/recorder/components/StepView.ts | breakpoints": {
+    "message": "Stabdos taškai"
+  },
+  "panels/recorder/components/StepView.ts | changeStepTitle": {
+    "message": "Keisti"
+  },
+  "panels/recorder/components/StepView.ts | clickStepTitle": {
+    "message": "Paspaudimas"
+  },
+  "panels/recorder/components/StepView.ts | closeStepTitle": {
+    "message": "Uždaryti"
+  },
+  "panels/recorder/components/StepView.ts | copyAs": {
+    "message": "Kopijuoti kaip"
+  },
+  "panels/recorder/components/StepView.ts | customStepTitle": {
+    "message": "Tinkintas veiksmas"
+  },
+  "panels/recorder/components/StepView.ts | doubleClickStepTitle": {
+    "message": "Dukart spustelėti"
+  },
+  "panels/recorder/components/StepView.ts | elementRoleButton": {
+    "message": "Mygtukas"
+  },
+  "panels/recorder/components/StepView.ts | elementRoleFallback": {
+    "message": "Elementas"
+  },
+  "panels/recorder/components/StepView.ts | elementRoleInput": {
+    "message": "Įvesti"
+  },
+  "panels/recorder/components/StepView.ts | emulateNetworkConditionsStepTitle": {
+    "message": "Imituoti tinklo sąlygas"
+  },
+  "panels/recorder/components/StepView.ts | hoverStepTitle": {
+    "message": "Žymeklio užvedimas"
+  },
+  "panels/recorder/components/StepView.ts | keyDownStepTitle": {
+    "message": "Nuspaustas klavišas"
+  },
+  "panels/recorder/components/StepView.ts | keyUpStepTitle": {
+    "message": "Klavišas atleistas"
+  },
+  "panels/recorder/components/StepView.ts | navigateStepTitle": {
+    "message": "Naršyti"
+  },
+  "panels/recorder/components/StepView.ts | openStepActions": {
+    "message": "Atidaryti veiksmus"
+  },
+  "panels/recorder/components/StepView.ts | removeBreakpoint": {
+    "message": "Pašalinti stabdos tašką"
+  },
+  "panels/recorder/components/StepView.ts | removeStep": {
+    "message": "Pašalinti veiksmą"
+  },
+  "panels/recorder/components/StepView.ts | scrollStepTitle": {
+    "message": "Slinkti"
+  },
+  "panels/recorder/components/StepView.ts | setViewportClickTitle": {
+    "message": "Nustatyti peržiūros sritį"
+  },
+  "panels/recorder/components/StepView.ts | stepManagement": {
+    "message": "Tvarkyti veiksmus"
+  },
+  "panels/recorder/components/StepView.ts | waitForElementStepTitle": {
+    "message": "Palaukite elemento"
+  },
+  "panels/recorder/components/StepView.ts | waitForExpressionStepTitle": {
+    "message": "Palaukite išraiškos"
+  },
+  "panels/recorder/models/RecorderSettings.ts | defaultRecordingName": {
+    "message": "Įrašoma {DATE} {TIME}"
+  },
+  "panels/recorder/recorder-meta.ts | createRecording": {
+    "message": "Kurti naują įrašą"
+  },
+  "panels/recorder/recorder-meta.ts | recorder": {
+    "message": "Garso įrašytuvas"
+  },
+  "panels/recorder/recorder-meta.ts | replayRecording": {
+    "message": "Pakartoti įrašą"
+  },
+  "panels/recorder/recorder-meta.ts | showRecorder": {
+    "message": "Rodyti garso įrašytuvą"
+  },
+  "panels/recorder/recorder-meta.ts | startStopRecording": {
+    "message": "Pradėti arba sustabdyti įrašymą"
+  },
+  "panels/recorder/recorder-meta.ts | toggleCode": {
+    "message": "Perjungti kodo rodinį"
   },
   "panels/screencast/ScreencastApp.ts | toggleScreencast": {
     "message": "Perjungti ekrano vaizdo įrašą"
@@ -9726,10 +10386,7 @@
     "message": "Pridėti šabloną..."
   },
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | automaticallyIgnoreListKnownThirdPartyScripts": {
-    "message": "Automatiškai pridėti žinomus trečiųjų šalių scenarijus prie nepaisomų elementų sąrašo"
-  },
-  "panels/settings/FrameworkIgnoreListSettingsTab.ts | automaticallyIgnoreListKnownThirdPartyScriptsTooltip": {
-    "message": "Pridėkite šaltinių iš lauko „x_google_ignoreList“ iš šaltinių žemėlapių į nepaisomų elementų sąrašą"
+    "message": "Žinomi trečiųjų šalių scenarijai iš šaltinio žemėlapių"
   },
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | customExclusionRules": {
     "message": "Tinkintos išskyrimo taisyklės:"
@@ -9750,13 +10407,13 @@
     "message": "Bendrosios išskyrimo taisyklės:"
   },
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | ignoreListContentScripts": {
-    "message": "Pridėti turinio scenarijus prie nepaisomų sąrašo"
-  },
-  "panels/settings/FrameworkIgnoreListSettingsTab.ts | ignoreListContentScriptsExtension": {
-    "message": "Pridėti turinio scenarijus prie nepaisomų sąrašo (puslapio plėtinių scenarijai)"
+    "message": "Turinio scenarijai, įterpti plėtinių"
   },
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | ignoreScriptsWhoseNamesMatchS": {
     "message": "Nepaisyti scenarijų, kurių pavadinimai atitinka „{PH1}“"
+  },
+  "panels/settings/FrameworkIgnoreListSettingsTab.ts | learnMore": {
+    "message": "Sužinokite daugiau"
   },
   "panels/settings/FrameworkIgnoreListSettingsTab.ts | pattern": {
     "message": "Pridėti šabloną"
@@ -9914,8 +10571,8 @@
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | architecturePlaceholder": {
     "message": "Architektūra (pvz., x86)"
   },
-  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandDeleteAriaLabel": {
-    "message": "Ištrinti „{PH1}“"
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandFullVersionListDelete": {
+    "message": "Ištrinti prekės ženklą iš viso versijų sąrašo"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandName": {
     "message": "Prekės ženklas"
@@ -9926,14 +10583,14 @@
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandProperties": {
     "message": "Naudotojo priemonės nuosavybės"
   },
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandUserAgentDelete": {
+    "message": "Ištrinti prekės ženklą iš naudotojo priemonės skilties"
+  },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandVersionAriaLabel": {
     "message": "{PH1} versija"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | brandVersionPlaceholder": {
     "message": "Versija (pvz., 87.0.4280.88)"
-  },
-  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | deleteTooltip": {
-    "message": "Ištrinti"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | deletedBrand": {
     "message": "Ištrinta prekės ženklo eilutė"
@@ -9952,6 +10609,9 @@
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | fullVersionList": {
     "message": "Visų versijų sąrašas (Sec-CH-UA-Full-Version-List)"
+  },
+  "panels/settings/emulation/components/UserAgentClientHintsForm.ts | learnMore": {
+    "message": "Sužinokite daugiau"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | mobileCheckboxLabel": {
     "message": "Mobilusis"
@@ -9981,7 +10641,7 @@
     "message": "Atnaujinti"
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | userAgentClientHintsInfo": {
-    "message": "Naudotojo priemonės kliento nurodymai yra naudotojo priemonės eilutės alternatyva. Pagal juos galima labiau struktūruotai identifikuoti naršyklę ir įrenginį užtikrinant didesnį privatumą. Jei norite sužinoti daugiau, spustelėkite mygtuką."
+    "message": "Naudotojo priemonės kliento nurodymai yra naudotojo priemonės eilutės alternatyva. Pagal juos galima labiau struktūruotai identifikuoti naršyklę ir įrenginį užtikrinant didesnį privatumą."
   },
   "panels/settings/emulation/components/UserAgentClientHintsForm.ts | useragent": {
     "message": "Naudotojo priemonė (Sec-CH-UA)"
@@ -10051,6 +10711,9 @@
   },
   "panels/sources/BreakpointEditDialog.ts | breakpointType": {
     "message": "Stabdos taško tipas"
+  },
+  "panels/sources/BreakpointEditDialog.ts | closeDialog": {
+    "message": "Uždaryti redagavimo dialogo langą ir išsaugoti pakeitimus"
   },
   "panels/sources/BreakpointEditDialog.ts | conditionalBreakpoint": {
     "message": "Sąlyginis stabdos taškas"
@@ -10217,15 +10880,6 @@
   "panels/sources/DebuggerPlugin.ts | neverPauseHere": {
     "message": "Niekada čia nepristabdyti"
   },
-  "panels/sources/DebuggerPlugin.ts | prettyprint": {
-    "message": "Taikyti struktūrinę lygiuotę"
-  },
-  "panels/sources/DebuggerPlugin.ts | prettyprintThisMinifiedFile": {
-    "message": "Taikyti struktūrinę lygiuotę šiam sumažintam failui?"
-  },
-  "panels/sources/DebuggerPlugin.ts | prettyprintingWillFormatThisFile": {
-    "message": "Naudojant struktūrinę lygiuotę šis failas bus formatuotas naujame skirtuke, kur galėsite toliau derinti. Be to, struktūrinę lygiuotę šiam failui galite taikyti spustelėję mygtuką „{PH1}“ apatinėje būsenos juostoje."
-  },
   "panels/sources/DebuggerPlugin.ts | removeBreakpoint": {
     "message": "{n,plural, =1{Pašalinti stabdos tašką}one{Pašalinti visus stabdos taškus eilutėje}few{Pašalinti visus stabdos taškus eilutėje}many{Pašalinti visus stabdos taškus eilutėje}other{Pašalinti visus stabdos taškus eilutėje}}"
   },
@@ -10246,6 +10900,9 @@
   },
   "panels/sources/FilteredUISourceCodeListProvider.ts | noFilesFound": {
     "message": "Failų nerasta"
+  },
+  "panels/sources/FilteredUISourceCodeListProvider.ts | sIgnoreListed": {
+    "message": "{PH1} (sudarytas nepaisomų elementų sąrašas)"
   },
   "panels/sources/GoToLineQuickOpen.ts | currentLineSTypeALineNumber": {
     "message": "Dabartinė eilutė: {PH1}. Įveskite skaičių nuo 1 iki {PH2}, kad pereitumėte."
@@ -10276,54 +10933,6 @@
   },
   "panels/sources/InplaceFormatterEditorAction.ts | formatS": {
     "message": "Formatuoti: {PH1}"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | activateBreakpoints": {
-    "message": "Suaktyvinti stabdos taškus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | checked": {
-    "message": "pažymėta"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | deactivateBreakpoints": {
-    "message": "Išaktyvinti stabdos taškus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | disableAllBreakpoints": {
-    "message": "Išjungti visus stabdos taškus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | disableBreakpointsInFile": {
-    "message": "Išjungti stabdos taškus faile"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | enableAllBreakpoints": {
-    "message": "Įgalinti visus stabdos taškus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | enableBreakpointsInFile": {
-    "message": "Įgalinti stabdos taškus faile"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | mixed": {
-    "message": "mišrus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | noBreakpoints": {
-    "message": "Atskaitos taškų nėra"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | removeAllBreakpoints": {
-    "message": "Pašalinti visus stabdos taškus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | removeAllBreakpointsInLine": {
-    "message": "Pašalinti visus stabdos taškus eilutėje"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | removeBreakpoint": {
-    "message": "Pašalinti atskaitos tašką"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | removeOtherBreakpoints": {
-    "message": "Pašalinti kitus stabdos taškus"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | revealLocation": {
-    "message": "Rodyti vietovę"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | sBreakpointHit": {
-    "message": "{PH1} stabdos taško įvykis"
-  },
-  "panels/sources/JavaScriptBreakpointsSidebarPane.ts | unchecked": {
-    "message": "atžymėta"
   },
   "panels/sources/NavigatorView.ts | areYouSureYouWantToDeleteAll": {
     "message": "Ar tikrai norite ištrinti visus nepaisomus elementus, esančius šiame aplanke?"
@@ -10379,6 +10988,9 @@
   "panels/sources/NavigatorView.ts | sFromSourceMap": {
     "message": "{PH1} (iš šaltinio žemėlapio)"
   },
+  "panels/sources/NavigatorView.ts | sIgnoreListed": {
+    "message": "{PH1} (sudarytas nepaisomų elementų sąrašas)"
+  },
   "panels/sources/NavigatorView.ts | searchInAllFiles": {
     "message": "Ieškoti visuose failuose"
   },
@@ -10403,11 +11015,11 @@
   "panels/sources/ProfilePlugin.ts | ms": {
     "message": "ms"
   },
-  "panels/sources/ResourceOriginPlugin.ts | providedViaDebugInfoByS": {
-    "message": "({PH1} pateikė kaip derinimo informaciją)"
+  "panels/sources/ResourceOriginPlugin.ts | fromS": {
+    "message": "(Iš {PH1})"
   },
   "panels/sources/ResourceOriginPlugin.ts | sourceMappedFromS": {
-    "message": "(šaltinis susietas iš {PH1})"
+    "message": "(Šaltinis susietas iš {PH1})"
   },
   "panels/sources/ScopeChainSidebarPane.ts | closure": {
     "message": "Uždarymas"
@@ -10432,12 +11044,6 @@
   },
   "panels/sources/ScopeChainSidebarPane.ts | revealInMemoryInspectorPanel": {
     "message": "Rodyti atminties tikrinimo priemonės skydelyje"
-  },
-  "panels/sources/ScriptFormatterEditorAction.ts | prettyPrint": {
-    "message": "Struktūrinė lygiuotė"
-  },
-  "panels/sources/ScriptFormatterEditorAction.ts | prettyPrintS": {
-    "message": "Taikyti struktūrinę lygiuotę „{PH1}“"
   },
   "panels/sources/SnippetsPlugin.ts | ctrlenter": {
     "message": "Ctrl + Enter"
@@ -10508,9 +11114,6 @@
   "panels/sources/SourcesPanel.ts | debuggerShown": {
     "message": "Derintuvės šoninė juosta rodoma"
   },
-  "panels/sources/SourcesPanel.ts | dontPauseOnExceptions": {
-    "message": "Nepristabdyti taikant išimtis"
-  },
   "panels/sources/SourcesPanel.ts | dropWorkspaceFolderHere": {
     "message": "Čia nuvilkite darbo srities aplanką"
   },
@@ -10543,9 +11146,6 @@
   },
   "panels/sources/SourcesPanel.ts | pauseOnCaughtExceptions": {
     "message": "Pristabdyti užfiksavus išimčių"
-  },
-  "panels/sources/SourcesPanel.ts | pauseOnExceptions": {
-    "message": "Pristabdyti taikant išimtis"
   },
   "panels/sources/SourcesPanel.ts | resumeWithAllPausesBlockedForMs": {
     "message": "Tęsti su visais pristabdymais, užblokuotais 500 ms"
@@ -10638,7 +11238,7 @@
     "message": "Įgalinti visus stabdos taškus faile"
   },
   "panels/sources/components/BreakpointsView.ts | indeterminate": {
-    "message": "mišrus"
+    "message": "mišri"
   },
   "panels/sources/components/BreakpointsView.ts | logpointCode": {
     "message": "Žurnalo vieta: {PH1}"
@@ -10675,6 +11275,9 @@
   },
   "panels/sources/components/HeadersView.ts | errorWhenParsing": {
     "message": "Analizuojant „{PH1}“ įvyko klaida."
+  },
+  "panels/sources/components/HeadersView.ts | learnMore": {
+    "message": "Sužinokite daugiau"
   },
   "panels/sources/components/HeadersView.ts | parsingErrorExplainer": {
     "message": "Greičiausiai tai įvyko dėl „{PH1}“ sintaksės klaidos. Pabandykite atidaryti šį failą išorinėje redagavimo priemonėje, kad pašalintumėte klaidą, arba ištrinkite failą ir iš naujo sukurkite pakeistą failą."
@@ -10754,6 +11357,9 @@
   "panels/sources/sources-meta.ts | disableTabMovesFocus": {
     "message": "Skirtuko judesių aktyvinimo išjungimas"
   },
+  "panels/sources/sources-meta.ts | disableWasmAutoStepping": {
+    "message": "„Wasm“ automatinių žingsnių išjungimas"
+  },
   "panels/sources/sources-meta.ts | disallowScrollingPastEndOfFile": {
     "message": "Neleidimas slinkti pasibaigus failui"
   },
@@ -10795,6 +11401,9 @@
   },
   "panels/sources/sources-meta.ts | enableTabMovesFocus": {
     "message": "Skirtuko judesių aktyvinimo įgalinimas"
+  },
+  "panels/sources/sources-meta.ts | enableWasmAutoStepping": {
+    "message": "„Wasm“ automatinių žingsnių įgalinimas"
   },
   "panels/sources/sources-meta.ts | evaluateSelectedTextInConsole": {
     "message": "Pasirinkto teksto pulte įvertinimas"
@@ -10955,8 +11564,14 @@
   "panels/sources/sources-meta.ts | trailing": {
     "message": "Galinis"
   },
+  "panels/sources/sources-meta.ts | wasmAutoStepping": {
+    "message": "Kai derinamas „Wasm“ su derinimo informacija, jei įmanoma, nepristabdykite „Wasm“ baitinio kodo"
+  },
   "panels/sources/sources-meta.ts | watch": {
     "message": "Stebėjimas"
+  },
+  "panels/timeline/AppenderUtils.ts | sSelfS": {
+    "message": "{PH1} (pats {PH2})"
   },
   "panels/timeline/CountersGraph.ts | documents": {
     "message": "Dokumentai"
@@ -10990,6 +11605,15 @@
   },
   "panels/timeline/EventsTimelineTreeView.ts | startTime": {
     "message": "Pradžios laikas"
+  },
+  "panels/timeline/GPUTrackAppender.ts | gpu": {
+    "message": "Grafikos procesorius"
+  },
+  "panels/timeline/InteractionsTrackAppender.ts | interactions": {
+    "message": "Sąveikos"
+  },
+  "panels/timeline/LayoutShiftsTrackAppender.ts | layoutShifts": {
+    "message": "Išdėstymo poslinkiai"
   },
   "panels/timeline/TimelineController.ts | cpuProfileForATargetIsNot": {
     "message": "Tikslinis centrinio procesoriaus profilis nepasiekiamas."
@@ -11027,9 +11651,6 @@
   "panels/timeline/TimelineDetailsView.ts | totalBlockingTimeSmss": {
     "message": "Bendras blokavimo laikas: {PH1} ms {PH2}"
   },
-  "panels/timeline/TimelineEventOverview.ts | coverage": {
-    "message": "APRĖPTIS"
-  },
   "panels/timeline/TimelineEventOverview.ts | cpu": {
     "message": "Centrinis procesorius"
   },
@@ -11045,14 +11666,8 @@
   "panels/timeline/TimelineFlameChartDataProvider.ts | animation": {
     "message": "Animacija"
   },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | console": {
-    "message": "Valdymo pultas"
-  },
   "panels/timeline/TimelineFlameChartDataProvider.ts | droppedFrame": {
     "message": "Nuvilktas rėmelis"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | experience": {
-    "message": "Patirtis"
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | frame": {
     "message": "Rėmelis"
@@ -11062,9 +11677,6 @@
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | frames": {
     "message": "Rėmeliai"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | gpu": {
-    "message": "Grafikos procesorius"
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | idleFrame": {
     "message": "Laisvas rėmelis"
@@ -11077,9 +11689,6 @@
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | mainS": {
     "message": "Pagrindinis – {PH1}"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | occurrencesS": {
-    "message": "Įvykių: {PH1}"
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | onIgnoreList": {
     "message": "Nepaisomų elementų sąraše"
@@ -11101,18 +11710,6 @@
   },
   "panels/timeline/TimelineFlameChartDataProvider.ts | thread": {
     "message": "Instrukcijų seka"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | threadS": {
-    "message": "{PH1} grupė"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | timings": {
-    "message": "Laikas"
-  },
-  "panels/timeline/TimelineFlameChartDataProvider.ts | userInteractions": {
-    "message": "Sąveikos"
-  },
-  "panels/timeline/TimelineFlameChartNetworkDataProvider.ts | network": {
-    "message": "Tinklas"
   },
   "panels/timeline/TimelineFlameChartView.ts | sAtS": {
     "message": "{PH1} {PH2}"
@@ -11198,9 +11795,6 @@
   "panels/timeline/TimelinePanel.ts | close": {
     "message": "Uždaryti"
   },
-  "panels/timeline/TimelinePanel.ts | coverage": {
-    "message": "Aprėptis"
-  },
   "panels/timeline/TimelinePanel.ts | cpu": {
     "message": "Centrinis procesorius:"
   },
@@ -11219,8 +11813,8 @@
   "panels/timeline/TimelinePanel.ts | enableAdvancedPaint": {
     "message": "Pažangių žymėjimo priemonių įgalinimas (lėtas)"
   },
-  "panels/timeline/TimelinePanel.ts | failedToSaveTimelineSSS": {
-    "message": "Nepavyko išsaugoti laiko juostos: {PH1} ({PH2}, {PH3})"
+  "panels/timeline/TimelinePanel.ts | failedToSaveTimelineSS": {
+    "message": "Nepavyko išsaugoti laiko juostos: {PH1} ({PH2})"
   },
   "panels/timeline/TimelinePanel.ts | initializingProfiler": {
     "message": "Inicijuojamas analizės įrankis…"
@@ -11252,9 +11846,6 @@
   "panels/timeline/TimelinePanel.ts | received": {
     "message": "Gauta"
   },
-  "panels/timeline/TimelinePanel.ts | recordCoverageWithPerformance": {
-    "message": "Įrašyti aprėptį su našumo pėdsaku"
-  },
   "panels/timeline/TimelinePanel.ts | recordingFailed": {
     "message": "Įrašyti nepavyko"
   },
@@ -11266,9 +11857,6 @@
   },
   "panels/timeline/TimelinePanel.ts | showMemoryTimeline": {
     "message": "Rodyti atminties laiko juostą"
-  },
-  "panels/timeline/TimelinePanel.ts | showWebVitals": {
-    "message": "Rodyti žiniatinklio „Vitals“ metriką"
   },
   "panels/timeline/TimelinePanel.ts | ssec": {
     "message": "{PH1} sek."
@@ -11287,9 +11875,6 @@
   },
   "panels/timeline/TimelinePanel.ts | wasd": {
     "message": "WASD"
-  },
-  "panels/timeline/TimelinePanel.ts | webVitals": {
-    "message": "Žiniatinklio „Vitals“ metrika"
   },
   "panels/timeline/TimelineTreeView.ts | activity": {
     "message": "Veikla"
@@ -11525,6 +12110,9 @@
   "panels/timeline/TimelineUIUtils.ts | decryptReply": {
     "message": "Iššifruoti atsakymą"
   },
+  "panels/timeline/TimelineUIUtils.ts | deserializeCodeCache": {
+    "message": "Atšaukti kodų talpyklos nuoseklinimą"
+  },
   "panels/timeline/TimelineUIUtils.ts | destroyWebsocket": {
     "message": "Sunaikinti „WebSocket“"
   },
@@ -11672,14 +12260,11 @@
   "panels/timeline/TimelineUIUtils.ts | initiator": {
     "message": "Iniciatorius"
   },
-  "panels/timeline/TimelineUIUtils.ts | inputLatency": {
-    "message": "Įvesties delsa"
-  },
   "panels/timeline/TimelineUIUtils.ts | installTimer": {
     "message": "Diegimo laikmatis"
   },
-  "panels/timeline/TimelineUIUtils.ts | interactionEvent": {
-    "message": "Sąveikos tipas: {PH1} ID:{PH2}"
+  "panels/timeline/TimelineUIUtils.ts | interactionID": {
+    "message": "Asmens tapatybės dokumentas"
   },
   "panels/timeline/TimelineUIUtils.ts | invalidateLayout": {
     "message": "Nepatvirtinti išdėstymo"
@@ -11695,6 +12280,15 @@
   },
   "panels/timeline/TimelineUIUtils.ts | jsFrame": {
     "message": "JS rėmelis"
+  },
+  "panels/timeline/TimelineUIUtils.ts | jsIdleFrame": {
+    "message": "JS laisvas rėmelis"
+  },
+  "panels/timeline/TimelineUIUtils.ts | jsRoot": {
+    "message": "JS šakninis katalogas"
+  },
+  "panels/timeline/TimelineUIUtils.ts | jsSystemFrame": {
+    "message": "JS sistemos rėmelis"
   },
   "panels/timeline/TimelineUIUtils.ts | largestContentfulPaint": {
     "message": "Didžiausias turiningas žymėjimas"
@@ -11734,6 +12328,9 @@
   },
   "panels/timeline/TimelineUIUtils.ts | location": {
     "message": "Vieta"
+  },
+  "panels/timeline/TimelineUIUtils.ts | longInteractionINP": {
+    "message": "Ilga sąveika"
   },
   "panels/timeline/TimelineUIUtils.ts | longTask": {
     "message": "Ilga užduotis"
@@ -11840,6 +12437,9 @@
   "panels/timeline/TimelineUIUtils.ts | producedCacheSize": {
     "message": "Gautas talpyklos dydis"
   },
+  "panels/timeline/TimelineUIUtils.ts | profilingOverhead": {
+    "message": "Profiliavimo valdymas"
+  },
   "panels/timeline/TimelineUIUtils.ts | range": {
     "message": "Diapazonas"
   },
@@ -11926,6 +12526,9 @@
   },
   "panels/timeline/TimelineUIUtils.ts | sIsALikelyPerformanceBottleneck": {
     "message": "{PH1} gali būti našumo silpnoji vieta."
+  },
+  "panels/timeline/TimelineUIUtils.ts | sIsLikelyPoorPageResponsiveness": {
+    "message": "{PH1} nurodo prastą puslapio atsaką."
   },
   "panels/timeline/TimelineUIUtils.ts | sLongFrameTimesAreAnIndicationOf": {
     "message": "{PH1}. Ilga kadro pateikimo trukmė nurodo {PH2}"
@@ -12038,9 +12641,6 @@
   "panels/timeline/TimelineUIUtils.ts | timeSpentInRendering": {
     "message": "Pateikimo laikas"
   },
-  "panels/timeline/TimelineUIUtils.ts | timeWaitingForMainThread": {
-    "message": "Pagrindinės grupės laukimo laikas"
-  },
   "panels/timeline/TimelineUIUtils.ts | timeout": {
     "message": "Skirtas laikas"
   },
@@ -12113,6 +12713,9 @@
   "panels/timeline/TimelineUIUtils.ts | yes": {
     "message": "Taip"
   },
+  "panels/timeline/TimingsTrackAppender.ts | timings": {
+    "message": "Laikas"
+  },
   "panels/timeline/UIDevtoolsUtils.ts | drawFrame": {
     "message": "Piešti rėmelį"
   },
@@ -12136,36 +12739,6 @@
   },
   "panels/timeline/UIDevtoolsUtils.ts | system": {
     "message": "Sistema"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | fcp": {
-    "message": "PTŽ"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | firstContentfulPaint": {
-    "message": "Pirmas turiningas žymėjimas"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | good": {
-    "message": "Gera"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | largestContentfulPaint": {
-    "message": "Didžiausias turiningas žymėjimas"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | lcp": {
-    "message": "DTŽ"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | longTask": {
-    "message": "Ilga užduotis"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | longTasks": {
-    "message": "Ilgos užduotys"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | ls": {
-    "message": "LS"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | needsImprovement": {
-    "message": "Reikia tobulinti"
-  },
-  "panels/timeline/components/WebVitalsTimeline.ts | poor": {
-    "message": "Prasta"
   },
   "panels/timeline/timeline-meta.ts | hideChromeFrameInLayersView": {
     "message": "„chrome“ rėmelio slėpimas sluoksnių rodinyje"
@@ -12282,7 +12855,7 @@
     "message": "Eksportuoti"
   },
   "panels/webauthn/WebauthnPane.ts | id": {
-    "message": "ID"
+    "message": "Asmens tapatybės dokumentas"
   },
   "panels/webauthn/WebauthnPane.ts | isResident": {
     "message": "Nuolatiniai"
@@ -12351,7 +12924,7 @@
     "message": "WebAuthn"
   },
   "ui/components/data_grid/DataGrid.ts | enterToSort": {
-    "message": "Paspauskite „Enter“, kad pritaikytumėte rūšiavimo filtrą"
+    "message": "Stulpelio rūšiavimo būsena: {PH1}. Paspauskite „Enter“, kad pritaikytumėte rūšiavimo filtrą"
   },
   "ui/components/data_grid/DataGrid.ts | headerOptions": {
     "message": "Antraščių parinktys"
@@ -12359,8 +12932,17 @@
   "ui/components/data_grid/DataGrid.ts | resetColumns": {
     "message": "Nustatyti stulpelius iš naujo"
   },
+  "ui/components/data_grid/DataGrid.ts | sortAsc": {
+    "message": "didėjimo tvarka"
+  },
   "ui/components/data_grid/DataGrid.ts | sortBy": {
     "message": "Rūšiuoti pagal"
+  },
+  "ui/components/data_grid/DataGrid.ts | sortDesc": {
+    "message": "mažėjimo tvarka"
+  },
+  "ui/components/data_grid/DataGrid.ts | sortNone": {
+    "message": "nėra"
   },
   "ui/components/data_grid/DataGridController.ts | sortInAscendingOrder": {
     "message": "„{PH1}“ rūšiuojamas didėjimo tvarka"
@@ -12370,6 +12952,15 @@
   },
   "ui/components/data_grid/DataGridController.ts | sortingCanceled": {
     "message": "„{PH1}“ rūšiavimas atšauktas"
+  },
+  "ui/components/dialogs/ShortcutDialog.ts | close": {
+    "message": "Uždaryti"
+  },
+  "ui/components/dialogs/ShortcutDialog.ts | dialogTitle": {
+    "message": "Spartieji klavišai"
+  },
+  "ui/components/dialogs/ShortcutDialog.ts | showShortcutTitle": {
+    "message": "Rodyti sparčiuosius klavišus"
   },
   "ui/components/diff_view/DiffView.ts | SkippingDMatchingLines": {
     "message": "( … Praleidžiamos atitinkančios eilutės ({PH1}) … )"
@@ -12511,6 +13102,66 @@
   },
   "ui/components/text_editor/config.ts | codeEditor": {
     "message": "Kodo redagavimo priemonė"
+  },
+  "ui/components/text_editor/config.ts | sSuggestionSOfS": {
+    "message": "„{PH1}“, {PH2} pasiūlymas iš {PH3}"
+  },
+  "ui/legacy/ActionRegistration.ts | background_services": {
+    "message": "Foninės paslaugos"
+  },
+  "ui/legacy/ActionRegistration.ts | console": {
+    "message": "Valdymo pultas"
+  },
+  "ui/legacy/ActionRegistration.ts | debugger": {
+    "message": "Derintuvė"
+  },
+  "ui/legacy/ActionRegistration.ts | drawer": {
+    "message": "Skydelis"
+  },
+  "ui/legacy/ActionRegistration.ts | elements": {
+    "message": "Elementai"
+  },
+  "ui/legacy/ActionRegistration.ts | global": {
+    "message": "Visuotiniai"
+  },
+  "ui/legacy/ActionRegistration.ts | help": {
+    "message": "Pagalba"
+  },
+  "ui/legacy/ActionRegistration.ts | javascript_profiler": {
+    "message": "„JavaScript“ analizės įrankis"
+  },
+  "ui/legacy/ActionRegistration.ts | layers": {
+    "message": "Sluoksniai"
+  },
+  "ui/legacy/ActionRegistration.ts | memory": {
+    "message": "Atmintis"
+  },
+  "ui/legacy/ActionRegistration.ts | mobile": {
+    "message": "Mobilieji įrenginiai"
+  },
+  "ui/legacy/ActionRegistration.ts | navigation": {
+    "message": "Naršymas"
+  },
+  "ui/legacy/ActionRegistration.ts | network": {
+    "message": "Tinklas"
+  },
+  "ui/legacy/ActionRegistration.ts | performance": {
+    "message": "Našumas"
+  },
+  "ui/legacy/ActionRegistration.ts | rendering": {
+    "message": "Pateikimas"
+  },
+  "ui/legacy/ActionRegistration.ts | resources": {
+    "message": "Šaltiniai"
+  },
+  "ui/legacy/ActionRegistration.ts | screenshot": {
+    "message": "Ekrano kopija"
+  },
+  "ui/legacy/ActionRegistration.ts | settings": {
+    "message": "Nustatymai"
+  },
+  "ui/legacy/ActionRegistration.ts | sources": {
+    "message": "Šaltiniai"
   },
   "ui/legacy/DockController.ts | close": {
     "message": "Uždaryti"
@@ -12764,6 +13415,27 @@
   "ui/legacy/ViewManager.ts | sPanel": {
     "message": "Skydelis „{PH1}“"
   },
+  "ui/legacy/ViewRegistration.ts | drawer": {
+    "message": "Skydelis"
+  },
+  "ui/legacy/ViewRegistration.ts | drawer_sidebar": {
+    "message": "Skydelio šoninė juosta"
+  },
+  "ui/legacy/ViewRegistration.ts | elements": {
+    "message": "Elementai"
+  },
+  "ui/legacy/ViewRegistration.ts | network": {
+    "message": "Tinklas"
+  },
+  "ui/legacy/ViewRegistration.ts | panel": {
+    "message": "Skydelis"
+  },
+  "ui/legacy/ViewRegistration.ts | settings": {
+    "message": "Nustatymai"
+  },
+  "ui/legacy/ViewRegistration.ts | sources": {
+    "message": "Šaltiniai"
+  },
   "ui/legacy/components/color_picker/ContrastDetails.ts | aa": {
     "message": "AA"
   },
@@ -12975,7 +13647,7 @@
     "message": "CSS nuosavybės"
   },
   "ui/legacy/components/inline_editor/FontEditor.ts | deleteS": {
-    "message": "Ištrinti „{PH1}“"
+    "message": "Ištrinti {PH1}"
   },
   "ui/legacy/components/inline_editor/FontEditor.ts | fallbackS": {
     "message": "{PH1} atsarginis"
@@ -13063,6 +13735,9 @@
   },
   "ui/legacy/components/object_ui/ObjectPropertiesSection.ts | noProperties": {
     "message": "Nuosavybių nėra"
+  },
+  "ui/legacy/components/object_ui/ObjectPropertiesSection.ts | revealInMemoryInpector": {
+    "message": "Rodyti atminties tikrinimo priemonės skydelyje"
   },
   "ui/legacy/components/object_ui/ObjectPropertiesSection.ts | showAllD": {
     "message": "Rodyti visus ({PH1})"
@@ -13263,7 +13938,7 @@
     "message": "Įkeliama…"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | prettyPrint": {
-    "message": "Struktūrinė lygiuotė"
+    "message": "Gražus spaudinys"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | source": {
     "message": "Šaltinis"
@@ -13327,6 +14002,9 @@
   },
   "ui/legacy/components/utils/JSPresentationUtils.ts | removeFromIgnore": {
     "message": "Pašalinti iš nepaisomų sąrašo"
+  },
+  "ui/legacy/components/utils/JSPresentationUtils.ts | showLess": {
+    "message": "Rodyti mažiau"
   },
   "ui/legacy/components/utils/JSPresentationUtils.ts | showSMoreFrames": {
     "message": "{n,plural, =1{Rodyti dar # rėmelį}one{Rodyti dar # rėmelį}few{Rodyti dar # rėmelius}many{Rodyti dar # rėmelio}other{Rodyti dar # rėmelių}}"

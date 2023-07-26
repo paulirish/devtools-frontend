@@ -29,12 +29,13 @@
  */
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
-import type * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as i18n from '../../core/i18n/i18n.js';
+
+import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
+import type * as TraceEngine from '../../models/trace/trace.js';
 
 let colorGeneratorInstance: Common.Color.Generator|null = null;
 
@@ -42,9 +43,9 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
   readonly colorGeneratorInternal: Common.Color.Generator;
   maxStackDepthInternal: number;
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  timelineData_: PerfUI.FlameChart.TimelineData|null;
-  entryNodes: SDK.ProfileTreeModel.ProfileNode[];
-  font?: string;
+  timelineData_: PerfUI.FlameChart.FlameChartTimelineData|null;
+  entryNodes: CPUProfile.ProfileTreeModel.ProfileNode[];
+  #font: string;
   boldFont?: string;
 
   constructor() {
@@ -52,6 +53,7 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
     this.maxStackDepthInternal = 0;
     this.timelineData_ = null;
     this.entryNodes = [];
+    this.#font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
   }
 
   static colorGenerator(): Common.Color.Generator {
@@ -82,11 +84,11 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
     return this.maxStackDepthInternal;
   }
 
-  timelineData(): PerfUI.FlameChart.TimelineData|null {
+  timelineData(): PerfUI.FlameChart.FlameChartTimelineData|null {
     return this.timelineData_ || this.calculateTimelineData();
   }
 
-  calculateTimelineData(): PerfUI.FlameChart.TimelineData {
+  calculateTimelineData(): PerfUI.FlameChart.FlameChartTimelineData {
     throw 'Not implemented.';
   }
 
@@ -104,11 +106,8 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
   }
 
   entryFont(entryIndex: number): string|null {
-    if (!this.font) {
-      this.font = '11px ' + Host.Platform.fontFamily();
-      this.boldFont = 'bold ' + this.font;
-    }
-    return this.entryHasDeoptReason(entryIndex) ? this.boldFont as string : this.font;
+    const boldFont = 'bold ' + this.#font;
+    return this.entryHasDeoptReason(entryIndex) ? boldFont : this.#font;
   }
 
   entryHasDeoptReason(_entryIndex: number): boolean {
@@ -137,7 +136,7 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
     return '#333';
   }
 
-  navStartTimes(): Map<string, SDK.TracingModel.Event> {
+  navStartTimes(): Map<string, TraceEngine.Legacy.Event> {
     return new Map();
   }
 
@@ -179,7 +178,7 @@ export class CPUProfileFlameChart extends
     this.searchResults = [];
   }
 
-  focus(): void {
+  override focus(): void {
     this.mainPane.focus();
   }
 
@@ -362,11 +361,11 @@ export class OverviewPane extends Common.ObjectWrapper.eventMixin<OverviewPaneEv
     this.dispatchEventToListeners(OverviewPaneEvents.WindowChanged, windowPosition);
   }
 
-  timelineData(): PerfUI.FlameChart.TimelineData|null {
+  timelineData(): PerfUI.FlameChart.FlameChartTimelineData|null {
     return this.dataProvider.timelineData();
   }
 
-  onResize(): void {
+  override onResize(): void {
     this.scheduleUpdate();
   }
 
@@ -422,7 +421,7 @@ export class OverviewPane extends Common.ObjectWrapper.eventMixin<OverviewPaneEv
 
   calculateDrawData(width: number): Uint8Array {
     const dataProvider = this.dataProvider;
-    const timelineData = (this.timelineData() as PerfUI.FlameChart.TimelineData);
+    const timelineData = (this.timelineData() as PerfUI.FlameChart.FlameChartTimelineData);
     const entryStartTimes = timelineData.entryStartTimes;
     const entryTotalTimes = timelineData.entryTotalTimes;
     const entryLevels = timelineData.entryLevels;

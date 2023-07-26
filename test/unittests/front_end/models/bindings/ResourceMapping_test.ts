@@ -72,6 +72,7 @@ describeWithMockConnection('ResourceMapping', () => {
   beforeEach(async () => {
     const target = createTarget();
     const targetManager = target.targetManager();
+    targetManager.setScopeTarget(target);
     workspace = Workspace.Workspace.WorkspaceImpl.instance();
     resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
     Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance({forceNew: true, resourceMapping, targetManager});
@@ -109,6 +110,19 @@ describeWithMockConnection('ResourceMapping', () => {
     assert.isNull(workspace.uiSourceCodeForURL(url));
     resourceMapping.modelAdded(resourceTreeModel);
     assert.isNotNull(workspace.uiSourceCodeForURL(url));
+  });
+
+  it('creates UISourceCode for added out of scope target', () => {
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(null);
+
+    const mimeType = 'text/html';
+    const frameId = 'other' as Protocol.Page.FrameId;
+    const otherUrl = 'http://example.com/other.html' as Platform.DevToolsPath.UrlString;
+    resourceTreeModel.frames()[0]?.addResource(new SDK.Resource.Resource(
+        resourceTreeModel, null, otherUrl, otherUrl, frameId, null,
+        Common.ResourceType.ResourceType.fromMimeType(mimeType), mimeType, null, null));
+    uiSourceCode = workspace.uiSourceCodeForURL(otherUrl) as Workspace.UISourceCode.UISourceCode;
+    assert.isNotNull(uiSourceCode);
   });
 
   describe('uiLocationToJSLocations', () => {

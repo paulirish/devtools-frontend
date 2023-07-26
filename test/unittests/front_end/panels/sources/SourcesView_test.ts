@@ -5,6 +5,7 @@
 const {assert} = chai;
 
 import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as Breakpoints from '../../../../../front_end/models/breakpoints/breakpoints.js';
 import * as Common from '../../../../../front_end/core/common/common.js';
 import * as Persistence from '../../../../../front_end/models/persistence/persistence.js';
 import * as Root from '../../../../../front_end/core/root/root.js';
@@ -16,13 +17,13 @@ import * as Sources from '../../../../../front_end/panels/sources/sources.js';
 import * as SourcesComponents from '../../../../../front_end/panels/sources/components/components.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
-import {initializeGlobalVars, deinitializeGlobalVars} from '../../helpers/EnvironmentHelpers.js';
+import {
+  describeWithEnvironment,
+} from '../../helpers/EnvironmentHelpers.js';
 import {createFileSystemUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
 
-describe('SourcesView', () => {
+describeWithEnvironment('SourcesView', () => {
   beforeEach(async () => {
-    await initializeGlobalVars();
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
     const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
@@ -33,18 +34,17 @@ describe('SourcesView', () => {
       resourceMapping,
       targetManager,
     });
-    const breakpointManager = Bindings.BreakpointManager.BreakpointManager.instance(
+    const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance(
         {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
-  });
-
-  afterEach(async () => {
-    await deinitializeGlobalVars();
   });
 
   it('creates new source view of updated type when renamed file requires a different viewer', async () => {
     const sourcesView = new Sources.SourcesView.SourcesView();
+    sourcesView.markAsRoot();
+    sourcesView.show(document.body);
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const {uiSourceCode, project} = createFileSystemUISourceCode({
       url: 'file:///path/to/overrides/example.html' as Platform.DevToolsPath.UrlString,
@@ -82,6 +82,7 @@ describe('SourcesView', () => {
     await uiSourceCode.rename('font.woff' as Platform.DevToolsPath.RawPathString);
     assert.isTrue(sourcesView.getSourceView(uiSourceCode) instanceof SourceFrame.FontView.FontView);
     workspace.removeProject(project);
+    sourcesView.detach();
   });
 
   it('creates a HeadersView when the filename is \'.headers\'', async () => {
@@ -100,9 +101,20 @@ describe('SourcesView', () => {
       const {uiSourceCode} = createFileSystemUISourceCode({
         url: 'file:///path/to/project/example.ts' as Platform.DevToolsPath.UrlString,
         mimeType: 'text/typescript',
+        content: 'export class Foo {}',
       });
       const sourcesPanelFileOpenedSpy = sinon.spy(Host.userMetrics, 'sourcesPanelFileOpened');
-      sourcesView.viewForFile(uiSourceCode);
+      const contentLoadedPromise = new Promise(res => window.addEventListener('source-file-loaded', res));
+      const widget = sourcesView.viewForFile(uiSourceCode);
+      assert.instanceOf(widget, Sources.UISourceCodeFrame.UISourceCodeFrame);
+      const uiSourceCodeFrame = widget as Sources.UISourceCodeFrame.UISourceCodeFrame;
+
+      // Skip creating the DebuggerPlugin, which times out and simulate DOM attach/showing.
+      sinon.stub(uiSourceCodeFrame, 'loadPlugins' as keyof typeof uiSourceCodeFrame).callsFake(() => {});
+      uiSourceCodeFrame.wasShown();
+
+      await contentLoadedPromise;
+
       assert.isTrue(sourcesPanelFileOpenedSpy.calledWithExactly('text/typescript'));
     });
   });

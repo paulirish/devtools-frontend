@@ -12,8 +12,8 @@ devtools_module("extensions") {
     "ExtensionEndpoint.ts",
     "ExtensionPanel.ts",
     "ExtensionServer.ts",
-    "ExtensionTraceProvider.ts",
     "ExtensionView.ts",
+    "HostUrlPattern.ts",
     "LanguageExtensionEndpoint.ts",
     "RecorderExtensionEndpoint.ts",
     "RecorderPluginManager.ts",
@@ -49,6 +49,7 @@ devtools_entrypoint("bundle") {
     "../../../test/unittests/front_end/models/extensions:extensions",
     "../../entrypoints/main/*",
     "../../panels/elements/*",
+    "../../panels/recorder/*",
     "../../panels/sources/*",
     "../../panels/timeline/*",
   ]

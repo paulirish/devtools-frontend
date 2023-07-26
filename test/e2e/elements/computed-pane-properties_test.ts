@@ -109,8 +109,8 @@ describe('The Computed pane', async function() {
     assert(isExpandedAfter);
   });
 
-  // Flaky test
-  it.skip('[crbug.com/1346261] allows tracing to style rules (ported layout test)', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1346261]: allows tracing to style rules (ported layout test)', async () => {
     const {frontend} = getBrowserAndPages();
     await goToResource('elements/css-styles-variables.html');
     await waitForNumberOfComputedProperties(7);
@@ -128,7 +128,7 @@ describe('The Computed pane', async function() {
     const expectedPropId1 = [
       {
         'name': '--a',
-        'value': ' red',
+        'value': 'red',
         'trace': [{
           'value': 'red',
           'selector': 'body',
@@ -137,7 +137,7 @@ describe('The Computed pane', async function() {
       },
       {
         'name': '--b',
-        'value': ' 44px',
+        'value': '44px',
         'trace': [{
           'value': '44px',
           'selector': '#id1',
@@ -153,7 +153,7 @@ describe('The Computed pane', async function() {
     const expectedPropId2 = [
       {
         'name': '--a',
-        'value': ' green',
+        'value': 'green',
         'trace': [
           {
             'value': 'green',
@@ -169,7 +169,7 @@ describe('The Computed pane', async function() {
       },
       {
         'name': '--b',
-        'value': ' 44px',
+        'value': '44px',
         'trace': [{
           'value': '44px',
           'selector': '#id1',
@@ -185,7 +185,7 @@ describe('The Computed pane', async function() {
     const expectedPropId3 = [
       {
         'name': '--a',
-        'value': ' green',
+        'value': 'green',
         'trace': [
           {
             'value': 'inherit',
@@ -206,7 +206,7 @@ describe('The Computed pane', async function() {
       },
       {
         'name': '--b',
-        'value': ' 44px',
+        'value': '44px',
         'trace': [{
           'value': '44px',
           'selector': '#id1',

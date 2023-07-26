@@ -37,6 +37,11 @@ const UIStrings = {
    * @description Label for a link for SameParty Issues. 'Attribute' refers to a cookie attribute.
    */
   firstPartySetsExplained: '`First-Party Sets` and the `SameParty` attribute',
+  /**
+   * @description Label for a link for third-party cookie Issues.
+   */
+  thirdPartyPhaseoutExplained: 'Prepare for phasing out third-party cookies',
+
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/CookieIssue.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -161,21 +166,21 @@ export class CookieIssue extends Issue {
     return [Protocol.Audits.InspectorIssueCode.CookieIssue, reason, operation].join('::');
   }
 
-  cookies(): Iterable<Protocol.Audits.AffectedCookie> {
+  override cookies(): Iterable<Protocol.Audits.AffectedCookie> {
     if (this.#issueDetails.cookie) {
       return [this.#issueDetails.cookie];
     }
     return [];
   }
 
-  rawCookieLines(): Iterable<string> {
+  override rawCookieLines(): Iterable<string> {
     if (this.#issueDetails.rawCookieLine) {
       return [this.#issueDetails.rawCookieLine];
     }
     return [];
   }
 
-  requests(): Iterable<Protocol.Audits.AffectedRequest> {
+  override requests(): Iterable<Protocol.Audits.AffectedRequest> {
     if (this.#issueDetails.request) {
       return [this.#issueDetails.request];
     }
@@ -194,7 +199,7 @@ export class CookieIssue extends Issue {
     return resolveLazyDescription(description);
   }
 
-  isCausedByThirdParty(): boolean {
+  override isCausedByThirdParty(): boolean {
     const outermostFrame = SDK.FrameManager.FrameManager.instance().getOutermostFrame();
     return isCausedByThirdParty(outermostFrame, this.#issueDetails.cookieUrl);
   }
@@ -272,26 +277,6 @@ function isSubdomainOf(subdomain: string, superdomain: string): boolean {
   const subdomainWithoutSuperdomian = subdomain.substr(0, subdomain.length - superdomain.length);
   return subdomainWithoutSuperdomian.endsWith('.');
 }
-
-const sameSiteUnspecifiedErrorRead: LazyMarkdownIssueDescription = {
-  file: 'SameSiteUnspecifiedTreatedAsLaxRead.md',
-  links: [
-    {
-      link: 'https://web.dev/samesite-cookies-explained/',
-      linkTitle: i18nLazyString(UIStrings.samesiteCookiesExplained),
-    },
-  ],
-};
-
-const sameSiteUnspecifiedErrorSet: LazyMarkdownIssueDescription = {
-  file: 'SameSiteUnspecifiedTreatedAsLaxSet.md',
-  links: [
-    {
-      link: 'https://web.dev/samesite-cookies-explained/',
-      linkTitle: i18nLazyString(UIStrings.samesiteCookiesExplained),
-    },
-  ],
-};
 
 const sameSiteUnspecifiedWarnRead: LazyMarkdownIssueDescription = {
   file: 'SameSiteUnspecifiedLaxAllowUnsafeRead.md',
@@ -445,9 +430,28 @@ const excludeDomainNonAscii: LazyMarkdownIssueDescription = {
   links: [],
 };
 
+const excludeBlockedWithinFirstPartySet: LazyMarkdownIssueDescription = {
+  file: 'cookieExcludeBlockedWithinFirstPartySet.md',
+  links: [],
+};
+
+const cookieWarnThirdPartyPhaseoutSet: LazyMarkdownIssueDescription = {
+  file: 'cookieWarnThirdPartyPhaseoutSet.md',
+  links: [{
+    link: 'https://developer.chrome.com/docs/privacy-sandbox/third-party-cookie-phase-out/',
+    linkTitle: i18nLazyString(UIStrings.thirdPartyPhaseoutExplained),
+  }],
+};
+
+const cookieWarnThirdPartyPhaseoutRead: LazyMarkdownIssueDescription = {
+  file: 'cookieWarnThirdPartyPhaseoutRead.md',
+  links: [{
+    link: 'https://developer.chrome.com/docs/privacy-sandbox/third-party-cookie-phase-out/',
+    linkTitle: i18nLazyString(UIStrings.thirdPartyPhaseoutExplained),
+  }],
+};
+
 const issueDescriptions: Map<string, LazyMarkdownIssueDescription> = new Map([
-  ['CookieIssue::ExcludeSameSiteUnspecifiedTreatedAsLax::ReadCookie', sameSiteUnspecifiedErrorRead],
-  ['CookieIssue::ExcludeSameSiteUnspecifiedTreatedAsLax::SetCookie', sameSiteUnspecifiedErrorSet],
   // These two don't have a deprecation date yet, but they need to be fixed eventually.
   ['CookieIssue::WarnSameSiteUnspecifiedLaxAllowUnsafe::ReadCookie', sameSiteUnspecifiedWarnRead],
   ['CookieIssue::WarnSameSiteUnspecifiedLaxAllowUnsafe::SetCookie', sameSiteUnspecifiedWarnSet],
@@ -480,4 +484,14 @@ const issueDescriptions: Map<string, LazyMarkdownIssueDescription> = new Map([
   ['CookieIssue::WarnDomainNonASCII::SetCookie', warnDomainNonAscii],
   ['CookieIssue::ExcludeDomainNonASCII::ReadCookie', excludeDomainNonAscii],
   ['CookieIssue::ExcludeDomainNonASCII::SetCookie', excludeDomainNonAscii],
+  [
+    'CookieIssue::ExcludeThirdPartyCookieBlockedInFirstPartySet::ReadCookie',
+    excludeBlockedWithinFirstPartySet,
+  ],
+  [
+    'CookieIssue::ExcludeThirdPartyCookieBlockedInFirstPartySet::SetCookie',
+    excludeBlockedWithinFirstPartySet,
+  ],
+  ['CookieIssue::WarnThirdPartyPhaseout::ReadCookie', cookieWarnThirdPartyPhaseoutRead],
+  ['CookieIssue::WarnThirdPartyPhaseout::SetCookie', cookieWarnThirdPartyPhaseoutSet],
 ]);

@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../../../front_end/core/common/common.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import * as Root from '../../../../../front_end/core/root/root.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Console from '../../../../../front_end/panels/console/console.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
-import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {assertElement, dispatchPasteEvent} from '../../helpers/DOMHelpers.js';
+import {createTarget, registerNoopActions} from '../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
@@ -16,37 +19,18 @@ import type * as Platform from '../../../../../front_end/core/platform/platform.
 const {assert} = chai;
 
 describeWithMockConnection('ConsoleView', () => {
+  let consoleView: Console.ConsoleView.ConsoleView;
+
   beforeEach(() => {
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear.history');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.create-pin');
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'console.clear',
-      category: UI.ActionRegistration.ActionCategory.CONSOLE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
-    });
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'console.clear.history',
-      category: UI.ActionRegistration.ActionCategory.CONSOLE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
-    });
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'console.create-pin',
-      category: UI.ActionRegistration.ActionCategory.CONSOLE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
-    });
-    const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
-    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
+    registerNoopActions(['console.clear', 'console.clear.history', 'console.create-pin']);
+    consoleView = Console.ConsoleView.ConsoleView.instance({forceNew: true, viewportThrottlerTimeout: 0});
   });
 
   afterEach(() => {
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear.history');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.create-pin');
+    consoleView.detach();
   });
 
   it('adds a title to every checkbox label in the settings view', async () => {
-    const consoleView = Console.ConsoleView.ConsoleView.instance({forceNew: true});
     const consoleSettingsCheckboxes =
         consoleView.element.querySelector('.toolbar')?.shadowRoot?.querySelectorAll('.toolbar-item.checkbox');
     if (!consoleSettingsCheckboxes) {
@@ -62,17 +46,18 @@ describeWithMockConnection('ConsoleView', () => {
     await consoleView.getScheduledRefreshPromiseForTest();
   });
 
+  function createConsoleMessage(target: SDK.Target.Target, message: string) {
+    return new SDK.ConsoleModel.ConsoleMessage(
+        target.model(SDK.RuntimeModel.RuntimeModel), Protocol.Log.LogEntrySource.Javascript, null, message);
+  }
+
   async function canSaveToFile(targetFactory: () => SDK.Target.Target) {
     const target = targetFactory();
-    const consoleView = Console.ConsoleView.ConsoleView.instance({forceNew: true});
-    SDK.ConsoleModel.ConsoleModel.instance().dispatchEventToListeners(
-        SDK.ConsoleModel.Events.MessageAdded,
-        new SDK.ConsoleModel.ConsoleMessage(
-            target.model(SDK.RuntimeModel.RuntimeModel), Protocol.Log.LogEntrySource.Javascript, null, 'message 1'));
-    SDK.ConsoleModel.ConsoleModel.instance().dispatchEventToListeners(
-        SDK.ConsoleModel.Events.MessageAdded,
-        new SDK.ConsoleModel.ConsoleMessage(
-            target.model(SDK.RuntimeModel.RuntimeModel), Protocol.Log.LogEntrySource.Javascript, null, 'message 2'));
+
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assertNotNullOrUndefined(consoleModel);
+    consoleModel.addMessage(createConsoleMessage(target, 'message 1'));
+    consoleModel.addMessage(createConsoleMessage(target, 'message 2'));
     const messagesElement = consoleView.element.querySelector('#console-messages');
     assertNotNullOrUndefined(messagesElement);
 
@@ -112,4 +97,123 @@ describeWithMockConnection('ConsoleView', () => {
                                            createTarget({parentTarget: tabTarget, subtype: 'prerender'});
                                            return createTarget({parentTarget: tabTarget});
                                          }));
+
+  async function getConsoleMessages() {
+    const messagesElement = consoleView.element.querySelector('#console-messages');
+    assertNotNullOrUndefined(messagesElement);
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return [...messagesElement.querySelectorAll('.console-message-text')].map(e => (e as HTMLElement).innerText);
+  }
+
+  const messageTests = (inScope: boolean) => () => {
+    let target: SDK.Target.Target;
+
+    beforeEach(() => {
+      target = createTarget();
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(inScope ? target : null);
+      consoleView.markAsRoot();
+      consoleView.show(document.body);
+    });
+
+    it('adds messages', async () => {
+      const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+      assertNotNullOrUndefined(consoleModel);
+      SDK.ConsoleModel.ConsoleModel.requestClearMessages();
+      consoleModel.addMessage(createConsoleMessage(target, 'message 1'));
+      consoleModel.addMessage(createConsoleMessage(target, 'message 2'));
+
+      const messages = await getConsoleMessages();
+      assert.deepEqual(messages, inScope ? ['message 1', 'message 2'] : []);
+    });
+
+    it('prints results', async () => {
+      const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+      assertNotNullOrUndefined(consoleModel);
+      const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+      assertNotNullOrUndefined(runtimeModel);
+      SDK.ConsoleModel.ConsoleModel.requestClearMessages();
+      consoleModel.dispatchEventToListeners(SDK.ConsoleModel.Events.CommandEvaluated, {
+        result: new SDK.RemoteObject.RemoteObjectImpl(runtimeModel, undefined, 'number', undefined, 42),
+        commandMessage: createConsoleMessage(target, '[ultimateQuestionOfLife, theUniverse, everything].join()'),
+      });
+
+      const messages = await getConsoleMessages();
+      assert.deepEqual(messages, inScope ? ['42'] : []);
+    });
+  };
+
+  describe('in scope', messageTests(true));
+  describe('out of scope', messageTests(false));
+
+  const handlesSwitchingScope = (preserveLog: boolean) => async () => {
+    Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').set(preserveLog);
+    const target = createTarget();
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+    const anotherTarget = createTarget();
+    consoleView.markAsRoot();
+    consoleView.show(document.body);
+
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assertNotNullOrUndefined(consoleModel);
+    consoleModel.addMessage(createConsoleMessage(target, 'message 1'));
+    consoleModel.addMessage(createConsoleMessage(target, 'message 2'));
+
+    const anotherConsoleModel = anotherTarget.model(SDK.ConsoleModel.ConsoleModel);
+    assertNotNullOrUndefined(anotherConsoleModel);
+    anotherConsoleModel.addMessage(createConsoleMessage(anotherTarget, 'message 3'));
+    assert.deepEqual(await getConsoleMessages(), ['message 1', 'message 2']);
+
+    SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
+    assert.deepEqual(await getConsoleMessages(), preserveLog ? ['message 1', 'message 2', 'message 3'] : ['message 3']);
+
+    Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').set(false);
+  };
+
+  it('replaces messages when switching scope with preserve log off', handlesSwitchingScope(false));
+  it('appends messages when switching scope with preserve log on', handlesSwitchingScope(true));
+
+  describe('self-XSS warning', () => {
+    let target: SDK.Target.Target;
+
+    beforeEach(() => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SELF_XSS_WARNING);
+      target = createTarget();
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+      consoleView.markAsRoot();
+      consoleView.show(document.body);
+    });
+
+    it('shows', async () => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'foo');
+
+      const messagesElement = consoleView.element.querySelector('#console-messages');
+      assertElement(messagesElement, HTMLElement);
+      dispatchPasteEvent(messagesElement, {clipboardData: dt, bubbles: true});
+      assert.strictEqual(
+          Common.Console.Console.instance().messages()[0].text,
+          'Warning: Do not paste code you do not understand or have not checked yourself into the DevTools console. This could allow attackers to steal your identity or take control of your computer. Please type \'allow pasting\' below to allow pasting.');
+    });
+
+    it('is turned off when console history reaches a length of 5', async () => {
+      const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+      assertNotNullOrUndefined(consoleModel);
+      const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+      assertNotNullOrUndefined(runtimeModel);
+      SDK.ConsoleModel.ConsoleModel.requestClearMessages();
+
+      const selfXssWarningDisabledSetting = Common.Settings.Settings.instance().createSetting(
+          'disableSelfXssWarning', false, Common.Settings.SettingStorageType.Synced);
+
+      for (let i = 0; i < 5; i++) {
+        assert.isFalse(selfXssWarningDisabledSetting.get());
+        consoleModel.dispatchEventToListeners(SDK.ConsoleModel.Events.CommandEvaluated, {
+          result: new SDK.RemoteObject.RemoteObjectImpl(runtimeModel, undefined, 'number', undefined, 42),
+          commandMessage: createConsoleMessage(target, String(i)),
+        });
+      }
+      assert.isTrue(selfXssWarningDisabledSetting.get());
+    });
+  });
 });

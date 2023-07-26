@@ -5,6 +5,7 @@
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Host from '../../core/host/host.js';
@@ -17,7 +18,7 @@ const UIStrings = {
   /**
    *@description Text in Application Panel Sidebar of the Application panel
    */
-  cacheStorage: 'Cache Storage',
+  cacheStorage: 'Cache storage',
   /**
    *@description A context menu item in the Application Panel Sidebar of the Application panel
    */
@@ -32,16 +33,18 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTreeElement {
   private swCacheModels: Set<SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel>;
   private swCacheTreeElements: Set<SWCacheTreeElement>;
+  private storageBucket?: Protocol.Storage.StorageBucket;
 
-  constructor(resourcesPanel: ResourcesPanel) {
+  constructor(resourcesPanel: ResourcesPanel, storageBucket?: Protocol.Storage.StorageBucket) {
     super(resourcesPanel, i18nString(UIStrings.cacheStorage), 'CacheStorage');
-    const icon = UI.Icon.Icon.create('mediumicon-database', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('database', 'resource-tree-item');
     this.setLink(
         'https://developer.chrome.com/docs/devtools/storage/cache/?utm_source=devtools' as
         Platform.DevToolsPath.UrlString);
     this.setLeadingIcons([icon]);
     this.swCacheModels = new Set();
     this.swCacheTreeElements = new Set();
+    this.storageBucket = storageBucket;
   }
 
   initialize(): void {
@@ -55,7 +58,7 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
     });
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -98,7 +101,8 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
 
   private addCache(
       model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel, cache: SDK.ServiceWorkerCacheModel.Cache): void {
-    const swCacheTreeElement = new SWCacheTreeElement(this.resourcesPanel, model, cache);
+    const swCacheTreeElement =
+        new SWCacheTreeElement(this.resourcesPanel, model, cache, this.storageBucket === undefined);
     this.swCacheTreeElements.add(swCacheTreeElement);
     this.appendChild(swCacheTreeElement);
   }
@@ -139,21 +143,27 @@ export class SWCacheTreeElement extends ApplicationPanelTreeElement {
 
   constructor(
       resourcesPanel: ResourcesPanel, model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel,
-      cache: SDK.ServiceWorkerCacheModel.Cache) {
-    super(resourcesPanel, cache.cacheName + ' - ' + cache.storageKey, false);
+      cache: SDK.ServiceWorkerCacheModel.Cache, appendStorageKey: boolean) {
+    let cacheName;
+    if (appendStorageKey) {
+      cacheName = cache.cacheName + ' - ' + cache.storageKey;
+    } else {
+      cacheName = cache.cacheName;
+    }
+    super(resourcesPanel, cacheName, false);
     this.model = model;
     this.cache = cache;
     this.view = null;
-    const icon = UI.Icon.Icon.create('mediumicon-table', 'resource-tree-item');
+    const icon = UI.Icon.Icon.create('table', 'resource-tree-item');
     this.setLeadingIcons([icon]);
   }
 
-  get itemURL(): Platform.DevToolsPath.UrlString {
+  override get itemURL(): Platform.DevToolsPath.UrlString {
     // I don't think this will work at all.
     return 'cache://' + this.cache.cacheId as Platform.DevToolsPath.UrlString;
   }
 
-  onattach(): void {
+  override onattach(): void {
     super.onattach();
     this.listItemElement.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), true);
   }
@@ -175,7 +185,7 @@ export class SWCacheTreeElement extends ApplicationPanelTreeElement {
     }
   }
 
-  onselect(selectedByUser: boolean|undefined): boolean {
+  override onselect(selectedByUser: boolean|undefined): boolean {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = new ServiceWorkerCacheView(this.model, this.cache);

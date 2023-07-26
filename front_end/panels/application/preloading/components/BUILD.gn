@@ -19,8 +19,10 @@ devtools_module("components") {
   sources = [
     "PreloadingDetailsReportView.ts",
     "PreloadingGrid.ts",
+    "PreloadingString.ts",
     "RuleSetDetailsReportView.ts",
     "RuleSetGrid.ts",
+    "UsedPreloadingView.ts",
   ]
 
   deps = [
@@ -38,12 +40,15 @@ devtools_module("components") {
     "../../../../ui/components/data_grid:bundle",
     "../../../../ui/components/expandable_list:bundle",
     "../../../../ui/components/icon_button:bundle",
+    "../../../../ui/components/legacy_wrapper:bundle",
     "../../../../ui/components/report_view:bundle",
+    "../../../../ui/components/request_link_icon:bundle",
     "../../../../ui/components/text_prompt:bundle",
     "../../../../ui/components/tree_outline:bundle",
     "../../../../ui/legacy:bundle",
     "../../../../ui/legacy/components/source_frame:bundle",
     "../../../../ui/legacy/components/utils:bundle",
+    "../helper:bundle",
   ]
 }
 

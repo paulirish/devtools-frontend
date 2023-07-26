@@ -4,30 +4,24 @@
 
 const {assert} = chai;
 
-import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
 import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
 import {
   DevToolsTimelineCategory,
   makeFakeSDKEventFromPayload,
-} from '../../helpers/TimelineHelpers.js';
+} from '../../helpers/TraceHelpers.js';
 
 const consoleEvent = makeFakeSDKEventFromPayload({
   categories: [DevToolsTimelineCategory, TimelineModel.TimelineModel.TimelineModelImpl.Category.Console],
   name: TimelineModel.TimelineModel.RecordType.ConsoleTime,
-  ph: SDK.TracingModel.Phase.Complete,
+  ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
   ts: 1,
 });
 
-const latencyInfoEvent = makeFakeSDKEventFromPayload({
-  categories: [DevToolsTimelineCategory, TimelineModel.TimelineModel.TimelineModelImpl.Category.LatencyInfo],
-  name: TimelineModel.TimelineModel.RecordType.LatencyInfo,
-  ph: SDK.TracingModel.Phase.Complete,
-  ts: 1,
-});
 const userTimingEvent = makeFakeSDKEventFromPayload({
   categories: [DevToolsTimelineCategory, TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming],
   name: TimelineModel.TimelineModel.RecordType.UserTiming,
-  ph: SDK.TracingModel.Phase.Complete,
+  ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
   ts: 1,
 });
 
@@ -40,7 +34,6 @@ describe('TimelineModelFilter', () => {
       ]);
 
       assert.isTrue(visibleFilter.accept(consoleEvent));
-      assert.isFalse(visibleFilter.accept(latencyInfoEvent));
     });
 
     describe('eventType', () => {
@@ -56,17 +49,11 @@ describe('TimelineModelFilter', () => {
             TimelineModel.TimelineModel.RecordType.UserTiming);
       });
 
-      it('returns LatencyInfo if the event has the LatencyInfo category', () => {
-        assert.strictEqual(
-            TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(latencyInfoEvent),
-            TimelineModel.TimelineModel.RecordType.LatencyInfo);
-      });
-
       it('returns the event name if the event is any other category', () => {
         const otherEvent = makeFakeSDKEventFromPayload({
           categories: [DevToolsTimelineCategory, TimelineModel.TimelineModel.TimelineModelImpl.Category.Loading],
           name: 'other',
-          ph: SDK.TracingModel.Phase.Complete,
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
           ts: 1,
         });
         assert.strictEqual(
@@ -93,11 +80,11 @@ describe('TimelineModelFilter', () => {
   });
 
   describe('ExclusiveNameFilter', () => {
-    function makeEventWithName(name: string): SDK.TracingModel.Event {
+    function makeEventWithName(name: string): TraceEngine.Legacy.Event {
       return makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name,
-        ph: SDK.TracingModel.Phase.Complete,
+        ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
         ts: 1,
       });
     }

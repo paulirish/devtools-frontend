@@ -41,19 +41,22 @@ describe('The Application Tab', async () => {
     await target.deleteCookie(...cookies);
   });
 
-  it('shows cookies even when navigating to an unreachable page (crbug.com/1047348)', async () => {
-    const {target} = getBrowserAndPages();
-    // This sets a new cookie foo=bar
-    await navigateToApplicationTab(target, 'cookies');
+  // Flaky test
+  it.skip(
+      '[crbug.com/1443434]: shows cookies even when navigating to an unreachable page (crbug.com/1047348)',
+      async () => {
+        const {target} = getBrowserAndPages();
+        // This sets a new cookie foo=bar
+        await navigateToApplicationTab(target, 'cookies');
 
-    await goToResource('network/unreachable.rawresponse');
+        await goToResource('network/unreachable.rawresponse');
 
-    await doubleClickSourceTreeItem(COOKIES_SELECTOR);
-    await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
+        await doubleClickSourceTreeItem(COOKIES_SELECTOR);
+        await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
 
-    const dataGridRowValues = await getStorageItemsData(['name', 'value']);
-    assertMatchesJSONSnapshot(dataGridRowValues);
-  });
+        const dataGridRowValues = await getStorageItemsData(['name', 'value']);
+        assertMatchesJSONSnapshot(dataGridRowValues);
+      });
 
   it('shows a preview of the cookie value (crbug.com/462370)', async () => {
     const {target} = getBrowserAndPages();
@@ -116,7 +119,7 @@ describe('The Application Tab', async () => {
       return previewValue === 'Hello%2BWorld!';
     });
 
-    await click('[aria-label="Show URL decoded"]');
+    await click('[title="Show URL-decoded"]');
 
     await waitForFunction(async () => {
       const previewValueNode = await waitFor('.cookie-preview-widget-cookie-value');

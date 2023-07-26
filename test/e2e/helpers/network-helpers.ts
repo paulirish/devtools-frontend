@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {
   $,
@@ -17,14 +17,22 @@ import {
 
 const REQUEST_LIST_SELECTOR = '.network-log-grid tbody';
 
+export async function waitForNetworkTab(): Promise<void> {
+  // Make sure the network tab is shown on the screen
+  await waitFor('.network-log-grid');
+}
+
+export async function openNetworkTab(): Promise<void> {
+  await click('#tab-network');
+  await waitForNetworkTab();
+}
+
 /**
  * Select the Network tab in DevTools
  */
 export async function navigateToNetworkTab(testName: string) {
   await goToResource(`network/${testName}`);
-  await click('#tab-network');
-  // Make sure the network tab is shown on the screen
-  await waitFor('.network-log-grid');
+  await openNetworkTab();
 }
 
 /**
@@ -42,6 +50,10 @@ export async function waitForSomeRequestsToAppear(numberOfRequests: number) {
 export async function getAllRequestNames() {
   const requests = await $$(REQUEST_LIST_SELECTOR + ' .name-column');
   return await Promise.all(requests.map(request => request.evaluate(r => r.childNodes[1].textContent)));
+}
+
+export async function getNumberOfRequests() {
+  return (await getAllRequestNames()).length;
 }
 
 export async function getSelectedRequestName() {
@@ -89,11 +101,21 @@ export async function waitForSelectedRequestChange(initialRequestName: string|nu
 }
 
 export async function setPersistLog(persist: boolean) {
-  await setCheckBox('[aria-label="Preserve log"]', persist);
+  await setCheckBox('[title="Do not clear log on page reload / navigation"]', persist);
 }
 
 export async function setCacheDisabled(disabled: boolean): Promise<void> {
-  await setCheckBox('[aria-label="Disable cache"]', disabled);
+  await setCheckBox('[title^="Disable cache"]', disabled);
+}
+
+export async function setTimeWindow(): Promise<void> {
+  const overviewGridCursorArea = await waitFor('.overview-grid-cursor-area');
+  await overviewGridCursorArea.click({offset: {x: 0, y: 10}});
+}
+
+export async function clearTimeWindow(): Promise<void> {
+  const overviewGridCursorArea = await waitFor('.overview-grid-cursor-area');
+  await overviewGridCursorArea.click({count: 2});
 }
 
 export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element>) {

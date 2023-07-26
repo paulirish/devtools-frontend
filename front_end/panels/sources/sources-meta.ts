@@ -7,13 +7,14 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Bindings from '../../models/bindings/bindings.js';
+import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Sources from './sources.js';
+import type * as SourcesComponents from './components/components.js';
 
 const UIStrings = {
   /**
@@ -348,6 +349,19 @@ const UIStrings = {
    */
   disallowScrollingPastEndOfFile: 'Disallow scrolling past end of file',
   /**
+   *@description Title of a setting under the Sources category in Settings
+   */
+  wasmAutoStepping: 'When debugging wasm with debug information, do not pause on wasm bytecode if possible',
+  /**
+   *@description Title of a setting under the Sources category in Settings
+   */
+  enableWasmAutoStepping: 'Enable wasm auto-stepping',
+  /**
+   *@description Title of a setting under the Sources category in Settings
+   */
+  disableWasmAutoStepping: 'Disable wasm auto-stepping',
+
+  /**
    *@description Text for command prefix of go to a given line or symbol
    */
   goTo: 'Go to',
@@ -399,12 +413,20 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/sources/sources-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 let loadedSourcesModule: (typeof Sources|undefined);
+let loadedSourcesComponentsModule: (typeof SourcesComponents|undefined);
 
 async function loadSourcesModule(): Promise<typeof Sources> {
   if (!loadedSourcesModule) {
     loadedSourcesModule = await import('./sources.js');
   }
   return loadedSourcesModule;
+}
+
+async function loadSourcesComponentsModule(): Promise<typeof SourcesComponents> {
+  if (!loadedSourcesComponentsModule) {
+    loadedSourcesComponentsModule = await import('./components/components.js');
+  }
+  return loadedSourcesComponentsModule;
 }
 
 function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (sourcesModule: typeof Sources) => T[]): T[] {
@@ -519,11 +541,8 @@ UI.ViewManager.registerViewExtension({
   title: i18nLazyString(UIStrings.breakpoints),
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   async loadView() {
-    const Sources = await loadSourcesModule();
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW)) {
-      return Sources.BreakpointsSidebarPane.BreakpointsSidebarPane.instance();
-    }
-    return Sources.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane.instance();
+    const SourcesComponents = await loadSourcesComponentsModule();
+    return SourcesComponents.BreakpointsView.BreakpointsView.instance().wrapper as UI.Widget.Widget;
   },
 });
 
@@ -705,7 +724,7 @@ UI.ActionRegistration.registerActionExtension({
     return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.runSnippet),
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_PLAY,
+  iconClass: UI.ActionRegistration.IconClass.PLAY,
   contextTypes() {
     return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
   },
@@ -724,7 +743,8 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   category: UI.ActionRegistration.ActionCategory.DEBUGGER,
   actionId: 'debugger.toggle-breakpoints-active',
-  iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_DEACTIVATE_BREAKPOINTS,
+  iconClass: UI.ActionRegistration.IconClass.BREAKPOINT_CROSSED,
+  toggledIconClass: UI.ActionRegistration.IconClass.BREAKPOINT_CROSSED_FILLED,
   toggleable: true,
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
@@ -1193,7 +1213,7 @@ if (!Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
       const Sources = await loadSourcesModule();
       return Sources.SourcesNavigator.ActionDelegate.instance();
     },
-    iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_ADD,
+    iconClass: UI.ActionRegistration.IconClass.PLUS,
     title: i18nLazyString(UIStrings.addFolderToWorkspace),
     condition: Root.Runtime.ConditionName.NOT_SOURCES_HIDE_ADD_FOLDER,
   });
@@ -1430,7 +1450,7 @@ Common.Settings.registerSettingExtension({
   title: i18nLazyString(UIStrings.automaticallyRevealFilesIn),
   settingName: 'autoRevealInNavigator',
   settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
+  defaultValue: true,
   options: [
     {
       value: true,
@@ -1543,7 +1563,7 @@ Common.Settings.registerSettingExtension({
   title: i18nLazyString(UIStrings.codeFolding),
   settingName: 'textEditorCodeFolding',
   settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
+  defaultValue: true,
   options: [
     {
       value: true,
@@ -1658,9 +1678,28 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Local,
+  title: i18nLazyString(UIStrings.wasmAutoStepping),
+  settingName: 'wasmAutoStepping',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.enableWasmAutoStepping),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.disableWasmAutoStepping),
+    },
+  ],
+});
+
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1669,7 +1708,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_TOP,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1678,7 +1717,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_BOTTOM,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1687,7 +1726,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_TABS,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1803,7 +1842,7 @@ Common.Revealer.registerRevealer({
 Common.Revealer.registerRevealer({
   contextTypes() {
     return [
-      Bindings.BreakpointManager.BreakpointLocation,
+      Breakpoints.BreakpointManager.BreakpointLocation,
     ];
   },
   destination: Common.Revealer.RevealerDestination.SOURCES_PANEL,
@@ -1828,12 +1867,8 @@ UI.Context.registerListener({
     return [SDK.DebuggerModel.DebuggerPausedDetails];
   },
   async loadListener() {
-    const Sources = await loadSourcesModule();
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW)) {
-      return Sources.BreakpointsSidebarPane.BreakpointsSidebarController.instance();
-    }
-    return Sources.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane.instance();
-
+    const SourcesComponents = await loadSourcesComponentsModule();
+    return SourcesComponents.BreakpointsView.BreakpointsSidebarController.instance();
   },
 });
 
@@ -1871,7 +1906,8 @@ UI.ContextMenu.registerItem({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '@',
-  iconName: 'ic_command_go_to_symbol',
+  iconName: 'symbol',
+  iconWidth: '16px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.OutlineQuickOpen.OutlineQuickOpen();
@@ -1882,7 +1918,8 @@ QuickOpen.FilteredListWidget.registerProvider({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: ':',
-  iconName: 'ic_command_go_to_line',
+  iconName: 'colon',
+  iconWidth: '20px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.GoToLineQuickOpen.GoToLineQuickOpen();
@@ -1893,7 +1930,8 @@ QuickOpen.FilteredListWidget.registerProvider({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '',
-  iconName: 'ic_command_open_file',
+  iconName: 'document',
+  iconWidth: '16px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.OpenFileQuickOpen.OpenFileQuickOpen();

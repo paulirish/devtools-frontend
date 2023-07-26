@@ -71,7 +71,7 @@ describeWithEnvironment('TextEditor', () => {
       let resolveEventPromise: Function;
       const dispatchSpy = sinon.spy(CodeMirror.EditorView.prototype, 'dispatch');
       const editor = new TextEditor.TextEditor.TextEditor(makeState(
-          'line1\nline2\nline3\nline4\nline5\line6',
+          'line1\nline2\nline3\nline4\nline5\nline6andthisisalonglinesothatwehaveenoughspacetoscrollhorizontally',
           [CodeMirror.EditorView.theme(
               {'&.cm-editor': {height: '50px', width: '50px'}, '.cm-scroller': {overflow: 'auto'}})]));
       const waitForFirstScrollPromise = new Promise(r => {
@@ -245,6 +245,25 @@ describeWithEnvironment('TextEditor', () => {
       await testQueryType('// comment', 10);
     });
   });
+
+  it('dispatching a transaction from a saved editor reference should not throw an error', () => {
+    const textEditor = new TextEditor.TextEditor.TextEditor(makeState('one'));
+    const editorViewA = textEditor.editor;
+
+    renderElementIntoDOM(textEditor);
+    // textEditor.editor references to EditorView A.
+    textEditor.dispatch({changes: {from: 0, insert: 'a'}});
+    // `disconnectedCallback` removed `textEditor.#activeEditor`
+    // so reaching to `textEditor.editor` will create a new EditorView after this.
+    textEditor.remove();
+    // EditorView B is created from the previous state
+    // and EditorView B's state is diverged from previous state after this transaction.
+    textEditor.dispatch({changes: {from: 0, insert: 'b'}});
+
+    // directly dispatching from Editor A now calls `textEditor.editor.update`
+    // which references to EditorView B that has a different state.
+    assert.doesNotThrow(() => editorViewA.dispatch({changes: {from: 3, insert: '!'}}));
+  });
 });
 
 describeWithMockConnection('TextEditor autocompletion', () => {
@@ -288,7 +307,7 @@ describeWithMockConnection('TextEditor autocompletion', () => {
         super('TextEditorTestPlugin');
       }
 
-      handleScript(script: SDK.Script.Script) {
+      override handleScript(script: SDK.Script.Script) {
         return script === testScript;
       }
     }());

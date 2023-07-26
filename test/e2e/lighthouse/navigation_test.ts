@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {expectError} from '../../conductor/events.js';
 import {
@@ -27,7 +27,6 @@ import {
   setLegacyNavigation,
   setThrottlingMethod,
   setToolbarCheckboxWithText,
-  unregisterAllServiceWorkers,
   waitForResult,
 } from '../helpers/lighthouse-helpers.js';
 
@@ -35,9 +34,9 @@ import {
 // To resolve this when debugging, just make sure the target page is visible during the lighthouse run.
 
 describe('Navigation', async function() {
-  // The tests in this suite are particularly slow especially in parallel
+  // The tests in this suite are particularly slow
   if (this.timeout() !== 0) {
-    this.timeout(120_000);
+    this.timeout(60_000);
   }
 
   let consoleLog: string[] = [];
@@ -62,9 +61,7 @@ describe('Navigation', async function() {
   });
 
   afterEach(async function() {
-    await unregisterAllServiceWorkers();
-
-    const {frontend} = await getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     frontend.off('console', consoleListener);
 
     if (this.currentTest?.isFailed()) {
@@ -113,7 +110,7 @@ describe('Navigation', async function() {
           assert.strictEqual(numNavigations, 6);
         }
 
-        assert.strictEqual(lhr.lighthouseVersion, '10.0.1');
+        assert.strictEqual(lhr.lighthouseVersion, '10.4.0');
         assert.match(lhr.finalUrl, /^https:\/\/localhost:[0-9]+\/test\/e2e\/resources\/lighthouse\/hello.html/);
 
         assert.strictEqual(lhr.configSettings.throttlingMethod, 'simulate');
@@ -133,7 +130,7 @@ describe('Navigation', async function() {
         });
 
         const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr);
-        assert.strictEqual(auditResults.length, 173);
+        assert.strictEqual(auditResults.length, 185);
         assert.deepStrictEqual(erroredAudits, []);
         assert.deepStrictEqual(failedAudits.map(audit => audit.id), [
           'service-worker',
@@ -200,6 +197,10 @@ describe('Navigation', async function() {
       });
 
       it('successfully returns a Lighthouse report with DevTools throttling', async () => {
+        // [crbug.com/1427407] Flaky in legacy mode
+        if (mode === 'legacy') {
+          return;
+        }
         await navigateToLighthouseTab('lighthouse/hello.html');
 
         await setThrottlingMethod('devtools');
@@ -218,7 +219,7 @@ describe('Navigation', async function() {
         ];
 
         const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, flakyAudits);
-        assert.strictEqual(auditResults.length, 150);
+        assert.strictEqual(auditResults.length, 162);
         assert.deepStrictEqual(erroredAudits, []);
         assert.deepStrictEqual(failedAudits.map(audit => audit.id), [
           'service-worker',

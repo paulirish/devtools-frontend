@@ -72,7 +72,7 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
     this.items = new UI.ListModel.ListModel();
     this.list = new UI.ListControl.ListControl(this.items, this, UI.ListControl.ListMode.NonViewport);
     this.list.element.classList.add('javascript-vm-instances-list');
-    UI.ARIAUtils.setAccessibleName(this.list.element, i18nString(UIStrings.javascriptVmInstances));
+    UI.ARIAUtils.setLabel(this.list.element, i18nString(UIStrings.javascriptVmInstances));
     this.contentElement.appendChild(this.list.element);
 
     this.itemByIsolate = new Map();
@@ -95,13 +95,13 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
         SDK.TargetManager.Events.InspectedURLChanged, this.targetChanged, this);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     SDK.IsolateManager.IsolateManager.instance().addEventListener(
         SDK.IsolateManager.Events.MemoryChanged, this.heapStatsChanged, this);
   }
 
-  willHide(): void {
+  override willHide(): void {
     SDK.IsolateManager.IsolateManager.instance().removeEventListener(
         SDK.IsolateManager.Events.MemoryChanged, this.heapStatsChanged, this);
   }
@@ -192,7 +192,7 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
       changeLabel = i18nString(UIStrings.decreasingBySPerSecond, {PH1: changeRateText});
     }
     element.textContent = changeText;
-    UI.ARIAUtils.setAccessibleName(element, changeLabel);
+    UI.ARIAUtils.setLabel(element, changeLabel);
   }
 
   totalMemoryElement(): Element {

@@ -9,6 +9,7 @@ import * as TimelineModel from '../../../../../front_end/models/timeline_model/t
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
 import {TestPlugin} from '../../helpers/LanguagePluginHelpers.js';
+import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
 import {type Chrome} from '../../../../../extension-api/ExtensionAPI.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as Root from '../../../../../front_end/core/root/root.js';
@@ -20,7 +21,6 @@ import {
   dispatchEvent,
   setMockConnectionResponseHandler,
 } from '../../helpers/MockConnection.js';
-import {FakeStorage} from '../../helpers/TimelineHelpers.js';
 
 const {assert} = chai;
 
@@ -87,23 +87,27 @@ const SOURCE_MAP_URL = 'file://gen.js.map';
 
 describeWithMockConnection('Name resolving in the Performance panel', () => {
   let performanceModel: Timeline.PerformanceModel.PerformanceModel;
-  let tracingModel: SDK.TracingModel.TracingModel;
+  let tracingModel: TraceEngine.Legacy.TracingModel;
   let target: SDK.Target.Target;
   beforeEach(async function() {
     target = createTarget();
     performanceModel = new Timeline.PerformanceModel.PerformanceModel();
-    const traceEvents = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.buildTraceProfileFromCpuProfile(
+    const traceEvents = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.createFakeTraceFromCpuProfile(
         profile, 1, false, 'mock-name');
-    tracingModel = new SDK.TracingModel.TracingModel(new FakeStorage());
+    tracingModel = new TraceEngine.Legacy.TracingModel();
     tracingModel.addEvents(traceEvents);
     await performanceModel.setTracingModel(tracingModel);
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const targetManager = SDK.TargetManager.TargetManager.instance();
     const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-    Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+    const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
       forceNew: true,
       resourceMapping,
       targetManager,
+    });
+    Bindings.IgnoreListManager.IgnoreListManager.instance({
+      forceNew: true,
+      debuggerWorkspaceBinding,
     });
     SDK.PageResourceLoader.PageResourceLoader.instance({
       forceNew: true,
@@ -113,7 +117,6 @@ describeWithMockConnection('Name resolving in the Performance panel', () => {
         errorDescription: {message: '', statusCode: 0, netError: 0, netErrorName: '', urlValid: true},
       }),
       maxConcurrentLoads: 1,
-      loadTimeout: 500,
     });
     setMockConnectionResponseHandler('Debugger.getScriptSource', getScriptSourceHandler);
 
@@ -137,7 +140,7 @@ describeWithMockConnection('Name resolving in the Performance panel', () => {
        const cpuProfiles = performanceModel.timelineModel().cpuProfiles();
        assert.strictEqual(cpuProfiles.length, 1);
 
-       const nodes = cpuProfiles[0].nodes();
+       const nodes = cpuProfiles[0].cpuProfileData.nodes();
        assert.strictEqual(nodes?.length, profile.nodes.length);
 
        const sourceMapAttachedPromise = new Promise<void>(
@@ -177,17 +180,17 @@ describeWithMockConnection('Name resolving in the Performance panel', () => {
         super('InstrumentationBreakpoints');
       }
 
-      getFunctionInfo(_rawLocation: Chrome.DevTools.RawLocation):
+      override getFunctionInfo(_rawLocation: Chrome.DevTools.RawLocation):
           Promise<{frames: Chrome.DevTools.FunctionInfo[], missingSymbolFiles?: string[]|undefined}> {
         return Promise.resolve({frames: [{name: PLUGIN_FUNCTION_NAME}]});
       }
-      handleScript(_: SDK.Script.Script) {
+      override handleScript(_: SDK.Script.Script) {
         return true;
       }
     }
 
     const cpuProfiles = performanceModel.timelineModel().cpuProfiles();
-    const nodes = cpuProfiles[0].nodes();
+    const nodes = cpuProfiles[0].cpuProfileData.nodes();
 
     Root.Runtime.experiments.setEnabled('wasmDWARFDebugging', true);
     const pluginManager =

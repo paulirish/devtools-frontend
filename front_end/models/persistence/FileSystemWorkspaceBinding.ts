@@ -29,6 +29,7 @@
  */
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
@@ -259,7 +260,7 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     return true;
   }
 
-  rename(
+  override rename(
       uiSourceCode: Workspace.UISourceCode.UISourceCode, newName: Platform.DevToolsPath.RawPathString,
       callback:
           (arg0: boolean, arg1?: string|undefined, arg2?: Platform.DevToolsPath.UrlString|undefined,
@@ -321,13 +322,18 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     return result;
   }
 
-  indexContent(progress: Common.Progress.Progress): void {
+  override indexContent(progress: Common.Progress.Progress): void {
     this.fileSystemInternal.indexContent(progress);
   }
 
   populate(): void {
-    const chunkSize = 1000;
     const filePaths = this.fileSystemInternal.initialFilePaths();
+    if (filePaths.length === 0) {
+      return;
+    }
+
+    const chunkSize = 1000;
+    const startTime = performance.now();
     reportFileChunk.call(this, 0);
 
     function reportFileChunk(this: FileSystem, from: number): void {
@@ -337,11 +343,13 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
       }
       if (to < filePaths.length) {
         window.setTimeout(reportFileChunk.bind(this, to), 100);
+      } else if (this.type() === 'filesystem') {
+        Host.userMetrics.workspacesPopulated(performance.now() - startTime);
       }
     }
   }
 
-  excludeFolder(url: Platform.DevToolsPath.UrlString): void {
+  override excludeFolder(url: Platform.DevToolsPath.UrlString): void {
     let relativeFolder = Common.ParsedURL.ParsedURL.sliceUrlToEncodedPathString(url, this.fileSystemBaseURL.length);
     if (!relativeFolder.startsWith('/')) {
       relativeFolder = Common.ParsedURL.ParsedURL.prepend('/', relativeFolder);
@@ -381,7 +389,7 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     return uiSourceCode;
   }
 
-  deleteFile(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+  override deleteFile(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
     const relativePath = this.filePathForUISourceCode(uiSourceCode);
     void this.fileSystemInternal.deleteFile(relativePath).then(success => {
       if (success) {
@@ -390,7 +398,7 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     });
   }
 
-  remove(): void {
+  override remove(): void {
     this.fileSystemWorkspaceBinding.isolatedFileSystemManager.removeFileSystem(this.fileSystemInternal);
   }
 

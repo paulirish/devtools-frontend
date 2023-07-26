@@ -43,6 +43,10 @@ const UIStrings = {
    */
   icons: 'Icons',
   /**
+   *@description Text in App Manifest View of the Application panel
+   */
+  windowControlsOverlay: 'Window Controls Overlay',
+  /**
    *@description Text for the name of something
    */
   name: 'Name',
@@ -198,11 +202,6 @@ const UIStrings = {
    */
   avoidPurposeAnyAndMaskable:
       'Declaring an icon with \'`purpose: "any maskable"`\' is discouraged. It is likely to look incorrect on some platforms due to too much or too little padding.',
-  /**
-   *@description Manifest installability error in the Application panel
-   */
-  noMatchingServiceWorkerDetected:
-      'No matching `service worker` detected. You may need to reload the page, or check that the scope of the `service worker` for the current page encloses the scope and start URL from the manifest.',
   /**
    *@description Manifest installability error in the Application panel
    *@example {100} PH1
@@ -375,6 +374,32 @@ const UIStrings = {
    */
   screenshotPixelSize:
       'Screenshot {url} should specify a pixel size `[width]x[height]` instead of `"any"` as first size.',
+  /**
+   *@description Link text for more information on the display override property in the Application panel
+   */
+  displayOverride: 'display-override',
+  /**
+   *@description Message for Window Controls Overlay value succsessfully found with links to documnetation
+   *@example {window-controls-overlay} PH1
+   *@example {https://developer.mozilla.org/en-US/docs/Web/Manifest/display_override} PH2
+   *@example {https://developer.mozilla.org/en-US/docs/Web/Manifest} PH3
+   */
+  wcoFound: 'Chrome has successfully found the {PH1} value for the {PH2} field in the {PH3}.',
+  /**
+   *@description Message for Windows Control Overlay value not found with link to documentation
+   *@example {https://developer.mozilla.org/en-US/docs/Web/Manifest/display_override} PH1
+   */
+  wcoNotFound:
+      'Define {PH1} in the manifest to use the Window Controls Overlay API and customize your app\'s title bar.',
+  /**
+   *@description Link text for more information on customizing Window Controls Overlay title bar in the Application panel
+   */
+  customizePwaTitleBar: 'Customize the window controls overlay of your PWA\'s title bar.',
+  /**
+   *@description Text wrapping link to documentation on how to customize WCO title bar
+   *@example {https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps-chromium/how-to/window-controls-overlay} PH1
+   */
+  wcoNeedHelpReadMore: 'Need help? Read {PH1}.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/application/AppManifestView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -396,6 +421,7 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
   private readonly identitySection: UI.ReportView.Section;
   private readonly presentationSection: UI.ReportView.Section;
   private readonly iconsSection: UI.ReportView.Section;
+  private readonly windowsControlsOverlaySection: UI.ReportView.Section;
   private readonly protocolHandlersSection: UI.ReportView.Section;
   private readonly shortcutSections: UI.ReportView.Section[];
   private readonly screenshotsSections: UI.ReportView.Section[];
@@ -418,6 +444,7 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
   private resourceTreeModel?: SDK.ResourceTreeModel.ResourceTreeModel|null;
   private serviceWorkerManager?: SDK.ServiceWorkerManager.ServiceWorkerManager|null;
   private protocolHandlersView: ApplicationComponents.ProtocolHandlersView.ProtocolHandlersView;
+  private manifestLink?: HTMLElement;
   constructor(
       emptyView: UI.EmptyWidget.EmptyWidget, reportView: UI.ReportView.ReportView,
       throttler: Common.Throttler.Throttler) {
@@ -449,6 +476,7 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
     this.protocolHandlersView = new ApplicationComponents.ProtocolHandlersView.ProtocolHandlersView();
     this.protocolHandlersSection.appendFieldWithCustomView(this.protocolHandlersView);
     this.iconsSection = this.reportView.appendSection(i18nString(UIStrings.icons), 'report-section-icons');
+    this.windowsControlsOverlaySection = this.reportView.appendSection(UIStrings.windowControlsOverlay);
     this.shortcutSections = [];
     this.screenshotsSections = [];
 
@@ -457,7 +485,7 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
     this.descriptionField = this.identitySection.appendFlexedField(i18nString(UIStrings.description));
 
     this.startURLField = this.presentationSection.appendField(i18nString(UIStrings.startUrl));
-    UI.ARIAUtils.setAccessibleName(this.startURLField, i18nString(UIStrings.startUrl));
+    UI.ARIAUtils.setLabel(this.startURLField, i18nString(UIStrings.startUrl));
 
     const themeColorField = this.presentationSection.appendField(i18nString(UIStrings.themeColor));
     this.themeColorSwatch = new InlineEditor.ColorSwatch.ColorSwatch();
@@ -486,7 +514,13 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
   }
 
   getStaticSections(): UI.ReportView.Section[] {
-    return [this.identitySection, this.presentationSection, this.protocolHandlersSection, this.iconsSection];
+    return [
+      this.identitySection,
+      this.presentationSection,
+      this.protocolHandlersSection,
+      this.iconsSection,
+      this.windowsControlsOverlaySection,
+    ];
   }
 
   getManifestElement(): Element {
@@ -494,7 +528,7 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
   }
 
   targetAdded(target: SDK.Target.Target): void {
-    if (target !== SDK.TargetManager.TargetManager.instance().mainFrameTarget()) {
+    if (target !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
       return;
     }
     this.target = target;
@@ -563,13 +597,18 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
     this.contentElement.dispatchEvent(new CustomEvent('manifestDetection', {detail: true}));
 
     const link = Components.Linkifier.Linkifier.linkifyURL(url);
+    this.manifestLink = link;
     link.tabIndex = 0;
     this.reportView.setURL(link);
     this.errorsSection.clearContent();
     this.errorsSection.element.classList.toggle('hidden', !errors.length);
     for (const error of errors) {
-      this.errorsSection.appendRow().appendChild(
-          UI.UIUtils.createIconLabel(error.message, error.critical ? 'smallicon-error' : 'smallicon-warning'));
+      const icon = UI.UIUtils.createIconLabel({
+        title: error.message,
+        iconName: error.critical ? 'cross-circle-filled' : 'warning-filled',
+        color: error.critical ? 'var(--icon-error)' : 'var(--icon-warning)',
+      });
+      this.errorsSection.appendRow().appendChild(icon);
     }
 
     if (!data) {
@@ -595,18 +634,18 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
     const startURL = stringProperty('start_url');
     if (appId && recommendedId) {
       const appIdField = this.identitySection.appendField(i18nString(UIStrings.computedAppId));
-      UI.ARIAUtils.setAccessibleName(appIdField, 'App Id');
+      UI.ARIAUtils.setLabel(appIdField, 'App Id');
       appIdField.textContent = appId;
 
       const helpIcon = new IconButton.Icon.Icon();
-      helpIcon.data = {iconName: 'help_outline', color: 'var(--color-text-secondary)', width: '16px', height: '16px'};
+      helpIcon.data = {iconName: 'help', color: 'var(--icon-default)', width: '16px', height: '16px'};
       helpIcon.classList.add('inline-icon');
       helpIcon.title = i18nString(UIStrings.appIdExplainer);
       helpIcon.tabIndex = 0;
       appIdField.appendChild(helpIcon);
 
-      appIdField.appendChild(UI.XLink.XLink.create(
-          'https://developer.chrome.com/blog/pwa-manifest-id/', i18nString(UIStrings.learnMore), 'learn-more'));
+      appIdField.appendChild(
+          UI.XLink.XLink.create('https://developer.chrome.com/blog/pwa-manifest-id/', i18nString(UIStrings.learnMore)));
 
       if (!stringProperty('id')) {
         const suggestedIdNote = appIdField.createChild('div', 'multiline-value');
@@ -625,11 +664,11 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
         copyButton.title = i18nString(UIStrings.copyToClipboard);
         copyButton.data = {
           groups: [{
-            iconName: 'copy_icon',
+            iconName: 'copy',
             iconHeight: '12px',
             iconWidth: '12px',
             text: '',
-            iconColor: 'var(--color-text-primary)',
+            iconColor: 'var(--icon-default-hover)',
           }],
           clickHandler: (): void => {
             UI.ARIAUtils.alert(i18nString(UIStrings.copiedToClipboard, {PH1: recommendedId}));
@@ -801,15 +840,19 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
     this.installabilitySection.element.classList.toggle('hidden', !installabilityErrors.length);
     const errorMessages = this.getInstallabilityErrorMessages(installabilityErrors);
     for (const error of errorMessages) {
-      this.installabilitySection.appendRow().appendChild(UI.UIUtils.createIconLabel(error, 'smallicon-warning'));
+      const icon = UI.UIUtils.createIconLabel({title: error, iconName: 'warning-filled', color: 'var(--icon-warning)'});
+      this.installabilitySection.appendRow().appendChild(icon);
     }
 
     this.errorsSection.element.classList.toggle('hidden', !errors.length && !imageErrors.length && !warnings.length);
     for (const warning of warnings) {
-      this.errorsSection.appendRow().appendChild(UI.UIUtils.createIconLabel(warning, 'smallicon-warning'));
+      const icon =
+          UI.UIUtils.createIconLabel({title: warning, iconName: 'warning-filled', color: 'var(--icon-warning)'});
+      this.errorsSection.appendRow().appendChild(icon);
     }
     for (const error of imageErrors) {
-      this.errorsSection.appendRow().appendChild(UI.UIUtils.createIconLabel(error, 'smallicon-warning'));
+      const icon = UI.UIUtils.createIconLabel({title: error, iconName: 'warning-filled', color: 'var(--icon-warning)'});
+      this.errorsSection.appendRow().appendChild(icon);
     }
 
     function stringProperty(name: string): string {
@@ -819,6 +862,49 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
       }
       return value;
     }
+
+    this.windowsControlsOverlaySection.clearContent();
+    const displayOverride = parsedManifest['display_override'] || [];
+    const hasWco = displayOverride.includes('window-controls-overlay');
+
+    const displayOverrideLink = UI.XLink.XLink.create(
+        'https://developer.mozilla.org/en-US/docs/Web/Manifest/display_override',
+        i18nString(UIStrings.displayOverride));
+    const displayOverrideText = document.createElement('code');
+    displayOverrideText.appendChild(displayOverrideLink);
+
+    const wcoStatusMessage = this.windowsControlsOverlaySection.appendRow();
+
+    if (hasWco) {
+      const checkmarkIcon = new IconButton.Icon.Icon();
+      checkmarkIcon
+          .data = {iconName: 'check-circle', color: 'var(--icon-checkmark-green)', width: '16px', height: '16px'};
+      checkmarkIcon.classList.add('inline-icon');
+      checkmarkIcon.tabIndex = 0;
+      wcoStatusMessage.appendChild(checkmarkIcon);
+
+      const wco = document.createElement('code');
+      wco.classList.add('wco');
+      wco.textContent = 'window-controls-overlay';
+      wcoStatusMessage.appendChild(i18n.i18n.getFormatLocalizedString(
+          str_, UIStrings.wcoFound, {PH1: wco, PH2: displayOverrideText, PH3: this.manifestLink}));
+    } else {
+      const infoIcon = new IconButton.Icon.Icon();
+      infoIcon.data = {iconName: 'info', color: 'var(--icon-default)', width: '16px', height: '16px'};
+      infoIcon.classList.add('inline-icon');
+      infoIcon.tabIndex = 0;
+
+      wcoStatusMessage.appendChild(infoIcon);
+
+      wcoStatusMessage.appendChild(
+          i18n.i18n.getFormatLocalizedString(str_, UIStrings.wcoNotFound, {PH1: displayOverrideText}));
+    }
+
+    const wcoDocumentationLink = UI.XLink.XLink.create(
+        'https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps-chromium/how-to/window-controls-overlay',
+        i18nString(UIStrings.customizePwaTitleBar));
+    this.windowsControlsOverlaySection.appendRow().appendChild(
+        i18n.i18n.getFormatLocalizedString(str_, UIStrings.wcoNeedHelpReadMore, {PH1: wcoDocumentationLink}));
   }
 
   getInstallabilityErrorMessages(installabilityErrors: Protocol.Page.InstallabilityError[]): string[] {
@@ -855,9 +941,6 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
           }
           errorMessage =
               i18nString(UIStrings.manifestDoesNotContainASuitable, {PH1: installabilityError.errorArguments[0].value});
-          break;
-        case 'no-matching-service-worker':
-          errorMessage = i18nString(UIStrings.noMatchingServiceWorkerDetected);
           break;
         case 'no-acceptable-icon':
           if (installabilityError.errorArguments.length !== 1 ||
@@ -1079,7 +1162,7 @@ export class AppManifestView extends UI.Widget.VBox implements SDK.TargetManager
     field.appendChild(wrapper);
     return {imageResourceErrors, squareSizedIconAvailable};
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.reportView.registerCSSFiles([appManifestViewStyles]);
     this.registerCSSFiles([appManifestViewStyles]);

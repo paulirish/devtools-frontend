@@ -13,6 +13,7 @@ generate_css("css_files") {
     "invalidationsTree.css",
     "timelineFlamechartPopover.css",
     "timelineHistoryManager.css",
+    "timelineMiniMap.css",
     "timelinePaintProfiler.css",
     "timelinePanel.css",
     "timelineStatusDialog.css",
@@ -21,12 +22,17 @@ generate_css("css_files") {
 
 devtools_module("timeline") {
   sources = [
+    "AppenderUtils.ts",
     "CLSLinkifier.ts",
     "CompatibilityTracksAppender.ts",
     "CountersGraph.ts",
     "EventsTimelineTreeView.ts",
-    "ExtensionTracingSession.ts",
+    "GPUTrackAppender.ts",
+    "InteractionsTrackAppender.ts",
+    "LayoutShiftsTrackAppender.ts",
+    "NetworkTrackAppender.ts",
     "PerformanceModel.ts",
+    "SaveFileFormatter.ts",
     "TimelineController.ts",
     "TimelineDetailsView.ts",
     "TimelineEventOverview.ts",
@@ -37,19 +43,22 @@ devtools_module("timeline") {
     "TimelineHistoryManager.ts",
     "TimelineLayersView.ts",
     "TimelineLoader.ts",
+    "TimelineMiniMap.ts",
     "TimelinePaintProfilerView.ts",
     "TimelinePanel.ts",
+    "TimelineSelection.ts",
     "TimelineTreeView.ts",
     "TimelineUIUtils.ts",
+    "TimingsTrackAppender.ts",
     "UIDevtoolsController.ts",
     "UIDevtoolsUtils.ts",
-    "WebVitalsTimelineUtils.ts",
   ]
 
   deps = [
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../generated:protocol",
+    "../../models/cpu_profile:bundle",
     "../../models/extensions:bundle",
     "../../models/source_map_scopes:bundle",
     "../../models/timeline_model:bundle",
@@ -58,12 +67,12 @@ devtools_module("timeline") {
     "../../panels/layer_viewer:bundle",
     "../../panels/mobile_throttling:bundle",
     "../../panels/profiler:bundle",
+    "../../ui/components/panel_feedback:bundle",
     "../../ui/legacy/components/data_grid:bundle",
     "../../ui/legacy/components/perf_ui:bundle",
     "../../ui/legacy/components/utils:bundle",
     "../../ui/legacy/theme_support:bundle",
     "../../ui/lit-html:bundle",
-    "./components:bundle",
   ]
 }
 
@@ -83,6 +92,7 @@ devtools_entrypoint("bundle") {
     "../../entrypoints/*",
     "../../ui/components/docs/performance_panel/*",
     "../js_profiler/*",
+    "../recorder/*",
 
     # TODO(crbug.com/1202788): Remove invalid dependents
     "../input/*",

@@ -4,21 +4,16 @@
 
 const {assert} = chai;
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
-import {loadEventsFromTraceFile} from '../../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
-describe('GPUHandler', () => {
+describe('GPUHandler', function() {
   beforeEach(() => {
     TraceModel.Handlers.ModelHandlers.Meta.initialize();
     TraceModel.Handlers.ModelHandlers.GPU.initialize();
   });
 
-  afterEach(() => {
-    TraceModel.Handlers.ModelHandlers.Meta.reset();
-    TraceModel.Handlers.ModelHandlers.GPU.reset();
-  });
-
-  it('finds all the GPU Tasks for the main GPU Thread', async () => {
-    const events = await loadEventsFromTraceFile('threejs-gpu.json.gz');
+  it('finds all the GPU Tasks for the main GPU Thread', async function() {
+    const events = await TraceLoader.rawEvents(this, 'threejs-gpu.json.gz');
 
     for (const event of events) {
       TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);

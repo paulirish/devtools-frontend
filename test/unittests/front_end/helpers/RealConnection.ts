@@ -87,7 +87,7 @@ function describeBody(fn: () => void) {
 }
 
 export function describeWithRealConnection(title: string, fn: (this: Mocha.Suite) => void) {
-  if (fn.toString().match(/(^|\s)it.only\('[^]+',.*\)/)?.length) {
+  if (fn.toString().match(/(^|\s)(?:describe|it).only\(['|"][^]+['|"],.*\)/)?.length) {
     // eslint-disable-next-line rulesdir/no_only
     describeWithRealConnection.only(title, fn);
     return;
@@ -134,6 +134,7 @@ export async function getExecutionContext(runtimeModel: SDK.RuntimeModel.Runtime
 }
 
 function resetHostBindingStubState() {
+  Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordedCountHistograms.splice(0);
   Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordedEnumeratedHistograms.splice(0);
   Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordedPerformanceHistograms.splice(0);
 }

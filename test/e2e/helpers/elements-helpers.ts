@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
-import {performance} from 'perf_hooks';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
+import {AsyncScope} from '../../shared/async-scope.js';
 
 import {
   $,
@@ -32,8 +32,8 @@ const COLOR_SWATCH_SELECTOR = '.color-swatch-inner';
 const CSS_STYLE_RULE_SELECTOR = '[aria-label*="css selector"]';
 const COMPUTED_PROPERTY_SELECTOR = 'devtools-computed-style-property';
 const COMPUTED_STYLES_PANEL_SELECTOR = '[aria-label="Computed panel"]';
-const COMPUTED_STYLES_SHOW_ALL_SELECTOR = '[aria-label="Show all"]';
-const COMPUTED_STYLES_GROUP_SELECTOR = '[aria-label="Group"]';
+const COMPUTED_STYLES_SHOW_ALL_SELECTOR = '[title="Show all"]';
+const COMPUTED_STYLES_GROUP_SELECTOR = '[title="Group"]';
 const ELEMENTS_PANEL_SELECTOR = '.panel[aria-label="elements"]';
 const FONT_EDITOR_SELECTOR = '[aria-label="Font Editor"]';
 const HIDDEN_FONT_EDITOR_SELECTOR = '.font-toolbar-hidden';
@@ -51,7 +51,7 @@ const ELEMENT_STYLE_SECTION_SELECTOR = '[aria-label="element.style, css selector
 const STYLE_QUERY_RULE_TEXT_SELECTOR = '.query-text';
 const STYLE_PROPERTIES_SELECTOR = '.tree-outline-disclosure [role="treeitem"]';
 const CSS_AUTHORING_HINTS_ICON_SELECTOR = '.hint';
-const SEARCH_BOX_SELECTOR = '.search-bar';
+export const SEARCH_BOX_SELECTOR = '.search-bar';
 const SEARCH_RESULTS_MATCHES = '.search-results-matches';
 
 export const openLayoutPane = async () => {
@@ -146,23 +146,11 @@ export const getContentOfSelectedNode = async () => {
   return await selectedNode.evaluate(node => node.textContent as string);
 };
 
-export const waitForSelectedNodeChange = async (initialValue: string, maxTotalTimeout = 1000) => {
-  if (maxTotalTimeout === 0) {
-    maxTotalTimeout = Number.POSITIVE_INFINITY;
-  }
-
-  const start = performance.now();
-  do {
+export const waitForSelectedNodeChange = async(initialValue: string, asyncScope = new AsyncScope()): Promise<void> => {
+  await waitForFunction(async () => {
     const currentContent = await getContentOfSelectedNode();
-    if (currentContent !== initialValue) {
-      return currentContent;
-    }
-
-    await timeout(30);
-
-  } while (performance.now() - start < maxTotalTimeout);
-
-  throw new Error(`Selected element did not change in ${maxTotalTimeout}`);
+    return currentContent !== initialValue;
+  }, asyncScope);
 };
 
 export const assertSelectedElementsNodeTextIncludes = async (expectedTextContent: string) => {
@@ -752,7 +740,7 @@ export const toggleClassesPaneCheckbox = async (checkboxLabel: string) => {
   const initialValue = await getContentOfSelectedNode();
 
   const classesPane = await waitFor(CLS_PANE_SELECTOR);
-  await click(`input[aria-label="${checkboxLabel}"]`, {root: classesPane});
+  await click(`[title="${checkboxLabel}"]`, {root: classesPane});
 
   await waitForSelectedNodeChange(initialValue);
 };

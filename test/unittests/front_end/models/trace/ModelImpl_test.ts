@@ -3,74 +3,68 @@
 // found in the LICENSE file.
 
 import * as TraceModel from '../../../../../front_end/models/trace/trace.js';
+import {TraceLoader} from '../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
-import {loadEventsFromTraceFile, setTraceModelTimeout} from '../../helpers/TraceHelpers.js';
-
 describe('TraceModel', async function() {
-  setTraceModelTimeout(this);
-  it('dispatches start and end events when parsing model data', function(done) {
-    const model = new TraceModel.TraceModel.Model();
+  it('dispatches an end event when the trace is done', function(done) {
+    const model = TraceModel.TraceModel.Model.createWithAllHandlers();
     const events: string[] = [];
 
     model.addEventListener(TraceModel.TraceModel.ModelUpdateEvent.eventName, (evt: Event) => {
       const updateEvent = evt as TraceModel.TraceModel.ModelUpdateEvent;
-      if (TraceModel.TraceModel.isModelUpdateEventDataTrace(updateEvent.data)) {
-        if (updateEvent.data.data === 'done') {
-          events.push('traceProcessor:done');
-        }
-      } else if (TraceModel.TraceModel.isModelUpdateEventDataGlobal(updateEvent.data)) {
-        if (updateEvent.data.data === 'done') {
-          events.push('global:done');
-        }
+      if (TraceModel.TraceModel.isModelUpdateDataComplete(updateEvent.data)) {
+        events.push('done');
       }
 
-      if (events.length === 2) {
-        assert.deepEqual(events, [
-          'traceProcessor:done',
-          'global:done',
-        ]);
-        done();
-      } else if (events.length > 2) {
-        assert.fail(`Got unexpectedly more than 2 events: ${events}`);
-      }
+      assert.deepEqual(events, ['done']);
+      done();
     });
 
-    void loadEventsFromTraceFile('basic.json.gz').then(events => model.parse(events));
+    void TraceLoader.rawEvents(this, 'basic.json.gz').then(events => model.parse(events));
   });
 
-  it('supports parsing a generic trace that has no browser specific details', async () => {
-    const model = new TraceModel.TraceModel.Model();
-    const file1 = await loadEventsFromTraceFile('generic-about-tracing-trace.json.gz');
+  it('supports parsing a generic trace that has no browser specific details', async function() {
+    const model = TraceModel.TraceModel.Model.createWithAllHandlers();
+    const file1 = await TraceLoader.rawEvents(this, 'generic-about-tracing-trace.json.gz');
     await model.parse(file1);
     assert.strictEqual(model.size(), 1);
   });
 
-  it('supports parsing multiple traces', async () => {
-    const model = new TraceModel.TraceModel.Model();
-    const file1 = await loadEventsFromTraceFile('basic.json.gz');
-    const file2 = await loadEventsFromTraceFile('slow-interaction-keydown.json.gz');
+  it('supports being given a set of handlers to run and will run just those and the Meta handler', async function() {
+    const model = new TraceModel.TraceModel.Model({
+      Animation: TraceModel.Handlers.ModelHandlers.Animation,
+    });
+    const file1 = await TraceLoader.rawEvents(this, 'animation.json.gz');
+    await model.parse(file1);
+    assert.deepEqual(Object.keys(model.traceParsedData(0) || {}), ['Meta', 'Animation']);
+  });
+
+  it('supports parsing multiple traces', async function() {
+    const model = TraceModel.TraceModel.Model.createWithAllHandlers();
+    const file1 = await TraceLoader.rawEvents(this, 'basic.json.gz');
+    const file2 = await TraceLoader.rawEvents(this, 'slow-interaction-keydown.json.gz');
 
     await model.parse(file1);
-    model.reset();
+    model.resetProcessor();
     await model.parse(file2);
-    model.reset();
+    model.resetProcessor();
 
     assert.strictEqual(model.size(), 2);
     assert.isNotNull(model.traceParsedData(0));
     assert.isNotNull(model.traceParsedData(1));
   });
 
-  it('supports deleting traces', async () => {
-    const model = new TraceModel.TraceModel.Model();
-    const file1 = await loadEventsFromTraceFile('basic.json.gz');
-    const file2 = await loadEventsFromTraceFile('slow-interaction-keydown.json.gz');
+  it('supports deleting traces', async function() {
+    const model = TraceModel.TraceModel.Model.createWithAllHandlers();
+    const file1 = await TraceLoader.rawEvents(this, 'basic.json.gz');
+    const file2 = await TraceLoader.rawEvents(this, 'slow-interaction-keydown.json.gz');
 
     await model.parse(file1);
-    model.reset();
+    model.resetProcessor();
     await model.parse(file2);
-    model.reset();
+    model.resetProcessor();
 
     // Test only one trace is deleted.
     assert.strictEqual(model.size(), 2);
@@ -84,18 +78,18 @@ describe('TraceModel', async function() {
   });
 
   it('names traces using their origin and defaults to "Trace n" when no origin is found', async function() {
-    const model = new TraceModel.TraceModel.Model();
+    const model = TraceModel.TraceModel.Model.createWithAllHandlers();
     const traceFiles = [
-      await loadEventsFromTraceFile('threejs-gpu.json.gz'),
-      await loadEventsFromTraceFile('web-dev.json.gz'),
+      await TraceLoader.rawEvents(this, 'threejs-gpu.json.gz'),
+      await TraceLoader.rawEvents(this, 'web-dev.json.gz'),
       // Process the previous trace again to test the trace sequencing
-      await loadEventsFromTraceFile('web-dev.json.gz'),
-      await loadEventsFromTraceFile('multiple-navigations.json.gz'),
-      await loadEventsFromTraceFile('basic.json.gz'),
+      await TraceLoader.rawEvents(this, 'web-dev.json.gz'),
+      await TraceLoader.rawEvents(this, 'multiple-navigations.json.gz'),
+      await TraceLoader.rawEvents(this, 'basic.json.gz'),
     ];
     for (const traceFile of traceFiles) {
       await model.parse(traceFile);
-      model.reset();
+      model.resetProcessor();
     }
     const expectedResults = [
       'threejs.org (1)',

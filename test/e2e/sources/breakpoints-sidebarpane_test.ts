@@ -4,7 +4,7 @@
 
 import {assert} from 'chai';
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
@@ -19,7 +19,6 @@ import {
 import {
   $,
   assertNotNullOrUndefined,
-  enableExperiment,
   waitForFunction,
   waitFor,
   activeElementTextContent,
@@ -40,16 +39,11 @@ async function extractTextContentIfConnected(element: puppeteer.ElementHandle): 
 }
 
 describe('The Breakpoints Sidebar', () => {
-  beforeEach(async () => {
-    await enableExperiment('breakpointView');
-  });
-
   describe('for source mapped files', () => {
-    // Flaky on mac.
-    it.skipOnPlatforms(['mac'], '[crbug.com/1409770] correctly shows the breakpoint location on reload', async () => {
+    it('correctly shows the breakpoint location on reload', async () => {
       const testBreakpointContent = async (expectedFileName: string, expectedLineNumber: number) => {
         await checkFileGroupName(expectedFileName);
-        await checkLineNumber(await waitFor(BREAKPOINT_ITEM_SELECTOR), expectedLineNumber);
+        await checkLineNumber(BREAKPOINT_ITEM_SELECTOR, expectedLineNumber);
       };
 
       const {target} = getBrowserAndPages();
@@ -77,7 +71,6 @@ describe('The Breakpoints Sidebar', () => {
   describe('for JS files', () => {
     const expectedLocations = [3, 4, 9];
     const fileName = 'click-breakpoint.js';
-    let breakpointItems: puppeteer.ElementHandle<Element>[] = [];
 
     beforeEach(async () => {
       const {frontend} = getBrowserAndPages();
@@ -87,12 +80,13 @@ describe('The Breakpoints Sidebar', () => {
         await addBreakpointForLine(frontend, location);
       }
 
-      breakpointItems = await waitForMany(BREAKPOINT_ITEM_SELECTOR, 3);
+      await waitForMany(BREAKPOINT_ITEM_SELECTOR, 3);
     });
 
     it('shows the correct location', async () => {
-      for (let i = 0; i < breakpointItems.length; ++i) {
-        await checkLineNumber(breakpointItems[i], expectedLocations[i]);
+      for (let i = 0; i < expectedLocations.length; ++i) {
+        const selector = `${BREAKPOINT_ITEM_SELECTOR}:nth-of-type(${i + 1})`;
+        await checkLineNumber(selector, expectedLocations[i]);
       }
     });
 
@@ -101,6 +95,7 @@ describe('The Breakpoints Sidebar', () => {
     });
 
     it('shows the correct code snippets', async () => {
+      const breakpointItems = await waitForMany(BREAKPOINT_ITEM_SELECTOR, 3);
       const actualCodeSnippets = await Promise.all(breakpointItems.map(async breakpoint => {
         const codeSnippetHandle = await waitFor(CODE_SNIPPET_SELECTOR, breakpoint);
         const content = await extractTextContentIfConnected(codeSnippetHandle);
@@ -112,6 +107,23 @@ describe('The Breakpoints Sidebar', () => {
       const expectedCodeSnippets = expectedLocations.map(line => sourceContent[line - 1]);
 
       assert.deepStrictEqual(actualCodeSnippets, expectedCodeSnippets);
+    });
+  });
+
+  describe('for wasm files', () => {
+    it('shows the correct code snippets', async () => {
+      const {frontend} = getBrowserAndPages();
+      await openSourceCodeEditorForFile('memory.wasm', 'wasm/memory.html');
+      await addBreakpointForLine(frontend, '0x037');
+
+      const codeSnippetHandle = await waitFor(`${BREAKPOINT_ITEM_SELECTOR} ${CODE_SNIPPET_SELECTOR}`);
+      const actualCodeSnippet = await extractTextContentIfConnected(codeSnippetHandle);
+      assertNotNullOrUndefined(actualCodeSnippet);
+
+      const sourceContent = await retrieveCodeMirrorEditorContent();
+
+      const expectedCodeSnippet = sourceContent[4];
+      assert.deepStrictEqual(actualCodeSnippet, expectedCodeSnippet);
     });
   });
 
@@ -163,9 +175,10 @@ async function checkFileGroupName(expectedFileName: string) {
   });
 }
 
-async function checkLineNumber(breakpoint: puppeteer.ElementHandle<Element>, expectedLineNumber: number) {
+async function checkLineNumber(breakpointItemSelector: string, expectedLineNumber: number) {
   await waitForFunction(async () => {
-    const locationHandle = await waitFor(LOCATION_SELECTOR, breakpoint);
+    const breakpointItem = await waitFor(breakpointItemSelector);
+    const locationHandle = await waitFor(LOCATION_SELECTOR, breakpointItem);
     const content = await extractTextContentIfConnected(locationHandle);
     return content && expectedLineNumber === parseInt(content, 10);
   });

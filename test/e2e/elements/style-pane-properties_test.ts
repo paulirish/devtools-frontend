@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {
   $$,
@@ -13,6 +13,7 @@ import {
   waitFor,
   clickElement,
   waitForFunction,
+  hover,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
@@ -55,9 +56,8 @@ const deletePropertyByBackspace = async (selector: string, root?: puppeteer.Elem
 };
 
 describe('The Styles pane', async () => {
-  // Flaky test.
-  it.skipOnPlatforms(
-      ['win32', 'linux'], '[crbug.com/1377761] can display the CSS properties of the selected element', async () => {
+  it(
+      'can display the CSS properties of the selected element', async () => {
         await goToResourceAndWaitForStyleSection('elements/simple-styled-page.html');
 
         const onH1RuleAppeared = waitForStyleRule('h1');
@@ -313,8 +313,7 @@ describe('The Styles pane', async () => {
     assert.deepEqual(computedStyles, ['rgb(255, 0, 0)', 'rgb(255, 0, 0)'], 'Styles are not correct after the update');
   });
 
-  // Flaky on mac.
-  it.skipOnPlatforms(['mac'], '[crbug.com/1342145] can display and edit container queries', async () => {
+  it('can display and edit container queries', async () => {
     await goToResourceAndWaitForStyleSection('elements/css-container-queries.html');
 
     // Select the child that has container queries.
@@ -1072,6 +1071,27 @@ describe('The Styles pane', async () => {
     const scopeQuery = await waitFor('.query.editable', rule1PropertiesSection);
     const scopeQueryText = await scopeQuery.evaluate(node => (node as HTMLElement).innerText as string);
     assert.deepEqual(scopeQueryText, '@scope (body)', 'incorrectly displayed @supports rule');
+  });
+
+  it('shows an infobox with specificity information when hovering a selector', async () => {
+    await goToResourceAndWaitForStyleSection('elements/css-specificity.html');
+
+    // Select the child that has a style rule attached
+    await waitForAndClickTreeElementWithPartialText('properties-to-inspect');
+    await waitForContentOfSelectedElementsNode('<div id=\u200B"properties-to-inspect">\u200B</div>\u200B');
+
+    // Hover the selector in the Styles pane
+    const testElementRule = await getStyleRule(PROPERTIES_TO_INSPECT_SELECTOR);
+    await hover('.selector-matches', {root: testElementRule});
+
+    // Check if an infobox is shown or not. If not, this will throw
+    const infobox = await waitFor('body > .vbox.flex-auto');
+
+    // Make sure it’s the specificity infobox
+    const innerText = await infobox.evaluate(node => {
+      return node.shadowRoot?.querySelector('span')?.innerText;
+    });
+    assert.strictEqual(innerText?.toLowerCase().startsWith('specificity'), true);
   });
 
   describe('Editing', () => {

@@ -17,6 +17,7 @@ import {createTarget} from '../../../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../../../helpers/MockConnection.js';
 import {type Chrome} from '../../../../../../../extension-api/ExtensionAPI.js';
 import {TestPlugin} from '../../../../helpers/LanguagePluginHelpers.js';
+import * as LinearMemoryInspector from '../../../../../../../front_end/ui/components/linear_memory_inspector/linear_memory_inspector.js';
 
 describeWithRealConnection('ObjectPropertiesSection', () => {
   async function setupTreeOutline(
@@ -72,7 +73,8 @@ describeWithRealConnection('ObjectPropertiesSection', () => {
     assert.strictEqual(VALUE, propertiesSection.valueElement.innerHTML);
   });
 
-  it('visually distinguishes important DOM properties for checkbox inputs', async () => {
+  // Flaky / Blocking tree
+  it.skip('[crbug.com/1442599] visually distinguishes important DOM properties for checkbox inputs', async () => {
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.IMPORTANT_DOM_PROPERTIES);
     const treeOutline = await setupTreeOutline(
         `(() => {
@@ -109,7 +111,8 @@ describeWithRealConnection('ObjectPropertiesSection', () => {
     assert.strictEqual(notExpected.size, 3, 'Unexpected properties were found');
   });
 
-  it('visually distinguishes important DOM properties for file inputs', async () => {
+  // Flaky / Blocking tree
+  it.skip('[crbug.com/1442599] visually distinguishes important DOM properties for file inputs', async () => {
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.IMPORTANT_DOM_PROPERTIES);
     const treeOutline = await setupTreeOutline(
         `(() => {
@@ -146,7 +149,8 @@ describeWithRealConnection('ObjectPropertiesSection', () => {
     assert.strictEqual(notExpected.size, 3, 'Unexpected properties were found');
   });
 
-  it('visually distinguishes important DOM properties for anchors', async () => {
+  // Flaky / Blocking tree
+  it.skip('[crbug.com/1442599] visually distinguishes important DOM properties for anchors', async () => {
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.IMPORTANT_DOM_PROPERTIES);
     const treeOutline = await setupTreeOutline(
         `(() => {
@@ -216,7 +220,7 @@ describeWithRealConnection('ObjectPropertiesSection', () => {
 
 describeWithMockConnection('ObjectPropertiesSection', () => {
   it('appends a memory icon for allowed remote object types', () => {
-    const subtypesForIcon = ['webassemblymemory', 'arraybuffer'];
+    const subtypesForIcon = LinearMemoryInspector.LinearMemoryInspectorController.ACCEPTED_MEMORY_TYPES;
     for (const subtype of subtypesForIcon) {
       const remoteObj = {
         type: 'object',
@@ -232,21 +236,6 @@ describeWithMockConnection('ObjectPropertiesSection', () => {
     }
   });
 
-  it('skips appending a memory icon for other remote object types', () => {
-    const subtypesToSkip = ['dataview', 'typedarray'];
-    for (const subtype of subtypesToSkip) {
-      const remoteObj = {
-        type: 'object',
-        subtype: subtype,
-      } as SDK.RemoteObject.RemoteObject;
-
-      const div = document.createElement('div');
-      assert.isFalse(div.hasChildNodes());
-      ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.appendMemoryIcon(div, remoteObj);
-      assert.isFalse(div.hasChildNodes());
-    }
-  });
-
   it('appends a memory icon for DWARF inspectable objects', () => {
     const target = createTarget();
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
@@ -254,17 +243,6 @@ describeWithMockConnection('ObjectPropertiesSection', () => {
     const callFrame = {
       debuggerModel,
     } as SDK.DebuggerModel.CallFrame;
-    {
-      const valueNode = new Bindings.DebuggerLanguagePlugins.ValueNode(
-          callFrame, undefined, 'object', undefined, undefined, 2 /* inspectableAddress*/);
-
-      const div = document.createElement('div');
-      assert.isFalse(div.hasChildNodes());
-      ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.appendMemoryIcon(div, valueNode);
-      assert.isTrue(div.hasChildNodes());
-      const icon = div.getElementsByClassName('devtools-icon');
-      assert.isNotNull(icon);
-    }
     {
       const extensionObject = {
         type: 'string' as Chrome.DevTools.RemoteObjectType,

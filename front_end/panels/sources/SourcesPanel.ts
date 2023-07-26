@@ -35,6 +35,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
+import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Extensions from '../../models/extensions/extensions.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
@@ -115,14 +116,6 @@ const UIStrings = {
    *@description Text in Sources Panel of the Sources panel
    */
   hideIgnoreListed: 'Hide ignore-listed sources',
-  /**
-   *@description Text for pausing the debugger on exceptions
-   */
-  pauseOnExceptions: 'Pause on exceptions',
-  /**
-   *@description Text in Sources Panel of the Sources panel
-   */
-  dontPauseOnExceptions: 'Don\'t pause on exceptions',
   /**
    *@description Tooltip text that appears when hovering over the largeicon play button in the Sources Panel of the Sources panel
    */
@@ -265,6 +258,10 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const navigatorMenuButton = new UI.Toolbar.ToolbarMenuButton(this.populateNavigatorMenu.bind(this), true);
     navigatorMenuButton.setTitle(i18nString(UIStrings.moreOptions));
     tabbedPane.rightToolbar().appendToolbarItem(navigatorMenuButton);
+    tabbedPane.addEventListener(
+        UI.TabbedPane.Events.TabSelected,
+        ({data: {tabId}}: Common.EventTarget.EventTargetEvent<UI.TabbedPane.EventData>): void =>
+            Host.userMetrics.sourcesSidebarTabShown(tabId));
 
     if (UI.ViewManager.ViewManager.instance().hasViewsForLocation('run-view-sidebar')) {
       const navigatorSplitWidget =
@@ -301,10 +298,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.updateSidebarPosition();
 
     void this.updateDebuggerButtonsAndStatus();
-    this.pauseOnExceptionEnabledChanged();
-    Common.Settings.Settings.instance()
-        .moduleSetting('pauseOnExceptionEnabled')
-        .addChangeListener(this.pauseOnExceptionEnabledChanged, this);
 
     this.liveLocationPool = new Bindings.LiveLocation.LiveLocationPool();
 
@@ -374,7 +367,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     if (ThreadsSidebarPane.shouldBeShown() && !this.threadsSidebarPane) {
       this.threadsSidebarPane = UI.ViewManager.ViewManager.instance().view('sources.threads');
       if (this.sidebarPaneStack && this.threadsSidebarPane) {
-        void this.sidebarPaneStack.showView(
+        this.sidebarPaneStack.appendView(
             this.threadsSidebarPane, this.splitWidget.isVertical() ? this.watchSidebarPane : this.callstackPane);
       }
     }
@@ -406,7 +399,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     return this.pausedInternal || false;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     UI.Context.Context.instance().setFlavor(SourcesPanel, this);
     this.registerCSSFiles([sourcesPanelStyles]);
     super.wasShown();
@@ -418,7 +411,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.editorView.setMainWidget(this.sourcesViewInternal);
   }
 
-  willHide(): void {
+  override willHide(): void {
     super.willHide();
     UI.Context.Context.instance().setFlavor(SourcesPanel, null);
     if (WrapperView.isShowing()) {
@@ -447,13 +440,13 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     return true;
   }
 
-  onResize(): void {
+  override onResize(): void {
     if (Common.Settings.Settings.instance().moduleSetting('sidebarPosition').get() === 'auto') {
       this.element.window().requestAnimationFrame(this.updateSidebarPosition.bind(this));
     }  // Do not force layout.
   }
 
-  searchableView(): UI.SearchableView.SearchableView {
+  override searchableView(): UI.SearchableView.SearchableView {
     return this.sourcesViewInternal.searchableView();
   }
 
@@ -585,10 +578,13 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     const previewIcon = new IconButton.Icon.Icon();
     previewIcon.data = {
-      iconName: 'ic_preview_feature',
-      color: 'var(--icon-color)',
-      width: '14px',
+      iconName: 'experiment',
+      color: 'var(--icon-default)',
+      width: '16px',
     };
+    // <devtools-icon> collapses to 0 width, wrong height otherwise, throwing off alignment and size calculation.
+    previewIcon.style.minHeight = '16px';
+    previewIcon.style.minWidth = '16px';
     menuSection.appendCheckboxItem(
         menuItem, toggleExperiment, Root.Runtime.experiments.isEnabled(experiment), false, previewIcon);
   }
@@ -650,16 +646,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
             callFrame.location(), this.executionLineChanged.bind(this), this.liveLocationPool);
   }
 
-  private pauseOnExceptionEnabledChanged(): void {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW)) {
-      const enabled = Common.Settings.Settings.instance().moduleSetting('pauseOnExceptionEnabled').get();
-      const button = (this.pauseOnExceptionButton as UI.Toolbar.ToolbarToggle);
-      button.setToggled(enabled);
-      button.setTitle(enabled ? i18nString(UIStrings.dontPauseOnExceptions) : i18nString(UIStrings.pauseOnExceptions));
-      this.debugToolbarDrawer.classList.toggle('expanded', enabled);
-    }
-  }
-
   private async updateDebuggerButtonsAndStatus(): Promise<void> {
     const currentTarget = UI.Context.Context.instance().flavor(SDK.Target.Target);
     const currentDebuggerModel = currentTarget ? currentTarget.model(SDK.DebuggerModel.DebuggerModel) : null;
@@ -688,7 +674,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const details = currentDebuggerModel ? currentDebuggerModel.debuggerPausedDetails() : null;
     await this.debuggerPausedMessage.render(
         details, Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(),
-        Bindings.BreakpointManager.BreakpointManager.instance());
+        Breakpoints.BreakpointManager.BreakpointManager.instance());
     if (details) {
       this.updateDebuggerButtonsAndStatusForTest();
     }
@@ -719,14 +705,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
         break;
       }
     }
-  }
-
-  private togglePauseOnExceptions(): void {
-    Common.Settings.Settings.instance()
-        .moduleSetting('pauseOnExceptionEnabled')
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-        // @ts-expect-error
-        .set(!(this.pauseOnExceptionButton).toggled());
   }
 
   runSnippet(): void {
@@ -857,10 +835,10 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const debugToolbar = new UI.Toolbar.Toolbar('scripts-debug-toolbar');
 
     const longResumeButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'largeicon-play');
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'play');
     longResumeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.longResume, this);
-    const terminateExecutionButton = new UI.Toolbar.ToolbarButton(
-        i18nString(UIStrings.terminateCurrentJavascriptCall), 'largeicon-terminate-execution');
+    const terminateExecutionButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.terminateCurrentJavascriptCall), 'stop');
     terminateExecutionButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.terminateExecution, this);
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createLongPressActionButton(
         this.togglePauseAction, [terminateExecutionButton, longResumeButton], []));
@@ -872,13 +850,6 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     debugToolbar.appendSeparator();
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.toggleBreakpointsActiveAction));
-
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.BREAKPOINT_VIEW)) {
-      this.pauseOnExceptionButton = new UI.Toolbar.ToolbarToggle('', 'largeicon-pause-on-exceptions');
-      this.pauseOnExceptionButton.addEventListener(
-          UI.Toolbar.ToolbarButton.Events.Click, this.togglePauseOnExceptions, this);
-      debugToolbar.appendToolbarItem(this.pauseOnExceptionButton);
-    }
 
     return debugToolbar;
   }
@@ -910,7 +881,10 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const uiSourceCode = (target as Workspace.UISourceCode.UISourceCode);
     const eventTarget = (event.target as Node);
     if (!uiSourceCode.project().isServiceProject() &&
-        !eventTarget.isSelfOrDescendant(this.navigatorTabbedLocation.widget().element)) {
+        !eventTarget.isSelfOrDescendant(this.navigatorTabbedLocation.widget().element) &&
+        !(Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.JUST_MY_CODE) &&
+          Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
+              uiSourceCode))) {
       contextMenu.revealSection().appendItem(
           i18nString(UIStrings.revealInSidebar), this.handleContextMenuReveal.bind(this, uiSourceCode));
     }
@@ -985,7 +959,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     contextMenu.debugSection().appendItem(
         i18nString(UIStrings.storeSAsGlobalVariable, {PH1: String(copyContextMenuTitle)}),
-        () => SDK.ConsoleModel.ConsoleModel.instance().saveToTempVariable(executionContext, remoteObject));
+        () => executionContext?.target()
+                  .model(SDK.ConsoleModel.ConsoleModel)
+                  ?.saveToTempVariable(executionContext, remoteObject));
 
     const ctxMenuClipboardSection = contextMenu.clipboardSection();
     const inspectorFrontendHost = Host.InspectorFrontendHost.InspectorFrontendHostInstance;
@@ -1141,7 +1117,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.sidebarPaneStack.appendApplicableItems('sources.sidebar-top');
 
     if (this.threadsSidebarPane) {
-      void this.sidebarPaneStack.showView(this.threadsSidebarPane);
+      this.sidebarPaneStack.appendView(this.threadsSidebarPane);
     }
 
     const jsBreakpoints = UI.ViewManager.ViewManager.instance().view('sources.jsBreakpoints');
@@ -1417,11 +1393,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
           const {state: editorState} = frame.textEditor;
           let text = editorState.sliceDoc(editorState.selection.main.from, editorState.selection.main.to);
           const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
-          if (executionContext) {
-            const message = SDK.ConsoleModel.ConsoleModel.instance().addCommandMessage(executionContext, text);
+          const consoleModel = executionContext?.target().model(SDK.ConsoleModel.ConsoleModel);
+          if (executionContext && consoleModel) {
+            const message = consoleModel.addCommandMessage(executionContext, text);
             text = ObjectUI.JavaScriptREPL.JavaScriptREPL.wrapObjectLiteral(text);
-            void SDK.ConsoleModel.ConsoleModel.instance().evaluateCommandInConsole(
-                executionContext, message, text, /* useCommandLineAPI */ true);
+            void consoleModel.evaluateCommandInConsole(executionContext, message, text, /* useCommandLineAPI */ true);
           }
         }
         return true;
@@ -1459,7 +1435,7 @@ export class WrapperView extends UI.Widget.VBox {
     return Boolean(wrapperViewInstance) && wrapperViewInstance.isShowing();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     if (!SourcesPanel.instance().isShowing()) {
       this.showViewInWrapper();
     } else {
@@ -1468,7 +1444,7 @@ export class WrapperView extends UI.Widget.VBox {
     SourcesPanel.updateResizerAndSidebarButtons(SourcesPanel.instance());
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.InspectorView.InspectorView.instance().setDrawerMinimized(false);
     queueMicrotask(() => {
       SourcesPanel.updateResizerAndSidebarButtons(SourcesPanel.instance());
