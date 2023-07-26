@@ -70,6 +70,7 @@ export class TimelineJSProfileProcessor {
       const name = node === jsProfileModel.idleNode                             ? RecordType.JSIdleSample :
           node === jsProfileModel.programNode || node === jsProfileModel.gcNode ? RecordType.JSSystemSample :
                                                                                   RecordType.JSSample;
+      // if (name === RecordType.JSIdleSample) continue;
 
       const jsSampleEvent = new TraceEngine.Legacy.ConstructedEvent(
           TraceEngine.Legacy.DevToolsTimelineEventCategory, name, TraceEngine.Types.TraceEvents.Phase.INSTANT,
@@ -341,6 +342,7 @@ export class TimelineJSProfileProcessor {
         let jsFrameType = RecordType.JSFrame;
         switch (e.name) {
           case RecordType.JSIdleSample:
+            // continue;
             jsFrameType = RecordType.JSIdleFrame;
             break;
           case RecordType.JSSystemSample:
