@@ -935,26 +935,20 @@ export function animateFunction(
       to: number,
     }[],
     duration: number, animationComplete?: (() => void)): () => void {
-
-  const div = document.createElement('div');
-  const anim = div.animate(null, {duration, easing: 'ease-in'});
-  const effect = anim.effect as AnimationEffect;
+  const start = window.performance.now();
   let raf = window.requestAnimationFrame(animationStep);
 
-  function animationStep(): void {
-    const progress = effect.getComputedTiming().progress;
-    if (typeof progress === 'number' && progress <= 1) {
-      func(...params.map(p => p.from + (p.to - p.from) * progress));
+  function animationStep(timestamp: number): void {
+    const progress = Platform.NumberUtilities.clamp((timestamp - start) / duration, 0, 1);
+    func(...params.map(p => p.from + (p.to - p.from) * progress));
+    if (progress < 1) {
       raf = window.requestAnimationFrame(animationStep);
     } else if (animationComplete) {
       animationComplete();
     }
   }
 
-  return (): void => {
-    window.cancelAnimationFrame(raf);
-    anim.cancel();
-  };
+  return (): void => window.cancelAnimationFrame(raf);
 }
 
 export class LongClickController {
