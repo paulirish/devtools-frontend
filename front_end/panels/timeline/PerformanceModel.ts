@@ -189,7 +189,14 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.timelineModelInternal.maximumRecordTime();
   }
 
+  // Set the window time selection to exclude any large 'empty' activity
+  // Introduced in https://codereview.chromium.org/1428823004
+  // TODO: also consider network activity.
   private autoWindowTimes(): void {
+    // const leftTime = this.timelineModelInternal.minimumRecordTime();
+    // const rightTime = this.timelineModelInternal.maximumRecordTime();
+    // this.setWindow({left: leftTime, right: rightTime});
+    // return;
     const timelineModel = this.timelineModelInternal;
     let tasks: TraceEngine.Legacy.Event[] = [];
     for (const track of timelineModel.tracks()) {
@@ -198,6 +205,11 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
         tasks = track.tasks;
       }
     }
+    // Idle frames are not activity.
+    tasks = tasks.filter(t => t.name !== 'JSIdleFrame');
+
+    console.log('full', { dur:timelineModel.maximumRecordTime() - timelineModel.minimumRecordTime(), left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
+
     if (!tasks.length) {
       this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
       return;
@@ -211,11 +223,11 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       const step = Math.sign(stopIndex - startIndex);
       for (let i = startIndex; i !== stopIndex; i += step) {
         const task = tasks[i];
-        const taskTime = (task.startTime + (task.endTime as number)) / 2;
-        const interval = Math.abs(cutTime - taskTime);
+        const taskMidpointTime = (task.startTime + (task.endTime as number)) / 2;
+        const interval = Math.abs(cutTime - taskMidpointTime);
         if (usedTime < threshold * interval) {
           cutIndex = i;
-          cutTime = taskTime;
+          cutTime = taskMidpointTime;
           usedTime = 0;
         }
         usedTime += (task.duration as number);
@@ -226,16 +238,25 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     const leftIndex = findLowUtilizationRegion(0, rightIndex);
     let leftTime: number = tasks[leftIndex].startTime;
     let rightTime: number = (tasks[rightIndex].endTime as number);
-    const span = rightTime - leftTime;
-    const totalSpan = timelineModel.maximumRecordTime() - timelineModel.minimumRecordTime();
-    if (span < totalSpan * 0.1) {
+    const autoDur = rightTime - leftTime;
+    const totalDur = timelineModel.maximumRecordTime() - timelineModel.minimumRecordTime();
+    // If the auto windowing would zoom to 10% of the trace, don't do it.
+    if (autoDur < totalDur * 0.0001) {
       leftTime = timelineModel.minimumRecordTime();
       rightTime = timelineModel.maximumRecordTime();
+      this.setWindow({left: leftTime, right: rightTime});
+      console.log('nothing',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
     } else {
-      leftTime = Math.max(leftTime - 0.05 * span, timelineModel.minimumRecordTime());
-      rightTime = Math.min(rightTime + 0.05 * span, timelineModel.maximumRecordTime());
+      leftTime = Math.max(leftTime - 0.05 * autoDur, timelineModel.minimumRecordTime());
+      rightTime = Math.min(rightTime + 0.05 * autoDur, timelineModel.maximumRecordTime());
+      console.log('auto',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
+
+      this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
+      setTimeout(() => {
+        this.setWindow({left: leftTime, right: rightTime}, true);
+      }, 20);
     }
-    this.setWindow({left: leftTime, right: rightTime});
+
   }
 }
 
