@@ -2293,8 +2293,9 @@ export class TimelineAsyncEventTracker {
     }
     const initiatorMapFromIdToEvent: Map<RecordType, TraceEngine.Legacy.Event>|undefined = this.initiatorMapsByRecordType.get(initiatorType);
 
-    if (id === 232813) {
+    if (id === 7353) { /// frame seq number of interest (example-dotcom-allevents)
       const instEv = initiatorMapFromIdToEvent?.get(id);
+      event.omg = 2;
       console.log({name: event.name, start: event.startTime - 235510170.514, event, isInitiator, initiatorInfo, instEvName: instEv?.name, initiatorEvent: instEv})
     }
     if (initiatorMapFromIdToEvent) {
