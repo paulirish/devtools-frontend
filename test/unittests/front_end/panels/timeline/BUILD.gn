@@ -21,6 +21,7 @@ ts_library("timeline") {
     "TimelineSelection_test.ts",
     "TimelineTreeView_test.ts",
     "TimelineUIUtils_test.ts",
+    "ported/timeline-aggregated-details_test.ts",
   ]
 
   deps = [

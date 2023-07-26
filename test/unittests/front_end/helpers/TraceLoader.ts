@@ -122,13 +122,18 @@ export class TraceLoader {
    * @returns tracingModel, timelineModel, performanceModel, traceParsedData
    * from this trace file
    */
-  static async allModels(context: Mocha.Context|Mocha.Suite|null, name: string): Promise<AllModelsLoaded> {
-    const fromCache = allModelsCache.get(name);
-    if (fromCache) {
-      return fromCache;
+  static async allModels(context: Mocha.Context|Mocha.Suite|null, name: string|TraceEngine.Types.File.Contents): Promise<AllModelsLoaded> {
+    let fileContents;
+    if (typeof name === 'string') {
+      const fromCache = allModelsCache.get(name);
+      if (fromCache) {
+        return fromCache;
+      }
+      // Load the contents of the file and get the array of all the events.
+      fileContents = await TraceLoader.fixtureContents(context, name);
+    } else {
+      fileContents = name;
     }
-    // Load the contents of the file and get the array of all the events.
-    const fileContents = await TraceLoader.fixtureContents(context, name);
     const events = 'traceEvents' in fileContents ? fileContents.traceEvents : fileContents;
 
     // Execute the new trace engine
