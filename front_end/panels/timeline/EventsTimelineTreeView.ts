@@ -57,7 +57,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
   }
 
   override filters(): TimelineModel.TimelineModelFilter.TimelineModelFilter[] {
-    return [...super.filters(), ...this.filtersControl.filters()];
+    return []; // [...super.filters(), ...this.filtersControl.filters()];
   }
 
   override updateContents(selection: TimelineSelection): void {
@@ -168,7 +168,7 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     super();
     this.categoryFilter = new Category();
     this.durationFilter = new IsLong();
-    this.filtersInternal = [this.categoryFilter, this.durationFilter];
+    this.filtersInternal = [ this.durationFilter];
   }
 
   filters(): TimelineModel.TimelineModelFilter.TimelineModelFilter[] {

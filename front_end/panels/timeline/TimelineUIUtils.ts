@@ -1783,11 +1783,6 @@ export class TimelineUIUtils {
           if (!Object.keys(event.args).length) {
             return details;
           }
-
-          details = details ?? document.createElement('span');
-          const omg = document.createElement('tt');
-          omg.textContent = Object.keys(event.args).length ? JSON.stringify(event.args, null, 2) : '';
-          details.append(omg);
         }
         break;
       }

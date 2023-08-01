@@ -1158,8 +1158,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // Draw lil arrows on instant events.
     if (barWidth === 1) {
       context.moveTo(barX + 0.25, barY);
-      context.lineTo(barX+2.25, barY+5);
-      context.lineTo(barX-1.75, barY+5);
+      context.lineTo(barX+1.25, barY+5);
+      context.lineTo(barX-0.75, barY+5);
       context.moveTo(barX+ 0.25, barY);
       context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
       return;
