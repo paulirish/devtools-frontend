@@ -9,32 +9,32 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {EditFileSystemView} from './EditFileSystemView.js';
 import workspaceSettingsTabStyles from './workspaceSettingsTab.css.js';
 
-import type {FileSystem} from './FileSystemWorkspaceBinding.js';
+import {type FileSystem} from './FileSystemWorkspaceBinding.js';
 import {IsolatedFileSystem} from './IsolatedFileSystem.js';
 import {Events, IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
 import {NetworkPersistenceManager} from './NetworkPersistenceManager.js';
-import type {PlatformFileSystem} from './PlatformFileSystem.js';
+import {type PlatformFileSystem} from './PlatformFileSystem.js';
 
 const UIStrings = {
   /**
-  *@description Text of a DOM element in Workspace Settings Tab of the Workspace settings in Settings
-  */
+   *@description Text of a DOM element in Workspace Settings Tab of the Workspace settings in Settings
+   */
   workspace: 'Workspace',
   /**
-  *@description Text of a DOM element in Workspace Settings Tab of the Workspace settings in Settings
-  */
+   *@description Text of a DOM element in Workspace Settings Tab of the Workspace settings in Settings
+   */
   mappingsAreInferredAutomatically: 'Mappings are inferred automatically.',
   /**
-  *@description Text of the add button in Workspace Settings Tab of the Workspace settings in Settings
-  */
+   *@description Text of the add button in Workspace Settings Tab of the Workspace settings in Settings
+   */
   addFolder: 'Add folder…',
   /**
-  *@description Label element text content in Workspace Settings Tab of the Workspace settings in Settings
-  */
+   *@description Label element text content in Workspace Settings Tab of the Workspace settings in Settings
+   */
   folderExcludePattern: 'Folder exclude pattern',
   /**
-  *@description Label for an item to remove something
-  */
+   *@description Label for an item to remove something
+   */
   remove: 'Remove',
 };
 const str_ = i18n.i18n.registerUIStrings('models/persistence/WorkspaceSettingsTab.ts', UIStrings);
@@ -95,7 +95,7 @@ export class WorkspaceSettingsTab extends UI.Widget.VBox {
     return workspaceSettingsTabInstance;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([workspaceSettingsTabStyles]);
   }
@@ -164,7 +164,7 @@ export class WorkspaceSettingsTab extends UI.Widget.VBox {
     UI.Tooltip.Tooltip.install(path, fileSystemPath);
 
     const toolbar = new UI.Toolbar.Toolbar('');
-    const button = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.remove), 'largeicon-delete');
+    const button = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.remove), 'cross');
     button.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.removeFileSystemClicked.bind(this, fileSystem));
     toolbar.appendToolbarItem(button);
     header.appendChild(toolbar.element);

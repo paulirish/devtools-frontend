@@ -47,69 +47,69 @@ import requestPayloadTreeStyles from './requestPayloadTree.css.js';
 import requestPayloadViewStyles from './requestPayloadView.css.js';
 const UIStrings = {
   /**
-  *@description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel and Network pane request.
-  */
+   *@description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel and Network pane request.
+   */
   copyValue: 'Copy value',
   /**
-  * @description Text in Request Payload View of the Network panel. This is a noun-phrase meaning the
-  * payload of a network request.
-  */
+   * @description Text in Request Payload View of the Network panel. This is a noun-phrase meaning the
+   * payload of a network request.
+   */
   requestPayload: 'Request Payload',
   /**
-  *@description Text in Request Payload View of the Network panel
-  */
+   *@description Text in Request Payload View of the Network panel
+   */
   unableToDecodeValue: '(unable to decode value)',
   /**
-  *@description Text in Request Payload View of the Network panel
-  */
+   *@description Text in Request Payload View of the Network panel
+   */
   queryStringParameters: 'Query String Parameters',
   /**
-  *@description Text in Request Payload View of the Network panel
-  */
+   *@description Text in Request Payload View of the Network panel
+   */
   formData: 'Form Data',
   /**
-  *@description Text to show more content
-  */
+   *@description Text to show more content
+   */
   showMore: 'Show more',
   /**
-  *@description Text for toggling the view of payload data (e.g. query string parameters) from source to parsed in the payload tab
-  */
+   *@description Text for toggling the view of payload data (e.g. query string parameters) from source to parsed in the payload tab
+   */
   viewParsed: 'View parsed',
   /**
-  *@description Text to show an item is empty
-  */
+   *@description Text to show an item is empty
+   */
   empty: '(empty)',
   /**
-  *@description Text for toggling the view of payload data (e.g. query string parameters) from parsed to source in the payload tab
-  */
+   *@description Text for toggling the view of payload data (e.g. query string parameters) from parsed to source in the payload tab
+   */
   viewSource: 'View source',
   /**
-  * @description Text for toggling payload data (e.g. query string parameters) from decoded to
-  * encoded in the payload tab or in the cookies preview. URL-encoded is a different data format for
-  * the same data, which the user sees when they click this command.
-  */
+   * @description Text for toggling payload data (e.g. query string parameters) from decoded to
+   * encoded in the payload tab or in the cookies preview. URL-encoded is a different data format for
+   * the same data, which the user sees when they click this command.
+   */
   viewUrlEncoded: 'View URL-encoded',
   /**
-  *@description Text for toggling payload data (e.g. query string parameters) from encoded to decoded in the payload tab or in the cookies preview
-  */
+   *@description Text for toggling payload data (e.g. query string parameters) from encoded to decoded in the payload tab or in the cookies preview
+   */
   viewDecoded: 'View decoded',
   /**
-  *@description Text for toggling payload data (e.g. query string parameters) from decoded to
-  * encoded in the payload tab or in the cookies preview. URL-encoded is a different data format for
-  * the same data, which the user sees when they click this command.
-  */
+   *@description Text for toggling payload data (e.g. query string parameters) from decoded to
+   * encoded in the payload tab or in the cookies preview. URL-encoded is a different data format for
+   * the same data, which the user sees when they click this command.
+   */
   viewUrlEncodedL: 'view URL-encoded',
   /**
-  *@description Text in Request Payload View of the Network panel
-  */
+   *@description Text in Request Payload View of the Network panel
+   */
   viewDecodedL: 'view decoded',
   /**
-  *@description Text in Request Payload View of the Network panel
-  */
+   *@description Text in Request Payload View of the Network panel
+   */
   viewParsedL: 'view parsed',
   /**
-  *@description Text in Request Payload View of the Network panel
-  */
+   *@description Text in Request Payload View of the Network panel
+   */
   viewSourceL: 'view source',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/RequestPayloadView.ts', UIStrings);
@@ -144,7 +144,7 @@ export class RequestPayloadView extends UI.Widget.VBox {
     this.requestPayloadCategory = new Category(root, 'requestPayload', i18nString(UIStrings.requestPayload));
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.registerCSSFiles([requestPayloadViewStyles]);
     this.request.addEventListener(SDK.NetworkRequest.Events.RequestHeadersChanged, this.refreshFormData, this);
 
@@ -153,7 +153,7 @@ export class RequestPayloadView extends UI.Widget.VBox {
     // this._root.select(/* omitFocus */ true, /* selectedByUser */ false);
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.request.removeEventListener(SDK.NetworkRequest.Events.RequestHeadersChanged, this.refreshFormData, this);
   }
 
@@ -501,9 +501,9 @@ export class RequestPayloadView extends UI.Widget.VBox {
 const viewSourceForItems = new WeakSet<Category|UI.TreeOutline.TreeElement>();
 
 export class Category extends UI.TreeOutline.TreeElement {
-  toggleOnClick: boolean;
+  override toggleOnClick: boolean;
   private readonly expandedSetting: Common.Settings.Setting<boolean>;
-  expanded: boolean;
+  override expanded: boolean;
 
   constructor(root: UI.TreeOutline.TreeOutline, name: string, title?: string) {
     super(title || '', true);
@@ -521,11 +521,11 @@ export class Category extends UI.TreeOutline.TreeElement {
     return leaf;
   }
 
-  onexpand(): void {
+  override onexpand(): void {
     this.expandedSetting.set(true);
   }
 
-  oncollapse(): void {
+  override oncollapse(): void {
     this.expandedSetting.set(false);
   }
 }

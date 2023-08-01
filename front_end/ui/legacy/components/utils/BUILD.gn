@@ -31,6 +31,7 @@ devtools_module("utils") {
     "../../../../core/sdk:bundle",
     "../../../../generated:protocol",
     "../../../../models/bindings:bundle",
+    "../../../../models/breakpoints:bundle",
     "../../../../models/text_utils:bundle",
     "../../../../models/workspace:bundle",
     "../../../../ui/legacy:bundle",
@@ -47,6 +48,7 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../../../../test/unittests/front_end/panels/console/*",
     "../../../../../test/unittests/front_end/ui/legacy/components/utils/*",
     "../../../../entrypoints/*",
     "../../../../panels/*",

@@ -15,8 +15,7 @@ export async function navigateToCrossToolIntegrationSite() {
 
 export async function clickOnContextMenuItemFromTab(tabId: string, menuItemSelector: string) {
   // Find the selected node, right click.
-  const selectedNode = await waitFor(tabId);
-  await click(selectedNode, {clickOptions: {button: 'right'}});
+  await click(tabId, {clickOptions: {button: 'right'}});
 
   // Click on the context menu option
   await click(menuItemSelector);
@@ -41,6 +40,6 @@ export async function tabExistsInDrawer(tabId: string) {
 export const checkIfTabExistsInDrawer = async (tabId: string) => {
   const drawer = await waitFor(DRAWER_PANEL_SELECTOR);
   const header = await waitFor(TAB_HEADER_SELECTOR, drawer);
-  const tab = await header.$(tabId);
+  const tab = await waitFor(tabId, header);
   return Boolean(tab);
 };

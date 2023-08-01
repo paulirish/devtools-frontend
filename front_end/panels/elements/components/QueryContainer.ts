@@ -5,11 +5,10 @@
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import * as NodeText from '../../../ui/components/node_text/node_text.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import type {DOMNode} from './Helper.js';
-import {NodeText} from './NodeText.js';
-import type {NodeTextData} from './NodeText.js';
+import {type DOMNode} from './Helper.js';
 import queryContainerStyles from './queryContainer.css.js';
 
 const {render, html} = LitHtml;
@@ -90,13 +89,13 @@ export class QueryContainer extends HTMLElement {
         @click=${this.#onContainerLinkClick}
         @mouseenter=${this.#onContainerLinkMouseEnter}
         @mouseleave=${this.#onContainerLinkMouseLeave}
-      ><${NodeText.litTagName}
+      ><${NodeText.NodeText.NodeText.litTagName}
           data-node-title=${nodeTitle}
           .data=${{
         nodeTitle,
         nodeId: idToDisplay,
         nodeClasses: classesToDisplay,
-      } as NodeTextData}></${NodeText.litTagName}></a>
+      } as NodeText.NodeText.NodeTextData}></${NodeText.NodeText.NodeText.litTagName}></a>
       ${this.#isContainerLinkHovered ? this.#renderQueriedSizeDetails() : LitHtml.nothing}
     `, this.#shadow, {
       host: this,
@@ -104,7 +103,7 @@ export class QueryContainer extends HTMLElement {
     // clang-format on
   }
 
-  #renderQueriedSizeDetails(): LitHtml.TemplateResult|{} {
+  #renderQueriedSizeDetails(): LitHtml.LitTemplate {
     if (!this.#queriedSizeDetails || this.#queriedSizeDetails.queryAxis === QueryAxis.None) {
       return LitHtml.nothing;
     }
@@ -123,8 +122,8 @@ export class QueryContainer extends HTMLElement {
       <span class="queried-size-details">
         (${this.#queriedSizeDetails.queryAxis}<${IconButton.Icon.Icon.litTagName}
           class=${axisIconClasses} .data=${{
-            iconName: 'ic_dimension_single',
-            color: 'var(--color-text-primary)',
+            iconName: 'width',
+            color: 'var(--icon-default)',
           } as IconButton.Icon.IconData}></${IconButton.Icon.Icon.litTagName}>)
         ${areBothAxesQueried && this.#queriedSizeDetails.width ? 'width:' : LitHtml.nothing}
         ${this.#queriedSizeDetails.width || LitHtml.nothing}

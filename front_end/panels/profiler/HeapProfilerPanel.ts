@@ -7,15 +7,15 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {HeapSnapshotView} from './HeapSnapshotView.js';
-import type {ProfileType} from './ProfileHeader.js';
+import {type HeapSnapshotView} from './HeapSnapshotView.js';
+import {type ProfileType} from './ProfileHeader.js';
 import {ProfilesPanel} from './ProfilesPanel.js';
 import {instance} from './ProfileTypeRegistry.js';
 
 const UIStrings = {
   /**
-  *@description A context menu item in the Heap Profiler Panel of a profiler tool
-  */
+   *@description A context menu item in the Heap Profiler Panel of a profiler tool
+   */
   revealInSummaryView: 'Reveal in Summary view',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/HeapProfilerPanel.ts', UIStrings);
@@ -83,18 +83,18 @@ export class HeapProfilerPanel extends ProfilesPanel implements UI.ContextMenu.P
     return true;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     UI.Context.Context.instance().setFlavor(HeapProfilerPanel, this);
     // Record the memory tool load time.
     Host.userMetrics.panelLoaded('heap_profiler', 'DevTools.Launch.HeapProfiler');
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.Context.Context.instance().setFlavor(HeapProfilerPanel, null);
   }
 
-  showObject(snapshotObjectId: string, perspectiveName: string): void {
+  override showObject(snapshotObjectId: string, perspectiveName: string): void {
     const registry = instance;
     const heapProfiles = registry.heapSnapshotProfileType.getProfiles();
     for (let i = 0; i < heapProfiles.length; i++) {

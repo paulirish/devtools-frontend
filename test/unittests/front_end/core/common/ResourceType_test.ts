@@ -395,6 +395,26 @@ describeWithEnvironment('ResourceType class', () => {
     assert.strictEqual(resourceType.canonicalMimeType(), '', 'the canonical mime type was not returned correctly');
   });
 
+  it('is able to return the simplified content type of a json subtype', () => {
+    assert.strictEqual(
+        ResourceType.simplifyContentType('application/sparql-results+json'), 'application/json',
+        'the simplified content type was not returned correctly');
+
+    assert.strictEqual(
+        ResourceType.simplifyContentType('application/hal+json'), 'application/json',
+        'the simplified content type was not returned correctly');
+  });
+
+  it('simplifyContentType() does not affect other content types than json subtypes', () => {
+    assert.strictEqual(
+        ResourceType.simplifyContentType('text/javascript'), 'text/javascript',
+        'the simplified content type was not returned correctly');
+
+    assert.strictEqual(
+        ResourceType.simplifyContentType('application/json'), 'application/json',
+        'the simplified content type was not returned correctly');
+  });
+
   it('treats a Ping as Other', () => {
     const resourceType = resourceTypes.Ping;
     assert.strictEqual(resourceType.isTextType(), false, 'A ping is not a text type');
@@ -405,5 +425,143 @@ describeWithEnvironment('ResourceType class', () => {
     const resourceType = resourceTypes.CSPViolationReport;
     assert.strictEqual(resourceType.isTextType(), false, 'A ping is not a text type');
     assert.strictEqual(resourceType.canonicalMimeType(), '', 'A ping does not have an associated mime type');
+  });
+});
+
+describe('ResourceType', () => {
+  describe('hasStyleSheet', () => {
+    it('holds true for documents', () => {
+      assert.isTrue(resourceTypes.Document.hasStyleSheets());
+    });
+
+    it('holds true for stylesheets', () => {
+      assert.isTrue(resourceTypes.Stylesheet.hasStyleSheets());
+    });
+  });
+
+  describe('mimeFromExtension', () => {
+    it('returns correct MIME type for .dart files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('dart'), 'application/vnd.dart');
+    });
+
+    it('returns correct MIME type for Go files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('go'), 'text/x-go');
+    });
+
+    it('returns correct MIME type for .gss files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('gss'), 'text/x-gss');
+    });
+
+    it('returns correct MIME type for .kt files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('kt'), 'text/x-kotlin');
+    });
+
+    it('returns correct MIME type for .less files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('less'), 'text/x-less');
+    });
+
+    it('returns correct MIME type for .php files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('php'), 'application/x-httpd-php');
+    });
+
+    it('returns correct MIME type for SASS files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('sass'), 'text/x-sass');
+      assert.strictEqual(ResourceType.mimeFromExtension('scss'), 'text/x-scss');
+    });
+
+    it('returns correct MIME type for Scala files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('scala'), 'text/x-scala');
+    });
+
+    it('returns correct MIME type for .component.html files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('component.html'), 'text/x.angular');
+    });
+
+    it('returns correct MIME type for .svelte files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('svelte'), 'text/x.svelte');
+    });
+
+    it('returns correct MIME type for .vue files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('vue'), 'text/x.vue');
+    });
+
+    it('returns correct MIME type for .webmanifest files', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('webmanifest'), 'application/manifest+json');
+    });
+
+    it('returns correct MIME type for source maps', () => {
+      assert.strictEqual(ResourceType.mimeFromExtension('map'), 'application/json');
+    });
+  });
+
+  describe('mimeFromURL', () => {
+    it('returns correct MIME type for .dart files', () => {
+      const url = 'http://localhost/example.dart' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'application/vnd.dart');
+    });
+
+    it('returns correct MIME type for Go files', () => {
+      const url = 'https://staging.server.com/main.go' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x-go');
+    });
+
+    it('returns correct MIME type for .gss files', () => {
+      const url = 'https://staging.server.com/styles.gss' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x-gss');
+    });
+
+    it('returns correct MIME type for .kt files', () => {
+      const url = 'https://staging.server.com/Main.kt' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x-kotlin');
+    });
+
+    it('returns correct MIME type for .less files', () => {
+      const url = 'https://staging.server.com/styles.less' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x-less');
+    });
+
+    it('returns correct MIME type for .php files', () => {
+      const url = 'http://localhost/file.php' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'application/x-httpd-php');
+    });
+
+    it('returns correct MIME type for SASS files', () => {
+      assert.strictEqual(
+          ResourceType.mimeFromURL('https://staging.server.com/styles.sass' as Platform.DevToolsPath.UrlString),
+          'text/x-sass');
+      assert.strictEqual(
+          ResourceType.mimeFromURL('https://staging.server.com/styles.scss' as Platform.DevToolsPath.UrlString),
+          'text/x-scss');
+    });
+
+    it('returns correct MIME type for Scala files', () => {
+      const url = 'http://localhost/App.scala' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x-scala');
+    });
+
+    it('returns correct MIME type for Angular component templates', () => {
+      const url = 'http://localhost/src/app/app.component.html' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x.angular');
+    });
+
+    it('returns correct MIME type for .svelte files', () => {
+      const url = 'http://localhost/App.svelte' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x.svelte');
+    });
+
+    it('returns correct MIME type for .vue files', () => {
+      const url = 'http://localhost/App.vue' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'text/x.vue');
+    });
+
+    it('returns correct MIME type for .webmanifest files', () => {
+      const url = 'http://localhost/app.webmanifest' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'application/manifest+json');
+    });
+
+    it('returns correct MIME type for source maps', () => {
+      const url = 'http://localhost/bundle.min.js.map' as Platform.DevToolsPath.UrlString;
+      assert.strictEqual(ResourceType.mimeFromURL(url), 'application/json');
+    });
   });
 });

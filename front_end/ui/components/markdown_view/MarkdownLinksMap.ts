@@ -27,9 +27,10 @@ export const markdownLinks = new Map<string, string>([
   ],
   ['issueQuirksModeDoctype', 'https://web.dev/doctype/'],
   ['sameSiteAndSameOrigin', 'https://web.dev/same-site-same-origin/'],
+  ['punycodeReference', 'https://wikipedia.org/wiki/Punycode'],
   // Link URLs for deprecation issues (see blink::Deprecation)
   ['https://xhr.spec.whatwg.org/', 'https://xhr.spec.whatwg.org/'],
-  ['https://goo.gl/rStTGz', 'https://goo.gl/rStTGz'],
+  ['https://goo.gle/chrome-insecure-origins', 'https://goo.gle/chrome-insecure-origins'],
   ['https://webrtc.org/web-apis/chrome/unified-plan/', 'https://webrtc.org/web-apis/chrome/unified-plan/'],
   [
     'https://developer.chrome.com/blog/enabling-shared-array-buffer/',
@@ -40,6 +41,15 @@ export const markdownLinks = new Map<string, string>([
     'https://developer.chrome.com/blog/immutable-document-domain/',
     'https://developer.chrome.com/blog/immutable-document-domain/',
   ],
+  [
+    'https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md',
+    'https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md',
+  ],
+  [
+    'https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled',
+    'https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled',
+  ],
+  ['PNASecureContextRestrictionFeatureStatus', 'https://chromestatus.com/feature/5954091755241472'],
 ]);
 
 export const getMarkdownLink = (key: string): string => {

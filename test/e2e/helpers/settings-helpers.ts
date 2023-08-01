@@ -2,27 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {click, scrollElementIntoView, waitFor, waitForAria, waitForFunction} from '../../shared/helper.js';
+import {
+  click,
+  clickElement,
+  scrollElementIntoView,
+  waitFor,
+  waitForAria,
+  waitForFunction,
+} from '../../shared/helper.js';
 
-export const openPanelViaMoreTools = async (panelTitle: string, isLocalized = false) => {
+export const openPanelViaMoreTools = async (panelTitle: string) => {
   // Head to the triple dot menu.
-  const tripleDotMenuText = isLocalized ? 'Ĉúŝt́ôḿîźê án̂d́ ĉón̂t́r̂ól̂ D́êv́T̂óôĺŝ' : 'Customize and control DevTools';
-  const tripleDotMenu = await waitForAria(tripleDotMenuText);
-  await click(tripleDotMenu);
+  await click('aria/Customize and control DevTools');
 
-  const moreToolsText = isLocalized ? 'M̂ór̂é t̂óôĺŝ' : 'More tools';
   // Open the “More Tools” option.
-  const moreTools = await waitForAria(`${moreToolsText}[role="menuitem"]`);
+  const moreTools = await waitForAria('More tools[role="menuitem"]');
   await moreTools.hover();
 
   // Click the desired menu item
-  const menuItem = await waitForAria(`${panelTitle}[role="menuitem"]`);
-  await click(menuItem);
-
-  const panelText = isLocalized ? 'p̂án̂él̂' : 'panel';
+  await click(`aria/${panelTitle}[role="menuitem"]`);
 
   // Wait for the corresponding panel to appear.
-  await waitForAria(`${panelTitle} ${panelText}[role="tabpanel"]`);
+  await waitForAria(`${panelTitle} panel[role="tabpanel"]`);
 };
 
 export const openSettingsTab = async (tabTitle: string) => {
@@ -39,21 +40,48 @@ export const openSettingsTab = async (tabTitle: string) => {
   await waitFor(panelSelector);
 };
 
-export const togglePreferenceInSettingsTab = async (label: string) => {
+export const closeSettings = async () => {
+  await click('.dialog-close-button');
+};
+
+export const togglePreferenceInSettingsTab = async (label: string, shouldBeChecked?: boolean) => {
   await openSettingsTab('Preferences');
 
-  const selector = `[aria-label="${label}"`;
+  const selector = `[aria-label="${label}"]`;
   await scrollElementIntoView(selector);
   const preference = await waitFor(selector);
 
   const value = await preference.evaluate(checkbox => (checkbox as HTMLInputElement).checked);
 
-  await click(preference);
+  if (value !== shouldBeChecked) {
+    await clickElement(preference);
 
-  await waitForFunction(async () => {
-    const newValue = await preference.evaluate(checkbox => (checkbox as HTMLInputElement).checked);
-    return newValue !== value;
-  });
+    await waitForFunction(async () => {
+      const newValue = await preference.evaluate(checkbox => (checkbox as HTMLInputElement).checked);
+      return newValue !== value;
+    });
+  }
 
-  await click('.dialog-close-button');
+  await closeSettings();
+};
+
+export const setIgnoreListPattern = async (pattern: string) => {
+  await openSettingsTab('Ignore List');
+  await click('[aria-label="Add filename pattern"]');
+  const textBox = await waitFor('[aria-label="Add Pattern"]');
+  await clickElement(textBox);
+  await textBox.type(pattern);
+  await textBox.type('\n');
+  await waitFor(`[title="Ignore scripts whose names match '${pattern}'"]`);
+  await closeSettings();
+};
+
+export const toggleIgnoreListing = async (enable: boolean) => {
+  await openSettingsTab('Ignore List');
+  const enabledPattern = '.ignore-list-options:not(.ignore-listing-disabled)';
+  const disabledPattern = '.ignore-list-options.ignore-listing-disabled';
+  await waitFor(enable ? disabledPattern : enabledPattern);
+  await click('[title="Enable Ignore Listing"]');
+  await waitFor(enable ? enabledPattern : disabledPattern);
+  await closeSettings();
 };

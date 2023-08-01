@@ -4,10 +4,18 @@
 
 import {assert} from 'chai';
 
-import {$, $$, click, getBrowserAndPages, goToResource, step, waitFor} from '../../shared/helper.js';
+import {$, $$, click, getBrowserAndPages, goToResource, step, waitFor, waitForFunction} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {checkIfTabExistsInDrawer, DRAWER_PANEL_SELECTOR} from '../helpers/cross-tool-helper.js';
-import {addBreakpointForLine, inspectMemory, openSourceCodeEditorForFile, PAUSE_BUTTON, reloadPageAndWaitForSourceFile, RESUME_BUTTON} from '../helpers/sources-helpers.js';
+import {
+  addBreakpointForLine,
+  inspectMemory,
+  openSourceCodeEditorForFile,
+  PAUSE_INDICATOR_SELECTOR,
+  reloadPageAndWaitForSourceFile,
+  RESUME_BUTTON,
+  retrieveTopCallFrameWithoutResuming,
+} from '../helpers/sources-helpers.js';
 
 const LINEAR_MEMORY_INSPECTOR_TAB_SELECTOR = '#tab-linear-memory-inspector';
 const LINEAR_MEMORY_INSPECTOR_TABBED_PANE_SELECTOR = DRAWER_PANEL_SELECTOR + ' .tabbed-pane';
@@ -29,7 +37,7 @@ describe('Scope View', async () => {
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(frontend, target, fileName);
+      await reloadPageAndWaitForSourceFile(target, fileName);
     });
 
     await step('expand the module scope', async () => {
@@ -51,18 +59,17 @@ describe('Scope View', async () => {
       const lmiTabbedPane = await waitFor(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_SELECTOR);
       const titleElement = await waitFor(LINEAR_MEMORY_INSPECTOR_TAB_TITLE_SELECTOR, lmiTabbedPane);
       assert.isNotNull(titleElement);
-      const title = await frontend.evaluate(x => x.innerText, titleElement);
+      const title = await frontend.evaluate(x => (x as HTMLElement).innerText, titleElement);
 
       assert.strictEqual(title, 'Memory(100)');
     });
   });
 
-  // Times out on Windows
-  it.skip('[crbug.com/1169143] opens one linear memory inspector per ArrayBuffer', async () => {
+  it('opens one linear memory inspector per ArrayBuffer', async () => {
     const {frontend} = getBrowserAndPages();
 
     await step('navigate to a page', async () => {
-      await goToResource('sources/memory-workers.html');
+      await goToResource('sources/memory-workers.rawresponse');
     });
 
     await step('wait for debugging to start', async () => {
@@ -82,9 +89,9 @@ describe('Scope View', async () => {
     await step('check that opened linear memory inspector has correct title', async () => {
       const titleElement = await waitFor(LINEAR_MEMORY_INSPECTOR_TAB_TITLE_SELECTOR, lmiTabbedPane);
       assert.isNotNull(titleElement);
-      const title = await frontend.evaluate(x => x.innerText, titleElement);
+      const title = await frontend.evaluate(x => (x as HTMLElement).innerText, titleElement);
 
-      assert.strictEqual(title, 'memory-worker2.js');
+      assert.strictEqual(title, 'SharedArrayBuffer(16)');
     });
 
     // Save this as we will select it multiple times
@@ -98,49 +105,61 @@ describe('Scope View', async () => {
       await inspectMemory('memory2');
       // Wait until two tabs are open
       await waitFor(
-          LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR + ' + ' + LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR,
+          `${LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR} + ${LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR}`,
           lmiTabbedPane);
       // Shared buffer tab no longer active
-      await waitFor('[aria-selected="false"]', sharedBufferTab);
+      await waitForFunction(() => {
+        return sharedBufferTab.evaluate(e => e.getAttribute('aria-selected') === 'false');
+      });
     });
 
     await step('open first buffer again by way of its typed array', async () => {
       await inspectMemory('sharedArray');
       // Shared buffer should be selected again
-      await waitFor('[aria-selected="true"]', sharedBufferTab);
+      await waitForFunction(() => {
+        return sharedBufferTab.evaluate(e => e.getAttribute('aria-selected') === 'true');
+      });
       // There should only be two tabs
-      const tabs = await $$(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR, lmiTabbedPane);
-      assert.strictEqual(tabs.length, 2);
+      await waitForFunction(async () => {
+        const tabs = await $$(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR, lmiTabbedPane);
+        return tabs.length === 2;
+      });
     });
 
-    await step('switch to other worker', async () => {
-      const elements = await $$('.thread-item-title');
-      const workerNames = await Promise.all(elements.map(x => x.evaluate(y => y.textContent)));
-      const workerIndex = 1 + workerNames.indexOf('memory-worker1.js');
-      // Click on worker
-      await click(`.thread-item[aria-posinset="${workerIndex}"]`);
-      // Pause the worker
-      await click(PAUSE_BUTTON);
-      // Wait for it to be paused
-      await waitFor(RESUME_BUTTON);
+    await step('resume and pause in other worker (hitting a debugger statement)', async () => {
+      // Continue execution in this worker.
+      await click(RESUME_BUTTON);
+
+      // Wait until we pause in the other worker.
+      await waitFor(PAUSE_INDICATOR_SELECTOR);
+      const scriptLocation = await retrieveTopCallFrameWithoutResuming();
+      assert.deepEqual(scriptLocation, 'memory-worker1.rawresponse:1');
     });
 
     await step('open other buffer in other worker', async () => {
       await inspectMemory('memory1');
       // Shared buffer tab no longer active
-      await waitFor('[aria-selected="false"]', sharedBufferTab);
+      await waitForFunction(() => {
+        return sharedBufferTab.evaluate(e => e.getAttribute('aria-selected') === 'false');
+      });
       // Now there are three tabs
-      const tabs = await $$(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR, lmiTabbedPane);
-      assert.strictEqual(tabs.length, 3);
+      await waitForFunction(async () => {
+        const tabs = await $$(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR, lmiTabbedPane);
+        return tabs.length === 3;
+      });
     });
 
     await step('open shared buffer in other worker', async () => {
       await inspectMemory('sharedArr');
       // Shared buffer tab active again
-      await waitFor('[aria-selected="true"]', sharedBufferTab);
+      await waitForFunction(() => {
+        return sharedBufferTab.evaluate(e => e.getAttribute('aria-selected') === 'true');
+      });
       // Still three tabs
-      const tabs = await $$(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR, lmiTabbedPane);
-      assert.strictEqual(tabs.length, 3);
+      await waitForFunction(async () => {
+        const tabs = await $$(LINEAR_MEMORY_INSPECTOR_TABBED_PANE_TAB_SELECTOR, lmiTabbedPane);
+        return tabs.length === 3;
+      });
     });
   });
 });

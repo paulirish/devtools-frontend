@@ -7,17 +7,21 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import type {LazyMarkdownIssueDescription, MarkdownIssueDescription} from './MarkdownIssueDescription.js';
-import {resolveLazyDescription} from './MarkdownIssueDescription.js';
+
+import {
+  resolveLazyDescription,
+  type LazyMarkdownIssueDescription,
+  type MarkdownIssueDescription,
+} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
-  *@description Link text for a link to external documentation
-  */
+   *@description Link text for a link to external documentation
+   */
   coopAndCoep: 'COOP and COEP',
   /**
-  *@description Title for an external link to more information in the issues view
-  */
+   *@description Title for an external link to more information in the issues view
+   */
   samesiteAndSameorigin: 'Same-Site and Same-Origin',
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/CrossOriginEmbedderPolicyIssue.ts', UIStrings);
@@ -51,11 +55,11 @@ export class CrossOriginEmbedderPolicyIssue extends Issue {
     return `${this.code()}-(${this.#issueDetails.request.requestId})`;
   }
 
-  getBlockedByResponseDetails(): Iterable<Protocol.Audits.BlockedByResponseIssueDetails> {
+  override getBlockedByResponseDetails(): Iterable<Protocol.Audits.BlockedByResponseIssueDetails> {
     return [this.#issueDetails];
   }
 
-  requests(): Iterable<Protocol.Audits.AffectedRequest> {
+  override requests(): Iterable<Protocol.Audits.AffectedRequest> {
     return [this.#issueDetails.request];
   }
 

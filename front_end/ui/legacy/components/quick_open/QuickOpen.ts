@@ -5,14 +5,13 @@
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as UI from '../../legacy.js';
 
-import type {Provider} from './FilteredListWidget.js';
-import {FilteredListWidget, getRegisteredProviders} from './FilteredListWidget.js';
+import {FilteredListWidget, getRegisteredProviders, type Provider} from './FilteredListWidget.js';
 
 const UIStrings = {
   /**
-  * @description Text of the hint shows under Quick Open input box
-  */
-  typeToSeeAvailableCommands: 'Type \'?\' to see available commands',
+   * @description Text of the hint shows under Quick Open input box
+   */
+  typeToSeeAvailableCommands: 'Type ? to see available commands',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/quick_open/QuickOpen.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);

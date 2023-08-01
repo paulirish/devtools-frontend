@@ -29,6 +29,7 @@
  */
 
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 
 import emptyWidgetStyles from './emptyWidget.css.legacy.js';
 import {VBox} from './Widget.js';
@@ -36,8 +37,8 @@ import {XLink} from './XLink.js';
 
 const UIStrings = {
   /**
-  *@description Text that is usually a hyperlink to more documentation
-  */
+   *@description Text that is usually a hyperlink to more documentation
+   */
   learnMore: 'Learn more',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/EmptyWidget.ts', UIStrings);
@@ -59,7 +60,7 @@ export class EmptyWidget extends VBox {
     return this.contentElement.createChild('p');
   }
 
-  appendLink(link: string): HTMLElement {
+  appendLink(link: Platform.DevToolsPath.UrlString): HTMLElement {
     return this.contentElement.appendChild(XLink.create(link, i18nString(UIStrings.learnMore))) as HTMLElement;
   }
 

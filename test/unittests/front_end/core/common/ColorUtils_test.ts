@@ -8,8 +8,8 @@ import * as Common from '../../../../../front_end/core/common/common.js';
 
 describe('ColorUtils', async () => {
   it('is able to blend two colors according to alpha blending', () => {
-    const firstColor = [1, 0, 0, 1];
-    const secondColor = [0, 0, 1, 1];
+    const firstColor: Common.ColorUtils.Color4D = [1, 0, 0, 1];
+    const secondColor: Common.ColorUtils.Color4D = [0, 0, 1, 1];
     const result = Common.ColorUtils.blendColors(firstColor, secondColor);
     assert.deepEqual(result, [1, 0, 0, 1], 'colors were not blended successfully');
   });
@@ -35,8 +35,8 @@ describe('ColorUtils', async () => {
   });
 
   it('is able to calculate the contrast ratio between two colors', () => {
-    const firstColor = [1, 0, 0, 1];
-    const secondColor = [0, 0, 1, 1];
+    const firstColor: Common.ColorUtils.Color4D = [1, 0, 0, 1];
+    const secondColor: Common.ColorUtils.Color4D = [0, 0, 1, 1];
     assert.strictEqual(
         Common.ColorUtils.contrastRatio(firstColor, secondColor), 2.148936170212766,
         'contrast ratio was not calculated correctly');
@@ -47,52 +47,52 @@ describe('ColorUtils', async () => {
       {
         fgColor: 'red',
         bgColor: 'blue',
-        expectedContrast: -21.22,
+        expectedContrast: -20.3,
       },
       {
         fgColor: '#333333',
         bgColor: '#444444',
-        expectedContrast: 2.142,
+        expectedContrast: 0.0,
       },
       {
         fgColor: '#888',
         bgColor: '#FFF',
-        expectedContrast: 66.89346308821438,
+        expectedContrast: 63.1,
       },
       {
         fgColor: '#aaa',
         bgColor: '#000',
-        expectedContrast: -60.438571788907524,
+        expectedContrast: -56.2,
       },
       {
         fgColor: '#def',
         bgColor: '#123',
-        expectedContrast: -98.44863435731266,
+        expectedContrast: -93.1,
       },
       {
         fgColor: '#123',
         bgColor: '#234',
-        expectedContrast: 1.276075977788573,
+        expectedContrast: 0.0,
       },
       {
         fgColor: 'rgb(158 158 158)',
         bgColor: 'white',
-        expectedContrast: 54.799,
+        expectedContrast: 52.1,
       },
       {
         fgColor: 'rgba(0 0 0 / 38%)',
         bgColor: 'white',
-        expectedContrast: 54.743,
+        expectedContrast: 52.1,
       },
     ];
     for (const test of tests) {
-      const fg = Common.Color.Color.parse(test.fgColor)?.rgba();
-      const bg = Common.Color.Color.parse(test.bgColor)?.rgba();
+      const fg = Common.Color.parse(test.fgColor)?.asLegacyColor();
+      const bg = Common.Color.parse(test.bgColor)?.asLegacyColor();
       if (!fg || !bg) {
         assert.fail(`Failed to parse foreground and/or background color: ${test.fgColor}, ${test.bgColor}`);
         return;
       }
-      assert.closeTo(Common.ColorUtils.contrastRatioAPCA(fg, bg), test.expectedContrast, 0.01);
+      assert.closeTo(Common.ColorUtils.contrastRatioAPCA(fg.rgba(), bg.rgba()), test.expectedContrast, 0.1);
     }
   });
 

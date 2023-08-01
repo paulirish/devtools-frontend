@@ -31,18 +31,19 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
+import * as FormatterActions from '../../../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line rulesdir/es_modules_import
 import type * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as UI from '../../legacy.js';
 
-import type {SourceFrameOptions} from './SourceFrame.js';
-import {SourceFrameImpl} from './SourceFrame.js';
 import resourceSourceFrameStyles from './resourceSourceFrame.css.legacy.js';
+import {SourceFrameImpl, type SourceFrameOptions} from './SourceFrame.js';
 
 const UIStrings = {
   /**
-  *@description Text to find an item
-  */
+   *@description Text to find an item
+   */
   find: 'Find',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/ResourceSourceFrame.ts', UIStrings);
@@ -64,7 +65,7 @@ export class ResourceSourceFrame extends SourceFrameImpl {
     return new SearchableContainer(resource, contentType, autoPrettyPrint);
   }
 
-  protected getContentType(): string {
+  protected override getContentType(): string {
     return this.givenContentType;
   }
 
@@ -72,7 +73,7 @@ export class ResourceSourceFrame extends SourceFrameImpl {
     return this.resourceInternal;
   }
 
-  protected populateTextAreaContextMenu(
+  protected override populateTextAreaContextMenu(
       contextMenu: UI.ContextMenu.ContextMenu, lineNumber: number, columnNumber: number): void {
     super.populateTextAreaContextMenu(contextMenu, lineNumber, columnNumber);
     contextMenu.appendApplicableItems(this.resourceInternal);
@@ -85,10 +86,10 @@ export class SearchableContainer extends UI.Widget.VBox {
   constructor(resource: TextUtils.ContentProvider.ContentProvider, contentType: string, autoPrettyPrint?: boolean) {
     super(true);
     this.registerRequiredCSS(resourceSourceFrameStyles);
-    const sourceFrame = new ResourceSourceFrame(resource, contentType);
+    const simpleContentType = Common.ResourceType.ResourceType.simplifyContentType(contentType);
+    const sourceFrame = new ResourceSourceFrame(resource, simpleContentType);
     this.sourceFrame = sourceFrame;
-    const canPrettyPrint =
-        sourceFrame.resource.contentType().isDocumentOrScriptOrStyleSheet() || contentType === 'application/json';
+    const canPrettyPrint = FormatterActions.FORMATTABLE_MEDIA_TYPES.includes(simpleContentType);
     sourceFrame.setCanPrettyPrint(canPrettyPrint, autoPrettyPrint);
     const searchableView = new UI.SearchableView.SearchableView(sourceFrame, sourceFrame);
     searchableView.element.classList.add('searchable-view');

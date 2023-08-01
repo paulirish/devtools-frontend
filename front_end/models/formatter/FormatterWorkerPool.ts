@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as FormatterActions from '../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line rulesdir/es_modules_import
+export {DefinitionKind, type ScopeTreeNode} from '../../entrypoints/formatter_worker/FormatterActions.js';
 
 const MAX_WORKERS = Math.min(2, navigator.hardwareConcurrency - 1);
 
@@ -108,7 +109,7 @@ export class FormatterWorkerPool {
   }
 
   private runTask(methodName: FormatterActions.FormatterActions, params: {
-    [x: string]: string|string[][],
+    [x: string]: unknown,
     // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }): Promise<any> {
@@ -124,20 +125,15 @@ export class FormatterWorkerPool {
     return this.runTask(FormatterActions.FormatterActions.FORMAT, parameters) as Promise<FormatterActions.FormatResult>;
   }
 
-  javaScriptIdentifiers(content: string): Promise<{
-    name: string,
-    offset: number,
-  }[]> {
-    return this.runTask(FormatterActions.FormatterActions.JAVASCRIPT_IDENTIFIERS, {content: content})
-        .then(ids => ids || []);
+  javaScriptSubstitute(expression: string, mapping: Map<string, string|null>): Promise<string> {
+    return this.runTask(FormatterActions.FormatterActions.JAVASCRIPT_SUBSTITUTE, {content: expression, mapping})
+        .then(result => result || '');
   }
 
-  javaScriptSubstitute(expression: string, mapping: Map<string, string>): Promise<string> {
-    return this
-        .runTask(
-            FormatterActions.FormatterActions.JAVASCRIPT_SUBSTITUTE,
-            {content: expression, mapping: Array.from(mapping.entries())})
-        .then(result => result || '');
+  javaScriptScopeTree(expression: string, sourceType: 'module'|'script' = 'script'):
+      Promise<FormatterActions.ScopeTreeNode|null> {
+    return this.runTask(FormatterActions.FormatterActions.JAVASCRIPT_SCOPE_TREE, {content: expression, sourceType})
+        .then(result => result || null);
   }
 
   evaluatableJavaScriptSubstring(content: string): Promise<string> {
@@ -155,47 +151,14 @@ export class FormatterWorkerPool {
       callback(isLastChunk, rules);
     }
   }
-
-  outlineForMimetype(content: string, mimeType: string, callback: (arg0: boolean, arg1: Array<OutlineItem>) => void):
-      boolean {
-    switch (mimeType) {
-      case 'text/html':
-        this.runChunkedTask(FormatterActions.FormatterActions.HTML_OUTLINE, {content: content}, callback);
-        return true;
-      case 'text/javascript':
-        this.runChunkedTask(FormatterActions.FormatterActions.JAVASCRIPT_OUTLINE, {content: content}, callback);
-        return true;
-      case 'text/css':
-        this.parseCSS(content, cssCallback);
-        return true;
-    }
-    return false;
-
-    function cssCallback(isLastChunk: boolean, rules: CSSRule[]): void {
-      callback(isLastChunk, rules.map(rule => {
-        const title = 'selectorText' in rule ? rule.selectorText : rule.atRule;
-        return {line: rule.lineNumber, subtitle: undefined, column: rule.columnNumber, title};
-      }));
-    }
-  }
-
-  argumentsList(content: string): Promise<string[]> {
-    return this.runTask(FormatterActions.FormatterActions.ARGUMENTS_LIST, {content}) as Promise<string[]>;
-  }
 }
 
 class Task {
   method: string;
-  params: {
-    [x: string]: string|string[][],
-  };
+  params: unknown;
   callback: (arg0: MessageEvent|null) => void;
   isChunked: boolean|undefined;
-  constructor(
-      method: string, params: {
-        [x: string]: string|string[][],
-      },
-      callback: (arg0: MessageEvent|null) => void, isChunked?: boolean) {
+  constructor(method: string, params: unknown, callback: (arg0: MessageEvent|null) => void, isChunked?: boolean) {
     this.method = method;
     this.params = params;
     this.callback = callback;

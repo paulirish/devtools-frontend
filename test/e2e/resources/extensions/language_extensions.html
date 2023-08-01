@@ -89,30 +89,6 @@ class ExtensionPluginBase {
   }
 
   /**
-   * @param {string} expression
-   * @param {!RawLocation} context
-   * @return {!Promise<?{typeInfos: !TypeInfo[], base: !EvalBase}>}
-   */
-  getTypeInfo(expression, context) {
-    if (this._impl.getTypeInfo) {
-      return this._impl.getTypeInfo(expression, context);
-    }
-    return Promise.resolve(null);
-  }
-
-  /**
-   * @param {string|{base: EvalBase, field: FieldInfo[]}} expressionOrField
-   * @param {!RawLocation} context
-   * @return {!Promise<?{js:string}>}
-   */
-  getFormatter(expressionOrField, context) {
-    if (this._impl.getFormatter) {
-      return this._impl.getFormatter(expressionOrField, context);
-    }
-    return Promise.resolve(null);
-  }
-
-  /**
    * @param {string} rawModuleId
    * @param {string} sourceFileURL
    * @return {!Promise<!Array<number>|undefined>}
@@ -122,6 +98,41 @@ class ExtensionPluginBase {
       return this._impl.getMappedLines(rawModuleId, sourceFileURL);
     }
     return Promise.resolve(undefined);
+  }
+
+  evaluate(expression, context, stopId){
+    if (this._impl.evaluate) {
+      return this._impl.evaluate(expression, context, stopId);
+    }
+    return Promise.resolve(null);
+  }
+
+  getProperties(objectId) {
+    if (this._impl.getProperties) {
+      return this._impl.getProperties(objectId);
+    }
+    return Promise.resolve([]);
+  }
+
+  releaseObject(objectId) {
+    if (this._impl.releaseObject) {
+      return this._impl.releaseObject(objectId);
+    }
+    return Promise.resolve();
+  }
+
+  getInlinedCalleesRanges(location) {
+    if (this._impl.getInlinedCalleesRanges) {
+      return this._impl.getInlinedCalleesRanges(location);
+    }
+    return Promise.resolve([]);
+  }
+
+  getInlinedFunctionRanges(location) {
+    if (this._impl.getInlinedFunctionRanges) {
+      return this._impl.getInlinedCalleesRanges(location);
+    }
+    return Promise.resolve([]);
   }
 }
 

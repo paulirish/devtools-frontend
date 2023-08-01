@@ -7,10 +7,8 @@ import type * as Marked from '../../../third_party/marked/marked.js';
 import * as ComponentHelpers from '../../components/helpers/helpers.js';
 import markdownViewStyles from './markdownView.css.js';
 
-import type {MarkdownImageData} from './MarkdownImage.js';
-import type {MarkdownLinkData} from './MarkdownLink.js';
-import {MarkdownLink} from './MarkdownLink.js';
-import {MarkdownImage} from './MarkdownImage.js';
+import {MarkdownLink, type MarkdownLinkData} from './MarkdownLink.js';
+import {MarkdownImage, type MarkdownImageData} from './MarkdownImage.js';
 
 const html = LitHtml.html;
 const render = LitHtml.render;
@@ -23,8 +21,7 @@ export class MarkdownView extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-markdown-view`;
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  // TODO(crbug.com/1108699): Replace with `Marked.Marked.Token[]` once AST types are fixed upstream.
-  #tokenData: readonly Object[] = [];
+  #tokenData: readonly Marked.Marked.Token[] = [];
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [markdownViewStyles];
@@ -60,10 +57,11 @@ declare global {
   }
 }
 
-// TODO(crbug.com/1108699): Fix types when they are available.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const renderChildTokens = (token: any): string => {
-  return token.tokens.map(renderToken);
+const renderChildTokens = (token: Marked.Marked.Token): LitHtml.TemplateResult[] => {
+  if ('tokens' in token && token.tokens) {
+    return token.tokens.map(renderToken);
+  }
+  throw new Error('Tokens not found');
 };
 
 const unescape = (text: string): string => {
@@ -81,45 +79,69 @@ const unescape = (text: string): string => {
     return replacement ? replacement : matchedString;
   });
 };
-// TODO(crbug.com/1108699): Fix types when they are available.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const renderText = (token: any): LitHtml.TemplateResult => {
-  if (token.tokens && token.tokens.length > 0) {
+
+const renderText = (token: Marked.Marked.Token): LitHtml.TemplateResult => {
+  if ('tokens' in token && token.tokens) {
     return html`${renderChildTokens(token)}`;
   }
   // Due to unescaping, unescaped html entities (see escapeReplacements' keys) will be rendered
   // as their corresponding symbol while the rest will be rendered as verbatim.
   // Marked's escape function can be found in front_end/third_party/marked/package/src/helpers.js
-  return html`${unescape(token.text)}`;
+  return html`${unescape('text' in token ? token.text : '')}`;
 };
 
-// TODO(crbug.com/1108699): Fix types when they are available.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const tokenRenderers = new Map<string, (token: any) => LitHtml.TemplateResult>([
-  ['paragraph', (token): LitHtml.TemplateResult => html`<p>${renderChildTokens(token)}`],
-  ['list', (token): LitHtml.TemplateResult => html`<ul>${token.items.map(renderToken)}</ul>`],
-  ['list_item', (token): LitHtml.TemplateResult => html`<li>${renderChildTokens(token)}`],
-  ['text', renderText],
-  ['codespan', (token): LitHtml.TemplateResult => html`<code>${unescape(token.text)}</code>`],
-  ['space', (): LitHtml.TemplateResult => html``],
-  [
-    'link',
-    (token): LitHtml.TemplateResult => html`<${MarkdownLink.litTagName} .data=${
-        {key: token.href, title: token.text} as MarkdownLinkData}></${MarkdownLink.litTagName}>`,
-  ],
-  [
-    'image',
-    (token): LitHtml.TemplateResult => html`<${MarkdownImage.litTagName} .data=${
-        {key: token.href, title: token.text} as MarkdownImageData}></${MarkdownImage.litTagName}>`,
-  ],
-]);
+const renderHeading = (heading: Marked.Marked.Tokens.Heading): LitHtml.TemplateResult => {
+  switch (heading.depth) {
+    case 1:
+      return html`<h1>${renderText(heading)}</h1>`;
+    case 2:
+      return html`<h2>${renderText(heading)}</h2>`;
+    case 3:
+      return html`<h3>${renderText(heading)}</h3>`;
+    case 4:
+      return html`<h4>${renderText(heading)}</h4>`;
+    case 5:
+      return html`<h5>${renderText(heading)}</h5>`;
+    default:
+      return html`<h6>${renderText(heading)}</h6>`;
+  }
+};
 
-// TODO(crbug.com/1108699): Fix types when they are available.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const renderToken = (token: any): LitHtml.TemplateResult => {
-  const renderFn = tokenRenderers.get(token.type);
-  if (!renderFn) {
+function templateForToken(token: Marked.Marked.Token): LitHtml.TemplateResult|null {
+  switch (token.type) {
+    case 'paragraph':
+      return html`<p>${renderChildTokens(token)}`;
+    case 'list':
+      return html`<ul>${token.items.map(renderToken)}</ul>`;
+    case 'list_item':
+      return html`<li>${renderChildTokens(token)}`;
+    case 'text':
+      return renderText(token);
+    case 'codespan':
+      return html`<code>${unescape(token.text)}</code>`;
+    case 'space':
+      return html``;
+    case 'link':
+      return html`<${MarkdownLink.litTagName} .data=${{key: token.href, title: token.text} as MarkdownLinkData}></${
+          MarkdownLink.litTagName}>`;
+    case 'image':
+      return html`<${MarkdownImage.litTagName} .data=${{key: token.href, title: token.text} as MarkdownImageData}></${
+          MarkdownImage.litTagName}>`;
+    case 'heading':
+      return renderHeading(token);
+    case 'strong':
+      return html`<strong>${renderText(token)}</strong>`;
+    case 'em':
+      return html`<em>${renderText(token)}</em>`;
+    default:
+      return null;
+  }
+}
+
+export const renderToken = (token: Marked.Marked.Token): LitHtml.TemplateResult => {
+  const template = templateForToken(token);
+  if (template === null) {
     throw new Error(`Markdown token type '${token.type}' not supported.`);
   }
-  return renderFn(token);
+  return template;
 };

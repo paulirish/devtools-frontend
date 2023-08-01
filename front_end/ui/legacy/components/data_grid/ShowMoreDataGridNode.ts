@@ -34,23 +34,23 @@ import {DataGridNode} from './DataGrid.js';
 
 const UIStrings = {
   /**
-  * @description Shown in a table when there are too many results to show directly. The user can
-  * click this button to show more results. This will result in the UI showing X more results before
-  * the current position.
-  * @example {5} PH1
-  */
+   * @description Shown in a table when there are too many results to show directly. The user can
+   * click this button to show more results. This will result in the UI showing X more results before
+   * the current position.
+   * @example {5} PH1
+   */
   showDBefore: 'Show {PH1} before',
   /**
-  * @description Shown in a table when there are too many results to show directly. The user can
-  * click this button to show more results. This will result in the UI showing X more results after
-  * the current position.
-  * @example {5} PH1
-  */
+   * @description Shown in a table when there are too many results to show directly. The user can
+   * click this button to show more results. This will result in the UI showing X more results after
+   * the current position.
+   * @example {5} PH1
+   */
   showDAfter: 'Show {PH1} after',
   /**
-  *@description In a data grid, for a list of items with omitted items, display all omitted items
-  *@example {50} PH1
-  */
+   *@description In a data grid, for a list of items with omitted items, display all omitted items
+   *@example {50} PH1
+   */
   showAllD: 'Show all {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/data_grid/ShowMoreDataGridNode.ts', UIStrings);
@@ -65,7 +65,7 @@ export class ShowMoreDataGridNode extends DataGridNode<ShowMoreDataGridNode> {
   showNext: HTMLButtonElement;
   showAll: HTMLButtonElement;
   showLast: HTMLButtonElement;
-  selectable: boolean;
+  override selectable: boolean;
   private hasCells?: boolean;
 
   constructor(callback: ShowMoreDataGridNodeCallback, startPosition: number, endPosition: number, chunkSize: number) {
@@ -120,12 +120,12 @@ export class ShowMoreDataGridNode extends DataGridNode<ShowMoreDataGridNode> {
     this.showAll.textContent = i18nString(UIStrings.showAllD, {PH1: totalSize});
   }
 
-  createCells(element: Element): void {
+  override createCells(element: Element): void {
     this.hasCells = false;
     super.createCells(element);
   }
 
-  createCell(columnIdentifier: string): HTMLElement {
+  override createCell(columnIdentifier: string): HTMLElement {
     const cell = this.createTD(columnIdentifier);
     cell.classList.add('show-more');
     if (!this.hasCells) {
@@ -150,7 +150,7 @@ export class ShowMoreDataGridNode extends DataGridNode<ShowMoreDataGridNode> {
     this.updateLabels();
   }
 
-  nodeSelfHeight(): number {
+  override nodeSelfHeight(): number {
     return 40;
   }
 

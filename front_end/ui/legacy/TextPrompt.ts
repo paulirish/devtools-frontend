@@ -32,15 +32,13 @@
  */
 
 import * as Common from '../../core/common/common.js';
-import * as DOMExtension from '../../core/dom_extension/dom_extension.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import * as ThemeSupport from './theme_support/theme_support.js';
 
-import type {SuggestBoxDelegate, Suggestion} from './SuggestBox.js';
-import {SuggestBox} from './SuggestBox.js';
+import {SuggestBox, type SuggestBoxDelegate, type Suggestion} from './SuggestBox.js';
 import {Tooltip} from './Tooltip.js';
 import {ElementFocusRestorer} from './UIUtils.js';
 import textPromptStyles from './textPrompt.css.legacy.js';
@@ -90,7 +88,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
   }
 
   initialize(
-      completions: (this: null, arg1: string, arg2: string, arg3?: boolean|undefined) => Promise<Suggestion[]>,
+      completions: (this: null, expression: string, filter: string, force?: boolean|undefined) => Promise<Suggestion[]>,
       stopCharacters?: string, usesSuggestionBuilder?: boolean): void {
     this.loadCompletions = completions;
     this.completionStopCharacters = stopCharacters || ' =:[({;,!+-*/&|^<>.';
@@ -513,7 +511,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
       return;
     }
 
-    const wordQueryRange = DOMExtension.DOMExtension.rangeOfWord(
+    const wordQueryRange = Platform.DOMUtilities.rangeOfWord(
         selectionRange.startContainer, selectionRange.startOffset, this.completionStopCharacters, this.element(),
         'backward');
 
@@ -719,7 +717,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
   }
 
   /** -1 if no caret can be found in text prompt
-     */
+   */
   private getCaretPosition(): number {
     if (!this.element().hasFocus()) {
       return -1;
@@ -773,6 +771,10 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
         leftParenthesesIndices.push(i);
       }
     }
+  }
+
+  suggestBoxForTest(): SuggestBox|undefined {
+    return this.suggestBox;
   }
 }
 

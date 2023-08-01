@@ -33,8 +33,8 @@ import * as Workspace from '../../models/workspace/workspace.js';
 import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 
-import type {SourcesView} from './SourcesView.js';
-import type {UISourceCodeFrame} from './UISourceCodeFrame.js';
+import {type SourcesView} from './SourcesView.js';
+import {type UISourceCodeFrame} from './UISourceCodeFrame.js';
 
 export const HistoryDepth = 20;
 
@@ -93,9 +93,7 @@ export class EditingLocationHistoryManager {
   }
 
   private reveal(entry: EditingLocationHistoryEntry): void {
-    // TODO(crbug.com/1253323): Cast to UrlString will be removed when migration to branded types is complete.
-    const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCode(
-        entry.projectId, entry.url as Platform.DevToolsPath.UrlString);
+    const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCode(entry.projectId, entry.url);
     if (uiSourceCode) {
       this.revealing = true;
       this.sourcesView.showSourceLocation(uiSourceCode, entry.position, false, true);
@@ -131,7 +129,7 @@ export class EditingLocationHistoryManager {
 
 class EditingLocationHistoryEntry {
   readonly projectId: string;
-  readonly url: string;
+  readonly url: Platform.DevToolsPath.UrlString;
   position: number;
 
   constructor(uiSourceCode: Workspace.UISourceCode.UISourceCode, position: number) {

@@ -15,8 +15,9 @@ import {CookieItemsView} from './CookieItemsView.js';
 import {DatabaseQueryView} from './DatabaseQueryView.js';
 import {DatabaseTableView} from './DatabaseTableView.js';
 import {DOMStorageItemsView} from './DOMStorageItemsView.js';
-import type {DOMStorage} from './DOMStorageModel.js';
+import {type DOMStorage} from './DOMStorageModel.js';
 import {StorageItemsView} from './StorageItemsView.js';
+import * as PreloadingHelper from './preloading/helper/helper.js';
 
 let resourcesPanelInstance: ResourcesPanel;
 
@@ -87,7 +88,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
     return ResourcesPanel.instance().sidebar;
   }
 
-  focus(): void {
+  override focus(): void {
     this.sidebar.focus();
   }
 
@@ -140,7 +141,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
     return view;
   }
 
-  showCategoryView(categoryName: string, categoryLink: string|null): void {
+  showCategoryView(categoryName: string, categoryLink: Platform.DevToolsPath.UrlString|null): void {
     if (!this.categoryView) {
       this.categoryView = new StorageCategoryView();
     }
@@ -186,7 +187,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
       }
     });
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([resourcesPanelStyles]);
   }
@@ -235,5 +236,28 @@ export class FrameDetailsRevealer implements Common.Revealer.Revealer {
     }
     const sidebar = await ResourcesPanel.showAndGetSidebar();
     sidebar.showFrame(frame);
+  }
+}
+
+let attemptViewWithFilterRevealerInstance: AttemptViewWithFilterRevealer;
+
+export class AttemptViewWithFilterRevealer implements Common.Revealer.Revealer {
+  static instance(opts: {
+    forceNew: boolean|null,
+  } = {forceNew: null}): FrameDetailsRevealer {
+    const {forceNew} = opts;
+    if (!attemptViewWithFilterRevealerInstance || forceNew) {
+      attemptViewWithFilterRevealerInstance = new AttemptViewWithFilterRevealer();
+    }
+
+    return attemptViewWithFilterRevealerInstance;
+  }
+
+  async reveal(filter: Object): Promise<void> {
+    if (!(filter instanceof PreloadingHelper.PreloadingForward.AttemptViewWithFilter)) {
+      throw new Error('Internal error: not an AttemptViewWithFilter');
+    }
+    const sidebar = await ResourcesPanel.showAndGetSidebar();
+    sidebar.showPreloadingAttemptViewWithFilter(filter);
   }
 }

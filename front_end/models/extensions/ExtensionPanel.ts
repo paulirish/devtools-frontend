@@ -34,7 +34,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import * as ExtensionAPI from './ExtensionAPI.js';
-import type {ExtensionServer} from './ExtensionServer.js';
+import {type ExtensionServer} from './ExtensionServer.js';
 import {ExtensionNotifierView, ExtensionView} from './ExtensionView.js';
 
 export class ExtensionPanel extends UI.Panel.Panel implements UI.SearchableView.Searchable {
@@ -62,12 +62,12 @@ export class ExtensionPanel extends UI.Panel.Panel implements UI.SearchableView.
     this.panelToolbar.appendToolbarItem(item);
   }
 
-  searchCanceled(): void {
+  onSearchCanceled(): void {
     this.server.notifySearchAction(this.id, ExtensionAPI.PrivateAPI.Panels.SearchAction.CancelSearch);
     this.searchableViewInternal.updateSearchMatchesCount(0);
   }
 
-  searchableView(): UI.SearchableView.SearchableView {
+  override searchableView(): UI.SearchableView.SearchableView {
     return this.searchableViewInternal;
   }
 
@@ -157,7 +157,7 @@ export class ExtensionSidebarPane extends UI.View.SimpleView {
         expression, true, false, evaluateOptions, securityOrigin, this.onEvaluate.bind(this, title, callback));
   }
 
-  setPage(url: string): void {
+  setPage(url: Platform.DevToolsPath.UrlString): void {
     if (this.objectPropertiesView) {
       this.objectPropertiesView.detach();
       delete this.objectPropertiesView;

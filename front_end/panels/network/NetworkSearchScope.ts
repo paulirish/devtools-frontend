@@ -13,8 +13,8 @@ import * as NetworkForward from '../../panels/network/forward/forward.js';
 
 const UIStrings = {
   /**
-  *@description Text for web URLs
-  */
+   *@description Text for web URLs
+   */
   url: 'URL',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkSearchScope.ts', UIStrings);
@@ -95,7 +95,7 @@ export class NetworkSearchScope implements Search.SearchConfig.SearchScope {
       let pos = 0;
       for (const regExp of regExps) {
         const match = string.substr(pos).match(regExp);
-        if (!match || !match.index) {
+        if (!match || match.index === undefined) {
           return false;
         }
         pos += match.index + match[0].length;

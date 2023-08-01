@@ -2,11 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
-import {click, getBrowserAndPages, goToResource, pressKey, tabForward, typeText, waitFor, waitForAria} from '../../shared/helper.js';
+import type * as puppeteer from 'puppeteer-core';
+import {
+  click,
+  getBrowserAndPages,
+  goToResource,
+  pressKey,
+  tabForward,
+  typeText,
+  waitFor,
+  waitForAria,
+  clickElement,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {waitForDomNodeToBeVisible} from '../helpers/elements-helpers.js';
-import {clickZoomDropDown, openDeviceToolbar, reloadDockableFrontEnd, selectDevice, selectEdit, selectTestDevice} from '../helpers/emulation-helpers.js';
+import {
+  clickZoomDropDown,
+  openDeviceToolbar,
+  reloadDockableFrontEnd,
+  selectDevice,
+  selectEdit,
+  selectTestDevice,
+} from '../helpers/emulation-helpers.js';
 
 const ADD_DEVICE_BUTTON_SELECTOR = '#custom-device-add-button';
 const FOCUSED_DEVICE_NAME_FIELD_SELECTOR = '#custom-device-name-field:focus';
@@ -36,8 +53,7 @@ describe('Custom devices', async () => {
 
   it('can add and then edit a custom device with UA-CH emulation', async () => {
     await selectEdit();
-    const add = await waitFor(ADD_DEVICE_BUTTON_SELECTOR);
-    await click(add);
+    await click(ADD_DEVICE_BUTTON_SELECTOR);
     await waitFor(FOCUSED_DEVICE_NAME_FIELD_SELECTOR);
     await typeText('Test device');
 
@@ -69,7 +85,16 @@ describe('Custom devices', async () => {
     await typeText('1.1');
 
     await tabForward();  // Focus second row delete button.
-    await tabForward();  // Focus Add browser button.
+    await tabForward();  // Focus Add brand button.
+
+    await tabForward();  // focus full-version-list brand
+    await typeText('Ready Rover');
+
+    await tabForward();  // focus full-version-list brand version
+    await typeText('2.4.9');
+
+    await tabForward();  // focus delete full-version-list brand button
+    await tabForward();  // focus add full-version-list brand button
     await tabForward();  // Focus full version.
     await typeText('1.1.2345');
 
@@ -90,7 +115,7 @@ describe('Custom devices', async () => {
     const finishAdd = await waitFor(FOCUSED_SELECTOR);
     const finishAddText = await elementTextContent(finishAdd);
     assert.strictEqual(finishAddText, 'Add');
-    await click(finishAdd);
+    await clickElement(finishAdd);
 
     // Select the device in the menu.
     await selectTestDevice();
@@ -125,7 +150,7 @@ describe('Custom devices', async () => {
     await waitFor(FOCUSED_DEVICE_NAME_FIELD_SELECTOR);
 
     // Skip over to the version field.
-    for (let i = 0; i < 15; ++i) {
+    for (let i = 0; i < 19; ++i) {
       if (i === 7) {
         await pressKey('ArrowRight');
       }
@@ -158,8 +183,7 @@ describe('Custom devices', async () => {
 
   it('can add and properly display a device with a custom resolution', async () => {
     await selectEdit();
-    const add = await waitFor(ADD_DEVICE_BUTTON_SELECTOR);
-    await click(add);
+    await click(ADD_DEVICE_BUTTON_SELECTOR);
     await waitFor(FOCUSED_DEVICE_NAME_FIELD_SELECTOR);
     await typeText('Prime numbers');
 
@@ -175,7 +199,7 @@ describe('Custom devices', async () => {
     const finishAdd = await waitFor(EDITOR_ADD_BUTTON_SELECTOR);
     const finishAddText = await elementTextContent(finishAdd);
     assert.strictEqual(finishAddText, 'Add');
-    await click(finishAdd);
+    await clickElement(finishAdd);
 
     // Select the device in the menu.
     await selectDevice('Prime numbers');
@@ -191,7 +215,7 @@ describe('Custom devices', async () => {
     assert.strictEqual(await elementTextContent(zoomButton), '51%');
 
     const zoomTo100Button = await waitFor('[aria-label*="100%"]');
-    await click(zoomTo100Button);
+    await clickElement(zoomTo100Button);
     assert.strictEqual(await elementTextContent(fitButton), 'Fit to window (51%)');
     assert.strictEqual(await elementTextContent(zoomButton), '100%');
   });

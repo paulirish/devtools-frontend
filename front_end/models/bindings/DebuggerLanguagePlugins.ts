@@ -2,116 +2,74 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {type Chrome} from '../../../extension-api/ExtensionAPI.js';  // eslint-disable-line rulesdir/es_modules_import
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
-import type {Chrome} from '../../../extension-api/ExtensionAPI.js'; // eslint-disable-line rulesdir/es_modules_import
 
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
 
-import type {DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
+import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
+import {type DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
 import {NetworkProject} from './NetworkProject.js';
 
 const UIStrings = {
   /**
-  *@description Error message that is displayed in the Console when language #plugins report errors
-  *@example {File not found} PH1
-  */
+   *@description Error message that is displayed in the Console when language #plugins report errors
+   *@example {File not found} PH1
+   */
   errorInDebuggerLanguagePlugin: 'Error in debugger language plugin: {PH1}',
   /**
-  *@description Status message that is shown in the Console when debugging information is being
-  *loaded. The 2nd and 3rd placeholders are URLs.
-  *@example {C/C++ DevTools Support (DWARF)} PH1
-  *@example {http://web.dev/file.wasm} PH2
-  *@example {http://web.dev/file.wasm.debug.wasm} PH3
-  */
+   *@description Status message that is shown in the Console when debugging information is being
+   *loaded. The 2nd and 3rd placeholders are URLs.
+   *@example {C/C++ DevTools Support (DWARF)} PH1
+   *@example {http://web.dev/file.wasm} PH2
+   *@example {http://web.dev/file.wasm.debug.wasm} PH3
+   */
   loadingDebugSymbolsForVia: '[{PH1}] Loading debug symbols for {PH2} (via {PH3})...',
   /**
-  *@description Status message that is shown in the Console when debugging information is being loaded
-  *@example {C/C++ DevTools Support (DWARF)} PH1
-  *@example {http://web.dev/file.wasm} PH2
-  */
+   *@description Status message that is shown in the Console when debugging information is being loaded
+   *@example {C/C++ DevTools Support (DWARF)} PH1
+   *@example {http://web.dev/file.wasm} PH2
+   */
   loadingDebugSymbolsFor: '[{PH1}] Loading debug symbols for {PH2}...',
   /**
-  *@description Warning message that is displayed in the Console when debugging information was loaded, but no source files were found
-  *@example {C/C++ DevTools Support (DWARF)} PH1
-  *@example {http://web.dev/file.wasm} PH2
-  */
+   *@description Warning message that is displayed in the Console when debugging information was loaded, but no source files were found
+   *@example {C/C++ DevTools Support (DWARF)} PH1
+   *@example {http://web.dev/file.wasm} PH2
+   */
   loadedDebugSymbolsForButDidnt: '[{PH1}] Loaded debug symbols for {PH2}, but didn\'t find any source files',
   /**
-  *@description Status message that is shown in the Console when debugging information is successfully loaded
-  *@example {C/C++ DevTools Support (DWARF)} PH1
-  *@example {http://web.dev/file.wasm} PH2
-  *@example {42} PH3
-  */
+   *@description Status message that is shown in the Console when debugging information is successfully loaded
+   *@example {C/C++ DevTools Support (DWARF)} PH1
+   *@example {http://web.dev/file.wasm} PH2
+   *@example {42} PH3
+   */
   loadedDebugSymbolsForFound: '[{PH1}] Loaded debug symbols for {PH2}, found {PH3} source file(s)',
   /**
-  *@description Error message that is displayed in the Console when debugging information cannot be loaded
-  *@example {C/C++ DevTools Support (DWARF)} PH1
-  *@example {http://web.dev/file.wasm} PH2
-  *@example {File not found} PH3
-  */
+   *@description Error message that is displayed in the Console when debugging information cannot be loaded
+   *@example {C/C++ DevTools Support (DWARF)} PH1
+   *@example {http://web.dev/file.wasm} PH2
+   *@example {File not found} PH3
+   */
   failedToLoadDebugSymbolsFor: '[{PH1}] Failed to load debug symbols for {PH2} ({PH3})',
   /**
-  *@description Error message that is displayed in UI debugging information cannot be found for a call frame
-  *@example {main} PH1
-  */
-  failedToLoadDebugSymbolsForFunction: 'Missing debug symbols for function "{PH1}"',
+   *@description Error message that is displayed in UI debugging information cannot be found for a call frame
+   *@example {main} PH1
+   */
+  failedToLoadDebugSymbolsForFunction: 'No debug information for function "{PH1}"',
   /**
-  *@description Error message that is displayed in UI when a file needed for debugging information for a call frame is missing
-  *@example {src/myapp.debug.wasm.dwp} PH1
-  */
-  symbolFileNotFound: 'Symbol file "{PH1}" not found',
+   *@description Error message that is displayed in UI when a file needed for debugging information for a call frame is missing
+   *@example {mainp.debug.wasm.dwp} PH1
+   */
+  debugSymbolsIncomplete: 'The debug information for function {PH1} is incomplete',
 };
 const str_ = i18n.i18n.registerUIStrings('models/bindings/DebuggerLanguagePlugins.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-class SourceType {
-  typeInfo: Chrome.DevTools.TypeInfo;
-  members: SourceType[];
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  typeMap: Map<any, SourceType>;
-
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(typeInfo: Chrome.DevTools.TypeInfo, members: SourceType[], typeMap: Map<any, SourceType>) {
-    this.typeInfo = typeInfo;
-    this.members = members;
-    this.typeMap = typeMap;
-  }
-
-  /**
-   * Create a type graph
-   */
-  static create(typeInfos: Chrome.DevTools.TypeInfo[]): SourceType|null {
-    if (typeInfos.length === 0) {
-      return null;
-    }
-
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const typeMap = new Map<any, SourceType>();
-    for (const typeInfo of typeInfos) {
-      typeMap.set(typeInfo.typeId, new SourceType(typeInfo, [], typeMap));
-    }
-
-    for (const sourceType of typeMap.values()) {
-      sourceType.members = sourceType.typeInfo.members.map(({typeId}) => {
-        const memberType = typeMap.get(typeId);
-        if (!memberType) {
-          throw new Error(`Incomplete type information for type ${typeInfos[0].typeNames[0] || '<anonymous>'}`);
-        }
-        return memberType;
-      });
-    }
-
-    return typeMap.get(typeInfos[0].typeId) || null;
-  }
-}
 
 /**
  * Generates the raw module ID for a script, which is used
@@ -133,313 +91,6 @@ function getRawLocation(callFrame: SDK.DebuggerModel.CallFrame): Chrome.DevTools
   };
 }
 
-async function resolveRemoteObject(
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    callFrame: SDK.DebuggerModel.CallFrame, object: SDK.RemoteObject.RemoteObject): Promise<any> {
-  if (typeof object.value !== 'undefined') {
-    return object.value;
-  }
-
-  const response = await callFrame.debuggerModel.target().runtimeAgent().invoke_callFunctionOn(
-      {functionDeclaration: 'function() { return this; }', objectId: object.objectId, returnByValue: true});
-  const {result} = response;
-  if (!result) {
-    return undefined;
-  }
-  return result.value;
-}
-
-export class ValueNode extends SDK.RemoteObject.RemoteObjectImpl {
-  inspectableAddress?: number;
-  callFrame: SDK.DebuggerModel.CallFrame;
-
-  constructor(
-      callFrame: SDK.DebuggerModel.CallFrame, objectId: Protocol.Runtime.RemoteObjectId|undefined, type: string,
-      subtype: string|undefined,
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      value: any, inspectableAddress?: number, unserializableValue?: string, description?: string,
-      preview?: Protocol.Runtime.ObjectPreview, customPreview?: Protocol.Runtime.CustomPreview, className?: string) {
-    super(
-        callFrame.debuggerModel.runtimeModel(), objectId, type, subtype, value, unserializableValue, description,
-        preview, customPreview, className);
-
-    this.inspectableAddress = inspectableAddress;
-    this.callFrame = callFrame;
-  }
-}
-
-// Debugger language #plugins present source-language values as trees with mixed dynamic and static structural
-// information. The static structure is defined by the variable's static type in the source language. Formatters are
-// able to present source-language values in an arbitrary user-friendly way, which contributes the dynamic structural
-// information. The classes StaticallyTypedValue and FormatedValueNode respectively implement the static and dynamic
-// parts in the RemoteObject tree that defines the presentation of the source-language value in the debugger UI.
-//
-// struct S {
-//   int i;
-//   struct A {
-//     int j;
-//   } a[3];
-// } s
-//
-// The RemoteObject tree representing the C struct above could look like the graph below with a formatter for the type
-// struct A[3], interleaving static and dynamic representations:
-//
-// StaticallyTypedValueNode   -->  s: struct S
-//                                 \
-//                                 |\
-// StaticallyTypedValueNode   -->  | i: int
-//                                 \
-//                                  \
-// StaticallyTypedValueNode   -->    a: struct A[3]
-//                                   \
-//                                   |\
-// FormattedValueNode         -->    | 0: struct A
-//                                   | \
-//                                   |  \
-// StaticallyTypedValueNode   -->    |   j: int
-//                                   .
-//                                   .
-//                                   .
-
-/** Create a new value tree from an expression.
- */
-async function getValueTreeForExpression(
-    callFrame: SDK.DebuggerModel.CallFrame, plugin: DebuggerLanguagePlugin, expression: string,
-    evalOptions: SDK.RuntimeModel.EvaluationOptions): Promise<SDK.RemoteObject.RemoteObject> {
-  const location = getRawLocation(callFrame);
-
-  let typeInfo;
-  try {
-    typeInfo = await plugin.getTypeInfo(expression, location);
-  } catch (e) {
-    FormattingError.throwLocal(callFrame, e.message);
-  }
-  // If there's no type information we cannot represent this expression.
-  if (!typeInfo) {
-    return new SDK.RemoteObject.LocalJSONObject(undefined);
-  }
-  const {base, typeInfos} = typeInfo;
-  const sourceType = SourceType.create(typeInfos);
-  if (!sourceType) {
-    return new SDK.RemoteObject.LocalJSONObject(undefined);
-  }
-  if (sourceType.typeInfo.hasValue && !sourceType.typeInfo.canExpand && base) {
-    // Need to run the formatter for the expression result.
-    return formatSourceValue(callFrame, plugin, sourceType, base, [], evalOptions);
-  }
-
-  // Create a new value tree with static information for the root.
-  const address = await StaticallyTypedValueNode.getInspectableAddress(callFrame, plugin, base, [], evalOptions);
-  return new StaticallyTypedValueNode(callFrame, plugin, sourceType, base, [], evalOptions, address);
-}
-
-/** Run the formatter for the value defined by the pair of #base and #fieldChain.
- */
-async function formatSourceValue(
-    callFrame: SDK.DebuggerModel.CallFrame, plugin: DebuggerLanguagePlugin, sourceType: SourceType,
-    base: Chrome.DevTools.EvalBase, field: Chrome.DevTools.FieldInfo[],
-    evalOptions: SDK.RuntimeModel.EvaluationOptions): Promise<FormattedValueNode> {
-  const location = getRawLocation(callFrame);
-
-  let evalCode: {
-    js: string,
-  }|({
-    js: string,
-  } | null) = await plugin.getFormatter({base, field}, location);
-  if (!evalCode) {
-    evalCode = {js: ''};
-  }
-  const response = await callFrame.debuggerModel.target().debuggerAgent().invoke_evaluateOnCallFrame({
-    callFrameId: callFrame.id,
-    expression: evalCode.js,
-    objectGroup: evalOptions.objectGroup,
-    includeCommandLineAPI: evalOptions.includeCommandLineAPI,
-    silent: evalOptions.silent,
-    returnByValue: evalOptions.returnByValue,
-    generatePreview: evalOptions.generatePreview,
-    throwOnSideEffect: evalOptions.throwOnSideEffect,
-    timeout: evalOptions.timeout,
-  });
-  const error = response.getError();
-  if (error) {
-    throw new Error(error);
-  }
-
-  const {result, exceptionDetails} = response;
-  if (exceptionDetails) {
-    throw new FormattingError(callFrame.debuggerModel.runtimeModel().createRemoteObject(result), exceptionDetails);
-  }
-  // Wrap the formatted result into a FormattedValueNode.
-  const object = new FormattedValueNode(callFrame, sourceType, plugin, result, null, evalOptions, undefined);
-  // Check whether the formatter returned a plain object or and object alongisde a formatter tag.
-  const unpackedResultObject = await unpackResultObject(object);
-  const node = unpackedResultObject || object;
-
-  if (typeof node.value === 'undefined' && node.type !== 'undefined') {
-    node.description = sourceType.typeInfo.typeNames[0];
-  }
-
-  return node;
-
-  async function unpackResultObject(object: FormattedValueNode): Promise<FormattedValueNode|null> {
-    const {tag, value, inspectableAddress, description} =
-        await object.findProperties('tag', 'value', 'inspectableAddress', 'description');
-    if (!tag || !value) {
-      return null;
-    }
-    const {className, symbol} = await tag.findProperties('className', 'symbol');
-    if (!className || !symbol) {
-      return null;
-    }
-    const resolvedClassName = className.value;
-    if (typeof resolvedClassName !== 'string' || typeof symbol.objectId === 'undefined') {
-      return null;
-    }
-
-    const descriptionText = description?.value;
-    if (typeof descriptionText === 'string') {
-      value.description = descriptionText;
-    }
-
-    value.formatterTag = {symbol: symbol.objectId, className: resolvedClassName};
-    value.inspectableAddress = inspectableAddress ? inspectableAddress.value : undefined;
-    return value;
-  }
-}
-
-// Formatters produce proper JavaScript objects, which are mirrored as RemoteObjects. To implement interleaving of
-// formatted and statically typed values, formatters may insert markers in the JavaScript objects. The markers contain
-// the static type information (`EvalBase`)to create a new StaticallyTypedValueNode tree root. Markers are identified by
-// their className and the presence of a special Symbol property. Both the class name and the symbol are defined by the
-// `formatterTag` property.
-//
-// A FormattedValueNode is a RemoteObject whose properties can be either FormattedValueNodes or
-// StaticallyTypedValueNodes. The class hooks into the creation of RemoteObjects for properties to check whether a
-// property is a marker.
-class FormattedValueNode extends ValueNode {
-  readonly #plugin: DebuggerLanguagePlugin;
-  readonly #sourceType: SourceType;
-  formatterTag: {
-    className: string,
-    symbol: string,
-  }|null;
-  readonly #evalOptions: SDK.RuntimeModel.EvaluationOptions;
-  constructor(
-      callFrame: SDK.DebuggerModel.CallFrame, sourceType: SourceType, plugin: DebuggerLanguagePlugin,
-      object: Protocol.Runtime.RemoteObject, formatterTag: {
-        className: string,
-        symbol: string,
-      }|null,
-      evalOptions: SDK.RuntimeModel.EvaluationOptions, inspectableAddress: number|undefined) {
-    super(
-        callFrame, object.objectId, object.type, object.subtype, object.value, inspectableAddress,
-        object.unserializableValue, object.description, object.preview, object.customPreview, object.className);
-
-    this.#plugin = plugin;
-    this.#sourceType = sourceType;
-
-    // The tag describes how to identify a marker by its className and its identifier symbol's object id.
-    this.formatterTag = formatterTag;
-
-    this.#evalOptions = evalOptions;
-  }
-
-  async findProperties(...properties: string[]): Promise<{
-    [x: string]: FormattedValueNode | undefined,
-  }> {
-    const result: {
-      [x: string]: FormattedValueNode|undefined,
-    } = {};
-    for (const prop of (await this.getOwnProperties(false)).properties || []) {
-      if (properties.indexOf(prop.name) >= 0) {
-        if (prop.value) {
-          result[prop.name] = (prop.value as FormattedValueNode | undefined);
-        }
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Hook into RemoteObject creation for properties to check whether a property is a marker.
-   */
-  async createRemoteObject(newObject: Protocol.Runtime.RemoteObject):
-      Promise<FormattedValueNode|StaticallyTypedValueNode> {
-    // Check if the property RemoteObject is a marker
-    const base = await this.getEvalBaseFromObject(newObject);
-    if (!base) {
-      return new FormattedValueNode(
-          this.callFrame, this.#sourceType, this.#plugin, newObject, this.formatterTag, this.#evalOptions, undefined);
-    }
-
-    // Property is a marker, check if it's just static type information or if we need to run formatters for the value.
-    const newSourceType = this.#sourceType.typeMap.get(base.rootType.typeId);
-    if (!newSourceType) {
-      throw new Error('Unknown typeId in eval base');
-    }
-    // The marker refers to a value that needs to be formatted, so run the formatter.
-    if (base.rootType.hasValue && !base.rootType.canExpand && base) {
-      return formatSourceValue(this.callFrame, this.#plugin, newSourceType, base, [], this.#evalOptions);
-    }
-
-    // The marker is just static information, so start a new subtree with a static type info root.
-    const address =
-        await StaticallyTypedValueNode.getInspectableAddress(this.callFrame, this.#plugin, base, [], this.#evalOptions);
-    return new StaticallyTypedValueNode(
-        this.callFrame, this.#plugin, newSourceType, base, [], this.#evalOptions, address);
-  }
-
-  /**
-   * Check whether an object is a marker and if so return the EvalBase it contains.
-   */
-  private async getEvalBaseFromObject(object: Protocol.Runtime.RemoteObject): Promise<Chrome.DevTools.EvalBase|null> {
-    const {objectId} = object;
-    if (!object || !this.formatterTag) {
-      return null;
-    }
-
-    // A marker is definitively identified by the symbol property. To avoid checking the properties of all objects,
-    // check the className first for an early exit.
-    const {className, symbol} = this.formatterTag;
-    if (className !== object.className) {
-      return null;
-    }
-
-    const response = await this.debuggerModel().target().runtimeAgent().invoke_callFunctionOn({
-      functionDeclaration: 'function(sym) { return this[sym]; }',
-      objectId,
-      arguments: [{objectId: symbol as Protocol.Runtime.RemoteObjectId}],
-    });
-    const {result} = response;
-    if (!result || result.type === 'undefined') {
-      return null;
-    }
-
-    // The object is a marker, so pull the static type information from its symbol property. The symbol property is not
-    // a formatted value per se, but we wrap it as one to be able to call `findProperties`.
-    const baseObject = new FormattedValueNode(
-        this.callFrame, this.#sourceType, this.#plugin, result, null, this.#evalOptions, undefined);
-    const {payload, rootType} = await baseObject.findProperties('payload', 'rootType');
-    if (typeof payload === 'undefined' || typeof rootType === 'undefined') {
-      return null;
-    }
-    const value = await resolveRemoteObject(this.callFrame, payload);
-    const {typeId} = await rootType.findProperties('typeId');
-    if (typeof value === 'undefined' || typeof typeId === 'undefined') {
-      return null;
-    }
-
-    const newSourceType = this.#sourceType.typeMap.get(typeId.value);
-    if (!newSourceType) {
-      return null;
-    }
-
-    return {payload: value, rootType: newSourceType.typeInfo};
-  }
-}
-
 class FormattingError extends Error {
   exception: SDK.RemoteObject.RemoteObject;
   exceptionDetails: Protocol.Runtime.ExceptionDetails;
@@ -450,7 +101,7 @@ class FormattingError extends Error {
     this.exceptionDetails = exceptionDetails;
   }
 
-  static throwLocal(callFrame: SDK.DebuggerModel.CallFrame, message: string): void {
+  static makeLocal(callFrame: SDK.DebuggerModel.CallFrame, message: string): FormattingError {
     const exception: Protocol.Runtime.RemoteObject = {
       type: Protocol.Runtime.RemoteObjectType.Object,
       subtype: Protocol.Runtime.RemoteObjectSubtype.Error,
@@ -459,139 +110,7 @@ class FormattingError extends Error {
     const exceptionDetails: Protocol.Runtime
         .ExceptionDetails = {text: 'Uncaught', exceptionId: -1, columnNumber: 0, lineNumber: 0, exception};
     const errorObject = callFrame.debuggerModel.runtimeModel().createRemoteObject(exception);
-    throw new FormattingError(errorObject, exceptionDetails);
-  }
-}
-
-// This class implements a `RemoteObject` for source language value whose immediate properties are defined purely by
-// static type information. Static type information is expressed by an `EvalBase` together with a `#fieldChain`. The
-// latter is necessary to express navigating through type members. We don't know how to make sense of an `EvalBase`'s
-// payload here, which is why member navigation is relayed to the formatter via the `#fieldChain`.
-class StaticallyTypedValueNode extends ValueNode {
-  readonly #variableType: string;
-  readonly #plugin: DebuggerLanguagePlugin;
-  readonly #sourceType: SourceType;
-  readonly #base: Chrome.DevTools.EvalBase|null;
-  readonly #fieldChain: Chrome.DevTools.FieldInfo[];
-  readonly #evalOptions: SDK.RuntimeModel.EvaluationOptions;
-
-  constructor(
-      callFrame: SDK.DebuggerModel.CallFrame, plugin: DebuggerLanguagePlugin, sourceType: SourceType,
-      base: Chrome.DevTools.EvalBase|null, fieldChain: Chrome.DevTools.FieldInfo[],
-      evalOptions: SDK.RuntimeModel.EvaluationOptions, inspectableAddress: number|undefined) {
-    const typeName = sourceType.typeInfo.typeNames[0] || '<anonymous>';
-    const variableType = 'object';
-    super(
-        callFrame,
-        /* objectId=*/ undefined,
-        /* type=*/ variableType,
-        /* subtype=*/ undefined, /* value=*/ null, inspectableAddress, /* unserializableValue=*/ undefined,
-        /* description=*/ typeName, /* preview=*/ undefined, /* customPreview=*/ undefined, /* className=*/ typeName);
-    this.#variableType = variableType;
-    this.#plugin = plugin;
-    this.#sourceType = sourceType;
-    this.#base = base;
-    this.#fieldChain = fieldChain;
-    this.hasChildrenInternal = true;
-    this.#evalOptions = evalOptions;
-  }
-
-  get type(): string {
-    return this.#variableType;
-  }
-
-  private async expandMember(sourceType: SourceType, fieldInfo: Chrome.DevTools.FieldInfo):
-      Promise<SDK.RemoteObject.RemoteObject> {
-    const fieldChain = this.#fieldChain.concat(fieldInfo);
-    if (sourceType.typeInfo.hasValue && !sourceType.typeInfo.canExpand && this.#base) {
-      return formatSourceValue(this.callFrame, this.#plugin, sourceType, this.#base, fieldChain, this.#evalOptions);
-    }
-
-    const address = this.inspectableAddress !== undefined ? this.inspectableAddress + fieldInfo.offset : undefined;
-    return new StaticallyTypedValueNode(
-        this.callFrame, this.#plugin, sourceType, this.#base, fieldChain, this.#evalOptions, address);
-  }
-
-  static async getInspectableAddress(
-      callFrame: SDK.DebuggerModel.CallFrame, plugin: DebuggerLanguagePlugin, base: Chrome.DevTools.EvalBase|null,
-      field: Chrome.DevTools.FieldInfo[], evalOptions: SDK.RuntimeModel.EvaluationOptions): Promise<number|undefined> {
-    if (!base) {
-      return undefined;
-    }
-
-    const addressCode = await plugin.getInspectableAddress({base, field});
-    if (!addressCode.js) {
-      return undefined;
-    }
-    const response = await callFrame.debuggerModel.target().debuggerAgent().invoke_evaluateOnCallFrame({
-      callFrameId: callFrame.id,
-      expression: addressCode.js,
-      objectGroup: evalOptions.objectGroup,
-      includeCommandLineAPI: evalOptions.includeCommandLineAPI,
-      silent: evalOptions.silent,
-      returnByValue: true,
-      generatePreview: evalOptions.generatePreview,
-      throwOnSideEffect: evalOptions.throwOnSideEffect,
-      timeout: evalOptions.timeout,
-    });
-
-    const error = response.getError();
-    if (error) {
-      throw new Error(error);
-    }
-
-    const {result, exceptionDetails} = response;
-    if (exceptionDetails) {
-      throw new FormattingError(callFrame.debuggerModel.runtimeModel().createRemoteObject(result), exceptionDetails);
-    }
-
-    const address = result.value;
-    if (!Number.isSafeInteger(address) || address < 0) {
-      console.error(`Inspectable address is not a positive, safe integer: ${address}`);
-      return undefined;
-    }
-
-    return address;
-  }
-
-  async doGetProperties(_ownProperties: boolean, accessorPropertiesOnly: boolean, _generatePreview: boolean):
-      Promise<SDK.RemoteObject.GetPropertiesResult> {
-    const {typeInfo} = this.#sourceType;
-    if (accessorPropertiesOnly || !typeInfo.canExpand) {
-      return {properties: [], internalProperties: []} as SDK.RemoteObject.GetPropertiesResult;
-    }
-
-    if (typeInfo.members.length > 0) {
-      // This value doesn't have a formatter, but we can eagerly expand arrays in the frontend if the size is known.
-      if (typeInfo.arraySize > 0) {
-        const {typeId} = this.#sourceType.typeInfo.members[0];
-        const properties: SDK.RemoteObject.RemoteObjectProperty[] = [];
-        const elementTypeInfo = this.#sourceType.members[0];
-        for (let i = 0; i < typeInfo.arraySize; ++i) {
-          const name = `${i}`;
-          const elementField = {name, typeId, offset: elementTypeInfo.typeInfo.size * i};
-          properties.push(new SDK.RemoteObject.RemoteObjectProperty(
-              name, await this.expandMember(elementTypeInfo, elementField), /* enumerable=*/ false,
-              /* writable=*/ false,
-              /* isOwn=*/ true,
-              /* wasThrown=*/ false));
-        }
-        return {properties, internalProperties: []} as SDK.RemoteObject.GetPropertiesResult;
-      }
-
-      // The node is expanded, just make remote objects for its members
-      const members = Promise.all(this.#sourceType.members.map(async (memberTypeInfo, idx) => {
-        const fieldInfo = this.#sourceType.typeInfo.members[idx];
-        const propertyObject = await this.expandMember(memberTypeInfo, fieldInfo);
-        const name = fieldInfo.name || '';
-        return new SDK.RemoteObject.RemoteObjectProperty(
-            name, propertyObject, /* enumerable=*/ false, /* writable=*/ false, /* isOwn=*/ true,
-            /* wasThrown=*/ false);
-      }));
-      return {properties: await members, internalProperties: []} as SDK.RemoteObject.GetPropertiesResult;
-    }
-
-    return {properties: [], internalProperties: []} as SDK.RemoteObject.GetPropertiesResult;
+    return new FormattingError(errorObject, exceptionDetails);
   }
 }
 
@@ -602,11 +121,11 @@ class NamespaceObject extends SDK.RemoteObject.LocalJSONObject {
     super(value);
   }
 
-  get description(): string {
+  override get description(): string {
     return this.type;
   }
 
-  get type(): string {
+  override get type(): string {
     return 'namespace';
   }
 }
@@ -615,15 +134,17 @@ class SourceScopeRemoteObject extends SDK.RemoteObject.RemoteObjectImpl {
   variables: Chrome.DevTools.Variable[];
   #callFrame: SDK.DebuggerModel.CallFrame;
   #plugin: DebuggerLanguagePlugin;
+  stopId: StopId;
 
-  constructor(callFrame: SDK.DebuggerModel.CallFrame, plugin: DebuggerLanguagePlugin) {
+  constructor(callFrame: SDK.DebuggerModel.CallFrame, stopId: StopId, plugin: DebuggerLanguagePlugin) {
     super(callFrame.debuggerModel.runtimeModel(), undefined, 'object', undefined, null);
     this.variables = [];
     this.#callFrame = callFrame;
     this.#plugin = plugin;
+    this.stopId = stopId;
   }
 
-  async doGetProperties(ownProperties: boolean, accessorPropertiesOnly: boolean, _generatePreview: boolean):
+  override async doGetProperties(ownProperties: boolean, accessorPropertiesOnly: boolean, _generatePreview: boolean):
       Promise<SDK.RemoteObject.GetPropertiesResult> {
     if (accessorPropertiesOnly) {
       return {properties: [], internalProperties: []} as SDK.RemoteObject.GetPropertiesResult;
@@ -641,15 +162,11 @@ class SourceScopeRemoteObject extends SDK.RemoteObject.RemoteObjectImpl {
     }
 
     for (const variable of this.variables) {
-      let sourceVar;
+      let sourceVar: SDK.RemoteObject.RemoteObject|undefined;
       try {
-        sourceVar = await getValueTreeForExpression(this.#callFrame, this.#plugin, variable.name, ({
-                                                      generatePreview: false,
-                                                      includeCommandLineAPI: true,
-                                                      objectGroup: 'backtrace',
-                                                      returnByValue: false,
-                                                      silent: false,
-                                                    } as SDK.RuntimeModel.EvaluationOptions));
+        const evalResult = await this.#plugin.evaluate(variable.name, getRawLocation(this.#callFrame), this.stopId);
+        sourceVar = evalResult ? new ExtensionRemoteObject(this.#callFrame, evalResult, this.#plugin) :
+                                 new SDK.RemoteObject.LocalJSONObject(undefined);
       } catch (e) {
         console.warn(e);
         sourceVar = new SDK.RemoteObject.LocalJSONObject(undefined);
@@ -691,13 +208,16 @@ export class SourceScope implements SDK.DebuggerModel.ScopeChainEntry {
   readonly #startLocationInternal: SDK.DebuggerModel.Location|null;
   readonly #endLocationInternal: SDK.DebuggerModel.Location|null;
   constructor(
-      callFrame: SDK.DebuggerModel.CallFrame, type: string, typeName: string, icon: string|undefined,
+      callFrame: SDK.DebuggerModel.CallFrame, stopId: StopId, type: string, typeName: string, icon: string|undefined,
       plugin: DebuggerLanguagePlugin) {
+    if (icon && new URL(icon).protocol !== 'data:') {
+      throw new Error('The icon must be a data:-URL');
+    }
     this.#callFrameInternal = callFrame;
     this.#typeInternal = type;
     this.#typeNameInternal = typeName;
     this.#iconInternal = icon;
-    this.#objectInternal = new SourceScopeRemoteObject(callFrame, plugin);
+    this.#objectInternal = new SourceScopeRemoteObject(callFrame, stopId, plugin);
     this.#startLocationInternal = null;
     this.#endLocationInternal = null;
   }
@@ -756,6 +276,119 @@ export class SourceScope implements SDK.DebuggerModel.ScopeChainEntry {
   }
 }
 
+export class ExtensionRemoteObject extends SDK.RemoteObject.RemoteObject {
+  private readonly extensionObject: Chrome.DevTools.RemoteObject;
+  private readonly plugin: DebuggerLanguagePlugin;
+  readonly callFrame: SDK.DebuggerModel.CallFrame;
+  constructor(
+      callFrame: SDK.DebuggerModel.CallFrame, extensionObject: Chrome.DevTools.RemoteObject,
+      plugin: DebuggerLanguagePlugin) {
+    super();
+    this.extensionObject = extensionObject;
+    this.plugin = plugin;
+    this.callFrame = callFrame;
+  }
+
+  get linearMemoryAddress(): number|undefined {
+    return this.extensionObject.linearMemoryAddress;
+  }
+
+  get linearMemorySize(): number|undefined {
+    return this.extensionObject.linearMemorySize;
+  }
+
+  override get objectId(): Protocol.Runtime.RemoteObjectId|undefined {
+    return this.extensionObject.objectId as Protocol.Runtime.RemoteObjectId;
+  }
+
+  override get type(): string {
+    if (this.extensionObject.type === 'array' || this.extensionObject.type === 'null') {
+      return 'object';
+    }
+    return this.extensionObject.type;
+  }
+
+  override get subtype(): string|undefined {
+    if (this.extensionObject.type === 'array' || this.extensionObject.type === 'null') {
+      return this.extensionObject.type;
+    }
+    return undefined;
+  }
+
+  override get value(): unknown {
+    return this.extensionObject.value;
+  }
+
+  override unserializableValue(): string|undefined {
+    return undefined;
+  }
+
+  override get description(): string|undefined {
+    return this.extensionObject.description;
+  }
+
+  override set description(description: string|undefined) {
+  }
+
+  override get hasChildren(): boolean {
+    return this.extensionObject.hasChildren;
+  }
+
+  override get preview(): Protocol.Runtime.ObjectPreview|undefined {
+    return undefined;
+  }
+
+  override get className(): string|null {
+    return this.extensionObject.className ?? null;
+  }
+
+  override arrayLength(): number {
+    return 0;
+  }
+
+  override arrayBufferByteLength(): number {
+    return 0;
+  }
+
+  override getOwnProperties(_generatePreview: boolean, _nonIndexedPropertiesOnly?: boolean):
+      Promise<SDK.RemoteObject.GetPropertiesResult> {
+    return this.getAllProperties(false, _generatePreview, _nonIndexedPropertiesOnly);
+  }
+
+  override async getAllProperties(
+      _accessorPropertiesOnly: boolean, _generatePreview: boolean,
+      _nonIndexedPropertiesOnly?: boolean): Promise<SDK.RemoteObject.GetPropertiesResult> {
+    const {objectId} = this.extensionObject;
+    if (objectId) {
+      assertNotNullOrUndefined(this.plugin.getProperties);
+      const extensionObjectProperties = await this.plugin.getProperties(objectId);
+      const properties = extensionObjectProperties.map(
+          p => new SDK.RemoteObject.RemoteObjectProperty(
+              p.name, new ExtensionRemoteObject(this.callFrame, p.value, this.plugin)));
+      return {properties, internalProperties: null};
+    }
+
+    return {properties: null, internalProperties: null};
+  }
+
+  override release(): void {
+    const {objectId} = this.extensionObject;
+    if (objectId) {
+      assertNotNullOrUndefined(this.plugin.releaseObject);
+      void this.plugin.releaseObject(objectId);
+    }
+  }
+
+  override debuggerModel(): SDK.DebuggerModel.DebuggerModel {
+    return this.callFrame.debuggerModel;
+  }
+
+  override runtimeModel(): SDK.RuntimeModel.RuntimeModel {
+    return this.callFrame.debuggerModel.runtimeModel();
+  }
+}
+
+export type StopId = bigint;
 export class DebuggerLanguagePluginManager implements
     SDK.TargetManager.SDKModelObserver<SDK.DebuggerModel.DebuggerModel> {
   readonly #workspace: Workspace.Workspace.WorkspaceImpl;
@@ -766,8 +399,11 @@ export class DebuggerLanguagePluginManager implements
     rawModuleId: string,
     plugin: DebuggerLanguagePlugin,
     scripts: Array<SDK.Script.Script>,
-    addRawModulePromise: Promise<Array<Platform.DevToolsPath.UrlString>>,
+    addRawModulePromise: Promise<Array<Platform.DevToolsPath.UrlString>|{missingSymbolFiles: string[]}>,
   }>;
+  private readonly callFrameByStopId: Map<StopId, SDK.DebuggerModel.CallFrame> = new Map();
+  private readonly stopIdByCallFrame: Map<SDK.DebuggerModel.CallFrame, StopId> = new Map();
+  private nextStopId: StopId = 0n;
 
   constructor(
       targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl,
@@ -791,7 +427,7 @@ export class DebuggerLanguagePluginManager implements
     error: string,
   }|null> {
     const {script} = callFrame;
-    const {expression} = options;
+    const {expression, returnByValue, throwOnSideEffect} = options;
     const {plugin} = await this.rawModuleIdAndPluginForScript(script);
     if (!plugin) {
       return null;
@@ -802,16 +438,43 @@ export class DebuggerLanguagePluginManager implements
       return null;
     }
 
+    if (returnByValue) {
+      return {error: 'Cannot return by value'};
+    }
+    if (throwOnSideEffect) {
+      return {error: 'Cannot guarantee side-effect freedom'};
+    }
+
     try {
-      const object = await getValueTreeForExpression(callFrame, plugin, expression, options);
-      return {object, exceptionDetails: undefined};
+      const object = await plugin.evaluate(expression, location, this.stopIdForCallFrame(callFrame));
+      if (object) {
+        return {object: new ExtensionRemoteObject(callFrame, object, plugin), exceptionDetails: undefined};
+      }
+      return {object: new SDK.RemoteObject.LocalJSONObject(undefined), exceptionDetails: undefined};
     } catch (error) {
       if (error instanceof FormattingError) {
         const {exception: object, exceptionDetails} = error;
         return {object, exceptionDetails};
       }
-      return {error: error.message};
+      const {exception: object, exceptionDetails} = FormattingError.makeLocal(callFrame, error.message);
+      return {object, exceptionDetails};
     }
+  }
+
+  stopIdForCallFrame(callFrame: SDK.DebuggerModel.CallFrame): StopId {
+    let stopId = this.stopIdByCallFrame.get(callFrame);
+    if (stopId !== undefined) {
+      return stopId;
+    }
+
+    stopId = this.nextStopId++;
+    this.stopIdByCallFrame.set(callFrame, stopId);
+    this.callFrameByStopId.set(stopId, callFrame);
+    return stopId;
+  }
+
+  callFrameForStopId(stopId: StopId): SDK.DebuggerModel.CallFrame|undefined {
+    return this.callFrameByStopId.get(stopId);
   }
 
   private expandCallFrames(callFrames: SDK.DebuggerModel.CallFrame[]): Promise<SDK.DebuggerModel.CallFrame[]> {
@@ -819,17 +482,19 @@ export class DebuggerLanguagePluginManager implements
         .all(callFrames.map(async callFrame => {
           const functionInfo = await this.getFunctionInfo(callFrame.script, callFrame.location());
           if (functionInfo) {
-            const {frames, missingSymbolFiles} = functionInfo;
-            if (frames.length) {
-              return frames.map(({name}, index) => callFrame.createVirtualCallFrame(index, name));
+            if ('frames' in functionInfo && functionInfo.frames.length) {
+              return functionInfo.frames.map(({name}, index) => callFrame.createVirtualCallFrame(index, name));
             }
-            if (missingSymbolFiles && missingSymbolFiles.length) {
-              for (const file of missingSymbolFiles) {
-                callFrame.addWarning(i18nString(UIStrings.symbolFileNotFound, {PH1: file}));
-              }
+            if ('missingSymbolFiles' in functionInfo && functionInfo.missingSymbolFiles.length) {
+              const resources = functionInfo.missingSymbolFiles;
+              const details = i18nString(UIStrings.debugSymbolsIncomplete, {PH1: callFrame.functionName});
+              callFrame.setMissingDebugInfoDetails({details, resources});
+            } else {
+              callFrame.setMissingDebugInfoDetails({
+                resources: [],
+                details: i18nString(UIStrings.failedToLoadDebugSymbolsForFunction, {PH1: callFrame.functionName}),
+              });
             }
-            callFrame.addWarning(
-                i18nString(UIStrings.failedToLoadDebugSymbolsForFunction, {PH1: callFrame.functionName}));
           }
           return callFrame;
         }))
@@ -840,6 +505,7 @@ export class DebuggerLanguagePluginManager implements
     this.#debuggerModelToData.set(debuggerModel, new ModelData(debuggerModel, this.#workspace));
     debuggerModel.addEventListener(SDK.DebuggerModel.Events.GlobalObjectCleared, this.globalObjectCleared, this);
     debuggerModel.addEventListener(SDK.DebuggerModel.Events.ParsedScriptSource, this.parsedScriptSource, this);
+    debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerResumed, this.debuggerResumed, this);
     debuggerModel.setEvaluateOnCallFrameCallback(this.evaluateOnCallFrame.bind(this));
     debuggerModel.setExpandCallFramesCallback(this.expandCallFrames.bind(this));
   }
@@ -847,6 +513,7 @@ export class DebuggerLanguagePluginManager implements
   modelRemoved(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
     debuggerModel.removeEventListener(SDK.DebuggerModel.Events.GlobalObjectCleared, this.globalObjectCleared, this);
     debuggerModel.removeEventListener(SDK.DebuggerModel.Events.ParsedScriptSource, this.parsedScriptSource, this);
+    debuggerModel.removeEventListener(SDK.DebuggerModel.Events.DebuggerResumed, this.debuggerResumed, this);
     debuggerModel.setEvaluateOnCallFrameCallback(null);
     debuggerModel.setExpandCallFramesCallback(null);
     const modelData = this.#debuggerModelToData.get(debuggerModel);
@@ -1046,6 +713,39 @@ export class DebuggerLanguagePluginManager implements
     return locationRanges.map(({start}) => start);
   }
 
+  async uiLocationRangeToRawLocationRanges(
+      uiSourceCode: Workspace.UISourceCode.UISourceCode,
+      textRange: TextUtils.TextRange.TextRange): Promise<SDK.DebuggerModel.LocationRange[]|null> {
+    const locationRangesPromises = [];
+    for (let line = textRange.startLine; line <= textRange.endLine; ++line) {
+      locationRangesPromises.push(this.uiLocationToRawLocationRanges(uiSourceCode, line));
+    }
+    const ranges = [];
+    for (const locationRanges of await Promise.all(locationRangesPromises)) {
+      if (locationRanges === null) {
+        return null;
+      }
+      for (const range of locationRanges) {
+        const [startLocation, endLocation] = await Promise.all([
+          this.rawLocationToUILocation(range.start),
+          this.rawLocationToUILocation(range.end),
+        ]);
+        if (startLocation === null || endLocation === null) {
+          continue;
+        }
+        // Report all ranges that somehow intersect with the `textRange`. It's the
+        // responsibility of the caller to filter / clamp these ranges appropriately.
+        const overlap = textRange.intersection(new TextUtils.TextRange.TextRange(
+            startLocation.lineNumber, startLocation.columnNumber ?? 0, endLocation.lineNumber,
+            endLocation.columnNumber ?? Infinity));
+        if (!overlap.isEmpty()) {
+          ranges.push(range);
+        }
+      }
+    }
+    return ranges;
+  }
+
   scriptsForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): SDK.Script.Script[] {
     for (const modelData of this.#debuggerModelToData.values()) {
       const scripts = modelData.uiSourceCodeToScripts.get(uiSourceCode);
@@ -1056,6 +756,15 @@ export class DebuggerLanguagePluginManager implements
     return [];
   }
 
+  setDebugInfoURL(script: SDK.Script.Script, externalURL: Platform.DevToolsPath.UrlString): void {
+    if (this.hasPluginForScript(script)) {
+      return;
+    }
+    script.debugSymbols = {type: Protocol.Debugger.DebugSymbolsType.ExternalDWARF, externalURL};
+    this.parsedScriptSource({data: script});
+    void script.debuggerModel.setDebugInfoURL(script, externalURL);
+  }
+
   private parsedScriptSource(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {
     const script = event.data;
     if (!script.sourceURL) {
@@ -1064,45 +773,50 @@ export class DebuggerLanguagePluginManager implements
 
     for (const plugin of this.#plugins) {
       if (!plugin.handleScript(script)) {
-        return;
+        continue;
       }
       const rawModuleId = rawModuleIdForScript(script);
       let rawModuleHandle = this.#rawModuleHandles.get(rawModuleId);
       if (!rawModuleHandle) {
-        const sourceFileURLsPromise = (async(): Promise<Platform.DevToolsPath.UrlString[]> => {
-          const console = Common.Console.Console.instance();
-          const url = script.sourceURL;
-          const symbolsUrl = (script.debugSymbols && script.debugSymbols.externalURL) || '';
-          if (symbolsUrl) {
-            console.log(i18nString(UIStrings.loadingDebugSymbolsForVia, {PH1: plugin.name, PH2: url, PH3: symbolsUrl}));
-          } else {
-            console.log(i18nString(UIStrings.loadingDebugSymbolsFor, {PH1: plugin.name, PH2: url}));
-          }
-          try {
-            const code = (!symbolsUrl && url.startsWith('wasm://')) ? await script.getWasmBytecode() : undefined;
-            const sourceFileURLs =
-                await plugin.addRawModule(rawModuleId, symbolsUrl, {url, code}) as Platform.DevToolsPath.UrlString[];
-            // Check that the handle isn't stale by now. This works because the code that assigns to
-            // `rawModuleHandle` below will run before this code because of the `await` in the preceding
-            // line. This is primarily to avoid logging the message below, which would give the developer
-            // the misleading information that we're done, while in reality it was a stale call that finished.
-            if (rawModuleHandle !== this.#rawModuleHandles.get(rawModuleId)) {
-              return [];
-            }
-            if (sourceFileURLs.length === 0) {
-              console.warn(i18nString(UIStrings.loadedDebugSymbolsForButDidnt, {PH1: plugin.name, PH2: url}));
-            } else {
-              console.log(i18nString(
-                  UIStrings.loadedDebugSymbolsForFound, {PH1: plugin.name, PH2: url, PH3: sourceFileURLs.length}));
-            }
-            return sourceFileURLs;
-          } catch (error) {
-            console.error(
-                i18nString(UIStrings.failedToLoadDebugSymbolsFor, {PH1: plugin.name, PH2: url, PH3: error.message}));
-            this.#rawModuleHandles.delete(rawModuleId);
-            return [];
-          }
-        })();
+        const sourceFileURLsPromise =
+            (async(): Promise<Platform.DevToolsPath.UrlString[]|{missingSymbolFiles: string[]}> => {
+              const console = Common.Console.Console.instance();
+              const url = script.sourceURL;
+              const symbolsUrl = (script.debugSymbols && script.debugSymbols.externalURL) || '';
+              if (symbolsUrl) {
+                console.log(
+                    i18nString(UIStrings.loadingDebugSymbolsForVia, {PH1: plugin.name, PH2: url, PH3: symbolsUrl}));
+              } else {
+                console.log(i18nString(UIStrings.loadingDebugSymbolsFor, {PH1: plugin.name, PH2: url}));
+              }
+              try {
+                const code = (!symbolsUrl && url.startsWith('wasm://')) ? await script.getWasmBytecode() : undefined;
+                const addModuleResult = await plugin.addRawModule(rawModuleId, symbolsUrl, {url, code});
+                // Check that the handle isn't stale by now. This works because the code that assigns to
+                // `rawModuleHandle` below will run before this code because of the `await` in the preceding
+                // line. This is primarily to avoid logging the message below, which would give the developer
+                // the misleading information that we're done, while in reality it was a stale call that finished.
+                if (rawModuleHandle !== this.#rawModuleHandles.get(rawModuleId)) {
+                  return [];
+                }
+                if ('missingSymbolFiles' in addModuleResult) {
+                  return {missingSymbolFiles: addModuleResult.missingSymbolFiles};
+                }
+                const sourceFileURLs = addModuleResult as Platform.DevToolsPath.UrlString[];
+                if (sourceFileURLs.length === 0) {
+                  console.warn(i18nString(UIStrings.loadedDebugSymbolsForButDidnt, {PH1: plugin.name, PH2: url}));
+                } else {
+                  console.log(i18nString(
+                      UIStrings.loadedDebugSymbolsForFound, {PH1: plugin.name, PH2: url, PH3: sourceFileURLs.length}));
+                }
+                return sourceFileURLs;
+              } catch (error) {
+                console.error(i18nString(
+                    UIStrings.failedToLoadDebugSymbolsFor, {PH1: plugin.name, PH2: url, PH3: error.message}));
+                this.#rawModuleHandles.delete(rawModuleId);
+                return [];
+              }
+            })();
         rawModuleHandle = {rawModuleId, plugin, scripts: [script], addRawModulePromise: sourceFileURLsPromise};
         this.#rawModuleHandles.set(rawModuleId, rawModuleHandle);
       } else {
@@ -1114,17 +828,40 @@ export class DebuggerLanguagePluginManager implements
       // for the DebuggerModel again, which may disappear
       // in the meantime...
       void rawModuleHandle.addRawModulePromise.then(sourceFileURLs => {
-        // The script might have disappeared meanwhile...
-        if (script.debuggerModel.scriptForId(script.scriptId) === script) {
-          const modelData = this.#debuggerModelToData.get(script.debuggerModel);
-          if (modelData) {  // The DebuggerModel could have disappeared meanwhile...
-            modelData.addSourceFiles(script, sourceFileURLs);
-            void this.#debuggerWorkspaceBinding.updateLocations(script);
+        if (!('missingSymbolFiles' in sourceFileURLs)) {
+          // The script might have disappeared meanwhile...
+          if (script.debuggerModel.scriptForId(script.scriptId) === script) {
+            const modelData = this.#debuggerModelToData.get(script.debuggerModel);
+            if (modelData) {  // The DebuggerModel could have disappeared meanwhile...
+              modelData.addSourceFiles(script, sourceFileURLs);
+              void this.#debuggerWorkspaceBinding.updateLocations(script);
+            }
           }
         }
       });
       return;
     }
+  }
+
+  private debuggerResumed(event: Common.EventTarget.EventTargetEvent<SDK.DebuggerModel.DebuggerModel>): void {
+    const resumedFrames =
+        Array.from(this.callFrameByStopId.values()).filter(callFrame => callFrame.debuggerModel === event.data);
+    for (const callFrame of resumedFrames) {
+      const stopId = this.stopIdByCallFrame.get(callFrame);
+      assertNotNullOrUndefined(stopId);
+      this.stopIdByCallFrame.delete(callFrame);
+      this.callFrameByStopId.delete(stopId);
+    }
+  }
+
+  getSourcesForScript(script: SDK.Script.Script):
+      Promise<Array<Platform.DevToolsPath.UrlString>|{missingSymbolFiles: string[]}|undefined> {
+    const rawModuleId = rawModuleIdForScript(script);
+    const rawModuleHandle = this.#rawModuleHandles.get(rawModuleId);
+    if (rawModuleHandle) {
+      return rawModuleHandle.addRawModulePromise;
+    }
+    return Promise.resolve(undefined);
   }
 
   async resolveScopeChain(callFrame: SDK.DebuggerModel.CallFrame): Promise<SourceScope[]|null> {
@@ -1140,6 +877,8 @@ export class DebuggerLanguagePluginManager implements
       inlineFrameIndex: callFrame.inlineFrameIndex,
     };
 
+    const stopId = this.stopIdForCallFrame(callFrame);
+
     try {
       const sourceMapping = await plugin.rawLocationToSourceLocation(location);
       if (sourceMapping.length === 0) {
@@ -1151,7 +890,7 @@ export class DebuggerLanguagePluginManager implements
         let scope = scopes.get(variable.scope);
         if (!scope) {
           const {type, typeName, icon} = await plugin.getScopeInfo(variable.scope);
-          scope = new SourceScope(callFrame, type, typeName, icon, plugin);
+          scope = new SourceScope(callFrame, stopId, type, typeName, icon, plugin);
           scopes.set(variable.scope, scope);
         }
         scope.object().variables.push(variable);
@@ -1164,10 +903,8 @@ export class DebuggerLanguagePluginManager implements
     }
   }
 
-  async getFunctionInfo(script: SDK.Script.Script, location: SDK.DebuggerModel.Location): Promise<{
-    frames: Array<Chrome.DevTools.FunctionInfo>,
-    missingSymbolFiles?: Array<string>,
-  }|null> {
+  async getFunctionInfo(script: SDK.Script.Script, location: SDK.DebuggerModel.Location):
+      Promise<{frames: Array<Chrome.DevTools.FunctionInfo>}|{missingSymbolFiles: string[]}|null> {
     const {rawModuleId, plugin} = await this.rawModuleIdAndPluginForScript(script);
     if (!plugin) {
       return null;
@@ -1180,7 +917,8 @@ export class DebuggerLanguagePluginManager implements
     };
 
     try {
-      return await plugin.getFunctionInfo(rawLocation);
+      const functionInfo = await plugin.getFunctionInfo(rawLocation);
+      return functionInfo;
     } catch (error) {
       Common.Console.Console.instance().warn(i18nString(UIStrings.errorInDebuggerLanguagePlugin, {PH1: error.message}));
       return {frames: []};
@@ -1261,11 +999,11 @@ export class DebuggerLanguagePluginManager implements
     }
   }
 
-  async getMappedLines(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<Set<number>|undefined> {
+  async getMappedLines(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<Set<number>|null> {
     const rawModuleIds =
         await Promise.all(this.scriptsForUISourceCode(uiSourceCode).map(s => this.rawModuleIdAndPluginForScript(s)));
 
-    let mappedLines: Set<number>|undefined;
+    let mappedLines: Set<number>|null = null;
     for (const {rawModuleId, plugin} of rawModuleIds) {
       if (!plugin) {
         continue;
@@ -1275,12 +1013,9 @@ export class DebuggerLanguagePluginManager implements
       if (lines === undefined) {
         continue;
       }
-      if (mappedLines === undefined) {
+      if (mappedLines === null) {
         mappedLines = new Set(lines);
       } else {
-        /**
-         * @param {number} l
-         */
         lines.forEach(l => (mappedLines as Set<number>).add(l));
       }
     }
@@ -1353,116 +1088,7 @@ class ModelData {
   }
 }
 
-export class DebuggerLanguagePlugin {
+export interface DebuggerLanguagePlugin extends Chrome.DevTools.LanguageExtensionPlugin {
   name: string;
-  constructor(name: string) {
-    this.name = name;
-  }
-
-  handleScript(_script: SDK.Script.Script): boolean {
-    throw new Error('Not implemented yet');
-  }
-
-  dispose(): void {
-  }
-
-  /** Notify the #plugin about a new script
-    */
-  async addRawModule(_rawModuleId: string, _symbolsURL: string, _rawModule: Chrome.DevTools.RawModule):
-      Promise<string[]> {
-    throw new Error('Not implemented yet');
-  }
-
-  /** Find #locations in raw modules from a #location in a source file
-    */
-  async sourceLocationToRawLocation(_sourceLocation: Chrome.DevTools.SourceLocation):
-      Promise<Chrome.DevTools.RawLocationRange[]> {
-    throw new Error('Not implemented yet');
-  }
-
-  /** Find #locations in source files from a #location in a raw module
-    */
-  async rawLocationToSourceLocation(_rawLocation: Chrome.DevTools.RawLocation):
-      Promise<Chrome.DevTools.SourceLocation[]> {
-    throw new Error('Not implemented yet');
-  }
-
-  /** Return detailed information about a scope
-     */
-  async getScopeInfo(_type: string): Promise<Chrome.DevTools.ScopeInfo> {
-    throw new Error('Not implemented yet');
-  }
-
-  /** List all variables in lexical scope at a given #location in a raw module
-    */
-  async listVariablesInScope(_rawLocation: Chrome.DevTools.RawLocation): Promise<Chrome.DevTools.Variable[]> {
-    throw new Error('Not implemented yet');
-  }
-
-  /**
-   * Notifies the #plugin that a script is removed.
-   */
-  removeRawModule(_rawModuleId: string): Promise<void> {
-    throw new Error('Not implemented yet');
-  }
-
-  getTypeInfo(_expression: string, _context: Chrome.DevTools.RawLocation): Promise<{
-    typeInfos: Array<Chrome.DevTools.TypeInfo>,
-    base: Chrome.DevTools.EvalBase,
-  }|null> {
-    throw new Error('Not implemented yet');
-  }
-
-  getFormatter(
-      _expressionOrField: string|{
-        base: Chrome.DevTools.EvalBase,
-        field: Array<Chrome.DevTools.FieldInfo>,
-      },
-      _context: Chrome.DevTools.RawLocation): Promise<{
-    js: string,
-  }|null> {
-    throw new Error('Not implemented yet');
-  }
-
-  getInspectableAddress(_field: {
-    base: Chrome.DevTools.EvalBase,
-    field: Array<Chrome.DevTools.FieldInfo>,
-  }): Promise<{
-    js: string,
-  }> {
-    throw new Error('Not implemented yet');
-  }
-
-  /**
-   * Find #locations in source files from a #location in a raw module
-   */
-  async getFunctionInfo(_rawLocation: Chrome.DevTools.RawLocation): Promise<{
-    frames: Array<Chrome.DevTools.FunctionInfo>,
-    missingSymbolFiles?: Array<string>,
-  }> {
-    throw new Error('Not implemented yet');
-  }
-
-  /**
-   * Find #locations in raw modules corresponding to the inline function
-   * that rawLocation is in. Used for stepping out of an inline function.
-   */
-  async getInlinedFunctionRanges(_rawLocation: Chrome.DevTools.RawLocation):
-      Promise<Chrome.DevTools.RawLocationRange[]> {
-    throw new Error('Not implemented yet');
-  }
-
-  /**
-   * Find #locations in raw modules corresponding to inline functions
-   * called by the function or inline frame that rawLocation is in.
-   * Used for stepping over inline functions.
-   */
-  async getInlinedCalleesRanges(_rawLocation: Chrome.DevTools.RawLocation):
-      Promise<Chrome.DevTools.RawLocationRange[]> {
-    throw new Error('Not implemented yet');
-  }
-
-  async getMappedLines(_rawModuleId: string, _sourceFileURL: string): Promise<number[]|undefined> {
-    throw new Error('Not implemented yet');
-  }
+  handleScript(script: SDK.Script.Script): boolean;
 }

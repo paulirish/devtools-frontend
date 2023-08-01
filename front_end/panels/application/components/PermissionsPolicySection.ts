@@ -18,39 +18,39 @@ import * as Common from '../../../core/common/common.js';
 
 const UIStrings = {
   /**
-  *@description Label for a button. When clicked more details (for the content this button refers to) will be shown.
-  */
+   *@description Label for a button. When clicked more details (for the content this button refers to) will be shown.
+   */
   showDetails: 'Show details',
   /**
-  *@description Label for a button. When clicked some details (for the content this button refers to) will be hidden.
-  */
+   *@description Label for a button. When clicked some details (for the content this button refers to) will be hidden.
+   */
   hideDetails: 'Hide details',
   /**
-  *@description Label for a list of features which are allowed according to the current Permissions policy
-  *(a mechanism that allows developers to enable/disable browser features and APIs (e.g. camera, geolocation, autoplay))
-  */
+   *@description Label for a list of features which are allowed according to the current Permissions policy
+   *(a mechanism that allows developers to enable/disable browser features and APIs (e.g. camera, geolocation, autoplay))
+   */
   allowedFeatures: 'Allowed Features',
   /**
-  *@description Label for a list of features which are disabled according to the current Permissions policy
-  *(a mechanism that allows developers to enable/disable browser features and APIs (e.g. camera, geolocation, autoplay))
-  */
+   *@description Label for a list of features which are disabled according to the current Permissions policy
+   *(a mechanism that allows developers to enable/disable browser features and APIs (e.g. camera, geolocation, autoplay))
+   */
   disabledFeatures: 'Disabled Features',
   /**
-  *@description Tooltip text for a link to a specific request's headers in the Network panel.
-  */
+   *@description Tooltip text for a link to a specific request's headers in the Network panel.
+   */
   clickToShowHeader: 'Click to reveal the request whose "`Permissions-Policy`" HTTP header disables this feature.',
   /**
-  *@description Tooltip text for a link to a specific iframe in the Elements panel (Iframes can be nested, the link goes
-  *  to the outer-most iframe which blocks a certain feature).
-  */
+   *@description Tooltip text for a link to a specific iframe in the Elements panel (Iframes can be nested, the link goes
+   *  to the outer-most iframe which blocks a certain feature).
+   */
   clickToShowIframe: 'Click to reveal the top-most iframe which does not allow this feature in the elements panel.',
   /**
-  *@description Text describing that a specific feature is blocked by not being included in the iframe's "allow" attribute.
-  */
+   *@description Text describing that a specific feature is blocked by not being included in the iframe's "allow" attribute.
+   */
   disabledByIframe: 'missing in iframe "`allow`" attribute',
   /**
-  *@description Text describing that a specific feature is blocked by a Permissions Policy specified in a request header.
-  */
+   *@description Text describing that a specific feature is blocked by a Permissions Policy specified in a request header.
+   */
   disabledByHeader: 'disabled by "`Permissions-Policy`" header',
   /**
    *@description Text describing that a specific feature is blocked by virtue of being inside a fenced frame tree.
@@ -76,7 +76,7 @@ export function renderIconLink(
     <button class="link" role="link" tabindex=0 @click=${clickHandler} title=${title}>
       <${IconButton.Icon.Icon.litTagName} .data=${{
         iconName: iconName,
-        color: 'var(--color-primary)',
+        color: 'var(--icon-link)',
         width: '16px',
         height: '16px',
       } as IconButton.Icon.IconData}>
@@ -105,7 +105,7 @@ export class PermissionsPolicySection extends HTMLElement {
     void this.#render();
   }
 
-  #renderAllowed(): LitHtml.TemplateResult|{} {
+  #renderAllowed(): LitHtml.LitTemplate {
     const allowed = this.#permissionsPolicySectionData.policies.filter(p => p.allowed).map(p => p.feature).sort();
     if (!allowed.length) {
       return LitHtml.nothing;
@@ -119,7 +119,7 @@ export class PermissionsPolicySection extends HTMLElement {
     `;
   }
 
-  async #renderDisallowed(): Promise<LitHtml.TemplateResult|{}> {
+  async #renderDisallowed(): Promise<LitHtml.LitTemplate> {
     const disallowed = this.#permissionsPolicySectionData.policies.filter(p => !p.allowed)
                            .sort((a, b) => a.feature.localeCompare(b.feature));
     if (!disallowed.length) {
@@ -173,11 +173,17 @@ export class PermissionsPolicySection extends HTMLElement {
         await Common.Revealer.reveal(requestLocation);
       };
 
+      // Disabled until https://crbug.com/1079231 is fixed.
+      // clang-format off
       return LitHtml.html`
         <div class="permissions-row">
           <div>
             <${IconButton.Icon.Icon.litTagName} class="allowed-icon"
-              .data=${{color: '', iconName: 'error_icon', width: '14px'} as IconButton.Icon.IconData}>
+              .data=${{
+                color: 'var(--icon-error)',
+                iconName: 'cross-circle',
+                width: '20px', height: '20px',
+              } as IconButton.Icon.IconData}>
             </${IconButton.Icon.Icon.litTagName}>
           </div>
           <div class="feature-name text-ellipsis">
@@ -187,14 +193,12 @@ export class PermissionsPolicySection extends HTMLElement {
           <div>
             ${
           linkTargetDOMNode ? renderIconLink(
-                                  'elements_panel_icon',
-                                  i18nString(UIStrings.clickToShowIframe),
-                                  (): Promise<void> => Common.Revealer.reveal(linkTargetDOMNode),
-                                  ) :
+                                  'code-circle', i18nString(UIStrings.clickToShowIframe),
+                                  (): Promise<void> => Common.Revealer.reveal(linkTargetDOMNode)) :
                               LitHtml.nothing}
             ${
           linkTargetRequest ? renderIconLink(
-                                  'network_panel_icon',
+                                  'arrow-up-down-circle',
                                   i18nString(UIStrings.clickToShowHeader),
                                   revealHeader,
                                   ) :
@@ -202,6 +206,7 @@ export class PermissionsPolicySection extends HTMLElement {
           </div>
         </div>
       `;
+      // clang-format on
     }));
 
     return LitHtml.html`

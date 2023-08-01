@@ -9,29 +9,35 @@
 }
 
 li {
+  border: 2px solid transparent;
   list-style: none;
   text-overflow: ellipsis;
   min-height: 12px;
+}
+
+.compact {
+  border: 0;
 }
 
 .tree-node-key {
   white-space: var(--override-key-whitespace-wrapping);
   /* Override the default |min-width: auto| to avoid overflows of flex items */
   min-width: 0;
+  flex-grow: 1;
 }
 
 .arrow-icon {
   display: block;
   user-select: none;
-  -webkit-mask-image: var(--image-file-treeoutlineTriangles);
-  -webkit-mask-size: 32px 24px;
-  -webkit-mask-position: 0 0;
-  background-color: var(--color-text-primary);
+  -webkit-mask-image: var(--image-file-triangle-right);
+  background-color: var(--icon-default);
   content: "";
   text-shadow: none;
-  height: 12px;
-  width: 13px;
+  height: 14px;
+  width: 14px;
   overflow: hidden;
+  flex: none;
+  transition: transform 200ms;
 }
 
 ul {
@@ -48,7 +54,7 @@ li:not(.parent) > .arrow-and-key-wrapper > .arrow-icon {
 }
 
 li.parent.expanded > .arrow-and-key-wrapper > .arrow-icon {
-  -webkit-mask-position: -16px 0;
+  transform: rotate(90deg);
 }
 
 li.is-top-level {
@@ -79,7 +85,6 @@ li.is-top-level:last-child {
 }
 
 .arrow-and-key-wrapper {
-  border: 2px solid transparent;
   display: flex;
   align-content: center;
   align-items: center;
@@ -92,4 +97,24 @@ li.is-top-level:last-child {
 ul[role="tree"]:focus-within [role="treeitem"].selected > .arrow-and-key-wrapper {
   /* stylelint-disable-next-line color-named */
   background-color: var(--legacy-item-selection-bg-color);
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inline-icon {
+  vertical-align: sub;
+}
+
+@media (forced-colors: active) {
+  .arrow-icon {
+    background-color: ButtonText;
+  }
+
+  ul[role="tree"]:focus-within [role="treeitem"].selected {
+    outline: solid 1px ButtonText;
+  }
 }

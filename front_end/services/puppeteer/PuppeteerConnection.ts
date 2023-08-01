@@ -6,18 +6,15 @@ import * as puppeteer from '../../third_party/puppeteer/puppeteer.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 
-export class Transport implements puppeteer.ConnectionTransport {
+class Transport implements puppeteer.ConnectionTransport {
   #connection: SDK.Connections.ParallelConnectionInterface;
-  #knownIds = new Set<number>();
 
   constructor(connection: SDK.Connections.ParallelConnectionInterface) {
     this.#connection = connection;
   }
 
-  send(message: string): void {
-    const data = JSON.parse(message);
-    this.#knownIds.add(data.id);
-    this.#connection.sendRawMessage(JSON.stringify(data));
+  send(data: string): void {
+    this.#connection.sendRawMessage(data);
   }
 
   close(): void {
@@ -26,17 +23,11 @@ export class Transport implements puppeteer.ConnectionTransport {
 
   set onmessage(cb: (message: string) => void) {
     this.#connection.setOnMessage((message: Object) => {
-      if (!cb) {
-        return;
-      }
       const data = (message) as {id: number, method: string, params: unknown, sessionId?: string};
-      if (data.id && !this.#knownIds.has(data.id)) {
-        return;
-      }
-      this.#knownIds.delete(data.id);
       if (!data.sessionId) {
         return;
       }
+
       return cb(JSON.stringify({
         ...data,
         // Puppeteer is expecting to use the default session, but we give it a non-default session in #connection.
@@ -59,49 +50,59 @@ export class Transport implements puppeteer.ConnectionTransport {
   }
 }
 
-export class PuppeteerConnection extends puppeteer.Connection {
-  // Overriding Puppeteer's API here.
-  // eslint-disable-next-line rulesdir/no_underscored_properties
-  async _onMessage(message: string): Promise<void> {
+class PuppeteerConnection extends puppeteer.Connection {
+  override async onMessage(message: string): Promise<void> {
     const msgObj = JSON.parse(message) as {id: number, method: string, params: unknown, sessionId?: string};
     if (msgObj.sessionId && !this._sessions.has(msgObj.sessionId)) {
       return;
     }
-    void super._onMessage(message);
+    void super.onMessage(message);
   }
 }
 
-export async function getPuppeteerConnection(
-    rawConnection: SDK.Connections.ParallelConnectionInterface,
+export class PuppeteerConnectionHelper {
+  static async connectPuppeteerToConnection(options: {
+    connection: SDK.Connections.ParallelConnectionInterface,
     mainFrameId: string,
-    mainTargetId: string,
-    ): Promise<{page: puppeteer.Page | null, browser: puppeteer.Browser}> {
-  const transport = new Transport(rawConnection);
+    targetInfos: Protocol.Target.TargetInfo[],
+    targetFilterCallback: (targetInfo: Protocol.Target.TargetInfo) => boolean,
+    isPageTargetCallback: (targetInfo: Protocol.Target.TargetInfo) => boolean,
+  }): Promise<{
+    page: puppeteer.Page | null,
+    browser: puppeteer.Browser,
+    puppeteerConnection: puppeteer.Connection,
+  }> {
+    const {connection, mainFrameId, targetInfos, targetFilterCallback, isPageTargetCallback} = options;
+    // Pass an empty message handler because it will be overwritten by puppeteer anyways.
+    const transport = new Transport(connection);
 
-  // url is an empty string in this case parallel to:
-  // https://github.com/puppeteer/puppeteer/blob/f63a123ecef86693e6457b07437a96f108f3e3c5/src/common/BrowserConnector.ts#L72
-  const connection = new PuppeteerConnection('', transport);
+    // url is an empty string in this case parallel to:
+    // https://github.com/puppeteer/puppeteer/blob/f63a123ecef86693e6457b07437a96f108f3e3c5/src/common/BrowserConnector.ts#L72
+    const puppeteerConnection = new PuppeteerConnection('', transport);
+    const targetIdsForAutoAttachEmulation = targetInfos.filter(targetFilterCallback).map(t => t.targetId);
 
-  const targetFilterCallback = (targetInfo: Protocol.Target.TargetInfo): boolean => {
-    if (targetInfo.type !== 'page' && targetInfo.type !== 'iframe') {
-      return false;
-    }
-    // TODO only connect to iframes that are related to the main target. This requires refactoring in Puppeteer: https://github.com/puppeteer/puppeteer/issues/3667.
-    return targetInfo.targetId === mainTargetId || targetInfo.openerId === mainTargetId || targetInfo.type === 'iframe';
-  };
+    const browserPromise = puppeteer.Browser._create(
+        'chrome',
+        puppeteerConnection,
+        [] /* contextIds */,
+        false /* ignoreHTTPSErrors */,
+        undefined /* defaultViewport */,
+        undefined /* process */,
+        undefined /* closeCallback */,
+        targetFilterCallback,
+        isPageTargetCallback,
+    );
 
-  const browser = await puppeteer.Browser.create(
-      connection,
-      [] /* contextIds */,
-      false /* ignoreHTTPSErrors */,
-      undefined /* defaultViewport */,
-      undefined /* process */,
-      undefined /* closeCallback */,
-      targetFilterCallback,
-  );
+    const [, browser] = await Promise.all([
+      Promise.all(targetIdsForAutoAttachEmulation.map(
+          targetId => puppeteerConnection._createSession({targetId}, /* emulateAutoAttach= */ true))),
+      browserPromise,
+    ]);
 
-  const pages = await browser.pages();
-  const page = pages.find(p => p.mainFrame()._id === mainFrameId) || null;
+    const pages = await browser.pages();
+    const page =
+        pages.filter((p): p is puppeteer.Page => p !== null).find(p => p.mainFrame()._id === mainFrameId) || null;
 
-  return {page, browser};
+    return {page, browser, puppeteerConnection};
+  }
 }

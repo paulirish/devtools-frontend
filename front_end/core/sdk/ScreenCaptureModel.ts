@@ -6,10 +6,15 @@ import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../generated/protocol.js';
 
 import {OverlayModel} from './OverlayModel.js';
-import type {Target} from './Target.js';
-import {Capability} from './Target.js';
+
+import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 
+export const enum ScreenshotMode {
+  FROM_VIEWPORT = 'fromViewport',
+  FROM_CLIP = 'fromClip',
+  FULLPAGE = 'fullpage',
+}
 export class ScreenCaptureModel extends SDKModel<void> implements ProtocolProxyApi.PageDispatcher {
   readonly #agent: ProtocolProxyApi.PageApi;
   #onScreencastFrame: ((arg0: Protocol.binary, arg1: Protocol.Page.ScreencastFrameMetadata) => void)|null;
@@ -39,11 +44,30 @@ export class ScreenCaptureModel extends SDKModel<void> implements ProtocolProxyA
   }
 
   async captureScreenshot(
-      format: Protocol.Page.CaptureScreenshotRequestFormat, quality: number,
+      format: Protocol.Page.CaptureScreenshotRequestFormat, quality: number, mode: ScreenshotMode,
       clip?: Protocol.Page.Viewport): Promise<string|null> {
+    const properties: Protocol.Page.CaptureScreenshotRequest = {
+      format: format,
+      quality: quality,
+      fromSurface: true,
+    };
+    switch (mode) {
+      case ScreenshotMode.FROM_CLIP:
+        properties.captureBeyondViewport = true;
+        properties.clip = clip;
+        break;
+      case ScreenshotMode.FULLPAGE:
+        properties.captureBeyondViewport = true;
+        break;
+      case ScreenshotMode.FROM_VIEWPORT:
+        properties.captureBeyondViewport = false;
+        break;
+      default:
+        throw new Error('Unexpected or unspecified screnshotMode');
+    }
+
     await OverlayModel.muteHighlight();
-    const result = await this.#agent.invoke_captureScreenshot(
-        {format, quality, clip, fromSurface: true, captureBeyondViewport: true});
+    const result = await this.#agent.invoke_captureScreenshot(properties);
     await OverlayModel.unmuteHighlight();
     return result.data;
   }
@@ -153,7 +177,13 @@ export class ScreenCaptureModel extends SDKModel<void> implements ProtocolProxyA
   downloadProgress(): void {
   }
 
-  prerenderAttemptCompleted(_params: Protocol.Page.PrerenderAttemptCompletedEvent): void {
+  prerenderAttemptCompleted(_params: Protocol.Preload.PrerenderAttemptCompletedEvent): void {
+  }
+
+  prefetchStatusUpdated(_params: Protocol.Preload.PrefetchStatusUpdatedEvent): void {
+  }
+
+  prerenderStatusUpdated(_params: Protocol.Preload.PrerenderStatusUpdatedEvent): void {
   }
 }
 

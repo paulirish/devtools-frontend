@@ -8,12 +8,12 @@ import * as Input from '../../../ui/components/input/input.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import adornerSettingsPaneStyles from './adornerSettingsPane.css.js';
 
-import type {AdornerSettingsMap} from './AdornerManager.js';
+import {type AdornerSettingsMap} from './AdornerManager.js';
 
 const UIStrings = {
   /**
-    * @description Title of a list of settings to toggle badges.
-    */
+   * @description Title of a list of settings to toggle badges.
+   */
   settingsTitle: 'Show badges',
   /**
    * @description ARIA label of the button to close the badge settings pane

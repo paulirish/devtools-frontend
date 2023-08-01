@@ -9,6 +9,7 @@ import './DOMLinkifier.js';
 import './DOMPath.js';
 import './ElementsSidebarPane.js';
 import './ElementsTreeElement.js';
+import './TopLayerContainer.js';
 import './ElementsTreeOutline.js';
 import './EventListenersWidget.js';
 import './MarkerDecorator.js';
@@ -21,15 +22,21 @@ import './StylePropertyHighlighter.js';
 import './StylesSidebarPane.js';
 import './StylePropertyTreeElement.js';
 import './ComputedStyleWidget.js';
+import './CSSRuleValidator.js';
 import './ElementsPanel.js';
 import './ClassesPaneWidget.js';
 import './ElementStatePaneWidget.js';
 import './ElementsTreeElementHighlighter.js';
+import './AccessibilityTreeUtils.js';
+import './AccessibilityTreeView.js';
 
+import * as AccessibilityTreeUtils from './AccessibilityTreeUtils.js';
+import * as AccessibilityTreeView from './AccessibilityTreeView.js';
 import * as ClassesPaneWidget from './ClassesPaneWidget.js';
 import * as ColorSwatchPopoverIcon from './ColorSwatchPopoverIcon.js';
 import * as ComputedStyleModel from './ComputedStyleModel.js';
 import * as ComputedStyleWidget from './ComputedStyleWidget.js';
+import * as CSSRuleValidator from './CSSRuleValidator.js';
 import * as DOMLinkifier from './DOMLinkifier.js';
 import * as DOMPath from './DOMPath.js';
 import * as ElementsPanel from './ElementsPanel.js';
@@ -41,7 +48,6 @@ import * as ElementsTreeOutline from './ElementsTreeOutline.js';
 import * as EventListenersWidget from './EventListenersWidget.js';
 import * as InspectElementModeController from './InspectElementModeController.js';
 import * as LayersWidget from './LayersWidget.js';
-import * as LayoutSidebarPane from './LayoutSidebarPane.js';
 import * as MarkerDecorator from './MarkerDecorator.js';
 import * as MetricsSidebarPane from './MetricsSidebarPane.js';
 import * as NodeStackTraceWidget from './NodeStackTraceWidget.js';
@@ -53,12 +59,17 @@ import * as StylePropertyHighlighter from './StylePropertyHighlighter.js';
 import * as StylePropertyTreeElement from './StylePropertyTreeElement.js';
 import * as StylePropertyUtils from './StylePropertyUtils.js';
 import * as StylesSidebarPane from './StylesSidebarPane.js';
+import * as TopLayerContainer from './TopLayerContainer.js';
+import * as WebCustomData from './WebCustomData.js';
 
 export {
+  AccessibilityTreeUtils,
+  AccessibilityTreeView,
   ClassesPaneWidget,
   ColorSwatchPopoverIcon,
   ComputedStyleModel,
   ComputedStyleWidget,
+  CSSRuleValidator,
   DOMLinkifier,
   DOMPath,
   ElementsPanel,
@@ -70,7 +81,6 @@ export {
   EventListenersWidget,
   InspectElementModeController,
   LayersWidget,
-  LayoutSidebarPane,
   MarkerDecorator,
   MetricsSidebarPane,
   NodeStackTraceWidget,
@@ -82,4 +92,6 @@ export {
   StylePropertyTreeElement,
   StylePropertyUtils,
   StylesSidebarPane,
+  TopLayerContainer,
+  WebCustomData,
 };

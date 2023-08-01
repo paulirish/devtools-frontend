@@ -36,14 +36,21 @@ import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../generated/protocol.js';
+import type * as Platform from '../platform/platform.js';
 
-import type {FunctionDetails} from './DebuggerModel.js';
-import {DebuggerModel} from './DebuggerModel.js';
+import {DebuggerModel, type FunctionDetails} from './DebuggerModel.js';
 import {HeapProfilerModel} from './HeapProfilerModel.js';
-import type {ScopeRef} from './RemoteObject.js';
-import {RemoteFunction, RemoteObject, RemoteObjectImpl, RemoteObjectProperty, ScopeRemoteObject} from './RemoteObject.js';
-import type {Target} from './Target.js';
-import {Capability, Type} from './Target.js';
+
+import {
+  RemoteFunction,
+  RemoteObject,
+  RemoteObjectImpl,
+  RemoteObjectProperty,
+  ScopeRemoteObject,
+  type ScopeRef,
+} from './RemoteObject.js';
+
+import {Capability, Type, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 
 export class RuntimeModel extends SDKModel<EventTypes> {
@@ -94,7 +101,7 @@ export class RuntimeModel extends SDKModel<EventTypes> {
   }
 
   /** comparator
-     */
+   */
   executionContextComparator(): (arg0: ExecutionContext, arg1: ExecutionContext) => number {
     return this.#executionContextComparatorInternal;
   }
@@ -115,7 +122,8 @@ export class RuntimeModel extends SDKModel<EventTypes> {
   executionContextCreated(context: Protocol.Runtime.ExecutionContextDescription): void {
     const data = context.auxData || {isDefault: true};
     const executionContext = new ExecutionContext(
-        this, context.id, context.uniqueId, context.name, context.origin, data['isDefault'], data['frameId']);
+        this, context.id, context.uniqueId, context.name, context.origin as Platform.DevToolsPath.UrlString,
+        data['isDefault'], data['frameId']);
     this.#executionContextById.set(executionContext.id, executionContext);
     this.dispatchEventToListeners(Events.ExecutionContextCreated, executionContext);
   }
@@ -555,14 +563,14 @@ export class ExecutionContext {
   uniqueId: string;
   name: string;
   #labelInternal: string|null;
-  origin: string;
+  origin: Platform.DevToolsPath.UrlString;
   isDefault: boolean;
   runtimeModel: RuntimeModel;
   debuggerModel: DebuggerModel;
   frameId: Protocol.Page.FrameId|undefined;
   constructor(
       runtimeModel: RuntimeModel, id: Protocol.Runtime.ExecutionContextId, uniqueId: string, name: string,
-      origin: string, isDefault: boolean, frameId?: Protocol.Page.FrameId) {
+      origin: Platform.DevToolsPath.UrlString, isDefault: boolean, frameId?: Protocol.Page.FrameId) {
     this.id = id;
     this.uniqueId = uniqueId;
     this.name = name;
@@ -581,7 +589,7 @@ export class ExecutionContext {
 
   static comparator(a: ExecutionContext, b: ExecutionContext): number {
     function targetWeight(target: Target): number {
-      if (!target.parentTarget()) {
+      if (target.parentTarget()?.type() !== Type.Frame) {
         return 5;
       }
       if (target.type() === Type.Frame) {

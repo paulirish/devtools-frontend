@@ -30,7 +30,7 @@
 
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {ExtensionServer} from './ExtensionServer.js';
+import {type ExtensionServer} from './ExtensionServer.js';
 
 export class ExtensionView extends UI.Widget.Widget {
   private readonly server: ExtensionServer;
@@ -58,14 +58,14 @@ export class ExtensionView extends UI.Widget.Widget {
     this.element.appendChild(this.iframe);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     if (typeof this.frameIndex === 'number') {
       this.server.notifyViewShown(this.id, this.frameIndex);
     }
   }
 
-  willHide(): void {
+  override willHide(): void {
     if (typeof this.frameIndex === 'number') {
       this.server.notifyViewHidden(this.id);
     }
@@ -90,11 +90,11 @@ export class ExtensionNotifierView extends UI.Widget.VBox {
     this.id = id;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.server.notifyViewShown(this.id);
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.server.notifyViewHidden(this.id);
   }
 }

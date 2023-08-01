@@ -3,10 +3,12 @@
 # Copyright 2019 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """
 Helper to manage DEPS. Use this script to update node_modules instead of
 running npm install manually. To upgrade a dependency, change the version
-number in DEPS below and run this script.
+number in DEPS below and run this script, which can be done with `npm run
+install-deps` locally.
 """
 
 import os
@@ -39,9 +41,11 @@ LICENSES = [
 # List all DEPS here.
 DEPS = {
     "@istanbuljs/schema": "0.1.3",
+    "@puppeteer/replay": "2.13.0",
     "@types/chai": "4.3.0",
-    "@types/codemirror": "0.0.108",
+    "@types/codemirror": "5.60.7",
     "@types/estree": "0.0.50",
+    "@types/emscripten": "1.39.4",
     "@types/filesystem": "0.0.32",
     "@types/istanbul-lib-coverage": "2.0.4",
     "@types/istanbul-lib-instrument": "1.7.4",
@@ -49,31 +53,31 @@ DEPS = {
     "@types/istanbul-lib-source-maps": "4.0.1",
     "@types/istanbul-reports": "3.0.1",
     "@types/karma-chai-sinon": "0.1.16",
-    "@types/node": "17.0.8",
+    "@types/node": "18.11.9",
     "@types/marked": "4.0.1",
     "@types/mocha": "9.0.0",
     "@types/rimraf": "3.0.2",
     "@types/sinon": "10.0.6",
     "@types/webidl2": "23.13.6",
-    "@typescript-eslint/parser": "5.20.0",
-    "@typescript-eslint/eslint-plugin": "5.20.0",
+    "@typescript-eslint/parser": "5.59.8",
+    "@typescript-eslint/eslint-plugin": "5.59.8",
     "@web/rollup-plugin-import-meta-assets": "1.0.7",
     "chai": "4.3.4",
     "chokidar": "3.5.2",
-    "clean-css": "5.2.2",
     "convert-source-map": "1.8.0",
 
     # This should be match with esbuild in DEPS.
     "esbuild": "0.14.13",
     "escodegen": "2.0.0",
-    "eslint": "8.13.0",
+    "eslint": "8.19.0",
     "eslint-plugin-import": "2.25.4",
     "eslint-plugin-lit-a11y": "2.1.0",
     "eslint-plugin-mocha": "10.0.3",
     "eslint-plugin-rulesdir": "0.2.1",
+    "eslint-plugin-jsdoc": "39.6.4",
     "istanbul-lib-instrument": "5.1.0",
     "istanbul-lib-report": "3.0.0",
-    "karma": "6.3.9",
+    "karma": "6.4.0",
     "karma-chai": "0.1.0",
     "karma-chrome-launcher": "3.1.0",
     "karma-coverage": "2.1.0",
@@ -85,23 +89,28 @@ DEPS = {
     "license-checker": "25.0.1",
     "mocha": "9.1.3",
     "postcss": "8.4.5",
-    "puppeteer": "13.1.1",
+    "cssnano": "5.1.14",
+    "cssnano-preset-lite": "2.1.3",
+    "puppeteer-core": "20.8.2",
     "recast": "0.20.5",
     "rimraf": "3.0.2",
     "rollup": "2.63.0",
     "rollup-plugin-minify-html-template-literals": "1.2.0",
+    "rollup-plugin-sourcemaps": "0.6.2",
     "rollup-plugin-terser": "7.0.2",
+    "@rollup/plugin-node-resolve": "10.0.0",
     "sinon": "12.0.1",
     "source-map-support": "0.5.21",
     "stylelint": "14.2.0",
     "stylelint-config-standard": "24.0.0",
     "svgo": "2.8.0",
-    "terser": "5.10.0",
-    "typescript": "4.6.2",
+    "terser": "5.19.1",
+    "typescript": "5.1.3",
     "ws": "8.4.0",
     "yargs": "17.3.1",
     "glob": "7.1.7",
-    "webidl2": "24.2.0",
+    "webidl2": "24.2.2",
+    "@webref/idl": "3.12.0",
 }
 
 ADDITIONAL_NPM_ARGS = [
@@ -123,8 +132,6 @@ def load_json_file(location):
 def exec_command(cmd):
     try:
         new_env = os.environ.copy()
-        # Prevent large files from being checked in to git.
-        new_env["PUPPETEER_SKIP_CHROMIUM_DOWNLOAD"] = "true"
         cmd_proc_result = subprocess.check_call(cmd,
                                                 cwd=devtools_paths.root_path(),
                                                 env=new_env)

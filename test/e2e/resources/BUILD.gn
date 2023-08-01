@@ -21,6 +21,7 @@ group("resources") {
     "inline_editor",
     "issues",
     "layers",
+    "lighthouse",
     "media",
     "memory",
     "network",
@@ -31,6 +32,7 @@ group("resources") {
     "sensors",
     "sources",
     "webaudio",
+    "recorder",
   ]
 }
 

@@ -11,17 +11,17 @@ import * as ARIAUtils from './ARIAUtils.js';
 import {Size} from './Geometry.js';
 import {AnchorBehavior, GlassPane, MarginBehavior, PointerEventsBehavior} from './GlassPane.js';
 import {Icon} from './Icon.js';
-import type {ListDelegate} from './ListControl.js';
-import {ListControl, ListMode} from './ListControl.js';
-import type {ItemsReplacedEvent, ListModel} from './ListModel.js';
-import {Events as ListModelEvents} from './ListModel.js';
+
+import {ListControl, ListMode, type ListDelegate} from './ListControl.js';
+
+import {Events as ListModelEvents, type ItemsReplacedEvent, type ListModel} from './ListModel.js';
 import softDropDownStyles from './softDropDown.css.legacy.js';
 import softDropDownButtonStyles from './softDropDownButton.css.legacy.js';
 
 const UIStrings = {
   /**
-  *@description Placeholder text in Soft Drop Down
-  */
+   *@description Placeholder text in Soft Drop Down
+   */
   noItemSelected: '(no item selected)',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/SoftDropDown.ts', UIStrings);
@@ -51,7 +51,7 @@ export class SoftDropDown<T> implements ListDelegate<T> {
     this.element.classList.add('soft-dropdown');
     ThemeSupport.ThemeSupport.instance().appendStyle(this.element, softDropDownButtonStyles);
     this.titleElement = this.element.createChild('span', 'title');
-    const dropdownArrowIcon = Icon.create('smallicon-triangle-down');
+    const dropdownArrowIcon = Icon.create('triangle-down');
     this.element.appendChild(dropdownArrowIcon);
     ARIAUtils.setExpanded(this.element, false);
 
@@ -244,6 +244,10 @@ export class SoftDropDown<T> implements ListDelegate<T> {
       this.selectHighlightedItem();
     }
     this.updateGlasspaneSize();
+  }
+
+  getSelectedItem(): T|null {
+    return this.selectedItem;
   }
 
   selectItem(item: T|null): void {

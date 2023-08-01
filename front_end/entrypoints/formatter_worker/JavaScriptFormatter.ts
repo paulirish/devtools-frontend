@@ -30,10 +30,9 @@
 
 import * as Acorn from '../../third_party/acorn/acorn.js';
 
-import type {TokenOrComment} from './AcornTokenizer.js';
-import {AcornTokenizer, ECMA_VERSION} from './AcornTokenizer.js';
+import {AcornTokenizer, ECMA_VERSION, type TokenOrComment} from './AcornTokenizer.js';
 import {ESTreeWalker} from './ESTreeWalker.js';
-import type {FormattedContentBuilder} from './FormattedContentBuilder.js';
+import {type FormattedContentBuilder} from './FormattedContentBuilder.js';
 
 export class JavaScriptFormatter {
   readonly #builder: FormattedContentBuilder;
@@ -55,6 +54,7 @@ export class JavaScriptFormatter {
     const ast = Acorn.parse(this.#content, {
       ranges: false,
       preserveParens: true,
+      allowAwaitOutsideFunction: true,
       allowImportExportEverywhere: true,
       ecmaVersion: ECMA_VERSION,
       allowHashBang: true,

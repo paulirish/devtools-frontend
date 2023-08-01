@@ -37,11 +37,28 @@ function testHighlight(code: string, mimeType: string) {
 }
 
 describe('CodeHighlighter', () => {
+  describe('languageFromMIMEType', () => {
+    it('also supports common legacy MIME types for JavaScript', async () => {
+      for (const mimeType of ['application/ecmascript', 'application/javascript', 'text/jscript']) {
+        const language = await CodeHighlighter.CodeHighlighter.languageFromMIME(mimeType);
+        assert.isNotNull(language, `legacy MIME type '${mimeType}' not recognized`);
+      }
+    });
+  });
+
   // clang-format off
   it('can highlight JavaScript', testHighlight(`
-[keyword function] [variable foo]([variable bar]) {
+[keyword function] [definition foo]([definition bar]) {
   [keyword return] [number 22];
 }`, 'text/javascript'));
+
+it('can highlight JavaScript compatible with CodeMirror 5', testHighlight(`
+[keyword function] [definition name]([definition params]) {
+  [keyword var] [definition x] = [number 1];
+  [keyword const] [definition y] = [number 2];
+  [keyword let] [definition z] = [number 3];
+  [keyword return] [variable x] + [variable params];
+}`, 'text/javascript')),
 
   it('can highlight TypeScript', testHighlight(`
 [keyword type] [type X] = {
@@ -49,14 +66,69 @@ describe('CodeHighlighter', () => {
 }`, 'text/typescript'));
 
   it('can highlight JSX', testHighlight(`
-[keyword const] [variable t] = <[tag div] [attribute disabled]>hello</[tag div]>
-`, 'text/jsx'));
+[keyword function] [definition App]() {
+  [keyword return] (
+    <[tag div] [attribute className]=[attribute-value "App"]>
+          Hello World!
+    </[tag div]>);
+ }`, 'text/jsx'));
+
+  it('can highlight JSX within JavaScript files', testHighlight(`
+[keyword const] [definition t] = <[tag div] [attribute disabled]>hello</[tag div]>
+`, 'text/javascript'));
 
   it('can highlight HTML', testHighlight(`
 [meta <!doctype html>]
 <[tag html] [attribute lang]=[attribute-value ar]>
   ...
 </[tag html]>`, 'text/html'));
+
+  it('can highlight HTML with <script type="text/jsx"> blocks', testHighlight(`
+[meta <!DOCTYPE html>]
+<[tag script] [attribute type]=[attribute-value "text/jsx"]>
+  [keyword const] [definition app] = [variable document].[property getElementById]([string 'app']);
+  [variable ReactDOM].[property render](<[tag h1]>Develop. Preview. Ship. 🚀</[tag h1]>, [variable app]);
+</[tag script]>`, 'text/html'));
+
+  it('can highlight HTML with onclick inline JavaScript', testHighlight(`
+[meta <!DOCTYPE html>]
+<[tag button] [attribute onclick]=[variable handleClick]()>Click me</[tag button]>`, 'text/html'));
+
+  it('can highlight HTML with element style', testHighlight(`
+[meta <!DOCTYPE html>]
+<[tag button] [attribute style]=[property color]:[atom green]]>Don't click me</[tag button]>`, 'text/html'));
+
+  it('can highlight SVG', testHighlight(`
+<[tag svg] [attribute viewBox]=[attribute-value "0 0 10 10"]>
+  <[tag circle] />
+</[tag svg]>`, 'image/svg+xml'));
+
+  it('can highlight Angular Templates', testHighlight(`
+<[tag div] [attribute class]=[attribute-value "title"]>{{[variable obj].[property title]}}</[tag div]>
+<[tag app-button] ([attribute clicked])=[variable onClick]()></[tag app-button]>
+`, 'text/x.angular'));
+
+  it('can highlight Svelte Templates', testHighlight(`
+<[tag script]>
+[keyword import] [definition Widget] [keyword from] [string './Widget.svelte'];
+</[tag script]>
+
+<[tag button] [attribute disabled]={[variable clickable]}>Click me!</[tag button]>
+
+<[tag style]>
+[tag button] {
+  [property font-weight]: [atom bold];
+  [property color]: [number #ff2];
+}
+</[tag style]>
+`, 'text/x.svelte'));
+
+  it('can highlight Vue Templates', testHighlight(`
+<[tag template]>
+  <[tag Header] [keyword v-show]=[attribute-value "][variable view][attribute-value "] />
+  <[tag Main] @[variable hide]=[attribute-value "][variable onHide][attribute-value "] />
+  <[tag router-view] />
+</[tag template]>`, 'text/x.vue'));
 
   it('can highlight CSS', testHighlight(`
 [tag span].[type cls]#[atom id] {
@@ -65,12 +137,49 @@ describe('CodeHighlighter', () => {
   [property width]: [number 4px];
 }`, 'text/css'));
 
+  it('can highlight GSS', testHighlight(`
+[definition @component] {
+  [tag foo] {
+    [property color]: [keyword black];
+  }
+}
+`, 'text/x-gss'));
+
+  it('can highlight LESS', testHighlight(`
+[variable @width]: [number 10px];
+[variable @height]: [variable @width] + [number 10px];
+
+#[atom header] {
+  [property width]: [variable @width];
+  [property height]: [variable @height];
+}
+`, 'text/x-less'));
+
+  it('can highlight SCSS', testHighlight(`
+[variable $width]: [number 10px];
+[variable $height]: [variable $width] + [number 10px];
+
+#[atom header] {
+  [property width]: [variable $width];
+  [property height]: [variable $height];
+}
+`, 'text/x-scss'));
+
+  it('can highlight SASS', testHighlight(`
+[variable $width]: [number 10px]
+[variable $height]: [variable $width] + [number 10px]
+
+#[atom header]
+  [property width]: [variable $width]
+  [property height]: [variable $height]
+`, 'text/x-sass'));
+
   it('can highlight WAST', testHighlight(`
 ([keyword module]
  ([keyword type] [variable $t] ([keyword func] ([keyword param] [type i32])))
  ([keyword func] [variable $max] [comment (; 1 ;)] ([keyword param] [variable $0] [type i32]) ([keyword result] [type i32])
    ([keyword get_local] [variable $0])))
-`, 'text/webassembly'));
+`, 'application/wasm'));
 
   it('can highlight JSON', testHighlight(`
 {
@@ -85,12 +194,51 @@ Paragraph with [emphasis&meta *][emphasis emphasized][emphasis&meta *] text.
 `, 'text/markdown'));
 
   it('can highlight Python', testHighlight(`
-[keyword def] [variable f]([variable x] = [atom True]):
-  [keyword return] [variable x] [keyword *] [number 10];
+[keyword def] [definition f]([variable x] = [atom True]):
+  [keyword return] [variable x] * [number 10];
 `, 'text/x-python'));
+
+it('can highlight PHP', testHighlight(`
+[meta <?] [keyword echo] [string 'Hello World!']; [meta ?>]
+`, 'application/x-httpd-php'));
 
   it('can highlight Shell code', testHighlight(`
 [builtin cat] [string "a"]
 `, 'text/x-sh'));
+
+  it('can highlight Dart code', testHighlight(`
+[builtin void] [variable main]() {
+  [variable print]([string 'Hello, World!']);
+}
+`, 'application/vnd.dart'));
+
+  it('can highlight Go code', testHighlight(`
+[keyword package] [variable main]
+
+[keyword import] [string "fmt"]
+
+[keyword func] [variable main]() {
+  [variable fmt][number .][variable Println]([string "hello world"])
+}
+`, 'text/x-go'));
+
+  it('can highlight Kotlin code', testHighlight(`
+[keyword fun] [definition main]([variable args] : [variable Array]<[type String]>) {
+    [variable println]([string "Hello, World!"])
+}
+`, 'text/x-kotlin'));
+
+  it('can highlight Scala code', testHighlight(`
+[keyword object] [definition HelloWord] [keyword extends] [type App] {
+  [keyword println]([string "Hello, world"])
+}
+`, 'text/x-scala'));
+
+  it('can highlight Web app manifests', testHighlight(`
+{
+  [property "name"]: [string "Test"],
+  [property "start_url"]: [string "."]
+}
+  `, 'application/manifest+json'));
   // clang_format on
 });

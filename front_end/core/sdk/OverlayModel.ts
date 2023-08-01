@@ -9,19 +9,19 @@ import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {DebuggerModel, Events as DebuggerModelEvents} from './DebuggerModel.js';
-import type {DOMNode} from './DOMModel.js';
-import {DeferredDOMNode, DOMModel, Events as DOMModelEvents} from './DOMModel.js';
+
+import {DeferredDOMNode, DOMModel, Events as DOMModelEvents, type DOMNode} from './DOMModel.js';
 import {OverlayPersistentHighlighter} from './OverlayPersistentHighlighter.js';
-import type {RemoteObject} from './RemoteObject.js';
-import type {Target} from './Target.js';
-import {Capability} from './Target.js';
+import {type RemoteObject} from './RemoteObject.js';
+
+import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 import {TargetManager} from './TargetManager.js';
 
 const UIStrings = {
   /**
-  *@description Text in Overlay Model
-  */
+   *@description Text in Overlay Model
+   */
   pausedInDebugger: 'Paused in debugger',
 };
 const str_ = i18n.i18n.registerUIStrings('core/sdk/OverlayModel.ts', UIStrings);
@@ -224,12 +224,12 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     await this.overlayAgent.invoke_setShowViewportSizeOnResize({show: this.#showViewportSizeOnResize});
   }
 
-  async suspendModel(): Promise<void> {
+  override async suspendModel(): Promise<void> {
     Common.EventTarget.removeEventListeners(this.#registeredListeners);
     await this.overlayAgent.invoke_disable();
   }
 
-  async resumeModel(): Promise<void> {
+  override async resumeModel(): Promise<void> {
     await Promise.all([this.overlayAgent.invoke_enable(), this.wireAgentToSettings()]);
   }
 
@@ -405,7 +405,7 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     if (!this.#persistentHighlighter) {
       return;
     }
-    const color = Common.Color.Color.parse(colorStr);
+    const color = Common.Color.parse(colorStr);
     if (!color) {
       return;
     }
@@ -424,7 +424,7 @@ export class OverlayModel extends SDKModel<EventTypes> implements ProtocolProxyA
     if (!this.#persistentHighlighter) {
       return;
     }
-    const color = Common.Color.Color.parse(colorStr);
+    const color = Common.Color.parse(colorStr);
     if (!color) {
       return;
     }

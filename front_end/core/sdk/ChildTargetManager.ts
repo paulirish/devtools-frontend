@@ -9,10 +9,11 @@ import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../generated/protocol.js';
 
 import {ParallelConnection} from './Connections.js';
-import type {Target} from './Target.js';
-import {Capability, Type} from './Target.js';
+
+import {Capability, Type, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 import {Events as TargetManagerEvents, TargetManager} from './TargetManager.js';
+import {PrimaryPageChangeType, ResourceTreeModel} from './ResourceTreeModel.js';
 
 export class ChildTargetManager extends SDKModel<EventTypes> implements ProtocolProxyApi.TargetDispatcher {
   readonly #targetManager: TargetManager;
@@ -40,7 +41,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       void this.#targetAgent.invoke_setAutoAttach({autoAttach: true, waitForDebuggerOnStart: true, flatten: true});
     }
 
-    if (!parentTarget.parentTarget() && !Host.InspectorFrontendHost.isUnderTest()) {
+    if (parentTarget.parentTarget()?.type() !== Type.Frame && !Host.InspectorFrontendHost.isUnderTest()) {
       void this.#targetAgent.invoke_setDiscoverTargets({discover: true});
       void this.#targetAgent.invoke_setRemoteLocations({locations: [{host: 'localhost', port: 9229}]});
     }
@@ -58,15 +59,15 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     return Array.from(this.#childTargetsBySessionId.values());
   }
 
-  async suspendModel(): Promise<void> {
+  override async suspendModel(): Promise<void> {
     await this.#targetAgent.invoke_setAutoAttach({autoAttach: true, waitForDebuggerOnStart: false, flatten: true});
   }
 
-  async resumeModel(): Promise<void> {
+  override async resumeModel(): Promise<void> {
     await this.#targetAgent.invoke_setAutoAttach({autoAttach: true, waitForDebuggerOnStart: true, flatten: true});
   }
 
-  dispose(): void {
+  override dispose(): void {
     for (const sessionId of this.#childTargetsBySessionId.keys()) {
       this.detachedFromTarget({sessionId, targetId: undefined});
     }
@@ -82,7 +83,15 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     this.#targetInfosInternal.set(targetInfo.targetId, targetInfo);
     const target = this.#childTargetsById.get(targetInfo.targetId);
     if (target) {
-      target.updateTargetInfo(targetInfo);
+      if (target.targetInfo()?.subtype === 'prerender' && !targetInfo.subtype) {
+        const resourceTreeModel = target.model(ResourceTreeModel);
+        target.updateTargetInfo(targetInfo);
+        if (resourceTreeModel && resourceTreeModel.mainFrame) {
+          resourceTreeModel.primaryPageChanged(resourceTreeModel.mainFrame, PrimaryPageChangeType.Activation);
+        }
+      } else {
+        target.updateTargetInfo(targetInfo);
+      }
     }
     this.fireAvailableTargetsChanged();
     this.dispatchEventToListeners(Events.TargetInfoChanged, targetInfo);
@@ -115,17 +124,29 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     if (this.#parentTargetId === targetInfo.targetId) {
       return;
     }
+    let type = Type.Browser;
     let targetName = '';
     if (targetInfo.type === 'worker' && targetInfo.title && targetInfo.title !== targetInfo.url) {
       targetName = targetInfo.title;
-    } else if (targetInfo.type !== 'iframe' && targetInfo.type !== 'webview') {
-      const parsedURL = Common.ParsedURL.ParsedURL.fromString(targetInfo.url);
-      targetName =
-          parsedURL ? parsedURL.lastPathComponentWithFragment() : '#' + (++ChildTargetManager.lastAnonymousTargetId);
+    } else if (!['page', 'iframe', 'webview'].includes(targetInfo.type)) {
+      const KNOWN_FRAME_PATTERNS = [
+        '^chrome://print/$',
+        '^chrome://file-manager/',
+        '^chrome://.*\\.top-chrome/$',
+        '^devtools://',
+      ];
+      if (KNOWN_FRAME_PATTERNS.some(p => targetInfo.url.match(p))) {
+        type = Type.Frame;
+      } else {
+        const parsedURL = Common.ParsedURL.ParsedURL.fromString(targetInfo.url);
+        targetName =
+            parsedURL ? parsedURL.lastPathComponentWithFragment() : '#' + (++ChildTargetManager.lastAnonymousTargetId);
+      }
     }
 
-    let type = Type.Browser;
     if (targetInfo.type === 'iframe' || targetInfo.type === 'webview') {
+      type = Type.Frame;
+    } else if (targetInfo.type === 'background_page' || targetInfo.type === 'app' || targetInfo.type === 'popup_page') {
       type = Type.Frame;
     }
     // TODO(lfg): ensure proper capabilities for child pages (e.g. portals).
@@ -142,16 +163,18 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     }
     const target = this.#targetManager.createTarget(
         targetInfo.targetId, targetName, type, this.#parentTarget, sessionId, undefined, undefined, targetInfo);
-    if (type === Type.Worker || type === Type.ServiceWorker || type === Type.SharedWorker) {
-      target.setInspectedURL(this.#parentTarget.inspectedURL());
-    }
     this.#childTargetsBySessionId.set(sessionId, target);
     this.#childTargetsById.set(target.id(), target);
 
     if (ChildTargetManager.attachCallback) {
       await ChildTargetManager.attachCallback({target, waitingForDebugger});
     }
-    void target.runtimeAgent().invoke_runIfWaitingForDebugger();
+
+    // [crbug/1423096] Invoking this on a worker session that is not waiting for the debugger can force the worker
+    // to resume even if there is another session waiting for the debugger.
+    if (waitingForDebugger) {
+      void target.runtimeAgent().invoke_runIfWaitingForDebugger();
+    }
   }
 
   detachedFromTarget({sessionId}: Protocol.Target.DetachedFromTargetEvent): void {

@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 import * as ProtocolClient from '../../../../front_end/core/protocol_client/protocol_client.js';
-import type {ProtocolMapping} from '../../../../front_end/generated/protocol-mapping.js'; // eslint-disable-line rulesdir/es_modules_import
+
+// eslint-disable-next-line rulesdir/es_modules_import
+import {type ProtocolMapping} from '../../../../front_end/generated/protocol-mapping.js';
 import type * as ProtocolProxyApi from '../../../../front_end/generated/protocol-proxy-api.js';
 
 import {deinitializeGlobalVars, initializeGlobalVars} from './EnvironmentHelpers.js';
@@ -14,12 +16,24 @@ export type ProtocolCommand = keyof ProtocolMapping.Commands;
 export type ProtocolCommandParams<C extends ProtocolCommand> = ProtocolMapping.Commands[C]['paramsType'];
 export type ProtocolResponse<C extends ProtocolCommand> = ProtocolMapping.Commands[C]['returnType'];
 export type ProtocolCommandHandler<C extends ProtocolCommand> = (...params: ProtocolCommandParams<C>) =>
-    Omit<ProtocolResponse<C>, 'getError'>;
+    Omit<ProtocolResponse<C>, 'getError'>|{getError(): string};
 export type MessageCallback = (result: string|Object) => void;
+type Message = {
+  id: number,
+  method: ProtocolCommand,
+  params: unknown,
+  sessionId: string,
+};
+
+type OutgoingMessageListenerEntry = {
+  promise: Promise<void>,
+  resolve: Function,
+};
 
 // Note that we can't set the Function to the correct handler on the basis
 // that we don't know which ProtocolCommand will be stored.
 const responseMap = new Map<ProtocolCommand, Function>();
+const outgoingMessageListenerEntryMap = new Map<ProtocolCommand, OutgoingMessageListenerEntry>();
 export function setMockConnectionResponseHandler<C extends ProtocolCommand>(
     command: C, handler: ProtocolCommandHandler<C>) {
   if (responseMap.get(command)) {
@@ -39,6 +53,19 @@ export function clearMockConnectionResponseHandler(method: ProtocolCommand) {
 
 export function clearAllMockConnectionResponseHandlers() {
   responseMap.clear();
+}
+
+export function registerListenerOnOutgoingMessage(method: ProtocolCommand): Promise<void> {
+  let outgoingMessageListenerEntry = outgoingMessageListenerEntryMap.get(method);
+  if (!outgoingMessageListenerEntry) {
+    let resolve = () => {};
+    const promise = new Promise<void>(r => {
+      resolve = r;
+    });
+    outgoingMessageListenerEntry = {promise, resolve};
+    outgoingMessageListenerEntryMap.set(method, outgoingMessageListenerEntry);
+  }
+  return outgoingMessageListenerEntry.promise;
 }
 
 export function dispatchEvent<E extends keyof ProtocolMapping.Events>(
@@ -68,47 +95,51 @@ async function enable({reset = true} = {}) {
   // minimally there.
   await initializeGlobalVars({reset});
 
-  let messageCallback: MessageCallback;
-  ProtocolClient.InspectorBackend.Connection.setFactory(() => {
-    return {
-      setOnMessage(callback: MessageCallback) {
-        messageCallback = callback;
-      },
+  ProtocolClient.InspectorBackend.Connection.setFactory(() => new MockConnection());
+}
 
-      sendRawMessage(message: string) {
-        const outgoingMessage = JSON.parse(message) as {id: number, method: ProtocolCommand, params: unknown};
-        const handler = responseMap.get(outgoingMessage.method);
-        if (!handler) {
-          return;
-        }
+class MockConnection extends ProtocolClient.InspectorBackend.Connection {
+  messageCallback?: MessageCallback;
+  override setOnMessage(callback: MessageCallback) {
+    this.messageCallback = callback;
+  }
 
-        const result = handler.call(undefined, outgoingMessage.params);
+  override sendRawMessage(message: string) {
+    void (async () => {
+      const outgoingMessage = JSON.parse(message) as Message;
 
-        // Since we allow the test author to omit the getError call, we
-        // need to add it in here on their behalf so that the calling code
-        // will succeed.
-        if (!('getError' in result)) {
-          result.getError = () => undefined;
-        }
-        messageCallback.call(undefined, {id: outgoingMessage.id, method: outgoingMessage.method, result});
-      },
+      const entry = outgoingMessageListenerEntryMap.get(outgoingMessage.method);
+      if (entry) {
+        outgoingMessageListenerEntryMap.delete(outgoingMessage.method);
+        entry.resolve();
+      }
+      const handler = responseMap.get(outgoingMessage.method);
+      if (!handler) {
+        return;
+      }
 
-      async disconnect() {
-        // Included only to meet interface requirements.
-      },
+      let result = handler.call(undefined, outgoingMessage.params) || {};
+      if ('then' in result) {
+        result = await result;
+      }
 
-      onMessage() {
-        // Included only to meet interface requirements.
-      },
-
-      setOnDisconnect() {
-        // Included only to meet interface requirements.
-      },
-    };
-  });
+      // Since we allow the test author to omit the getError call, we
+      // need to add it in here on their behalf so that the calling code
+      // will succeed.
+      if (!('getError' in result)) {
+        result.getError = () => undefined;
+      }
+      this.messageCallback?.call(
+          undefined,
+          {id: outgoingMessage.id, method: outgoingMessage.method, result, sessionId: outgoingMessage.sessionId});
+    })();
+  }
 }
 
 async function disable() {
+  if (outgoingMessageListenerEntryMap.size > 0) {
+    throw new Error('MockConnection still has pending listeners. All promises should be awaited.');
+  }
   await deinitializeGlobalVars();
   // @ts-ignore Setting back to undefined as a hard reset.
   ProtocolClient.InspectorBackend.Connection.setFactory(undefined);
@@ -117,9 +148,20 @@ async function disable() {
 export function describeWithMockConnection(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
   reset: true,
 }) {
-  return describe(`mock-${title}`, () => {
+  return describe(title, function() {
     beforeEach(async () => await enable(opts));
+    fn.call(this);
     afterEach(disable);
-    describe(title, fn);
   });
 }
+
+describeWithMockConnection.only = function(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
+  reset: true,
+}) {
+  // eslint-disable-next-line rulesdir/no_only
+  return describe.only(title, function() {
+    beforeEach(async () => await enable(opts));
+    fn.call(this);
+    afterEach(disable);
+  });
+};

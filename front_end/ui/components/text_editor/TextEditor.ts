@@ -27,7 +27,7 @@ export class TextEditor extends HTMLElement {
   #dynamicSettings: readonly DynamicSetting<unknown>[] = DynamicSetting.none;
   #activeSettingListeners: [Common.Settings.Setting<unknown>, (event: {data: unknown}) => void][] = [];
   #pendingState: CodeMirror.EditorState|undefined;
-  #lastScrollPos = {left: 0, top: 0};
+  #lastScrollPos = {left: 0, top: 0, changed: false};
   #resizeTimeout = -1;
   #resizeListener = (): void => {
     if (this.#resizeTimeout < 0) {
@@ -52,19 +52,28 @@ export class TextEditor extends HTMLElement {
       state: this.state,
       parent: this.#shadow,
       root: this.#shadow,
-      dispatch: (tr: CodeMirror.Transaction): void => {
-        this.editor.update([tr]);
+      dispatch: (tr: CodeMirror.Transaction, view: CodeMirror.EditorView): void => {
+        view.update([tr]);
         if (tr.reconfigured) {
           this.#ensureSettingListeners();
         }
       },
     });
-    this.#activeEditor.scrollDOM.scrollTop = this.#lastScrollPos.top;
-    this.#activeEditor.scrollDOM.scrollLeft = this.#lastScrollPos.left;
-    this.#activeEditor.scrollDOM.addEventListener('scroll', (event): void => {
-      this.#lastScrollPos.left = (event.target as HTMLElement).scrollLeft;
-      this.#lastScrollPos.top = (event.target as HTMLElement).scrollTop;
+
+    this.#restoreScrollPosition(this.#activeEditor);
+    this.#activeEditor.scrollDOM.addEventListener('scroll', event => {
+      if (!this.#activeEditor) {
+        return;
+      }
+
+      this.#saveScrollPosition(this.#activeEditor, {
+        scrollLeft: (event.target as HTMLElement).scrollLeft,
+        scrollTop: (event.target as HTMLElement).scrollTop,
+      });
+
+      this.scrollEventHandledToSaveScrollPositionForTest();
     });
+
     this.#ensureSettingListeners();
     this.#startObservingResize();
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
@@ -95,21 +104,87 @@ export class TextEditor extends HTMLElement {
   }
 
   set state(state: CodeMirror.EditorState) {
+    if (this.#pendingState === state) {
+      return;
+    }
+
+    this.#pendingState = state;
+
     if (this.#activeEditor) {
       this.#activeEditor.setState(state);
-    } else {
-      this.#pendingState = state;
+      this.#ensureSettingListeners();
     }
+  }
+
+  #restoreScrollPosition(editor: CodeMirror.EditorView): void {
+    // Only restore scroll position if the scroll position
+    // has already changed. This check is needed because
+    // we only want to restore scroll for the text editors
+    // that are itself scrollable which, when scrolled,
+    // triggers 'scroll' event from `scrollDOM` meaning that
+    // it contains a scrollable `scrollDOM` that is scrolled.
+    if (!this.#lastScrollPos.changed) {
+      return;
+    }
+
+    // Instead of reaching to the internal DOM node
+    // of CodeMirror `scrollDOM` and setting the scroll
+    // position directly via `scrollLeft` and `scrollTop`
+    // we're using the public `scrollIntoView` effect.
+    // However, this effect doesn't provide a way to
+    // scroll to the given rectangle position.
+    // So, as a "workaround", we're instructing it to scroll to
+    // the start of the page with last scroll position margins
+    // from the sides.
+    editor.dispatch({
+      effects: CodeMirror.EditorView.scrollIntoView(0, {
+        x: 'start',
+        xMargin: -this.#lastScrollPos.left,
+        y: 'start',
+        yMargin: -this.#lastScrollPos.top,
+      }),
+    });
+  }
+
+  // `scrollIntoView` starts the scrolling from the start of the `line`
+  // not the content area and there is a padding between the
+  // sides and initial character of the line. So, we're saving
+  // the last scroll position with this margin taken into account.
+  #saveScrollPosition(editor: CodeMirror.EditorView, {scrollLeft, scrollTop}: {scrollLeft: number, scrollTop: number}):
+      void {
+    const contentRect = editor.contentDOM.getBoundingClientRect();
+
+    // In some cases `editor.coordsAtPos(0)` can return `null`
+    // (maybe, somehow, the editor is not visible yet).
+    // So, in that case, we don't take margins from the sides
+    // into account by setting `coordsAtZero` rectangle
+    // to be the same with `contentRect`.
+    const coordsAtZero = editor.coordsAtPos(0) ?? {
+      top: contentRect.top,
+      left: contentRect.left,
+      bottom: contentRect.bottom,
+      right: contentRect.right,
+    };
+
+    this.#lastScrollPos.left = scrollLeft + (contentRect.left - coordsAtZero.left);
+    this.#lastScrollPos.top = scrollTop + (contentRect.top - coordsAtZero.top);
+    this.#lastScrollPos.changed = true;
+  }
+
+  scrollEventHandledToSaveScrollPositionForTest(): void {
   }
 
   connectedCallback(): void {
     if (!this.#activeEditor) {
       this.#createEditor();
+    } else {
+      this.#restoreScrollPosition(this.#activeEditor);
     }
   }
 
   disconnectedCallback(): void {
     if (this.#activeEditor) {
+      this.#activeEditor.dispatch({effects: clearHighlightedLine.of(null)});
       this.#pendingState = this.#activeEditor.state;
       this.#devtoolsResizeObserver.disconnect();
       window.removeEventListener('resize', this.#resizeListener);
@@ -119,7 +194,7 @@ export class TextEditor extends HTMLElement {
     }
   }
 
-  focus(): void {
+  override focus(): void {
     if (this.#activeEditor) {
       this.#activeEditor.focus();
     }
@@ -169,15 +244,26 @@ export class TextEditor extends HTMLElement {
     const line = view.state.doc.lineAt(selection.main.head);
     const effects: CodeMirror.StateEffect<unknown>[] = [];
     if (highlight) {
-      effects.push(
-          view.state.field(highlightState, false) ?
-              setHighlightLine.of(line.from) :
-              CodeMirror.StateEffect.appendConfig.of(highlightState.init(() => highlightDeco(line.from))));
+      // Lazily register the highlight line state.
+      if (!view.state.field(highlightedLineState, false)) {
+        view.dispatch({effects: CodeMirror.StateEffect.appendConfig.of(highlightedLineState)});
+      } else {
+        // Always clear the previous highlight line first. This cannot be done
+        // in combination with the other effects, as it wouldn't restart the CSS
+        // highlight line animation.
+        view.dispatch({effects: clearHighlightedLine.of(null)});
+      }
+
+      // Here we finally start the actual highlight line effects.
+      effects.push(setHighlightedLine.of(line.from));
     }
+
     const editorRect = view.scrollDOM.getBoundingClientRect();
     const targetPos = view.coordsAtPos(selection.main.head);
     if (!targetPos || targetPos.top < editorRect.top || targetPos.bottom > editorRect.bottom) {
       effects.push(CodeMirror.EditorView.scrollIntoView(selection.main, {y: 'center'}));
+    } else if (targetPos.left < editorRect.left || targetPos.right > editorRect.right) {
+      effects.push(CodeMirror.EditorView.scrollIntoView(selection.main, {x: 'center'}));
     }
 
     view.dispatch({
@@ -185,16 +271,6 @@ export class TextEditor extends HTMLElement {
       effects,
       userEvent: 'select.reveal',
     });
-    if (highlight) {
-      const {id} = view.state.field(highlightState);
-      // Reset the highlight state if, after 2 seconds (the animation
-      // duration) it is still showing this highlight.
-      window.setTimeout(() => {
-        if (view.state.field(highlightState).id === id) {
-          view.dispatch({effects: setHighlightLine.of(null)});
-        }
-      }, 2000);
-    }
   }
 
   createSelection(head: {lineNumber: number, columnNumber: number}, anchor?: {
@@ -217,27 +293,27 @@ export class TextEditor extends HTMLElement {
 
 ComponentHelpers.CustomElements.defineComponent('devtools-text-editor', TextEditor);
 
-const setHighlightLine = CodeMirror.StateEffect.define<number|null>(
-    {map: (value, mapping) => value === null ? null : mapping.mapPos(value)});
+// Line highlighting
 
-function highlightDeco(position: number): {deco: CodeMirror.DecorationSet, id: number} {
-  const deco = CodeMirror.Decoration.set(
-      [CodeMirror.Decoration.line({attributes: {class: 'cm-highlightedLine'}}).range(position)]);
-  return {deco, id: Math.floor(Math.random() * 0xfffff)};
-}
+const clearHighlightedLine = CodeMirror.StateEffect.define<null>();
+const setHighlightedLine = CodeMirror.StateEffect.define<number>();
 
-const highlightState = CodeMirror.StateField.define<{deco: CodeMirror.DecorationSet, id: number}>({
-  create: () => ({deco: CodeMirror.Decoration.none, id: 0}),
+const highlightedLineState = CodeMirror.StateField.define<CodeMirror.DecorationSet>({
+  create: () => CodeMirror.Decoration.none,
   update(value, tr) {
-    if (!tr.changes.empty && value.deco.size) {
-      value = {deco: value.deco.map(tr.changes), id: value.id};
+    if (!tr.changes.empty && value.size) {
+      value = value.map(tr.changes);
     }
     for (const effect of tr.effects) {
-      if (effect.is(setHighlightLine)) {
-        value = effect.value === null ? {deco: CodeMirror.Decoration.none, id: 0} : highlightDeco(effect.value);
+      if (effect.is(clearHighlightedLine)) {
+        value = CodeMirror.Decoration.none;
+      } else if (effect.is(setHighlightedLine)) {
+        value = CodeMirror.Decoration.set([
+          CodeMirror.Decoration.line({attributes: {class: 'cm-highlightedLine'}}).range(effect.value),
+        ]);
       }
     }
     return value;
   },
-  provide: field => CodeMirror.EditorView.decorations.from(field, value => value.deco),
+  provide: field => CodeMirror.EditorView.decorations.from(field, value => value),
 });

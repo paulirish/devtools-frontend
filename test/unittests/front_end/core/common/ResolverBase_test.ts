@@ -39,7 +39,7 @@ export class ResolverTestImpl extends Common.ResolverBase.ResolverBase<string, T
     assert.isFalse(this.currentlyListening, 'Expected to be listening');
   }
 
-  onResolve(id: string, obj: TestClass) {
+  override onResolve(id: string, obj: TestClass) {
     super.onResolve(id, obj);
   }
 }
@@ -65,6 +65,7 @@ describe('ResolverBase', () => {
       });
       resolver.assertIsListening();
       assert.strictEqual(obj, null);
+      resolver.clear();
     });
 
     it('should resolve a previously unknown object when it becomes available', async () => {

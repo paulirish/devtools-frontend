@@ -12,70 +12,75 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {AnimationGroupPreviewUI} from './AnimationGroupPreviewUI.js';
 import animationTimelineStyles from './animationTimeline.css.js';
 
-import type {AnimationEffect, AnimationGroup, AnimationImpl} from './AnimationModel.js';
-import {AnimationModel, Events} from './AnimationModel.js';
+import {
+  AnimationModel,
+  Events,
+  type AnimationEffect,
+  type AnimationGroup,
+  type AnimationImpl,
+} from './AnimationModel.js';
 import {AnimationScreenshotPopover} from './AnimationScreenshotPopover.js';
 import {AnimationUI} from './AnimationUI.js';
 
 const UIStrings = {
   /**
-  *@description Timeline hint text content in Animation Timeline of the Animation Inspector
-  */
+   *@description Timeline hint text content in Animation Timeline of the Animation Inspector
+   */
   selectAnEffectAboveToInspectAnd: 'Select an effect above to inspect and modify.',
   /**
-  *@description Text to clear everything
-  */
+   *@description Text to clear everything
+   */
   clearAll: 'Clear all',
   /**
-  *@description Tooltip text that appears when hovering over largeicon pause button in Animation Timeline of the Animation Inspector
-  */
+   *@description Tooltip text that appears when hovering over largeicon pause button in Animation Timeline of the Animation Inspector
+   */
   pauseAll: 'Pause all',
   /**
-  *@description Title of the playback rate button listbox
-  */
+   *@description Title of the playback rate button listbox
+   */
   playbackRates: 'Playback rates',
   /**
-  *@description Text in Animation Timeline of the Animation Inspector
-  *@example {50} PH1
-  */
+   *@description Text in Animation Timeline of the Animation Inspector
+   *@example {50} PH1
+   */
   playbackRatePlaceholder: '{PH1}%',
   /**
-  *@description Text of an item that pause the running task
-  */
+   *@description Text of an item that pause the running task
+   */
   pause: 'Pause',
   /**
-  *@description Button title in Animation Timeline of the Animation Inspector
-  *@example {50%} PH1
-  */
+   *@description Button title in Animation Timeline of the Animation Inspector
+   *@example {50%} PH1
+   */
   setSpeedToS: 'Set speed to {PH1}',
   /**
-  *@description Title of Animation Previews listbox
-  */
+   *@description Title of Animation Previews listbox
+   */
   animationPreviews: 'Animation previews',
   /**
-  *@description Empty buffer hint text content in Animation Timeline of the Animation Inspector
-  */
+   *@description Empty buffer hint text content in Animation Timeline of the Animation Inspector
+   */
   waitingForAnimations: 'Waiting for animations...',
   /**
-  *@description Tooltip text that appears when hovering over largeicon replay animation button in Animation Timeline of the Animation Inspector
-  */
+   *@description Tooltip text that appears when hovering over largeicon replay animation button in Animation Timeline of the Animation Inspector
+   */
   replayTimeline: 'Replay timeline',
   /**
-  *@description Text in Animation Timeline of the Animation Inspector
-  */
+   *@description Text in Animation Timeline of the Animation Inspector
+   */
   resumeAll: 'Resume all',
   /**
-  *@description Title of control button in animation timeline of the animation inspector
-  */
+   *@description Title of control button in animation timeline of the animation inspector
+   */
   playTimeline: 'Play timeline',
   /**
-  *@description Title of control button in animation timeline of the animation inspector
-  */
+   *@description Title of control button in animation timeline of the animation inspector
+   */
   pauseTimeline: 'Pause timeline',
   /**
-  *@description Title of a specific Animation Preview
-  *@example {1} PH1
-  */
+   *@description Title of a specific Animation Preview
+   *@example {1} PH1
+   */
   animationPreviewS: 'Animation Preview {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/animation/AnimationTimeline.ts', UIStrings);
@@ -144,13 +149,13 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     this.#previewMap = new Map();
     this.#animationsMap = new Map();
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DOMModel.DOMModel, SDK.DOMModel.Events.NodeRemoved, this.nodeRemoved, this);
-    SDK.TargetManager.TargetManager.instance().observeModels(AnimationModel, this);
+        SDK.DOMModel.DOMModel, SDK.DOMModel.Events.NodeRemoved, this.nodeRemoved, this, {scoped: true});
+    SDK.TargetManager.TargetManager.instance().observeModels(AnimationModel, this, {scoped: true});
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.nodeChanged, this);
   }
 
-  static instance(): AnimationTimeline {
-    if (!animationTimelineInstance) {
+  static instance(opts?: {forceNew: boolean}): AnimationTimeline {
+    if (!animationTimelineInstance || opts?.forceNew) {
       animationTimelineInstance = new AnimationTimeline();
     }
     return animationTimelineInstance;
@@ -168,15 +173,15 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     return this.#groupBuffer;
   }
 
-  wasShown(): void {
-    for (const animationModel of SDK.TargetManager.TargetManager.instance().models(AnimationModel)) {
+  override wasShown(): void {
+    for (const animationModel of SDK.TargetManager.TargetManager.instance().models(AnimationModel, {scoped: true})) {
       this.addEventListeners(animationModel);
     }
     this.registerCSSFiles([animationTimelineStyles]);
   }
 
-  willHide(): void {
-    for (const animationModel of SDK.TargetManager.TargetManager.instance().models(AnimationModel)) {
+  override willHide(): void {
+    for (const animationModel of SDK.TargetManager.TargetManager.instance().models(AnimationModel, {scoped: true})) {
       this.removeEventListeners(animationModel);
     }
 
@@ -225,20 +230,19 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
   private createHeader(): HTMLElement {
     const toolbarContainer = this.contentElement.createChild('div', 'animation-timeline-toolbar-container');
     const topToolbar = new UI.Toolbar.Toolbar('animation-timeline-toolbar', toolbarContainer);
-    this.#clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAll), 'largeicon-clear');
+    this.#clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAll), 'clear');
     this.#clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.reset.bind(this));
     topToolbar.appendToolbarItem(this.#clearButton);
     topToolbar.appendSeparator();
 
-    this.#pauseButton =
-        new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.pauseAll), 'largeicon-pause', 'largeicon-resume');
+    this.#pauseButton = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.pauseAll), 'pause', 'resume');
     this.#pauseButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.togglePauseAll.bind(this));
     topToolbar.appendToolbarItem(this.#pauseButton);
 
     const playbackRateControl = toolbarContainer.createChild('div', 'animation-playback-rate-control');
     playbackRateControl.addEventListener('keydown', this.handlePlaybackRateControlKeyDown.bind(this));
     UI.ARIAUtils.markAsListBox(playbackRateControl);
-    UI.ARIAUtils.setAccessibleName(playbackRateControl, i18nString(UIStrings.playbackRates));
+    UI.ARIAUtils.setLabel(playbackRateControl, i18nString(UIStrings.playbackRates));
 
     this.#playbackRateButtons = [];
     for (const playbackRate of GlobalPlaybackRates) {
@@ -255,7 +259,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     this.updatePlaybackControls();
     this.#previewContainer = (this.contentElement.createChild('div', 'animation-timeline-buffer') as HTMLElement);
     UI.ARIAUtils.markAsListBox(this.#previewContainer);
-    UI.ARIAUtils.setAccessibleName(this.#previewContainer, i18nString(UIStrings.animationPreviews));
+    UI.ARIAUtils.setLabel(this.#previewContainer, i18nString(UIStrings.animationPreviews));
     this.#popoverHelper = new UI.PopoverHelper.PopoverHelper(this.#previewContainer, this.getPopoverRequest.bind(this));
     this.#popoverHelper.setDisableOnClick(true);
     this.#popoverHelper.setTimeout(0);
@@ -266,8 +270,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     this.#currentTime = (controls.createChild('div', 'animation-timeline-current-time monospace') as HTMLElement);
 
     const toolbar = new UI.Toolbar.Toolbar('animation-controls-toolbar', controls);
-    this.#controlButton =
-        new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.replayTimeline), 'largeicon-replay-animation');
+    this.#controlButton = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.replayTimeline), 'replay');
     this.#controlState = ControlState.Replay;
     this.#controlButton.setToggled(true);
     this.#controlButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.controlButtonToggle.bind(this));
@@ -375,7 +378,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
 
   private setPlaybackRate(playbackRate: number): void {
     this.#playbackRate = playbackRate;
-    for (const animationModel of SDK.TargetManager.TargetManager.instance().models(AnimationModel)) {
+    for (const animationModel of SDK.TargetManager.TargetManager.instance().models(AnimationModel, {scoped: true})) {
       animationModel.setPlaybackRate(this.#allPaused ? 0 : this.#playbackRate);
     }
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.AnimationsPlaybackRateChanged);
@@ -414,19 +417,19 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       this.#controlState = ControlState.Play;
       this.#controlButton.setToggled(true);
       this.#controlButton.setTitle(i18nString(UIStrings.playTimeline));
-      this.#controlButton.setGlyph('largeicon-play-animation');
+      this.#controlButton.setGlyph('play');
     } else if (
         !this.#scrubberPlayer || !this.#scrubberPlayer.currentTime ||
-        this.#scrubberPlayer.currentTime >= this.duration()) {
+        typeof this.#scrubberPlayer.currentTime !== 'number' || this.#scrubberPlayer.currentTime >= this.duration()) {
       this.#controlState = ControlState.Replay;
       this.#controlButton.setToggled(true);
       this.#controlButton.setTitle(i18nString(UIStrings.replayTimeline));
-      this.#controlButton.setGlyph('largeicon-replay-animation');
+      this.#controlButton.setGlyph('replay');
     } else {
       this.#controlState = ControlState.Pause;
       this.#controlButton.setToggled(false);
       this.#controlButton.setTitle(i18nString(UIStrings.pauseTimeline));
-      this.#controlButton.setGlyph('largeicon-pause-animation');
+      this.#controlButton.setGlyph('pause');
     }
   }
 
@@ -484,11 +487,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
 
   private reset(): void {
     this.clearTimeline();
-    if (this.#allPaused) {
-      this.togglePauseAll();
-    } else {
-      this.setPlaybackRate(this.#playbackRate);
-    }
+    this.setPlaybackRate(this.#playbackRate);
 
     for (const group of this.#groupBuffer) {
       group.release();
@@ -546,7 +545,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     preview.removeButton().addEventListener('click', this.removeAnimationGroup.bind(this, group));
     preview.element.addEventListener('click', this.selectAnimationGroup.bind(this, group));
     preview.element.addEventListener('keydown', this.handleAnimationGroupKeyDown.bind(this, group));
-    UI.ARIAUtils.setAccessibleName(
+    UI.ARIAUtils.setLabel(
         preview.element, i18nString(UIStrings.animationPreviewS, {PH1: this.#groupBuffer.indexOf(group) + 1}));
     UI.ARIAUtils.markAsOption(preview.element);
 
@@ -739,7 +738,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     }
   }
 
-  onResize(): void {
+  override onResize(): void {
     this.#cachedTimelineWidth = Math.max(0, this.#animationsContainer.offsetWidth - this.#timelineControlsWidth) || 0;
     this.#cachedTimelineHeight = this.#animationsContainer.offsetHeight;
     this.scheduleRedraw();
@@ -797,7 +796,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     if (!this.#scrubberPlayer) {
       return;
     }
-    this.#currentTime.textContent = i18n.TimeUtilities.millisToString(this.#scrubberPlayer.currentTime || 0);
+    this.#currentTime.textContent = i18n.TimeUtilities.millisToString(this.#scrubberCurrentTime());
     if (this.#scrubberPlayer.playState.toString() === 'pending' || this.#scrubberPlayer.playState === 'running') {
       this.element.window().requestAnimationFrame(this.updateScrubber.bind(this));
     } else if (this.#scrubberPlayer.playState === 'finished') {
@@ -812,7 +811,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
 
     // Seek to current mouse position.
     if (!this.#gridOffsetLeft) {
-      this.#gridOffsetLeft = this.#grid.totalOffsetLeft() + 10;
+      this.#gridOffsetLeft = this.#grid.getBoundingClientRect().left + 10;
     }
 
     const {x} = (event as any);  // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -832,7 +831,8 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       return false;
     }
 
-    this.#originalScrubberTime = this.#scrubberPlayer.currentTime;
+    this.#originalScrubberTime =
+        typeof this.#scrubberPlayer.currentTime === 'number' ? this.#scrubberPlayer.currentTime : null;
     this.#timelineScrubber.classList.remove('animation-timeline-end');
     this.#scrubberPlayer.pause();
 
@@ -858,9 +858,13 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     }
   }
 
+  #scrubberCurrentTime(): number {
+    return typeof this.#scrubberPlayer?.currentTime === 'number' ? this.#scrubberPlayer.currentTime : 0;
+  }
+
   private scrubberDragEnd(_event: Event): void {
     if (this.#scrubberPlayer) {
-      const currentTime = Math.max(0, this.#scrubberPlayer.currentTime || 0);
+      const currentTime = Math.max(0, this.#scrubberCurrentTime());
       this.#scrubberPlayer.play();
       this.#scrubberPlayer.currentTime = currentTime;
     }

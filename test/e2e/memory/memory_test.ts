@@ -3,10 +3,40 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type {puppeteer} from '../../shared/helper.js';
-import {$$, assertNotNullOrUndefined, click, getBrowserAndPages, goToResource, step, waitFor, waitForElementsWithTextContent, waitForElementWithTextContent, waitForFunction, waitForNoElementsWithTextContent} from '../../shared/helper.js';
+
+import type * as puppeteer from 'puppeteer-core';
+
+import {
+  $$,
+  $,
+  assertNotNullOrUndefined,
+  getBrowserAndPages,
+  goToResource,
+  step,
+  waitFor,
+  clickElement,
+  waitForElementsWithTextContent,
+  waitForElementWithTextContent,
+  waitForFunction,
+  waitForNoElementsWithTextContent,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {changeAllocationSampleViewViaDropdown, changeViewViaDropdown, findSearchResult, getDataGridRows, navigateToMemoryTab, setSearchFilter, takeAllocationProfile, takeAllocationTimelineProfile, takeHeapSnapshot, waitForNonEmptyHeapSnapshotData, waitForRetainerChain, waitForSearchResultNumber, waitUntilRetainerChainSatisfies} from '../helpers/memory-helpers.js';
+import {
+  changeAllocationSampleViewViaDropdown,
+  changeViewViaDropdown,
+  findSearchResult,
+  getDataGridRows,
+  navigateToMemoryTab,
+  setClassFilter,
+  setSearchFilter,
+  takeAllocationProfile,
+  takeAllocationTimelineProfile,
+  takeHeapSnapshot,
+  waitForNonEmptyHeapSnapshotData,
+  waitForRetainerChain,
+  waitForSearchResultNumber,
+  waitUntilRetainerChainSatisfies,
+} from '../helpers/memory-helpers.js';
 
 describe('The Memory Panel', async function() {
   // These tests render large chunks of data into DevTools and filter/search
@@ -21,7 +51,8 @@ describe('The Memory Panel', async function() {
     await navigateToMemoryTab();
   });
 
-  it('Can take several heap snapshots ', async () => {
+  // Flaky test
+  it.skip('[crbug.com/1435436] Can take several heap snapshots ', async () => {
     await goToResource('memory/default.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -39,10 +70,7 @@ describe('The Memory Panel', async function() {
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('leaking');
     await waitForSearchResultNumber(4);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-function');
-      return el !== null && await el.evaluate(el => el.textContent === 'leaking()');
-    });
+    await findSearchResult('leaking()');
     await waitForRetainerChain([
       'Detached V8EventListener',
       'Detached EventListener',
@@ -54,9 +82,8 @@ describe('The Memory Panel', async function() {
     ]);
   });
 
-  // Flaky test
-  it.skipOnPlatforms(
-      ['mac', 'linux'], '[crbug.com/1134602] Correctly retains the path for event listeners', async () => {
+  it(
+      'Correctly retains the path for event listeners', async () => {
         await goToResource('memory/event-listeners.html');
         await step('taking a heap snapshot', async () => {
           await navigateToMemoryTab();
@@ -69,10 +96,7 @@ describe('The Memory Panel', async function() {
         });
 
         await step('selecting the search result that we need', async () => {
-          await findSearchResult(async p => {
-            const el = await p.$(':scope > td > div > .object-value-function');
-            return el !== null && await el.evaluate(el => el.textContent === 'myEventListener()');
-          });
+          await findSearchResult('myEventListener()');
         });
 
         await step('waiting for retainer chain', async () => {
@@ -82,9 +106,6 @@ describe('The Memory Panel', async function() {
             'InternalNode',
             'InternalNode',
             'HTMLBodyElement',
-            'HTMLHtmlElement',
-            'HTMLDocument',
-            'Window',
           ]);
         });
       });
@@ -104,25 +125,24 @@ describe('The Memory Panel', async function() {
     await setSearchFilter('Pending activities');
     // Here and below we have to wait until the elements are actually created
     // and visible.
-    const [pendingActivitiesSpan] = await waitForFunction(async () => {
-      const elements = await frontend.$x('//span[text()="Pending activities"]');
-      return elements.length > 0 ? elements : undefined;
-    });
-    const [pendingActiviesRow] = await pendingActivitiesSpan.$x('ancestor-or-self::tr');
     await waitForFunction(async () => {
-      await click(pendingActivitiesSpan);
+      const pendingActivitiesSpan = await waitFor('//span[text()="Pending activities"]', undefined, undefined, 'xpath');
+      const pendingActiviesRow = await waitFor('ancestor-or-self::tr', pendingActivitiesSpan, undefined, 'xpath');
+      try {
+        await clickElement(pendingActivitiesSpan);
+      } catch {
+        return false;
+      }
       const res = await pendingActiviesRow.evaluate(x => x.classList.toString());
       return res.includes('selected');
     });
     await frontend.keyboard.press('ArrowRight');
-    const [internalNodeSpan] = await waitForFunction(async () => {
-      const elements = await frontend.$x(
-          '//span[text()="InternalNode"][ancestor-or-self::tr[preceding-sibling::*[1][//span[text()="Pending activities"]]]]');
-      return elements.length === 1 ? elements : undefined;
-    });
-    const [internalNodeRow] = await internalNodeSpan.$x('ancestor-or-self::tr');
+    const internalNodeSpan = await waitFor(
+        '//span[text()="InternalNode"][ancestor-or-self::tr[preceding-sibling::*[1][//span[text()="Pending activities"]]]]',
+        undefined, undefined, 'xpath');
+    const internalNodeRow = await $('ancestor-or-self::tr', internalNodeSpan, 'xpath');
     await waitForFunction(async () => {
-      await click(internalNodeSpan);
+      await clickElement(internalNodeSpan);
       const res = await internalNodeRow.evaluate(x => x.classList.toString());
       return res.includes('selected');
     });
@@ -149,10 +169,7 @@ describe('The Memory Panel', async function() {
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('Retainer');
     await waitForSearchResultNumber(8);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-object');
-      return el !== null && await el.evaluate(el => el.textContent === 'Retainer');
-    });
+    await findSearchResult('Retainer');
     // The following line checks two things: That the property 'aUniqueName'
     // in the iframe is retaining the Retainer class object, and that the
     // iframe window is not detached.
@@ -168,10 +185,7 @@ describe('The Memory Panel', async function() {
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('leaking');
     await waitForSearchResultNumber(4);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-string');
-      return el !== null && await el.evaluate(el => el.textContent === '"leaking"');
-    });
+    await findSearchResult('\"leaking\"');
 
     await waitForFunction(async () => {
       // Wait for all the rows of the data-grid to load.
@@ -200,7 +214,7 @@ describe('The Memory Panel', async function() {
 
     // Have to click it not in the middle as the middle can hold the link to the
     // file in the sources pane and we want to avoid clicking that.
-    await click(sharedInLeakingElementRow, {maxPixelsFromLeft: 10});
+    await clickElement(sharedInLeakingElementRow /* TODO(crbug.com/1363150): {maxPixelsFromLeft: 10} */);
     const {frontend} = getBrowserAndPages();
     // Expand the data-grid for the shared list
     await frontend.keyboard.press('ArrowRight');
@@ -214,12 +228,13 @@ describe('The Memory Panel', async function() {
     // Now we want to get the two rows below the "shared in leaking()" row and assert on them.
     // Unfortunately they are not structured in the data-grid as children, despite being children in the UI
     // So the best way to get at them is to grab the two subsequent siblings of the "shared in leaking()" row.
-    const nextRow =
-        await sharedInLeakingElementRow.evaluateHandle<puppeteer.ElementHandle<HTMLElement>>(e => e.nextSibling);
+    const nextRow = (await sharedInLeakingElementRow.evaluateHandle(e => e.nextSibling)).asElement() as
+        puppeteer.ElementHandle<HTMLElement>;
     if (!nextRow) {
       assert.fail('Could not find row below "shared in leaking()" row');
     }
-    const nextNextRow = await nextRow.evaluateHandle<puppeteer.ElementHandle<HTMLElement>>(e => e.nextSibling);
+    const nextNextRow =
+        (await nextRow.evaluateHandle(e => e.nextSibling)).asElement() as puppeteer.ElementHandle<HTMLElement>;
     if (!nextNextRow) {
       assert.fail('Could not find 2nd row below "shared in leaking()" row');
     }
@@ -261,19 +276,17 @@ describe('The Memory Panel', async function() {
   });
 
   it('shows the flamechart for an allocation sample', async () => {
-    const {frontend} = getBrowserAndPages();
     await goToResource('memory/allocations.html');
     await navigateToMemoryTab();
-    void takeAllocationProfile(frontend);
+    void takeAllocationProfile();
     void changeAllocationSampleViewViaDropdown('Chart');
     await waitFor('canvas.flame-chart-canvas');
   });
 
   it('shows allocations for an allocation timeline', async () => {
-    const {frontend} = getBrowserAndPages();
     await goToResource('memory/allocations.html');
     await navigateToMemoryTab();
-    void takeAllocationTimelineProfile(frontend, {recordStacks: true});
+    void takeAllocationTimelineProfile({recordStacks: true});
     await changeViewViaDropdown('Allocation');
 
     const header = await waitForElementWithTextContent('Live Count');
@@ -284,11 +297,105 @@ describe('The Memory Panel', async function() {
   });
 
   it('does not show allocations perspective when stacks not recorded', async () => {
-    const {frontend} = getBrowserAndPages();
     await goToResource('memory/allocations.html');
     await navigateToMemoryTab();
-    void takeAllocationTimelineProfile(frontend, {recordStacks: false});
+    void takeAllocationTimelineProfile({recordStacks: false});
     const dropdown = await waitFor('select[aria-label="Perspective"]');
     await waitForNoElementsWithTextContent('Allocation', dropdown);
+  });
+
+  it('shows object source links in snapshot', async () => {
+    const {target, frontend} = getBrowserAndPages();
+    await target.evaluate(`
+        class MyTestClass {
+          constructor() {
+            this.z = new Uint32Array(1e6);  // Pull the class to top.
+            this.myFunction = () => 42;
+          }
+        };
+        function* MyTestGenerator() {
+          yield 1;
+        }
+        class MyTestClass2 {}
+        window.myTestClass = new MyTestClass();
+        window.myTestGenerator = MyTestGenerator();
+        window.myTestClass2 = new MyTestClass2();
+        //# sourceURL=my-test-script.js`);
+    await navigateToMemoryTab();
+    await takeHeapSnapshot();
+    await setClassFilter('MyTest');
+    await waitForNonEmptyHeapSnapshotData();
+
+    const expectedEntries = [
+      {constructor: 'MyTestClass', link: 'my-test-script.js:3'},
+      {constructor: 'MyTestClass', prop: 'myFunction', link: 'my-test-script.js:5'},
+      {constructor: 'MyTestGenerator', link: 'my-test-script.js:8'},
+      {constructor: 'MyTestClass2', link: 'my-test-script.js:11'},
+    ];
+
+    const rows = await getDataGridRows('.data-grid');
+    for (const entry of expectedEntries) {
+      let row: puppeteer.ElementHandle<Element>|null = null;
+      // Find the row with the desired constructor.
+      for (const r of rows) {
+        const constructorName = await waitForFunction(() => r.evaluate(e => e.firstChild?.textContent));
+        if (entry.constructor === constructorName) {
+          row = r;
+          break;
+        }
+      }
+      assertNotNullOrUndefined(row);
+      // Expand the constructor sub-tree.
+      await clickElement(row);
+      await frontend.keyboard.press('ArrowRight');
+      // Get the object subtree/child.
+      const {objectElement, objectName} = await waitForFunction(async () => {
+        const objectElement =
+            await row?.evaluateHandle(e => e.nextSibling) as puppeteer.ElementHandle<HTMLElement>| null;
+        const objectName = await objectElement?.evaluate(e => e.querySelector('.object-value-object')?.textContent);
+        if (!objectName) {
+          return undefined;
+        }
+        return {objectElement, objectName};
+      });
+      let element = objectElement;
+      assertNotNullOrUndefined(element);
+      // Verify we have the object with the matching name.
+      assert.strictEqual(objectName, entry.constructor);
+      // Get the right property of the object if required.
+      if (entry.prop) {
+        // Expand the object.
+        await clickElement(element);
+        await frontend.keyboard.press('ArrowRight');
+        // Try to find the property.
+        element = await waitForFunction(async () => {
+          let row = element;
+          while (row) {
+            const nextRow = await row.evaluateHandle(e => e.nextSibling) as puppeteer.ElementHandle<HTMLElement>| null;
+            if (!nextRow) {
+              return undefined;
+            }
+            row = nextRow;
+            const text = await row.evaluate(e => e.querySelector('.property-name')?.textContent);
+            // If we did not find any text at all, then we saw all properties. Let us fail/retry here.
+            if (!text) {
+              return undefined;
+            }
+            // If we found the property, we are done.
+            if (text === entry.prop) {
+              return row;
+            }
+            // Continue looking for the property on the next row.
+          }
+          return undefined;
+        });
+        assertNotNullOrUndefined(element);
+      }
+
+      // Verify the link to the source code.
+      const linkText =
+          await waitForFunction(async () => element?.evaluate(e => e.querySelector('.devtools-link')?.textContent));
+      assert.strictEqual(linkText, entry.link);
+    }
   });
 });

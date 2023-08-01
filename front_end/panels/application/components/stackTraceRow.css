@@ -23,6 +23,10 @@
   white-space: nowrap;
 }
 
+.stack-trace-source-location .text-ellipsis {
+  padding-right: 2px;
+}
+
 .ignore-list-link {
   opacity: 60%;
 }
@@ -32,5 +36,5 @@
   color: var(--color-link);
   text-decoration: underline;
   cursor: pointer;
-  padding: 2px 0; /* adjust focus ring size */
+  outline-offset: 2px;
 }

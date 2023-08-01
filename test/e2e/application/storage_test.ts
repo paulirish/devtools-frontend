@@ -4,15 +4,23 @@
 
 import {assert} from 'chai';
 
+import {expectError} from '../../conductor/events.js';
 import {click, getBrowserAndPages, getTestServerPort, waitForFunction} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {doubleClickSourceTreeItem, getPieChartLegendRows, getStorageItemsData, navigateToApplicationTab, waitForQuotaUsage} from '../helpers/application-helpers.js';
+import {
+  doubleClickSourceTreeItem,
+  getPieChartLegendRows,
+  getQuotaUsage,
+  getStorageItemsData,
+  navigateToApplicationTab,
+  waitForQuotaUsage,
+} from '../helpers/application-helpers.js';
 
 // The parent suffix makes sure we wait for the Cookies item to have children before trying to click it.
 const COOKIES_SELECTOR = '[aria-label="Cookies"].parent';
 const STORAGE_SELECTOR = '[aria-label="Storage"]';
 const CLEAR_SITE_DATA_BUTTON_SELECTOR = '#storage-view-clear-button';
-const INCLUDE_3RD_PARTY_COOKIES_SELECTOR = '[aria-label="including third-party cookies"]';
+const INCLUDE_3RD_PARTY_COOKIES_SELECTOR = '[title="including third-party cookies"]';
 
 let DOMAIN_SELECTOR: string;
 
@@ -22,6 +30,7 @@ describe('The Application Tab', async () => {
   });
 
   afterEach(async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     const cookies = await target.cookies();
     await target.deleteCookie(...cookies);
@@ -136,8 +145,15 @@ describe('The Application Tab', async () => {
       });
 
       await waitForQuotaUsage(quota => quota > 20000);
-      await click(CLEAR_SITE_DATA_BUTTON_SELECTOR, {clickOptions: {delay: 250}});
-      await waitForQuotaUsage(quota => quota === 0);
+
+      // We may click too early. If the total quota exceeds 20000, some remaining
+      // quota may show. Instead,
+      // try to click another time, if necessary.
+      await waitForFunction(async () => {
+        await click(CLEAR_SITE_DATA_BUTTON_SELECTOR, {clickOptions: {delay: 250}});
+        const quota = await getQuotaUsage();
+        return quota === 0;
+      });
     });
 
     it('reports storage correctly, including the pie chart legend', async () => {

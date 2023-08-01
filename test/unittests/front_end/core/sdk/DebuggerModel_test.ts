@@ -2,12 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as SDKModule from '../../../../../front_end/core/sdk/sdk.js';
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
-import type * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as Common from '../../../../../front_end/core/common/common.js';
+import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 
-import {createTarget, describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
-import {describeWithMockConnection, dispatchEvent, setMockConnectionResponseHandler} from '../../helpers/MockConnection.js';
+import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {
+  describeWithMockConnection,
+  dispatchEvent,
+  setMockConnectionResponseHandler,
+} from '../../helpers/MockConnection.js';
+import {MockProtocolBackend} from '../../helpers/MockScopeChain.js';
 
 const {assert} = chai;
 
@@ -15,9 +23,94 @@ const SCRIPT_ID_ONE = '1' as Protocol.Runtime.ScriptId;
 const SCRIPT_ID_TWO = '2' as Protocol.Runtime.ScriptId;
 
 describeWithMockConnection('DebuggerModel', () => {
-  let SDK: typeof SDKModule;
-  before(async () => {
-    SDK = await import('../../../../../front_end/core/sdk/sdk.js');
+  describe('breakpoint activation', () => {
+    beforeEach(() => {
+      // Dummy handlers for unblocking target suspension.
+      setMockConnectionResponseHandler('Debugger.setAsyncCallStackDepth', () => ({}));
+      setMockConnectionResponseHandler('Debugger.disable', () => ({}));
+      setMockConnectionResponseHandler('DOM.disable', () => ({}));
+      setMockConnectionResponseHandler('CSS.disable', () => ({}));
+      setMockConnectionResponseHandler('Overlay.disable', () => ({}));
+      setMockConnectionResponseHandler('Overlay.setShowGridOverlays', () => ({}));
+      setMockConnectionResponseHandler('Overlay.setShowFlexOverlays', () => ({}));
+      setMockConnectionResponseHandler('Overlay.setShowScrollSnapOverlays', () => ({}));
+      setMockConnectionResponseHandler('Overlay.setShowContainerQueryOverlays', () => ({}));
+      setMockConnectionResponseHandler('Overlay.setShowIsolatedElements', () => ({}));
+      setMockConnectionResponseHandler('Overlay.setShowViewportSizeOnResize', () => ({}));
+      setMockConnectionResponseHandler('Target.setAutoAttach', () => ({}));
+
+      // Dummy handlers for unblocking target resumption.
+      setMockConnectionResponseHandler('Debugger.enable', () => ({}));
+      setMockConnectionResponseHandler('Debugger.setPauseOnExceptions', () => ({}));
+      setMockConnectionResponseHandler('DOM.enable', () => ({}));
+      setMockConnectionResponseHandler('Overlay.enable', () => ({}));
+      setMockConnectionResponseHandler('CSS.enable', () => ({}));
+    });
+
+    it('deactivates breakpoints on construction with inactive breakpoints', async () => {
+      let breakpointsDeactivated = false;
+      setMockConnectionResponseHandler('Debugger.setBreakpointsActive', request => {
+        if (request.active === false) {
+          breakpointsDeactivated = true;
+        }
+        return {};
+      });
+      Common.Settings.Settings.instance().moduleSetting('breakpointsActive').set(false);
+      createTarget();
+      assert.isTrue(breakpointsDeactivated);
+    });
+
+    it('deactivates breakpoints for suspended target', async () => {
+      let breakpointsDeactivated = false;
+      setMockConnectionResponseHandler('Debugger.setBreakpointsActive', request => {
+        if (request.active === false) {
+          breakpointsDeactivated = true;
+        }
+        return {};
+      });
+
+      const target = createTarget();
+
+      await target.suspend();
+
+      // Deactivate breakpoints while suspended.
+      Common.Settings.Settings.instance().moduleSetting('breakpointsActive').set(false);
+
+      // Verify that the backend received the message.
+      assert.isTrue(breakpointsDeactivated);
+
+      // Resume and verify that the setBreakpointsActive(false) is called again when the target resumes.
+      // This is only needed for older backends (before crbug.com/1357046 is fixed).
+      breakpointsDeactivated = false;
+      await target.resume();
+      assert.isTrue(breakpointsDeactivated);
+    });
+
+    it('activates breakpoints for suspended target', async () => {
+      let breakpointsDeactivated = false;
+      let breakpointsActivated = false;
+      setMockConnectionResponseHandler('Debugger.setBreakpointsActive', request => {
+        if (request.active) {
+          breakpointsActivated = true;
+        } else {
+          breakpointsDeactivated = true;
+        }
+        return {};
+      });
+
+      // Deactivate breakpoints befroe the target is created.
+      Common.Settings.Settings.instance().moduleSetting('breakpointsActive').set(false);
+      const target = createTarget();
+      assert.isTrue(breakpointsDeactivated);
+
+      await target.suspend();
+
+      // Activate breakpoints while suspended.
+      Common.Settings.Settings.instance().moduleSetting('breakpointsActive').set(true);
+
+      // Verify that the backend received the message.
+      assert.isTrue(breakpointsActivated);
+    });
   });
 
   describe('createRawLocationFromURL', () => {
@@ -132,184 +225,176 @@ describeWithMockConnection('DebuggerModel', () => {
       assert.strictEqual(scripts[1].scriptId, SCRIPT_ID_ONE);
     });
   });
+
+  describe('Scope', () => {
+    it('Scope.typeName covers every enum value', async () => {
+      const target = createTarget();
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
+      const scriptUrl = 'https://script-host/script.js' as Platform.DevToolsPath.UrlString;
+      const script = new SDK.Script.Script(
+          debuggerModel, SCRIPT_ID_ONE, scriptUrl, 0, 0, 0, 0, 0, '', false, false, undefined, false, 0, null, null,
+          null, null, null, null);
+      const scopeTypes: Protocol.Debugger.ScopeType[] = [
+        Protocol.Debugger.ScopeType.Global,
+        Protocol.Debugger.ScopeType.Local,
+        Protocol.Debugger.ScopeType.With,
+        Protocol.Debugger.ScopeType.Closure,
+        Protocol.Debugger.ScopeType.Catch,
+        Protocol.Debugger.ScopeType.Block,
+        Protocol.Debugger.ScopeType.Script,
+        Protocol.Debugger.ScopeType.Eval,
+        Protocol.Debugger.ScopeType.Module,
+        Protocol.Debugger.ScopeType.WasmExpressionStack,
+      ];
+      for (const scopeType of scopeTypes) {
+        const payload: Protocol.Debugger.CallFrame = {
+          callFrameId: '0' as Protocol.Debugger.CallFrameId,
+          functionName: 'test',
+          functionLocation: undefined,
+          location: {
+            scriptId: SCRIPT_ID_ONE,
+            lineNumber: 0,
+            columnNumber: 0,
+          },
+          url: 'test-url',
+          scopeChain: [{
+            type: scopeType,
+            object: {type: 'object'} as Protocol.Runtime.RemoteObject,
+          }],
+          this: {type: 'object'} as Protocol.Runtime.RemoteObject,
+          returnValue: undefined,
+          canBeRestarted: false,
+        };
+        const callFrame = new SDK.DebuggerModel.CallFrame(debuggerModel, script, payload, 0);
+        const scope = new SDK.DebuggerModel.Scope(callFrame, 0);
+        assert.notEqual('', scope.typeName());
+      }
+    });
+  });
+
+  describe('pause', () => {
+    let target: SDK.Target.Target;
+    let backend: MockProtocolBackend;
+    let debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding;
+
+    beforeEach(() => {
+      target = createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.Frame});
+      const targetManager = target.targetManager();
+      const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+      const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+      debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(
+          {forceNew: false, resourceMapping, targetManager});
+      backend = new MockProtocolBackend();
+      Bindings.IgnoreListManager.IgnoreListManager.instance({forceNew: false, debuggerWorkspaceBinding});
+    });
+
+    it('with empty call frame list will invoke plain step-into', async () => {
+      const stepIntoRequestPromise = new Promise<void>(resolve => {
+        setMockConnectionResponseHandler('Debugger.stepInto', () => {
+          resolve();
+          return {};
+        });
+      });
+      backend.dispatchDebuggerPauseWithNoCallFrames(target, Protocol.Debugger.PausedEventReason.Other);
+      await stepIntoRequestPromise;
+    });
+  });
 });
 
-describeWithEnvironment('LocationRanges', () => {
-  let SDK: typeof SDKModule;
-  before(async () => {
-    SDK = await import('../../../../../front_end/core/sdk/sdk.js');
-  });
-
-  function createRange(
-      scriptId: Protocol.Runtime.ScriptId, startLine: number, startColumn: number, endLine: number, endColumn: number) {
-    return new SDK.DebuggerModel.LocationRange(
-        scriptId, new SDK.DebuggerModel.ScriptPosition(startLine, startColumn),
-        new SDK.DebuggerModel.ScriptPosition(endLine, endColumn));
-  }
-
-  function sort(locationRange: SDKModule.DebuggerModel.LocationRange[]) {
-    return locationRange.concat().sort(SDK.DebuggerModel.LocationRange.comparator);
-  }
-
-  function sortAndMerge(locationRange: SDKModule.DebuggerModel.LocationRange[]) {
-    return SDK.DebuggerModel.sortAndMergeRanges(locationRange.concat());
-  }
-
-  function checkIsMaximallyMerged(locationRange: SDKModule.DebuggerModel.LocationRange[]) {
-    for (let i = 1; i < locationRange.length; ++i) {
-      assert.isTrue(locationRange[i - 1].compareTo(locationRange[i]) < 0);
+describe('DebuggerModel', () => {
+  describe('sortAndMergeRanges', () => {
+    function createRange(
+        scriptId: Protocol.Runtime.ScriptId, startLine: number, startColumn: number, endLine: number,
+        endColumn: number): Protocol.Debugger.LocationRange {
+      return {
+        scriptId,
+        start: {lineNumber: startLine, columnNumber: startColumn},
+        end: {lineNumber: endLine, columnNumber: endColumn},
+      };
     }
-  }
 
-  it('can be sorted after scriptId', () => {
-    const locationRanges = [
-      createRange(SCRIPT_ID_TWO, 0, 0, 0, 0),
-      createRange(SCRIPT_ID_ONE, 0, 0, 0, 0),
-    ];
-    const sorted = sort(locationRanges);
-    assert.deepEqual(sorted, locationRanges.reverse());
-  });
+    function sortAndMerge(locationRange: Protocol.Debugger.LocationRange[]) {
+      return SDK.DebuggerModel.sortAndMergeRanges(locationRange.concat());
+    }
 
-  it('can be sorted after line number', () => {
-    let locationRanges = [
-      createRange(SCRIPT_ID_ONE, 3, 0, 0, 0),
-      createRange(SCRIPT_ID_ONE, 0, 0, 0, 0),
-    ];
-    let sorted = sort(locationRanges);
-    assert.deepEqual(sorted, locationRanges.reverse());
+    function assertIsMaximallyMerged(locationRange: Protocol.Debugger.LocationRange[]) {
+      for (let i = 1; i < locationRange.length; ++i) {
+        const prev = locationRange[i - 1];
+        const curr = locationRange[i];
+        assert.isTrue(prev.scriptId <= curr.scriptId);
+        if (prev.scriptId === curr.scriptId) {
+          assert.isTrue(prev.end.lineNumber <= curr.start.lineNumber);
+          if (prev.end.lineNumber === curr.start.lineNumber) {
+            assert.isTrue(prev.end.columnNumber <= curr.start.columnNumber);
+          }
+        }
+      }
+    }
 
-    locationRanges = [
-      createRange(SCRIPT_ID_ONE, 0, 0, 3, 0),
-      createRange(SCRIPT_ID_ONE, 0, 0, 0, 0),
-    ];
-    sorted = sort(locationRanges);
-    assert.deepEqual(sorted, locationRanges.reverse());
-  });
+    it('can be reduced if equal', () => {
+      const testRange = createRange(SCRIPT_ID_ONE, 0, 3, 3, 3);
+      const locationRangesToBeReduced = [
+        testRange,
+        testRange,
+      ];
+      const reduced = sortAndMerge(locationRangesToBeReduced);
+      assert.deepEqual(reduced, [testRange]);
+      assertIsMaximallyMerged(reduced);
+    });
 
-  it('can be sorted after column number', () => {
-    let locationRanges = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 0, 0),
-      createRange(SCRIPT_ID_ONE, 0, 0, 0, 0),
-    ];
-    let sorted = sort(locationRanges);
-    assert.deepEqual(sorted, locationRanges.reverse());
+    it('can be reduced if overlapping (multiple ranges)', () => {
+      const locationRangesToBeReduced = [
+        createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
+        createRange(SCRIPT_ID_ONE, 0, 3, 3, 3),
+        createRange(SCRIPT_ID_ONE, 5, 3, 10, 10),
+        createRange(SCRIPT_ID_TWO, 5, 4, 10, 10),
+      ];
+      const locationRangesExpected = [
+        createRange(SCRIPT_ID_ONE, 0, 3, 10, 10),
+        locationRangesToBeReduced[3],
+      ];
+      const reduced = sortAndMerge(locationRangesToBeReduced);
+      assert.deepEqual(reduced, locationRangesExpected);
+      assertIsMaximallyMerged(reduced);
+    });
 
-    locationRanges = [
-      createRange(SCRIPT_ID_ONE, 0, 0, 0, 3),
-      createRange(SCRIPT_ID_ONE, 0, 0, 0, 0),
-    ];
-    sorted = sort(locationRanges);
-    assert.deepEqual(sorted, locationRanges.reverse());
-  });
+    it('can be reduced if overlapping (same start, different end)', () => {
+      const locationRangesToBeReduced = [
+        createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
+        createRange(SCRIPT_ID_ONE, 0, 5, 3, 3),
+      ];
+      const locationRangesExpected = [
+        createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
+      ];
+      const reduced = sortAndMerge(locationRangesToBeReduced);
+      assert.deepEqual(reduced, locationRangesExpected);
+      assertIsMaximallyMerged(reduced);
+    });
 
-  it('can be sorted by scriptId, line and column', () => {
-    const locationRangesExpected = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 0, 0),
-      createRange(SCRIPT_ID_ONE, 0, 3, 0, 5),
-      createRange(SCRIPT_ID_TWO, 3, 3, 3, 5),
-      createRange(SCRIPT_ID_TWO, 5, 4, 5, 8),
-    ];
+    it('can be reduced if overlapping (different start, same end)', () => {
+      const locationRangesToBeReduced = [
+        createRange(SCRIPT_ID_ONE, 0, 3, 5, 3),
+        createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
+      ];
+      const locationRangesExpected = [
+        createRange(SCRIPT_ID_ONE, 0, 3, 5, 3),
+      ];
+      const reduced = sortAndMerge(locationRangesToBeReduced);
+      assert.deepEqual(reduced, locationRangesExpected);
+      assertIsMaximallyMerged(reduced);
+    });
 
-    const locationRangeToSort = [
-      locationRangesExpected[3],
-      locationRangesExpected[1],
-      locationRangesExpected[2],
-      locationRangesExpected[0],
-    ];
-
-    const sorted = sort(locationRangeToSort);
-    assert.deepEqual(sorted, locationRangesExpected);
-  });
-
-  it('correctly checks overlap', () => {
-    const location1 = createRange(SCRIPT_ID_ONE, 1, 0, 3, 0);
-    const location2 = createRange(SCRIPT_ID_ONE, 0, 0, 5, 0);
-
-    assert.isTrue(location1.overlap(location2));
-    assert.isTrue(location2.overlap(location1));
-    assert.isTrue(location1.overlap(location1));
-  });
-
-  it('correctly checks overlap (end and start overlapping)', () => {
-    const location1 = createRange(SCRIPT_ID_ONE, 1, 0, 3, 0);
-    const location2 = createRange(SCRIPT_ID_ONE, 3, 0, 5, 0);
-
-    assert.isTrue(location1.overlap(location2));
-    assert.isTrue(location2.overlap(location1));
-    assert.isTrue(location1.overlap(location1));
-  });
-
-  it('correctly checks non-overlap', () => {
-    const location1 = createRange(SCRIPT_ID_TWO, 1, 0, 3, 0);
-    const location2 = createRange(SCRIPT_ID_ONE, 3, 1, 5, 0);
-
-    assert.isFalse(location1.overlap(location2));
-    assert.isFalse(location2.overlap(location1));
-  });
-
-  it('can be reduced if equal', () => {
-    const testRange = createRange(SCRIPT_ID_ONE, 0, 3, 3, 3);
-    const locationRangesToBeReduced = [
-      testRange,
-      testRange,
-    ];
-    const reduced = sortAndMerge(locationRangesToBeReduced);
-    assert.deepEqual(reduced, [testRange]);
-    checkIsMaximallyMerged(reduced);
-  });
-
-  it('can be reduced if overlapping (multiple ranges)', () => {
-    const locationRangesToBeReduced = [
-      createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
-      createRange(SCRIPT_ID_ONE, 0, 3, 3, 3),
-      createRange(SCRIPT_ID_ONE, 5, 3, 10, 10),
-      createRange(SCRIPT_ID_TWO, 5, 4, 10, 10),
-    ];
-    const locationRangesExpected = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 10, 10),
-      locationRangesToBeReduced[3],
-    ];
-    const reduced = sortAndMerge(locationRangesToBeReduced);
-    assert.deepEqual(reduced, locationRangesExpected);
-    checkIsMaximallyMerged(reduced);
-  });
-
-  it('can be reduced if overlapping (same start, different end)', () => {
-    const locationRangesToBeReduced = [
-      createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
-      createRange(SCRIPT_ID_ONE, 0, 5, 3, 3),
-    ];
-    const locationRangesExpected = [
-      createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
-    ];
-    const reduced = sortAndMerge(locationRangesToBeReduced);
-    assert.deepEqual(reduced, locationRangesExpected);
-    checkIsMaximallyMerged(reduced);
-  });
-
-  it('can be reduced if overlapping (different start, same end)', () => {
-    const locationRangesToBeReduced = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 5, 3),
-      createRange(SCRIPT_ID_ONE, 0, 5, 5, 3),
-    ];
-    const locationRangesExpected = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 5, 3),
-    ];
-    const reduced = sortAndMerge(locationRangesToBeReduced);
-    assert.deepEqual(reduced, locationRangesExpected);
-    checkIsMaximallyMerged(reduced);
-  });
-
-  it('can be reduced if overlapping (start == other.end)', () => {
-    const locationRangesToBeReduced = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 5, 3),
-      createRange(SCRIPT_ID_ONE, 5, 3, 10, 3),
-    ];
-    const locationRangesExpected = [
-      createRange(SCRIPT_ID_ONE, 0, 3, 10, 3),
-    ];
-    const reduced = sortAndMerge(locationRangesToBeReduced);
-    assert.deepEqual(reduced, locationRangesExpected);
-    checkIsMaximallyMerged(reduced);
+    it('can be reduced if overlapping (start == other.end)', () => {
+      const locationRangesToBeReduced = [
+        createRange(SCRIPT_ID_ONE, 0, 3, 5, 3),
+        createRange(SCRIPT_ID_ONE, 5, 3, 10, 3),
+      ];
+      const locationRangesExpected = [
+        createRange(SCRIPT_ID_ONE, 0, 3, 10, 3),
+      ];
+      const reduced = sortAndMerge(locationRangesToBeReduced);
+      assert.deepEqual(reduced, locationRangesExpected);
+      assertIsMaximallyMerged(reduced);
+    });
   });
 });

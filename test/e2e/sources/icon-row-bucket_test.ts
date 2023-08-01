@@ -3,9 +3,19 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
-import {$$, click, goToResource, waitFor, waitForFunction, waitForWithTries} from '../../shared/helper.js';
+import {
+  $$,
+  click,
+  disableExperiment,
+  goToResource,
+  waitFor,
+  clickElement,
+  waitForFunction,
+  waitForWithTries,
+  hoverElement,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {navigateToIssuesTab} from '../helpers/issues-helpers.js';
 import {openSourcesPanel} from '../helpers/sources-helpers.js';
@@ -29,7 +39,7 @@ async function getRowsText(root: puppeteer.ElementHandle<Element>): Promise<stri
 
 async function getIconFile(iconComponent: puppeteer.ElementHandle<Element>): Promise<string> {
   const issueIcon = await waitFor('.icon-basic', iconComponent);
-  const imageSrc = await issueIcon.evaluate(x => window.getComputedStyle(x).backgroundImage);
+  const imageSrc = await issueIcon.evaluate(x => window.getComputedStyle(x).webkitMaskImage);
   const splitImageSrc = imageSrc.substring(5, imageSrc.length - 2).split('/');
   return splitImageSrc[splitImageSrc.length - 1];
 }
@@ -57,7 +67,7 @@ async function getExpandedIssuesTitle(): Promise<Set<string>> {
 
 async function waitForExpandedIssueTitle(issueIconComponent: puppeteer.ElementHandle<Element>): Promise<Set<string>> {
   return await waitForFunction(async () => {
-    await click(issueIconComponent);
+    await clickElement(issueIconComponent);
     const expandedIssues = await getExpandedIssuesTitle();
     if (expandedIssues.size) {
       return expandedIssues;
@@ -71,6 +81,15 @@ describe('The row\'s icon bucket', async function() {
     this.timeout(10000);
   }
 
+  // TODO(crbug.com/1382752): These tests currently don't interact well with pretty-printing.
+  beforeEach(async () => {
+    await disableExperiment('sourcesPrettyPrint');
+  });
+
+  // This test and the tests below require the use of unsafe hoverElement/clickElement helpers
+  // because they return a list of elements and check each one of them. Perhaps, the tests
+  // can be changed to check the elements one by one using the safer hover/click helpers.
+  // Or perhaps the tests only ever check a single element and the list checks are not needed at all.
   it('should display error messages', async () => {
     await openFileInSourceTab('trusted-type-policy-violation-report-only.rawresponse');
     const iconComponents = await getIconComponents('cm-messageIcon-error');
@@ -79,7 +98,7 @@ describe('The row\'s icon bucket', async function() {
       '[Report Only] Refused to create a TrustedTypePolicy named \'policy2\' because it violates the following Content Security Policy directive: "trusted-types policy1".',
     ];
     for (const iconComponent of iconComponents) {
-      await iconComponent.hover();
+      await hoverElement(iconComponent);
       const vbox = await waitFor('div.vbox.flex-auto.no-pointer-events');
       const rowMessages = await getRowsText(vbox);
       messages.push(...rowMessages);
@@ -91,13 +110,13 @@ describe('The row\'s icon bucket', async function() {
     await openFileInSourceTab('trusted-type-violations-report-only.rawresponse');
     const bucketIconComponents = await getIconComponents('cm-messageIcon-error');
     for (const bucketIconComponent of bucketIconComponents) {
-      await bucketIconComponent.hover();
+      await hoverElement(bucketIconComponent);
       const vbox = await waitFor('div.vbox.flex-auto.no-pointer-events');
       const iconComponents = await getIconComponents('text-editor-row-message-icon', vbox);
       for (const iconComponent of iconComponents) {
-        assert.strictEqual(await getIconFile(iconComponent), 'error_icon.svg');
+        assert.strictEqual(await getIconFile(iconComponent), 'cross-circle-filled.svg');
       }
-      assert.strictEqual(await getIconFile(bucketIconComponent), 'error_icon.svg');
+      assert.strictEqual(await getIconFile(bucketIconComponent), 'cross-circle-filled.svg');
     }
   });
 
@@ -111,7 +130,7 @@ describe('The row\'s icon bucket', async function() {
       'Trusted Type expected, but String received',
     ];
     for (const issueIconComponent of issueIconComponents) {
-      await issueIconComponent.hover();
+      await hoverElement(issueIconComponent);
       const vbox = await waitFor('div.vbox.flex-auto.no-pointer-events');
       const rowMessages = await getRowsText(vbox);
       issueMessages.push(...rowMessages);
@@ -136,7 +155,7 @@ describe('The row\'s icon bucket', async function() {
     const bucketIssueIconComponents = await getIconComponents('cm-messageIcon-issue');
     assert.strictEqual(bucketIssueIconComponents.length, 1);
     const issueIconComponent = bucketIssueIconComponents[0];
-    await click(issueIconComponent);
+    await clickElement(issueIconComponent);
 
     const expandedIssues = await waitForExpandedIssueTitle(issueIconComponent);
     assert.isTrue(expandedIssues.has('Trusted Type policy creation blocked by Content Security Policy'));

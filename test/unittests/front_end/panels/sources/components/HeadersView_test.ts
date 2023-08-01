@@ -2,12 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../../../../front_end/core/host/host.js';
 import * as Workspace from '../../../../../../front_end/models/workspace/workspace.js';
 import * as SourcesComponents from '../../../../../../front_end/panels/sources/components/components.js';
 import * as Coordinator from '../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
-import {assertElement, assertShadowRoot, dispatchKeyDownEvent, renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
+import * as UI from '../../../../../../front_end/ui/legacy/legacy.js';
+import {
+  assertElement,
+  assertShadowRoot,
+  dispatchFocusEvent,
+  dispatchFocusOutEvent,
+  dispatchInputEvent,
+  dispatchKeyDownEvent,
+  dispatchPasteEvent,
+  renderElementIntoDOM,
+} from '../../../helpers/DOMHelpers.js';
 import {deinitializeGlobalVars, initializeGlobalVars} from '../../../helpers/EnvironmentHelpers.js';
-import {createUISourceCode} from '../../../helpers/UISourceCodeHelpers.js';
+import {createFileSystemUISourceCode} from '../../../helpers/UISourceCodeHelpers.js';
+import {recordedMetricsContain, resetRecordedMetrics} from '../../../helpers/UserMetricsHelpers.js';
 
 import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
 
@@ -15,11 +27,19 @@ const {assert} = chai;
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 describe('HeadersView', async () => {
+  const commitWorkingCopySpy = sinon.spy();
+
   before(async () => {
     await initializeGlobalVars();
   });
+
   after(async () => {
     await deinitializeGlobalVars();
+  });
+
+  beforeEach(() => {
+    commitWorkingCopySpy.resetHistory();
+    resetRecordedMetrics();
   });
 
   async function renderEditor(): Promise<SourcesComponents.HeadersView.HeadersViewComponent> {
@@ -53,6 +73,7 @@ describe('HeadersView', async () => {
       uiSourceCode: {
         name: () => '.headers',
         setWorkingCopy: () => {},
+        commitWorkingCopy: commitWorkingCopySpy,
       } as unknown as Workspace.UISourceCode.UISourceCode,
     };
     renderElementIntoDOM(editor);
@@ -66,23 +87,31 @@ describe('HeadersView', async () => {
     const headers = `[
       {
         "applyTo": "*",
-        "headers": {
-          "server": "DevTools Unit Test Server",
-          "access-control-allow-origin": "*"
-        }
+        "headers": [
+          {
+            "name": "server",
+            "value": "DevTools Unit Test Server"
+          },
+          {
+            "name": "access-control-allow-origin",
+            "value": "*"
+          }
+        ]
       },
       {
         "applyTo": "*.jpg",
-        "headers": {
-          "jpg-header": "only for jpg files"
-        }
+        "headers": [{
+          "name": "jpg-header",
+          "value": "only for jpg files"
+        }]
       }
     ]`;
-    const {uiSourceCode, project} = createUISourceCode({
+    const {uiSourceCode, project} = createFileSystemUISourceCode({
       url: 'file:///path/to/overrides/example.html' as Platform.DevToolsPath.UrlString,
       mimeType: 'text/html',
       content: headers,
     });
+    uiSourceCode.commitWorkingCopy = commitWorkingCopySpy;
     project.canSetFileContent = () => true;
 
     const editorWrapper = new SourcesComponents.HeadersView.HeadersView(uiSourceCode);
@@ -97,12 +126,14 @@ describe('HeadersView', async () => {
   }
 
   async function changeEditable(editable: HTMLElement, value: string): Promise<void> {
-    editable.focus();
+    dispatchFocusEvent(editable, {bubbles: true});
     editable.innerText = value;
-    dispatchKeyDownEvent(editable, {
-      key: 'Enter',
-    });
+    dispatchInputEvent(editable, {inputType: 'insertText', data: value, bubbles: true, composed: true});
+    dispatchFocusOutEvent(editable, {bubbles: true});
     await coordinator.done();
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
   }
 
   async function pressButton(shadowRoot: ShadowRoot, rowIndex: number, selector: string): Promise<void> {
@@ -116,8 +147,18 @@ describe('HeadersView', async () => {
   function getRowContent(shadowRoot: ShadowRoot): string[] {
     const rows = Array.from(shadowRoot.querySelectorAll('.row'));
     return rows.map(row => {
-      return Array.from(row.querySelectorAll('div, .editable')).map(element => element.textContent).join('');
+      return Array.from(row.querySelectorAll('div, .editable'))
+          .map(element => (element as HTMLElement).innerText)
+          .join('');
     });
+  }
+
+  function getSingleRowContent(shadowRoot: ShadowRoot, rowIndex: number): string {
+    const rows = Array.from(shadowRoot.querySelectorAll('.row'));
+    assert.isTrue(rows.length > rowIndex);
+    return Array.from(rows[rowIndex].querySelectorAll('div, .editable'))
+        .map(element => (element as HTMLElement).innerText)
+        .join('');
   }
 
   function isWholeElementContentSelected(element: HTMLElement): boolean {
@@ -166,7 +207,15 @@ describe('HeadersView', async () => {
       'jpg-header:only for jpg files',
     ]);
 
-    const editables = editor.shadowRoot?.querySelectorAll('.editable');
+    const addRuleButton = editor.shadowRoot.querySelector('.add-block');
+    assertElement(addRuleButton, HTMLElement);
+    assert.strictEqual(addRuleButton.textContent?.trim(), 'Add override rule');
+
+    const learnMoreLink = editor.shadowRoot.querySelector('.learn-more-row x-link');
+    assertElement(learnMoreLink, HTMLElement);
+    assert.strictEqual(learnMoreLink.title, 'https://goo.gle/devtools-override');
+
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
     await changeEditable(editables[0] as HTMLElement, 'index.html');
     await changeEditable(editables[1] as HTMLElement, 'content-type');
     await changeEditable(editables[4] as HTMLElement, 'example.com');
@@ -180,12 +229,45 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:is image',
     ]);
+    assert.strictEqual(commitWorkingCopySpy.callCount, 4);
+  });
+
+  it('resets edited value to previous state on Escape key', async () => {
+    const editor = await renderEditor();
+    assertShadowRoot(editor.shadowRoot);
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 1), 'server:DevTools Unit Test Server');
+
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
+    assert.strictEqual(editables.length, 8);
+    const headerValue = editables[2] as HTMLElement;
+    headerValue.focus();
+    headerValue.innerText = 'discard_me';
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 1), 'server:discard_me');
+
+    dispatchKeyDownEvent(headerValue, {
+      key: 'Escape',
+      bubbles: true,
+    });
+    await coordinator.done();
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 1), 'server:DevTools Unit Test Server');
+
+    const headerName = editables[1] as HTMLElement;
+    headerName.focus();
+    headerName.innerText = 'discard_me_2';
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 1), 'discard_me_2:DevTools Unit Test Server');
+
+    dispatchKeyDownEvent(headerName, {
+      key: 'Escape',
+      bubbles: true,
+    });
+    await coordinator.done();
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 1), 'server:DevTools Unit Test Server');
   });
 
   it('selects the whole content when clicking on an editable field', async () => {
     const editor = await renderEditor();
     assertShadowRoot(editor.shadowRoot);
-    const editables = editor.shadowRoot?.querySelectorAll('.editable');
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
 
     let element = editables[0] as HTMLElement;
     element.focus();
@@ -203,7 +285,7 @@ describe('HeadersView', async () => {
   it('un-selects the content when an editable field loses focus', async () => {
     const editor = await renderEditor();
     assertShadowRoot(editor.shadowRoot);
-    const editables = editor.shadowRoot?.querySelectorAll('.editable');
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
 
     const element = editables[0] as HTMLElement;
     element.focus();
@@ -212,23 +294,85 @@ describe('HeadersView', async () => {
     assert.isFalse(element.hasSelection());
   });
 
-  it('moves focus to the next field when pressing \'Enter\'', async () => {
+  it('handles pressing \'Enter\' key by removing focus and moving it to the next field if possible', async () => {
     const editor = await renderEditor();
     assertShadowRoot(editor.shadowRoot);
-    const editables = editor.shadowRoot?.querySelectorAll('.editable');
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
+    assert.strictEqual(editables.length, 8);
 
-    const first = editables[1] as HTMLSpanElement;
-    const second = editables[2] as HTMLElement;
-    assert.isFalse(first.hasSelection());
-    assert.isFalse(second.hasSelection());
+    const lastHeaderName = editables[6] as HTMLSpanElement;
+    const lastHeaderValue = editables[7] as HTMLSpanElement;
+    assert.isFalse(lastHeaderName.hasSelection());
+    assert.isFalse(lastHeaderValue.hasSelection());
 
-    first.focus();
-    assert.isTrue(isWholeElementContentSelected(first));
-    assert.isFalse(second.hasSelection());
+    lastHeaderName.focus();
+    assert.isTrue(isWholeElementContentSelected(lastHeaderName));
+    assert.isFalse(lastHeaderValue.hasSelection());
 
-    dispatchKeyDownEvent(first, {key: 'Enter', bubbles: true});
-    assert.isFalse(first.hasSelection());
-    assert.isTrue(isWholeElementContentSelected(second));
+    dispatchKeyDownEvent(lastHeaderName, {key: 'Enter', bubbles: true});
+    assert.isFalse(lastHeaderName.hasSelection());
+    assert.isTrue(isWholeElementContentSelected(lastHeaderValue));
+
+    dispatchKeyDownEvent(lastHeaderValue, {key: 'Enter', bubbles: true});
+    for (const editable of editables) {
+      assert.isFalse(editable.hasSelection());
+    }
+  });
+
+  it('sets empty \'ApplyTo\' to \'*\'', async () => {
+    const editor = await renderEditor();
+    assertShadowRoot(editor.shadowRoot);
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
+    assert.strictEqual(editables.length, 8);
+
+    const applyTo = editables[5] as HTMLSpanElement;
+    assert.strictEqual(applyTo.innerHTML, '*.jpg');
+
+    applyTo.innerText = '';
+    dispatchInputEvent(applyTo, {inputType: 'deleteContentBackward', data: null, bubbles: true});
+    assert.strictEqual(applyTo.innerHTML, '');
+
+    dispatchFocusOutEvent(applyTo, {bubbles: true});
+    assert.strictEqual(applyTo.innerHTML, '*');
+    assert.strictEqual(commitWorkingCopySpy.callCount, 1);
+  });
+
+  it('removes the entire header when the header name is deleted', async () => {
+    const editor = await renderEditorWithinWrapper();
+    assertShadowRoot(editor.shadowRoot);
+    let rows = getRowContent(editor.shadowRoot);
+    assert.deepEqual(rows, [
+      'Apply to:*',
+      'server:DevTools Unit Test Server',
+      'access-control-allow-origin:*',
+      'Apply to:*.jpg',
+      'jpg-header:only for jpg files',
+    ]);
+
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
+    assert.strictEqual(editables.length, 8);
+
+    const headerName = editables[1] as HTMLSpanElement;
+    assert.strictEqual(headerName.innerHTML, 'server');
+
+    headerName.innerText = '';
+    dispatchInputEvent(headerName, {inputType: 'deleteContentBackward', data: null, bubbles: true});
+    assert.strictEqual(headerName.innerHTML, '');
+
+    dispatchFocusOutEvent(headerName, {bubbles: true});
+    await coordinator.done();
+
+    rows = getRowContent(editor.shadowRoot);
+    assert.deepEqual(rows, [
+      'Apply to:*',
+      'access-control-allow-origin:*',
+      'Apply to:*.jpg',
+      'jpg-header:only for jpg files',
+    ]);
+    assert.strictEqual(commitWorkingCopySpy.callCount, 1);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
   });
 
   it('allows adding headers', async () => {
@@ -251,13 +395,16 @@ describe('HeadersView', async () => {
     assert.deepEqual(rows, [
       'Apply to:*',
       'server:DevTools Unit Test Server',
-      'headerName1:headerValue',
+      'header-name-1:header value',
       'access-control-allow-origin:*',
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
 
-    const editables = editor.shadowRoot?.querySelectorAll('.editable');
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
     await changeEditable(editables[3] as HTMLElement, 'cache-control');
     await changeEditable(editables[4] as HTMLElement, 'max-age=1000');
 
@@ -299,10 +446,13 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
       'Apply to:*',
-      'headerName:headerValue',
+      'header-name-1:header value',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
 
-    const editables = editor.shadowRoot?.querySelectorAll('.editable');
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
     await changeEditable(editables[8] as HTMLElement, 'articles/*');
     await changeEditable(editables[9] as HTMLElement, 'cache-control');
     await changeEditable(editables[10] as HTMLElement, 'max-age=1000');
@@ -342,13 +492,16 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
 
     await pressButton(editor.shadowRoot, 1, '.remove-header');
 
     rows = getRowContent(editor.shadowRoot);
     assert.deepEqual(rows, [
       'Apply to:*',
-      'headerName1:headerValue',
+      'header-name-1:header value',
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
@@ -375,5 +528,36 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
+  });
+
+  it('removes formatting for pasted content', async () => {
+    const editor = await renderEditor();
+    assertShadowRoot(editor.shadowRoot);
+    const editables = editor.shadowRoot.querySelectorAll('.editable');
+    assert.strictEqual(editables.length, 8);
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 2), 'access-control-allow-origin:*');
+
+    const headerValue = editables[4] as HTMLSpanElement;
+    headerValue.focus();
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'foo\nbar');
+    dt.setData('text/html', 'This is <b>bold</b>');
+    dispatchPasteEvent(headerValue, {clipboardData: dt, bubbles: true});
+    await coordinator.done();
+    assert.deepEqual(getSingleRowContent(editor.shadowRoot, 2), 'access-control-allow-origin:foo bar');
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
+  });
+
+  it('shows context menu', async () => {
+    const editor = await renderEditor();
+    assertShadowRoot(editor.shadowRoot);
+    const contextMenuShow = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
+    editor.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true}));
+    assert.isTrue(contextMenuShow.calledOnce);
   });
 });

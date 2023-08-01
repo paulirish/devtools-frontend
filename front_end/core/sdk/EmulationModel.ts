@@ -9,8 +9,8 @@ import * as Protocol from '../../generated/protocol.js';
 import {CSSModel} from './CSSModel.js';
 import {MultitargetNetworkManager} from './NetworkManager.js';
 import {Events, OverlayModel} from './OverlayModel.js';
-import type {Target} from './Target.js';
-import {Capability} from './Target.js';
+
+import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 
 export class EmulationModel extends SDKModel<void> {
@@ -21,6 +21,7 @@ export class EmulationModel extends SDKModel<void> {
   readonly #mediaConfiguration: Map<string, string>;
   #touchEnabled: boolean;
   #touchMobile: boolean;
+  #touchEmulationAllowed: boolean;
   #customTouchEnabled: boolean;
   #touchConfiguration: {
     enabled: boolean,
@@ -80,6 +81,8 @@ export class EmulationModel extends SDKModel<void> {
         Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeaturePrefersContrast');
     const mediaFeaturePrefersReducedDataSetting =
         Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeaturePrefersReducedData');
+    const mediaFeaturePrefersReducedTransparencySetting =
+        Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeaturePrefersReducedTransparency');
     const mediaFeaturePrefersReducedMotionSetting =
         Common.Settings.Settings.instance().moduleSetting<string>('emulatedCSSMediaFeaturePrefersReducedMotion');
     // Note: this uses a different format than what the CDP API expects,
@@ -94,6 +97,7 @@ export class EmulationModel extends SDKModel<void> {
       ['prefers-contrast', mediaFeaturePrefersContrastSetting.get()],
       ['prefers-reduced-data', mediaFeaturePrefersReducedDataSetting.get()],
       ['prefers-reduced-motion', mediaFeaturePrefersReducedMotionSetting.get()],
+      ['prefers-reduced-transparency', mediaFeaturePrefersReducedTransparencySetting.get()],
     ]);
     mediaTypeSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('type', mediaTypeSetting.get());
@@ -121,6 +125,10 @@ export class EmulationModel extends SDKModel<void> {
     });
     mediaFeaturePrefersReducedMotionSetting.addChangeListener(() => {
       this.#mediaConfiguration.set('prefers-reduced-motion', mediaFeaturePrefersReducedMotionSetting.get());
+      void this.updateCssMedia();
+    });
+    mediaFeaturePrefersReducedTransparencySetting.addChangeListener(() => {
+      this.#mediaConfiguration.set('prefers-reduced-transparency', mediaFeaturePrefersReducedTransparencySetting.get());
       void this.updateCssMedia();
     });
     void this.updateCssMedia();
@@ -151,16 +159,12 @@ export class EmulationModel extends SDKModel<void> {
     }
 
     const avifFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('avifFormatDisabled');
-    const jpegXlFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('jpegXlFormatDisabled');
     const webpFormatDisabledSetting = Common.Settings.Settings.instance().moduleSetting('webpFormatDisabled');
 
     const updateDisabledImageFormats = (): void => {
       const types = [];
       if (avifFormatDisabledSetting.get()) {
         types.push(Protocol.Emulation.DisabledImageType.Avif);
-      }
-      if (jpegXlFormatDisabledSetting.get()) {
-        types.push(Protocol.Emulation.DisabledImageType.Jxl);
       }
       if (webpFormatDisabledSetting.get()) {
         types.push(Protocol.Emulation.DisabledImageType.Webp);
@@ -170,12 +174,12 @@ export class EmulationModel extends SDKModel<void> {
 
     avifFormatDisabledSetting.addChangeListener(updateDisabledImageFormats);
     webpFormatDisabledSetting.addChangeListener(updateDisabledImageFormats);
-    jpegXlFormatDisabledSetting.addChangeListener(updateDisabledImageFormats);
 
-    if (avifFormatDisabledSetting.get() || jpegXlFormatDisabledSetting.get() || webpFormatDisabledSetting.get()) {
+    if (avifFormatDisabledSetting.get() || webpFormatDisabledSetting.get()) {
       updateDisabledImageFormats();
     }
 
+    this.#touchEmulationAllowed = true;
     this.#touchEnabled = false;
     this.#touchMobile = false;
     this.#customTouchEnabled = false;
@@ -183,6 +187,10 @@ export class EmulationModel extends SDKModel<void> {
       enabled: false,
       configuration: Protocol.Emulation.SetEmitTouchEventsForMouseRequestConfiguration.Mobile,
     };
+  }
+
+  setTouchEmulationAllowed(touchEmulationAllowed: boolean): void {
+    this.#touchEmulationAllowed = touchEmulationAllowed;
   }
 
   supportsDeviceEmulation(): boolean {
@@ -314,14 +322,21 @@ export class EmulationModel extends SDKModel<void> {
     await this.#emulationAgent.invoke_setCPUThrottlingRate({rate});
   }
 
+  async setHardwareConcurrency(hardwareConcurrency: number): Promise<void> {
+    if (hardwareConcurrency < 1) {
+      throw new Error('hardwareConcurrency must be a positive value');
+    }
+    await this.#emulationAgent.invoke_setHardwareConcurrencyOverride({hardwareConcurrency});
+  }
+
   async emulateTouch(enabled: boolean, mobile: boolean): Promise<void> {
-    this.#touchEnabled = enabled;
-    this.#touchMobile = mobile;
+    this.#touchEnabled = enabled && this.#touchEmulationAllowed;
+    this.#touchMobile = mobile && this.#touchEmulationAllowed;
     await this.updateTouch();
   }
 
   async overrideEmulateTouch(enabled: boolean): Promise<void> {
-    this.#customTouchEnabled = enabled;
+    this.#customTouchEnabled = enabled && this.#touchEmulationAllowed;
     await this.updateTouch();
   }
 
@@ -386,6 +401,10 @@ export class EmulationModel extends SDKModel<void> {
       {
         name: 'prefers-reduced-motion',
         value: this.#mediaConfiguration.get('prefers-reduced-motion') ?? '',
+      },
+      {
+        name: 'prefers-reduced-transparency',
+        value: this.#mediaConfiguration.get('prefers-reduced-transparency') ?? '',
       },
     ];
     return this.emulateCSSMedia(type, features);

@@ -9,6 +9,7 @@
  * Note that `resetTestDOM` is automatically run before each test (see `test_setup.ts`).
  **/
 
+import type * as NodeText from '../../../../front_end/ui/components/node_text/node_text.js';
 const {assert} = chai;
 
 const TEST_CONTAINER_ID = '__devtools-test-container-id';
@@ -31,7 +32,7 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
   const allowMultipleChildren = Boolean(renderOptions.allowMultipleChildren);
 
   if (container.childNodes.length !== 0 && !allowMultipleChildren) {
-    assert.fail('renderIntoDOM expects the container to be empty');
+    assert.fail('renderIntoDOM expects the container to be empty ' + container.innerHTML);
     return;
   }
 
@@ -39,6 +40,25 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
   return element;
 };
 
+function removeChildren(node: Node): void {
+  while (node.firstChild) {
+    const child = node.firstChild;
+    if (child.__widget) {
+      // Child is a widget, so we have to use the Widget system to remove it from the DOM.
+      child.__widget.detach();
+    } else if (child.__widgetCounter) {
+      // If an element has __widgetCounter, this means it is not a widget
+      // itself, but at least one of its children are, so we now recurse
+      // on this element's children. If we try to just remove this
+      // element, we will get errors about removing widgets using regular
+      // DOM operations.
+      removeChildren(child);
+    } else {
+      // Non-widget element, so remove using normal DOM APIs.
+      node.removeChild(child);
+    }
+  }
+}
 /**
  * Completely cleans out the test DOM to ensure it's empty for the next test run.
  * This is run automatically between tests - you should not be manually calling this yourself.
@@ -46,6 +66,7 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
 export const resetTestDOM = () => {
   const previousContainer = document.getElementById(TEST_CONTAINER_ID);
   if (previousContainer) {
+    removeChildren(previousContainer);
     previousContainer.remove();
   }
 
@@ -155,6 +176,11 @@ export function dispatchKeyDownEvent<T extends Element>(element: T, options: Key
   }
 }
 
+export function dispatchInputEvent<T extends Element>(element: T, options: InputEventInit = {}) {
+  const inputEvent = new InputEvent('input', options);
+  element.dispatchEvent(inputEvent);
+}
+
 /**
  * Dispatches a mouse over event.
  */
@@ -187,6 +213,22 @@ export function dispatchMouseLeaveEvent<T extends Element>(element: T, options: 
 }
 
 /**
+ * Dispatches a clipboard copy event.
+ */
+export function dispatchCopyEvent<T extends Element>(element: T, options: ClipboardEventInit = {}) {
+  const copyEvent = new ClipboardEvent('copy', options);
+  element.dispatchEvent(copyEvent);
+}
+
+/**
+ * Dispatches a clipboard paste event.
+ */
+export function dispatchPasteEvent<T extends Element>(element: T, options: ClipboardEventInit = {}) {
+  const pasteEvent = new ClipboardEvent('paste', options);
+  element.dispatchEvent(pasteEvent);
+}
+
+/**
  * Listens to an event of an element and returns a Promise that resolves to the
  * specified event type.
  */
@@ -207,11 +249,11 @@ export async function raf() {
 }
 
 /**
-  * It's useful to use innerHTML in the tests to have full confidence in the
-  * renderer output, but LitHtml uses comment nodes to split dynamic from
-  * static parts of a template, and we don't want our tests full of noise
-  * from those.
-  */
+ * It's useful to use innerHTML in the tests to have full confidence in the
+ * renderer output, but LitHtml uses comment nodes to split dynamic from
+ * static parts of a template, and we don't want our tests full of noise
+ * from those.
+ */
 export function stripLitHtmlCommentNodes(text: string) {
   /**
    * LitHtml comments take the form of:
@@ -226,9 +268,24 @@ export function stripLitHtmlCommentNodes(text: string) {
  * Returns an array of textContents.
  * Multiple consecutive newLine and space characters are removed.
  */
-export function getCleanTextContentFromElements(shadowRoot: ShadowRoot, selector: string): string[] {
-  const elements = Array.from(shadowRoot.querySelectorAll(selector));
+export function getCleanTextContentFromElements(el: ShadowRoot|HTMLElement, selector: string): string[] {
+  const elements = Array.from(el.querySelectorAll(selector));
   return elements.map(element => {
     return element.textContent ? element.textContent.trim().replace(/[ \n]{2,}/g, '') : '';
   });
+}
+
+export function assertNodeTextContent(component: NodeText.NodeText.NodeText, expectedContent: string) {
+  assertShadowRoot(component.shadowRoot);
+  const content = Array.from(component.shadowRoot.querySelectorAll('span')).map(span => span.textContent).join('');
+  assert.strictEqual(content, expectedContent);
+}
+
+export function querySelectorErrorOnMissing<T extends HTMLElement = HTMLElement>(
+    parent: HTMLElement, selector: string): T {
+  const elem = parent.querySelector<T>(selector);
+  if (!elem) {
+    throw new Error(`Expected element with selector ${selector} not found.`);
+  }
+  return elem;
 }

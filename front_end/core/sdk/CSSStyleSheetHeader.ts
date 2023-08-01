@@ -9,20 +9,20 @@ import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 import type * as Protocol from '../../generated/protocol.js';
 
-import type {CSSModel} from './CSSModel.js';
+import {type CSSModel} from './CSSModel.js';
 import {DeferredDOMNode} from './DOMModel.js';
-import type {FrameAssociated} from './FrameAssociated.js';
-import type {PageResourceLoadInitiator} from './PageResourceLoader.js';
+import {type FrameAssociated} from './FrameAssociated.js';
+import {type PageResourceLoadInitiator} from './PageResourceLoader.js';
 import {ResourceTreeModel} from './ResourceTreeModel.js';
 
 const UIStrings = {
   /**
-  *@description Error message for when a CSS file can't be loaded
-  */
+   *@description Error message for when a CSS file can't be loaded
+   */
   couldNotFindTheOriginalStyle: 'Could not find the original style sheet.',
   /**
-  *@description Error message to display when a source CSS file could not be retrieved.
-  */
+   *@description Error message to display when a source CSS file could not be retrieved.
+   */
   thereWasAnErrorRetrievingThe: 'There was an error retrieving the source styles.',
 };
 const str_ = i18n.i18n.registerUIStrings('core/sdk/CSSStyleSheetHeader.ts', UIStrings);
@@ -47,6 +47,7 @@ export class CSSStyleSheetHeader implements TextUtils.ContentProvider.ContentPro
   contentLength: number;
   ownerNode: DeferredDOMNode|undefined;
   sourceMapURL: Platform.DevToolsPath.UrlString|undefined;
+  readonly loadingFailed: boolean;
   #originalContentProviderInternal: TextUtils.StaticContentProvider.StaticContentProvider|null;
 
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSStyleSheetHeader) {
@@ -70,6 +71,7 @@ export class CSSStyleSheetHeader implements TextUtils.ContentProvider.ContentPro
       this.ownerNode = new DeferredDOMNode(cssModel.target(), payload.ownerNode);
     }
     this.sourceMapURL = payload.sourceMapURL as Platform.DevToolsPath.UrlString;
+    this.loadingFailed = payload.loadingFailed ?? false;
     this.#originalContentProviderInternal = null;
   }
 
@@ -164,10 +166,6 @@ export class CSSStyleSheetHeader implements TextUtils.ContentProvider.ContentPro
 
   contentType(): Common.ResourceType.ResourceType {
     return Common.ResourceType.resourceTypes.Stylesheet;
-  }
-
-  contentEncoded(): Promise<boolean> {
-    return Promise.resolve(false);
   }
 
   async requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {

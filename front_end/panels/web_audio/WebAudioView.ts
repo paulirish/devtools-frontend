@@ -16,8 +16,8 @@ import {Events as ModelEvents, WebAudioModel} from './WebAudioModel.js';
 
 const UIStrings = {
   /**
-  *@description Text in Web Audio View
-  */
+   *@description Text in Web Audio View
+   */
   openAPageThatUsesWebAudioApiTo: 'Open a page that uses Web Audio API to start monitoring.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/web_audio/WebAudioView.ts', UIStrings);
@@ -87,7 +87,7 @@ export class WebAudioView extends UI.ThrottledWidget.ThrottledWidget implements
     return webAudioViewInstance;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([webAudioStyles]);
     for (const model of SDK.TargetManager.TargetManager.instance().models(WebAudioModel)) {
@@ -95,7 +95,7 @@ export class WebAudioView extends UI.ThrottledWidget.ThrottledWidget implements
     }
   }
 
-  willHide(): void {
+  override willHide(): void {
     for (const model of SDK.TargetManager.TargetManager.instance().models(WebAudioModel)) {
       this.removeEventListeners(model);
     }
@@ -111,7 +111,7 @@ export class WebAudioView extends UI.ThrottledWidget.ThrottledWidget implements
     this.removeEventListeners(webAudioModel);
   }
 
-  async doUpdate(): Promise<void> {
+  override async doUpdate(): Promise<void> {
     await this.pollRealtimeData();
     this.update();
   }

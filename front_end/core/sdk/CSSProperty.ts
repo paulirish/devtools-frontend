@@ -9,8 +9,8 @@ import * as Platform from '../platform/platform.js';
 import type * as Protocol from '../../generated/protocol.js';
 
 import {cssMetadata, GridAreaRowRegex} from './CSSMetadata.js';
-import type {Edit} from './CSSModel.js';
-import type {CSSStyleDeclaration} from './CSSStyleDeclaration.js';
+import {type Edit} from './CSSModel.js';
+import {type CSSStyleDeclaration} from './CSSStyleDeclaration.js';
 
 export class CSSProperty {
   ownerStyle: CSSStyleDeclaration;
@@ -27,10 +27,12 @@ export class CSSProperty {
   #nameRangeInternal: TextUtils.TextRange.TextRange|null;
   #valueRangeInternal: TextUtils.TextRange.TextRange|null;
   #invalidString?: Common.UIString.LocalizedString;
+  #longhandProperties: CSSProperty[] = [];
 
   constructor(
       ownerStyle: CSSStyleDeclaration, index: number, name: string, value: string, important: boolean,
-      disabled: boolean, parsedOk: boolean, implicit: boolean, text?: string|null, range?: Protocol.CSS.SourceRange) {
+      disabled: boolean, parsedOk: boolean, implicit: boolean, text?: string|null, range?: Protocol.CSS.SourceRange,
+      longhandProperties?: Protocol.CSS.CSSProperty[]) {
     this.ownerStyle = ownerStyle;
     this.index = index;
     this.name = name;
@@ -44,6 +46,23 @@ export class CSSProperty {
     this.#active = true;
     this.#nameRangeInternal = null;
     this.#valueRangeInternal = null;
+
+    if (longhandProperties && longhandProperties.length > 0) {
+      for (const property of longhandProperties) {
+        this.#longhandProperties.push(
+            new CSSProperty(ownerStyle, ++index, property.name, property.value, important, disabled, parsedOk, true));
+      }
+    } else {
+      // Blink would not parse shorthands containing 'var()' functions:
+      // https://drafts.csswg.org/css-variables/#variables-in-shorthands).
+      // Therefore we manually check if the current property is a shorthand,
+      // and fills its longhand components with empty values.
+      const longhandNames = cssMetadata().getLonghands(name);
+      for (const longhandName of longhandNames || []) {
+        this.#longhandProperties.push(
+            new CSSProperty(ownerStyle, ++index, longhandName, '', important, disabled, parsedOk, true));
+      }
+    }
   }
 
   static parsePayload(ownerStyle: CSSStyleDeclaration, index: number, payload: Protocol.CSS.CSSProperty): CSSProperty {
@@ -55,7 +74,7 @@ export class CSSProperty {
     const result = new CSSProperty(
         ownerStyle, index, payload.name, payload.value, payload.important || false, payload.disabled || false,
         ('parsedOk' in payload) ? Boolean(payload.parsedOk) : true, Boolean(payload.implicit), payload.text,
-        payload.range);
+        payload.range, payload.longhandProperties);
     return result;
   }
 
@@ -151,6 +170,10 @@ export class CSSProperty {
 
     if (majorChange) {
       HostModule.userMetrics.actionTaken(HostModule.UserMetrics.Action.StyleRuleEdited);
+      if (this.ownerStyle.parentRule?.isKeyframeRule()) {
+        HostModule.userMetrics.actionTaken(HostModule.UserMetrics.Action.StylePropertyInsideKeyframeEdited);
+      }
+
       if (this.name.startsWith('--')) {
         HostModule.userMetrics.actionTaken(HostModule.UserMetrics.Action.CustomPropertyEdited);
       }
@@ -163,8 +186,8 @@ export class CSSProperty {
 
     const range = this.range.relativeTo(this.ownerStyle.range.startLine, this.ownerStyle.range.startColumn);
     const indentation = this.ownerStyle.cssText ?
-    this.detectIndentation(this.ownerStyle.cssText) :
-    Common.Settings.Settings.instance().moduleSetting('textEditorIndent').get();
+        this.detectIndentation(this.ownerStyle.cssText) :
+        Common.Settings.Settings.instance().moduleSetting('textEditorIndent').get();
     const endIndentation = this.ownerStyle.cssText ? indentation.substring(0, this.ownerStyle.range.endColumn) : '';
     const text = new TextUtils.Text.Text(this.ownerStyle.cssText || '');
     const newStyleText = text.replaceRange(range, Platform.StringUtilities.sprintf(';%s;', propertyText));
@@ -172,8 +195,7 @@ export class CSSProperty {
     return this.ownerStyle.setText(styleText, majorChange);
   }
 
-  static async formatStyle(
-    styleText: string, indentation: string, endIndentation: string): Promise<string> {
+  static async formatStyle(styleText: string, indentation: string, endIndentation: string): Promise<string> {
     const doubleIndent = indentation.substring(endIndentation.length) + indentation;
     if (indentation) {
       indentation = '\n' + indentation;
@@ -189,7 +211,7 @@ export class CSSProperty {
     if (insideProperty) {
       result += propertyText;
     }
-    result = result.substring(2, result.length - 1).trimRight();
+    result = result.substring(2, result.length - 1).trimEnd();
     return result + (indentation ? '\n' + endIndentation : '');
 
     function processToken(token: string, tokenType: string|null): void {
@@ -197,7 +219,7 @@ export class CSSProperty {
         const disabledProperty = tokenType?.includes('comment') && isDisabledProperty(token);
         const isPropertyStart =
             (tokenType?.includes('string') || tokenType?.includes('meta') || tokenType?.includes('property') ||
-            tokenType?.includes('variableName'));
+             (tokenType?.includes('variableName') && tokenType !== ('variableName.function')));
         if (disabledProperty) {
           result = result.trimEnd() + indentation + token;
         } else if (isPropertyStart) {
@@ -222,8 +244,8 @@ export class CSSProperty {
         // implementation takes special care to restore a single
         // whitespace token in this edge case. https://crbug.com/1071296
         const trimmedPropertyText = propertyText.trim();
-        result =
-            result.trimEnd() + indentation + trimmedPropertyText + (trimmedPropertyText.endsWith(':') ? ' ' : '') + token;
+        result = result.trimEnd() + indentation + trimmedPropertyText + (trimmedPropertyText.endsWith(':') ? ' ' : '') +
+            token;
         needsSemi = false;
         insideProperty = false;
         propertyName = '';
@@ -231,8 +253,8 @@ export class CSSProperty {
       }
       if (cssMetadata().isGridAreaDefiningProperty(propertyName)) {
         const rowResult = GridAreaRowRegex.exec(token);
-        if (rowResult && rowResult.index === 0 && !propertyText.trimRight().endsWith(']')) {
-          propertyText = propertyText.trimRight() + '\n' + doubleIndent;
+        if (rowResult && rowResult.index === 0 && !propertyText.trimEnd().endsWith(']')) {
+          propertyText = propertyText.trimEnd() + '\n' + doubleIndent;
         }
       }
       if (!propertyName && token === ':') {
@@ -302,5 +324,9 @@ export class CSSProperty {
    */
   getInvalidStringForInvalidProperty(): Common.UIString.LocalizedString|undefined {
     return this.#invalidString;
+  }
+
+  getLonghandProperties(): CSSProperty[] {
+    return this.#longhandProperties;
   }
 }

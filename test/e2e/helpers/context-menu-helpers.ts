@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
-import type {puppeteer} from '../../shared/helper.js';
-import {$, $$, $textContent, platform, waitForFunction} from '../../shared/helper.js';
+
+import type * as puppeteer from 'puppeteer-core';
+
+import {$, $$, $textContent, platform, waitFor, waitForFunction} from '../../shared/helper.js';
 
 export function platformSpecificTextForSubMenuEntryItem(text: string): string {
   /**
@@ -12,6 +14,10 @@ export function platformSpecificTextForSubMenuEntryItem(text: string): string {
    * Mac, we append the search text with the icon, else we do not.
    */
   return platform === 'mac' ? `${text}▶` : text;
+}
+
+export function waitForSoftContextMenu(): Promise<puppeteer.ElementHandle<Element>> {
+  return waitFor('.soft-context-menu');
 }
 
 export async function assertTopLevelContextMenuItemsText(expectedOptions: string[]): Promise<void> {
@@ -25,20 +31,21 @@ export async function assertTopLevelContextMenuItemsText(expectedOptions: string
 
   assert.deepEqual(allItemsText, expectedOptions);
 }
-export async function findSubMenuEntryItem(text: string): Promise<puppeteer.ElementHandle<Element>> {
-  const textToSearchFor = platformSpecificTextForSubMenuEntryItem(text);
+export async function findSubMenuEntryItem(
+    text: string, hasSubmenu: boolean): Promise<puppeteer.ElementHandle<Element>> {
+  const textToSearchFor = hasSubmenu ? platformSpecificTextForSubMenuEntryItem(text) : text;
   const matchingElement = await $textContent(textToSearchFor);
 
   if (!matchingElement) {
     const allItems = await $$('.soft-context-menu > .soft-context-menu-item');
     const allItemsText = await Promise.all(allItems.map(item => item.evaluate(div => div.textContent)));
-    assert.fail(`Could not find "${text}" option on context menu. Found items: ${allItemsText.join(' | ')}`);
+    assert.fail(`Could not find "${textToSearchFor}" option on context menu. Found items: ${allItemsText.join(' | ')}`);
   }
   return matchingElement;
 }
 
 export async function assertSubMenuItemsText(subMenuText: string, expectedOptions: string[]): Promise<void> {
-  const subMenuEntryItem = await findSubMenuEntryItem(subMenuText);
+  const subMenuEntryItem = await findSubMenuEntryItem(subMenuText, true);
   if (!subMenuEntryItem) {
     const allItems = await $$('.soft-context-menu > .soft-context-menu-item');
     const allItemsText = await Promise.all(allItems.map(item => item.evaluate(div => div.textContent)));

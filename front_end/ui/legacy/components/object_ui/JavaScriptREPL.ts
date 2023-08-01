@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 import * as Platform from '../../../../core/platform/platform.js';
+import * as Root from '../../../../core/root/root.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
+import * as Formatter from '../../../../models/formatter/formatter.js';
+import * as SourceMapScopes from '../../../../models/source_map_scopes/source_map_scopes.js';
 import * as UI from '../../legacy.js';
 
 import {RemoteObjectPreviewFormatter} from './RemoteObjectPreviewFormatter.js';
@@ -11,17 +14,27 @@ import {RemoteObjectPreviewFormatter} from './RemoteObjectPreviewFormatter.js';
 export class JavaScriptREPL {
   static wrapObjectLiteral(code: string): string {
     // Only parenthesize what appears to be an object literal.
-    if (!(/^\s*\{/.test(code) && /\}\s*$/.test(code))) {
+    const result = /^\s*\{\s*(.*)\s*\}[\s;]*$/.exec(code);
+    if (result === null) {
       return code;
+    }
+    const [, body] = result;
+    let level = 0;
+    for (const c of body) {
+      if (c === '{') {
+        level++;
+      } else if (c === '}' && --level < 0) {
+        return code;
+      }
     }
 
     const parse = (async(): Promise<number> => 0).constructor;
     try {
-      // Check if the code can be interpreted as an expression.
-      parse('return ' + code + ';');
+      // Check if the body can be interpreted as an expression.
+      parse('return {' + body + '};');
 
       // No syntax error! Does it work parenthesized?
-      const wrappedCode = '(' + code + ')';
+      const wrappedCode = '({' + body + '})';
       parse(wrappedCode);
 
       return wrappedCode;
@@ -30,13 +43,9 @@ export class JavaScriptREPL {
     }
   }
 
-  static preprocessExpression(text: string): string {
-    return JavaScriptREPL.wrapObjectLiteral(text);
-  }
-
   static async evaluateAndBuildPreview(
       text: string, throwOnSideEffect: boolean, replMode: boolean, timeout?: number, allowErrors?: boolean,
-      objectGroup?: string, awaitPromise: boolean = false): Promise<{
+      objectGroup?: string, awaitPromise: boolean = false, silent: boolean = false): Promise<{
     preview: DocumentFragment,
     result: SDK.RuntimeModel.EvaluationResult|null,
   }> {
@@ -46,19 +55,30 @@ export class JavaScriptREPL {
       return {preview: document.createDocumentFragment(), result: null};
     }
 
-    const expression = JavaScriptREPL.preprocessExpression(text);
+    let expression = text;
+    if (Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps')) {
+      const callFrame = executionContext.debuggerModel.selectedCallFrame();
+      if (callFrame) {
+        const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(callFrame);
+        try {
+          expression =
+              await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(expression, nameMap);
+        } catch {
+        }
+      }
+    }
+
+    expression = JavaScriptREPL.wrapObjectLiteral(expression);
     const options = {
-      expression: expression,
+      expression,
       generatePreview: true,
       includeCommandLineAPI: true,
-      throwOnSideEffect: throwOnSideEffect,
-      timeout: timeout,
-      objectGroup: objectGroup,
+      throwOnSideEffect,
+      timeout,
+      objectGroup,
       disableBreaks: true,
-      replMode: replMode,
-      silent: undefined,
-      returnByValue: undefined,
-      allowUnsafeEvalBlockedByCSP: undefined,
+      replMode,
+      silent,
     };
     const result = await executionContext.evaluate(options, false /* userGesture */, awaitPromise);
     const preview = JavaScriptREPL.buildEvaluationPreview(result, allowErrors);

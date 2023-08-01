@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as SDK from '../../core/sdk/sdk.js';
+import type * as Platform from '../../core/platform/platform.js';
+import type * as TraceEngine from '../../models/trace/trace.js';
 
 export class LighthouseReportGenerator {
   generateReportHtml(_lhr: ReportJSON): string {
@@ -46,8 +47,9 @@ export interface ReportJSON {
   userAgent: string;
   fetchTime: string;
   timing: {total: number};
-  requestedUrl: string;
-  finalUrl: string;
+  requestedUrl?: string;
+  finalDisplayedUrl: string;
+  finalUrl?: string;
   runWarnings?: string[];
   artifacts: {traces: {defaultPass: {traceEvents: Array<unknown>}}};
   audits: {[x: string]: AuditResultJSON};
@@ -62,7 +64,7 @@ export interface DetailsJSON {
   displayUnit?: string;
 }
 export interface RunnerResultArtifacts {
-  traces: {defaultPass: {traceEvents: SDK.TracingManager.EventPayload[]}};
+  traces: {defaultPass: {traceEvents: TraceEngine.TracingManager.EventPayload[]}};
   settings: {throttlingMethod: string};
 }
 export interface RunnerResult {
@@ -80,7 +82,7 @@ export interface NodeDetailsJSON {
   snippet?: string;
 }
 export interface SourceLocationDetailsJSON {
-  sourceUrl?: string;
+  sourceUrl?: Platform.DevToolsPath.UrlString;
   sourceLine?: string;
   sourceColumn?: string;
 }

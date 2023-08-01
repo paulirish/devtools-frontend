@@ -2,20 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
-import {performance} from 'perf_hooks';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
+import {AsyncScope} from '../../shared/async-scope.js';
 
-import {$, $$, click, getBrowserAndPages, pressKey, step, timeout, typeText, waitFor, waitForAria, waitForFunction} from '../../shared/helper.js';
+import {
+  $,
+  $$,
+  click,
+  getBrowserAndPages,
+  getTextContent,
+  goToResource,
+  pressKey,
+  step,
+  summonSearchBox,
+  timeout,
+  typeText,
+  waitFor,
+  waitForAria,
+  clickElement,
+  waitForFunction,
+} from '../../shared/helper.js';
 
 const SELECTED_TREE_ELEMENT_SELECTOR = '.selected[role="treeitem"]';
 const CSS_PROPERTY_NAME_SELECTOR = '.webkit-css-property';
 const CSS_PROPERTY_VALUE_SELECTOR = '.value';
+const CSS_DECLARATION_SELECTOR =
+    `[role="treeitem"]:has(${CSS_PROPERTY_NAME_SELECTOR}):has(${CSS_PROPERTY_VALUE_SELECTOR})`;
 const COLOR_SWATCH_SELECTOR = '.color-swatch-inner';
 const CSS_STYLE_RULE_SELECTOR = '[aria-label*="css selector"]';
 const COMPUTED_PROPERTY_SELECTOR = 'devtools-computed-style-property';
 const COMPUTED_STYLES_PANEL_SELECTOR = '[aria-label="Computed panel"]';
-const COMPUTED_STYLES_SHOW_ALL_SELECTOR = '[aria-label="Show all"]';
-const COMPUTED_STYLES_GROUP_SELECTOR = '[aria-label="Group"]';
+const COMPUTED_STYLES_SHOW_ALL_SELECTOR = '[title="Show all"]';
+const COMPUTED_STYLES_GROUP_SELECTOR = '[title="Group"]';
 const ELEMENTS_PANEL_SELECTOR = '.panel[aria-label="elements"]';
 const FONT_EDITOR_SELECTOR = '[aria-label="Font Editor"]';
 const HIDDEN_FONT_EDITOR_SELECTOR = '.font-toolbar-hidden';
@@ -31,6 +49,10 @@ export const ACTIVE_GRID_ADORNER_SELECTOR = '[aria-label="Disable grid mode"]';
 const ELEMENT_CHECKBOX_IN_LAYOUT_PANE_SELECTOR = '.elements input[type=checkbox]';
 const ELEMENT_STYLE_SECTION_SELECTOR = '[aria-label="element.style, css selector"]';
 const STYLE_QUERY_RULE_TEXT_SELECTOR = '.query-text';
+const STYLE_PROPERTIES_SELECTOR = '.tree-outline-disclosure [role="treeitem"]';
+const CSS_AUTHORING_HINTS_ICON_SELECTOR = '.hint';
+export const SEARCH_BOX_SELECTOR = '.search-bar';
+const SEARCH_RESULTS_MATCHES = '.search-results-matches';
 
 export const openLayoutPane = async () => {
   await step('Open Layout pane', async () => {
@@ -69,6 +91,10 @@ export const waitForAdorners = async (expectedAdorners: {textContent: string, is
 
     return expectedAdorners.length === 0;
   });
+};
+
+export const waitForSelectedNodeToBeExpanded = async () => {
+  await waitFor(`${SELECTED_TREE_ELEMENT_SELECTOR}[aria-expanded="true"]`);
 };
 
 export const waitForAdornerOnSelectedNode = async (expectedAdornerText: string) => {
@@ -120,23 +146,11 @@ export const getContentOfSelectedNode = async () => {
   return await selectedNode.evaluate(node => node.textContent as string);
 };
 
-export const waitForSelectedNodeChange = async (initialValue: string, maxTotalTimeout = 1000) => {
-  if (maxTotalTimeout === 0) {
-    maxTotalTimeout = Number.POSITIVE_INFINITY;
-  }
-
-  const start = performance.now();
-  do {
+export const waitForSelectedNodeChange = async(initialValue: string, asyncScope = new AsyncScope()): Promise<void> => {
+  await waitForFunction(async () => {
     const currentContent = await getContentOfSelectedNode();
-    if (currentContent !== initialValue) {
-      return currentContent;
-    }
-
-    await timeout(30);
-
-  } while (performance.now() - start < maxTotalTimeout);
-
-  throw new Error(`Selected element did not change in ${maxTotalTimeout}`);
+    return currentContent !== initialValue;
+  }, asyncScope);
 };
 
 export const assertSelectedElementsNodeTextIncludes = async (expectedTextContent: string) => {
@@ -165,6 +179,35 @@ export const waitForChildrenOfSelectedElementNode = async () => {
   await waitFor(`${SELECTED_TREE_ELEMENT_SELECTOR} + ol > li`);
 };
 
+export const waitForAndClickTreeElementWithPartialText = async (text: string) =>
+    waitForFunction(async () => clickTreeElementWithPartialText(text));
+
+export const waitForElementWithPartialText = async (text: string) => {
+  return waitForFunction(async () => elementWithPartialText(text));
+};
+
+const elementWithPartialText = async (text: string) => {
+  const tree = await waitFor('Page DOM[role="tree"]', undefined, undefined, 'aria');
+  const elements = await $$('[role="treeitem"]', tree, 'aria');
+  for (const handle of elements) {
+    const match = await handle.evaluate((element, text) => element.textContent?.includes(text), text);
+    if (match) {
+      return handle;
+    }
+  }
+  return null;
+};
+
+export const clickTreeElementWithPartialText = async (text: string) => {
+  const handle = await elementWithPartialText(text);
+  if (handle) {
+    await clickElement(handle);
+    return true;
+  }
+
+  throw false;
+};
+
 export const clickNthChildOfSelectedElementNode = async (childIndex: number) => {
   assert(childIndex > 0, 'CSS :nth-child() selector indices are 1-based.');
   const element = await waitFor(`${SELECTED_TREE_ELEMENT_SELECTOR} + ol > li:nth-child(${childIndex})`);
@@ -190,8 +233,8 @@ export const waitForElementsComputedSection = async () => {
 };
 
 export const getContentOfComputedPane = async () => {
-  const pane = await waitFor('.computed-properties');
-  const tree = await waitFor('.tree-outline', pane);
+  const pane = await waitFor('Computed panel', undefined, undefined, 'aria');
+  const tree = await waitFor('[role="tree"]', pane, undefined, 'aria');
   return await tree.evaluate(node => node.textContent as string);
 };
 
@@ -204,9 +247,11 @@ export const waitForComputedPaneChange = async (initialValue: string) => {
 
 export const getAllPropertiesFromComputedPane = async () => {
   const properties = await $$(COMPUTED_PROPERTY_SELECTOR);
-  return (await Promise.all(properties.map(elem => elem.evaluate(node => {
-           const name = node.querySelector('[slot="property-name"]');
-           const value = node.querySelector('[slot="property-value"]');
+  return (await Promise.all(properties.map(elem => elem.evaluate(async node => {
+           const nameSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-name slot');
+           const valueSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-value slot');
+           const name = nameSlot?.assignedElements().at(0);
+           const value = valueSlot?.assignedElements().at(0);
 
            return (!name || !value) ? null : {
              name: name.textContent ? name.textContent.trim().replace(/:$/, '') : '',
@@ -219,17 +264,15 @@ export const getAllPropertiesFromComputedPane = async () => {
 export const getPropertyFromComputedPane = async (name: string) => {
   const properties = await $$(COMPUTED_PROPERTY_SELECTOR);
   for (const property of properties) {
-    const matchingProperty = await property.evaluateHandle((node, name) => {
-      const nameEl = node.querySelector('[slot="property-name"]');
-      if (nameEl && nameEl.textContent === name) {
-        return node;
-      }
-      return undefined;
+    const matchingProperty = await property.evaluate((node, name) => {
+      const nameSlot = node.shadowRoot?.querySelector<HTMLSlotElement>('.property-name slot');
+      const nameEl = nameSlot?.assignedElements().at(0);
+      return nameEl?.textContent?.trim().replace(/:$/, '') === name;
     }, name);
     // Note that evaluateHandle always returns a handle, even if it points to an undefined remote object, so we need to
     // check it's defined here or continue iterating.
-    if (await matchingProperty.evaluate(n => Boolean(n))) {
-      return matchingProperty as puppeteer.ElementHandle;
+    if (matchingProperty) {
+      return property;
     }
   }
   return undefined;
@@ -251,8 +294,7 @@ export const expandSelectedNodeRecursively = async () => {
   const EXPAND_RECURSIVELY = '[aria-label="Expand recursively"]';
 
   // Find the selected node, right click.
-  const selectedNode = await waitFor(SELECTED_TREE_ELEMENT_SELECTOR);
-  await click(selectedNode, {clickOptions: {button: 'right'}});
+  await click(SELECTED_TREE_ELEMENT_SELECTOR, {clickOptions: {button: 'right'}});
 
   // Wait for the 'expand recursively' option, and click it.
   await waitFor(EXPAND_RECURSIVELY);
@@ -272,7 +314,8 @@ export const removePseudoState = async (pseudoState: string) => {
   await click(`[aria-label="${pseudoState}"]`);
 };
 
-export const getComputedStylesForDomNode = async (elementSelector: string, styleAttribute: string) => {
+export const getComputedStylesForDomNode =
+    async (elementSelector: string, styleAttribute: keyof CSSStyleDeclaration) => {
   const {target} = getBrowserAndPages();
 
   return target.evaluate((elementSelector, styleAttribute) => {
@@ -284,12 +327,31 @@ export const getComputedStylesForDomNode = async (elementSelector: string, style
   }, elementSelector, styleAttribute);
 };
 
+export const waitForNumberOfComputedProperties = async (numberToWaitFor: number) => {
+  const computedPane = await getComputedPanel();
+  return waitForFunction(
+      async () => numberToWaitFor ===
+          await computedPane.$$eval('pierce/' + COMPUTED_PROPERTY_SELECTOR, properties => properties.length));
+};
+
+export const getComputedPanel = async () => waitFor(COMPUTED_STYLES_PANEL_SELECTOR);
+
+export const filterComputedProperties = async (filterString: string) => {
+  const initialContent = await getContentOfComputedPane();
+
+  const computedPanel = await waitFor(COMPUTED_STYLES_PANEL_SELECTOR);
+  await click('[aria-label="Filter Computed Styles"]', {
+    root: computedPanel,
+  });
+  await typeText(filterString);
+  await waitForComputedPaneChange(initialContent);
+};
+
 export const toggleShowAllComputedProperties = async () => {
   const initialContent = await getContentOfComputedPane();
 
   const computedPanel = await waitFor(COMPUTED_STYLES_PANEL_SELECTOR);
-  const showAllButton = await waitFor(COMPUTED_STYLES_SHOW_ALL_SELECTOR, computedPanel);
-  await click(showAllButton);
+  await click(COMPUTED_STYLES_SHOW_ALL_SELECTOR, {root: computedPanel});
   await waitForComputedPaneChange(initialContent);
 };
 
@@ -299,7 +361,9 @@ export const toggleGroupComputedProperties = async () => {
 
   const wasChecked = await groupCheckbox.evaluate(checkbox => (checkbox as HTMLInputElement).checked);
 
-  await click(groupCheckbox);
+  await click(COMPUTED_STYLES_GROUP_SELECTOR, {
+    root: computedPanel,
+  });
 
   if (wasChecked) {
     await waitFor('[role="tree"].alphabetical-list', computedPanel);
@@ -332,6 +396,39 @@ export const waitForStyleRule = async (expectedSelector: string) => {
     const rules = await getDisplayedStyleRules();
     return rules.map(rule => rule.selectorText).includes(expectedSelector);
   });
+};
+
+export const getComputedStyleProperties = async () => {
+  const computedPanel = await getComputedPanel();
+  const allProperties = await computedPanel.$$('pierce/[role="treeitem"][aria-level="1"]');
+  const properties = [];
+  for (const prop of allProperties) {
+    const name = await prop.$eval('pierce/' + CSS_PROPERTY_NAME_SELECTOR, element => element.textContent);
+    const value = await prop.$eval('pierce/' + CSS_PROPERTY_VALUE_SELECTOR, element => element.textContent);
+    const traceElements = await prop.$$('pierce/devtools-computed-style-trace');
+    const trace = await Promise.all(traceElements.map(async element => {
+      const value = await element.$eval('pierce/.value', element => element.textContent);
+      const selector = await element.$eval('pierce/.trace-selector', element => element.textContent);
+      const link = await element.$eval('pierce/.trace-link', element => element.textContent);
+      return {value, selector, link};
+    }));
+    properties.push({name, value, trace});
+  }
+  return properties;
+};
+
+export const getDisplayedCSSDeclarations = async () => {
+  const cssDeclarations = await $$(CSS_DECLARATION_SELECTOR);
+  return Promise.all(cssDeclarations.map(async node => await node.evaluate(n => n.textContent?.trim())));
+};
+
+export const getDisplayedStyleRulesCompact = async () => {
+  const compactRules = [];
+  for (const rule of await getDisplayedStyleRules()) {
+    compactRules.push(
+        {selectorText: rule.selectorText, propertyNames: rule.propertyData.map(data => data.propertyName)});
+  }
+  return compactRules;
 };
 
 export const getDisplayedStyleRules = async () => {
@@ -405,7 +502,7 @@ export const getStyleRuleWithSourcePosition = (styleSelector: string, sourcePosi
   });
 };
 
-export const getColorSwatch = async (parent: puppeteer.ElementHandle<Element>, index: number) => {
+export const getColorSwatch = async (parent: puppeteer.ElementHandle<Element>|undefined, index: number) => {
   const swatches = await $$(COLOR_SWATCH_SELECTOR, parent);
   return swatches[index];
 };
@@ -419,7 +516,7 @@ export const shiftClickColorSwatch = async (ruleSection: puppeteer.ElementHandle
   const swatch = await getColorSwatch(ruleSection, index);
   const {frontend} = getBrowserAndPages();
   await frontend.keyboard.down('Shift');
-  await click(swatch);
+  await clickElement(swatch);
   await frontend.keyboard.up('Shift');
 };
 
@@ -452,11 +549,10 @@ export const getCSSPropertyInRule =
   const propertyNames = await $$(CSS_PROPERTY_NAME_SELECTOR, ruleSection);
   for (const node of propertyNames) {
     const parent =
-        await node.evaluateHandle((node, name) => (name === node.textContent) ? node.parentNode : undefined, name);
-    // Note that evaluateHandle always returns a handle, even if it points to an undefined remote object, so we need to
-    // check it's defined here or continue iterating.
-    if (await parent.evaluate(n => Boolean(n))) {
-      return parent as puppeteer.ElementHandle;
+        (await node.evaluateHandle((node, name) => (name === node.textContent) ? node.parentNode : undefined, name))
+            .asElement();
+    if (parent) {
+      return parent as puppeteer.ElementHandle<HTMLElement>;
     }
   }
   return undefined;
@@ -464,8 +560,20 @@ export const getCSSPropertyInRule =
 
 export const focusCSSPropertyValue = async (selector: string, propertyName: string) => {
   await waitForStyleRule(selector);
-  const property = await getCSSPropertyInRule(selector, propertyName);
-  await click(CSS_PROPERTY_VALUE_SELECTOR, {root: property});
+  let property = await getCSSPropertyInRule(selector, propertyName);
+  // Clicking on the semicolon element to make sure we don't hit the swatch or other
+  // non-editable elements.
+  await click(CSS_PROPERTY_VALUE_SELECTOR + ' + .styles-semicolon', {root: property});
+  await waitForFunction(async () => {
+    property = await getCSSPropertyInRule(selector, propertyName);
+    const value = await $(CSS_PROPERTY_VALUE_SELECTOR, property);
+    if (!value) {
+      assert.fail(`Could not find property ${propertyName} in rule ${selector}`);
+    }
+    return await value.evaluate(node => {
+      return node.classList.contains('text-prompt') && node.hasAttribute('contenteditable');
+    });
+  });
 };
 
 /**
@@ -554,7 +662,7 @@ export async function waitForPropertyToHighlight(ruleSelector: string, propertyN
     }
     // StylePropertyHighlighter temporarily highlights the property using the Web Animations API, so the only way to
     // know it's happening is by listing all animations.
-    const animationCount = await property.evaluate(node => node.getAnimations().length);
+    const animationCount = await property.evaluate(node => (node as HTMLElement).getAnimations().length);
     return animationCount > 0;
   });
 }
@@ -632,8 +740,14 @@ export const toggleClassesPaneCheckbox = async (checkboxLabel: string) => {
   const initialValue = await getContentOfSelectedNode();
 
   const classesPane = await waitFor(CLS_PANE_SELECTOR);
-  await click(`input[aria-label="${checkboxLabel}"]`, {root: classesPane});
+  await click(`[title="${checkboxLabel}"]`, {root: classesPane});
 
+  await waitForSelectedNodeChange(initialValue);
+};
+
+export const uncheckStylesPaneCheckbox = async (checkboxLabel: string) => {
+  const initialValue = await getContentOfSelectedNode();
+  await click(`.enabled-button[aria-label="${checkboxLabel}"]`);
   await waitForSelectedNodeChange(initialValue);
 };
 
@@ -656,13 +770,61 @@ export const toggleAccessibilityPane = async () => {
   if (!a11yPane) {
     const elementsPanel = await waitForAria('Elements panel');
     const moreTabs = await waitForAria('More tabs', elementsPanel);
-    await click(moreTabs);
+    await clickElement(moreTabs);
     a11yPane = await waitForAria('Accessibility');
   }
-  await click(a11yPane);
+  await clickElement(a11yPane);
 };
 
 export const toggleAccessibilityTree = async () => {
-  const treeToggleButton = await waitForAria('Switch to Accessibility Tree view');
-  await click(treeToggleButton);
+  await click('aria/Switch to Accessibility Tree view');
+};
+
+export const getPropertiesWithHints = async () => {
+  const allRuleSelectors = await $$(CSS_STYLE_RULE_SELECTOR);
+
+  const propertiesWithHints = [];
+  for (const propertiesSection of allRuleSelectors) {
+    const cssRuleNodes = await $$('li ', propertiesSection);
+
+    for (const cssRuleNode of cssRuleNodes) {
+      const propertyNode = await $(CSS_PROPERTY_NAME_SELECTOR, cssRuleNode);
+      const propertyName = propertyNode !== null ? await propertyNode.evaluate(n => n.textContent) : null;
+      if (propertyName === null) {
+        continue;
+      }
+
+      const authoringHintsIcon = await $(CSS_AUTHORING_HINTS_ICON_SELECTOR, cssRuleNode);
+      if (authoringHintsIcon) {
+        propertiesWithHints.push(propertyName);
+      }
+    }
+  }
+
+  return propertiesWithHints;
+};
+
+export const summonAndWaitForSearchBox = async () => {
+  await summonSearchBox();
+  await waitFor(SEARCH_BOX_SELECTOR);
+};
+
+export const assertSearchResultMatchesText = async (text: string) => {
+  await waitForFunction(async () => {
+    return await getTextContent(SEARCH_RESULTS_MATCHES) === text;
+  });
+};
+
+export const goToResourceAndWaitForStyleSection = async (path: string) => {
+  await goToResource(path);
+  await waitForElementsStyleSection();
+
+  // Check to make sure we have the correct node selected after opening a file.
+  await waitForPartialContentOfSelectedElementsNode('<body>\u200B');
+};
+
+export const checkStyleAttributes = async (expectedStyles: string[]) => {
+  const result = await $$(STYLE_PROPERTIES_SELECTOR, undefined, 'pierce');
+  const actual = await Promise.all(result.map(e => e.evaluate(e => e.textContent?.trim())));
+  return actual.sort().join(' ') === expectedStyles.sort().join(' ');
 };

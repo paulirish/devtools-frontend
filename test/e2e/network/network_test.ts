@@ -4,9 +4,21 @@
 
 import {assert} from 'chai';
 
-import {$textContent, goTo, reloadDevTools, typeText, waitFor} from '../../shared/helper.js';
+import {$textContent, goTo, reloadDevTools, typeText, waitFor, waitForFunction} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {getAllRequestNames, getSelectedRequestName, navigateToNetworkTab, selectRequestByName, setCacheDisabled, setPersistLog, waitForSelectedRequestChange, waitForSomeRequestsToAppear} from '../helpers/network-helpers.js';
+import {
+  clearTimeWindow,
+  getAllRequestNames,
+  getNumberOfRequests,
+  getSelectedRequestName,
+  navigateToNetworkTab,
+  selectRequestByName,
+  setCacheDisabled,
+  setPersistLog,
+  setTimeWindow,
+  waitForSelectedRequestChange,
+  waitForSomeRequestsToAppear,
+} from '../helpers/network-helpers.js';
 
 const SIMPLE_PAGE_REQUEST_NUMBER = 10;
 const SIMPLE_PAGE_URL = `requests.html?num=${SIMPLE_PAGE_REQUEST_NUMBER}`;
@@ -39,28 +51,27 @@ describe('The Network Tab', async function() {
     await setPersistLog(false);
   });
 
-  // Flakey test
-  it.skip('[crbug.com/1093287] displays requests', async () => {
+  it('displays requests', async () => {
     await navigateToNetworkTab(SIMPLE_PAGE_URL);
 
     // Wait for all the requests to be displayed + 1 to account for the page itself.
     await waitForSomeRequestsToAppear(SIMPLE_PAGE_REQUEST_NUMBER + 1);
 
-    const expectedNames = [SIMPLE_PAGE_URL];
+    const expectedNames = [];
     for (let i = 0; i < SIMPLE_PAGE_REQUEST_NUMBER; i++) {
       expectedNames.push(`image.svg?id=${i}`);
     }
+    expectedNames.push(SIMPLE_PAGE_URL);
 
-    const names = await getAllRequestNames();
+    const names = (await getAllRequestNames()).sort();
     assert.deepStrictEqual(names, expectedNames, 'The right request names should appear in the list');
   });
 
-  // Flakey test
-  it.skip('[crbug.com/1093287] can select requests', async () => {
+  it('can select requests', async () => {
     await navigateToNetworkTab(SIMPLE_PAGE_URL);
 
     let selected = await getSelectedRequestName();
-    assert.isUndefined(selected, 'No request should be selected by default');
+    assert.isNull(selected, 'No request should be selected by default');
 
     await selectRequestByName(SIMPLE_PAGE_URL);
     await waitForSelectedRequestChange(selected);
@@ -76,20 +87,24 @@ describe('The Network Tab', async function() {
     assert.strictEqual(selected, lastRequestName, 'Selecting the last request should work');
   });
 
-  // Flakey test
-  it.skip('[crbug.com/1093287] can persist requests', async () => {
+  it('can persist requests', async () => {
     await navigateToNetworkTab(SIMPLE_PAGE_URL);
 
     // Wait for all the requests to be displayed + 1 to account for the page itself, and get their names.
     await waitForSomeRequestsToAppear(SIMPLE_PAGE_REQUEST_NUMBER + 1);
-    const firstPageRequestNames = await getAllRequestNames();
+    const firstPageRequestNames = (await getAllRequestNames()).sort();
 
     await setPersistLog(true);
 
     // Navigate to a new page, and wait for the same requests to still be there.
     await goTo('about:blank');
     await waitForSomeRequestsToAppear(SIMPLE_PAGE_REQUEST_NUMBER + 1);
-    const secondPageRequestNames = await getAllRequestNames();
+    let secondPageRequestNames: (string|null)[] = [];
+    await waitForFunction(async () => {
+      secondPageRequestNames = await getAllRequestNames();
+      return secondPageRequestNames.length === SIMPLE_PAGE_REQUEST_NUMBER + 1;
+    });
+    secondPageRequestNames.sort();
 
     assert.deepStrictEqual(secondPageRequestNames, firstPageRequestNames, 'The requests were persisted');
   });
@@ -123,5 +138,22 @@ describe('The Network Tab', async function() {
 
     names = await getAllRequestNames();
     assert.deepStrictEqual(names, ['external_image.svg'], 'The right request names should appear in the list');
+  });
+
+  it('should continue receiving new requests after timeline filter is cleared', async () => {
+    await navigateToNetworkTab('infinite-requests.html');
+    await waitForSomeRequestsToAppear(2);
+
+    await setTimeWindow();
+    // After the time filter is set, only visible request is the html page.
+    assert.strictEqual(await getNumberOfRequests(), 1);
+    await clearTimeWindow();
+    const numberOfRequestsAfterFilter = await getNumberOfRequests();
+    // Time filter is cleared so the number of requests must be greater than 1.
+    assert.isTrue(numberOfRequestsAfterFilter > 1);
+
+    // After some time we expect new requests to come so it must be
+    // that the number of requests increased.
+    await waitForSomeRequestsToAppear(numberOfRequestsAfterFilter + 1);
   });
 });

@@ -12,15 +12,17 @@ generate_css("css_files") {
     "appManifestView.css",
     "backgroundServiceView.css",
     "cookieItemsView.css",
-    "frameDetailsReportView.css",
     "indexedDBViews.css",
     "interestGroupStorageView.css",
+    "openedWindowDetailsView.css",
+    "preloading/preloadingView.css",
     "reportingApiReportsView.css",
     "resourcesPanel.css",
     "resourcesSidebar.css",
     "serviceWorkerCacheViews.css",
     "serviceWorkerUpdateCycleView.css",
     "serviceWorkersView.css",
+    "sharedStorageEventsView.css",
     "storageView.css",
   ]
 }
@@ -28,11 +30,12 @@ generate_css("css_files") {
 devtools_module("application") {
   sources = [
     "AppManifestView.ts",
-    "ApplicationPanelCacheSection.ts",
     "ApplicationPanelSidebar.ts",
     "ApplicationPanelTreeElement.ts",
+    "BackForwardCacheTreeElement.ts",
     "BackgroundServiceModel.ts",
     "BackgroundServiceView.ts",
+    "BounceTrackingMitigationsTreeElement.ts",
     "CookieItemsView.ts",
     "DOMStorageItemsView.ts",
     "DOMStorageModel.ts",
@@ -45,16 +48,24 @@ devtools_module("application") {
     "InterestGroupStorageView.ts",
     "InterestGroupTreeElement.ts",
     "OpenedWindowDetailsView.ts",
+    "PreloadingTreeElement.ts",
     "ReportingApiReportsView.ts",
     "ReportingApiTreeElement.ts",
     "ReportingApiView.ts",
     "ResourcesPanel.ts",
+    "ServiceWorkerCacheTreeElement.ts",
     "ServiceWorkerCacheViews.ts",
     "ServiceWorkerUpdateCycleView.ts",
     "ServiceWorkersView.ts",
+    "SharedStorageEventsView.ts",
+    "SharedStorageItemsView.ts",
+    "SharedStorageListTreeElement.ts",
+    "SharedStorageModel.ts",
+    "SharedStorageTreeElement.ts",
     "StorageItemsView.ts",
     "StorageView.ts",
     "TrustTokensTreeElement.ts",
+    "preloading/PreloadingView.ts",
   ]
 
   deps = [
@@ -76,7 +87,9 @@ devtools_module("application") {
     "../../panels/network/forward:bundle",
     "../../ui/components/data_grid:bundle",
     "../../ui/components/expandable_list:bundle",
+    "../../ui/components/legacy_wrapper:bundle",
     "../../ui/components/report_view:bundle",
+    "../../ui/components/split_view:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/cookie_table:bundle",
     "../../ui/legacy/components/data_grid:bundle",
@@ -85,6 +98,8 @@ devtools_module("application") {
     "../../ui/legacy/components/source_frame:bundle",
     "../../ui/legacy/components/utils:bundle",
     "./components:bundle",
+    "./preloading/components:bundle",
+    "./preloading/helper:bundle",
   ]
 }
 

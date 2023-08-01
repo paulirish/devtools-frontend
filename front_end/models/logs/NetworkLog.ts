@@ -44,7 +44,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/logs/NetworkLog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let networkLogInstance: NetworkLog;
+let networkLogInstance: NetworkLog|undefined;
 
 export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     SDK.TargetManager.SDKModelObserver<SDK.NetworkManager.NetworkManager> {
@@ -90,6 +90,10 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     return networkLogInstance;
   }
 
+  static removeInstance(): void {
+    networkLogInstance = undefined;
+  }
+
   modelAdded(networkManager: SDK.NetworkManager.NetworkManager): void {
     const eventListeners = [];
     eventListeners.push(
@@ -110,7 +114,7 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
       eventListeners.push(
           resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.WillReloadPage, this.willReloadPage, this));
       eventListeners.push(resourceTreeModel.addEventListener(
-          SDK.ResourceTreeModel.Events.MainFrameNavigated, this.onMainFrameNavigated, this));
+          SDK.ResourceTreeModel.Events.PrimaryPageChanged, this.onPrimaryPageChanged, this));
       eventListeners.push(resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.Load, this.onLoad, this));
       eventListeners.push(resourceTreeModel.addEventListener(
           SDK.ResourceTreeModel.Events.DOMContentLoaded, this.onDOMContentLoaded.bind(this, resourceTreeModel)));
@@ -196,19 +200,21 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     return initiatorInfo;
   }
 
-  initiatorInfoForRequest(request: SDK.NetworkRequest.NetworkRequest): InitiatorInfo {
-    const initiatorInfo = this.initializeInitiatorSymbolIfNeeded(request);
-    if (initiatorInfo.info) {
-      return initiatorInfo.info;
-    }
+  static initiatorInfoForRequest(request: SDK.NetworkRequest.NetworkRequest, existingInitiatorData?: InitiatorData):
+      InitiatorInfo {
+    const initiatorInfo: InitiatorData = existingInitiatorData || {
+      info: null,
+      chain: null,
+      request: undefined,
+    };
 
     let type = SDK.NetworkRequest.InitiatorType.Other;
     let url = Platform.DevToolsPath.EmptyUrlString;
-    let lineNumber: number = -Infinity;
-    let columnNumber: number = -Infinity;
+    let lineNumber: number|undefined = undefined;
+    let columnNumber: number|undefined = undefined;
     let scriptId: Protocol.Runtime.ScriptId|null = null;
     let initiatorStack: Protocol.Runtime.StackTrace|null = null;
-    let initiatorRequest: (SDK.NetworkRequest.NetworkRequest|null)|null = null;
+    let initiatorRequest: SDK.NetworkRequest.NetworkRequest|null = null;
     const initiator = request.initiator();
 
     const redirectSource = request.redirectSource();
@@ -219,8 +225,8 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
       if (initiator.type === Protocol.Network.InitiatorType.Parser) {
         type = SDK.NetworkRequest.InitiatorType.Parser;
         url = initiator.url ? initiator.url as Platform.DevToolsPath.UrlString : url;
-        lineNumber = typeof initiator.lineNumber === 'number' ? initiator.lineNumber : lineNumber;
-        columnNumber = typeof initiator.columnNumber === 'number' ? initiator.columnNumber : columnNumber;
+        lineNumber = initiator.lineNumber;
+        columnNumber = initiator.columnNumber;
       } else if (initiator.type === Protocol.Network.InitiatorType.Script) {
         for (let stack: (Protocol.Runtime.StackTrace|undefined) = initiator.stack; stack;) {
           const topFrame = stack.callFrames.length ? stack.callFrames[0] : null;
@@ -238,10 +244,10 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
         if (!initiator.stack && initiator.url) {
           type = SDK.NetworkRequest.InitiatorType.Script;
           url = initiator.url as Platform.DevToolsPath.UrlString;
-          lineNumber = initiator.lineNumber || 0;
+          lineNumber = initiator.lineNumber;
         }
-        if (initiator.stack && initiator.stack.callFrames && initiator.stack.callFrames.length) {
-          initiatorStack = initiator.stack || null;
+        if (initiator.stack?.callFrames?.length) {
+          initiatorStack = initiator.stack;
         }
       } else if (initiator.type === Protocol.Network.InitiatorType.Preload) {
         type = SDK.NetworkRequest.InitiatorType.Preload;
@@ -253,9 +259,17 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
         url = initiator.url as Platform.DevToolsPath.UrlString || Platform.DevToolsPath.EmptyUrlString;
       }
     }
-
     initiatorInfo.info = {type, url, lineNumber, columnNumber, scriptId, stack: initiatorStack, initiatorRequest};
     return initiatorInfo.info;
+  }
+
+  initiatorInfoForRequest(request: SDK.NetworkRequest.NetworkRequest): InitiatorInfo {
+    const initiatorInfo = this.initializeInitiatorSymbolIfNeeded(request);
+    if (initiatorInfo.info) {
+      return initiatorInfo.info;
+    }
+
+    return NetworkLog.initiatorInfoForRequest(request, initiatorInfo);
   }
 
   initiatorGraphForRequest(request: SDK.NetworkRequest.NetworkRequest): InitiatorGraph {
@@ -317,11 +331,12 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     }
   }
 
-  private onMainFrameNavigated(event: Common.EventTarget.EventTargetEvent<SDK.ResourceTreeModel.ResourceTreeFrame>):
-      void {
-    const mainFrame = event.data;
+  private onPrimaryPageChanged(
+      event: Common.EventTarget.EventTargetEvent<
+          {frame: SDK.ResourceTreeModel.ResourceTreeFrame, type: SDK.ResourceTreeModel.PrimaryPageChangeType}>): void {
+    const mainFrame = event.data.frame;
     const manager = mainFrame.resourceTreeModel().target().model(SDK.NetworkManager.NetworkManager);
-    if (!manager || mainFrame.resourceTreeModel().target().parentTarget()) {
+    if (!manager || mainFrame.resourceTreeModel().target().parentTarget()?.type() === SDK.Target.Type.Frame) {
       return;
     }
 
@@ -530,7 +545,7 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
         networkManager.target().model(SDK.RuntimeModel.RuntimeModel), Protocol.Log.LogEntrySource.Network,
         warning ? Protocol.Log.LogEntryLevel.Warning : Protocol.Log.LogEntryLevel.Info, message);
     this.associateConsoleMessageWithRequest(consoleMessage, requestId);
-    SDK.ConsoleModel.ConsoleModel.instance().addMessage(consoleMessage);
+    networkManager.target().model(SDK.ConsoleModel.ConsoleModel)?.addMessage(consoleMessage);
   }
 
   associateConsoleMessageWithRequest(consoleMessage: SDK.ConsoleModel.ConsoleMessage, requestId: string): void {
@@ -584,7 +599,7 @@ export type EventTypes = {
   [Events.RequestUpdated]: SDK.NetworkRequest.NetworkRequest,
 };
 
-interface InitiatorData {
+export interface InitiatorData {
   info: InitiatorInfo|null;
   chain: Set<SDK.NetworkRequest.NetworkRequest>|null;
   request?: SDK.NetworkRequest.NetworkRequest|null;
@@ -595,12 +610,12 @@ export interface InitiatorGraph {
   initiated: Map<SDK.NetworkRequest.NetworkRequest, SDK.NetworkRequest.NetworkRequest>;
 }
 
-interface InitiatorInfo {
+export interface InitiatorInfo {
   type: SDK.NetworkRequest.InitiatorType;
   // generally this is a url but can also contain "<anonymous>"
   url: Platform.DevToolsPath.UrlString;
-  lineNumber: number;
-  columnNumber: number;
+  lineNumber: number|undefined;
+  columnNumber: number|undefined;
   scriptId: Protocol.Runtime.ScriptId|null;
   stack: Protocol.Runtime.StackTrace|null;
   initiatorRequest: SDK.NetworkRequest.NetworkRequest|null;

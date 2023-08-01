@@ -25,10 +25,14 @@ export interface RegisteredAdorner {
 // eslint-disable-next-line rulesdir/const_enum
 export enum RegisteredAdorners {
   GRID = 'grid',
+  SUBGRID = 'subgrid',
   FLEX = 'flex',
   AD = 'ad',
   SCROLL_SNAP = 'scroll-snap',
   CONTAINER = 'container',
+  SLOT = 'slot',
+  TOP_LAYER = 'top-layer',
+  REVEAL = 'reveal',
 }
 
 // This enum-like const object serves as the authoritative registry for all the
@@ -38,6 +42,12 @@ export function getRegisteredAdorner(which: RegisteredAdorners): RegisteredAdorn
     case RegisteredAdorners.GRID:
       return {
         name: 'grid',
+        category: AdornerCategories.LAYOUT,
+        enabledByDefault: true,
+      };
+    case RegisteredAdorners.SUBGRID:
+      return {
+        name: 'subgrid',
         category: AdornerCategories.LAYOUT,
         enabledByDefault: true,
       };
@@ -63,6 +73,24 @@ export function getRegisteredAdorner(which: RegisteredAdorners): RegisteredAdorn
       return {
         name: 'container',
         category: AdornerCategories.LAYOUT,
+        enabledByDefault: true,
+      };
+    case RegisteredAdorners.SLOT:
+      return {
+        name: 'slot',
+        category: AdornerCategories.LAYOUT,
+        enabledByDefault: true,
+      };
+    case RegisteredAdorners.TOP_LAYER:
+      return {
+        name: 'top-layer',
+        category: AdornerCategories.LAYOUT,
+        enabledByDefault: true,
+      };
+    case RegisteredAdorners.REVEAL:
+      return {
+        name: 'reveal',
+        category: AdornerCategories.DEFAULT,
         enabledByDefault: true,
       };
   }

@@ -2,94 +2,90 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Workspace from '../../models/workspace/workspace.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {SourcesView} from './SourcesView.js';
-import type {UISourceCodeFrame} from './UISourceCodeFrame.js';
+import {type UISourceCodeFrame} from './UISourceCodeFrame.js';
 
 const UIStrings = {
   /**
-  *@description Text in Go To Line Quick Open of the Sources panel
-  */
+   *@description Text in Go To Line Quick Open of the Sources panel
+   */
   noFileSelected: 'No file selected.',
   /**
-  *@description Text to show no results have been found
-  */
+   *@description Text to show no results have been found
+   */
   noResultsFound: 'No results found',
   /**
-  *@description Text in Go To Line Quick Open of the Sources panel
-  */
+   *@description Text in Go To Line Quick Open of the Sources panel
+   */
   typeANumberToGoToThatLine: 'Type a number to go to that line.',
   /**
-  *@description Text in Go To Line Quick Open of the Sources panel
-  *@example {abc} PH1
-  *@example {000} PH2
-  *@example {bbb} PH3
-  */
+   *@description Text in Go To Line Quick Open of the Sources panel
+   *@example {abc} PH1
+   *@example {000} PH2
+   *@example {bbb} PH3
+   */
   currentPositionXsTypeAnOffset:
       'Current position: 0x{PH1}. Type an offset between 0x{PH2} and 0x{PH3} to navigate to.',
   /**
-  *@description Text in the GoToLine dialog of the Sources pane that describes the current line number, file line number range, and use of the GoToLine dialog
-  *@example {1} PH1
-  *@example {100} PH2
-  */
+   *@description Text in the GoToLine dialog of the Sources pane that describes the current line number, file line number range, and use of the GoToLine dialog
+   *@example {1} PH1
+   *@example {100} PH2
+   */
   currentLineSTypeALineNumber: 'Current line: {PH1}. Type a line number between 1 and {PH2} to navigate to.',
   /**
-  *@description Text in Go To Line Quick Open of the Sources panel
-  *@example {abc} PH1
-  */
+   *@description Text in Go To Line Quick Open of the Sources panel
+   *@example {abc} PH1
+   */
   goToOffsetXs: 'Go to offset 0x{PH1}.',
   /**
-  *@description Text in Go To Line Quick Open of the Sources panel
-  *@example {2} PH1
-  *@example {2} PH2
-  */
+   *@description Text in Go To Line Quick Open of the Sources panel
+   *@example {2} PH1
+   *@example {2} PH2
+   */
   goToLineSAndColumnS: 'Go to line {PH1} and column {PH2}.',
   /**
-  *@description Text in Go To Line Quick Open of the Sources panel
-  *@example {2} PH1
-  */
+   *@description Text in Go To Line Quick Open of the Sources panel
+   *@example {2} PH1
+   */
   goToLineS: 'Go to line {PH1}.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/GoToLineQuickOpen.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let goToLineQuickOpenInstance: GoToLineQuickOpen;
 export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
   #goToLineStrings: string[] = [];
 
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): GoToLineQuickOpen {
-    const {forceNew} = opts;
-    if (!goToLineQuickOpenInstance || forceNew) {
-      goToLineQuickOpenInstance = new GoToLineQuickOpen();
-    }
-
-    return goToLineQuickOpenInstance;
-  }
-
-  selectItem(_itemIndex: number|null, promptValue: string): void {
-    const uiSourceCode = this.currentUISourceCode();
-    if (!uiSourceCode) {
+  override selectItem(_itemIndex: number|null, promptValue: string): void {
+    const sourceFrame = this.currentSourceFrame();
+    if (!sourceFrame) {
       return;
     }
     const position = this.parsePosition(promptValue);
     if (!position) {
       return;
     }
-    void Common.Revealer.reveal(uiSourceCode.uiLocation(position.line - 1, position.column - 1));
+    sourceFrame.revealPosition({lineNumber: position.line - 1, columnNumber: position.column - 1});
   }
 
-  updateGoToLineStrings(query: string): void {
+  override itemCount(): number {
+    return this.#goToLineStrings.length;
+  }
+
+  override renderItem(itemIndex: number, _query: string, titleElement: Element, _subtitleElement: Element): void {
+    UI.UIUtils.createTextChild(titleElement, this.#goToLineStrings[itemIndex]);
+  }
+
+  override rewriteQuery(_query: string): string {
+    // For Go to Line Quick Open, we don't need to filter any item, set query to empty string, so the filter regex matching will be skipped
+    return '';
+  }
+
+  override queryChanged(query: string): void {
     this.#goToLineStrings = [];
-    if (!this.currentUISourceCode()) {
-      return;
-    }
     const position = this.parsePosition(query);
     const sourceFrame = this.currentSourceFrame();
     if (!position) {
@@ -99,7 +95,9 @@ export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
       }
       const editorState = sourceFrame.textEditor.state;
       const disassembly = sourceFrame.wasmDisassembly;
-      const currentLineNumber = editorState.doc.lineAt(editorState.selection.main.head).number - 1;
+      const currentLineNumber =
+          sourceFrame.editorLocationToUILocation(editorState.doc.lineAt(editorState.selection.main.head).number - 1)
+              .lineNumber;
       if (disassembly) {
         const lastBytecodeOffset = disassembly.lineNumberToBytecodeOffset(disassembly.lineNumbers - 1);
         const bytecodeOffsetDigits = lastBytecodeOffset.toString(16).length;
@@ -111,7 +109,7 @@ export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
         }));
         return;
       }
-      const linesCount = editorState.doc.lines;
+      const linesCount = sourceFrame.editorLocationToUILocation(editorState.doc.lines - 1).lineNumber + 1;
       this.#goToLineStrings.push(
           i18nString(UIStrings.currentLineSTypeALineNumber, {PH1: currentLineNumber + 1, PH2: linesCount}));
       return;
@@ -131,25 +129,8 @@ export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
     this.#goToLineStrings.push(i18nString(UIStrings.goToLineS, {PH1: position.line}));
   }
 
-  itemCount(): number {
-    return this.#goToLineStrings.length;
-  }
-
-  renderItem(itemIndex: number, _query: string, titleElement: Element, _subtitleElement: Element): void {
-    UI.UIUtils.createTextChild(titleElement, this.#goToLineStrings[itemIndex]);
-  }
-
-  rewriteQuery(_query: string): string {
-    // For Go to Line Quick Open, we don't need to filter any item, set query to empty string, so the filter regex matching will be skipped
-    return '';
-  }
-
-  queryChanged(query: string): void {
-    this.updateGoToLineStrings(query);
-  }
-
-  notFoundText(_query: string): string {
-    if (!this.currentUISourceCode()) {
+  override notFoundText(_query: string): string {
+    if (!this.currentSourceFrame()) {
       return i18nString(UIStrings.noFileSelected);
     }
     return i18nString(UIStrings.noResultsFound);
@@ -180,14 +161,6 @@ export class GoToLineQuickOpen extends QuickOpen.FilteredListWidget.Provider {
       column = parseInt(parts[2].substring(1), 10);
     }
     return {line: Math.max(line | 0, 1), column: Math.max(column | 0, 1)};
-  }
-
-  private currentUISourceCode(): Workspace.UISourceCode.UISourceCode|null {
-    const sourcesView = UI.Context.Context.instance().flavor(SourcesView);
-    if (!sourcesView) {
-      return null;
-    }
-    return sourcesView.currentUISourceCode();
   }
 
   private currentSourceFrame(): UISourceCodeFrame|null {

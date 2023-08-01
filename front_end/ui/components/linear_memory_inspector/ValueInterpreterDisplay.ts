@@ -9,12 +9,23 @@ import * as ComponentHelpers from '../helpers/helpers.js';
 import * as IconButton from '../icon_button/icon_button.js';
 
 import valueInterpreterDisplayStyles from './valueInterpreterDisplay.css.js';
-import {Endianness, format, getDefaultValueTypeMapping, getPointerAddress, isNumber, isPointer, isValidMode, VALUE_TYPE_MODE_LIST, ValueType, ValueTypeMode} from './ValueInterpreterDisplayUtils.js';
+import {
+  Endianness,
+  format,
+  getDefaultValueTypeMapping,
+  getPointerAddress,
+  isNumber,
+  isPointer,
+  isValidMode,
+  VALUE_TYPE_MODE_LIST,
+  ValueType,
+  ValueTypeMode,
+} from './ValueInterpreterDisplayUtils.js';
 
 const UIStrings = {
   /**
-  *@description Tooltip text that appears when hovering over an unsigned interpretation of the memory under the Value Interpreter
-  */
+   *@description Tooltip text that appears when hovering over an unsigned interpretation of the memory under the Value Interpreter
+   */
   unsignedValue: '`Unsigned` value',
   /**
    *@description Tooltip text that appears when hovering over the element to change value type modes of under the Value Interpreter. Value type modes
@@ -22,16 +33,16 @@ const UIStrings = {
    */
   changeValueTypeMode: 'Change mode',
   /**
-  *@description Tooltip text that appears when hovering over a signed interpretation of the memory under the Value Interpreter
-  */
+   *@description Tooltip text that appears when hovering over a signed interpretation of the memory under the Value Interpreter
+   */
   signedValue: '`Signed` value',
   /**
-  *@description Tooltip text that appears when hovering over a 'jump-to-address' button that is next to a pointer (32-bit or 64-bit) under the Value Interpreter
-  */
+   *@description Tooltip text that appears when hovering over a 'jump-to-address' button that is next to a pointer (32-bit or 64-bit) under the Value Interpreter
+   */
   jumpToPointer: 'Jump to address',
   /**
-  *@description Tooltip text that appears when hovering over a 'jump-to-address' button that is next to a pointer (32-bit or 64-bit) with an invalid address under the Value Interpreter.
-  */
+   *@description Tooltip text that appears when hovering over a 'jump-to-address' button that is next to a pointer (32-bit or 64-bit) with an invalid address under the Value Interpreter.
+   */
   addressOutOfRange: 'Address out of memory range',
 
 };
@@ -138,20 +149,20 @@ export class ValueInterpreterDisplay extends HTMLElement {
     const address = getPointerAddress(type, this.#buffer, this.#endianness);
     const jumpDisabled = Number.isNaN(address) || BigInt(address) >= BigInt(this.#memoryLength);
     const buttonTitle = jumpDisabled ? i18nString(UIStrings.addressOutOfRange) : i18nString(UIStrings.jumpToPointer);
-    const iconColor = jumpDisabled ? 'var(--color-text-secondary)' : 'var(--color-primary)';
+    const iconColor = jumpDisabled ? 'var(--icon-default)' : 'var(--icon-link)';
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
-      <span class="value-type-cell-no-mode value-type-cell">${i18n.i18n.lockedString(type)}</span>
+      <span class="value-type-cell-no-mode value-type-cell selectable-text">${i18n.i18n.lockedString(type)}</span>
       <div class="value-type-cell">
         <div class="value-type-value-with-link" data-value="true">
-        <span>${unsignedValue}</span>
+        <span class="selectable-text">${unsignedValue}</span>
           ${
             html`
               <button class="jump-to-button" data-jump="true" title=${buttonTitle} ?disabled=${jumpDisabled}
                 @click=${this.#onJumpToAddressClicked.bind(this, Number(address))}>
                 <${IconButton.Icon.Icon.litTagName} .data=${
-                  {iconName: 'link_icon', color: iconColor, width: '14px'} as IconButton.Icon.IconWithName}>
+                  {iconName: 'open-externally', color: iconColor, width: '16px'} as IconButton.Icon.IconWithName}>
                 </${IconButton.Icon.Icon.litTagName}>
               </button>`}
         </div>
@@ -168,7 +179,7 @@ export class ValueInterpreterDisplay extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
-      <span class="value-type-cell">${i18n.i18n.lockedString(type)}</span>
+      <span class="value-type-cell selectable-text">${i18n.i18n.lockedString(type)}</span>
       <div>
         <select title=${i18nString(UIStrings.changeValueTypeMode)}
           data-mode-settings="true"
@@ -195,7 +206,7 @@ export class ValueInterpreterDisplay extends HTMLElement {
     const showSignedAndUnsigned =
         signedValue !== unsignedValue && mode !== ValueTypeMode.Hexadecimal && mode !== ValueTypeMode.Octal;
 
-    const unsignedRendered = html`<span class="value-type-cell"  title=${
+    const unsignedRendered = html`<span class="value-type-cell selectable-text"  title=${
         i18nString(UIStrings.unsignedValue)} data-value="true">${unsignedValue}</span>`;
     if (!showSignedAndUnsigned) {
       return unsignedRendered;
@@ -203,8 +214,8 @@ export class ValueInterpreterDisplay extends HTMLElement {
 
     // Some values are too long to show in one line, we're putting them into the next line.
     const showInMultipleLines = type === ValueType.Int32 || type === ValueType.Int64;
-    const signedRendered =
-        html`<span data-value="true" title=${i18nString(UIStrings.signedValue)}>${signedValue}</span>`;
+    const signedRendered = html`<span class="selectable-text" data-value="true" title=${
+        i18nString(UIStrings.signedValue)}>${signedValue}</span>`;
 
     if (showInMultipleLines) {
       return html`

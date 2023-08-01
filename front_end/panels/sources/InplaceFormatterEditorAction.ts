@@ -10,18 +10,23 @@ import type * as Workspace from '../../models/workspace/workspace.js';
 import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {EditorAction, EditorClosedEvent, SourcesView} from './SourcesView.js';
-import {Events, registerEditorAction} from './SourcesView.js';
+import {
+  Events,
+  registerEditorAction,
+  type EditorAction,
+  type EditorClosedEvent,
+  type SourcesView,
+} from './SourcesView.js';
 
 const UIStrings = {
   /**
-  *@description Title of the format button in the Sources panel
-  *@example {file name} PH1
-  */
+   *@description Title of the format button in the Sources panel
+   *@example {file name} PH1
+   */
   formatS: 'Format {PH1}',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon pretty print button in the Inplace Formatter Editor Action of the Sources panel
-  */
+   *@description Tooltip text that appears when hovering over the largeicon pretty print button in the Inplace Formatter Editor Action of the Sources panel
+   */
   format: 'Format',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/InplaceFormatterEditorAction.ts', UIStrings);
@@ -74,7 +79,7 @@ export class InplaceFormatterEditorAction implements EditorAction {
     this.sourcesView.addEventListener(Events.EditorSelected, this.editorSelected.bind(this));
     this.sourcesView.addEventListener(Events.EditorClosed, this.editorClosed.bind(this));
 
-    this.button = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.format), 'largeicon-pretty-print');
+    this.button = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.format), 'brackets');
     this.button.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.formatSourceInPlace, this);
     this.updateButton(sourcesView.currentUISourceCode());
 
@@ -88,10 +93,10 @@ export class InplaceFormatterEditorAction implements EditorAction {
     if (uiSourceCode.project().canSetFileContent()) {
       return true;
     }
-    if (Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode)) {
+    if (Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode) !== null) {
       return true;
     }
-    return uiSourceCode.contentType().isStyleSheet();
+    return false;
   }
 
   private formatSourceInPlace(): void {

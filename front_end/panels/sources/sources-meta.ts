@@ -7,388 +7,426 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Sources from './sources.js';
+import type * as SourcesComponents from './components/components.js';
 
 const UIStrings = {
   /**
-  *@description Command for showing the 'Sources' tool
-  */
+   *@description Command for showing the 'Sources' tool
+   */
   showSources: 'Show Sources',
   /**
-  *@description Name of the Sources panel
-  */
+   *@description Name of the Sources panel
+   */
   sources: 'Sources',
   /**
-  *@description Command for showing the 'Filesystem' tool
-  */
+   *@description Command for showing the 'Filesystem' tool
+   */
   showFilesystem: 'Show Filesystem',
   /**
-  *@description Title of the 'Filesystem' tool in the Files Navigator View, which is part of the Sources tool
-  */
+   *@description Title of the 'Filesystem' tool in the Files Navigator View, which is part of the Sources tool
+   */
   filesystem: 'Filesystem',
   /**
-  *@description Command for showing the 'Snippets' tool
-  */
+   *@description Command for showing the 'Snippets' tool
+   */
   showSnippets: 'Show Snippets',
   /**
-  *@description Title of the 'Snippets' tool in the Snippets Navigator View, which is part of the Sources tool
-  */
+   *@description Title of the 'Snippets' tool in the Snippets Navigator View, which is part of the Sources tool
+   */
   snippets: 'Snippets',
   /**
-  *@description Command for showing the 'Search' tool
-  */
+   *@description Command for showing the 'Search' tool
+   */
   showSearch: 'Show Search',
   /**
-  *@description Title of a search bar or tool
-  */
+   *@description Title of a search bar or tool
+   */
   search: 'Search',
   /**
-  *@description Command for showing the 'Quick source' tool
-  */
+   *@description Command for showing the 'Quick source' tool
+   */
   showQuickSource: 'Show Quick source',
   /**
-  *@description Title of the 'Quick source' tool in the bottom drawer
-  */
+   *@description Title of the 'Quick source' tool in the bottom drawer
+   */
   quickSource: 'Quick source',
   /**
-  *@description Command for showing the 'Threads' tool
-  */
+   *@description Command for showing the 'Threads' tool
+   */
   showThreads: 'Show Threads',
   /**
-  *@description Title of the sources threads
-  */
+   *@description Title of the sources threads
+   */
   threads: 'Threads',
   /**
-  *@description Command for showing the 'Scope' tool
-  */
+   *@description Command for showing the 'Scope' tool
+   */
   showScope: 'Show Scope',
   /**
-  *@description Title of the sources scopeChain
-  */
+   *@description Title of the sources scopeChain
+   */
   scope: 'Scope',
   /**
-  *@description Command for showing the 'Watch' tool
-  */
+   *@description Command for showing the 'Watch' tool
+   */
   showWatch: 'Show Watch',
   /**
-  *@description Title of the sources watch
-  */
+   *@description Title of the sources watch
+   */
   watch: 'Watch',
   /**
-  *@description Command for showing the 'Breakpoints' tool
-  */
+   *@description Command for showing the 'Breakpoints' tool
+   */
   showBreakpoints: 'Show Breakpoints',
   /**
-  *@description Title of the sources jsBreakpoints
-  */
+   *@description Title of the sources jsBreakpoints
+   */
   breakpoints: 'Breakpoints',
   /**
-  *@description Title of an action under the Debugger category that can be invoked through the Command Menu
-  */
+   *@description Title of an action under the Debugger category that can be invoked through the Command Menu
+   */
   pauseScriptExecution: 'Pause script execution',
   /**
-  *@description Title of an action under the Debugger category that can be invoked through the Command Menu
-  */
+   *@description Title of an action under the Debugger category that can be invoked through the Command Menu
+   */
   resumeScriptExecution: 'Resume script execution',
   /**
-  *@description Title of an action in the debugger tool to step over
-  */
+   *@description Title of an action in the debugger tool to step over
+   */
   stepOverNextFunctionCall: 'Step over next function call',
   /**
-  *@description Title of an action in the debugger tool to step into
-  */
+   *@description Title of an action in the debugger tool to step into
+   */
   stepIntoNextFunctionCall: 'Step into next function call',
   /**
-  *@description Title of an action in the debugger tool to step
-  */
+   *@description Title of an action in the debugger tool to step
+   */
   step: 'Step',
   /**
-  *@description Title of an action in the debugger tool to step out
-  */
+   *@description Title of an action in the debugger tool to step out
+   */
   stepOutOfCurrentFunction: 'Step out of current function',
   /**
-  *@description Text to run a code snippet
-  */
+   *@description Text to run a code snippet
+   */
   runSnippet: 'Run snippet',
   /**
-  *@description Text in Java Script Breakpoints Sidebar Pane of the Sources panel
-  */
+   *@description Text in Java Script Breakpoints Sidebar Pane of the Sources panel
+   */
   deactivateBreakpoints: 'Deactivate breakpoints',
   /**
-  *@description Text in Java Script Breakpoints Sidebar Pane of the Sources panel
-  */
+   *@description Text in Java Script Breakpoints Sidebar Pane of the Sources panel
+   */
   activateBreakpoints: 'Activate breakpoints',
   /**
-  *@description Title of an action in the sources tool to add to watch
-  */
+   *@description Title of an action in the sources tool to add to watch
+   */
   addSelectedTextToWatches: 'Add selected text to watches',
   /**
-  *@description Title of an action in the debugger tool to evaluate selection
-  */
+   *@description Title of an action in the debugger tool to evaluate selection
+   */
   evaluateSelectedTextInConsole: 'Evaluate selected text in console',
   /**
-  *@description Title of an action that switches files in the Sources panel
-  */
+   *@description Title of an action that switches files in the Sources panel
+   */
   switchFile: 'Switch file',
   /**
-  *@description Title of a sources panel action that renames a file
-  */
+   *@description Title of a sources panel action that renames a file
+   */
   rename: 'Rename',
   /**
-  *@description Title of an action in the sources tool to close all
-  */
+   *@description Title of an action in the sources tool to close all
+   */
   closeAll: 'Close All',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (jump to previous editing location in text editor)
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (jump to previous editing location in text editor)
+   */
   jumpToPreviousEditingLocation: 'Jump to previous editing location',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (jump to next editing location in text editor)
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (jump to next editing location in text editor)
+   */
   jumpToNextEditingLocation: 'Jump to next editing location',
   /**
-  *@description Title of an action that closes the active editor tab in the Sources panel
-  */
+   *@description Title of an action that closes the active editor tab in the Sources panel
+   */
   closeTheActiveTab: 'Close the active tab',
   /**
-  *@description Text to go to a given line
-  */
+   *@description Text to go to a given line
+   */
   goToLine: 'Go to line',
   /**
-  *@description Title of an action that opens the go to member menu
-  */
+   *@description Title of an action that opens the go to member menu
+   */
   goToAFunctionDeclarationruleSet: 'Go to a function declaration/rule set',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (toggle breakpoint in debugger)
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (toggle breakpoint in debugger)
+   */
   toggleBreakpoint: 'Toggle breakpoint',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (enable toggle breakpoint shortcut in debugger)
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (enable toggle breakpoint shortcut in debugger)
+   */
   toggleBreakpointEnabled: 'Toggle breakpoint enabled',
   /**
-  *@description Title of a sources panel action that opens the breakpoint input window
-  */
+   *@description Title of a sources panel action that opens the breakpoint input window
+   */
   toggleBreakpointInputWindow: 'Toggle breakpoint input window',
   /**
-  *@description Text to save something
-  */
+   *@description Text to save something
+   */
   save: 'Save',
   /**
-  *@description Title of an action to save all files in the Sources panel
-  */
+   *@description Title of an action to save all files in the Sources panel
+   */
   saveAll: 'Save all',
   /**
-  *@description Title of an action in the sources tool to create snippet
-  */
+   *@description Title of an action in the sources tool to create snippet
+   */
   createNewSnippet: 'Create new snippet',
   /**
-  *@description Title of an action in the sources tool to add folder to workspace
-  */
+   *@description Title of an action in the sources tool to add folder to workspace
+   */
   addFolderToWorkspace: 'Add folder to workspace',
   /**
-  *@description Title of an action in the debugger tool to previous call frame
-  */
+   *@description Title of an action in the debugger tool to previous call frame
+   */
   previousCallFrame: 'Previous call frame',
   /**
-  *@description Title of an action in the debugger tool to next call frame
-  */
+   *@description Title of an action in the debugger tool to next call frame
+   */
   nextCallFrame: 'Next call frame',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (increment CSS unit by the amount passed in the placeholder in Styles pane)
-  *@example {10} PH1
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (increment CSS unit by the amount passed in the placeholder in Styles pane)
+   *@example {10} PH1
+   */
   incrementCssUnitBy: 'Increment CSS unit by {PH1}',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (decrement CSS unit by the amount passed in the placeholder in Styles pane)
-  *@example {10} PH1
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (decrement CSS unit by the amount passed in the placeholder in Styles pane)
+   *@example {10} PH1
+   */
   decrementCssUnitBy: 'Decrement CSS unit by {PH1}',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   searchInAnonymousAndContent: 'Search in anonymous and content scripts',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   doNotSearchInAnonymousAndContent: 'Do not search in anonymous and content scripts',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   automaticallyRevealFilesIn: 'Automatically reveal files in sidebar',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   doNotAutomaticallyRevealFilesIn: 'Do not automatically reveal files in sidebar',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   enableJavascriptSourceMaps: 'Enable JavaScript source maps',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   disableJavascriptSourceMaps: 'Disable JavaScript source maps',
   /**
-  *@description Title of a setting that can be invoked through the Command Menu.
-  *'tab moves focus' is the name of the setting, which means that when the user
-  *hits the tab key, the focus in the UI will be moved to the next part of the
-  *text editor, as opposed to inserting a tab character into the text in the
-  *text editor.
-  */
+   *@description Title of a setting that can be invoked through the Command Menu.
+   *'tab moves focus' is the name of the setting, which means that when the user
+   *hits the tab key, the focus in the UI will be moved to the next part of the
+   *text editor, as opposed to inserting a tab character into the text in the
+   *text editor.
+   */
   enableTabMovesFocus: 'Enable tab moves focus',
   /**
-  *@description Title of a setting that can be invoked through the Command Menu.
-  *'tab moves focus' is the name of the setting, which means that when the user
-  *hits the tab key, the focus in the UI will be moved to the next part of the
-  *text editor, as opposed to inserting a tab character into the text in the
-  *text editor.
-  */
+   *@description Title of a setting that can be invoked through the Command Menu.
+   *'tab moves focus' is the name of the setting, which means that when the user
+   *hits the tab key, the focus in the UI will be moved to the next part of the
+   *text editor, as opposed to inserting a tab character into the text in the
+   *text editor.
+   */
   disableTabMovesFocus: 'Disable tab moves focus',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   detectIndentation: 'Detect indentation',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   doNotDetectIndentation: 'Do not detect indentation',
   /**
-  *@description Text for autocompletion
-  */
+   *@description Text for autocompletion
+   */
   autocompletion: 'Autocompletion',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   enableAutocompletion: 'Enable autocompletion',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   disableAutocompletion: 'Disable autocompletion',
   /**
-  *@description Title of a setting under the Sources category in Settings
-  */
+   *@description Title of a setting under the Sources category in Settings
+   */
   bracketMatching: 'Bracket matching',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   enableBracketMatching: 'Enable bracket matching',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   disableBracketMatching: 'Disable bracket matching',
   /**
-  *@description Title of a setting under the Sources category in Settings
-  */
+   *@description Title of a setting under the Sources category in Settings
+   */
   codeFolding: 'Code folding',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   enableCodeFolding: 'Enable code folding',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   disableCodeFolding: 'Disable code folding',
   /**
-  *@description Title of a setting under the Sources category in Settings
-  */
+   *@description Title of a setting under the Sources category in Settings
+   */
   showWhitespaceCharacters: 'Show whitespace characters:',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   doNotShowWhitespaceCharacters: 'Do not show whitespace characters',
   /**
-  * @description One value of an option that can be set to 'none', 'all', or 'trailing'. The setting
-  * controls how whitespace characters are shown in a text editor.
-  */
+   * @description One value of an option that can be set to 'none', 'all', or 'trailing'. The setting
+   * controls how whitespace characters are shown in a text editor.
+   */
   none: 'None',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   showAllWhitespaceCharacters: 'Show all whitespace characters',
   /**
-  *@description Text for everything
-  */
+   *@description Text for everything
+   */
   all: 'All',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   showTrailingWhitespaceCharacters: 'Show trailing whitespace characters',
   /**
-  *@description A drop-down menu option to show trailing whitespace characters
-  */
+   *@description A drop-down menu option to show trailing whitespace characters
+   */
   trailing: 'Trailing',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   displayVariableValuesInlineWhile: 'Display variable values inline while debugging',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   doNotDisplayVariableValuesInline: 'Do not display variable values inline while debugging',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   enableCssSourceMaps: 'Enable CSS source maps',
   /**
-  *@description Title of a setting under the Sources category that can be invoked through the Command Menu
-  */
+   *@description Title of a setting under the Sources category that can be invoked through the Command Menu
+   */
   disableCssSourceMaps: 'Disable CSS source maps',
   /**
-  *@description Title of a setting under the Sources category in Settings
-  */
+   *@description Title of a setting under the Sources category in Settings
+   */
   allowScrollingPastEndOfFile: 'Allow scrolling past end of file',
   /**
-  *@description Title of a setting under the Sources category in Settings
-  */
+   *@description Title of a setting under the Sources category in Settings
+   */
   disallowScrollingPastEndOfFile: 'Disallow scrolling past end of file',
   /**
-  *@description Text for command prefix of go to a given line or symbol
-  */
+   *@description Title of a setting under the Sources category in Settings
+   */
+  wasmAutoStepping: 'When debugging wasm with debug information, do not pause on wasm bytecode if possible',
+  /**
+   *@description Title of a setting under the Sources category in Settings
+   */
+  enableWasmAutoStepping: 'Enable wasm auto-stepping',
+  /**
+   *@description Title of a setting under the Sources category in Settings
+   */
+  disableWasmAutoStepping: 'Disable wasm auto-stepping',
+
+  /**
+   *@description Text for command prefix of go to a given line or symbol
+   */
   goTo: 'Go to',
   /**
-  *@description Text for command suggestion of go to a given line
-  */
+   *@description Text for command suggestion of go to a given line
+   */
   line: 'Line',
   /**
-  *@description Text for command suggestion of go to a given symbol
-  */
+   *@description Text for command suggestion of go to a given symbol
+   */
   symbol: 'Symbol',
   /**
-  *@description Text for command prefix of open a file
-  */
+   *@description Text for command prefix of open a file
+   */
   open: 'Open',
   /**
-  *@description Text for command suggestion of open a file
-  */
+   *@description Text for command suggestion of open a file
+   */
   file: 'File',
   /**
-  * @description  Title of a setting under the Sources category in Settings. If this option is off,
-  * the sources panel will not be automatically be focsed whenever the application hits a breakpoint
-  * and comes to a halt.
-  */
+   * @description  Title of a setting under the Sources category in Settings. If this option is off,
+   * the sources panel will not be automatically be focsed whenever the application hits a breakpoint
+   * and comes to a halt.
+   */
   disableAutoFocusOnDebuggerPaused: 'Do not focus Sources panel when triggering a breakpoint',
   /**
-  * @description  Title of a setting under the Sources category in Settings. If this option is on,
-  * the sources panel will be automatically shown whenever the application hits a breakpoint and
-  * comes to a halt.
-  */
+   * @description  Title of a setting under the Sources category in Settings. If this option is on,
+   * the sources panel will be automatically shown whenever the application hits a breakpoint and
+   * comes to a halt.
+   */
   enableAutoFocusOnDebuggerPaused: 'Focus Sources panel when triggering a breakpoint',
-
+  /**
+   * @description Text for command of toggling navigator sidebar in Sources panel
+   */
+  toggleNavigatorSidebar: 'Toggle navigator sidebar',
+  /**
+   * @description Text for command of toggling debugger sidebar in Sources panel
+   */
+  toggleDebuggerSidebar: 'Toggle debugger sidebar',
+  /**
+   * @description Title of an action that navigates to the next editor in the Sources panel.
+   */
+  nextEditorTab: 'Next editor',
+  /**
+   * @description Title of an action that navigates to the next editor in the Sources panel.
+   */
+  previousEditorTab: 'Previous editor',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/sources-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 let loadedSourcesModule: (typeof Sources|undefined);
+let loadedSourcesComponentsModule: (typeof SourcesComponents|undefined);
 
 async function loadSourcesModule(): Promise<typeof Sources> {
   if (!loadedSourcesModule) {
     loadedSourcesModule = await import('./sources.js');
   }
   return loadedSourcesModule;
+}
+
+async function loadSourcesComponentsModule(): Promise<typeof SourcesComponents> {
+  if (!loadedSourcesComponentsModule) {
+    loadedSourcesComponentsModule = await import('./components/components.js');
+  }
+  return loadedSourcesComponentsModule;
 }
 
 function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (sourcesModule: typeof Sources) => T[]): T[] {
@@ -503,8 +541,8 @@ UI.ViewManager.registerViewExtension({
   title: i18nLazyString(UIStrings.breakpoints),
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   async loadView() {
-    const Sources = await loadSourcesModule();
-    return Sources.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane.instance();
+    const SourcesComponents = await loadSourcesComponentsModule();
+    return SourcesComponents.BreakpointsView.BreakpointsView.instance().wrapper as UI.Widget.Widget;
   },
 });
 
@@ -567,7 +605,7 @@ UI.ActionRegistration.registerActionExtension({
   actionId: 'debugger.step-over',
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
 
   title: i18nLazyString(UIStrings.stepOverNextFunctionCall),
@@ -599,7 +637,7 @@ UI.ActionRegistration.registerActionExtension({
   actionId: 'debugger.step-into',
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.stepIntoNextFunctionCall),
   iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_STEP_INTO,
@@ -630,7 +668,7 @@ UI.ActionRegistration.registerActionExtension({
   actionId: 'debugger.step',
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.step),
   iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_STEP,
@@ -652,7 +690,7 @@ UI.ActionRegistration.registerActionExtension({
   actionId: 'debugger.step-out',
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.stepOutOfCurrentFunction),
   iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_STEP_OUT,
@@ -683,10 +721,10 @@ UI.ActionRegistration.registerActionExtension({
   category: UI.ActionRegistration.ActionCategory.DEBUGGER,
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.runSnippet),
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_PLAY,
+  iconClass: UI.ActionRegistration.IconClass.PLAY,
   contextTypes() {
     return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
   },
@@ -705,11 +743,12 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   category: UI.ActionRegistration.ActionCategory.DEBUGGER,
   actionId: 'debugger.toggle-breakpoints-active',
-  iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_DEACTIVATE_BREAKPOINTS,
+  iconClass: UI.ActionRegistration.IconClass.BREAKPOINT_CROSSED,
+  toggledIconClass: UI.ActionRegistration.IconClass.BREAKPOINT_CROSSED_FILLED,
   toggleable: true,
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
   contextTypes() {
     return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
@@ -764,7 +803,7 @@ UI.ActionRegistration.registerActionExtension({
   category: UI.ActionRegistration.ActionCategory.DEBUGGER,
   async loadActionDelegate() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.DebuggingActionDelegate.instance();
+    return Sources.SourcesPanel.ActionDelegate.instance();
   },
   title: i18nLazyString(UIStrings.evaluateSelectedTextInConsole),
   contextTypes() {
@@ -894,6 +933,68 @@ UI.ActionRegistration.registerActionExtension({
 });
 
 UI.ActionRegistration.registerActionExtension({
+  actionId: 'sources.next-editor-tab',
+  category: UI.ActionRegistration.ActionCategory.SOURCES,
+  title: i18nLazyString(UIStrings.nextEditorTab),
+  async loadActionDelegate() {
+    const Sources = await loadSourcesModule();
+    return Sources.SourcesView.ActionDelegate.instance();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
+  },
+  bindings: [
+    {
+      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      shortcut: 'Ctrl+PageDown',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+    },
+    {
+      platform: UI.ActionRegistration.Platforms.Mac,
+      shortcut: 'Meta+PageDown',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+    },
+  ],
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'sources.previous-editor-tab',
+  category: UI.ActionRegistration.ActionCategory.SOURCES,
+  title: i18nLazyString(UIStrings.previousEditorTab),
+  async loadActionDelegate() {
+    const Sources = await loadSourcesModule();
+    return Sources.SourcesView.ActionDelegate.instance();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
+  },
+  bindings: [
+    {
+      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      shortcut: 'Ctrl+PageUp',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+    },
+    {
+      platform: UI.ActionRegistration.Platforms.Mac,
+      shortcut: 'Meta+PageUp',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+    },
+  ],
+});
+
+UI.ActionRegistration.registerActionExtension({
   actionId: 'sources.go-to-line',
   category: UI.ActionRegistration.ActionCategory.SOURCES,
   title: i18nLazyString(UIStrings.goToLine),
@@ -974,10 +1075,16 @@ UI.ActionRegistration.registerActionExtension({
     {
       platform: UI.ActionRegistration.Platforms.WindowsLinux,
       shortcut: 'Ctrl+b',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+      ],
     },
     {
       platform: UI.ActionRegistration.Platforms.Mac,
       shortcut: 'Meta+b',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+      ],
     },
     {
       shortcut: 'F9',
@@ -1106,7 +1213,7 @@ if (!Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
       const Sources = await loadSourcesModule();
       return Sources.SourcesNavigator.ActionDelegate.instance();
     },
-    iconClass: UI.ActionRegistration.IconClass.LARGE_ICON_ADD,
+    iconClass: UI.ActionRegistration.IconClass.PLUS,
     title: i18nLazyString(UIStrings.addFolderToWorkspace),
     condition: Root.Runtime.ConditionName.NOT_SOURCES_HIDE_ADD_FOLDER,
   });
@@ -1240,10 +1347,82 @@ UI.ActionRegistration.registerActionExtension({
   ],
 });
 
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'sources.toggle-navigator-sidebar',
+  category: UI.ActionRegistration.ActionCategory.SOURCES,
+  title: i18nLazyString(UIStrings.toggleNavigatorSidebar),
+  async loadActionDelegate() {
+    const Sources = await loadSourcesModule();
+    return Sources.SourcesPanel.ActionDelegate.instance();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
+  },
+  bindings: [
+    {
+      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      shortcut: 'Ctrl+Shift+y',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+      ],
+    },
+    {
+      platform: UI.ActionRegistration.Platforms.Mac,
+      shortcut: 'Meta+Shift+y',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.DEVTOOLS_DEFAULT,
+      ],
+    },
+    {
+      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      shortcut: 'Ctrl+b',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+    },
+    {
+      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      shortcut: 'Meta+b',
+      keybindSets: [
+        UI.ActionRegistration.KeybindSet.VS_CODE,
+      ],
+    },
+  ],
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'sources.toggle-debugger-sidebar',
+  category: UI.ActionRegistration.ActionCategory.SOURCES,
+  title: i18nLazyString(UIStrings.toggleDebuggerSidebar),
+  async loadActionDelegate() {
+    const Sources = await loadSourcesModule();
+    return Sources.SourcesPanel.ActionDelegate.instance();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
+  },
+  bindings: [
+    {
+      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      shortcut: 'Ctrl+Shift+h',
+    },
+    {
+      platform: UI.ActionRegistration.Platforms.Mac,
+      shortcut: 'Meta+Shift+h',
+    },
+  ],
+});
+
 Common.Settings.registerSettingExtension({
   settingName: 'navigatorGroupByFolder',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: true,
+});
+
+Common.Settings.registerSettingExtension({
+  settingName: 'navigatorGroupByAuthored',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: false,
 });
 
 Common.Settings.registerSettingExtension({
@@ -1271,7 +1450,7 @@ Common.Settings.registerSettingExtension({
   title: i18nLazyString(UIStrings.automaticallyRevealFilesIn),
   settingName: 'autoRevealInNavigator',
   settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
+  defaultValue: true,
   options: [
     {
       value: true,
@@ -1384,7 +1563,7 @@ Common.Settings.registerSettingExtension({
   title: i18nLazyString(UIStrings.codeFolding),
   settingName: 'textEditorCodeFolding',
   settingType: Common.Settings.SettingType.BOOLEAN,
-  defaultValue: false,
+  defaultValue: true,
   options: [
     {
       value: true,
@@ -1499,9 +1678,28 @@ Common.Settings.registerSettingExtension({
   ],
 });
 
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Local,
+  title: i18nLazyString(UIStrings.wasmAutoStepping),
+  settingName: 'wasmAutoStepping',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.enableWasmAutoStepping),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.disableWasmAutoStepping),
+    },
+  ],
+});
+
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1510,7 +1708,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_TOP,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1519,7 +1717,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_BOTTOM,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1528,7 +1726,7 @@ UI.ViewManager.registerLocationResolver({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_TABS,
-  category: UI.ViewManager.ViewLocationCategoryValues.SOURCES,
+  category: UI.ViewManager.ViewLocationCategory.SOURCES,
   async loadResolver() {
     const Sources = await loadSourcesModule();
     return Sources.SourcesPanel.SourcesPanel.instance();
@@ -1641,6 +1839,19 @@ Common.Revealer.registerRevealer({
   },
 });
 
+Common.Revealer.registerRevealer({
+  contextTypes() {
+    return [
+      Breakpoints.BreakpointManager.BreakpointLocation,
+    ];
+  },
+  destination: Common.Revealer.RevealerDestination.SOURCES_PANEL,
+  async loadRevealer() {
+    const Sources = await loadSourcesModule();
+    return Sources.DebuggerPlugin.BreakpointLocationRevealer.instance();
+  },
+});
+
 UI.Toolbar.registerToolbarItem({
   actionId: 'sources.add-folder-to-workspace',
   location: UI.Toolbar.ToolbarItemLocation.FILES_NAVIGATION_TOOLBAR,
@@ -1656,18 +1867,8 @@ UI.Context.registerListener({
     return [SDK.DebuggerModel.DebuggerPausedDetails];
   },
   async loadListener() {
-    const Sources = await loadSourcesModule();
-    return Sources.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane.instance();
-  },
-});
-
-UI.Context.registerListener({
-  contextTypes() {
-    return [SDK.DebuggerModel.DebuggerPausedDetails];
-  },
-  async loadListener() {
-    const Sources = await loadSourcesModule();
-    return Sources.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane.instance();
+    const SourcesComponents = await loadSourcesComponentsModule();
+    return SourcesComponents.BreakpointsView.BreakpointsSidebarController.instance();
   },
 });
 
@@ -1705,10 +1906,11 @@ UI.ContextMenu.registerItem({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '@',
-  iconName: 'ic_command_go_to_symbol',
+  iconName: 'symbol',
+  iconWidth: '16px',
   async provider() {
     const Sources = await loadSourcesModule();
-    return Sources.OutlineQuickOpen.OutlineQuickOpen.instance();
+    return new Sources.OutlineQuickOpen.OutlineQuickOpen();
   },
   titlePrefix: i18nLazyString(UIStrings.goTo),
   titleSuggestion: i18nLazyString(UIStrings.symbol),
@@ -1716,10 +1918,11 @@ QuickOpen.FilteredListWidget.registerProvider({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: ':',
-  iconName: 'ic_command_go_to_line',
+  iconName: 'colon',
+  iconWidth: '20px',
   async provider() {
     const Sources = await loadSourcesModule();
-    return Sources.GoToLineQuickOpen.GoToLineQuickOpen.instance();
+    return new Sources.GoToLineQuickOpen.GoToLineQuickOpen();
   },
   titlePrefix: i18nLazyString(UIStrings.goTo),
   titleSuggestion: i18nLazyString(UIStrings.line),
@@ -1727,10 +1930,11 @@ QuickOpen.FilteredListWidget.registerProvider({
 
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '',
-  iconName: 'ic_command_open_file',
+  iconName: 'document',
+  iconWidth: '16px',
   async provider() {
     const Sources = await loadSourcesModule();
-    return Sources.OpenFileQuickOpen.OpenFileQuickOpen.instance();
+    return new Sources.OpenFileQuickOpen.OpenFileQuickOpen();
   },
   titlePrefix: i18nLazyString(UIStrings.open),
   titleSuggestion: i18nLazyString(UIStrings.file),

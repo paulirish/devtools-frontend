@@ -2,15 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-import type * as Protocol from '../../generated/protocol.js';
 
-import {cssMetadata, CustomVariableRegex, VariableRegex} from './CSSMetadata.js';
-import type {CSSModel} from './CSSModel.js';
-import type {CSSProperty} from './CSSProperty.js';
-import {CSSKeyframesRule, CSSStyleRule} from './CSSRule.js';
+import {cssMetadata, VariableRegex} from './CSSMetadata.js';
+
+import {type CSSModel} from './CSSModel.js';
+import {type CSSProperty} from './CSSProperty.js';
+import {CSSKeyframesRule, CSSPositionFallbackRule, CSSStyleRule} from './CSSRule.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
-import type {DOMNode} from './DOMModel.js';
+import {type DOMNode} from './DOMModel.js';
+
+export function parseCSSVariableNameAndFallback(cssVariableValue: string): {
+  variableName: string|null,
+  fallback: string|null,
+} {
+  const match = cssVariableValue.match(/var\(\s*(--(?:[\s\w\P{ASCII}-]|\\.)+),?\s*(.*)\s*\)/u);
+  return {variableName: match && match[1].trim(), fallback: match && match[2]};
+}
+
+interface CSSMatchedStylesPayload {
+  cssModel: CSSModel;
+  node: DOMNode;
+  inlinePayload: Protocol.CSS.CSSStyle|null;
+  attributesPayload: Protocol.CSS.CSSStyle|null;
+  matchedPayload: Protocol.CSS.RuleMatch[];
+  pseudoPayload: Protocol.CSS.PseudoElementMatches[];
+  inheritedPayload: Protocol.CSS.InheritedStyleEntry[];
+  inheritedPseudoPayload: Protocol.CSS.InheritedPseudoElementMatches[];
+  animationsPayload: Protocol.CSS.CSSKeyframesRule[];
+  parentLayoutNodeId: Protocol.DOM.NodeId|undefined;
+  positionFallbackRules: Protocol.CSS.CSSPositionFallbackRule[];
+}
 
 export class CSSMatchedStyles {
   readonly #cssModelInternal: CSSModel;
@@ -22,14 +45,24 @@ export class CSSMatchedStyles {
   readonly #inheritedStyles: Set<CSSStyleDeclaration>;
   readonly #mainDOMCascade: DOMInheritanceCascade;
   readonly #pseudoDOMCascades: Map<Protocol.DOM.PseudoType, DOMInheritanceCascade>;
+  readonly #customHighlightPseudoDOMCascades: Map<string, DOMInheritanceCascade>;
   readonly #styleToDOMCascade: Map<CSSStyleDeclaration, DOMInheritanceCascade>;
+  readonly #parentLayoutNodeId: Protocol.DOM.NodeId|undefined;
+  readonly #positionFallbackRules: CSSPositionFallbackRule[];
 
-  constructor(
-      cssModel: CSSModel, node: DOMNode, inlinePayload: Protocol.CSS.CSSStyle|null,
-      attributesPayload: Protocol.CSS.CSSStyle|null, matchedPayload: Protocol.CSS.RuleMatch[],
-      pseudoPayload: Protocol.CSS.PseudoElementMatches[], inheritedPayload: Protocol.CSS.InheritedStyleEntry[],
-      inheritedPseudoPayload: Protocol.CSS.InheritedPseudoElementMatches[],
-      animationsPayload: Protocol.CSS.CSSKeyframesRule[]) {
+  constructor({
+    cssModel,
+    node,
+    inlinePayload,
+    attributesPayload,
+    matchedPayload,
+    pseudoPayload,
+    inheritedPayload,
+    inheritedPseudoPayload,
+    animationsPayload,
+    parentLayoutNodeId,
+    positionFallbackRules,
+  }: CSSMatchedStylesPayload) {
     this.#cssModelInternal = cssModel;
     this.#nodeInternal = node;
     this.#addedStyles = new Map();
@@ -38,6 +71,8 @@ export class CSSMatchedStyles {
     if (animationsPayload) {
       this.#keyframesInternal = animationsPayload.map(rule => new CSSKeyframesRule(cssModel, rule));
     }
+    this.#positionFallbackRules = positionFallbackRules.map(rule => new CSSPositionFallbackRule(cssModel, rule));
+    this.#parentLayoutNodeId = parentLayoutNodeId;
 
     this.#nodeForStyleInternal = new Map();
     this.#inheritedStyles = new Set();
@@ -48,10 +83,13 @@ export class CSSMatchedStyles {
     }
 
     this.#mainDOMCascade = this.buildMainCascade(inlinePayload, attributesPayload, matchedPayload, inheritedPayload);
-    this.#pseudoDOMCascades = this.buildPseudoCascades(pseudoPayload, inheritedPseudoPayload);
+    [this.#pseudoDOMCascades, this.#customHighlightPseudoDOMCascades] =
+        this.buildPseudoCascades(pseudoPayload, inheritedPseudoPayload);
 
     this.#styleToDOMCascade = new Map();
-    for (const domCascade of Array.from(this.#pseudoDOMCascades.values()).concat(this.#mainDOMCascade)) {
+    for (const domCascade of Array.from(this.#customHighlightPseudoDOMCascades.values())
+             .concat(Array.from(this.#pseudoDOMCascades.values()))
+             .concat(this.#mainDOMCascade)) {
       for (const style of domCascade.styles()) {
         this.#styleToDOMCascade.set(style, domCascade);
       }
@@ -206,36 +244,133 @@ export class CSSMatchedStyles {
     }
   }
 
+  /**
+   * Pseudo rule matches received via the inspector protocol are grouped by pseudo type.
+   * For custom highlight pseudos, we need to instead group the rule matches by highlight
+   * name in order to produce separate cascades for each highlight name. This is necessary
+   * so that styles of ::highlight(foo) are not shown as overriding styles of ::highlight(bar).
+   *
+   * This helper function takes a list of rule matches and generates separate NodeCascades
+   * for each custom highlight name that was matched.
+   */
+  private buildSplitCustomHighlightCascades(
+      rules: Protocol.CSS.RuleMatch[], node: DOMNode, isInherited: boolean,
+      pseudoCascades: Map<string, NodeCascade[]>): void {
+    const splitHighlightRules = new Map<string, CSSStyleDeclaration[]>();
+
+    for (let j = rules.length - 1; j >= 0; --j) {
+      const highlightNamesToMatchingSelectorIndices = this.customHighlightNamesToMatchingSelectorIndices(rules[j]);
+
+      for (const [highlightName, matchingSelectors] of highlightNamesToMatchingSelectorIndices) {
+        const pseudoRule = new CSSStyleRule(this.#cssModelInternal, rules[j].rule);
+        this.#nodeForStyleInternal.set(pseudoRule.style, node);
+        if (isInherited) {
+          this.#inheritedStyles.add(pseudoRule.style);
+        }
+        this.addMatchingSelectors(node, pseudoRule, matchingSelectors);
+
+        const ruleListForHighlightName = splitHighlightRules.get(highlightName);
+        if (ruleListForHighlightName) {
+          ruleListForHighlightName.push(pseudoRule.style);
+        } else {
+          splitHighlightRules.set(highlightName, [pseudoRule.style]);
+        }
+      }
+    }
+
+    for (const [highlightName, highlightStyles] of splitHighlightRules) {
+      const nodeCascade = new NodeCascade(this, highlightStyles, isInherited, true /* #isHighlightPseudoCascade*/);
+      const cascadeListForHighlightName = pseudoCascades.get(highlightName);
+      if (cascadeListForHighlightName) {
+        cascadeListForHighlightName.push(nodeCascade);
+      } else {
+        pseudoCascades.set(highlightName, [nodeCascade]);
+      }
+    }
+  }
+
+  /**
+   * Return a mapping of the highlight names in the specified RuleMatch to
+   * the indices of selectors in that selector list with that highlight name.
+   *
+   * For example, consider the following ruleset:
+   * span::highlight(foo), div, #mySpan::highlight(bar), .highlighted::highlight(foo) {
+   *   color: blue;
+   * }
+   *
+   * For a <span id="mySpan" class="highlighted"></span>, a RuleMatch for that span
+   * would have matchingSelectors [0, 2, 3] indicating that the span
+   * matches all of the highlight selectors.
+   *
+   * For that RuleMatch, this function would produce the following map:
+   * {
+   *  "foo": [0, 3],
+   *  "bar": [2]
+   * }
+   *
+   * @param ruleMatch
+   * @returns A mapping of highlight names to lists of indices into the selector
+   * list associated with ruleMatch. The indices correspond to the selectors in the rule
+   * associated with the key's highlight name.
+   */
+  private customHighlightNamesToMatchingSelectorIndices(ruleMatch: Protocol.CSS.RuleMatch): Map<string, number[]> {
+    const highlightNamesToMatchingSelectors = new Map<string, number[]>();
+
+    for (let i = 0; i < ruleMatch.matchingSelectors.length; i++) {
+      const matchingSelectorIndex = ruleMatch.matchingSelectors[i];
+      const selectorText = ruleMatch.rule.selectorList.selectors[matchingSelectorIndex].text;
+      const highlightNameMatch = selectorText.match(/::highlight\((.*)\)/);
+      if (highlightNameMatch) {
+        const highlightName = highlightNameMatch[1];
+        const selectorsForName = highlightNamesToMatchingSelectors.get(highlightName);
+        if (selectorsForName) {
+          selectorsForName.push(matchingSelectorIndex);
+        } else {
+          highlightNamesToMatchingSelectors.set(highlightName, [matchingSelectorIndex]);
+        }
+      }
+    }
+    return highlightNamesToMatchingSelectors;
+  }
+
   private buildPseudoCascades(
       pseudoPayload: Protocol.CSS.PseudoElementMatches[],
       inheritedPseudoPayload: Protocol.CSS.InheritedPseudoElementMatches[]):
-      Map<Protocol.DOM.PseudoType, DOMInheritanceCascade> {
+      [Map<Protocol.DOM.PseudoType, DOMInheritanceCascade>, Map<string, DOMInheritanceCascade>] {
     const pseudoInheritanceCascades = new Map<Protocol.DOM.PseudoType, DOMInheritanceCascade>();
+    const customHighlightPseudoInheritanceCascades = new Map<string, DOMInheritanceCascade>();
     if (!pseudoPayload) {
-      return pseudoInheritanceCascades;
+      return [pseudoInheritanceCascades, customHighlightPseudoInheritanceCascades];
     }
 
     const pseudoCascades = new Map<Protocol.DOM.PseudoType, NodeCascade[]>();
+    const customHighlightPseudoCascades = new Map<string, NodeCascade[]>();
     for (let i = 0; i < pseudoPayload.length; ++i) {
       const entryPayload = pseudoPayload[i];
       // PseudoElement nodes are not created unless "content" css property is set.
-      const pseudoElement = this.#nodeInternal.pseudoElements().get(entryPayload.pseudoType) || null;
+      const pseudoElement = this.#nodeInternal.pseudoElements().get(entryPayload.pseudoType)?.at(-1) || null;
       const pseudoStyles = [];
       const rules = entryPayload.matches || [];
-      for (let j = rules.length - 1; j >= 0; --j) {
-        const pseudoRule = new CSSStyleRule(this.#cssModelInternal, rules[j].rule);
-        pseudoStyles.push(pseudoRule.style);
-        const nodeForStyle =
-            cssMetadata().isHighlightPseudoType(entryPayload.pseudoType) ? this.#nodeInternal : pseudoElement;
-        this.#nodeForStyleInternal.set(pseudoRule.style, nodeForStyle);
-        if (nodeForStyle) {
-          this.addMatchingSelectors(nodeForStyle, pseudoRule, rules[j].matchingSelectors);
+
+      if (entryPayload.pseudoType === Protocol.DOM.PseudoType.Highlight) {
+        this.buildSplitCustomHighlightCascades(
+            rules, this.#nodeInternal, false /* #isInherited */, customHighlightPseudoCascades);
+      } else {
+        for (let j = rules.length - 1; j >= 0; --j) {
+          const pseudoRule = new CSSStyleRule(this.#cssModelInternal, rules[j].rule);
+          pseudoStyles.push(pseudoRule.style);
+          const nodeForStyle =
+              cssMetadata().isHighlightPseudoType(entryPayload.pseudoType) ? this.#nodeInternal : pseudoElement;
+          this.#nodeForStyleInternal.set(pseudoRule.style, nodeForStyle);
+          if (nodeForStyle) {
+            this.addMatchingSelectors(nodeForStyle, pseudoRule, rules[j].matchingSelectors);
+          }
         }
+        const isHighlightPseudoCascade = cssMetadata().isHighlightPseudoType(entryPayload.pseudoType);
+        const nodeCascade = new NodeCascade(
+            this, pseudoStyles, false /* #isInherited */, isHighlightPseudoCascade /* #isHighlightPseudoCascade*/);
+        pseudoCascades.set(entryPayload.pseudoType, [nodeCascade]);
       }
-      const isHighlightPseudoCascade = cssMetadata().isHighlightPseudoType(entryPayload.pseudoType);
-      const nodeCascade = new NodeCascade(
-          this, pseudoStyles, false /* #isInherited */, isHighlightPseudoCascade /* #isHighlightPseudoCascade*/);
-      pseudoCascades.set(entryPayload.pseudoType, [nodeCascade]);
     }
 
     if (inheritedPseudoPayload) {
@@ -244,24 +379,30 @@ export class CSSMatchedStyles {
         const inheritedPseudoMatches = inheritedPseudoPayload[i].pseudoElements;
         for (let j = 0; j < inheritedPseudoMatches.length; ++j) {
           const inheritedEntryPayload = inheritedPseudoMatches[j];
-          const pseudoStyles = [];
           const rules = inheritedEntryPayload.matches || [];
-          for (let k = rules.length - 1; k >= 0; --k) {
-            const pseudoRule = new CSSStyleRule(this.#cssModelInternal, rules[k].rule);
-            pseudoStyles.push(pseudoRule.style);
-            this.#nodeForStyleInternal.set(pseudoRule.style, parentNode);
-            this.#inheritedStyles.add(pseudoRule.style);
-            this.addMatchingSelectors(parentNode, pseudoRule, rules[k].matchingSelectors);
-          }
 
-          const isHighlightPseudoCascade = cssMetadata().isHighlightPseudoType(inheritedEntryPayload.pseudoType);
-          const nodeCascade = new NodeCascade(
-              this, pseudoStyles, true /* #isInherited */, isHighlightPseudoCascade /* #isHighlightPseudoCascade*/);
-          const cascadeListForPseudoType = pseudoCascades.get(inheritedEntryPayload.pseudoType);
-          if (cascadeListForPseudoType) {
-            cascadeListForPseudoType.push(nodeCascade);
+          if (inheritedEntryPayload.pseudoType === Protocol.DOM.PseudoType.Highlight) {
+            this.buildSplitCustomHighlightCascades(
+                rules, parentNode, true /* #isInherited */, customHighlightPseudoCascades);
           } else {
-            pseudoCascades.set(inheritedEntryPayload.pseudoType, [nodeCascade]);
+            const pseudoStyles = [];
+            for (let k = rules.length - 1; k >= 0; --k) {
+              const pseudoRule = new CSSStyleRule(this.#cssModelInternal, rules[k].rule);
+              pseudoStyles.push(pseudoRule.style);
+              this.#nodeForStyleInternal.set(pseudoRule.style, parentNode);
+              this.#inheritedStyles.add(pseudoRule.style);
+              this.addMatchingSelectors(parentNode, pseudoRule, rules[k].matchingSelectors);
+            }
+
+            const isHighlightPseudoCascade = cssMetadata().isHighlightPseudoType(inheritedEntryPayload.pseudoType);
+            const nodeCascade = new NodeCascade(
+                this, pseudoStyles, true /* #isInherited */, isHighlightPseudoCascade /* #isHighlightPseudoCascade*/);
+            const cascadeListForPseudoType = pseudoCascades.get(inheritedEntryPayload.pseudoType);
+            if (cascadeListForPseudoType) {
+              cascadeListForPseudoType.push(nodeCascade);
+            } else {
+              pseudoCascades.set(inheritedEntryPayload.pseudoType, [nodeCascade]);
+            }
           }
         }
 
@@ -275,14 +416,18 @@ export class CSSMatchedStyles {
       pseudoInheritanceCascades.set(pseudoType, new DOMInheritanceCascade(nodeCascade));
     }
 
-    return pseudoInheritanceCascades;
+    for (const [highlightName, nodeCascade] of customHighlightPseudoCascades.entries()) {
+      customHighlightPseudoInheritanceCascades.set(highlightName, new DOMInheritanceCascade(nodeCascade));
+    }
+
+    return [pseudoInheritanceCascades, customHighlightPseudoInheritanceCascades];
   }
 
   private addMatchingSelectors(
       this: CSSMatchedStyles, node: DOMNode, rule: CSSStyleRule, matchingSelectorIndices: number[]): void {
     for (const matchingSelectorIndex of matchingSelectorIndices) {
       const selector = rule.selectors[matchingSelectorIndex];
-      this.setSelectorMatches(node, selector.text, true);
+      selector && this.setSelectorMatches(node, selector.text, true);
     }
   }
 
@@ -297,6 +442,10 @@ export class CSSMatchedStyles {
   hasMatchingSelectors(rule: CSSStyleRule): boolean {
     const matchingSelectors = this.getMatchingSelectors(rule);
     return matchingSelectors.length > 0 && this.queryMatches(rule.style);
+  }
+
+  getParentLayoutNodeId(): Protocol.DOM.NodeId|undefined {
+    return this.#parentLayoutNodeId;
   }
 
   getMatchingSelectors(rule: CSSStyleRule): number[] {
@@ -379,7 +528,7 @@ export class CSSMatchedStyles {
       return true;
     }
     const parentRule = style.parentRule as CSSStyleRule;
-    const queries = [...parentRule.media, ...parentRule.containerQueries, ...parentRule.supports];
+    const queries = [...parentRule.media, ...parentRule.containerQueries, ...parentRule.supports, ...parentRule.scopes];
     for (const query of queries) {
       if (!query.active()) {
         return false;
@@ -396,6 +545,10 @@ export class CSSMatchedStyles {
     return this.#keyframesInternal;
   }
 
+  positionFallbackRules(): CSSPositionFallbackRule[] {
+    return this.#positionFallbackRules;
+  }
+
   pseudoStyles(pseudoType: Protocol.DOM.PseudoType): CSSStyleDeclaration[] {
     const domCascade = this.#pseudoDOMCascades.get(pseudoType);
     return domCascade ? domCascade.styles() : [];
@@ -403,6 +556,15 @@ export class CSSMatchedStyles {
 
   pseudoTypes(): Set<Protocol.DOM.PseudoType> {
     return new Set(this.#pseudoDOMCascades.keys());
+  }
+
+  customHighlightPseudoStyles(highlightName: string): CSSStyleDeclaration[] {
+    const domCascade = this.#customHighlightPseudoDOMCascades.get(highlightName);
+    return domCascade ? domCascade.styles() : [];
+  }
+
+  customHighlightPseudoNames(): Set<string> {
+    return new Set(this.#customHighlightPseudoDOMCascades.keys());
   }
 
   private containsInherited(style: CSSStyleDeclaration): boolean {
@@ -444,8 +606,7 @@ export class CSSMatchedStyles {
     fromFallback: boolean,
   }|null {
     const domCascade = this.#styleToDOMCascade.get(style) || null;
-    const cssVariableValueNoSpaces = cssVariableValue.replace(/\s/g, '');
-    return domCascade ? domCascade.computeSingleVariableValue(style, cssVariableValueNoSpaces) : null;
+    return domCascade ? domCascade.computeSingleVariableValue(style, cssVariableValue) : null;
   }
 
   isInherited(style: CSSStyleDeclaration): boolean {
@@ -460,6 +621,10 @@ export class CSSMatchedStyles {
   resetActiveProperties(): void {
     this.#mainDOMCascade.reset();
     for (const domCascade of this.#pseudoDOMCascades.values()) {
+      domCascade.reset();
+    }
+
+    for (const domCascade of this.#customHighlightPseudoDOMCascades.values()) {
       domCascade.reset();
     }
   }
@@ -487,7 +652,8 @@ class NodeCascade {
     this.propertiesState.clear();
     this.activeProperties.clear();
 
-    for (const style of this.styles) {
+    for (let i = this.styles.length - 1; i >= 0; i--) {
+      const style = this.styles[i];
       const rule = style.parentRule;
       // Compute cascade for CSSStyleRules only.
       if (rule && !(rule instanceof CSSStyleRule)) {
@@ -506,43 +672,42 @@ class NodeCascade {
           continue;
         }
 
+        // When a property does not have a range in an otherwise ranged CSSStyleDeclaration,
+        // we consider it as a non-leading property (see computeLeadingProperties()), and most
+        // of them are computed longhands. We exclude these from activeProperties calculation,
+        // and use parsed longhands instead (see below).
+        if (style.range && !property.range) {
+          continue;
+        }
+
         if (!property.activeInStyle()) {
           this.propertiesState.set(property, PropertyState.Overloaded);
           continue;
         }
 
         const canonicalName = metadata.canonicalPropertyName(property.name);
-        const isPropShorthand = Boolean(metadata.getLonghands(canonicalName));
-
-        if (isPropShorthand) {
-          const longhandsFromShort =
-              (property.value.match(CustomVariableRegex) || []).map(e => e.replace(CustomVariableRegex, '$2'));
-          longhandsFromShort.forEach(longhandProperty => {
-            if (metadata.isCSSPropertyName(longhandProperty)) {
-              const activeProperty = this.activeProperties.get(longhandProperty);
-              if (!activeProperty) {
-                this.activeProperties.set(longhandProperty, property);
-              } else {
-                this.propertiesState.set(activeProperty, PropertyState.Overloaded);
-                this.activeProperties.set(longhandProperty, property);
-              }
-            }
-          });
+        this.updatePropertyState(property, canonicalName);
+        for (const longhand of property.getLonghandProperties()) {
+          if (metadata.isCSSPropertyName(longhand.name)) {
+            this.updatePropertyState(longhand, longhand.name);
+          }
         }
-
-        const activeProperty = this.activeProperties.get(canonicalName);
-        if (activeProperty && (activeProperty.important || !property.important)) {
-          this.propertiesState.set(property, PropertyState.Overloaded);
-          continue;
-        }
-
-        if (activeProperty) {
-          this.propertiesState.set(activeProperty, PropertyState.Overloaded);
-        }
-        this.propertiesState.set(property, PropertyState.Active);
-        this.activeProperties.set(canonicalName, property);
       }
     }
+  }
+
+  private updatePropertyState(propertyWithHigherSpecificity: CSSProperty, canonicalName: string): void {
+    const activeProperty = this.activeProperties.get(canonicalName);
+    if (activeProperty?.important && !propertyWithHigherSpecificity.important) {
+      this.propertiesState.set(propertyWithHigherSpecificity, PropertyState.Overloaded);
+      return;
+    }
+
+    if (activeProperty) {
+      this.propertiesState.set(activeProperty, PropertyState.Overloaded);
+    }
+    this.propertiesState.set(propertyWithHigherSpecificity, PropertyState.Active);
+    this.activeProperties.set(canonicalName, propertyWithHigherSpecificity);
   }
 }
 
@@ -624,17 +789,9 @@ class DOMInheritanceCascade {
       return null;
     }
     const computedValue = this.innerComputeValue(availableCSSVariables, computedCSSVariables, cssVariableValue);
-    const {variableName} = this.getCSSVariableNameAndFallback(cssVariableValue);
+    const {variableName} = parseCSSVariableNameAndFallback(cssVariableValue);
 
     return {computedValue, fromFallback: variableName !== null && !availableCSSVariables.has(variableName)};
-  }
-
-  private getCSSVariableNameAndFallback(cssVariableValue: string): {
-    variableName: string|null,
-    fallback: string|null,
-  } {
-    const match = cssVariableValue.match(/^var\((--[a-zA-Z0-9-_]+)[,]?\s*(.*)\)$/);
-    return {variableName: match && match[1], fallback: match && match[2]};
   }
 
   private innerComputeCSSVariable(
@@ -668,7 +825,7 @@ class DOMInheritanceCascade {
         continue;
       }
       // process var() function
-      const {variableName, fallback} = this.getCSSVariableNameAndFallback(result.value);
+      const {variableName, fallback} = parseCSSVariableNameAndFallback(result.value);
       if (!variableName) {
         return null;
       }
@@ -710,9 +867,7 @@ class DOMInheritanceCascade {
     const activeProperties = new Map<string, CSSProperty>();
     for (const nodeCascade of this.#nodeCascades) {
       nodeCascade.computeActiveProperties();
-      for (const entry of nodeCascade.propertiesState.entries()) {
-        const property = (entry[0] as CSSProperty);
-        const state = (entry[1] as PropertyState);
+      for (const [property, state] of nodeCascade.propertiesState) {
         if (state === PropertyState.Overloaded) {
           this.#propertiesState.set(property, PropertyState.Overloaded);
           continue;
@@ -727,11 +882,9 @@ class DOMInheritanceCascade {
       }
     }
     // If every longhand of the shorthand is not active, then the shorthand is not active too.
-    for (const entry of activeProperties.entries()) {
-      const canonicalName = (entry[0] as string);
-      const shorthandProperty = (entry[1] as CSSProperty);
+    for (const [canonicalName, shorthandProperty] of activeProperties) {
       const shorthandStyle = shorthandProperty.ownerStyle;
-      const longhands = shorthandStyle.longhandProperties(shorthandProperty.name);
+      const longhands = shorthandProperty.getLonghandProperties();
       if (!longhands.length) {
         continue;
       }

@@ -10,8 +10,16 @@ import * as Coordinator from '../render_coordinator/render_coordinator.js';
 
 import treeOutlineStyles from './treeOutline.css.js';
 
-import type {TreeNodeId, TreeNode, TreeNodeWithChildren} from './TreeOutlineUtils.js';
-import {findNextNodeForTreeOutlineKeyboardNavigation, getNodeChildren, getPathToTreeNode, isExpandableNode, trackDOMNodeToTreeNode} from './TreeOutlineUtils.js';
+import {
+  findNextNodeForTreeOutlineKeyboardNavigation,
+  getNodeChildren,
+  getPathToTreeNode,
+  isExpandableNode,
+  trackDOMNodeToTreeNode,
+  type TreeNodeId,
+  type TreeNode,
+  type TreeNodeWithChildren,
+} from './TreeOutlineUtils.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -25,6 +33,7 @@ export interface TreeOutlineData<TreeNodeDataType> {
    */
   tree: readonly TreeNode<TreeNodeDataType>[];
   filter?: (node: TreeNodeDataType) => FilterOption;
+  compact?: boolean;
 }
 
 export function defaultRenderer(node: TreeNode<string>): LitHtml.TemplateResult {
@@ -95,17 +104,17 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
    */
   #nodeIdPendingFocus: TreeNodeId|null = null;
   #selectedTreeNode: TreeNode<TreeNodeDataType>|null = null;
-  #defaultRenderer =
-      (node: TreeNode<TreeNodeDataType>, _state: {isExpanded: boolean}): LitHtml.TemplateResult => {
-        if (typeof node.treeNodeData !== 'string') {
-          console.warn(`The default TreeOutline renderer simply stringifies its given value. You passed in ${
-              JSON.stringify(
-                  node.treeNodeData, null,
-                  2)}. Consider providing a different defaultRenderer that can handle nodes of this type.`);
-        }
-        return LitHtml.html`${String(node.treeNodeData)}`;
-      };
+  #defaultRenderer = (node: TreeNode<TreeNodeDataType>, _state: {isExpanded: boolean}): LitHtml.TemplateResult => {
+    if (typeof node.treeNodeData !== 'string') {
+      console.warn(`The default TreeOutline renderer simply stringifies its given value. You passed in ${
+          JSON.stringify(
+              node.treeNodeData, null,
+              2)}. Consider providing a different defaultRenderer that can handle nodes of this type.`);
+    }
+    return LitHtml.html`${String(node.treeNodeData)}`;
+  };
   #nodeFilter?: ((node: TreeNodeDataType) => FilterOption);
+  #compact = false;
 
   /**
    * scheduledRender = render() has been called and scheduled a render.
@@ -150,6 +159,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
     this.#defaultRenderer = data.defaultRenderer;
     this.#treeData = data.tree;
     this.#nodeFilter = data.filter;
+    this.#compact = data.compact || false;
 
     if (!this.#hasRenderedAtLeastOnce) {
       this.#selectedTreeNode = this.#treeData[0];
@@ -248,30 +258,34 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
     this.#setNodeExpandedState(treeNode, false);
   }
 
-  #getSelectedTreeNode(): TreeNode<TreeNodeDataType> {
-    if (!this.#selectedTreeNode) {
-      throw new Error('getSelectedNode was called but selectedTreeNode is null');
-    }
-    return this.#selectedTreeNode;
-  }
-
-  async #fetchNodeChildren(node: TreeNodeWithChildren<TreeNodeDataType>): Promise<TreeNode<TreeNodeDataType>[]> {
+  async #flattenSubtree(node: TreeNodeWithChildren<TreeNodeDataType>, filter: (node: TreeNodeDataType) => FilterOption):
+      Promise<TreeNode<TreeNodeDataType>[]> {
     const children = await getNodeChildren(node);
-    if (!this.#nodeFilter) {
-      return children;
-    }
     const filteredChildren = [];
     for (const child of children) {
-      const filtering = this.#nodeFilter(child.treeNodeData);
+      const filtering = filter(child.treeNodeData);
       // We always include the selected node in the tree, regardless of its filtering status.
-      if (filtering === FilterOption.SHOW || this.#isSelectedNode(child) || child.id === this.#nodeIdPendingFocus) {
+      const toBeSelected = this.#isSelectedNode(child) || child.id === this.#nodeIdPendingFocus;
+      // If a node is already expanded we should not flatten it away.
+      const expanded = this.#nodeExpandedMap.get(child.id);
+      if (filtering === FilterOption.SHOW || toBeSelected || expanded) {
         filteredChildren.push(child);
       } else if (filtering === FilterOption.FLATTEN && isExpandableNode(child)) {
-        const grandChildren = await this.#fetchNodeChildren(child);
+        const grandChildren = await this.#flattenSubtree(child, filter);
         filteredChildren.push(...grandChildren);
       }
     }
     return filteredChildren;
+  }
+
+  async #fetchNodeChildren(node: TreeNodeWithChildren<TreeNodeDataType>): Promise<TreeNode<TreeNodeDataType>[]> {
+    const children = await getNodeChildren(node);
+    const filter = this.#nodeFilter;
+    if (!filter) {
+      return children;
+    }
+    const filteredDescendants = await this.#flattenSubtree(node, filter);
+    return filteredDescendants.length ? filteredDescendants : children;
   }
 
   #setNodeExpandedState(node: TreeNode<TreeNodeDataType>, newExpandedState: boolean): void {
@@ -431,13 +445,14 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
       // clang-format on
     }
 
-    const nodeIsFocusable = this.#getSelectedTreeNode() === node;
+    const nodeIsFocusable = this.#isSelectedNode(node);
     const tabIndex = nodeIsFocusable ? 0 : -1;
     const listItemClasses = LitHtml.Directives.classMap({
       expanded: isExpandableNode(node) && nodeIsExpanded,
       parent: isExpandableNode(node),
       selected: this.#isSelectedNode(node),
       'is-top-level': depth === 0,
+      compact: this.#compact,
     });
     const ariaExpandedAttribute =
         LitHtml.Directives.ifDefined(isExpandableNode(node) ? String(nodeIsExpanded) : undefined);
@@ -463,12 +478,12 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
         track-dom-node-to-tree-node=${trackDOMNodeToTreeNode(this.#domNodeToTreeNodeMap, node)}
         on-render=${ComponentHelpers.Directives.nodeRenderedCallback(domNode => {
          /**
-           * Because TreeNodes are lazily rendered, you can call
-           * `outline.expandToAndSelect(NodeX)`, but `NodeX` will be rendered at some
-           * later point, once it's been fully resolved, within a LitHtml.until
-           * directive. That means we don't have a direct hook into when it's
-           * rendered, which we need because we want to focus the element, so we use this directive to receive a callback when the node is rendered.
-           */
+          * Because TreeNodes are lazily rendered, you can call
+          * `outline.expandToAndSelect(NodeX)`, but `NodeX` will be rendered at some
+          * later point, once it's been fully resolved, within a LitHtml.until
+          * directive. That means we don't have a direct hook into when it's
+          * rendered, which we need because we want to focus the element, so we use this directive to receive a callback when the node is rendered.
+          */
           if (!(domNode instanceof HTMLLIElement)) {
             return;
           }

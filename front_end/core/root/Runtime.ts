@@ -25,7 +25,7 @@ export function getRemoteBase(location: string = self.location.toString()): {
     return null;
   }
 
-  return {base: `${url.origin}/remote/serve_file/${version[1]}/`, version: version[1]};
+  return {base: `devtools://devtools/remote/serve_file/${version[1]}/`, version: version[1]};
 }
 
 export class Runtime {
@@ -120,26 +120,25 @@ export class ExperimentsSupport {
   #enabledTransiently: Set<string>;
   readonly #enabledByDefault: Set<string>;
   readonly #serverEnabled: Set<string>;
+  // Experiments in this set won't be shown to the user
+  readonly #nonConfigurable: Set<string>;
   constructor() {
     this.#experiments = [];
     this.#experimentNames = new Set();
     this.#enabledTransiently = new Set();
     this.#enabledByDefault = new Set();
     this.#serverEnabled = new Set();
+    this.#nonConfigurable = new Set();
   }
 
   allConfigurableExperiments(): Experiment[] {
     const result = [];
     for (const experiment of this.#experiments) {
-      if (!this.#enabledTransiently.has(experiment.name)) {
+      if (!this.#enabledTransiently.has(experiment.name) && !this.#nonConfigurable.has(experiment.name)) {
         result.push(experiment);
       }
     }
     return result;
-  }
-
-  enabledExperiments(): Experiment[] {
-    return this.#experiments.filter(experiment => experiment.isEnabled());
   }
 
   private setExperimentsSetting(value: Object): void {
@@ -149,11 +148,16 @@ export class ExperimentsSupport {
     self.localStorage['experiments'] = JSON.stringify(value);
   }
 
-  register(experimentName: string, experimentTitle: string, unstable?: boolean, docLink?: string): void {
+  register(
+      experimentName: string, experimentTitle: string, unstable?: boolean, docLink?: string,
+      feedbackLink?: string): void {
     Platform.DCHECK(
         () => !this.#experimentNames.has(experimentName), 'Duplicate registration of experiment ' + experimentName);
     this.#experimentNames.add(experimentName);
-    this.#experiments.push(new Experiment(this, experimentName, experimentTitle, Boolean(unstable), docLink ?? ''));
+    this.#experiments.push(new Experiment(
+        this, experimentName, experimentTitle, Boolean(unstable),
+        docLink as Platform.DevToolsPath.UrlString ?? Platform.DevToolsPath.EmptyUrlString,
+        feedbackLink as Platform.DevToolsPath.UrlString ?? Platform.DevToolsPath.EmptyUrlString));
   }
 
   isEnabled(experimentName: string): boolean {
@@ -201,9 +205,21 @@ export class ExperimentsSupport {
     }
   }
 
+  setNonConfigurableExperiments(experimentNames: string[]): void {
+    for (const experiment of experimentNames) {
+      this.checkExperiment(experiment);
+      this.#nonConfigurable.add(experiment);
+    }
+  }
+
   enableForTest(experimentName: string): void {
     this.checkExperiment(experimentName);
     this.#enabledTransiently.add(experimentName);
+  }
+
+  disableForTest(experimentName: string): void {
+    this.checkExperiment(experimentName);
+    this.#enabledTransiently.delete(experimentName);
   }
 
   clearForTest(): void {
@@ -239,13 +255,17 @@ export class Experiment {
   name: string;
   title: string;
   unstable: boolean;
-  docLink?: string;
+  docLink?: Platform.DevToolsPath.UrlString;
+  readonly feedbackLink?: Platform.DevToolsPath.UrlString;
   readonly #experiments: ExperimentsSupport;
-  constructor(experiments: ExperimentsSupport, name: string, title: string, unstable: boolean, docLink: string) {
+  constructor(
+      experiments: ExperimentsSupport, name: string, title: string, unstable: boolean,
+      docLink: Platform.DevToolsPath.UrlString, feedbackLink: Platform.DevToolsPath.UrlString) {
     this.name = name;
     this.title = title;
     this.unstable = unstable;
     this.docLink = docLink;
+    this.feedbackLink = feedbackLink;
     this.#experiments = experiments;
   }
 
@@ -268,20 +288,28 @@ export enum ExperimentName {
   CSS_OVERVIEW = 'cssOverview',
   LIVE_HEAP_PROFILE = 'liveHeapProfile',
   DEVELOPER_RESOURCES_VIEW = 'developerResourcesView',
-  TIMELINE_REPLAY_EVENT = 'timelineReplayEvent',
   CSP_VIOLATIONS_VIEW = 'cspViolationsView',
   WASM_DWARF_DEBUGGING = 'wasmDWARFDebugging',
   ALL = '*',
   PROTOCOL_MONITOR = 'protocolMonitor',
   WEBAUTHN_PANE = 'webauthnPane',
-  SYNC_SETTINGS = 'syncSettings',
   FULL_ACCESSIBILITY_TREE = 'fullAccessibilityTree',
   PRECISE_CHANGES = 'preciseChanges',
   STYLES_PANE_CSS_CHANGES = 'stylesPaneCSSChanges',
   HEADER_OVERRIDES = 'headerOverrides',
-  CSS_LAYERS = 'cssLayers',
   EYEDROPPER_COLOR_PICKER = 'eyedropperColorPicker',
   INSTRUMENTATION_BREAKPOINTS = 'instrumentationBreakpoints',
+  AUTHORED_DEPLOYED_GROUPING = 'authoredDeployedGrouping',
+  IMPORTANT_DOM_PROPERTIES = 'importantDOMProperties',
+  JUST_MY_CODE = 'justMyCode',
+  PRELOADING_STATUS_PANEL = 'preloadingStatusPanel',
+  DISABLE_COLOR_FORMAT_SETTING = 'disableColorFormatSetting',
+  TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL = 'timelineAsConsoleProfileResultPanel',
+  OUTERMOST_TARGET_SELECTOR = 'outermostTargetSelector',
+  JS_PROFILER_TEMP_ENABLE = 'jsProfilerTemporarilyEnable',
+  HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlightErrorsElementsPanel',
+  SET_ALL_BREAKPOINTS_EAGERLY = 'setAllBreakpointsEagerly',
+  SELF_XSS_WARNING = 'selfXssWarning',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

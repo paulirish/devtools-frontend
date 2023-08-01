@@ -3,8 +3,15 @@
 // found in the LICENSE file.
 
 import * as LinearMemoryInspector from '../../../../../../front_end/ui/components/linear_memory_inspector/linear_memory_inspector.js';
-
-import {assertElement, assertElements, assertShadowRoot, getElementsWithinComponent, getElementWithinComponent, getEventPromise, renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
+import {
+  assertElement,
+  assertElements,
+  assertShadowRoot,
+  getElementsWithinComponent,
+  getElementWithinComponent,
+  getEventPromise,
+  renderElementIntoDOM,
+} from '../../../helpers/DOMHelpers.js';
 
 const {assert} = chai;
 
@@ -16,13 +23,7 @@ export const VIEWER_ADDRESS_SELECTOR = '.address';
 
 describe('LinearMemoryViewer', () => {
   async function setUpComponent() {
-    const component = new LinearMemoryInspector.LinearMemoryViewer.LinearMemoryViewer();
-    const flexWrapper = document.createElement('div');
-    flexWrapper.style.width = '500px';
-    flexWrapper.style.height = '500px';
-    flexWrapper.style.display = 'flex';
-    flexWrapper.appendChild(component);
-    renderElementIntoDOM(flexWrapper);
+    const component = createComponent();
     const data = createComponentData();
     component.data = data;
 
@@ -30,9 +31,40 @@ describe('LinearMemoryViewer', () => {
     const numBytesPerPage = event.data;
     assert.isAbove(numBytesPerPage, 4);
 
-    // trigger re-render
-    component.data = data;
     return {component, data};
+  }
+
+  async function setUpComponentWithHighlightInfo() {
+    const component = createComponent();
+    const data = createComponentData();
+    const highlightInfo: LinearMemoryInspector.LinearMemoryViewerUtils.HighlightInfo = {
+      startAddress: 2,
+      size: 21,  // A large enough odd number so that the highlight spans mulitple rows.
+      type: 'bool[]',
+    };
+    const dataWithHighlightInfo = {
+      ...data,
+      highlightInfo: highlightInfo,
+    };
+
+    const eventPromise = getEventPromise<LinearMemoryInspector.LinearMemoryViewer.ResizeEvent>(component, 'resize');
+    component.data = dataWithHighlightInfo;
+    const event = await eventPromise;
+    const numBytesPerPage = event.data;
+    assert.isAbove(numBytesPerPage, 4);
+
+    return {component, dataWithHighlightInfo};
+  }
+
+  function createComponent() {
+    const component = new LinearMemoryInspector.LinearMemoryViewer.LinearMemoryViewer();
+    const flexWrapper = document.createElement('div');
+    flexWrapper.style.width = '500px';
+    flexWrapper.style.height = '500px';
+    flexWrapper.style.display = 'flex';
+    flexWrapper.appendChild(component);
+    renderElementIntoDOM(flexWrapper);
+    return component;
   }
 
   function createComponentData() {
@@ -303,5 +335,61 @@ describe('LinearMemoryViewer', () => {
     const numBytesPerPage = bytes.length;
     const expectedAddress = addressBefore - numBytesPerPage;
     await assertEventTriggeredOnArrowNavigation(component, 'PageUp', expectedAddress);
+  });
+
+  it('does not highlight any bytes when no highlight info set', async () => {
+    const {component} = await setUpComponent();
+    const byteCells = getElementsWithinComponent(component, '.byte-cell.highlight-area', HTMLSpanElement);
+    const textCells = getElementsWithinComponent(component, '.text-cell.highlight-area', HTMLSpanElement);
+
+    assert.strictEqual(byteCells.length, 0);
+    assert.strictEqual(textCells.length, 0);
+  });
+
+  it('highlights correct number of bytes when highlight info set', async () => {
+    const {component, dataWithHighlightInfo} = await setUpComponentWithHighlightInfo();
+    const byteCells = getElementsWithinComponent(component, '.byte-cell.highlight-area', HTMLSpanElement);
+    const textCells = getElementsWithinComponent(component, '.text-cell.highlight-area', HTMLSpanElement);
+
+    assert.strictEqual(byteCells.length, dataWithHighlightInfo.highlightInfo.size);
+    assert.strictEqual(textCells.length, dataWithHighlightInfo.highlightInfo.size);
+  });
+
+  it('highlights byte cells at correct positions when highlight info set', async () => {
+    const {component, dataWithHighlightInfo} = await setUpComponentWithHighlightInfo();
+    const byteCells = getElementsWithinComponent(component, '.byte-cell.highlight-area', HTMLSpanElement);
+
+    for (let i = 0; i < byteCells.length; ++i) {
+      const selectedValue = parseInt(byteCells[i].innerText, 16);
+      const index = dataWithHighlightInfo.highlightInfo.startAddress - dataWithHighlightInfo.memoryOffset + i;
+      assert.strictEqual(selectedValue, dataWithHighlightInfo.memory[index]);
+    }
+  });
+
+  it('focuses highlighted byte cells when focusedMemoryHighlight provided', async () => {
+    const {component, dataWithHighlightInfo} = await setUpComponentWithHighlightInfo();
+    const dataWithFocusedMemoryHighlight = {
+      ...dataWithHighlightInfo,
+      focusedMemoryHighlight: dataWithHighlightInfo.highlightInfo,
+    };
+    component.data = dataWithFocusedMemoryHighlight;
+    const byteCells = getElementsWithinComponent(component, '.byte-cell.focused', HTMLSpanElement);
+
+    for (let i = 0; i < byteCells.length; ++i) {
+      const selectedValue = parseInt(byteCells[i].innerText, 16);
+      const index = dataWithHighlightInfo.highlightInfo.startAddress - dataWithHighlightInfo.memoryOffset + i;
+      assert.strictEqual(selectedValue, dataWithHighlightInfo.memory[index]);
+    }
+  });
+
+  it('does not focus highlighted byte cells when no focusedMemoryHighlight provided', async () => {
+    const {component, dataWithHighlightInfo} = await setUpComponentWithHighlightInfo();
+    const dataWithFocusedMemoryHighlight = {
+      ...dataWithHighlightInfo,
+      focusedMemoryHighlight: dataWithHighlightInfo.highlightInfo,
+    };
+    component.data = dataWithFocusedMemoryHighlight;
+    const byteCells = getElementsWithinComponent(component, '.byte-cell.focused', HTMLSpanElement);
+    assert.isEmpty(byteCells);
   });
 });

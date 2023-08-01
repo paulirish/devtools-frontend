@@ -33,32 +33,42 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 
-import type {ActionDelegate} from './ActionRegistration.js';
-import type {Context} from './Context.js';
-import type {Provider, ToolbarItem} from './Toolbar.js';
-import {ToolbarButton} from './Toolbar.js';
+import {type ActionDelegate} from './ActionRegistration.js';
+import {type Context} from './Context.js';
+
+import {ToolbarButton, type Provider, type ToolbarItem} from './Toolbar.js';
+import {alert} from './ARIAUtils.js';
 
 const UIStrings = {
   /**
-  *@description Text to close something
-  */
+   *@description Text to close something
+   */
   close: 'Close',
   /**
-  *@description Text to dock the DevTools to the right of the browser tab
-  */
+   *@description Text to dock the DevTools to the right of the browser tab
+   */
   dockToRight: 'Dock to right',
   /**
-  *@description Text to dock the DevTools to the bottom of the browser tab
-  */
+   *@description Text to dock the DevTools to the bottom of the browser tab
+   */
   dockToBottom: 'Dock to bottom',
   /**
-  *@description Text to dock the DevTools to the left of the browser tab
-  */
+   *@description Text to dock the DevTools to the left of the browser tab
+   */
   dockToLeft: 'Dock to left',
   /**
-  *@description Text to undock the DevTools
-  */
+   *@description Text to undock the DevTools
+   */
   undockIntoSeparateWindow: 'Undock into separate window',
+  /**
+   *@description Text announced when the DevTools are undocked
+   */
+  devtoolsUndocked: 'DevTools is undocked',
+  /**
+   *@description Text announced when the DevTools are docked to the left, right, or bottom of the browser tab
+   *@example {bottom} PH1
+   */
+  devToolsDockedTo: 'DevTools is docked to {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/DockController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -77,7 +87,7 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
     super();
     this.canDockInternal = canDock;
 
-    this.closeButton = new ToolbarButton(i18nString(UIStrings.close), 'largeicon-delete');
+    this.closeButton = new ToolbarButton(i18nString(UIStrings.close), 'cross');
     this.closeButton.element.classList.add('close-devtools');
     this.closeButton.addEventListener(
         ToolbarButton.Events.Click,
@@ -130,6 +140,7 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
 
   private dockSideChanged(): void {
     this.setDockSide(this.currentDockStateSetting.get());
+    setTimeout(this.announceDockLocation.bind(this), 2000);
   }
 
   dockSide(): DockState|undefined {
@@ -189,6 +200,14 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
       this.lastDockStateSetting.set(states[(index + 1) % states.length]);
     }
     this.setDockSide(this.lastDockStateSetting.get());
+  }
+
+  announceDockLocation(): void {
+    if (this.dockSideInternal === DockState.UNDOCKED) {
+      alert(i18nString(UIStrings.devtoolsUndocked));
+    } else {
+      alert(i18nString(UIStrings.devToolsDockedTo, {PH1: this.dockSideInternal || ''}));
+    }
   }
 }
 

@@ -4,29 +4,36 @@
 
 import {assert} from 'chai';
 
-import {click, getBrowserAndPages, goToResource, step, waitFor} from '../../shared/helper.js';
+import {clickElement, enableExperiment, goToResource, step, waitFor} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {navigateToElementsTab} from '../helpers/elements-helpers.js';
-import {getMenuItemAtPosition, getMenuItemTitleAtPosition, openFileQuickOpen} from '../helpers/quick_open-helpers.js';
-import {togglePreferenceInSettingsTab} from '../helpers/settings-helpers.js';
-import {listenForSourceFilesLoaded, waitForSourceLoadedEvent} from '../helpers/sources-helpers.js';
+import {
+  getMenuItemAtPosition,
+  getMenuItemTitleAtPosition,
+  openFileQuickOpen,
+  readQuickOpenResults,
+  typeIntoQuickOpen,
+} from '../helpers/quick_open-helpers.js';
+import {setIgnoreListPattern, togglePreferenceInSettingsTab} from '../helpers/settings-helpers.js';
+import {openSourcesPanel, SourceFileEvents, waitForSourceFiles} from '../helpers/sources-helpers.js';
 
 async function openAFileWithQuickMenu() {
-  const {frontend} = getBrowserAndPages();
-  await listenForSourceFilesLoaded(frontend);
   await step('navigate to elements tab', async () => {
     await navigateToElementsTab();
   });
-  await step('open quick open menu and select the first option', async () => {
-    await goToResource('pages/hello-world.html');
-    await openFileQuickOpen();
-    const firstItem = await getMenuItemAtPosition(0);
-    await click(firstItem);
-  });
-  await step('check the sources panel is open with the selected file', async () => {
-    await waitFor('.navigator-file-tree-item');
-    await waitForSourceLoadedEvent(frontend, 'hello-world.html');
-  });
+
+  await waitForSourceFiles(
+      SourceFileEvents.SourceFileLoaded, files => files.some(f => f.endsWith('hello-world.html')), async () => {
+        await step('open quick open menu and select the first option', async () => {
+          await goToResource('pages/hello-world.html');
+          await openFileQuickOpen();
+          const firstItem = await getMenuItemAtPosition(0);
+          await clickElement(firstItem);
+        });
+        await step('check the sources panel is open with the selected file', async () => {
+          await waitFor('.navigator-file-tree-item');
+        });
+      });
 }
 
 describe('Quick Open menu', () => {
@@ -41,5 +48,58 @@ describe('Quick Open menu', () => {
     await openAFileWithQuickMenu();
     await togglePreferenceInSettingsTab('Focus Sources panel when triggering a breakpoint');
     await openAFileWithQuickMenu();
+  });
+
+  it('sorts authored above deployed', async () => {
+    await goToResource('sources/multi-workers-sourcemap.html');
+    await openSourcesPanel();
+
+    await typeIntoQuickOpen('mult');
+    const list = await readQuickOpenResults();
+    assert.deepEqual(list, ['multi-workers.js', 'multi-workers.min.js', 'multi-workers-sourcemap.html']);
+  });
+
+  it('sorts ignore listed below unignored', async () => {
+    await setIgnoreListPattern('mycode');
+    await goToResource('sources/multi-files.html');
+    await openSourcesPanel();
+
+    await typeIntoQuickOpen('mult');
+    const list = await readQuickOpenResults();
+    assert.deepEqual(list, ['multi-files-thirdparty.js', 'multi-files.html', 'multi-files-mycode.js']);
+  });
+
+  it('Does not list ignore-listed files', async () => {
+    await enableExperiment('justMyCode');
+    await setIgnoreListPattern('workers.js');
+    await goToResource('sources/multi-workers-sourcemap.html');
+    await openSourcesPanel();
+
+    await typeIntoQuickOpen('mult');
+    const list = await readQuickOpenResults();
+    assert.deepEqual(list, ['multi-workers.min.js', 'multi-workers-sourcemap.html']);
+  });
+
+  it('lists both deployed and authored file', async () => {
+    await goToResource('sources/sourcemap-origin.html');
+    await openSourcesPanel();
+
+    await typeIntoQuickOpen('sourcemap-origin.clash.js');
+    const list = await readQuickOpenResults();
+    assert.deepEqual(list, ['sourcemap-origin.clash.js', 'sourcemap-origin.clash.js']);
+  });
+
+  it('should not list network fetch requests (that are not overidden)', async () => {
+    await goToResource('network/fetch-json.html');
+    await typeIntoQuickOpen('json');
+    const list = await readQuickOpenResults();
+    assert.isFalse(list.includes('coffees.json'));
+  });
+
+  it('should not list network xhr requests (that are not overidden)', async () => {
+    await goToResource('network/xhr-json.html');
+    await typeIntoQuickOpen('json');
+    const list = await readQuickOpenResults();
+    assert.isFalse(list.includes('coffees.json'));
   });
 });

@@ -26,6 +26,11 @@ describe('JavaScriptFormatter', () => {
 `);
   });
 
+  it('formats top-level await correctly', () => {
+    const formattedCode = formatJavaScript('const myFile=await import(\n"my-file.mjs");');
+    assert.strictEqual(formattedCode, 'const myFile = await import("my-file.mjs");\n');
+  });
+
   it('formats identifiers containing escaped characters correctly', () => {
     const formattedCode = formatJavaScript(String.raw`const x=42;let \u0275_escaped;`);
     assert.strictEqual(formattedCode, 'const x = 42;\nlet \\u0275_escaped;\n');
@@ -239,11 +244,39 @@ else if (a % 5 === 3) {
 `);
   });
 
-  it('formats object desctructuring correctly', () => {
+  it('formats object destructuring correctly', () => {
     const formattedCode = formatJavaScript('let{x,y}=getXYFromTouchOrPointer(e);var test = function({x,y}){foo(x,y);}');
     assert.strictEqual(formattedCode, `let {x, y} = getXYFromTouchOrPointer(e);
 var test = function({x, y}) {
   foo(x, y);
+}
+`);
+  });
+
+  it('formats let declaration for "$" correctly', () => {
+    const formattedCode = formatJavaScript('let $=1;');
+    assert.strictEqual(formattedCode, 'let $ = 1;\n');
+  });
+
+  it('formats let declaration for "_" correctly', () => {
+    const formattedCode = formatJavaScript('let _=1;');
+    assert.strictEqual(formattedCode, 'let _ = 1;\n');
+  });
+
+  it('formats let declaration for unicode name correctly', () => {
+    const formattedCode = formatJavaScript('let \u00e1=1;');
+    assert.strictEqual(formattedCode, 'let \u00e1 = 1;\n');
+  });
+
+  it('formats const declaration for unicode name correctly', () => {
+    const formattedCode = formatJavaScript('const \u00e1=1;');
+    assert.strictEqual(formattedCode, 'const \u00e1 = 1;\n');
+  });
+
+  it('formats yield <number> correctly', () => {
+    const formattedCode = formatJavaScript('function *one() {yield 1;}');
+    assert.strictEqual(formattedCode, `function *one() {
+  yield 1;
 }
 `);
   });

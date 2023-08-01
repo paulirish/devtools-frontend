@@ -35,105 +35,105 @@ import webSocketFrameViewStyles from './webSocketFrameView.css.js';
 
 const UIStrings = {
   /**
-  *@description Text in Event Source Messages View of the Network panel
-  */
+   *@description Text in Event Source Messages View of the Network panel
+   */
   data: 'Data',
   /**
-  *@description Text in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Text in Resource Web Socket Frame View of the Network panel
+   */
   length: 'Length',
   /**
-  *@description Text that refers to the time
-  */
+   *@description Text that refers to the time
+   */
   time: 'Time',
   /**
-  *@description Data grid name for Web Socket Frame data grids
-  */
+   *@description Data grid name for Web Socket Frame data grids
+   */
   webSocketFrame: 'Web Socket Frame',
   /**
-  *@description Text to clear everything
-  */
+   *@description Text to clear everything
+   */
   clearAll: 'Clear All',
   /**
-  *@description Text to filter result items
-  */
+   *@description Text to filter result items
+   */
   filter: 'Filter',
   /**
-  *@description Text in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Text in Resource Web Socket Frame View of the Network panel
+   */
   selectMessageToBrowseItsContent: 'Select message to browse its content.',
   /**
-  *@description Text in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Text in Resource Web Socket Frame View of the Network panel
+   */
   copyMessageD: 'Copy message...',
   /**
-  *@description A context menu item in the Resource Web Socket Frame View of the Network panel
-  */
+   *@description A context menu item in the Resource Web Socket Frame View of the Network panel
+   */
   copyMessage: 'Copy message',
   /**
-  *@description Text to clear everything
-  */
+   *@description Text to clear everything
+   */
   clearAllL: 'Clear all',
   /**
-  * @description Text in Resource Web Socket Frame View of the Network panel. Displays which Opcode
-  * is relevant to a particular operation. 'mask' indicates that the Opcode used a mask, which is a
-  * way of modifying a value by overlaying another value on top of it, partially covering/changing
-  * it, hence 'masking' it.
-  * https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
-  * @example {Localized name of the Opcode} PH1
-  * @example {0} PH2
-  */
+   * @description Text in Resource Web Socket Frame View of the Network panel. Displays which Opcode
+   * is relevant to a particular operation. 'mask' indicates that the Opcode used a mask, which is a
+   * way of modifying a value by overlaying another value on top of it, partially covering/changing
+   * it, hence 'masking' it.
+   * https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
+   * @example {Localized name of the Opcode} PH1
+   * @example {0} PH2
+   */
   sOpcodeSMask: '{PH1} (Opcode {PH2}, mask)',
   /**
-  * @description Text in Resource Web Socket Frame View of the Network panel. Displays which Opcode
-  * is relevant to a particular operation.
-  * @example {Localized name of the Opcode} PH1
-  * @example {0} PH2
-  */
+   * @description Text in Resource Web Socket Frame View of the Network panel. Displays which Opcode
+   * is relevant to a particular operation.
+   * @example {Localized name of the Opcode} PH1
+   * @example {0} PH2
+   */
   sOpcodeS: '{PH1} (Opcode {PH2})',
   /**
-  *@description Op codes continuation frame of map in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Op codes continuation frame of map in Resource Web Socket Frame View of the Network panel
+   */
   continuationFrame: 'Continuation Frame',
   /**
-  *@description Op codes text frame of map in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Op codes text frame of map in Resource Web Socket Frame View of the Network panel
+   */
   textMessage: 'Text Message',
   /**
-  *@description Op codes binary frame of map in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Op codes binary frame of map in Resource Web Socket Frame View of the Network panel
+   */
   binaryMessage: 'Binary Message',
   /**
-  *@description Op codes continuation frame of map in Resource Web Socket Frame View of the Network panel indicating that the web socket connection has been closed.
-  */
+   *@description Op codes continuation frame of map in Resource Web Socket Frame View of the Network panel indicating that the web socket connection has been closed.
+   */
   connectionCloseMessage: 'Connection Close Message',
   /**
-  *@description Op codes ping frame of map in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Op codes ping frame of map in Resource Web Socket Frame View of the Network panel
+   */
   pingMessage: 'Ping Message',
   /**
-  *@description Op codes pong frame of map in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Op codes pong frame of map in Resource Web Socket Frame View of the Network panel
+   */
   pongMessage: 'Pong Message',
   /**
-  *@description Text for everything
-  */
+   *@description Text for everything
+   */
   all: 'All',
   /**
-  *@description Text in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Text in Resource Web Socket Frame View of the Network panel
+   */
   send: 'Send',
   /**
-  *@description Text in Resource Web Socket Frame View of the Network panel
-  */
+   *@description Text in Resource Web Socket Frame View of the Network panel
+   */
   receive: 'Receive',
   /**
-  *@description Text for something not available
-  */
+   *@description Text for something not available
+   */
   na: 'N/A',
   /**
-  *@description Example for placeholder text
-  */
+   *@description Example for placeholder text
+   */
   enterRegex: 'Enter regex, for example: (web)?socket',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/ResourceWebSocketFrameView.ts', UIStrings);
@@ -206,7 +206,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
     this.mainToolbar = new UI.Toolbar.Toolbar('');
 
-    this.clearAllButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAll), 'largeicon-clear');
+    this.clearAllButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAll), 'clear');
     this.clearAllButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.clearFrames, this);
     this.mainToolbar.appendToolbarItem(this.clearAllButton);
 
@@ -268,13 +268,13 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     return i18nString(UIStrings.sOpcodeS, {PH1: localizedDescription(), PH2: opCode});
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.refresh();
     this.registerCSSFiles([webSocketFrameViewStyles]);
     this.request.addEventListener(SDK.NetworkRequest.Events.WebsocketFrameAdded, this.frameAdded, this);
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.request.removeEventListener(SDK.NetworkRequest.Events.WebsocketFrameAdded, this.frameAdded, this);
   }
 
@@ -307,7 +307,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
   private applyFilter(text: string): void {
     const type = (this.filterTypeCombobox.selectedOption() as HTMLOptionElement).value;
-    this.filterRegex = text ? new RegExp(text, 'i') : null;
+    this.filterRegex = text ? new RegExp(Platform.StringUtilities.escapeForRegExp(text), 'i') : null;
     this.filterType = type === 'all' ? null : type;
     this.refresh();
   }
@@ -388,13 +388,13 @@ export const _filterTypes: UI.FilterBar.Item[] = [
 ];
 
 export class ResourceWebSocketFrameNode extends DataGrid.SortableDataGrid.SortableDataGridNode<unknown> {
-  private readonly url: string;
+  private readonly url: Platform.DevToolsPath.UrlString;
   readonly frame: SDK.NetworkRequest.WebSocketFrame;
   private readonly isTextFrame: boolean;
   private dataTextInternal: string;
   private binaryViewInternal: BinaryResourceView|null;
 
-  constructor(url: string, frame: SDK.NetworkRequest.WebSocketFrame) {
+  constructor(url: Platform.DevToolsPath.UrlString, frame: SDK.NetworkRequest.WebSocketFrame) {
     let length = String(frame.text.length);
     const time = new Date(frame.time * 1000);
     const timeText = ('0' + time.getHours()).substr(-2) + ':' + ('0' + time.getMinutes()).substr(-2) + ':' +
@@ -432,7 +432,7 @@ export class ResourceWebSocketFrameNode extends DataGrid.SortableDataGrid.Sortab
     this.binaryViewInternal = null;
   }
 
-  createCells(element: Element): void {
+  override createCells(element: Element): void {
     element.classList.toggle(
         'websocket-frame-view-row-error', this.frame.type === SDK.NetworkRequest.WebSocketFrameType.Error);
     element.classList.toggle(
@@ -442,7 +442,7 @@ export class ResourceWebSocketFrameNode extends DataGrid.SortableDataGrid.Sortab
     super.createCells(element);
   }
 
-  nodeSelfHeight(): number {
+  override nodeSelfHeight(): number {
     return 21;
   }
 

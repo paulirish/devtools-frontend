@@ -12,16 +12,16 @@ import surveyLinkStyles from './surveyLink.css.js';
 
 const UIStrings = {
   /**
-  *@description Text shown when the link to open a survey is clicked but the survey has not yet appeared
-  */
+   *@description Text shown when the link to open a survey is clicked but the survey has not yet appeared
+   */
   openingSurvey: 'Opening survey …',
   /**
-  *@description Text displayed instead of the survey link after the survey link is clicked, if the survey was shown successfully
-  */
+   *@description Text displayed instead of the survey link after the survey link is clicked, if the survey was shown successfully
+   */
   thankYouForYourFeedback: 'Thank you for your feedback',
   /**
-  *@description Text displayed instead of the survey link after the survey link is clicked, if the survey was not shown successfully
-  */
+   *@description Text displayed instead of the survey link after the survey link is clicked, if the survey was not shown successfully
+   */
   anErrorOccurredWithTheSurvey: 'An error occurred with the survey',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/components/survey_link/SurveyLink.ts', UIStrings);
@@ -124,7 +124,7 @@ export class SurveyLink extends HTMLElement {
     // eslint-disable-next-line rulesdir/ban_style_tags_in_lit_html
     const output = LitHtml.html`
       <button class="link ${linkState}" tabindex=${ariaDisabled ? '-1' : '0'} .disabled=${ariaDisabled} aria-disabled=${ariaDisabled} @click=${this.#sendSurvey}>
-        <${IconButton.Icon.Icon.litTagName} class="link-icon" .data=${{iconName: 'feedback_button_icon', color: 'var(--color-link)', width: 'var(--issue-link-icon-size, 16px)', height: 'var(--issue-link-icon-size, 16px)'} as IconButton.Icon.IconData}></${IconButton.Icon.Icon.litTagName}><!--
+        <${IconButton.Icon.Icon.litTagName} class="link-icon" .data=${{iconName: 'review', color: 'var(--color-link)', width: 'var(--issue-link-icon-size, 16px)', height: 'var(--issue-link-icon-size, 16px)'} as IconButton.Icon.IconData}></${IconButton.Icon.Icon.litTagName}><!--
       -->${linkText}
       </button>
     `;

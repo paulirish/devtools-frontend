@@ -7,12 +7,12 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
+import {type MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
-  *@description Label for the link for Mixed Content Issues
-  */
+   *@description Label for the link for Mixed Content Issues
+   */
   preventingMixedContent: 'Preventing mixed content',
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/MixedContentIssue.ts', UIStrings);
@@ -26,7 +26,7 @@ export class MixedContentIssue extends Issue {
     this.#issueDetails = issueDetails;
   }
 
-  requests(): Iterable<Protocol.Audits.AffectedRequest> {
+  override requests(): Iterable<Protocol.Audits.AffectedRequest> {
     if (this.#issueDetails.request) {
       return [this.#issueDetails.request];
     }

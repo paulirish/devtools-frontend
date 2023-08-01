@@ -15,24 +15,24 @@ import reportingApiGridStyles from './reportingApiGrid.css.js';
 
 const UIStrings = {
   /**
-  *@description Placeholder text when there are no Reporting API reports.
-  *(https://developers.google.com/web/updates/2018/09/reportingapi#sending)
-  */
+   *@description Placeholder text when there are no Reporting API reports.
+   *(https://developers.google.com/web/updates/2018/09/reportingapi#sending)
+   */
   noReportsToDisplay: 'No reports to display',
   /**
-  *@description Column header for a table displaying Reporting API reports.
-  *Status is one of 'Queued', 'Pending', 'MarkedForRemoval' or 'Success'.
-  */
+   *@description Column header for a table displaying Reporting API reports.
+   *Status is one of 'Queued', 'Pending', 'MarkedForRemoval' or 'Success'.
+   */
   status: 'Status',
   /**
-  *@description Column header for a table displaying Reporting API reports.
-  *Destination is the name of the endpoint the report is being sent to.
-  */
+   *@description Column header for a table displaying Reporting API reports.
+   *Destination is the name of the endpoint the report is being sent to.
+   */
   destination: 'Destination',
   /**
-  *@description Column header for a table displaying Reporting API reports.
-  *The column contains the timestamp of when a report was generated.
-  */
+   *@description Column header for a table displaying Reporting API reports.
+   *The column contains the timestamp of when a report was generated.
+   */
   generatedAt: 'Generated at',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/ReportsGrid.ts', UIStrings);
@@ -56,8 +56,8 @@ export class ReportsGridStatusHeader extends HTMLElement {
       ${i18nString(UIStrings.status)}
       <x-link href="https://web.dev/reporting-api/#report-status">
         <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
-          iconName: 'help_outline',
-          color: 'var(--color-primary)',
+          iconName: 'help',
+          color: 'var(--icon-link)',
           width: '16px',
           height: '16px',
           } as IconButton.Icon.IconData}></${IconButton.Icon.Icon.litTagName}>

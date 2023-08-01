@@ -14,16 +14,16 @@ import {MaxDeviceSize, MinDeviceSize, Insets} from './DeviceModeModel.js';
 
 const UIStrings = {
   /**
-  *@description Title of the Laptop with touch device
-  */
+   *@description Title of the Laptop with touch device
+   */
   laptopWithTouch: 'Laptop with touch',
   /**
-  *@description Title of the Laptop with HiDPI screen device
-  */
+   *@description Title of the Laptop with HiDPI screen device
+   */
   laptopWithHiDPIScreen: 'Laptop with HiDPI screen',
   /**
-  *@description Title of the Laptop with MDPI screen device
-  */
+   *@description Title of the Laptop with MDPI screen device
+   */
   laptopWithMDPIScreen: 'Laptop with MDPI screen',
 };
 const str_ = i18n.i18n.registerUIStrings('models/emulation/EmulatedDevices.ts', UIStrings);
@@ -725,6 +725,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; Android 11; Pixel 3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '11', 'architecture': '', 'model': 'Pixel 3', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -745,6 +747,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '11', 'architecture': '', 'model': 'Pixel 5', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -765,6 +769,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; Android 8.0.0; SM-G955U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '8.0.0', 'architecture': '', 'model': 'SM-G955U', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -785,6 +791,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '10', 'architecture': '', 'model': 'SM-G981B', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -844,7 +852,7 @@ const emulatedDevices = [
     },
     'capabilities': ['touch', 'mobile'],
     'user-agent':
-        'Mozilla/5.0 (iPad; CPU OS 13_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/87.0.4280.77 Mobile/15E148 Safari/604.1',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.82 Safari/537.36',
     'type': 'tablet',
   },
   {
@@ -869,7 +877,9 @@ const emulatedDevices = [
     },
     'capabilities': ['touch', 'mobile'],
     'user-agent':
-        'Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Mobile Safari/537.36',
+        'Mozilla/5.0 (Linux; Android 11.0; Surface Duo) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '11.0', 'architecture': '', 'model': 'Surface Duo', 'mobile': true},
     'type': 'phone',
     'modes': [
       {'title': 'default', 'orientation': 'vertical', 'insets': {'left': 0, 'top': 0, 'right': 0, 'bottom': 0}},
@@ -896,7 +906,9 @@ const emulatedDevices = [
     },
     'capabilities': ['touch', 'mobile'],
     'user-agent':
-        'Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Mobile Safari/537.36',
+        'Mozilla/5.0 (Linux; Android 9.0; SAMSUNG SM-F900U Build/PPR1.180610.011) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '9.0', 'architecture': '', 'model': 'SM-F900U', 'mobile': true},
     'type': 'phone',
     'modes': [
       {'title': 'default', 'orientation': 'vertical', 'insets': {'left': 0, 'top': 0, 'right': 0, 'bottom': 0}},
@@ -927,6 +939,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; Android 8.0.0; SM-G955U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Mobile Safari/537.36',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '8.0.0', 'architecture': '', 'model': 'SM-G955U', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -976,6 +990,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.109 Safari/537.36 CrKey/1.54.248666',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '', 'architecture': '', 'model': '', 'mobile': false},
     'type': 'tablet',
     'modes': [{'title': 'default', 'orientation': 'horizontal'}],
   },
@@ -1409,6 +1425,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Windows Phone 10.0; Android 4.2.1; Microsoft; Lumia 550) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Mobile Safari/537.36 Edge/14.14263',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '4.2.1', 'architecture': '', 'model': 'Lumia 550', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -1422,6 +1440,8 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Windows Phone 10.0; Android 4.2.1; Microsoft; Lumia 950) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Mobile Safari/537.36 Edge/14.14263',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '4.2.1', 'architecture': '', 'model': 'Lumia 950', 'mobile': true},
     'type': 'phone',
   },
   {
@@ -1497,7 +1517,7 @@ const emulatedDevices = [
     'user-agent':
         'Mozilla/5.0 (Linux; Android 8.1.0; SM-T837A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.80 Safari/537.36',
     'user-agent-metadata':
-        {'platform': 'Android', 'platformVersion': '8.1.0', 'architecture': '', 'model': 'SM-T837A', 'mobile': true},
+        {'platform': 'Android', 'platformVersion': '8.1.0', 'architecture': '', 'model': 'SM-T837A', 'mobile': false},
     'type': 'phone',
   },
   {
@@ -1512,6 +1532,13 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Mobile; LYF/F300B/LYF-F300B-001-01-15-130718-i;Android; rv:48.0) Gecko/48.0 Firefox/48.0 KAIOS/2.5',
+    'user-agent-metadata': {
+      'platform': 'Android',
+      'platformVersion': '',
+      'architecture': '',
+      'model': 'LYF/F300B/LYF-F300B-001-01-15-130718-i',
+      'mobile': true,
+    },
     'type': 'phone',
   },
   {
@@ -1525,19 +1552,6 @@ const emulatedDevices = [
     'capabilities': ['touch', 'mobile'],
     'user-agent':
         'Mozilla/5.0 (Linux; U; en-us; KFAPWI Build/JDQ39) AppleWebKit/535.19 (KHTML, like Gecko) Silk/3.13 Safari/535.19 Silk-Accelerated=true',
-    'type': 'tablet',
-  },
-  {
-    'show-by-default': false,
-    'title': 'iPad Mini',
-    'screen': {
-      'horizontal': {'width': 1024, 'height': 768},
-      'device-pixel-ratio': 2,
-      'vertical': {'width': 768, 'height': 1024},
-    },
-    'capabilities': ['touch', 'mobile'],
-    'user-agent':
-        'Mozilla/5.0 (iPad; CPU OS 11_0 like Mac OS X) AppleWebKit/604.1.34 (KHTML, like Gecko) Version/11.0 Mobile/15A5341f Safari/604.1',
     'type': 'tablet',
   },
   {
@@ -1733,6 +1747,54 @@ const emulatedDevices = [
         'Mozilla/5.0 (Linux; Android 6.0.1; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Mobile Safari/537.36',
     'user-agent-metadata':
         {'platform': 'Android', 'platformVersion': '6.0.1', 'architecture': '', 'model': 'Moto G (4)', 'mobile': true},
+    'type': 'phone',
+  },
+  {
+    'show-by-default': false,
+    'title': 'Moto G Power',
+    'screen': {
+      'device-pixel-ratio': 1.75,
+      'horizontal': {
+        'width': 823,
+        'height': 412,
+      },
+      'vertical': {
+        'width': 412,
+        'height': 823,
+      },
+    },
+    'capabilities': ['touch', 'mobile'],
+    'user-agent':
+        'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Mobile Safari/537.36',
+    'user-agent-metadata': {
+      'platform': 'Android',
+      'platformVersion': '11',
+      'architecture': '',
+      'model': 'moto g power (2022)',
+      'mobile': true,
+    },
+    'type': 'phone',
+  },
+  {
+    'order': 200,
+    'show-by-default': false,
+    'title': 'Facebook on Android',
+    'screen': {
+      'horizontal': {
+        'width': 892,
+        'height': 412,
+      },
+      'device-pixel-ratio': 3.5,
+      'vertical': {
+        'width': 412,
+        'height': 892,
+      },
+    },
+    'capabilities': ['touch', 'mobile'],
+    'user-agent':
+        'Mozilla/5.0 (Linux; Android 12; Pixel 6 Build/SQ3A.220705.004; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/%s Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/407.0.0.0.65;]',
+    'user-agent-metadata':
+        {'platform': 'Android', 'platformVersion': '12', 'architecture': '', 'model': 'Pixel 6', 'mobile': true},
     'type': 'phone',
   },
   // DEVICE-LIST-END

@@ -11,8 +11,8 @@ import {ScreencastView} from './ScreencastView.js';
 
 const UIStrings = {
   /**
-  *@description Tooltip text that appears when hovering over largeicon phone button in Screencast App of the Remote Devices tab when toggling screencast
-  */
+   *@description Tooltip text that appears when hovering over largeicon phone button in Screencast App of the Remote Devices tab when toggling screencast
+   */
   toggleScreencast: 'Toggle screencast',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/screencast/ScreencastApp.ts', UIStrings);
@@ -26,9 +26,10 @@ export class ScreencastApp implements Common.App.App,
   private rootSplitWidget?: UI.SplitWidget.SplitWidget;
   private screenCaptureModel?: SDK.ScreenCaptureModel.ScreenCaptureModel;
   private screencastView?: ScreencastView;
+  rootView?: UI.RootView.RootView;
   constructor() {
     this.enabledSetting = Common.Settings.Settings.instance().createSetting('screencastEnabled', true);
-    this.toggleButton = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.toggleScreencast), 'largeicon-phone');
+    this.toggleButton = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.toggleScreencast), 'devices');
     this.toggleButton.setToggled(this.enabledSetting.get());
     this.toggleButton.setEnabled(false);
     this.toggleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.toggleButtonClicked, this);
@@ -43,23 +44,23 @@ export class ScreencastApp implements Common.App.App,
   }
 
   presentUI(document: Document): void {
-    const rootView = new UI.RootView.RootView();
+    this.rootView = new UI.RootView.RootView();
 
     this.rootSplitWidget =
         new UI.SplitWidget.SplitWidget(false, true, 'InspectorView.screencastSplitViewState', 300, 300);
     this.rootSplitWidget.setVertical(true);
     this.rootSplitWidget.setSecondIsSidebar(true);
-    this.rootSplitWidget.show(rootView.element);
+    this.rootSplitWidget.show(this.rootView.element);
     this.rootSplitWidget.hideMain();
 
     this.rootSplitWidget.setSidebarWidget(UI.InspectorView.InspectorView.instance());
     UI.InspectorView.InspectorView.instance().setOwnerSplit(this.rootSplitWidget);
-    rootView.attachToDocument(document);
-    rootView.focus();
+    this.rootView.attachToDocument(document);
+    this.rootView.focus();
   }
 
   modelAdded(screenCaptureModel: SDK.ScreenCaptureModel.ScreenCaptureModel): void {
-    if (this.screenCaptureModel) {
+    if (screenCaptureModel.target() !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
       return;
     }
     this.screenCaptureModel = screenCaptureModel;

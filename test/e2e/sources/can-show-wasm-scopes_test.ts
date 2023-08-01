@@ -6,7 +6,15 @@ import {assert} from 'chai';
 
 import {click, getBrowserAndPages, step, waitFor, waitForFunction} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {addBreakpointForLine, getScopeNames, getValuesForScope, openSourceCodeEditorForFile, PAUSE_INDICATOR_SELECTOR, reloadPageAndWaitForSourceFile, RESUME_BUTTON} from '../helpers/sources-helpers.js';
+import {
+  addBreakpointForLine,
+  getScopeNames,
+  getValuesForScope,
+  openSourceCodeEditorForFile,
+  PAUSE_INDICATOR_SELECTOR,
+  reloadPageAndWaitForSourceFile,
+  RESUME_BUTTON,
+} from '../helpers/sources-helpers.js';
 
 describe('Source Tab', async () => {
   it('shows and updates the module, local, and stack scope while pausing', async () => {
@@ -25,7 +33,7 @@ describe('Source Tab', async () => {
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(frontend, target, fileName);
+      await reloadPageAndWaitForSourceFile(target, fileName);
     });
 
     await step('check that the module, local, and stack scope appear', async () => {

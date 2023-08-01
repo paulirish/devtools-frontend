@@ -16,20 +16,20 @@ import {PersistenceImpl} from './PersistenceImpl.js';
 
 const UIStrings = {
   /**
-  *@description Text to save content as a specific file type
-  */
+   *@description Text to save content as a specific file type
+   */
   saveAs: 'Save as...',
   /**
-  *@description Context menu item for saving an image
-  */
+   *@description Context menu item for saving an image
+   */
   saveImage: 'Save image',
   /**
-  *@description A context menu item in the Persistence Actions of the Workspace settings in Settings
-  */
-  saveForOverrides: 'Save for overrides',
+   *@description A context menu item in the Persistence Actions of the Workspace settings in Settings
+   */
+  overrideContent: 'Override content',
   /**
-  *@description A context menu item in the Persistence Actions of the Workspace settings in Settings
-  */
+   *@description A context menu item in the Persistence Actions of the Workspace settings in Settings
+   */
   openInContainingFolder: 'Open in containing folder',
 };
 const str_ = i18n.i18n.registerUIStrings('models/persistence/PersistenceActions.ts', UIStrings);
@@ -54,12 +54,13 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
       if (contentProvider instanceof Workspace.UISourceCode.UISourceCode) {
         (contentProvider as Workspace.UISourceCode.UISourceCode).commitWorkingCopy();
       }
-      let content: string = (await contentProvider.requestContent()).content || '';
-      if (await contentProvider.contentEncoded()) {
-        content = window.atob(content);
+      const content = await contentProvider.requestContent();
+      let decodedContent = content.content || '';
+      if (content.isEncoded) {
+        decodedContent = window.atob(decodedContent);
       }
       const url = contentProvider.contentURL();
-      void Workspace.FileManager.FileManager.instance().save(url, content as string, true);
+      void Workspace.FileManager.FileManager.instance().save(url, decodedContent, true);
       Workspace.FileManager.FileManager.instance().close(url);
     }
 
@@ -80,12 +81,13 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
 
     // Retrieve uiSourceCode by URL to pick network resources everywhere.
     const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(contentProvider.contentURL());
-    if (uiSourceCode && NetworkPersistenceManager.instance().canSaveUISourceCodeForOverrides(uiSourceCode)) {
-      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveForOverrides), () => {
-        uiSourceCode.commitWorkingCopy();
-        void NetworkPersistenceManager.instance().saveUISourceCodeForOverrides(
-            uiSourceCode as Workspace.UISourceCode.UISourceCode);
-        void Common.Revealer.reveal(uiSourceCode);
+    const networkPersistenceManager = NetworkPersistenceManager.instance();
+    if (uiSourceCode && networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode)) {
+      contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), async () => {
+        const isSuccess = await networkPersistenceManager.setupAndStartLocalOverrides(uiSourceCode);
+        if (isSuccess) {
+          await Common.Revealer.reveal(uiSourceCode);
+        }
       });
     }
 

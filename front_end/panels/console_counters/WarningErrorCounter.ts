@@ -13,21 +13,21 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-  *@description The console error count in the Warning Error Counter shown in the main toolbar (top-left in DevTools). The error count refers to the number of errors currently present in the JavaScript console.
-  */
+   *@description The console error count in the Warning Error Counter shown in the main toolbar (top-left in DevTools). The error count refers to the number of errors currently present in the JavaScript console.
+   */
   sErrors: '{n, plural, =1 {# error} other {# errors}}',
   /**
-  *@description The console warning count in the Warning Error Counter shown in the main toolbar (top-left in DevTools). The warning count refers to the number of warnings currently present in the JavaScript console.
-  */
+   *@description The console warning count in the Warning Error Counter shown in the main toolbar (top-left in DevTools). The warning count refers to the number of warnings currently present in the JavaScript console.
+   */
   sWarnings: '{n, plural, =1 {# warning} other {# warnings}}',
   /**
-  *@description Tooltip shown for a main toolbar button that opens the Console panel
-  *@example {2 errors, 1 warning} PH1
-  */
+   *@description Tooltip shown for a main toolbar button that opens the Console panel
+   *@example {2 errors, 1 warning} PH1
+   */
   openConsoleToViewS: 'Open Console to view {PH1}',
   /**
-  *@description Title for the issues count in the Issues Error Counter shown in the main toolbar (top-left in DevTools). The issues count refers to the number of issues in the issues tab.
-  */
+   *@description Title for the issues count in the Issues Error Counter shown in the main toolbar (top-left in DevTools). The issues count refers to the number of issues in the issues tab.
+   */
   openIssuesToView: '{n, plural, =1 {Open Issues to view # issue:} other {Open Issues to view # issues:}}',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/console_counters/WarningErrorCounter.ts', UIStrings);
@@ -54,11 +54,15 @@ export class WarningErrorCounter implements UI.Toolbar.Provider {
     countersWrapper.appendChild(this.consoleCounter);
     this.consoleCounter.data = {
       clickHandler: Common.Console.Console.instance().show.bind(Common.Console.Console.instance()),
-      groups: [{iconName: 'error_icon'}, {iconName: 'warning_icon'}],
+      groups: [
+        {iconName: 'cross-circle-filled', iconColor: 'var(--icon-error)', iconHeight: '14px', iconWidth: '14px'},
+        {iconName: 'warning-filled', iconColor: 'var(--icon-warning)', iconHeight: '14px', iconWidth: '14px'},
+      ],
     };
 
     const issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
     this.issueCounter = new IssueCounter.IssueCounter.IssueCounter();
+    this.issueCounter.classList.add('main-toolbar');
     countersWrapper.appendChild(this.issueCounter);
     this.issueCounter.data = {
       clickHandler: (): void => {
@@ -71,11 +75,12 @@ export class WarningErrorCounter implements UI.Toolbar.Provider {
 
     this.throttler = new Common.Throttler.Throttler(100);
 
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
-        SDK.ConsoleModel.Events.ConsoleCleared, this.update, this);
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(SDK.ConsoleModel.Events.MessageAdded, this.update, this);
-    SDK.ConsoleModel.ConsoleModel.instance().addEventListener(
-        SDK.ConsoleModel.Events.MessageUpdated, this.update, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.ConsoleCleared, this.update, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, this.update, this);
+    SDK.TargetManager.TargetManager.instance().addModelListener(
+        SDK.ConsoleModel.ConsoleModel, SDK.ConsoleModel.Events.MessageUpdated, this.update, this);
 
     issuesManager.addEventListener(IssuesManager.IssuesManager.Events.IssuesCountUpdated, this.update, this);
 
@@ -115,8 +120,8 @@ export class WarningErrorCounter implements UI.Toolbar.Provider {
   }
 
   private async updateThrottled(): Promise<void> {
-    const errors = SDK.ConsoleModel.ConsoleModel.instance().errors();
-    const warnings = SDK.ConsoleModel.ConsoleModel.instance().warnings();
+    const errors = SDK.ConsoleModel.ConsoleModel.allErrors();
+    const warnings = SDK.ConsoleModel.ConsoleModel.allWarnings();
     const issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
     const issues = issuesManager.numberOfIssues();
 

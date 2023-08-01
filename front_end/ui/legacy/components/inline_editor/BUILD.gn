@@ -12,6 +12,7 @@ generate_css("css_files") {
   sources = [
     "bezierEditor.css",
     "bezierSwatch.css",
+    "colorMixSwatch.css",
     "colorSwatch.css",
     "cssAngle.css",
     "cssAngleEditor.css",
@@ -19,30 +20,36 @@ generate_css("css_files") {
     "cssLength.css",
     "cssShadowEditor.css",
     "cssShadowSwatch.css",
-    "cssVarSwatch.css",
     "fontEditor.css",
+    "linkSwatch.css",
     "swatchPopover.css",
   ]
 }
 
 devtools_module("inline_editor") {
   sources = [
+    "AnimationTimingModel.ts",
+    "AnimationTimingUI.ts",
     "BezierEditor.ts",
     "BezierUI.ts",
     "CSSAngle.ts",
     "CSSAngleEditor.ts",
     "CSSAngleSwatch.ts",
     "CSSAngleUtils.ts",
+    "CSSAnimationModel.ts",
     "CSSLength.ts",
     "CSSLengthUtils.ts",
+    "CSSLinearEasingModel.ts",
     "CSSShadowEditor.ts",
     "CSSShadowModel.ts",
-    "CSSVarSwatch.ts",
+    "ColorMixModel.ts",
+    "ColorMixSwatch.ts",
     "ColorSwatch.ts",
     "FontEditor.ts",
     "FontEditorUnitConverter.ts",
     "FontEditorUtils.ts",
     "InlineEditorUtils.ts",
+    "LinkSwatch.ts",
     "SwatchPopoverHelper.ts",
     "Swatches.ts",
   ]

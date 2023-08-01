@@ -15,22 +15,20 @@ describe('The Console Tab', async () => {
     await waitForIssueButtonLabel('No Issues');
   });
 
-  // Flaky test on mac.
-  it.skipOnPlatforms(['mac'], '[crbug.com/1317582]: shows the toolbar button for one issue correctly', async () => {
-    // Navigate to page which causes a CookieIssue.
-    await goToResource('console/cookie-issue.html');
+  it('shows the toolbar button for one issue correctly', async () => {
+    // Navigate to page which causes a single issue.
+    await goToResource('issues/cross-origin-portal-post.html');
     await navigateToConsoleTab();
 
     await waitForIssueButtonLabel('1 Issue:');
   });
 
-  // Flaky test on mac.
-  it.skipOnPlatforms(['mac'], '[crbug.com/1317582]:shows the toolbar button for two issues correctly', async () => {
-    // Navigate to page which causes two CookieIssue.
-    await goToResource('console/two-cookie-issues.html');
+  it('shows the toolbar button for three issues correctly', async () => {
+    // Navigate to page which causes three issues.
+    await goToResource('issues/cors-issue-2.html');
     await navigateToConsoleTab();
 
-    await waitForIssueButtonLabel('2 Issues:');
+    await waitForIssueButtonLabel('3 Issues:');
   });
 
   it('updates the toolbar button correctly', async () => {

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Platform from '../../../../front_end/core/platform/platform.js';
 import * as Common from '../../../../front_end/core/common/common.js';
 import * as Host from '../../../../front_end/core/host/host.js';
 import * as i18n from '../../../../front_end/core/i18n/i18n.js';
@@ -9,9 +10,10 @@ import * as Root from '../../../../front_end/core/root/root.js';
 import * as SDK from '../../../../front_end/core/sdk/sdk.js';
 import type * as Protocol from '../../../../front_end/generated/protocol.js';
 import * as Bindings from '../../../../front_end/models/bindings/bindings.js';
-import * as Workspace from '../../../../front_end/models/workspace/workspace.js';
 import * as IssuesManager from '../../../../front_end/models/issues_manager/issues_manager.js';
-
+import * as Logs from '../../../../front_end/models/logs/logs.js';
+import * as Persistence from '../../../../front_end/models/persistence/persistence.js';
+import * as Workspace from '../../../../front_end/models/workspace/workspace.js';
 import type * as UIModule from '../../../../front_end/ui/legacy/legacy.js';
 
 // Don't import UI at this stage because it will fail without
@@ -27,11 +29,29 @@ function initializeTargetManagerIfNecessary(): SDK.TargetManager.TargetManager {
   return targetManager;
 }
 
+let uniqueTargetId = 0;
+
 export function createTarget(
-    {id = 'test' as Protocol.Target.TargetID, name = 'test', type = SDK.Target.Type.Frame, parentTarget}:
-        {id?: Protocol.Target.TargetID, name?: string, type?: SDK.Target.Type, parentTarget?: SDK.Target.Target} = {}) {
+    {id, name, type = SDK.Target.Type.Frame, parentTarget, subtype, url = 'http://example.com'}: {
+      id?: Protocol.Target.TargetID,
+      name?: string,
+      type?: SDK.Target.Type,
+      parentTarget?: SDK.Target.Target,
+      subtype?: string,
+      url?: string,
+    } = {}) {
+  if (!id) {
+    if (!uniqueTargetId++) {
+      id = 'test' as Protocol.Target.TargetID;
+    } else {
+      id = ('test' + uniqueTargetId) as Protocol.Target.TargetID;
+    }
+  }
   const targetManager = initializeTargetManagerIfNecessary();
-  return targetManager.createTarget(id, name, type, parentTarget ? parentTarget : null);
+  return targetManager.createTarget(
+      id, name ?? id, type, parentTarget ? parentTarget : null, /* sessionId=*/ parentTarget ? id : undefined,
+      /* suspended=*/ false,
+      /* connection=*/ undefined, {targetId: id, url, subtype} as Protocol.Target.TargetInfo);
 }
 
 function createSettingValue(
@@ -40,18 +60,70 @@ function createSettingValue(
   return {category, settingName, defaultValue, settingType};
 }
 
+export function stubNoopSettings() {
+  sinon.stub(Common.Settings.Settings, 'instance').returns({
+    createSetting: () => ({
+      get: () => [],
+      set: () => {},
+      addChangeListener: () => {},
+      removeChangeListener: () => {},
+      setDisabled: () => {},
+      setTitle: () => {},
+      title: () => {},
+      asRegExp: () => {},
+      type: () => Common.Settings.SettingType.BOOLEAN,
+      getAsArray: () => [],
+    }),
+    moduleSetting: () => ({
+      get: () => [],
+      set: () => {},
+      addChangeListener: () => {},
+      removeChangeListener: () => {},
+      setDisabled: () => {},
+      setTitle: () => {},
+      title: () => {},
+      asRegExp: () => {},
+      type: () => Common.Settings.SettingType.BOOLEAN,
+      getAsArray: () => [],
+    }),
+  } as unknown as Common.Settings.Settings);
+}
+
+export function registerNoopActions(actionIds: string[]): void {
+  for (const actionId of actionIds) {
+    UI.ActionRegistration.maybeRemoveActionExtension(actionId);
+    UI.ActionRegistration.registerActionExtension({
+      actionId,
+      category: UI.ActionRegistration.ActionCategory.NONE,
+      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
+    });
+  }
+  const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+  UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
+}
+
 const REGISTERED_EXPERIMENTS = [
+  'bfcacheDisplayTree',
   'captureNodeCreationStacks',
-  'hideIssuesFeature',
   'keyboardShortcutEditor',
   'preciseChanges',
   'protocolMonitor',
   'sourcesPrettyPrint',
   'wasmDWARFDebugging',
+  'timelineShowAllEvents',
   'timelineV8RuntimeCallStats',
   'timelineInvalidationTracking',
   'ignoreListJSFramesOnTimeline',
   'instrumentationBreakpoints',
+  'cssTypeComponentLength',
+  'stylesPaneCSSChanges',
+  'timelineEventInitiators',
+  'timelineAsConsoleProfileResultPanel',
+  'headerOverrides',
+  'highlightErrorsElementsPanel',
+  'setAllBreakpointsEagerly',
+  'selfXssWarning',
+  'evaluateExpressionsWithSourceMaps',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -61,14 +133,18 @@ export async function initializeGlobalVars({reset = true} = {}) {
   const settings = [
     createSettingValue(Common.Settings.SettingCategory.APPEARANCE, 'disablePausedStateOverlay', false),
     createSettingValue(Common.Settings.SettingCategory.CONSOLE, 'customFormatters', false),
-    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'pauseOnCaughtException', false),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'pauseOnExceptionEnabled', false),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'pauseOnCaughtException', false),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'pauseOnUncaughtException', false),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'disableAsyncStackTraces', false),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'breakpointsActive', true),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'javaScriptDisabled', false),
-    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'skipContentScripts', false),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'skipContentScripts', true),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'automaticallyIgnoreListKnownThirdPartyScripts', true),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'enableIgnoreListing', true),
     createSettingValue(
         Common.Settings.SettingCategory.DEBUGGER, 'skipStackFramesPattern', '', Common.Settings.SettingType.REGEX),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'navigatorGroupByFolder', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'showDetailedInspectTooltip', true),
     createSettingValue(Common.Settings.SettingCategory.NETWORK, 'cacheDisabled', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'avifFormatDisabled', false),
@@ -90,6 +166,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMediaFeaturePrefersReducedData', '',
         Common.Settings.SettingType.ENUM),
     createSettingValue(
+        Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMediaFeaturePrefersReducedTransparency', '',
+        Common.Settings.SettingType.ENUM),
+    createSettingValue(
         Common.Settings.SettingCategory.RENDERING, 'emulatedCSSMediaFeatureColorGamut', '',
         Common.Settings.SettingType.ENUM),
     createSettingValue(
@@ -105,7 +184,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showScrollBottleneckRects', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'showWebVitals', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'webpFormatDisabled', false),
-    createSettingValue(Common.Settings.SettingCategory.RENDERING, 'jpegXlFormatDisabled', false),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'allowScrollPastEof', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'cssSourceMapsEnabled', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'inlineVariableValues', true),
@@ -122,7 +200,8 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.EMULATION, 'emulation.touch', '', Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.EMULATION, 'emulation.idleDetection', '', Common.Settings.SettingType.ENUM),
-    createSettingValue(Common.Settings.SettingCategory.GRID, 'showGridLineLabels', true),
+    createSettingValue(
+        Common.Settings.SettingCategory.GRID, 'showGridLineLabels', 'none', Common.Settings.SettingType.ENUM),
     createSettingValue(Common.Settings.SettingCategory.GRID, 'extendGridLines', true),
     createSettingValue(Common.Settings.SettingCategory.GRID, 'showGridAreas', true),
     createSettingValue(Common.Settings.SettingCategory.GRID, 'showGridTrackSizes', true),
@@ -143,7 +222,12 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.PERSISTENCE, 'persistenceNetworkOverridesEnabled', true,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
+        Common.Settings.SettingCategory.NETWORK, 'network_log.preserve-log', true, Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
         Common.Settings.SettingCategory.NETWORK, 'network_log.record-log', true, Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.SOURCES, 'network.enable-remote-file-loading', false,
+        Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'hideNetworkMessages', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
@@ -160,12 +244,23 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.CONSOLE, 'consoleHistoryAutocomplete', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
+        Common.Settings.SettingCategory.CONSOLE, 'consoleAutocompleteOnEnter', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'preserveConsoleLog', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'consoleEagerEval', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'consoleUserActivationEval', false,
         Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.CONSOLE, 'consoleTraceExpand', false, Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.PERFORMANCE, 'showNativeFunctionsInJSProfile', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.PERFORMANCE, 'flamechartMouseWheelAction', false,
+        Common.Settings.SettingType.ENUM),
   ];
 
   Common.Settings.registerSettingsForTest(settings, reset);
@@ -175,6 +270,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
   Common.Settings.Settings.instance(
       {forceNew: reset, syncedStorage: storage, globalStorage: storage, localStorage: storage});
 
+  Root.Runtime.experiments.clearForTest();
   for (const experimentName of REGISTERED_EXPERIMENTS) {
     Root.Runtime.experiments.register(experimentName, '');
   }
@@ -200,16 +296,24 @@ export async function deinitializeGlobalVars() {
 
   Root.Runtime.experiments.clearForTest();
 
+  for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
+    target.dispose('deinitializeGlobalVars');
+  }
   // Remove instances.
   await deinitializeGlobalLocaleVars();
+  Logs.NetworkLog.NetworkLog.removeInstance();
   SDK.TargetManager.TargetManager.removeInstance();
   targetManager = null;
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
+  Common.Console.Console.removeInstance();
   Workspace.Workspace.WorkspaceImpl.removeInstance();
+  Bindings.IgnoreListManager.IgnoreListManager.removeInstance();
   Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.removeInstance();
   Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.removeInstance();
   IssuesManager.IssuesManager.IssuesManager.removeInstance();
+  Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.removeInstance();
+
   Common.Settings.resetSettings();
 
   // Protect against the dynamic import not having happened.
@@ -217,18 +321,32 @@ export async function deinitializeGlobalVars() {
     UI.ZoomManager.ZoomManager.removeInstance();
     UI.ViewManager.ViewManager.removeInstance();
     UI.ViewManager.resetViewRegistration();
+    UI.Context.Context.removeInstance();
+    UI.InspectorView.InspectorView.removeInstance();
+    UI.ActionRegistry.ActionRegistry.reset();
   }
 }
 
 export function describeWithEnvironment(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
   reset: true,
 }) {
-  return describe(`env-${title}`, () => {
+  return describe(title, function() {
     before(async () => await initializeGlobalVars(opts));
+    fn.call(this);
     after(async () => await deinitializeGlobalVars());
-    describe(title, fn);
   });
 }
+
+describeWithEnvironment.only = function(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
+  reset: true,
+}) {
+  // eslint-disable-next-line rulesdir/no_only
+  return describe.only(title, function() {
+    before(async () => await initializeGlobalVars(opts));
+    fn.call(this);
+    after(async () => await deinitializeGlobalVars());
+  });
+};
 
 export async function initializeGlobalLocaleVars() {
   // Expose the locale.
@@ -257,12 +375,20 @@ export function deinitializeGlobalLocaleVars() {
 }
 
 export function describeWithLocale(title: string, fn: (this: Mocha.Suite) => void) {
-  return describe(`locale-${title}`, () => {
+  return describe(title, function() {
     before(async () => await initializeGlobalLocaleVars());
+    fn.call(this);
     after(deinitializeGlobalLocaleVars);
-    describe(title, fn);
   });
 }
+describeWithLocale.only = function(title: string, fn: (this: Mocha.Suite) => void) {
+  // eslint-disable-next-line rulesdir/no_only
+  return describe.only(title, function() {
+    before(async () => await initializeGlobalLocaleVars());
+    fn.call(this);
+    after(deinitializeGlobalLocaleVars);
+  });
+};
 
 export function createFakeSetting<T>(name: string, defaultValue: T): Common.Settings.Setting<T> {
   const storage = new Common.Settings.SettingsStorage({}, Common.Settings.NOOP_STORAGE, 'test');
@@ -271,4 +397,60 @@ export function createFakeSetting<T>(name: string, defaultValue: T): Common.Sett
 
 export function enableFeatureForTest(feature: string): void {
   Root.Runtime.experiments.enableForTest(feature);
+}
+
+export function setupActionRegistry() {
+  before(function() {
+    const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
+    UI.ShortcutRegistry.ShortcutRegistry.instance({
+      forceNew: true,
+      actionRegistry,
+    });
+  });
+  after(function() {
+    if (UI) {
+      UI.ShortcutRegistry.ShortcutRegistry.removeInstance();
+      UI.ActionRegistry.ActionRegistry.removeInstance();
+    }
+  });
+}
+
+export function expectConsoleLogs(expectedLogs: {warn?: string[], log?: string[], error?: string[]}) {
+  const {error, warn, log} = console;
+  before(() => {
+    if (expectedLogs.log) {
+      // eslint-disable-next-line no-console
+      console.log = (...data: unknown[]) => {
+        if (!expectedLogs.log?.includes(data.join(' '))) {
+          log(...data);
+        }
+      };
+    }
+    if (expectedLogs.warn) {
+      console.warn = (...data: unknown[]) => {
+        if (!expectedLogs.warn?.includes(data.join(' '))) {
+          warn(...data);
+        }
+      };
+    }
+    if (expectedLogs.error) {
+      console.error = (...data: unknown[]) => {
+        if (!expectedLogs.error?.includes(data.join(' '))) {
+          error(...data);
+        }
+      };
+    }
+  });
+  after(() => {
+    if (expectedLogs.log) {
+      // eslint-disable-next-line no-console
+      console.log = log;
+    }
+    if (expectedLogs.warn) {
+      console.warn = warn;
+    }
+    if (expectedLogs.error) {
+      console.error = error;
+    }
+  });
 }

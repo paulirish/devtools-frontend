@@ -4,19 +4,36 @@
 
 import {assert} from 'chai';
 
-import {$$, click, getBrowserAndPages, getTestServerPort, goToResource, pressKey, waitFor, waitForFunction} from '../../shared/helper.js';
+import {expectError} from '../../conductor/events.js';
+import {
+  $$,
+  click,
+  getBrowserAndPages,
+  getTestServerPort,
+  goToResource,
+  pressKey,
+  waitFor,
+  waitForFunction,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {doubleClickSourceTreeItem, getFrameTreeTitles, getTrimmedTextContent, navigateToApplicationTab} from '../helpers/application-helpers.js';
+import {
+  doubleClickSourceTreeItem,
+  getFrameTreeTitles,
+  getTrimmedTextContent,
+  navigateToApplicationTab,
+} from '../helpers/application-helpers.js';
+import {setIgnoreListPattern} from '../helpers/settings-helpers.js';
 
 const TOP_FRAME_SELECTOR = '[aria-label="top"]';
 const WEB_WORKERS_SELECTOR = '[aria-label="Web Workers"]';
-const SERVICE_WORKERS_SELECTOR = '[aria-label="top"] ~ ol [aria-label="Service Workers"]';
+const SERVICE_WORKERS_SELECTOR = '[aria-label="top"] ~ ol [aria-label="Service workers"]';
 const OPENED_WINDOWS_SELECTOR = '[aria-label="Opened Windows"]';
 const IFRAME_FRAME_ID_SELECTOR = '[aria-label="frameId (iframe.html)"]';
 const MAIN_FRAME_SELECTOR = '[aria-label="frameId (main-frame.html)"]';
 const IFRAME_SELECTOR = '[aria-label="iframe.html"]';
 const EXPAND_STACKTRACE_BUTTON_SELECTOR = '.arrow-icon-button';
 const STACKTRACE_ROW_SELECTOR = '.stack-trace-row';
+const STACKTRACE_ROW_LINK_SELECTOR = '.stack-trace-row .link';
 const APPLICATION_PANEL_SELECTED_SELECTOR = '.tabbed-pane-header-tab.selected[aria-label="Application"]';
 
 const getTrailingURL = (text: string): string => {
@@ -38,6 +55,7 @@ declare global {
     iFrameWindow: Window|null|undefined;
   }
 }
+
 describe('The Application Tab', async () => {
   afterEach(async () => {
     const {target} = getBrowserAndPages();
@@ -87,6 +105,7 @@ describe('The Application Tab', async () => {
   });
 
   it('shows stack traces for OOPIF', async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     await goToResource('application/js-oopif.html');
     await ensureApplicationPanel();
     await waitForFunction(async () => {
@@ -105,11 +124,68 @@ describe('The Application Tab', async () => {
       return undefined;
     });
     const expected = [
-      'second\xA0@\xA0js-oopif.html:17',
-      'first\xA0@\xA0js-oopif.html:11',
-      '(anonymous)\xA0@\xA0js-oopif.html:20',
+      'second\xA0@\xA0js-oopif.html:13',
+      'first\xA0@\xA0js-oopif.js:3',
+      '(anonymous)\xA0@\xA0js-oopif.js:6',
     ];
     assert.deepEqual(stackTraceRowsTextContent, expected);
+  });
+
+  it('stack traces for OOPIF with ignore listed frames can be expanded and collapsed', async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
+    await setIgnoreListPattern('js-oopif.js');
+    await goToResource('application/js-oopif.html');
+    await ensureApplicationPanel();
+    await waitForFunction(async () => {
+      await doubleClickSourceTreeItem(TOP_FRAME_SELECTOR);
+      await doubleClickSourceTreeItem(IFRAME_SELECTOR);
+      return (await $$(EXPAND_STACKTRACE_BUTTON_SELECTOR)).length === 1;
+    });
+    let stackTraceRowsTextContent = await waitForFunction(async () => {
+      await ensureApplicationPanel();
+      await click(EXPAND_STACKTRACE_BUTTON_SELECTOR);
+      const stackTraceRows = await getTrimmedTextContent(STACKTRACE_ROW_SELECTOR);
+      // Make sure the length is equivalent to the expected value below
+      if (stackTraceRows.length === 2) {
+        return stackTraceRows;
+      }
+      return undefined;
+    });
+    const expectedCollapsed = [
+      'second\xA0@\xA0js-oopif.html:13',
+      'Show 2 more frames',
+    ];
+    assert.deepEqual(stackTraceRowsTextContent, expectedCollapsed);
+
+    // Expand all frames
+    await click(STACKTRACE_ROW_LINK_SELECTOR);
+    stackTraceRowsTextContent = await waitForFunction(async () => {
+      const stackTraceRows = await getTrimmedTextContent(STACKTRACE_ROW_SELECTOR);
+      // Make sure the length is equivalent to the expected value below
+      if (stackTraceRows.length === 4) {
+        return stackTraceRows;
+      }
+      return undefined;
+    });
+
+    const expectedFull = [
+      'second\xA0@\xA0js-oopif.html:13',
+      'first\xA0@\xA0js-oopif.js:3',
+      '(anonymous)\xA0@\xA0js-oopif.js:6',
+      'Show less',
+    ];
+    assert.deepEqual(stackTraceRowsTextContent, expectedFull);
+
+    await click(STACKTRACE_ROW_LINK_SELECTOR);
+    stackTraceRowsTextContent = await waitForFunction(async () => {
+      const stackTraceRows = await getTrimmedTextContent(STACKTRACE_ROW_SELECTOR);
+      // Make sure the length is equivalent to the expected value below
+      if (stackTraceRows.length === 2) {
+        return stackTraceRows;
+      }
+      return undefined;
+    });
+    assert.deepEqual(stackTraceRowsTextContent, expectedCollapsed);
   });
 
   it('shows details for opened windows in the frame tree', async () => {
@@ -146,6 +222,7 @@ describe('The Application Tab', async () => {
   });
 
   it('shows dedicated workers in the frame tree', async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     await goToResource('application/frame-tree.html');
     await click('#tab-resources');
@@ -174,6 +251,7 @@ describe('The Application Tab', async () => {
   });
 
   it('shows service workers in the frame tree', async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     await goToResource('application/service-worker-network.html');
     await click('#tab-resources');
     await doubleClickSourceTreeItem(TOP_FRAME_SELECTOR);
@@ -199,6 +277,7 @@ describe('The Application Tab', async () => {
 
   // Update and reactivate when the whole FrameDetailsView is a custom component
   it('can handle when JS writes to frame', async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     await goToResource('application/main-frame.html');
     await click('#tab-resources');

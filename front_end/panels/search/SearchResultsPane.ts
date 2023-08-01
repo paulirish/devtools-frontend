@@ -11,23 +11,23 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 import searchResultsPaneStyles from './searchResultsPane.css.js';
 
-import type {SearchConfig, SearchResult} from './SearchConfig.js';
+import {type SearchConfig, type SearchResult} from './SearchConfig.js';
 
 const UIStrings = {
   /**
-  *@description Accessibility label for number of matches in each file in search results pane
-  *@example {2} PH1
-  */
+   *@description Accessibility label for number of matches in each file in search results pane
+   *@example {2} PH1
+   */
   matchesCountS: 'Matches Count {PH1}',
   /**
-  *@description Search result label for results in the Search tool
-  *@example {2} PH1
-  */
+   *@description Search result label for results in the Search tool
+   *@example {2} PH1
+   */
   lineS: 'Line {PH1}',
   /**
-  *@description Text in Search Results Pane of the Search tab
-  *@example {2} PH1
-  */
+   *@description Text in Search Results Pane of the Search tab
+   *@example {2} PH1
+   */
   showDMore: 'Show {PH1} more',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/search/SearchResultsPane.ts', UIStrings);
@@ -85,7 +85,7 @@ export class SearchResultsPane extends UI.Widget.VBox {
     this.matchesExpandedCount += searchResult.matchesCount();
     this.treeElements.push(treeElement);
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.treeOutline.registerCSSFiles([searchResultsPaneStyles]);
   }
@@ -98,7 +98,7 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
   private searchConfig: SearchConfig;
   private searchResult: SearchResult;
   private initialized: boolean;
-  toggleOnClick: boolean;
+  override toggleOnClick: boolean;
 
   constructor(searchConfig: SearchConfig, searchResult: SearchResult) {
     super('', true);
@@ -108,7 +108,7 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
     this.toggleOnClick = true;
   }
 
-  onexpand(): void {
+  override onexpand(): void {
     if (this.initialized) {
       return;
     }
@@ -133,7 +133,7 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
     }
   }
 
-  onattach(): void {
+  override onattach(): void {
     this.updateSearchMatches();
   }
 
@@ -150,7 +150,7 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
     matchesCountSpan.className = 'search-result-matches-count';
 
     matchesCountSpan.textContent = `${this.searchResult.matchesCount()}`;
-    UI.ARIAUtils.setAccessibleName(
+    UI.ARIAUtils.setLabel(
         matchesCountSpan, i18nString(UIStrings.matchesCountS, {PH1: this.searchResult.matchesCount()}));
 
     this.listItemElement.appendChild(matchesCountSpan);
@@ -190,9 +190,9 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
       const resultLabel = searchResult.matchLabel(i);
       labelSpan.textContent = resultLabel;
       if (typeof resultLabel === 'number' && !isNaN(resultLabel)) {
-        UI.ARIAUtils.setAccessibleName(labelSpan, i18nString(UIStrings.lineS, {PH1: resultLabel}));
+        UI.ARIAUtils.setLabel(labelSpan, i18nString(UIStrings.lineS, {PH1: resultLabel}));
       } else {
-        UI.ARIAUtils.setAccessibleName(labelSpan, resultLabel);
+        UI.ARIAUtils.setLabel(labelSpan, resultLabel);
       }
       anchor.appendChild(labelSpan);
 
@@ -237,7 +237,7 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
     const contentSpan = document.createElement('span');
     contentSpan.className = 'search-match-content';
     contentSpan.textContent = lineContent;
-    UI.ARIAUtils.setAccessibleName(contentSpan, `${lineContent} line`);
+    UI.ARIAUtils.setLabel(contentSpan, `${lineContent} line`);
     UI.UIUtils.highlightRangesWithStyleClass(contentSpan, matchRanges, 'highlighted-search-result');
     return contentSpan;
   }

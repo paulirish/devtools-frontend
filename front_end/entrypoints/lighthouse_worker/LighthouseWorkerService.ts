@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as Root from '../../core/root/root.js';
-import * as Puppeteer from '../../services/puppeteer/puppeteer.js';
+import * as PuppeteerService from '../../services/puppeteer/puppeteer.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 
 function disableLoggingForTest(): void {
@@ -42,7 +42,7 @@ class LegacyPort {
 /**
  * ConnectionProxy is a SDK interface, but the implementation has no knowledge it's a parallelConnection.
  * The CDP traffic is smuggled back and forth by the system described in LighthouseProtocolService
-*/
+ */
 class ConnectionProxy implements SDK.Connections.ParallelConnectionInterface {
   sessionId: string;
   onMessage: ((arg0: Object) => void)|null;
@@ -97,8 +97,8 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
     notifyFrontendViaWorkerMessage('statusUpdate', {message: message[1]});
   });
 
-  let puppeteerConnection: Awaited<ReturnType<typeof Puppeteer.PuppeteerConnection['getPuppeteerConnection']>>|
-      undefined;
+  let puppeteerHandle: Awaited<ReturnType<
+      typeof PuppeteerService.PuppeteerConnection.PuppeteerConnectionHelper['connectPuppeteerToConnection']>>|undefined;
 
   try {
     // For timespan we only need to perform setup on startTimespan.
@@ -118,8 +118,14 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
     flags.channel = 'devtools';
     flags.locale = locale;
 
+    // TODO: Remove this filter once pubads is mode restricted
+    // https://github.com/googleads/publisher-ads-lighthouse-plugin/pull/339
+    if (action === 'startTimespan' || action === 'snapshot') {
+      args.categoryIDs = args.categoryIDs.filter((c: string) => c !== 'lighthouse-plugin-publisher-ads');
+    }
+
     // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
-    const config = self.createConfig(args.categoryIDs, flags.emulatedFormFactor);
+    const config = args.config || self.createConfig(args.categoryIDs, flags.formFactor);
     const url = args.url;
 
     // Handle legacy Lighthouse runner path.
@@ -130,33 +136,45 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
       return await self.runLighthouse(url, flags, config, connection);
     }
 
-    const {mainTargetId, mainFrameId, mainSessionId} = args.target;
+    const {mainFrameId, mainSessionId, targetInfos} = args;
     cdpConnection = new ConnectionProxy(mainSessionId);
-    puppeteerConnection =
-        await Puppeteer.PuppeteerConnection.getPuppeteerConnection(cdpConnection, mainFrameId, mainTargetId);
-    const {page} = puppeteerConnection;
-    const configContext = {
-      logLevel: flags.logLevel,
-      settingsOverrides: {
-        channel: flags.channel,
-        locale: flags.locale,
+    puppeteerHandle = await PuppeteerService.PuppeteerConnection.PuppeteerConnectionHelper.connectPuppeteerToConnection({
+      connection: cdpConnection,
+      mainFrameId,
+      targetInfos,
+      // For the most part, defer to Lighthouse for which targets are important.
+      // Excluding devtools targets is required for e2e tests to work, and LH doesn't support auditing DT targets anyway.
+      targetFilterCallback: targetInfo => {
+        if (targetInfo.url.startsWith('https://i0.devtools-frontend') || targetInfo.url.startsWith('devtools://')) {
+          return false;
+        }
+        // TODO only connect to iframes that are related to the main target. This requires refactoring in Puppeteer: https://github.com/puppeteer/puppeteer/issues/3667.
+        return (
+            targetInfo.targetId === mainFrameId || targetInfo.openerId === mainFrameId || targetInfo.type === 'iframe');
       },
-    };
+      // Lighthouse can only audit normal pages.
+      isPageTargetCallback: targetInfo => targetInfo.type === 'page',
+    });
+
+    const {page} = puppeteerHandle;
+    if (!page) {
+      throw new Error('Could not create page handle for the target page');
+    }
 
     if (action === 'snapshot') {
       // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
-      return await self.runLighthouseSnapshot({config, page, configContext});
+      return await self.snapshot(page, {config, flags});
     }
 
     if (action === 'startTimespan') {
       // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
-      const timespan = await self.startLighthouseTimespan({config, page, configContext});
+      const timespan = await self.startTimespan(page, {config, flags});
       endTimespan = timespan.endTimespan;
       return;
     }
 
     // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
-    return await self.runLighthouseNavigation(url, {config, page, configContext});
+    return await self.navigation(page, url, {config, flags});
   } catch (err) {
     return ({
       fatal: true,
@@ -166,7 +184,7 @@ async function invokeLH(action: string, args: any): Promise<unknown> {
   } finally {
     // endTimespan will need to use the same connection as startTimespan.
     if (action !== 'startTimespan') {
-      puppeteerConnection?.browser.disconnect();
+      puppeteerHandle?.browser.disconnect();
     }
   }
 }
@@ -216,25 +234,35 @@ async function fetchLocaleData(locales: string[]): Promise<string|void> {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function notifyFrontendViaWorkerMessage(action: string, args: any): void {
-  self.postMessage(JSON.stringify({action, args}));
+  self.postMessage({action, args});
 }
 
 async function onFrontendMessage(event: MessageEvent): Promise<void> {
-  const messageFromFrontend = JSON.parse(event.data);
+  const messageFromFrontend = event.data;
   switch (messageFromFrontend.action) {
     case 'startTimespan':
     case 'endTimespan':
     case 'snapshot':
     case 'navigation': {
       const result = await invokeLH(messageFromFrontend.action, messageFromFrontend.args);
-      self.postMessage(JSON.stringify({id: messageFromFrontend.id, result}));
+      if (result && typeof result === 'object') {
+        // Report isn't used upstream.
+        if ('report' in result) {
+          delete result.report;
+        }
+
+        // Logger PerformanceTiming objects cannot be cloned by this worker's `postMessage` function.
+        if ('artifacts' in result) {
+          // @ts-expect-error
+          result.artifacts.Timing = JSON.parse(JSON.stringify(result.artifacts.Timing));
+        }
+      }
+      self.postMessage({id: messageFromFrontend.id, result});
       break;
     }
     case 'dispatchProtocolMessage': {
-      cdpConnection?.onMessage?.(
-          JSON.parse(messageFromFrontend.args.message),
-      );
-      legacyPort.onMessage?.(messageFromFrontend.args.message);
+      cdpConnection?.onMessage?.(messageFromFrontend.args.message);
+      legacyPort.onMessage?.(JSON.stringify(messageFromFrontend.args.message));
       break;
     }
     default: {

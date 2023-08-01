@@ -4,6 +4,7 @@
   },
   "files": [
     "codemirror.next.js",
+    "chunk/angular.js",
     "chunk/codemirror.js",
     "chunk/cpp.js",
     "chunk/css.js",
@@ -15,6 +16,8 @@
     "chunk/markdown.js",
     "chunk/php.js",
     "chunk/python.js",
+    "chunk/svelte.js",
+    "chunk/vue.js",
     "chunk/wast.js",
     "chunk/xml.js"
   ]

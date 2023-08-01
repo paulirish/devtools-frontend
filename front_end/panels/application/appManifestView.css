@@ -19,6 +19,7 @@
 
 .inline-icon {
   margin-left: 4px;
+  margin-right: 4px;
   vertical-align: middle;
 }
 
@@ -26,6 +27,6 @@
   white-space: normal;
 }
 
-.learn-more {
-  padding-left: 4px;
+.inline-icon:focus-visible {
+  outline-width: unset;
 }

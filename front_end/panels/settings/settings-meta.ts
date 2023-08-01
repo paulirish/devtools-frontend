@@ -44,12 +44,12 @@ const UIStrings = {
    */
   showIgnoreList: 'Show Ignore List',
   /**
-  *@description Name of the Settings view
-  */
+   *@description Name of the Settings view
+   */
   settings: 'Settings',
   /**
    *@description Text for the documentation of something
-  */
+   */
   documentation: 'Documentation',
 };
 
@@ -188,7 +188,7 @@ UI.ActionRegistration.registerActionExtension({
 
 UI.ViewManager.registerLocationResolver({
   name: UI.ViewManager.ViewLocationValues.SETTINGS_VIEW,
-  category: UI.ViewManager.ViewLocationCategoryValues.SETTINGS,
+  category: UI.ViewManager.ViewLocationCategory.SETTINGS,
   async loadResolver() {
     const Settings = await loadSettingsModule();
     return Settings.SettingsScreen.SettingsScreen.instance();
@@ -199,6 +199,7 @@ Common.Revealer.registerRevealer({
   contextTypes() {
     return [
       Common.Settings.Setting,
+      Root.Runtime.Experiment,
     ];
   },
   async loadRevealer() {

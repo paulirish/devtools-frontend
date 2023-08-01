@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {$, $$, click, getBrowserAndPages, goToResource, waitFor, waitForFunction} from '../../shared/helper.js';
 
@@ -14,8 +14,15 @@ export async function navigateToApplicationTab(target: puppeteer.Page, testName:
 }
 
 export async function navigateToServiceWorkers() {
-  const SERVICE_WORKER_ROW_SELECTOR = '[aria-label="Service Workers"]';
+  const SERVICE_WORKER_ROW_SELECTOR = '[aria-label="Service workers"]';
   await click(SERVICE_WORKER_ROW_SELECTOR);
+}
+
+export async function navigateToManifestInApplicationTab(testName: string) {
+  const MANIFEST_SELECTOR = '[aria-label="Manifest"]';
+  const {target} = getBrowserAndPages();
+  await navigateToApplicationTab(target, testName);
+  await click(MANIFEST_SELECTOR);
 }
 
 export async function doubleClickSourceTreeItem(selector: string) {
@@ -71,6 +78,26 @@ export async function clearStorageItems() {
   await click('#storage-items-delete-all');
 }
 
+export async function selectStorageItemAtIndex(index: number) {
+  await waitForFunction(async () => {
+    try {
+      const dataGridNodes = await $$('.storage-view .data-grid-data-grid-node:not(.creation-node)');
+      await dataGridNodes[index].click();
+    } catch (error) {
+      if (error.message === 'Node is detached from document') {
+        return false;
+      }
+      throw error;
+    }
+    return true;
+  });
+}
+
+export async function deleteSelectedStorageItem() {
+  await waitFor('[aria-label="Delete Selected"]');
+  await click('[aria-label="Delete Selected"]');
+}
+
 export async function selectCookieByName(name: string) {
   const {frontend} = getBrowserAndPages();
   await waitFor('.cookies-table');
@@ -82,25 +109,30 @@ export async function selectCookieByName(name: string) {
       return result ? result.cell : undefined;
     }, name);
 
-    return tmp.asElement() || undefined;
+    return tmp.asElement() as puppeteer.ElementHandle<HTMLElement>|| undefined;
   });
   await cell.click();
 }
 
 export async function waitForQuotaUsage(p: (quota: number) => boolean) {
   await waitForFunction(async () => {
-    const storageRow = await waitFor('.quota-usage-row');
-    const quotaString = await storageRow.evaluate(el => el.textContent || '');
-    const [usedQuotaText, modifier] =
-        quotaString.replace(/^\D*([\d.]+)\D*(kM?)B.used.out.of\D*\d+\D*.?B.*$/, '$1 $2').split(' ');
-    let usedQuota = Number.parseInt(usedQuotaText, 10);
-    if (modifier === 'k') {
-      usedQuota *= 1000;
-    } else if (modifier === 'M') {
-      usedQuota *= 1000000;
-    }
+    const usedQuota = await getQuotaUsage();
     return p(usedQuota);
   });
+}
+
+export async function getQuotaUsage() {
+  const storageRow = await waitFor('.quota-usage-row');
+  const quotaString = await storageRow.evaluate(el => el.textContent || '');
+  const [usedQuotaText, modifier] =
+      quotaString.replace(/^\D*([\d.]+)\D*(kM?)B.used.out.of\D*\d+\D*.?B.*$/, '$1 $2').split(' ');
+  let usedQuota = Number.parseInt(usedQuotaText, 10);
+  if (modifier === 'k') {
+    usedQuota *= 1000;
+  } else if (modifier === 'M') {
+    usedQuota *= 1000000;
+  }
+  return usedQuota;
 }
 
 export async function getPieChartLegendRows() {

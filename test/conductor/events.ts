@@ -11,7 +11,8 @@
 
 // use require here due to
 // https://github.com/evanw/esbuild/issues/587#issuecomment-901397213
-import puppeteer = require('puppeteer');
+import puppeteer = require('puppeteer-core');
+const path = require('path');
 
 const ALLOWED_ASSERTION_FAILURES = [
   // Failure during shutdown. crbug.com/1145969
@@ -32,6 +33,7 @@ const ALLOWED_ASSERTION_FAILURES = [
   // See: https://crbug.com/1192052
   'Request Runtime.evaluate failed. {"code":-32602,"message":"uniqueContextId not found"}',
   'uniqueContextId not found',
+  'Request Storage.getStorageKeyForFrame failed. {"code":-32602,"message":"Frame tree node for given frame not found"}',
 ];
 
 const logLevels = {
@@ -86,6 +88,9 @@ export function installPageErrorHandlers(page: puppeteer.Page): void {
   });
 
   page.on('pageerror', error => {
+    if (error.message.includes(path.join('ui', 'components', 'docs'))) {
+      uiComponentDocErrors.push(error);
+    }
     throw new Error(`Page error in Frontend: ${error}`);
   });
 
@@ -95,7 +100,7 @@ export function installPageErrorHandlers(page: puppeteer.Page): void {
       if (logLevel === 'E') {
         let message = `${logLevel}> `;
         if (msg.text() === 'JSHandle@error') {
-          const errorHandle: puppeteer.JSHandle<Error> = msg.args()[0];
+          const errorHandle = msg.args()[0] as puppeteer.JSHandle<Error>;
           message += await errorHandle.evaluate(error => {
             return error.stack;
           });
@@ -138,6 +143,12 @@ export class ErrorExpectation {
   readonly #msg: string|RegExp;
   constructor(msg: string|RegExp) {
     this.#msg = msg;
+    pendingErrorExpectations.add(this);
+  }
+
+  drop() {
+    pendingErrorExpectations.delete(this);
+    return this.#caught;
   }
 
   get caught() {
@@ -155,9 +166,7 @@ export class ErrorExpectation {
 }
 
 export function expectError(msg: string|RegExp) {
-  const expectation = new ErrorExpectation(msg);
-  pendingErrorExpectations.add(expectation);
-  return expectation;
+  return new ErrorExpectation(msg);
 }
 
 function formatStackFrame(stackFrame: puppeteer.ConsoleMessageLocation): string {
@@ -174,8 +183,16 @@ export function dumpCollectedErrors(): void {
   if (fatalErrors.length) {
     throw new Error('Fatal errors logged:\n' + fatalErrors.join('\n'));
   }
+  if (uiComponentDocErrors.length) {
+    console.log(
+        '\nErrors from component examples during test run:\n', uiComponentDocErrors.map(e => e.message).join('\n  '));
+  }
 }
 
 const pendingErrorExpectations = new Set<ErrorExpectation>();
 export const fatalErrors: string[] = [];
 export const expectedErrors: string[] = [];
+// Gathered separately so we can surface them during screenshot tests to help
+// give an idea of failures, rather than having to guess purely based on the
+// screenshot.
+export const uiComponentDocErrors: Error[] = [];

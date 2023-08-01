@@ -41,10 +41,10 @@
 .style-panes-wrapper {
   overflow: hidden scroll;
   background-color: var(--color-background);
-}
 
-.style-panes-wrapper > div:not(:last-child) {
-  border-bottom: 1px solid var(--color-details-hairline);
+  & > div:not(:last-child) {
+    border-bottom: 1px solid var(--sys-color-divider);
+  }
 }
 
 #elements-content:not(.elements-wrap) > div {
@@ -53,25 +53,10 @@
 }
 
 #elements-crumbs {
-  background-color: var(--color-background);
-  border-top: 1px solid var(--color-details-hairline);
+  background-color: var(--sys-color-cdt-base-container);
+  border-top: 1px solid var(--sys-color-divider);
   overflow: hidden;
   width: 100%;
-}
-
-.elements-tree-header {
-  height: 24px;
-  border-top: 1px solid var(--color-details-hairline);
-  border-bottom: 1px solid var(--color-details-hairline);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.elements-tree-header-frame {
-  margin-left: 6px;
-  margin-right: 6px;
-  flex: none;
 }
 
 devtools-adorner-settings-pane {

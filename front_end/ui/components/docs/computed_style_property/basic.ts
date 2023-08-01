@@ -10,19 +10,10 @@ await FrontendHelpers.initializeGlobalVars();
 
 const component = new Elements.ComputedStyleProperty.ComputedStyleProperty();
 
-const propertyName = document.createElement('span');
-propertyName.textContent = 'display';
-propertyName.slot = 'property-name';
-component.appendChild(propertyName);
-
-const propertyValue = document.createElement('span');
-propertyValue.textContent = 'block';
-propertyValue.slot = 'property-value';
-component.appendChild(propertyValue);
-
 document.getElementById('container')?.appendChild(component);
-component.data = {
-  inherited: true,
-  traceable: false,
-  onNavigateToSource: (): void => {},
-};
+component.innerHTML = `
+<span slot="name">display</span>
+<span slot="value">block</span>
+  `;
+component.traceable = false;
+component.inherited = true;

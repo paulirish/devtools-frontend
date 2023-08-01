@@ -5,13 +5,13 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as Deprecation from '../../generated/Deprecation.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
-import {resolveLazyDescription} from './MarkdownIssueDescription.js';
+
+import {resolveLazyDescription, type MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
-  // Store strings used across messages in this block.
   /**
    * @description This links to the chrome feature status page when one exists.
    */
@@ -22,31 +22,25 @@ const UIStrings = {
    */
   milestone: 'This change will go into effect with milestone {milestone}.',
   /**
-   *@description Title of issue raised when a deprecated feature is used
+   * @description Title of issue raised when a deprecated feature is used
    */
   title: 'Deprecated Feature Used',
-
-  // Store alphabetized messages per DeprecationIssueType in this block.
-  /**
-   *@description This message is shown when the example deprecated feature is used
-   */
-  deprecationExample: 'This is an example of a translated deprecation issue message.',
 };
+
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/DeprecationIssue.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
+
+// eslint-disable-next-line rulesdir/l10n_filename_matches
+const strDeprecation = i18n.i18n.registerUIStrings('generated/Deprecation.ts', Deprecation.UIStrings);
+const i18nLazyDeprecationString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, strDeprecation);
 
 export class DeprecationIssue extends Issue {
   #issueDetails: Protocol.Audits.DeprecationIssueDetails;
 
   constructor(issueDetails: Protocol.Audits.DeprecationIssueDetails, issuesModel: SDK.IssuesModel.IssuesModel) {
-    let typeCode = String(issueDetails.type);
-    // TODO(crbug.com/1264960): Remove legacy type when issues are translated.
-    if (issueDetails.type === Protocol.Audits.DeprecationIssueType.Untranslated) {
-      typeCode = String(issueDetails.deprecationType);
-    }
     const issueCode = [
       Protocol.Audits.InspectorIssueCode.DeprecationIssue,
-      typeCode,
+      issueDetails.type,
     ].join('::');
     super({code: issueCode, umaCode: 'DeprecationIssue'}, issuesModel);
     this.#issueDetails = issueDetails;
@@ -62,27 +56,21 @@ export class DeprecationIssue extends Issue {
 
   getDescription(): MarkdownIssueDescription {
     let messageFunction = (): string => '';
-    let feature = 0;
-    let milestone = 0;
-    // Keep case statements alphabetized per DeprecationIssueType.
-    switch (this.#issueDetails.type) {
-      case Protocol.Audits.DeprecationIssueType.DeprecationExample:
-        messageFunction = i18nLazyString(UIStrings.deprecationExample);
-        feature = 5684289032159232;
-        milestone = 100;
-        break;
-      // TODO(crbug.com/1264960): Remove legacy type when issues are translated.
-      case Protocol.Audits.DeprecationIssueType.Untranslated:
-        messageFunction = (): string => this.#issueDetails.message ?? '';
-        break;
+    const maybeEnglishMessage = (Deprecation.UIStrings as Record<string, string>)[this.#issueDetails.type];
+    if (maybeEnglishMessage) {
+      messageFunction = i18nLazyDeprecationString(maybeEnglishMessage);
     }
+
     const links = [];
+    const deprecationMeta = Deprecation.DEPRECATIONS_METADATA[this.#issueDetails.type];
+    const feature = deprecationMeta?.chromeStatusFeature ?? 0;
     if (feature !== 0) {
       links.push({
         link: `https://chromestatus.com/feature/${feature}`,
         linkTitle: i18nLazyString(UIStrings.feature),
       });
     }
+    const milestone = deprecationMeta?.milestone ?? 0;
     if (milestone !== 0) {
       links.push({
         link: 'https://chromiumdash.appspot.com/schedule',
@@ -99,7 +87,7 @@ export class DeprecationIssue extends Issue {
     });
   }
 
-  sources(): Iterable<Protocol.Audits.SourceCodeLocation> {
+  override sources(): Iterable<Protocol.Audits.SourceCodeLocation> {
     if (this.#issueDetails.sourceCodeLocation) {
       return [this.#issueDetails.sourceCodeLocation];
     }
@@ -119,16 +107,6 @@ export class DeprecationIssue extends Issue {
     const details = inspectorIssue.details.deprecationIssueDetails;
     if (!details) {
       console.warn('Deprecation issue without details received.');
-      return [];
-    }
-    if (details.type !== Protocol.Audits.DeprecationIssueType.Untranslated &&
-        (details.deprecationType || details.message)) {
-      console.warn('Translated deprecation issue with malformed details received.');
-      return [];
-    }
-    if (details.type === Protocol.Audits.DeprecationIssueType.Untranslated &&
-        (!details.deprecationType || !details.message)) {
-      console.warn('Untranslated deprecation issue with malformed details received.');
       return [];
     }
     return [new DeprecationIssue(details, issuesModel)];

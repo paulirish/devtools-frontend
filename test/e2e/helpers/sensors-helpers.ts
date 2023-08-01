@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 import {selectOption, waitFor, waitForMany} from '../../shared/helper.js';
-import type {ElementHandle} from 'puppeteer';
+import {type ElementHandle} from 'puppeteer-core';
 
 export async function setCustomOrientation() {
   const dropDown = await waitFor('.orientation-fields select');
-  void selectOption(dropDown, 'custom');
+  void selectOption(await dropDown.toElement('select'), 'custom');
 }
 
 export async function getInputFieldValue(field: ElementHandle<Element>): Promise<string> {

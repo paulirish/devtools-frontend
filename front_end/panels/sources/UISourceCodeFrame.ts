@@ -29,11 +29,12 @@
  */
 
 import * as Common from '../../core/common/common.js';
-import * as Platform from '../../core/platform/platform.js';
+import * as Host from '../../core/host/host.js';
 import * as Root from '../../core/root/root.js';
+import * as FormatterActions from '../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line rulesdir/es_modules_import
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Persistence from '../../models/persistence/persistence.js';
-import type * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
@@ -44,10 +45,9 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {CoveragePlugin} from './CoveragePlugin.js';
 import {CSSPlugin} from './CSSPlugin.js';
 import {DebuggerPlugin} from './DebuggerPlugin.js';
+import {type Plugin} from './Plugin.js';
 import {MemoryProfilePlugin, PerformanceProfilePlugin} from './ProfilePlugin.js';
-import {JavaScriptCompilerPlugin} from './JavaScriptCompilerPlugin.js';
-import type {Plugin} from './Plugin.js';
-import {ScriptOriginPlugin} from './ScriptOriginPlugin.js';
+import {ResourceOriginPlugin} from './ResourceOriginPlugin.js';
 import {SnippetsPlugin} from './SnippetsPlugin.js';
 import {SourcesPanel} from './SourcesPanel.js';
 
@@ -57,9 +57,8 @@ function sourceFramePlugins(): (typeof Plugin)[] {
   return [
     CSSPlugin,
     DebuggerPlugin,
-    JavaScriptCompilerPlugin,
     SnippetsPlugin,
-    ScriptOriginPlugin,
+    ResourceOriginPlugin,
     CoveragePlugin,
     MemoryProfilePlugin,
     PerformanceProfilePlugin,
@@ -79,9 +78,10 @@ export class UISourceCodeFrame extends
   // recreated when the binding changes
   private plugins: Plugin[] = [];
   private readonly errorPopoverHelper: UI.PopoverHelper.PopoverHelper;
+  #sourcesPanelOpenedMetricsRecorded = false;
 
   constructor(uiSourceCode: Workspace.UISourceCode.UISourceCode) {
-    super(workingCopy);
+    super(() => this.workingCopy());
     this.uiSourceCodeInternal = uiSourceCode;
 
     this.muteSourceCodeEvents = false;
@@ -104,30 +104,30 @@ export class UISourceCodeFrame extends
     this.errorPopoverHelper.setTimeout(100, 100);
 
     this.initializeUISourceCode();
-
-    async function workingCopy(): Promise<TextUtils.ContentProvider.DeferredContent> {
-      if (uiSourceCode.isDirty()) {
-        return {content: uiSourceCode.workingCopy(), isEncoded: false};
-      }
-      return uiSourceCode.requestContent();
-    }
   }
 
-  protected editorConfiguration(doc: string): CodeMirror.Extension {
+  private async workingCopy(): Promise<TextUtils.ContentProvider.DeferredContent> {
+    if (this.uiSourceCodeInternal.isDirty()) {
+      return {content: this.uiSourceCodeInternal.workingCopy(), isEncoded: false};
+    }
+    return this.uiSourceCodeInternal.requestContent();
+  }
+
+  protected override editorConfiguration(doc: string): CodeMirror.Extension {
     return [
       super.editorConfiguration(doc),
-      rowMessages([...this.allMessages()]),
+      rowMessages(this.allMessages()),
       // Inject editor extensions from plugins
       pluginCompartment.of(this.plugins.map(plugin => plugin.editorExtension())),
     ];
   }
 
-  protected onFocus(): void {
+  protected override onFocus(): void {
     super.onFocus();
     UI.Context.Context.instance().setFlavor(UISourceCodeFrame, this);
   }
 
-  protected onBlur(): void {
+  protected override onBlur(): void {
     super.onBlur();
     UI.Context.Context.instance().setFlavor(UISourceCodeFrame, null);
   }
@@ -165,14 +165,14 @@ export class UISourceCodeFrame extends
   setUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
     const loaded = uiSourceCode.contentLoaded() ? Promise.resolve() : uiSourceCode.requestContent();
     const startUISourceCode = this.uiSourceCodeInternal;
-    loaded.then(() => {
+    loaded.then(async () => {
       if (this.uiSourceCodeInternal !== startUISourceCode) {
         return;
       }
       this.unloadUISourceCode();
       this.uiSourceCodeInternal = uiSourceCode;
       if (uiSourceCode.workingCopy() !== this.textEditor.state.doc.toString()) {
-        void this.setContent(uiSourceCode.workingCopy());
+        await this.setDeferredContent(Promise.resolve(uiSourceCode.workingCopyContent()));
       } else {
         this.reloadPlugins();
       }
@@ -201,18 +201,20 @@ export class UISourceCodeFrame extends
         this.uiSourceCodeInternal, this.boundOnBindingChanged);
     this.installMessageAndDecorationListeners();
     this.updateStyle();
-    if (Root.Runtime.experiments.isEnabled('sourcesPrettyPrint')) {
-      const supportedPrettyTypes = new Set<string>(['text/html', 'text/css', 'text/javascript']);
-      this.setCanPrettyPrint(supportedPrettyTypes.has(this.contentType), true);
-    }
+    const canPrettyPrint = FormatterActions.FORMATTABLE_MEDIA_TYPES.includes(this.contentType) &&
+        !this.uiSourceCodeInternal.project().canSetFileContent() &&
+        Persistence.Persistence.PersistenceImpl.instance().binding(this.uiSourceCodeInternal) === null;
+    const autoPrettyPrint = Root.Runtime.experiments.isEnabled('sourcesPrettyPrint') &&
+        !this.uiSourceCodeInternal.contentType().isFromSourceMap();
+    this.setCanPrettyPrint(canPrettyPrint, autoPrettyPrint);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.setEditable(this.canEditSourceInternal());
   }
 
-  willHide(): void {
+  override willHide(): void {
     for (const plugin of this.plugins) {
       plugin.willHide();
     }
@@ -221,9 +223,10 @@ export class UISourceCodeFrame extends
     this.uiSourceCodeInternal.removeWorkingCopyGetter();
   }
 
-  protected getContentType(): string {
+  protected override getContentType(): string {
     const binding = Persistence.Persistence.PersistenceImpl.instance().binding(this.uiSourceCodeInternal);
-    return binding ? binding.network.mimeType() : this.uiSourceCodeInternal.mimeType();
+    const mimeType = binding ? binding.network.mimeType() : this.uiSourceCodeInternal.mimeType();
+    return Common.ResourceType.ResourceType.simplifyContentType(mimeType);
   }
 
   canEditSourceInternal(): boolean {
@@ -270,26 +273,30 @@ export class UISourceCodeFrame extends
     this.muteSourceCodeEvents = false;
   }
 
-  async setContent(content: string): Promise<void> {
+  override async setContent(content: string): Promise<void> {
     this.disposePlugins();
     this.loadPlugins();
     await super.setContent(content);
     for (const plugin of this.plugins) {
       plugin.editorInitialized(this.textEditor);
     }
+    this.#recordSourcesPanelOpenedMetrics();
     Common.EventTarget.fireEvent('source-file-loaded', this.uiSourceCodeInternal.displayName(true));
   }
 
-  private allMessages(): Set<Workspace.UISourceCode.Message> {
-    if (this.persistenceBinding) {
-      const combinedSet = this.persistenceBinding.network.messages();
-      Platform.SetUtilities.addAll(combinedSet, this.persistenceBinding.fileSystem.messages());
-      return combinedSet;
-    }
-    return this.uiSourceCodeInternal.messages();
+  private createMessage(origin: Workspace.UISourceCode.Message): RowMessage {
+    const {lineNumber, columnNumber} = this.uiLocationToEditorLocation(origin.lineNumber(), origin.columnNumber());
+    return new RowMessage(origin, lineNumber, columnNumber);
   }
 
-  onTextChanged(): void {
+  private allMessages(): RowMessage[] {
+    const origins = this.persistenceBinding !== null ?
+        [...this.persistenceBinding.network.messages(), ...this.persistenceBinding.fileSystem.messages()] :
+        [...this.uiSourceCodeInternal.messages()];
+    return origins.map(origin => this.createMessage(origin));
+  }
+
+  override onTextChanged(): void {
     const wasPretty = this.pretty;
     super.onTextChanged();
     this.errorPopoverHelper.hidePopover();
@@ -298,7 +305,7 @@ export class UISourceCodeFrame extends
     if (this.isClean()) {
       this.uiSourceCodeInternal.resetWorkingCopy();
     } else {
-      this.uiSourceCodeInternal.setWorkingCopyGetter(() => this.textEditor.state.doc.toString());
+      this.uiSourceCodeInternal.setWorkingCopyGetter(() => this.textEditor.state.sliceDoc());
     }
     this.muteSourceCodeEvents = false;
     if (wasPretty !== this.pretty) {
@@ -311,12 +318,12 @@ export class UISourceCodeFrame extends
     if (this.muteSourceCodeEvents) {
       return;
     }
-    this.maybeSetContent(this.uiSourceCodeInternal.workingCopy());
+    this.maybeSetContent(this.uiSourceCodeInternal.workingCopyContent());
   }
 
   private onWorkingCopyCommitted(): void {
     if (!this.muteSourceCodeEvents) {
-      this.maybeSetContent(this.uiSourceCode().workingCopy());
+      this.maybeSetContent(this.uiSourceCode().workingCopyContent());
     }
     this.contentCommitted();
     this.updateStyle();
@@ -369,7 +376,7 @@ export class UISourceCodeFrame extends
   }
 
   private reloadMessages(): void {
-    const messages = [...this.allMessages()];
+    const messages = this.allMessages();
     const {editor} = this.textEditor;
     editor.dispatch({effects: setRowMessages.of(RowMessages.create(messages))});
   }
@@ -378,13 +385,13 @@ export class UISourceCodeFrame extends
     this.setEditable(this.canEditSourceInternal());
   }
 
-  private maybeSetContent(content: string): void {
-    if (this.textEditor.state.doc.toString() !== content) {
-      void this.setContent(content);
+  private maybeSetContent(content: TextUtils.ContentProvider.DeferredContent): void {
+    if (this.textEditor.state.doc.toString() !== content.content) {
+      void this.setDeferredContent(Promise.resolve(content));
     }
   }
 
-  protected populateTextAreaContextMenu(
+  protected override populateTextAreaContextMenu(
       contextMenu: UI.ContextMenu.ContextMenu, lineNumber: number, columnNumber: number): void {
     super.populateTextAreaContextMenu(contextMenu, lineNumber, columnNumber);
     contextMenu.appendApplicableItems(this.uiSourceCodeInternal);
@@ -396,7 +403,7 @@ export class UISourceCodeFrame extends
     }
   }
 
-  protected populateLineGutterContextMenu(contextMenu: UI.ContextMenu.ContextMenu, lineNumber: number): void {
+  protected override populateLineGutterContextMenu(contextMenu: UI.ContextMenu.ContextMenu, lineNumber: number): void {
     super.populateLineGutterContextMenu(contextMenu, lineNumber);
     for (const plugin of this.plugins) {
       plugin.populateLineGutterContextMenu(contextMenu, lineNumber);
@@ -417,14 +424,16 @@ export class UISourceCodeFrame extends
   private onMessageAdded(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.Message>): void {
     const {editor} = this.textEditor, shownMessages = editor.state.field(showRowMessages, false);
     if (shownMessages) {
-      editor.dispatch({effects: setRowMessages.of(shownMessages.messages.add(event.data))});
+      const message = this.createMessage(event.data);
+      editor.dispatch({effects: setRowMessages.of(shownMessages.messages.add(message))});
     }
   }
 
   private onMessageRemoved(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.Message>): void {
     const {editor} = this.textEditor, shownMessages = editor.state.field(showRowMessages, false);
     if (shownMessages) {
-      editor.dispatch({effects: setRowMessages.of(shownMessages.messages.remove(event.data))});
+      const message = this.createMessage(event.data);
+      editor.dispatch({effects: setRowMessages.of(shownMessages.messages.remove(message))});
     }
   }
 
@@ -434,12 +443,12 @@ export class UISourceCodeFrame extends
     }
   }
 
-  async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
+  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
     const leftToolbarItems = await super.toolbarItems();
     const rightToolbarItems = [];
     for (const plugin of this.plugins) {
       leftToolbarItems.push(...plugin.leftToolbarItems());
-      rightToolbarItems.push(...await plugin.rightToolbarItems());
+      rightToolbarItems.push(...plugin.rightToolbarItems());
     }
 
     if (!rightToolbarItems.length) {
@@ -500,19 +509,36 @@ export class UISourceCodeFrame extends
       },
     };
   }
+
+  /**
+   * Only records metrics once per UISourceCodeFrame instance and must only be
+   * called once the content of the UISourceCode is available.
+   */
+  #recordSourcesPanelOpenedMetrics(): void {
+    if (this.#sourcesPanelOpenedMetricsRecorded) {
+      return;
+    }
+    this.#sourcesPanelOpenedMetricsRecorded = true;
+
+    const mimeType = Common.ResourceType.ResourceType.mimeFromURL(this.uiSourceCodeInternal.url());
+    const mediaType = Common.ResourceType.ResourceType.mediaTypeForMetrics(
+        mimeType ?? '', this.uiSourceCodeInternal.contentType().isFromSourceMap(),
+        TextUtils.TextUtils.isMinified(this.uiSourceCodeInternal.content()));
+    Host.userMetrics.sourcesPanelFileOpened(mediaType);
+  }
 }
 
 function getIconDataForLevel(level: Workspace.UISourceCode.Message.Level): IconButton.Icon.IconData {
   if (level === Workspace.UISourceCode.Message.Level.Error) {
-    return {color: '', width: '12px', height: '12px', iconName: 'error_icon'};
+    return {color: 'var(--icon-error)', width: '16px', height: '14px', iconName: 'cross-circle-filled'};
   }
   if (level === Workspace.UISourceCode.Message.Level.Warning) {
-    return {color: '', width: '12px', height: '12px', iconName: 'warning_icon'};
+    return {color: 'var(--icon-warning)', width: '18px', height: '14px', iconName: 'warning-filled'};
   }
   if (level === Workspace.UISourceCode.Message.Level.Issue) {
-    return {color: 'var(--issue-color-yellow)', width: '12px', height: '12px', iconName: 'issue-exclamation-icon'};
+    return {color: 'var(--icon-warning)', width: '17px', height: '14px', iconName: 'issue-exclamation-filled'};
   }
-  return {color: '', width: '12px', height: '12px', iconName: 'error_icon'};
+  return {color: 'var(--icon-error)', width: '16px', height: '14px', iconName: 'cross-circle-filled'};
 }
 
 function getBubbleTypePerLevel(level: Workspace.UISourceCode.Message.Level): string {
@@ -526,7 +552,7 @@ function getBubbleTypePerLevel(level: Workspace.UISourceCode.Message.Level): str
   }
 }
 
-function messageLevelComparator(a: Workspace.UISourceCode.Message, b: Workspace.UISourceCode.Message): number {
+function messageLevelComparator(a: RowMessage, b: RowMessage): number {
   const messageLevelPriority = {
     [Workspace.UISourceCode.Message.Level.Issue]: 2,
     [Workspace.UISourceCode.Message.Level.Warning]: 3,
@@ -535,10 +561,10 @@ function messageLevelComparator(a: Workspace.UISourceCode.Message, b: Workspace.
   return messageLevelPriority[a.level()] - messageLevelPriority[b.level()];
 }
 
-function getIconDataForMessage(message: Workspace.UISourceCode.Message): IconButton.Icon.IconData {
-  if (message instanceof IssuesManager.SourceFrameIssuesManager.IssueMessage) {
+function getIconDataForMessage(message: RowMessage): IconButton.Icon.IconData {
+  if (message.origin instanceof IssuesManager.SourceFrameIssuesManager.IssueMessage) {
     return {
-      ...IssueCounter.IssueCounter.getIssueKindIconData(message.getIssueKind()),
+      ...IssueCounter.IssueCounter.getIssueKindIconData(message.origin.getIssueKind()),
       width: '12px',
       height: '12px',
     };
@@ -564,8 +590,43 @@ const pluginCompartment = new CodeMirror.Compartment();
 // of the line, with icons indicating the message severity and content
 // at the end of the line.
 
-function addMessage(rows: Workspace.UISourceCode.Message[][], message: Workspace.UISourceCode.Message):
-    Workspace.UISourceCode.Message[][] {
+class RowMessage {
+  readonly origin: Workspace.UISourceCode.Message;
+  readonly #lineNumber: number;
+  readonly #columnNumber: number;
+
+  constructor(origin: Workspace.UISourceCode.Message, lineNumber: number, columnNumber: number) {
+    this.origin = origin;
+    this.#lineNumber = lineNumber;
+    this.#columnNumber = columnNumber;
+  }
+
+  level(): Workspace.UISourceCode.Message.Level {
+    return this.origin.level();
+  }
+
+  text(): string {
+    return this.origin.text();
+  }
+
+  clickHandler(): (() => void)|undefined {
+    return this.origin.clickHandler();
+  }
+
+  lineNumber(): number {
+    return this.#lineNumber;
+  }
+
+  columnNumber(): number {
+    return this.#columnNumber;
+  }
+
+  isEqual(that: RowMessage): boolean {
+    return this.origin.isEqual(that.origin);
+  }
+}
+
+function addMessage(rows: RowMessage[][], message: RowMessage): RowMessage[][] {
   const lineNumber = message.lineNumber();
   let i = 0;
   for (; i < rows.length; i++) {
@@ -582,7 +643,7 @@ function addMessage(rows: Workspace.UISourceCode.Message[][], message: Workspace
   return rows;
 }
 
-function removeMessage(rows: Workspace.UISourceCode.Message[][], message: Workspace.UISourceCode.Message): void {
+function removeMessage(rows: RowMessage[][], message: RowMessage): void {
   for (let i = 0; i < rows.length; i++) {
     if (rows[i][0].lineNumber() === message.lineNumber()) {
       const remaining = rows[i].filter(m => !m.isEqual(message));
@@ -597,24 +658,24 @@ function removeMessage(rows: Workspace.UISourceCode.Message[][], message: Worksp
 }
 
 class RowMessages {
-  constructor(readonly rows: Workspace.UISourceCode.Message[][]) {
+  constructor(readonly rows: RowMessage[][]) {
   }
 
-  static create(messages: Workspace.UISourceCode.Message[]): RowMessages {
-    const rows: Workspace.UISourceCode.Message[][] = [];
+  static create(messages: RowMessage[]): RowMessages {
+    const rows: RowMessage[][] = [];
     for (const message of messages) {
       addMessage(rows, message);
     }
     return new RowMessages(rows);
   }
 
-  remove(message: Workspace.UISourceCode.Message): RowMessages {
+  remove(message: RowMessage): RowMessages {
     const rows = this.rows.slice();
     removeMessage(rows, message);
     return new RowMessages(rows);
   }
 
-  add(message: Workspace.UISourceCode.Message): RowMessages {
+  add(message: RowMessage): RowMessages {
     return new RowMessages(addMessage(this.rows.slice(), message));
   }
 }
@@ -625,11 +686,11 @@ const underlineMark = CodeMirror.Decoration.mark({class: 'cm-waveUnderline'});
 
 // The widget shown at the end of a message annotation.
 class MessageWidget extends CodeMirror.WidgetType {
-  constructor(readonly messages: Workspace.UISourceCode.Message[]) {
+  constructor(readonly messages: RowMessage[]) {
     super();
   }
 
-  eq(other: MessageWidget): boolean {
+  override eq(other: MessageWidget): boolean {
     return other.messages === this.messages;
   }
 
@@ -699,7 +760,7 @@ const showRowMessages = CodeMirror.StateField.define<RowMessageDecorations>({
   provide: field => CodeMirror.Prec.lowest(CodeMirror.EditorView.decorations.from(field, value => value.decorations)),
 });
 
-function countDuplicates(messages: Workspace.UISourceCode.Message[]): number[] {
+function countDuplicates(messages: RowMessage[]): number[] {
   const counts = [];
   for (let i = 0; i < messages.length; i++) {
     counts[i] = 0;
@@ -713,9 +774,12 @@ function countDuplicates(messages: Workspace.UISourceCode.Message[]): number[] {
   return counts;
 }
 
-function renderMessage(message: Workspace.UISourceCode.Message, count: number): HTMLElement {
+function renderMessage(message: RowMessage, count: number): HTMLElement {
   const element = document.createElement('div');
   element.classList.add('text-editor-row-message');
+  element.style.display = 'flex';
+  element.style.alignItems = 'center';
+  element.style.gap = '4px';
 
   if (count === 1) {
     const icon = element.appendChild(new IconButton.Icon.Icon());
@@ -727,6 +791,7 @@ function renderMessage(message: Workspace.UISourceCode.Message, count: number): 
         document.createElement('span', {is: 'dt-small-bubble'}) as UI.UIUtils.DevToolsSmallBubble;
     repeatCountElement.textContent = String(count);
     repeatCountElement.classList.add('text-editor-row-message-repeat-count');
+    repeatCountElement.style.flexShrink = '0';
     element.appendChild(repeatCountElement);
     repeatCountElement.type = getBubbleTypePerLevel(message.level());
   }
@@ -757,9 +822,14 @@ const rowMessageTheme = CodeMirror.EditorView.baseTheme({
       marginLeft: '2px',
     },
   },
+
+  '.cm-messageIcon-issue, .cm-messageIcon-error': {
+    marginTop: '-1px',
+    marginBottom: '-1px',
+  },
 });
 
-function rowMessages(initialMessages: Workspace.UISourceCode.Message[]): CodeMirror.Extension {
+function rowMessages(initialMessages: RowMessage[]): CodeMirror.Extension {
   return [
     showRowMessages.init(
         (state): RowMessageDecorations => RowMessageDecorations.create(RowMessages.create(initialMessages), state.doc)),

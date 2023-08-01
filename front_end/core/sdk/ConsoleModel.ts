@@ -32,53 +32,76 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import * as i18n from '../i18n/i18n.js';
-import type * as Platform from '../platform/platform.js';
+import * as Platform from '../platform/platform.js';
 
 import {FrontendMessageSource, FrontendMessageType} from './ConsoleModelTypes.js';
+
 export {FrontendMessageSource, FrontendMessageType} from './ConsoleModelTypes.js';
 
-import type {EventData} from './CPUProfilerModel.js';
-import {CPUProfilerModel, Events as CPUProfilerModelEvents} from './CPUProfilerModel.js';
-import type {Location} from './DebuggerModel.js';
-import {Events as DebuggerModelEvents} from './DebuggerModel.js';
+import {CPUProfilerModel, Events as CPUProfilerModelEvents, type EventData} from './CPUProfilerModel.js';
+
+import {
+  Events as DebuggerModelEvents,
+  type Location,
+  BreakpointType,
+  COND_BREAKPOINT_SOURCE_URL,
+  LOGPOINT_SOURCE_URL,
+} from './DebuggerModel.js';
 import {LogModel} from './LogModel.js';
 import {RemoteObject} from './RemoteObject.js';
-import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
-import type {ConsoleAPICall, ExceptionWithTimestamp, ExecutionContext, QueryObjectRequestedEvent} from './RuntimeModel.js';
-import {Events as RuntimeModelEvents, RuntimeModel} from './RuntimeModel.js';
-import type {Target} from './Target.js';
+import {
+  Events as ResourceTreeModelEvents,
+  ResourceTreeModel,
+  type ResourceTreeFrame,
+  type PrimaryPageChangeType,
+} from './ResourceTreeModel.js';
+
+import {
+  Events as RuntimeModelEvents,
+  RuntimeModel,
+  type ConsoleAPICall,
+  type ExceptionWithTimestamp,
+  type ExecutionContext,
+  type QueryObjectRequestedEvent,
+} from './RuntimeModel.js';
+import {Capability, type Target, Type} from './Target.js';
 import {TargetManager} from './TargetManager.js';
-import type {Observer} from './TargetManager.js';
-import type {ResourceTreeFrame} from './ResourceTreeModel.js';
+import {SDKModel} from './SDKModel.js';
 
 const UIStrings = {
   /**
-  *@description Text shown when the main frame (page) of the website was navigated to a different URL.
-  *@example {https://example.com} PH1
-  */
+   *@description Text shown when the main frame (page) of the website was navigated to a different URL.
+   *@example {https://example.com} PH1
+   */
   navigatedToS: 'Navigated to {PH1}',
   /**
-  *@description Text shown in the console when a performance profile (with the given name) was started.
-  *@example {title} PH1
-  */
+   *@description Text shown when the main frame (page) of the website was navigated to a different URL
+   * and the page was restored from back/forward cache (https://web.dev/bfcache/).
+   *@example {https://example.com} PH1
+   */
+  bfcacheNavigation: 'Navigation to {PH1} was restored from back/forward cache (see https://web.dev/bfcache/)',
+  /**
+   *@description Text shown in the console when a performance profile (with the given name) was started.
+   *@example {title} PH1
+   */
   profileSStarted: 'Profile \'\'{PH1}\'\' started.',
   /**
-  *@description Text shown in the console when a performance profile (with the given name) was stopped.
-  *@example {name} PH1
-  */
+   *@description Text shown in the console when a performance profile (with the given name) was stopped.
+   *@example {name} PH1
+   */
   profileSFinished: 'Profile \'\'{PH1}\'\' finished.',
   /**
-  *@description Error message shown in the console after the user tries to save a JavaScript value to a temporary variable.
-  */
+   *@description Error message shown in the console after the user tries to save a JavaScript value to a temporary variable.
+   */
   failedToSaveToTempVariable: 'Failed to save to temp variable.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('core/sdk/ConsoleModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-let settingsInstance: ConsoleModel;
 
-export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements Observer {
+export class ConsoleModel extends SDKModel<EventTypes> {
   #messagesInternal: ConsoleMessage[];
+  readonly #messagesByTimestamp: Platform.MapUtilities.Multimap<number, ConsoleMessage>;
   readonly #messageByExceptionId: Map<RuntimeModel, Map<number, ConsoleMessage>>;
   #warningsInternal: number;
   #errorsInternal: number;
@@ -86,10 +109,11 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   #pageLoadSequenceNumber: number;
   readonly #targetListeners: WeakMap<Target, Common.EventTarget.EventDescriptor[]>;
 
-  private constructor() {
-    super();
+  constructor(target: Target) {
+    super(target);
 
     this.#messagesInternal = [];
+    this.#messagesByTimestamp = new Platform.MapUtilities.Multimap();
     this.#messageByExceptionId = new Map();
     this.#warningsInternal = 0;
     this.#errorsInternal = 0;
@@ -97,21 +121,6 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     this.#pageLoadSequenceNumber = 0;
     this.#targetListeners = new WeakMap();
 
-    TargetManager.instance().observeTargets(this);
-  }
-
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ConsoleModel {
-    const {forceNew} = opts;
-    if (!settingsInstance || forceNew) {
-      settingsInstance = new ConsoleModel();
-    }
-
-    return settingsInstance;
-  }
-
-  targetAdded(target: Target): void {
     const resourceTreeModel = target.model(ResourceTreeModel);
     if (!resourceTreeModel || resourceTreeModel.cachedResourcesLoaded()) {
       this.initTarget(target);
@@ -136,9 +145,9 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     }
 
     const resourceTreeModel = target.model(ResourceTreeModel);
-    if (resourceTreeModel && !target.parentTarget()) {
+    if (resourceTreeModel && target.parentTarget()?.type() !== Type.Frame) {
       eventListeners.push(resourceTreeModel.addEventListener(
-          ResourceTreeModelEvents.MainFrameNavigated, this.mainFrameNavigated, this));
+          ResourceTreeModelEvents.PrimaryPageChanged, this.primaryPageChanged, this));
     }
 
     const runtimeModel = target.model(RuntimeModel);
@@ -149,7 +158,7 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
           RuntimeModelEvents.ExceptionRevoked, this.exceptionRevoked.bind(this, runtimeModel)));
       eventListeners.push(runtimeModel.addEventListener(
           RuntimeModelEvents.ConsoleAPICalled, this.consoleAPICalled.bind(this, runtimeModel)));
-      if (!target.parentTarget()) {
+      if (target.parentTarget()?.type() !== Type.Frame) {
         eventListeners.push(runtimeModel.debuggerModel().addEventListener(
             DebuggerModelEvents.GlobalObjectCleared, this.clearIfNecessary, this));
       }
@@ -173,7 +182,7 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
       useCommandLineAPI: boolean): Promise<void> {
     const result = await executionContext.evaluate(
         {
-          expression: expression,
+          expression,
           objectGroup: 'console',
           includeCommandLineAPI: useCommandLineAPI,
           silent: false,
@@ -181,9 +190,6 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
           generatePreview: true,
           replMode: true,
           allowUnsafeEvalBlockedByCSP: false,
-          disableBreaks: undefined,
-          throwOnSideEffect: undefined,
-          timeout: undefined,
         },
         Common.Settings.Settings.instance().moduleSetting('consoleUserActivationEval').get(), /* awaitPromise */ false);
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.ConsoleEvaluated);
@@ -213,6 +219,7 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     }
 
     this.#messagesInternal.push(msg);
+    this.#messagesByTimestamp.set(msg.timestamp, msg);
     const runtimeModel = msg.runtimeModel();
     const exceptionId = msg.getExceptionId();
     if (exceptionId && runtimeModel) {
@@ -289,6 +296,11 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     };
     const consoleMessage =
         new ConsoleMessage(runtimeModel, FrontendMessageSource.ConsoleAPI, level, (message as string), details);
+    for (const msg of this.#messagesByTimestamp.get(consoleMessage.timestamp).values()) {
+      if (consoleMessage.isEqual(msg)) {
+        return;
+      }
+    }
     this.addMessage(consoleMessage);
   }
 
@@ -312,9 +324,15 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     ++this.#pageLoadSequenceNumber;
   }
 
-  private mainFrameNavigated(event: Common.EventTarget.EventTargetEvent<ResourceTreeFrame>): void {
+  private primaryPageChanged(
+      event: Common.EventTarget.EventTargetEvent<{frame: ResourceTreeFrame, type: PrimaryPageChangeType}>): void {
     if (Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').get()) {
-      Common.Console.Console.instance().log(i18nString(UIStrings.navigatedToS, {PH1: event.data.url}));
+      const {frame} = event.data;
+      if (frame.backForwardCacheDetails.restoredFromCache) {
+        Common.Console.Console.instance().log(i18nString(UIStrings.bfcacheNavigation, {PH1: frame.url}));
+      } else {
+        Common.Console.Console.instance().log(i18nString(UIStrings.navigatedToS, {PH1: frame.url}));
+      }
     }
   }
 
@@ -368,18 +386,31 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.#messagesInternal;
   }
 
-  requestClearMessages(): void {
+  // messages[] are not ordered by timestamp.
+  static allMessagesUnordered(): ConsoleMessage[] {
+    const messages = [];
+    for (const target of TargetManager.instance().targets()) {
+      const targetMessages = target.model(ConsoleModel)?.messages() || [];
+      messages.push(...targetMessages);
+    }
+    return messages;
+  }
+
+  static requestClearMessages(): void {
     for (const logModel of TargetManager.instance().models(LogModel)) {
       logModel.requestClear();
     }
     for (const runtimeModel of TargetManager.instance().models(RuntimeModel)) {
       runtimeModel.discardConsoleEntries();
     }
-    this.clear();
+    for (const target of TargetManager.instance().targets()) {
+      target.model(ConsoleModel)?.clear();
+    }
   }
 
   private clear(): void {
     this.#messagesInternal = [];
+    this.#messagesByTimestamp.clear();
     this.#messageByExceptionId.clear();
     this.#errorsInternal = 0;
     this.#warningsInternal = 0;
@@ -391,12 +422,36 @@ export class ConsoleModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.#errorsInternal;
   }
 
+  static allErrors(): number {
+    let errors = 0;
+    for (const target of TargetManager.instance().targets()) {
+      errors += target.model(ConsoleModel)?.errors() || 0;
+    }
+    return errors;
+  }
+
   warnings(): number {
     return this.#warningsInternal;
   }
 
+  static allWarnings(): number {
+    let warnings = 0;
+    for (const target of TargetManager.instance().targets()) {
+      warnings += target.model(ConsoleModel)?.warnings() || 0;
+    }
+    return warnings;
+  }
+
   violations(): number {
     return this.#violationsInternal;
+  }
+
+  static allViolations(): number {
+    let violations = 0;
+    for (const target of TargetManager.instance().targets()) {
+      violations += target.model(ConsoleModel)?.violations() || 0;
+    }
+    return violations;
   }
 
   async saveToTempVariable(currentExecutionContext: ExecutionContext|null, remoteObject: RemoteObject|null):
@@ -554,6 +609,16 @@ export class ConsoleMessage {
   #affectedResources?: AffectedResources;
   category?: Protocol.Log.LogEntryCategory;
 
+  /**
+   * The parent frame of the `console.log` call of logpoints or conditional breakpoints
+   * if they called `console.*` explicitly. The parent frame is where V8 paused
+   * and consequently where the logpoint is set.
+   *
+   * Is `null` for page console.logs, commands, command results, etc.
+   */
+  readonly stackFrameWithBreakpoint: Protocol.Runtime.CallFrame|null = null;
+  readonly #originatingBreakpointType: BreakpointType|null = null;
+
   constructor(
       runtimeModel: RuntimeModel|null, source: MessageSource, level: Protocol.Log.LogEntryLevel|null,
       messageText: string, details?: ConsoleMessageDetails) {
@@ -585,6 +650,12 @@ export class ConsoleMessage {
     if (details?.context) {
       const match = details?.context.match(/[^#]*/);
       this.context = match?.[0];
+    }
+
+    if (this.stackTrace) {
+      const {callFrame, type} = ConsoleMessage.#stackFrameWithBreakpoint(this.stackTrace);
+      this.stackFrameWithBreakpoint = callFrame;
+      this.#originatingBreakpointType = type;
     }
   }
 
@@ -715,7 +786,40 @@ export class ConsoleMessage {
         areAffectedResourcesEquivalent(this.#affectedResources, msg.#affectedResources) &&
         areStackTracesEquivalent(this.stackTrace, msg.stackTrace);
   }
+
+  get originatesFromLogpoint(): boolean {
+    return this.#originatingBreakpointType === BreakpointType.LOGPOINT;
+  }
+
+  /** @returns true, iff this was a console.* call in a conditional breakpoint */
+  get originatesFromConditionalBreakpoint(): boolean {
+    return this.#originatingBreakpointType === BreakpointType.CONDITIONAL_BREAKPOINT;
+  }
+
+  static #stackFrameWithBreakpoint({callFrames}: Protocol.Runtime.StackTrace):
+      {callFrame: Protocol.Runtime.CallFrame|null, type: BreakpointType|null} {
+    // Note that breakpoint condition code could in theory call into user JS and back into
+    // "condition-defined" functions. This means that the top-most
+    // stack frame is not necessarily the `console.log` call, but there could be other things
+    // on top. We want the LAST marker frame in the stack.
+    // We search FROM THE TOP for the last marked stack frame and
+    // return it's parent (successor).
+    const markerSourceUrls = [COND_BREAKPOINT_SOURCE_URL, LOGPOINT_SOURCE_URL];
+    const lastBreakpointFrameIndex = callFrames.findLastIndex(({url}) => markerSourceUrls.includes(url));
+    if (lastBreakpointFrameIndex === -1 || lastBreakpointFrameIndex === callFrames.length - 1) {
+      // We either didn't find any breakpoint or we didn't capture enough stack
+      // frames and the breakpoint condition is the bottom-most frame.
+      return {callFrame: null, type: null};
+    }
+
+    const type = callFrames[lastBreakpointFrameIndex].url === LOGPOINT_SOURCE_URL ?
+        BreakpointType.LOGPOINT :
+        BreakpointType.CONDITIONAL_BREAKPOINT;
+    return {callFrame: callFrames[lastBreakpointFrameIndex + 1], type};
+  }
 }
+
+SDKModel.register(ConsoleModel, {capabilities: Capability.JS, autostart: true});
 
 export type MessageSource = Protocol.Log.LogEntrySource|FrontendMessageSource;
 export type MessageLevel = Protocol.Log.LogEntryLevel;

@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CDPSession } from './Connection.js';
 import { Protocol } from 'devtools-protocol';
+import { CDPSession } from './Connection.js';
 /**
  * Dialog instances are dispatched by the {@link Page} via the `dialog` event.
  *
  * @remarks
  *
  * @example
- * ```js
- * const puppeteer = require('puppeteer');
+ *
+ * ```ts
+ * import puppeteer from 'puppeteer';
  *
  * (async () => {
  *   const browser = await puppeteer.launch();
@@ -35,40 +36,38 @@ import { Protocol } from 'devtools-protocol';
  *   page.evaluate(() => alert('1'));
  * })();
  * ```
+ *
  * @public
  */
 export declare class Dialog {
-    private _client;
-    private _type;
-    private _message;
-    private _defaultValue;
-    private _handled;
+    #private;
     /**
      * @internal
      */
     constructor(client: CDPSession, type: Protocol.Page.DialogType, message: string, defaultValue?: string);
     /**
-     * @returns The type of the dialog.
+     * The type of the dialog.
      */
     type(): Protocol.Page.DialogType;
     /**
-     * @returns The message displayed in the dialog.
+     * The message displayed in the dialog.
      */
     message(): string;
     /**
-     * @returns The default value of the prompt, or an empty string if the dialog
+     * The default value of the prompt, or an empty string if the dialog
      * is not a `prompt`.
      */
     defaultValue(): string;
     /**
+     * A promise that resolves when the dialog has been accepted.
+     *
      * @param promptText - optional text that will be entered in the dialog
      * prompt. Has no effect if the dialog's type is not `prompt`.
      *
-     * @returns A promise that resolves when the dialog has been accepted.
      */
     accept(promptText?: string): Promise<void>;
     /**
-     * @returns A promise which will resolve once the dialog has been dismissed
+     * A promise which will resolve once the dialog has been dismissed
      */
     dismiss(): Promise<void>;
 }

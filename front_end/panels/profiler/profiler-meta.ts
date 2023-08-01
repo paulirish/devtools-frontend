@@ -14,40 +14,40 @@ let loadedProfilerModule: (typeof Profiler|undefined);
 
 const UIStrings = {
   /**
-  *@description Title for the profiler tab
-  */
+   *@description Title for the profiler tab
+   */
   memory: 'Memory',
   /**
-  *@description Title of the 'Live Heap Profile' tool in the bottom drawer
-  */
+   *@description Title of the 'Live Heap Profile' tool in the bottom drawer
+   */
   liveHeapProfile: 'Live Heap Profile',
   /**
-  *@description Title of an action under the Performance category that can be invoked through the Command Menu
-  */
+   *@description Title of an action under the Performance category that can be invoked through the Command Menu
+   */
   startRecordingHeapAllocations: 'Start recording heap allocations',
   /**
-  *@description Title of an action under the Performance category that can be invoked through the Command Menu
-  */
+   *@description Title of an action under the Performance category that can be invoked through the Command Menu
+   */
   stopRecordingHeapAllocations: 'Stop recording heap allocations',
   /**
-  *@description Title of an action in the live heap profile tool to start with reload
-  */
+   *@description Title of an action in the live heap profile tool to start with reload
+   */
   startRecordingHeapAllocationsAndReload: 'Start recording heap allocations and reload the page',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (start/stop recording performance)
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (start/stop recording performance)
+   */
   startStopRecording: 'Start/stop recording',
   /**
-  *@description Title of a setting under the Performance category in Settings
-  */
+   *@description Title of a setting under the Performance category in Settings
+   */
   showNativeFunctions: 'Show native functions in JS Profile',
   /**
-  *@description Command for shwoing the profiler tab
-  */
+   *@description Command for shwoing the profiler tab
+   */
   showMemory: 'Show Memory',
   /**
-  *@description Command for showing the 'Live Heap Profile' tool in the bottom drawer
-  */
+   *@description Command for showing the 'Live Heap Profile' tool in the bottom drawer
+   */
   showLiveHeapProfile: 'Show Live Heap Profile',
 
 };
@@ -96,9 +96,9 @@ UI.ViewManager.registerViewExtension({
 
 UI.ActionRegistration.registerActionExtension({
   actionId: 'live-heap-profile.toggle-recording',
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_START_RECORDING,
+  iconClass: UI.ActionRegistration.IconClass.START_RECORDING,
   toggleable: true,
-  toggledIconClass: UI.ActionRegistration.IconClass.LARGEICON_STOP_RECORDING,
+  toggledIconClass: UI.ActionRegistration.IconClass.STOP_RECORDING,
   toggleWithRedColor: true,
   async loadActionDelegate() {
     const Profiler = await loadProfilerModule();
@@ -120,7 +120,7 @@ UI.ActionRegistration.registerActionExtension({
 
 UI.ActionRegistration.registerActionExtension({
   actionId: 'live-heap-profile.start-with-reload',
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_REFRESH,
+  iconClass: UI.ActionRegistration.IconClass.REFRESH,
   async loadActionDelegate() {
     const Profiler = await loadProfilerModule();
     return Profiler.LiveHeapProfileView.ActionDelegate.instance();
@@ -133,10 +133,10 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'profiler.heap-toggle-recording',
   category: UI.ActionRegistration.ActionCategory.MEMORY,
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_START_RECORDING,
+  iconClass: UI.ActionRegistration.IconClass.START_RECORDING,
   title: i18nLazyString(UIStrings.startStopRecording),
   toggleable: true,
-  toggledIconClass: UI.ActionRegistration.IconClass.LARGEICON_STOP_RECORDING,
+  toggledIconClass: UI.ActionRegistration.IconClass.STOP_RECORDING,
   toggleWithRedColor: true,
   contextTypes() {
     return maybeRetrieveContextTypes(Profiler => [Profiler.HeapProfilerPanel.HeapProfilerPanel]);

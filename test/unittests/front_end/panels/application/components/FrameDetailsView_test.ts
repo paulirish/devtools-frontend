@@ -2,14 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as SDK from '../../../../../../front_end/core/sdk/sdk.js';
+import {assertNotNullOrUndefined} from '../../../../../../front_end/core/platform/platform.js';
+import * as SDK from '../../../../../../front_end/core/sdk/sdk.js';
+import * as Protocol from '../../../../../../front_end/generated/protocol.js';
 import * as ApplicationComponents from '../../../../../../front_end/panels/application/components/components.js';
 import * as ExpandableList from '../../../../../../front_end/ui/components/expandable_list/expandable_list.js';
 import * as Coordinator from '../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import * as ReportView from '../../../../../../front_end/ui/components/report_view/report_view.js';
-import * as Protocol from '../../../../../../front_end/generated/protocol.js';
-import {assertShadowRoot, getCleanTextContentFromElements, getElementWithinComponent, getElementsWithinComponent, renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import {
+  assertShadowRoot,
+  getCleanTextContentFromElements,
+  getElementsWithinComponent,
+  getElementWithinComponent,
+  renderElementIntoDOM,
+} from '../../../helpers/DOMHelpers.js';
+import {describeWithRealConnection} from '../../../helpers/RealConnection.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -22,6 +29,8 @@ const makeFrame = (): SDK.ResourceTreeModel.ResourceTreeFrame => {
     displayName: () => 'TestTitle',
     unreachableUrl: () => '',
     adFrameType: () => Protocol.Page.AdFrameType.None,
+    adFrameStatus: () => undefined,
+    getAdScriptId: () => '1' as Protocol.Runtime.ScriptId,
     resourceForURL: () => null,
     isSecureContext: () => true,
     isCrossOriginIsolated: () => true,
@@ -33,25 +42,8 @@ const makeFrame = (): SDK.ResourceTreeModel.ResourceTreeFrame => {
     getOwnerDOMNodeOrDocument: () => ({
       nodeName: () => 'iframe',
     }),
-    resourceTreeModel: () => ({
-      target: () => ({
-        // set to true so that Linkifier.maybeLinkifyScriptLocation() exits
-        // early and does not run into other problems with this mock
-        isDisposed: () => true,
-        model: () => ({
-          getSecurityIsolationStatus: () => ({
-            coep: {
-              value: Protocol.Network.CrossOriginEmbedderPolicyValue.None,
-              reportOnlyValue: Protocol.Network.CrossOriginEmbedderPolicyValue.None,
-            },
-            coop: {
-              value: Protocol.Network.CrossOriginOpenerPolicyValue.SameOrigin,
-              reportOnlyValue: Protocol.Network.CrossOriginOpenerPolicyValue.SameOrigin,
-            },
-          }),
-        }),
-      }),
-    }),
+    resourceTreeModel: () =>
+        SDK.TargetManager.TargetManager.instance().primaryPageTarget()?.model(SDK.ResourceTreeModel.ResourceTreeModel),
     getCreationStackTraceData: () => ({
       creationStackTrace: {
         callFrames: [{
@@ -83,21 +75,22 @@ const makeFrame = (): SDK.ResourceTreeModel.ResourceTreeFrame => {
       },
     ]),
     getPermissionsPolicyState: () => null,
+    prerenderFinalStatus: Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
+    prerenderDisallowedApiMethod: 'device.mojom.GamepadMonitor',
+    parentFrame: () => null,
   } as unknown as SDK.ResourceTreeModel.ResourceTreeFrame;
   return newFrame;
 };
 
-describeWithEnvironment('FrameDetailsView', () => {
+describeWithRealConnection('FrameDetailsView', () => {
   it('renders with a title', async () => {
     const frame = makeFrame();
-    const component = new ApplicationComponents.FrameDetailsView.FrameDetailsReportView();
+    const component = new ApplicationComponents.FrameDetailsView.FrameDetailsReportView(frame);
     renderElementIntoDOM(component);
-    component.data = {
-      frame: frame,
-    };
 
     assertShadowRoot(component.shadowRoot);
-    await coordinator.done();
+    void component.render();
+    await coordinator.done({waitForWork: true});
     const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
     assertShadowRoot(report.shadowRoot);
 
@@ -106,16 +99,40 @@ describeWithEnvironment('FrameDetailsView', () => {
   });
 
   it('renders report keys and values', async () => {
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    const target = targetManager.rootTarget();
+    assertNotNullOrUndefined(target);
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    assertNotNullOrUndefined(debuggerModel);
+    const debuggerId = debuggerModel.debuggerId();
+
     const frame = makeFrame();
-    const component = new ApplicationComponents.FrameDetailsView.FrameDetailsReportView();
+    frame.adFrameType = () => Protocol.Page.AdFrameType.Root;
+    frame.parentFrame = () => ({
+      getAdScriptId: () => ({
+        scriptId: 'scriptId' as Protocol.Runtime.ScriptId,
+        debuggerId: debuggerId as Protocol.Runtime.UniqueDebuggerId,
+      }),
+    } as unknown as SDK.ResourceTreeModel.ResourceTreeFrame);
+    const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+    assertNotNullOrUndefined(networkManager);
+    sinon.stub(networkManager, 'getSecurityIsolationStatus').resolves({
+      coep: {
+        value: Protocol.Network.CrossOriginEmbedderPolicyValue.None,
+        reportOnlyValue: Protocol.Network.CrossOriginEmbedderPolicyValue.None,
+      },
+      coop: {
+        value: Protocol.Network.CrossOriginOpenerPolicyValue.SameOrigin,
+        reportOnlyValue: Protocol.Network.CrossOriginOpenerPolicyValue.SameOrigin,
+      },
+    });
+
+    const component = new ApplicationComponents.FrameDetailsView.FrameDetailsReportView(frame);
     renderElementIntoDOM(component);
-    component.data = {
-      frame: frame,
-    };
 
     assertShadowRoot(component.shadowRoot);
-    await coordinator.done();
-    await coordinator.done();  // 2nd call awaits async render
+    void component.render();
+    await coordinator.done({waitForWork: true});
 
     const keys = getCleanTextContentFromElements(component.shadowRoot, 'devtools-report-key');
     assert.deepEqual(keys, [
@@ -123,12 +140,16 @@ describeWithEnvironment('FrameDetailsView', () => {
       'Origin',
       'Owner Element',
       'Frame Creation Stack Trace',
+      'Ad Status',
+      'Creator Ad Script',
       'Secure Context',
       'Cross-Origin Isolated',
       'Cross-Origin Embedder Policy (COEP)',
       'Cross-Origin Opener Policy (COOP)',
       'SharedArrayBuffers',
       'Measure Memory',
+      'Prerendering Status',
+      'Disallowed API method',
     ]);
 
     const values = getCleanTextContentFromElements(component.shadowRoot, 'devtools-report-value');
@@ -137,12 +158,16 @@ describeWithEnvironment('FrameDetailsView', () => {
       'https://www.example.com',
       '<iframe>',
       '',
+      '',
+      '',
       'Yes\xA0Localhost is always a secure context',
       'Yes',
       'None',
       'SameOrigin',
       'available, transferable',
       'available\xA0Learn more',
+      'A disallowed API was used by the prerendered page',
+      'device.mojom.GamepadMonitor',
     ]);
 
     const stackTrace = getElementWithinComponent(
@@ -161,6 +186,67 @@ describeWithEnvironment('FrameDetailsView', () => {
       stackTraceText = stackTraceText.concat(getCleanTextContentFromElements(row.shadowRoot, '.stack-trace-row'));
     });
 
-    assert.deepEqual(stackTraceText, ['function1\xA0@\xA0www.example.com/script.js:16']);
+    assert.deepEqual(stackTraceText[0], 'function1\xA0@\xA0http://www.example.com/script.js:16');
+
+    const adScriptLink = component.shadowRoot.querySelector('devtools-report-value.ad-script-link');
+    assertNotNullOrUndefined(adScriptLink);
+    assert.strictEqual(adScriptLink.textContent, '');
+  });
+
+  it('renders report keys and values with on-going prerendering', async () => {
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    const target = targetManager.rootTarget();
+    assertNotNullOrUndefined(target);
+
+    const frame = makeFrame();
+
+    const component = new ApplicationComponents.FrameDetailsView.FrameDetailsReportView(frame);
+    const networkManager = target.model(SDK.NetworkManager.NetworkManager);
+    assertNotNullOrUndefined(networkManager);
+    sinon.stub(networkManager, 'getSecurityIsolationStatus').resolves({
+      coep: {
+        value: Protocol.Network.CrossOriginEmbedderPolicyValue.None,
+        reportOnlyValue: Protocol.Network.CrossOriginEmbedderPolicyValue.None,
+      },
+      coop: {
+        value: Protocol.Network.CrossOriginOpenerPolicyValue.SameOrigin,
+        reportOnlyValue: Protocol.Network.CrossOriginOpenerPolicyValue.SameOrigin,
+      },
+    });
+    renderElementIntoDOM(component);
+    component.targetChanged({data: {subtype: 'prerender', url: 'https://example.test/'} as Protocol.Target.TargetInfo});
+
+    assertShadowRoot(component.shadowRoot);
+    await coordinator.done({waitForWork: true});
+
+    const keys = getCleanTextContentFromElements(component.shadowRoot, 'devtools-report-key');
+    assert.deepEqual(keys, [
+      'URL',
+      'Origin',
+      'Owner Element',
+      'Frame Creation Stack Trace',
+      'Secure Context',
+      'Cross-Origin Isolated',
+      'Cross-Origin Embedder Policy (COEP)',
+      'Cross-Origin Opener Policy (COOP)',
+      'SharedArrayBuffers',
+      'Measure Memory',
+      'Prerendering Status',
+    ]);
+
+    const values = getCleanTextContentFromElements(component.shadowRoot, 'devtools-report-value');
+    assert.deepEqual(values, [
+      'https://www.example.com/path/page.html',
+      'https://www.example.com',
+      '<iframe>',
+      '',
+      'Yes\xA0Localhost is always a secure context',
+      'Yes',
+      'None',
+      'SameOrigin',
+      'available, transferable',
+      'available\xA0Learn more',
+      'Prerendering ongoing https://example.test/',
+    ]);
   });
 });

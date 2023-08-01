@@ -32,7 +32,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {ConsoleViewMessage} from './ConsoleViewMessage.js';
+import {type ConsoleViewMessage} from './ConsoleViewMessage.js';
 
 interface SelectionModel {
   item: number;
@@ -637,8 +637,9 @@ export class ConsoleViewport {
     let node: Node|null = itemElement;
     while ((node = node.traverseNextNode(itemElement)) && node !== selectionNode) {
       if (node.nodeType !== Node.TEXT_NODE ||
-          (node.parentElement &&
-           (node.parentElement.nodeName === 'STYLE' || node.parentElement.nodeName === 'SCRIPT'))) {
+          (node.parentNode &&
+           (node.parentNode.nodeName === 'STYLE' || node.parentNode.nodeName === 'SCRIPT' ||
+            node.parentNode.nodeName === '#document-fragment'))) {
         continue;
       }
       chars += Components.Linkifier.Linkifier.untruncatedNodeText(node).length;

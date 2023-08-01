@@ -6,9 +6,9 @@ import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import type * as ElementsComponents from './components/components.js';
 
-import type {StylePropertiesSection} from './StylePropertiesSection.js';
+import {type StylePropertiesSection} from './StylePropertiesSection.js';
 import {StylePropertyTreeElement} from './StylePropertyTreeElement.js';
-import type {StylesSidebarPane} from './StylesSidebarPane.js';
+import {type StylesSidebarPane} from './StylesSidebarPane.js';
 
 type PropertySelectedEvent = ElementsComponents.StylePropertyEditor.PropertySelectedEvent;
 type PropertyDeselectedEvent = ElementsComponents.StylePropertyEditor.PropertyDeselectedEvent;
@@ -157,7 +157,7 @@ function createButton(buttonTitle: string): HTMLButtonElement {
     event.stopPropagation();
   };
   const icon = new IconButton.Icon.Icon();
-  icon.data = {iconName: 'flex-wrap-icon', color: 'var(--color-text-secondary)', width: '12px', height: '12px'};
+  icon.data = {iconName: 'flex-wrap', color: 'var(--color-text-secondary)', width: '16px', height: '16px'};
   button.appendChild(icon);
   return button;
 }

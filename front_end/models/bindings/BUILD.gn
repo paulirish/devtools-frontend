@@ -8,7 +8,6 @@ import("../visibility.gni")
 
 devtools_module("bindings") {
   sources = [
-    "BreakpointManager.ts",
     "CSSWorkspaceBinding.ts",
     "CompilerScriptMapping.ts",
     "ContentProviderBasedProject.ts",
@@ -52,14 +51,16 @@ devtools_entrypoint("bundle") {
     "../../../test/unittests/front_end/helpers/*",
     "../../../test/unittests/front_end/models/bindings/*",
     "../../../test/unittests/front_end/models/formatter/*",
+    "../../../test/unittests/front_end/panels/console/*",
+    "../../../test/unittests/front_end/panels/timeline/*",
     "../../entrypoints/main/*",
     "../../legacy_test_runner/*",
     "../../panels/application/*",
     "../../panels/console/*",
     "../../panels/coverage/*",
-    "../../panels/input/*",
     "../../panels/network/*",
     "../../panels/profiler/*",
+    "../../panels/recorder/*",
     "../../panels/sources/*",
     "../persistence/*",
 
@@ -67,10 +68,12 @@ devtools_entrypoint("bundle") {
     "../../../test/unittests/front_end/ui/legacy/components/utils/*",
     "../../panels/elements/*",
     "../../panels/emulation/*",
+    "../../ui/components/docs/performance_panel/*",
     "../../ui/components/linkifier/*",
     "../../ui/legacy/components/inline_editor/*",
     "../../ui/legacy/components/perf_ui/*",
     "../../ui/legacy/components/utils/*",
+    "../breakpoints/*",
     "../extensions/*",
     "../formatter/*",
     "../issues_manager/*",

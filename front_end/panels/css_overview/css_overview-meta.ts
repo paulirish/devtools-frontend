@@ -9,12 +9,12 @@ import type * as CSSOverview from './css_overview.js';
 
 const UIStrings = {
   /**
-  *@description Title of the CSS Overview Panel
-  */
+   *@description Title of the CSS Overview Panel
+   */
   cssOverview: 'CSS Overview',
   /**
-  *@description Title of the CSS Overview Panel
-  */
+   *@description Title of the CSS Overview Panel
+   */
   showCssOverview: 'Show CSS Overview',
 };
 
@@ -39,7 +39,8 @@ UI.ViewManager.registerViewExtension({
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   async loadView() {
     const CSSOverview = await loadCSSOverviewModule();
-    return CSSOverview.CSSOverviewPanel.CSSOverviewPanel.instance();
+    return new CSSOverview.CSSOverviewPanel.CSSOverviewPanel(
+        new CSSOverview.CSSOverviewController.OverviewController());
   },
   isPreviewFeature: true,
 });

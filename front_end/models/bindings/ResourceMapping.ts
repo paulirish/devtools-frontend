@@ -14,41 +14,30 @@ import {DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
 import {NetworkProject} from './NetworkProject.js';
 import {resourceMetadata} from './ResourceUtils.js';
 
-let resourceMappingInstance: ResourceMapping;
-
-const styleSheetOffsetMap = new WeakMap<SDK.CSSStyleSheetHeader.CSSStyleSheetHeader, TextUtils.TextRange.TextRange>();
-const scriptOffsetMap = new WeakMap<SDK.Script.Script, TextUtils.TextRange.TextRange>();
+const styleSheetRangeMap = new WeakMap<SDK.CSSStyleSheetHeader.CSSStyleSheetHeader, TextUtils.TextRange.TextRange>();
+const scriptRangeMap = new WeakMap<SDK.Script.Script, TextUtils.TextRange.TextRange>();
 const boundUISourceCodes = new WeakSet<Workspace.UISourceCode.UISourceCode>();
 
+function computeScriptRange(script: SDK.Script.Script): TextUtils.TextRange.TextRange {
+  return new TextUtils.TextRange.TextRange(script.lineOffset, script.columnOffset, script.endLine, script.endColumn);
+}
+
+function computeStyleSheetRange(header: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader): TextUtils.TextRange.TextRange {
+  return new TextUtils.TextRange.TextRange(header.startLine, header.startColumn, header.endLine, header.endColumn);
+}
+
 export class ResourceMapping implements SDK.TargetManager.SDKModelObserver<SDK.ResourceTreeModel.ResourceTreeModel> {
-  readonly #workspace: Workspace.Workspace.WorkspaceImpl;
+  readonly workspace: Workspace.Workspace.WorkspaceImpl;
   readonly #modelToInfo: Map<SDK.ResourceTreeModel.ResourceTreeModel, ModelInfo>;
-  private constructor(targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl) {
-    this.#workspace = workspace;
+
+  constructor(targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl) {
+    this.workspace = workspace;
     this.#modelToInfo = new Map();
     targetManager.observeModels(SDK.ResourceTreeModel.ResourceTreeModel, this);
   }
 
-  static instance(opts: {
-    forceNew: boolean|null,
-    targetManager: SDK.TargetManager.TargetManager|null,
-    workspace: Workspace.Workspace.WorkspaceImpl|null,
-  } = {forceNew: null, targetManager: null, workspace: null}): ResourceMapping {
-    const {forceNew, targetManager, workspace} = opts;
-    if (!resourceMappingInstance || forceNew) {
-      if (!targetManager || !workspace) {
-        throw new Error(
-            `Unable to create ResourceMapping: targetManager and workspace must be provided: ${new Error().stack}`);
-      }
-
-      resourceMappingInstance = new ResourceMapping(targetManager, workspace);
-    }
-
-    return resourceMappingInstance;
-  }
-
   modelAdded(resourceTreeModel: SDK.ResourceTreeModel.ResourceTreeModel): void {
-    const info = new ModelInfo(this.#workspace, resourceTreeModel);
+    const info = new ModelInfo(this.workspace, resourceTreeModel);
     this.#modelToInfo.set(resourceTreeModel, info);
   }
 
@@ -65,6 +54,17 @@ export class ResourceMapping implements SDK.TargetManager.SDKModelObserver<SDK.R
     return resourceTreeModel ? this.#modelToInfo.get(resourceTreeModel) || null : null;
   }
 
+  uiSourceCodeForScript(script: SDK.Script.Script): Workspace.UISourceCode.UISourceCode|null {
+    const info = this.infoForTarget(script.debuggerModel.target());
+    if (!info) {
+      return null;
+    }
+
+    const project = info.getProject();
+    const uiSourceCode = project.uiSourceCodeForURL(script.sourceURL);
+    return uiSourceCode;
+  }
+
   cssLocationToUILocation(cssLocation: SDK.CSSModel.CSSLocation): Workspace.UISourceCode.UILocation|null {
     const header = cssLocation.header();
     if (!header) {
@@ -78,8 +78,7 @@ export class ResourceMapping implements SDK.TargetManager.SDKModelObserver<SDK.R
     if (!uiSourceCode) {
       return null;
     }
-    const offset = styleSheetOffsetMap.get(header) ||
-        TextUtils.TextRange.TextRange.createFromLocation(header.startLine, header.startColumn);
+    const offset = styleSheetRangeMap.get(header) ?? computeStyleSheetRange(header);
     const lineNumber = cssLocation.lineNumber + offset.startLine - header.startLine;
     let columnNumber = cssLocation.columnNumber;
     if (cssLocation.lineNumber === header.startLine) {
@@ -97,16 +96,25 @@ export class ResourceMapping implements SDK.TargetManager.SDKModelObserver<SDK.R
     if (!info) {
       return null;
     }
-    const uiSourceCode = info.getProject().uiSourceCodeForURL(script.sourceURL);
+    const embedderName = script.embedderName();
+    if (!embedderName) {
+      return null;
+    }
+    const uiSourceCode = info.getProject().uiSourceCodeForURL(embedderName);
     if (!uiSourceCode) {
       return null;
     }
-    const offset = scriptOffsetMap.get(script) ||
-        TextUtils.TextRange.TextRange.createFromLocation(script.lineOffset, script.columnOffset);
-    const lineNumber = jsLocation.lineNumber + offset.startLine - script.lineOffset;
-    let columnNumber = jsLocation.columnNumber;
-    if (jsLocation.lineNumber === script.lineOffset) {
-      columnNumber += offset.startColumn - script.columnOffset;
+    const {startLine, startColumn} = scriptRangeMap.get(script) ?? computeScriptRange(script);
+    let {lineNumber, columnNumber} = jsLocation;
+    if (lineNumber === script.lineOffset) {
+      columnNumber += startColumn - script.columnOffset;
+    }
+    lineNumber += startLine - script.lineOffset;
+    if (script.hasSourceURL) {
+      if (lineNumber === 0) {
+        columnNumber += script.columnOffset;
+      }
+      lineNumber += script.lineOffset;
     }
     return uiSourceCode.uiLocation(lineNumber, columnNumber);
   }
@@ -124,14 +132,93 @@ export class ResourceMapping implements SDK.TargetManager.SDKModelObserver<SDK.R
     if (!debuggerModel) {
       return [];
     }
-    const location = debuggerModel.createRawLocationByURL(uiSourceCode.url(), lineNumber, columnNumber);
-    if (location) {
-      const script = location.script();
-      if (script && script.containsLocation(lineNumber, columnNumber)) {
-        return [location];
+    const locations = [];
+    for (const script of debuggerModel.scripts()) {
+      if (script.embedderName() !== uiSourceCode.url()) {
+        continue;
+      }
+      const range = scriptRangeMap.get(script) ?? computeScriptRange(script);
+      if (!range.containsLocation(lineNumber, columnNumber)) {
+        continue;
+      }
+      let scriptLineNumber = lineNumber;
+      let scriptColumnNumber = columnNumber;
+      if (script.hasSourceURL) {
+        scriptLineNumber -= range.startLine;
+        if (scriptLineNumber === 0) {
+          scriptColumnNumber -= range.startColumn;
+        }
+      }
+      locations.push(debuggerModel.createRawLocation(script, scriptLineNumber, scriptColumnNumber));
+    }
+    return locations;
+  }
+
+  uiLocationRangeToJSLocationRanges(
+      uiSourceCode: Workspace.UISourceCode.UISourceCode,
+      textRange: TextUtils.TextRange.TextRange): SDK.DebuggerModel.LocationRange[]|null {
+    if (!boundUISourceCodes.has(uiSourceCode)) {
+      return null;
+    }
+    const target = NetworkProject.targetForUISourceCode(uiSourceCode);
+    if (!target) {
+      return null;
+    }
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    if (!debuggerModel) {
+      return null;
+    }
+    const ranges = [];
+    for (const script of debuggerModel.scripts()) {
+      if (script.embedderName() !== uiSourceCode.url()) {
+        continue;
+      }
+      const scriptTextRange = scriptRangeMap.get(script) ?? computeScriptRange(script);
+      const range = scriptTextRange.intersection(textRange);
+      if (range.isEmpty()) {
+        continue;
+      }
+      let {startLine, startColumn, endLine, endColumn} = range;
+      if (script.hasSourceURL) {
+        startLine -= range.startLine;
+        if (startLine === 0) {
+          startColumn -= range.startColumn;
+        }
+        endLine -= range.startLine;
+        if (endLine === 0) {
+          endColumn -= range.startColumn;
+        }
+      }
+      const start = debuggerModel.createRawLocation(script, startLine, startColumn);
+      const end = debuggerModel.createRawLocation(script, endLine, endColumn);
+      ranges.push({start, end});
+    }
+    return ranges;
+  }
+
+  getMappedLines(uiSourceCode: Workspace.UISourceCode.UISourceCode): Set<number>|null {
+    if (!boundUISourceCodes.has(uiSourceCode)) {
+      return null;
+    }
+    const target = NetworkProject.targetForUISourceCode(uiSourceCode);
+    if (!target) {
+      return null;
+    }
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    if (!debuggerModel) {
+      return null;
+    }
+    const mappedLines = new Set<number>();
+    for (const script of debuggerModel.scripts()) {
+      if (script.embedderName() !== uiSourceCode.url()) {
+        continue;
+      }
+      const {startLine, endLine} = scriptRangeMap.get(script) ?? computeScriptRange(script);
+      for (let line = startLine; line <= endLine; ++line) {
+        mappedLines.add(line);
       }
     }
-    return [];
+    return mappedLines;
   }
 
   uiLocationToCSSLocations(uiLocation: Workspace.UISourceCode.UILocation): SDK.CSSModel.CSSLocation[] {
@@ -177,6 +264,11 @@ class ModelInfo {
     const cssModel = target.model(SDK.CSSModel.CSSModel);
     console.assert(Boolean(cssModel));
     this.#cssModel = (cssModel as SDK.CSSModel.CSSModel);
+    for (const frame of resourceTreeModel.frames()) {
+      for (const resource of frame.getResourcesMap().values()) {
+        this.addResource(resource);
+      }
+    }
     this.#eventListeners = [
       resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.ResourceAdded, this.resourceAdded, this),
       resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.FrameWillNavigate, this.frameWillNavigate, this),
@@ -209,7 +301,9 @@ class ModelInfo {
     if (resourceType !== Common.ResourceType.resourceTypes.Image &&
         resourceType !== Common.ResourceType.resourceTypes.Font &&
         resourceType !== Common.ResourceType.resourceTypes.Document &&
-        resourceType !== Common.ResourceType.resourceTypes.Manifest) {
+        resourceType !== Common.ResourceType.resourceTypes.Manifest &&
+        resourceType !== Common.ResourceType.resourceTypes.Fetch &&
+        resourceType !== Common.ResourceType.resourceTypes.XHR) {
       return false;
     }
 
@@ -231,7 +325,10 @@ class ModelInfo {
   }
 
   private resourceAdded(event: Common.EventTarget.EventTargetEvent<SDK.Resource.Resource>): void {
-    const resource = event.data;
+    this.addResource(event.data);
+  }
+
+  private addResource(resource: SDK.Resource.Resource): void {
     if (!this.acceptsResource(resource)) {
       return;
     }
@@ -312,6 +409,11 @@ class Binding implements TextUtils.ContentProvider.ContentProvider {
     }
     this.#project.addUISourceCodeWithProvider(this.#uiSourceCode, this, resourceMetadata(resource), resource.mimeType);
     this.#edits = [];
+
+    void Promise.all([
+      ...this.inlineScripts().map(script => DebuggerWorkspaceBinding.instance().updateLocations(script)),
+      ...this.inlineStyles().map(style => CSSWorkspaceBinding.instance().updateLocations(style)),
+    ]);
   }
 
   private inlineStyles(): SDK.CSSStyleSheetHeader.CSSStyleSheetHeader[] {
@@ -341,7 +443,7 @@ class Binding implements TextUtils.ContentProvider.ContentProvider {
     if (!debuggerModel) {
       return [];
     }
-    return debuggerModel.scriptsForSourceURL(this.#uiSourceCode.url());
+    return debuggerModel.scripts().filter(script => script.embedderName() === this.#uiSourceCode.url());
   }
 
   async styleSheetChanged(stylesheet: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader, edit: SDK.CSSModel.Edit|null):
@@ -368,29 +470,26 @@ class Binding implements TextUtils.ContentProvider.ContentProvider {
         continue;
       }
       const stylesheet = data.stylesheet;
-      const startLocation = styleSheetOffsetMap.get(stylesheet) ||
-          TextUtils.TextRange.TextRange.createFromLocation(stylesheet.startLine, stylesheet.startColumn);
+      const startLocation = styleSheetRangeMap.get(stylesheet) ?? computeStyleSheetRange(stylesheet);
 
       const oldRange = edit.oldRange.relativeFrom(startLocation.startLine, startLocation.startColumn);
       const newRange = edit.newRange.relativeFrom(startLocation.startLine, startLocation.startColumn);
       text = new TextUtils.Text.Text(text.replaceRange(oldRange, edit.newText));
       const updatePromises = [];
       for (const script of scripts) {
-        const scriptOffset = scriptOffsetMap.get(script) ||
-            TextUtils.TextRange.TextRange.createFromLocation(script.lineOffset, script.columnOffset);
-        if (!scriptOffset.follows(oldRange)) {
+        const range = scriptRangeMap.get(script) ?? computeScriptRange(script);
+        if (!range.follows(oldRange)) {
           continue;
         }
-        scriptOffsetMap.set(script, scriptOffset.rebaseAfterTextEdit(oldRange, newRange));
+        scriptRangeMap.set(script, range.rebaseAfterTextEdit(oldRange, newRange));
         updatePromises.push(DebuggerWorkspaceBinding.instance().updateLocations(script));
       }
       for (const style of styles) {
-        const styleOffset = styleSheetOffsetMap.get(style) ||
-            TextUtils.TextRange.TextRange.createFromLocation(style.startLine, style.startColumn);
-        if (!styleOffset.follows(oldRange)) {
+        const range = styleSheetRangeMap.get(style) ?? computeStyleSheetRange(style);
+        if (!range.follows(oldRange)) {
           continue;
         }
-        styleSheetOffsetMap.set(style, styleOffset.rebaseAfterTextEdit(oldRange, newRange));
+        styleSheetRangeMap.set(style, range.rebaseAfterTextEdit(oldRange, newRange));
         updatePromises.push(CSSWorkspaceBinding.instance().updateLocations(style));
       }
       await Promise.all(updatePromises);
@@ -413,7 +512,11 @@ class Binding implements TextUtils.ContentProvider.ContentProvider {
   }
 
   dispose(): void {
-    this.#project.removeFile(this.#uiSourceCode.url());
+    this.#project.removeUISourceCode(this.#uiSourceCode.url());
+    void Promise.all([
+      ...this.inlineScripts().map(script => DebuggerWorkspaceBinding.instance().updateLocations(script)),
+      ...this.inlineStyles().map(style => CSSWorkspaceBinding.instance().updateLocations(style)),
+    ]);
   }
 
   private firstResource(): SDK.Resource.Resource {
@@ -427,10 +530,6 @@ class Binding implements TextUtils.ContentProvider.ContentProvider {
 
   contentType(): Common.ResourceType.ResourceType {
     return this.firstResource().contentType();
-  }
-
-  contentEncoded(): Promise<boolean> {
-    return this.firstResource().contentEncoded();
   }
 
   requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {

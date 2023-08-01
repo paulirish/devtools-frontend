@@ -14,36 +14,36 @@ import networkConfigViewStyles from './networkConfigView.css.js';
 
 const UIStrings = {
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   custom: 'Custom...',
   /**
-  *@description Other user agent element placeholder in Network Config View of the Network panel
-  */
+   *@description Other user agent element placeholder in Network Config View of the Network panel
+   */
   enterACustomUserAgent: 'Enter a custom user agent',
   /**
-  *@description Error message for empty custom user agent input
-  */
+   *@description Error message for empty custom user agent input
+   */
   customUserAgentFieldIsRequired: 'Custom user agent field is required',
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   caching: 'Caching',
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   disableCache: 'Disable cache',
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   networkThrottling: 'Network throttling',
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   userAgent: 'User agent',
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   selectAutomatically: 'Use browser default',
   /**
    * @description Title of a section in the Network conditions view that includes
@@ -51,12 +51,12 @@ const UIStrings = {
    */
   acceptedEncoding: 'Accepted `Content-Encoding`s',
   /**
-  * @description Status text for successful update of client hints.
-  */
+   * @description Status text for successful update of client hints.
+   */
   clientHintsStatusText: 'User agent updated.',
   /**
-  * @description The aria alert message when the Network conditions panel is shown.
-  */
+   * @description The aria alert message when the Network conditions panel is shown.
+   */
   networkConditionsPanelShown: 'Network conditions shown',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkConfigView.ts', UIStrings);
@@ -99,7 +99,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
         Common.Settings.Settings.instance().createSetting<Protocol.Emulation.UserAgentMetadata|null>(
             'customUserAgentMetadata', null);
     const userAgentSelectElement = document.createElement('select');
-    UI.ARIAUtils.setAccessibleName(userAgentSelectElement, title);
+    UI.ARIAUtils.setLabel(userAgentSelectElement, title);
 
     const customOverride = {title: i18nString(UIStrings.custom), value: 'custom'};
     userAgentSelectElement.appendChild(new Option(customOverride.title, customOverride.value));
@@ -121,7 +121,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
     UI.Tooltip.Tooltip.install(otherUserAgentElement, userAgentSetting.get());
     otherUserAgentElement.placeholder = i18nString(UIStrings.enterACustomUserAgent);
     otherUserAgentElement.required = true;
-    UI.ARIAUtils.setAccessibleName(otherUserAgentElement, otherUserAgentElement.placeholder);
+    UI.ARIAUtils.setLabel(otherUserAgentElement, otherUserAgentElement.placeholder);
 
     const errorElement = document.createElement('div');
     errorElement.classList.add('network-config-input-validation-error');
@@ -205,7 +205,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
     const section = this.createSection(title, 'network-config-throttling');
     const networkThrottlingSelect = (section.createChild('select', 'chrome-select') as HTMLSelectElement);
     MobileThrottling.ThrottlingManager.throttlingManager().decorateSelectWithNetworkThrottling(networkThrottlingSelect);
-    UI.ARIAUtils.setAccessibleName(networkThrottlingSelect, title);
+    UI.ARIAUtils.setLabel(networkThrottlingSelect, title);
   }
 
   private createUserAgentSection(): void {
@@ -324,6 +324,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
       Deflate: Protocol.Network.ContentEncoding.Deflate,
       Gzip: Protocol.Network.ContentEncoding.Gzip,
       Br: Protocol.Network.ContentEncoding.Br,
+      Zstd: Protocol.Network.ContentEncoding.Zstd,
     };
     for (const encoding of Object.values(contentEncodings)) {
       const label = UI.UIUtils.CheckboxLabel.create(encoding, true);
@@ -349,7 +350,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
       customAcceptedEncodingSetting.set(encodings.join(','));
     }
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([networkConfigViewStyles]);
 

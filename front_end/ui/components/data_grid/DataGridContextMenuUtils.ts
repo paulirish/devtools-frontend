@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 import type * as UI from '../../legacy/legacy.js';
 
-import type {DataGrid} from './DataGrid.js';
+import {type DataGrid} from './DataGrid.js';
 import {ContextMenuColumnSortClickEvent} from './DataGridEvents.js';
-import type {Column} from './DataGridUtils.js';
+import {type Column} from './DataGridUtils.js';
 
 function toggleColumnVisibility(dataGrid: DataGrid, column: Column): void {
   const newVisibility = !column.visible;
@@ -36,10 +36,10 @@ export function addColumnVisibilityCheckboxes(
       continue;
     }
     /**
-       * Append checkboxes for each column that is hideable; these will show
-       * with checkboxes if the column is visible and allow the user to click in
-       * the context menu to toggle an individual column's visibility.
-       */
+     * Append checkboxes for each column that is hideable; these will show
+     * with checkboxes if the column is visible and allow the user to click in
+     * the context menu to toggle an individual column's visibility.
+     */
     contextMenu.defaultSection().appendCheckboxItem(column.title, () => {
       toggleColumnVisibility(dataGrid, column);
     }, column.visible);

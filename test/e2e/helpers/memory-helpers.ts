@@ -3,16 +3,28 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
-import {platform, waitForElementWithTextContent} from '../../shared/helper.js';
-import {$$, click, getBrowserAndPages, pasteText, waitFor, waitForFunction, waitForNone} from '../../shared/helper.js';
+import {
+  $,
+  platform,
+  waitForElementWithTextContent,
+  $$,
+  click,
+  clickElement,
+  getBrowserAndPages,
+  pasteText,
+  waitFor,
+  waitForFunction,
+  waitForNone,
+} from '../../shared/helper.js';
 
 const NEW_HEAP_SNAPSHOT_BUTTON = 'button[aria-label="Take heap snapshot"]';
 const MEMORY_PANEL_CONTENT = 'div[aria-label="Memory panel"]';
 const PROFILE_TREE_SIDEBAR = 'div.profiles-tree-sidebar';
 export const MEMORY_TAB_ID = '#tab-heap_profiler';
 const CLASS_FILTER_INPUT = 'div[aria-placeholder="Class filter"]';
+const SELECTED_RESULT = '#profile-views table.data tr.data-grid-data-grid-node.revealed.parent.selected';
 
 export async function navigateToMemoryTab() {
   await click(MEMORY_TAB_ID);
@@ -20,9 +32,9 @@ export async function navigateToMemoryTab() {
   await waitFor(PROFILE_TREE_SIDEBAR);
 }
 
-export async function takeAllocationProfile(frontend: puppeteer.Page) {
-  const [radioButton] = await frontend.$x('//label[text()="Allocation sampling"]');
-  await click(radioButton);
+export async function takeAllocationProfile() {
+  const radioButton = await $('//label[text()="Allocation sampling"]', undefined, 'xpath');
+  await clickElement(radioButton);
   await click('button[aria-label="Start heap profiling"]');
   await new Promise(r => setTimeout(r, 200));
   await click('button[aria-label="Stop heap profiling"]');
@@ -30,14 +42,13 @@ export async function takeAllocationProfile(frontend: puppeteer.Page) {
   await waitFor('.heap-snapshot-sidebar-tree-item.selected');
 }
 
-export async function takeAllocationTimelineProfile(
-    frontend: puppeteer.Page, {recordStacks}: {recordStacks: boolean} = {
-      recordStacks: false,
-    }) {
-  const [radioButton] = await frontend.$x('//label[text()="Allocation instrumentation on timeline"]');
-  await click(radioButton);
+export async function takeAllocationTimelineProfile({recordStacks}: {recordStacks: boolean} = {
+  recordStacks: false,
+}) {
+  const radioButton = await $('//label[text()="Allocation instrumentation on timeline"]', undefined, 'xpath');
+  await clickElement(radioButton);
   if (recordStacks) {
-    await click('input[aria-label="Record stack traces of allocations (extra performance overhead)"]');
+    await click('[title="Record stack traces of allocations (extra performance overhead)"]');
   }
   await click('button[aria-label="Start recording heap profile"]');
   await new Promise(r => setTimeout(r, 200));
@@ -130,40 +141,37 @@ export async function waitForSearchResultNumber(results: number) {
   return await waitForFunction(findMatch);
 }
 
-/**
- * Waits for the next selected row in `grid` whose text content is different from `previousContent`.
- *
- * @param grid the grid root element
- * @param previousContent the previously selected text content
- */
-async function waitForNextSelectedRow(grid: puppeteer.ElementHandle<Element>, previousContent: string) {
-  const findMatch = async () => {
-    const currentMatch = await grid.$('.data-grid-data-grid-node.selected');
-    const currentTextContent = currentMatch && await currentMatch.evaluate(el => el.textContent);
-    if (currentMatch && currentTextContent !== previousContent) {
-      return currentMatch;
-    }
-    return undefined;
-  };
-  return await waitForFunction(findMatch);
-}
-
-export async function findSearchResult(p: (el: puppeteer.ElementHandle<Element>) => Promise<boolean>) {
-  const grid = await waitFor('#profile-views table.data');
-  const next = await waitFor('[aria-label="Search next"]');
-  let previousContent = '';
-  const findSearchResult = async () => {
-    const currentMatch = await waitForNextSelectedRow(grid, previousContent);
-    if (currentMatch && await p(currentMatch)) {
-      return currentMatch;
-    }
-    // Since `waitForNextSelectedRow` above waited for the new selection, we haven't found
-    // the right search result yet, so click on the button for the next search result.
-    previousContent = currentMatch && await currentMatch.evaluate(el => el.textContent) || '';
-    await next.click();
-    return undefined;
-  };
-  return await waitForFunction(findSearchResult);
+export async function findSearchResult(searchResult: string, pollIntrerval: number = 500) {
+  const {frontend} = getBrowserAndPages();
+  const match = await waitFor('#profile-views table.data');
+  const matches = await waitFor('label.search-results-matches');
+  const matchesText = await matches.evaluate(async element => {
+    return element.textContent;
+  });
+  if (matchesText === '1 of 1') {
+    await waitForElementWithTextContent(searchResult, match);
+  } else {
+    await waitForFunction(async () => {
+      const selectedBefore = await waitFor(SELECTED_RESULT);
+      await click('[aria-label="Search next"]');
+      // Wait until the click has taken effect by checking that the selected
+      // result has changed. This is done to prevent the assertion afterwards
+      // from happening before the next result is fully loaded.
+      await waitForFunction(async () => {
+        const selectedAfter = await waitFor(SELECTED_RESULT);
+        return await frontend.evaluate((b, a) => {
+          return b !== a;
+        }, selectedBefore, selectedAfter);
+      });
+      const result = Promise.race([
+        waitForElementWithTextContent(searchResult, match),
+        new Promise(resolve => {
+          setTimeout(resolve, pollIntrerval, false);
+        }),
+      ]);
+      return result;
+    });
+  }
 }
 
 const normalizRetainerName = (retainerName: string) => {
@@ -220,17 +228,35 @@ export async function waitUntilRetainerChainSatisfies(p: (retainerChain: Array<R
   await waitForFunction(assertRetainerChainSatisfies.bind(null, p));
 }
 
+export function appearsInOrder(targetArray: string[], inputArray: string[]) {
+  let i = 0;
+  let j = 0;
+
+  if (inputArray.length > targetArray.length) {
+    return false;
+  }
+
+  if (inputArray === targetArray) {
+    return true;
+  }
+
+  while (i < targetArray.length && j < inputArray.length) {
+    if (inputArray[j] === targetArray[i]) {
+      j++;
+    }
+    i++;
+  }
+
+  if (j === inputArray.length) {
+    return true;
+  }
+  return false;
+}
+
 export async function waitForRetainerChain(expectedRetainers: Array<string>) {
   await waitForFunction(assertRetainerChainSatisfies.bind(null, retainerChain => {
-    if (retainerChain.length !== expectedRetainers.length) {
-      return false;
-    }
-    for (let i = 0; i < expectedRetainers.length; ++i) {
-      if (retainerChain[i].retainerClassName !== expectedRetainers[i]) {
-        return false;
-      }
-    }
-    return true;
+    const actual = retainerChain.map(e => e.retainerClassName);
+    return appearsInOrder(actual, expectedRetainers);
   }));
 }
 

@@ -6,7 +6,11 @@ import {assert} from 'chai';
 
 import {getTestServerPort} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {getConsoleMessages, showVerboseMessages, waitForConsoleMessagesToBeNonEmpty} from '../helpers/console-helpers.js';
+import {
+  getConsoleMessages,
+  showVerboseMessages,
+  waitForConsoleMessagesToBeNonEmpty,
+} from '../helpers/console-helpers.js';
 
 describe('The Console Tab', async () => {
   it('shows BigInts formatted', async () => {
@@ -113,6 +117,7 @@ describe('The Console Tab', async () => {
       'NaN',
       '{}',
       '[ƒ]',
+      '[\'test\']',
       'Infinity',
       '-Infinity',
       'Number\xA0{42}',
@@ -120,6 +125,7 @@ describe('The Console Tab', async () => {
       '0.12',
       '-0',
       'test',
+      'test named \"test\"',
       'https://chromium.org',
       'Number\xA0{42, 1: \'foo\', a: \'bar\'}',
       'String\xA0{\'abc\', 3: \'foo\', 01: \'foo\', a: \'bar\'}',

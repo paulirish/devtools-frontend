@@ -263,16 +263,13 @@ export const regexSpecialCharacters = function(): string {
 };
 
 export const filterRegex = function(query: string): RegExp {
-  let regexString = '';
+  let regexString = '^(?:.*\\0)?';  // Start from beginning or after a \0
   for (let i = 0; i < query.length; ++i) {
     let c = query.charAt(i);
     if (SPECIAL_REGEX_CHARACTERS.indexOf(c) !== -1) {
       c = '\\' + c;
     }
-    if (i) {
-      regexString += '[^\\0' + c + ']*';
-    }
-    regexString += c;
+    regexString += '[^\\0' + c + ']*' + c;
   }
   return new RegExp(regexString, 'i');
 };
@@ -454,4 +451,32 @@ export const createPlainTextSearchRegex = function(query: string, flags?: string
     regex += c;
   }
   return new RegExp(regex, flags || '');
+};
+
+class LowerCaseStringTag {
+  private lowerCaseStringTag: (string|undefined);
+}
+
+export type LowerCaseString = string&LowerCaseStringTag;
+
+export const toLowerCaseString = function(input: string): LowerCaseString {
+  return input.toLowerCase() as LowerCaseString;
+};
+
+// Replaces the last ocurrence of parameter `search` with parameter `replacement` in `input`
+export const replaceLast = function(input: string, search: string, replacement: string): string {
+  const replacementStartIndex = input.lastIndexOf(search);
+  if (replacementStartIndex === -1) {
+    return input;
+  }
+
+  return input.slice(0, replacementStartIndex) + input.slice(replacementStartIndex).replace(search, replacement);
+};
+
+export const stringifyWithPrecision = function stringifyWithPrecision(s: number, precision = 2): string {
+  if (precision === 0) {
+    return s.toFixed(0);
+  }
+  const string = s.toFixed(precision).replace(/\.?0*$/, '');
+  return string === '-0' ? '0' : string;
 };

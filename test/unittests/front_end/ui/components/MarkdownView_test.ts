@@ -9,43 +9,58 @@ import {assertShadowRoot, renderElementIntoDOM} from '../../helpers/DOMHelpers.j
 
 const {assert} = chai;
 
+type TestToken = {
+  type: string,
+  tokens?: Marked.Marked.Token[],
+  text?: string,
+  href?: string,
+  items?: Object[],
+  depth?: number,
+};
+
+function getFakeToken(token: TestToken): Marked.Marked.Token {
+  return token as unknown as Marked.Marked.Token;
+}
+
 describe('MarkdownView', async () => {
   describe('renderToken', async () => {
     it('wraps paragraph tokens in <p> tags', () => {
-      const renderResult = MarkdownView.MarkdownView.renderToken({type: 'paragraph', tokens: []});
+      const renderResult = MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'paragraph', tokens: []}));
       assert.deepStrictEqual(renderResult.strings.raw, ['<p>', '']);
     });
 
     it('wraps an unordered list token in <ul> tags', () => {
-      const renderResult = MarkdownView.MarkdownView.renderToken({type: 'list', items: []});
+      const renderResult = MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'list', items: []}));
       assert.deepStrictEqual(renderResult.strings.raw, ['<ul>', '</ul>']);
     });
 
     it('wraps list items in <li> tags', () => {
-      const renderResult = MarkdownView.MarkdownView.renderToken({type: 'list_item', tokens: []});
+      const renderResult = MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'list_item', tokens: []}));
       assert.deepStrictEqual(renderResult.strings.raw, ['<li>', '']);
     });
 
     it('wraps a codespan token in <code> tags', () => {
-      const renderResult = MarkdownView.MarkdownView.renderToken({type: 'codespan', text: 'const foo = 42;'});
+      const renderResult =
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'codespan', text: 'const foo = 42;'}));
       assert.deepStrictEqual(renderResult.strings.raw, ['<code>', '</code>']);
       assert.deepStrictEqual(renderResult.values, ['const foo = 42;']);
     });
 
     it('renders childless text tokens as-is', () => {
-      const renderResult = MarkdownView.MarkdownView.renderToken({type: 'text', text: 'Simple text token'});
+      const renderResult =
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'text', text: 'Simple text token'}));
       assert.deepStrictEqual(renderResult.values, ['Simple text token']);
     });
 
     it('renders nested text tokens correctly', () => {
-      const renderResult = MarkdownView.MarkdownView.renderToken({
+      const renderResult = MarkdownView.MarkdownView.renderToken(getFakeToken({
         type: 'text',
         text: 'This text should not be rendered. Only the subtokens!',
         tokens: [
-          {type: 'text', text: 'Nested raw text'},
-          {type: 'codespan', text: 'and a nested codespan to boot'},
+          getFakeToken({type: 'text', text: 'Nested raw text'}),
+          getFakeToken({type: 'codespan', text: 'and a nested codespan to boot'}),
         ],
-      });
+      }));
 
       const renderedParts = renderResult.values[0] as LitHtml.TemplateResult[];
       assert.strictEqual(renderedParts.length, 2);
@@ -54,13 +69,14 @@ describe('MarkdownView', async () => {
     });
 
     it('throws an error for invalid or unsupported token types', () => {
-      assert.throws(() => MarkdownView.MarkdownView.renderToken({type: 'no_way_this_is_a_valid_markdown_token'}));
+      assert.throws(
+          () => MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'no_way_this_is_a_valid_markdown_token'})));
     });
 
     it('renders link with valid key', () => {
       MarkdownView.MarkdownLinksMap.markdownLinks.set('exampleLink', 'https://web.dev/');
       const renderResult =
-          MarkdownView.MarkdownView.renderToken({type: 'link', text: 'learn more', href: 'exampleLink'})
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'link', text: 'learn more', href: 'exampleLink'}))
               .strings.join('');
 
       assert.isTrue(renderResult.includes('<devtools-markdown-link'));
@@ -72,11 +88,11 @@ describe('MarkdownView', async () => {
 
     it('renders icon with valid key', () => {
       MarkdownView.MarkdownImagesMap.markdownImages.set('testExampleImage', {
-        src: 'largeicon-phone',
+        src: 'devices',
         isIcon: true,
       });
       const renderResult =
-          MarkdownView.MarkdownView.renderToken({type: 'image', text: 'phone', href: 'testExampleImage'})
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'image', text: 'phone', href: 'testExampleImage'}))
               .strings.join('');
       assert.isTrue(renderResult.includes('<devtools-markdown-image'));
     });
@@ -87,12 +103,32 @@ describe('MarkdownView', async () => {
         isIcon: false,
       });
       const renderResult =
-          MarkdownView.MarkdownView.renderToken({type: 'image', text: 'phone', href: 'exampleImage'}).strings.join('');
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'image', text: 'phone', href: 'exampleImage'}))
+              .strings.join('');
       assert.isTrue(renderResult.includes('<devtools-markdown-image'));
     });
 
     it('throws an error if invalid image key is provided', () => {
       assert.throws(() => MarkdownView.MarkdownImagesMap.getMarkdownImage('testErrorImageLink'));
+    });
+    it('renders a heading correctly', () => {
+      const renderResult =
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'heading', text: 'a heading text', depth: 3}))
+              .strings.join('');
+
+      assert.isTrue(renderResult.includes('<h3'));
+    });
+    it('renders strong correctly', () => {
+      const renderResult =
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'strong', text: 'a strong text'})).strings.join('');
+
+      assert.isTrue(renderResult.includes('<strong'));
+    });
+    it('renders em correctly', () => {
+      const renderResult =
+          MarkdownView.MarkdownView.renderToken(getFakeToken({type: 'em', text: 'em text'})).strings.join('');
+
+      assert.isTrue(renderResult.includes('<em'));
     });
   });
 

@@ -4,7 +4,15 @@
 
 import {assert} from 'chai';
 
-import {clearPermissionsOverride, getBrowserAndPages, goToResource, overridePermissions, selectOption, step, waitFor} from '../../shared/helper.js';
+import {
+  clearPermissionsOverride,
+  getBrowserAndPages,
+  goToResource,
+  overridePermissions,
+  selectOption,
+  step,
+  waitFor,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 
@@ -67,7 +75,7 @@ describe('Idle Emulation on Sensors panel', () => {
       await goToResource('sensors/idle-detector.html');
     });
 
-    const select = await waitFor('.idle-section select');
+    const select = await (await waitFor('.idle-section select')).toElement('select');
 
     // InitialState can be idle as well.
     const initialState = await getState();

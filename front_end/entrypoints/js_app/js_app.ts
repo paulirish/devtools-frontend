@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import '../shell/shell.js';
+import '../../panels/mobile_throttling/mobile_throttling-meta.js';
 import '../../panels/js_profiler/js_profiler-meta.js';
 
 import * as Common from '../../core/common/common.js';
@@ -13,8 +14,8 @@ import * as Main from '../main/main.js';
 
 const UIStrings = {
   /**
-  *@description Text that refers to the main target.
-  */
+   *@description Text that refers to the main target.
+   */
   main: 'Main',
 };
 

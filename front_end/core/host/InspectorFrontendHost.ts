@@ -36,30 +36,62 @@ import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import type {CanShowSurveyResult, ContextMenuDescriptor, EnumeratedHistogram, EventTypes, ExtensionDescriptor, InspectorFrontendHostAPI, LoadNetworkResourceResult, ShowSurveyResult, SyncInformation} from './InspectorFrontendHostAPI.js';
-import {EventDescriptors, Events} from './InspectorFrontendHostAPI.js';
+import {
+  EventDescriptors,
+  Events,
+  type CanShowSurveyResult,
+  type ContextMenuDescriptor,
+  type EnumeratedHistogram,
+  type EventTypes,
+  type ExtensionDescriptor,
+  type InspectorFrontendHostAPI,
+  type LoadNetworkResourceResult,
+  type ShowSurveyResult,
+  type SyncInformation,
+} from './InspectorFrontendHostAPI.js';
 import {streamWrite as resourceLoaderStreamWrite} from './ResourceLoader.js';
+
+interface DecompressionStream extends GenericTransformStream {
+  readonly format: string;
+}
+declare const DecompressionStream: {
+  prototype: DecompressionStream,
+  new (format: string): DecompressionStream,
+};
 
 const UIStrings = {
   /**
-  *@description Document title in Inspector Frontend Host of the DevTools window
-  *@example {example.com} PH1
-  */
+   *@description Document title in Inspector Frontend Host of the DevTools window
+   *@example {example.com} PH1
+   */
   devtoolsS: 'DevTools - {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('core/host/InspectorFrontendHost.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const MAX_RECORDED_HISTOGRAMS_SIZE = 100;
+const OVERRIDES_FILE_SYSTEM_PATH = '/overrides' as Platform.DevToolsPath.RawPathString;
 
 export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   readonly #urlsBeingSaved: Map<Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, string[]>;
   events!: Common.EventTarget.EventTarget<EventTypes>;
+  #fileSystem: FileSystem|null = null;
 
+  recordedCountHistograms:
+      {histogramName: string, sample: number, min: number, exclusiveMax: number, bucketSize: number}[] = [];
   recordedEnumeratedHistograms: {actionName: EnumeratedHistogram, actionCode: number}[] = [];
   recordedPerformanceHistograms: {histogramName: string, duration: number}[] = [];
 
   constructor() {
+    this.#urlsBeingSaved = new Map();
+
+    // Guard against errors should this file ever be imported at the top level
+    // within a worker - in which case this constructor is run. If there's no
+    // document, we can early exit.
+    if (typeof document === 'undefined') {
+      return;
+    }
+
     function stopEventPropagation(this: InspectorFrontendHostAPI, event: KeyboardEvent): void {
       // Let browser handle Ctrl+/Ctrl- shortcuts in hosted mode.
       const zoomModifier = this.platform() === 'mac' ? event.metaKey : event.ctrlKey;
@@ -67,10 +99,10 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
         event.stopPropagation();
       }
     }
+
     document.addEventListener('keydown', event => {
       stopEventPropagation.call(this, (event as KeyboardEvent));
     }, true);
-    this.#urlsBeingSaved = new Map();
   }
 
   platform(): string {
@@ -188,6 +220,14 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   sendMessageToBackend(message: string): void {
   }
 
+  recordCountHistogram(histogramName: string, sample: number, min: number, exclusiveMax: number, bucketSize: number):
+      void {
+    if (this.recordedCountHistograms.length >= MAX_RECORDED_HISTOGRAMS_SIZE) {
+      this.recordedCountHistograms.shift();
+    }
+    this.recordedCountHistograms.push({histogramName, sample, min, exclusiveMax, bucketSize});
+  }
+
   recordEnumeratedHistogram(actionName: EnumeratedHistogram, actionCode: number, bucketSize: number): void {
     if (this.recordedEnumeratedHistograms.length >= MAX_RECORDED_HISTOGRAMS_SIZE) {
       this.recordedEnumeratedHistograms.shift();
@@ -210,19 +250,68 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   addFileSystem(type?: string): void {
+    const onFileSystem = (fs: FileSystem): void => {
+      this.#fileSystem = fs;
+      const fileSystem = {
+        fileSystemName: 'sandboxedRequestedFileSystem',
+        fileSystemPath: OVERRIDES_FILE_SYSTEM_PATH,
+        rootURL: 'filesystem:devtools://devtools/isolated/',
+        type: 'overrides',
+      };
+      this.events.dispatchEventToListeners(Events.FileSystemAdded, {fileSystem});
+    };
+    window.webkitRequestFileSystem(window.TEMPORARY, 1024 * 1024, onFileSystem);
   }
 
   removeFileSystem(fileSystemPath: Platform.DevToolsPath.RawPathString): void {
+    const removalCallback = (entries: Entry[]): void => {
+      entries.forEach(entry => {
+        if (entry.isDirectory) {
+          (entry as DirectoryEntry).removeRecursively(() => {});
+        } else if (entry.isFile) {
+          entry.remove(() => {});
+        }
+      });
+    };
+
+    if (this.#fileSystem) {
+      this.#fileSystem.root.createReader().readEntries(removalCallback);
+    }
+
+    this.#fileSystem = null;
+    this.events.dispatchEventToListeners(Events.FileSystemRemoved, OVERRIDES_FILE_SYSTEM_PATH);
   }
 
   isolatedFileSystem(fileSystemId: string, registeredName: string): FileSystem|null {
-    return null;
+    return this.#fileSystem;
   }
 
   loadNetworkResource(
       url: string, headers: string, streamId: number, callback: (arg0: LoadNetworkResourceResult) => void): void {
+    // Read the first 3 bytes looking for the gzip signature in the file header
+    function isGzip(ab: ArrayBuffer): boolean {
+      const buf = new Uint8Array(ab);
+      if (!buf || buf.length < 3) {
+        return false;
+      }
+
+      // https://www.rfc-editor.org/rfc/rfc1952#page-6
+      return buf[0] === 0x1F && buf[1] === 0x8B && buf[2] === 0x08;
+    }
     fetch(url)
-        .then(result => result.text())
+        .then(async result => {
+          const resultArrayBuf = await result.arrayBuffer();
+          let decoded: ReadableStream|ArrayBuffer = resultArrayBuf;
+          if (isGzip(resultArrayBuf)) {
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            void writer.write(resultArrayBuf);
+            void writer.close();
+            decoded = ds.readable;
+          }
+          const text = await new Response(decoded).text();
+          return text;
+        })
         .then(function(text) {
           resourceLoaderStreamWrite(streamId, text);
           callback({
@@ -364,7 +453,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 
 // @ts-ignore Global injected by devtools-compatibility.js
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export let InspectorFrontendHostInstance: InspectorFrontendHostStub = window.InspectorFrontendHost;
+export let InspectorFrontendHostInstance: InspectorFrontendHostStub = globalThis.InspectorFrontendHost;
 
 class InspectorFrontendAPIImpl {
   constructor() {
@@ -411,7 +500,7 @@ function initializeInspectorFrontendHost(): void {
   if (!InspectorFrontendHostInstance) {
     // Instantiate stub for web-hosted mode if necessary.
     // @ts-ignore Global injected by devtools-compatibility.js
-    window.InspectorFrontendHost = InspectorFrontendHostInstance = new InspectorFrontendHostStub();
+    globalThis.InspectorFrontendHost = InspectorFrontendHostInstance = new InspectorFrontendHostStub();
   } else {
     // Otherwise add stubs for missing methods that are declared in the interface.
     proto = InspectorFrontendHostStub.prototype;
@@ -438,7 +527,7 @@ function initializeInspectorFrontendHost(): void {
 // so the host instance should not be initialized there.
 initializeInspectorFrontendHost();
 // @ts-ignore Global injected by devtools-compatibility.js
-window.InspectorFrontendAPI = new InspectorFrontendAPIImpl();
+globalThis.InspectorFrontendAPI = new InspectorFrontendAPIImpl();
 })();
 
 export function isUnderTest(prefs?: {

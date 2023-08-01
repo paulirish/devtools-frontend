@@ -7,11 +7,17 @@ import("../../../../scripts/build/ninja/copy.gni")
 copy_to_gen("network") {
   sources = [
     "cacheable.rawresponse",
+    "chunked.txt",
+    "chunked_sync.html",
+    "coffees.json",
     "csp-report-only.rawresponse",
     "embedded_requests.html",
+    "fetch-json.html",
     "fetch.html",
     "headers-and-payload.html",
+    "hello.html",
     "image.svg",
+    "infinite-requests.html",
     "last-modified.html",
     "last-modified.rawresponse",
     "requests.html",
@@ -23,6 +29,8 @@ copy_to_gen("network") {
     "service-worker.html",
     "service-worker.js",
     "style.css",
+    "stylesheet-resources.css",
+    "stylesheet-resources.html",
     "third-party-resources.html",
     "trusted-type-policy-violation-report-only.rawresponse",
     "trusted-type-violations-enforced.rawresponse",
@@ -37,6 +45,7 @@ copy_to_gen("network") {
     "webbundle_bad_metadata.wbn",
     "webbundle_bad_metadata.wbn.headers",
     "websocket.html",
+    "xhr-json.html",
     "xhr.html",
   ]
 }

@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Platform from '../../../../../front_end/core/platform/platform.js';
+import * as i18n from '../../../../../front_end/core/i18n/i18n.js';
 import * as Root from '../../../../../front_end/core/root/root.js';
 import * as QuickOpen from '../../../../../front_end/ui/legacy/components/quick_open/quick_open.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
-import {deinitializeGlobalVars, describeWithEnvironment, initializeGlobalVars} from '../../helpers/EnvironmentHelpers.js';
+import {
+  deinitializeGlobalVars,
+  describeWithEnvironment,
+  initializeGlobalVars,
+} from '../../helpers/EnvironmentHelpers.js';
 
 const {assert} = chai;
 let actionExecuted = false;
@@ -26,7 +30,7 @@ describeWithEnvironment('Action registration', () => {
     UI.ActionRegistration.registerActionExtension({
       actionId,
       category: UI.ActionRegistration.ActionCategory.ELEMENTS,
-      title: (): Platform.UIString.LocalizedString => actionTitle as Platform.UIString.LocalizedString,
+      title: i18n.i18n.lockedLazyString(actionTitle),
       async loadActionDelegate() {
         return new MockActionDelegate();
       },
@@ -45,7 +49,7 @@ describeWithEnvironment('Action registration', () => {
 
   after(async () => {
     await deinitializeGlobalVars();
-    UI.ActionRegistry.ActionRegistry.removeInstance();
+    UI.ActionRegistry.ActionRegistry.reset();
     UI.ShortcutRegistry.ShortcutRegistry.removeInstance();
     UI.Context.Context.instance().setFlavor(MockContextType, null);
   });
@@ -75,7 +79,7 @@ describeWithEnvironment('Action registration', () => {
 
   it('executes a pre registered from the command menu', async () => {
     actionExecuted = false;
-    const commandMenuProvider = QuickOpen.CommandMenu.CommandMenuProvider.instance({forceNew: true});
+    const commandMenuProvider = new QuickOpen.CommandMenu.CommandMenuProvider();
     commandMenuProvider.attach();
     await commandMenuProvider.selectItem(0, '');
     assert.isTrue(actionExecuted, 'Action was not executed from CommandMenu');
@@ -92,7 +96,7 @@ describeWithEnvironment('Action registration', () => {
 
   it('does not find a pre registered action as available when its context types are not in the current context flavors',
      () => {
-       UI.Context.Context.instance().setFlavor(MockContextType, undefined);
+       UI.Context.Context.instance().setFlavor(MockContextType, null);
        const availableActions =
            UI.ActionRegistry.ActionRegistry.instance().availableActions().map(action => action.id());
        assert.strictEqual(availableActions.indexOf(actionId), -1);

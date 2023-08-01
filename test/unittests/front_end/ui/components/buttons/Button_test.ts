@@ -11,7 +11,7 @@ const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 const {assert} = chai;
 
 describe('Button', async () => {
-  const iconUrl = new URL('../../../../../../front_end/Images/ic_file_image.svg', import.meta.url).toString();
+  const iconUrl = new URL('../../../../../../front_end/Images/file-image.svg', import.meta.url).toString();
 
   async function renderButton(
       data: Buttons.Button.ButtonData = {
@@ -20,7 +20,10 @@ describe('Button', async () => {
       text = 'Button'): Promise<Buttons.Button.Button> {
     const button = new Buttons.Button.Button();
     button.data = data;
-    button.innerText = text;
+    // Toolbar and round buttons do not take text, and error if you try to set any.
+    if (data.variant !== Buttons.Button.Variant.TOOLBAR && data.variant !== Buttons.Button.Variant.ROUND) {
+      button.innerText = text;
+    }
     renderElementIntoDOM(button);
     await coordinator.done();
     return button;
@@ -159,6 +162,25 @@ describe('Button', async () => {
         '');
     const innerButton = button.shadowRoot?.querySelector('button') as HTMLButtonElement;
     assert.isFalse(innerButton.classList.contains('small'));
+  });
+
+  it('sets icon size for round icon button according to passed parameters', async () => {
+    const iconUrl = new URL('../../../../../../front_end/Images/document.svg', import.meta.url).toString();
+    const button = await renderButton(
+        {
+          variant: Buttons.Button.Variant.ROUND,
+          size: Buttons.Button.Size.SMALL,
+          iconUrl,
+          iconWidth: '15px',
+          iconHeight: '16px',
+        },
+        '');
+    const innerButton = button.shadowRoot?.querySelector('button') as HTMLButtonElement;
+    assert.isTrue(innerButton.classList.contains('explicit-size'));
+    const icon = button.shadowRoot?.querySelector('devtools-icon') as HTMLElement;
+    const basicIcon = icon.shadowRoot?.querySelector('.icon-basic') as HTMLElement;
+    assert.strictEqual(basicIcon.style.height, '16px');
+    assert.strictEqual(basicIcon.style.width, '15px');
   });
 
   describe('in forms', () => {

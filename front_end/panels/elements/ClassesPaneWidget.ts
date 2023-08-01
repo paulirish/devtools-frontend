@@ -13,24 +13,24 @@ import {ElementsPanel} from './ElementsPanel.js';
 
 const UIStrings = {
   /**
-  * @description Prompt text for a text field in the Classes Pane Widget of the Elements panel.
-  * Class refers to a CSS class.
-  */
+   * @description Prompt text for a text field in the Classes Pane Widget of the Elements panel.
+   * Class refers to a CSS class.
+   */
   addNewClass: 'Add new class',
   /**
-  * @description Screen reader announcement string when adding a CSS class via the Classes Pane Widget.
-  * @example {vbox flex-auto} PH1
-  */
+   * @description Screen reader announcement string when adding a CSS class via the Classes Pane Widget.
+   * @example {vbox flex-auto} PH1
+   */
   classesSAdded: 'Classes {PH1} added',
   /**
-  * @description Screen reader announcement string when adding a class via the Classes Pane Widget.
-  * @example {title-container} PH1
-  */
+   * @description Screen reader announcement string when adding a class via the Classes Pane Widget.
+   * @example {title-container} PH1
+   */
   classSAdded: 'Class {PH1} added',
   /**
-  * @description Accessible title read by screen readers for the Classes Pane Widget of the Elements
-  * panel. Element is a HTML DOM Element and classes refers to CSS classes.
-  */
+   * @description Accessible title read by screen readers for the Classes Pane Widget of the Elements
+   * panel. Element is a HTML DOM Element and classes refers to CSS classes.
+   */
   elementClasses: 'Element Classes',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/ClassesPaneWidget.ts', UIStrings);
@@ -62,7 +62,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
     proxyElement.addEventListener('keydown', this.onKeyDown.bind(this), false);
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DOMModel.DOMModel, SDK.DOMModel.Events.DOMMutated, this.onDOMMutated, this);
+        SDK.DOMModel.DOMModel, SDK.DOMModel.Events.DOMMutated, this.onDOMMutated, this, {scoped: true});
     this.mutatingNodes = new Set();
     this.pendingNodeClasses = new Map();
     this.updateNodeThrottler = new Common.Throttler.Throttler(0);
@@ -75,7 +75,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (!(event.key === 'Enter') && !isEscKey(event)) {
+    if (!(event.key === 'Enter') && !Platform.KeyboardUtilities.isEscKey(event)) {
       return;
     }
 
@@ -88,7 +88,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
 
     const eventTarget = (event.target as HTMLElement);
     let text: ''|string = (eventTarget.textContent as string);
-    if (isEscKey(event)) {
+    if (Platform.KeyboardUtilities.isEscKey(event)) {
       if (!Platform.StringUtilities.isWhitespace(text)) {
         event.consume(true);
       }
@@ -149,7 +149,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
     this.update();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.update();
     this.registerCSSFiles([classesPaneWidgetStyles]);
@@ -360,7 +360,6 @@ export class ClassNamePrompt extends UI.TextPrompt.TextPrompt {
         text: completion,
         title: undefined,
         subtitle: undefined,
-        iconType: undefined,
         priority: undefined,
         isSecondary: undefined,
         subtitleRenderer: undefined,

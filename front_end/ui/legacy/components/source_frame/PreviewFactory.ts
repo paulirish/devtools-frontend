@@ -15,8 +15,8 @@ import {XMLView} from './XMLView.js';
 
 const UIStrings = {
   /**
-  *@description Text in Preview Factory of the Sources panel
-  */
+   *@description Text in Preview Factory of the Sources panel
+   */
   nothingToPreview: 'Nothing to preview',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/PreviewFactory.ts', UIStrings);
@@ -45,7 +45,7 @@ export class PreviewFactory {
     }
 
     let content: string = deferredContent.content;
-    if (await provider.contentEncoded()) {
+    if (deferredContent.isEncoded) {
       content = window.atob(content);
     }
 

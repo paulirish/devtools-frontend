@@ -27,15 +27,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import type * as SDK from '../../core/sdk/sdk.js';
 import type * as UI from '../../ui/legacy/legacy.js';
 
-import type {Formatter} from './ProfileDataGrid.js';
-import {ProfileDataGridNode, ProfileDataGridTree} from './ProfileDataGrid.js';
+import {ProfileDataGridNode, ProfileDataGridTree, type Formatter} from './ProfileDataGrid.js';
+import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 
 export class TopDownProfileDataGridNode extends ProfileDataGridNode {
-  remainingChildren: SDK.ProfileTreeModel.ProfileNode[];
-  constructor(profileNode: SDK.ProfileTreeModel.ProfileNode, owningTree: TopDownProfileDataGridTree) {
+  remainingChildren: CPUProfile.ProfileTreeModel.ProfileNode[];
+  constructor(profileNode: CPUProfile.ProfileTreeModel.ProfileNode, owningTree: TopDownProfileDataGridTree) {
     const hasChildren = Boolean(profileNode.children && profileNode.children.length);
 
     super(profileNode, owningTree, hasChildren);
@@ -76,23 +75,23 @@ export class TopDownProfileDataGridNode extends ProfileDataGridNode {
     }
   }
 
-  populateChildren(): void {
+  override populateChildren(): void {
     TopDownProfileDataGridNode.sharedPopulate(this);
   }
 }
 
 export class TopDownProfileDataGridTree extends ProfileDataGridTree {
-  remainingChildren: SDK.ProfileTreeModel.ProfileNode[];
+  remainingChildren: CPUProfile.ProfileTreeModel.ProfileNode[];
 
   constructor(
       formatter: Formatter, searchableView: UI.SearchableView.SearchableView,
-      rootProfileNode: SDK.ProfileTreeModel.ProfileNode, total: number) {
+      rootProfileNode: CPUProfile.ProfileTreeModel.ProfileNode, total: number) {
     super(formatter, searchableView, total);
     this.remainingChildren = rootProfileNode.children;
     ProfileDataGridNode.populate(this);
   }
 
-  focus(profileDataGridNode: ProfileDataGridNode): void {
+  override focus(profileDataGridNode: ProfileDataGridNode): void {
     if (!profileDataGridNode) {
       return;
     }
@@ -104,7 +103,7 @@ export class TopDownProfileDataGridTree extends ProfileDataGridTree {
     this.total = profileDataGridNode.total;
   }
 
-  exclude(profileDataGridNode: ProfileDataGridNode): void {
+  override exclude(profileDataGridNode: ProfileDataGridNode): void {
     if (!profileDataGridNode) {
       return;
     }
@@ -118,7 +117,7 @@ export class TopDownProfileDataGridTree extends ProfileDataGridTree {
     }
   }
 
-  restore(): void {
+  override restore(): void {
     if (!this.savedChildren) {
       return;
     }
@@ -128,7 +127,7 @@ export class TopDownProfileDataGridTree extends ProfileDataGridTree {
     super.restore();
   }
 
-  populateChildren(): void {
+  override populateChildren(): void {
     TopDownProfileDataGridNode.sharedPopulate(this);
   }
 }

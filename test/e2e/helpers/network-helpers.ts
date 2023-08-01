@@ -2,19 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {$$, click, getBrowserAndPages, goToResource, setCheckBox, waitFor, waitForFunction} from '../../shared/helper.js';
+import type * as puppeteer from 'puppeteer-core';
 
-import type {puppeteer} from '../../shared/helper.js';
+import {
+  $,
+  $$,
+  click,
+  getBrowserAndPages,
+  goToResource,
+  setCheckBox,
+  waitFor,
+  waitForFunction,
+} from '../../shared/helper.js';
+
 const REQUEST_LIST_SELECTOR = '.network-log-grid tbody';
+
+export async function waitForNetworkTab(): Promise<void> {
+  // Make sure the network tab is shown on the screen
+  await waitFor('.network-log-grid');
+}
+
+export async function openNetworkTab(): Promise<void> {
+  await click('#tab-network');
+  await waitForNetworkTab();
+}
 
 /**
  * Select the Network tab in DevTools
  */
 export async function navigateToNetworkTab(testName: string) {
   await goToResource(`network/${testName}`);
-  await click('#tab-network');
-  // Make sure the network tab is shown on the screen
-  await waitFor('.network-log-grid');
+  await openNetworkTab();
 }
 
 /**
@@ -34,8 +52,15 @@ export async function getAllRequestNames() {
   return await Promise.all(requests.map(request => request.evaluate(r => r.childNodes[1].textContent)));
 }
 
+export async function getNumberOfRequests() {
+  return (await getAllRequestNames()).length;
+}
+
 export async function getSelectedRequestName() {
-  const request = await waitFor(REQUEST_LIST_SELECTOR + ' tr.selected .name-column');
+  const request = await $(REQUEST_LIST_SELECTOR + ' tr.selected .name-column');
+  if (!request) {
+    return null;
+  }
   return await request.evaluate(node => {
     return node && node.childNodes[1].textContent;
   });
@@ -76,9 +101,34 @@ export async function waitForSelectedRequestChange(initialRequestName: string|nu
 }
 
 export async function setPersistLog(persist: boolean) {
-  await setCheckBox('[aria-label="Preserve log"]', persist);
+  await setCheckBox('[title="Do not clear log on page reload / navigation"]', persist);
 }
 
 export async function setCacheDisabled(disabled: boolean): Promise<void> {
-  await setCheckBox('[aria-label="Disable cache"]', disabled);
+  await setCheckBox('[title^="Disable cache"]', disabled);
+}
+
+export async function setTimeWindow(): Promise<void> {
+  const overviewGridCursorArea = await waitFor('.overview-grid-cursor-area');
+  await overviewGridCursorArea.click({offset: {x: 0, y: 10}});
+}
+
+export async function clearTimeWindow(): Promise<void> {
+  const overviewGridCursorArea = await waitFor('.overview-grid-cursor-area');
+  await overviewGridCursorArea.click({count: 2});
+}
+
+export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element>) {
+  const headerNameElement = await waitFor('.header-name', row);
+  const headerNameText = await headerNameElement.evaluate(el => el.textContent || '');
+
+  const headerValueElement = await waitFor('.header-value', row);
+  let headerValueText = (await headerValueElement.evaluate(el => el.textContent || '')).trim();
+  if (headerValueText === '') {
+    const headerValueEditableSpanComponent = await waitFor('.header-value devtools-editable-span', row);
+    const editableSpan = await waitFor('.editable', headerValueEditableSpanComponent);
+    headerValueText = (await editableSpan.evaluate(el => el.textContent || '')).trim();
+  }
+
+  return [headerNameText.trim(), headerValueText];
 }

@@ -12,41 +12,61 @@ import type * as Protocol from '../../generated/protocol.js';
 
 const UIStrings = {
   /**
-  *@description A context menu item in the Console View of the Console panel
-  */
+   *@description A context menu item in the Console View of the Console panel
+   */
   default: 'Default',
   /**
-  *@description Text in Network Throttling Selector of the Network panel
-  */
+   *@description Text in Network Throttling Selector of the Network panel
+   */
   custom: 'Custom',
   /**
-  *@description Text for everything
-  */
+   *@description Text for everything
+   */
   all: 'All',
   /**
-  *@description Text for errors
-  */
+   *@description Text for errors
+   */
   error: 'Error',
   /**
-  *@description Text to indicate an item is a warning
-  */
+   *@description Text to indicate an item is a warning
+   */
   warning: 'Warning',
   /**
-  *@description Sdk console message message level info of level Labels in Console View of the Console panel
-  */
+   *@description Sdk console message message level info of level Labels in Console View of the Console panel
+   */
   info: 'Info',
   /**
-  *@description Debug log level
-  */
+   *@description Debug log level
+   */
   debug: 'Debug',
   /**
-  *@description Label for selecting between the set of log levels to show.
-  */
+   *@description Label for selecting between the set of log levels to show.
+   */
   logLevel: 'Log level:',
   /**
-  *@description Default text for user-text-entry for searching log messages.
-  */
+   *@description Default text for user-text-entry for searching log messages.
+   */
   filterLogMessages: 'Filter log messages',
+  /**
+   *@description The label for the group name that this error belongs to.
+   */
+  errorGroupLabel: 'Error Group:',
+  /**
+   *@description The label for the numeric code associated with this error.
+   */
+  errorCodeLabel: 'Error Code:',
+  /**
+   *@description The label for extra data associated with an error.
+   */
+  errorDataLabel: 'Data:',
+  /**
+   *@description The label for the stacktrace associated with the error.
+   */
+  errorStackLabel: 'Stacktrace:',
+  /**
+   *@description The label for a root cause error associated with this error.
+   */
+  errorCauseLabel: 'Caused by:',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/media/PlayerMessagesView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -264,6 +284,8 @@ export class PlayerMessagesView extends UI.Widget.VBox {
     dropDownItem.element.classList.add('toolbar-has-dropdown');
     dropDownItem.setEnabled(true);
     dropDownItem.setTitle(this.messageLevelSelector.defaultTitle());
+    UI.ARIAUtils.setLabel(
+        dropDownItem.element, `${i18nString(UIStrings.logLevel)} ${this.messageLevelSelector.defaultTitle()}`);
     return dropDownItem;
   }
 
@@ -318,7 +340,63 @@ export class PlayerMessagesView extends UI.Widget.VBox {
     UI.UIUtils.createTextChild(container, message.message);
   }
 
-  wasShown(): void {
+  private errorToDiv(error: Protocol.Media.PlayerError): Element {
+    const entry = UI.Fragment.Fragment.build`
+    <div class="status-error-box">
+    <div class="status-error-field-labeled">
+      <span class="status-error-field-label" $="status-error-group"></span>
+      <span>${error.errorType}</span>
+    </div>
+    <div class="status-error-field-labeled">
+      <span class="status-error-field-label" $="status-error-code"></span>
+      <span>${error.code}</span>
+    </div>
+    <div class="status-error-field-labeled" $="status-error-data">
+    </div>
+    <div class="status-error-field-labeled" $="status-error-stack">
+    </div>
+    <div class="status-error-field-labeled" $="status-error-cause">
+    </div>
+    `;
+
+    entry.$('status-error-group').textContent = i18nString(UIStrings.errorGroupLabel);
+    entry.$('status-error-code').textContent = i18nString(UIStrings.errorCodeLabel);
+
+    if (Object.keys(error.data).length !== 0) {
+      const label = entry.$('status-error-data').createChild('span', 'status-error-field-label');
+      UI.UIUtils.createTextChild(label, i18nString(UIStrings.errorDataLabel));
+      const dataContent = entry.$('status-error-data').createChild('div');
+      for (const [key, value] of Object.entries(error.data)) {
+        const datumContent = dataContent.createChild('div');
+        UI.UIUtils.createTextChild(datumContent, `${key}: ${value}`);
+      }
+    }
+
+    if (error.stack.length !== 0) {
+      const label = entry.$('status-error-stack').createChild('span', 'status-error-field-label');
+      UI.UIUtils.createTextChild(label, i18nString(UIStrings.errorStackLabel));
+      const stackContent = entry.$('status-error-stack').createChild('div');
+      for (const stackEntry of error.stack) {
+        const frameBox = stackContent.createChild('div');
+        UI.UIUtils.createTextChild(frameBox, `${stackEntry.file}:${stackEntry.line}`);
+      }
+    }
+
+    if (error.cause.length !== 0) {
+      const label = entry.$('status-error-cause').createChild('span', 'status-error-field-label');
+      UI.UIUtils.createTextChild(label, i18nString(UIStrings.errorCauseLabel));
+      entry.$('status-error-cause').appendChild(this.errorToDiv(error.cause[0]));
+    }
+
+    return entry.element();
+  }
+
+  addError(error: Protocol.Media.PlayerError): void {
+    const container = this.bodyPanel.createChild('div', 'media-messages-message-container media-message-error');
+    container.appendChild(this.errorToDiv(error));
+  }
+
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([playerMessagesViewStyles]);
   }

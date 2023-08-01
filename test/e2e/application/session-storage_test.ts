@@ -4,10 +4,17 @@
 
 import {assert} from 'chai';
 
-import {getBrowserAndPages, getTestServerPort, step} from '../../shared/helper.js';
-import {doubleClickSourceTreeItem, getStorageItemsData, navigateToApplicationTab} from '../helpers/application-helpers.js';
+import {getBrowserAndPages, getTestServerPort, step, waitForFunction} from '../../shared/helper.js';
+import {describe, it} from '../../shared/mocha-extensions.js';
+import {
+  deleteSelectedStorageItem,
+  doubleClickSourceTreeItem,
+  getStorageItemsData,
+  navigateToApplicationTab,
+  selectStorageItemAtIndex,
+} from '../helpers/application-helpers.js';
 
-const SESSION_STORAGE_SELECTOR = '[aria-label="Session Storage"].parent';
+const SESSION_STORAGE_SELECTOR = '[aria-label="Session storage"].parent';
 let DOMAIN_SELECTOR: string;
 
 describe('The Application Tab', async () => {
@@ -28,6 +35,10 @@ describe('The Application Tab', async () => {
     });
 
     await step('check that storage data values are correct', async () => {
+      await waitForFunction(async () => {
+        const values = await getStorageItemsData(['key', 'value']);
+        return values.length >= 2;
+      });
       const dataGridRowValues = await getStorageItemsData(['key', 'value']);
       assert.deepEqual(dataGridRowValues, [
         {
@@ -40,5 +51,25 @@ describe('The Application Tab', async () => {
         },
       ]);
     });
+  });
+
+  it('can delete selected items', async () => {
+    const {target} = getBrowserAndPages();
+
+    await navigateToApplicationTab(target, 'session-storage');
+
+    await doubleClickSourceTreeItem(SESSION_STORAGE_SELECTOR);
+    await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
+
+    await selectStorageItemAtIndex(0);
+    await deleteSelectedStorageItem();
+
+    const dataGridRowValues = await getStorageItemsData(['key', 'value']);
+    assert.deepEqual(dataGridRowValues, [
+      {
+        key: 'secondKey',
+        value: '{"field":"complexValue","primitive":2}',
+      },
+    ]);
   });
 });

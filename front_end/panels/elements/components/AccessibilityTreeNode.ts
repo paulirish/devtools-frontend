@@ -14,8 +14,8 @@ import accessibilityTreeNodeStyles from './accessibilityTreeNode.css.js';
 
 const UIStrings = {
   /**
-  *@description Ignored node element text content in Accessibility Tree View of the Elements panel
-  */
+   *@description Ignored node element text content in Accessibility Tree View of the Elements panel
+   */
   ignored: 'Ignored',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/components/AccessibilityTreeNode.ts', UIStrings);
@@ -49,6 +49,7 @@ export interface AccessibilityTreeNodeData {
   name: string;
   role: string;
   properties: Protocol.Accessibility.AXProperty[];
+  id: string;
 }
 
 export class AccessibilityTreeNode extends HTMLElement {
@@ -59,12 +60,14 @@ export class AccessibilityTreeNode extends HTMLElement {
   #name = '';
   #role = '';
   #properties: Protocol.Accessibility.AXProperty[] = [];
+  #id = '';
 
   set data(data: AccessibilityTreeNodeData) {
     this.#ignored = data.ignored;
     this.#name = data.name;
     this.#role = data.role;
     this.#properties = data.properties;
+    this.#id = data.id;
     void this.#render();
   }
 
@@ -77,20 +80,20 @@ export class AccessibilityTreeNode extends HTMLElement {
     const name = LitHtml.html`"<span class='attribute-value'>${this.#name}</span>"`;
     const properties = this.#properties.map(
         ({name, value}) => isPrintable(value.type) ?
-            LitHtml.html`&nbsp<span class='attribute-name'>${name}</span>:&nbsp<span class='attribute-value'>${
+            LitHtml.html` <span class='attribute-name'>${name}</span>:&nbsp;<span class='attribute-value'>${
                 value.value}</span>` :
             LitHtml.nothing);
-
-    await Coordinator.RenderCoordinator.RenderCoordinator.instance().write('Accessibility node render', () => {
-      // clang-format off
+    const content = this.#ignored ? LitHtml.html`<span>${i18nString(UIStrings.ignored)}</span>` :
+                                    LitHtml.html`${role}&nbsp;${name}${properties}`;
+    await Coordinator.RenderCoordinator.RenderCoordinator.instance().write(
+        `Accessibility node ${this.#id} render`, () => {
+          // clang-format off
       LitHtml.render(
-        this.#ignored ?
-          LitHtml.html`<span>${i18nString(UIStrings.ignored)}</span>` :
-          LitHtml.html`${role}&nbsp${name}${properties}`,
+        LitHtml.html`<div class='container'>${content}</div>`,
         this.#shadow,
         {host: this});
-      // clang-format on
-    });
+          // clang-format on
+        });
   }
 }
 

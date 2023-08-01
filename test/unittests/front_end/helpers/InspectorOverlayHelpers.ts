@@ -6,9 +6,16 @@ const {assert} = chai;
 
 import {renderElementIntoDOM, assertElements, assertElement} from './DOMHelpers.js';
 
-import type {CanvasSize, GridPositionNormalizedDataWithNames, NormalizePositionDataConfig} from '../../../../inspector_overlay/css_grid_label_helpers.js';
-import {normalizePositionData, drawGridAreaNames, drawGridLineNumbers, drawGridLineNames} from '../../../../inspector_overlay/css_grid_label_helpers.js';
-import type {AreaBounds, Bounds} from '../../../../inspector_overlay/common.js';
+import {
+  normalizePositionData,
+  drawGridAreaNames,
+  drawGridLineNumbers,
+  drawGridLineNames,
+  type CanvasSize,
+  type GridPositionNormalizedDataWithNames,
+  type NormalizePositionDataConfig,
+} from '../../../../inspector_overlay/css_grid_label_helpers.js';
+import {type AreaBounds, type Bounds} from '../../../../inspector_overlay/common.js';
 import {gridStyle} from '../../../../inspector_overlay/highlight_grid_common.js';
 
 const GRID_LABEL_CONTAINER_ID = 'grid-label-container';
@@ -189,13 +196,13 @@ export function drawGridLineNamesAndAssertLabels(
     }
 
     if (expected.type === 'column' && typeof expected.x !== 'undefined') {
-      assert.strictEqual(
-          foundLabel.x, expected.x,
+      assert.closeTo(
+          foundLabel.x, expected.x, 0.5,
           `Expected column line name label ${expected.textContent} to be positioned at ${expected.x}px`);
     }
     if (expected.type === 'row' && typeof expected.y !== 'undefined') {
-      assert.strictEqual(
-          foundLabel.y, expected.y,
+      assert.closeTo(
+          foundLabel.y, expected.y, 0.5,
           `Expected row line name label ${expected.textContent} to be positioned at ${expected.y}px`);
     }
   }

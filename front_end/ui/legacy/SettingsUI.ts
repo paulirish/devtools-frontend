@@ -39,12 +39,12 @@ import {CheckboxLabel} from './UIUtils.js';
 
 const UIStrings = {
   /**
-  *@description Note when a setting change will require the user to reload DevTools
-  */
+   *@description Note when a setting change will require the user to reload DevTools
+   */
   srequiresReload: '*Requires reload',
   /**
-  *@description Message to display if a setting change requires a reload of DevTools
-  */
+   *@description Message to display if a setting change requires a reload of DevTools
+   */
   oneOrMoreSettingsHaveChanged: 'One or more settings have changed which requires a reload to take effect.',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/SettingsUI.ts', UIStrings);
@@ -72,7 +72,7 @@ export const createSettingCheckbox = function(
 
 const createSettingSelect = function(
     name: string, options: Common.Settings.SimpleSettingOption[], requiresReload: boolean|null,
-    setting: Common.Settings.Setting<unknown>, subtitle?: string): Element {
+    setting: Common.Settings.Setting<unknown>, subtitle?: string): HTMLElement {
   const container = document.createElement('div');
   const settingSelectElement = container.createChild('p');
   settingSelectElement.classList.add('settings-select');
@@ -96,6 +96,13 @@ const createSettingSelect = function(
     reloadWarning = container.createChild('span', 'reload-warning hidden');
     reloadWarning.textContent = i18nString(UIStrings.srequiresReload);
     ARIAUtils.markAsAlert(reloadWarning);
+  }
+
+  const {deprecation} = setting;
+  if (deprecation) {
+    const warning = new Settings.SettingDeprecationWarning.SettingDeprecationWarning();
+    warning.data = deprecation;
+    label.appendChild(warning);
   }
 
   setting.addChangeListener(settingChanged);
@@ -151,26 +158,26 @@ export const createCustomSetting = function(name: string, element: Element): Ele
   return p;
 };
 
-export const createControlForSetting = function(setting: Common.Settings.Setting<unknown>, subtitle?: string): Element|
-    null {
-      const uiTitle = setting.title();
-      switch (setting.type()) {
-        case Common.Settings.SettingType.BOOLEAN: {
-          const component = new Settings.SettingCheckbox.SettingCheckbox();
-          component.data = {setting: setting as Common.Settings.Setting<boolean>};
-          return component;
-        }
-        case Common.Settings.SettingType.ENUM:
-          if (Array.isArray(setting.options())) {
-            return createSettingSelect(uiTitle, setting.options(), setting.reloadRequired(), setting, subtitle);
-          }
-          console.error('Enum setting defined without options');
-          return null;
-        default:
-          console.error('Invalid setting type: ' + setting.type());
-          return null;
+export const createControlForSetting = function(
+    setting: Common.Settings.Setting<unknown>, subtitle?: string): HTMLElement|null {
+  const uiTitle = setting.title();
+  switch (setting.type()) {
+    case Common.Settings.SettingType.BOOLEAN: {
+      const component = new Settings.SettingCheckbox.SettingCheckbox();
+      component.data = {setting: setting as Common.Settings.Setting<boolean>};
+      return component;
+    }
+    case Common.Settings.SettingType.ENUM:
+      if (Array.isArray(setting.options())) {
+        return createSettingSelect(uiTitle, setting.options(), setting.reloadRequired(), setting, subtitle);
       }
-    };
+      console.error('Enum setting defined without options');
+      return null;
+    default:
+      console.error('Invalid setting type: ' + setting.type());
+      return null;
+  }
+};
 
 export interface SettingUI {
   settingElement(): Element|null;

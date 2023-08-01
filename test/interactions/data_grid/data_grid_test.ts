@@ -4,12 +4,21 @@
 
 import {assert} from 'chai';
 
-import {assertDataGridNotScrolled, getDataGrid, getDataGridCellAtIndex, getDataGridFillerCellAtColumnIndex, getDataGridRows, getInnerTextOfDataGridCells, scrollDataGridDown, waitForScrollTopOfDataGrid} from '../../e2e/helpers/datagrid-helpers.js';
+import {
+  assertDataGridNotScrolled,
+  getDataGrid,
+  getDataGridCellAtIndex,
+  getDataGridFillerCellAtColumnIndex,
+  getDataGridRows,
+  getInnerTextOfDataGridCells,
+  scrollDataGridDown,
+  waitForScrollTopOfDataGrid,
+} from '../../e2e/helpers/datagrid-helpers.js';
 import {$, $$, click, getBrowserAndPages, waitFor, waitForFunction} from '../../shared/helper.js';
 import {it} from '../../shared/mocha-extensions.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../helpers/shared.js';
 
-import type {ElementHandle} from 'puppeteer';
+import {type ElementHandle} from 'puppeteer-core';
 
 function assertNumberBetween(number: number, min: number, max: number) {
   assert.isAbove(number, min);
@@ -47,7 +56,9 @@ async function getColumnPercentageWidthsRounded(dataGrid: ElementHandle<Element>
   }));
 }
 
-describe('data grid', async () => {
+// Constantly failing in autoroll not because of the tests itself but
+// because of the code coverage in afterEach.
+describe.skip('[crbug.com/1463394]: data grid', async () => {
   preloadForCodeCoverage('data_grid/basic.html');
 
   it('lists the data grid contents', async () => {
@@ -146,78 +157,78 @@ describe('data grid', async () => {
     assertNumberBetween(columnWidths[2], 297, 304);  // 33% of 900 = 300
   });
 
-  it('lets the user resize columns when there is a middle hidden column inbetween', async () => {
-    /** Imagine we have a data grid with 3 columns:
-     * A | B | C And then we hide B, so the user sees:
-     * A | C
-     * If the user clicks and drags between A and C,
-     * it should resize them accordingly, and leave B alone, even though
-     * there is technically the B column inbetween them, but it's hidden.
-     */
-    await loadComponentDocExample('data_grid/hide-cols.html');
+  // Flaky test
+  it.skipOnPlatforms(
+      ['mac'], '[crbug.com/1340177] lets the user resize columns when there is a middle hidden column inbetween',
+      async () => {
+        /** Imagine we have a data grid with 3 columns:
+         * A | B | C And then we hide B, so the user sees:
+         * A | C
+         * If the user clicks and drags between A and C,
+         * it should resize them accordingly, and leave B alone, even though
+         * there is technically the B column inbetween them, but it's hidden.
+         */
+        await loadComponentDocExample('data_grid/hide-cols.html');
 
-    /**
-     * The value column is visible by default, so clicking this will hide it.
-     */
-    const toggleValueColumnButton = await $('.value-visibility-toggle');
-    if (!toggleValueColumnButton) {
-      assert.fail('Could not find value column toggle button.');
-    }
-    await click(toggleValueColumnButton);
+        /**
+         * The value column is visible by default, so clicking this will hide it.
+         */
+        await click('.value-visibility-toggle');
 
-    await waitForFunction(async () => {
-      const dataGrid = await getDataGrid();
-      const hiddenCells = await $$('tbody td.hidden', dataGrid);
-      const resizerHandlers = await $$('.cell-resize-handle', dataGrid);
-      // Now there are only 2 columns visible, there should be 1 resize handler.
-      return hiddenCells.length === 3 && resizerHandlers.length === 1;
-    });
+        await waitForFunction(async () => {
+          const dataGrid = await getDataGrid();
+          const hiddenCells = await $$('tbody td.hidden', dataGrid);
+          const resizerHandlers = await $$('.cell-resize-handle', dataGrid);
+          // Now there are only 2 columns visible, there should be 1 resize handler.
+          return hiddenCells.length === 3 && resizerHandlers.length === 1;
+        });
 
-    const dataGrid = await getDataGrid();
-    await getDataGridRows(3, dataGrid);
-    const renderedText = await getInnerTextOfDataGridCells(dataGrid, 3);
-    // Make sure that the middle column ("value") is hidden now.
-    assert.deepEqual(renderedText, [
-      ['Bravo', '1'],
-      ['Alpha', '2'],
-      ['Charlie', '3'],
-    ]);
-
-    const firstRowFirstCell = await waitFor<HTMLTableElement>('td[data-row-index="1"][data-col-index="0"]', dataGrid);
-
-    const columns = [
-      await getDataGridCellAtIndex(dataGrid, {row: 1, column: 0}),
-      await getDataGridCellAtIndex(dataGrid, {row: 1, column: 2}),
-    ];
-
-    let columnWidths = await getColumnPixelWidths(columns);
-
-    // The container is 900px wide and the first column has a weighting of 2 and
-    // the last column has a waiting of 1, so we expect one column to be ~600
-    // and the other ~300
-    assertNumberBetween(columnWidths[0], 602, 607);
-    assertNumberBetween(columnWidths[1], 294, 300);
-
-    await clickAndDragCellToResizeHorizontally(firstRowFirstCell, -100);
-    /* The resize calculation is roughly as follows
-     * mouse delta = 100px (-100, but we Math.abs it)
-     * delta as a % = (100 / (leftCellWidth + rightCellWidth)) * 100
-     * % delta = (100 / 666 + 333) * 100
-     * % delta = 11.1%
-     * therefore left column % = -11.1%
-     * and right column % = + 11.1%
-     */
-    const newColumnPercentageWidths = await getColumnPercentageWidthsRounded(dataGrid);
-    assert.deepEqual(
-        newColumnPercentageWidths,
-        [
-          56,  // 66.66 - 11.1 rounded
-          44,  // 33.33 + 11.1 rounded
+        const dataGrid = await getDataGrid();
+        await getDataGridRows(3, dataGrid);
+        const renderedText = await getInnerTextOfDataGridCells(dataGrid, 3);
+        // Make sure that the middle column ("value") is hidden now.
+        assert.deepEqual(renderedText, [
+          ['Bravo', '1'],
+          ['Alpha', '2'],
+          ['Charlie', '3'],
         ]);
-    columnWidths = await getColumnPixelWidths(columns);
-    assertNumberBetween(columnWidths[0], 500, 504);  // 55.8% of 900 = 502
-    assertNumberBetween(columnWidths[1], 395, 400);  // 44.12% of 900 = 397
-  });
+
+        const firstRowFirstCell =
+            await waitFor<HTMLTableElement>('td[data-row-index="1"][data-col-index="0"]', dataGrid);
+
+        const columns = [
+          await getDataGridCellAtIndex(dataGrid, {row: 1, column: 0}),
+          await getDataGridCellAtIndex(dataGrid, {row: 1, column: 2}),
+        ];
+
+        let columnWidths = await getColumnPixelWidths(columns);
+
+        // The container is 900px wide and the first column has a weighting of 2 and
+        // the last column has a waiting of 1, so we expect one column to be ~600
+        // and the other ~300
+        assertNumberBetween(columnWidths[0], 602, 607);
+        assertNumberBetween(columnWidths[1], 294, 300);
+
+        await clickAndDragCellToResizeHorizontally(firstRowFirstCell, -100);
+        /** The resize calculation is roughly as follows:
+         * mouse delta = 100px (-100, but we Math.abs it)
+         * delta as a % = (100 / (leftCellWidth + rightCellWidth)) * 100
+         * % delta = (100 / 666 + 333) * 100
+         * % delta = 11.1%
+         * therefore left column % = -11.1%
+         * and right column % = + 11.1%
+         */
+        const newColumnPercentageWidths = await getColumnPercentageWidthsRounded(dataGrid);
+        assert.deepEqual(
+            newColumnPercentageWidths,
+            [
+              56,  // 66.66 - 11.1 rounded
+              44,  // 33.33 + 11.1 rounded
+            ]);
+        columnWidths = await getColumnPixelWidths(columns);
+        assertNumberBetween(columnWidths[0], 500, 504);  // 55.8% of 900 = 502
+        assertNumberBetween(columnWidths[1], 395, 400);  // 44.12% of 900 = 397
+      });
 
   it('persists the column resizes when new data is added', async () => {
     await loadComponentDocExample('data_grid/adding-data.html');
@@ -250,8 +261,7 @@ describe('data grid', async () => {
     assertNumberBetween(columnPixelWidths[0], 348, 352);  // 58.35% of 600 = ~350
     assertNumberBetween(columnPixelWidths[1], 247, 252);  // 42% of 600 = ~249
 
-    const addButton = await waitFor('#add');
-    await click(addButton);
+    await click('#add');
     await getDataGridRows(11, dataGrid);
 
     const newColumnPixelWidths = await getColumnPixelWidths(columns);
@@ -286,11 +296,7 @@ describe('data grid', async () => {
       const dataGrid = await getDataGrid();
       await assertDataGridNotScrolled(dataGrid);
 
-      const firstBodyCell = await $('tr[aria-rowindex="1"] > td[aria-colindex="1"]', dataGrid);
-      if (!firstBodyCell) {
-        throw new Error('Could not find first body cell to click.');
-      }
-      await click(firstBodyCell);
+      await click('tr[aria-rowindex="1"] > td[aria-colindex="1"]');
       await waitFor('tr.selected', dataGrid);
       const {frontend} = getBrowserAndPages();
       await frontend.evaluate('window.addNewRow()');
@@ -314,40 +320,33 @@ describe('data grid', async () => {
          const dataGrid = await getDataGrid();
          await assertDataGridNotScrolled(dataGrid);
 
-         const firstBodyCell = await $('tr[aria-rowindex="1"] > td[aria-colindex="1"]', dataGrid);
-         if (!firstBodyCell) {
-           throw new Error('Could not find first body cell to click.');
-         }
-         await click(firstBodyCell);
+         await click('tr[aria-rowindex="1"] > td[aria-colindex="1"]');
          await waitFor('tr.selected', dataGrid);
          await clickAddButton();
          await getDataGridRows(11, dataGrid);
          await waitForScrollTopOfDataGrid(dataGrid, 89);
        });
 
-    it('will resume autoscroll if the user clicks a cell but then scrolls to the bottom', async () => {
-      const {frontend} = getBrowserAndPages();
-      const dataGrid = await getDataGrid();
-      await assertDataGridNotScrolled(dataGrid);
+    it(
+        'will resume autoscroll if the user clicks a cell but then scrolls to the bottom', async () => {
+          const {frontend} = getBrowserAndPages();
+          const dataGrid = await getDataGrid();
+          await assertDataGridNotScrolled(dataGrid);
 
-      const firstBodyCell = await $('tr[aria-rowindex="1"] > td[aria-colindex="1"]', dataGrid);
-      if (!firstBodyCell) {
-        throw new Error('Could not find first body cell to click.');
-      }
-      await click(firstBodyCell);
-      await waitFor('tr.selected', dataGrid);
-      // And new row and ensure we have not auto scrolled as we have a cell selected.
-      await frontend.evaluate('window.addNewRow()');
-      await getDataGridRows(11, dataGrid);
-      await waitForScrollTopOfDataGrid(dataGrid, 0);
+          await click('tr[aria-rowindex="1"] > td[aria-colindex="1"]');
+          await waitFor('tr.selected', dataGrid);
+          // And new row and ensure we have not auto scrolled as we have a cell selected.
+          await frontend.evaluate('window.addNewRow()');
+          await getDataGridRows(11, dataGrid);
+          await waitForScrollTopOfDataGrid(dataGrid, 0);
 
-      // Now scroll down to the very bottom of the grid
-      await scrollDataGridDown(dataGrid, 89);
-      await frontend.evaluate('window.addNewRow()');
-      await getDataGridRows(12, dataGrid);
-      // Ensure the scrollTop has changed: we are auto-scrolling again as the
-      // user scrolled to the bottom
-      await waitForScrollTopOfDataGrid(dataGrid, 109);
-    });
+          // Now scroll down to the very bottom of the grid
+          await scrollDataGridDown(dataGrid, 89);
+          await frontend.evaluate('window.addNewRow()');
+          await getDataGridRows(12, dataGrid);
+          // Ensure the scrollTop has changed: we are auto-scrolling again as the
+          // user scrolled to the bottom
+          await waitForScrollTopOfDataGrid(dataGrid, 109);
+        });
   });
 });

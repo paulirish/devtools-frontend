@@ -31,6 +31,7 @@
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {AnchorBehavior, GlassPane, MarginBehavior, PointerEventsBehavior, SizeBehavior} from './GlassPane.js';
@@ -39,28 +40,29 @@ import * as ThemeSupport from './theme_support/theme_support.js';
 import {createTextChild, ElementFocusRestorer} from './UIUtils.js';
 import softContextMenuStyles from './softContextMenu.css.legacy.js';
 import {InspectorView} from './InspectorView.js';
+import {Tooltip} from './Tooltip.js';
 
 const UIStrings = {
   /**
-  *@description Text exposed to screen readers on checked items.
-  */
+   *@description Text exposed to screen readers on checked items.
+   */
   checked: 'checked',
   /**
-  *@description Accessible text exposed to screen readers when the screen reader encounters an unchecked checkbox.
-  */
+   *@description Accessible text exposed to screen readers when the screen reader encounters an unchecked checkbox.
+   */
   unchecked: 'unchecked',
   /**
-  *@description Accessibility label for checkable SoftContextMenuItems with shortcuts
-  *@example {Open File} PH1
-  *@example {Ctrl + P} PH2
-  *@example {checked} PH3
-  */
+   *@description Accessibility label for checkable SoftContextMenuItems with shortcuts
+   *@example {Open File} PH1
+   *@example {Ctrl + P} PH2
+   *@example {checked} PH3
+   */
   sSS: '{PH1}, {PH2}, {PH3}',
   /**
-  *@description Generic text with two placeholders separated by a comma
-  *@example {1 613 680} PH1
-  *@example {44 %} PH2
-  */
+   *@description Generic text with two placeholders separated by a comma
+   *@example {1 613 680} PH1
+   *@example {44 %} PH2
+   */
   sS: '{PH1}, {PH2}',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/SoftContextMenu.ts', UIStrings);
@@ -80,6 +82,7 @@ export class SoftContextMenu {
   private activeSubMenuElement?: HTMLElement;
   private subMenu?: SoftContextMenu;
   private onMenuClosed?: () => void;
+  private focusOnTheFirstItem = true;
 
   constructor(
       items: SoftContextMenuDescriptor[], itemSelectedCallback: (arg0: number) => void, parentMenu?: SoftContextMenu,
@@ -150,20 +153,26 @@ export class SoftContextMenu {
         let firedOnce = false;
         const observer = new ResizeObserver(() => {
           if (firedOnce) {
-            // observer.disconnect();
-            // this.discard();
+            observer.disconnect();
+            this.discard();
             return;
           }
           firedOnce = true;
         });
         observer.observe(devToolsElem);
       }
+
+      // focus on the first menu item
+      if (this.contextMenuElement.children && this.focusOnTheFirstItem) {
+        const focusElement = this.contextMenuElement.children[0] as HTMLElement;
+        this.highlightMenuItem(focusElement, /* scheduleSubMenu */ false);
+      }
     }
   }
 
   setContextMenuElementLabel(label: string): void {
     if (this.contextMenuElement) {
-      ARIAUtils.setAccessibleName(this.contextMenuElement, label);
+      ARIAUtils.setLabel(this.contextMenuElement, label);
     }
   }
 
@@ -207,10 +216,18 @@ export class SoftContextMenu {
     menuItemElement.classList.add('soft-context-menu-item');
     menuItemElement.tabIndex = -1;
     ARIAUtils.markAsMenuItem(menuItemElement);
-    const checkMarkElement = Icon.create('smallicon-checkmark', 'checkmark');
+    const checkMarkElement = new IconButton.Icon.Icon();
+    checkMarkElement.data = {iconName: 'checkmark', color: 'var(--icon-default)', width: '14px', height: '14px'};
+    checkMarkElement.classList.add('checkmark');
+    checkMarkElement.style.minWidth =
+        '14px';  // <devtools-icon> collapses to 0 width otherwise, throwing off alignment.
+    checkMarkElement.style.minHeight = '14px';
     menuItemElement.appendChild(checkMarkElement);
     if (!item.checked) {
       checkMarkElement.style.opacity = '0';
+    }
+    if (item.tooltip) {
+      Tooltip.install(menuItemElement, item.tooltip);
     }
     const detailsForElement: ElementMenuDetails = {
       actionId: undefined,
@@ -223,6 +240,11 @@ export class SoftContextMenu {
     if (item.element && !item.label) {
       const wrapper = menuItemElement.createChild('div', 'soft-context-menu-custom-item');
       wrapper.appendChild(item.element);
+      if (item.element?.classList.contains('location-menu')) {
+        const label = item.element.ariaLabel || '';
+        item.element.ariaLabel = '';
+        ARIAUtils.setLabel(menuItemElement, label);
+      }
       detailsForElement.customElement = (item.element as HTMLElement);
       this.detailsForElementMap.set(menuItemElement, detailsForElement);
       return menuItemElement;
@@ -258,7 +280,7 @@ export class SoftContextMenu {
     } else if (item.shortcut) {
       accessibleName = i18nString(UIStrings.sS, {PH1: String(item.label), PH2: item.shortcut});
     }
-    ARIAUtils.setAccessibleName(menuItemElement, accessibleName);
+    ARIAUtils.setLabel(menuItemElement, accessibleName);
 
     this.detailsForElementMap.set(menuItemElement, detailsForElement);
     return menuItemElement;
@@ -278,9 +300,12 @@ export class SoftContextMenu {
     });
 
     // Occupy the same space on the left in all items.
-    const checkMarkElement = Icon.create('smallicon-checkmark', 'soft-context-menu-item-checkmark');
-    checkMarkElement.classList.add('checkmark');
+    const checkMarkElement = new IconButton.Icon.Icon();
+    checkMarkElement.data = {iconName: 'checkmark', color: 'var(--icon-default)', width: '14px', height: '14px'};
+    checkMarkElement.classList.add('checkmark', 'soft-context-menu-item-checkmark');
     menuItemElement.appendChild(checkMarkElement);
+    checkMarkElement.style.minWidth =
+        '14px';  // <devtools-icon> collapses to 0 width otherwise, throwing off alignment.
     checkMarkElement.style.opacity = '0';
 
     createTextChild(menuItemElement, item.label || '');
@@ -292,7 +317,7 @@ export class SoftContextMenu {
       ARIAUtils.markAsHidden(subMenuArrowElement);
       subMenuArrowElement.textContent = '\u25B6';  // BLACK RIGHT-POINTING TRIANGLE
     } else {
-      const subMenuArrowElement = Icon.create('smallicon-triangle-right', 'soft-context-menu-item-submenu-arrow');
+      const subMenuArrowElement = Icon.create('triangle-right', 'soft-context-menu-item-submenu-arrow');
       menuItemElement.appendChild(subMenuArrowElement);
     }
 
@@ -422,7 +447,8 @@ export class SoftContextMenu {
       this.highlightedMenuItemElement.classList.add('force-white-icons');
       this.highlightedMenuItemElement.classList.add('soft-context-menu-item-mouse-over');
       const detailsForElement = this.detailsForElementMap.get(this.highlightedMenuItemElement);
-      if (detailsForElement && detailsForElement.customElement) {
+      if (detailsForElement && detailsForElement.customElement &&
+          !detailsForElement.customElement.classList.contains('location-menu')) {
         detailsForElement.customElement.focus();
       } else {
         this.highlightedMenuItemElement.focus();
@@ -432,12 +458,17 @@ export class SoftContextMenu {
             window.setTimeout(this.showSubMenu.bind(this, this.highlightedMenuItemElement), 150);
       }
     }
+
+    if (this.contextMenuElement) {
+      ARIAUtils.setActiveDescendant(this.contextMenuElement, menuItemElement);
+    }
   }
 
   private highlightPrevious(): void {
     let menuItemElement: (ChildNode|null) = this.highlightedMenuItemElement ?
         this.highlightedMenuItemElement.previousSibling :
-        this.contextMenuElement ? this.contextMenuElement.lastChild : null;
+        this.contextMenuElement ? this.contextMenuElement.lastChild :
+                                  null;
     let menuItemDetails: (ElementMenuDetails|undefined) =
         menuItemElement ? this.detailsForElementMap.get((menuItemElement as HTMLElement)) : undefined;
     while (menuItemElement && menuItemDetails &&
@@ -454,7 +485,8 @@ export class SoftContextMenu {
   private highlightNext(): void {
     let menuItemElement: (ChildNode|null) = this.highlightedMenuItemElement ?
         this.highlightedMenuItemElement.nextSibling :
-        this.contextMenuElement ? this.contextMenuElement.firstChild : null;
+        this.contextMenuElement ? this.contextMenuElement.firstChild :
+                                  null;
     let menuItemDetails: (ElementMenuDetails|undefined) =
         menuItemElement ? this.detailsForElementMap.get((menuItemElement as HTMLElement)) : undefined;
     while (menuItemElement &&
@@ -513,6 +545,10 @@ export class SoftContextMenu {
             this.subMenu.highlightNext();
           }
         }
+        if (detailsForElement?.customElement?.classList.contains('location-menu')) {
+          detailsForElement.customElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
+          this.highlightMenuItem(null, true);
+        }
         keyboardEvent.consume(true);
         break;
       }
@@ -544,12 +580,18 @@ export class SoftContextMenu {
       return;
     }
     for (const child of this.contextMenuElement.children) {
-      ARIAUtils.markAsMenuItemCheckBox(child);
+      if (child.className !== 'soft-context-menu-separator') {
+        ARIAUtils.markAsMenuItemCheckBox(child);
+      }
     }
+  }
+
+  setFocusOnTheFirstItem(focusOnTheFirstItem: boolean): void {
+    this.focusOnTheFirstItem = focusOnTheFirstItem;
   }
 }
 export interface SoftContextMenuDescriptor {
-  type: string;
+  type: 'checkbox'|'item'|'separator'|'subMenu';
   id?: number;
   label?: string;
   enabled?: boolean;
@@ -557,6 +599,7 @@ export interface SoftContextMenuDescriptor {
   subItems?: SoftContextMenuDescriptor[];
   element?: Element;
   shortcut?: string;
+  tooltip?: Platform.UIString.LocalizedString;
 }
 interface ElementMenuDetails {
   customElement?: HTMLElement;

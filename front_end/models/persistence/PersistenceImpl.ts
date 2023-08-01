@@ -8,27 +8,29 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as Bindings from '../bindings/bindings.js';
+import * as BreakpointManager from '../breakpoints/breakpoints.js';
 import * as Workspace from '../workspace/workspace.js';
 
-import type {AutomappingStatus} from './Automapping.js';
-import {Automapping} from './Automapping.js';
+import {Automapping, type AutomappingStatus} from './Automapping.js';
 import {LinkDecorator} from './PersistenceUtils.js';
 
 let persistenceInstance: PersistenceImpl;
 
 export class PersistenceImpl extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private readonly workspace: Workspace.Workspace.WorkspaceImpl;
-  private readonly breakpointManager: Bindings.BreakpointManager.BreakpointManager;
+  private readonly breakpointManager: BreakpointManager.BreakpointManager.BreakpointManager;
   private readonly filePathPrefixesToBindingCount: FilePathPrefixesBindingCounts;
   private subscribedBindingEventListeners:
       Platform.MapUtilities.Multimap<Workspace.UISourceCode.UISourceCode, () => void>;
   private readonly mapping: Automapping;
 
   constructor(
-      workspace: Workspace.Workspace.WorkspaceImpl, breakpointManager: Bindings.BreakpointManager.BreakpointManager) {
+      workspace: Workspace.Workspace.WorkspaceImpl,
+      breakpointManager: BreakpointManager.BreakpointManager.BreakpointManager) {
     super();
     this.workspace = workspace;
     this.breakpointManager = breakpointManager;
+    this.breakpointManager.addUpdateBindingsCallback(this.#setupBindings.bind(this));
     this.filePathPrefixesToBindingCount = new FilePathPrefixesBindingCounts();
 
     this.subscribedBindingEventListeners = new Platform.MapUtilities.Multimap();
@@ -42,7 +44,7 @@ export class PersistenceImpl extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   static instance(opts: {
     forceNew: boolean|null,
     workspace: Workspace.Workspace.WorkspaceImpl|null,
-    breakpointManager: Bindings.BreakpointManager.BreakpointManager|null,
+    breakpointManager: BreakpointManager.BreakpointManager.BreakpointManager|null,
   } = {forceNew: null, workspace: null, breakpointManager: null}): PersistenceImpl {
     const {forceNew, workspace, breakpointManager} = opts;
     if (!persistenceInstance || forceNew) {
@@ -77,6 +79,13 @@ export class PersistenceImpl extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
   async removeBindingForTest(binding: PersistenceBinding): Promise<void> {
     await this.innerRemoveBinding(binding);
+  }
+
+  #setupBindings(networkUISourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
+    if (networkUISourceCode.project().type() !== Workspace.Workspace.projectTypes.Network) {
+      return Promise.resolve();
+    }
+    return this.mapping.computeNetworkStatus(networkUISourceCode);
   }
 
   private async innerAddBinding(binding: PersistenceBinding): Promise<void> {
@@ -133,17 +142,17 @@ export class PersistenceImpl extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         Workspace.UISourceCode.Events.WorkingCopyChanged, this.onWorkingCopyChanged, this);
 
     this.filePathPrefixesToBindingCount.remove(binding.fileSystem.url());
-    await this.breakpointManager.copyBreakpoints(binding.network.url(), binding.fileSystem);
+    await this.breakpointManager.copyBreakpoints(binding.network, binding.fileSystem);
 
     this.notifyBindingEvent(binding.network);
     this.notifyBindingEvent(binding.fileSystem);
     this.dispatchEventToListeners(Events.BindingRemoved, binding);
   }
 
-  private async onStatusAdded(status: AutomappingStatus): Promise<void> {
+  private onStatusAdded(status: AutomappingStatus): Promise<void> {
     const binding = new PersistenceBinding(status.network, status.fileSystem);
     statusBindings.set(status, binding);
-    await this.innerAddBinding(binding);
+    return this.innerAddBinding(binding);
   }
 
   private async onStatusRemoved(status: AutomappingStatus): Promise<void> {
@@ -256,10 +265,11 @@ export class PersistenceImpl extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       Promise<void> {
     const breakpoints = this.breakpointManager.breakpointLocationsForUISourceCode(from).map(
         breakpointLocation => breakpointLocation.breakpoint);
-    await Promise.all(breakpoints.map(breakpoint => {
-      breakpoint.remove(false /* keepInStorage */);
+    await Promise.all(breakpoints.map(async breakpoint => {
+      await breakpoint.remove(false /* keepInStorage */);
       return this.breakpointManager.setBreakpoint(
-          to, breakpoint.lineNumber(), breakpoint.columnNumber(), breakpoint.condition(), breakpoint.enabled());
+          to, breakpoint.lineNumber(), breakpoint.columnNumber(), breakpoint.condition(), breakpoint.enabled(),
+          breakpoint.isLogpoint(), BreakpointManager.BreakpointManager.BreakpointOrigin.OTHER);
     }));
   }
 
@@ -379,21 +389,6 @@ export type EventTypes = {
   [Events.BindingCreated]: PersistenceBinding,
   [Events.BindingRemoved]: PersistenceBinding,
 };
-
-export class PathEncoder {
-  private readonly encoder: Common.CharacterIdMap.CharacterIdMap<string>;
-  constructor() {
-    this.encoder = new Common.CharacterIdMap.CharacterIdMap();
-  }
-
-  encode(path: string): string {
-    return path.split('/').map(token => this.encoder.toChar(token)).join('');
-  }
-
-  decode(path: string): string {
-    return path.split('').map(token => this.encoder.fromChar(token)).join('/');
-  }
-}
 
 export class PersistenceBinding {
   network: Workspace.UISourceCode.UISourceCode;

@@ -23,7 +23,7 @@ export class CSSShadowModel {
     this.offsetYInternal = CSSLength.zero();
     this.blurRadiusInternal = CSSLength.zero();
     this.spreadRadiusInternal = CSSLength.zero();
-    this.colorInternal = (Common.Color.Color.parse('black') as Common.Color.Color);
+    this.colorInternal = (Common.Color.parse('black') as Common.Color.Color);
     this.format = [Part.OffsetX, Part.OffsetY];
     this.important = false;
   }
@@ -78,7 +78,7 @@ export class CSSShadowModel {
             shadow.insetInternal = true;
             shadow.format.push(Part.Inset);
           } else if (result.regexIndex === 2) {
-            const color = Common.Color.Color.parse(result.value);
+            const color = Common.Color.parse(result.value);
             if (!color) {
               return [];
             }
@@ -210,7 +210,7 @@ export class CSSShadowModel {
       } else if (part === Part.SpreadRadius) {
         parts.push(this.spreadRadiusInternal.asCSSText());
       } else if (part === Part.Color) {
-        parts.push(this.colorInternal.asString(this.colorInternal.format()));
+        parts.push(this.colorInternal.getAuthoredText() ?? this.colorInternal.asString());
       } else if (part === Part.Important && this.important) {
         parts.push('!important');
       }

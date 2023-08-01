@@ -39,12 +39,12 @@ import {Events, LayerTreeModel} from './LayerTreeModel.js';
 
 const UIStrings = {
   /**
-  *@description Text for the details of something
-  */
+   *@description Text for the details of something
+   */
   details: 'Details',
   /**
-  *@description Title of the Profiler tool
-  */
+   *@description Title of the Profiler tool
+   */
   profiler: 'Profiler',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/layers/LayersPanel.ts', UIStrings);
@@ -57,7 +57,7 @@ export class LayersPanel extends UI.Panel.PanelWithSidebar implements SDK.Target
   private readonly layerViewHost: LayerViewer.LayerViewHost.LayerViewHost;
   private readonly layerTreeOutline: LayerViewer.LayerTreeOutline.LayerTreeOutline;
   private readonly rightSplitWidget: UI.SplitWidget.SplitWidget;
-  private readonly layers3DView: LayerViewer.Layers3DView.Layers3DView;
+  readonly layers3DView: LayerViewer.Layers3DView.Layers3DView;
   private tabbedPane: UI.TabbedPane.TabbedPane;
   private readonly layerDetailsView: LayerViewer.LayerDetailsView.LayerDetailsView;
   private readonly paintProfilerView: LayerPaintProfilerView;
@@ -67,7 +67,7 @@ export class LayersPanel extends UI.Panel.PanelWithSidebar implements SDK.Target
     super('layers', 225);
     this.model = null;
 
-    SDK.TargetManager.TargetManager.instance().observeTargets(this);
+    SDK.TargetManager.TargetManager.instance().observeTargets(this, {scoped: true});
     this.layerViewHost = new LayerViewer.LayerViewHost.LayerViewHost();
     this.layerTreeOutline = new LayerViewer.LayerTreeOutline.LayerTreeOutline(this.layerViewHost);
     this.layerTreeOutline.addEventListener(
@@ -97,27 +97,26 @@ export class LayersPanel extends UI.Panel.PanelWithSidebar implements SDK.Target
     this.updateThrottler = new Common.Throttler.Throttler(100);
   }
 
-  static instance(opts = {forceNew: null}): LayersPanel {
-    const {forceNew} = opts;
-    if (!layersPanelInstance || forceNew) {
+  static instance(opts?: {forceNew: boolean}): LayersPanel {
+    if (!layersPanelInstance || opts?.forceNew) {
       layersPanelInstance = new LayersPanel();
     }
 
     return layersPanelInstance;
   }
 
-  focus(): void {
+  override focus(): void {
     this.layerTreeOutline.focus();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     if (this.model) {
       this.model.enable();
     }
   }
 
-  willHide(): void {
+  override willHide(): void {
     if (this.model) {
       void this.model.disable();
     }
@@ -125,7 +124,7 @@ export class LayersPanel extends UI.Panel.PanelWithSidebar implements SDK.Target
   }
 
   targetAdded(target: SDK.Target.Target): void {
-    if (this.model) {
+    if (target !== target.outermostTarget()) {
       return;
     }
     this.model = target.model(LayerTreeModel);
@@ -136,6 +135,7 @@ export class LayersPanel extends UI.Panel.PanelWithSidebar implements SDK.Target
     this.model.addEventListener(Events.LayerPainted, this.onLayerPainted, this);
     if (this.isShowing()) {
       this.model.enable();
+      void this.update();
     }
   }
 

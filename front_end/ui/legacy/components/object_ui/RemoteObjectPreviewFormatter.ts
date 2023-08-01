@@ -10,22 +10,22 @@ import * as UI from '../../legacy.js';
 
 const UIStrings = {
   /**
-  * @description Text shown in the console object preview. Shown when the user is inspecting a
-  * JavaScript object and there are multiple empty properties on the object (x =
-  * 'times'/'multiply').
-  * @example {3} PH1
-  */
+   * @description Text shown in the console object preview. Shown when the user is inspecting a
+   * JavaScript object and there are multiple empty properties on the object (x =
+   * 'times'/'multiply').
+   * @example {3} PH1
+   */
   emptyD: 'empty × {PH1}',
   /**
-  * @description Shown when the user is inspecting a JavaScript object in the console and there is
-  * an empty property on the object..
-  */
+   * @description Shown when the user is inspecting a JavaScript object in the console and there is
+   * an empty property on the object..
+   */
   empty: 'empty',
   /**
-  * @description Text shown when the user is inspecting a JavaScript object, but of the properties
-  * is not immediately available because it is a JavaScript 'getter' function, which means we have
-  * to run some code first in order to compute this property.
-  */
+   * @description Text shown when the user is inspecting a JavaScript object, but of the properties
+   * is not immediately available because it is a JavaScript 'getter' function, which means we have
+   * to run some code first in order to compute this property.
+   */
   thePropertyIsComputedWithAGetter: 'The property is computed with a getter',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/object_ui/RemoteObjectPreviewFormatter.ts', UIStrings);
@@ -43,7 +43,8 @@ export class RemoteObjectPreviewFormatter {
       if (property.name === InternalName.PromiseResult) {
         return 2;
       }
-      if (property.name === InternalName.GeneratorState || property.name === InternalName.PrimitiveValue) {
+      if (property.name === InternalName.GeneratorState || property.name === InternalName.PrimitiveValue ||
+          property.name === InternalName.WeakRefTarget) {
         return 3;
       }
       if (property.type !== Protocol.Runtime.PropertyPreviewType.Function && !property.name.startsWith('#')) {
@@ -138,6 +139,12 @@ export class RemoteObjectPreviewFormatter {
         parentElement.appendChild(this.renderDisplayName('<' + property.value + '>'));
       } else if (name === InternalName.PrimitiveValue) {
         parentElement.appendChild(this.renderPropertyPreviewOrAccessor([property]));
+      } else if (name === InternalName.WeakRefTarget) {
+        if (property.type === Protocol.Runtime.PropertyPreviewType.Undefined) {
+          parentElement.appendChild(this.renderDisplayName('<cleared>'));
+        } else {
+          parentElement.appendChild(this.renderPropertyPreviewOrAccessor([property]));
+        }
       } else {
         parentElement.appendChild(this.renderDisplayName(name));
         UI.UIUtils.createTextChild(parentElement, ': ');
@@ -306,6 +313,7 @@ const enum InternalName {
   PrimitiveValue = '[[PrimitiveValue]]',
   PromiseState = '[[PromiseState]]',
   PromiseResult = '[[PromiseResult]]',
+  WeakRefTarget = '[[WeakRefTarget]]',
 }
 
 export const createSpansForNodeTitle = function(container: Element, nodeTitle: string): void {

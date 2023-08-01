@@ -20,7 +20,7 @@ export const editorTheme = CM.EditorView.theme({
   },
 
   '.cm-panels': {
-    backgroundColor: 'var(--color-background-elevation-1)',
+    backgroundColor: 'var(--sys-color-cdt-base-container)',
   },
 
   '.cm-selectionMatch': {
@@ -40,7 +40,7 @@ export const editorTheme = CM.EditorView.theme({
   },
 
   '.cm-selectionBackground': {
-    background: 'var(--color-editor-selection-selection)',
+    background: 'var(--color-editor-selection)',
   },
 
   '&.cm-focused .cm-selectionBackground': {
@@ -48,9 +48,19 @@ export const editorTheme = CM.EditorView.theme({
   },
 
   '.cm-gutters': {
-    borderRight: '1px solid var(--color-details-hairline)',
+    borderRight: '1px solid var(--sys-color-divider)',
     whiteSpace: 'nowrap',
-    backgroundColor: 'var(--color-background)',
+    backgroundColor: 'var(--sys-color-cdt-base-container)',
+  },
+
+  '.cm-gutters .cm-foldGutterElement': {
+    cursor: 'pointer',
+    opacity: '0%',
+    transition: 'opacity 0.2s',
+  },
+
+  '.cm-gutters .cm-foldGutterElement-folded, .cm-gutters:hover .cm-foldGutterElement': {
+    opacity: '100%',
   },
 
   '.cm-lineNumbers': {
@@ -60,6 +70,12 @@ export const editorTheme = CM.EditorView.theme({
   '.cm-lineNumbers .cm-gutterElement': {
     color: 'var(--color-line-number)',
     padding: '0 3px 0 9px',
+  },
+
+  '.cm-foldPlaceholder': {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--color-text-secondary)',
   },
 
   '.cm-matchingBracket, .cm-nonmatchingBracket': {
@@ -129,9 +145,15 @@ export const editorTheme = CM.EditorView.theme({
     backgroundColor: 'var(--color-background)',
     maxHeight: '25em',
     minWidth: '16em',
+    '& > li': {
+      display: 'flex',
+      justifyContent: 'space-between',
+      border: '1px solid var(--color-background)',
+    },
     '& > li.cm-secondaryCompletion': {
       display: 'flex',
       backgroundColor: 'var(--color-background-elevation-1)',
+      borderColor: 'var(--color-background-elevation-1)',
       justifyContent: 'space-between',
       '&::before': {
         content: '">"',
@@ -145,9 +167,32 @@ export const editorTheme = CM.EditorView.theme({
     },
     '& > li[aria-selected]': {
       backgroundColor: 'var(--color-selected-option-background)',
+      borderColor: 'var(--color-selected-option-background)',
       '&, &.cm-secondaryCompletion::before': {
         color: 'var(--color-selected-option)',
       },
+      '&::after': {
+        content: '"tab"',
+        color: 'var(--color-button-primary-text)',
+        border: '1px solid var(--color-selected-option-outline)',
+        borderRadius: '2px',
+        marginLeft: '5px',
+        padding: '1px 3px',
+        fontSize: '10px',
+        lineHeight: '10px',
+      },
+    },
+  },
+
+  '.cm-tooltip.cm-tooltip-autocomplete.cm-conservativeCompletion > ul > li[aria-selected]': {
+    backgroundColor: 'var(--color-background)',
+    border: '1px dotted var(--color-text-primary)',
+    '&, &.cm-secondaryCompletion::before': {
+      color: 'var(--color-text-primary)',
+    },
+    '&::after': {
+      border: '1px solid var(--color-button-secondary-border)',
+      color: 'var(--color-text-secondary)',
     },
   },
 

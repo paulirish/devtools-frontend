@@ -7,12 +7,12 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
+import {type MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
-  *@description Link title for the Quirks Mode issue in the Issues panel
-  */
+   *@description Link title for the Quirks Mode issue in the Issues panel
+   */
   documentCompatibilityMode: 'Document compatibility mode',
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/QuirksModeIssue.ts', UIStrings);

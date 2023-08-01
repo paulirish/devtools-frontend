@@ -4,33 +4,47 @@
 
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+
 import computedStylePropertyStyles from './computedStyleProperty.css.js';
 
 const {render, html} = LitHtml;
 
-export interface ComputedStylePropertyData {
-  inherited: boolean;
-  traceable: boolean;
-  onNavigateToSource: (event?: Event) => void;
+export class NavigateToSourceEvent extends Event {
+  static readonly eventName = 'onnavigatetosource';
+  constructor() {
+    super(NavigateToSourceEvent.eventName, {bubbles: true, composed: true});
+  }
 }
 
 export class ComputedStyleProperty extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-computed-style-property`;
   readonly #shadow = this.attachShadow({mode: 'open'});
-
   #inherited = false;
   #traceable = false;
-  #onNavigateToSource: ((event?: Event) => void) = () => {};
 
-  connectedCallback(): void {
+  constructor() {
+    super();
     this.#shadow.adoptedStyleSheets = [computedStylePropertyStyles];
   }
 
-  set data(data: ComputedStylePropertyData) {
-    this.#inherited = data.inherited;
-    this.#traceable = data.traceable;
-    this.#onNavigateToSource = data.onNavigateToSource;
+  set inherited(inherited: boolean) {
+    if (inherited === this.#inherited) {
+      return;
+    }
+    this.#inherited = inherited;
     this.#render();
+  }
+
+  set traceable(traceable: boolean) {
+    if (traceable === this.#traceable) {
+      return;
+    }
+    this.#traceable = traceable;
+    this.#render();
+  }
+
+  #onNavigateToSourceClick(): void {
+    this.dispatchEvent(new NavigateToSourceEvent());
   }
 
   #render(): void {
@@ -38,12 +52,16 @@ export class ComputedStyleProperty extends HTMLElement {
     // clang-format off
     render(html`
       <div class="computed-style-property ${this.#inherited ? 'inherited' : ''}">
-        <slot name="property-name"></slot>
+        <div class="property-name">
+          <slot name="name"></slot>
+        </div>
         <span class="hidden" aria-hidden="false">: </span>
         ${this.#traceable ?
-            html`<span class="goto" @click=${this.#onNavigateToSource}></span>` :
+            html`<span class="goto" @click=${this.#onNavigateToSourceClick}></span>` :
             null}
-        <slot name="property-value"></slot>
+        <div class="property-value">
+          <slot name="value"></slot>
+        </div>
         <span class="hidden" aria-hidden="false">;</span>
       </div>
     `, this.#shadow, {

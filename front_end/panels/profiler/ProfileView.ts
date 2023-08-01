@@ -11,104 +11,105 @@ import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import type * as Protocol from '../../generated/protocol.js';
+import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {BottomUpProfileDataGridTree} from './BottomUpProfileDataGrid.js';
-import type {ProfileFlameChartDataProvider} from './CPUProfileFlameChart.js';
-import {CPUProfileFlameChart} from './CPUProfileFlameChart.js';
-import type {Formatter, ProfileDataGridNode} from './ProfileDataGrid.js';
-import {ProfileDataGridTree} from './ProfileDataGrid.js';
-import type {DataDisplayDelegate, ProfileType} from './ProfileHeader.js';
-import {Events, ProfileHeader} from './ProfileHeader.js';
+
+import {CPUProfileFlameChart, type ProfileFlameChartDataProvider} from './CPUProfileFlameChart.js';
+
+import {ProfileDataGridTree, type Formatter, type ProfileDataGridNode} from './ProfileDataGrid.js';
+
+import {Events, ProfileHeader, type DataDisplayDelegate, type ProfileType} from './ProfileHeader.js';
 import {ProfileSidebarTreeElement} from './ProfileSidebarTreeElement.js';
 import {TopDownProfileDataGridTree} from './TopDownProfileDataGrid.js';
 
 const UIStrings = {
   /**
-  *@description Text in Profile View of a profiler tool
-  */
+   *@description Text in Profile View of a profiler tool
+   */
   profile: 'Profile',
   /**
-  *@description Placeholder text in the search box of the JavaScript profiler tool. Users can search
-  *the results by the cost in milliseconds, the name of the function, or the file name.
-  */
+   *@description Placeholder text in the search box of the JavaScript profiler tool. Users can search
+   *the results by the cost in milliseconds, the name of the function, or the file name.
+   */
   findByCostMsNameOrFile: 'Find by cost (>50ms), name or file',
   /**
-  *@description Text for a programming function
-  */
+   *@description Text for a programming function
+   */
   function: 'Function',
   /**
-  *@description Title of the Profiler tool
-  */
+   *@description Title of the Profiler tool
+   */
   profiler: 'Profiler',
   /**
-  *@description Aria-label for profiles view combobox in memory tool
-  */
+   *@description Aria-label for profiles view combobox in memory tool
+   */
   profileViewMode: 'Profile view mode',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon visibility button in the Profile View of a profiler tool
-  */
+   *@description Tooltip text that appears when hovering over the largeicon visibility button in the Profile View of a profiler tool
+   */
   focusSelectedFunction: 'Focus selected function',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon delete button in the Profile View of a profiler tool
-  */
+   *@description Tooltip text that appears when hovering over the largeicon delete button in the Profile View of a profiler tool
+   */
   excludeSelectedFunction: 'Exclude selected function',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon refresh button in the Profile View of a profiler tool
-  */
+   *@description Tooltip text that appears when hovering over the largeicon refresh button in the Profile View of a profiler tool
+   */
   restoreAllFunctions: 'Restore all functions',
   /**
-  *@description Text in Profile View of a profiler tool
-  */
+   *@description Text in Profile View of a profiler tool
+   */
   chart: 'Chart',
   /**
-  *@description Text in Profile View of a profiler tool
-  */
+   *@description Text in Profile View of a profiler tool
+   */
   heavyBottomUp: 'Heavy (Bottom Up)',
   /**
-  *@description Text for selecting different profile views in the JS profiler tool. This option is a tree view.
-  */
+   *@description Text for selecting different profile views in the JS profiler tool. This option is a tree view.
+   */
   treeTopDown: 'Tree (Top Down)',
   /**
-  * @description Name of a profile
-  * @example {2} PH1
-  */
+   * @description Name of a profile
+   * @example {2} PH1
+   */
   profileD: 'Profile {PH1}',
   /**
    *@description Text in Profile View of a profiler tool
-  *@example {4 MB} PH1
-  */
+   *@example {4 MB} PH1
+   */
   loadingD: 'Loading… {PH1}%',
   /**
-  *@description Text in Profile View of a profiler tool
-  *@example {example.file} PH1
-  *@example {cannot open file} PH2
-  */
+   *@description Text in Profile View of a profiler tool
+   *@example {example.file} PH1
+   *@example {cannot open file} PH2
+   */
   fileSReadErrorS: 'File \'\'{PH1}\'\' read error: {PH2}',
   /**
-  *@description Text when something is loading
-  */
+   *@description Text when something is loading
+   */
   loading: 'Loading…',
   /**
-  *@description Text in Profile View of a profiler tool
-  */
+   *@description Text in Profile View of a profiler tool
+   */
   failedToReadFile: 'Failed to read file',
   /**
-  *@description Text in Profile View of a profiler tool
-  */
+   *@description Text in Profile View of a profiler tool
+   */
   parsing: 'Parsing…',
   /**
-  * @description Status indicator in the JS Profiler to show that a file has been successfully loaded
-  * from file, as opposed to a profile that has been captured locally.
-  */
+   * @description Status indicator in the JS Profiler to show that a file has been successfully loaded
+   * from file, as opposed to a profile that has been captured locally.
+   */
   loaded: 'Loaded',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfileView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ProfileView extends UI.View.SimpleView implements UI.SearchableView.Searchable {
-  profileInternal: SDK.ProfileTreeModel.ProfileTreeModel|null;
+  profileInternal: CPUProfile.ProfileTreeModel.ProfileTreeModel|null;
   searchableViewInternal: UI.SearchableView.SearchableView;
   dataGrid: DataGrid.DataGrid.DataGridImpl<unknown>;
   viewSelectComboBox: UI.Toolbar.ToolbarComboBox;
@@ -208,17 +209,15 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     this.viewSelectComboBox =
         new UI.Toolbar.ToolbarComboBox(this.changeView.bind(this), i18nString(UIStrings.profileViewMode));
 
-    this.focusButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.focusSelectedFunction), 'largeicon-visibility');
+    this.focusButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.focusSelectedFunction), 'eye');
     this.focusButton.setEnabled(false);
     this.focusButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.focusClicked, this);
 
-    this.excludeButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.excludeSelectedFunction), 'largeicon-delete');
+    this.excludeButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.excludeSelectedFunction), 'cross');
     this.excludeButton.setEnabled(false);
     this.excludeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.excludeClicked, this);
 
-    this.resetButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.restoreAllFunctions), 'largeicon-refresh');
+    this.resetButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.restoreAllFunctions), 'refresh');
     this.resetButton.setEnabled(false);
     this.resetButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.resetClicked, this);
 
@@ -238,7 +237,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     return table;
   }
 
-  setProfile(profile: SDK.ProfileTreeModel.ProfileTreeModel): void {
+  setProfile(profile: CPUProfile.ProfileTreeModel.ProfileTreeModel): void {
     this.profileInternal = profile;
     this.bottomUpProfileDataGridTree = null;
     this.topDownProfileDataGridTree = null;
@@ -246,7 +245,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     this.refresh();
   }
 
-  profile(): SDK.ProfileTreeModel.ProfileTreeModel|null {
+  profile(): CPUProfile.ProfileTreeModel.ProfileTreeModel|null {
     return this.profileInternal;
   }
 
@@ -274,7 +273,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     }
   }
 
-  focus(): void {
+  override focus(): void {
     if (this.flameChart) {
       this.flameChart.focus();
     } else {
@@ -293,7 +292,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     this.flameChart.selectRange(timeLeft, timeRight);
   }
 
-  async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
+  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
     return [this.viewSelectComboBox, this.focusButton, this.excludeButton, this.resetButton];
   }
 
@@ -301,7 +300,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     if (!this.bottomUpProfileDataGridTree) {
       this.bottomUpProfileDataGridTree = new BottomUpProfileDataGridTree(
           this.nodeFormatter, this.searchableViewInternal,
-          (this.profileInternal as SDK.ProfileTreeModel.ProfileTreeModel).root, this.adjustedTotal);
+          (this.profileInternal as CPUProfile.ProfileTreeModel.ProfileTreeModel).root, this.adjustedTotal);
     }
     return this.bottomUpProfileDataGridTree;
   }
@@ -310,7 +309,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     if (!this.topDownProfileDataGridTree) {
       this.topDownProfileDataGridTree = new TopDownProfileDataGridTree(
           this.nodeFormatter, this.searchableViewInternal,
-          (this.profileInternal as SDK.ProfileTreeModel.ProfileTreeModel).root, this.adjustedTotal);
+          (this.profileInternal as CPUProfile.ProfileTreeModel.ProfileTreeModel).root, this.adjustedTotal);
     }
     return this.topDownProfileDataGridTree;
   }
@@ -323,7 +322,7 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     }
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.currentSearchResultIndex = -1;
   }
 
@@ -370,9 +369,9 @@ export class ProfileView extends UI.View.SimpleView implements UI.SearchableView
     return false;
   }
 
-  searchCanceled(): void {
+  onSearchCanceled(): void {
     if (this.searchableElement) {
-      this.searchableElement.searchCanceled();
+      this.searchableElement.onSearchCanceled();
     }
   }
 
@@ -581,19 +580,19 @@ export class WritableProfileHeader extends ProfileHeader implements Common.Strin
   async close(): Promise<void> {
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.removeTempFile();
   }
 
-  createSidebarTreeElement(panel: DataDisplayDelegate): ProfileSidebarTreeElement {
+  override createSidebarTreeElement(panel: DataDisplayDelegate): ProfileSidebarTreeElement {
     return new ProfileSidebarTreeElement(panel, this, 'profile-sidebar-tree-item');
   }
 
-  canSaveToFile(): boolean {
+  override canSaveToFile(): boolean {
     return !this.fromFile() && Boolean(this.protocolProfileInternal);
   }
 
-  async saveToFile(): Promise<void> {
+  override async saveToFile(): Promise<void> {
     const fileOutputStream = new Bindings.FileUtils.FileOutputStream();
     if (!this.fileName) {
       const now = Platform.DateUtilities.toISO8601Compact(new Date());
@@ -613,7 +612,7 @@ export class WritableProfileHeader extends ProfileHeader implements Common.Strin
     void fileOutputStream.close();
   }
 
-  async loadFromFile(file: File): Promise<Error|null> {
+  override async loadFromFile(file: File): Promise<Error|null> {
     this.updateStatus(i18nString(UIStrings.loading), true);
     const fileReader = new Bindings.FileUtils.ChunkedFileReader(file, 10000000, this.onChunkTransferred.bind(this));
     this.jsonifiedProfile = '';

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Platform from '../../core/platform/platform.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import listWidgetStyles from './listWidget.css.legacy.js';
@@ -13,24 +14,24 @@ import {VBox} from './Widget.js';
 
 const UIStrings = {
   /**
-  *@description Text on a button to start editing text
-  */
+   *@description Text on a button to start editing text
+   */
   editString: 'Edit',
   /**
-  *@description Label for an item to remove something
-  */
+   *@description Label for an item to remove something
+   */
   removeString: 'Remove',
   /**
-  *@description Text to save something
-  */
+   *@description Text to save something
+   */
   saveString: 'Save',
   /**
-  *@description Text to add something
-  */
+   *@description Text to add something
+   */
   addString: 'Add',
   /**
-  *@description Text to cancel something
-  */
+   *@description Text to cancel something
+   */
   cancelString: 'Cancel',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/ListWidget.ts', UIStrings);
@@ -151,11 +152,11 @@ export class ListWidget<T> extends VBox {
 
     const toolbar = new Toolbar('', buttons);
 
-    const editButton = new ToolbarButton(i18nString(UIStrings.editString), 'largeicon-edit');
+    const editButton = new ToolbarButton(i18nString(UIStrings.editString), 'edit');
     editButton.addEventListener(ToolbarButton.Events.Click, onEditClicked.bind(this));
     toolbar.appendToolbarItem(editButton);
 
-    const removeButton = new ToolbarButton(i18nString(UIStrings.removeString), 'largeicon-trash-bin');
+    const removeButton = new ToolbarButton(i18nString(UIStrings.removeString), 'bin');
     removeButton.addEventListener(ToolbarButton.Events.Click, onRemoveClicked.bind(this));
     toolbar.appendToolbarItem(removeButton);
 
@@ -174,7 +175,7 @@ export class ListWidget<T> extends VBox {
     }
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.stopEditing();
   }
@@ -200,6 +201,7 @@ export class ListWidget<T> extends VBox {
     this.focusRestorer = new ElementFocusRestorer(this.element);
 
     this.list.classList.add('list-editing');
+    this.element.classList.add('list-editing');
     this.editItem = item;
     this.editElement = element;
     if (element) {
@@ -227,6 +229,7 @@ export class ListWidget<T> extends VBox {
 
   private stopEditing(): void {
     this.list.classList.remove('list-editing');
+    this.element.classList.remove('list-editing');
     if (this.focusRestorer) {
       this.focusRestorer.restore();
     }
@@ -275,7 +278,8 @@ export class Editor<T> {
   constructor() {
     this.element = document.createElement('div');
     this.element.classList.add('editor-container');
-    this.element.addEventListener('keydown', onKeyDown.bind(null, isEscKey, this.cancelClicked.bind(this)), false);
+    this.element.addEventListener(
+        'keydown', onKeyDown.bind(null, Platform.KeyboardUtilities.isEscKey, this.cancelClicked.bind(this)), false);
 
     this.contentElementInternal = this.element.createChild('div', 'editor-content');
     this.contentElementInternal.addEventListener(
@@ -318,8 +322,7 @@ export class Editor<T> {
     const input = (createInput('', type) as HTMLInputElement);
     input.placeholder = title;
     input.addEventListener('input', this.validateControls.bind(this, false), false);
-    input.addEventListener('blur', this.validateControls.bind(this, false), false);
-    ARIAUtils.setAccessibleName(input, title);
+    ARIAUtils.setLabel(input, title);
     this.controlByName.set(name, input);
     this.controls.push(input);
     this.validators.push(validator);
@@ -338,7 +341,7 @@ export class Editor<T> {
     }
     if (title) {
       Tooltip.install(select, title);
-      ARIAUtils.setAccessibleName(select, title);
+      ARIAUtils.setLabel(select, title);
     }
     select.addEventListener('input', this.validateControls.bind(this, false), false);
     select.addEventListener('blur', this.validateControls.bind(this, false), false);

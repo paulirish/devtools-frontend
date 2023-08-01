@@ -60,17 +60,17 @@ function patchHSLA(hsla: number[], colorUsage: ColorUsage): void {
 }
 
 function patchColor(colorAsText: string, colorUsage: ColorUsage): string {
-  const color = Common.Color.Color.parse(colorAsText);
+  const color = Common.Color.parse(colorAsText)?.as(Common.Color.Format.HSL);
   if (!color) {
     return colorAsText;
   }
-  const hsla = color.hsla();
+  const hsla: Common.ColorUtils.Color4D = [color.h, color.s, color.l, color.alpha ?? 1];
   patchHSLA(hsla, colorUsage);
 
-  const rgba: number[] = [];
-  Common.Color.Color.hsl2rgb(hsla, rgba);
-  const outColor = new Common.Color.Color(rgba, color.format());
-  let outText = outColor.asString(null);
+  const rgba: Common.ColorUtils.Color4D = [0, 0, 0, 0];
+  Common.Color.hsl2rgb(hsla, rgba);
+  const outColor = new Common.Color.Legacy(rgba, Common.Color.Format.RGBA);
+  let outText = outColor.asString();
   if (!outText) {
     outText = outColor.asString(outColor.hasAlpha() ? Common.Color.Format.RGBA : Common.Color.Format.RGB);
   }

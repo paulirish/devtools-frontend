@@ -31,13 +31,13 @@
 import * as Common from '../../core/common/common.js';
 import type * as HeapSnapshotModel from '../../models/heap_snapshot_model/heap_snapshot_model.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type {ChildrenProvider} from './ChildrenProvider.js';
+import {type ChildrenProvider} from './ChildrenProvider.js';
 
 const UIStrings = {
   /**
-  *@description Text in Heap Snapshot Proxy of a profiler tool
-  *@example {functionName} PH1
-  */
+   *@description Text in Heap Snapshot Proxy of a profiler tool
+   *@example {functionName} PH1
+   */
   anErrorOccurredWhenACallToMethod: 'An error occurred when a call to method \'\'{PH1}\'\' was requested',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/HeapSnapshotProxy.ts', UIStrings);
@@ -103,7 +103,7 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
     this.postMessage({callId: callId, disposition: 'evaluateForTest', source: script});
   }
 
-  callFactoryMethod<T>(
+  callFactoryMethod<T extends Object>(
       callback: ((...arg0: unknown[]) => void)|null, objectId: string, methodName: string,
       proxyConstructor: new(...arg1: unknown[]) => T): Object|null {
     const callId = this.nextCallId++;
@@ -373,7 +373,7 @@ export class HeapSnapshotProxy extends HeapSnapshotProxyObject {
     return this.callMethodPromise('allocationStack', nodeIndex);
   }
 
-  dispose(): void {
+  override dispose(): void {
     throw new Error('Should never be called');
   }
 

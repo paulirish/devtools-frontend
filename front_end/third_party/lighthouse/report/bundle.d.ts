@@ -1,6 +1,19 @@
 
 export type ComponentName = '3pFilter' | 'audit' | 'categoryHeader' | 'chevron' | 'clump' | 'crc' | 'crcChain' | 'elementScreenshot' | 'footer' | 'fraction' | 'gauge' | 'gaugePwa' | 'heading' | 'metric' | 'opportunity' | 'opportunityHeader' | 'scorescale' | 'scoresWrapper' | 'snippet' | 'snippetContent' | 'snippetHeader' | 'snippetLine' | 'styles' | 'topbar' | 'warningsToplevel';
-export type I18n<T> = any;
+export type ItemValueType = import('../../types/lhr/audit-details').default.ItemValueType;
+export type Rect = LH.Audit.Details.Rect;
+export type Size = {
+    width: number;
+    height: number;
+};
+export type InstallOverlayFeatureParams = {
+    dom: DOM;
+    rootEl: Element;
+    overlayContainerEl: Element;
+    fullPageScreenshot: LH.Result.FullPageScreenshot;
+};
+export type SnippetValue = any;
+export type I18nFormatter = any;
 export type DetailsRenderer = any;
 export type CRCSegment = {
     node: LH.Audit.Details.SimpleCriticalRequestNode;
@@ -9,13 +22,6 @@ export type CRCSegment = {
     startTime: number;
     transferSize: number;
     treeMarkers: boolean[];
-};
-export type LineDetails = {
-    content: string;
-    lineNumber: string | number;
-    contentType: LineContentType;
-    truncated?: boolean;
-    visibility?: LineVisibility;
 };
 /**
  * @license
@@ -86,9 +92,12 @@ export class DOM {
     clearComponentCache(): void;
     /**
      * @param {string} text
+     * @param {{alwaysAppendUtmSource?: boolean}} opts
      * @return {Element}
      */
-    convertMarkdownLinkSnippets(text: string): Element;
+    convertMarkdownLinkSnippets(text: string, opts?: {
+        alwaysAppendUtmSource?: boolean;
+    }): Element;
     /**
      * Set link href, but safely, preventing `javascript:` protocol, etc.
      * @see https://github.com/google/safevalues/
@@ -249,6 +258,7 @@ export class ReportUIFeatures {
      * @param {LH.Result} lhr
      */
     initFeatures(lhr: LH.Result): void;
+    _fullPageScreenshot: LH.Result.FullPageScreenshot;
     /**
      * @param {{text: string, icon?: string, onClick: () => void}} opts
      */
@@ -284,14 +294,18 @@ export class ReportUIFeatures {
      * From a table with URL entries, finds the rows containing third-party URLs
      * and returns them.
      * @param {HTMLElement[]} rowEls
-     * @param {string} finalUrl
+     * @param {string} finalDisplayedUrl
      * @return {Array<HTMLElement>}
      */
-    _getThirdPartyRows(rowEls: HTMLElement[], finalUrl: string): Array<HTMLElement>;
+    _getThirdPartyRows(rowEls: HTMLElement[], finalDisplayedUrl: string): Array<HTMLElement>;
     /**
      * @param {Blob|File} blob
      */
     _saveFile(blob: Blob | File): void;
+}
+export namespace format {
+    export { registerLocaleData };
+    export { hasLocale };
 }
 /**
  * @license Copyright 2021 The Lighthouse Authors. All Rights Reserved.
@@ -304,19 +318,16 @@ export class ReportUIFeatures {
  * @return {HTMLElement}
  */
 export function renderReport(lhr: LH.Result, opts?: LH.Renderer.Options): HTMLElement;
-type LineContentType = number;
-declare namespace LineContentType {
-    const CONTENT_NORMAL: number;
-    const CONTENT_HIGHLIGHTED: number;
-    const PLACEHOLDER: number;
-    const MESSAGE: number;
-}
-type LineVisibility = number;
-declare namespace LineVisibility {
-    const ALWAYS: number;
-    const WHEN_COLLAPSED: number;
-    const WHEN_EXPANDED: number;
-}
+/**
+ * Returns a new LHR with all strings changed to the new requestedLocale.
+ * @param {LH.Result} lhr
+ * @param {LH.Locale} requestedLocale
+ * @return {{lhr: LH.Result, missingIcuMessageIds: string[]}}
+ */
+export function swapLocale(lhr: LH.Result, requestedLocale: LH.Locale): {
+    lhr: LH.Result;
+    missingIcuMessageIds: string[];
+};
 /**
  * @license
  * Copyright 2017 The Lighthouse Authors. All Rights Reserved.
@@ -587,16 +598,34 @@ declare class TopbarFeatures {
      */
     _updateStickyHeader(): void;
 }
+/**
+ * Populate the i18n string lookup dict with locale data
+ * Used when the host environment selects the locale and serves lighthouse the intended locale file
+ * @see https://docs.google.com/document/d/1jnt3BqKB-4q3AE94UWFA0Gqspx8Sd_jivlB7gQMlmfk/edit
+ * @param {LH.Locale} locale
+ * @param {Record<string, {message: string}>} lhlMessages
+ */
+declare function registerLocaleData(locale: LH.Locale, lhlMessages: Record<string, {
+    message: string;
+}>): void;
+/**
+ * Returns whether the requestedLocale is registered and available for use
+ * @param {LH.Locale} requestedLocale
+ * @return {boolean}
+ */
+declare function hasLocale(requestedLocale: LH.Locale): boolean;
 declare class DetailsRenderer {
     /**
      * @param {DOM} dom
-     * @param {{fullPageScreenshot?: LH.Audit.Details.FullPageScreenshot}} [options]
+     * @param {{fullPageScreenshot?: LH.Result.FullPageScreenshot, entities?: LH.Result.Entities}} [options]
      */
     constructor(dom: DOM, options?: {
-        fullPageScreenshot?: LH.Audit.Details.FullPageScreenshot;
+        fullPageScreenshot?: LH.Result.FullPageScreenshot;
+        entities?: LH.Result.Entities;
     });
     _dom: DOM;
-    _fullPageScreenshot: LH.Audit.Details.FullPageScreenshot;
+    _fullPageScreenshot: LH.Result.FullPageScreenshot;
+    _entities: LH.Result.Entities;
     /**
      * @param {AuditDetails} details
      * @return {Element|null}
@@ -661,62 +690,60 @@ declare class DetailsRenderer {
      * based on the heading's valueType, unless the value itself has a `type`
      * property to override it.
      * @param {TableItemValue} value
-     * @param {LH.Audit.Details.OpportunityColumnHeading} heading
+     * @param {LH.Audit.Details.TableColumnHeading} heading
      * @return {Element|null}
      */
-    _renderTableValue(value: TableItemValue, heading: LH.Audit.Details.OpportunityColumnHeading): Element | null;
-    /**
-     * Get the headings of a table-like details object, converted into the
-     * OpportunityColumnHeading type until we have all details use the same
-     * heading format.
-     * @param {Table|OpportunityTable} tableLike
-     * @return {OpportunityTable['headings']}
-     */
-    _getCanonicalizedHeadingsFromTable(tableLike: Table | OpportunityTable): OpportunityTable;
-    /**
-     * Get the headings of a table-like details object, converted into the
-     * OpportunityColumnHeading type until we have all details use the same
-     * heading format.
-     * @param {Table['headings'][number]} heading
-     * @return {OpportunityTable['headings'][number]}
-     */
-    _getCanonicalizedHeading(heading: Table): OpportunityTable;
-    /**
-     * @param {Exclude<LH.Audit.Details.TableColumnHeading['subItemsHeading'], undefined>} subItemsHeading
-     * @param {LH.Audit.Details.TableColumnHeading} parentHeading
-     * @return {LH.Audit.Details.OpportunityColumnHeading['subItemsHeading']}
-     */
-    _getCanonicalizedsubItemsHeading(subItemsHeading: Exclude<LH.Audit.Details.TableColumnHeading['subItemsHeading'], undefined>, parentHeading: LH.Audit.Details.TableColumnHeading): LH.Audit.Details.OpportunityColumnHeading;
+    _renderTableValue(value: TableItemValue, heading: LH.Audit.Details.TableColumnHeading): Element | null;
     /**
      * Returns a new heading where the values are defined first by `heading.subItemsHeading`,
      * and secondly by `heading`. If there is no subItemsHeading, returns null, which will
      * be rendered as an empty column.
-     * @param {LH.Audit.Details.OpportunityColumnHeading} heading
-     * @return {LH.Audit.Details.OpportunityColumnHeading | null}
+     * @param {LH.Audit.Details.TableColumnHeading} heading
+     * @return {LH.Audit.Details.TableColumnHeading | null}
      */
-    _getDerivedsubItemsHeading(heading: LH.Audit.Details.OpportunityColumnHeading): LH.Audit.Details.OpportunityColumnHeading | null;
+    _getDerivedSubItemsHeading(heading: LH.Audit.Details.TableColumnHeading): LH.Audit.Details.TableColumnHeading | null;
     /**
      * @param {TableItem} item
-     * @param {(LH.Audit.Details.OpportunityColumnHeading | null)[]} headings
+     * @param {(LH.Audit.Details.TableColumnHeading | null)[]} headings
      */
-    _renderTableRow(item: TableItem, headings: (LH.Audit.Details.OpportunityColumnHeading | null)[]): HTMLElementByTagName;
+    _renderTableRow(item: TableItem, headings: (LH.Audit.Details.TableColumnHeading | null)[]): HTMLElementByTagName;
     /**
      * Renders one or more rows from a details table item. A single table item can
      * expand into multiple rows, if there is a subItemsHeading.
      * @param {TableItem} item
-     * @param {LH.Audit.Details.OpportunityColumnHeading[]} headings
+     * @param {LH.Audit.Details.TableColumnHeading[]} headings
      */
-    _renderTableRowsFromItem(item: TableItem, headings: LH.Audit.Details.OpportunityColumnHeading[]): DocumentFragment;
+    _renderTableRowsFromItem(item: TableItem, headings: LH.Audit.Details.TableColumnHeading[]): DocumentFragment;
     /**
-     * @param {OpportunityTable|Table} details
+     * Adorn a table row element with entity chips based on [data-entity] attribute.
+     * @param {HTMLTableRowElement} rowEl
+     */
+    _adornEntityGroupRow(rowEl: HTMLTableRowElement): void;
+    /**
+     * Renders an entity-grouped row.
+     * @param {TableItem} item
+     * @param {LH.Audit.Details.TableColumnHeading[]} headings
+     */
+    _renderEntityGroupRow(item: TableItem, headings: LH.Audit.Details.TableColumnHeading[]): DocumentFragment;
+    /**
+     * Returns an array of entity-grouped TableItems to use as the top-level rows in
+     * an grouped table. Each table item returned represents a unique entity, with every
+     * applicable key that can be grouped as a property. Optionally, supported columns are
+     * summed by entity, and sorted by specified keys.
+     * @param {TableLike} details
+     * @return {TableItem[]}
+     */
+    _getEntityGroupItems(details: TableLike): TableItem[];
+    /**
+     * @param {TableLike} details
      * @return {Element}
      */
-    _renderTable(details: OpportunityTable | Table): Element;
+    _renderTable(details: TableLike): Element;
     /**
-     * @param {LH.Audit.Details.List} details
+     * @param {LH.FormattedIcu<LH.Audit.Details.List>} details
      * @return {Element}
      */
-    _renderList(details: LH.Audit.Details.List): Element;
+    _renderList(details: LH.FormattedIcu<LH.Audit.Details.List>): Element;
     /**
      * @param {LH.Audit.Details.NodeValue} item
      * @return {Element}

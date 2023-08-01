@@ -30,7 +30,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import type {SearchableView} from './SearchableView.js';
+import {type SearchableView} from './SearchableView.js';
 import {SplitWidget} from './SplitWidget.js';
 import {VBox} from './Widget.js';
 
@@ -47,6 +47,10 @@ export class Panel extends VBox {
 
     // @ts-ignore: Legacy global. Requires rewriting tests to get rid of.
     // For testing.
+    self.UI = self.UI || {};
+    // @ts-ignore
+    self.UI.panels = self.UI.panels || {};
+    // @ts-ignore
     UI.panels[name] = this;
   }
 
@@ -58,7 +62,7 @@ export class Panel extends VBox {
     return null;
   }
 
-  elementsToRestoreScrollPositionsFor(): Element[] {
+  override elementsToRestoreScrollPositionsFor(): Element[] {
     return [];
   }
 }

@@ -9,6 +9,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
+import * as ApplicationComponents from './components/components.js';
 import serviceWorkerCacheViewsStyles from './serviceWorkerCacheViews.css.js';
 
 import type * as Protocol from '../../generated/protocol.js';
@@ -16,58 +17,58 @@ import * as Network from '../network/network.js';
 
 const UIStrings = {
   /**
-  *@description Text in Application Panel Sidebar of the Application panel
-  */
+   *@description Text in Application Panel Sidebar of the Application panel
+   */
   cache: 'Cache',
   /**
-  *@description Text to refresh the page
-  */
+   *@description Text to refresh the page
+   */
   refresh: 'Refresh',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon delete button in the Service Worker Cache Views of the Application panel
-  */
+   *@description Tooltip text that appears when hovering over the largeicon delete button in the Service Worker Cache Views of the Application panel
+   */
   deleteSelected: 'Delete Selected',
   /**
-  *@description Text in Service Worker Cache Views of the Application panel
-  */
+   *@description Text in Service Worker Cache Views of the Application panel
+   */
   filterByPath: 'Filter by Path',
   /**
-  *@description Text in Service Worker Cache Views of the Application panel
-  */
+   *@description Text in Service Worker Cache Views of the Application panel
+   */
   selectACacheEntryAboveToPreview: 'Select a cache entry above to preview',
   /**
-  *@description Text for the name of something
-  */
+   *@description Text for the name of something
+   */
   name: 'Name',
   /**
-  *@description Text in Service Worker Cache Views of the Application panel
-  */
+   *@description Text in Service Worker Cache Views of the Application panel
+   */
   timeCached: 'Time Cached',
   /**
-  * @description Tooltip text that appears when hovering over the vary header column in the Service Worker Cache Views of the Application panel
-  */
+   * @description Tooltip text that appears when hovering over the vary header column in the Service Worker Cache Views of the Application panel
+   */
   varyHeaderWarning: '⚠️ Set ignoreVary to true when matching this entry',
   /**
-  *@description Text used to show that data was retrieved from ServiceWorker Cache
-  */
+   *@description Text used to show that data was retrieved from ServiceWorker Cache
+   */
   serviceWorkerCache: '`Service Worker` Cache',
   /**
-  *@description Span text content in Service Worker Cache Views of the Application panel
-  *@example {2} PH1
-  */
+   *@description Span text content in Service Worker Cache Views of the Application panel
+   *@example {2} PH1
+   */
   matchingEntriesS: 'Matching entries: {PH1}',
   /**
-  *@description Span text content in Indexed DBViews of the Application panel
-  *@example {2} PH1
-  */
+   *@description Span text content in Indexed DBViews of the Application panel
+   *@example {2} PH1
+   */
   totalEntriesS: 'Total entries: {PH1}',
   /**
-  *@description Text for network request headers
-  */
+   *@description Text for network request headers
+   */
   headers: 'Headers',
   /**
-  *@description Text for previewing items
-  */
+   *@description Text for previewing items
+   */
   preview: 'Preview',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/application/ServiceWorkerCacheViews.ts', UIStrings);
@@ -90,6 +91,8 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     entries: Array<Protocol.CacheStorage.DataEntry>,
     returnCount: number,
   }>|null;
+  private readonly metadataView = new ApplicationComponents.StorageMetadataView.StorageMetadataView();
+
   constructor(model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel, cache: SDK.ServiceWorkerCacheModel.Cache) {
     super(i18nString(UIStrings.cache));
 
@@ -100,6 +103,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     this.element.classList.add('storage-view');
 
     const editorToolbar = new UI.Toolbar.Toolbar('data-view-toolbar', this.element);
+    this.element.appendChild(this.metadataView);
     this.splitWidget = new UI.SplitWidget.SplitWidget(false, false);
     this.splitWidget.show(this.element);
 
@@ -111,13 +115,21 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     this.preview = null;
 
     this.cache = cache;
+    const bucketInfo = this.model.target()
+                           .model(SDK.StorageBucketsModel.StorageBucketsModel)
+                           ?.getBucketByName(cache.storageBucket.storageKey, cache.storageBucket.name);
+    if (bucketInfo) {
+      this.metadataView.setStorageBucket(bucketInfo);
+    } else if (cache.storageKey) {
+      this.metadataView.setStorageKey(cache.storageKey);
+    }
     this.dataGrid = null;
     this.refreshThrottler = new Common.Throttler.Throttler(300);
-    this.refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'largeicon-refresh');
+    this.refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'refresh');
     this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.refreshButtonClicked, this);
     editorToolbar.appendToolbarItem(this.refreshButton);
 
-    this.deleteSelectedButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.deleteSelected), 'largeicon-delete');
+    this.deleteSelectedButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.deleteSelected), 'cross');
     this.deleteSelectedButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       void this.deleteButtonClicked(null);
     });
@@ -150,14 +162,14 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     dataGridWidget.setMinimumSize(0, 250);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.model.addEventListener(
         SDK.ServiceWorkerCacheModel.Events.CacheStorageContentUpdated, this.cacheContentUpdated, this);
     this.registerCSSFiles([serviceWorkerCacheViewsStyles]);
     void this.updateData(true);
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.model.removeEventListener(
         SDK.ServiceWorkerCacheModel.Events.CacheStorageContentUpdated, this.cacheContentUpdated, this);
   }
@@ -359,8 +371,8 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
 
   private cacheContentUpdated(
       event: Common.EventTarget.EventTargetEvent<SDK.ServiceWorkerCacheModel.CacheStorageContentUpdatedEvent>): void {
-    const {cacheName, origin} = event.data;
-    if (this.cache.securityOrigin !== origin || this.cache.cacheName !== cacheName) {
+    const {cacheName, storageBucket} = event.data;
+    if ((!this.cache.inBucket(storageBucket) || this.cache.cacheName !== cacheName)) {
       return;
     }
     void this.refreshThrottler.schedule(() => Promise.resolve(this.updateData(true)), true);
@@ -452,7 +464,7 @@ export class DataGridNode extends DataGrid.DataGrid.DataGridNode<DataGridNode> {
     this.varyHeader = request.responseHeaders.find(header => header.name.toLowerCase() === 'vary')?.value || '';
   }
 
-  createCell(columnId: string): HTMLElement {
+  override createCell(columnId: string): HTMLElement {
     const cell = this.createTD(columnId);
     let value;
     let tooltip = this.request.url() as string;
@@ -509,7 +521,7 @@ export class RequestView extends UI.Widget.VBox {
     this.tabbedPane.show(this.element);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.selectTab();
   }

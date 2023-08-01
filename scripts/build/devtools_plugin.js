@@ -65,11 +65,11 @@ function devtoolsPlugin(source, importer) {
   // An import is considered external (and therefore a separate
   // bundle) if its filename matches its immediate parent's folder
   // name (without the extension). For example:
-  // import * as Components from './components/components.js' = external
-  // import * as UI from '../ui/ui.js' = external
-  // import * as LitHtml from '../third_party/lit-html/lit-html.js' = external
-  // import {DataGrid} from './components/DataGrid.js' = not external
-  // import * as Components from './components/foo.js' = not external
+  // `import * as Components from './components/components.js'` = external
+  // `import * as UI from '../ui/ui.js'` = external
+  // `import * as LitHtml from '../third_party/lit-html/lit-html.js'` = external
+  // `import {DataGrid} from './components/DataGrid.js'` = not external
+  // `import * as Components from './components/foo.js'` = not external
 
   // Note that we can't do a simple check for only `third_party`, as in Chromium
   // our full path is `third_party/devtools-frontend/src/`, which thus *always*
@@ -78,15 +78,6 @@ function devtoolsPlugin(source, importer) {
   // would therefore not match the path of `__dirname`.
   // These should be removed because the new heuristic _should_ deal with these
   // e.g. it'll pick up third_party/lit-html/lit-html.js is its own entrypoint
-
-  // Puppeteer has dynamic imports in its build gated on an ifNode
-  // flag, but our Rollup config doesn't know about that and tries
-  // to parse dynamic import('fs'). Let's ignore Puppeteer for now.
-  // The long term plan is probably for Puppeteer to ship a web
-  // bundle anyway. See go/pptr-agnostify for details.
-  if (importedFileDirectory.includes(path.join('front_end', 'third_party', 'puppeteer'))) {
-    return null;
-  }
 
   // The CodeMirror addons look like bundles (addon/comment/comment.js) but are not.
   if (importedFileDirectory.includes(path.join('front_end', 'third_party', 'codemirror', 'package'))) {

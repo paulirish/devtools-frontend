@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Mocha from 'mocha';
+
 import * as ResultsDb from './resultsdb.js';
 
 const {
@@ -11,6 +12,29 @@ const {
   EVENT_TEST_PASS,
   EVENT_TEST_PENDING,
 } = Mocha.Runner.constants;
+
+function sanitize(message: string): string {
+  return message.replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('\'', '&#39;');
+}
+
+function getErrorMessage(error: Error|unknown): string {
+  if (error instanceof Error) {
+    if (error.cause) {
+      // TypeScript types error.cause as {}, which doesn't allow us to access
+      // properties on it or check for them. So we have to cast it to allow us
+      // to read the `message` property.
+      const cause = error.cause as {message?: string};
+      const causeMessage = cause.message || '';
+      return sanitize(`${error.message}\n${causeMessage}`);
+    }
+    return sanitize(error.stack ?? error.message);
+  }
+  return sanitize(`${error}`);
+}
 
 class ResultsDbReporter extends Mocha.reporters.Spec {
   private suitePrefix?: string;
@@ -38,7 +62,7 @@ class ResultsDbReporter extends Mocha.reporters.Spec {
     const testResult = this.buildDefaultTestResultFrom(test);
     testResult.status = 'FAIL';
     testResult.expected = false;
-    testResult.summaryHtml = `<pre>${error instanceof Error ? error.stack : error}</pre>`;
+    testResult.summaryHtml = `<pre>${getErrorMessage(error)}</pre>`;
     ResultsDb.recordTestResult(testResult);
   }
 

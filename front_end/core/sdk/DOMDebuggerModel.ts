@@ -9,21 +9,21 @@ import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {CategorizedBreakpoint} from './CategorizedBreakpoint.js';
-import type {Location} from './DebuggerModel.js';
-import type {DOMNode} from './DOMModel.js';
-import {DOMModel, Events as DOMModelEvents} from './DOMModel.js';
+import {type Location} from './DebuggerModel.js';
+
+import {DOMModel, Events as DOMModelEvents, type DOMNode} from './DOMModel.js';
 import {RemoteObject} from './RemoteObject.js';
 import {RuntimeModel} from './RuntimeModel.js';
-import type {Target} from './Target.js';
-import {Capability} from './Target.js';
+
+import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
-import type {SDKModelObserver} from './TargetManager.js';
-import {TargetManager} from './TargetManager.js';
+
+import {TargetManager, type SDKModelObserver} from './TargetManager.js';
 
 const UIStrings = {
   /**
-  *@description Title for a category of breakpoints on Trusted Type violations
-  */
+   *@description Title for a category of breakpoints on Trusted Type violations
+   */
   trustedTypeViolations: 'Trusted Type Violations',
   /**
    * @description Noun. Title for a checkbox that turns on breakpoints on Trusted Type sink violations.
@@ -33,167 +33,167 @@ const UIStrings = {
    */
   sinkViolations: 'Sink Violations',
   /**
-  *@description Title for a checkbox that turns on breakpoints on Trusted Type policy violations
-  */
+   *@description Title for a checkbox that turns on breakpoints on Trusted Type policy violations
+   */
   policyViolations: 'Policy Violations',
   /**
-  *@description Text that refers to the animation of the web page
-  */
+   *@description Text that refers to the animation of the web page
+   */
   animation: 'Animation',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   canvas: 'Canvas',
   /**
-  *@description Title for a group of cities
-  */
+   *@description Title for a group of cities
+   */
   geolocation: 'Geolocation',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   notification: 'Notification',
   /**
-  *@description Text to parse something
-  */
+   *@description Text to parse something
+   */
   parse: 'Parse',
   /**
-  *@description Label for a group of JavaScript files
-  */
+   *@description Label for a group of JavaScript files
+   */
   script: 'Script',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   timer: 'Timer',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   window: 'Window',
   /**
-  *@description Title of the WebAudio tool
-  */
+   *@description Title of the WebAudio tool
+   */
   webaudio: 'WebAudio',
   /**
-  *@description Text that appears on a button for the media resource type filter.
-  */
+   *@description Text that appears on a button for the media resource type filter.
+   */
   media: 'Media',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   pictureinpicture: 'Picture-in-Picture',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   clipboard: 'Clipboard',
   /**
    * @description Noun. Describes a group of DOM events (such as 'select' and 'submit') in this context.
    */
   control: 'Control',
   /**
-  *@description Text that refers to device such as a phone
-  */
+   *@description Text that refers to device such as a phone
+   */
   device: 'Device',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   domMutation: 'DOM Mutation',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   dragDrop: 'Drag / drop',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   keyboard: 'Keyboard',
   /**
-  *@description Text to load something
-  */
+   *@description Text to load something
+   */
   load: 'Load',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   mouse: 'Mouse',
   /**
-  *@description Text in DOMDebugger Model
-  */
+   *@description Text in DOMDebugger Model
+   */
   pointer: 'Pointer',
   /**
-  *@description Text for the touch type to simulate on a device
-  */
+   *@description Text for the touch type to simulate on a device
+   */
   touch: 'Touch',
   /**
-  *@description Text that appears on a button for the xhr resource type filter.
-  */
+   *@description Text that appears on a button for the xhr resource type filter.
+   */
   xhr: 'XHR',
   /**
-  *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
-  *@example {setTimeout} PH1
-  */
+   *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
+   *@example {setTimeout} PH1
+   */
   setTimeoutOrIntervalFired: '{PH1} fired',
   /**
-  *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
-  */
+   *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
+   */
   scriptFirstStatement: 'Script First Statement',
   /**
-  *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
-  */
+   *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
+   */
   scriptBlockedByContentSecurity: 'Script Blocked by Content Security Policy',
   /**
-  *@description Text for the request animation frame event
-  */
+   *@description Text for the request animation frame event
+   */
   requestAnimationFrame: 'Request Animation Frame',
   /**
-  *@description Text to cancel the animation frame
-  */
+   *@description Text to cancel the animation frame
+   */
   cancelAnimationFrame: 'Cancel Animation Frame',
   /**
-  *@description Text for the event that an animation frame is fired
-  */
+   *@description Text for the event that an animation frame is fired
+   */
   animationFrameFired: 'Animation Frame Fired',
   /**
-  *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
-  */
+   *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
+   */
   webglErrorFired: 'WebGL Error Fired',
   /**
-  *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
-  */
+   *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
+   */
   webglWarningFired: 'WebGL Warning Fired',
   /**
-  *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
-  */
+   *@description Text in the Event Listener Breakpoints Panel of the JavaScript Debugger in the Sources Panel
+   */
   setInnerhtml: 'Set `innerHTML`',
   /**
-  *@description Name of a breakpoint type in the Sources Panel.
-  */
+   *@description Name of a breakpoint type in the Sources Panel.
+   */
   createCanvasContext: 'Create canvas context',
   /**
-  *@description Name of a breakpoint type in the Sources Panel.
-  */
+   *@description Name of a breakpoint type in the Sources Panel.
+   */
   createAudiocontext: 'Create `AudioContext`',
   /**
-  *@description Name of a breakpoint type in the Sources Panel. Close is a verb.
-  */
+   *@description Name of a breakpoint type in the Sources Panel. Close is a verb.
+   */
   closeAudiocontext: 'Close `AudioContext`',
   /**
-  *@description Name of a breakpoint type in the Sources Panel. Resume is a verb.
-  */
+   *@description Name of a breakpoint type in the Sources Panel. Resume is a verb.
+   */
   resumeAudiocontext: 'Resume `AudioContext`',
   /**
-  *@description Name of a breakpoint type in the Sources Panel.
-  */
+   *@description Name of a breakpoint type in the Sources Panel.
+   */
   suspendAudiocontext: 'Suspend `AudioContext`',
   /**
-  *@description Error message text
-  *@example {Snag Error} PH1
-  */
+   *@description Error message text
+   *@example {Snag Error} PH1
+   */
   webglErrorFiredS: 'WebGL Error Fired ({PH1})',
   /**
-  *@description Text in DOMDebugger Model
-  *@example {"script-src 'self'"} PH1
-  */
+   *@description Text in DOMDebugger Model
+   *@example {"script-src 'self'"} PH1
+   */
   scriptBlockedDueToContent: 'Script blocked due to Content Security Policy directive: {PH1}',
   /**
-  *@description Text for the service worker type.
-  */
+   *@description Text for the service worker type.
+   */
   worker: 'Worker',
 };
 const str_ = i18n.i18n.registerUIStrings('core/sdk/DOMDebuggerModel.ts', UIStrings);
@@ -261,11 +261,11 @@ export class DOMDebuggerModel extends SDKModel<EventTypes> {
     return this.#runtimeModelInternal;
   }
 
-  async suspendModel(): Promise<void> {
+  override async suspendModel(): Promise<void> {
     this.suspended = true;
   }
 
-  async resumeModel(): Promise<void> {
+  override async resumeModel(): Promise<void> {
     this.suspended = false;
   }
 
@@ -720,7 +720,7 @@ export class DOMEventListenerBreakpoint extends CategorizedBreakpoint {
     this.eventTargetNames = eventTargetNames;
   }
 
-  setEnabled(enabled: boolean): void {
+  override setEnabled(enabled: boolean): void {
     if (this.enabled() === enabled) {
       return;
     }
@@ -807,11 +807,12 @@ export class DOMDebuggerManager implements SDKModelObserver<DOMDebuggerModel> {
     this.createEventListenerBreakpoints(
         i18nString(UIStrings.pictureinpicture), ['enterpictureinpicture', 'leavepictureinpicture'], ['video']);
     this.createEventListenerBreakpoints(i18nString(UIStrings.pictureinpicture), ['resize'], ['PictureInPictureWindow']);
+    this.createEventListenerBreakpoints(i18nString(UIStrings.pictureinpicture), ['enter'], ['documentPictureInPicture']);
     this.createEventListenerBreakpoints(
         i18nString(UIStrings.clipboard), ['copy', 'cut', 'paste', 'beforecopy', 'beforecut', 'beforepaste'], ['*']);
     this.createEventListenerBreakpoints(
         i18nString(UIStrings.control),
-        ['resize', 'scroll', 'zoom', 'focus', 'blur', 'select', 'change', 'submit', 'reset'], ['*']);
+        ['resize', 'scroll', 'scrollend', 'zoom', 'focus', 'blur', 'select', 'change', 'submit', 'reset'], ['*']);
     this.createEventListenerBreakpoints(i18nString(UIStrings.device), ['deviceorientation', 'devicemotion'], ['*']);
     this.createEventListenerBreakpoints(
         i18nString(UIStrings.domMutation),

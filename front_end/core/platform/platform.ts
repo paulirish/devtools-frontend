@@ -29,12 +29,14 @@
  */
 
 import * as ArrayUtilities from './array-utilities.js';
+import * as Brand from './brand.js';
 import * as DateUtilities from './date-utilities.js';
 import * as DevToolsPath from './DevToolsPath.js';
 import * as DOMUtilities from './dom-utilities.js';
 import * as KeyboardUtilities from './keyboard-utilities.js';
 import * as MapUtilities from './map-utilities.js';
 import * as NumberUtilities from './number-utilities.js';
+import * as PromiseUtilities from './promise-utilities.js';
 import * as SetUtilities from './set-utilities.js';
 import * as StringUtilities from './string-utilities.js';
 import * as TypeScriptUtilities from './typescript-utilities.js';
@@ -50,12 +52,14 @@ export {DCHECK} from './dcheck.js';
 export {assertNever, assertNotNullOrUndefined, assertUnhandled} from './typescript-utilities.js';
 export {
   ArrayUtilities,
+  Brand,
   DateUtilities,
   DevToolsPath,
   DOMUtilities,
   KeyboardUtilities,
   MapUtilities,
   NumberUtilities,
+  PromiseUtilities,
   SetUtilities,
   StringUtilities,
   TypeScriptUtilities,

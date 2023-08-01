@@ -7,13 +7,17 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import type {MarkdownIssueDescription, LazyMarkdownIssueDescription} from './MarkdownIssueDescription.js';
-import {resolveLazyDescription} from './MarkdownIssueDescription.js';
+
+import {
+  resolveLazyDescription,
+  type MarkdownIssueDescription,
+  type LazyMarkdownIssueDescription,
+} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
-  *@description Title for Client Hint specification url link
-  */
+   *@description Title for Client Hint specification url link
+   */
   clientHintsInfrastructure: 'Client Hints Infrastructure',
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/ClientHintIssue.ts', UIStrings);
@@ -48,7 +52,7 @@ export class ClientHintIssue extends Issue {
     return resolveLazyDescription(description);
   }
 
-  sources(): Iterable<Protocol.Audits.SourceCodeLocation> {
+  override sources(): Iterable<Protocol.Audits.SourceCodeLocation> {
     return [this.issueDetails.sourceCodeLocation];
   }
 

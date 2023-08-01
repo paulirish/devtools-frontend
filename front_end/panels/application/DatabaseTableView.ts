@@ -32,30 +32,30 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {Database} from './DatabaseModel.js';
+import {type Database} from './DatabaseModel.js';
 
 const UIStrings = {
   /**
-  *@description Text in Database Table View of the Application panel
-  */
+   *@description Text in Database Table View of the Application panel
+   */
   database: 'Database',
   /**
-  *@description Text to refresh the page
-  */
+   *@description Text to refresh the page
+   */
   refresh: 'Refresh',
   /**
-  *@description Text in Database Table View of the Application panel
-  */
+   *@description Text in Database Table View of the Application panel
+   */
   visibleColumns: 'Visible columns',
   /**
-  *@description Text in Database Table View of the Application panel
-  *@example {database} PH1
-  */
+   *@description Text in Database Table View of the Application panel
+   *@example {database} PH1
+   */
   theStableIsEmpty: 'The "{PH1}" table is empty.',
   /**
-  *@description Error msg element text content in Database Table View of the Application panel
-  *@example {database} PH1
-  */
+   *@description Error msg element text content in Database Table View of the Application panel
+   *@example {database} PH1
+   */
   anErrorOccurredTryingToreadTheS: 'An error occurred trying to read the "{PH1}" table.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/application/DatabaseTableView.ts', UIStrings);
@@ -89,7 +89,7 @@ export class DatabaseTableView extends UI.View.SimpleView {
     this.visibleColumnsSetting =
         Common.Settings.Settings.instance().createSetting('databaseTableViewVisibleColumns', {});
 
-    this.refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'largeicon-refresh');
+    this.refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'refresh');
     this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.refreshButtonClicked, this);
     this.visibleColumnsInput = new UI.Toolbar.ToolbarInput(i18nString(UIStrings.visibleColumns), '', 1);
     this.visibleColumnsInput.addEventListener(
@@ -98,11 +98,11 @@ export class DatabaseTableView extends UI.View.SimpleView {
     this.dataGrid = null;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.update();
   }
 
-  async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
+  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
     return [this.refreshButton, this.visibleColumnsInput];
   }
 

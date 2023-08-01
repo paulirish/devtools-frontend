@@ -5,9 +5,18 @@
 import type * as SDK from '../../../../../../front_end/core/sdk/sdk.js';
 import * as ApplicationComponents from '../../../../../../front_end/panels/application/components/components.js';
 import * as ExpandableList from '../../../../../../front_end/ui/components/expandable_list/expandable_list.js';
+import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
 import * as Components from '../../../../../../front_end/ui/legacy/components/utils/utils.js';
 import type * as Protocol from '../../../../../../front_end/generated/protocol.js';
-import {assertElement, assertShadowRoot, dispatchClickEvent, getCleanTextContentFromElements, getElementWithinComponent, getElementsWithinComponent, renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
+import {
+  assertElement,
+  assertShadowRoot,
+  dispatchClickEvent,
+  getCleanTextContentFromElements,
+  getElementWithinComponent,
+  getElementsWithinComponent,
+  renderElementIntoDOM,
+} from '../../../helpers/DOMHelpers.js';
 import {describeWithLocale} from '../../../helpers/EnvironmentHelpers.js';
 
 const {assert} = chai;
@@ -31,12 +40,13 @@ function mockBuildStackTraceRows(
     _updateCallback?: (arg0: (Components.JSPresentationUtils.StackTraceRegularRow|
                               Components.JSPresentationUtils.StackTraceAsyncRow)[]) => void,
     ): (Components.JSPresentationUtils.StackTraceRegularRow|Components.JSPresentationUtils.StackTraceAsyncRow)[] {
-  return stackTrace.callFrames.map(callFrame => ({
-                                     functionName: callFrame.functionName,
-                                     ignoreListHide: callFrame.url.includes('hidden'),
-                                     link: Components.Linkifier.Linkifier.linkifyURL(callFrame.url),
-                                     rowCountHide: false,
-                                   }));
+  return stackTrace.callFrames.map(
+      callFrame => ({
+        functionName: callFrame.functionName,
+        ignoreListHide: callFrame.url.includes('hidden'),
+        link: Components.Linkifier.Linkifier.linkifyURL(callFrame.url as Platform.DevToolsPath.UrlString),
+        rowCountHide: false,
+      }));
 }
 
 const fakeScriptId = '1' as Protocol.Runtime.ScriptId;
@@ -178,6 +188,27 @@ describeWithLocale('StackTrace', () => {
     assert.deepEqual(openedStackTraceText, [
       'function1\xA0@\xA0www.example.com/script.js',
       'function2\xA0@\xA0www.example.com/hidden.js',
+      'Show less',
+    ]);
+
+    const newStackTraceLinkButton = getElementWithinComponent(
+        expandableList, 'devtools-stack-trace-link-button', ApplicationComponents.StackTrace.StackTraceLinkButton);
+    assertShadowRoot(newStackTraceLinkButton.shadowRoot);
+    const showLessButton = newStackTraceLinkButton.shadowRoot.querySelector('.stack-trace-row button.link');
+    assertElement(showLessButton, HTMLButtonElement);
+    dispatchClickEvent(showLessButton);
+
+    const reclosedStackTraceRows = Array.from(expandableList.shadowRoot.querySelectorAll('[data-stack-trace-row]'));
+    stackTraceText = [];
+
+    reclosedStackTraceRows.forEach(row => {
+      assertShadowRoot(row.shadowRoot);
+      stackTraceText = stackTraceText.concat(getCleanTextContentFromElements(row.shadowRoot, '.stack-trace-row'));
+    });
+
+    assert.deepEqual(stackTraceText, [
+      'function1\xA0@\xA0www.example.com/script.js',
+      'Show 1 more frame',
     ]);
   });
 });

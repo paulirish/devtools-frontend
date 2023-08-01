@@ -5,6 +5,7 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Logs from '../../models/logs/logs.js';
@@ -15,21 +16,21 @@ import type * as NetworkForward from '../../panels/network/forward/forward.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as RequestLinkIcon from '../../ui/components/request_link_icon/request_link_icon.js';
 
-import type {IssueView} from './IssueView.js';
-import type {AggregatedIssue} from './IssueAggregator.js';
+import {type IssueView} from './IssueView.js';
+import {type AggregatedIssue} from './IssueAggregator.js';
 
 const UIStrings = {
   /**
-  *@description Text in Object Properties Section
-  */
+   *@description Text in Object Properties Section
+   */
   unknown: 'unknown',
   /**
-  *@description Tooltip for button linking to the Elements panel
-  */
+   *@description Tooltip for button linking to the Elements panel
+   */
   clickToRevealTheFramesDomNodeIn: 'Click to reveal the frame\'s DOM node in the Elements panel',
   /**
-  *@description Replacement text for a link to an HTML element which is not available (anymore).
-  */
+   *@description Replacement text for a link to an HTML element which is not available (anymore).
+   */
   unavailable: 'unavailable',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/issues/AffectedResourcesView.ts', UIStrings);
@@ -44,7 +45,7 @@ export const enum AffectedItem {
   Source = 'Source',
 }
 
-export const extractShortPath = (path: string): string => {
+export const extractShortPath = (path: Platform.DevToolsPath.UrlString): string => {
   // 1st regex matches everything after last '/'
   // if path ends with '/', 2nd regex returns everything between the last two '/'
   return (/[^/]+$/.exec(path) || /[^/]+\/$/.exec(path) || [''])[0];
@@ -179,7 +180,7 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
     frameCell.classList.add('affected-resource-cell');
     if (frame) {
       const icon = new IconButton.Icon.Icon();
-      icon.data = {iconName: 'elements_panel_icon', color: 'var(--color-link)', width: '16px', height: '16px'};
+      icon.data = {iconName: 'code-circle', color: 'var(--icon-link)', width: '16px', height: '16px'};
       icon.classList.add('link', 'elements-panel');
       icon.onclick = async(): Promise<void> => {
         Host.userMetrics.issuesPanelResourceOpened(issueCategory, AffectedItem.Element);
@@ -255,8 +256,8 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
       // TODO(crbug.com/1108503): Add some mechanism to be able to add telemetry to this element.
       const linkifier = new Components.Linkifier.Linkifier(maxLengthForDisplayedURLs);
       const sourceAnchor = linkifier.linkifyScriptLocation(
-          target || null, sourceLocation.scriptId || null, sourceLocation.url, sourceLocation.lineNumber,
-          {columnNumber: sourceLocation.columnNumber, inlineFrameIndex: 0});
+          target || null, sourceLocation.scriptId || null, sourceLocation.url as Platform.DevToolsPath.UrlString,
+          sourceLocation.lineNumber, {columnNumber: sourceLocation.columnNumber, inlineFrameIndex: 0});
       sourceCodeLocation.appendChild(sourceAnchor);
     }
     element.appendChild(sourceCodeLocation);

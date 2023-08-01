@@ -42,7 +42,7 @@ USE_PYTHON3 = True
 
 def _ExecuteSubProcess(input_api, output_api, script_path, args, results):
     if isinstance(script_path, six.string_types):
-        script_path = [input_api.python_executable, script_path]
+        script_path = [input_api.python3_executable, script_path]
 
     start_time = time.time()
     process = input_api.subprocess.Popen(script_path + args,
@@ -65,6 +65,7 @@ def _ExecuteSubProcess(input_api, output_api, script_path, args, results):
 def _CheckChangesAreExclusiveToDirectory(input_api, output_api):
     if input_api.change.DISABLE_THIRD_PARTY_CHECK != None:
         return []
+
     results = [output_api.PresubmitNotifyResult('Directory Exclusivity Check:')]
 
     def IsParentDir(file, dir):
@@ -84,6 +85,8 @@ def _CheckChangesAreExclusiveToDirectory(input_api, output_api):
     EXCLUSIVE_CHANGE_DIRECTORIES = [
         [
             'third_party', 'v8',
+            input_api.os_path.join('front_end', 'models',
+                                   'javascript_metadata'),
             input_api.os_path.join('front_end', 'generated')
         ],
         [
@@ -168,6 +171,17 @@ def _CheckExperimentTelemetry(input_api, output_api):
     ]
     script_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
                                          'scripts', 'check_experiments.js')
+    results.extend(_checkWithNodeScript(input_api, output_api, script_path))
+    return results
+
+
+def _CheckESBuildVersion(input_api, output_api):
+    results = [
+        output_api.PresubmitNotifyResult('Running ESBuild version check:')
+    ]
+    script_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
+                                         'scripts',
+                                         'check_esbuild_versions.js')
     results.extend(_checkWithNodeScript(input_api, output_api, script_path))
     return results
 
@@ -426,6 +440,8 @@ def _CheckGeneratedFiles(input_api, output_api):
 
     generated_aria_path = input_api.os_path.join(scripts_build_path, 'generate_aria.py')
     generated_supported_css_path = input_api.os_path.join(scripts_build_path, 'generate_supported_css.py')
+    generated_deprecation_path = input_api.os_path.join(
+        scripts_build_path, 'generate_deprecations.py')
     generated_protocol_path = input_api.os_path.join(scripts_build_path, 'code_generator_frontend.py')
     generated_protocol_typescript_path = input_api.os_path.join(
         input_api.PresubmitLocalPath(), 'scripts', 'protocol_typescript')
@@ -439,6 +455,7 @@ def _CheckGeneratedFiles(input_api, output_api):
                                'pyjson5'),
         generated_aria_path,
         generated_supported_css_path,
+        generated_deprecation_path,
         concatenate_protocols_path,
         generated_protocol_path,
         scripts_generated_output_path,
@@ -458,28 +475,25 @@ def _CheckGeneratedFiles(input_api, output_api):
     return _ExecuteSubProcess(input_api, output_api, generate_protocol_resources_path, [], results)
 
 
-def _CollectStrings(input_api, output_api):
+def _CheckL10nStrings(input_api, output_api):
     devtools_root = input_api.PresubmitLocalPath()
     devtools_front_end = input_api.os_path.join(devtools_root, 'front_end')
     script_path = input_api.os_path.join(devtools_root, 'third_party', 'i18n',
-                                         'collect-strings.js')
+                                         'check-strings.js')
     affected_front_end_files = _getAffectedFiles(
         input_api, [devtools_front_end, script_path], [], ['.js', '.ts'])
     if len(affected_front_end_files) == 0:
         return [
             output_api.PresubmitNotifyResult(
-                'No affected files to run collect-strings')
+                'No affected files to run check-strings')
         ]
 
     results = [
-        output_api.PresubmitNotifyResult('Collecting strings from front_end:')
+        output_api.PresubmitNotifyResult('Checking UI strings from front_end:')
     ]
     results.extend(
         _checkWithNodeScript(input_api, output_api, script_path,
                              [devtools_front_end]))
-    results.append(
-        output_api.PresubmitNotifyResult(
-            'Please commit en-US.json/en-XL.json if changes are generated.'))
     return results
 
 
@@ -532,6 +546,31 @@ def _CheckForTooLargeFiles(input_api, output_api):
         return []
 
 
+def _CheckObsoleteScreenshotGoldens(input_api, output_api):
+    results = [
+        output_api.PresubmitNotifyResult('Obsolete screenshot images check')
+    ]
+    interaction_test_root_path = input_api.os_path.join(
+        input_api.PresubmitLocalPath(), 'test', 'interactions')
+    interaction_test_files = [interaction_test_root_path]
+
+    interaction_test_files_changed = _getAffectedFiles(input_api,
+                                                       interaction_test_files,
+                                                       [], [])
+
+    if len(interaction_test_files_changed) > 0:
+        script_path = input_api.os_path.join(input_api.PresubmitLocalPath(),
+                                             'scripts', 'test',
+                                             'check_obsolete_goldens.js')
+
+        script_args = ["--interaction-test-root", interaction_test_root_path]
+        errors_from_script = _checkWithNodeScript(input_api, output_api,
+                                                  script_path, script_args)
+        results.extend(errors_from_script)
+
+    return results
+
+
 def _RunCannedChecks(input_api, output_api):
     results = []
     results.extend(
@@ -567,7 +606,9 @@ def _CommonChecks(input_api, output_api):
         input_api, output_api))
 
     results.extend(_CheckFormat(input_api, output_api))
+    results.extend(_CheckESBuildVersion(input_api, output_api))
     results.extend(_CheckChangesAreExclusiveToDirectory(input_api, output_api))
+    results.extend(_CheckObsoleteScreenshotGoldens(input_api, output_api))
     # Run the canned checks from `depot_tools` after the custom DevTools checks.
     # The canned checks for example check that lines have line endings. The
     # DevTools presubmit checks automatically fix these issues. If we would run
@@ -592,7 +633,7 @@ def _SideEffectChecks(input_api, output_api):
 def CheckChangeOnUpload(input_api, output_api):
     results = []
     results.extend(_CommonChecks(input_api, output_api))
-    results.extend(_CollectStrings(input_api, output_api))
+    results.extend(_CheckL10nStrings(input_api, output_api))
     # Run checks that rely on output from other DevTool checks
     results.extend(_SideEffectChecks(input_api, output_api))
     results.extend(_CheckBugAssociation(input_api, output_api, False))
@@ -602,7 +643,7 @@ def CheckChangeOnUpload(input_api, output_api):
 def CheckChangeOnCommit(input_api, output_api):
     results = []
     results.extend(_CommonChecks(input_api, output_api))
-    results.extend(_CollectStrings(input_api, output_api))
+    results.extend(_CheckL10nStrings(input_api, output_api))
     # Run checks that rely on output from other DevTool checks
     results.extend(_SideEffectChecks(input_api, output_api))
     results.extend(input_api.canned_checks.CheckChangeHasDescription(input_api, output_api))
@@ -655,9 +696,10 @@ def _getFilesToLint(input_api, output_api, lint_config_files,
                                           default_linted_directories, ['D'],
                                           accepted_endings)
 
-        # Exclude front_end/third_party files.
+        # Exclude front_end/third_party and front_end/generated files.
         files_to_lint = [
-            file for file in files_to_lint if "third_party" not in file
+            file for file in files_to_lint
+            if "third_party" not in file or "generated" not in file
         ]
 
         if len(files_to_lint) == 0:

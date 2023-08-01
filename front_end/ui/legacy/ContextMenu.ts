@@ -30,12 +30,13 @@
 
 import type * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 
 import {ActionRegistry} from './ActionRegistry.js';
 import {ShortcutRegistry} from './ShortcutRegistry.js';
-import type {SoftContextMenuDescriptor} from './SoftContextMenu.js';
-import {SoftContextMenu} from './SoftContextMenu.js';
+
+import {SoftContextMenu, type SoftContextMenuDescriptor} from './SoftContextMenu.js';
 import {deepElementFromEvent} from './UIUtils.js';
 
 export class Item {
@@ -47,14 +48,18 @@ export class Item {
   protected idInternal: number|undefined;
   customElement?: Element;
   private shortcut?: string;
+  #tooltip: Common.UIString.LocalizedString|undefined;
 
-  constructor(contextMenu: ContextMenu|null, type: string, label?: string, disabled?: boolean, checked?: boolean) {
+  constructor(
+      contextMenu: ContextMenu|null, type: 'checkbox'|'item'|'separator'|'subMenu', label?: string, disabled?: boolean,
+      checked?: boolean, tooltip?: Platform.UIString.LocalizedString) {
     this.typeInternal = type;
     this.label = label;
     this.disabled = disabled;
     this.checked = checked;
     this.contextMenu = contextMenu;
     this.idInternal = undefined;
+    this.#tooltip = tooltip;
     if (type === 'item' || type === 'checkbox') {
       this.idInternal = contextMenu ? contextMenu.nextId() : 0;
     }
@@ -82,21 +87,20 @@ export class Item {
   buildDescriptor(): SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor {
     switch (this.typeInternal) {
       case 'item': {
-        const result = {
+        const result: SoftContextMenuDescriptor = {
           type: 'item',
           id: this.idInternal,
           label: this.label,
           enabled: !this.disabled,
           checked: undefined,
           subItems: undefined,
+          tooltip: this.#tooltip,
         };
         if (this.customElement) {
-          const resultAsSoftContextMenuItem = (result as SoftContextMenuDescriptor);
-          resultAsSoftContextMenuItem.element = (this.customElement as Element);
+          result.element = this.customElement;
         }
         if (this.shortcut) {
-          const resultAsSoftContextMenuItem = (result as SoftContextMenuDescriptor);
-          resultAsSoftContextMenuItem.shortcut = this.shortcut;
+          result.shortcut = this.shortcut;
         }
         return result;
       }
@@ -111,7 +115,7 @@ export class Item {
         };
       }
       case 'checkbox': {
-        return {
+        const result: SoftContextMenuDescriptor = {
           type: 'checkbox',
           id: this.idInternal,
           label: this.label,
@@ -119,6 +123,10 @@ export class Item {
           enabled: !this.disabled,
           subItems: undefined,
         };
+        if (this.customElement) {
+          result.element = this.customElement;
+        }
+        return result;
       }
     }
     throw new Error('Invalid item type:' + this.typeInternal);
@@ -137,8 +145,10 @@ export class Section {
     this.items = [];
   }
 
-  appendItem(label: string, handler: () => void, disabled?: boolean, additionalElement?: Element): Item {
-    const item = new Item(this.contextMenu, 'item', label, disabled);
+  appendItem(
+      label: string, handler: () => void, disabled?: boolean, additionalElement?: Element,
+      tooltip?: Platform.UIString.LocalizedString): Item {
+    const item = new Item(this.contextMenu, 'item', label, disabled, undefined, tooltip);
     if (additionalElement) {
       item.customElement = additionalElement;
     }
@@ -187,11 +197,15 @@ export class Section {
     return item;
   }
 
-  appendCheckboxItem(label: string, handler: () => void, checked?: boolean, disabled?: boolean): Item {
+  appendCheckboxItem(
+      label: string, handler: () => void, checked?: boolean, disabled?: boolean, additionalElement?: Element): Item {
     const item = new Item(this.contextMenu, 'checkbox', label, disabled, checked);
     this.items.push(item);
     if (this.contextMenu) {
       this.contextMenu.setHandler(item.id(), handler);
+    }
+    if (additionalElement) {
+      item.customElement = additionalElement;
     }
     return item;
   }
@@ -257,6 +271,10 @@ export class SubMenu extends Item {
     return this.section('default');
   }
 
+  overrideSection(): Section {
+    return this.section('override');
+  }
+
   saveSection(): Section {
     return this.section('save');
   }
@@ -265,7 +283,7 @@ export class SubMenu extends Item {
     return this.section('footer');
   }
 
-  buildDescriptor(): SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor {
+  override buildDescriptor(): SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor {
     const result: Host.InspectorFrontendHostAPI.ContextMenuDescriptor|SoftContextMenuDescriptor = {
       type: 'subMenu',
       label: this.label,
@@ -340,7 +358,7 @@ export interface ContextMenuOptions {
 }
 
 export class ContextMenu extends SubMenu {
-  protected contextMenu: this;
+  protected override contextMenu: this;
   private readonly defaultSectionInternal: Section;
   private pendingPromises: Promise<Provider[]>[];
   private pendingTargets: Object[];
@@ -350,7 +368,7 @@ export class ContextMenu extends SubMenu {
   private y: number;
   private onSoftMenuClosed?: () => void;
   private readonly handlers: Map<number, () => void>;
-  idInternal: number;
+  override idInternal: number;
   private softMenu?: SoftContextMenu;
   private contextMenuLabel?: string;
 
@@ -440,6 +458,11 @@ export class ContextMenu extends SubMenu {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
       this.softMenu = new SoftContextMenu(
           (menuObject as SoftContextMenuDescriptor[]), this.itemSelected.bind(this), undefined, this.onSoftMenuClosed);
+      // let soft context menu focus on the first item when the event is triggered by a non-mouse event
+      // add another check of button value to differentiate mouse event with 'shift + f10' keyboard event
+      const isMouseEvent =
+          (this.event as PointerEvent).pointerType === 'mouse' && (this.event as PointerEvent).button >= 0;
+      this.softMenu.setFocusOnTheFirstItem(!isMouseEvent);
       this.softMenu.show((ownerDocument as Document), new AnchorBox(this.x, this.y, 0, 0));
       if (this.contextMenuLabel) {
         this.softMenu.setContextMenuElementLabel(this.contextMenuLabel);
@@ -523,7 +546,7 @@ export class ContextMenu extends SubMenu {
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/naming-convention
   static readonly groupWeights =
-      ['header', 'new', 'reveal', 'edit', 'clipboard', 'debug', 'view', 'default', 'save', 'footer'];
+      ['header', 'new', 'reveal', 'edit', 'clipboard', 'debug', 'view', 'default', 'override', 'save', 'footer'];
 }
 
 export interface Provider {

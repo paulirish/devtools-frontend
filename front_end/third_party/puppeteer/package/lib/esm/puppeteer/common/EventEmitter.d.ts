@@ -1,20 +1,38 @@
-import { EventType, Handler } from '../../vendor/mitt/src/index.js';
+/**
+ * Copyright 2022 Google Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /**
  * @public
  */
-export { EventType, Handler };
+export type EventType = string | symbol;
+/**
+ * @public
+ */
+export type Handler<T = unknown> = (event: T) => void;
 /**
  * @public
  */
 export interface CommonEventEmitter {
-    on(event: EventType, handler: Handler): CommonEventEmitter;
-    off(event: EventType, handler: Handler): CommonEventEmitter;
-    addListener(event: EventType, handler: Handler): CommonEventEmitter;
-    removeListener(event: EventType, handler: Handler): CommonEventEmitter;
+    on(event: EventType, handler: Handler): this;
+    off(event: EventType, handler: Handler): this;
+    addListener(event: EventType, handler: Handler): this;
+    removeListener(event: EventType, handler: Handler): this;
     emit(event: EventType, eventData?: unknown): boolean;
-    once(event: EventType, handler: Handler): CommonEventEmitter;
+    once(event: EventType, handler: Handler): this;
     listenerCount(event: string): number;
-    removeAllListeners(event?: EventType): CommonEventEmitter;
+    removeAllListeners(event?: EventType): this;
 }
 /**
  * The EventEmitter class that many Puppeteer classes extend.
@@ -38,27 +56,27 @@ export declare class EventEmitter implements CommonEventEmitter {
     /**
      * Bind an event listener to fire when an event occurs.
      * @param event - the event type you'd like to listen to. Can be a string or symbol.
-     * @param handler  - the function to be called when the event occurs.
+     * @param handler - the function to be called when the event occurs.
      * @returns `this` to enable you to chain method calls.
      */
-    on(event: EventType, handler: Handler): EventEmitter;
+    on(event: EventType, handler: Handler<any>): this;
     /**
      * Remove an event listener from firing.
      * @param event - the event type you'd like to stop listening to.
-     * @param handler  - the function that should be removed.
+     * @param handler - the function that should be removed.
      * @returns `this` to enable you to chain method calls.
      */
-    off(event: EventType, handler: Handler): EventEmitter;
+    off(event: EventType, handler: Handler<any>): this;
     /**
      * Remove an event listener.
      * @deprecated please use {@link EventEmitter.off} instead.
      */
-    removeListener(event: EventType, handler: Handler): EventEmitter;
+    removeListener(event: EventType, handler: Handler<any>): this;
     /**
      * Add an event listener.
      * @deprecated please use {@link EventEmitter.on} instead.
      */
-    addListener(event: EventType, handler: Handler): EventEmitter;
+    addListener(event: EventType, handler: Handler<any>): this;
     /**
      * Emit an event and call any associated listeners.
      *
@@ -73,7 +91,7 @@ export declare class EventEmitter implements CommonEventEmitter {
      * @param handler - the handler function to run when the event occurs
      * @returns `this` to enable you to chain method calls.
      */
-    once(event: EventType, handler: Handler): EventEmitter;
+    once(event: EventType, handler: Handler<any>): this;
     /**
      * Gets the number of listeners for a given event.
      *
@@ -87,7 +105,7 @@ export declare class EventEmitter implements CommonEventEmitter {
      * @param event - the event to remove listeners for.
      * @returns `this` to enable you to chain method calls.
      */
-    removeAllListeners(event?: EventType): EventEmitter;
+    removeAllListeners(event?: EventType): this;
     private eventListenersCount;
 }
 //# sourceMappingURL=EventEmitter.d.ts.map

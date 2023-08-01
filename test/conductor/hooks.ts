@@ -6,18 +6,32 @@
 
 // use require here due to
 // https://github.com/evanw/esbuild/issues/587#issuecomment-901397213
-import puppeteer = require('puppeteer');
+import puppeteer = require('puppeteer-core');
 
-import type {CoverageMapData} from 'istanbul-lib-coverage';
+import {type CoverageMapData} from 'istanbul-lib-coverage';
 
-import {clearPuppeteerState, getBrowserAndPages, registerHandlers, setBrowserAndPages, setTestServerPort} from './puppeteer-state.js';
+import {
+  clearPuppeteerState,
+  getBrowserAndPages,
+  registerHandlers,
+  setBrowserAndPages,
+  setTestServerPort,
+} from './puppeteer-state.js';
 import {getTestRunnerConfigSetting} from './test_runner_config.js';
-import {loadEmptyPageAndWaitForContent, DevToolsFrontendTab, type DevToolsFrontendReloadOptions} from './frontend_tab.js';
-import {dumpCollectedErrors, installPageErrorHandlers, setupBrowserProcessIO} from './events.js';
+import {
+  loadEmptyPageAndWaitForContent,
+  DevToolsFrontendTab,
+  type DevToolsFrontendReloadOptions,
+} from './frontend_tab.js';
+import {
+  dumpCollectedErrors,
+  installPageErrorHandlers,
+  setupBrowserProcessIO,
+} from './events.js';
 import {TargetTab} from './target_tab.js';
 
 // Workaround for mismatching versions of puppeteer types and puppeteer library.
-declare module 'puppeteer' {
+declare module 'puppeteer-core' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ConsoleMessage {
     stackTrace(): ConsoleMessageLocation[];
@@ -37,6 +51,9 @@ const windowHeight = viewportHeight + 200;
 const headless = !process.env['DEBUG_TEST'];
 const envSlowMo = process.env['STRESS'] ? 50 : undefined;
 const envThrottleRate = process.env['STRESS'] ? 3 : 1;
+const envLatePromises = process.env['LATE_PROMISES'] !== undefined ?
+    ['true', ''].includes(process.env['LATE_PROMISES'].toLowerCase()) ? 10 : Number(process.env['LATE_PROMISES']) :
+    0;
 
 const TEST_SERVER_TYPE = getTestRunnerConfigSetting<string>('test-server-type', 'hosted-mode');
 
@@ -49,9 +66,17 @@ const envChromeFeatures = getTestRunnerConfigSetting<string>('chrome-features', 
 
 function launchChrome() {
   // Use port 0 to request any free port.
-  const enabledFeatures = ['Portals', 'PortalsCrossOrigin', 'PartitionedCookies'];
+  const enabledFeatures = [
+    'Portals',
+    'PortalsCrossOrigin',
+    'PartitionedCookies',
+    'SharedStorageAPI',
+    'FencedFrames',
+    'PrivacySandboxAdsAPIsOverride',
+    'AutofillEnableDevtoolsIssues',
+  ];
   const launchArgs = [
-    '--remote-debugging-port=0', '--enable-experimental-web-platform-features',
+    '--remote-allow-origins=*', '--remote-debugging-port=0', '--enable-experimental-web-platform-features',
     // This fingerprint may be generated from the certificate using
     // openssl x509 -noout -pubkey -in scripts/hosted_mode/cert.pem | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
     '--ignore-certificate-errors-spki-list=KLy6vv6synForXwI6lDIl+D3ZrMV6Y1EMTY6YpOcAos=',
@@ -98,7 +123,11 @@ async function loadTargetPageAndFrontend(testServerPort: number) {
     /**
      * In hosted mode we run the DevTools and test against it.
      */
-    frontendTab = await DevToolsFrontendTab.create({browser, testServerPort, targetId: targetTab.targetId()});
+    frontendTab = await DevToolsFrontendTab.create({
+      browser,
+      testServerPort,
+      targetId: targetTab.targetId(),
+    });
     frontend = frontendTab.page;
   } else if (TEST_SERVER_TYPE === 'component-docs') {
     /**
@@ -115,30 +144,57 @@ async function loadTargetPageAndFrontend(testServerPort: number) {
   setBrowserAndPages({target: targetTab.page, frontend, browser});
 }
 
+export async function unregisterAllServiceWorkers() {
+  const {target} = getBrowserAndPages();
+  await target.evaluate(async () => {
+    if (!navigator.serviceWorker) {
+      return;
+    }
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(r => r.unregister()));
+  });
+}
+
 export async function resetPages() {
   await targetTab.reset();
 
-  // Under stress conditions throttle the CPU down.
-  await throttleCPUIfRequired();
+  const {frontend} = getBrowserAndPages();
+  await throttleCPUIfRequired(frontend);
+  await delayPromisesIfRequired(frontend);
 
   if (TEST_SERVER_TYPE === 'hosted-mode') {
     await frontendTab.reset();
   } else if (TEST_SERVER_TYPE === 'component-docs') {
     // Reset the frontend back to an empty page for the component docs server.
-    const {frontend} = getBrowserAndPages();
     await loadEmptyPageAndWaitForContent(frontend);
   }
 }
 
-async function throttleCPUIfRequired(): Promise<void> {
-  const {frontend} = getBrowserAndPages();
-  // Under stress conditions throttle the CPU down.
-  if (envThrottleRate !== 1) {
-    console.log(`Throttling CPU: ${envThrottleRate}x slowdown`);
-
-    const client = await frontend.target().createCDPSession();
-    await client.send('Emulation.setCPUThrottlingRate', {rate: envThrottleRate});
+async function delayPromisesIfRequired(page: puppeteer.Page): Promise<void> {
+  if (envLatePromises === 0) {
+    return;
   }
+  console.log(`Delaying promises by ${envLatePromises}ms`);
+  await page.evaluate(delay => {
+    globalThis.Promise = class<T> extends Promise<T>{
+      constructor(executor: (resolve: (value: T|PromiseLike<T>) => void, reject: (reason?: unknown) => void) => void) {
+        super((resolve, reject) => {
+          executor(value => setTimeout(() => resolve(value), delay), reason => setTimeout(() => reject(reason), delay));
+        });
+      }
+    };
+  }, envLatePromises);
+}
+
+async function throttleCPUIfRequired(page: puppeteer.Page): Promise<void> {
+  if (envThrottleRate === 1) {
+    return;
+  }
+  console.log(`Throttling CPU: ${envThrottleRate}x slowdown`);
+  const client = await page.target().createCDPSession();
+  await client.send('Emulation.setCPUThrottlingRate', {
+    rate: envThrottleRate,
+  });
 }
 
 export async function reloadDevTools(options?: DevToolsFrontendReloadOptions) {
@@ -168,7 +224,7 @@ export async function postFileTeardown() {
 export function collectCoverageFromPage(): Promise<CoverageMapData|undefined> {
   const {frontend} = getBrowserAndPages();
 
-  return frontend.evaluate('window.__coverage__');
+  return frontend.evaluate('window.__coverage__') as Promise<CoverageMapData|undefined>;
 }
 
 export function getDevToolsFrontendHostname(): string {

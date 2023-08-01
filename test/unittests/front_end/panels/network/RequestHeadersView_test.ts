@@ -11,23 +11,13 @@ import * as Root from '../../../../../front_end/core/root/root.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Persistence from '../../../../../front_end/models/persistence/persistence.js';
 import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as Breakpoints from '../../../../../front_end/models/breakpoints/breakpoints.js';
 import {assertElement, renderElementIntoDOM} from '../../helpers/DOMHelpers.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
-import {createUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
+import {createFileSystemUISourceCode} from '../../helpers/UISourceCodeHelpers.js';
+import {setUpEnvironment} from '../../helpers/OverridesHelpers.js';
 
 const {assert} = chai;
-
-function setUpEnvironment() {
-  createTarget();
-  const workspace = Workspace.Workspace.WorkspaceImpl.instance();
-  const targetManager = SDK.TargetManager.TargetManager.instance();
-  const debuggerWorkspaceBinding =
-      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({forceNew: true, targetManager, workspace});
-  const breakpointManager = Bindings.BreakpointManager.BreakpointManager.instance(
-      {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
-  Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
-  Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
-}
 
 function renderHeadersView(request: SDK.NetworkRequest.NetworkRequest): Network.RequestHeadersView.RequestHeadersView {
   const component = new Network.RequestHeadersView.RequestHeadersView(request);
@@ -39,15 +29,14 @@ function renderHeadersView(request: SDK.NetworkRequest.NetworkRequest): Network.
 }
 
 describeWithMockConnection('RequestHeadersView', () => {
-  beforeEach(async () => {
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
+  beforeEach(() => {
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
   });
   afterEach(async () => {
     await deinitializeGlobalVars();
   });
 
-  it('does not render a link to \'.headers\' if that file does not exist', async () => {
+  it('does not render a link to \'.headers\' if that file does not exist', () => {
     setUpEnvironment();
     const request = SDK.NetworkRequest.NetworkRequest.create(
         'requestId' as Protocol.Network.RequestId,
@@ -65,7 +54,7 @@ describeWithMockConnection('RequestHeadersView', () => {
 
   it('renders a link to \'.headers\'', async () => {
     setUpEnvironment();
-    const {project} = createUISourceCode({
+    const {project} = createFileSystemUISourceCode({
       url: 'file:///path/to/overrides/www.example.com/.headers' as Platform.DevToolsPath.UrlString,
       mimeType: 'text/plain',
       fileSystemPath: 'file:///path/to/overrides',
@@ -88,13 +77,17 @@ describeWithMockConnection('RequestHeadersView', () => {
     component.detach();
   });
 
-  it('renders without error when no overrides folder specified (i.e. there is no project)', async () => {
+  it('renders without error when no overrides folder specified (i.e. there is no project)', () => {
     createTarget();
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const targetManager = SDK.TargetManager.TargetManager.instance();
-    const debuggerWorkspaceBinding =
-        Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({forceNew: true, targetManager, workspace});
-    const breakpointManager = Bindings.BreakpointManager.BreakpointManager.instance(
+    const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+    const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+      forceNew: true,
+      resourceMapping,
+      targetManager,
+    });
+    const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance(
         {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});

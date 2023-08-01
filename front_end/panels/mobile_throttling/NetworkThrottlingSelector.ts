@@ -6,21 +6,20 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 
-import type {NetworkThrottlingConditionsGroup} from './ThrottlingPresets.js';
-import {ThrottlingPresets} from './ThrottlingPresets.js';
+import {ThrottlingPresets, type NetworkThrottlingConditionsGroup} from './ThrottlingPresets.js';
 
 const UIStrings = {
   /**
-  *@description Text to indicate something is not enabled
-  */
+   *@description Text to indicate something is not enabled
+   */
   disabled: 'Disabled',
   /**
-  *@description Title for a group of configuration options
-  */
+   *@description Title for a group of configuration options
+   */
   presets: 'Presets',
   /**
-  *@description Text in Network Throttling Selector of the Network panel
-  */
+   *@description Text in Network Throttling Selector of the Network panel
+   */
   custom: 'Custom',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/NetworkThrottlingSelector.ts', UIStrings);

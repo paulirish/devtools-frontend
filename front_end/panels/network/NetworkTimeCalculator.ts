@@ -39,31 +39,31 @@ import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 const UIStrings = {
   /**
-  *@description Latency download total format in Network Time Calculator of the Network panel
-  *@example {20ms} PH1
-  *@example {20ms} PH2
-  *@example {40ms} PH3
-  */
+   *@description Latency download total format in Network Time Calculator of the Network panel
+   *@example {20ms} PH1
+   *@example {20ms} PH2
+   *@example {40ms} PH3
+   */
   sLatencySDownloadSTotal: '{PH1} latency, {PH2} download ({PH3} total)',
   /**
-  *@description Latency format in Network Time Calculator of the Network panel
-  *@example {20ms} PH1
-  */
+   *@description Latency format in Network Time Calculator of the Network panel
+   *@example {20ms} PH1
+   */
   sLatency: '{PH1} latency',
   /**
-  * @description Duration of the download in ms/s shown for a completed network request.
-  * @example {5ms} PH1
-  */
+   * @description Duration of the download in ms/s shown for a completed network request.
+   * @example {5ms} PH1
+   */
   sDownload: '{PH1} download',
   /**
-  *@description From service worker format in Network Time Calculator of the Network panel
-  *@example {20ms latency} PH1
-  */
+   *@description From service worker format in Network Time Calculator of the Network panel
+   *@example {20ms latency} PH1
+   */
   sFromServiceworker: '{PH1} (from `ServiceWorker`)',
   /**
-  *@description From cache format in Network Time Calculator of the Network panel
-  *@example {20ms latency} PH1
-  */
+   *@description From cache format in Network Time Calculator of the Network panel
+   *@example {20ms latency} PH1
+   */
   sFromCache: '{PH1} (from cache)',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkTimeCalculator.ts', UIStrings);
@@ -315,15 +315,15 @@ export class NetworkTransferTimeCalculator extends NetworkTimeCalculator {
     super(false);
   }
 
-  formatValue(value: number, precision?: number): string {
+  override formatValue(value: number, precision?: number): string {
     return i18n.TimeUtilities.secondsToString(value - this.zeroTime(), Boolean(precision));
   }
 
-  lowerBound(request: SDK.NetworkRequest.NetworkRequest): number {
+  override lowerBound(request: SDK.NetworkRequest.NetworkRequest): number {
     return request.issueTime();
   }
 
-  upperBound(request: SDK.NetworkRequest.NetworkRequest): number {
+  override upperBound(request: SDK.NetworkRequest.NetworkRequest): number {
     return request.endTime;
   }
 }
@@ -333,11 +333,11 @@ export class NetworkTransferDurationCalculator extends NetworkTimeCalculator {
     super(true);
   }
 
-  formatValue(value: number, precision?: number): string {
+  override formatValue(value: number, precision?: number): string {
     return i18n.TimeUtilities.secondsToString(value, Boolean(precision));
   }
 
-  upperBound(request: SDK.NetworkRequest.NetworkRequest): number {
+  override upperBound(request: SDK.NetworkRequest.NetworkRequest): number {
     return request.duration;
   }
 }

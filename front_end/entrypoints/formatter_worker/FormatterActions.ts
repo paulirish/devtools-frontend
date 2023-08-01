@@ -5,13 +5,30 @@
 export const enum FormatterActions {
   FORMAT = 'format',
   PARSE_CSS = 'parseCSS',
-  HTML_OUTLINE = 'htmlOutline',
-  JAVASCRIPT_OUTLINE = 'javaScriptOutline',
-  JAVASCRIPT_IDENTIFIERS = 'javaScriptIdentifiers',
   JAVASCRIPT_SUBSTITUTE = 'javaScriptSubstitute',
+  JAVASCRIPT_SCOPE_TREE = 'javaScriptScopeTree',
   EVALUATE_JAVASCRIPT_SUBSTRING = 'evaluatableJavaScriptSubstring',
-  ARGUMENTS_LIST = 'argumentsList',
 }
+
+export const enum FormattableMediaTypes {
+  APPLICATION_JAVASCRIPT = 'application/javascript',
+  APPLICATION_JSON = 'application/json',
+  APPLICATION_MANIFEST_JSON = 'application/manifest+json',
+  TEXT_CSS = 'text/css',
+  TEXT_HTML = 'text/html',
+  TEXT_JAVASCRIPT = 'text/javascript',
+  TEXT_X_SCSS = 'text/x-scss',
+}
+
+export const FORMATTABLE_MEDIA_TYPES: string[] = [
+  FormattableMediaTypes.APPLICATION_JAVASCRIPT,
+  FormattableMediaTypes.APPLICATION_JSON,
+  FormattableMediaTypes.APPLICATION_MANIFEST_JSON,
+  FormattableMediaTypes.TEXT_CSS,
+  FormattableMediaTypes.TEXT_HTML,
+  FormattableMediaTypes.TEXT_JAVASCRIPT,
+  FormattableMediaTypes.TEXT_X_SCSS,
+];
 
 export interface FormatMapping {
   original: number[];
@@ -21,4 +38,18 @@ export interface FormatMapping {
 export interface FormatResult {
   content: string;
   mapping: FormatMapping;
+}
+
+export const enum DefinitionKind {
+  None = 0,
+  Let = 1,
+  Var = 2,
+  Fixed = 3,
+}
+
+export interface ScopeTreeNode {
+  variables: {name: string, kind: DefinitionKind, offsets: number[]}[];
+  start: number;
+  end: number;
+  children: ScopeTreeNode[];
 }

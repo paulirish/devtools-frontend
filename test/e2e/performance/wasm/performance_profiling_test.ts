@@ -3,11 +3,29 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
-import {$, getBrowserAndPages, step, waitFor, waitForElementWithTextContent, waitForFunction} from '../../../shared/helper.js';
+import {
+  $,
+  getBrowserAndPages,
+  step,
+  waitFor,
+  waitForElementWithTextContent,
+  waitForFunction,
+} from '../../../shared/helper.js';
 import {describe, it} from '../../../shared/mocha-extensions.js';
-import {BOTTOM_UP_SELECTOR, CALL_TREE_SELECTOR, clickOnFunctionLink, getTotalTimeFromSummary, navigateToBottomUpTab, navigateToCallTreeTab, navigateToPerformanceTab, searchForComponent, startRecording, stopRecording, SUMMARY_TAB_SELECTOR} from '../../helpers/performance-helpers.js';
+import {
+  BOTTOM_UP_SELECTOR,
+  CALL_TREE_SELECTOR,
+  getTotalTimeFromSummary,
+  navigateToBottomUpTab,
+  navigateToCallTreeTab,
+  navigateToPerformanceTab,
+  searchForComponent,
+  startRecording,
+  stopRecording,
+  SUMMARY_TAB_SELECTOR,
+} from '../../helpers/performance-helpers.js';
 
 async function expandAndCheckActivityTree(frontend: puppeteer.Page, expectedActivities: string[]) {
   let index = 0;
@@ -17,11 +35,11 @@ async function expandAndCheckActivityTree(frontend: puppeteer.Page, expectedActi
       if (parentItem) {
         parentItem.evaluate(e => e.scrollIntoView());
       }
-      const treeItem = await $('.data-grid-data-grid-node.selected.revealed .activity-name');
+      const treeItem = await $<HTMLElement>('.data-grid-data-grid-node.selected.revealed .activity-name');
       if (!treeItem) {
         return false;
       }
-      const treeItemText = await frontend.evaluate(el => el.innerText, treeItem);
+      const treeItemText = await treeItem.evaluate(el => el.innerText);
       if (expectedActivities[index] === treeItemText) {
         parentItem = treeItem;
         return true;
@@ -71,46 +89,40 @@ describe('The Performance panel', async function() {
   });
 });
 
+async function searchForWasmCall() {
+  const {frontend} = getBrowserAndPages();
+  await waitForFunction(async () => {
+    await searchForComponent(frontend, 'mainWasm');
+    const title = await $('.timeline-details-chip-title');
+    if (!title) {
+      return false;
+    }
+    const titleText = await title.evaluate(x => x.textContent);
+    return titleText === 'mainWasm';
+  });
+}
+
 describe('The Performance panel', async function() {
   // These tests have lots of waiting which might take more time to execute
-  this.timeout(20000);
+  if (this.timeout() !== 0) {
+    this.timeout(20000);
+  }
 
   beforeEach(async () => {
-    const {frontend} = getBrowserAndPages();
-
     await step('navigate to the Performance tab and uplaod performance profile', async () => {
       await navigateToPerformanceTab('wasm/profiling');
 
-      const uploadProfileHandle = await waitFor('input[type=file]');
+      const uploadProfileHandle = await waitFor<HTMLInputElement>('input[type=file]');
       assert.isNotNull(uploadProfileHandle, 'unable to upload the performance profile');
       await uploadProfileHandle.uploadFile('test/e2e/resources/performance/wasm/mainWasm_profile.json');
     });
 
     await step('search for "mainWasm"', async () => {
-      await searchForComponent(frontend, 'mainWasm');
+      await searchForWasmCall();
     });
   });
 
-  // Link to wasm function is broken in profiling tab
-  it.skip('[crbug.com/1125986] is able to inspect how long a wasm function takes to execute', async () => {
-    await step('check that the total time is more than zero', async () => {
-      const totalTime = await getTotalTimeFromSummary();
-      assert.isAbove(totalTime, 0, 'total time for "mainWasm" is not above zero');
-    });
-
-    await step('click on the function link', async () => {
-      await clickOnFunctionLink();
-    });
-
-    // TODO(almuthanna): this step will be added once the bug crbug.com/1125986 is solved
-    await step(
-        'check that the system has navigated to the Sources tab with the "mainWasm" function highlighted',
-        async () => {
-            // step pending
-        });
-  });
-
-  it(' is able to display the execution time for a wasm function', async () => {
+  it('is able to display the execution time for a wasm function', async () => {
     await step('check that the Summary tab shows more than zero total time for "mainWasm"', async () => {
       const totalTime = await getTotalTimeFromSummary();
       assert.isAbove(totalTime, 0, 'mainWasm function execution time is displayed incorrectly');

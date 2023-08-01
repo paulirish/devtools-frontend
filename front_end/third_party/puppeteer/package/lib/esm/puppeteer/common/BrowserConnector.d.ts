@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { ConnectionTransport } from './ConnectionTransport.js';
-import { Browser, TargetFilterCallback } from './Browser.js';
+import { IsPageTargetCallback, TargetFilterCallback } from '../api/Browser.js';
+import { CDPBrowser } from './Browser.js';
+import type { ConnectOptions } from './Puppeteer.js';
 import { Viewport } from './PuppeteerViewport.js';
 /**
  * Generic browser options that can be passed when launching any browser or when
@@ -24,7 +25,7 @@ import { Viewport } from './PuppeteerViewport.js';
 export interface BrowserConnectOptions {
     /**
      * Whether to ignore HTTPS errors during navigation.
-     * @defaultValue false
+     * @defaultValue `false`
      */
     ignoreHTTPSErrors?: boolean;
     /**
@@ -40,15 +41,27 @@ export interface BrowserConnectOptions {
      * Callback to decide if Puppeteer should connect to a given target or not.
      */
     targetFilter?: TargetFilterCallback;
+    /**
+     * @internal
+     */
+    _isPageTarget?: IsPageTargetCallback;
+    /**
+     * @defaultValue 'cdp'
+     * @internal
+     */
+    protocol?: 'cdp' | 'webDriverBiDi';
+    /**
+     * Timeout setting for individual protocol (CDP) calls.
+     *
+     * @defaultValue `180_000`
+     */
+    protocolTimeout?: number;
 }
 /**
  * Users should never call this directly; it's called when calling
  * `puppeteer.connect`.
+ *
  * @internal
  */
-export declare const connectToBrowser: (options: BrowserConnectOptions & {
-    browserWSEndpoint?: string;
-    browserURL?: string;
-    transport?: ConnectionTransport;
-}) => Promise<Browser>;
+export declare function _connectToCDPBrowser(options: BrowserConnectOptions & ConnectOptions): Promise<CDPBrowser>;
 //# sourceMappingURL=BrowserConnector.d.ts.map

@@ -6,25 +6,29 @@ import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {DataDisplayDelegate, ProfileHeader, StatusUpdate} from './ProfileHeader.js';
-import {Events as ProfileHeaderEvents} from './ProfileHeader.js';
+import {
+  Events as ProfileHeaderEvents,
+  type DataDisplayDelegate,
+  type ProfileHeader,
+  type StatusUpdate,
+} from './ProfileHeader.js';
 
 const UIStrings = {
   /**
-  *@description Text to save something
-  */
+   *@description Text to save something
+   */
   save: 'Save',
   /**
-  *@description Text to save something (with ellipsis)
-  */
+   *@description Text to save something (with ellipsis)
+   */
   saveWithEllipsis: 'Save…',
   /**
-  *@description A context menu item in the Profiles Panel of a profiler tool
-  */
+   *@description A context menu item in the Profiles Panel of a profiler tool
+   */
   load: 'Load…',
   /**
-  *@description Text to delete something
-  */
+   *@description Text to delete something
+   */
   delete: 'Delete',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfileSidebarTreeElement.ts', UIStrings);
@@ -43,7 +47,7 @@ export class ProfileSidebarTreeElement extends UI.TreeOutline.TreeElement {
   readonly iconElement: HTMLDivElement;
   readonly titlesElement: HTMLDivElement;
   titleContainer: HTMLElement;
-  titleElement: HTMLElement;
+  override titleElement: HTMLElement;
   subtitleElement: HTMLElement;
   readonly className: string;
   small: boolean;
@@ -97,7 +101,7 @@ export class ProfileSidebarTreeElement extends UI.TreeOutline.TreeElement {
     }
   }
 
-  ondblclick(event: Event): boolean {
+  override ondblclick(event: Event): boolean {
     if (!this.editing) {
       this.startEditing((event.target as Element));
     }
@@ -127,17 +131,17 @@ export class ProfileSidebarTreeElement extends UI.TreeOutline.TreeElement {
     this.profile.removeEventListener(ProfileHeaderEvents.ProfileReceived, this.onProfileReceived, this);
   }
 
-  onselect(): boolean {
+  override onselect(): boolean {
     this.dataDisplayDelegate.showProfile(this.profile);
     return true;
   }
 
-  ondelete(): boolean {
+  override ondelete(): boolean {
     this.profile.profileType().removeProfile(this.profile);
     return true;
   }
 
-  onattach(): void {
+  override onattach(): void {
     if (this.className) {
       this.listItemElement.classList.add(this.className);
     }

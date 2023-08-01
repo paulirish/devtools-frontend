@@ -2,8 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
-import type {ElementHandle} from 'puppeteer';
-import {$$, $$textContent, click, platform, selectOption, waitFor, waitForElementsWithTextContent, waitForElementWithTextContent, waitForFunction} from '../../shared/helper.js';
+import {type ElementHandle} from 'puppeteer-core';
+import {
+  $$,
+  $$textContent,
+  click,
+  platform,
+  selectOption,
+  waitFor,
+  clickElement,
+  waitForElementsWithTextContent,
+  waitForElementWithTextContent,
+  waitForFunction,
+} from '../../shared/helper.js';
 
 const CANCEL_BUTTON_SELECTOR = '[aria-label="Discard changes"]';
 const CONFIRM_BUTTON_SELECTOR = '[aria-label="Confirm changes"]';
@@ -47,7 +58,7 @@ if (platform === 'mac') {
 
 export const selectKeyboardShortcutPreset = async (option: string) => {
   const presetSelectElement = await waitForElementWithTextContent(SHORTCUT_SELECT_TEXT);
-  await selectOption(presetSelectElement, option);
+  await selectOption(await presetSelectElement.toElement('select'), option);
 };
 
 export const getShortcutListItemElement = async (shortcutText: string) => {
@@ -70,7 +81,7 @@ export const getShortcutListItemElement = async (shortcutText: string) => {
 export const editShortcutListItem = async (shortcutText: string) => {
   const listItemElement = await getShortcutListItemElement(shortcutText) as ElementHandle;
 
-  await click(listItemElement);
+  await clickElement(listItemElement);
   await waitFor(EDIT_BUTTON_SELECTOR, listItemElement);
   await click(EDIT_BUTTON_SELECTOR, {root: listItemElement});
 
@@ -85,7 +96,8 @@ export const shortcutsForAction = async (shortcutText: string) => {
   const shortcutElements = await listItemElement.$$(SHORTCUT_DISPLAY_SELECTOR);
   const shortcutElementsTextContent =
       await Promise.all(shortcutElements.map(element => element.getProperty('textContent')));
-  return Promise.all(shortcutElementsTextContent.map(async textContent => textContent ? await textContent.jsonValue<string>() : []));
+  return Promise.all(
+      shortcutElementsTextContent.map(async textContent => textContent ? await textContent.jsonValue() : []));
 };
 
 export const shortcutInputValues = async () => {
@@ -94,7 +106,7 @@ export const shortcutInputValues = async () => {
     assert.fail('shortcut input not found');
   }
   const shortcutValues = await Promise.all(shortcutInputs.map(async input => input.getProperty('value')));
-  return Promise.all(shortcutValues.map(async value => value ? await value.jsonValue<string>() : []));
+  return Promise.all(shortcutValues.map(async value => value ? await value.jsonValue() : []));
 };
 
 export const clickAddShortcutLink = async () => {
@@ -111,7 +123,7 @@ export const clickAddShortcutLink = async () => {
     assert.fail('could not find add shortcut link');
   }
 
-  await click(addShortcutLinkElement);
+  await clickElement(addShortcutLinkElement);
 };
 
 export const clickShortcutConfirmButton = async () => {
@@ -131,7 +143,7 @@ export const clickShortcutDeleteButton = async (index: number) => {
   if (deleteButtons.length <= index) {
     assert.fail(`shortcut delete button #${index} not found`);
   }
-  await click(deleteButtons[index]);
+  await clickElement(deleteButtons[index]);
 };
 
 export const waitForEmptyShortcutInput = async () => {

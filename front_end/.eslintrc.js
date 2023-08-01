@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// clang-format off
 const path = require('path');
 const rulesDirPlugin = require('eslint-plugin-rulesdir');
 rulesDirPlugin.RULES_DIR = path.join(__dirname, '..', 'scripts', 'eslint_rules', 'lib');
@@ -19,7 +20,9 @@ module.exports = {
     'rulesdir/l10n_no_locked_or_placeholder_only_phrase': 2,
     'rulesdir/l10n_no_uistrings_export': 2,
     'rulesdir/l10n_no_unused_message': 2,
-    'rulesdir/custom_element_definitions_location': 2,
+    'rulesdir/custom_element_definitions_location': [2, {
+      rootFrontendDirectory: __dirname,
+    }],
     'rulesdir/custom_element_component_definition': 2,
   },
   'overrides': [
@@ -28,6 +31,7 @@ module.exports = {
       'rules': {
         '@typescript-eslint/explicit-function-return-type': 2,
         'rulesdir/no_importing_images_from_src': 2,
+        'rulesdir/enforce_bound_render_for_schedule_render': 2,
         'rulesdir/enforce_custom_event_names': 2,
         'rulesdir/set_data_type_reference': 2,
         'rulesdir/no_bound_component_methods': 2,
@@ -44,6 +48,8 @@ module.exports = {
         'rulesdir/static_custom_event_names': 2,
         'rulesdir/lit_html_host_this': 2,
         'rulesdir/lit_html_no_attribute_quotes': 2,
+        'rulesdir/lit_template_result_or_nothing': 2,
+        'rulesdir/inject_checkbox_styles': 2,
         '@typescript-eslint/naming-convention': [
           'error', {
             'selector': ['property', 'parameterProperty'],
@@ -120,10 +126,7 @@ module.exports = {
           },
           {
             // Ignore type properties that require quotes
-            'selector': [
-              'typeProperty',
-              'enumMember'
-            ],
+            'selector': ['typeProperty', 'enumMember'],
             'format': null,
             'modifiers': ['requiresQuotes']
           }
@@ -147,6 +150,17 @@ module.exports = {
       'rules': {
         'rulesdir/use_private_class_members': 2,
       }
+    },
+    // TODO(crbug/1402569): Remove once LitElement is fully adopted.
+    {
+      'files': ['panels/recorder/**/*.ts', 'panels/protocol_monitor/**/*.ts'],
+      'rules': {
+        'rulesdir/check_component_naming': 0,
+        'rulesdir/ban_literal_devtools_component_tag_names': 0,
+        // TODO(crbug/1402569): Reenable once https://github.com/microsoft/TypeScript/issues/48885 is closed.
+        'rulesdir/use_private_class_members': 0,
+      }
     }
   ]
 };
+// clang-format on

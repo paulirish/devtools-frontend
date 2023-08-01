@@ -13,9 +13,11 @@ generate_css("css_files") {
 
 devtools_module("color_picker") {
   sources = [
+    "ColorFormatSpec.ts",
     "ContrastDetails.ts",
     "ContrastInfo.ts",
     "ContrastOverlay.ts",
+    "FormatPickerContextMenu.ts",
     "Spectrum.ts",
   ]
 
@@ -27,6 +29,7 @@ devtools_module("color_picker") {
     "../../../../core/root:bundle",
     "../../../../core/sdk:bundle",
     "../../../../ui/components/icon_button:bundle",
+    "../../../../ui/components/srgb_overlay:bundle",
     "../../../../ui/legacy:bundle",
   ]
 }
@@ -41,6 +44,7 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../../../../test/unittests/front_end/ui/legacy/components/color_picker/*",
     "../../../../panels/css_overview/*",
     "../../../../panels/elements/*",
     "../../../../panels/sources/*",

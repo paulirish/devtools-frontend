@@ -16,41 +16,41 @@ import type * as Protocol from '../../generated/protocol.js';
 
 const UIStrings = {
   /**
-  *@description Text for a heap profile type
-  */
+   *@description Text for a heap profile type
+   */
   jsHeap: 'JS Heap',
   /**
-  *@description Text in Live Heap Profile View of a profiler tool
-  */
+   *@description Text in Live Heap Profile View of a profiler tool
+   */
   allocatedJsHeapSizeCurrentlyIn: 'Allocated JS heap size currently in use',
   /**
-  *@description Text in Live Heap Profile View of a profiler tool
-  */
+   *@description Text in Live Heap Profile View of a profiler tool
+   */
   vms: 'VMs',
   /**
-  *@description Text in Live Heap Profile View of a profiler tool
-  */
+   *@description Text in Live Heap Profile View of a profiler tool
+   */
   numberOfVmsSharingTheSameScript: 'Number of VMs sharing the same script source',
   /**
-  *@description Text in Live Heap Profile View of a profiler tool
-  */
+   *@description Text in Live Heap Profile View of a profiler tool
+   */
   scriptUrl: 'Script URL',
   /**
-  *@description Text in Live Heap Profile View of a profiler tool
-  */
+   *@description Text in Live Heap Profile View of a profiler tool
+   */
   urlOfTheScriptSource: 'URL of the script source',
   /**
-  *@description Data grid name for Heap Profile data grids
-  */
+   *@description Data grid name for Heap Profile data grids
+   */
   heapProfile: 'Heap Profile',
   /**
-  *@description Text in Live Heap Profile View of a profiler tool
-  *@example {1} PH1
-  */
+   *@description Text in Live Heap Profile View of a profiler tool
+   *@example {1} PH1
+   */
   anonymousScriptS: '(Anonymous Script {PH1})',
   /**
-  *@description A unit
-  */
+   *@description A unit
+   */
   kb: 'kB',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/LiveHeapProfileView.ts', UIStrings);
@@ -79,7 +79,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     this.toggleRecordButton.setToggled(this.setting.get());
     toolbar.appendToolbarItem(this.toggleRecordButton);
 
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (mainTarget && mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel)) {
       const startWithReloadAction =
           (UI.ActionRegistry.ActionRegistry.instance().action('live-heap-profile.start-with-reload') as
@@ -171,14 +171,14 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     return dataGrid;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     void this.poll();
     this.registerCSSFiles([liveHeapProfileStyles]);
     this.setting.addChangeListener(this.settingChanged, this);
   }
 
-  willHide(): void {
+  override willHide(): void {
     ++this.currentPollId;
     this.setting.removeChangeListener(this.settingChanged, this);
   }
@@ -292,7 +292,6 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     if (!node || !node.url) {
       return;
     }
-    // TODO(crbug.com/1253323): Cast to UrlString will be removed when migration to branded types is complete.
     const sourceCode =
         Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(node.url as Platform.DevToolsPath.UrlString);
     if (sourceCode) {
@@ -336,7 +335,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     if (!reload) {
       return;
     }
-    const mainTarget = SDK.TargetManager.TargetManager.instance().mainTarget();
+    const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     if (!mainTarget) {
       return;
     }
@@ -373,7 +372,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<unk
     this.refresh();
   }
 
-  createCell(columnId: string): HTMLElement {
+  override createCell(columnId: string): HTMLElement {
     const cell = this.createTD(columnId);
     switch (columnId) {
       case 'url':

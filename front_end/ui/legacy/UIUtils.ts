@@ -33,11 +33,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import * as DOMExtension from '../../core/dom_extension/dom_extension.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as IconButton from '../components/icon_button/icon_button.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {Dialog} from './Dialog.js';
@@ -47,10 +47,9 @@ import {Icon} from './Icon.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
 import * as Utils from './utils/utils.js';
 
-import type {ToolbarButton} from './Toolbar.js';
-import {Toolbar} from './Toolbar.js';
+import {Toolbar, type ToolbarButton} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
-import type {TreeOutline} from './Treeoutline.js';
+import {type TreeOutline} from './Treeoutline.js';
 import checkboxTextLabelStyles from './checkboxTextLabel.css.legacy.js';
 import closeButtonStyles from './closeButton.css.legacy.js';
 import confirmDialogStyles from './confirmDialog.css.legacy.js';
@@ -61,53 +60,53 @@ import smallBubbleStyles from './smallBubble.css.legacy.js';
 
 const UIStrings = {
   /**
-  *@description label to open link externally
-  */
+   *@description label to open link externally
+   */
   openInNewTab: 'Open in new tab',
   /**
-  *@description label to copy link address
-  */
+   *@description label to copy link address
+   */
   copyLinkAddress: 'Copy link address',
   /**
-  *@description label to copy file name
-  */
+   *@description label to copy file name
+   */
   copyFileName: 'Copy file name',
   /**
-  *@description label for the profiler control button
-  */
+   *@description label for the profiler control button
+   */
   anotherProfilerIsAlreadyActive: 'Another profiler is already active',
   /**
-  *@description Text in UIUtils
-  */
+   *@description Text in UIUtils
+   */
   promiseResolvedAsync: 'Promise resolved (async)',
   /**
-  *@description Text in UIUtils
-  */
+   *@description Text in UIUtils
+   */
   promiseRejectedAsync: 'Promise rejected (async)',
   /**
-  *@description Text in UIUtils
-  *@example {Promise} PH1
-  */
+   *@description Text in UIUtils
+   *@example {Promise} PH1
+   */
   sAsync: '{PH1} (async)',
   /**
-  *@description Text for the title of asynchronous function calls group in Call Stack
-  */
+   *@description Text for the title of asynchronous function calls group in Call Stack
+   */
   asyncCall: 'Async Call',
   /**
-  *@description Text for the name of anonymous functions
-  */
+   *@description Text for the name of anonymous functions
+   */
   anonymous: '(anonymous)',
   /**
-  *@description Text to close something
-  */
+   *@description Text to close something
+   */
   close: 'Close',
   /**
-  *@description Text on a button for message dialog
-  */
+   *@description Text on a button for message dialog
+   */
   ok: 'OK',
   /**
-  *@description Text to cancel something
-  */
+   *@description Text to cancel something
+   */
   cancel: 'Cancel',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/UIUtils.ts', UIStrings);
@@ -546,7 +545,7 @@ export function handleElementValueModifications(
   }
 
   const originalValue = element.textContent;
-  const wordRange = DOMExtension.DOMExtension.rangeOfWord(
+  const wordRange = Platform.DOMUtilities.rangeOfWord(
       selectionRange.startContainer, selectionRange.startOffset, StyleValueDelimiters, element);
   const wordString = wordRange.toString();
 
@@ -955,7 +954,7 @@ export function animateFunction(
 export class LongClickController {
   private readonly element: Element;
   private readonly callback: (arg0: Event) => void;
-  private readonly editKey: (arg0: Event) => boolean;
+  private readonly editKey: (arg0: KeyboardEvent) => boolean;
   private longClickData!: {
     mouseUp: (arg0: Event) => void,
     mouseDown: (arg0: Event) => void,
@@ -965,7 +964,8 @@ export class LongClickController {
 
   constructor(
       element: Element, callback: (arg0: Event) => void,
-      isEditKeyFunc: (arg0: Event) => boolean = (event): boolean => isEnterOrSpaceKey(event)) {
+      isEditKeyFunc: (arg0: KeyboardEvent) => boolean = (event):
+          boolean => Platform.KeyboardUtilities.isEnterOrSpaceKey(event)) {
     this.element = element;
     this.callback = callback;
     this.editKey = isEditKeyFunc;
@@ -999,14 +999,14 @@ export class LongClickController {
     this.longClickData = {mouseUp: boundMouseUp, mouseDown: boundMouseDown, reset: boundReset};
 
     function keyDown(this: LongClickController, e: Event): void {
-      if (this.editKey(e)) {
+      if (this.editKey(e as KeyboardEvent)) {
         const callback = this.callback;
         this.longClickInterval = window.setTimeout(callback.bind(null, e), LongClickController.TIME_MS);
       }
     }
 
     function keyUp(this: LongClickController, e: Event): void {
-      if (this.editKey(e)) {
+      if (this.editKey(e as KeyboardEvent)) {
         this.reset();
       }
     }
@@ -1104,7 +1104,7 @@ export function createInput(className?: string, type?: string): HTMLInputElement
 export function createSelect(name: string, options: string[]|Map<string, string[]>[]|Set<string>): HTMLSelectElement {
   const select = document.createElement('select');
   select.classList.add('chrome-select');
-  ARIAUtils.setAccessibleName(select, name);
+  ARIAUtils.setLabel(select, name);
   for (const option of options) {
     if (option instanceof Map) {
       for (const [key, value] of option) {
@@ -1144,10 +1144,19 @@ export function createRadioLabel(name: string, title: string, checked?: boolean)
   return element;
 }
 
-export function createIconLabel(title: string, iconClass: string): HTMLElement {
+export function createIconLabel(
+    options: {title?: string, iconName: string, color?: string, width?: '14px'|'20px', height?: '14px'|'20px'}):
+    DevToolsIconLabel {
   const element = (document.createElement('span', {is: 'dt-icon-label'}) as DevToolsIconLabel);
-  element.createChild('span').textContent = title;
-  element.type = iconClass;
+  if (options.title) {
+    element.createChild('span').textContent = options.title;
+  }
+  element.data = {
+    iconName: options.iconName,
+    color: options.color ?? 'var(--icon-default)',
+    width: options.width ?? '14px',
+    height: options.height ?? '14px',
+  };
   return element;
 }
 
@@ -1161,7 +1170,7 @@ export function createSlider(min: number, max: number, tabIndex: number): Elemen
 }
 
 export function setTitle(element: HTMLElement, title: string): void {
-  ARIAUtils.setAccessibleName(element, title);
+  ARIAUtils.setLabel(element, title);
   Tooltip.install(element, title);
 }
 
@@ -1192,7 +1201,7 @@ export class CheckboxLabel extends HTMLSpanElement {
     element.checkboxElement.checked = Boolean(checked);
     if (title !== undefined) {
       element.textElement.textContent = title;
-      ARIAUtils.setAccessibleName(element.checkboxElement, title);
+      element.checkboxElement.title = title;
       if (subtitle !== undefined) {
         element.textElement.createChild('div', 'dt-checkbox-subtitle').textContent = subtitle;
       }
@@ -1200,29 +1209,12 @@ export class CheckboxLabel extends HTMLSpanElement {
     return element;
   }
 
-  set backgroundColor(color: string) {
-    this.checkboxElement.classList.add('dt-checkbox-themed');
-    this.checkboxElement.style.backgroundColor = color;
-  }
-
-  set checkColor(color: string) {
-    this.checkboxElement.classList.add('dt-checkbox-themed');
-    const stylesheet = document.createElement('style');
-    stylesheet.textContent = 'input.dt-checkbox-themed:checked:after { background-color: ' + color + '}';
-    this.shadowRootInternal.appendChild(stylesheet);
-  }
-
-  set borderColor(color: string) {
-    this.checkboxElement.classList.add('dt-checkbox-themed');
-    this.checkboxElement.style.borderColor = color;
-  }
-
   private static lastId = 0;
   static constructorInternal: (() => Element)|null = null;
 }
 
 export class DevToolsIconLabel extends HTMLSpanElement {
-  private readonly iconElement: Icon;
+  readonly #icon: IconButton.Icon.Icon;
 
   constructor() {
     super();
@@ -1230,14 +1222,21 @@ export class DevToolsIconLabel extends HTMLSpanElement {
       cssFile: undefined,
       delegatesFocus: undefined,
     });
-    this.iconElement = Icon.create();
-    this.iconElement.style.setProperty('margin-right', '4px');
-    root.appendChild(this.iconElement);
+    this.#icon = new IconButton.Icon.Icon();
+    this.#icon.style.setProperty('margin-right', '4px');
+    root.appendChild(this.#icon);
     root.createChild('slot');
   }
 
-  set type(type: string) {
-    this.iconElement.setIconType(type);
+  set data(data: IconButton.Icon.IconData) {
+    this.#icon.data = data;
+    // TODO(crbug.com/1427397): Clean this up. This was necessary so `DevToolsIconLabel` can use Lit icon
+    //    while being backwards-compatible with the legacy Icon while working for both small and large icons.
+    if (data.height === '14px') {
+      this.#icon.style.setProperty('margin-bottom', '-2px');
+    } else if (data.height === '20px') {
+      this.#icon.style.setProperty('margin-bottom', '2px');
+    }
   }
 }
 
@@ -1316,36 +1315,20 @@ Utils.registerCustomElement('span', 'dt-small-bubble', DevToolsSmallBubble);
 
 export class DevToolsCloseButton extends HTMLDivElement {
   private buttonElement: HTMLElement;
-  private readonly hoverIcon: Icon;
-  private readonly activeIcon: Icon;
 
   constructor() {
     super();
     const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: closeButtonStyles, delegatesFocus: undefined});
     this.buttonElement = (root.createChild('div', 'close-button') as HTMLElement);
     Tooltip.install(this.buttonElement, i18nString(UIStrings.close));
-    ARIAUtils.setAccessibleName(this.buttonElement, i18nString(UIStrings.close));
+    ARIAUtils.setLabel(this.buttonElement, i18nString(UIStrings.close));
     ARIAUtils.markAsButton(this.buttonElement);
-    const regularIcon = Icon.create('smallicon-cross', 'default-icon');
-    this.hoverIcon = Icon.create('mediumicon-red-cross-hover', 'hover-icon');
-    this.activeIcon = Icon.create('mediumicon-red-cross-active', 'active-icon');
+    const regularIcon = Icon.create('cross', 'default-icon');
     this.buttonElement.appendChild(regularIcon);
-    this.buttonElement.appendChild(this.hoverIcon);
-    this.buttonElement.appendChild(this.activeIcon);
-  }
-
-  set gray(gray: boolean) {
-    if (gray) {
-      this.hoverIcon.setIconType('mediumicon-gray-cross-hover');
-      this.activeIcon.setIconType('mediumicon-gray-cross-active');
-    } else {
-      this.hoverIcon.setIconType('mediumicon-red-cross-hover');
-      this.activeIcon.setIconType('mediumicon-red-cross-active');
-    }
   }
 
   setAccessibleName(name: string): void {
-    ARIAUtils.setAccessibleName(this.buttonElement, name);
+    ARIAUtils.setLabel(this.buttonElement, name);
   }
 
   setTabbable(tabbable: boolean): void {
@@ -1490,25 +1473,25 @@ let measureTextWidthCache: Map<string, Map<string, number>>|null = null;
 /**
  * Adds a 'utm_source=devtools' as query parameter to the url.
  */
-export function addReferrerToURL(url: string): string {
+export function addReferrerToURL(url: Platform.DevToolsPath.UrlString): Platform.DevToolsPath.UrlString {
   if (/(\?|&)utm_source=devtools/.test(url)) {
     return url;
   }
   if (url.indexOf('?') === -1) {
     // If the URL does not contain a query, add the referrer query after path
     // and before (potential) anchor.
-    return url.replace(/^([^#]*)(#.*)?$/g, '$1?utm_source=devtools$2');
+    return url.replace(/^([^#]*)(#.*)?$/g, '$1?utm_source=devtools$2') as Platform.DevToolsPath.UrlString;
   }
   // If the URL already contains a query, add the referrer query after the last query
   // and before (potential) anchor.
-  return url.replace(/^([^#]*)(#.*)?$/g, '$1&utm_source=devtools$2');
+  return url.replace(/^([^#]*)(#.*)?$/g, '$1&utm_source=devtools$2') as Platform.DevToolsPath.UrlString;
 }
 
 /**
  * We want to add a referrer query param to every request to
  * 'web.dev' or 'developers.google.com'.
  */
-export function addReferrerToURLIfNecessary(url: string): string {
+export function addReferrerToURLIfNecessary(url: Platform.DevToolsPath.UrlString): Platform.DevToolsPath.UrlString {
   if (/(\/\/developers.google.com\/|\/\/web.dev\/|\/\/developer.chrome.com\/)/.test(url)) {
     return addReferrerToURL(url);
   }
@@ -1545,7 +1528,7 @@ export function createFileSelectorElement(callback: (arg0: File) => void): HTMLI
 export const MaxLengthForDisplayedURLs = 150;
 
 export class MessageDialog {
-  static async show(message: string, where?: Element | Document): Promise<void> {
+  static async show(message: string, where?: Element|Document): Promise<void> {
     const dialog = new Dialog();
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
@@ -1568,11 +1551,11 @@ export class MessageDialog {
 }
 
 export class ConfirmDialog {
-  static async show(message: string, where?: Element | Document): Promise<boolean> {
+  static async show(message: string, where?: Element|Document): Promise<boolean> {
     const dialog = new Dialog();
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
-    ARIAUtils.setAccessibleName(dialog.contentElement, message);
+    ARIAUtils.setLabel(dialog.contentElement, message);
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
         dialog.contentElement, {cssFile: confirmDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');

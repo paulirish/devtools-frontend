@@ -15,58 +15,22 @@ const UIStrings = {
    */
   nViolations: '{n, plural, =1 {# violation} other {# violations}}',
   /**
-   * @description Noun, label for the column showing the associated frame in the issue details table.
-   * The associated frame can either be the "main frame" (or main window), or an HTML iframe.
-   */
-  frame: 'Frame',
-  /**
    * @description Noun, label for the column showing the associated HTML element in the issue details table.
    */
   element: 'Element',
+  /**
+   * @description Noun, label for the column showing the invalid header value in the issue details table.
+   */
+  invalidHeaderValue: 'Invalid Header Value',
   /**
    * @description Noun, label for the column showing the associated network request in the issue details table.
    */
   request: 'Request',
   /**
-   * @description Label for the column showing the invalid value used as the 'attributionsourceeventid' attribute
-   * on an anchor HTML element ("a link").
-   */
-  invalidSourceEventId: 'Invalid `attributionsourceeventid`',
-  /**
-   * @description Label for the column showing the invalid value used as the 'attributionexpiry' attribute
-   * on an anchor HTML element ("a link").
-   */
-  invalidSourceExpiry: 'Invalid `attributionexpiry`',
-  /**
-   * @description Label for the column showing the invalid value used as the 'attributionpriority' attribute
-   * on an anchor HTML element ("a link").
-   */
-  invalidSourcePriority: 'Invalid `attributionsourcepriority`',
-  /**
    * @description Label for the column showing the invalid URL used in an HTML anchor element ("a link").
    * A origin is (roughly said) the front part of a URL.
    */
   untrustworthyOrigin: 'Untrustworthy origin',
-  /**
-   * @description Label for the column showing the invalid value used for the 'trigger-data' query
-   * parameter.
-   */
-  invalidTriggerData: 'Invalid `trigger-data`',
-  /**
-   * @description Label for the column showing the invalid value used for the
-   * 'event-source-trigger-data' query parameter.
-   */
-  invalidEventSourceTriggerData: 'Invalid `event-source-trigger-data`',
-  /**
-   * @description Label for the column showing the invalid value used for the
-   * 'priority' query parameter.
-   */
-  invalidTriggerPriority: 'Invalid `priority`',
-  /**
-   * @description Label for the column showing the invalid value used for the
-   * 'dedup-key' query parameter.
-   */
-  invalidTriggerDedupKey: 'Invalid `dedup-key`',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/issues/AttributionReportingIssueDetailsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -91,64 +55,33 @@ export class AttributionReportingIssueDetailsView extends AffectedResourcesView 
       issues: Iterable<IssuesManager.AttributionReportingIssue.AttributionReportingIssue>): void {
     const header = document.createElement('tr');
     switch (issueCode) {
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionUntrustworthyFrameOrigin:
-        this.appendColumnTitle(header, i18nString(UIStrings.frame));
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterSourceHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterTriggerHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsSourceHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsTriggerHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OsSourceIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OsTriggerIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.SourceIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.TriggerIgnored:
+        this.appendColumnTitle(header, i18nString(UIStrings.request));
+        this.appendColumnTitle(header, i18nString(UIStrings.invalidHeaderValue));
+        break;
+      case IssuesManager.AttributionReportingIssue.IssueCode.InsecureContext:
+      case IssuesManager.AttributionReportingIssue.IssueCode.UntrustworthyReportingOrigin:
+        this.appendColumnTitle(header, i18nString(UIStrings.element));
         this.appendColumnTitle(header, i18nString(UIStrings.request));
         this.appendColumnTitle(header, i18nString(UIStrings.untrustworthyOrigin));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionUntrustworthyOrigin:
-        this.appendColumnTitle(header, i18nString(UIStrings.request));
-        this.appendColumnTitle(header, i18nString(UIStrings.untrustworthyOrigin));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionSourceUntrustworthyFrameOrigin:
-        this.appendColumnTitle(header, i18nString(UIStrings.frame));
-        this.appendColumnTitle(header, i18nString(UIStrings.element));
-        this.appendColumnTitle(header, i18nString(UIStrings.untrustworthyOrigin));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionSourceUntrustworthyOrigin:
-        this.appendColumnTitle(header, i18nString(UIStrings.element));
-        this.appendColumnTitle(header, i18nString(UIStrings.untrustworthyOrigin));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionData:
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionTriggerDataTooLarge:
-        this.appendColumnTitle(header, i18nString(UIStrings.request));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidTriggerData));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidEventSourceTriggerData:
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionEventSourceTriggerDataTooLarge:
-        this.appendColumnTitle(header, i18nString(UIStrings.request));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidEventSourceTriggerData));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidTriggerPriority:
-        this.appendColumnTitle(header, i18nString(UIStrings.request));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidTriggerPriority));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidTriggerDedupKey:
-        this.appendColumnTitle(header, i18nString(UIStrings.request));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidTriggerDedupKey));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionSourceEventId:
-        this.appendColumnTitle(header, i18nString(UIStrings.frame));
-        this.appendColumnTitle(header, i18nString(UIStrings.element));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidSourceEventId));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionSourceExpiry:
-        this.appendColumnTitle(header, i18nString(UIStrings.frame));
-        this.appendColumnTitle(header, i18nString(UIStrings.element));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidSourceExpiry));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionSourcePriority:
-        this.appendColumnTitle(header, i18nString(UIStrings.frame));
-        this.appendColumnTitle(header, i18nString(UIStrings.element));
-        this.appendColumnTitle(header, i18nString(UIStrings.invalidSourcePriority));
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.MissingAttributionData:
-        this.appendColumnTitle(header, i18nString(UIStrings.request));
         break;
       case IssuesManager.AttributionReportingIssue.IssueCode.PermissionPolicyDisabled:
-        this.appendColumnTitle(header, i18nString(UIStrings.frame));
         this.appendColumnTitle(header, i18nString(UIStrings.element));
         this.appendColumnTitle(header, i18nString(UIStrings.request));
+        break;
+      case IssuesManager.AttributionReportingIssue.IssueCode.SourceAndTriggerHeaders:
+      case IssuesManager.AttributionReportingIssue.IssueCode.WebAndOsHeaders:
+        this.appendColumnTitle(header, i18nString(UIStrings.request));
+        break;
+      case IssuesManager.AttributionReportingIssue.IssueCode.NavigationRegistrationWithoutTransientUserActivation:
+        this.appendColumnTitle(header, i18nString(UIStrings.element));
         break;
     }
 
@@ -170,54 +103,37 @@ export class AttributionReportingIssueDetailsView extends AffectedResourcesView 
     const details = issue.issueDetails;
 
     switch (issueCode) {
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionUntrustworthyFrameOrigin:
-        this.#appendFrameOrEmptyCell(element, issue);
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterSourceHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterTriggerHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsSourceHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsTriggerHeader:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OsSourceIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OsTriggerIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.SourceIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.TriggerIgnored:
         this.#appendRequestOrEmptyCell(element, details.request);
         this.appendIssueDetailCell(element, details.invalidParameter || '');
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionSourceUntrustworthyOrigin:
+      case IssuesManager.AttributionReportingIssue.IssueCode.InsecureContext:
+      case IssuesManager.AttributionReportingIssue.IssueCode.UntrustworthyReportingOrigin:
         await this.#appendElementOrEmptyCell(element, issue);
-        this.appendIssueDetailCell(element, details.invalidParameter || '');
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionTriggerDataTooLarge:
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionEventSourceTriggerDataTooLarge:
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionUntrustworthyOrigin:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionData:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidEventSourceTriggerData:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidTriggerPriority:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidTriggerDedupKey:
         this.#appendRequestOrEmptyCell(element, details.request);
         this.appendIssueDetailCell(element, details.invalidParameter || '');
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.AttributionSourceUntrustworthyFrameOrigin:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionSourceEventId:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionSourceExpiry:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidAttributionSourcePriority:
-        this.#appendFrameOrEmptyCell(element, issue);
-        await this.#appendElementOrEmptyCell(element, issue);
-        this.appendIssueDetailCell(element, details.invalidParameter || '');
-        break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.MissingAttributionData:
-        this.#appendRequestOrEmptyCell(element, details.request);
         break;
       case IssuesManager.AttributionReportingIssue.IssueCode.PermissionPolicyDisabled:
-        this.#appendFrameOrEmptyCell(element, issue);
         await this.#appendElementOrEmptyCell(element, issue);
         this.#appendRequestOrEmptyCell(element, details.request);
+        break;
+      case IssuesManager.AttributionReportingIssue.IssueCode.SourceAndTriggerHeaders:
+      case IssuesManager.AttributionReportingIssue.IssueCode.WebAndOsHeaders:
+        this.#appendRequestOrEmptyCell(element, details.request);
+        break;
+      case IssuesManager.AttributionReportingIssue.IssueCode.NavigationRegistrationWithoutTransientUserActivation:
+        await this.#appendElementOrEmptyCell(element, issue);
         break;
     }
 
     this.affectedResources.appendChild(element);
-  }
-
-  #appendFrameOrEmptyCell(
-      parent: HTMLElement, issue: IssuesManager.AttributionReportingIssue.AttributionReportingIssue): void {
-    const details = issue.issueDetails;
-    if (details.frame) {
-      parent.appendChild(this.createFrameCell(details.frame.frameId, issue.getCategory()));
-    } else {
-      this.appendIssueDetailCell(parent, '');
-    }
   }
 
   async #appendElementOrEmptyCell(

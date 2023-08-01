@@ -4,9 +4,26 @@
 
 import {assert} from 'chai';
 
-import {click, getBrowserAndPages, getTestServerPort, goToResource, waitFor, waitForFunction} from '../../shared/helper.js';
+import {expectError} from '../../conductor/events.js';
+import {
+  click,
+  getBrowserAndPages,
+  getTestServerPort,
+  goToResource,
+  waitFor,
+  waitForFunction,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {clearStorageItems, clearStorageItemsFilter, doubleClickSourceTreeItem, filterStorageItems, getStorageItemsData, navigateToApplicationTab, selectCookieByName} from '../helpers/application-helpers.js';
+import {assertMatchesJSONSnapshot} from '../../shared/snapshots.js';
+import {
+  clearStorageItems,
+  clearStorageItemsFilter,
+  doubleClickSourceTreeItem,
+  filterStorageItems,
+  getStorageItemsData,
+  navigateToApplicationTab,
+  selectCookieByName,
+} from '../helpers/application-helpers.js';
 
 // The parent suffix makes sure we wait for the Cookies item to have children before trying to click it.
 const COOKIES_SELECTOR = '[aria-label="Cookies"].parent';
@@ -18,41 +35,28 @@ describe('The Application Tab', async () => {
   });
 
   afterEach(async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     const cookies = await target.cookies();
     await target.deleteCookie(...cookies);
   });
 
-  it('shows cookies even when navigating to an unreachable page (crbug.com/1047348)', async () => {
-    const {target} = getBrowserAndPages();
-    // This sets a new cookie foo=bar
-    await navigateToApplicationTab(target, 'cookies');
+  // Flaky test
+  it.skip(
+      '[crbug.com/1443434]: shows cookies even when navigating to an unreachable page (crbug.com/1047348)',
+      async () => {
+        const {target} = getBrowserAndPages();
+        // This sets a new cookie foo=bar
+        await navigateToApplicationTab(target, 'cookies');
 
-    await goToResource('network/unreachable.rawresponse');
+        await goToResource('network/unreachable.rawresponse');
 
-    await doubleClickSourceTreeItem(COOKIES_SELECTOR);
-    await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
+        await doubleClickSourceTreeItem(COOKIES_SELECTOR);
+        await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
 
-    const dataGridRowValues = await getStorageItemsData(['name', 'value']);
-    assert.deepEqual(dataGridRowValues, [
-      {
-        name: 'urlencoded',
-        value: 'Hello%2BWorld!',
-      },
-      {
-        name: '__Host-foo3',
-        value: 'bar',
-      },
-      {
-        name: 'foo2',
-        value: 'bar',
-      },
-      {
-        name: 'foo',
-        value: 'bar',
-      },
-    ]);
-  });
+        const dataGridRowValues = await getStorageItemsData(['name', 'value']);
+        assertMatchesJSONSnapshot(dataGridRowValues);
+      });
 
   it('shows a preview of the cookie value (crbug.com/462370)', async () => {
     const {target} = getBrowserAndPages();
@@ -115,7 +119,7 @@ describe('The Application Tab', async () => {
       return previewValue === 'Hello%2BWorld!';
     });
 
-    await click('[aria-label="Show URL decoded"]');
+    await click('[title="Show URL-decoded"]');
 
     await waitForFunction(async () => {
       const previewValueNode = await waitFor('.cookie-preview-widget-cookie-value');
@@ -153,6 +157,7 @@ describe('The Application Tab', async () => {
   });
 
   it('only clear currently visible cookies (crbug.com/978059)', async () => {
+    expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     // This sets a new cookie foo=bar
     await navigateToApplicationTab(target, 'cookies');

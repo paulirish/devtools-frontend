@@ -8,21 +8,20 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import stylePropertyEditorStyles from './stylePropertyEditor.css.js';
 
-import type {IconInfo} from './CSSPropertyIconResolver.js';
-import {findFlexContainerIcon, findGridContainerIcon} from './CSSPropertyIconResolver.js';
+import {findFlexContainerIcon, findGridContainerIcon, type IconInfo} from './CSSPropertyIconResolver.js';
 
 const UIStrings = {
   /**
-    * @description Title of the button that selects a flex property.
-    * @example {flex-direction} propertyName
-    * @example {column} propertyValue
-    */
+   * @description Title of the button that selects a flex property.
+   * @example {flex-direction} propertyName
+   * @example {column} propertyValue
+   */
   selectButton: 'Add {propertyName}: {propertyValue}',
   /**
-    * @description Title of the button that deselects a flex property.
-    * @example {flex-direction} propertyName
-    * @example {row} propertyValue
-    */
+   * @description Title of the button that deselects a flex property.
+   * @example {flex-direction} propertyName
+   * @example {row} propertyValue
+   */
   deselectButton: 'Remove {propertyName}: {propertyValue}',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/components/StylePropertyEditor.ts', UIStrings);
@@ -139,7 +138,7 @@ export class StylePropertyEditor extends HTMLElement {
     return html`<button title=${title} class=${classes} @click=${
         (): void => this.#onButtonClick(propertyName, propertyValue, selected)}>
        <${IconButton.Icon.Icon.litTagName} style=${transform} .data=${
-        {iconName: iconInfo.iconName, color: 'var(--icon-color)', width: '18px', height: '18px'} as
+        {iconName: iconInfo.iconName, color: 'var(--icon-color)', width: '20px', height: '20px'} as
         IconButton.Icon.IconWithName}></${IconButton.Icon.Icon.litTagName}>
     </button>`;
   }
@@ -158,9 +157,9 @@ export class StylePropertyEditor extends HTMLElement {
 }
 
 export class FlexboxEditor extends StylePropertyEditor {
-  protected readonly editableProperties: EditableProperty[] = FlexboxEditableProperties;
+  protected override readonly editableProperties: EditableProperty[] = FlexboxEditableProperties;
 
-  protected findIcon(query: string, computedProperties: Map<string, string>): IconInfo|null {
+  protected override findIcon(query: string, computedProperties: Map<string, string>): IconInfo|null {
     return findFlexContainerIcon(query, computedProperties);
   }
 }
@@ -175,9 +174,9 @@ declare global {
 }
 
 export class GridEditor extends StylePropertyEditor {
-  protected readonly editableProperties: EditableProperty[] = GridEditableProperties;
+  protected override readonly editableProperties: EditableProperty[] = GridEditableProperties;
 
-  protected findIcon(query: string, computedProperties: Map<string, string>): IconInfo|null {
+  protected override findIcon(query: string, computedProperties: Map<string, string>): IconInfo|null {
     return findGridContainerIcon(query, computedProperties);
   }
 }

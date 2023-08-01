@@ -24,7 +24,6 @@ devtools_module("lighthouse") {
     "LighthouseReportSelector.ts",
     "LighthouseReporterTypes.ts",
     "LighthouseStartView.ts",
-    "LighthouseStartViewFR.ts",
     "LighthouseStatusView.ts",
     "LighthouseTimespanView.ts",
     "RadioSetting.ts",
@@ -38,6 +37,7 @@ devtools_module("lighthouse") {
     "../../core/protocol_client:bundle",
     "../../core/root:bundle",
     "../../core/sdk:bundle",
+    "../../models/trace:bundle",
     "../../models/workspace:bundle",
     "../../panels/emulation:bundle",
     "../../panels/timeline:bundle",
@@ -59,6 +59,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
+    "../../../test/unittests/front_end/panels/lighthouse/*",
     "../../entrypoints/*",
   ]
 

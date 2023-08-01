@@ -272,10 +272,23 @@ describe('ConsoleFormat', () => {
             'tokens', [
               {type: 'style', value: `color:rgb(${i},0,0)`},
               {type: 'style', value: `color:rgb(5,${i},0)`},
-              {type: 'style', value: `background:rgb(${i},${i},${i})`},
+              {type: 'style', value: `background-color:rgb(${i},${i},${i})`},
               {type: 'style', value: ''},
             ]);
       }
+    });
+
+    it('correctly clears ANSI color and background color', () => {
+      assert.deepNestedPropertyVal(
+          Console.ConsoleFormat.format('foo \x1B[41m\x1B[37mbar\x1B[39m\x1B[49m baz', []), 'tokens', [
+            {type: 'string', value: 'foo '},
+            {type: 'style', value: 'background-color:var(--console-color-red)'},
+            {type: 'style', value: 'background-color:var(--console-color-red);color:var(--console-color-gray)'},
+            {type: 'string', value: 'bar'},
+            {type: 'style', value: 'background-color:var(--console-color-red)'},
+            {type: 'style', value: ''},
+            {type: 'string', value: ' baz'},
+          ]);
     });
 
     it('deals with ANSI colors and formatting specifiers', () => {
@@ -411,6 +424,27 @@ describe('ConsoleFormat', () => {
 
       Console.ConsoleFormat.updateStyle(styles, 'border-image-source:url(file://c/a.txt)');
       assert.isFalse(styles.has('border-image-source'));
+
+      Console.ConsoleFormat.updateStyle(styles, 'background-image:url(httpS://localhost/a.png)');
+      assert.isFalse(styles.has('background-image'));
+
+      Console.ConsoleFormat.updateStyle(styles, 'border-image-source:url(fIle://c/a.txt)');
+      assert.isFalse(styles.has('border-image-source'));
+
+      Console.ConsoleFormat.updateStyle(styles, 'background-image:url(https\\0009://localhost/a.png)');
+      assert.isFalse(styles.has('background-image'));
+
+      Console.ConsoleFormat.updateStyle(styles, 'background-image:url("file://c/a.txt")');  // With double quotes.
+      assert.isFalse(styles.has('background-image'));
+
+      Console.ConsoleFormat.updateStyle(
+          styles, 'background-image:url(\'http://localhost/a.png\')');  // With single quots.
+      assert.isFalse(styles.has('background-image'));
+
+      Console.ConsoleFormat.updateStyle(
+          styles,
+          'background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAAAAABzHgM7AAAAF0lEQVR42mM4Awb/wYCBYg6EgghRzAEAWDWBGQVyKPMAAAAASUVORK5CYII=), url(http://localhost/a.png)');  // Multiple URLs
+      assert.isFalse(styles.has('background-image'));
     });
 
     it('allows data urls in values', () => {

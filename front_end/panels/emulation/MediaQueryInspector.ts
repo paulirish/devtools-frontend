@@ -14,9 +14,9 @@ import mediaQueryInspectorStyles from './mediaQueryInspector.css.legacy.js';
 
 const UIStrings = {
   /**
-  * @description A context menu item/command in the Media Query Inspector of the Device Toolbar.
-  * Takes the user to the source code where this media query actually came from.
-  */
+   * @description A context menu item/command in the Media Query Inspector of the Device Toolbar.
+   * Takes the user to the source code where this media query actually came from.
+   */
   revealInSourceCode: 'Reveal in source code',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/emulation/MediaQueryInspector.ts', UIStrings);
@@ -32,13 +32,15 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
   private cssModel?: SDK.CSSModel.CSSModel;
   private cachedQueryModels?: MediaQueryUIModel[];
 
-  constructor(getWidthCallback: () => number, setWidthCallback: (arg0: number) => void) {
+  constructor(
+      getWidthCallback: () => number, setWidthCallback: (arg0: number) => void,
+      mediaThrottler: Common.Throttler.Throttler) {
     super(true);
     this.registerRequiredCSS(mediaQueryInspectorStyles);
     this.contentElement.classList.add('media-inspector-view');
     this.contentElement.addEventListener('click', this.onMediaQueryClicked.bind(this), false);
     this.contentElement.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
-    this.mediaThrottler = new Common.Throttler.Throttler(0);
+    this.mediaThrottler = mediaThrottler;
 
     this.getWidthCallback = getWidthCallback;
     this.setWidthCallback = setWidthCallback;
@@ -54,7 +56,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
 
   modelAdded(cssModel: SDK.CSSModel.CSSModel): void {
     // FIXME: adapt this to multiple targets.
-    if (this.cssModel) {
+    if (cssModel.target() !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
       return;
     }
     this.cssModel = cssModel;
@@ -264,7 +266,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
     return UI.ZoomManager.ZoomManager.instance().zoomFactor() / this.scale;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.scheduleMediaQueriesUpdate();
   }

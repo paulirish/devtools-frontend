@@ -7,13 +7,17 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import type {MarkdownIssueDescription, LazyMarkdownIssueDescription} from './MarkdownIssueDescription.js';
-import {resolveLazyDescription} from './MarkdownIssueDescription.js';
+
+import {
+  resolveLazyDescription,
+  type MarkdownIssueDescription,
+  type LazyMarkdownIssueDescription,
+} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
-  *@description Title for Client Hint specification url link
-  */
+   *@description Title for Client Hint specification url link
+   */
   fedCm: 'Federated Credential Management API',
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/FederatedAuthRequestIssue.ts', UIStrings);
@@ -73,16 +77,6 @@ export class FederatedAuthRequestIssue extends Issue {
 
 const issueDescriptions: Map<Protocol.Audits.FederatedAuthRequestIssueReason, LazyMarkdownIssueDescription> = new Map([
   [
-    Protocol.Audits.FederatedAuthRequestIssueReason.ApprovalDeclined,
-    {
-      file: 'federatedAuthRequestApprovalDeclined.md',
-      links: [{
-        link: 'https://fedidcg.github.io/FedCM/',
-        linkTitle: i18nLazyString(UIStrings.fedCm),
-      }],
-    },
-  ],
-  [
     Protocol.Audits.FederatedAuthRequestIssueReason.TooManyRequests,
     {
       file: 'federatedAuthRequestTooManyRequests.md',
@@ -93,7 +87,7 @@ const issueDescriptions: Map<Protocol.Audits.FederatedAuthRequestIssueReason, La
     },
   ],
   [
-    Protocol.Audits.FederatedAuthRequestIssueReason.ManifestHttpNotFound,
+    Protocol.Audits.FederatedAuthRequestIssueReason.ConfigHttpNotFound,
     {
       file: 'federatedAuthRequestManifestHttpNotFound.md',
       links: [{
@@ -103,7 +97,7 @@ const issueDescriptions: Map<Protocol.Audits.FederatedAuthRequestIssueReason, La
     },
   ],
   [
-    Protocol.Audits.FederatedAuthRequestIssueReason.ManifestNoResponse,
+    Protocol.Audits.FederatedAuthRequestIssueReason.ConfigNoResponse,
     {
       file: 'federatedAuthRequestManifestNoResponse.md',
       links: [{
@@ -113,7 +107,7 @@ const issueDescriptions: Map<Protocol.Audits.FederatedAuthRequestIssueReason, La
     },
   ],
   [
-    Protocol.Audits.FederatedAuthRequestIssueReason.ManifestInvalidResponse,
+    Protocol.Audits.FederatedAuthRequestIssueReason.ConfigInvalidResponse,
     {
       file: 'federatedAuthRequestManifestInvalidResponse.md',
       links: [{

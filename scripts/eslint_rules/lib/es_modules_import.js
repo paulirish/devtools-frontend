@@ -11,6 +11,7 @@
 const path = require('path');
 
 const FRONT_END_DIRECTORY = path.join(__dirname, '..', '..', '..', 'front_end');
+const THIRD_PARTY_DIRECTORY = path.join(FRONT_END_DIRECTORY, 'third_party');
 const INSPECTOR_OVERLAY_DIRECTORY = path.join(__dirname, '..', '..', '..', 'front_end', 'inspector_overlay');
 const COMPONENT_DOCS_DIRECTORY = path.join(FRONT_END_DIRECTORY, 'ui', 'components', 'docs');
 
@@ -42,7 +43,7 @@ function computeTopLevelFolder(fileName) {
 }
 
 function checkImportExtension(importPath, importPathForErrorMessage, context, node) {
-  // import * as fs from 'fs';
+  // detect import * as fs from 'fs';
   if (!importPath.startsWith('.')) {
     return;
   }
@@ -150,10 +151,9 @@ module.exports = {
         checkImportExtension(node.source.value, importPathForErrorMessage, context, node);
 
         // Accidental relative URL:
-        // import * as Root from 'front_end/root/root.js';
+        // e.g.: import * as Root from 'front_end/root/root.js';
         //
-        // Should ignore named imports:
-        // import * as fs from 'fs';
+        // Should ignore named imports import * as fs from 'fs';
         //
         // Don't use `importPath` here, as `path.normalize` removes
         // the `./` from same-folder import paths.
@@ -164,7 +164,10 @@ module.exports = {
           });
         }
 
-        if (importingFileName.startsWith(INSPECTOR_OVERLAY_DIRECTORY)) {
+        // the Module import rules do not apply within:
+        // 1. inspector_overlay
+        // 2. front_end/third_party
+        if (importingFileName.startsWith(INSPECTOR_OVERLAY_DIRECTORY) || importingFileName.startsWith(THIRD_PARTY_DIRECTORY)) {
           return;
         }
 

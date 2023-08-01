@@ -12,16 +12,16 @@ import issueCounterStyles from './issueCounter.css.js';
 
 const UIStrings = {
   /**
-  *@description Label for link to Issues tab, specifying how many issues there are.
-  */
+   *@description Label for link to Issues tab, specifying how many issues there are.
+   */
   pageErrors: '{issueCount, plural, =1 {# page error} other {# page errors}}',
   /**
- *@description Label for link to Issues tab, specifying how many issues there are.
- */
+   *@description Label for link to Issues tab, specifying how many issues there are.
+   */
   breakingChanges: '{issueCount, plural, =1 {# breaking change} other {# breaking changes}}',
   /**
- *@description Label for link to Issues tab, specifying how many issues there are.
- */
+   *@description Label for link to Issues tab, specifying how many issues there are.
+   */
   possibleImprovements: '{issueCount, plural, =1 {# possible improvement} other {# possible improvements}}',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/components/issue_counter/IssueCounter.ts', UIStrings);
@@ -30,11 +30,11 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export function getIssueKindIconData(issueKind: IssuesManager.Issue.IssueKind): IconButton.Icon.IconWithName {
   switch (issueKind) {
     case IssuesManager.Issue.IssueKind.PageError:
-      return {iconName: 'issue-cross-icon', color: 'var(--issue-color-red)', width: '16px', height: '16px'};
+      return {iconName: 'issue-cross-filled', color: 'var(--icon-error)', width: '20px', height: '20px'};
     case IssuesManager.Issue.IssueKind.BreakingChange:
-      return {iconName: 'issue-exclamation-icon', color: 'var(--issue-color-yellow)', width: '16px', height: '16px'};
+      return {iconName: 'issue-exclamation-filled', color: 'var(--icon-warning)', width: '20px', height: '20px'};
     case IssuesManager.Issue.IssueKind.Improvement:
-      return {iconName: 'issue-text-icon', color: 'var(--issue-color-blue)', width: '16px', height: '16px'};
+      return {iconName: 'issue-text-filled', color: 'var(--icon-info)', width: '20px', height: '20px'};
   }
 }
 
@@ -82,7 +82,7 @@ export function getIssueCountsEnumeration(
 }
 
 export class IssueCounter extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`issue-counter`;
+  static readonly litTagName = LitHtml.literal`devtools-issue-counter`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #clickHandler: undefined|(() => void) = undefined;
   #tooltipCallback: undefined|(() => void) = undefined;
@@ -200,10 +200,10 @@ export class IssueCounter extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('issue-counter', IssueCounter);
+ComponentHelpers.CustomElements.defineComponent('devtools-issue-counter', IssueCounter);
 
 declare global {
   interface HTMLElementTagNameMap {
-    'issue-counter': IssueCounter;
+    'devtools-issue-counter': IssueCounter;
   }
 }

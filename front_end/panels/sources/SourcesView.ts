@@ -16,26 +16,30 @@ import * as Components from './components/components.js';
 import {EditingLocationHistoryManager} from './EditingLocationHistoryManager.js';
 import sourcesViewStyles from './sourcesView.css.js';
 
-import type {EditorSelectedEvent, TabbedEditorContainerDelegate} from './TabbedEditorContainer.js';
-import {Events as TabbedEditorContainerEvents, TabbedEditorContainer} from './TabbedEditorContainer.js';
+import {
+  Events as TabbedEditorContainerEvents,
+  TabbedEditorContainer,
+  type EditorSelectedEvent,
+  type TabbedEditorContainerDelegate,
+} from './TabbedEditorContainer.js';
 import {Events as UISourceCodeFrameEvents, UISourceCodeFrame} from './UISourceCodeFrame.js';
 
 const UIStrings = {
   /**
-  *@description Text to open a file
-  */
+   *@description Text to open a file
+   */
   openFile: 'Open file',
   /**
-  *@description Text to run commands
-  */
+   *@description Text to run commands
+   */
   runCommand: 'Run command',
   /**
-  *@description Text in Sources View of the Sources panel
-  */
+   *@description Text in Sources View of the Sources panel
+   */
   dropInAFolderToAddToWorkspace: 'Drop in a folder to add to workspace',
   /**
-  *@description Accessible label for Sources placeholder view actions list
-  */
+   *@description Accessible label for Sources placeholder view actions list
+   */
   sourceViewActions: 'Source View Actions',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/SourcesView.ts', UIStrings);
@@ -65,7 +69,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     super();
 
     this.element.id = 'sources-panel-sources-view';
-    this.setMinimumAndPreferredSizes(250, 52, 250, 100);
+    this.setMinimumAndPreferredSizes(88, 52, 150, 100);
 
     this.placeholderOptionArray = [];
     this.selectedIndex = 0;
@@ -88,12 +92,6 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.historyManager = new EditingLocationHistoryManager(this);
 
     this.toolbarContainerElementInternal = this.element.createChild('div', 'sources-toolbar');
-    if (!Root.Runtime.experiments.isEnabled('sourcesPrettyPrint')) {
-      const toolbarEditorActions = new UI.Toolbar.Toolbar('', this.toolbarContainerElementInternal);
-      for (const action of getRegisteredEditorActions()) {
-        toolbarEditorActions.appendToolbarItem(action.getOrCreateButton(this));
-      }
-    }
     this.scriptViewToolbar = new UI.Toolbar.Toolbar('', this.toolbarContainerElementInternal);
     this.scriptViewToolbar.element.style.flex = 'auto';
     this.bottomToolbarInternal = new UI.Toolbar.Toolbar('', this.toolbarContainerElementInternal);
@@ -117,7 +115,11 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       const projects =
           Workspace.Workspace.WorkspaceImpl.instance().projectsForType(Workspace.Workspace.projectTypes.FileSystem);
       for (const project of projects) {
-        unsavedSourceCodes.push(...project.uiSourceCodes().filter(sourceCode => sourceCode.isDirty()));
+        for (const uiSourceCode of project.uiSourceCodes()) {
+          if (uiSourceCode.isDirty()) {
+            unsavedSourceCodes.push(uiSourceCode);
+          }
+        }
       }
 
       if (!unsavedSourceCodes.length) {
@@ -152,7 +154,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     const list = element.createChild('div', 'tabbed-pane-placeholder');
     list.addEventListener('keydown', this.placeholderOnKeyDown.bind(this), false);
     UI.ARIAUtils.markAsList(list);
-    UI.ARIAUtils.setAccessibleName(list, i18nString(UIStrings.sourceViewActions));
+    UI.ARIAUtils.setLabel(list, i18nString(UIStrings.sourceViewActions));
 
     for (let i = 0; i < shortcuts.length; i++) {
       const shortcut = shortcuts[i];
@@ -187,7 +189,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
   private placeholderOnKeyDown(event: Event): void {
     const keyboardEvent = (event as KeyboardEvent);
-    if (isEnterOrSpaceKey(keyboardEvent)) {
+    if (Platform.KeyboardUtilities.isEnterOrSpaceKey(keyboardEvent)) {
       this.placeholderOptionArray[this.selectedIndex].handler();
       return;
     }
@@ -252,13 +254,13 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     }
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([sourcesViewStyles]);
     UI.Context.Context.instance().setFlavor(SourcesView, this);
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.Context.Context.instance().setFlavor(SourcesView, null);
     super.willHide();
   }
@@ -337,7 +339,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   private projectRemoved(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
     const project = event.data;
     const uiSourceCodes = project.uiSourceCodes();
-    this.removeUISourceCodes(uiSourceCodes);
+    this.removeUISourceCodes([...uiSourceCodes]);
   }
 
   private updateScriptViewToolbarItems(): void {
@@ -345,6 +347,9 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     if (view instanceof UI.View.SimpleView) {
       void view.toolbarItems().then(items => {
         this.scriptViewToolbar.removeToolbarItems();
+        for (const action of getRegisteredEditorActions()) {
+          this.scriptViewToolbar.appendToolbarItem(action.getOrCreateButton(this));
+        }
         items.map(item => this.scriptViewToolbar.appendToolbarItem(item));
       });
     }
@@ -527,9 +532,9 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
         UISourceCodeFrameEvents.ToolbarItemsChanged, this.updateScriptViewToolbarItems, this);
   }
 
-  searchCanceled(): void {
+  onSearchCanceled(): void {
     if (this.searchView) {
-      this.searchView.searchCanceled();
+      this.searchView.onSearchCanceled();
     }
 
     delete this.searchView;
@@ -614,18 +619,20 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   save(): void {
-    this.saveSourceView(this.visibleView());
+    this.saveSourceFrame(this.currentSourceFrame());
   }
 
   saveAll(): void {
     const sourceFrames = this.editorContainer.fileViews();
-    sourceFrames.forEach(this.saveSourceView.bind(this));
+    sourceFrames.forEach(this.saveSourceFrame.bind(this));
   }
 
-  private saveSourceView(sourceView: UI.Widget.Widget|null): void {
-    if (sourceView instanceof UISourceCodeFrame || sourceView instanceof Components.HeadersView.HeadersView) {
-      sourceView.commitEditing();
+  private saveSourceFrame(sourceFrame: UI.Widget.Widget|null): void {
+    if (!(sourceFrame instanceof UISourceCodeFrame)) {
+      return;
     }
+    const uiSourceCodeFrame = (sourceFrame as UISourceCodeFrame);
+    uiSourceCodeFrame.commitEditing();
   }
 
   toggleBreakpointsActiveState(active: boolean): void {
@@ -686,13 +693,11 @@ export class SwitchFileActionDelegate implements UI.ActionRegistration.ActionDel
       return namePrefix.toLowerCase();
     }
 
-    const uiSourceCodes = currentUISourceCode.project().uiSourceCodes();
     const candidates = [];
     const url = currentUISourceCode.parentURL();
     const name = currentUISourceCode.name();
     const namePrefix = fileNamePrefix(name);
-    for (let i = 0; i < uiSourceCodes.length; ++i) {
-      const uiSourceCode = uiSourceCodes[i];
+    for (const uiSourceCode of currentUISourceCode.project().uiSourceCodes()) {
       if (url !== uiSourceCode.parentURL()) {
         continue;
       }
@@ -755,6 +760,12 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         return true;
       case 'sources.jump-to-next-location':
         sourcesView.onJumpToNextLocation();
+        return true;
+      case 'sources.next-editor-tab':
+        sourcesView.editorContainer.selectNextTab();
+        return true;
+      case 'sources.previous-editor-tab':
+        sourcesView.editorContainer.selectPrevTab();
         return true;
       case 'sources.close-editor-tab':
         return sourcesView.onCloseEditorTab();

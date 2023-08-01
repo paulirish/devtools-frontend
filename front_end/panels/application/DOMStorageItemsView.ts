@@ -41,24 +41,29 @@ import {StorageItemsView} from './StorageItemsView.js';
 
 const UIStrings = {
   /**
-  *@description Text in DOMStorage Items View of the Application panel
-  */
+   *@description Text in DOMStorage Items View of the Application panel
+   */
   domStorage: 'DOM Storage',
   /**
-  *@description Text in DOMStorage Items View of the Application panel
-  */
+   *@description Text in DOMStorage Items View of the Application panel
+   */
   key: 'Key',
   /**
-  *@description Text for the value of something
-  */
+   *@description Text for the value of something
+   */
   value: 'Value',
   /**
-  *@description Data grid name for DOM Storage Items data grids
-  */
+   *@description Name for the "DOM Storage Items" table that shows the content of the DOM Storage.
+   */
   domStorageItems: 'DOM Storage Items',
   /**
-  *@description Text in DOMStorage Items View of the Application panel
-  */
+   *@description Text for announcing that the "DOM Storage Items" table was cleared, that is, all
+   * entries were deleted.
+   */
+  domStorageItemsCleared: 'DOM Storage Items cleared',
+  /**
+   *@description Text in DOMStorage Items View of the Application panel
+   */
   selectAValueToPreview: 'Select a value to preview',
   /**
    *@description Text for announcing a DOM Storage key/value item has been deleted
@@ -85,6 +90,9 @@ export class DOMStorageItemsView extends StorageItemsView {
     super(i18nString(UIStrings.domStorage), 'domStoragePanel');
 
     this.domStorage = domStorage;
+    if (domStorage.storageKey) {
+      this.setStorageKey(domStorage.storageKey);
+    }
 
     this.element.classList.add('storage-view', 'table');
 
@@ -133,6 +141,9 @@ export class DOMStorageItemsView extends StorageItemsView {
   setStorage(domStorage: DOMStorage): void {
     Common.EventTarget.removeEventListeners(this.eventListeners);
     this.domStorage = domStorage;
+    if (domStorage.storageKey) {
+      this.setStorageKey(domStorage.storageKey);
+    }
     this.eventListeners = [
       this.domStorage.addEventListener(DOMStorage.Events.DOMStorageItemsCleared, this.domStorageItemsCleared, this),
       this.domStorage.addEventListener(DOMStorage.Events.DOMStorageItemRemoved, this.domStorageItemRemoved, this),
@@ -149,6 +160,7 @@ export class DOMStorageItemsView extends StorageItemsView {
 
     this.dataGrid.rootNode().removeChildren();
     this.dataGrid.addCreationNode(false);
+    UI.ARIAUtils.alert(i18nString(UIStrings.domStorageItemsCleared));
     this.setCanDeleteSelected(false);
   }
 
@@ -200,16 +212,19 @@ export class DOMStorageItemsView extends StorageItemsView {
     const storageData = event.data;
     const childNode = this.dataGrid.rootNode().children.find(
         (child: DataGrid.DataGrid.DataGridNode<unknown>) => child.data.key === storageData.key);
-    if (!childNode || childNode.data.value === storageData.value) {
+    if (!childNode) {
       return;
     }
-
-    childNode.data.value = storageData.value;
-    childNode.refresh();
+    if (childNode.data.value !== storageData.value) {
+      childNode.data.value = storageData.value;
+      childNode.refresh();
+    }
     if (!childNode.selected) {
       return;
     }
-    void this.previewEntry(childNode);
+    if (this.previewValue !== storageData.value) {
+      void this.previewEntry(childNode);
+    }
     this.setCanDeleteSelected(true);
   }
 
@@ -245,7 +260,7 @@ export class DOMStorageItemsView extends StorageItemsView {
     UI.ARIAUtils.alert(i18nString(UIStrings.domStorageNumberEntries, {PH1: filteredList.length}));
   }
 
-  deleteSelectedItem(): void {
+  override deleteSelectedItem(): void {
     if (!this.dataGrid || !this.dataGrid.selectedNode) {
       return;
     }
@@ -253,11 +268,11 @@ export class DOMStorageItemsView extends StorageItemsView {
     this.deleteCallback(this.dataGrid.selectedNode);
   }
 
-  refreshItems(): void {
+  override refreshItems(): void {
     void this.domStorage.getItems().then(items => items && this.showDOMStorageItems(items));
   }
 
-  deleteAllItems(): void {
+  override deleteAllItems(): void {
     this.domStorage.clear();
     // explicitly clear the view because the event won't be fired when it has no items
     this.domStorageItemsCleared();

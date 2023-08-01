@@ -182,21 +182,33 @@ label {
   grid-template-columns: auto min-content 1fr;
 }
 
-.settings-experiment [is="dt-checkbox"] {
-  padding-right: 10px;
-}
-
 .settings-experiment .devtools-link {
   display: flex !important; /* stylelint-disable-line declaration-no-important */
   align-items: center;
 }
 
-.settings-experiment .link-icon {
-  margin-left: 4px;
+.settings-experiment .devtools-link:has(.link-icon) {
+  outline-offset: 0;
+}
+
+.experiment-label {
+  margin-right: 2px;
 }
 
 .settings-experiment-unstable {
   color: var(--color-text-secondary);
+}
+
+.settings-experiment .feedback-link {
+  color: var(--color-primary-old);
+  text-decoration-line: underline;
+  margin-left: 4px;
+}
+
+.tabbed-pane-content slot::slotted(.widget) {
+  /* '!important' in order to overwrite the slotted widget's 'overflow-auto' class.
+  This prevents the focus-ring of selectable elements from being cut off. */
+  overflow: visible !important; /* stylelint-disable-line declaration-no-important */
 }
 
 @media (forced-colors: active) {

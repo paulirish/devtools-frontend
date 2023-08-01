@@ -29,25 +29,26 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
+import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 
-import type * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-  * @description This message is presented as a tooltip when developers investigate the performance
-  * of a page. The tooltip alerts developers that some parts of code in execution were not optimized
-  * (made to run faster) and that associated timing information must be considered with this in
-  * mind. The placeholder text is the reason the code was not optimized.
-  * @example {Optimized too many times} PH1
-  */
+   * @description This message is presented as a tooltip when developers investigate the performance
+   * of a page. The tooltip alerts developers that some parts of code in execution were not optimized
+   * (made to run faster) and that associated timing information must be considered with this in
+   * mind. The placeholder text is the reason the code was not optimized.
+   * @example {Optimized too many times} PH1
+   */
   notOptimizedS: 'Not optimized: {PH1}',
   /**
-  *@description Generic text with two placeholders separated by a comma
-  *@example {1 613 680} PH1
-  *@example {44 %} PH2
-  */
+   *@description Generic text with two placeholders separated by a comma
+   *@example {1 613 680} PH1
+   *@example {44 %} PH2
+   */
   genericTextTwoPlaceholders: '{PH1}, {PH2}',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfileDataGrid.ts', UIStrings);
@@ -56,7 +57,7 @@ export class ProfileDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown>
   searchMatchedSelfColumn: boolean;
   searchMatchedTotalColumn: boolean;
   searchMatchedFunctionColumn: boolean;
-  profileNode: SDK.ProfileTreeModel.ProfileNode;
+  profileNode: CPUProfile.ProfileTreeModel.ProfileNode;
   tree: ProfileDataGridTree;
   childrenByCallUID: Map<string, ProfileDataGridNode>;
   lastComparator: unknown;
@@ -65,14 +66,15 @@ export class ProfileDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown>
   total: number;
   functionName: string;
   readonly deoptReason: string;
-  url: string;
+  url: Platform.DevToolsPath.UrlString;
   linkElement: Element|null;
   populated: boolean;
   savedSelf?: number;
   savedTotal?: number;
   savedChildren?: DataGrid.DataGrid.DataGridNode<unknown>[];
 
-  constructor(profileNode: SDK.ProfileTreeModel.ProfileNode, owningTree: ProfileDataGridTree, hasChildren: boolean) {
+  constructor(
+      profileNode: CPUProfile.ProfileTreeModel.ProfileNode, owningTree: ProfileDataGridTree, hasChildren: boolean) {
     super(null, hasChildren);
 
     this.searchMatchedSelfColumn = false;
@@ -182,7 +184,7 @@ export class ProfileDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown>
     }
   }
 
-  createCell(columnId: string): HTMLElement {
+  override createCell(columnId: string): HTMLElement {
     switch (columnId) {
       case 'self': {
         const cell = this.createValueCell(this.self, this.selfPercent, columnId);
@@ -201,7 +203,9 @@ export class ProfileDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown>
         cell.classList.toggle('highlight', this.searchMatchedFunctionColumn);
         if (this.deoptReason) {
           cell.classList.add('not-optimized');
-          const warningIcon = UI.Icon.Icon.create('smallicon-warning', 'profile-warn-marker');
+          const warningIcon = new IconButton.Icon.Icon();
+          warningIcon.data = {iconName: 'warning-filled', color: 'var(--icon-warning)', width: '14px', height: '14px'};
+          warningIcon.classList.add('profile-warn-marker');
           UI.Tooltip.Tooltip.install(warningIcon, i18nString(UIStrings.notOptimizedS, {PH1: this.deoptReason}));
           cell.appendChild(warningIcon);
         }
@@ -245,24 +249,24 @@ export class ProfileDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown>
     return ProfileDataGridNode.sort([[this]], sortComparator, force);
   }
 
-  insertChild(child: DataGrid.DataGrid.DataGridNode<unknown>, index: number): void {
+  override insertChild(child: DataGrid.DataGrid.DataGridNode<unknown>, index: number): void {
     const profileDataGridNode = (child as ProfileDataGridNode);
     super.insertChild(profileDataGridNode, index);
     this.childrenByCallUID.set(profileDataGridNode.callUID, (profileDataGridNode as ProfileDataGridNode));
   }
 
-  removeChild(profileDataGridNode: DataGrid.DataGrid.DataGridNode<unknown>): void {
+  override removeChild(profileDataGridNode: DataGrid.DataGrid.DataGridNode<unknown>): void {
     super.removeChild(profileDataGridNode);
     this.childrenByCallUID.delete((profileDataGridNode as ProfileDataGridNode).callUID);
   }
 
-  removeChildren(): void {
+  override removeChildren(): void {
     super.removeChildren();
 
     this.childrenByCallUID.clear();
   }
 
-  findChild(node: SDK.ProfileTreeModel.ProfileNode): ProfileDataGridNode|null {
+  findChild(node: CPUProfile.ProfileTreeModel.ProfileNode): ProfileDataGridNode|null {
     if (!node) {
       return null;
     }
@@ -277,7 +281,7 @@ export class ProfileDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown>
     return this.total / this.tree.total * 100.0;
   }
 
-  populate(): void {
+  override populate(): void {
     ProfileDataGridNode.populate(this);
   }
 
@@ -458,7 +462,7 @@ export class ProfileDataGridTree implements UI.SearchableView.Searchable {
     // Not implemented.
   }
 
-  findChild(node: SDK.ProfileTreeModel.ProfileNode): ProfileDataGridNode|null {
+  findChild(node: CPUProfile.ProfileTreeModel.ProfileNode): ProfileDataGridNode|null {
     if (!node) {
       return null;
     }
@@ -605,7 +609,7 @@ export class ProfileDataGridTree implements UI.SearchableView.Searchable {
   }
 
   performSearch(searchConfig: UI.SearchableView.SearchConfig, shouldJump: boolean, jumpBackwards?: boolean): void {
-    this.searchCanceled();
+    this.onSearchCanceled();
     const matchesQuery = this.matchFunction(searchConfig);
     if (!matchesQuery) {
       return;
@@ -629,7 +633,7 @@ export class ProfileDataGridTree implements UI.SearchableView.Searchable {
     this.searchableView.updateCurrentMatchIndex(this.searchResultIndex);
   }
 
-  searchCanceled(): void {
+  onSearchCanceled(): void {
     if (this.searchResults) {
       for (let i = 0; i < this.searchResults.length; ++i) {
         const profileNode = this.searchResults[i].profileNode;

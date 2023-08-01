@@ -7,32 +7,32 @@ import type * as Platform from '../platform/platform.js';
 
 const UIStrings = {
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   elementsPanel: 'Elements panel',
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   stylesSidebar: 'styles sidebar',
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   changesDrawer: 'Changes drawer',
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   issuesView: 'Issues view',
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   networkPanel: 'Network panel',
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   applicationPanel: 'Application panel',
   /**
-  *@description The UI destination when right clicking an item that can be revealed
-  */
+   *@description The UI destination when right clicking an item that can be revealed
+   */
   sourcesPanel: 'Sources panel',
 };
 const str_ = i18n.i18n.registerUIStrings('core/common/Revealer.ts', UIStrings);
@@ -49,6 +49,9 @@ export let reveal = async function(revealable: Object|null, omitFocus?: boolean)
   const revealers =
       await Promise.all(getApplicableRegisteredRevealers(revealable).map(registration => registration.loadRevealer()));
 
+  if (!revealers.length) {
+    return Promise.reject(new Error('Can\'t reveal ' + revealable));
+  }
   return reveal(revealers);
   function reveal(revealers: Revealer[]): Promise<void> {
     const promises = [];
@@ -59,7 +62,7 @@ export let reveal = async function(revealable: Object|null, omitFocus?: boolean)
   }
 };
 
-export function setRevealForTest(newReveal: (arg0: Object|null, arg1?: boolean|undefined) => Promise<undefined>): void {
+export function setRevealForTest(newReveal: (arg0: Object|null, arg1?: boolean|undefined) => Promise<void>): void {
   reveal = newReveal;
 }
 

@@ -3,18 +3,44 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
+import * as fs from 'fs';
+import * as path from 'path';
 
-import {$$, click, getBrowserAndPages, getPendingEvents, getTestServerPort, goToResource, pasteText, platform, pressKey, reloadDevTools, step, timeout, typeText, waitFor, waitForFunction} from '../../shared/helper.js';
+import type * as puppeteer from 'puppeteer-core';
+import {requireTestRunnerConfigSetting} from '../../conductor/test_runner_config.js';
+
+import {
+  $,
+  $$,
+  assertNotNullOrUndefined,
+  click,
+  getBrowserAndPages,
+  getPendingEvents,
+  getTestServerPort,
+  goToResource,
+  pasteText,
+  platform,
+  pressKey,
+  reloadDevTools,
+  step,
+  timeout,
+  typeText,
+  waitFor,
+  clickElement,
+  waitForFunction,
+  waitForFunctionWithTries,
+  waitForAria,
+} from '../../shared/helper.js';
 
 export const ACTIVE_LINE = '.CodeMirror-activeline > pre > span';
-export const PAUSE_ON_EXCEPTION_BUTTON = '[aria-label="Pause on exceptions"]';
 export const PAUSE_BUTTON = '[aria-label="Pause script execution"]';
 export const RESUME_BUTTON = '[aria-label="Resume script execution"]';
 export const SOURCES_LINES_SELECTOR = '.CodeMirror-code > div';
 export const PAUSE_INDICATOR_SELECTOR = '.paused-status';
+export const CODE_LINE_COLUMN_SELECTOR = '.cm-lineNumbers';
 export const CODE_LINE_SELECTOR = '.cm-lineNumbers .cm-gutterElement';
 export const SCOPE_LOCAL_VALUES_SELECTOR = 'li[aria-label="Local"] + ol';
+export const THREADS_SELECTOR = '[aria-label="Threads"]';
 export const SELECTED_THREAD_SELECTOR = 'div.thread-item.selected > div.thread-item-title';
 export const STEP_INTO_BUTTON = '[aria-label="Step into next function call"]';
 export const STEP_OVER_BUTTON = '[aria-label="Step over next function call"]';
@@ -23,21 +49,29 @@ export const TURNED_OFF_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-off';
 export const TURNED_ON_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-on';
 export const DEBUGGER_PAUSED_EVENT = 'DevTools.DebuggerPaused';
 const WATCH_EXPRESSION_VALUE_SELECTOR = '.watch-expression-tree-item .object-value-string.value';
+export const MORE_TABS_SELECTOR = '[aria-label="More tabs"]';
+export const OVERRIDES_TAB_SELECTOR = '[aria-label="Overrides"]';
+export const ENABLE_OVERRIDES_SELECTOR = '[aria-label="Select folder for overrides"]';
+const CLEAR_CONFIGURATION_SELECTOR = '[aria-label="Clear configuration"]';
+export const PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR = '.pause-on-uncaught-exceptions';
+export const BREAKPOINT_ITEM_SELECTOR = '.breakpoint-item';
 
-export async function navigateToLine(frontend: puppeteer.Page, lineNumber: number|string) {
-  // Navigating to a line will trigger revealing the current
-  // uiSourceCodeFrame. Make sure to consume the 'source-file-loaded'
-  // event for this file.
-  await listenForSourceFilesLoaded(frontend);
+export async function toggleNavigatorSidebar(frontend: puppeteer.Page) {
+  const modifierKey = platform === 'mac' ? 'Meta' : 'Control';
+  await frontend.keyboard.down(modifierKey);
+  await frontend.keyboard.down('Shift');
+  await frontend.keyboard.press('y');
+  await frontend.keyboard.up('Shift');
+  await frontend.keyboard.up(modifierKey);
+}
 
-  await frontend.keyboard.down('Control');
-  await frontend.keyboard.press('KeyG');
-  await frontend.keyboard.up('Control');
-  await frontend.keyboard.type(`${lineNumber}`);
-  await frontend.keyboard.press('Enter');
-
-  const source = await getSelectedSource();
-  await waitForSourceLoadedEvent(frontend, source);
+export async function toggleDebuggerSidebar(frontend: puppeteer.Page) {
+  const modifierKey = platform === 'mac' ? 'Meta' : 'Control';
+  await frontend.keyboard.down(modifierKey);
+  await frontend.keyboard.down('Shift');
+  await frontend.keyboard.press('h');
+  await frontend.keyboard.up('Shift');
+  await frontend.keyboard.up(modifierKey);
 }
 
 export async function getLineNumberElement(lineNumber: number|string) {
@@ -52,16 +86,19 @@ export async function getLineNumberElement(lineNumber: number|string) {
 }
 
 export async function doubleClickSourceTreeItem(selector: string) {
-  const item = await waitFor(selector);
-  await click(item, {clickOptions: {clickCount: 2}, maxPixelsFromLeft: 40});
+  await click(selector, {clickOptions: {clickCount: 2, offset: {x: 40, y: 10}}});
+}
+
+export async function waitForSourcesPanel(): Promise<void> {
+  // Wait for the navigation panel to show up
+  await waitFor('.navigator-file-tree-item');
 }
 
 export async function openSourcesPanel() {
   // Locate the button for switching to the sources tab.
   await click('#tab-sources');
 
-  // Wait for the navigation panel to show up
-  await waitFor('.navigator-file-tree-item');
+  await waitForSourcesPanel();
 }
 
 export async function openFileInSourcesPanel(testInput: string) {
@@ -130,15 +167,23 @@ export async function createNewSnippet(snippetName: string, content?: string) {
   }
 }
 
+export async function openOverridesSubPane() {
+  const root = await waitFor('.navigator-tabbed-pane');
+
+  await waitFor('[aria-label="More tabs"]', root);
+  await click('[aria-label="More tabs"]', {root});
+
+  await waitFor('[aria-label="Overrides"]');
+
+  await click('[aria-label="Overrides"]');
+  await waitFor('[aria-label="Overrides panel"]');
+}
+
 export async function openFileInEditor(sourceFile: string) {
-  const {frontend} = getBrowserAndPages();
-
-  await listenForSourceFilesLoaded(frontend);
-
-  // Open a particular file in the editor
-  await doubleClickSourceTreeItem(`[aria-label="${sourceFile}, file"]`);
-
-  await waitForSourceLoadedEvent(frontend, sourceFile);
+  await waitForSourceFiles(
+      SourceFileEvents.SourceFileLoaded, files => files.some(f => f.endsWith(sourceFile)),
+      // Open a particular file in the editor
+      () => doubleClickSourceTreeItem(`[aria-label="${sourceFile}, file"]`));
 }
 
 export async function openSourceCodeEditorForFile(sourceFile: string, testInput: string) {
@@ -150,6 +195,18 @@ export async function getSelectedSource(): Promise<string> {
   const sourceTabPane = await waitFor('#sources-panel-sources-view .tabbed-pane');
   const sourceTabs = await waitFor('.tabbed-pane-header-tab.selected', sourceTabPane);
   return sourceTabs.evaluate(node => node.getAttribute('aria-label')) as Promise<string>;
+}
+
+export async function getBreakpointHitLocation() {
+  const breakpointHitHandle = await waitFor('.breakpoint-item.hit');
+  const locationHandle = await waitFor('.location', breakpointHitHandle);
+  const locationText = await locationHandle.evaluate(location => location.textContent);
+
+  const groupHandle = await breakpointHitHandle.evaluateHandle(x => x.parentElement);
+  const groupHeaderTitleHandle = await waitFor('.group-header-title', groupHandle);
+  const groupHeaderTitle = await groupHeaderTitleHandle?.evaluate(header => header.textContent);
+
+  return `${groupHeaderTitle}:${locationText}`;
 }
 
 export async function getOpenSources() {
@@ -183,30 +240,81 @@ export async function getToolbarText() {
 }
 
 export async function addBreakpointForLine(frontend: puppeteer.Page, index: number|string) {
-  await navigateToLine(frontend, index);
   const breakpointLine = await getLineNumberElement(index);
-  assert.isNotNull(breakpointLine, 'Line is not visible or does not exist');
+  assertNotNullOrUndefined(breakpointLine);
 
   await waitForFunction(async () => !(await isBreakpointSet(index)));
-  await breakpointLine?.click();
+  await clickElement(breakpointLine);
 
   await waitForFunction(async () => await isBreakpointSet(index));
 }
 
 export async function removeBreakpointForLine(frontend: puppeteer.Page, index: number|string) {
-  await navigateToLine(frontend, index);
   const breakpointLine = await getLineNumberElement(index);
-  assert.isNotNull(breakpointLine, 'Line is not visible or does not exist');
+  assertNotNullOrUndefined(breakpointLine);
 
   await waitForFunction(async () => await isBreakpointSet(index));
-  await breakpointLine?.click();
+  await clickElement(breakpointLine);
   await waitForFunction(async () => !(await isBreakpointSet(index)));
+}
+
+export async function addLogpointForLine(index: number, condition: string) {
+  const {frontend} = getBrowserAndPages();
+  const breakpointLine = await getLineNumberElement(index);
+  assertNotNullOrUndefined(breakpointLine);
+
+  await waitForFunction(async () => !(await isBreakpointSet(index)));
+  await clickElement(breakpointLine, {clickOptions: {button: 'right'}});
+
+  await click('aria/Add logpoint…');
+
+  const editDialog = await waitFor('.sources-edit-breakpoint-dialog');
+  const conditionEditor = await waitForAria('Code editor', editDialog);
+  await conditionEditor.focus();
+
+  await typeText(condition);
+  await frontend.keyboard.press('Enter');
+
+  await waitForFunction(async () => await isBreakpointSet(index));
 }
 
 export async function isBreakpointSet(lineNumber: number|string) {
   const lineNumberElement = await getLineNumberElement(lineNumber);
   const breakpointLineParentClasses = await lineNumberElement?.evaluate(n => n.className);
   return breakpointLineParentClasses?.includes('cm-breakpoint');
+}
+
+/**
+ * @param lineNumber 1-based line number
+ * @param index 1-based index of the inline breakpoint in the given line
+ */
+export async function enableInlineBreakpointForLine(line: number, index: number) {
+  const {frontend} = getBrowserAndPages();
+  const decorationSelector = `pierce/.cm-content > :nth-child(${line}) > :nth-child(${index} of .cm-inlineBreakpoint)`;
+  await click(decorationSelector);
+  await waitForFunction(
+      () => frontend.$eval(decorationSelector, element => !element.classList.contains('cm-inlineBreakpoint-disabled')));
+}
+
+/**
+ * @param lineNumber 1-based line number
+ * @param index 1-based index of the inline breakpoint in the given line
+ * @param expectNoBreakpoint If we should wait for the line to not have any inline breakpoints after
+ *                           the click instead of a disabled one.
+ */
+export async function disableInlineBreakpointForLine(line: number, index: number, expectNoBreakpoint: boolean = false) {
+  const {frontend} = getBrowserAndPages();
+  const decorationSelector = `pierce/.cm-content > :nth-child(${line}) > :nth-child(${index} of .cm-inlineBreakpoint)`;
+  await click(decorationSelector);
+  if (expectNoBreakpoint) {
+    await waitForFunction(
+        () => frontend.$$eval(
+            `pierce/.cm-content > :nth-child(${line}) > .cm-inlineBreakpoint`, elements => elements.length === 0));
+  } else {
+    await waitForFunction(
+        () =>
+            frontend.$eval(decorationSelector, element => element.classList.contains('cm-inlineBreakpoint-disabled')));
+  }
 }
 
 export async function checkBreakpointDidNotActivate() {
@@ -240,8 +348,9 @@ export async function executionLineHighlighted() {
 }
 
 export async function getCallFrameNames() {
-  await waitFor('.call-frame-item-title');
-  const items = await $$('.call-frame-item-title');
+  const selector = '.call-frame-item:not(.hidden) .call-frame-item-title';
+  await waitFor(selector);
+  const items = await $$(selector);
   const promises = items.map(handle => handle.evaluate(el => el.textContent as string));
   const results = [];
   for (const promise of promises) {
@@ -251,8 +360,9 @@ export async function getCallFrameNames() {
 }
 
 export async function getCallFrameLocations() {
-  await waitFor('.call-frame-location');
-  const items = await $$('.call-frame-location');
+  const selector = '.call-frame-item:not(.hidden) .call-frame-location';
+  await waitFor(selector);
+  const items = await $$(selector);
   const promises = items.map(handle => handle.evaluate(el => el.textContent as string));
   const results = [];
   for (const promise of promises) {
@@ -299,37 +409,86 @@ export async function retrieveTopCallFrameWithoutResuming() {
   return scriptLocation;
 }
 
+export async function waitForStackTopMatch(matcher: RegExp) {
+  // The call stack is updated asynchronously, so let us wait until we see the correct one
+  // (or report the last one we have seen before timeout).
+  let stepLocation = '<no call stack>';
+  await waitForFunctionWithTries(async () => {
+    stepLocation = await retrieveTopCallFrameWithoutResuming() ?? '<invalid>';
+    return stepLocation?.match(matcher);
+  }, {tries: 10});
+  return stepLocation;
+}
+
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface Window {
     /* eslint-disable @typescript-eslint/naming-convention */
-    __sourceFilesAddedEvents: string[];
-    __sourceFilesLoadedEvents: string[];
-    __sourceFilesLoadedEventListenerAdded: boolean;
+    __sourceFileEvents: Map<number, {files: string[], handler: (e: Event) => void}>;
     /* eslint-enable @typescript-eslint/naming-convention */
   }
 }
 
-export async function reloadPageAndWaitForSourceFile(
-    frontend: puppeteer.Page, target: puppeteer.Page, sourceFile: string) {
-  await listenForSourceFilesLoaded(frontend);
-  await target.reload();
-  await waitForSourceLoadedEvent(frontend, sourceFile);
+export const enum SourceFileEvents {
+  SourceFileLoaded = 'source-file-loaded',
+  AddedToSourceTree = 'source-tree-file-added',
 }
 
-export function listenForSourceFilesLoaded(frontend: puppeteer.Page) {
-  return frontend.evaluate(() => {
-    if (!window.__sourceFilesLoadedEvents) {
-      window.__sourceFilesLoadedEvents = [];
+let nextEventHandlerId = 0;
+export async function waitForSourceFiles<T>(
+    eventName: SourceFileEvents, waitCondition: (files: string[]) => boolean | Promise<boolean>,
+    action: () => T): Promise<T> {
+  const {frontend} = getBrowserAndPages();
+  const eventHandlerId = nextEventHandlerId++;
+
+  // Install new listener for the event
+  await frontend.evaluate((eventName, eventHandlerId) => {
+    if (!window.__sourceFileEvents) {
+      window.__sourceFileEvents = new Map();
     }
-    if (!window.__sourceFilesLoadedEventListenerAdded) {
-      window.addEventListener('source-file-loaded', (event: Event) => {
-        const customEvent = event as CustomEvent<string>;
-        window.__sourceFilesLoadedEvents.push(customEvent.detail);
-      });
-      window.__sourceFilesLoadedEventListenerAdded = true;
-    }
+    const handler = (event: Event) => {
+      const {detail} = event as CustomEvent<string>;
+      if (!detail.includes('pptr:')) {
+        window.__sourceFileEvents.get(eventHandlerId)?.files.push(detail);
+      }
+    };
+    window.__sourceFileEvents.set(eventHandlerId, {files: [], handler});
+    window.addEventListener(eventName, handler);
+  }, eventName, eventHandlerId);
+
+  const result = await action();
+
+  await waitForFunction(async () => {
+    const files =
+        await frontend.evaluate(eventHandlerId => window.__sourceFileEvents.get(eventHandlerId)?.files, eventHandlerId);
+    assertNotNullOrUndefined(files);
+    return await waitCondition(files);
   });
+
+  await frontend.evaluate((eventName, eventHandlerId) => {
+    const handler = window.__sourceFileEvents.get(eventHandlerId);
+    if (!handler) {
+      throw new Error('handler unexpectandly unregistered');
+    }
+    window.__sourceFileEvents.delete(eventHandlerId);
+    window.removeEventListener(eventName, handler.handler);
+  }, eventName, eventHandlerId);
+
+  return result;
+}
+
+export async function captureAddedSourceFiles(count: number, action: () => Promise<void>): Promise<string[]> {
+  let capturedFileNames!: string[];
+  await waitForSourceFiles(SourceFileEvents.AddedToSourceTree, files => {
+    capturedFileNames = files;
+    return files.length >= count;
+  }, action);
+  return capturedFileNames.map(f => new URL(`http://${f}`).pathname);
+}
+
+export async function reloadPageAndWaitForSourceFile(target: puppeteer.Page, sourceFile: string) {
+  await waitForSourceFiles(
+      SourceFileEvents.SourceFileLoaded, files => files.some(f => f.endsWith(sourceFile)), () => target.reload());
 }
 
 export function isEqualOrAbbreviation(abbreviated: string, full: string): boolean {
@@ -341,58 +500,11 @@ export function isEqualOrAbbreviation(abbreviated: string, full: string): boolea
   return full.startsWith(split[0]) && full.endsWith(split[1]);
 }
 
-export async function waitForSourceLoadedEvent(frontend: puppeteer.Page, fileName: string) {
-  const nameRegex = fileName.replace('…', '.*');
-
-  await waitForFunction(async () => {
-    return frontend.evaluate(nameRegex => {
-      return window.__sourceFilesLoadedEvents.some(x => new RegExp(nameRegex).test(x));
-    }, nameRegex);
-  });
-
-  await frontend.evaluate(nameRegex => {
-    window.__sourceFilesLoadedEvents =
-        window.__sourceFilesLoadedEvents.filter(event => !new RegExp(nameRegex).test(event));
-  }, nameRegex);
-}
-
-export function listenForSourceFilesAdded(frontend: puppeteer.Page) {
-  return frontend.evaluate(() => {
-    window.__sourceFilesAddedEvents = [];
-    window.addEventListener('source-tree-file-added', (event: Event) => {
-      const customEvent = event as CustomEvent<string>;
-      if (customEvent.detail !== '/__puppeteer_evaluation_script__') {
-        window.__sourceFilesAddedEvents.push(customEvent.detail);
-      }
-    });
-  });
-}
-
-export function waitForAdditionalSourceFiles(frontend: puppeteer.Page, count = 1) {
-  return waitForFunction(async () => {
-    return frontend.evaluate(count => {
-      return window.__sourceFilesAddedEvents.length >= count;
-    }, count);
-  });
-}
-
-export function clearSourceFilesAdded(frontend: puppeteer.Page) {
-  return frontend.evaluate(() => {
-    window.__sourceFilesAddedEvents = [];
-  });
-}
-
-export function retrieveSourceFilesAdded(frontend: puppeteer.Page) {
-  // Strip hostname, to make it agnostic of which server port we use
-  return frontend.evaluate(() => window.__sourceFilesAddedEvents.map(file => new URL(`https://${file}`).pathname));
-}
-
 // Helpers for navigating the file tree.
 export type NestedFileSelector = {
   rootSelector: string,
   domainSelector: string,
-  folderSelector: string,
-  fileSelector: string,
+  folderSelector?: string, fileSelector: string,
 };
 
 export function createSelectorsForWorkerFile(
@@ -410,14 +522,17 @@ export function createSelectorsForWorkerFile(
   };
 }
 
-async function expandSourceTreeItem(selector: string) {
+async function isExpanded(sourceTreeItem: puppeteer.ElementHandle<Element>): Promise<boolean> {
+  return await sourceTreeItem.evaluate(element => {
+    return element.getAttribute('aria-expanded') === 'true';
+  });
+}
+
+export async function expandSourceTreeItem(selector: string) {
   // FIXME(crbug/1112692): Refactor test to remove the timeout.
   await timeout(50);
   const sourceTreeItem = await waitFor(selector);
-  const isExpanded = await sourceTreeItem.evaluate(element => {
-    return element.getAttribute('aria-expanded') === 'true';
-  });
-  if (!isExpanded) {
+  if (!await isExpanded(sourceTreeItem)) {
     // FIXME(crbug/1112692): Refactor test to remove the timeout.
     await timeout(50);
     await doubleClickSourceTreeItem(selector);
@@ -427,16 +542,65 @@ async function expandSourceTreeItem(selector: string) {
 export async function expandFileTree(selectors: NestedFileSelector) {
   await expandSourceTreeItem(selectors.rootSelector);
   await expandSourceTreeItem(selectors.domainSelector);
-  await expandSourceTreeItem(selectors.folderSelector);
+  if (selectors.folderSelector) {
+    await expandSourceTreeItem(selectors.folderSelector);
+  }
   // FIXME(crbug/1112692): Refactor test to remove the timeout.
   await timeout(50);
   return await waitFor(selectors.fileSelector);
 }
 
+export async function readSourcesTreeView(): Promise<string[]> {
+  const items = await $$('.navigator-folder-tree-item,.navigator-file-tree-item');
+  const promises = items.map(handle => handle.evaluate(el => el.textContent as string));
+  const results = await Promise.all(promises);
+  return results.map(item => item.replace(/localhost:[0-9]+/, 'localhost:XXXX'));
+}
+
+export async function readIgnoreListedSources(): Promise<string[]> {
+  const items = await $$('.navigator-folder-tree-item.is-ignore-listed,.navigator-file-tree-item.is-ignore-listed');
+  const promises = items.map(handle => handle.evaluate(el => el.textContent as string));
+  const results = await Promise.all(promises);
+  return results.map(item => item.replace(/localhost:[0-9]+/, 'localhost:XXXX'));
+}
+
+async function hasPausedEvents(frontend: puppeteer.Page): Promise<boolean> {
+  const events = await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
+  return Boolean(events && events.length);
+}
+
 export async function stepThroughTheCode() {
   const {frontend} = getBrowserAndPages();
+  await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
   await frontend.keyboard.press('F9');
-  await waitForFunction(() => getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT));
+  await waitForFunction(() => hasPausedEvents(frontend));
+  await waitFor(PAUSE_INDICATOR_SELECTOR);
+}
+
+export async function stepIn() {
+  const {frontend} = getBrowserAndPages();
+  await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
+  await frontend.keyboard.press('F11');
+  await waitForFunction(() => hasPausedEvents(frontend));
+  await waitFor(PAUSE_INDICATOR_SELECTOR);
+}
+
+export async function stepOver() {
+  const {frontend} = getBrowserAndPages();
+  await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
+  await frontend.keyboard.press('F10');
+  await waitForFunction(() => hasPausedEvents(frontend));
+  await waitFor(PAUSE_INDICATOR_SELECTOR);
+}
+
+export async function stepOut() {
+  const {frontend} = getBrowserAndPages();
+  await getPendingEvents(frontend, DEBUGGER_PAUSED_EVENT);
+  await frontend.keyboard.down('Shift');
+  await frontend.keyboard.press('F11');
+  await frontend.keyboard.up('Shift');
+  await waitForFunction(() => hasPausedEvents(frontend));
+
   await waitFor(PAUSE_INDICATOR_SELECTOR);
 }
 
@@ -449,11 +613,10 @@ export async function openNestedWorkerFile(selectors: NestedFileSelector) {
 
 export async function clickOnContextMenu(selector: string, label: string) {
   // Find the selected node, right click.
-  const selectedNode = await waitFor(selector);
-  await click(selectedNode, {clickOptions: {button: 'right'}});
+  await click(selector, {clickOptions: {button: 'right'}});
 
   // Wait for the context menu option, and click it.
-  const labelSelector = `[aria-label="${label}"]`;
+  const labelSelector = `.soft-context-menu > [aria-label="${label}"]`;
   await waitFor(labelSelector);
   await click(labelSelector);
 }
@@ -512,9 +675,21 @@ export async function getPausedMessages() {
 
 export async function getWatchExpressionsValues() {
   const {frontend} = getBrowserAndPages();
-  await click('[aria-label="Watch"]');
+  await waitForFunction(async () => {
+    const expandedOption = await $('[aria-label="Watch"].expanded');
+    if (expandedOption) {
+      return true;
+    }
+    await click('[aria-label="Watch"]');
+    // Wait for the click event to settle.
+    await timeout(100);
+    return expandedOption !== null;
+  });
   await frontend.keyboard.press('ArrowRight');
-  await waitFor(WATCH_EXPRESSION_VALUE_SELECTOR);
+  const watchExpressionValue = await $(WATCH_EXPRESSION_VALUE_SELECTOR);
+  if (!watchExpressionValue) {
+    return null;
+  }
   const values = await $$(WATCH_EXPRESSION_VALUE_SELECTOR) as puppeteer.ElementHandle<HTMLElement>[];
   return await Promise.all(values.map(value => value.evaluate(element => element.innerText)));
 }
@@ -551,4 +726,148 @@ export async function refreshDevToolsAndRemoveBackendState(target: puppeteer.Pag
   // Navigate to a different site to make sure that back-end state will be removed.
   await target.goto('about:blank');
   await reloadDevTools({selectedPanel: {name: 'sources'}});
+}
+
+export async function enableLocalOverrides() {
+  await click(MORE_TABS_SELECTOR);
+  await click(OVERRIDES_TAB_SELECTOR);
+  await click(ENABLE_OVERRIDES_SELECTOR);
+  await waitFor(CLEAR_CONFIGURATION_SELECTOR);
+}
+
+export type LabelMapping = {
+  label: string,
+  moduleOffset: number,
+  bytecode: number,
+  sourceLine: number,
+  labelLine: number,
+  labelColumn: number,
+};
+
+export class WasmLocationLabels {
+  readonly #mappings: Map<string, LabelMapping[]>;
+  readonly #source: string;
+  readonly #wasm: string;
+  constructor(source: string, wasm: string, mappings: Map<string, LabelMapping[]>) {
+    this.#mappings = mappings;
+    this.#source = source;
+    this.#wasm = wasm;
+  }
+
+  static load(source: string, wasm: string): WasmLocationLabels {
+    const testSuitePath = requireTestRunnerConfigSetting<string>('test-suite-path');
+    const target = requireTestRunnerConfigSetting<string>('target');
+    const mapFileName = path.join('out', target, testSuitePath, 'resources', `${wasm}.map.json`);
+    const mapFile = JSON.parse(fs.readFileSync(mapFileName, {encoding: 'utf-8'})) as Array<{
+                      source: string,
+                      generatedLine: number,
+                      generatedColumn: number,
+                      bytecodeOffset: number,
+                      originalLine: number,
+                      originalColumn: number,
+                    }>;
+    const sourceFileName = path.join('out', target, testSuitePath, 'resources', source);
+    const sourceFile = fs.readFileSync(sourceFileName, {encoding: 'utf-8'});
+    const labels = new Map<string, number>();
+    for (const [index, line] of sourceFile.split('\n').entries()) {
+      if (line.trim().startsWith(';;@')) {
+        const label = line.trim().substr(3).trim();
+        assert.isFalse(labels.has(label), `Label ${label} must be unique`);
+        labels.set(label, index + 1);
+      }
+    }
+    const mappings = new Map<string, LabelMapping[]>();
+    for (const m of mapFile) {
+      const entry = mappings.get(m.source) ?? [];
+      if (entry.length === 0) {
+        mappings.set(m.source, entry);
+      }
+      const labelLine = m.originalLine as number;
+      const labelColumn = m.originalColumn as number;
+      const sourceLine = labels.get(`${m.source}:${labelLine}:${labelColumn}`);
+      assertNotNullOrUndefined(sourceLine);
+      entry.push({
+        label: m.source,
+        moduleOffset: m.generatedColumn,
+        bytecode: m.bytecodeOffset,
+        sourceLine,
+        labelLine,
+        labelColumn,
+      });
+    }
+    return new WasmLocationLabels(source, wasm, mappings);
+  }
+
+  async checkLocationForLabel(label: string) {
+    const mappedLines = this.#mappings.get(label);
+    assertNotNullOrUndefined(mappedLines);
+
+    const pauseLocation = await retrieveTopCallFrameWithoutResuming();
+    const pausedLine = mappedLines.find(
+        line => pauseLocation === `${path.basename(this.#wasm)}:0x${line.moduleOffset.toString(16)}` ||
+            pauseLocation === `${path.basename(this.#source)}:${line.sourceLine}`);
+    assertNotNullOrUndefined(pausedLine);
+    return pausedLine;
+  }
+
+  async addBreakpointsForLabelInSource(label: string) {
+    const {frontend} = getBrowserAndPages();
+    const mappedLines = this.#mappings.get(label);
+    assertNotNullOrUndefined(mappedLines);
+    await openFileInEditor(path.basename(this.#source));
+    for (const line of mappedLines) {
+      await addBreakpointForLine(frontend, line.sourceLine);
+    }
+  }
+
+  async addBreakpointsForLabelInWasm(label: string) {
+    const {frontend} = getBrowserAndPages();
+    const mappedLines = this.#mappings.get(label);
+    assertNotNullOrUndefined(mappedLines);
+    await openFileInEditor(path.basename(this.#wasm));
+    const visibleLines = await $$(CODE_LINE_SELECTOR);
+    const lineNumbers = await Promise.all(visibleLines.map(line => line.evaluate(node => node.textContent)));
+    const lineNumberLabels = new Map(lineNumbers.map(label => [Number(label), label]));
+
+    for (const line of mappedLines) {
+      const lineNumberLabel = lineNumberLabels.get(line.moduleOffset);
+      assertNotNullOrUndefined(lineNumberLabel);
+      await addBreakpointForLine(frontend, lineNumberLabel);
+    }
+  }
+
+  async setBreakpointInSourceAndRun(label: string, script: string) {
+    const {target} = getBrowserAndPages();
+    await this.addBreakpointsForLabelInSource(label);
+
+    target.evaluate(script);
+    await this.checkLocationForLabel(label);
+  }
+
+  async setBreakpointInWasmAndRun(label: string, script: string) {
+    const {target} = getBrowserAndPages();
+    await this.addBreakpointsForLabelInWasm(label);
+
+    target.evaluate(script);
+    await this.checkLocationForLabel(label);
+  }
+
+  async continueAndCheckForLabel(label: string) {
+    await click(RESUME_BUTTON);
+    await this.checkLocationForLabel(label);
+  }
+
+  getMappingsForPlugin(): LabelMapping[] {
+    return Array.from(this.#mappings.values()).flat();
+  }
+}
+
+export async function retrieveCodeMirrorEditorContent(): Promise<Array<string>> {
+  const editor = await waitFor('[aria-label="Code editor"]');
+  return await editor.evaluate(
+      node => [...node.querySelectorAll('.cm-line')].map(node => node.textContent || '') || []);
+}
+
+export async function waitForLines(lineCount: number): Promise<void> {
+  await waitFor(new Array(lineCount).fill('.cm-line').join(' ~ '));
 }

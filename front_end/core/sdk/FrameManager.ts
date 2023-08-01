@@ -5,12 +5,12 @@
 import * as Common from '../common/common.js';
 import type * as Protocol from '../../generated/protocol.js';
 
-import type {Resource} from './Resource.js';
-import type {ResourceTreeFrame} from './ResourceTreeModel.js';
-import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
-import type {Target} from './Target.js';
-import type {SDKModelObserver} from './TargetManager.js';
-import {TargetManager} from './TargetManager.js';
+import {type Resource} from './Resource.js';
+
+import {Events as ResourceTreeModelEvents, ResourceTreeModel, type ResourceTreeFrame} from './ResourceTreeModel.js';
+import {type Target} from './Target.js';
+
+import {TargetManager, type SDKModelObserver} from './TargetManager.js';
 
 let frameManagerInstance: FrameManager|null = null;
 
@@ -21,32 +21,27 @@ let frameManagerInstance: FrameManager|null = null;
  */
 export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     SDKModelObserver<ResourceTreeModel> {
-  readonly #eventListeners: WeakMap<ResourceTreeModel, Common.EventTarget.EventDescriptor[]>;
-  #frames: Map<string, {
+  readonly #eventListeners = new WeakMap<ResourceTreeModel, Common.EventTarget.EventDescriptor[]>();
+
+  // Maps frameIds to #frames and a count of how many ResourceTreeModels contain this frame.
+  // (OOPIFs are usually first attached to a new target and then detached from their old target,
+  // therefore being contained in 2 models for a short period of time.)
+  #frames = new Map<string, {
     frame: ResourceTreeFrame,
     count: number,
-  }>;
-  readonly #framesForTarget: Map<Protocol.Target.TargetID|'main', Set<Protocol.Page.FrameId>>;
-  #topFrame: ResourceTreeFrame|null;
-  #creationStackTraceDataForTransferringFrame:
-      Map<string, {creationStackTrace: Protocol.Runtime.StackTrace | null, creationStackTraceTarget: Target}>;
+  }>();
+
+  readonly #framesForTarget = new Map<Protocol.Target.TargetID|'main', Set<Protocol.Page.FrameId>>();
+  #outermostFrame: ResourceTreeFrame|null = null;
+  #transferringFramesDataCache = new Map<string, {
+    creationStackTrace?: Protocol.Runtime.StackTrace,
+    creationStackTraceTarget?: Target,
+  }>();
   #awaitedFrames: Map<string, {notInTarget?: Target, resolve: (frame: ResourceTreeFrame) => void}[]> = new Map();
 
   constructor() {
     super();
-    this.#eventListeners = new WeakMap();
     TargetManager.instance().observeModels(ResourceTreeModel, this);
-
-    // Maps frameIds to #frames and a count of how many ResourceTreeModels contain this frame.
-    // (OOPIFs are usually first attached to a new target and then detached from their old target,
-    // therefore being contained in 2 models for a short period of time.)
-    this.#frames = new Map();
-
-    // Maps targetIds to a set of frameIds.
-    this.#framesForTarget = new Map();
-
-    this.#topFrame = null;
-    this.#creationStackTraceDataForTransferringFrame = new Map();
   }
 
   static instance({forceNew}: {
@@ -94,21 +89,24 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     const frameData = this.#frames.get(frame.id);
     // If the frame is already in the map, increase its count, otherwise add it to the map.
     if (frameData) {
-      // In order to not lose frame creation stack trace information during
-      // an OOPIF transfer we need to copy it to the new frame
+      // In order to not lose the following attributes of a frame during
+      // an OOPIF transfer we need to copy them to the new frame
       frame.setCreationStackTrace(frameData.frame.getCreationStackTraceData());
       this.#frames.set(frame.id, {frame, count: frameData.count + 1});
     } else {
       // If the transferring frame's detached event is received before its frame added
-      // event in the new target, the persisted frame creation stacktrace is reassigned.
-      const traceData = this.#creationStackTraceDataForTransferringFrame.get(frame.id);
-      if (traceData && traceData.creationStackTrace) {
-        frame.setCreationStackTrace(traceData);
+      // event in the new target, the frame's cached attributes are reassigned.
+      const cachedFrameAttributes = this.#transferringFramesDataCache.get(frame.id);
+      if (cachedFrameAttributes?.creationStackTrace && cachedFrameAttributes?.creationStackTraceTarget) {
+        frame.setCreationStackTrace({
+          creationStackTrace: cachedFrameAttributes.creationStackTrace,
+          creationStackTraceTarget: cachedFrameAttributes.creationStackTraceTarget,
+        });
       }
       this.#frames.set(frame.id, {frame, count: 1});
-      this.#creationStackTraceDataForTransferringFrame.delete(frame.id);
+      this.#transferringFramesDataCache.delete(frame.id);
     }
-    this.resetTopFrame();
+    this.resetOutermostFrame();
 
     // Add the frameId to the the targetId's set of frameIds.
     const frameSet = this.#framesForTarget.get(frame.resourceTreeModel().target().id());
@@ -126,13 +124,15 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     this.decreaseOrRemoveFrame(frame.id);
 
     // If the transferring frame's detached event is received before its frame
-    // added event in the new target, we persist the frame creation stacktrace here
-    // so that later on the frame added event in the new target it can be reassigned.
+    // added event in the new target, we persist some attributes of the frame here
+    // so that later on the frame added event in the new target they can be reassigned.
     if (isSwap && !this.#frames.get(frame.id)) {
       const traceData = frame.getCreationStackTraceData();
-      if (traceData.creationStackTrace) {
-        this.#creationStackTraceDataForTransferringFrame.set(frame.id, traceData);
-      }
+      const cachedFrameAttributes = {
+        ...(traceData.creationStackTrace && {creationStackTrace: traceData.creationStackTrace}),
+        ...(traceData.creationStackTrace && {creationStackTraceTarget: traceData.creationStackTraceTarget}),
+      };
+      this.#transferringFramesDataCache.set(frame.id, cachedFrameAttributes);
     }
 
     // Remove the frameId from the target's set of frameIds.
@@ -145,8 +145,8 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   private frameNavigated(event: Common.EventTarget.EventTargetEvent<ResourceTreeFrame>): void {
     const frame = event.data;
     this.dispatchEventToListeners(Events.FrameNavigated, {frame});
-    if (frame.isTopFrame()) {
-      this.dispatchEventToListeners(Events.TopFrameNavigated, {frame});
+    if (frame.isOutermostFrame()) {
+      this.dispatchEventToListeners(Events.OutermostFrameNavigated, {frame});
     }
   }
 
@@ -159,7 +159,7 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     if (frameData) {
       if (frameData.count === 1) {
         this.#frames.delete(frameId);
-        this.resetTopFrame();
+        this.resetOutermostFrame();
         this.dispatchEventToListeners(Events.FrameRemoved, {frameId});
       } else {
         frameData.count--;
@@ -168,13 +168,13 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   }
 
   /**
-   * Looks for the top frame in `#frames` and sets `#topFrame` accordingly.
+   * Looks for the outermost frame in `#frames` and sets `#outermostFrame` accordingly.
    *
    * Important: This method needs to be called everytime `#frames` is updated.
    */
-  private resetTopFrame(): void {
-    const topFrames = this.getAllFrames().filter(frame => frame.isTopFrame());
-    this.#topFrame = topFrames.length > 0 ? topFrames[0] : null;
+  private resetOutermostFrame(): void {
+    const outermostFrames = this.getAllFrames().filter(frame => frame.isOutermostFrame());
+    this.#outermostFrame = outermostFrames.length > 0 ? outermostFrames[0] : null;
   }
 
   /**
@@ -196,8 +196,8 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return Array.from(this.#frames.values(), frameData => frameData.frame);
   }
 
-  getTopFrame(): ResourceTreeFrame|null {
-    return this.#topFrame;
+  getOutermostFrame(): ResourceTreeFrame|null {
+    return this.#outermostFrame;
   }
 
   async getOrWaitForFrame(frameId: Protocol.Page.FrameId, notInTarget?: Target): Promise<ResourceTreeFrame> {
@@ -247,7 +247,7 @@ export enum Events {
   // all targets.
   FrameRemoved = 'FrameRemoved',
   ResourceAdded = 'ResourceAdded',
-  TopFrameNavigated = 'TopFrameNavigated',
+  OutermostFrameNavigated = 'OutermostFrameNavigated',
 }
 
 export type EventTypes = {
@@ -255,5 +255,5 @@ export type EventTypes = {
   [Events.FrameNavigated]: {frame: ResourceTreeFrame},
   [Events.FrameRemoved]: {frameId: Protocol.Page.FrameId},
   [Events.ResourceAdded]: {resource: Resource},
-  [Events.TopFrameNavigated]: {frame: ResourceTreeFrame},
+  [Events.OutermostFrameNavigated]: {frame: ResourceTreeFrame},
 };

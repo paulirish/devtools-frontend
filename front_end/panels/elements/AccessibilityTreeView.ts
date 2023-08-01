@@ -7,24 +7,33 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as AccessibilityTreeUtils from './AccessibilityTreeUtils.js';
+import accessibilityTreeViewStyles from './accessibilityTreeView.css.js';
 import {ElementsPanel} from './ElementsPanel.js';
 
 export class AccessibilityTreeView extends UI.Widget.VBox implements
     SDK.TargetManager.SDKModelObserver<SDK.AccessibilityModel.AccessibilityModel> {
-  private accessibilityTreeComponent = new TreeOutline.TreeOutline.TreeOutline<AccessibilityTreeUtils.AXTreeNodeData>();
+  private accessibilityTreeComponent: TreeOutline.TreeOutline.TreeOutline<AccessibilityTreeUtils.AXTreeNodeData>;
   private readonly toggleButton: HTMLElement;
   private inspectedDOMNode: SDK.DOMModel.DOMNode|null = null;
   private root: SDK.AccessibilityModel.AccessibilityNode|null = null;
 
-  constructor(toggleButton: HTMLElement) {
+  constructor(
+      toggleButton: HTMLElement,
+      accessibilityTreeComponent: TreeOutline.TreeOutline.TreeOutline<AccessibilityTreeUtils.AXTreeNodeData>) {
     super();
     // toggleButton is bound to a click handler on ElementsPanel to switch between the DOM tree
     // and accessibility tree views.
     this.toggleButton = toggleButton;
-    this.contentElement.appendChild(this.toggleButton);
-    this.contentElement.appendChild(this.accessibilityTreeComponent);
+    this.accessibilityTreeComponent = accessibilityTreeComponent;
 
-    SDK.TargetManager.TargetManager.instance().observeModels(SDK.AccessibilityModel.AccessibilityModel, this);
+    const container = this.contentElement.createChild('div');
+
+    container.classList.add('accessibility-tree-view-container');
+    container.appendChild(this.toggleButton);
+    container.appendChild(this.accessibilityTreeComponent);
+
+    SDK.TargetManager.TargetManager.instance().observeModels(
+        SDK.AccessibilityModel.AccessibilityModel, this, {scoped: true});
 
     // The DOM tree and accessibility are kept in sync as much as possible, so
     // on node selection, update the currently inspected node and reveal in the
@@ -56,16 +65,17 @@ export class AccessibilityTreeView extends UI.Widget.VBox implements
     });
   }
 
-  async wasShown(): Promise<void> {
+  override async wasShown(): Promise<void> {
     await this.refreshAccessibilityTree();
     if (this.inspectedDOMNode) {
       await this.loadSubTreeIntoAccessibilityModel(this.inspectedDOMNode);
     }
+    this.registerCSSFiles([accessibilityTreeViewStyles]);
   }
 
   async refreshAccessibilityTree(): Promise<void> {
     if (!this.root) {
-      const frameId = SDK.FrameManager.FrameManager.instance().getTopFrame()?.id;
+      const frameId = SDK.FrameManager.FrameManager.instance().getOutermostFrame()?.id;
       if (!frameId) {
         throw Error('No top frame');
       }
@@ -137,8 +147,8 @@ export class AccessibilityTreeView extends UI.Widget.VBox implements
       void this.renderTree();
       return;
     }
-    const topFrameId = SDK.FrameManager.FrameManager.instance().getTopFrame()?.id;
-    if (data.root?.getFrameId() !== topFrameId) {
+    const outermostFrameId = SDK.FrameManager.FrameManager.instance().getOutermostFrame()?.id;
+    if (data.root?.getFrameId() !== outermostFrameId) {
       void this.renderTree();
       return;
     }

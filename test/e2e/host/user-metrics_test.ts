@@ -3,16 +3,39 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
 
-import {$, click, enableExperiment, getBrowserAndPages, goToResource, platform, pressKey, reloadDevTools, scrollElementIntoView, typeText, waitFor, waitForFunction} from '../../shared/helper.js';
+import type * as puppeteer from 'puppeteer-core';
+
+import {
+  $,
+  click,
+  enableExperiment,
+  getBrowserAndPages,
+  getResourcesPath,
+  goToResource,
+  platform,
+  pressKey,
+  reloadDevTools,
+  scrollElementIntoView,
+  typeText,
+  waitFor,
+  waitForFunction,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {toggleShowCorsErrors} from '../helpers/console-helpers.js';
 import {navigateToCssOverviewTab, startCaptureCSSOverview} from '../helpers/css-overview-helpers.js';
-import {editCSSProperty, focusElementsTree, navigateToSidePane, waitForContentOfSelectedElementsNode, waitForElementsStyleSection} from '../helpers/elements-helpers.js';
+import {CONSOLE_MESSAGES_SELECTOR, navigateToConsoleTab} from '../helpers/console-helpers.js';
+import {
+  editCSSProperty,
+  focusElementsTree,
+  navigateToSidePane,
+  waitForContentOfSelectedElementsNode,
+  waitForElementsStyleSection,
+} from '../helpers/elements-helpers.js';
 import {openCommandMenu} from '../helpers/quick_open-helpers.js';
 import {closeSecurityTab, navigateToSecurityTab} from '../helpers/security-helpers.js';
 import {openPanelViaMoreTools, openSettingsTab} from '../helpers/settings-helpers.js';
+import {waitForSourcesPanel} from '../helpers/sources-helpers.js';
+import {navigateToNetworkTab, openNetworkTab} from '../helpers/network-helpers.js';
 
 interface UserMetrics {
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -60,17 +83,25 @@ function retrieveRecordedPerformanceHistogramEvents(frontend: puppeteer.Page): P
 
 async function assertHistogramEventsInclude(expected: EnumHistogramEvent[]) {
   const {frontend} = getBrowserAndPages();
-  const events = await retrieveRecordedHistogramEvents(frontend);
-
-  assert.includeDeepMembers(events, expected);
+  await waitForFunction(async () => {
+    const events = await retrieveRecordedHistogramEvents(frontend);
+    try {
+      assert.includeDeepMembers(events, expected);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
-async function waitForHistogramEvent(expected: EnumHistogramEventWithOptionalCode) {
+async function waitForHistogramEvent(expected: EnumHistogramEventWithOptionalCode, expectedCount = 1) {
   const {frontend} = getBrowserAndPages();
   await waitForFunction(async () => {
     const events = await retrieveRecordedHistogramEvents(frontend);
-    return events.find(
-        e => e.actionName === expected.actionName && (!('value' in expected) || e.actionCode === expected.actionCode));
+    const matchedEvents = events.filter(
+        e => e.actionName === expected.actionName &&
+            (!('actionCode' in expected) || e.actionCode === expected.actionCode));
+    return matchedEvents.length >= expectedCount;
   });
 }
 
@@ -111,30 +142,6 @@ describe('User Metrics', () => {
     ]);
   });
 
-  it('dispatches a metric event for show CORS errors console settings', async () => {
-    const {frontend} = getBrowserAndPages();
-
-    await frontend.keyboard.press('Escape');
-    await frontend.waitForSelector('.console-view');
-    await toggleShowCorsErrors();
-    await toggleShowCorsErrors();
-
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // drawer-console-view.
-      },
-      {
-        actionName: 'DevTools.ConsoleShowsCorsErrors',
-        actionCode: 0,  // disabled
-      },
-      {
-        actionName: 'DevTools.ConsoleShowsCorsErrors',
-        actionCode: 1,  // enabled
-      },
-    ]);
-  });
-
   it('dispatches events for views', async () => {
     const {frontend} = getBrowserAndPages();
 
@@ -142,9 +149,33 @@ describe('User Metrics', () => {
     await click('#tab-timeline');
     await frontend.waitForSelector('.timeline');
 
+    await assertHistogramEventsInclude([
+      {
+        actionName: 'DevTools.PanelShown',
+        actionCode: 1,  // Elements (at launch).
+      },
+      {
+        actionName: 'DevTools.PanelShown',
+        actionCode: 5,  // Timeline.
+      },
+    ]);
+  });
+
+  it('dispatches events for view shown at launch', async () => {
+    await reloadDevTools({selectedPanel: {name: 'timeline'}});
+
     await assertHistogramEventsInclude([{
       actionName: 'DevTools.PanelShown',
       actionCode: 5,  // Timeline.
+    }]);
+  });
+
+  it('dispatches events for drawer shown at launch', async () => {
+    await reloadDevTools({drawerShown: true});
+
+    await assertHistogramEventsInclude([{
+      actionName: 'DevTools.PanelShown',
+      actionCode: 10,  // drawer-console-view.
     }]);
   });
 
@@ -313,7 +344,7 @@ describe('User Metrics', () => {
 
   it('dispatches an event when experiments are enabled and disabled', async () => {
     await openSettingsTab('Experiments');
-    const customThemeCheckbox = await waitFor('[aria-label="Allow extensions to load custom stylesheets"]');
+    const customThemeCheckbox = await waitFor('[title="Allow extensions to load custom stylesheets"]');
     // Enable the experiment
     await customThemeCheckbox.click();
     // Disable the experiment
@@ -335,6 +366,19 @@ describe('User Metrics', () => {
       {
         actionName: 'DevTools.ExperimentDisabled',
         actionCode: 0,  // Allow extensions to load custom stylesheets
+      },
+    ]);
+  });
+
+  it('dispatches an event when experiments are initialized at launch', async () => {
+    await assertHistogramEventsInclude([
+      {
+        actionName: 'DevTools.ExperimentEnabledAtLaunch',
+        actionCode: 52,  // Enabled by default: cssTypeComponentLength
+      },
+      {
+        actionName: 'DevTools.ExperimentDisabledAtLaunch',
+        actionCode: 41,  // Disabled by default: FontEditor
       },
     ]);
   });
@@ -398,7 +442,7 @@ describe('User Metrics for sidebar panes', () => {
     await navigateToSidePane('Computed');
     await assertHistogramEventsInclude([
       {
-        actionName: 'DevTools.SidebarPaneShown',
+        actionName: 'DevTools.Elements.SidebarTabShown',
         actionCode: 2,  // Computed
       },
     ]);
@@ -411,7 +455,19 @@ describe('User Metrics for sidebar panes', () => {
     const events = await retrieveRecordedHistogramEvents(frontend);
     const eventNames = events.map(event => event.actionName);
 
-    assert.notInclude(eventNames, 'DevTools.SidebarPaneShown');
+    assert.notInclude(eventNames, 'DevTools.Elements.SidebarTabShown');
+  });
+
+  it('dispatches sidebar panes events for switching to \'Filesystem\' tab in the \'Sources\' panel', async () => {
+    await click('#tab-sources');
+    await navigateToSidePane('Filesystem');
+
+    await assertHistogramEventsInclude([
+      {
+        actionName: 'DevTools.Sources.SidebarTabShown',
+        actionCode: 2,  // navigator-files
+      },
+    ]);
   });
 });
 
@@ -539,8 +595,8 @@ describe('User Metrics for Issue Panel', () => {
     ]);
   });
 
-  it('dispatches an event when a Client Hints are used with invalid origin', async () => {
-    await goToResource('issues/client-hint-issue-MetaTagAllowListInvalidOrigin.html');
+  it('dispatches an event when a Client Hints are used with invalid origin for DelegateCH', async () => {
+    await goToResource('issues/client-hint-issue-DelegateCH-MetaTagAllowListInvalidOrigin.html');
     await waitFor('.issue');
 
     await assertHistogramEventsInclude([
@@ -551,8 +607,8 @@ describe('User Metrics for Issue Panel', () => {
     ]);
   });
 
-  it('dispatches an event when a Client Hints are modified by javascript', async () => {
-    await goToResource('issues/client-hint-issue-MetaTagModifiedHTML.html');
+  it('dispatches an event when a Client Hints are modified by javascript for DelegateCH', async () => {
+    await goToResource('issues/client-hint-issue-DelegateCH-MetaTagModifiedHTML.html');
     await waitFor('.issue');
 
     await assertHistogramEventsInclude([
@@ -578,7 +634,7 @@ describe('User Metrics for CSS custom properties in the Styles pane', () => {
     await frontend.keyboard.press('ArrowRight');
     await waitForContentOfSelectedElementsNode('<div id=\u200B"properties-to-inspect">\u200B</div>\u200B');
 
-    await click('.css-var-link');
+    await click('.link-swatch-link');
     await assertHistogramEventsInclude([
       {
         actionName: 'DevTools.ActionTaken',
@@ -616,5 +672,56 @@ describe('User Metrics for the Page Resource Loader', () => {
           actionName: 'DevTools.DeveloperResourceScheme',
         },
     );
+  });
+});
+
+describe('User Metrics for clicking stylesheet request initiators', () => {
+  const expectedAction = {
+    actionName: 'DevTools.ActionTaken',
+    actionCode: 80,  // StyleSheetInitiatorLinkClicked
+  };
+  it('dispatches an event when clicked in the console', async () => {
+    async function clickOnLinkWithText(text: string, root?: puppeteer.JSHandle) {
+      const element = await click(`text/${text}`, {root});
+      assert.isTrue(
+          await element.evaluate(e => e.classList.contains('devtools-link')),
+          'Clicked element was not a devtools link');
+    }
+
+    await navigateToConsoleTab();
+    await goToResource('network/stylesheet-resources.html');
+    const consoleMessages = await waitFor(CONSOLE_MESSAGES_SELECTOR);
+
+    await clickOnLinkWithText('stylesheet-resources.html:2', consoleMessages);
+    await waitForHistogramEvent(expectedAction, 1);
+    await waitForSourcesPanel();
+    await navigateToConsoleTab();
+    await clickOnLinkWithText('stylesheet-resources.html:8', consoleMessages);
+    await waitForHistogramEvent(expectedAction, 2);
+    await waitForSourcesPanel();
+    await navigateToConsoleTab();
+    await clickOnLinkWithText('stylesheet-resources.css:8', consoleMessages);
+    await waitForHistogramEvent(expectedAction, 3);
+  });
+  it('dispatches an event when clicked in the Network panel', async () => {
+    async function clickOnInitiatorLink(resource: string) {
+      const resourceURL = `${getResourcesPath()}/network/${resource}`;
+      const element = await click(`[title="${resourceURL}"] ~ .initiator-column .devtools-link`);
+      assert.isTrue(
+          await element.evaluate(e => e.classList.contains('devtools-link')),
+          'Clicked element was not a devtools link');
+    }
+    await navigateToNetworkTab('stylesheet-resources.html');
+
+    await clickOnInitiatorLink('missing.css');
+    await waitForHistogramEvent(expectedAction, 1);
+    await waitForSourcesPanel();
+    await openNetworkTab();
+    await clickOnInitiatorLink('missing2.css');
+    await waitForHistogramEvent(expectedAction, 2);
+    await waitForSourcesPanel();
+    await openNetworkTab();
+    await clickOnInitiatorLink('missing3.css');
+    await waitForHistogramEvent(expectedAction, 3);
   });
 });

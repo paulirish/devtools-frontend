@@ -14,7 +14,7 @@
 }
 
 :selection {
-  background-color: var(--color-primary);
+  background-color: var(--color-primary-old);
   color: var(--color-background);
 }
 
@@ -72,6 +72,10 @@
 .spectrum-hue {
   top: 16px;
   background: linear-gradient(to left, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%); /* stylelint-disable-line plugin/use_theme_colors */
+}
+
+.spectrum-hue.display-p3 {
+  background: linear-gradient(to left, color(display-p3 1 0 0) 0%, color(display-p3 1 1 0) 17%, color(display-p3 0 1 0) 33%, color(display-p3 0 1 1) 50%, color(display-p3 0 0 1) 67%, color(display-p3 1 0 1) 83%, color(display-p3 1 0 0) 100%); /* stylelint-disable-line plugin/use_theme_colors */
 }
 
 .spectrum-alpha {
@@ -194,7 +198,7 @@
   content: " ";
   width: 13px;
   height: 13px;
-  background-image: var(--image-file-ic_suggest_color);
+  background-image: var(--image-file-refresh);
   background-size: contain;
   position: absolute;
   left: 5.5px;
@@ -245,6 +249,10 @@
   user-select: text;
 }
 
+.contrast-pass-fail devtools-icon {
+  margin-left: 5px;
+}
+
 .contrast-details-value [is="ui-icon"] {
   display: none;
   margin-left: 5px;
@@ -255,17 +263,18 @@
   background-color: var(--color-text-secondary);
 }
 
-[is="ui-icon"].smallicon-no {
-  background-color: var(--color-accent-red);
+[is="ui-icon"].clear {
+  transform: scale(0.7);
+  background-color: var(--icon-error);
 }
 
 .contrast-pass-fail span[is="ui-icon"] {
   margin-left: 5px;
 }
 
-[is="ui-icon"].smallicon-checkmark-square,
-[is="ui-icon"].smallicon-checkmark-behind {
-  background-color: var(--color-accent-green);
+[is="ui-icon"].checkmark,
+[is="ui-icon"].check-double {
+  background-color: var(--icon-checkmark-green);
 }
 
 .spectrum-contrast-details .contrast-details-value.contrast-unknown {
@@ -275,19 +284,16 @@
   text-align: center;
 }
 
-.contrast-details-value .smallicon-checkmark-behind {
-  margin-left: -6px;
-}
-
-.contrast-details-value .smallicon-no,
-.contrast-details-value .smallicon-checkmark-square,
-.contrast-details-value .smallicon-checkmark-behind {
+.contrast-details-value .clear,
+.contrast-details-value .checkmark,
+.contrast-details-value .check-double {
   cursor: pointer;
+  vertical-align: -5px;
 }
 
-.spectrum-contrast-details.contrast-fail .contrast-details-value .smallicon-no,
-.contrast-details-value.contrast-aa .smallicon-checkmark-square,
-.contrast-details-value.contrast-aaa .smallicon-checkmark-behind {
+.spectrum-contrast-details.contrast-fail .contrast-details-value .clear,
+.contrast-details-value.contrast-aa .checkmark,
+.contrast-details-value.contrast-aaa .check-double {
   display: inline-block;
 }
 
@@ -333,6 +339,8 @@
 
 [is="ui-icon"].icon-mask.copy-color-icon {
   background-color: var(--color-background);
+  margin-top: 2px;
+  margin-left: 2px;
 }
 
 .spectrum-text {
@@ -378,6 +386,9 @@
   height: 20px;
   width: 20px;
   padding: 2px;
+  border: none;
+  background: none;
+  margin: 0;
 }
 
 .spectrum-display-switcher {

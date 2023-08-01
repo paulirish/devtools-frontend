@@ -5,7 +5,7 @@
 import type * as Platform from '../platform/platform.js';
 import type * as Protocol from '../../generated/protocol.js';
 
-const OPAQUE_PARITION_KEY = '<opaque>';
+const OPAQUE_PARTITION_KEY = '<opaque>';
 
 export class Cookie {
   readonly #nameInternal: string;
@@ -43,9 +43,6 @@ export class Cookie {
     if (protocolCookie['sameSite']) {
       cookie.addAttribute('sameSite', protocolCookie['sameSite']);
     }
-    if (protocolCookie.sameParty) {
-      cookie.addAttribute('sameParty');
-    }
     if ('sourcePort' in protocolCookie) {
       cookie.addAttribute('sourcePort', protocolCookie.sourcePort);
     }
@@ -56,7 +53,7 @@ export class Cookie {
       cookie.addAttribute('partitionKey', protocolCookie.partitionKey);
     }
     if ('partitionKeyOpaque' in protocolCookie) {
-      cookie.addAttribute('partitionKey', OPAQUE_PARITION_KEY);
+      cookie.addAttribute('partitionKey', OPAQUE_PARTITION_KEY);
     }
     cookie.setSize(protocolCookie['size']);
     return cookie;
@@ -92,16 +89,20 @@ export class Cookie {
     return this.#attributes['samesite'] as Protocol.Network.CookieSameSite;
   }
 
-  sameParty(): boolean {
-    return 'sameparty' in this.#attributes;
-  }
-
   partitionKey(): string {
     return this.#attributes['partitionkey'] as string;
   }
 
+  setPartitionKey(key: string): void {
+    this.addAttribute('partitionKey', key);
+  }
+
   partitionKeyOpaque(): boolean {
-    return (this.#attributes['partitionkey'] === OPAQUE_PARITION_KEY);
+    return (this.#attributes['partitionkey'] === OPAQUE_PARTITION_KEY);
+  }
+
+  setPartitionKeyOpaque(): void {
+    this.addAttribute('partitionKey', OPAQUE_PARTITION_KEY);
   }
 
   priority(): Protocol.Network.CookiePriority {
@@ -259,7 +260,6 @@ export enum Attributes {
   HttpOnly = 'httpOnly',
   Secure = 'secure',
   SameSite = 'sameSite',
-  SameParty = 'sameParty',
   SourceScheme = 'sourceScheme',
   SourcePort = 'sourcePort',
   Priority = 'priority',

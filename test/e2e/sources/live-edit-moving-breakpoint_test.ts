@@ -4,9 +4,20 @@
 
 import {assert} from 'chai';
 
-import {$textContent, assertNotNullOrUndefined, click, getBrowserAndPages, pressKey, step, waitFor} from '../../shared/helper.js';
+import {
+  click,
+  getBrowserAndPages,
+  pressKey,
+  step,
+  waitFor,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {addBreakpointForLine, isBreakpointSet, openSourceCodeEditorForFile, reloadPageAndWaitForSourceFile} from '../helpers/sources-helpers.js';
+import {
+  addBreakpointForLine,
+  isBreakpointSet,
+  openSourceCodeEditorForFile,
+  reloadPageAndWaitForSourceFile,
+} from '../helpers/sources-helpers.js';
 
 describe('Live edit', async () => {
   it('moves the breakpoint after reload when changes are not persisted', async () => {
@@ -15,12 +26,11 @@ describe('Live edit', async () => {
 
     await step('add two newlines to the script', async () => {
       const editorContent = await waitFor('.cm-content');
-      const markerLine = await $textContent('// Insertion marker for newline.', editorContent);
-      assertNotNullOrUndefined(markerLine);
-
       // Place the caret at the end of the marker line by clicking in the middle of the
       // line element and then pressing 'End'.
-      await click(markerLine);
+      await click('pierceShadowText/// Insertion marker for newline.', {
+        root: editorContent,
+      });
       await frontend.keyboard.press('End');
 
       await frontend.keyboard.press('Enter');
@@ -37,14 +47,11 @@ describe('Live edit', async () => {
     });
 
     await step('reload the page and verify that the breakpoint has moved', async () => {
-      await reloadPageAndWaitForSourceFile(frontend, target, 'live-edit-moving-breakpoint.js');
+      await reloadPageAndWaitForSourceFile(target, 'live-edit-moving-breakpoint.js');
       await openSourceCodeEditorForFile('live-edit-moving-breakpoint.js', 'live-edit-moving-breakpoint.html');
 
-      // TODO(crbug.com/1216904): Flip this assumption once crbug.com/1216904 is fixed.
-      //     We currently expect the bugged state to make sure the test keeps running
-      //     and is maintained.
-      assert.isTrue(await isBreakpointSet(9));
-      assert.isFalse(await isBreakpointSet(7));
+      assert.isFalse(await isBreakpointSet(9));
+      assert.isTrue(await isBreakpointSet(7));
     });
   });
 });

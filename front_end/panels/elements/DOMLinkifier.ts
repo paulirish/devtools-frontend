@@ -10,10 +10,10 @@ import domLinkifierStyles from './domLinkifier.css.js';
 
 const UIStrings = {
   /**
-  * @description Text displayed when trying to create a link to a node in the UI, but the node
-  * location could not be found so we display this placeholder instead. Node refers to a DOM node.
-  * This should be translated if appropriate.
-  */
+   * @description Text displayed when trying to create a link to a node in the UI, but the node
+   * location could not be found so we display this placeholder instead. Node refers to a DOM node.
+   * This should be translated if appropriate.
+   */
   node: '<node>',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/DOMLinkifier.ts', UIStrings);
@@ -95,7 +95,11 @@ export const linkifyNodeReference = function(
   link.addEventListener('mouseleave', () => SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight(), false);
 
   if (!options.preventKeyboardFocus) {
-    link.addEventListener('keydown', event => event.key === 'Enter' && Common.Revealer.reveal(node, false) && false);
+    link.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        void Common.Revealer.reveal(node, false);
+      }
+    });
     link.tabIndex = 0;
     UI.ARIAUtils.markAsLink(link);
   }

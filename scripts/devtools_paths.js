@@ -51,7 +51,7 @@ function isInChromiumDirectory() {
   const normalizedPath = PATH_TO_EXECUTED_FILE.split(path.sep).join('/');
   const devtoolsPath = 'src/third_party/devtools-frontend';
   const isInChromium = normalizedPath.includes(devtoolsPath);
-  const potentialChromiumDir = PATH_TO_EXECUTED_FILE.substring(0, PATH_TO_EXECUTED_FILE.indexOf(devtoolsPath));
+  const potentialChromiumDir = PATH_TO_EXECUTED_FILE.substring(0, normalizedPath.indexOf(devtoolsPath));
   const result = {isInChromium, chromiumDirectory: potentialChromiumDir};
   _lookUpCaches.set('chromium', result);
   return result;
@@ -93,7 +93,7 @@ function thirdPartyPath() {
 
 function nodePath() {
   const paths = {
-    'darwin': path.join('mac', 'node-darwin-x64', 'bin', 'node'),
+    'darwin': path.join('mac', process.arch === 'arm64' ? 'node-darwin-arm64' : 'node-darwin-x64', 'bin', 'node'),
     'linux': path.join('linux', 'node-linux-x64', 'bin', 'node'),
     'win32': path.join('win', 'node.exe'),
   };
@@ -118,7 +118,8 @@ function mochaExecutablePath() {
 function downloadedChromeBinaryPath() {
   const paths = {
     'linux': path.join('chrome-linux', 'chrome'),
-    'darwin': path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+    'darwin':
+        path.join('chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
     'win32': path.join('chrome-win', 'chrome.exe'),
   };
   return path.join(thirdPartyPath(), 'chrome', paths[os.platform()]);

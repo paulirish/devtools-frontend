@@ -6,12 +6,11 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as Root from '../root/root.js';
 
-import type {Attributes} from './Cookie.js';
-import {Cookie} from './Cookie.js';
-import type {Resource} from './Resource.js';
+import {Cookie, type Attributes} from './Cookie.js';
+import {type Resource} from './Resource.js';
 import {ResourceTreeModel} from './ResourceTreeModel.js';
-import type {Target} from './Target.js';
-import {Capability} from './Target.js';
+
+import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 
 export class CookieModel extends SDKModel<void> {
@@ -90,7 +89,6 @@ export class CookieModel extends SDKModel<void> {
       sameSite: cookie.sameSite(),
       expires,
       priority: cookie.priority(),
-      sameParty: cookie.sameParty(),
       partitionKey: cookie.partitionKey(),
       sourceScheme: enabled ? cookie.sourceScheme() : preserveUnset(cookie.sourceScheme()),
       sourcePort: enabled ? cookie.sourcePort() : undefined,

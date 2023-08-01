@@ -12,28 +12,28 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 const UIStrings = {
   /**
-  *@description Text in Event Source Messages View of the Network panel
-  */
+   *@description Text in Event Source Messages View of the Network panel
+   */
   id: 'Id',
   /**
-  *@description Text that refers to some types
-  */
+   *@description Text that refers to some types
+   */
   type: 'Type',
   /**
-  *@description Text in Event Source Messages View of the Network panel
-  */
+   *@description Text in Event Source Messages View of the Network panel
+   */
   data: 'Data',
   /**
-  *@description Text that refers to the time
-  */
+   *@description Text that refers to the time
+   */
   time: 'Time',
   /**
-  *@description Data grid name for Event Source data grids
-  */
+   *@description Data grid name for Event Source data grids
+   */
   eventSource: 'Event Source',
   /**
-  *@description A context menu item in the Resource Web Socket Frame View of the Network panel
-  */
+   *@description A context menu item in the Resource Web Socket Frame View of the Network panel
+   */
   copyMessage: 'Copy message',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/EventSourceMessagesView.ts', UIStrings);
@@ -73,7 +73,7 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
     this.dataGrid.asWidget().show(this.element);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.dataGrid.rootNode().removeChildren();
     this.registerCSSFiles([eventSourceMessagesViewStyles]);
     const messages = this.request.eventSourceMessages();
@@ -84,7 +84,7 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
     this.request.addEventListener(SDK.NetworkRequest.Events.EventSourceMessageAdded, this.messageAdded, this);
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.request.removeEventListener(SDK.NetworkRequest.Events.EventSourceMessageAdded, this.messageAdded, this);
   }
 

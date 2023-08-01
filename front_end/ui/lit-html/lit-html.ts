@@ -2,20 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as LitHtml from '../../third_party/lit-html/lit-html.js';
-import * as Static from './static.js';
-export {Directive, type TemplateResult} from '../../third_party/lit-html/lit-html.js';
+import type * as Lit from '../../third_party/lit/lit.js';
 
-const {render, svg, Directives, nothing, noChange} = LitHtml;
-const {html, literal, flattenTemplate} = Static;
+import * as Static from './static.js';
 
 export {
   render,
-  Directives,
+  svg,
   nothing,
   noChange,
-  svg,
-  html,
-  literal,
-  flattenTemplate,  // Exposed for unit testing.
-};
+  LitElement,
+  Directive,
+  type TemplateResult,
+  type PropertyValues,
+  Directives,
+  Decorators,
+} from '../../third_party/lit/lit.js';
+
+const {html, literal, flattenTemplate} = Static;
+
+type LitTemplate = Lit.TemplateResult|typeof Lit.nothing;
+
+export {html, literal, flattenTemplate, type LitTemplate};

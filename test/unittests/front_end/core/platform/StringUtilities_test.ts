@@ -192,19 +192,32 @@ describe('StringUtilities', () => {
     });
   });
   describe('filterRegex', () => {
-    it('should do nothing for single non-special character', () => {
-      const regex = Platform.StringUtilities.filterRegex('f');
-      assert.strictEqual(regex.toString(), '/f/i');
-    });
-
-    it('should prepend [^\\0 ]* patterns for following characters', () => {
+    it('should prepend [^\\0 ]* patterns for all characters', () => {
       const regex = Platform.StringUtilities.filterRegex('bar');
-      assert.strictEqual(regex.toString(), '/b[^\\0a]*a[^\\0r]*r/i');
+      assert.strictEqual(regex.toString(), '/^(?:.*\\0)?[^\\0b]*b[^\\0a]*a[^\\0r]*r/i');
     });
 
-    it('should espace special characters', () => {
+    it('should escape special characters', () => {
       const regex = Platform.StringUtilities.filterRegex('{?}');
-      assert.strictEqual(regex.toString(), '/\\{[^\\0\\?]*\\?[^\\0\\}]*\\}/i');
+      assert.strictEqual(regex.toString(), '/^(?:.*\\0)?[^\\0\\{]*\\{[^\\0\\?]*\\?[^\\0\\}]*\\}/i');
+    });
+
+    it('should match strings that have the query characters in the same order', () => {
+      const testCases = [
+        {query: 'abc', pos: ['abc', 'adabxac', 'AbC', 'a\x00abc'], neg: ['ab', 'acb', 'a\x00bc']},
+        {query: 'aba', pos: ['abba', 'abracadabra'], neg: ['ab', 'aab', 'baa']},
+        {query: '.?a*', pos: ['x.y?ax*b'], neg: ['', 'a?a*', 'a*', '.?']},
+      ];
+      for (const {query, pos, neg} of testCases) {
+        const regex = Platform.StringUtilities.filterRegex(query);
+        assert.exists(regex, `Could not create regex from query "${query}"`);
+        for (const example of pos) {
+          assert.isTrue(regex.test(example), `query "${query}" should match "${example}"`);
+        }
+        for (const example of neg) {
+          assert.isFalse(regex.test(example), `query "${query}" should not match "${example}"`);
+        }
+      }
     });
   });
 
@@ -516,6 +529,45 @@ describe('StringUtilities', () => {
       assert.throws(() => Platform.StringUtilities.sprintf('%2$s', 'World'));
       assert.throws(() => Platform.StringUtilities.sprintf('%2$s %s!', 'World', 'Hello'));
       assert.throws(() => Platform.StringUtilities.sprintf('%s %d', 'World'));
+    });
+  });
+
+  describe('LowerCaseString', () => {
+    function fnExpectingLowerCaseString(lowerCaseString: Platform.StringUtilities.LowerCaseString): void {
+      lowerCaseString;
+    }
+
+    // @ts-expect-error Passing a plain string when LowerCaseString is expected
+    fnExpectingLowerCaseString('Foo');
+
+    const lower = Platform.StringUtilities.toLowerCaseString('lower case string');
+    fnExpectingLowerCaseString(lower);
+  });
+
+  describe('replaceLast', () => {
+    it('should return the input string when the search is not found', () => {
+      const output = Platform.StringUtilities.replaceLast('input', 'search', 'repl');
+      assert.strictEqual(output, 'input');
+    });
+
+    it('should replace the occurrance when the search exists inside the input', () => {
+      const output = Platform.StringUtilities.replaceLast('input', 'pu', 'r');
+      assert.strictEqual(output, 'inrt');
+    });
+
+    it('should replace the last occurrence when there are multiple matches', () => {
+      const output = Platform.StringUtilities.replaceLast('inpuput', 'pu', 'r');
+      assert.strictEqual(output, 'inpurt');
+    });
+  });
+
+  describe('stringifyWithPrecision', () => {
+    it('should stringify with 2 precision if precision argument is not given', () => {
+      assert.strictEqual('0.69', Platform.StringUtilities.stringifyWithPrecision(0.685733));
+    });
+
+    it('should stringify with given precision', () => {
+      assert.strictEqual('0.686', Platform.StringUtilities.stringifyWithPrecision(0.685733, 3));
     });
   });
 });

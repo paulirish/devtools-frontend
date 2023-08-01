@@ -7,25 +7,26 @@ import * as ComponentHelpers from '../helpers/helpers.js';
 import * as IconButton from '../icon_button/icon_button.js';
 import linearMemoryValueInterpreterStyles from './linearMemoryValueInterpreter.css.js';
 
-import {ValueInterpreterDisplay} from './ValueInterpreterDisplay.js';
-import {ValueInterpreterSettings} from './ValueInterpreterSettings.js';
+import {ValueInterpreterDisplay, type ValueDisplayData} from './ValueInterpreterDisplay.js';
+import {
+  ValueInterpreterSettings,
+  type TypeToggleEvent,
+  type ValueInterpreterSettingsData,
+} from './ValueInterpreterSettings.js';
 
-import type {ValueDisplayData} from './ValueInterpreterDisplay.js';
-import type {ValueType, ValueTypeMode} from './ValueInterpreterDisplayUtils.js';
-import {Endianness} from './ValueInterpreterDisplayUtils.js';
-import type {TypeToggleEvent, ValueInterpreterSettingsData} from './ValueInterpreterSettings.js';
+import {Endianness, type ValueType, type ValueTypeMode} from './ValueInterpreterDisplayUtils.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 
 const UIStrings = {
   /**
-  *@description Tooltip text that appears when hovering over the gear button to open and close settings in the Linear Memory Inspector. These settings
-  *             allow the user to change the value type to view, such as 32-bit Integer, or 32-bit Float.
-  */
+   *@description Tooltip text that appears when hovering over the gear button to open and close settings in the Linear Memory Inspector. These settings
+   *             allow the user to change the value type to view, such as 32-bit Integer, or 32-bit Float.
+   */
   toggleValueTypeSettings: 'Toggle value type settings',
   /**
-  *@description Tooltip text that appears when hovering over the 'Little Endian' or 'Big Endian' setting in the Linear Memory Inspector.
-  */
+   *@description Tooltip text that appears when hovering over the 'Little Endian' or 'Big Endian' setting in the Linear Memory Inspector.
+   */
   changeEndianness: 'Change `Endianness`',
 };
 const str_ =
@@ -95,7 +96,7 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
           ${this.#renderEndiannessSetting()}
           <button data-settings="true" class="settings-toolbar-button ${this.#showSettings ? 'active' : ''}" title=${i18nString(UIStrings.toggleValueTypeSettings)} @click=${this.#onSettingsToggle}>
             <${IconButton.Icon.Icon.litTagName}
-              .data=${{ iconName: 'settings_14x14_icon', color: 'var(--color-text-secondary)', width: '14px' } as IconButton.Icon.IconWithName}>
+              .data=${{ iconName: 'gear', color: 'var(--icon-default)', width: '20px' } as IconButton.Icon.IconWithName}>
             </${IconButton.Icon.Icon.litTagName}>
           </button>
         </div>

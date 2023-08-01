@@ -37,6 +37,7 @@ devtools_module("css_overview") {
     "../../core/sdk:bundle",
     "../../generated:protocol",
     "../../models/text_utils:bundle",
+    "../../ui/components/icon_button:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/color_picker:bundle",
     "../../ui/legacy/components/data_grid:bundle",
@@ -56,6 +57,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
+    "../../../test/unittests/front_end/panels/css_overview/*",
     "../../entrypoints/*",
 
     # TODO(crbug.com/1202788): Remove invalid dependents

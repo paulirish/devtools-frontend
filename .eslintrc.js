@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// clang-format off
+
 const path = require('path');
 const rulesDirPlugin = require('eslint-plugin-rulesdir');
 rulesDirPlugin.RULES_DIR = path.join(__dirname, 'scripts', 'eslint_rules', 'lib');
@@ -18,6 +20,7 @@ module.exports = {
     'mocha',
     'rulesdir',
     'import',
+    'jsdoc',
   ],
 
   'parserOptions': {'ecmaVersion': 9, 'sourceType': 'module'},
@@ -117,18 +120,33 @@ module.exports = {
     // Closure does not properly typecheck default exports
     'import/no-default-export': 2,
 
+    /**
+     * Catch duplicate import paths. For example this would catch the following example:
+     * import {Foo} from './foo.js'
+     * import * as FooModule from './foo.js'
+     **/
+    'import/no-duplicates': 2,
+
     // Try to spot '// console.log()' left over from debugging
     'rulesdir/commented_out_console': 2,
+
+    // Prevent imports being commented out rather than deleted.
+    'rulesdir/commented_out_import': 2,
 
     // DevTools specific rules
     'rulesdir/es_modules_import': 2,
     'rulesdir/check_license_header': 2,
+    /**
+     * Ensures that JS Doc comments are properly aligned - all the starting
+     * `*` are in the right place.
+     */
+    'jsdoc/check-alignment': 2,
   },
   'overrides': [{
     'files': ['*.ts'],
     'parserOptions': {
       'allowAutomaticSingleRunInference': true,
-      'project': './config/typescript/tsconfig.eslint.json',
+      'project': path.join(__dirname, 'config', 'typescript', 'tsconfig.eslint.json'),
     },
     'rules': {
       '@typescript-eslint/explicit-member-accessibility': [2, {'accessibility': 'no-public'}],
@@ -176,6 +194,9 @@ module.exports = {
       'rulesdir/const_enum': 2,
       'rulesdir/no_underscored_properties': 2,
       'rulesdir/prefer_readonly_keyword': 2,
+      'rulesdir/inline_type_imports': 2,
     }
   }]
 };
+
+// clang-format on

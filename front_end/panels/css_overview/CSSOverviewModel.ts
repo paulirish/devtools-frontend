@@ -9,9 +9,9 @@ import * as ColorPicker from '../../ui/legacy/components/color_picker/color_pick
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 
-import type {ContrastIssue} from './CSSOverviewCompletedView.js';
-import type {UnusedDeclaration} from './CSSOverviewUnusedDeclarations.js';
-import {CSSOverviewUnusedDeclarations} from './CSSOverviewUnusedDeclarations.js';
+import {type ContrastIssue} from './CSSOverviewCompletedView.js';
+
+import {CSSOverviewUnusedDeclarations, type UnusedDeclaration} from './CSSOverviewUnusedDeclarations.js';
 
 interface NodeStyleStats {
   elementCount: number;
@@ -69,13 +69,13 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
   }
 
   async getNodeStyleStats(): Promise<NodeStyleStats> {
-    const backgroundColors = new Map();
-    const textColors = new Map();
-    const textColorContrastIssues = new Map();
-    const fillColors = new Map();
-    const borderColors = new Map();
-    const fontInfo = new Map();
-    const unusedDeclarations = new Map();
+    const backgroundColors: Map<string, Set<Protocol.DOM.BackendNodeId>> = new Map();
+    const textColors: Map<string, Set<Protocol.DOM.BackendNodeId>> = new Map();
+    const textColorContrastIssues: Map<string, ContrastIssue[]> = new Map();
+    const fillColors: Map<string, Set<Protocol.DOM.BackendNodeId>> = new Map();
+    const borderColors: Map<string, Set<Protocol.DOM.BackendNodeId>> = new Map();
+    const fontInfo: Map<string, Map<string, Map<string, Protocol.DOM.BackendNodeId[]>>> = new Map();
+    const unusedDeclarations: Map<string, UnusedDeclaration[]> = new Map();
     const snapshotConfig = {
       computedStyles: [
         'background-color',
@@ -108,7 +108,11 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
     };
 
     const formatColor = (color: Common.Color.Color): string|null => {
-      return color.hasAlpha() ? color.asString(Common.Color.Format.HEXA) : color.asString(Common.Color.Format.HEX);
+      if (color instanceof Common.Color.Legacy) {
+        return color.hasAlpha() ? color.asString(Common.Color.Format.HEXA) : color.asString(Common.Color.Format.HEX);
+      }
+
+      return color.asString();
     };
 
     const storeColor = (id: number, nodeId: number, target: Map<string, Set<number>>): Common.Color.Color|undefined => {
@@ -122,8 +126,8 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
         return;
       }
 
-      const color = Common.Color.Color.parse(colorText);
-      if (!color || color.rgba()[3] === 0) {
+      const color = Common.Color.parse(colorText);
+      if (!color || color.asLegacyColor().rgba()[3] === 0) {
         return;
       }
 
@@ -264,7 +268,7 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
 
         const blendedBackgroundColor =
             textColor && layout.blendedBackgroundColors && layout.blendedBackgroundColors[idx] !== -1 ?
-            Common.Color.Color.parse(strings[layout.blendedBackgroundColors[idx]]) :
+            Common.Color.parse(strings[layout.blendedBackgroundColors[idx]]) :
             null;
         if (textColor && blendedBackgroundColor) {
           const contrastInfo = new ColorPicker.ContrastInfo.ContrastInfo({
@@ -273,16 +277,16 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
             computedFontWeight: fontWeightIdx !== -1 ? strings[fontWeightIdx] : '',
           });
           const blendedTextColor =
-              textColor.blendWithAlpha(layout.textColorOpacities ? layout.textColorOpacities[idx] : 1);
+              textColor.asLegacyColor().blendWithAlpha(layout.textColorOpacities ? layout.textColorOpacities[idx] : 1);
           contrastInfo.setColor(blendedTextColor);
           const formattedTextColor = formatColor(blendedTextColor);
-          const formattedBackgroundColor = formatColor(blendedBackgroundColor);
+          const formattedBackgroundColor = formatColor(blendedBackgroundColor.asLegacyColor());
           const key = `${formattedTextColor}_${formattedBackgroundColor}`;
           if (Root.Runtime.experiments.isEnabled('APCA')) {
             const contrastRatio = contrastInfo.contrastRatioAPCA();
             const threshold = contrastInfo.contrastRatioAPCAThreshold();
             const passes = contrastRatio && threshold ? Math.abs(contrastRatio) >= threshold : false;
-            if (!passes) {
+            if (!passes && contrastRatio) {
               const issue = {
                 nodeId,
                 contrastRatio,
@@ -295,7 +299,7 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
                 },
               };
               if (textColorContrastIssues.has(key)) {
-                textColorContrastIssues.get(key).push(issue);
+                (textColorContrastIssues.get(key) as ContrastIssue[]).push(issue);
               } else {
                 textColorContrastIssues.set(key, [issue]);
               }
@@ -317,7 +321,7 @@ export class CSSOverviewModel extends SDK.SDKModel.SDKModel<void> {
                 },
               };
               if (textColorContrastIssues.has(key)) {
-                textColorContrastIssues.get(key).push(issue);
+                (textColorContrastIssues.get(key) as ContrastIssue[]).push(issue);
               } else {
                 textColorContrastIssues.set(key, [issue]);
               }

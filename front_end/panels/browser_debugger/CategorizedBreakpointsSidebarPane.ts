@@ -12,8 +12,8 @@ import type * as Protocol from '../../generated/protocol.js';
 
 const UIStrings = {
   /**
-  *@description Screen reader description of a hit breakpoint in the Sources panel
-  */
+   *@description Screen reader description of a hit breakpoint in the Sources panel
+   */
   breakpointHit: 'breakpoint hit',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/browser_debugger/CategorizedBreakpointsSidebarPane.ts', UIStrings);
@@ -70,8 +70,17 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
     return this.#breakpoints;
   }
 
-  focus(): void {
+  override focus(): void {
     this.#categoriesTreeOutline.forceSelect();
+  }
+
+  private handleSpaceKeyEventOnBreakpoint(event: KeyboardEvent, breakpoint?: Item): void {
+    if (event && event.key === ' ') {
+      if (breakpoint) {
+        breakpoint.checkbox.click();
+      }
+      event.consume(true);
+    }
   }
 
   private createCategory(name: string): void {
@@ -81,15 +90,14 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
 
     const treeElement = new UI.TreeOutline.TreeElement(labelNode);
     treeElement.listItemElement.addEventListener('keydown', event => {
-      if (event.key === ' ') {
-        const category = this.#categories.get(name);
-        if (category) {
-          category.checkbox.click();
-        }
-        event.consume(true);
-      }
+      this.handleSpaceKeyEventOnBreakpoint(event, this.#categories.get(name));
     });
-    labelNode.checkboxElement.addEventListener('focus', () => treeElement.listItemElement.focus());
+
+    labelNode.checkboxElement.addEventListener('keydown', event => {
+      treeElement.listItemElement.focus();
+      this.handleSpaceKeyEventOnBreakpoint(event, this.#categories.get(name));
+    });
+
     UI.ARIAUtils.setChecked(treeElement.listItemElement, false);
     this.#categoriesTreeOutline.appendChild(treeElement);
 
@@ -104,15 +112,14 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
 
     const treeElement = new UI.TreeOutline.TreeElement(labelNode);
     treeElement.listItemElement.addEventListener('keydown', event => {
-      if (event.key === ' ') {
-        const breakpointToClick = this.#breakpoints.get(breakpoint);
-        if (breakpointToClick) {
-          breakpointToClick.checkbox.click();
-        }
-        event.consume(true);
-      }
+      this.handleSpaceKeyEventOnBreakpoint(event, this.#breakpoints.get(breakpoint));
     });
-    labelNode.checkboxElement.addEventListener('focus', () => treeElement.listItemElement.focus());
+
+    labelNode.checkboxElement.addEventListener('keydown', event => {
+      treeElement.listItemElement.focus();
+      this.handleSpaceKeyEventOnBreakpoint(event, this.#breakpoints.get(breakpoint));
+    });
+
     UI.ARIAUtils.setChecked(treeElement.listItemElement, false);
     treeElement.listItemElement.createChild('div', 'breakpoint-hit-marker');
     const category = this.#categories.get(breakpoint.category());
@@ -169,12 +176,13 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
     const enabled = item.checkbox.checked;
     UI.ARIAUtils.setChecked(item.element.listItemElement, enabled);
 
-    for (const breakpoint of this.#breakpoints.keys()) {
+    for (const [breakpoint, treeItem] of this.#breakpoints) {
       if (breakpoint.category() === category) {
         const matchingBreakpoint = this.#breakpoints.get(breakpoint);
         if (matchingBreakpoint) {
           matchingBreakpoint.checkbox.checked = enabled;
           this.toggleBreakpoint(breakpoint, enabled);
+          UI.ARIAUtils.setChecked(treeItem.element.listItemElement, enabled);
         }
       }
     }
@@ -218,7 +226,7 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
       UI.ARIAUtils.setChecked(category.element.listItemElement, hasEnabled);
     }
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.#categoriesTreeOutline.registerCSSFiles([categorizedBreakpointsSidebarPaneStyles]);
   }

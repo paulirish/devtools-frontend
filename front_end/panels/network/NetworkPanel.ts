@@ -39,6 +39,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Logs from '../../models/logs/logs.js';
+import * as TraceEngine from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
@@ -48,113 +49,108 @@ import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 import * as Search from '../search/search.js';
 
 import {BlockedURLsPane} from './BlockedURLsPane.js';
-import type {RequestActivatedEvent} from './NetworkDataGridNode.js';
-import {Events} from './NetworkDataGridNode.js';
+
+import {Events, type RequestActivatedEvent} from './NetworkDataGridNode.js';
 import {NetworkItemView} from './NetworkItemView.js';
 import {NetworkLogView} from './NetworkLogView.js';
 import {NetworkOverview} from './NetworkOverview.js';
 import networkPanelStyles from './networkPanel.css.js';
 import {NetworkSearchScope} from './NetworkSearchScope.js';
 
-import type {NetworkTimeCalculator} from './NetworkTimeCalculator.js';
-import {NetworkTransferTimeCalculator} from './NetworkTimeCalculator.js';
+import {NetworkTransferTimeCalculator, type NetworkTimeCalculator} from './NetworkTimeCalculator.js';
 
 const UIStrings = {
   /**
-  *@description Text to close something
-  */
+   *@description Text to close something
+   */
   close: 'Close',
   /**
-  *@description Title of a search bar or tool
-  */
+   *@description Title of a search bar or tool
+   */
   search: 'Search',
   /**
-  *@description Text to clear content
-  */
-  clear: 'Clear',
-  /**
-  *@description Tooltip text that appears on the setting to preserve log when hovering over the item
-  */
+   *@description Tooltip text that appears on the setting to preserve log when hovering over the item
+   */
   doNotClearLogOnPageReload: 'Do not clear log on page reload / navigation',
   /**
-  *@description Text to preserve the log after refreshing
-  */
+   *@description Text to preserve the log after refreshing
+   */
   preserveLog: 'Preserve log',
   /**
-  *@description Text to disable cache while DevTools is open
-  */
+   *@description Text to disable cache while DevTools is open
+   */
   disableCacheWhileDevtoolsIsOpen: 'Disable cache (while DevTools is open)',
   /**
-  *@description Text in Network Config View of the Network panel
-  */
+   *@description Text in Network Config View of the Network panel
+   */
   disableCache: 'Disable cache',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon settings gear in show settings pane setting in network panel of the network panel
-  */
+   *@description Tooltip text that appears when hovering over the largeicon settings gear in show settings pane setting in network panel of the network panel
+   */
   networkSettings: 'Network settings',
   /**
-  *@description Tooltip for expanding network request row setting
-  */
+   *@description Tooltip for expanding network request row setting
+   */
   showMoreInformationInRequestRows: 'Show more information in request rows',
   /**
-  *@description Text in Network Panel of the Network panel
-  */
-  useLargeRequestRows: 'Use large request rows',
+   *@description Text in Network Panel of the Network panel
+   */
+  useLargeRequestRows: 'Big request rows',
   /**
-  *@description Tooltip text for network request overview setting
-  */
+   *@description Tooltip text for network request overview setting
+   */
   showOverviewOfNetworkRequests: 'Show overview of network requests',
   /**
-  *@description Text in Network Panel of the Network panel
-  */
-  showOverview: 'Show overview',
+   *@description Text in Network Panel of the Network panel
+   */
+  showOverview: 'Overview',
   /**
-  *@description Tooltip for group by frame network setting
-  */
+   *@description Tooltip for group by frame network setting
+   */
   groupRequestsByTopLevelRequest: 'Group requests by top level request frame',
   /**
-  *@description Text in Network Panel of the Network panel
-  */
+   *@description Text in Network Panel of the Network panel
+   */
   groupByFrame: 'Group by frame',
   /**
-  *@description Tooltip for capture screenshot network setting
-  */
+   *@description Tooltip for capture screenshot network setting
+   */
   captureScreenshotsWhenLoadingA: 'Capture screenshots when loading a page',
   /**
-  *@description Text to take screenshots
-  */
-  captureScreenshots: 'Capture screenshots',
+   *@description Text to take screenshots
+   */
+  captureScreenshots: 'Screenshots',
   /**
-  * @description Tooltip text that appears when hovering over the largeicon load button in the
-  * Network Panel. This action prompts the user to select a HAR file to upload to DevTools.
-  */
+   * @description Tooltip text that appears when hovering over the largeicon load button in the
+   * Network Panel. This action prompts the user to select a HAR file to upload to DevTools.
+   */
   importHarFile: 'Import `HAR` file...',
   /**
-  * @description Tooltip text that appears when hovering over the largeicon download button in the
-  * Network Panel. HAR is a file format (HTTP Archive) and should not be translated. This action
-  * triggers the download of a HAR file.
-  */
+   * @description Tooltip text that appears when hovering over the largeicon download button in the
+   * Network Panel. HAR is a file format (HTTP Archive) and should not be translated. This action
+   * triggers the download of a HAR file.
+   */
   exportHar: 'Export `HAR`...',
   /**
-  *@description Text for throttling the network
-  */
+   *@description Text for throttling the network
+   */
   throttling: 'Throttling',
   /**
-  *@description Text in Network Panel of the Network panel
-  *@example {Ctrl + R} PH1
-  */
+   *@description Text in Network Panel of the Network panel
+   *@example {Ctrl + R} PH1
+   */
   hitSToReloadAndCaptureFilmstrip: 'Hit {PH1} to reload and capture filmstrip.',
   /**
-  *@description A context menu item in the Network Panel of the Network panel
-  */
+   *@description A context menu item in the Network Panel of the Network panel
+   */
   revealInNetworkPanel: 'Reveal in Network panel',
   /**
-  *@description Text in Network Panel of the Network panel
-  */
+   *@description Text in Network Panel of the Network panel
+   */
   recordingFrames: 'Recording frames...',
   /**
-  *@description Text in Network Panel of the Network panel
-  */
+   *@description Text in Network Panel of the Network panel
+   */
   fetchingFrames: 'Fetching frames...',
   /**
    * @description Text of a button in the Network panel's toolbar that open Network Conditions panel in the drawer.
@@ -195,10 +191,12 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   private preserveLogSetting: Common.Settings.Setting<boolean>;
   recordLogSetting: Common.Settings.Setting<boolean>;
   private readonly throttlingSelect: UI.Toolbar.ToolbarComboBox;
+  private readonly displayScreenshotDelay: number;
 
-  constructor() {
+  constructor(displayScreenshotDelay: number) {
     super('network');
 
+    this.displayScreenshotDelay = displayScreenshotDelay;
     this.networkLogShowOverviewSetting =
         Common.Settings.Settings.instance().createSetting('networkLogShowOverview', true);
     this.networkLogLargeRowsSetting = Common.Settings.Settings.instance().createSetting('networkLogLargeRows', false);
@@ -269,7 +267,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       splitWidget.hideSidebar();
       event.consume();
     });
-    const closeSidebar = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.close), 'largeicon-delete');
+    const closeSidebar = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.close), 'cross');
     closeSidebar.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => splitWidget.hideSidebar());
     tabbedPane.rightToolbar().appendToolbarItem(closeSidebar);
     splitWidget.setSidebarWidget(tabbedPane);
@@ -318,10 +316,10 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.updateUI();
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.WillReloadPage, this.willReloadPage,
-        this);
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.WillReloadPage, this.willReloadPage, this,
+        {scoped: true});
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.Load, this.load, this);
+        SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.Load, this.load, this, {scoped: true});
     this.networkLogView.addEventListener(Events.RequestSelected, this.onRequestSelected, this);
     this.networkLogView.addEventListener(Events.RequestActivated, this.onRequestActivated, this);
     Logs.NetworkLog.NetworkLog.instance().addEventListener(
@@ -331,12 +329,12 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     Logs.NetworkLog.NetworkLog.instance().addEventListener(Logs.NetworkLog.Events.Reset, this.onNetworkLogReset, this);
   }
 
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): NetworkPanel {
-    const {forceNew} = opts;
-    if (!networkPanelInstance || forceNew) {
-      networkPanelInstance = new NetworkPanel();
+  static instance(opts?: {
+    forceNew: boolean,
+    displayScreenshotDelay?: number,
+  }): NetworkPanel {
+    if (!networkPanelInstance || opts?.forceNew) {
+      networkPanelInstance = new NetworkPanel(opts?.displayScreenshotDelay ?? 1000);
     }
 
     return networkPanelInstance;
@@ -374,7 +372,15 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       void {
     const startTime = Math.max(this.calculator.minimumBoundary(), event.data.startTime / 1000);
     const endTime = Math.min(this.calculator.maximumBoundary(), event.data.endTime / 1000);
-    this.networkLogView.setWindow(startTime, endTime);
+    if (startTime === this.calculator.minimumBoundary() && endTime === this.calculator.maximumBoundary()) {
+      // Reset the filters for NetworkLogView when the window is reset
+      // to its boundaries. This clears the filters and allows the users
+      // to see the incoming requests after they have updated the curtains
+      // to be in the edges. (ex: by double clicking on the overview grid)
+      this.networkLogView.setWindow(0, 0);
+    } else {
+      this.networkLogView.setWindow(startTime, endTime);
+    }
   }
 
   private async searchToggleClick(): Promise<void> {
@@ -385,7 +391,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 
   private setupToolbarButtons(splitWidget: UI.SplitWidget.SplitWidget): void {
-    const searchToggle = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.search), 'largeicon-search');
+    const searchToggle = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.search), 'search');
     function updateSidebarToggle(): void {
       const isSidebarShowing = splitWidget.showMode() !== UI.SplitWidget.ShowMode.OnlyMain;
       searchToggle.setToggled(isSidebarShowing);
@@ -394,10 +400,8 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       }
     }
     this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
-    const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'largeicon-clear');
-    clearButton.addEventListener(
-        UI.Toolbar.ToolbarButton.Events.Click, () => Logs.NetworkLog.NetworkLog.instance().reset(true), this);
-    this.panelToolbar.appendToolbarItem(clearButton);
+    this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(
+        (UI.ActionRegistry.ActionRegistry.instance().action('network.clear') as UI.ActionRegistration.Action)));
     this.panelToolbar.appendSeparator();
 
     this.panelToolbar.appendToolbarItem(this.filterBar.filterButton());
@@ -422,10 +426,10 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     const networkConditionsIcon = new IconButton.Icon.Icon();
     networkConditionsIcon.data = {
-      iconName: 'network_conditions_icon',
-      color: 'rgb(110 110 110)',
-      width: '18px',
-      height: '18px',
+      iconName: 'network-settings',
+      color: 'var(--icon-default)',
+      width: '20px',
+      height: '20px',
     };
     const networkConditionsButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.moreNetworkConditions), networkConditionsIcon);
@@ -437,7 +441,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.rightToolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.progressBarContainer));
     this.rightToolbar.appendSeparator();
     this.rightToolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingToggle(
-        this.showSettingsPaneSetting, 'largeicon-settings-gear', i18nString(UIStrings.networkSettings)));
+        this.showSettingsPaneSetting, 'gear', i18nString(UIStrings.networkSettings), 'gear-filled'));
 
     const settingsToolbarLeft = new UI.Toolbar.Toolbar('', this.settingsPane.element);
     settingsToolbarLeft.makeVertical();
@@ -458,11 +462,11 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
         i18nString(UIStrings.captureScreenshots)));
 
     this.panelToolbar.appendSeparator();
-    const importHarButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.importHarFile), 'largeicon-load');
+    const importHarButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.importHarFile), 'import');
     importHarButton.addEventListener(
         UI.Toolbar.ToolbarButton.Events.Click, () => this.fileSelectorElement.click(), this);
     this.panelToolbar.appendToolbarItem(importHarButton);
-    const exportHarButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.exportHar), 'largeicon-download');
+    const exportHarButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.exportHar), 'download');
     exportHarButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       void this.networkLogView.exportAll();
     }, this);
@@ -493,21 +497,14 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     }
   }
 
-  private filmStripAvailable(filmStripModel: SDK.FilmStripModel.FilmStripModel|null): void {
-    if (!filmStripModel) {
-      return;
-    }
-    const calculator = this.networkLogView.timeCalculator();
+  private filmStripAvailable(filmStrip: TraceEngine.Extras.FilmStrip.Data): void {
     if (this.filmStripView) {
-      this.filmStripView.setModel(
-          filmStripModel, calculator.minimumBoundary() * 1000, calculator.boundarySpan() * 1000);
+      this.filmStripView.setModel(filmStrip);
     }
-    this.networkOverview.setFilmStripModel(filmStripModel);
-    const timestamps = filmStripModel.frames().map(mapTimestamp);
-
-    function mapTimestamp(frame: SDK.FilmStripModel.Frame): number {
-      return frame.timestamp / 1000;
-    }
+    const timestamps = filmStrip.frames.map(frame => {
+      // The network view works in seconds.
+      return TraceEngine.Helpers.Timing.microSecondsToSeconds(frame.screenshotEvent.ts);
+    });
 
     this.networkLogView.addFilmStripFrames(timestamps);
   }
@@ -536,7 +533,10 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
   private load(): void {
     if (this.filmStripRecorder && this.filmStripRecorder.isRecording()) {
-      this.pendingStopTimer = window.setTimeout(this.stopFilmStripRecording.bind(this), displayScreenshotDelay);
+      if (this.pendingStopTimer) {
+        window.clearTimeout(this.pendingStopTimer);
+      }
+      this.pendingStopTimer = window.setTimeout(this.stopFilmStripRecording.bind(this), this.displayScreenshotDelay);
     }
   }
 
@@ -565,7 +565,6 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const toggled = this.networkRecordFilmStripSetting.get();
     if (toggled && !this.filmStripRecorder) {
       this.filmStripView = new PerfUI.FilmStripView.FilmStripView();
-      this.filmStripView.setMode(PerfUI.FilmStripView.Modes.FrameBased);
       this.filmStripView.element.classList.add('network-film-strip');
       this.filmStripRecorder = new FilmStripRecorder(this.networkLogView.timeCalculator(), this.filmStripView);
       this.filmStripView.show(this.filmStripPlaceholderElement);
@@ -597,11 +596,11 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     }
   }
 
-  elementsToRestoreScrollPositionsFor(): Element[] {
+  override elementsToRestoreScrollPositionsFor(): Element[] {
     return this.networkLogView.elementsToRestoreScrollPositionsFor();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     UI.Context.Context.instance().setFlavor(NetworkPanel, this);
     this.registerCSSFiles([networkPanelStyles]);
 
@@ -609,7 +608,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     Host.userMetrics.panelLoaded('network', 'DevTools.Launch.Network');
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.Context.Context.instance().setFlavor(NetworkPanel, null);
   }
 
@@ -793,8 +792,6 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 }
 
-export const displayScreenshotDelay = 1000;
-
 let contextMenuProviderInstance: ContextMenuProvider;
 
 export class ContextMenuProvider implements UI.ContextMenu.Provider {
@@ -879,15 +876,21 @@ export class NetworkLogWithFilterRevealer implements Common.Revealer.Revealer {
   }
 }
 
-export class FilmStripRecorder implements SDK.TracingManager.TracingManagerClient {
-  private tracingManager: SDK.TracingManager.TracingManager|null;
+export class FilmStripRecorder implements TraceEngine.TracingManager.TracingManagerClient {
+  private tracingManager: TraceEngine.TracingManager.TracingManager|null;
   private resourceTreeModel: SDK.ResourceTreeModel.ResourceTreeModel|null;
   private readonly timeCalculator: NetworkTimeCalculator;
   private readonly filmStripView: PerfUI.FilmStripView.FilmStripView;
-  private tracingModel: SDK.TracingModel.TracingModel|null;
-  private callback: ((arg0: SDK.FilmStripModel.FilmStripModel|null) => void)|null;
+  private tracingModel: TraceEngine.Legacy.TracingModel|null;
+  private callback: ((filmStrip: TraceEngine.Extras.FilmStrip.Data) => void)|null;
+  // Used to fetch screenshots of the page load and show them in the panel.
+  #traceEngine: TraceEngine.TraceModel.Model<TraceEngine.Extras.FilmStrip.HandlersWithFilmStrip>;
 
   constructor(timeCalculator: NetworkTimeCalculator, filmStripView: PerfUI.FilmStripView.FilmStripView) {
+    this.#traceEngine = new TraceEngine.TraceModel.Model({
+      Screenshots: TraceEngine.Handlers.ModelHandlers.Screenshots,
+    });
+
     this.tracingManager = null;
     this.resourceTreeModel = null;
     this.timeCalculator = timeCalculator;
@@ -896,23 +899,41 @@ export class FilmStripRecorder implements SDK.TracingManager.TracingManagerClien
     this.callback = null;
   }
 
-  traceEventsCollected(events: SDK.TracingManager.EventPayload[]): void {
+  traceEventsCollected(events: TraceEngine.TracingManager.EventPayload[]): void {
     if (this.tracingModel) {
       this.tracingModel.addEvents(events);
     }
   }
 
-  tracingComplete(): void {
+  async tracingComplete(): Promise<void> {
     if (!this.tracingModel || !this.tracingManager) {
       return;
     }
     this.tracingModel.tracingComplete();
     this.tracingManager = null;
+    await this.#traceEngine.parse(
+        // OPP's data layer uses `EventPayload` as the type to represent raw JSON from the trace.
+        // When we pass this into the new data engine, we need to tell TS to use the new TraceEventData type.
+        this.tracingModel.allRawEvents() as unknown as TraceEngine.Types.TraceEvents.TraceEventData[],
+    );
+
+    const data = this.#traceEngine.traceParsedData(this.#traceEngine.size() - 1);
+    if (!data) {
+      return;
+    }
+    const zeroTimeInSeconds = TraceEngine.Types.Timing.Seconds(this.timeCalculator.minimumBoundary());
+    const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(
+        data, TraceEngine.Helpers.Timing.secondsToMicroseconds(zeroTimeInSeconds));
+
     if (this.callback) {
-      this.callback(
-          new SDK.FilmStripModel.FilmStripModel(this.tracingModel, this.timeCalculator.minimumBoundary() * 1000));
+      this.callback(filmStrip);
     }
     this.callback = null;
+    // Now we have created the film strip and stored the data, we need to reset
+    // the trace processor so that it is ready to record again if the user
+    // refreshes the page.
+    this.#traceEngine.resetProcessor();
+
     if (this.resourceTreeModel) {
       this.resourceTreeModel.resumeReload();
     }
@@ -928,20 +949,15 @@ export class FilmStripRecorder implements SDK.TracingManager.TracingManagerClien
   startRecording(): void {
     this.filmStripView.reset();
     this.filmStripView.setStatusText(i18nString(UIStrings.recordingFrames));
-    const tracingManagers = SDK.TargetManager.TargetManager.instance().models(SDK.TracingManager.TracingManager);
-    if (this.tracingManager || !tracingManagers.length) {
+    const tracingManager =
+        SDK.TargetManager.TargetManager.instance().scopeTarget()?.model(TraceEngine.TracingManager.TracingManager);
+    if (this.tracingManager || !tracingManager) {
       return;
     }
 
-    this.tracingManager = tracingManagers[0];
-    if (!this.tracingManager) {
-      return;
-    }
+    this.tracingManager = tracingManager;
     this.resourceTreeModel = this.tracingManager.target().model(SDK.ResourceTreeModel.ResourceTreeModel);
-    if (this.tracingModel) {
-      this.tracingModel.dispose();
-    }
-    this.tracingModel = new SDK.TracingModel.TracingModel(new Bindings.TempFile.TempFileBackingStorage());
+    this.tracingModel = new TraceEngine.Legacy.TracingModel();
     void this.tracingManager.start(this, '-*,disabled-by-default-devtools.screenshot', '');
 
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.FilmStripStartedRecording);
@@ -951,7 +967,7 @@ export class FilmStripRecorder implements SDK.TracingManager.TracingManagerClien
     return Boolean(this.tracingManager);
   }
 
-  stopRecording(callback: (arg0: SDK.FilmStripModel.FilmStripModel|null) => void): void {
+  stopRecording(callback: (filmStrip: TraceEngine.Extras.FilmStrip.Data) => void): void {
     if (!this.tracingManager) {
       return;
     }
@@ -999,14 +1015,19 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
       }
       case 'network.search': {
         const selection = UI.InspectorView.InspectorView.instance().element.window().getSelection();
-        if (selection) {
-          let queryCandidate = '';
-          if (selection.rangeCount) {
-            queryCandidate = selection.toString().replace(/\r?\n.*/, '');
-          }
-          void SearchNetworkView.openSearch(queryCandidate);
-          return true;
+        if (!selection) {
+          return false;
         }
+        let queryCandidate = '';
+        if (selection.rangeCount) {
+          queryCandidate = selection.toString().replace(/\r?\n.*/, '');
+        }
+        void SearchNetworkView.openSearch(queryCandidate);
+        return true;
+      }
+      case 'network.clear': {
+        Logs.NetworkLog.NetworkLog.instance().reset(true);
+        return true;
       }
     }
     return false;
@@ -1067,7 +1088,7 @@ export class SearchNetworkView extends Search.SearchView.SearchView {
     return searchView;
   }
 
-  createScope(): Search.SearchConfig.SearchScope {
+  override createScope(): Search.SearchConfig.SearchScope {
     return new NetworkSearchScope();
   }
 }

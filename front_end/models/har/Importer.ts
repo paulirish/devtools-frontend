@@ -6,7 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
-import type {HAREntry, HARLog, HARPage, HARTimings} from './HARFormat.js';
+import {type HAREntry, type HARLog, type HARPage, type HARTimings} from './HARFormat.js';
 
 export class Importer {
   static requestsFromHARLog(log: HARLog): SDK.NetworkRequest.NetworkRequest[] {
@@ -25,17 +25,15 @@ export class Importer {
           pageref ? pageLoads.get(pageref) : undefined;
       const documentURL = pageLoad ? pageLoad.mainRequest.url() : entry.request.url;
 
-      let initiator: {
-        type: Protocol.Network.InitiatorType,
-        url: string|undefined,
-        lineNumber: number|undefined,
-      }|null = null;
+      let initiator: Protocol.Network.Initiator|null = null;
       const initiatorEntry = entry.customInitiator();
       if (initiatorEntry) {
         initiator = {
           type: (initiatorEntry.type as Protocol.Network.InitiatorType),
           url: initiatorEntry.url,
           lineNumber: initiatorEntry.lineNumber,
+          requestId: initiatorEntry.requestId,
+          stack: initiatorEntry.stack,
         };
       }
       const request = SDK.NetworkRequest.NetworkRequest.createWithoutBackendRequest(
@@ -225,6 +223,7 @@ export class Importer {
       sendEnd: accumulateTime(timings.send),
       pushStart: 0,
       pushEnd: 0,
+      receiveHeadersStart: timings.wait && (timings.wait >= 0) ? lastEntry : -1,
       receiveHeadersEnd: accumulateTime(timings.wait),
     };
     accumulateTime(timings.receive);

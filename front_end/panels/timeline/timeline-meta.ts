@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import type * as Profiler from '../profiler/profiler.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -11,68 +12,68 @@ import type * as Timeline from './timeline.js';
 
 const UIStrings = {
   /**
-  *@description Text for the performance of something
-  */
+   *@description Text for the performance of something
+   */
   performance: 'Performance',
   /**
-  *@description Command for showing the 'Performance' tool
-  */
+   *@description Command for showing the 'Performance' tool
+   */
   showPerformance: 'Show Performance',
   /**
-  *@description Title of the 'JavaScript Profiler' tool
-  */
+   *@description Title of the 'JavaScript Profiler' tool
+   */
   javascriptProfiler: 'JavaScript Profiler',
   /**
-  *@description Command for showing the 'JavaScript Profiler' tool
-  */
+   *@description Command for showing the 'JavaScript Profiler' tool
+   */
   showJavascriptProfiler: 'Show JavaScript Profiler',
   /**
-  *@description Text to record a series of actions for analysis
-  */
+   *@description Text to record a series of actions for analysis
+   */
   record: 'Record',
   /**
-  *@description Text of an item that stops the running task
-  */
+   *@description Text of an item that stops the running task
+   */
   stop: 'Stop',
   /**
-  *@description Title of an action in the timeline tool to record reload
-  */
+   *@description Title of an action in the timeline tool to record reload
+   */
   startProfilingAndReloadPage: 'Start profiling and reload page',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon download button
-  */
+   *@description Tooltip text that appears when hovering over the largeicon download button
+   */
   saveProfile: 'Save profile…',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon load button
-  */
+   *@description Tooltip text that appears when hovering over the largeicon load button
+   */
   loadProfile: 'Load profile…',
   /**
-  *@description Prev button title in Film Strip View of the Performance panel
-  */
+   *@description Prev button title in Film Strip View of the Performance panel
+   */
   previousFrame: 'Previous frame',
   /**
-  *@description Next button title in Film Strip View of the Performance panel
-  */
+   *@description Next button title in Film Strip View of the Performance panel
+   */
   nextFrame: 'Next frame',
   /**
-  *@description Title of an action in the timeline tool to show history
-  */
+   *@description Title of an action in the timeline tool to show history
+   */
   showRecentTimelineSessions: 'Show recent timeline sessions',
   /**
-  *@description Title of an action that opens the previous recording in the performance panel
-  */
+   *@description Title of an action that opens the previous recording in the performance panel
+   */
   previousRecording: 'Previous recording',
   /**
-  *@description Title of an action that opens the next recording in the performance panel
-  */
+   *@description Title of an action that opens the next recording in the performance panel
+   */
   nextRecording: 'Next recording',
   /**
-  *@description Title of a setting under the Performance category in Settings
-  */
+   *@description Title of a setting under the Performance category in Settings
+   */
   hideChromeFrameInLayersView: 'Hide `chrome` frame in Layers view',
   /**
-  *@description Text in the Shortcuts page to explain a keyboard shortcut (start/stop recording performance)
-  */
+   *@description Text in the Shortcuts page to explain a keyboard shortcut (start/stop recording performance)
+   */
   startStopRecording: 'Start/stop recording',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/timeline-meta.ts', UIStrings);
@@ -137,6 +138,7 @@ UI.ViewManager.registerViewExtension({
   commandPrompt: i18nLazyString(UIStrings.showJavascriptProfiler),
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   order: 65,
+  experiment: Root.Runtime.ExperimentName.JS_PROFILER_TEMP_ENABLE,
   async loadView() {
     const Profiler = await loadProfilerModule();
     return Profiler.ProfilesPanel.JSProfilerPanel.instance();
@@ -146,9 +148,9 @@ UI.ViewManager.registerViewExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'timeline.toggle-recording',
   category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_START_RECORDING,
+  iconClass: UI.ActionRegistration.IconClass.START_RECORDING,
   toggleable: true,
-  toggledIconClass: UI.ActionRegistration.IconClass.LARGEICON_STOP_RECORDING,
+  toggledIconClass: UI.ActionRegistration.IconClass.STOP_RECORDING,
   toggleWithRedColor: true,
   contextTypes() {
     return maybeRetrieveContextTypes(Timeline => [Timeline.TimelinePanel.TimelinePanel]);
@@ -181,7 +183,7 @@ UI.ActionRegistration.registerActionExtension({
 
 UI.ActionRegistration.registerActionExtension({
   actionId: 'timeline.record-reload',
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_REFRESH,
+  iconClass: UI.ActionRegistration.IconClass.REFRESH,
   contextTypes() {
     return maybeRetrieveContextTypes(Timeline => [Timeline.TimelinePanel.TimelinePanel]);
   },
@@ -358,9 +360,9 @@ UI.ActionRegistration.registerActionExtension({
   actionId: 'profiler.js-toggle-recording',
   category: UI.ActionRegistration.ActionCategory.JAVASCRIPT_PROFILER,
   title: i18nLazyString(UIStrings.startStopRecording),
-  iconClass: UI.ActionRegistration.IconClass.LARGEICON_START_RECORDING,
+  iconClass: UI.ActionRegistration.IconClass.START_RECORDING,
   toggleable: true,
-  toggledIconClass: UI.ActionRegistration.IconClass.LARGEICON_STOP_RECORDING,
+  toggledIconClass: UI.ActionRegistration.IconClass.STOP_RECORDING,
   toggleWithRedColor: true,
   contextTypes() {
     return maybeRetrieveProfilerContextTypes(Profiler => [Profiler.ProfilesPanel.JSProfilerPanel]);

@@ -10,6 +10,8 @@ This process puts the IC in charge, but also requires Chrome DevTools' leaders t
 1. Be kind and civilized.
 1. Be pragmatic.
 
+![DevTools Design Process](design_guidelines.png)
+
 ## Roles
 
 ### Individual Contributor (IC)
@@ -22,7 +24,7 @@ This person is the creator of the feature and the creator of the design document
 
 _LGTM_: Required. May delegate.
 
-The Chrome DevTools TL is Benedikt Meurer (bmeurer@chromium.org). The TL ensures architectural consistency and good coverage by the right set of LGTM providers, and is required to sign off on the design. They may however explicitly delegate to other LGTM providers.
+The Chrome DevTools TL is Danil Somsikov (dsv@chromium.org). The TL ensures architectural consistency and good coverage by the right set of LGTM providers, and is required to sign off on the design. They may however explicitly delegate to other LGTM providers.
 
 In the absence of the TL, an EnReOw can act in their stead.
 
@@ -42,7 +44,7 @@ This is somebody who reviews and comments on the proposal. Their input should be
 
 _LGTM_: Not required. However, LGTM or non-LGTM is binding.
 
-Stuck proposals can be escalated to the [ENG_REVIEW_OWNERS](https://cs.chromium.org/chromium/src/third_party/devtools-frontend/src/config/owner/ENG_REVIEW_OWNERS) Potential use cases of such an escalation:
+Stuck proposals can be escalated to the [ENG_REVIEW_OWNERS](https://cs.chromium.org/chromium/src/third_party/devtools-frontend/src/config/owner/ENG_REVIEW_OWNERS). Potential use cases of such an escalation:
 
 - An LGTM provider is non-responsive.
 - No consensus on the design can be reached.
@@ -81,7 +83,7 @@ Some pointers when people should be added to the list of LGTM providers:
 
 ### Where can I find a template for design documents?
 
-[Here](https://bit.ly/devtools-design-doc-template).
+[Here](https://goo.gle/devtools-design-doc-template).
 
 ### What if I made big changes to the design document?
 

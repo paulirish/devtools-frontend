@@ -42,43 +42,43 @@ import imageViewStyles from './imageView.css.legacy.js';
 
 const UIStrings = {
   /**
-  *@description Text in Image View of the Sources panel
-  */
+   *@description Text in Image View of the Sources panel
+   */
   image: 'Image',
   /**
-  *@description Text that appears when user drag and drop something (for example, a file) in Image View of the Sources panel
-  */
+   *@description Text that appears when user drag and drop something (for example, a file) in Image View of the Sources panel
+   */
   dropImageFileHere: 'Drop image file here',
   /**
-  *@description Text to indicate the source of an image
-  *@example {example.com} PH1
-  */
+   *@description Text to indicate the source of an image
+   *@example {example.com} PH1
+   */
   imageFromS: 'Image from {PH1}',
   /**
-  *@description Text in Image View of the Sources panel
-  *@example {2} PH1
-  *@example {2} PH2
-  */
+   *@description Text in Image View of the Sources panel
+   *@example {2} PH1
+   *@example {2} PH2
+   */
   dD: '{PH1} × {PH2}',
   /**
-  *@description A context menu item in the Image View of the Sources panel
-  */
+   *@description A context menu item in the Image View of the Sources panel
+   */
   copyImageUrl: 'Copy image URL',
   /**
-  *@description A context menu item in the Image View of the Sources panel
-  */
+   *@description A context menu item in the Image View of the Sources panel
+   */
   copyImageAsDataUri: 'Copy image as data URI',
   /**
-  *@description A context menu item in the Image View of the Sources panel
-  */
+   *@description A context menu item in the Image View of the Sources panel
+   */
   openImageInNewTab: 'Open image in new tab',
   /**
-  *@description A context menu item in the Image Preview
-  */
+   *@description A context menu item in the Image Preview
+   */
   saveImageAs: 'Save image as...',
   /**
-  *@description The default file name when downloading a file
-  */
+   *@description The default file name when downloading a file
+   */
   download: 'download',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/ImageView.ts', UIStrings);
@@ -95,7 +95,7 @@ export class ImageView extends UI.View.SimpleView {
   private readonly mimeTypeLabel: UI.Toolbar.ToolbarText;
   private readonly container: HTMLElement;
   private imagePreviewElement: HTMLImageElement;
-  private cachedContent?: string|null;
+  private cachedContent?: TextUtils.ContentProvider.DeferredContent;
   constructor(mimeType: string, contentProvider: TextUtils.ContentProvider.ContentProvider) {
     super(i18nString(UIStrings.image));
     this.registerRequiredCSS(imageViewStyles);
@@ -124,7 +124,7 @@ export class ImageView extends UI.View.SimpleView {
     this.imagePreviewElement.addEventListener('contextmenu', this.contextMenu.bind(this), true);
   }
 
-  async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
+  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
     await this.updateContentIfNeeded();
     return [
       this.sizeLabel,
@@ -137,11 +137,11 @@ export class ImageView extends UI.View.SimpleView {
     ];
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     void this.updateContentIfNeeded();
   }
 
-  disposeView(): void {
+  override disposeView(): void {
     if (this.uiSourceCode) {
       this.uiSourceCode.removeEventListener(
           Workspace.UISourceCode.Events.WorkingCopyCommitted, this.workingCopyCommitted, this);
@@ -153,20 +153,21 @@ export class ImageView extends UI.View.SimpleView {
   }
 
   private async updateContentIfNeeded(): Promise<void> {
-    const {content} = await this.contentProvider.requestContent();
-    if (this.cachedContent === content) {
+    const content = await this.contentProvider.requestContent();
+    if (this.cachedContent?.content === content.content) {
       return;
     }
 
-    const contentEncoded = await this.contentProvider.contentEncoded();
     this.cachedContent = content;
-    const imageSrc = TextUtils.ContentProvider.contentAsDataURL(content, this.mimeType, contentEncoded) || this.url;
+    const imageSrc =
+        TextUtils.ContentProvider.contentAsDataURL(content.content, this.mimeType, content.isEncoded) || this.url;
     const loadPromise = new Promise(x => {
       this.imagePreviewElement.onload = x;
     });
     this.imagePreviewElement.src = imageSrc;
     this.imagePreviewElement.alt = i18nString(UIStrings.imageFromS, {PH1: this.url});
-    const size = content && !contentEncoded ? content.length : Platform.StringUtilities.base64ToSize(content);
+    const size = content.content && !content.isEncoded ? content.content.length :
+                                                         Platform.StringUtilities.base64ToSize(content.content);
     this.sizeLabel.setText(Platform.NumberUtilities.bytesToString(size));
     await loadPromise;
     this.dimensionsLabel.setText(i18nString(
@@ -203,13 +204,11 @@ export class ImageView extends UI.View.SimpleView {
   }
 
   private async saveImage(): Promise<void> {
-    const contentEncoded = await this.contentProvider.contentEncoded();
-    if (!this.cachedContent) {
+    if (!this.cachedContent || !this.cachedContent.content) {
       return;
     }
-    const cachedContent = this.cachedContent;
-    const imageDataURL =
-        TextUtils.ContentProvider.contentAsDataURL(cachedContent, this.mimeType, contentEncoded, '', false);
+    const imageDataURL = TextUtils.ContentProvider.contentAsDataURL(
+        this.cachedContent.content, this.mimeType, this.cachedContent.isEncoded, '', false);
 
     if (!imageDataURL) {
       return;

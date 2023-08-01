@@ -2,19 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {click, reloadDevTools, waitFor} from '../../shared/helper.js';
+import {
+  assertNotNullOrUndefined,
+  click,
+  clickElement,
+  reloadDevTools,
+  waitFor,
+  waitForFunction,
+  waitForMany,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {navigateToConsoleTab, navigateToIssuesPanelViaInfoBar, waitForConsoleMessageAndClickOnLink} from '../helpers/console-helpers.js';
-import {clickOnContextMenuItemFromTab, MOVE_TO_DRAWER_SELECTOR, MOVE_TO_MAIN_PANEL_SELECTOR, prepareForCrossToolScenario, tabExistsInDrawer, tabExistsInMainPanel} from '../helpers/cross-tool-helper.js';
+import {
+  navigateToConsoleTab,
+  navigateToIssuesPanelViaInfoBar,
+  waitForConsoleInfoMessageAndClickOnLink,
+} from '../helpers/console-helpers.js';
+import {
+  clickOnContextMenuItemFromTab,
+  MOVE_TO_DRAWER_SELECTOR,
+  MOVE_TO_MAIN_PANEL_SELECTOR,
+  prepareForCrossToolScenario,
+  tabExistsInDrawer,
+  tabExistsInMainPanel,
+} from '../helpers/cross-tool-helper.js';
 import {clickOnFirstLinkInStylesPanel, navigateToElementsTab} from '../helpers/elements-helpers.js';
 import {LAYERS_TAB_SELECTOR} from '../helpers/layers-helpers.js';
 import {MEMORY_TAB_ID, navigateToMemoryTab} from '../helpers/memory-helpers.js';
-import {navigateToPerformanceSidebarTab, navigateToPerformanceTab, startRecording, stopRecording, waitForSourceLinkAndFollowIt} from '../helpers/performance-helpers.js';
+import {
+  navigateToPerformanceSidebarTab,
+  navigateToPerformanceTab,
+  startRecording,
+  stopRecording,
+} from '../helpers/performance-helpers.js';
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 
 describe('A user can navigate across', async function() {
   // These tests move between panels, which takes time.
-  this.timeout(10000);
+  if (this.timeout() !== 0) {
+    this.timeout(10000);
+  }
 
   beforeEach(async function() {
     await prepareForCrossToolScenario();
@@ -22,11 +48,12 @@ describe('A user can navigate across', async function() {
 
   it('Console -> Sources', async () => {
     await navigateToConsoleTab();
-    await waitForConsoleMessageAndClickOnLink();
+    await waitForConsoleInfoMessageAndClickOnLink();
     await waitFor('.panel[aria-label="sources"]');
   });
 
-  it('Console -> Issues', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1342045]: Console -> Issues', async () => {
     await navigateToConsoleTab();
     await navigateToIssuesPanelViaInfoBar();
 
@@ -44,15 +71,26 @@ describe('A user can navigate across', async function() {
     await waitFor('.panel[aria-label="sources"]');
   });
 
-  // Flakes in multiple ways, with timeouts or assertion failures
-  it.skip('[crbug.com/1100337]: Performance -> Sources', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1375161]: Performance -> Sources', async () => {
     await navigateToPerformanceTab();
 
     await startRecording();
     await stopRecording();
 
     await navigateToPerformanceSidebarTab('Bottom-Up');
-    await waitForSourceLinkAndFollowIt();
+
+    // Find the link pointing to default.html.
+    const link = await waitForFunction(async () => {
+      const allLinks = await waitForMany('.devtools-link', 1);
+      const linkText = await Promise.all(allLinks.map(link => link.evaluate(x => x.textContent)));
+      const linkIdx = linkText.findIndex(text => text?.startsWith('default.html'));
+      return linkIdx < 0 ? undefined : allLinks[linkIdx];
+    });
+
+    assertNotNullOrUndefined(link);
+    await clickElement(link);
+    await waitFor('.panel[aria-label="sources"]');
   });
 });
 

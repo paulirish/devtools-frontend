@@ -18,12 +18,17 @@ export const enum Variant {
   PRIMARY = 'primary',
   SECONDARY = 'secondary',
   TOOLBAR = 'toolbar',
+  // Just like toolbar but has a style similar to a primary button.
+  PRIMARY_TOOLBAR = 'primary_toolbar',
   ROUND = 'round',
 }
 
 export const enum Size {
   SMALL = 'SMALL',
   MEDIUM = 'MEDIUM',
+  // The 'tiny' size only has an effect on buttons of type 'round', for other
+  // button types 'tiny' buttons look just like 'small' buttons.
+  TINY = 'TINY',
 }
 
 type ButtonType = 'button'|'submit'|'reset';
@@ -38,38 +43,35 @@ interface ButtonState {
   type: ButtonType;
   value?: string;
   title?: string;
+  iconWidth?: string;
+  iconHeight?: string;
+  iconName?: string;
 }
 
-export type ButtonData = {
-  variant: Variant.TOOLBAR|Variant.ROUND,
+interface CommonButtonData {
+  variant: Variant;
+  iconUrl?: string;
+  iconName?: string;
+  size?: Size;
+  disabled?: boolean;
+  active?: boolean;
+  spinner?: boolean;
+  type?: ButtonType;
+  value?: string;
+  title?: string;
+  iconWidth?: string;
+  iconHeight?: string;
+}
+
+export type ButtonData = CommonButtonData&(|{
+  variant: Variant.PRIMARY_TOOLBAR | Variant.TOOLBAR | Variant.ROUND,
   iconUrl: string,
-  size?: Size,
-  disabled?: boolean,
-  active?: boolean,
-  spinner?: boolean,
-  type?: ButtonType,
-  value?: string,
-  title?: string,
+}|{
+  variant: Variant.PRIMARY_TOOLBAR | Variant.TOOLBAR | Variant.ROUND,
+  iconName: string,
 }|{
   variant: Variant.PRIMARY | Variant.SECONDARY,
-  iconUrl?: string,
-  size?: Size,
-  disabled?: boolean,
-  active?: boolean,
-  spinner?: boolean,
-  type?: ButtonType,
-  value?: string,
-  title?: string,
-};
-
-interface ButtonElementInternals extends ElementInternals {
-  readonly form?: HTMLFormElement;
-  readonly validity: ValidityState;
-  readonly willValidate: boolean;
-  readonly validationMessage: string;
-  checkValidity(): void;
-  reportValidity(): void;
-}
+});
 
 export class Button extends HTMLElement {
   static formAssociated = true;
@@ -85,7 +87,7 @@ export class Button extends HTMLElement {
     type: 'button',
   };
   #isEmpty = true;
-  #internals = this.attachInternals() as ButtonElementInternals;
+  #internals = this.attachInternals();
 
   constructor() {
     super();
@@ -100,10 +102,26 @@ export class Button extends HTMLElement {
   set data(data: ButtonData) {
     this.#props.variant = data.variant;
     this.#props.iconUrl = data.iconUrl;
-    this.#props.size = data.size || Size.MEDIUM;
+    this.#props.iconName = data.iconName;
+    this.#props.size = Size.MEDIUM;
+
+    if ('size' in data && data.size) {
+      this.#props.size = data.size;
+    }
+    if ('iconWidth' in data && data.iconWidth) {
+      this.#props.iconWidth = data.iconWidth;
+    }
+    if ('iconHeight' in data && data.iconHeight) {
+      this.#props.iconHeight = data.iconHeight;
+    }
+
     this.#props.active = Boolean(data.active);
-    this.#props.spinner = Boolean(data.spinner);
-    this.#props.type = data.type || 'button';
+    this.#props.spinner = Boolean('spinner' in data ? data.spinner : false);
+
+    this.#props.type = 'button';
+    if ('type' in data && data.type) {
+      this.#props.type = data.type;
+    }
     this.#setDisabledProperty(data.disabled || false);
     this.#props.title = data.title;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
@@ -111,6 +129,11 @@ export class Button extends HTMLElement {
 
   set iconUrl(iconUrl: string|undefined) {
     this.#props.iconUrl = iconUrl;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  set iconName(iconName: string|undefined) {
+    this.#props.iconName = iconName;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -124,12 +147,22 @@ export class Button extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
+  set iconWidth(iconWidth: string) {
+    this.#props.iconWidth = iconWidth;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  set iconHeight(iconHeight: string) {
+    this.#props.iconHeight = iconHeight;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
   set type(type: ButtonType) {
     this.#props.type = type;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set title(title: string) {
+  override set title(title: string) {
     this.#props.title = title;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -154,7 +187,7 @@ export class Button extends HTMLElement {
     this.toggleAttribute('disabled', disabled);
   }
 
-  focus(): void {
+  override focus(): void {
     this.#shadow.querySelector('button')?.focus();
   }
 
@@ -188,35 +221,46 @@ export class Button extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
+  #isToolbarVariant(): boolean {
+    return this.#props.variant === Variant.TOOLBAR || this.#props.variant === Variant.PRIMARY_TOOLBAR;
+  }
+
   #render(): void {
     if (!this.#props.variant) {
       throw new Error('Button requires a variant to be defined');
     }
-    if (this.#props.variant === Variant.TOOLBAR) {
-      if (!this.#props.iconUrl) {
+    if (this.#isToolbarVariant()) {
+      if (!this.#props.iconUrl && !this.#props.iconName) {
         throw new Error('Toolbar button requires an icon');
       }
       if (!this.#isEmpty) {
-        throw new Error('Tooblar button does not accept children');
+        throw new Error('Toolbar button does not accept children');
       }
     }
     if (this.#props.variant === Variant.ROUND) {
-      if (!this.#props.iconUrl) {
+      if (!this.#props.iconUrl && !this.#props.iconName) {
         throw new Error('Round button requires an icon');
       }
       if (!this.#isEmpty) {
         throw new Error('Round button does not accept children');
       }
     }
+    if (this.#props.iconName && this.#props.iconUrl) {
+      throw new Error('Both iconName and iconUrl are provided.');
+    }
+    const hasIcon = Boolean(this.#props.iconUrl) || Boolean(this.#props.iconName);
     const classes = {
       primary: this.#props.variant === Variant.PRIMARY,
       secondary: this.#props.variant === Variant.SECONDARY,
-      toolbar: this.#props.variant === Variant.TOOLBAR,
+      toolbar: this.#isToolbarVariant(),
+      'primary-toolbar': this.#props.variant === Variant.PRIMARY_TOOLBAR,
       round: this.#props.variant === Variant.ROUND,
-      'text-with-icon': Boolean(this.#props.iconUrl) && !this.#isEmpty,
-      'only-icon': Boolean(this.#props.iconUrl) && this.#isEmpty,
-      small: Boolean(this.#props.size === Size.SMALL),
+      'text-with-icon': hasIcon && !this.#isEmpty,
+      'only-icon': hasIcon && this.#isEmpty,
+      small: Boolean(this.#props.size === Size.SMALL || this.#props.size === Size.TINY),
+      tiny: Boolean(this.#props.size === Size.TINY),
       active: this.#props.active,
+      'explicit-size': Boolean(this.#props.iconHeight || this.#props.iconWidth),
     };
     const spinnerClasses = {
       primary: this.#props.variant === Variant.PRIMARY,
@@ -228,10 +272,13 @@ export class Button extends HTMLElement {
     LitHtml.render(
       LitHtml.html`
         <button title=${LitHtml.Directives.ifDefined(this.#props.title)} .disabled=${this.#props.disabled} class=${LitHtml.Directives.classMap(classes)}>
-          ${this.#props.iconUrl ? LitHtml.html`<${IconButton.Icon.Icon.litTagName}
+          ${hasIcon ? LitHtml.html`<${IconButton.Icon.Icon.litTagName}
             .data=${{
               iconPath: this.#props.iconUrl,
+              iconName: this.#props.iconName,
               color: 'var(--color-background)',
+              width: this.#props.iconWidth || undefined,
+              height: this.#props.iconHeight || undefined,
             } as IconButton.Icon.IconData}
           >
           </${IconButton.Icon.Icon.litTagName}>` : ''}
@@ -254,7 +301,7 @@ export class Button extends HTMLElement {
   // The following properties and methods aren't strictly required,
   // but browser-level form controls provide them. Providing them helps
   // ensure consistency with browser-provided controls.
-  get form(): HTMLFormElement|undefined {
+  get form(): HTMLFormElement|null {
     return this.#internals.form;
   }
   get name(): string|null {
@@ -272,10 +319,10 @@ export class Button extends HTMLElement {
   get willValidate(): boolean {
     return this.#internals.willValidate;
   }
-  checkValidity(): void {
+  checkValidity(): boolean {
     return this.#internals.checkValidity();
   }
-  reportValidity(): void {
+  reportValidity(): boolean {
     return this.#internals.reportValidity();
   }
 }

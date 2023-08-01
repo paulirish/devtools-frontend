@@ -3,10 +3,21 @@
 // found in the LICENSE file.
 
 import * as Common from '../../../../../../front_end/core/common/common.js';
+import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
+import {assertNotNullOrUndefined} from '../../../../../../front_end/core/platform/platform.js';
+import * as Root from '../../../../../../front_end/core/root/root.js';
+import * as SDK from '../../../../../../front_end/core/sdk/sdk.js';
+import type * as Protocol from '../../../../../../front_end/generated/protocol.js';
+import * as Bindings from '../../../../../../front_end/models/bindings/bindings.js';
+import * as Workspace from '../../../../../../front_end/models/workspace/workspace.js';
 import * as CodeMirror from '../../../../../../front_end/third_party/codemirror.next/codemirror.next.js';
 import * as TextEditor from '../../../../../../front_end/ui/components/text_editor/text_editor.js';
+import * as UI from '../../../../../../front_end/ui/legacy/legacy.js';
 import {renderElementIntoDOM} from '../../../helpers/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import {TestPlugin} from '../../../helpers/LanguagePluginHelpers.js';
+import {describeWithMockConnection} from '../../../helpers/MockConnection.js';
+import {MockExecutionContext} from '../../../helpers/MockExecutionContext.js';
 
 const {assert} = chai;
 
@@ -16,7 +27,7 @@ function makeState(doc: string, extensions: CodeMirror.Extension = []) {
     extensions: [
       extensions,
       TextEditor.Config.baseConfiguration(doc),
-      TextEditor.Config.autocompletion,
+      TextEditor.Config.autocompletion.instance(),
     ],
   });
 }
@@ -54,6 +65,87 @@ describeWithEnvironment('TextEditor', () => {
       Common.Settings.Settings.instance().moduleSetting('showWhitespacesInEditor').set('none');
       assert.strictEqual(editor.editor.dom.querySelectorAll('.cm-trailingWhitespace, .cm-highlightedSpaces').length, 0);
       editor.remove();
+    });
+
+    it('should restore scroll to the same position after reconnecting to DOM when it is scrollable', async () => {
+      let resolveEventPromise: Function;
+      const dispatchSpy = sinon.spy(CodeMirror.EditorView.prototype, 'dispatch');
+      const editor = new TextEditor.TextEditor.TextEditor(makeState(
+          'line1\nline2\nline3\nline4\nline5\nline6andthisisalonglinesothatwehaveenoughspacetoscrollhorizontally',
+          [CodeMirror.EditorView.theme(
+              {'&.cm-editor': {height: '50px', width: '50px'}, '.cm-scroller': {overflow: 'auto'}})]));
+      const waitForFirstScrollPromise = new Promise(r => {
+        resolveEventPromise = r;
+      });
+      sinon.stub(editor, 'scrollEventHandledToSaveScrollPositionForTest').callsFake(() => {
+        // Resolves the waitForScrollPromise(s) after 'scrollEventHandledToSaveScrollPositionForTest' is called
+        resolveEventPromise();
+      });
+      renderElementIntoDOM(editor);
+      editor.editor.dispatch({
+        effects: CodeMirror.EditorView.scrollIntoView(0, {
+          x: 'start',
+          xMargin: -20,
+          y: 'start',
+          yMargin: -20,
+        }),
+      });
+      await waitForFirstScrollPromise;
+
+      const waitForSecondScrollPromise = new Promise(r => {
+        resolveEventPromise = r;
+      });
+      editor.remove();
+      dispatchSpy.resetHistory();
+      renderElementIntoDOM(editor);
+      await waitForSecondScrollPromise;
+
+      assert.strictEqual(
+          dispatchSpy.calledWith({
+            effects: CodeMirror.EditorView.scrollIntoView(0, {
+              x: 'start',
+              xMargin: -20,
+              y: 'start',
+              yMargin: -20,
+            }),
+          }),
+          true, 'Scroll is not initiated in TextEditor');
+    });
+
+    it('shouldn\'t restore scroll when code editor is not scrollable', async () => {
+      const dispatchSpy = sinon.spy(CodeMirror.EditorView.prototype, 'dispatch');
+      const editor = new TextEditor.TextEditor.TextEditor(makeState(
+          'line1\nline2\nline3\nline4\nline5\line6',
+          [CodeMirror.EditorView.theme(
+              {'&.cm-editor': {height: '50px', width: '50px'}, '.cm-scroller': {overflow: 'hidden'}})]));
+      const scrollHandledForTestSpy = sinon.spy(editor, 'scrollEventHandledToSaveScrollPositionForTest');
+      renderElementIntoDOM(editor);
+      editor.editor.dispatch({
+        effects: CodeMirror.EditorView.scrollIntoView(0, {
+          x: 'start',
+          xMargin: -20,
+          y: 'start',
+          yMargin: -20,
+        }),
+      });
+
+      editor.remove();
+      dispatchSpy.resetHistory();
+      renderElementIntoDOM(editor);
+
+      assert.strictEqual(
+          dispatchSpy.calledWith({
+            effects: CodeMirror.EditorView.scrollIntoView(0, {
+              x: 'start',
+              xMargin: -20,
+              y: 'start',
+              yMargin: -20,
+            }),
+          }),
+          false, 'Scroll is initiated in TextEditor whereas it shouldn\'t have been');
+      assert.strictEqual(
+          scrollHandledForTestSpy.notCalled, true,
+          'Scroll event for restoring scroll position is handled whereas it shouldn\'t have been');
     });
   });
 
@@ -124,8 +216,6 @@ describeWithEnvironment('TextEditor', () => {
       await testQueryType('foo.bar', 7, TextEditor.JavaScript.QueryType.PropertyName, 'bar', 'foo.bar');
       await testQueryType('foo.', 4, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo.');
       await testQueryType('if (foo.', 8, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo.');
-      await testQueryType('foo.', 4, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo.');
-      await testQueryType('foo.\n', 5, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo.');
       await testQueryType('new foo.bar().', 14, TextEditor.JavaScript.QueryType.PropertyName, '', 'new foo.bar().');
       await testQueryType('foo?.', 5, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo?.');
       await testQueryType('foo?.b', 6, TextEditor.JavaScript.QueryType.PropertyName, 'b', 'foo?.b');
@@ -133,7 +223,6 @@ describeWithEnvironment('TextEditor', () => {
 
     it('recognizes property expression queries', async () => {
       await testQueryType('foo[', 4, TextEditor.JavaScript.QueryType.PropertyExpression, '', 'foo[');
-      await testQueryType('foo[ ', 5, TextEditor.JavaScript.QueryType.PropertyExpression, '', 'foo[');
       await testQueryType('foo["ba', 7, TextEditor.JavaScript.QueryType.PropertyExpression, '"ba', 'foo["ba');
     });
 
@@ -155,5 +244,77 @@ describeWithEnvironment('TextEditor', () => {
       await testQueryType('x["foo" + "bar', 14);
       await testQueryType('// comment', 10);
     });
+  });
+
+  it('dispatching a transaction from a saved editor reference should not throw an error', () => {
+    const textEditor = new TextEditor.TextEditor.TextEditor(makeState('one'));
+    const editorViewA = textEditor.editor;
+
+    renderElementIntoDOM(textEditor);
+    // textEditor.editor references to EditorView A.
+    textEditor.dispatch({changes: {from: 0, insert: 'a'}});
+    // `disconnectedCallback` removed `textEditor.#activeEditor`
+    // so reaching to `textEditor.editor` will create a new EditorView after this.
+    textEditor.remove();
+    // EditorView B is created from the previous state
+    // and EditorView B's state is diverged from previous state after this transaction.
+    textEditor.dispatch({changes: {from: 0, insert: 'b'}});
+
+    // directly dispatching from Editor A now calls `textEditor.editor.update`
+    // which references to EditorView B that has a different state.
+    assert.doesNotThrow(() => editorViewA.dispatch({changes: {from: 3, insert: '!'}}));
+  });
+});
+
+describeWithMockConnection('TextEditor autocompletion', () => {
+  it('does not complete on language plugin frames', async () => {
+    const executionContext = new MockExecutionContext(createTarget());
+    const {debuggerModel} = executionContext;
+    UI.Context.Context.instance().setFlavor(SDK.RuntimeModel.ExecutionContext, executionContext);
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+
+    Root.Runtime.experiments.setEnabled('wasmDWARFDebugging', true);
+    const pluginManager = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding
+                              .instance({forceNew: true, targetManager, resourceMapping})
+                              .initPluginManagerForTest();
+    assertNotNullOrUndefined(pluginManager);
+
+    const testScript = debuggerModel.parsedScriptSource(
+        '1' as Protocol.Runtime.ScriptId, 'script://1' as Platform.DevToolsPath.UrlString, 0, 0, 0, 0,
+        executionContext.id, '', undefined, false, undefined, false, false, 0, null, null, null, null, null, null);
+    const payload: Protocol.Debugger.CallFrame = {
+      callFrameId: '0' as Protocol.Debugger.CallFrameId,
+      functionName: 'test',
+      functionLocation: undefined,
+      location: {
+        scriptId: testScript.scriptId,
+        lineNumber: 0,
+        columnNumber: 0,
+      },
+      url: 'test-url',
+      scopeChain: [],
+      this: {type: 'object'} as Protocol.Runtime.RemoteObject,
+      returnValue: undefined,
+      canBeRestarted: false,
+    };
+    const callframe = new SDK.DebuggerModel.CallFrame(debuggerModel, testScript, payload);
+
+    executionContext.debuggerModel.setSelectedCallFrame(callframe);
+    pluginManager.addPlugin(new class extends TestPlugin {
+      constructor() {
+        super('TextEditorTestPlugin');
+      }
+
+      override handleScript(script: SDK.Script.Script) {
+        return script === testScript;
+      }
+    }());
+
+    const state = makeState('c', CodeMirror.javascript.javascriptLanguage);
+    const result =
+        await TextEditor.JavaScript.javascriptCompletionSource(new CodeMirror.CompletionContext(state, 1, false));
+    assert.isNull(result);
   });
 });

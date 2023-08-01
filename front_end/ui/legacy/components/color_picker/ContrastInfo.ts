@@ -12,9 +12,9 @@ export class ContrastInfo extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     [x: string]: number,
   }|null;
   private readonly contrastRationAPCAThreshold: number|null;
-  private fgColor: Common.Color.Color|null;
-  private bgColorInternal: Common.Color.Color|null;
-  private colorFormatInternal!: string|undefined;
+  private fgColor: Common.Color.Legacy|null;
+  private bgColorInternal: Common.Color.Legacy|null;
+  private colorFormatInternal: Common.Color.Format|undefined;
   constructor(contrastInfo: ContrastInfoType|null) {
     super();
     this.isNullInternal = true;
@@ -40,7 +40,7 @@ export class ContrastInfo extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     this.contrastRationAPCAThreshold =
         Common.ColorUtils.getAPCAThreshold(contrastInfo.computedFontSize, contrastInfo.computedFontWeight);
     const bgColorText = contrastInfo.backgroundColors[0];
-    const bgColor = Common.Color.Color.parse(bgColorText);
+    const bgColor = Common.Color.parse(bgColorText)?.asLegacyColor();
     if (bgColor) {
       this.setBgColorInternal(bgColor);
     }
@@ -50,18 +50,18 @@ export class ContrastInfo extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.isNullInternal;
   }
 
-  setColor(fgColor: Common.Color.Color, colorFormat?: string): void {
+  setColor(fgColor: Common.Color.Legacy, colorFormat?: Common.Color.Format): void {
     this.fgColor = fgColor;
     this.colorFormatInternal = colorFormat;
     this.updateContrastRatio();
     this.dispatchEventToListeners(Events.ContrastInfoUpdated);
   }
 
-  colorFormat(): string|undefined {
+  colorFormat(): Common.Color.Format|undefined {
     return this.colorFormatInternal;
   }
 
-  color(): Common.Color.Color|null {
+  color(): Common.Color.Legacy|null {
     return this.fgColor;
   }
 
@@ -77,12 +77,12 @@ export class ContrastInfo extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.contrastRationAPCAThreshold;
   }
 
-  setBgColor(bgColor: Common.Color.Color): void {
+  setBgColor(bgColor: Common.Color.Legacy): void {
     this.setBgColorInternal(bgColor);
     this.dispatchEventToListeners(Events.ContrastInfoUpdated);
   }
 
-  private setBgColorInternal(bgColor: Common.Color.Color): void {
+  private setBgColorInternal(bgColor: Common.Color.Legacy): void {
     this.bgColorInternal = bgColor;
 
     if (!this.fgColor) {
@@ -95,8 +95,8 @@ export class ContrastInfo extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     // background, draw the line for the "worst case" scenario: where
     // the unknown background is the same color as the text.
     if (bgColor.hasAlpha()) {
-      const blendedRGBA: number[] = Common.ColorUtils.blendColors(bgColor.rgba(), fgRGBA);
-      this.bgColorInternal = new Common.Color.Color(blendedRGBA, Common.Color.Format.RGBA);
+      const blendedRGBA = Common.ColorUtils.blendColors(bgColor.rgba(), fgRGBA);
+      this.bgColorInternal = new Common.Color.Legacy(blendedRGBA, Common.Color.Format.RGBA);
     }
 
     this.contrastRatioInternal = Common.ColorUtils.contrastRatio(fgRGBA, this.bgColorInternal.rgba());
@@ -104,7 +104,7 @@ export class ContrastInfo extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
         Common.ColorUtils.contrastRatioAPCA(this.fgColor.rgba(), this.bgColorInternal.rgba());
   }
 
-  bgColor(): Common.Color.Color|null {
+  bgColor(): Common.Color.Legacy|null {
     return this.bgColorInternal;
   }
 

@@ -34,7 +34,7 @@
 }
 
 .status {
-  margin-right: 15px;
+  margin-right: 11px;
   flex-shrink: 0;
 }
 
@@ -43,7 +43,7 @@
   display: flex;
   align-items: center;
   margin: 0 30px;
-  line-height: 28px;
+  line-height: 26px;
 }
 
 .report-key {
@@ -55,8 +55,9 @@
 
 .report-value {
   padding: 0 6px;
-  overflow-wrap: break-word;
-  line-height: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .link,
@@ -64,7 +65,7 @@
   color: var(--color-link);
   text-decoration: underline;
   cursor: pointer;
-  padding: 2px 0; /* adjust focus ring size */
+  outline-offset: 2px;
 }
 
 .tree-outline li .selection {

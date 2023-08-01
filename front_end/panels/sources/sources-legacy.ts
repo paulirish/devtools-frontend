@@ -17,10 +17,6 @@ Sources.AddSourceMapURLDialog = SourcesModule.AddSourceMapURLDialog.AddSourceMap
 /** @constructor */
 Sources.BreakpointEditDialog = SourcesModule.BreakpointEditDialog.BreakpointEditDialog;
 
-Sources.BreakpointEditDialog.LogpointPrefix = SourcesModule.BreakpointEditDialog.LogpointPrefix;
-Sources.BreakpointEditDialog._LogpointSuffix = SourcesModule.BreakpointEditDialog.LogpointSuffix;
-Sources.BreakpointEditDialog.BreakpointType = SourcesModule.BreakpointEditDialog.BreakpointType;
-
 /** @constructor */
 Sources.CallStackSidebarPane = SourcesModule.CallStackSidebarPane.CallStackSidebarPane;
 
@@ -73,18 +69,6 @@ Sources.GoToLineQuickOpen = SourcesModule.GoToLineQuickOpen.GoToLineQuickOpen;
 Sources.InplaceFormatterEditorAction = SourcesModule.InplaceFormatterEditorAction.InplaceFormatterEditorAction;
 
 /** @constructor */
-Sources.JavaScriptBreakpointsSidebarPane =
-    SourcesModule.JavaScriptBreakpointsSidebarPane.JavaScriptBreakpointsSidebarPane;
-
-Sources.JavaScriptBreakpointsSidebarPane.retrieveLocationForElement =
-    SourcesModule.JavaScriptBreakpointsSidebarPane.retrieveLocationForElement;
-
-/** @constructor */
-Sources.JavaScriptCompilerPlugin = SourcesModule.JavaScriptCompilerPlugin.JavaScriptCompilerPlugin;
-
-Sources.JavaScriptCompilerPlugin.CompileDelay = SourcesModule.JavaScriptCompilerPlugin.CompileDelay;
-
-/** @constructor */
 Sources.NavigatorView = SourcesModule.NavigatorView.NavigatorView;
 
 Sources.NavigatorView.Types = SourcesModule.NavigatorView.Types;
@@ -121,14 +105,6 @@ Sources.ScopeChainSidebarPane = SourcesModule.ScopeChainSidebarPane.ScopeChainSi
 
 /** @constructor */
 Sources.ScopeChainSidebarPane.OpenLinearMemoryInspector = SourcesModule.ScopeChainSidebarPane.OpenLinearMemoryInspector;
-
-/** @constructor */
-Sources.ScriptFormatterEditorAction = SourcesModule.ScriptFormatterEditorAction.ScriptFormatterEditorAction;
-
-/** @constructor */
-Sources.ScriptOriginPlugin = SourcesModule.ScriptOriginPlugin.ScriptOriginPlugin;
-
-Sources.ScriptOriginPlugin._linkifier = SourcesModule.ScriptOriginPlugin.linkifier;
 
 /** @constructor */
 Sources.SearchSourcesView = SourcesModule.SearchSourcesView.SearchSourcesView;
@@ -189,7 +165,7 @@ Sources.SourcesPanel.DebuggerPausedDetailsRevealer = SourcesModule.SourcesPanel.
 Sources.SourcesPanel.RevealingActionDelegate = SourcesModule.SourcesPanel.RevealingActionDelegate;
 
 /** @constructor */
-Sources.SourcesPanel.DebuggingActionDelegate = SourcesModule.SourcesPanel.DebuggingActionDelegate;
+Sources.SourcesPanel.ActionDelegate = SourcesModule.SourcesPanel.ActionDelegate;
 
 /** @constructor */
 Sources.SourcesPanel.WrapperView = SourcesModule.SourcesPanel.WrapperView;
@@ -222,10 +198,6 @@ Sources.TabbedEditorContainer = SourcesModule.TabbedEditorContainer.TabbedEditor
 
 /** @enum {symbol} */
 Sources.TabbedEditorContainer.Events = SourcesModule.TabbedEditorContainer.Events;
-
-Sources.TabbedEditorContainer._tabId = SourcesModule.TabbedEditorContainer.tabId;
-Sources.TabbedEditorContainer.maximalPreviouslyViewedFilesCount =
-    SourcesModule.TabbedEditorContainer.maximalPreviouslyViewedFilesCount;
 
 /** @constructor */
 Sources.TabbedEditorContainer.HistoryItem = SourcesModule.TabbedEditorContainer.HistoryItem;

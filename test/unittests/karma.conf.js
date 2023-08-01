@@ -10,6 +10,7 @@ const glob = require('glob');
 const fs = require('fs');
 const rimraf = require('rimraf');
 const debugCheck = require('./debug-check.js');
+const ResultsDb = require('../shared/resultsdb.js');
 
 const USER_DEFINED_COVERAGE_FOLDERS = process.env['COVERAGE_FOLDERS'];
 
@@ -51,7 +52,6 @@ target with is_debug = true in the args.gn file.`;
 
 const GEN_DIRECTORY = path.join(__dirname, '..', '..');
 const ROOT_DIRECTORY = path.join(GEN_DIRECTORY, '..', '..', '..');
-const browser = DEBUG_ENABLED ? 'Chrome' : 'ChromeHeadless';
 const singleRun = !(DEBUG_ENABLED || REPEAT_ENABLED);
 
 const coverageReporters = COVERAGE_ENABLED ? ['coverage'] : [];
@@ -60,7 +60,7 @@ const commonIstanbulReporters = [{type: 'json-summary'}, {type: 'json'}];
 const istanbulReportOutputs = commonIstanbulReporters;
 
 if (TEXT_COVERAGE_ENABLED) {
-  istanbulReportOutputs.push({type: 'text'});
+  istanbulReportOutputs.push({type: process.env.COVERAGE_TEXT_REPORTER || 'text', file: 'coverage.txt'});
 }
 
 if (HTML_COVERAGE_ENABLED) {
@@ -123,6 +123,57 @@ for (const pattern of TEST_FILES) {
   }
 }
 
+const ResultsDBReporter = function(baseReporterDecorator, formatError, config) {
+  baseReporterDecorator(this);
+
+  const capturedLog = [];
+  this.onBrowserLog = (browser, log, type) => {
+    capturedLog.push({log, type});
+  };
+
+  const specComplete = (browser, result) => {
+    const {suite, description, log, startTime, endTime, success, skipped} = result;
+    const testId = ResultsDb.sanitizedTestId([...suite, description].join('/'));
+    const expected = success || skipped;
+    const status = skipped ? 'SKIP' : success ? 'PASS' : 'FAIL';
+    const duration = endTime - startTime;
+
+    const consoleLog = capturedLog.map(({type, log}) => `${type.toUpperCase()}: ${log}`);
+    capturedLog.length = 0;
+
+    let summaryHtml = undefined;
+    if (!expected || consoleLog.length > 0) {
+      const messages = [...consoleLog, ...log.map(formatError)];
+      // Prepare resultsdb summary
+      summaryHtml = messages.map(m => `<p><pre>${m}</pre></p>`).join('\n');
+
+      // Log to console
+      const header = `==== ${status}: ${testId}`;
+      this.write(`${header}\n${messages.join('\n\n')}\n${'='.repeat(header.length)}\n\n`);
+    } else if (skipped) {
+      this.write(`==== ${status}: ${testId}\n\n`);
+    }
+
+    const testResult = {status, expected, summaryHtml, testId, duration};
+    ResultsDb.recordTestResult(testResult);
+  };
+  this.specSuccess = specComplete;
+  this.specSkipped = specComplete;
+  this.specFailure = specComplete;
+
+  this.onRunComplete = (browsers, results) => {
+    if (browsers.length >= 1 && !results.disconnected && !results.error) {
+      if (!results.failed) {
+        this.write('SUCCESS: %d passed (%d skipped)\n', results.success, results.skipped);
+      } else {
+        this.write('FAILED: %d failed, %d passed (%d skipped)\n', results.failed, results.success, results.skipped);
+      }
+    }
+    ResultsDb.sendCollectedTestResultsIfSinkIsAvailable();
+  };
+};
+ResultsDBReporter.$inject = ['baseReporterDecorator', 'formatError', 'config'];
+
 module.exports = function(config) {
   const targetDir = path.relative(process.cwd(), GEN_DIRECTORY);
   const options = {
@@ -149,18 +200,26 @@ module.exports = function(config) {
       {pattern: path.join(ROOT_DIRECTORY, 'front_end/**/*.ts'), served: true, included: false, watched: false},
       {pattern: path.join(GEN_DIRECTORY, 'inspector_overlay/**/*.js'), served: true, included: false},
       {pattern: path.join(GEN_DIRECTORY, 'inspector_overlay/**/*.js.map'), served: true, included: false},
+      {pattern: path.join(GEN_DIRECTORY, 'test/unittests/fixtures/**/*'), served: true, included: false},
     ],
 
     reporters: [
-      EXPANDED_REPORTING ? 'mocha' : 'dots',
+      EXPANDED_REPORTING ? 'mocha' : 'resultsdb',
       ...coverageReporters,
     ],
 
     browsers: ['BrowserWithArgs'],
     customLaunchers: {
       'BrowserWithArgs': {
-        base: browser,
-        flags: [`--remote-debugging-port=${REMOTE_DEBUGGING_PORT}`],
+        base: 'Chrome',
+        flags: [
+          '--remote-allow-origins=*',
+          `--remote-debugging-port=${REMOTE_DEBUGGING_PORT}`,
+          '--use-mock-keychain',
+          '--disable-features=DialMediaRouteProvider',
+          '--password-store=basic',
+          ...(DEBUG_ENABLED ? [] : ['--headless=new']),
+        ],
       }
     },
 
@@ -176,6 +235,8 @@ module.exports = function(config) {
 
       mocha: {
         grep: MOCHA_FGREP,
+        // Up the default Mocha timeout to give the bots some space!
+        timeout: 5_000,
       },
       remoteDebuggingPort: REMOTE_DEBUGGING_PORT,
     },
@@ -189,6 +250,7 @@ module.exports = function(config) {
       require('karma-sourcemap-loader'),
       require('karma-spec-reporter'),
       require('karma-coverage'),
+      {'reporter:resultsdb': ['type', ResultsDBReporter]},
     ],
 
     preprocessors: {
@@ -199,7 +261,8 @@ module.exports = function(config) {
     proxies: {
       '/Images': `/base/${targetDir}/front_end/Images`,
       '/locales': `/base/${targetDir}/front_end/core/i18n/locales`,
-      '/json/new': `http://localhost:${REMOTE_DEBUGGING_PORT}/json/new`,
+      '/json': `http://localhost:${REMOTE_DEBUGGING_PORT}/json`,
+      '/fixtures': `/base/${targetDir}/test/unittests/fixtures`,
     },
 
     coverageReporter: {

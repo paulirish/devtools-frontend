@@ -4,6 +4,7 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import playerPropertiesViewStyles from './playerPropertiesView.css.js';
@@ -12,122 +13,122 @@ import type * as Protocol from '../../generated/protocol.js';
 
 const UIStrings = {
   /**
-  *@description The type of media, for example - video, audio, or text. Capitalized.
-  */
+   *@description The type of media, for example - video, audio, or text. Capitalized.
+   */
   video: 'Video',
   /**
-  *@description The type of media, for example - video, audio, or text. Capitalized.
-  */
+   *@description The type of media, for example - video, audio, or text. Capitalized.
+   */
   audio: 'Audio',
   /**
-  *@description A video or audio stream - but capitalized.
-  */
+   *@description A video or audio stream - but capitalized.
+   */
   track: 'Track',
   /**
-  *@description A device that converts media files into playable streams of audio or video.
-  */
+   *@description A device that converts media files into playable streams of audio or video.
+   */
   decoder: 'Decoder',
   /**
-  *@description Title of the 'Properties' tool in the sidebar of the elements tool
-  */
+   *@description Title of the 'Properties' tool in the sidebar of the elements tool
+   */
   properties: 'Properties',
   /**
-  *@description Menu label for text tracks, it is followed by a number, like 'Text Track #1'
-  */
+   *@description Menu label for text tracks, it is followed by a number, like 'Text Track #1'
+   */
   textTrack: 'Text track',
   /**
-  * @description Placeholder text stating that there are no text tracks on this player. A text track
-  * is all of the text that accompanies a particular video.
-  */
+   * @description Placeholder text stating that there are no text tracks on this player. A text track
+   * is all of the text that accompanies a particular video.
+   */
   noTextTracks: 'No text tracks',
   /**
-  *@description Media property giving the width x height of the video
-  */
+   *@description Media property giving the width x height of the video
+   */
   resolution: 'Resolution',
   /**
-  *@description Media property giving the file size of the media
-  */
+   *@description Media property giving the file size of the media
+   */
   fileSize: 'File size',
   /**
-  *@description Media property giving the media file bitrate
-  */
+   *@description Media property giving the media file bitrate
+   */
   bitrate: 'Bitrate',
   /**
-  *@description Text for the duration of something
-  */
+   *@description Text for the duration of something
+   */
   duration: 'Duration',
   /**
-  *@description The label for a timestamp when a video was started.
-  */
+   *@description The label for a timestamp when a video was started.
+   */
   startTime: 'Start time',
   /**
-  *@description Media property signaling whether the media is streaming
-  */
+   *@description Media property signaling whether the media is streaming
+   */
   streaming: 'Streaming',
   /**
-  *@description Media property describing where the media is playing from.
-  */
+   *@description Media property describing where the media is playing from.
+   */
   playbackFrameUrl: 'Playback frame URL',
   /**
-  *@description Media property giving the title of the frame where the media is embedded
-  */
+   *@description Media property giving the title of the frame where the media is embedded
+   */
   playbackFrameTitle: 'Playback frame title',
   /**
-  *@description Media property describing whether the file is single or cross origin in nature
-  */
+   *@description Media property describing whether the file is single or cross origin in nature
+   */
   singleoriginPlayback: 'Single-origin playback',
   /**
-  *@description Media property describing support for range http headers
-  */
+   *@description Media property describing support for range http headers
+   */
   rangeHeaderSupport: '`Range` header support',
   /**
-  *@description Media property giving the media file frame rate
-  */
+   *@description Media property giving the media file frame rate
+   */
   frameRate: 'Frame rate',
   /**
-  * @description Media property giving the distance of the playback quality from the ideal playback.
-  * Roughness is the opposite to smoothness, i.e. whether each frame of the video was played at the
-  * right time so that the video looks smooth when it plays.
-  */
+   * @description Media property giving the distance of the playback quality from the ideal playback.
+   * Roughness is the opposite to smoothness, i.e. whether each frame of the video was played at the
+   * right time so that the video looks smooth when it plays.
+   */
   videoPlaybackRoughness: 'Video playback roughness',
   /**
-  *@description A score describing how choppy the video playback is.
-  */
+   *@description A score describing how choppy the video playback is.
+   */
   videoFreezingScore: 'Video freezing score',
   /**
-  *@description Media property giving the name of the renderer being used
-  */
+   *@description Media property giving the name of the renderer being used
+   */
   rendererName: 'Renderer name',
 
   /**
-  *@description Media property giving the name of the decoder being used
-  */
+   *@description Media property giving the name of the decoder being used
+   */
   decoderName: 'Decoder name',
   /**
-  *@description There is no decoder
-  */
+   *@description There is no decoder
+   */
   noDecoder: 'No decoder',
   /**
-  *@description Media property signaling whether a hardware decoder is being used
-  */
+   *@description Media property signaling whether a hardware decoder is being used
+   */
   hardwareDecoder: 'Hardware decoder',
   /**
-  *@description Media property signaling whether the content is encrypted. This is a noun phrase for
-  *a demultiplexer that does decryption.
-  */
+   *@description Media property signaling whether the content is encrypted. This is a noun phrase for
+   *a demultiplexer that does decryption.
+   */
   decryptingDemuxer: 'Decrypting demuxer',
 
   /**
-  *@description Media property giving the name of the video encoder being used.
-  */
+   *@description Media property giving the name of the video encoder being used.
+   */
   encoderName: 'Encoder name',
   /**
-  *@description There is no encoder.
-  */
+   *@description There is no encoder.
+   */
   noEncoder: 'No encoder',
   /**
-  *@description Media property signaling whether the encoder is hardware accelerated.
-  */
+   *@description Media property signaling whether the encoder is hardware accelerated.
+   */
   hardwareEncoder: 'Hardware encoder',
 };
 
@@ -136,7 +137,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
 type TabData = {
-  [x: string]: string,
+  [x: string]: string|object,
 };
 
 // Keep this enum in sync with panels/media/base/media_log_properties.h
@@ -146,7 +147,7 @@ export const enum PlayerPropertyKeys {
   Bitrate = 'kBitrate',
   MaxDuration = 'kMaxDuration',
   StartTime = 'kStartTime',
-  IsVideoEncrypted = 'kIsVideoEncrypted',
+  IsCdmAttached = 'kIsCdmAttached',
   IsStreaming = 'kIsStreaming',
   FrameUrl = 'kFrameUrl',
   FrameTitle = 'kFrameTitle',
@@ -179,7 +180,7 @@ export class PropertyRenderer extends UI.Widget.VBox {
     super();
     this.contentElement.classList.add('media-property-renderer');
     const titleElement = this.contentElement.createChild('span', 'media-property-renderer-title');
-    this.contents = this.contentElement.createChild('span', 'media-property-renderer-contents');
+    this.contents = this.contentElement.createChild('div', 'media-property-renderer-contents');
     UI.UIUtils.createTextChild(titleElement, title);
     this.title = title;
     this.value = null;
@@ -213,16 +214,36 @@ export class PropertyRenderer extends UI.Widget.VBox {
     }
   }
 
+  protected unsetNestedContents(): void {
+    this.contentElement.classList.add('media-property-renderer-hidden');
+    if (this.pseudoColorProtectionElement === null) {
+      this.pseudoColorProtectionElement = document.createElement('div');
+      this.pseudoColorProtectionElement.classList.add('media-property-renderer');
+      this.pseudoColorProtectionElement.classList.add('media-property-renderer-hidden');
+      (this.contentElement.parentNode as HTMLElement)
+          .insertBefore(this.pseudoColorProtectionElement, this.contentElement);
+    }
+  }
+
+  changeNestedContents(value: object): void {
+    if (value === null || Object.keys(value).length === 0) {
+      this.unsetNestedContents();
+    } else {
+      if (this.pseudoColorProtectionElement !== null) {
+        this.pseudoColorProtectionElement.remove();
+        this.pseudoColorProtectionElement = null;
+      }
+      this.contentElement.classList.remove('media-property-renderer-hidden');
+      this.contents.removeChildren();
+      const jsonWrapperElement =
+          new SourceFrame.JSONView.JSONView(new SourceFrame.JSONView.ParsedJSON(value, '', ''), true);
+      jsonWrapperElement.show(this.contents);
+    }
+  }
+
   changeContents(value: string|null): void {
     if (value === null) {
-      this.contentElement.classList.add('media-property-renderer-hidden');
-      if (this.pseudoColorProtectionElement === null) {
-        this.pseudoColorProtectionElement = document.createElement('div');
-        this.pseudoColorProtectionElement.classList.add('media-property-renderer');
-        this.pseudoColorProtectionElement.classList.add('media-property-renderer-hidden');
-        (this.contentElement.parentNode as HTMLElement)
-            .insertBefore(this.pseudoColorProtectionElement, this.contentElement);
-      }
+      this.unsetNestedContents();
     } else {
       if (this.pseudoColorProtectionElement !== null) {
         this.pseudoColorProtectionElement.remove();
@@ -244,7 +265,7 @@ export class FormattedPropertyRenderer extends PropertyRenderer {
     this.formatfunction = formatfunction;
   }
 
-  updateDataInternal(propname: string, propvalue: string|null): void {
+  override updateDataInternal(propname: string, propvalue: string|null): void {
     if (propvalue === null) {
       this.changeContents(null);
     } else {
@@ -260,6 +281,13 @@ export class DefaultPropertyRenderer extends PropertyRenderer {
   }
 }
 
+export class NestedPropertyRenderer extends PropertyRenderer {
+  constructor(title: Platform.UIString.LocalizedString, content: object) {
+    super(title);
+    this.changeNestedContents(content);
+  }
+}
+
 export class DimensionPropertyRenderer extends PropertyRenderer {
   private width: number;
   private height: number;
@@ -270,7 +298,7 @@ export class DimensionPropertyRenderer extends PropertyRenderer {
     this.height = 0;
   }
 
-  updateDataInternal(propname: string, propvalue: string|null): void {
+  override updateDataInternal(propname: string, propvalue: string|null): void {
     let needsUpdate = false;
     if (propname === 'width' && Number(propvalue) !== this.width) {
       this.width = Number(propvalue);
@@ -337,7 +365,11 @@ export class TrackManager {
   addNewTab(tabs: GenericTrackMenu|NoTracksPlaceholderMenu, tabData: TabData, tabNumber: number): void {
     const tabElements = [];
     for (const [name, data] of Object.entries(tabData)) {
-      tabElements.push(new DefaultPropertyRenderer(i18n.i18n.lockedString(name), data));
+      if (typeof data === 'object') {
+        tabElements.push(new NestedPropertyRenderer(i18n.i18n.lockedString(name), data));
+      } else {
+        tabElements.push(new DefaultPropertyRenderer(i18n.i18n.lockedString(name), data));
+      }
     }
     const newTab = new AttributesView(tabElements);
 
@@ -633,7 +665,7 @@ export class PlayerPropertiesView extends UI.Widget.VBox {
     const textTrackManager = new TextTrackManager(this);
     this.attributeMap.set(PlayerPropertyKeys.TextTracks, textTrackManager);
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([playerPropertiesViewStyles]);
   }

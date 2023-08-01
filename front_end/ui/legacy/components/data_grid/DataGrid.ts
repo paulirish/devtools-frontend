@@ -35,70 +35,70 @@ import dataGridStyles from './dataGrid.css.js';
 
 const UIStrings = {
   /**
-  *@description Accessible text label for expandible nodes in datagrids
-  */
+   *@description Accessible text label for expandible nodes in datagrids
+   */
   expanded: 'expanded',
   /**
-  *@description accessible name for expandible nodes in datagrids
-  */
+   *@description accessible name for expandible nodes in datagrids
+   */
   collapsed: 'collapsed',
   /**
-  *@description Accessible text for datagrid
-  *@example {Coverage grid} PH1
-  *@example {expanded} PH2
-  */
+   *@description Accessible text for datagrid
+   *@example {Coverage grid} PH1
+   *@example {expanded} PH2
+   */
   sRowS: '{PH1} Row {PH2}',
   /**
-  *@description Number of rows in a grid
-  *@example {1} PH1
-  */
+   *@description Number of rows in a grid
+   *@example {1} PH1
+   */
   rowsS: 'Rows: {PH1}',
   /**
-  * @description Default Accessible Text for a Datagrid. This text is read to the user by a
-  * screenreader when they navigate to a table structure. The placeholders tell the user something
-  * brief about the table contents i.e. the topic and how much data is in it.
-  * @example {Network} PH1
-  * @example {Rows: 27} PH2
-  */
+   * @description Default Accessible Text for a Datagrid. This text is read to the user by a
+   * screenreader when they navigate to a table structure. The placeholders tell the user something
+   * brief about the table contents i.e. the topic and how much data is in it.
+   * @example {Network} PH1
+   * @example {Rows: 27} PH2
+   */
   sSUseTheUpAndDownArrowKeysTo:
       '{PH1} {PH2}, use the up and down arrow keys to navigate and interact with the rows of the table; Use browse mode to read cell by cell.',
   /**
-  *@description A context menu item in the Data Grid of a data grid
-  */
+   *@description A context menu item in the Data Grid of a data grid
+   */
   sortByString: 'Sort By',
   /**
-  *@description A context menu item in data grids to reset the columns to their default weight
-  */
+   *@description A context menu item in data grids to reset the columns to their default weight
+   */
   resetColumns: 'Reset Columns',
   /**
-  *@description A context menu item in data grids to list header options.
-  */
+   *@description A context menu item in data grids to list header options.
+   */
   headerOptions: 'Header Options',
   /**
-  *@description Text to refresh the page
-  */
+   *@description Text to refresh the page
+   */
   refresh: 'Refresh',
   /**
-  *@description A context menu item in the Data Grid of a data grid
-  */
+   *@description A context menu item in the Data Grid of a data grid
+   */
   addNew: 'Add new',
   /**
-  *@description A context menu item in the Data Grid of a data grid
-  *@example {pattern} PH1
-  */
+   *@description A context menu item in the Data Grid of a data grid
+   *@example {pattern} PH1
+   */
   editS: 'Edit "{PH1}"',
   /**
-  *@description Text to delete something
-  */
+   *@description Text to delete something
+   */
   delete: 'Delete',
   /**
-  *@description Depth of a node in the datagrid
-  *@example {1} PH1
-  */
+   *@description Depth of a node in the datagrid
+   *@example {1} PH1
+   */
   levelS: 'level {PH1}',
   /**
-  *@description Text exposed to screen readers on checked items.
-  */
+   *@description Text exposed to screen readers on checked items.
+   */
   checked: 'checked',
   /**
    *@description Accessible text indicating an empty row is created.
@@ -122,7 +122,7 @@ const elementToIndexMap = new WeakMap<Element, number>();
 
 export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTypes<T>> {
   element: HTMLDivElement;
-  private displayName: string;
+  displayName: string;
   private editCallback: ((arg0: any, arg1: string, arg2: any, arg3: any) => void)|undefined;
   private readonly deleteCallback: ((arg0: any) => void)|undefined;
   private readonly refreshCallback: (() => void)|undefined;
@@ -130,6 +130,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     [x: string]: Element,
   };
   scrollContainerInternal: Element;
+  private dataContainerInternal: Element;
   private readonly dataTable: Element;
   protected inline: boolean;
   private columnsArray: ColumnDescriptor[];
@@ -190,8 +191,9 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     this.dataTableHeaders = {};
 
-    this.scrollContainerInternal = this.element.createChild('div', 'data-container');
-    this.dataTable = this.scrollContainerInternal.createChild('table', 'data');
+    this.dataContainerInternal = this.element.createChild('div', 'data-container');
+    this.dataTable = this.dataContainerInternal.createChild('table', 'data');
+    this.scrollContainerInternal = this.dataContainerInternal;
 
     // FIXME: Add a createCallback which is different from editCallback and has different
     // behavior when creating a new node.
@@ -557,7 +559,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     const column = this.visibleColumnsArray[cellIndex];
     if (column.dataType === DataType.Boolean) {
       const checkboxLabel = UI.UIUtils.CheckboxLabel.create(undefined, (node.data[column.id] as boolean));
-      UI.ARIAUtils.setAccessibleName(checkboxLabel, column.title || '');
+      UI.ARIAUtils.setLabel(checkboxLabel, column.title || '');
 
       let hasChanged = false;
       checkboxLabel.style.height = '100%';
@@ -606,10 +608,11 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
   }
 
-  startEditingNextEditableColumnOfDataGridNode(node: DataGridNode<T>, columnIdentifier: string): void {
+  startEditingNextEditableColumnOfDataGridNode(node: DataGridNode<T>, columnIdentifier: string, inclusive?: boolean):
+      void {
     const column = this.columns[columnIdentifier];
     const cellIndex = this.visibleColumnsArray.indexOf(column);
-    const nextEditableColumn = this.nextEditableColumn(cellIndex);
+    const nextEditableColumn = this.nextEditableColumn(cellIndex, false, inclusive);
     if (nextEditableColumn !== -1) {
       this.startEditingColumnOfDataGridNode(node, nextEditableColumn);
     }
@@ -751,10 +754,11 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.editingNode = null;
   }
 
-  private nextEditableColumn(cellIndex: number, moveBackward?: boolean): number {
+  private nextEditableColumn(cellIndex: number, moveBackward?: boolean, inclusive?: boolean): number {
     const increment = moveBackward ? -1 : 1;
+    const start = inclusive ? cellIndex : cellIndex + increment;
     const columns = this.visibleColumnsArray;
-    for (let i = cellIndex + increment; (i >= 0) && (i < columns.length); i += increment) {
+    for (let i = start; (i >= 0) && (i < columns.length); i += increment) {
       if (columns[i].editable) {
         return i;
       }
@@ -1179,11 +1183,9 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       nextSelectedNode.select();
     }
 
-    if ((event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' ||
-         event.key === 'ArrowRight') &&
-        document.activeElement !== this.element) {
-      // crbug.com/1005449
-      // navigational keys pressed but current DataGrid panel has lost focus;
+    if (handled && this.element !== document.activeElement && !this.element.contains(document.activeElement)) {
+      // crbug.com/1005449, crbug.com/1329956
+      // navigational or delete keys pressed but current DataGrid panel has lost focus;
       // re-focus to ensure subsequent keydowns can be registered within this DataGrid
       this.element.focus();
     }
@@ -1269,7 +1271,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (!icon) {
       return;
     }
-    icon.setIconType(sortOrder === Order.Ascending ? 'smallicon-triangle-up' : 'smallicon-triangle-down');
+    icon.setIconType(sortOrder === Order.Ascending ? 'triangle-up' : 'triangle-down');
 
     this.dispatchEventToListeners(Events.SortingChanged);
   }
@@ -1454,7 +1456,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     // Constrain the dragpoint to be within the containing div of the
     // datagrid.
-    let dragPoint: number = event.clientX - this.element.totalOffsetLeft();
+    let dragPoint: number = event.clientX - this.element.getBoundingClientRect().left;
     let leftEdgeOfPreviousColumn = 0;
     // Constrain the dragpoint to be within the space made up by the
     // column directly to the left and the column directly to the right.
@@ -1539,7 +1541,19 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return this.topFillerRow;
   }
 
-  protected headerHeight(): number {
+  // Note on the following methods:
+  // The header row is a child of the scrollable container, and uses position: sticky
+  // so it can visually obscure other elements below it in the grid. We need to manually
+  // subtract the header's height when calculating the actual client area in which
+  // data rows are visible. However, if a caller has set a different scroll container
+  // then we report 0 height and the caller is expected to ensure their chosen scroll
+  // container's height matches the visible scrollable data area as seen by the user.
+
+  protected headerHeightInScroller(): number {
+    return this.scrollContainer === this.dataContainerInternal ? this.headerHeight() : 0;
+  }
+
+  headerHeight(): number {
     return this.dataTableHeadInternal.offsetHeight;
   }
 
@@ -1633,7 +1647,7 @@ export class DataGridNode<T> {
   parent: DataGridNode<T>|null;
   previousSibling: DataGridNode<T>|null;
   nextSibling: DataGridNode<T>|null;
-  disclosureToggleWidth: number;
+  #disclosureToggleWidth: number = 15;
   selectable: boolean;
   isRoot: boolean;
   nodeAccessibleText: string;
@@ -1656,7 +1670,6 @@ export class DataGridNode<T> {
     this.parent = null;
     this.previousSibling = null;
     this.nextSibling = null;
-    this.disclosureToggleWidth = 10;
 
     this.selectable = true;
 
@@ -1933,6 +1946,13 @@ export class DataGridNode<T> {
           cell.style.setProperty('padding-left', this.leftPadding + 'px');
         }
       }
+
+      // Allow accessibility tool to identify the editable cell and display context menu
+      const editableCell = this.dataGrid.columns[columnId].editable;
+      if (editableCell) {
+        cell.tabIndex = 0;
+        cell.ariaHasPopup = 'true';
+      }
     }
 
     return cell;
@@ -1956,7 +1976,7 @@ export class DataGridNode<T> {
     for (let i = 0; i < cell.children.length; i++) {
       UI.ARIAUtils.markAsHidden(cell.children[i]);
     }
-    UI.ARIAUtils.setAccessibleName(cell, name);
+    UI.ARIAUtils.setLabel(cell, name);
   }
 
   nodeSelfHeight(): number {
@@ -2317,8 +2337,8 @@ export class DataGridNode<T> {
       return false;
     }
 
-    const left = cell.totalOffsetLeft() + this.leftPadding;
-    return event.pageX >= left && event.pageX <= left + this.disclosureToggleWidth;
+    const left = cell.getBoundingClientRect().left + this.leftPadding;
+    return event.pageX >= left && event.pageX <= left + this.#disclosureToggleWidth;
   }
 
   private attach(): void {
@@ -2380,7 +2400,7 @@ export class DataGridNode<T> {
 }
 
 export class CreationDataGridNode<T> extends DataGridNode<T> {
-  isCreationNode: boolean;
+  override isCreationNode: boolean;
   constructor(
       data?: {
         [x: string]: any,
@@ -2404,20 +2424,20 @@ export class DataGridWidget<T> extends UI.Widget.VBox {
     this.setDefaultFocusedElement(dataGrid.element);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.registerCSSFiles([dataGridStyles]);
     this.dataGrid.wasShown();
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.dataGrid.willHide();
   }
 
-  onResize(): void {
+  override onResize(): void {
     this.dataGrid.onResize();
   }
 
-  elementsToRestoreScrollPositionsFor(): Element[] {
+  override elementsToRestoreScrollPositionsFor(): Element[] {
     return [this.dataGrid.scrollContainer];
   }
 }

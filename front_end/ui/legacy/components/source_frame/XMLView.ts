@@ -12,8 +12,8 @@ import xmlViewStyles from './xmlView.css.legacy.js';
 
 const UIStrings = {
   /**
-  *@description Text to find an item
-  */
+   *@description Text to find an item
+   */
   find: 'Find',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/XMLView.ts', UIStrings);
@@ -162,7 +162,7 @@ export class XMLView extends UI.Widget.Widget implements UI.SearchableView.Searc
     this.updateSearchIndex(0);
   }
 
-  searchCanceled(): void {
+  onSearchCanceled(): void {
     this.searchConfig = null;
     this.currentSearchTreeElements = [];
     this.innerSearchCanceled();
@@ -358,19 +358,19 @@ export class XMLViewNode extends UI.TreeOutline.TreeElement {
     this.xmlView.innerPerformSearch(false, false);
   }
 
-  onattach(): void {
+  override onattach(): void {
     this.listItemElement.classList.toggle('shadow-xml-view-close-tag', this.closeTag);
   }
 
-  onexpand(): void {
+  override onexpand(): void {
     this.updateTitle();
   }
 
-  oncollapse(): void {
+  override oncollapse(): void {
     this.updateTitle();
   }
 
-  async onpopulate(): Promise<void> {
+  override async onpopulate(): Promise<void> {
     XMLViewNode.populate(this, this.node, this.xmlView);
     this.appendChild(new XMLViewNode(this.node, true, this.xmlView));
   }

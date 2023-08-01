@@ -33,9 +33,13 @@ function main() {
     fs.mkdirSync(CACHE_PATH);
   }
 
-  const hasUserCompiledContentShell = utils.isFile(getContentShellBinaryPath(RELEASE_PATH));
+  const contentShellBinaryPath = getContentShellBinaryPath(RELEASE_PATH);
+  const hasUserCompiledContentShell = utils.isFile(contentShellBinaryPath);
   if (!hasUserCompiledContentShell) {
-    return;
+    throw new Error(
+        `${contentShellBinaryPath} not found. ` +
+        'Ensure you have built a release version of `chrome` or use ' +
+        '`--target=Debug`.');
   }
   const outDir = path.resolve(RELEASE_PATH, '..');
 
@@ -90,6 +94,7 @@ function runTests(buildDirectoryPath, useDebugDevtools) {
   }
 
   if (IS_DEBUG_ENABLED) {
+    testArgs.push('--additional-driver-flag=--remote-allow-origins=*');
     testArgs.push('--additional-driver-flag=--remote-debugging-port=9222');
     testArgs.push('--timeout-ms=6000000');
     console.log('\n=============================================');

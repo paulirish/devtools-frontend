@@ -28,8 +28,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// TODO(crbug.com/1253323): Casts to Branded Types will be removed from this file when migration to branded types is complete.
-
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Bindings from '../../models/bindings/bindings.js';
@@ -87,7 +85,7 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
     const compositeProgress = new Common.Progress.CompositeProgress(progress);
     for (let i = 0; i < projects.length; ++i) {
       const project = projects[i];
-      const projectProgress = compositeProgress.createSubProgress(project.uiSourceCodes().length);
+      const projectProgress = compositeProgress.createSubProgress([...project.uiSourceCodes()].length);
       project.indexContent(projectProgress);
     }
   }
@@ -126,7 +124,7 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
     const searchContentProgress = compositeProgress.createSubProgress();
     const findMatchingFilesProgress = new Common.Progress.CompositeProgress(compositeProgress.createSubProgress());
     for (const project of this.projects()) {
-      const weight = project.uiSourceCodes().length;
+      const weight = [...project.uiSourceCodes()].length;
       const findMatchingFilesInProjectProgress = findMatchingFilesProgress.createSubProgress(weight);
       const filesMatchingFileQuery = this.projectFilesMatchingFileQuery(project, searchConfig);
       const promise =
@@ -145,9 +143,7 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
       project: Workspace.Workspace.Project, searchConfig: Workspace.Workspace.ProjectSearchConfig,
       dirtyOnly?: boolean): Platform.DevToolsPath.UrlString[] {
     const result = [];
-    const uiSourceCodes = project.uiSourceCodes();
-    for (let i = 0; i < uiSourceCodes.length; ++i) {
-      const uiSourceCode = uiSourceCodes[i];
+    for (const uiSourceCode of project.uiSourceCodes()) {
       if (!uiSourceCode.contentType().isTextType()) {
         continue;
       }
@@ -263,6 +259,9 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
           const nextMatches = TextUtils.TextUtils.performSearchInContent(
               content, queries[i], !searchConfig.ignoreCase(), searchConfig.isRegex());
           matches = Platform.ArrayUtilities.mergeOrdered(matches, nextMatches, matchesComparator);
+        }
+        if (!searchConfig.queries().length) {
+          matches = [new TextUtils.ContentProvider.SearchMatch(0, (new TextUtils.Text.Text(content)).lineAt(0))];
         }
       }
       if (matches && this.searchResultCallback) {

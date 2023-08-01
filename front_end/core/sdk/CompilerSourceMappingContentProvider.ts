@@ -33,15 +33,14 @@ import type * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import type * as Platform from '../platform/platform.js';
 
-import type {PageResourceLoadInitiator} from './PageResourceLoader.js';
-import {PageResourceLoader} from './PageResourceLoader.js';
+import {PageResourceLoader, type PageResourceLoadInitiator} from './PageResourceLoader.js';
 
 const UIStrings = {
   /**
-  *@description Error message when failing to fetch a resource referenced in a source map
-  *@example {https://example.com/sourcemap.map} PH1
-  *@example {An error occurred} PH2
-  */
+   *@description Error message when failing to fetch a resource referenced in a source map
+   *@example {https://example.com/sourcemap.map} PH1
+   *@example {An error occurred} PH2
+   */
   couldNotLoadContentForSS: 'Could not load content for {PH1} ({PH2})',
 };
 
@@ -67,10 +66,6 @@ export class CompilerSourceMappingContentProvider implements TextUtils.ContentPr
 
   contentType(): Common.ResourceType.ResourceType {
     return this.#contentTypeInternal;
-  }
-
-  async contentEncoded(): Promise<boolean> {
-    return false;
   }
 
   async requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {

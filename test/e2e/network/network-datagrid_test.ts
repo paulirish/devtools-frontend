@@ -2,12 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, expect} from 'chai';
-import type {BrowserAndPages} from '../../conductor/puppeteer-state.js';
+import {assert} from 'chai';
+import {type BrowserAndPages} from '../../conductor/puppeteer-state.js';
 
-import {click, getBrowserAndPages, pressKey, step, waitFor, waitForAria, waitForElementWithTextContent, waitForFunction} from '../../shared/helper.js';
+import {
+  click,
+  disableExperiment,
+  getBrowserAndPages,
+  pressKey,
+  step,
+  waitFor,
+  waitForElementWithTextContent,
+  waitForFunction,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {getAllRequestNames, navigateToNetworkTab, selectRequestByName, setCacheDisabled, setPersistLog, waitForSelectedRequestChange, waitForSomeRequestsToAppear} from '../helpers/network-helpers.js';
+import {
+  getAllRequestNames,
+  navigateToNetworkTab,
+  selectRequestByName,
+  setCacheDisabled,
+  setPersistLog,
+  waitForSelectedRequestChange,
+  waitForSomeRequestsToAppear,
+} from '../helpers/network-helpers.js';
+import {unregisterAllServiceWorkers} from '../../conductor/hooks.js';
 
 async function getRequestRowInfo(frontend: BrowserAndPages['frontend'], name: string) {
   const statusColumn = await frontend.evaluate(() => {
@@ -36,18 +54,25 @@ describe('The Network Tab', async function() {
   };
 
   beforeEach(async () => {
+    // Automatic pretty printing doesn't play well with the assertions.
+    await disableExperiment('sourcesPrettyPrint');
+
     await navigateToNetworkTab('empty.html');
     await setCacheDisabled(true);
     await setPersistLog(false);
+  });
+
+  afterEach(async () => {
+    await unregisterAllServiceWorkers();
   });
 
   it('can click on checkbox label to toggle checkbox', async () => {
     await navigateToNetworkTab('resources-from-cache.html');
 
     // Click the label next to the checkbox input element
-    await click('[aria-label="Disable cache"] + label');
+    await click('[title^="Disable cache"] + label');
 
-    const checkbox = await waitFor('[aria-label="Disable cache"]');
+    const checkbox = await waitFor('[title^="Disable cache"]');
     const checked = await checkbox.evaluate(box => (box as HTMLInputElement).checked);
 
     assert.strictEqual(checked, false, 'The disable cache checkbox should be unchecked');
@@ -69,13 +94,11 @@ describe('The Network Tab', async function() {
     });
 
     await step('Click "Response Headers" submenu', async () => {
-      const responseHeaders = await waitForAria('Response Headers');
-      await click(responseHeaders);
+      await click('aria/Response Headers');
     });
 
     await step('Enable the Last-Modified column in the network datagrid', async () => {
-      const lastModified = await waitForAria('Last-Modified, unchecked');
-      await click(lastModified);
+      await click('aria/Last-Modified, unchecked');
     });
 
     await step('Wait for the "Last-Modified" column to have the expected values', async () => {
@@ -88,6 +111,43 @@ describe('The Network Tab', async function() {
         return JSON.stringify(lastModifiedColumnValues) === expectedValues;
       });
     });
+  });
+
+  it('shows size of chunked responses', async () => {
+    const {target, frontend} = getBrowserAndPages();
+    await navigateToNetworkTab('chunked.txt?numChunks=5');
+
+    // Reload to populate network request table
+    await target.reload({waitUntil: 'networkidle0'});
+    await waitForSomeRequestsToAppear(1);
+
+    // Get the size of the first two network request responses (excluding header and favicon.ico).
+    const getNetworkRequestSize = () => frontend.evaluate(() => {
+      return Array.from(document.querySelectorAll('.size-column')).slice(1, 3).map(node => node.textContent);
+    });
+
+    assert.deepEqual(await getNetworkRequestSize(), [
+      `${formatByteSize(210)}${formatByteSize(25)}`,
+    ]);
+  });
+
+  it('shows size of chunked responses for sync XHR', async () => {
+    const {target, frontend} = getBrowserAndPages();
+    await navigateToNetworkTab('chunked_sync.html');
+
+    // Reload to populate network request table
+    await target.reload({waitUntil: 'networkidle0'});
+    await waitForSomeRequestsToAppear(2);
+
+    // Get the size of the first two network request responses (excluding header and favicon.ico).
+    const getNetworkRequestSize = () => frontend.evaluate(() => {
+      return Array.from(document.querySelectorAll('.size-column')).slice(1, 3).map(node => node.textContent);
+    });
+
+    assert.deepEqual(await getNetworkRequestSize(), [
+      `${formatByteSize(313)}${formatByteSize(128)}`,
+      `${formatByteSize(210)}${formatByteSize(25)}`,
+    ]);
   });
 
   it('the HTML response including cyrillic characters with utf-8 encoding', async () => {
@@ -177,8 +237,7 @@ describe('The Network Tab', async function() {
     });
 
     await step('Enable the Initiator Address Space column in the network datagrid', async () => {
-      const initiatorAddressSpace = await waitForAria('Initiator Address Space, unchecked');
-      await click(initiatorAddressSpace);
+      await click('aria/Initiator Address Space, unchecked');
     });
 
     await step('Wait for the Initiator Address Space column to have the expected values', async () => {
@@ -208,8 +267,7 @@ describe('The Network Tab', async function() {
     });
 
     await step('Enable the Remote Address Space column in the network datagrid', async () => {
-      const remoteAddressSpace = await waitForAria('Remote Address Space, unchecked');
-      await click(remoteAddressSpace);
+      await click('aria/Remote Address Space, unchecked');
     });
 
     await step('Wait for the Remote Address Space column to have the expected values', async () => {
@@ -253,12 +311,22 @@ describe('The Network Tab', async function() {
 
     await waitForSomeRequestsToAppear(3);
     await waitForElementWithTextContent('Web Bundle error');
-
-    const getNetworkRequestStatus = () => frontend.evaluate(() => {
-      return Array.from(document.querySelectorAll('.status-column')).slice(2, 4).map(node => node.textContent);
+    await waitForFunction(async () => {
+      const [nameColumn, statusColumn] = await frontend.evaluate(() => {
+        return [
+          Array.from(document.querySelectorAll('.name-column')).map(node => node.textContent),
+          Array.from(document.querySelectorAll('.status-column')).map(node => node.textContent),
+        ];
+      });
+      const webBundleStatus = statusColumn[nameColumn.indexOf('webbundle_bad_metadata.wbn/test/e2e/resources/network')];
+      const webBundleInnerRequestStatus =
+          statusColumn[nameColumn.indexOf('uuid-in-package:020111b3-437a-4c5c-ae07-adb6bbffb720')];
+      return webBundleStatus === 'Web Bundle error' &&
+          (webBundleInnerRequestStatus === '(failed)net::ERR_INVALID_WEB_BUNDLE' ||
+           // There's a race in the renderer where the subresource request will
+           // be canceled if it hasn't finished before parsing the metadata failed.
+           webBundleInnerRequestStatus === '(canceled)');
     });
-
-    assert.sameMembers(await getNetworkRequestStatus(), ['Web Bundle error', '(failed)net::ERR_INVALID_WEB_BUNDLE']);
   });
 
   it('shows web bundle inner request error in the status column', async () => {
@@ -292,7 +360,7 @@ describe('The Network Tab', async function() {
     const getNetworkRequestIcons = () => frontend.evaluate(() => {
       return Array.from(document.querySelectorAll('.name-column > .icon'))
           .slice(1, 4)
-          .map(node => (node as HTMLImageElement).alt);
+          .map(node => (node as HTMLDivElement).title);
     });
     assert.sameMembers(await getNetworkRequestIcons(), [
       'Script',
@@ -300,7 +368,7 @@ describe('The Network Tab', async function() {
     ]);
     const getFromWebBundleIcons = () => frontend.evaluate(() => {
       return Array.from(document.querySelectorAll('.name-column > [role="link"] > .icon'))
-          .map(node => (node as HTMLImageElement).alt);
+          .map(node => (node as HTMLDivElement).title);
     });
     assert.sameMembers(await getFromWebBundleIcons(), [
       'Served from Web Bundle',
@@ -326,7 +394,7 @@ describe('The Network Tab', async function() {
     await waitForFunction(async () => {
       const {status, time} = await getRequestRowInfo(frontend, 'sendBeacon');
       // Depending on timing of the reporting, the status infomation (404) might reach DevTools in time.
-      return (status === '(unknown)' || status === '404') && time === '(unknown)';
+      return (status === '(unknown)' || status === '404Not Found') && time === '(unknown)';
     });
   });
 
@@ -346,6 +414,23 @@ describe('The Network Tab', async function() {
     assert.deepStrictEqual(updatedRequestNames, ['xhr.html', 'image.svg', 'image.svg']);
   });
 
+  it('displays focused background color when request is selected via keyboard navigation', async () => {
+    const {target, frontend} = getBrowserAndPages();
+
+    await navigateToNetworkTab('xhr.html');
+    await target.reload({waitUntil: 'networkidle0'});
+    await waitForSomeRequestsToAppear(2);
+    await selectRequestByName('xhr.html');
+    await pressKey('ArrowDown');
+
+    const getSelectedRequestBgColor = () => frontend.evaluate(() => {
+      return document.querySelector('.network-log-grid tbody tr.selected')?.getAttribute('style');
+    });
+
+    assert.deepStrictEqual(
+        await getSelectedRequestBgColor(), 'background-color: var(--network-grid-focus-selected-color);');
+  });
+
   it('shows the request panel when clicked during a websocket message (https://crbug.com/1222382)', async () => {
     await navigateToNetworkTab('websocket.html?infiniteMessages=true');
 
@@ -358,21 +443,21 @@ describe('The Network Tab', async function() {
     await waitFor('.network-item-view');
   });
 
-  // This is currently skipped while we fix the alignment of requestId+networkId in the CDP
-  // events that apply to the main service worker request
-  it.skip('[crbug.com/1304795] shows the main service worker request as complete', async () => {
-    await navigateToNetworkTab('service-worker.html');
+  it('shows the main service worker request as complete', async () => {
     const {target, frontend} = getBrowserAndPages();
+    const promises = [
+      waitForFunction(async () => {
+        const {status, type} = await getRequestRowInfo(frontend, 'service-worker.html/test/e2e/resources/network');
+        return status === '200OK' && type === 'document';
+      }),
+      waitForFunction(async () => {
+        const {status, type} =
+            await getRequestRowInfo(frontend, '⚙ service-worker.jslocalhost/test/e2e/resources/network');
+        return status === 'Finished' && type === 'script';
+      }),
+    ];
+    await navigateToNetworkTab('service-worker.html');
     await target.waitForXPath('//div[@id="content" and text()="pong"]');
-    const html = await getRequestRowInfo(frontend, 'service-worker.html/test/e2e/resources/network');
-    expect(html).to.contain({
-      status: '200OK',
-      type: 'document',
-    });
-    const sw = await getRequestRowInfo(frontend, '⚙ service-worker.js/test/e2e/resources/network');
-    expect(sw).to.contain({
-      status: '200OK',
-      type: 'script',
-    });
+    await Promise.all(promises);
   });
 });

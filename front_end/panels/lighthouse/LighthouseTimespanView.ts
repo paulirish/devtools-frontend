@@ -5,8 +5,7 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type {LighthouseController} from './LighthouseController.js';
-import {Events} from './LighthouseController.js';
+import {type LighthousePanel} from './LighthousePanel.js';
 import lighthouseDialogStyles from './lighthouseDialog.css.js';
 
 const UIStrings = {
@@ -32,13 +31,13 @@ const str_ = i18n.i18n.registerUIStrings('panels/lighthouse/LighthouseTimespanVi
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class TimespanView extends UI.Dialog.Dialog {
-  private controller: LighthouseController;
+  private panel: LighthousePanel;
   private statusHeader: Element|null;
   private endButton: HTMLButtonElement|null;
 
-  constructor(controller: LighthouseController) {
+  constructor(panel: LighthousePanel) {
     super();
-    this.controller = controller;
+    this.panel = panel;
     this.statusHeader = null;
     this.endButton = null;
     this.setDimmed(true);
@@ -47,7 +46,7 @@ export class TimespanView extends UI.Dialog.Dialog {
     this.render();
   }
 
-  show(dialogRenderElement: Element): void {
+  override show(dialogRenderElement: Element): void {
     this.reset();
     super.show(dialogRenderElement);
   }
@@ -71,13 +70,20 @@ export class TimespanView extends UI.Dialog.Dialog {
     const dialogRoot = UI.Utils.createShadowRootWithCoreStyles(
         this.contentElement, {cssFile: [lighthouseDialogStyles], delegatesFocus: undefined});
 
-    this.endButton = UI.UIUtils.createTextButton(i18nString(UIStrings.endTimespan), this.endTimespan.bind(this));
+    this.endButton = UI.UIUtils.createTextButton(
+        i18nString(UIStrings.endTimespan),
+        this.endTimespan.bind(this),
+        undefined,
+        true,
+    );
     const cancelButton = UI.UIUtils.createTextButton(i18nString(UIStrings.cancel), this.cancel.bind(this));
     const fragment = UI.Fragment.Fragment.build`
   <div class="lighthouse-view vbox">
   <h2 $="status-header"></h2>
-  ${this.endButton}
+  <div class="lighthouse-action-buttons hbox">
   ${cancelButton}
+  ${this.endButton}
+  </div>
   </div>
   `;
 
@@ -89,11 +95,11 @@ export class TimespanView extends UI.Dialog.Dialog {
     this.reset();
   }
 
-  private endTimespan(): void {
-    this.controller.dispatchEventToListeners(Events.RequestLighthouseTimespanEnd, false);
+  private async endTimespan(): Promise<void> {
+    await this.panel.handleTimespanEnd();
   }
 
-  private cancel(): void {
-    this.controller.dispatchEventToListeners(Events.RequestLighthouseCancel);
+  private async cancel(): Promise<void> {
+    await this.panel.handleRunCancel();
   }
 }

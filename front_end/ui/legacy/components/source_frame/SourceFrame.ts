@@ -40,45 +40,45 @@ import * as UI from '../../legacy.js';
 
 const UIStrings = {
   /**
-  *@description Text for the source of something
-  */
+   *@description Text for the source of something
+   */
   source: 'Source',
   /**
-  *@description Text to pretty print a file
-  */
+   *@description Text to pretty print a file
+   */
   prettyPrint: 'Pretty print',
   /**
-  *@description Text when something is loading
-  */
+   *@description Text when something is loading
+   */
   loading: 'Loading…',
   /**
-  * @description Shown at the bottom of the Sources panel when the user has made multiple
-  * simultaneous text selections in the text editor.
-  * @example {2} PH1
-  */
+   * @description Shown at the bottom of the Sources panel when the user has made multiple
+   * simultaneous text selections in the text editor.
+   * @example {2} PH1
+   */
   dSelectionRegions: '{PH1} selection regions',
   /**
-  * @description Position indicator in Source Frame of the Sources panel. The placeholder is a
-  * hexadecimal number value, which is why it is prefixed with '0x'.
-  * @example {abc} PH1
-  */
+   * @description Position indicator in Source Frame of the Sources panel. The placeholder is a
+   * hexadecimal number value, which is why it is prefixed with '0x'.
+   * @example {abc} PH1
+   */
   bytecodePositionXs: 'Bytecode position `0x`{PH1}',
   /**
-  *@description Text in Source Frame of the Sources panel
-  *@example {2} PH1
-  *@example {2} PH2
-  */
+   *@description Text in Source Frame of the Sources panel
+   *@example {2} PH1
+   *@example {2} PH2
+   */
   lineSColumnS: 'Line {PH1}, Column {PH2}',
   /**
-  *@description Text in Source Frame of the Sources panel
-  *@example {2} PH1
-  */
+   *@description Text in Source Frame of the Sources panel
+   *@example {2} PH1
+   */
   dCharactersSelected: '{PH1} characters selected',
   /**
-  *@description Text in Source Frame of the Sources panel
-  *@example {2} PH1
-  *@example {2} PH2
-  */
+   *@description Text in Source Frame of the Sources panel
+   *@example {2} PH1
+   *@example {2} PH2
+   */
   dLinesDCharactersSelected: '{PH1} lines, {PH2} characters selected',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/SourceFrame.ts', UIStrings);
@@ -105,8 +105,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     UI.View.SimpleView) implements UI.SearchableView.Searchable, UI.SearchableView.Replaceable, Transformer {
   private readonly lazyContent: () => Promise<TextUtils.ContentProvider.DeferredContent>;
   private prettyInternal: boolean;
-  private rawContent: string|null;
-  private formattedContentPromise: Promise<Formatter.ScriptFormatter.FormattedContent>|null;
+  private rawContent: string|CodeMirror.Text|null;
   private formattedMap: Formatter.ScriptFormatter.FormatterSourceMapping|null;
   private readonly prettyToggle: UI.Toolbar.ToolbarToggle;
   private shouldAutoPrettyPrint: boolean;
@@ -146,9 +145,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
     this.prettyInternal = false;
     this.rawContent = null;
-    this.formattedContentPromise = null;
     this.formattedMap = null;
-    this.prettyToggle = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.prettyPrint), 'largeicon-pretty-print');
+    this.prettyToggle = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.prettyPrint), 'brackets');
     this.prettyToggle.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
       void this.setPretty(!this.prettyToggle.toggled());
     });
@@ -190,6 +188,26 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
     this.wasmDisassemblyInternal = null;
     this.contentSet = false;
+
+    Common.Settings.Settings.instance()
+        .moduleSetting('textEditorIndent')
+        .addChangeListener(this.#textEditorIndentChanged, this);
+  }
+
+  override disposeView(): void {
+    Common.Settings.Settings.instance()
+        .moduleSetting('textEditorIndent')
+        .removeChangeListener(this.#textEditorIndentChanged, this);
+  }
+
+  async #textEditorIndentChanged(): Promise<void> {
+    if (this.prettyInternal) {
+      // Indentation settings changed, which are used for pretty printing as well,
+      // so if the editor is currently pretty printed, just toggle the state here
+      // to apply the new indentation settings.
+      await this.setPretty(false);
+      await this.setPretty(true);
+    }
   }
 
   private placeholderEditorState(content: string): CodeMirror.EditorState {
@@ -203,12 +221,12 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     });
   }
 
-  protected editorConfiguration(doc: string): CodeMirror.Extension {
+  protected editorConfiguration(doc: string|CodeMirror.Text): CodeMirror.Extension {
     return [
       CodeMirror.EditorView.updateListener.of(update => this.dispatchEventToListeners(Events.EditorUpdate, update)),
       TextEditor.Config.baseConfiguration(doc),
       TextEditor.Config.closeBrackets,
-      TextEditor.Config.sourcesAutocompletion.instance(),
+      TextEditor.Config.autocompletion.instance(),
       TextEditor.Config.showWhitespace.instance(),
       TextEditor.Config.allowScrollPastEof.instance(),
       CodeMirror.Prec.lowest(TextEditor.Config.codeFolding.instance()),
@@ -310,7 +328,9 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     const startPos = textEditor.toLineColumn(selection.from), endPos = textEditor.toLineColumn(selection.to);
     let newSelection;
     if (this.prettyInternal) {
-      const formatInfo = await this.requestFormattedContent();
+      const content =
+          this.rawContent instanceof CodeMirror.Text ? this.rawContent.sliceString(0) : this.rawContent || '';
+      const formatInfo = await Formatter.ScriptFormatter.formatScriptContent(this.contentType, content);
       this.formattedMap = formatInfo.formattedMapping;
       await this.setContent(formatInfo.formattedContent);
       this.prettyBaseDoc = textEditor.state.doc;
@@ -393,18 +413,18 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     return this.loadError;
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     void this.ensureContentLoaded();
     this.wasShownOrLoaded();
   }
 
-  willHide(): void {
+  override willHide(): void {
     super.willHide();
 
     this.clearPositionToReveal();
   }
 
-  async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
+  override async toolbarItems(): Promise<UI.Toolbar.ToolbarItem[]> {
     return [this.prettyToggle, this.sourcePosition, this.progressToolbarItem];
   }
 
@@ -431,106 +451,107 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   private async ensureContentLoaded(): Promise<void> {
     if (!this.contentRequested) {
       this.contentRequested = true;
+      await this.setDeferredContent(this.lazyContent());
 
-      const progressIndicator = new UI.ProgressIndicator.ProgressIndicator();
-      progressIndicator.setTitle(i18nString(UIStrings.loading));
-      progressIndicator.setTotalWork(100);
-      this.progressToolbarItem.element.appendChild(progressIndicator.element);
-
-      const deferredContent = await this.lazyContent();
-      let error, content;
-      if (deferredContent.content === null) {
-        error = deferredContent.error;
-        this.rawContent = deferredContent.error;
-      } else {
-        content = deferredContent.content;
-        if (deferredContent.isEncoded) {
-          const view = new DataView(Common.Base64.decode(deferredContent.content));
-          const decoder = new TextDecoder();
-          this.rawContent = decoder.decode(view, {stream: true});
-        } else {
-          this.rawContent = deferredContent.content;
-        }
-      }
-
-      progressIndicator.setWorked(1);
-
-      if (!error && this.contentType === 'application/wasm') {
-        const worker = Common.Worker.WorkerWrapper.fromURL(
-            new URL('../../../../entrypoints/wasmparser_worker/wasmparser_worker-entrypoint.js', import.meta.url));
-        const promise = new Promise<{
-          source: string,
-          offsets: number[],
-          functionBodyOffsets: {
-            start: number,
-            end: number,
-          }[],
-        }>((resolve, reject) => {
-          worker.onmessage =
-              // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ({data}: MessageEvent<any>): void => {
-                if ('event' in data) {
-                  switch (data.event) {
-                    case 'progress':
-                      progressIndicator.setWorked(data.params.percentage);
-                      break;
-                  }
-                } else if ('method' in data) {
-                  switch (data.method) {
-                    case 'disassemble':
-                      if ('error' in data) {
-                        reject(data.error);
-                      } else if ('result' in data) {
-                        resolve(data.result);
-                      }
-                      break;
-                  }
-                }
-              };
-          worker.onerror = reject;
-        });
-        worker.postMessage({method: 'disassemble', params: {content}});
-        try {
-          const {source, offsets, functionBodyOffsets} = await promise;
-          this.rawContent = content = source;
-          this.wasmDisassemblyInternal = new Common.WasmDisassembly.WasmDisassembly(offsets, functionBodyOffsets);
-        } catch (e) {
-          this.rawContent = content = error = e.message;
-        } finally {
-          worker.terminate();
-        }
-      }
-
-      progressIndicator.setWorked(100);
-      progressIndicator.done();
-
-      this.formattedContentPromise = null;
-      this.formattedMap = null;
-      this.prettyToggle.setEnabled(true);
-
-      if (error) {
-        this.loadError = true;
-        this.textEditor.editor.setState(this.placeholderEditorState(error));
-        this.prettyToggle.setEnabled(false);
-      } else {
-        if (this.shouldAutoPrettyPrint && TextUtils.TextUtils.isMinified(content)) {
-          await this.setPretty(true);
-        } else {
-          await this.setContent(this.rawContent || '');
-        }
-      }
       this.contentSet = true;
     }
   }
 
-  private requestFormattedContent(): Promise<Formatter.ScriptFormatter.FormattedContent> {
-    if (this.formattedContentPromise) {
-      return this.formattedContentPromise;
+  protected async setDeferredContent(deferredContentPromise: Promise<TextUtils.ContentProvider.DeferredContent>):
+      Promise<void> {
+    const progressIndicator = new UI.ProgressIndicator.ProgressIndicator();
+    progressIndicator.setTitle(i18nString(UIStrings.loading));
+    progressIndicator.setTotalWork(100);
+    this.progressToolbarItem.element.appendChild(progressIndicator.element);
+
+    progressIndicator.setWorked(1);
+    const deferredContent = await deferredContentPromise;
+
+    let error, content;
+    if (deferredContent.content === null) {
+      error = deferredContent.error;
+      this.rawContent = deferredContent.error;
+    } else {
+      content = deferredContent.content;
+      if (deferredContent.isEncoded) {
+        const view = new DataView(Common.Base64.decode(deferredContent.content));
+        const decoder = new TextDecoder();
+        this.rawContent = decoder.decode(view, {stream: true});
+      } else if ('wasmDisassemblyInfo' in deferredContent && deferredContent.wasmDisassemblyInfo) {
+        const {wasmDisassemblyInfo} = deferredContent;
+        this.rawContent = CodeMirror.Text.of(wasmDisassemblyInfo.lines);
+        this.wasmDisassemblyInternal = wasmDisassemblyInfo;
+      } else {
+        this.rawContent = content;
+        this.wasmDisassemblyInternal = null;
+      }
     }
-    this.formattedContentPromise =
-        Formatter.ScriptFormatter.formatScriptContent(this.contentType, this.rawContent || '');
-    return this.formattedContentPromise;
+
+    // If the input is wasm but v8-based wasm disassembly failed, fall back to wasmparser for backwards compatibility.
+    if (content && this.contentType === 'application/wasm' && !this.wasmDisassemblyInternal) {
+      const worker = Common.Worker.WorkerWrapper.fromURL(
+          new URL('../../../../entrypoints/wasmparser_worker/wasmparser_worker-entrypoint.js', import.meta.url));
+      const promise = new Promise<{
+        lines: string[],
+        offsets: number[],
+        functionBodyOffsets: {
+          start: number,
+          end: number,
+        }[],
+      }>((resolve, reject) => {
+        worker.onmessage =
+            // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ({data}: MessageEvent<any>): void => {
+              if ('event' in data) {
+                switch (data.event) {
+                  case 'progress':
+                    progressIndicator?.setWorked(data.params.percentage);
+                    break;
+                }
+              } else if ('method' in data) {
+                switch (data.method) {
+                  case 'disassemble':
+                    if ('error' in data) {
+                      reject(data.error);
+                    } else if ('result' in data) {
+                      resolve(data.result);
+                    }
+                    break;
+                }
+              }
+            };
+        worker.onerror = reject;
+      });
+      worker.postMessage({method: 'disassemble', params: {content}});
+      try {
+        const {lines, offsets, functionBodyOffsets} = await promise;
+        this.rawContent = content = CodeMirror.Text.of(lines);
+        this.wasmDisassemblyInternal = new Common.WasmDisassembly.WasmDisassembly(lines, offsets, functionBodyOffsets);
+      } catch (e) {
+        this.rawContent = content = error = e.message;
+      } finally {
+        worker.terminate();
+      }
+    }
+
+    progressIndicator.setWorked(100);
+    progressIndicator.done();
+
+    this.formattedMap = null;
+    this.prettyToggle.setEnabled(true);
+
+    if (error) {
+      this.loadError = true;
+      this.textEditor.state = this.placeholderEditorState(error);
+      this.prettyToggle.setEnabled(false);
+    } else {
+      if (this.shouldAutoPrettyPrint && TextUtils.TextUtils.isMinified(content || '')) {
+        await this.setPretty(true);
+      } else {
+        await this.setContent(this.rawContent || '');
+      }
+    }
   }
 
   revealPosition(position: {lineNumber: number, columnNumber?: number}|number, shouldHighlight?: boolean): void {
@@ -584,10 +605,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     if (this.lineToScrollTo !== null) {
       if (this.loaded && this.isShowing()) {
         const {textEditor} = this;
-        // DevTools history items are 0-based, but CodeMirror is 1-based, so we have to increment the
-        // line we want to scroll to by 1.
-        const position = textEditor.toOffset({lineNumber: this.lineToScrollTo + 1, columnNumber: 0});
-        textEditor.dispatch({effects: CodeMirror.EditorView.scrollIntoView(position, {y: 'start'})});
+        const position = textEditor.toOffset({lineNumber: this.lineToScrollTo, columnNumber: 0});
+        textEditor.dispatch({effects: CodeMirror.EditorView.scrollIntoView(position, {y: 'start', yMargin: 0})});
         this.lineToScrollTo = null;
       }
     }
@@ -640,7 +659,6 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.prettyBaseDoc = null;
     this.rawContent = this.textEditor.state.doc.toString();
     this.formattedMap = null;
-    this.formattedContentPromise = null;
     if (this.prettyInternal) {
       this.prettyInternal = false;
       this.updatePrettyPrintState();
@@ -648,45 +666,24 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.prettyToggle.setEnabled(true);
   }
 
-  private simplifyMimeType(content: string, mimeType: string): string {
-    if (!mimeType) {
-      return '';
+  protected async getLanguageSupport(content: string|CodeMirror.Text): Promise<CodeMirror.Extension> {
+    // This is a pretty horrible work-around for webpack-based Vue2 setups. See
+    // https://crbug.com/1416562 for the full story behind this.
+    let {contentType} = this;
+    if (contentType === 'text/x.vue') {
+      content = typeof content === 'string' ? content : content.sliceString(0);
+      if (!content.trimStart().startsWith('<')) {
+        contentType = 'text/javascript';
+      }
     }
-    // There are plenty of instances where TSX/JSX files are served with out the trailing x, i.e. JSX with a 'js' suffix
-    // which breaks the formatting. Therefore, if the mime type is TypeScript or JavaScript, we switch to the TSX/JSX
-    // superset so that we don't break formatting.
-    if (mimeType.indexOf('typescript') >= 0) {
-      return 'text/typescript-jsx';
-    }
-    if (mimeType.indexOf('javascript') >= 0 || mimeType.indexOf('jscript') >= 0 ||
-        mimeType.indexOf('ecmascript') >= 0) {
-      return 'text/jsx';
-    }
-    // A hack around the fact that files with "php" extension might be either standalone or html embedded php scripts.
-    if (mimeType === 'text/x-php' && content.match(/\<\?.*\?\>/g)) {
-      return 'application/x-httpd-php';
-    }
-    if (mimeType === 'application/wasm') {
-      // text/webassembly is not a proper MIME type, but CodeMirror uses it for WAT syntax highlighting.
-      // We generally use application/wasm, which is the correct MIME type for Wasm binary data.
-      return 'text/webassembly';
-    }
-    return mimeType;
-  }
-
-  protected async getLanguageSupport(content: string): Promise<CodeMirror.Extension> {
-    const mimeType = this.simplifyMimeType(content, this.contentType) || '';
-    const languageDesc = await CodeHighlighter.CodeHighlighter.languageFromMIME(mimeType);
+    const languageDesc = await CodeHighlighter.CodeHighlighter.languageFromMIME(contentType);
     if (!languageDesc) {
       return [];
     }
-    if (mimeType === 'text/jsx') {
-      return [
-        languageDesc,
-        CodeMirror.javascript.javascriptLanguage.data.of({autocomplete: CodeMirror.completeAnyWord}),
-      ];
-    }
-    return languageDesc;
+    return [
+      languageDesc,
+      CodeMirror.javascript.javascriptLanguage.data.of({autocomplete: CodeMirror.completeAnyWord}),
+    ];
   }
 
   async updateLanguageMode(content: string): Promise<void> {
@@ -694,7 +691,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.textEditor.dispatch({effects: config.language.reconfigure(langExtension)});
   }
 
-  async setContent(content: string): Promise<void> {
+  async setContent(content: string|CodeMirror.Text): Promise<void> {
     this.muteChangeEventsForSetContent = true;
     const {textEditor} = this;
     const wasLoaded = this.loadedInternal;
@@ -712,7 +709,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
       ],
     });
     this.baseDoc = editorState.doc;
-    textEditor.editor.setState(editorState);
+    textEditor.state = editorState;
     if (wasLoaded) {
       textEditor.editor.scrollDOM.scrollTop = scrollTop;
     }
@@ -794,7 +791,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.searchRegex = null;
   }
 
-  searchCanceled(): void {
+  onSearchCanceled(): void {
     const range = this.currentSearchResultIndex !== -1 ? this.searchResults[this.currentSearchResultIndex] : null;
     this.resetSearch();
     if (!this.loaded) {
@@ -898,6 +895,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
         if (match[0].length) {
           const from = pos + match.index;
           ranges.push(new SearchMatch(from, from + match[0].length, match));
+        } else {
+          regex.lastIndex = match.index + 1;
         }
       }
       pos += line.length + 1;
@@ -974,7 +973,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   protected populateLineGutterContextMenu(_menu: UI.ContextMenu.ContextMenu, _lineNumber: number): void {
   }
 
-  focus(): void {
+  override focus(): void {
     this.textEditor.focus();
   }
 }
@@ -1099,9 +1098,14 @@ const searchHighlighter = CodeMirror.ViewPlugin.fromClass(class {
             if (!match) {
               break;
             }
-            const start = pos + match.index, end = start + match[0].length;
-            const current = active.currentRange && active.currentRange.from === start && active.currentRange.to === end;
-            builder.add(start, end, current ? currentSearchMatchDeco : searchMatchDeco);
+            if (match[0].length) {
+              const start = pos + match.index, end = start + match[0].length;
+              const current =
+                  active.currentRange && active.currentRange.from === start && active.currentRange.to === end;
+              builder.add(start, end, current ? currentSearchMatchDeco : searchMatchDeco);
+            } else {
+              active.regexp.regex.lastIndex = match.index + 1;
+            }
           }
         }
         pos += part.length;
@@ -1112,7 +1116,7 @@ const searchHighlighter = CodeMirror.ViewPlugin.fromClass(class {
 }, {decorations: (value): CodeMirror.DecorationSet => value.decorations});
 
 const nonBreakableLineMark = new (class extends CodeMirror.GutterMarker {
-  elementClass = 'cm-nonBreakableLine';
+  override elementClass = 'cm-nonBreakableLine';
 })();
 
 // Effect to add lines (by position) to the set of non-breakable lines.
@@ -1161,7 +1165,7 @@ function markNonBreakableLines(disassembly: Common.WasmDisassembly.WasmDisassemb
 const sourceFrameTheme = CodeMirror.EditorView.theme({
   '&.cm-editor': {height: '100%'},
   '.cm-scroller': {overflow: 'auto'},
-  '.cm-lineNumbers .cm-gutterElement.cm-nonBreakableLine': {color: 'var(--color-non-breakable-line)'},
+  '.cm-lineNumbers .cm-gutterElement.cm-nonBreakableLine': {color: 'var(--color-non-breakable-line) !important'},
   '.cm-searchMatch': {
     border: '1px solid var(--color-search-match-border)',
     borderRadius: '3px',
@@ -1176,6 +1180,6 @@ const sourceFrameTheme = CodeMirror.EditorView.theme({
     },
   },
   ':host-context(.pretty-printed) & .cm-lineNumbers .cm-gutterElement': {
-    color: 'var(--legacy-accent-color)',
+    color: 'var(--color-primary-old)',
   },
 });

@@ -11,49 +11,49 @@ import xhrBreakpointsSidebarPaneStyles from './xhrBreakpointsSidebarPane.css.js'
 
 const UIStrings = {
   /**
-  *@description Title of the 'XHR/fetch Breakpoints' tool in the bottom sidebar of the Sources tool
-  */
+   *@description Title of the 'XHR/fetch Breakpoints' tool in the bottom sidebar of the Sources tool
+   */
   xhrfetchBreakpoints: 'XHR/fetch Breakpoints',
   /**
-  *@description Text to indicate there are no breakpoints
-  */
+   *@description Text to indicate there are no breakpoints
+   */
   noBreakpoints: 'No breakpoints',
   /**
-  *@description Label for a button in the Sources panel that opens the input field to create a new XHR/fetch breakpoint.
-  */
+   *@description Label for a button in the Sources panel that opens the input field to create a new XHR/fetch breakpoint.
+   */
   addXhrfetchBreakpoint: 'Add XHR/fetch breakpoint',
   /**
-  *@description Text to add a breakpoint
-  */
+   *@description Text to add a breakpoint
+   */
   addBreakpoint: 'Add breakpoint',
   /**
-  *@description Input element container text content in XHRBreakpoints Sidebar Pane of the JavaScript Debugging pane in the Sources panel or the DOM Breakpoints pane in the Elements panel
-  */
+   *@description Input element container text content in XHRBreakpoints Sidebar Pane of the JavaScript Debugging pane in the Sources panel or the DOM Breakpoints pane in the Elements panel
+   */
   breakWhenUrlContains: 'Break when URL contains:',
   /**
-  *@description Accessible label for XHR/fetch breakpoint text input
-  */
+   *@description Accessible label for XHR/fetch breakpoint text input
+   */
   urlBreakpoint: 'URL Breakpoint',
   /**
-  *@description Text in XHRBreakpoints Sidebar Pane of the JavaScript Debugging pane in the Sources panel or the DOM Breakpoints pane in the Elements panel
-  *@example {example.com} PH1
-  */
+   *@description Text in XHRBreakpoints Sidebar Pane of the JavaScript Debugging pane in the Sources panel or the DOM Breakpoints pane in the Elements panel
+   *@example {example.com} PH1
+   */
   urlContainsS: 'URL contains "{PH1}"',
   /**
-  *@description Text in XHRBreakpoints Sidebar Pane of the JavaScript Debugging pane in the Sources panel or the DOM Breakpoints pane in the Elements panel
-  */
+   *@description Text in XHRBreakpoints Sidebar Pane of the JavaScript Debugging pane in the Sources panel or the DOM Breakpoints pane in the Elements panel
+   */
   anyXhrOrFetch: 'Any XHR or fetch',
   /**
-  *@description Screen reader description of a hit breakpoint in the Sources panel
-  */
+   *@description Screen reader description of a hit breakpoint in the Sources panel
+   */
   breakpointHit: 'breakpoint hit',
   /**
-  *@description Text to remove all breakpoints
-  */
+   *@description Text to remove all breakpoints
+   */
   removeAllBreakpoints: 'Remove all breakpoints',
   /**
-  *@description Text to remove a breakpoint
-  */
+   *@description Text to remove a breakpoint
+   */
   removeBreakpoint: 'Remove breakpoint',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/browser_debugger/XHRBreakpointsSidebarPane.ts', UIStrings);
@@ -84,13 +84,13 @@ export class XHRBreakpointsSidebarPane extends UI.Widget.VBox implements UI.Cont
     this.contentElement.appendChild(this.#list.element);
     this.#list.element.classList.add('breakpoint-list', 'hidden');
     UI.ARIAUtils.markAsList(this.#list.element);
-    UI.ARIAUtils.setAccessibleName(this.#list.element, i18nString(UIStrings.xhrfetchBreakpoints));
+    UI.ARIAUtils.setLabel(this.#list.element, i18nString(UIStrings.xhrfetchBreakpoints));
     this.#emptyElement = this.contentElement.createChild('div', 'gray-info-message');
     this.#emptyElement.textContent = i18nString(UIStrings.noBreakpoints);
 
     this.#breakpointElements = new Map();
 
-    this.#addButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addXhrfetchBreakpoint), 'largeicon-add');
+    this.#addButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addXhrfetchBreakpoint), 'plus');
     this.#addButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
       void this.addButtonClicked();
     });
@@ -126,7 +126,7 @@ export class XHRBreakpointsSidebarPane extends UI.Widget.VBox implements UI.Cont
     inputElementContainer.textContent = i18nString(UIStrings.breakWhenUrlContains);
 
     const inputElement = inputElementContainer.createChild('span', 'breakpoint-condition-input');
-    UI.ARIAUtils.setAccessibleName(inputElement, i18nString(UIStrings.urlBreakpoint));
+    UI.ARIAUtils.setLabel(inputElement, i18nString(UIStrings.urlBreakpoint));
     this.addListElement(inputElementContainer, this.#list.element.firstChild as Element | null);
 
     function finishEditing(this: XHRBreakpointsSidebarPane, accept: boolean, e: Element, text: string): void {
@@ -184,7 +184,7 @@ export class XHRBreakpointsSidebarPane extends UI.Widget.VBox implements UI.Cont
     const title = item ? i18nString(UIStrings.urlContainsS, {PH1: item}) : i18nString(UIStrings.anyXhrOrFetch);
     const label = UI.UIUtils.CheckboxLabel.create(title, enabled);
     UI.ARIAUtils.markAsHidden(label);
-    UI.ARIAUtils.setAccessibleName(element, title);
+    UI.ARIAUtils.setLabel(element, title);
     element.appendChild(label);
     label.checkboxElement.addEventListener('click', this.checkboxClicked.bind(this, item, enabled), false);
     element.addEventListener('click', event => {
@@ -381,7 +381,7 @@ export class XHRBreakpointsSidebarPane extends UI.Widget.VBox implements UI.Cont
       this.setBreakpoint(url);
     }
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([xhrBreakpointsSidebarPaneStyles]);
   }

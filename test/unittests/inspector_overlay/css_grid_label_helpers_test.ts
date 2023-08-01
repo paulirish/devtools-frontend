@@ -4,8 +4,22 @@
 
 const {assert} = chai;
 
-import {drawGridAreaNamesAndAssertLabels, drawGridLineNumbersAndAssertLabels, drawMultipleGridLineNumbersAndAssertLabels, getGridLineNumberLabelContainer, getGridTrackSizesLabelContainer, initFrameForGridLabels, initFrameForMultipleGridLabels, drawGridLineNamesAndAssertLabels} from '../front_end/helpers/InspectorOverlayHelpers.js';
-import {drawGridLineNumbers, drawGridTrackSizes, generateLegibleTextColor, normalizePositionData} from '../../../inspector_overlay/css_grid_label_helpers.js';
+import {
+  drawGridAreaNamesAndAssertLabels,
+  drawGridLineNumbersAndAssertLabels,
+  drawMultipleGridLineNumbersAndAssertLabels,
+  getGridLineNumberLabelContainer,
+  getGridTrackSizesLabelContainer,
+  initFrameForGridLabels,
+  initFrameForMultipleGridLabels,
+  drawGridLineNamesAndAssertLabels,
+} from '../front_end/helpers/InspectorOverlayHelpers.js';
+import {
+  drawGridLineNumbers,
+  drawGridTrackSizes,
+  generateLegibleTextColor,
+  normalizePositionData,
+} from '../../../inspector_overlay/css_grid_label_helpers.js';
 
 describe('drawGridLineNumbers label creation', () => {
   beforeEach(initFrameForGridLabels);
@@ -740,9 +754,9 @@ describe('drawGridLineNames', () => {
         {type: 'row', textContent: 'first-row', y: 100},
         {type: 'row', textContent: 'second-row', y: 199.5},
         {type: 'row', textContent: 'third-row', y: 299.5},
-        {type: 'column', textContent: 'first-col', x: 99},
-        {type: 'column', textContent: 'second-col', x: 199},
-        {type: 'column', textContent: 'third-col', x: 299},
+        {type: 'column', textContent: 'first-col', x: 99.5},
+        {type: 'column', textContent: 'second-col', x: 199.5},
+        {type: 'column', textContent: 'third-col', x: 299.5},
       ],
       deviceEmulationFactor: 1,
     },
@@ -778,9 +792,9 @@ describe('drawGridLineNames', () => {
         {type: 'row', textContent: 'first-row', y: 200},
         {type: 'row', textContent: 'second-row', y: 399.5},
         {type: 'row', textContent: 'third-row', y: 599.5},
-        {type: 'column', textContent: 'first-col', x: 199},
-        {type: 'column', textContent: 'second-col', x: 399},
-        {type: 'column', textContent: 'third-col', x: 599},
+        {type: 'column', textContent: 'first-col', x: 199.5},
+        {type: 'column', textContent: 'second-col', x: 399.5},
+        {type: 'column', textContent: 'third-col', x: 599.5},
       ],
       deviceEmulationFactor: 2,
     },

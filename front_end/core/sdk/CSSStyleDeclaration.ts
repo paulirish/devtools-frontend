@@ -6,10 +6,10 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import type * as Protocol from '../../generated/protocol.js';
 
 import {cssMetadata} from './CSSMetadata.js';
-import type {CSSModel, Edit} from './CSSModel.js';
+import {type CSSModel, type Edit} from './CSSModel.js';
 import {CSSProperty} from './CSSProperty.js';
-import type {CSSRule} from './CSSRule.js';
-import type {Target} from './Target.js';
+import {type CSSRule} from './CSSRule.js';
+import {type Target} from './Target.js';
 
 export class CSSStyleDeclaration {
   readonly #cssModelInternal: CSSModel;
@@ -26,7 +26,7 @@ export class CSSStyleDeclaration {
   constructor(cssModel: CSSModel, parentRule: CSSRule|null, payload: Protocol.CSS.CSSStyle, type: Type) {
     this.#cssModelInternal = cssModel;
     this.parentRule = parentRule;
-    this.reinitialize(payload);
+    this.#reinitialize(payload);
     this.type = type;
   }
 
@@ -35,7 +35,7 @@ export class CSSStyleDeclaration {
       return;
     }
     if (edit.oldRange.equal(this.range)) {
-      this.reinitialize((edit.payload as Protocol.CSS.CSSStyle));
+      this.#reinitialize((edit.payload as Protocol.CSS.CSSStyle));
     } else {
       this.range = this.range.rebaseAfterTextEdit(edit.oldRange, edit.newRange);
       for (let i = 0; i < this.#allPropertiesInternal.length; ++i) {
@@ -44,7 +44,7 @@ export class CSSStyleDeclaration {
     }
   }
 
-  private reinitialize(payload: Protocol.CSS.CSSStyle): void {
+  #reinitialize(payload: Protocol.CSS.CSSStyle): void {
     this.styleSheetId = payload.styleSheetId;
     this.range = payload.range ? TextUtils.TextRange.TextRange.fromObject(payload.range) : null;
 
@@ -62,23 +62,27 @@ export class CSSStyleDeclaration {
 
     if (payload.cssText && this.range) {
       const cssText = new TextUtils.Text.Text(payload.cssText);
-      let start: {
-        line: number,
-        column: number,
-      }|{
-        line: number,
-        column: number,
-      } = {line: this.range.startLine, column: this.range.startColumn};
+      let start = {line: this.range.startLine, column: this.range.startColumn};
+
+      const longhands = [];
       for (const cssProperty of payload.cssProperties) {
         const range = cssProperty.range;
-        if (range) {
-          parseUnusedText.call(this, cssText, start.line, start.column, range.startLine, range.startColumn);
-          start = {line: range.endLine, column: range.endColumn};
+        if (!range) {
+          continue;
         }
-        this.#allPropertiesInternal.push(
-            CSSProperty.parsePayload(this, this.#allPropertiesInternal.length, cssProperty));
+        this.#parseUnusedText(cssText, start.line, start.column, range.startLine, range.startColumn);
+        start = {line: range.endLine, column: range.endColumn};
+        const parsedProperty = CSSProperty.parsePayload(this, this.#allPropertiesInternal.length, cssProperty);
+        this.#allPropertiesInternal.push(parsedProperty);
+        for (const longhand of parsedProperty.getLonghandProperties()) {
+          longhands.push(longhand);
+        }
       }
-      parseUnusedText.call(this, cssText, start.line, start.column, this.range.endLine, this.range.endColumn);
+      for (const longhand of longhands) {
+        longhand.index = this.#allPropertiesInternal.length;
+        this.#allPropertiesInternal.push(longhand);
+      }
+      this.#parseUnusedText(cssText, start.line, start.column, this.range.endLine, this.range.endColumn);
     } else {
       for (const cssProperty of payload.cssProperties) {
         this.#allPropertiesInternal.push(
@@ -86,9 +90,11 @@ export class CSSStyleDeclaration {
       }
     }
 
-    this.generateSyntheticPropertiesIfNeeded();
-    this.computeInactiveProperties();
+    this.#generateSyntheticPropertiesIfNeeded();
+    this.#computeInactiveProperties();
 
+    // TODO(changhaohan): verify if this #activePropertyMap is still necessary, or if it is
+    // providing different information against the activeness in allPropertiesInternal.
     this.#activePropertyMap = new Map();
     for (const property of this.#allPropertiesInternal) {
       if (!property.activeInStyle()) {
@@ -99,70 +105,79 @@ export class CSSStyleDeclaration {
 
     this.cssText = payload.cssText;
     this.#leadingPropertiesInternal = null;
+  }
 
-    function parseUnusedText(
-        this: CSSStyleDeclaration, cssText: TextUtils.Text.Text, startLine: number, startColumn: number,
-        endLine: number, endColumn: number): void {
-      const tr = new TextUtils.TextRange.TextRange(startLine, startColumn, endLine, endColumn);
-      if (!this.range) {
-        return;
+  #parseUnusedText(
+      cssText: TextUtils.Text.Text, startLine: number, startColumn: number, endLine: number, endColumn: number): void {
+    const tr = new TextUtils.TextRange.TextRange(startLine, startColumn, endLine, endColumn);
+    if (!this.range) {
+      return;
+    }
+    const missingText = cssText.extract(tr.relativeTo(this.range.startLine, this.range.startColumn));
+
+    // Try to fit the malformed css into properties.
+    const lines = missingText.split('\n');
+    const context: SkipBlockContext = {
+      inComment: false,
+      nestedBlocks: 0,
+      validContent: '',
+    };
+    for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+      skipBlocks(lines[lineNumber], context);
+      if (context.nestedBlocks > 0 || !context.validContent) {
+        // We skip the whole line if we have entered a nested block.
+        continue;
       }
-      const missingText = cssText.extract(tr.relativeTo(this.range.startLine, this.range.startColumn));
 
-      // Try to fit the malformed css into properties.
-      const lines = missingText.split('\n');
-      let lineNumber = 0;
-      let inComment = false;
-      for (const line of lines) {
-        let column = 0;
-        for (const property of line.split(';')) {
-          const strippedProperty = stripComments(property, inComment);
-          const trimmedProperty = strippedProperty.text.trim();
-          inComment = strippedProperty.inComment;
-
-          if (trimmedProperty) {
-            let name;
-            let value;
-            const colonIndex = trimmedProperty.indexOf(':');
-            if (colonIndex === -1) {
-              name = trimmedProperty;
-              value = '';
-            } else {
-              name = trimmedProperty.substring(0, colonIndex).trim();
-              value = trimmedProperty.substring(colonIndex + 1).trim();
-            }
-            const range = new TextUtils.TextRange.TextRange(lineNumber, column, lineNumber, column + property.length);
-            this.#allPropertiesInternal.push(new CSSProperty(
-                this, this.#allPropertiesInternal.length, name, value, false, false, false, false, property,
-                range.relativeFrom(startLine, startColumn)));
+      let column = 0;
+      for (const property of context.validContent.split(';')) {
+        const trimmedProperty = property.trim();
+        if (trimmedProperty) {
+          let name;
+          let value;
+          const colonIndex = trimmedProperty.indexOf(':');
+          if (colonIndex === -1) {
+            name = trimmedProperty;
+            value = '';
+          } else {
+            name = trimmedProperty.substring(0, colonIndex).trim();
+            value = trimmedProperty.substring(colonIndex + 1).trim();
           }
-          column += property.length + 1;
+          const range = new TextUtils.TextRange.TextRange(lineNumber, column, lineNumber, column + property.length);
+          this.#allPropertiesInternal.push(new CSSProperty(
+              this, this.#allPropertiesInternal.length, name, value, false, false, false, false, property,
+              range.relativeFrom(startLine, startColumn)));
         }
-        lineNumber++;
+        column += property.length + 1;
       }
     }
 
-    function stripComments(text: string, inComment: boolean): {
-      text: string,
-      inComment: boolean,
-    } {
-      let output = '';
+    function skipBlocks(text: string, context: SkipBlockContext): void {
+      context.validContent = '';
       for (let i = 0; i < text.length; i++) {
-        if (!inComment && text.substring(i, i + 2) === '/*') {
-          inComment = true;
+        if (!context.inComment) {
+          if (text[i] === '{') {
+            context.nestedBlocks++;
+            // Since we don't retrospectively parse the block's selector, we treat anything
+            // between the last `;` and `{` as the block's selector and ignore it.
+            context.validContent = context.validContent.substring(0, context.validContent.lastIndexOf(';') + 1);
+          } else if (text[i] === '}') {
+            context.nestedBlocks--;
+          } else if (text.substring(i, i + 2) === '/*') {
+            context.inComment = true;
+            i++;
+          } else if (context.nestedBlocks === 0) {
+            context.validContent += text[i];
+          }
+        } else if (text.substring(i, i + 2) === '*/') {
+          context.inComment = false;
           i++;
-        } else if (inComment && text.substring(i, i + 2) === '*/') {
-          inComment = false;
-          i++;
-        } else if (!inComment) {
-          output += text[i];
         }
       }
-      return {text: output, inComment};
     }
   }
 
-  private generateSyntheticPropertiesIfNeeded(): void {
+  #generateSyntheticPropertiesIfNeeded(): void {
     if (this.range) {
       return;
     }
@@ -184,7 +199,7 @@ export class CSSStyleDeclaration {
       for (const shorthand of shorthands) {
         if (propertiesSet.has(shorthand)) {
           continue;
-        }  // There already is a shorthand this #longhands falls under.
+        }  // There already is a shorthand this #longhand falls under.
         const shorthandValue = this.#shorthandValues.get(shorthand);
         if (!shorthandValue) {
           continue;
@@ -201,7 +216,7 @@ export class CSSStyleDeclaration {
     this.#allPropertiesInternal = this.#allPropertiesInternal.concat(generatedProperties);
   }
 
-  private computeLeadingProperties(): CSSProperty[] {
+  #computeLeadingProperties(): CSSProperty[] {
     function propertyHasRange(property: CSSProperty): boolean {
       return Boolean(property.range);
     }
@@ -230,7 +245,7 @@ export class CSSStyleDeclaration {
 
   leadingProperties(): CSSProperty[] {
     if (!this.#leadingPropertiesInternal) {
-      this.#leadingPropertiesInternal = this.computeLeadingProperties();
+      this.#leadingPropertiesInternal = this.#computeLeadingProperties();
     }
     return this.#leadingPropertiesInternal;
   }
@@ -243,39 +258,38 @@ export class CSSStyleDeclaration {
     return this.#cssModelInternal;
   }
 
-  private computeInactiveProperties(): void {
+  #computeInactiveProperties(): void {
     const activeProperties = new Map<string, CSSProperty>();
-    for (let i = 0; i < this.#allPropertiesInternal.length; ++i) {
-      const property = this.#allPropertiesInternal[i];
+    // The order of the properties are:
+    // 1. regular property, including shorthands
+    // 2. longhand components from shorthands, in the order of their shorthands.
+    const processedLonghands = new Set();
+    for (const property of this.#allPropertiesInternal) {
       if (property.disabled || !property.parsedOk) {
         property.setActive(false);
         continue;
       }
+      if (processedLonghands.has(property)) {
+        continue;
+      }
       const metadata = cssMetadata();
       const canonicalName = metadata.canonicalPropertyName(property.name);
-      const longhands = metadata.getLonghands(canonicalName);
-      if (longhands) {
-        for (const longhand of longhands) {
-          const activeLonghand = activeProperties.get(longhand);
-          if (activeLonghand && activeLonghand.range && (!activeLonghand.important || property.important)) {
-            activeLonghand.setActive(false);
-            activeProperties.delete(longhand);
-          }
+      for (const longhand of property.getLonghandProperties()) {
+        const activeLonghand = activeProperties.get(longhand.name);
+        if (!activeLonghand) {
+          activeProperties.set(longhand.name, longhand);
+        } else if (!activeLonghand.important || longhand.important) {
+          activeLonghand.setActive(false);
+          activeProperties.set(longhand.name, longhand);
+        } else {
+          longhand.setActive(false);
         }
+        processedLonghands.add(longhand);
       }
+
       const activeProperty = activeProperties.get(canonicalName);
       if (!activeProperty) {
         activeProperties.set(canonicalName, property);
-      } else if (!property.range) {
-        // For some -webkit- properties, the backend returns also the canonical
-        // property. e.g. if you set in the css only the property
-        // -webkit-background-clip, the backend will return
-        // -webkit-background-clip and background-clip.
-        // This behavior will invalidate -webkit-background-clip (only visually,
-        // the property will be correctly applied)
-        // So this is checking if the property is visible or not in the
-        // styles panel and if not, it will not deactivate the "activeProperty".
-        property.setActive(false);
       } else if (!activeProperty.important || property.important) {
         activeProperty.setActive(false);
         activeProperties.set(canonicalName, property);
@@ -303,18 +317,6 @@ export class CSSStyleDeclaration {
     return property ? property.implicit : false;
   }
 
-  longhandProperties(name: string): CSSProperty[] {
-    const longhands = cssMetadata().getLonghands(name.toLowerCase());
-    const result = [];
-    for (let i = 0; longhands && i < longhands.length; ++i) {
-      const property = this.#activePropertyMap.get(longhands[i]);
-      if (property) {
-        result.push(property);
-      }
-    }
-    return result;
-  }
-
   propertyAt(index: number): CSSProperty|null {
     return (index < this.allProperties().length) ? this.allProperties()[index] : null;
   }
@@ -328,7 +330,7 @@ export class CSSStyleDeclaration {
     return 0;
   }
 
-  private insertionRange(index: number): TextUtils.TextRange.TextRange {
+  #insertionRange(index: number): TextUtils.TextRange.TextRange {
     const property = this.propertyAt(index);
     if (property && property.range) {
       return property.range.collapseToStart();
@@ -341,7 +343,7 @@ export class CSSStyleDeclaration {
 
   newBlankProperty(index?: number): CSSProperty {
     index = (typeof index === 'undefined') ? this.pastLastSourcePropertyIndex() : index;
-    const property = new CSSProperty(this, index, '', '', false, false, true, false, '', this.insertionRange(index));
+    const property = new CSSProperty(this, index, '', '', false, false, true, false, '', this.#insertionRange(index));
     return property;
   }
 
@@ -368,3 +370,9 @@ export enum Type {
   Inline = 'Inline',
   Attributes = 'Attributes',
 }
+
+type SkipBlockContext = {
+  inComment: boolean,
+  nestedBlocks: number,
+  validContent: string,
+};

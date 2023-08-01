@@ -4,6 +4,9 @@
  * found in the LICENSE file.
  */
 
+/* TODO(crbug.com/1442257): remove stylelint-disable. */
+/* stylelint-disable plugin/use_theme_colors */
+
 * {
   margin: 0;
   padding: 0;
@@ -27,22 +30,40 @@
 }
 
 button {
+  /*
+    --override-button-no-right-border-radius decides
+    whether button has border radius on the right or not.
+
+    It works as a boolean variable:
+    * If it is 1, `--button-has-right-border-radius` becomes a 0 multiplier
+    for the border-radius-top-right and border-radius-bottom-right properties.
+    * If it is not set or 0, it becomes a 1 multiplier
+    for the same properties which means they'll continue to have the given
+    border radius.
+  */
+  --button-has-right-border-radius: calc(1 - var(--override-button-no-right-border-radius, 0));
+  --button-border-size: 1px;
+  --button-height: 24px;
+  --button-width: 100%;
+
   align-items: center;
-  border-radius: 4px;
+  border-radius: 4px calc(var(--button-has-right-border-radius) * 4px) calc(var(--button-has-right-border-radius) * 4px) 4px;
   display: inline-flex;
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
-  height: 24px;
+  height: var(--button-height);
   line-height: 14px;
   padding: 5px 12px;
   justify-content: center;
-  width: 100%;
+  width: var(--button-width);
+  white-space: nowrap;
 }
 
 button.small {
-  height: 18px;
-  border-radius: 2px;
+  --button-height: 20px;
+
+  border-radius: 2px calc(var(--button-has-right-border-radius) * 2px) calc(var(--button-has-right-border-radius) * 2px) 2px;
 }
 
 button:focus-visible {
@@ -51,11 +72,12 @@ button:focus-visible {
 
 button.toolbar,
 button.round {
+  --button-height: 24px;
+  --button-width: 24px;
+
   background: transparent;
-  border-radius: 2px;
+  border-radius: 2px calc(var(--button-has-right-border-radius) * 2px) calc(var(--button-has-right-border-radius) * 2px) 2px;
   border: none;
-  height: 24px;
-  width: 24px;
   overflow: hidden;
   padding: 0;
   white-space: nowrap;
@@ -63,47 +85,46 @@ button.round {
 
 button.round {
   border-radius: 100%;
-  height: 30px;
-  width: 30px;
 }
 
+button.round.small,
 button.toolbar.small {
-  height: 18px;
-  width: 18px;
+  --button-height: 20px;
+  --button-width: 20px;
 }
 
-button.round.small {
-  height: 24px;
-  width: 24px;
+button.round.tiny {
+  --button-height: 18px;
+  --button-width: 18px;
 }
 
 button.primary {
-  border: 1px solid var(--color-primary);
+  border: var(--button-border-size) solid var(--color-primary);
   background: var(--color-primary);
   color: var(--color-background);
 }
 
 button.primary:hover {
   background: var(--color-button-primary-background-hovering);
-  border: 1px solid var(--color-button-primary-background-hovering);
+  border: var(--button-border-size) solid var(--color-button-primary-background-hovering);
 }
 
 button.primary.active,
 button.primary:active {
   background: var(--color-button-primary-background-pressed);
-  border: 1px solid var(--color-button-primary-background-pressed);
+  border: var(--button-border-size) solid var(--color-button-primary-background-pressed);
 }
 
 button.primary:disabled,
 button.primary:disabled:hover {
-  border: 1px solid transparent;
+  border: var(--button-border-size) solid transparent;
   background: var(--color-background-elevation-1);
   color: var(--color-text-disabled);
   cursor: not-allowed;
 }
 
 button.secondary {
-  border: 1px solid var(--color-details-hairline);
+  border: var(--button-border-size) solid var(--color-details-hairline);
   background: var(--color-background);
   color: var(--color-primary);
 }
@@ -115,16 +136,16 @@ button.secondary:hover {
 button.secondary.active,
 button.secondary:active {
   background: var(--color-button-secondary-background-pressed);
-  border: 1px solid var(--color-button-secondary-background-pressed);
+  border: var(--button-border-size) solid var(--color-button-secondary-background-pressed);
 }
 
 button.secondary:focus-visible {
-  border: 1px solid var(--color-background);
+  border: var(--button-border-size) solid var(--color-background);
 }
 
 button.secondary:disabled,
 button.secondary:disabled:hover {
-  border: 1px solid var(--color-background-elevation-1);
+  border: var(--button-border-size) solid var(--color-background-elevation-1);
   background: var(--color-background);
   color: var(--color-text-disabled);
   cursor: not-allowed;
@@ -132,7 +153,7 @@ button.secondary:disabled:hover {
 
 button.secondary.active:focus-visible,
 button.secondary:active:focus-visible {
-  border: 1px solid var(--color-button-secondary-background-pressed);
+  border: var(--button-border-size) solid var(--color-button-secondary-background-pressed);
 }
 
 button.toolbar:hover,
@@ -162,11 +183,11 @@ button.round:disabled:hover {
 }
 
 button.text-with-icon {
-  padding: 0 12px 0 4px;
+  padding: 0 calc(12px - var(--button-border-size)) 0 calc(8px - var(--button-border-size));
 }
 
 button.small.text-with-icon {
-  padding: 0 9px 0 3px;
+  padding: 0 calc(9px - var(--button-border-size)) 0 calc(3px - var(--button-border-size));
 }
 
 button.only-icon {
@@ -174,16 +195,23 @@ button.only-icon {
 }
 
 button devtools-icon {
-  width: 19px;
-  height: 19px;
+  width: calc(var(--button-width) - 4px);
+  height: calc(var(--button-height) - 4px);
+}
+
+button.text-with-icon devtools-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
 }
 
 button.toolbar devtools-icon,
 button.round devtools-icon {
-  width: 24px;
-  height: 24px;
+  --icon-color: var(--icon-default);
+}
 
-  --icon-color: var(--color-text-secondary);
+button.primary-toolbar devtools-icon {
+  --icon-color: var(--icon-primary);
 }
 
 button.primary devtools-icon {
@@ -191,40 +219,54 @@ button.primary devtools-icon {
 }
 
 button.secondary devtools-icon {
-  --icon-color: var(--color-primary);
+  --icon-color: var(--icon-primary);
 }
 
-button.small devtools-icon {
-  width: 14px;
-  height: 14px;
+button.explicit-size devtools-icon {
+  width: unset;
+  height: unset;
 }
 
-button.toolbar.small devtools-icon,
-button.round.small devtools-icon {
-  width: 18px;
-  height: 18px;
+button.small.text-with-icon devtools-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+button.toolbar.explicit-size devtools-icon,
+button.round.explicit-size devtools-icon {
+  width: unset;
+  height: unset;
 }
 
 button.toolbar.active devtools-icon,
 button.toolbar:active devtools-icon {
-  --icon-color: var(--color-primary);
+  --icon-color: var(--icon-toggled);
+}
+
+button.primary-toolbar:active devtools-icon {
+  --icon-color: var(--icon-primary);
 }
 
 button.toolbar:hover devtools-icon {
-  --icon-color: var(--color-text-primary);
+  --icon-color: var(--icon-default-hover);
+}
+
+button.primary-toolbar:hover devtools-icon {
+  --icon-color: var(--icon-primary);
 }
 
 button.toolbar:disabled devtools-icon,
 button.round:disabled devtools-icon {
-  --icon-color: var(--color-text-disabled);
+  --icon-color: var(--icon-disabled);
 }
 
 button.primary:disabled devtools-icon {
-  --icon-color: var(--color-text-disabled);
+  --icon-color: var(--icon-disabled);
 }
 
 button.secondary:disabled devtools-icon {
-  --icon-color: var(--color-text-disabled);
+  --icon-color: var(--icon-disabled);
 }
 
 .spinner-component.secondary {
@@ -245,7 +287,7 @@ button.secondary:disabled devtools-icon {
   border: 2px solid var(--color-background);
   animation: spinner-animation 1s linear infinite;
   border-right-color: transparent;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 
 @keyframes spinner-animation {

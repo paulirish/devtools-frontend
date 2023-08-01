@@ -4,10 +4,23 @@
 
 import {assert} from 'chai';
 
-import {assertNotNullOrUndefined, getBrowserAndPages, goToResource, setCheckBox, waitFor, waitForFunction} from '../../shared/helper.js';
+import {
+  assertNotNullOrUndefined,
+  getBrowserAndPages,
+  goToResource,
+  setCheckBox,
+  waitFor,
+  waitForFunction,
+} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {getResourcesElement} from '../helpers/issues-helpers.js';
-import {ensureResourceSectionIsExpanded, expandIssue, getIssueByTitle, navigateToIssuesTab, waitForTableFromResourceSectionContents} from '../helpers/issues-helpers.js';
+import {
+  ensureResourceSectionIsExpanded,
+  expandIssue,
+  getIssueByTitle,
+  getResourcesElement,
+  navigateToIssuesTab,
+  waitForTableFromResourceSectionContents,
+} from '../helpers/issues-helpers.js';
 
 describe('IssueView cache', async () => {
   it('should correctly update the issue', async () => {
@@ -36,15 +49,17 @@ describe('IssueView cache', async () => {
     await triggerIssue();
     await navigateToIssuesTab();
     async function waitForResources(numberOfAggregatedIssues: number, expectedTableRows: string[][]) {
-      await expandIssue();
-      const issueElement = await getIssueByTitle('Ensure CORS requests include credentials only when allowed');
-      assertNotNullOrUndefined(issueElement);
-      const section = await getResourcesElement('requests', issueElement, '.cors-issue-affected-resource-label');
       await waitForFunction(async () => {
+        await expandIssue();
+        const issueElement = await getIssueByTitle('Ensure CORS requests include credentials only when allowed');
+        assertNotNullOrUndefined(issueElement);
+        const section = await getResourcesElement('requests', issueElement, '.cors-issue-affected-resource-label');
         const text = await section.label.evaluate(el => el.textContent);
         const expected = numberOfAggregatedIssues === 1 ? '1 request' : `${numberOfAggregatedIssues} requests`;
         return text === expected;
       });
+      const issueElement = await getIssueByTitle('Ensure CORS requests include credentials only when allowed');
+      const section = await getResourcesElement('requests', issueElement, '.cors-issue-affected-resource-label');
       await ensureResourceSectionIsExpanded(section);
       await waitForTableFromResourceSectionContents(section.content, expectedTableRows);
       const adorner = await waitFor('devtools-adorner');
@@ -70,7 +85,7 @@ describe('IssueView cache', async () => {
       'false',
     ];
     await waitForResources(2, [header, expectedRow1, expectedRow2]);
-    await setCheckBox('[aria-label="Include third-party cookie issues"]', true);
+    await setCheckBox('[title="Include cookie Issues caused by third-party sites"]', true);
 
     // Trigger issue again to see if resources are updated.
     await triggerIssue();

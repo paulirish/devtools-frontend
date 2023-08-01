@@ -15,13 +15,13 @@ import * as SDK from '../../core/sdk/sdk.js';
 
 const UIStrings = {
   /**
-  *@description Text that refers to the main target
-  */
+   *@description Text that refers to the main target
+   */
   main: 'Main',
   /**
-  *@description Text in Node Main of the Sources panel when debugging a Node.js app
-  *@example {example.com} PH1
-  */
+   *@description Text in Node Main of the Sources panel when debugging a Node.js app
+   *@example {example.com} PH1
+   */
   nodejsS: 'Node.js: {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('entrypoints/node_app/NodeMain.ts', UIStrings);
@@ -81,7 +81,7 @@ export class NodeChildTargetManager extends SDK.SDKModel.SDKModel<void> implemen
     void this.#targetAgent.invoke_setRemoteLocations({locations});
   }
 
-  dispose(): void {
+  override dispose(): void {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.removeEventListener(
         Host.InspectorFrontendHostAPI.Events.DevicesDiscoveryConfigChanged, this.#devicesDiscoveryConfigChanged, this);
 

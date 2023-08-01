@@ -16,8 +16,8 @@ import deviceModeViewStyles from './deviceModeView.css.legacy.js';
 
 const UIStrings = {
   /**
-  *@description Bottom resizer element title in Device Mode View of the Device Toolbar
-  */
+   *@description Bottom resizer element title in Device Mode View of the Device Toolbar
+   */
   doubleclickForFullHeight: 'Double-click for full height',
   /**
    * @description Name of a device that the user can select to emulate. Small mobile device.
@@ -103,8 +103,9 @@ export class DeviceModeView extends UI.Widget.VBox {
 
     this.model = EmulationModel.DeviceModeModel.DeviceModeModel.instance();
     this.model.addEventListener(EmulationModel.DeviceModeModel.Events.Updated, this.updateUI, this);
-    this.mediaInspector =
-        new MediaQueryInspector(() => this.model.appliedDeviceSize().width, this.model.setWidth.bind(this.model));
+    this.mediaInspector = new MediaQueryInspector(
+        () => this.model.appliedDeviceSize().width, this.model.setWidth.bind(this.model),
+        new Common.Throttler.Throttler(0));
     this.showMediaInspectorSetting = Common.Settings.Settings.instance().moduleSetting('showMediaQueryInspector');
     this.showMediaInspectorSetting.addChangeListener(this.updateUI, this);
     this.showRulersSetting = Common.Settings.Settings.instance().moduleSetting('emulation.showRulers');
@@ -430,18 +431,18 @@ export class DeviceModeView extends UI.Widget.VBox {
     }
   }
 
-  onResize(): void {
+  override onResize(): void {
     if (this.isShowing()) {
       this.contentAreaResized();
     }
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.measureHandles();
     this.toolbar.restore();
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.model.emulate(EmulationModel.DeviceModeModel.Type.None, null, null);
   }
 
@@ -587,7 +588,7 @@ export class Ruler extends UI.Widget.VBox {
     void this.throttler.schedule(this.update.bind(this));
   }
 
-  onResize(): void {
+  override onResize(): void {
     void this.throttler.schedule(this.update.bind(this));
   }
 

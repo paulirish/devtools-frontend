@@ -9,7 +9,12 @@ import * as ComponentHelpers from '../../helpers/helpers.js';
 await ComponentHelpers.ComponentServerSetup.setup();
 await FrontendHelpers.initializeGlobalVars();
 
-const testIcon = '/front_end/Images/ic_file_image.svg';
+const testIcon = '/front_end/Images/file-image.svg';
+const fileIcon = '/front_end/Images/document.svg';
+const plusIcon = '/front_end/Images/plus.svg';
+const minusIcon = '/front_end/Images/minus.svg';
+const trashBinIcon = '/front_end/Images/bin.svg';
+const closeIcon = '/front_end/Images/cross.svg';
 
 function appendButton(button: Buttons.Button.Button): void {
   document.querySelector('#container')?.appendChild(button);
@@ -32,6 +37,16 @@ primaryButton.innerText = 'Click me';
 primaryButton.title = 'Custom title';
 primaryButton.onclick = () => alert('clicked');
 appendButton(primaryButton);
+
+const primaryButtonWithoutRightBorderRadius = new Buttons.Button.Button();
+primaryButtonWithoutRightBorderRadius.data = {
+  variant: Buttons.Button.Variant.PRIMARY,
+};
+primaryButtonWithoutRightBorderRadius.style.setProperty('--override-button-no-right-border-radius', '1');
+primaryButtonWithoutRightBorderRadius.innerText = 'No right border radius';
+primaryButtonWithoutRightBorderRadius.title = 'Custom title';
+primaryButtonWithoutRightBorderRadius.onclick = () => alert('clicked');
+appendButton(primaryButtonWithoutRightBorderRadius);
 
 // Primary (forced active)
 const forcedActive = new Buttons.Button.Button();
@@ -146,6 +161,16 @@ primaryIconOnlyButton.onclick = () => alert('clicked');
 primaryIconOnlyButton.style.width = '24px';
 appendButton(primaryIconOnlyButton);
 
+// Primary Icon with a name
+const primaryIconByNameButton = new Buttons.Button.Button();
+primaryIconByNameButton.data = {
+  variant: Buttons.Button.Variant.PRIMARY,
+  iconName: 'file-image',
+};
+primaryIconByNameButton.onclick = () => alert('clicked');
+primaryIconByNameButton.innerHTML = 'Icon by name';
+appendButton(primaryIconByNameButton);
+
 // Secondary Icon Only
 const secondaryIconOnlyButton = new Buttons.Button.Button();
 secondaryIconOnlyButton.onclick = () => alert('clicked');
@@ -223,16 +248,44 @@ roundButtonDisabled.title = 'Disabled Round Button';
 roundButtonDisabled.onclick = () => alert('clicked');
 appendButton(roundButtonDisabled);
 
-// Small Round Button
-const smallRoundButton = new Buttons.Button.Button();
-smallRoundButton.data = {
-  variant: Buttons.Button.Variant.ROUND,
-  iconUrl: testIcon,
-  size: Buttons.Button.Size.SMALL,
-};
-smallRoundButton.title = 'Small Round Button';
-smallRoundButton.onclick = () => alert('clicked');
-appendButton(smallRoundButton);
+// Small Round Buttons
+const roundIcons = [
+  {iconUrl: testIcon},
+  {iconUrl: fileIcon, iconWidth: '16px', iconHeight: '16px'},
+  {iconUrl: plusIcon},
+  {iconUrl: minusIcon},
+  {iconUrl: trashBinIcon, iconWidth: '10px', iconHeight: '14px'},
+  {iconUrl: closeIcon, iconWidth: '10px', iconHeight: '10px'},
+];
+for (const roundIcon of roundIcons) {
+  const smallRoundButton = new Buttons.Button.Button();
+  smallRoundButton.data = {
+    variant: Buttons.Button.Variant.ROUND,
+    size: Buttons.Button.Size.SMALL,
+    ...roundIcon,
+  };
+  smallRoundButton.title = 'Small Round Button';
+  smallRoundButton.onclick = () => alert('clicked');
+  appendButton(smallRoundButton);
+}
+
+// Tiny Round Buttons
+const tinyRoundIcons = [
+  {iconUrl: plusIcon},
+  {iconUrl: minusIcon},
+  {iconUrl: closeIcon, iconWidth: '9px', iconHeight: '9px'},
+];
+for (const roundIcon of tinyRoundIcons) {
+  const tinyRoundButton = new Buttons.Button.Button();
+  tinyRoundButton.data = {
+    variant: Buttons.Button.Variant.ROUND,
+    size: Buttons.Button.Size.TINY,
+    ...roundIcon,
+  };
+  tinyRoundButton.title = 'Tiny Round Button';
+  tinyRoundButton.onclick = () => alert('clicked');
+  appendButton(tinyRoundButton);
+}
 
 // Small Disabled Round Button
 const smallRoundButtonDisabled = new Buttons.Button.Button();
@@ -251,7 +304,7 @@ for (let i = 0; i < 6; i++) {
   const toolbarButton = new Buttons.Button.Button();
   toolbarButton.onclick = () => alert('clicked');
   toolbarButton.data = {
-    variant: Buttons.Button.Variant.TOOLBAR,
+    variant: i % 2 === 1 ? Buttons.Button.Variant.TOOLBAR : Buttons.Button.Variant.PRIMARY_TOOLBAR,
     iconUrl: testIcon,
   };
   appendToToolbar(toolbarButton);

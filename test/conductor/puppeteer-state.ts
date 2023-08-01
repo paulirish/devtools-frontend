@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as puppeteer from 'puppeteer';
+import * as puppeteer from 'puppeteer-core';
 
 import {querySelectorShadowTextAll, querySelectorShadowTextOne} from './custom-query-handlers.js';
 
@@ -78,8 +78,8 @@ export const registerHandlers = () => {
     return;
   }
   puppeteer.registerCustomQueryHandler('pierceShadowText', {
-    queryOne: querySelectorShadowTextOne,
-    queryAll: querySelectorShadowTextAll,
+    queryOne: querySelectorShadowTextOne as ((node: Node, selector: string) => Node | null),
+    queryAll: querySelectorShadowTextAll as unknown as ((node: Node, selector: string) => Node[]),
   });
   handlerRegistered = true;
 };

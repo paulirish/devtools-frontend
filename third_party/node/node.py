@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2017 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -13,7 +13,8 @@ import os
 def GetBinaryPath():
     return os_path.join(
         os_path.dirname(__file__), *{
-            'Darwin': ('mac', 'node-darwin-x64', 'bin', 'node'),
+            'Darwin': ('mac', 'node-darwin-arm64' if platform.machine()
+                       == 'arm64' else 'node-darwin-x64', 'bin', 'node'),
             'Linux': ('linux', 'node-linux-x64', 'bin', 'node'),
             'Windows': ('win', 'node.exe'),
         }[platform.system()])

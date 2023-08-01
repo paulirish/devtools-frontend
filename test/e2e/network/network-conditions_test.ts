@@ -3,17 +3,24 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type {ElementHandle, Page} from 'puppeteer';
+import {type ElementHandle, type Page} from 'puppeteer-core';
 import {getBrowserAndPages, pressKey, typeText, waitFor, waitForAria, tabForward} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {navigateToNetworkTab} from '../helpers/network-helpers.js';
-import type * as Protocol from '../../../front_end/generated/protocol.js';
 
-interface MetaData extends Protocol.Emulation.UserAgentMetadata {
-  getHighEntropyValues: (metaDataKeys: string[]) => Promise<string[]>;
-}
-interface NavigatorWithUserAgentData extends Navigator {
-  userAgentData: MetaData;
+interface Navigator {
+  userAgentData?: {
+    brands: {
+      brand: string,
+      version: string,
+    }[],
+    fullVersionList: {
+      brand: string,
+      version: string,
+    }[],
+    mobile: string,
+    getHighEntropyValues: (metaDataKeys: string[]) => Promise<string[]>,
+  };
 }
 
 describe('The Network Tab', async function() {
@@ -39,11 +46,12 @@ describe('The Network Tab', async function() {
 
   async function getUserAgentMetadataFromTarget(target: Page) {
     const getUserAgentMetaData = async () => {
-      const nav = <NavigatorWithUserAgentData>navigator;
+      const nav = <Navigator>navigator;
       return {
-        brands: nav.userAgentData.brands,
-        mobile: nav.userAgentData.mobile,
-        ...(await nav.userAgentData.getHighEntropyValues([
+        brands: nav.userAgentData?.brands,
+        fullVersionList: nav.userAgentData?.fullVersionList,
+        mobile: nav.userAgentData?.mobile,
+        ...(await nav.userAgentData?.getHighEntropyValues([
           'uaFullVersion',
           'architecture',
           'model',
@@ -58,10 +66,10 @@ describe('The Network Tab', async function() {
 
   it('can change accepted content encodings', async () => {
     const section = await openNetworkConditions('.network-config-accepted-encoding');
-    const autoCheckbox = await waitForAria('Use browser default', section);
-    const deflateCheckbox = await waitForAria('deflate', section);
-    const gzipCheckbox = await waitForAria('gzip', section);
-    const brotliCheckbox = await waitForAria('br', section);
+    const autoCheckbox = await (await waitForAria('Use browser default', section)).toElement('input');
+    const deflateCheckbox = await (await waitForAria('deflate', section)).toElement('input');
+    const gzipCheckbox = await (await waitForAria('gzip', section)).toElement('input');
+    const brotliCheckbox = await (await waitForAria('br', section)).toElement('input');
     await brotliCheckbox.evaluate(el => el.scrollIntoView(true));
     await assertChecked(autoCheckbox, true);
     await assertChecked(deflateCheckbox, true);
@@ -147,7 +155,7 @@ describe('The Network Tab', async function() {
       'model': '',
     };
     const section = await openNetworkConditions('.network-config-ua');
-    const autoCheckbox = await waitForAria('Use browser default', section);
+    const autoCheckbox = await (await waitForAria('Use browser default', section)).toElement('input');
     const uaDropdown = await waitForAria('User agent', section);
     await assertChecked(autoCheckbox, true);
     await autoCheckbox.click();
@@ -179,7 +187,7 @@ describe('The Network Tab', async function() {
         `Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${
             fullVersion} Mobile Safari/537.36`;
     const section = await openNetworkConditions('.network-config-ua');
-    const autoCheckbox = await waitForAria('Use browser default', section);
+    const autoCheckbox = await (await waitForAria('Use browser default', section)).toElement('input');
     const uaDropdown = await waitForAria('User agent', section);
     await assertChecked(autoCheckbox, true);
 
@@ -202,7 +210,7 @@ describe('The Network Tab', async function() {
   it('can apply customized userAgentMetadata', async () => {
     const {target} = getBrowserAndPages();
     const section = await openNetworkConditions('.network-config-ua');
-    const autoCheckbox = await waitForAria('Use browser default', section);
+    const autoCheckbox = await (await waitForAria('Use browser default', section)).toElement('input');
     const uaDropdown = await waitForAria('User agent', section);
     await assertChecked(autoCheckbox, true);
 
@@ -214,29 +222,38 @@ describe('The Network Tab', async function() {
     const userAgent = await waitForAria('Enter a custom user agent');
     await userAgent.click();
     await userAgent.type('Test User Agent String');
-    await tabForward();          // focus help button
-    await pressKey('Space');     // open client hints section
-    await tabForward();          // focus help link
-    await tabForward();          // focus brand name
+    await tabForward();       // focus help button
+    await pressKey('Space');  // open client hints section
+    await tabForward();       // focus help link
+
+    // UA brands
+    await tabForward();  // focus brand name
     await typeText('Test Brand 1');
     await tabForward();  // focus brand version
     await typeText('99');
-    await tabForward();          // focus delete brand button
-    await tabForward();          // focus add brand button
-    await pressKey('Enter');     // add a second brand
-
+    await tabForward();       // focus delete brand button
+    await tabForward();       // focus add brand button
+    await pressKey('Enter');  // add a second brand
     await typeText('Test Brand 2');
     await tabForward();  // focus brand version
     await typeText('100');
-    await tabForward();          // focus delete brand button
-    await tabForward();          // focus add brand button
-    await pressKey('Enter');     // add a third brand
-
+    await tabForward();       // focus delete brand button
+    await tabForward();       // focus add brand button
+    await pressKey('Enter');  // add a third brand
     await typeText('Test Brand 3');
     await tabForward();  // focus brand version
     await typeText('101');
     await tabForward();  // focus delete brand button
     await tabForward();  // focus add brand button
+
+    // full-version brands
+    await tabForward();  // focus brand
+    await typeText('FV Brand 1');
+    await tabForward();  // focus brand version
+    await typeText('9.8.7');
+    await tabForward();  // focus delete brand button
+    await tabForward();  // focus add brand button
+
     await tabForward();  // focus browser full version
     await typeText('99.99');
     await tabForward();  // focus platform name

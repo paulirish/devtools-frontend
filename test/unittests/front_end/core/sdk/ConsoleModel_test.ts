@@ -4,11 +4,20 @@
 
 const {assert} = chai;
 
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
 import type * as SDKModule from '../../../../../front_end/core/sdk/sdk.js';
-import type * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as Common from '../../../../../front_end/core/common/common.js';
+import {
+  createTarget,
+} from '../../helpers/EnvironmentHelpers.js';
 
-describe('ConsoleMessage', () => {
+import {
+  describeWithMockConnection,
+} from '../../helpers/MockConnection.js';
+
+describeWithMockConnection('ConsoleMessage', () => {
   let SDK: typeof SDKModule;
   before(async () => {
     SDK = await import('../../../../../front_end/core/sdk/sdk.js');
@@ -88,5 +97,144 @@ describe('ConsoleMessage', () => {
     const b =
         newMessage({stackTrace: {callFrames: [{functionName, scriptId: scriptId2, url, lineNumber, columnNumber}]}});
     assert.isFalse(a.isEqual(b));
+  });
+
+  it('logs a message on main frame navigation', async () => {
+    Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').set(true);
+    const consoleLog = sinon.spy(Common.Console.Console.instance(), 'log');
+    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const mainFrameUnderTabTarget = createTarget({type: SDK.Target.Type.Frame, parentTarget: tabTarget});
+    const mainFrameWithoutTabTarget = createTarget({type: SDK.Target.Type.Frame});
+    const subframeTarget = createTarget({type: SDK.Target.Type.Frame, parentTarget: mainFrameWithoutTabTarget});
+    const navigateTarget = (target: SDKModule.Target.Target) => {
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assertNotNullOrUndefined(resourceTreeModel);
+      resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.CachedResourcesLoaded, resourceTreeModel);
+      const frame = {url: 'http://example.com/', backForwardCacheDetails: {}} as
+          SDKModule.ResourceTreeModel.ResourceTreeFrame;
+      resourceTreeModel.dispatchEventToListeners(
+          SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          {frame, type: SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation});
+    };
+    navigateTarget(subframeTarget);
+    assert.isTrue(consoleLog.notCalled);
+
+    navigateTarget(mainFrameUnderTabTarget);
+    assert.isTrue(consoleLog.calledOnce);
+    assert.isTrue(consoleLog.calledOnceWith('Navigated to http://example.com/'));
+
+    navigateTarget(mainFrameWithoutTabTarget);
+    assert.isTrue(consoleLog.calledTwice);
+    assert.isTrue(consoleLog.secondCall.calledWith('Navigated to http://example.com/'));
+  });
+
+  it('logs a message on main frame navigation via bfcache', async () => {
+    Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').set(true);
+    const consoleLog = sinon.spy(Common.Console.Console.instance(), 'log');
+    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const mainFrameUnderTabTarget = createTarget({type: SDK.Target.Type.Frame, parentTarget: tabTarget});
+    const mainFrameWithoutTabTarget = createTarget({type: SDK.Target.Type.Frame});
+    const subframeTarget = createTarget({type: SDK.Target.Type.Frame, parentTarget: mainFrameWithoutTabTarget});
+    const navigateTarget = (target: SDKModule.Target.Target) => {
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assertNotNullOrUndefined(resourceTreeModel);
+      resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.CachedResourcesLoaded, resourceTreeModel);
+      const frame = {url: 'http://example.com/', backForwardCacheDetails: {restoredFromCache: true}} as
+          SDKModule.ResourceTreeModel.ResourceTreeFrame;
+      resourceTreeModel.dispatchEventToListeners(
+          SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          {frame, type: SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation});
+    };
+    navigateTarget(subframeTarget);
+    assert.isTrue(consoleLog.notCalled);
+
+    navigateTarget(mainFrameUnderTabTarget);
+    assert.isTrue(consoleLog.calledOnce);
+    assert.isTrue(consoleLog.calledOnceWith(
+        'Navigation to http://example.com/ was restored from back/forward cache (see https://web.dev/bfcache/)'));
+
+    navigateTarget(mainFrameWithoutTabTarget);
+    assert.isTrue(consoleLog.calledTwice);
+    assert.isTrue(consoleLog.secondCall.calledWith(
+        'Navigation to http://example.com/ was restored from back/forward cache (see https://web.dev/bfcache/)'));
+  });
+
+  it('discards duplicate console messages with identical timestamps', async () => {
+    const target = createTarget({type: SDK.Target.Type.Frame});
+    const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+    assertNotNullOrUndefined(runtimeModel);
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    assertNotNullOrUndefined(resourceTreeModel);
+    const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+    assertNotNullOrUndefined(consoleModel);
+    const addMessage = sinon.spy(consoleModel, 'addMessage');
+    resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.CachedResourcesLoaded, resourceTreeModel);
+
+    const consoleAPICall = {
+      type: Protocol.Runtime.ConsoleAPICalledEventType.Log,
+      args: [{type: Protocol.Runtime.RemoteObjectType.String, value: 'log me'}],
+      executionContextId: 1,
+      timestamp: 123456.789,
+    };
+
+    runtimeModel.dispatchEventToListeners(SDK.RuntimeModel.Events.ConsoleAPICalled, consoleAPICall);
+    assert.isTrue(addMessage.calledOnce);
+    assert.isTrue(addMessage.calledOnceWith(sinon.match({messageText: 'log me'})));
+
+    runtimeModel.dispatchEventToListeners(SDK.RuntimeModel.Events.ConsoleAPICalled, consoleAPICall);
+    assert.isTrue(addMessage.calledOnce);
+
+    runtimeModel.dispatchEventToListeners(
+        SDK.RuntimeModel.Events.ConsoleAPICalled, {...consoleAPICall, timestamp: 123457.000});
+    assert.isTrue(addMessage.calledTwice);
+    assert.isTrue(addMessage.secondCall.calledWith(sinon.match({messageText: 'log me'})));
+  });
+
+  it('clears when main frame global object cleared', async () => {
+    Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').set(false);
+    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const mainFrameUnderTabTarget = createTarget({type: SDK.Target.Type.Frame, parentTarget: tabTarget});
+    const mainFrameWithoutTabTarget = createTarget({type: SDK.Target.Type.Frame});
+    const subframeTarget = createTarget({type: SDK.Target.Type.Frame, parentTarget: mainFrameWithoutTabTarget});
+    const clearGlobalObjectOnTarget = (target: SDKModule.Target.Target) => {
+      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      assertNotNullOrUndefined(resourceTreeModel);
+      resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.CachedResourcesLoaded, resourceTreeModel);
+
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      assertNotNullOrUndefined(debuggerModel);
+      debuggerModel.dispatchEventToListeners(SDK.DebuggerModel.Events.GlobalObjectCleared, debuggerModel);
+    };
+
+    let consoleClearEventsTabTarget = 0;
+    let consoleClearEventsMainFrameUnderTabTarget = 0;
+    let consoleClearEventsMainFrameWithoutTabTarget = 0;
+    let consoleClearEventsSubframeTarget = 0;
+    tabTarget.model(SDK.ConsoleModel.ConsoleModel)
+        ?.addEventListener(SDK.ConsoleModel.Events.ConsoleCleared, () => ++consoleClearEventsTabTarget);
+    mainFrameUnderTabTarget.model(SDK.ConsoleModel.ConsoleModel)
+        ?.addEventListener(SDK.ConsoleModel.Events.ConsoleCleared, () => ++consoleClearEventsMainFrameUnderTabTarget);
+    mainFrameWithoutTabTarget.model(SDK.ConsoleModel.ConsoleModel)
+        ?.addEventListener(SDK.ConsoleModel.Events.ConsoleCleared, () => ++consoleClearEventsMainFrameWithoutTabTarget);
+    subframeTarget.model(SDK.ConsoleModel.ConsoleModel)
+        ?.addEventListener(SDK.ConsoleModel.Events.ConsoleCleared, () => ++consoleClearEventsSubframeTarget);
+
+    clearGlobalObjectOnTarget(subframeTarget);
+    assert.strictEqual(consoleClearEventsTabTarget, 0);
+    assert.strictEqual(consoleClearEventsMainFrameUnderTabTarget, 0);
+    assert.strictEqual(consoleClearEventsMainFrameWithoutTabTarget, 0);
+    assert.strictEqual(consoleClearEventsSubframeTarget, 0);
+
+    clearGlobalObjectOnTarget(mainFrameUnderTabTarget);
+    assert.strictEqual(consoleClearEventsTabTarget, 0);
+    assert.strictEqual(consoleClearEventsMainFrameUnderTabTarget, 1);
+    assert.strictEqual(consoleClearEventsMainFrameWithoutTabTarget, 0);
+    assert.strictEqual(consoleClearEventsSubframeTarget, 0);
+
+    clearGlobalObjectOnTarget(mainFrameWithoutTabTarget);
+    assert.strictEqual(consoleClearEventsTabTarget, 0);
+    assert.strictEqual(consoleClearEventsMainFrameUnderTabTarget, 1);
+    assert.strictEqual(consoleClearEventsMainFrameWithoutTabTarget, 1);
+    assert.strictEqual(consoleClearEventsSubframeTarget, 0);
   });
 });

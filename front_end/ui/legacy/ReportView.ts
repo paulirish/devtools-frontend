@@ -36,6 +36,10 @@ export class ReportView extends VBox {
     this.sectionList = this.contentBox.createChild('div', 'vbox');
   }
 
+  getHeaderElement(): Element {
+    return this.headerElement;
+  }
+
   setTitle(title: string): void {
     if (this.titleElement.textContent === title) {
       return;
@@ -122,6 +126,17 @@ export class Section extends VBox {
     return this.titleElement.textContent || '';
   }
 
+  getTitleElement(): Element {
+    return this.titleElement;
+  }
+
+  getFieldElement(): HTMLElement {
+    return this.fieldList;
+  }
+  appendFieldWithCustomView(customElement: HTMLElement): void {
+    this.fieldList.append(customElement);
+  }
+
   setTitle(title: string, tooltip?: string): void {
     if (this.titleElement.textContent !== title) {
       this.titleElement.textContent = title;
@@ -135,7 +150,7 @@ export class Section extends VBox {
    */
   setUiGroupTitle(groupTitle: string): void {
     ARIAUtils.markAsGroup(this.element);
-    ARIAUtils.setAccessibleName(this.element, groupTitle);
+    ARIAUtils.setLabel(this.element, groupTitle);
   }
 
   createToolbar(): Toolbar {
@@ -199,7 +214,7 @@ export class Section extends VBox {
 
   markFieldListAsGroup(): void {
     ARIAUtils.markAsGroup(this.fieldList);
-    ARIAUtils.setAccessibleName(this.fieldList, this.title());
+    ARIAUtils.setLabel(this.fieldList, this.title());
   }
 
   setIconMasked(masked: boolean): void {

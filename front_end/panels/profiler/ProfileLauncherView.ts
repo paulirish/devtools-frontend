@@ -35,33 +35,33 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {IsolateSelector} from './IsolateSelector.js';
 import profileLauncherViewStyles from './profileLauncherView.css.js';
 
-import type {ProfileType} from './ProfileHeader.js';
-import type {ProfilesPanel} from './ProfilesPanel.js';
+import {type ProfileType} from './ProfileHeader.js';
+import {type ProfilesPanel} from './ProfilesPanel.js';
 
 const UIStrings = {
   /**
-  *@description Text in Profile Launcher View of a profiler tool
-  */
+   *@description Text in Profile Launcher View of a profiler tool
+   */
   selectJavascriptVmInstance: 'Select JavaScript VM instance',
   /**
-  *@description Text to load something
-  */
+   *@description Text to load something
+   */
   load: 'Load',
   /**
-  *@description Control button text content in Profile Launcher View of a profiler tool
-  */
+   *@description Control button text content in Profile Launcher View of a profiler tool
+   */
   takeSnapshot: 'Take snapshot',
   /**
-  *@description Text of an item that stops the running task
-  */
+   *@description Text of an item that stops the running task
+   */
   stop: 'Stop',
   /**
-  *@description Control button text content in Profile Launcher View of a profiler tool
-  */
+   *@description Control button text content in Profile Launcher View of a profiler tool
+   */
   start: 'Start',
   /**
-  *@description Profile type header element text content in Profile Launcher View of a profiler tool
-  */
+   *@description Profile type header element text content in Profile Launcher View of a profiler tool
+   */
   selectProfilingType: 'Select profiling type',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfileLauncherView.ts', UIStrings);
@@ -175,13 +175,15 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
     UI.ARIAUtils.setDescription(optionElement, profileType.description);
     const customContent = profileType.customContent();
     if (customContent) {
+      customContent.setAttribute('role', 'group');
+      customContent.setAttribute('aria-labelledby', `${optionElement.id}`);
       this.profileTypeSelectorForm.createChild('p').appendChild(customContent);
       profileType.setCustomContentEnabled(false);
     }
     const headerText = this.typeIdToOptionElementAndProfileType.size > 1 ? i18nString(UIStrings.selectProfilingType) :
                                                                            profileType.name;
     this.profileTypeHeaderElement.textContent = headerText;
-    UI.ARIAUtils.setAccessibleName(this.profileTypeSelectorForm, headerText);
+    UI.ARIAUtils.setLabel(this.profileTypeSelectorForm, headerText);
   }
 
   restoreSelectedProfileType(): void {
@@ -222,7 +224,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
     this.updateControls();
     this.selectedProfileTypeSetting.set(profileType.id);
   }
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([profileLauncherViewStyles]);
   }

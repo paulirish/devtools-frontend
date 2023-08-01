@@ -3,11 +3,27 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import type * as puppeteer from 'puppeteer';
 
-import {goToResource} from '../../shared/helper.js';
+import {waitForSoftContextMenu} from '../helpers/context-menu-helpers.js';
+
+import type * as puppeteer from 'puppeteer-core';
+
+import {click, goToResource} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {clickNthChildOfSelectedElementNode, editCSSProperty, getColorSwatch, getColorSwatchColor, getCSSPropertyInRule, getPropertyFromComputedPane, navigateToSidePane, shiftClickColorSwatch, waitForContentOfSelectedElementsNode, waitForCSSPropertyValue, waitForElementsComputedSection, waitForPropertyValueInComputedPane} from '../helpers/elements-helpers.js';
+import {
+  clickNthChildOfSelectedElementNode,
+  editCSSProperty,
+  getColorSwatch,
+  getColorSwatchColor,
+  getCSSPropertyInRule,
+  getPropertyFromComputedPane,
+  navigateToSidePane,
+  shiftClickColorSwatch,
+  waitForContentOfSelectedElementsNode,
+  waitForCSSPropertyValue,
+  waitForElementsComputedSection,
+  waitForPropertyValueInComputedPane,
+} from '../helpers/elements-helpers.js';
 
 async function goToTestPageAndSelectTestElement(path: string = 'inline_editor/default.html') {
   await goToResource(path);
@@ -116,7 +132,9 @@ describe('The color swatch', async () => {
     }
     await shiftClickColorSwatch(property, 0);
 
-    await waitForCSSPropertyValue('#inspected', 'color', 'rgb(255 0 0)');
+    const menu = await waitForSoftContextMenu();
+    await click('[aria-label="#f00"]', {root: menu});
+    await waitForCSSPropertyValue('#inspected', 'color', '#f00');
   });
 
   it('supports shift-clicking for color properties in the Computed pane', async () => {
@@ -131,6 +149,9 @@ describe('The color swatch', async () => {
 
     await waitForPropertyValueInComputedPane('color', 'rgb(255, 0, 0)');
     await shiftClickColorSwatch(property, 0);
+
+    const menu = await waitForSoftContextMenu();
+    await click('[aria-label="hsl(0deg 100% 50%)"]', {root: menu});
     await waitForPropertyValueInComputedPane('color', 'hsl(0deg 100% 50%)');
   });
 
@@ -144,7 +165,9 @@ describe('The color swatch', async () => {
     }
     await shiftClickColorSwatch(property, 0);
 
-    await waitForCSSPropertyValue('#inspected', 'background-color', 'rgb(0 0 255)');
+    const menu = await waitForSoftContextMenu();
+    await click('[aria-label="#00f"]', {root: menu});
+    await waitForCSSPropertyValue('#inspected', 'background-color', '#00f');
   });
 
   it('is updated when the color value is updated in the Styles pane', async () => {

@@ -7,15 +7,16 @@
 import {StreamLanguage} from "@codemirror/language";
 
 export {
-  acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap
-, closeCompletion, completeAnyWord,
-  Completion, CompletionContext, CompletionResult, CompletionSource, currentCompletions,
-  ifNotIn, selectedCompletion, startCompletion} from '@codemirror/autocomplete';
+  acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap,
+  closeCompletion, completeAnyWord, Completion, CompletionContext, CompletionResult,
+  CompletionSource, completionStatus, currentCompletions, ifNotIn,
+  moveCompletionSelection, selectedCompletion, selectedCompletionIndex, startCompletion
+} from '@codemirror/autocomplete';
 export {
-  cursorMatchingBracket, cursorSubwordBackward, cursorSubwordForward,
+  cursorMatchingBracket, cursorSubwordBackward, cursorSubwordForward, cursorSyntaxLeft, cursorSyntaxRight,
   history, historyKeymap,
   indentLess, indentMore, insertNewlineAndIndent, redo, redoSelection, selectMatchingBracket,
-  selectSubwordBackward, selectSubwordForward,
+  selectSubwordBackward, selectSubwordForward, selectSyntaxLeft, selectSyntaxRight,
   standardKeymap, toggleComment, undo, undoSelection
 } from '@codemirror/commands';
 export * as css from '@codemirror/lang-css';
@@ -26,7 +27,6 @@ export { bracketMatching,
   ensureSyntaxTree, foldGutter, foldKeymap, HighlightStyle, indentOnInput, indentUnit,Language, LanguageSupport,
   StreamLanguage, StreamParser, StringStream
 , syntaxHighlighting, syntaxTree, TagStyle} from '@codemirror/language';
-export {} from '@codemirror/rangeset';
 export { highlightSelectionMatches,selectNextOccurrence} from '@codemirror/search';
 export {
   Annotation, AnnotationType, ChangeDesc, ChangeSet, ChangeSpec, Compartment,
@@ -35,7 +35,6 @@ export {
   SelectionRange, StateEffect, StateEffectType, StateField, Text, TextIterator
 , Transaction,
   TransactionSpec} from '@codemirror/state';
-export {} from '@codemirror/stream-parser';
 export {
   Command, Decoration, DecorationSet, drawSelection, EditorView,
   gutter, GutterMarker, gutters,
@@ -50,6 +49,9 @@ export {highlightTree, Tag, tags} from '@lezer/highlight';
 export {LRParser} from '@lezer/lr';
 export {StyleModule} from 'style-mod';
 
+export function angular() {
+  return import('@codemirror/lang-angular');
+}
 export async function clojure() {
   return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/clojure')).clojure);
 }
@@ -59,11 +61,26 @@ export async function coffeescript() {
 export function cpp() {
   return import('@codemirror/lang-cpp');
 }
+export async function dart() {
+  return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/clike')).dart);
+}
+export async function gss() {
+  return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/css')).gss);
+}
+export async function go() {
+  return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/go')).go);
+}
 export function java() {
   return import('@codemirror/lang-java');
 }
 export function json() {
   return import('@codemirror/lang-json');
+}
+export async function kotlin() {
+  return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/clike')).kotlin);
+}
+export function less() {
+  return import('@codemirror/lang-less');
 }
 export function markdown() {
   return import('@codemirror/lang-markdown');
@@ -74,11 +91,23 @@ export function php() {
 export function python() {
   return import('@codemirror/lang-python');
 }
+export function sass() {
+  return import('@codemirror/lang-sass');
+}
+export async function scala() {
+  return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/clike')).scala);
+}
 export async function shell() {
   return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/shell')).shell);
 }
+export async function svelte() {
+  return import('@replit/codemirror-lang-svelte');
+}
 export async function cssStreamParser() {
-  return (await import('@codemirror/legacy-modes/mode/css') as any).sCSS;
+  return (await import('@codemirror/legacy-modes/mode/css') as any).css;
+}
+export function vue() {
+  return import('@codemirror/lang-vue');
 }
 export function wast() {
   return import('@codemirror/lang-wast');

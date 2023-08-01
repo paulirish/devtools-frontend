@@ -31,12 +31,23 @@
 import type * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import type {Color} from './Color.js';
-import {Format} from './Color.js';
+import {Format, type Color} from './Color.js';
 import {Console} from './Console.js';
-import type {GenericEvents, EventDescriptor, EventTargetEvent} from './EventTarget.js';
+import {type GenericEvents, type EventDescriptor, type EventTargetEvent} from './EventTarget.js';
 import {ObjectWrapper} from './Object.js';
-import {getLocalizedSettingsCategory, getRegisteredSettings, maybeRemoveSettingExtension, type RegExpSettingItem, registerSettingExtension, registerSettingsForTest, resetSettings, SettingCategory, type SettingExtensionOption, type SettingRegistration, SettingType} from './SettingRegistration.js';
+import {
+  getLocalizedSettingsCategory,
+  getRegisteredSettings,
+  maybeRemoveSettingExtension,
+  type RegExpSettingItem,
+  registerSettingExtension,
+  registerSettingsForTest,
+  resetSettings,
+  SettingCategory,
+  type SettingExtensionOption,
+  type SettingRegistration,
+  SettingType,
+} from './SettingRegistration.js';
 
 let settingsInstance: Settings|undefined;
 
@@ -171,9 +182,9 @@ export class Settings {
 
   clearAll(): void {
     this.globalStorage.removeAll();
+    this.syncedStorage.removeAll();
     this.localStorage.removeAll();
-    const versionSetting = Settings.instance().createSetting(VersionController.currentVersionName, 0);
-    versionSetting.set(VersionController.currentVersion);
+    new VersionController().resetToCurrent();
   }
 
   private storageFromType(storageType?: SettingStorageType): SettingsStorage {
@@ -294,6 +305,23 @@ function removeSetting(setting: Setting<unknown>): void {
   setting.storage.remove(name);
 }
 
+export class Deprecation {
+  readonly disabled: boolean;
+  readonly warning: Platform.UIString.LocalizedString;
+  readonly experiment?: Root.Runtime.Experiment;
+
+  constructor({deprecationNotice}: SettingRegistration) {
+    if (!deprecationNotice) {
+      throw new Error('Cannot create deprecation info for a non-deprecated setting');
+    }
+    this.disabled = deprecationNotice.disabled;
+    this.warning = deprecationNotice.warning();
+    this.experiment = deprecationNotice.experiment ?
+        Root.Runtime.experiments.allConfigurableExperiments().find(e => e.name === deprecationNotice.experiment) :
+        undefined;
+  }
+}
+
 export class Setting<V> {
   #titleFunction?: () => Platform.UIString.LocalizedString;
   #titleInternal!: string;
@@ -304,6 +332,7 @@ export class Setting<V> {
   #serializer: Serializer<unknown, V> = JSON;
   #hadUserAction?: boolean;
   #disabled?: boolean;
+  #deprecation: Deprecation|null = null;
 
   constructor(
       readonly name: string, readonly defaultValue: V, private readonly eventSupport: ObjectWrapper<GenericEvents>,
@@ -414,6 +443,16 @@ export class Setting<V> {
 
   setRegistration(registration: SettingRegistration): void {
     this.#registration = registration;
+    const {deprecationNotice} = registration;
+    if (deprecationNotice?.disabled) {
+      const experiment = deprecationNotice.experiment ?
+          Root.Runtime.experiments.allConfigurableExperiments().find(e => e.name === deprecationNotice.experiment) :
+          undefined;
+      if ((!experiment || experiment.isEnabled())) {
+        this.set(this.defaultValue);
+        this.setDisabled(true);
+      }
+    }
   }
 
   type(): SettingType|null {
@@ -467,6 +506,16 @@ export class Setting<V> {
     return null;
   }
 
+  get deprecation(): Deprecation|null {
+    if (!this.#registration || !this.#registration.deprecationNotice) {
+      return null;
+    }
+    if (!this.#deprecation) {
+      this.#deprecation = new Deprecation(this.#registration);
+    }
+    return this.#deprecation;
+  }
+
   private printSettingsSavingError(message: string, name: string, value: string): void {
     const errorMessage =
         'Error saving setting with name: ' + this.name + ', value length: ' + value.length + '. Error: ' + message;
@@ -489,7 +538,7 @@ export class RegExpSetting extends Setting<any> {
     this.#regexFlags = regexFlags;
   }
 
-  get(): string {
+  override get(): string {
     const result = [];
     const items = this.getAsArray();
     for (let i = 0; i < items.length; ++i) {
@@ -505,7 +554,7 @@ export class RegExpSetting extends Setting<any> {
     return super.get();
   }
 
-  set(value: string): void {
+  override set(value: string): void {
     this.setAsArray([{pattern: value, disabled: false}]);
   }
 
@@ -531,30 +580,57 @@ export class RegExpSetting extends Setting<any> {
 }
 
 export class VersionController {
-  static get currentVersionName(): string {
-    return 'inspectorVersion';
+  static readonly GLOBAL_VERSION_SETTING_NAME = 'inspectorVersion';
+  static readonly SYNCED_VERSION_SETTING_NAME = 'syncedInspectorVersion';
+  static readonly LOCAL_VERSION_SETTING_NAME = 'localInspectorVersion';
+
+  static readonly CURRENT_VERSION = 35;
+
+  readonly #globalVersionSetting: Setting<number>;
+  readonly #syncedVersionSetting: Setting<number>;
+  readonly #localVersionSetting: Setting<number>;
+
+  constructor() {
+    // If no version setting is found, we initialize with the current version and don't do anything.
+    this.#globalVersionSetting = Settings.instance().createSetting(
+        VersionController.GLOBAL_VERSION_SETTING_NAME, VersionController.CURRENT_VERSION, SettingStorageType.Global);
+    this.#syncedVersionSetting = Settings.instance().createSetting(
+        VersionController.SYNCED_VERSION_SETTING_NAME, VersionController.CURRENT_VERSION, SettingStorageType.Synced);
+    this.#localVersionSetting = Settings.instance().createSetting(
+        VersionController.LOCAL_VERSION_SETTING_NAME, VersionController.CURRENT_VERSION, SettingStorageType.Local);
   }
 
-  static get currentVersion(): number {
-    return 31;
+  /**
+   * Force re-sets all version number settings to the current version without
+   * running any migrations.
+   */
+  resetToCurrent(): void {
+    this.#globalVersionSetting.set(VersionController.CURRENT_VERSION);
+    this.#syncedVersionSetting.set(VersionController.CURRENT_VERSION);
+    this.#localVersionSetting.set(VersionController.CURRENT_VERSION);
   }
 
+  /**
+   * Runs the appropriate migrations and updates the version settings accordingly.
+   *
+   * To determine what migrations to run we take the minimum of all version number settings.
+   *
+   * IMPORTANT: All migrations must be idempotent since they might be applied multiple times.
+   */
   updateVersion(): void {
-    const localStorageVersion = window.localStorage ? window.localStorage[VersionController.currentVersionName] : 0;
-    const versionSetting = Settings.instance().createSetting(VersionController.currentVersionName, 0);
-    const currentVersion = VersionController.currentVersion;
-    const oldVersion = versionSetting.get() || parseInt(localStorageVersion || '0', 10);
-    if (oldVersion === 0) {
-      // First run, no need to do anything.
-      versionSetting.set(currentVersion);
-      return;
-    }
-    const methodsToRun = this.methodsToRunToUpdateVersion(oldVersion, currentVersion);
+    const currentVersion = VersionController.CURRENT_VERSION;
+    const minimumVersion =
+        Math.min(this.#globalVersionSetting.get(), this.#syncedVersionSetting.get(), this.#localVersionSetting.get());
+    const methodsToRun = this.methodsToRunToUpdateVersion(minimumVersion, currentVersion);
+    console.assert(
+        // @ts-ignore
+        this[`updateVersionFrom${currentVersion}To${currentVersion + 1}`] === undefined,
+        'Unexpected migration method found. Increment CURRENT_VERSION or remove the method.');
     for (const method of methodsToRun) {
       // @ts-ignore Special version method matching
       this[method].call(this);
     }
-    versionSetting.set(currentVersion);
+    this.resetToCurrent();
   }
 
   private methodsToRunToUpdateVersion(oldVersion: number, currentVersion: number): string[] {
@@ -1040,6 +1116,95 @@ export class VersionController {
     removeSetting(recordingsSetting);
   }
 
+  updateVersionFrom31To32(): void {
+    // Introduce the new 'resourceTypeName' property on stored breakpoints. Prior to
+    // this change we synchronized the breakpoint only by URL, but since we don't
+    // know on which resource type the given breakpoint was set, we just assume
+    // 'script' here to keep things simple.
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const breakpointsSetting = Settings.instance().createLocalSetting<any>('breakpoints', []);
+    const breakpoints = breakpointsSetting.get();
+    for (const breakpoint of breakpoints) {
+      breakpoint['resourceTypeName'] = 'script';
+    }
+    breakpointsSetting.set(breakpoints);
+  }
+
+  updateVersionFrom32To33(): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const previouslyViewedFilesSetting = Settings.instance().createLocalSetting<any>('previouslyViewedFiles', []);
+    let previouslyViewedFiles = previouslyViewedFilesSetting.get();
+
+    // Discard old 'previouslyViewedFiles' items that don't have a 'url' property.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    previouslyViewedFiles = previouslyViewedFiles.filter((previouslyViewedFile: any) => 'url' in previouslyViewedFile);
+
+    // Introduce the new 'resourceTypeName' property on previously viewed files.
+    // Prior to this change we only keyed them based on the URL, but since we
+    // don't know which resource type the given file had, we just assume 'script'
+    // here to keep things simple.
+    for (const previouslyViewedFile of previouslyViewedFiles) {
+      previouslyViewedFile['resourceTypeName'] = 'script';
+    }
+
+    previouslyViewedFilesSetting.set(previouslyViewedFiles);
+  }
+
+  updateVersionFrom33To34(): void {
+    // Introduces the 'isLogpoint' property on stored breakpoints. This information was
+    // previously encoded in the 'condition' itself. This migration leaves the condition
+    // alone but ensures that 'isLogpoint' is accurate for already stored breakpoints.
+    // This enables us to use the 'isLogpoint' property in code.
+    // A separate migration will remove the special encoding from the condition itself
+    // once all refactorings are done.
+
+    // The prefix/suffix are hardcoded here, since these constants will be removed in
+    // the future.
+    const logpointPrefix = '/** DEVTOOLS_LOGPOINT */ console.log(';
+    const logpointSuffix = ')';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const breakpointsSetting = Settings.instance().createLocalSetting<any>('breakpoints', []);
+    const breakpoints = breakpointsSetting.get();
+    for (const breakpoint of breakpoints) {
+      const isLogpoint =
+          breakpoint.condition.startsWith(logpointPrefix) && breakpoint.condition.endsWith(logpointSuffix);
+      breakpoint['isLogpoint'] = isLogpoint;
+    }
+    breakpointsSetting.set(breakpoints);
+  }
+
+  updateVersionFrom34To35(): void {
+    // Uses the 'isLogpoint' property on stored breakpoints to remove the prefix/suffix
+    // from logpoints. This way, we store the entered log point condition as the user
+    // entered it.
+
+    // The prefix/suffix are hardcoded here, since these constants will be removed in
+    // the future.
+    const logpointPrefix = '/** DEVTOOLS_LOGPOINT */ console.log(';
+    const logpointSuffix = ')';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const breakpointsSetting = Settings.instance().createLocalSetting<any>('breakpoints', []);
+    const breakpoints = breakpointsSetting.get();
+    for (const breakpoint of breakpoints) {
+      const {condition, isLogpoint} = breakpoint;
+      if (isLogpoint) {
+        breakpoint.condition = condition.slice(logpointPrefix.length, condition.length - logpointSuffix.length);
+      }
+    }
+    breakpointsSetting.set(breakpoints);
+  }
+
+  /*
+   * Any new migration should be added before this comment.
+   *
+   * IMPORTANT: Migrations must be idempotent, since they may be applied
+   * multiple times! E.g. when renaming a setting one has to check that the
+   * a setting with the new name does not yet exist.
+   * ----------------------------------------------------------------------- */
+
   private migrateSettingsFromLocalStorage(): void {
     // This step migrates all the settings except for the ones below into the browser profile.
     const localSettings = new Set<string>([
@@ -1104,21 +1269,18 @@ export function settingForTest(settingName: string): Setting<unknown> {
 }
 
 export function detectColorFormat(color: Color): Format {
-  const cf = Format;
   let format;
   const formatSetting = Settings.instance().moduleSetting('colorFormat').get();
-  if (formatSetting === cf.Original) {
-    format = cf.Original;
-  } else if (formatSetting === cf.RGB) {
-    format = cf.RGB;
-  } else if (formatSetting === cf.HSL) {
-    format = cf.HSL;
-  } else if (formatSetting === cf.HWB) {
-    format = cf.HWB;
-  } else if (formatSetting === cf.HEX) {
-    format = color.detectHEXFormat();
+  if (formatSetting === Format.RGB) {
+    format = Format.RGB;
+  } else if (formatSetting === Format.HSL) {
+    format = Format.HSL;
+  } else if (formatSetting === Format.HWB) {
+    format = Format.HWB;
+  } else if (formatSetting === Format.HEX) {
+    format = color.asLegacyColor().detectHEXFormat();
   } else {
-    format = cf.RGB;
+    format = color.format();
   }
 
   return format;

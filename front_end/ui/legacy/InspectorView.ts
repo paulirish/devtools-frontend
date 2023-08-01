@@ -32,52 +32,53 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
+import type * as IconButton from '../components/icon_button/icon_button.js';
 
-import type {ActionDelegate as ActionDelegateInterface} from './ActionRegistration.js';
-import type {Context} from './Context.js';
-import type {ContextMenu} from './ContextMenu.js';
+import {type ActionDelegate as ActionDelegateInterface} from './ActionRegistration.js';
+import {type Context} from './Context.js';
+import {type ContextMenu} from './ContextMenu.js';
 import {Dialog} from './Dialog.js';
 import {DockController, DockState} from './DockController.js';
 import {GlassPane} from './GlassPane.js';
-import type {Icon} from './Icon.js';
+import {type Icon} from './Icon.js';
 import {Infobar, Type as InfobarType} from './Infobar.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
-import type {Panel} from './Panel.js';
-import {SplitWidget} from './SplitWidget.js';
-import {Events as TabbedPaneEvents} from './TabbedPane.js';
-import type {EventData, TabbedPane, TabbedPaneTabDelegate} from './TabbedPane.js';
+import {type Panel} from './Panel.js';
+import {SplitWidget, ShowMode} from './SplitWidget.js';
+import {Events as TabbedPaneEvents, type EventData, type TabbedPane, type TabbedPaneTabDelegate} from './TabbedPane.js';
+
 import {ToolbarButton} from './Toolbar.js';
-import type {TabbedViewLocation, View, ViewLocation, ViewLocationResolver} from './View.js';
+import {type TabbedViewLocation, type View, type ViewLocation, type ViewLocationResolver} from './View.js';
 import {ViewManager} from './ViewManager.js';
-import type {Widget} from './Widget.js';
-import {VBox, WidgetFocusRestorer} from './Widget.js';
+
+import {VBox, WidgetFocusRestorer, type Widget} from './Widget.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import inspectorViewTabbedPaneStyles from './inspectorViewTabbedPane.css.legacy.js';
 
 const UIStrings = {
   /**
-  *@description Title of more tabs button in inspector view
-  */
+   *@description Title of more tabs button in inspector view
+   */
   moreTools: 'More Tools',
   /**
-  *@description Text that appears when hovor over the close button on the drawer view
-  */
+   *@description Text that appears when hovor over the close button on the drawer view
+   */
   closeDrawer: 'Close drawer',
   /**
-  *@description The aria label for main tabbed pane that contains Panels
-  */
+   *@description The aria label for main tabbed pane that contains Panels
+   */
   panels: 'Panels',
   /**
-  *@description Title of an action that reloads the DevTools
-  */
+   *@description Title of an action that reloads the DevTools
+   */
   reloadDevtools: 'Reload DevTools',
   /**
-  *@description Text for context menu action to move a tab to the main panel
-  */
+   *@description Text for context menu action to move a tab to the main panel
+   */
   moveToTop: 'Move to top',
   /**
-  *@description Text for context menu action to move a tab to the drawer
-  */
+   *@description Text for context menu action to move a tab to the drawer
+   */
   moveToBottom: 'Move to bottom',
   /**
    * @description Text shown in a prompt to the user when DevTools is started and the
@@ -100,25 +101,34 @@ const UIStrings = {
    */
   setToSpecificLanguage: 'Switch DevTools to {PH1}',
   /**
-  *@description The aria label for main toolbar
-  */
+   *@description The aria label for main toolbar
+   */
   mainToolbar: 'Main toolbar',
   /**
-  *@description The aria label for the drawer.
-  */
+   *@description The aria label for the drawer.
+   */
   drawer: 'Tool drawer',
   /**
-  *@description The aria label for the drawer shown.
-  */
+   *@description The aria label for the drawer shown.
+   */
   drawerShown: 'Drawer shown',
   /**
-  *@description The aria label for the drawer hidden.
-  */
+   *@description The aria label for the drawer hidden.
+   */
   drawerHidden: 'Drawer hidden',
+  /**
+   * @description Request for the user to select a local file system folder for DevTools
+   * to store local overrides in.
+   */
+  selectOverrideFolder: 'Select a folder to store override files in.',
+  /**
+   *@description Label for a button which opens a file picker.
+   */
+  selectFolder: 'Select folder',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/InspectorView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-let inspectorViewInstance: InspectorView;
+let inspectorViewInstance: InspectorView|null = null;
 
 export class InspectorView extends VBox implements ViewLocationResolver {
   private readonly drawerSplitWidget: SplitWidget;
@@ -133,6 +143,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
   private focusRestorer?: WidgetFocusRestorer|null;
   private ownerSplitWidget?: SplitWidget;
   private reloadRequiredInfobar?: Infobar;
+  #selectOverrideFolderInfobar?: Infobar;
 
   constructor() {
     super();
@@ -155,14 +166,18 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.drawerTabbedPane = this.drawerTabbedLocation.tabbedPane();
     this.drawerTabbedPane.setMinimumSize(0, 27);
     this.drawerTabbedPane.element.classList.add('drawer-tabbed-pane');
-    const closeDrawerButton = new ToolbarButton(i18nString(UIStrings.closeDrawer), 'largeicon-delete');
+    const closeDrawerButton = new ToolbarButton(i18nString(UIStrings.closeDrawer), 'cross');
     closeDrawerButton.addEventListener(ToolbarButton.Events.Click, this.closeDrawer, this);
     this.drawerTabbedPane.addEventListener(TabbedPaneEvents.TabSelected, this.tabSelected, this);
+    const selectedDrawerTab = this.drawerTabbedPane.selectedTabId;
+    if (this.drawerSplitWidget.showMode() !== ShowMode.OnlyMain && selectedDrawerTab) {
+      Host.userMetrics.panelShown(selectedDrawerTab, true);
+    }
     this.drawerTabbedPane.setTabDelegate(this.tabDelegate);
 
     const drawerElement = this.drawerTabbedPane.element;
     ARIAUtils.markAsComplementary(drawerElement);
-    ARIAUtils.setAccessibleName(drawerElement, i18nString(UIStrings.drawer));
+    ARIAUtils.setLabel(drawerElement, i18nString(UIStrings.drawer));
 
     this.drawerSplitWidget.installResizer(this.drawerTabbedPane.headerElement());
     this.drawerSplitWidget.setSidebarWidget(this.drawerTabbedPane);
@@ -176,14 +191,24 @@ export class InspectorView extends VBox implements ViewLocationResolver {
 
     this.tabbedPane = this.tabbedLocation.tabbedPane();
     this.tabbedPane.element.classList.add('main-tabbed-pane');
+    // The 'Inspect element' and 'Device mode' buttons in the tabs toolbar takes longer to load than
+    // the tabs themselves, so a space equal to the buttons' total width is preemptively allocated
+    // to prevent to prevent a shift in the tab layout. Note that when DevTools cannot be docked,
+    // the Device mode button is not added and so the allocated space is smaller.
+    const allocatedSpace = Root.Runtime.Runtime.queryParam(Root.Runtime.ConditionName.CAN_DOCK) ? '69px' : '41px';
+    this.tabbedPane.leftToolbar().element.style.minWidth = allocatedSpace;
     this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(TabbedPaneEvents.TabSelected, this.tabSelected, this);
+    const selectedTab = this.tabbedPane.selectedTabId;
+    if (selectedTab) {
+      Host.userMetrics.panelShown(selectedTab, true);
+    }
     this.tabbedPane.setAccessibleName(i18nString(UIStrings.panels));
     this.tabbedPane.setTabDelegate(this.tabDelegate);
 
     const mainHeaderElement = this.tabbedPane.headerElement();
     ARIAUtils.markAsNavigation(mainHeaderElement);
-    ARIAUtils.setAccessibleName(mainHeaderElement, i18nString(UIStrings.mainToolbar));
+    ARIAUtils.setLabel(mainHeaderElement, i18nString(UIStrings.mainToolbar));
 
     // Store the initial selected panel for use in launch histograms
     Host.userMetrics.setLaunchPanel(this.tabbedPane.selectedTabId);
@@ -219,15 +244,19 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     return inspectorViewInstance;
   }
 
-  static maybeGetInspectorViewInstance(): InspectorView|undefined {
+  static maybeGetInspectorViewInstance(): InspectorView|null {
     return inspectorViewInstance;
   }
 
-  wasShown(): void {
+  static removeInstance(): void {
+    inspectorViewInstance = null;
+  }
+
+  override wasShown(): void {
     this.element.ownerDocument.addEventListener('keydown', this.keyDownBound, false);
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.element.ownerDocument.removeEventListener('keydown', this.keyDownBound, false);
   }
 
@@ -277,7 +306,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     await ViewManager.instance().showView(panelName);
   }
 
-  setPanelIcon(tabId: string, icon: Icon|null): void {
+  setPanelIcon(tabId: string, icon: Icon|IconButton.Icon.Icon|null): void {
     // Find the tabbed location where the panel lives
     const tabbedPane = this.getTabbedPaneForTabId(tabId);
     if (tabbedPane) {
@@ -383,7 +412,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     }
   }
 
-  onResize(): void {
+  override onResize(): void {
     GlassPane.containerMoved(this.element);
   }
 
@@ -435,6 +464,25 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       this.reloadRequiredInfobar = infobar;
       infobar.setCloseCallback(() => {
         delete this.reloadRequiredInfobar;
+      });
+    }
+  }
+
+  displaySelectOverrideFolderInfobar(callback: () => void): void {
+    if (!this.#selectOverrideFolderInfobar) {
+      const infobar = new Infobar(InfobarType.Info, i18nString(UIStrings.selectOverrideFolder), [
+        {
+          text: i18nString(UIStrings.selectFolder),
+          highlight: true,
+          delegate: (): void => callback(),
+          dismiss: true,
+        },
+      ]);
+      infobar.setParentView(this);
+      this.attachInfobar(infobar);
+      this.#selectOverrideFolderInfobar = infobar;
+      infobar.setCloseCallback(() => {
+        this.#selectOverrideFolderInfobar = undefined;
       });
     }
   }

@@ -6,6 +6,7 @@ import * as AddSourceMapURLDialog from './AddSourceMapURLDialog.js';
 import * as BreakpointEditDialog from './BreakpointEditDialog.js';
 import * as CallStackSidebarPane from './CallStackSidebarPane.js';
 import * as CoveragePlugin from './CoveragePlugin.js';
+import * as CSSPlugin from './CSSPlugin.js';
 import * as DebuggerPausedMessage from './DebuggerPausedMessage.js';
 import * as DebuggerPlugin from './DebuggerPlugin.js';
 import * as EditingLocationHistoryManager from './EditingLocationHistoryManager.js';
@@ -13,15 +14,12 @@ import * as FilePathScoreFunction from './FilePathScoreFunction.js';
 import * as FilteredUISourceCodeListProvider from './FilteredUISourceCodeListProvider.js';
 import * as GoToLineQuickOpen from './GoToLineQuickOpen.js';
 import * as InplaceFormatterEditorAction from './InplaceFormatterEditorAction.js';
-import * as JavaScriptBreakpointsSidebarPane from './JavaScriptBreakpointsSidebarPane.js';
-import * as JavaScriptCompilerPlugin from './JavaScriptCompilerPlugin.js';
 import * as NavigatorView from './NavigatorView.js';
 import * as OpenFileQuickOpen from './OpenFileQuickOpen.js';
 import * as OutlineQuickOpen from './OutlineQuickOpen.js';
 import * as Plugin from './Plugin.js';
+import * as ResourceOriginPlugin from './ResourceOriginPlugin.js';
 import * as ScopeChainSidebarPane from './ScopeChainSidebarPane.js';
-import * as ScriptFormatterEditorAction from './ScriptFormatterEditorAction.js';
-import * as ScriptOriginPlugin from './ScriptOriginPlugin.js';
 import * as SearchSourcesView from './SearchSourcesView.js';
 import * as SnippetsPlugin from './SnippetsPlugin.js';
 import * as SourcesNavigator from './SourcesNavigator.js';
@@ -38,6 +36,7 @@ export {
   BreakpointEditDialog,
   CallStackSidebarPane,
   CoveragePlugin,
+  CSSPlugin,
   DebuggerPausedMessage,
   DebuggerPlugin,
   EditingLocationHistoryManager,
@@ -45,15 +44,12 @@ export {
   FilteredUISourceCodeListProvider,
   GoToLineQuickOpen,
   InplaceFormatterEditorAction,
-  JavaScriptBreakpointsSidebarPane,
-  JavaScriptCompilerPlugin,
   NavigatorView,
   OpenFileQuickOpen,
   OutlineQuickOpen,
   Plugin,
+  ResourceOriginPlugin,
   ScopeChainSidebarPane,
-  ScriptFormatterEditorAction,
-  ScriptOriginPlugin,
   SearchSourcesView,
   SnippetsPlugin,
   SourcesNavigator,

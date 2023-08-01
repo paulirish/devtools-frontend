@@ -37,97 +37,180 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as IconButton from '../../../components/icon_button/icon_button.js';
+import * as SrgbOverlay from '../../../components/srgb_overlay/srgb_overlay.js';
 import * as UI from '../../legacy.js';
 
 import {ContrastDetails, Events as ContrastDetailsEvents} from './ContrastDetails.js';
+import {FormatPickerContextMenu} from './FormatPickerContextMenu.js';
 
-import type {ContrastInfo} from './ContrastInfo.js';
+import {type ContrastInfo} from './ContrastInfo.js';
 import {ContrastOverlay} from './ContrastOverlay.js';
+import {colorFormatSpec, type SpectrumColorFormat} from './ColorFormatSpec.js';
 import spectrumStyles from './spectrum.css.js';
 
 const UIStrings = {
   /**
-  *@description Tooltip text that appears when hovering over largeicon eyedropper button in Spectrum of the Color Picker
-  */
-  toggleColorPicker: 'Toggle color picker',
+   *@description Tooltip text that appears when hovering over largeicon eyedropper button in Spectrum of the Color Picker
+   * @example {c} PH1
+   */
+  toggleColorPicker: 'Eye dropper [{PH1}]',
   /**
-  *@description Aria label for hue slider in Color Picker
-  */
+   *@description Aria label for hue slider in Color Picker
+   */
   changeHue: 'Change hue',
   /**
-  * @description Aria label for alpha slider in Color Picker. Alpha refers to the alpha channel of a
-  * color, and this tool allows the user to change the alpha value.
-  */
+   * @description Aria label for alpha slider in Color Picker. Alpha refers to the alpha channel of a
+   * color, and this tool allows the user to change the alpha value.
+   */
   changeAlpha: 'Change alpha',
   /**
-  *@description Aria label for HEX color format input
-  */
+   *@description Aria label for HEX color format input
+   */
   hex: 'HEX',
   /**
-  *@description Aria label for color format switcher button in Color Picker
-  */
+   *@description Aria label for color format switcher button in Color Picker
+   */
   changeColorFormat: 'Change color format',
   /**
-  *@description Screen reader reads this text when palette switcher button receives focus
-  */
+   *@description Screen reader reads this text when palette switcher button receives focus
+   */
   previewPalettes: 'Preview palettes',
   /**
-  *@description Tooltip text that appears when hovering over the largeicon add button in the Spectrum of the Color Picker
-  */
+   *@description Tooltip text that appears when hovering over the largeicon add button in the Spectrum of the Color Picker
+   */
   addToPalette: 'Add to palette',
   /**
-  *@description Title text content in Spectrum of the Color Picker
-  */
+   *@description Title text content in Spectrum of the Color Picker
+   */
   colorPalettes: 'Color Palettes',
   /**
-  *@description Label for close button in Color Picker
-  */
+   *@description Label for close button in Color Picker
+   */
   returnToColorPicker: 'Return to color picker',
   /**
-  *@description Aria label which declares hex value of a swatch in the Color Picker
-  *@example {#969696} PH1
-  */
+   *@description Aria label which declares hex value of a swatch in the Color Picker
+   *@example {#969696} PH1
+   */
   colorS: 'Color {PH1}',
   /**
-  *@description Color element title in Spectrum of the Color Picker
-  *@example {#9c1724} PH1
-  */
+   *@description Color element title in Spectrum of the Color Picker
+   *@example {#9c1724} PH1
+   */
   longclickOrLongpressSpaceToShow: 'Long-click or long-press space to show alternate shades of {PH1}',
   /**
-  *@description A context menu item in the Color Picker to organize the user-defined color palette (removes the user-defined color to which this action is performed)"
-  */
+   *@description A context menu item in the Color Picker to organize the user-defined color palette (removes the user-defined color to which this action is performed)"
+   */
   removeColor: 'Remove color',
   /**
-  *@description A context menu item in the Color Picker to organize the user-defined color palette (removes all user-defined colors to the right of the color to which this action is performed)"
-  */
+   *@description A context menu item in the Color Picker to organize the user-defined color palette (removes all user-defined colors to the right of the color to which this action is performed)"
+   */
   removeAllToTheRight: 'Remove all to the right',
   /**
-  *@description A context menu item in the Color Picker to organize the user-defined color palette (removes all user-defined colors)"
-  */
+   *@description A context menu item in the Color Picker to organize the user-defined color palette (removes all user-defined colors)"
+   */
   clearPalette: 'Clear palette',
   /**
-  *@description Aria label for RGBA and HSLA color format inputs in Color Picker
-  *@example {R} PH1
-  *@example {RGBA} PH2
-  */
+   *@description Aria label for RGBA and HSLA color format inputs in Color Picker
+   *@example {R} PH1
+   *@example {RGBA} PH2
+   */
   sInS: '{PH1} in {PH2}',
   /**
-  *@description Swatch copy icon title in Spectrum of the Color Picker
-  */
+   *@description Swatch copy icon title in Spectrum of the Color Picker
+   */
   copyColorToClipboard: 'Copy color to clipboard',
   /**
-  *@description Aria text for the swatch position. Swatch is the color picker spectrum tool.
-  */
+   *@description Aria text for the swatch position. Swatch is the color picker spectrum tool.
+   */
   pressArrowKeysMessage:
       'Press arrow keys with or without modifiers to move swatch position. Arrow key with Shift key moves position largely, with Ctrl key it is less and with Alt key it is even less',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/color_picker/Spectrum.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const colorElementToMutable = new WeakMap<HTMLElement, boolean>();
-
 const colorElementToColor = new WeakMap<HTMLElement, string>();
+const srgbGamutFormats = [
+  Common.Color.Format.SRGB,
+  Common.Color.Format.Nickname,
+  Common.Color.Format.RGB,
+  Common.Color.Format.HEX,
+  Common.Color.Format.HSL,
+  Common.Color.Format.HWB,
+  Common.Color.Format.ShortHEX,
+];
+
+const enum SpectrumGamut {
+  SRGB = 'srgb',
+  DISPLAY_P3 = 'display-p3',
+}
+
+function doesFormatSupportDisplayP3(format: Common.Color.Format): boolean {
+  return !srgbGamutFormats.includes(format);
+}
+
+function convertColorFormat(colorFormat: Common.Color.Format): SpectrumColorFormat {
+  if (colorFormat === Common.Color.Format.RGBA) {
+    return Common.Color.Format.RGB;
+  }
+  if (colorFormat === Common.Color.Format.HSLA) {
+    return Common.Color.Format.HSL;
+  }
+  if (colorFormat === Common.Color.Format.HWBA) {
+    return Common.Color.Format.HWB;
+  }
+  if (colorFormat === Common.Color.Format.HEXA) {
+    return Common.Color.Format.HEX;
+  }
+  if (colorFormat === Common.Color.Format.ShortHEXA) {
+    return Common.Color.Format.ShortHEX;
+  }
+
+  return colorFormat;
+}
+
+// HSV by itself, without a color space, doesn't map to a color and
+// it is usually interpreted as an sRGB color. However, it can also
+// represent colors in other color spaces since `HSV` -> `RGB` mapping
+// is not color space dependent. For example, color(display-p3 1 1 1) and rgb(1 1 1)
+// map to the same HSV values. The tricky thing is, `hsl()` syntax is interpreted
+// as it is in sRGB in CSS. So, when you convert those two colors and use as `hsl()`, it will
+// show an sRGB color. Though, if there was a function `color-hsl(<color-space> h s l)`
+// it was going to show the color in the color-space represented with `hsl`.
+// This function, gets the HSV values by interpreting them in the given gamut.
+function getHsvFromColor(gamut: SpectrumGamut, color: Common.Color.Color): Common.ColorUtils.Color4D {
+  switch (gamut) {
+    case SpectrumGamut.DISPLAY_P3: {
+      const displayP3color = color.as(Common.Color.Format.DISPLAY_P3);
+      return [
+        ...Common.Color.rgb2hsv([displayP3color.p0, displayP3color.p1, displayP3color.p2]),
+        displayP3color.alpha || 1,
+      ];
+    }
+    case SpectrumGamut.SRGB: {
+      return color.as(Common.Color.Format.HSL).hsva();
+    }
+  }
+}
+
+// Interprets the given `hsva` values in the given gamut and returns the concrete `Color` object.
+function getColorFromHsva(gamut: SpectrumGamut, hsva: Common.ColorUtils.Color4D): Common.Color.Color {
+  const color: Common.Color.Legacy = Common.Color.Legacy.fromHSVA(hsva);
+  switch (gamut) {
+    case SpectrumGamut.DISPLAY_P3: {
+      const rgba: Common.ColorUtils.Color4D = [0, 0, 0, 0];
+      Common.Color.hsva2rgba(hsva, rgba);
+      return new Common.Color.ColorFunction(
+          Common.Color.Format.DISPLAY_P3, rgba[0], rgba[1], rgba[2], rgba[3], undefined);
+    }
+    case SpectrumGamut.SRGB: {
+      return color;
+    }
+  }
+}
 
 export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
+  private colorInternal?: Common.Color.Color;
+  private gamut: SpectrumGamut = SpectrumGamut.SRGB;
   private colorElement: HTMLElement;
   private colorDragElement: HTMLElement;
   private dragX: number;
@@ -145,6 +228,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private hexContainer: HTMLElement;
   private hexValue: HTMLInputElement;
   private readonly contrastInfo: ContrastInfo|undefined;
+  private srgbOverlay: SrgbOverlay.SrgbOverlay.SrgbOverlay;
   private contrastOverlay: ContrastOverlay|undefined;
   private contrastDetails: ContrastDetails|undefined;
   private readonly contrastDetailsBackgroundColorPickedToggledBound:
@@ -160,7 +244,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private readonly addColorToolbar: UI.Toolbar.Toolbar;
   private readonly colorPickedBound:
       (event: Common.EventTarget.EventTargetEvent<Host.InspectorFrontendHostAPI.EyeDropperPickedColorEvent>) => void;
-  private hsv!: number[];
+  private hsv!: Common.ColorUtils.Color4D;
   private hueAlphaWidth!: number;
   dragWidth!: number;
   dragHeight!: number;
@@ -169,10 +253,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private numPaletteRowsShown: number;
   private selectedColorPalette!: Common.Settings.Setting<string>;
   private customPaletteSetting!: Common.Settings.Setting<Palette>;
-  private colorOffset?: {
-    left: number,
-    top: number,
-  };
+  private colorOffset?: DOMRect;
   private closeButton?: UI.Toolbar.ToolbarButton;
   private paletteContainerMutable?: boolean;
   private eyeDropperExperimentEnabled?: boolean;
@@ -180,10 +261,17 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private dragElement?: HTMLElement;
   private dragHotSpotX?: number;
   private dragHotSpotY?: number;
-  private originalFormat?: string;
   private colorNameInternal?: string;
+  private colorFormat: SpectrumColorFormat = Common.Color.Format.RGB;
+  private eyeDropperAbortController: AbortController|null = null;
+  private isFormatPickerShown = false;
+  // Used to represent how the current color
+  // should be stringified externally (emitted event etc.).
+  // For example, this is used when a color variable
+  // selected form the palettes. That time, we don't
+  // want to return the value of the variable but the
+  // actual variable string.
   private colorStringInternal?: string;
-  private colorFormat?: string;
   constructor(contrastInfo?: ContrastInfo|null) {
     super(true);
 
@@ -193,7 +281,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.setDefaultFocusedElement(this.colorElement);
     this.colorElement.addEventListener('keydown', this.onSliderKeydown.bind(this, positionColor.bind(this)));
     const swatchAriaText = i18nString(UIStrings.pressArrowKeysMessage);
-    UI.ARIAUtils.setAccessibleName(this.colorElement, swatchAriaText);
+    UI.ARIAUtils.setLabel(this.colorElement, swatchAriaText);
     UI.ARIAUtils.markAsApplication(this.colorElement);
     this.colorDragElement = this.colorElement.createChild('div', 'spectrum-sat fill')
                                 .createChild('div', 'spectrum-val fill')
@@ -203,8 +291,14 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
     const toolsContainer: HTMLElement = this.contentElement.createChild('div', 'spectrum-tools') as HTMLElement;
     const toolbar = new UI.Toolbar.Toolbar('spectrum-eye-dropper', toolsContainer);
-    this.colorPickerButton =
-        new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.toggleColorPicker), 'largeicon-eyedropper');
+    const toggleEyeDropperShortcut =
+        UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('elements.toggle-eye-dropper');
+    const definedShortcutKey =
+        toggleEyeDropperShortcut[0]?.descriptors.flatMap(descriptor => descriptor.name.split(' + '))[0];
+
+    this.colorPickerButton = new UI.Toolbar.ToolbarToggle(
+        i18nString(UIStrings.toggleColorPicker, {PH1: definedShortcutKey || ''}), 'color-picker',
+        'color-picker-filled');
     this.colorPickerButton.setToggled(true);
     this.colorPickerButton.addEventListener(
         UI.Toolbar.ToolbarButton.Events.Click, this.toggleColorPicker.bind(this, undefined));
@@ -215,13 +309,13 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.hueElement = toolsContainer.createChild('div', 'spectrum-hue');
     this.hueElement.tabIndex = 0;
     this.hueElement.addEventListener('keydown', this.onSliderKeydown.bind(this, positionHue.bind(this)));
-    UI.ARIAUtils.setAccessibleName(this.hueElement, i18nString(UIStrings.changeHue));
+    UI.ARIAUtils.setLabel(this.hueElement, i18nString(UIStrings.changeHue));
     UI.ARIAUtils.markAsSlider(this.hueElement, 0, 360);
     this.hueSlider = this.hueElement.createChild('div', 'spectrum-slider');
     this.alphaElement = toolsContainer.createChild('div', 'spectrum-alpha');
     this.alphaElement.tabIndex = 0;
     this.alphaElement.addEventListener('keydown', this.onSliderKeydown.bind(this, positionAlpha.bind(this)));
-    UI.ARIAUtils.setAccessibleName(this.alphaElement, i18nString(UIStrings.changeAlpha));
+    UI.ARIAUtils.setLabel(this.alphaElement, i18nString(UIStrings.changeAlpha));
     UI.ARIAUtils.markAsSlider(this.alphaElement, 0, 1);
     this.alphaElementBackground = this.alphaElement.createChild('div', 'spectrum-alpha-background');
     this.alphaSlider = this.alphaElement.createChild('div', 'spectrum-slider');
@@ -256,17 +350,15 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
     const label = this.hexContainer.createChild('div', 'spectrum-text-label');
     label.textContent = i18nString(UIStrings.hex);
-    UI.ARIAUtils.setAccessibleName(this.hexValue, label.textContent);
+    UI.ARIAUtils.setLabel(this.hexValue, label.textContent);
 
-    const displaySwitcher = toolsContainer.createChild('div', 'spectrum-display-switcher spectrum-switcher');
+    const displaySwitcher = toolsContainer.createChild('button', 'spectrum-display-switcher spectrum-switcher');
     appendSwitcherIcon(displaySwitcher);
     UI.UIUtils.setTitle(displaySwitcher, i18nString(UIStrings.changeColorFormat));
     displaySwitcher.tabIndex = 0;
-    self.onInvokeElement(displaySwitcher, event => {
-      this.formatViewSwitch();
-      event.consume(true);
+    displaySwitcher.addEventListener('click', (ev: MouseEvent) => {
+      void this.showFormatPicker(ev);
     });
-    UI.ARIAUtils.markAsButton(displaySwitcher);
 
     UI.UIUtils.installDragHandle(
         this.hueElement, this.dragStart.bind(this, positionHue.bind(this)), positionHue.bind(this), null, 'ew-resize',
@@ -284,7 +376,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       this.contrastOverlay = new ContrastOverlay(this.contrastInfo, this.colorElement);
       this.contrastDetails = new ContrastDetails(
           this.contrastInfo, this.contentElement, this.toggleColorPicker.bind(this),
-          this.contrastPanelExpanded.bind(this), this.colorSelected.bind(this));
+          this.contrastPanelExpandedChanged.bind(this), this.colorSelected.bind(this));
 
       this.contrastDetailsBackgroundColorPickedToggledBound =
           this.contrastDetailsBackgroundColorPickedToggled.bind(this);
@@ -313,14 +405,14 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     });
 
     this.deleteIconToolbar = new UI.Toolbar.Toolbar('delete-color-toolbar');
-    this.deleteButton = new UI.Toolbar.ToolbarButton('', 'largeicon-trash-bin');
+    this.deleteButton = new UI.Toolbar.ToolbarButton('', 'bin');
     this.deleteIconToolbar.appendToolbarItem(this.deleteButton);
 
     const overlay = this.contentElement.createChild('div', 'spectrum-overlay fill');
     overlay.addEventListener('click', this.togglePalettePanel.bind(this, false));
 
     this.addColorToolbar = new UI.Toolbar.Toolbar('add-color-toolbar');
-    const addColorButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addToPalette), 'largeicon-add');
+    const addColorButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addToPalette), 'plus');
     addColorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onAddColorMousedown.bind(this));
     addColorButton.element.addEventListener('keydown', this.onAddColorKeydown.bind(this));
     this.addColorToolbar.appendToolbarItem(addColorButton);
@@ -329,6 +421,19 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
     this.numPaletteRowsShown = -1;
 
+    this.contentElement.addEventListener('focusout', ev => {
+      // Do not propagate 'focusout' event when the format picker
+      // context menu is shown. The reason is, when it is shown,
+      // 'focusout' event is emitted and SwatchPopoverHelper listens
+      // to it and closes the color picker. However, we don't want
+      // color picker to be closed when the focus is gone for the
+      // format picker context menu. That's why we stop the propagation.
+      if (this.isFormatPickerShown) {
+        ev.stopImmediatePropagation();
+      }
+    });
+
+    this.srgbOverlay = new SrgbOverlay.SrgbOverlay.SrgbOverlay();
     this.loadPalettes();
     new PaletteGenerator(palette => {
       if (palette.colors.length) {
@@ -354,36 +459,37 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
 
     function positionHue(this: Spectrum, event: Event): void {
-      const hsva = this.hsv.slice();
+      const hsva = this.hsv.slice() as Common.ColorUtils.Color4D;
       const sliderPosition = getUpdatedSliderPosition(this.hueSlider, event);
       const hueAlphaLeft = this.hueElement.getBoundingClientRect().left;
       const positionFraction = (sliderPosition - hueAlphaLeft) / this.hueAlphaWidth;
       const newHue = 1 - positionFraction;
       hsva[0] = Platform.NumberUtilities.clamp(newHue, 0, 1);
       this.innerSetColor(hsva, '', undefined /* colorName */, undefined, ChangeSource.Other);
-      const colorValues = this.color().canonicalHSLA();
+      const color = getColorFromHsva(this.gamut, hsva);
+      const colorValues = color.as(Common.Color.Format.HSL).canonicalHSLA();
       UI.ARIAUtils.setValueNow(this.hueElement, colorValues[0]);
     }
 
     function positionAlpha(this: Spectrum, event: Event): void {
-      const hsva = this.hsv.slice();
+      const hsva = this.hsv.slice() as Common.ColorUtils.Color4D;
       const sliderPosition = getUpdatedSliderPosition(this.alphaSlider, event);
       const hueAlphaLeft = this.hueElement.getBoundingClientRect().left;
       const positionFraction = (sliderPosition - hueAlphaLeft) / this.hueAlphaWidth;
       const newAlpha = Math.round(positionFraction * 100) / 100;
       hsva[3] = Platform.NumberUtilities.clamp(newAlpha, 0, 1);
       this.innerSetColor(hsva, '', undefined /* colorName */, undefined, ChangeSource.Other);
-      const colorValues = this.color().canonicalHSLA();
+      const color = getColorFromHsva(this.gamut, hsva);
+      const colorValues = color.as(Common.Color.Format.HSL).canonicalHSLA();
       UI.ARIAUtils.setValueText(this.alphaElement, colorValues[3]);
     }
 
     function positionColor(this: Spectrum, event: Event): void {
-      const hsva = this.hsv.slice();
+      const hsva = this.hsv.slice() as Common.ColorUtils.Color4D;
       const colorPosition = getUpdatedColorPosition(this.colorDragElement, event);
-      this.colorOffset = this.colorElement.totalOffset();
+      this.colorOffset = this.colorElement.getBoundingClientRect();
       hsva[1] = Platform.NumberUtilities.clamp((colorPosition.x - this.colorOffset.left) / this.dragWidth, 0, 1);
       hsva[2] = Platform.NumberUtilities.clamp(1 - (colorPosition.y - this.colorOffset.top) / this.dragHeight, 0, 1);
-
       this.innerSetColor(hsva, '', undefined /* colorName */, undefined, ChangeSource.Other);
     }
 
@@ -428,13 +534,13 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
     function appendSwitcherIcon(parentElement: Element): void {
       const switcherIcon = new IconButton.Icon.Icon();
-      switcherIcon.data = {iconName: 'switcherIcon', color: 'var(--color-text-primary)', width: '16px', height: '16px'};
+      switcherIcon.data = {iconName: 'fold-more', color: 'var(--icon-default)', width: '16px', height: '16px'};
       parentElement.appendChild(switcherIcon);
     }
   }
 
   private dragStart(this: Spectrum, callback: (arg0: Event) => void, event: Event): boolean {
-    this.colorOffset = this.colorElement.totalOffset();
+    this.colorOffset = this.colorElement.getBoundingClientRect();
     callback(event);
     return true;
   }
@@ -447,12 +553,18 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
   }
 
-  private contrastPanelExpanded(): void {
+  private contrastPanelExpandedChanged(): void {
     if (!this.contrastOverlay || !this.contrastDetails) {
       return;
     }
     this.contrastOverlay.setVisible(this.contrastDetails.expanded());
     this.resizeForSelectedPalette(true);
+
+    if (this.contrastDetails.expanded()) {
+      this.hideSrgbOverlay();
+    } else {
+      this.showSrgbOverlay();
+    }
   }
 
   private updatePalettePanel(): void {
@@ -460,13 +572,14 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     const title = this.palettePanel.createChild('div', 'palette-title');
     title.textContent = i18nString(UIStrings.colorPalettes);
     const toolbar = new UI.Toolbar.Toolbar('', this.palettePanel);
-    this.closeButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.returnToColorPicker), 'largeicon-delete');
+    this.closeButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.returnToColorPicker), 'cross');
     this.closeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.togglePalettePanel.bind(this, false));
     this.closeButton.element.addEventListener('keydown', this.onCloseBtnKeydown.bind(this));
     toolbar.appendToolbarItem(this.closeButton);
     for (const palette of this.palettes.values()) {
       this.palettePanel.appendChild(this.createPreviewPaletteElement(palette));
     }
+    this.contentElement.scrollIntoView({block: 'end'});
   }
 
   private togglePalettePanel(show: boolean): void {
@@ -481,8 +594,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.focusInternal();
   }
 
-  private onCloseBtnKeydown(event: Event): void {
-    if (isEscKey(event) || isEnterOrSpaceKey(event)) {
+  private onCloseBtnKeydown(event: KeyboardEvent): void {
+    if (Platform.KeyboardUtilities.isEscKey(event) || Platform.KeyboardUtilities.isEnterOrSpaceKey(event)) {
       this.togglePalettePanel(false);
       event.consume(true);
     }
@@ -533,7 +646,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       const animationDelay = animate ? i * 100 / palette.colors.length : 0;
       const colorElement = this.createPaletteColor(palette.colors[i], palette.colorNames[i], animationDelay);
       UI.ARIAUtils.markAsButton(colorElement);
-      UI.ARIAUtils.setAccessibleName(colorElement, i18nString(UIStrings.colorS, {PH1: palette.colors[i]}));
+      UI.ARIAUtils.setLabel(colorElement, i18nString(UIStrings.colorS, {PH1: palette.colors[i]}));
       colorElement.tabIndex = -1;
       colorElement.addEventListener(
           'mousedown',
@@ -556,7 +669,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         shadow.style.background = palette.colors[i];
         const tooltipText = i18nString(UIStrings.longclickOrLongpressSpaceToShow, {PH1: palette.colors[i]});
         UI.Tooltip.Tooltip.install(colorElement, tooltipText);
-        UI.ARIAUtils.setAccessibleName(colorElement, tooltipText);
+        UI.ARIAUtils.setLabel(colorElement, tooltipText);
         new UI.UIUtils.LongClickController(
             colorElement, this.showLightnessShades.bind(this, colorElement, palette.colors[i]));
       }
@@ -613,7 +726,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         const shadeElement =
             this.createPaletteColor(shades[i], undefined /* colorName */, i * 200 / shades.length + 100);
         UI.ARIAUtils.markAsButton(shadeElement);
-        UI.ARIAUtils.setAccessibleName(shadeElement, i18nString(UIStrings.colorS, {PH1: shades[i]}));
+        UI.ARIAUtils.setLabel(shadeElement, i18nString(UIStrings.colorS, {PH1: shades[i]}));
         shadeElement.tabIndex = -1;
         shadeElement.addEventListener('mousedown', this.paletteColorSelected.bind(this, shades[i], shades[i], false));
         shadeElement.addEventListener('focus', this.paletteColorSelected.bind(this, shades[i], shades[i], false));
@@ -631,8 +744,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private slotIndexForEvent(event: Event): number {
     const mouseEvent = event as MouseEvent;
-    const localX = mouseEvent.pageX - this.paletteContainer.totalOffsetLeft();
-    const localY = mouseEvent.pageY - this.paletteContainer.totalOffsetTop();
+    const localX = mouseEvent.pageX - this.paletteContainer.getBoundingClientRect().left;
+    const localY = mouseEvent.pageY - this.paletteContainer.getBoundingClientRect().top;
     const col = Math.min(localX / COLOR_CHIP_SIZE | 0, ITEMS_PER_PALETTE_ROW - 1);
     const row = (localY / COLOR_CHIP_SIZE) | 0;
     return Math.min(row * ITEMS_PER_PALETTE_ROW + col, this.customPaletteSetting.get().colors.length - 1);
@@ -640,7 +753,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private isDraggingToBin(event: Event): boolean {
     const mouseEvent = event as MouseEvent;
-    return mouseEvent.pageX > this.deleteIconToolbar.element.totalOffsetLeft();
+    return mouseEvent.pageX > this.deleteIconToolbar.element.getBoundingClientRect().left;
   }
 
   private paletteDragStart(event: Event): boolean {
@@ -659,8 +772,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
   private paletteDrag(event: Event): void {
     const mouseEvent = event as MouseEvent;
-    if (mouseEvent.pageX < this.paletteContainer.totalOffsetLeft() ||
-        mouseEvent.pageY < this.paletteContainer.totalOffsetTop()) {
+    if (mouseEvent.pageX < this.paletteContainer.getBoundingClientRect().left ||
+        mouseEvent.pageY < this.paletteContainer.getBoundingClientRect().top) {
       return;
     }
     if (!this.dragElement || this.dragHotSpotX === undefined || this.dragHotSpotY === undefined) {
@@ -676,11 +789,11 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     const dragElementTransform =
         'translateX(' + (offsetX - this.dragHotSpotX) + 'px) translateY(' + (offsetY - this.dragHotSpotY) + 'px)';
     this.dragElement.style.transform = isDeleting ? dragElementTransform + ' scale(0.8)' : dragElementTransform;
-    const children = Array.prototype.slice.call(this.paletteContainer.children);
+    const children = [...this.paletteContainer.children];
     const index = children.indexOf(this.dragElement);
-    const swatchOffsets = new Map<Element, {left: number, top: number}>();
+    const swatchOffsets = new Map<Element, DOMRect>();
     for (const swatch of children) {
-      swatchOffsets.set(swatch, swatch.totalOffset());
+      swatchOffsets.set(swatch, swatch.getBoundingClientRect());
     }
 
     if (index !== newIndex) {
@@ -692,7 +805,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         continue;
       }
       const before = swatchOffsets.get(swatch);
-      const after = swatch.totalOffset();
+      const after = swatch.getBoundingClientRect();
       if (before && (before.left !== after.left || before.top !== after.top)) {
         swatch.animate(
             [
@@ -814,12 +927,12 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private paletteColorSelected(colorText: string, colorName: string|undefined, matchUserFormat: boolean): void {
-    const color = Common.Color.Color.parse(colorText);
+    const color = Common.Color.parse(colorText);
     if (!color) {
       return;
     }
     this.innerSetColor(
-        color.hsva(), colorText, colorName, matchUserFormat ? this.colorFormat : color.format(), ChangeSource.Other);
+        color, colorText, colorName, matchUserFormat ? this.colorFormat : color.format(), ChangeSource.Other);
   }
 
   private onPaletteColorKeydown(colorIndex: number, event: Event): void {
@@ -845,19 +958,18 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
   }
 
-  private onShadeColorKeydown(colorElement: HTMLElement, event: Event): void {
-    const keyboardEvent = event as KeyboardEvent;
-    const target = keyboardEvent.target as HTMLElement;
-    if (isEscKey(event) || keyboardEvent.key === 'Tab') {
+  private onShadeColorKeydown(colorElement: HTMLElement, event: KeyboardEvent): void {
+    const target = event.target as HTMLElement;
+    if (Platform.KeyboardUtilities.isEscKey(event) || event.key === 'Tab') {
       colorElement.focus();
       if (this.shadesCloseHandler) {
         this.shadesCloseHandler();
       }
       event.consume(true);
-    } else if (keyboardEvent.key === 'ArrowUp' && target.previousElementSibling) {
+    } else if (event.key === 'ArrowUp' && target.previousElementSibling) {
       (target.previousElementSibling as HTMLElement).focus();
       event.consume(true);
-    } else if (keyboardEvent.key === 'ArrowDown' && target.nextElementSibling) {
+    } else if (event.key === 'ArrowDown' && target.nextElementSibling) {
       (target.nextElementSibling as HTMLElement).focus();
       event.consume(true);
     }
@@ -867,8 +979,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.addColorToCustomPalette();
   }
 
-  private onAddColorKeydown(event: Event): void {
-    if (isEnterOrSpaceKey(event)) {
+  private onAddColorKeydown(event: KeyboardEvent): void {
+    if (Platform.KeyboardUtilities.isEnterOrSpaceKey(event)) {
       this.addColorToCustomPalette();
       event.consume(true);
     }
@@ -910,47 +1022,82 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.showPalette(palette, false);
   }
 
-  setColor(color: Common.Color.Color, colorFormat: string): void {
-    this.originalFormat = colorFormat;
-    this.innerSetColor(color.hsva(), '', undefined /* colorName */, colorFormat, ChangeSource.Model);
-    const colorValues = this.color().canonicalHSLA();
+  setColor(color: Common.Color.Color, colorFormat: Common.Color.Format): void {
+    this.innerSetColor(color, '', undefined /* colorName */, colorFormat, ChangeSource.Model);
+    const colorValues = color.as(Common.Color.Format.HSL).canonicalHSLA();
     UI.ARIAUtils.setValueNow(this.hueElement, colorValues[0]);
     UI.ARIAUtils.setValueText(this.alphaElement, colorValues[3]);
   }
 
-  colorSelected(color: Common.Color.Color): void {
-    this.innerSetColor(color.hsva(), '', undefined /* colorName */, undefined /* colorFormat */, ChangeSource.Other);
+  private colorSelected(color: Common.Color.Legacy): void {
+    this.innerSetColor(color, '', undefined /* colorName */, undefined /* colorFormat */, ChangeSource.Other);
+  }
+
+  private get color(): Common.Color.Color {
+    if (this.colorInternal) {
+      return this.colorInternal;
+    }
+
+    return getColorFromHsva(this.gamut, this.hsv);
   }
 
   private innerSetColor(
-      hsva: number[]|undefined, colorString: string|undefined, colorName: string|undefined,
-      colorFormat: string|undefined, changeSource: string): void {
-    if (hsva !== undefined) {
-      this.hsv = hsva;
-    }
-    this.colorNameInternal = colorName;
+      colorOrHsv: Common.Color.Color|Common.ColorUtils.Color4D|undefined, colorString: string|undefined,
+      colorName: string|undefined, colorFormat: Common.Color.Format|undefined, changeSource: string): void {
+    // It is important to do `undefined` check here since we want to update the
+    // `colorStringInternal` to be empty specifically. The difference is:
+    // * If we give `undefined` as an argument to this function, it means
+    // we don't want to change `colorStringInternal`
+    // * If we give "" as an argument to this funciton, it means
+    // we want to clear the `colorStringInternal`.
     if (colorString !== undefined) {
       this.colorStringInternal = colorString;
     }
+
     if (colorFormat !== undefined) {
-      const cf = Common.Color.Format;
-      console.assert(colorFormat !== cf.Original, 'Spectrum\'s color format cannot be Original');
-      if (colorFormat === cf.RGBA) {
-        colorFormat = cf.RGB;
-      } else if (colorFormat === cf.HSLA) {
-        colorFormat = cf.HSL;
-      } else if (colorFormat === cf.HWBA) {
-        colorFormat = cf.HWB;
-      } else if (colorFormat === cf.HEXA) {
-        colorFormat = cf.HEX;
-      } else if (colorFormat === cf.ShortHEXA) {
-        colorFormat = cf.ShortHEX;
-      }
-      this.colorFormat = colorFormat;
+      this.colorFormat = convertColorFormat(colorFormat);
+      this.gamut = doesFormatSupportDisplayP3(this.colorFormat) ? SpectrumGamut.DISPLAY_P3 : SpectrumGamut.SRGB;
     }
 
+    // For decreasing the conversion errors, if a color is given as is
+    // we're storing it in `colorInternal` and using it properly.
+    // Otherwise, if an `HSV` is given, we're discarding the `colorInternal`
+    // and keeping HSV values as the source of truth.
+    // This logic enables us to
+    // * Keep color picker and the reflected color consistent (ex: lch(100 55.30 34.40) is
+    //   shown with values 100, 55.30 and 34.40). If we were to get `HSV` from it
+    //   and convert that HSV to `lch` color when needed, it might have resulted in rounding errors
+    //   where color picker shows inconsistent values (i.e. inputs) with the selected color.
+    // * Allow `HSV` values to be set independently from the color it represents.
+    //   for example, lch(100 0 50) and lch(100 0 30) represents the same colors (both white)
+    //   and hue component is powerless. This results in converted `h` in `hsv` to be
+    //   0 as well. Meaning that, when the user comes to white, the hue will be reset to
+    //   `0` which will change the state of the color picker unintentionally.
+    if (Array.isArray(colorOrHsv)) {
+      this.colorInternal = undefined;
+      this.hsv = colorOrHsv;
+    } else if (colorOrHsv !== undefined) {
+      this.colorInternal = colorOrHsv;
+      const oldHue = this.hsv ? this.hsv[0] : null;
+      this.hsv = getHsvFromColor(this.gamut, colorOrHsv);
+      // When the hue is powerless in lch color space
+      // its `h` is directly set to 0 which results in
+      // hue in hsv representation being 0 too.
+      // For that case, we don't want to update the
+      // hue slider of the color picker to keep its state consistent.
+      // Otherwise, when the hue slider is set in the middle and the user
+      // drags the cursor to the left most line (where c is 0)
+      // it will reset hue slider of color picker to be 0 too and we don't want this.
+      // The reason we convert to LCH instead of HSL to check hue's powerlessness is that
+      // we don't want the color to be clipped for doing this check.
+      if (oldHue !== null && colorOrHsv.as(Common.Color.Format.LCH).isHuePowerless()) {
+        this.hsv[0] = oldHue;
+      }
+    }
+    this.colorNameInternal = colorName;
+
     if (this.contrastInfo) {
-      this.contrastInfo.setColor(Common.Color.Color.fromHSVA(this.hsv), this.colorFormat);
+      this.contrastInfo.setColor(Common.Color.Legacy.fromHSVA(this.hsv), this.colorFormat);
     }
 
     this.updateHelperLocations();
@@ -964,38 +1111,41 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
   }
 
-  private color(): Common.Color.Color {
-    return Common.Color.Color.fromHSVA(this.hsv);
-  }
-
   colorName(): string|undefined {
     return this.colorNameInternal;
   }
 
-  colorString(): string {
+  private colorString(): string {
+    // If the `colorStringInternal` exists and
+    // if it is not an empty string, we will show that.
+    // Empty string check is important here since we use
+    // that to point that the colorStringInternal is cleared
+    // and should not be used.
     if (this.colorStringInternal) {
       return this.colorStringInternal;
     }
-    const cf = Common.Color.Format;
-    const color = this.color();
 
-    let colorString = color.asString(this.colorFormat);
+    const color = this.color;
+    let colorString = this.colorFormat && this.colorFormat !== color.format() ?
+        color.asString(this.colorFormat) :
+        (color.getAuthoredText() ?? color.asString());
     if (colorString) {
       return colorString;
     }
 
-    if (this.colorFormat === cf.Nickname) {
-      colorString = color.asString(color.hasAlpha() ? cf.HEXA : cf.HEX);
-    } else if (this.colorFormat === cf.ShortHEX) {
-      colorString = color.asString(color.detectHEXFormat());
-    } else if (this.colorFormat === cf.HEX) {
-      colorString = color.asString(cf.HEXA);
-    } else if (this.colorFormat === cf.HSL) {
-      colorString = color.asString(cf.HSLA);
-    } else if (this.colorFormat === cf.HWB) {
-      colorString = color.asString(cf.HWBA);
+    if (this.colorFormat === Common.Color.Format.Nickname) {
+      colorString =
+          color.asString(color.asLegacyColor().hasAlpha() ? Common.Color.Format.HEXA : Common.Color.Format.HEX);
+    } else if (this.colorFormat === Common.Color.Format.ShortHEX) {
+      colorString = color.asString(color.asLegacyColor().detectHEXFormat());
+    } else if (this.colorFormat === Common.Color.Format.HEX) {
+      colorString = color.asString(Common.Color.Format.HEXA);
+    } else if (this.colorFormat === Common.Color.Format.HSL) {
+      colorString = color.asString(Common.Color.Format.HSLA);
+    } else if (this.colorFormat === Common.Color.Format.HWB) {
+      colorString = color.asString(Common.Color.Format.HWBA);
     } else {
-      colorString = color.asString(cf.RGBA);
+      colorString = color.asString(Common.Color.Format.RGBA);
     }
 
     console.assert(Boolean(colorString));
@@ -1029,78 +1179,91 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private updateInput(): void {
-    const cf = Common.Color.Format;
-    if (this.colorFormat === cf.HEX || this.colorFormat === cf.ShortHEX || this.colorFormat === cf.Nickname) {
+    if (this.colorFormat === Common.Color.Format.HEX || this.colorFormat === Common.Color.Format.ShortHEX ||
+        this.colorFormat === Common.Color.Format.Nickname) {
       this.hexContainer.hidden = false;
       this.displayContainer.hidden = true;
-      if (this.colorFormat === cf.ShortHEX) {
-        this.hexValue.value = String(this.color().asString(this.color().detectHEXFormat()));
+      if (this.colorFormat === Common.Color.Format.ShortHEX) {
+        this.hexValue.value = String(this.color.asString(this.color.asLegacyColor().detectHEXFormat()));
       } else {  // Don't use ShortHEX if original was not in that format.
-        this.hexValue.value = String(this.color().asString(this.color().hasAlpha() ? cf.HEXA : cf.HEX));
+        this.hexValue.value = String(this.color.asString(
+            this.color.asLegacyColor().hasAlpha() ? Common.Color.Format.HEXA : Common.Color.Format.HEX));
       }
     } else {
-      // RGBA, HSLA, HWBA display.
+      // RGBA, HSLA, HWBA, color() display.
       this.hexContainer.hidden = true;
       this.displayContainer.hidden = false;
-      let colorValues;
-      if (this.colorFormat === cf.RGB) {
-        this.textLabels.textContent = 'RGBA';
-        colorValues = this.color().canonicalRGBA();
-      } else if (this.colorFormat === cf.HSL) {
-        this.textLabels.textContent = 'HSLA';
-        colorValues = this.color().canonicalHSLA();
-      } else {
-        this.textLabels.textContent = 'HWBA';
-        colorValues = this.color().canonicalHWBA();
-      }
+      const spec = colorFormatSpec[this.colorFormat];
+      const colorValues = spec.toValues(this.color);
+      this.textLabels.textContent = spec.label;
 
-      for (let i = 0; i < 3; ++i) {
-        UI.ARIAUtils.setAccessibleName(
+      for (let i = 0; i < this.textValues.length; ++i) {
+        UI.ARIAUtils.setLabel(
             this.textValues[i],
             /** R in RGBA */ i18nString(UIStrings.sInS, {
               PH1: this.textLabels.textContent.charAt(i),
               PH2: this.textLabels.textContent,
             }));
         this.textValues[i].value = String(colorValues[i]);
-        if (this.colorFormat !== cf.RGB && (i === 1 || i === 2)) {
-          this.textValues[i].value += '%';
-        }
       }
-      UI.ARIAUtils.setAccessibleName(
-          this.textValues[3],
-          /** A in RGBA */ i18nString(UIStrings.sInS, {
-            PH1: this.textLabels.textContent.charAt(3),
-            PH2: this.textLabels.textContent,
-          }));
-      this.textValues[3].value = String(Math.round(colorValues[3] * 100) / 100);
+    }
+  }
+
+  private hideSrgbOverlay(): void {
+    if (this.colorElement.contains(this.srgbOverlay)) {
+      this.colorElement.removeChild(this.srgbOverlay);
+    }
+  }
+
+  private showSrgbOverlay(): void {
+    if ((this.contrastDetails && this.contrastDetails.expanded()) || this.gamut !== SpectrumGamut.DISPLAY_P3) {
+      return;
+    }
+
+    void this.srgbOverlay.render({
+      hue: this.hsv[0],
+      width: this.dragWidth,
+      height: this.dragHeight,
+    });
+
+    if (!this.colorElement.contains(this.srgbOverlay)) {
+      this.colorElement.appendChild(this.srgbOverlay);
+    }
+  }
+
+  private updateSrgbOverlay(): void {
+    if (this.gamut === SpectrumGamut.DISPLAY_P3) {
+      this.showSrgbOverlay();
+    } else {
+      this.hideSrgbOverlay();
     }
   }
 
   private updateUI(): void {
-    const h = Common.Color.Color.fromHSVA([this.hsv[0], 1, 1, 1]);
-    this.colorElement.style.backgroundColor = h.asString(Common.Color.Format.RGB) as string;
+    this.colorElement.style.backgroundColor = getColorFromHsva(this.gamut, [this.hsv[0], 1, 1, 1]).asString() as string;
     if (this.contrastOverlay) {
       this.contrastOverlay.setDimensions(this.dragWidth, this.dragHeight);
     }
+    this.updateSrgbOverlay();
 
-    this.swatch.setColor(this.color(), this.colorString());
-    this.colorDragElement.style.backgroundColor = this.color().asString(Common.Color.Format.RGBA) as string;
-    const noAlpha = Common.Color.Color.fromHSVA(this.hsv.slice(0, 3).concat(1));
+    this.swatch.setColor(this.color, this.colorString());
+    this.colorDragElement.style.backgroundColor = this.color.asString(Common.Color.Format.LCH) as string;
+    const noAlpha = Common.Color.Legacy.fromHSVA(this.hsv.slice(0, 3).concat(1) as Common.ColorUtils.Color4D);
     this.alphaElementBackground.style.backgroundImage = Platform.StringUtilities.sprintf(
-        'linear-gradient(to right, rgba(0,0,0,0), %s)', noAlpha.asString(Common.Color.Format.RGB));
+        'linear-gradient(to right, rgba(0,0,0,0), %s)', noAlpha.asString(Common.Color.Format.LCH));
+
+    this.hueElement.classList.toggle('display-p3', doesFormatSupportDisplayP3(this.colorFormat));
   }
 
-  private formatViewSwitch(): void {
-    const cf = Common.Color.Format;
-    let format: string = cf.RGB;
-    if (this.colorFormat === cf.RGB) {
-      format = cf.HSL;
-    } else if (this.colorFormat === cf.HSL) {
-      format = cf.HWB;
-    } else if (this.colorFormat === cf.HWB) {
-      format = (this.originalFormat === cf.ShortHEX || this.originalFormat === cf.ShortHEXA) ? cf.ShortHEX : cf.HEX;
-    }
-    this.innerSetColor(undefined, '', undefined /* colorName */, format, ChangeSource.Other);
+  private async showFormatPicker(event: MouseEvent): Promise<void> {
+    const contextMenu = new FormatPickerContextMenu(this.color, this.colorFormat);
+    this.isFormatPickerShown = true;
+    await contextMenu.show(event, (format: Common.Color.Format) => {
+      const newColor = this.color.as(format);
+      this.innerSetColor(newColor, undefined, undefined, format, ChangeSource.Other);
+      Host.userMetrics.colorConvertedFrom(Host.UserMetrics.ColorConvertedFrom.ColorPicker);
+    });
+    this.isFormatPickerShown = false;
   }
 
   /**
@@ -1111,19 +1274,15 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       return;
     }
     const text = event.clipboardData.getData('text');
-    const color = Common.Color.Color.parse(text);
+    const color = Common.Color.parse(text);
     if (!color) {
       return;
     }
-    this.innerSetColor(color.hsva(), text, undefined /* colorName */, undefined /* colorFormat */, ChangeSource.Other);
+    this.innerSetColor(color, text, undefined /* colorName */, undefined /* colorFormat */, ChangeSource.Other);
     event.preventDefault();
   }
 
   private inputChanged(event: Event): void {
-    function elementValue(element: HTMLInputElement): string {
-      return element.value;
-    }
-
     const inputElement = event.currentTarget as HTMLInputElement;
     const newValue = UI.UIUtils.createReplacementString(inputElement.value, event);
     if (newValue) {
@@ -1133,29 +1292,32 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       event.consume(true);
     }
 
-    const cf = Common.Color.Format;
-    let colorString;
-    if (this.colorFormat === cf.Nickname || this.colorFormat === cf.HEX || this.colorFormat === cf.ShortHEX) {
-      colorString = this.hexValue.value;
+    let color: Common.Color.Color|null = null;
+    let colorFormat: Common.Color.Format|undefined;
+    if (this.colorFormat === Common.Color.Format.HEX || this.colorFormat === Common.Color.Format.ShortHEX ||
+        this.colorFormat === Common.Color.Format.Nickname) {
+      color = Common.Color.parse(this.hexValue.value);
     } else {
-      const values = this.textValues.slice(0, -1).map(elementValue).join(' ');
-      const alpha = this.textValues.slice(-1).map(elementValue).join(' ');
-      colorString = Platform.StringUtilities.sprintf('%s(%s)', this.colorFormat, [values, alpha].join(' / '));
+      const spec = colorFormatSpec[this.colorFormat];
+      const colorTextValues = this.textValues.map(element => element.value);
+      if (colorTextValues.length !== 4) {
+        // Somehow the `textValues` array updated to contain more elements
+        // This shouldn't happen.
+        return;
+      }
+      // Since we know that `textValues` is an array with 4 elements we're safe
+      // to assert that `colorTextValues` is an array with 4 strings.
+      color = spec.fromValues(colorTextValues as [string, string, string, string]);
     }
 
-    const color = Common.Color.Color.parse(colorString);
     if (!color) {
       return;
     }
 
-    let colorFormat: string|undefined = undefined;
-    if (this.colorFormat === cf.HEX || this.colorFormat === cf.ShortHEX) {
-      colorFormat = color.detectHEXFormat();
-    }
-    this.innerSetColor(color.hsva(), colorString, undefined /* colorName */, colorFormat, ChangeSource.Input);
+    this.innerSetColor(color, undefined, undefined /* colorName */, colorFormat, ChangeSource.Input);
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.registerCSSFiles([spectrumStyles]);
     this.hueAlphaWidth = this.hueElement.offsetWidth;
     this.slideHelperWidth = this.hueSlider.offsetWidth / 2;
@@ -1180,7 +1342,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
   }
 
-  willHide(): void {
+  override willHide(): void {
     void this.toggleColorPicker(false);
     if (this.contrastDetails && this.contrastDetailsBackgroundColorPickedToggledBound) {
       this.contrastDetails.removeEventListener(
@@ -1189,7 +1351,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
   }
 
-  private async toggleColorPicker(enabled?: boolean): Promise<void> {
+  async toggleColorPicker(enabled?: boolean): Promise<void> {
     const eyeDropperExperimentEnabled = this.eyeDropperExperimentEnabled;
 
     if (enabled === undefined) {
@@ -1220,16 +1382,23 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       // https://github.com/microsoft/TypeScript/issues/48638
       /* eslint-disable  @typescript-eslint/no-explicit-any */
       const eyeDropper = new (<any>window).EyeDropper();
+      this.eyeDropperAbortController = new AbortController();
 
       try {
-        const hexColor = await eyeDropper.open();
-        const color = Common.Color.Color.parse(hexColor.sRGBHex);
-        this.innerSetColor(color?.hsva(), '', undefined /* colorName */, undefined, ChangeSource.Other);
+        const hexColor = await eyeDropper.open({signal: this.eyeDropperAbortController.signal});
+        const color = Common.Color.parse(hexColor.sRGBHex);
+
+        this.innerSetColor(color ?? undefined, '', undefined /* colorName */, undefined, ChangeSource.Other);
       } catch (error) {
-        console.error(error);
+        if (error.name !== 'AbortError') {
+          console.error(error);
+        }
       }
 
       this.colorPickerButton.setToggled(false);
+    } else if (eyeDropperExperimentEnabled && !enabled) {
+      this.eyeDropperAbortController?.abort();
+      this.eyeDropperAbortController = null;
     }
   }
 
@@ -1237,8 +1406,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     data: rgbColor,
   }: Common.EventTarget.EventTargetEvent<Host.InspectorFrontendHostAPI.EyeDropperPickedColorEvent>): void {
     const rgba = [rgbColor.r, rgbColor.g, rgbColor.b, (rgbColor.a / 2.55 | 0) / 100];
-    const color = Common.Color.Color.fromRGBA(rgba);
-    this.innerSetColor(color.hsva(), '', undefined /* colorName */, undefined, ChangeSource.Other);
+    const color = Common.Color.Legacy.fromRGBA(rgba);
+    this.innerSetColor(color, '', undefined /* colorName */, undefined, ChangeSource.Other);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.bringToFront();
   }
 }
@@ -1290,8 +1459,8 @@ export class PaletteGenerator {
 
   private finish(): void {
     function hueComparator(a: string, b: string): number {
-      const hsva = (paletteColors.get(a) as Common.Color.Color).hsva();
-      const hsvb = (paletteColors.get(b) as Common.Color.Color).hsva();
+      const hsva = (paletteColors.get(a) as Common.Color.Legacy).as(Common.Color.Format.HSL).hsva();
+      const hsvb = (paletteColors.get(b) as Common.Color.Legacy).as(Common.Color.Format.HSL).hsva();
 
       // First trim the shades of gray
       if (hsvb[1] < 0.12 && hsva[1] < 0.12) {
@@ -1318,8 +1487,8 @@ export class PaletteGenerator {
     const colorsPerRow = 24;
     while (paletteColors.size < colorsPerRow && colors.length) {
       const colorText = colors.shift() as string;
-      const color = Common.Color.Color.parse(colorText);
-      if (!color || color.nickname() === 'white' || color.nickname() === 'black') {
+      const color = Common.Color.parse(colorText);
+      if (!color) {
         continue;
       }
       paletteColors.set(colorText, color);
@@ -1447,16 +1616,17 @@ export class Swatch {
     self.onInvokeElement(this.swatchOverlayElement, this.onCopyText.bind(this));
     this.swatchOverlayElement.addEventListener('mouseout', this.onCopyIconMouseout.bind(this));
     this.swatchOverlayElement.addEventListener('blur', this.onCopyIconMouseout.bind(this));
-    this.swatchCopyIcon = UI.Icon.Icon.create('largeicon-copy', 'copy-color-icon');
+    this.swatchCopyIcon = UI.Icon.Icon.create('copy', 'copy-color-icon');
     UI.Tooltip.Tooltip.install(this.swatchCopyIcon, i18nString(UIStrings.copyColorToClipboard));
     this.swatchOverlayElement.appendChild(this.swatchCopyIcon);
-    UI.ARIAUtils.setAccessibleName(this.swatchOverlayElement, this.swatchCopyIcon.title);
+    UI.ARIAUtils.setLabel(this.swatchOverlayElement, this.swatchCopyIcon.title);
   }
 
   setColor(color: Common.Color.Color, colorString?: string): void {
-    this.swatchInnerElement.style.backgroundColor = color.asString(Common.Color.Format.RGBA) as string;
+    const lchColor = color.as(Common.Color.Format.LCH);
+    this.swatchInnerElement.style.backgroundColor = lchColor.asString() as string;
     // Show border if the swatch is white.
-    this.swatchInnerElement.classList.toggle('swatch-inner-white', color.hsla()[2] > 0.9);
+    this.swatchInnerElement.classList.toggle('swatch-inner-white', lchColor.l > 90);
     this.colorString = colorString || null;
     if (colorString) {
       this.swatchOverlayElement.hidden = false;
@@ -1466,14 +1636,14 @@ export class Swatch {
   }
 
   private onCopyText(event: Event): void {
-    this.swatchCopyIcon.setIconType('largeicon-checkmark');
+    this.swatchCopyIcon.setIconType('checkmark');
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(this.colorString);
     UI.ARIAUtils.setPressed(this.swatchOverlayElement, true);
     event.consume();
   }
 
   private onCopyIconMouseout(): void {
-    this.swatchCopyIcon.setIconType('largeicon-copy');
+    this.swatchCopyIcon.setIconType('copy');
     UI.ARIAUtils.setPressed(this.swatchOverlayElement, false);
   }
 }

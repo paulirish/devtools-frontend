@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import '../shell/shell.js';
+import '../../panels/mobile_throttling/mobile_throttling-meta.js';
 import '../../panels/js_profiler/js_profiler-meta.js';
 import type * as Sources from '../../panels/sources/sources.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -15,12 +16,12 @@ import {NodeConnectionsPanel} from './NodeConnectionsPanel.js';  // eslint-disab
 
 const UIStrings = {
   /**
-  *@description Text that refers to the network connection
-  */
+   *@description Text that refers to the network connection
+   */
   connection: 'Connection',
   /**
- *@description A tag of Node.js Connection Panel that can be searched in the command menu
- */
+   *@description A tag of Node.js Connection Panel that can be searched in the command menu
+   */
   node: 'node',
   /**
    *@description Command for showing the Connection tool
@@ -28,12 +29,12 @@ const UIStrings = {
   showConnection: 'Show Connection',
   /**
    *@description Title of the 'Node' tool in the Network Navigator View, which is part of the Sources tool
-  */
+   */
   networkTitle: 'Node',
   /**
    *@description Command for showing the 'Node' tool in the Network Navigator View, which is part of the Sources tool
-  */
-  showNode: 'Node',
+   */
+  showNode: 'Show Node',
 };
 
 const str_ = i18n.i18n.registerUIStrings('entrypoints/node_app/node_app.ts', UIStrings);

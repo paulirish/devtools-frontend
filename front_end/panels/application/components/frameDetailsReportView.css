@@ -19,7 +19,8 @@ button ~ .text-ellipsis {
   color: var(--color-link);
   text-decoration: underline;
   cursor: pointer;
-  padding: 2px 0; /* adjust focus ring size */
+  outline-offset: 2px;
+  padding: 0;
 }
 
 button.link {
@@ -27,6 +28,16 @@ button.link {
   background: none;
   font-family: inherit;
   font-size: inherit;
+  height: 16px;
+}
+
+button.link:has(devtools-icon) {
+  margin-top: 5px;
+}
+
+button.text-link {
+  padding-left: 2px;
+  height: 26px;
 }
 
 .inline-button {
@@ -65,10 +76,6 @@ button.link {
   grid-column-start: span 2;
   margin: 0 0 8px 30px;
   line-height: 28px;
-}
-
-.button-icon-with-text {
-  vertical-align: sub;
 }
 
 .without-min-width {
