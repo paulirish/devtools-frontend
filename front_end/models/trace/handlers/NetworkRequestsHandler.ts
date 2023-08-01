@@ -388,6 +388,11 @@ export async function finalize(): Promise<void> {
           redirects,
           // In the event the property isn't set, assume non-blocking.
           renderBlocking: renderBlocking ? renderBlocking : 'non_blocking',
+
+          // nastay.
+          receiveDatas: request.receivedData,
+          receiveResponse: request.receiveResponse,
+
           requestId,
           requestingFrameUrl,
           requestMethod: finalSendRequest.args.data.requestMethod,

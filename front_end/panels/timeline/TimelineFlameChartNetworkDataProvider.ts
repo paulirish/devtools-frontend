@@ -262,18 +262,23 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     const request = event;
     const darkened = this.entryColor(index).replace(/\d+%\)/, '20%, 0.4)').replace('hsl', 'hsla');
     context.fillStyle = darkened;
-    const receiveDataEvents = request.children.filter(evt => evt.args?.data?.encodedDataLength && evt.name !== 'ResourceFinish');
+    const data = request.args.data;
+
+    const receiveDataEvents = [receiveResponse, ...data.receiveDatas]; // everything with encodedDataLength (thats not resourcefinish)
     const totalDataChunkLength = receiveDataEvents.reduce((sum, item) => sum + item.args?.data?.encodedDataLength || 0, 0);
     // each "data received" event in blink gets a 'length' from a chunk.size().
     // This number probaly includes some overhead (mojo IPC chunk metadata?) and generally likes to be 65k.
     //  so bytesSum will generally be larger than the request's encodedDataLength. Shrug.
-    const adjFactor = totalDataChunkLength / request.encodedDataLength;
+    const adjFactor = totalDataChunkLength / request.args.data.syntheticData.encodedDataLength;
+
+  /// ???
+    const timeToPixel = (time: number): number => Math.floor(unclippedBarX + (time - beginTime) * timeToPixelRatio);
 
     let bytesSum = receiveDataEvents[0].args.data.encodedDataLength || 0;
     for (let i = 1; i < receiveDataEvents.length; i++) {
         const prevEvt = receiveDataEvents[i-1];
         const evt = receiveDataEvents[i];
-        const chunkLength = evt.args.data.encodedDataLength
+        const chunkLength = evt.args.data.encodedDataLength;
         bytesSum += chunkLength;
         const scaledHeight = Math.min(bytesSum / request.encodedDataLength / adjFactor, 100) * (barHeight - 1);
         // console.log(evt.name, bytesSum / request.encodedDataLength / adjFactor, 'here', chunkLength, 'totalling', bytesSum, 'out of', request.encodedDataLength, ' umwhat', scaledHeight);
