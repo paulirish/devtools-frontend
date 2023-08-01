@@ -1154,6 +1154,16 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const barHeight = this.#eventBarHeight(timelineData, entryIndex);
     const barY = this.levelToOffset(barLevel);
     const barWidth = overrides?.width || this.#eventBarWidth(timelineData, entryIndex);
+
+    // Draw lil arrows on instant events.
+    if (barWidth === 1) {
+      context.moveTo(barX + 0.25, barY);
+      context.lineTo(barX+2.25, barY+5);
+      context.lineTo(barX-1.75, barY+5);
+      context.moveTo(barX+ 0.25, barY);
+      context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
+      return;
+    }
     // We purposefully leave a 1px gap off the height so there is a small gap
     // visually between events vertically in the panel.
     // Similarly, we leave 0.5 pixels off the width so that there is a small
