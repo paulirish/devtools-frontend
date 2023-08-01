@@ -3,24 +3,25 @@
 // found in the LICENSE file.
 
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
+import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../helpers/TraceLoader.js';
 const {assert} = chai;
 
-describe('TraceModel helpers', function() {
+describeWithEnvironment('TraceModel helpers', function() {
   describe('extractOriginFromTrace', () => {
-    it('extracts the origin of a parsed trace correctly', async () => {
+    it('extracts the origin of a parsed trace correctly', async function() {
       const model = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       const origin = TraceModel.Helpers.Trace.extractOriginFromTrace(model.Meta.mainFrameURL);
       assert.strictEqual(origin, 'web.dev');
     });
 
-    it('will remove the `www` if it is present', async () => {
+    it('will remove the `www` if it is present', async function() {
       const traceEvents = await TraceLoader.traceEngine(this, 'multiple-navigations.json.gz');
       const origin = TraceModel.Helpers.Trace.extractOriginFromTrace(traceEvents.Meta.mainFrameURL);
       assert.strictEqual(origin, 'google.com');
     });
 
-    it('returns null when no origin is found', async () => {
+    it('returns null when no origin is found', async function() {
       const traceEvents = await TraceLoader.traceEngine(this, 'basic.json.gz');
       const origin = TraceModel.Helpers.Trace.extractOriginFromTrace(traceEvents.Meta.mainFrameURL);
       assert.isNull(origin);
@@ -100,7 +101,7 @@ describe('TraceModel helpers', function() {
   });
 
   describe('getNavigationForTraceEvent', () => {
-    it('returns the correct navigation for a request', async () => {
+    it('returns the correct navigation for a request', async function() {
       const {NetworkRequests, Meta} = await TraceLoader.traceEngine(this, 'multiple-navigations.json.gz');
       const request1 = NetworkRequests.byTime[0];
       const navigationForFirstRequest = TraceModel.Helpers.Trace.getNavigationForTraceEvent(
@@ -113,7 +114,7 @@ describe('TraceModel helpers', function() {
       assert.strictEqual(navigationForSecondRequest?.ts, TraceModel.Types.Timing.MicroSeconds(636471400029));
     });
 
-    it('returns the correct navigation for a page load event', async () => {
+    it('returns the correct navigation for a page load event', async function() {
       const {PageLoadMetrics, Meta} = await TraceLoader.traceEngine(this, 'multiple-navigations.json.gz');
       const firstNavigationId = Meta.navigationsByNavigationId.keys().next().value;
 
@@ -363,6 +364,18 @@ describe('TraceModel helpers', function() {
             eventsHaveDuration && ordered[i].ts === ordered[i - 1].ts && dur <= durPrev;
         assert.isTrue(ordered[i].ts > ordered[i - 1].ts || correctOrderForSharedTimestamp);
       }
+    });
+  });
+  describe('activeURLForFrameAtTime', () => {
+    it('extracts the active url for a frame at a given time', async function() {
+      const traceEvents = await TraceLoader.traceEngine(this, 'simple-js-program.json.gz');
+      const frameId = '1F729458403A23CF1D8D246095129AC4';
+      const firstURL = TraceModel.Helpers.Trace.activeURLForFrameAtTime(
+          frameId, TraceModel.Types.Timing.MicroSeconds(251126654355), traceEvents.Meta.rendererProcessesByFrame);
+      assert.strictEqual(firstURL, 'about:blank');
+      const secondURL = TraceModel.Helpers.Trace.activeURLForFrameAtTime(
+          frameId, TraceModel.Types.Timing.MicroSeconds(251126663398), traceEvents.Meta.rendererProcessesByFrame);
+      assert.strictEqual(secondURL, 'https://www.google.com');
     });
   });
 });

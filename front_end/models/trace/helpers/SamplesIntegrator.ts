@@ -332,8 +332,11 @@ export class SamplesIntegrator {
     for (; i < stackTrace.length; ++i) {
       const call = stackTrace[i];
       this.#currentJSStack.push(call);
-      if (call.nodeId === this.#profileModel.programNode?.id || call.nodeId === this.#profileModel.root?.id) {
-        // Skip (root) and (program) frames.
+      if (call.nodeId === this.#profileModel.programNode?.id || call.nodeId === this.#profileModel.root?.id ||
+          call.nodeId === this.#profileModel.idleNode?.id) {
+        // Skip (root), (program) and (idle) frames, since this are not
+        // relevant for web profiling and we don't want to show them in
+        // the timeline.
         continue;
       }
       this.#constructedProfileCalls.push(call);
@@ -397,8 +400,14 @@ export class SamplesIntegrator {
   }
 
   static showNativeName(name: string): boolean {
-    const showRuntimeCallStats = Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats');
-    return showRuntimeCallStats && Boolean(SamplesIntegrator.nativeGroup(name));
+    try {
+      // Querying for unregistered experiments will error on debug
+      // builds.
+      const showRuntimeCallStats = Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats');
+      return showRuntimeCallStats && Boolean(SamplesIntegrator.nativeGroup(name));
+    } catch (error) {
+      return false;
+    }
   }
 
   static nativeGroup(nativeName: string): 'Parse'|'Compile'|null {
@@ -416,7 +425,13 @@ export class SamplesIntegrator {
   }
 
   static filterStackFrames(stack: Types.TraceEvents.TraceEventSyntheticProfileCall[]): void {
-    const showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
+    let showAllEvents = false;
+    try {
+      // Querying for unregistered experiments will error on debug
+      // builds.
+      showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
+    } catch (_err) {
+    }
     const showNativeFunctions = Common.Settings.Settings.hasInstance() &&
         Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get();
     if (showAllEvents) {
@@ -452,7 +467,6 @@ export class SamplesIntegrator {
       cat: '',
       name: 'ProfileCall',
       nodeId: node.id,
-      children: [],
       ph: Types.TraceEvents.Phase.COMPLETE,
       pid,
       tid,
