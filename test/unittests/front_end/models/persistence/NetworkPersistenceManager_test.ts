@@ -21,7 +21,6 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
 
   beforeEach(async () => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
     const target = createTarget();
     networkPersistenceManager =
@@ -549,13 +548,15 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
 
   it('is aware of which \'.headers\' files are currently active', done => {
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const project = {
+      type: () => Workspace.Workspace.projectTypes.Network,
+    } as Workspace.Workspace.Project;
     const networkUISourceCode = {
       url: () => 'https://www.example.com/hello/world/index.html',
-      project: () => ({
-        type: () => Workspace.Workspace.projectTypes.Network,
-      }),
+      project: () => project,
       contentType: () => Common.ResourceType.resourceTypes.Document,
     } as Workspace.UISourceCode.UISourceCode;
+    project.uiSourceCodes = () => [networkUISourceCode];
 
     const eventURLs: string[] = [];
     networkPersistenceManager.addEventListener(
@@ -578,9 +579,23 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
       project: () => networkPersistenceManager.project(),
     } as Workspace.UISourceCode.UISourceCode));
 
+    workspace.dispatchEventToListeners(Workspace.Workspace.Events.ProjectRemoved, project);
+
     setTimeout(() => {
       assert.deepStrictEqual(
           eventURLs, ['file:///path/to/overrides/.headers', 'file:///path/to/overrides/www.example.com/.headers']);
+      assert.isFalse(networkPersistenceManager.hasMatchingNetworkUISourceCodeForHeaderOverridesFile({
+        url: () => 'file:///path/to/overrides/www.example.com/.headers',
+        project: () => networkPersistenceManager.project(),
+      } as Workspace.UISourceCode.UISourceCode));
+      assert.isFalse(networkPersistenceManager.hasMatchingNetworkUISourceCodeForHeaderOverridesFile({
+        url: () => 'file:///path/to/overrides/.headers',
+        project: () => networkPersistenceManager.project(),
+      } as Workspace.UISourceCode.UISourceCode));
+      assert.isFalse(networkPersistenceManager.hasMatchingNetworkUISourceCodeForHeaderOverridesFile({
+        url: () => 'file:///path/to/overrides/www.foo.com/.headers',
+        project: () => networkPersistenceManager.project(),
+      } as Workspace.UISourceCode.UISourceCode));
       done();
     }, 0);
   });
@@ -589,7 +604,6 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
 describeWithMockConnection('NetworkPersistenceManager', () => {
   beforeEach(() => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
   });
 
@@ -599,7 +613,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
         createFileSystemUISourceCode({url: 'file:///tmp' as Platform.DevToolsPath.UrlString, mimeType: 'text/plain'});
     await networkPersistenceManager.setProject(project);
     const targetManager = SDK.TargetManager.TargetManager.instance();
-    assert.isNull(targetManager.mainTarget());
+    assert.isNull(targetManager.rootTarget());
     assert.isFalse(networkPersistenceManager.active());
 
     const target = await createTarget();

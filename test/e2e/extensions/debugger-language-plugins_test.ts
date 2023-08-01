@@ -14,6 +14,7 @@ import {
   getBrowserAndPages,
   getResourcesPath,
   goToResource,
+  installEventListener,
   pasteText,
   pressKey,
   typeText,
@@ -45,6 +46,9 @@ import {
   type LabelMapping,
   captureAddedSourceFiles,
   PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR,
+  stepOver,
+  retrieveTopCallFrameWithoutResuming,
+  DEBUGGER_PAUSED_EVENT,
 } from '../helpers/sources-helpers.js';
 import {expectError} from '../../conductor/events.js';
 
@@ -61,6 +65,18 @@ declare function RegisterExtension(
     pluginImpl: Partial<Chrome.DevTools.LanguageExtensionPlugin>, name: string,
     // eslint-disable-next-line @typescript-eslint/naming-convention
     supportedScriptTypes: {language: string, symbol_types: string[]}): void;
+
+function goToWasmResource(
+    moduleName: string, options: {autoLoadModule?: boolean, runFunctionAfterLoad?: string} = {}): Promise<void> {
+  const queryParams = [`module=${moduleName}`];
+  if (!options.autoLoadModule) {
+    queryParams.push('defer=1');
+  }
+  if (options.runFunctionAfterLoad) {
+    queryParams.push(`autorun=${options.runFunctionAfterLoad}`);
+  }
+  return goToResource(`extensions/wasm_module.html?${queryParams.join('&')}`);
+}
 
 // This testcase reaches into DevTools internals to install the extension plugin. At this point, there is no sensible
 // alternative, because loading a real extension is not supported in our test setup.
@@ -86,8 +102,7 @@ describe('The Debugger Language Plugins', async () => {
       RegisterExtension(new SingleFilePlugin(), 'Single File', {language: 'WebAssembly', symbol_types: ['None']});
     });
 
-    await goToResource(
-        'extensions/wasm_module.html?module=/test/e2e/resources/extensions/global_variable.wasm&defer=1');
+    await goToWasmResource('/test/e2e/resources/extensions/global_variable.wasm');
     await openSourcesPanel();
     const capturedFileNames = await captureAddedSourceFiles(2, async () => {
       await target.evaluate('loadModule();');
@@ -136,7 +151,7 @@ describe('The Debugger Language Plugins', async () => {
     await openSourcesPanel();
     await click(PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR);
 
-    await goToResource('extensions/wasm_module.html?module=unreachable.wasm&autorun=Main');
+    await goToWasmResource('unreachable.wasm', {runFunctionAfterLoad: 'Main', autoLoadModule: true});
     await waitFor('.paused-status');
 
     const pauseLocation = await locationLabels.checkLocationForLabel('PAUSED(unreachable)');
@@ -215,22 +230,17 @@ describe('The Debugger Language Plugins', async () => {
           new LocationMappingPlugin(), 'Location Mapping', {language: 'WebAssembly', symbol_types: ['None']});
     }, locationLabels.getMappingsForPlugin());
 
-    await goToResource('extensions/wasm_module.html?module=/test/e2e/resources/extensions/global_variable.wasm');
+    await goToWasmResource('/test/e2e/resources/extensions/global_variable.wasm', {autoLoadModule: true});
     await openSourcesPanel();
     await openFileInEditor('global_variable.wat');
 
-    const toolbar = await waitFor('.sources-toolbar');
-    const itemElements = await waitForMany('.toolbar-item', 2, toolbar);
-    const items = await Promise.all(itemElements.map(e => e.evaluate(e => e.textContent)));
-    assert.isAtLeast(
-        items.indexOf('(provided via debug info by global_variable.wasm)'), 0, 'Toolbar debug info hint not found');
+    const toolbarLink = await waitFor('.toolbar-item .devtools-link');
+    const toolbarLinkText = await toolbarLink.evaluate(({textContent}) => textContent);
+    assert.strictEqual(toolbarLinkText, 'global_variable.wasm');
 
     assert.isNotEmpty(await getNonBreakableLines());
 
     await locationLabels.setBreakpointInSourceAndRun('BREAK(return)', 'Module.instance.exports.Main();');
-
-    // FIXME(pfaffe) what was the point of this check?
-    // await waitForFunction(async () => !(await isBreakpointSet(4)));
   });
 
   it('shows top-level and nested variables', async () => {
@@ -576,170 +586,6 @@ describe('The Debugger Language Plugins', async () => {
     assert.deepEqual(title, `${incompleteMessage}\n${text}`);
   });
 
-  it('shows variable values with JS formatters', async () => {
-    const extension = await loadExtension(
-        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
-    await extension.evaluate(() => {
-      class VariableListingPlugin {
-        private modules:
-            Map<string,
-                {rawLocationRange?: Chrome.DevTools.RawLocationRange, sourceLocation?: Chrome.DevTools.SourceLocation}>;
-        constructor() {
-          this.modules = new Map();
-        }
-
-        async addRawModule(rawModuleId: string, symbols: string, rawModule: Chrome.DevTools.RawModule) {
-          const sourceFileURL = new URL('unreachable.ll', rawModule.url || symbols).href;
-          this.modules.set(rawModuleId, {
-            rawLocationRange: {rawModuleId, startOffset: 6, endOffset: 7},
-            sourceLocation: {rawModuleId, sourceFileURL, lineNumber: 5, columnNumber: 2},
-          });
-          return [sourceFileURL];
-        }
-
-        async rawLocationToSourceLocation(rawLocation: Chrome.DevTools.RawLocation) {
-          const {rawLocationRange, sourceLocation} = this.modules.get(rawLocation.rawModuleId) || {};
-          if (rawLocationRange && sourceLocation && rawLocationRange.startOffset <= rawLocation.codeOffset &&
-              rawLocation.codeOffset < rawLocationRange.endOffset) {
-            return [sourceLocation];
-          }
-          return [];
-        }
-
-        async listVariablesInScope(_rawLocation: Chrome.DevTools.RawLocation) {
-          return [{scope: 'LOCAL', name: 'local', type: 'TestType'}];
-        }
-
-        async getScopeInfo(type: string) {
-          return {type, typeName: type};
-        }
-
-        async getTypeInfo(expression: string, _context: Chrome.DevTools.RawLocation):
-            Promise<{typeInfos: Chrome.DevTools.TypeInfo[], base: Chrome.DevTools.EvalBase}|null> {
-          if (expression === 'local') {
-            const typeInfos = [
-              {
-                typeNames: ['TestType'],
-                typeId: 'TestType',
-                members: [{name: 'member', offset: 1, typeId: 'TestTypeMember'}],
-                alignment: 0,
-                arraySize: 0,
-                size: 4,
-                canExpand: true,
-                hasValue: false,
-              },
-              {
-                typeNames: ['TestTypeMember'],
-                typeId: 'TestTypeMember',
-                members: [{name: 'member2', offset: 1, typeId: 'TestTypeMember2'}],
-                alignment: 0,
-                arraySize: 0,
-                size: 3,
-                canExpand: true,
-                hasValue: false,
-              },
-              {
-                typeNames: ['TestTypeMember2'],
-                typeId: 'TestTypeMember2',
-                members: [],
-                alignment: 0,
-                arraySize: 0,
-                size: 2,
-                canExpand: false,
-                hasValue: true,
-              },
-              {
-                typeNames: ['int'],
-                typeId: 'int',
-                members: [],
-                alignment: 0,
-                arraySize: 0,
-                size: 4,
-                canExpand: false,
-                hasValue: true,
-              },
-            ];
-            const base = {rootType: typeInfos[0], payload: 28};
-
-            return {typeInfos, base};
-          }
-          return null;
-        }
-
-        async getFormatter(
-            expressionOrField: string|{base: Chrome.DevTools.EvalBase, field: Chrome.DevTools.FieldInfo[]},
-            _context: Chrome.DevTools.RawLocation): Promise<{js: string}|null> {
-          function formatWithDescription(description: string) {
-            const sym = Symbol('sym');
-            const tag = {className: '$tag', symbol: sym};
-            return {tag, value: 27, description};
-          }
-          function format(description?: string) {
-            const sym = Symbol('sym');
-            const tag = {className: '$tag', symbol: sym};
-
-            class $tag {
-              [sym]: Chrome.DevTools.EvalBase;
-              constructor(value: number) {
-                const rootType = {
-                  typeNames: ['int'],
-                  typeId: 'int',
-                  members: [],
-                  alignment: 0,
-                  arraySize: 0,
-                  size: 4,
-                  canExpand: false,
-                  hasValue: true,
-                };
-                this[sym] = {payload: {value}, rootType};
-              }
-            }
-
-            const value = {value: 26, recurse: new $tag(19), describe: new $tag(20)};
-            Object.setPrototypeOf(value, null);
-            return {tag, value, description};
-          }
-
-          if (typeof expressionOrField === 'string') {
-            return null;
-          }
-
-          const {base, field} = expressionOrField;
-          if (base.payload === 28 && field.length === 2 && field[0].name === 'member' && field[0].offset === 1 &&
-              field[0].typeId === 'TestTypeMember' && field[1].name === 'member2' && field[1].offset === 1 &&
-              field[1].typeId === 'TestTypeMember2') {
-            return {js: `(${format})()`};
-          }
-          if ((base.payload as {value: number}).value === 19 && field.length === 0) {
-            return {js: '27'};
-          }
-          if ((base.payload as {value: number}).value === 20 && field.length === 0) {
-            return {js: `(${formatWithDescription})('CustomLabel')`};
-          }
-          return null;
-        }
-      }
-
-      RegisterExtension(
-          new VariableListingPlugin(), 'Location Mapping', {language: 'WebAssembly', symbol_types: ['None']});
-    });
-
-    await openSourcesPanel();
-    await click(PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR);
-    await goToResource('sources/wasm/unreachable.html');
-    await waitFor(RESUME_BUTTON);
-
-    const locals = await getValuesForScope('LOCAL', 3, 6);
-    assert.deepEqual(locals, [
-      'local: TestType',
-      'member: TestTypeMember',
-      'member2: TestTypeMember2',
-      'describe: CustomLabel',
-      'recurse: 27',
-      'value: 26',
-    ]);
-  });
-
   it('shows variable values with the evaluate API', async () => {
     const extension = await loadExtension(
         'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
@@ -776,58 +622,6 @@ describe('The Debugger Language Plugins', async () => {
 
         async getScopeInfo(type: string) {
           return {type, typeName: type};
-        }
-
-        async getTypeInfo(expression: string, _context: Chrome.DevTools.RawLocation):
-            Promise<{typeInfos: Chrome.DevTools.TypeInfo[], base: Chrome.DevTools.EvalBase}|null> {
-          if (expression === 'local') {
-            const typeInfos = [
-              {
-                typeNames: ['TestType'],
-                typeId: 'TestType',
-                members: [{name: 'member', offset: 1, typeId: 'TestTypeMember'}],
-                alignment: 0,
-                arraySize: 0,
-                size: 4,
-                canExpand: true,
-                hasValue: false,
-              },
-              {
-                typeNames: ['TestTypeMember'],
-                typeId: 'TestTypeMember',
-                members: [{name: 'member2', offset: 1, typeId: 'TestTypeMember2'}],
-                alignment: 0,
-                arraySize: 0,
-                size: 3,
-                canExpand: true,
-                hasValue: false,
-              },
-              {
-                typeNames: ['TestTypeMember2'],
-                typeId: 'TestTypeMember2',
-                members: [],
-                alignment: 0,
-                arraySize: 0,
-                size: 2,
-                canExpand: false,
-                hasValue: true,
-              },
-              {
-                typeNames: ['int'],
-                typeId: 'int',
-                members: [],
-                alignment: 0,
-                arraySize: 0,
-                size: 4,
-                canExpand: false,
-                hasValue: true,
-              },
-            ];
-            const base = {rootType: typeInfos[0], payload: undefined};
-
-            return {typeInfos, base};
-          }
-          return null;
         }
 
         async evaluate(expression: string, _context: Chrome.DevTools.RawLocation, _stopId: unknown):
@@ -965,30 +759,12 @@ describe('The Debugger Language Plugins', async () => {
           return [{scope: 'LOCAL', name: 'unreachable', type: 'int'}];
         }
 
-        async getTypeInfo(expression: string, _context: Chrome.DevTools.RawLocation):
-            Promise<{typeInfos: Chrome.DevTools.TypeInfo[], base: Chrome.DevTools.EvalBase}|null> {
+        evaluate(expression: string, _context: Chrome.DevTools.RawLocation, _stopId: unknown):
+            Promise<Chrome.DevTools.RemoteObject|null> {
           if (expression === 'unreachable') {
-            const typeInfos = [{
-              typeNames: ['int'],
-              typeId: 'int',
-              members: [],
-              alignment: 0,
-              arraySize: 0,
-              size: 4,
-              canExpand: false,
-              hasValue: true,
-            }];
-            const base = {rootType: typeInfos[0], payload: 28};
-
-            return {typeInfos, base};
+            return Promise.resolve({type: 'number', value: 23, description: '23', hasChildren: false});
           }
-          return null;
-        }
-
-        async getFormatter(
-            _expressionOrField: string|{base: Chrome.DevTools.EvalBase, field: Chrome.DevTools.FieldInfo[]},
-            _context: Chrome.DevTools.RawLocation): Promise<{js: string}|null> {
-          return {js: '23'};
+          return Promise.resolve(null);
         }
       }
 
@@ -1054,40 +830,19 @@ describe('The Debugger Language Plugins', async () => {
           const {codeOffset} = rawLocation;
           if (!rawLocationRange || rawLocationRange.startOffset > codeOffset ||
               rawLocationRange.endOffset <= codeOffset) {
+            console.error('foobar');
             return [];
           }
 
           return [{scope: 'LOCAL', name: 'unreachable', type: 'int'}];
         }
 
-        async getTypeInfo(expression: string, _context: Chrome.DevTools.RawLocation):
-            Promise<{typeInfos: Chrome.DevTools.TypeInfo[], base: Chrome.DevTools.EvalBase}|null> {
+        async evaluate(expression: string, _context: Chrome.DevTools.RawLocation, _stopId: unknown):
+            Promise<Chrome.DevTools.RemoteObject|null> {
           if (expression === 'foo') {
-            const typeInfos = [{
-              typeNames: ['int'],
-              typeId: 'int',
-              members: [],
-              alignment: 0,
-              arraySize: 0,
-              size: 4,
-              canExpand: false,
-              hasValue: true,
-            }];
-            const base = {rootType: typeInfos[0], payload: 28};
-
-            return {typeInfos, base};
+            return {type: 'number', value: 23, description: '23', hasChildren: false};
           }
           throw new Error(`No typeinfo for ${expression}`);
-        }
-
-        async getFormatter(
-            expressionOrField: string|{base: Chrome.DevTools.EvalBase, field: Chrome.DevTools.FieldInfo[]},
-            _context: Chrome.DevTools.RawLocation): Promise<{js: string}|null> {
-          if (typeof expressionOrField !== 'string' && expressionOrField.base.payload as number === 28 &&
-              expressionOrField.field.length === 0) {
-            return {js: '23'};
-          }
-          throw new Error(`cannot format ${expressionOrField}`);
         }
       }
 
@@ -1168,7 +923,7 @@ describe('The Debugger Language Plugins', async () => {
       RegisterExtension(new WasmDataExtension(), 'Wasm Data', {language: 'WebAssembly', symbol_types: ['None']});
     });
 
-    await goToResource('extensions/wasm_module.html?module=can_access_wasm_data.wasm');
+    await goToWasmResource('can_access_wasm_data.wasm', {autoLoadModule: true});
     await openSourcesPanel();
 
     await target.evaluate(
@@ -1240,8 +995,7 @@ describe('The Debugger Language Plugins', async () => {
           {language: 'WebAssembly', symbol_types: ['ExternalDWARF']});
     });
 
-    await goToResource(
-        'extensions/wasm_module.html?module=/test/e2e/resources/extensions/global_variable.wasm&defer=1');
+    await goToWasmResource('/test/e2e/resources/extensions/global_variable.wasm');
     await openSourcesPanel();
 
     {
@@ -1264,5 +1018,117 @@ describe('The Debugger Language Plugins', async () => {
 
       assert.deepEqual(capturedFileNames, ['/source_file.c']);
     }
+  });
+
+  it('does not auto-step for modules without a plugin', async () => {
+    const {frontend} = getBrowserAndPages();
+    const locationLabels = WasmLocationLabels.load('extensions/stepping.wat', 'extensions/stepping.wasm');
+
+    await goToWasmResource('stepping.wasm', {autoLoadModule: true});
+    await openSourcesPanel();
+
+    installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
+    await locationLabels.setBreakpointInWasmAndRun('FIRST_PAUSE', 'window.Module.instance.exports.Main(16)');
+    await waitFor('.paused-status');
+    await locationLabels.checkLocationForLabel('FIRST_PAUSE');
+    const beforeStepCallFrame = (await retrieveTopCallFrameWithoutResuming())?.split(':');
+    assertNotNullOrUndefined(beforeStepCallFrame);
+    const beforeStepFunctionNames = await getCallFrameNames();
+
+    await stepOver();
+    const afterStepCallFrame = await waitForFunction(async () => {
+      const callFrame = (await retrieveTopCallFrameWithoutResuming())?.split(':');
+      if (callFrame && (callFrame[0] !== beforeStepCallFrame[0] || callFrame[1] !== beforeStepCallFrame[1])) {
+        return callFrame;
+      }
+      return undefined;
+    });
+    const afterStepFunctionNames = await getCallFrameNames();
+    // still in the same function:
+    assert.deepStrictEqual(beforeStepFunctionNames, afterStepFunctionNames);
+    // still in the same module:
+    assert.deepStrictEqual(beforeStepCallFrame[0], afterStepCallFrame[0]);
+    // moved one instruction:
+    assert.deepStrictEqual(parseInt(beforeStepCallFrame[1], 16) + 2, parseInt(afterStepCallFrame[1], 16));
+  });
+
+  it('auto-steps over unmapped code correctly', async () => {
+    const {frontend} = getBrowserAndPages();
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
+    const locationLabels = WasmLocationLabels.load('extensions/stepping.wat', 'extensions/stepping.wasm');
+
+    await goToWasmResource('stepping.wasm', {autoLoadModule: true});
+    await openSourcesPanel();
+
+    // Do this after setting the breakpoint, otherwise the helper gets confused
+    await locationLabels.setBreakpointInWasmAndRun('FIRST_PAUSE', 'window.Module.instance.exports.Main(16)');
+    await extension.evaluate((mappings: LabelMapping[]) => {
+      // This plugin will emulate a source mapping with a single file and a single corresponding source line and byte
+      // code offset pair.
+      class LocationMappingPlugin {
+        private module: undefined|{rawModuleId: string, sourceFileURL: string} = undefined;
+
+        async addRawModule(rawModuleId: string, symbols: string, rawModule: Chrome.DevTools.RawModule) {
+          if (this.module) {
+            throw new Error('Expected only one module');
+          }
+          const sourceFileURL = new URL('stepping.wat', rawModule.url || symbols).href;
+          this.module = {rawModuleId, sourceFileURL};
+          return [sourceFileURL];
+        }
+
+        async rawLocationToSourceLocation(rawLocation: Chrome.DevTools.RawLocation) {
+          if (this.module) {
+            const {rawModuleId, sourceFileURL} = this.module;
+            if (rawModuleId === rawLocation.rawModuleId) {
+              const mapping = mappings.find(m => rawLocation.codeOffset === m.bytecode && m.label !== 'THIRD_PAUSE');
+              if (mapping) {
+                return [{rawModuleId, sourceFileURL, lineNumber: mapping.sourceLine - 1, columnNumber: -1}];
+              }
+            }
+          }
+          return [];
+        }
+
+        async sourceLocationToRawLocation(sourceLocation: Chrome.DevTools.SourceLocation):
+            Promise<Chrome.DevTools.RawLocationRange[]> {
+          if (this.module) {
+            const {rawModuleId, sourceFileURL} = this.module;
+            if (rawModuleId === sourceLocation.rawModuleId && sourceFileURL === sourceLocation.sourceFileURL) {
+              const mapping = mappings.find(m => sourceLocation.lineNumber === m.sourceLine - 1);
+              if (mapping) {
+                return [{rawModuleId, startOffset: mapping.bytecode, endOffset: mapping.bytecode + 1}];
+              }
+            }
+          }
+          return [];
+        }
+
+        async getMappedLines(rawModuleIdArg: string, sourceFileURLArg: string) {
+          if (this.module) {
+            const {rawModuleId, sourceFileURL} = this.module;
+            if (rawModuleId === rawModuleIdArg && sourceFileURL === sourceFileURLArg) {
+              return Array.from(new Set(mappings.map(m => m.sourceLine - 1)).values()).sort();
+            }
+          }
+          return undefined;
+        }
+      }
+
+      RegisterExtension(
+          new LocationMappingPlugin(), 'Location Mapping', {language: 'WebAssembly', symbol_types: ['None']});
+    }, locationLabels.getMappingsForPlugin());
+
+    await waitFor('.paused-status');
+    await locationLabels.checkLocationForLabel('FIRST_PAUSE');
+    installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
+    await stepOver();
+    await locationLabels.checkLocationForLabel('SECOND_PAUSE');
+    await stepOver();
+    const pausedLocation = await locationLabels.checkLocationForLabel('THIRD_PAUSE');
+    // We're paused at the right location, but let's also check that we're paused in wasm, not the source code:
+    const pausedFrame = await retrieveTopCallFrameWithoutResuming();
+    assert.deepEqual(pausedFrame, `stepping.wasm:0x${pausedLocation.moduleOffset.toString(16)}`);
   });
 });

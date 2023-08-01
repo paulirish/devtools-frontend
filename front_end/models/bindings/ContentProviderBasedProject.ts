@@ -66,12 +66,26 @@ export class ContentProviderBasedProject extends Workspace.Workspace.ProjectStor
     const {contentProvider} = this.#uiSourceCodeToData.get(uiSourceCode) as UISourceCodeData;
     try {
       const content = await contentProvider.requestContent();
+      if ('error' in content) {
+        return {
+          error: content.error,
+          isEncoded: content.isEncoded,
+          content: null,
+        };
+      }
       const wasmDisassemblyInfo = 'wasmDisassemblyInfo' in content ? content.wasmDisassemblyInfo : undefined;
+
+      if (wasmDisassemblyInfo && content.isEncoded === false) {
+        return {
+          content: '',
+          wasmDisassemblyInfo,
+          isEncoded: false,
+        };
+      }
+
       return {
         content: content.content,
-        wasmDisassemblyInfo,
         isEncoded: content.isEncoded,
-        error: 'error' in content && content.error || '',
       };
     } catch (err) {
       // TODO(rob.paveza): CRBug 1013683 - Consider propagating exceptions full-stack
@@ -119,7 +133,7 @@ export class ContentProviderBasedProject extends Workspace.Workspace.ProjectStor
     return false;
   }
 
-  rename(
+  override rename(
       uiSourceCode: Workspace.UISourceCode.UISourceCode, newName: Platform.DevToolsPath.RawPathString,
       callback:
           (arg0: boolean, arg1?: string|undefined, arg2?: Platform.DevToolsPath.UrlString|undefined,
@@ -133,7 +147,7 @@ export class ContentProviderBasedProject extends Workspace.Workspace.ProjectStor
     });
   }
 
-  excludeFolder(_path: Platform.DevToolsPath.UrlString): void {
+  override excludeFolder(_path: Platform.DevToolsPath.UrlString): void {
   }
 
   canExcludeFolder(_path: Platform.DevToolsPath.EncodedPathString): boolean {
@@ -150,10 +164,10 @@ export class ContentProviderBasedProject extends Workspace.Workspace.ProjectStor
     return false;
   }
 
-  deleteFile(_uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+  override deleteFile(_uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
   }
 
-  remove(): void {
+  override remove(): void {
   }
 
   performRename(
@@ -199,7 +213,7 @@ export class ContentProviderBasedProject extends Workspace.Workspace.ProjectStor
     }
   }
 
-  indexContent(progress: Common.Progress.Progress): void {
+  override indexContent(progress: Common.Progress.Progress): void {
     queueMicrotask(progress.done.bind(progress));
   }
 

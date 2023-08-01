@@ -1,0 +1,73 @@
+/*
+ * Copyright 2023 The Chromium Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+}
+
+:host {
+  display: block;
+  height: 100%;
+}
+
+.target-select-menu {
+  max-width: 180px;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  color: var(--color-syntax-1);
+  font-family: var(--monospace-font-family);
+  font-size: var(--monospace-font-size);
+  align-items: center;
+  line-height: 18px;
+  margin-top: 3px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  color: var(--color-syntax-1);
+  font-family: var(--monospace-font-family);
+  font-size: var(--monospace-font-size);
+  line-height: 18px;
+  margin-top: 3px;
+}
+
+.separator {
+  margin-right: 0.5em;
+  color: var(--color-text-primary);
+}
+
+ul {
+  padding-left: 2em;
+}
+
+.colorBlue {
+  color: var(--color-syntax-3);
+}
+
+.wrapper {
+  padding-left: 2em;
+  overflow: auto;
+  height: 100%;
+  width: 100%;
+  padding-bottom: 50px;
+}
+
+.deleteButton {
+  opacity: 0%;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.row:focus-within .deleteButton,
+.row:hover .deleteButton {
+  opacity: 100%;
+}

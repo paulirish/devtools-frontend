@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as ColorPicker from '../../ui/legacy/components/color_picker/color_picker.js';
@@ -28,6 +29,12 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/elements/ColorSwatchPopoverIcon.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+interface BezierPopoverIconParams {
+  treeElement: StylePropertyTreeElement;
+  swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
+  swatch: InlineEditor.Swatches.BezierSwatch;
+}
+
 export class BezierPopoverIcon {
   private treeElement: StylePropertyTreeElement;
   private readonly swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper;
@@ -38,9 +45,11 @@ export class BezierPopoverIcon {
   private scrollerElement?: Element;
   private originalPropertyText?: string|null;
 
-  constructor(
-      treeElement: StylePropertyTreeElement, swatchPopoverHelper: InlineEditor.SwatchPopoverHelper.SwatchPopoverHelper,
-      swatch: InlineEditor.Swatches.BezierSwatch) {
+  constructor({
+    treeElement,
+    swatchPopoverHelper,
+    swatch,
+  }: BezierPopoverIconParams) {
     this.treeElement = treeElement;
     this.swatchPopoverHelper = swatchPopoverHelper;
     this.swatch = swatch;
@@ -60,10 +69,9 @@ export class BezierPopoverIcon {
       return;
     }
 
-    const cubicBezier = UI.Geometry.CubicBezier.parse(this.swatch.bezierText()) ||
-        (UI.Geometry.CubicBezier.parse('linear') as UI.Geometry.CubicBezier);
-    this.bezierEditor = new InlineEditor.BezierEditor.BezierEditor(cubicBezier);
-    this.bezierEditor.setBezier(cubicBezier);
+    const model = InlineEditor.AnimationTimingModel.AnimationTimingModel.parse(this.swatch.bezierText()) ||
+        InlineEditor.AnimationTimingModel.LINEAR_BEZIER;
+    this.bezierEditor = new InlineEditor.BezierEditor.BezierEditor(model);
     this.bezierEditor.addEventListener(InlineEditor.BezierEditor.Events.BezierChanged, this.boundBezierChanged);
     this.swatchPopoverHelper.show(this.bezierEditor, this.swatch.iconElement(), this.onPopoverHidden.bind(this));
     this.scrollerElement = this.swatch.enclosingNodeOrSelfWithClass('style-panes-wrapper');
@@ -210,6 +218,7 @@ export class ColorSwatchPopoverIcon extends Common.ObjectWrapper.ObjectWrapper<C
     }
 
     UI.Context.Context.instance().setFlavor(ColorSwatchPopoverIcon, this);
+    Host.userMetrics.colorPickerOpenedFrom(Host.UserMetrics.ColorPickerOpenedFrom.StylesPane);
   }
 
   private spectrumResized(): void {

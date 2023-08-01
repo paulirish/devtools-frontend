@@ -72,6 +72,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   private disableEditInternal: boolean;
   private contentEncodedInternal?: boolean;
   private isKnownThirdPartyInternal: boolean;
+  private isUnconditionallyIgnoreListedInternal: boolean;
 
   constructor(project: Project, url: Platform.DevToolsPath.UrlString, contentType: Common.ResourceType.ResourceType) {
     super();
@@ -110,6 +111,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     this.workingCopyGetter = null;
     this.disableEditInternal = false;
     this.isKnownThirdPartyInternal = false;
+    this.isUnconditionallyIgnoreListedInternal = false;
   }
 
   requestMetadata(): Promise<UISourceCodeMetadata|null> {
@@ -213,13 +215,19 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     return this.projectInternal;
   }
 
-  requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
+  requestContent({cachedWasmOnly}: {cachedWasmOnly?: boolean} = {}):
+      Promise<TextUtils.ContentProvider.DeferredContent> {
     if (this.requestContentPromise) {
       return this.requestContentPromise;
     }
 
     if (this.contentLoadedInternal) {
       return Promise.resolve(this.contentInternal as TextUtils.ContentProvider.DeferredContent);
+    }
+
+    if (cachedWasmOnly && this.mimeType() === 'application/wasm') {
+      return Promise.resolve(
+          {content: '', isEncoded: false, wasmDisassemblyInfo: new Common.WasmDisassembly.WasmDisassembly([], [], [])});
     }
 
     this.requestContentPromise = this.requestContentImpl();
@@ -334,14 +342,21 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   }
 
   workingCopy(): string {
+    return this.workingCopyContent().content || '';
+  }
+
+  workingCopyContent(): TextUtils.ContentProvider.DeferredContent {
     if (this.workingCopyGetter) {
       this.workingCopyInternal = this.workingCopyGetter();
       this.workingCopyGetter = null;
     }
     if (this.isDirty()) {
-      return this.workingCopyInternal as string;
+      return {content: this.workingCopyInternal as string, isEncoded: false};
     }
-    return this.contentInternal?.content || '';
+    if (this.contentInternal) {
+      return this.contentInternal;
+    }
+    return {content: '', isEncoded: false};
   }
 
   resetWorkingCopy(): void {
@@ -404,6 +419,21 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
 
   markKnownThirdParty(): void {
     this.isKnownThirdPartyInternal = true;
+  }
+
+  /**
+   * {@link markAsUnconditionallyIgnoreListed}
+   */
+  isUnconditionallyIgnoreListed(): boolean {
+    return this.isUnconditionallyIgnoreListedInternal;
+  }
+
+  /**
+   * Unconditionally ignore list this UISourcecode, ignoring any user
+   * setting. We use this to mark breakpoint/logpoint condition scripts for now.
+   */
+  markAsUnconditionallyIgnoreListed(): void {
+    this.isUnconditionallyIgnoreListedInternal = true;
   }
 
   extension(): string {

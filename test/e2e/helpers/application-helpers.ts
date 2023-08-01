@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {$, $$, click, getBrowserAndPages, goToResource, waitFor, waitForFunction} from '../../shared/helper.js';
 
@@ -14,7 +14,7 @@ export async function navigateToApplicationTab(target: puppeteer.Page, testName:
 }
 
 export async function navigateToServiceWorkers() {
-  const SERVICE_WORKER_ROW_SELECTOR = '[aria-label="Service Workers"]';
+  const SERVICE_WORKER_ROW_SELECTOR = '[aria-label="Service workers"]';
   await click(SERVICE_WORKER_ROW_SELECTOR);
 }
 
@@ -79,10 +79,18 @@ export async function clearStorageItems() {
 }
 
 export async function selectStorageItemAtIndex(index: number) {
-  const dataGridNodes = await $$('.storage-view .data-grid-data-grid-node:not(.creation-node)');
-  await dataGridNodes[index].click();
-  throw new Error('This helper is flaky and should not be used.');
-  // TODO(crbug.com/1369995) This helper is flaky, grid nodes might go away after the selector and before the click.
+  await waitForFunction(async () => {
+    try {
+      const dataGridNodes = await $$('.storage-view .data-grid-data-grid-node:not(.creation-node)');
+      await dataGridNodes[index].click();
+    } catch (error) {
+      if (error.message === 'Node is detached from document') {
+        return false;
+      }
+      throw error;
+    }
+    return true;
+  });
 }
 
 export async function deleteSelectedStorageItem() {

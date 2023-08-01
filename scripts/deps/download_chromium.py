@@ -31,8 +31,8 @@ def handleAccessDeniedOnWindows(func, path, exc):
     if not os.name == 'nt':
         raise exc
     if not os.access(path, os.W_OK):
-        # Is the error an access error ?
-        print("Retrying due to access error ...")
+        # Is the error an access error?
+        print("Retrying due to access error...")
         os.chmod(path, stat.S_IWUSR)
         func(path)
     else:

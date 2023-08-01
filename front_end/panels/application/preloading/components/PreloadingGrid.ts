@@ -5,25 +5,20 @@
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
+import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+
+import type * as UI from '../../../../ui/legacy/legacy.js';
 
 import preloadingGridStyles from './preloadingGrid.css.js';
 
 const UIStrings = {
   /**
-   *@description Column header for a table displaying prerendering attempt.
+   *@description Column header: Action of preloading (prefetch/prerender)
    */
-  startedAt: 'Started at',
+  action: 'Action',
   /**
-   *@description Column header for a table displaying prerendering attempt.
-   */
-  type: 'Type',
-  /**
-   *@description Column header for a table displaying prerendering attempt.
-   */
-  trigger: 'Trigger',
-  /**
-   *@description Column header for a table displaying prerendering attempt.
+   *@description Column header: Status of preloading attempt
    */
   status: 'Status',
 };
@@ -34,15 +29,13 @@ const {render, html} = LitHtml;
 
 export interface PreloadingGridRow {
   id: string;
-  startedAt: string;
-  type: string;
-  trigger: string;
+  action: string;
   url: string;
   status: string;
 }
 
 // Grid component to show prerendering attempts.
-export class PreloadingGrid extends HTMLElement {
+export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
   static readonly litTagName = LitHtml.literal`devtools-resources-preloading-grid`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
@@ -62,27 +55,6 @@ export class PreloadingGrid extends HTMLElement {
     const reportsGridData: DataGrid.DataGridController.DataGridControllerData = {
       columns: [
         {
-          id: 'startedAt',
-          title: i18nString(UIStrings.startedAt),
-          widthWeighting: 20,
-          hideable: false,
-          visible: true,
-        },
-        {
-          id: 'type',
-          title: i18nString(UIStrings.type),
-          widthWeighting: 10,
-          hideable: false,
-          visible: true,
-        },
-        {
-          id: 'trigger',
-          title: i18nString(UIStrings.trigger),
-          widthWeighting: 10,
-          hideable: false,
-          visible: true,
-        },
-        {
           id: 'url',
           title: i18n.i18n.lockedString('URL'),
           widthWeighting: 40,
@@ -90,9 +62,16 @@ export class PreloadingGrid extends HTMLElement {
           visible: true,
         },
         {
+          id: 'action',
+          title: i18nString(UIStrings.action),
+          widthWeighting: 15,
+          hideable: false,
+          visible: true,
+        },
+        {
           id: 'status',
           title: i18nString(UIStrings.status),
-          widthWeighting: 20,
+          widthWeighting: 15,
           hideable: false,
           visible: true,
         },
@@ -116,10 +95,8 @@ export class PreloadingGrid extends HTMLElement {
     return this.#rows.map(row => ({
                             cells: [
                               {columnId: 'id', value: row.id},
-                              {columnId: 'type', value: row.type},
-                              {columnId: 'startedAt', value: row.startedAt},
-                              {columnId: 'trigger', value: row.trigger},
                               {columnId: 'url', value: row.url},
+                              {columnId: 'action', value: row.action},
                               {columnId: 'status', value: row.status},
                             ],
                           }));

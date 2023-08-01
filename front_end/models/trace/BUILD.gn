@@ -7,16 +7,21 @@ import("../../../scripts/build/ninja/devtools_module.gni")
 import("../visibility.gni")
 
 devtools_module("trace") {
-  sources = [ "ModelImpl.ts" ]
+  sources = [
+    "LegacyTracingModel.ts",
+    "ModelImpl.ts",
+    "Processor.ts",
+    "TracingManager.ts",
+  ]
 
   deps = [
     "../../core/common:bundle",
     "../../core/platform:bundle",
+    "../../core/sdk:bundle",
+    "extras:bundle",
     "handlers:bundle",
     "helpers:bundle",
-    "sdk_services:bundle",
     "types:bundle",
-    "worker:worker_entrypoint",
   ]
 }
 
@@ -27,10 +32,27 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../test/unittests/front_end/helpers/*",
-    "../../../test/unittests/front_end/models/trace/*",
+    "../../../test/unittests/front_end/*",
+    "../../panels/lighthouse/*",
+    "../../panels/network/*",
+    "../../panels/recorder/*",
     "../../panels/timeline/*",
+    "../../services/tracing/*",
+    "../../ui/components/docs/*",
+    "../timeline_model/*",
   ]
 
   visibility += devtools_models_visibility
+}
+
+devtools_entrypoint("legacy") {
+  entrypoint = "trace-legacy.ts"
+
+  deps = [ ":bundle" ]
+
+  visibility = [
+    "../..:legacy_entrypoints",
+    "../../entrypoints/shell/*",
+    "../../legacy_test_runner/*",
+  ]
 }

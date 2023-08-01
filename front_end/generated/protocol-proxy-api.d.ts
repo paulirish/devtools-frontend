@@ -24,6 +24,8 @@ declare namespace ProtocolProxyApi {
 
     Audits: AuditsApi;
 
+    Autofill: AutofillApi;
+
     BackgroundService: BackgroundServiceApi;
 
     Browser: BrowserApi;
@@ -100,6 +102,10 @@ declare namespace ProtocolProxyApi {
 
     DeviceAccess: DeviceAccessApi;
 
+    Preload: PreloadApi;
+
+    FedCm: FedCmApi;
+
     Debugger: DebuggerApi;
 
     HeapProfiler: HeapProfilerApi;
@@ -118,6 +124,8 @@ declare namespace ProtocolProxyApi {
     Animation: AnimationDispatcher;
 
     Audits: AuditsDispatcher;
+
+    Autofill: AutofillDispatcher;
 
     BackgroundService: BackgroundServiceDispatcher;
 
@@ -194,6 +202,10 @@ declare namespace ProtocolProxyApi {
     Media: MediaDispatcher;
 
     DeviceAccess: DeviceAccessDispatcher;
+
+    Preload: PreloadDispatcher;
+
+    FedCm: FedCmDispatcher;
 
     Debugger: DebuggerDispatcher;
 
@@ -366,10 +378,32 @@ declare namespace ProtocolProxyApi {
      */
     invoke_checkContrast(params: Protocol.Audits.CheckContrastRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Runs the form issues check for the target page. Found issues are reported
+     * using Audits.issueAdded event.
+     */
+    invoke_checkFormsIssues(): Promise<Protocol.Audits.CheckFormsIssuesResponse>;
+
   }
   export interface AuditsDispatcher {
     issueAdded(params: Protocol.Audits.IssueAddedEvent): void;
 
+  }
+
+  export interface AutofillApi {
+    /**
+     * Trigger autofill on a form identified by the fieldId.
+     * If the field and related form cannot be autofilled, returns an error.
+     */
+    invoke_trigger(params: Protocol.Autofill.TriggerRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Set addresses so that developers can verify their forms implementation.
+     */
+    invoke_setAddresses(params: Protocol.Autofill.SetAddressesRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface AutofillDispatcher {
   }
 
   export interface BackgroundServiceApi {
@@ -494,6 +528,12 @@ declare namespace ProtocolProxyApi {
      * Invoke custom browser commands used by telemetry.
      */
     invoke_executeBrowserCommand(params: Protocol.Browser.ExecuteBrowserCommandRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Allows a site to use privacy sandbox features that require enrollment
+     * without the site actually being enrolled. Only supported on page targets.
+     */
+    invoke_addPrivacySandboxEnrollmentOverride(params: Protocol.Browser.AddPrivacySandboxEnrollmentOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
   }
   export interface BrowserDispatcher {
@@ -1581,6 +1621,11 @@ declare namespace ProtocolProxyApi {
     invoke_dispatchTouchEvent(params: Protocol.Input.DispatchTouchEventRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Cancels any active dragging in the page.
+     */
+    invoke_cancelDragging(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Emulates touch event from the mouse event parameters.
      */
     invoke_emulateTouchFromMouseEvent(params: Protocol.Input.EmulateTouchFromMouseEventRequest): Promise<Protocol.ProtocolResponseWithError>;
@@ -2604,6 +2649,17 @@ declare namespace ProtocolProxyApi {
      */
     invoke_setInterceptFileChooserDialog(params: Protocol.Page.SetInterceptFileChooserDialogRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Enable/disable prerendering manually.
+     *
+     * This command is a short-term solution for https://crbug.com/1440085.
+     * See https://docs.google.com/document/d/12HVmFxYj5Jc-eJr5OmWsa2bqTJsbgGLKI6ZIyx0_wpA
+     * for more details.
+     *
+     * TODO(https://crbug.com/1440085): Remove this once Puppeteer supports tab targets.
+     */
+    invoke_setPrerenderingAllowed(params: Protocol.Page.SetPrerenderingAllowedRequest): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface PageDispatcher {
     domContentEventFired(params: Protocol.Page.DomContentEventFiredEvent): void;
@@ -2707,17 +2763,6 @@ declare namespace ProtocolProxyApi {
      * when bfcache navigation fails.
      */
     backForwardCacheNotUsed(params: Protocol.Page.BackForwardCacheNotUsedEvent): void;
-
-    /**
-     * Fired when a prerender attempt is completed.
-     */
-    prerenderAttemptCompleted(params: Protocol.Page.PrerenderAttemptCompletedEvent): void;
-
-    /**
-     * TODO(crbug/1384419): Create a dedicated domain for preloading.
-     * Fired when a prefetch attempt is updated.
-     */
-    prefetchStatusUpdated(params: Protocol.Page.PrefetchStatusUpdatedEvent): void;
 
     loadEventFired(params: Protocol.Page.LoadEventFiredEvent): void;
 
@@ -3022,6 +3067,31 @@ declare namespace ProtocolProxyApi {
      */
     invoke_setSharedStorageTracking(params: Protocol.Storage.SetSharedStorageTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Set tracking for a storage key's buckets.
+     */
+    invoke_setStorageBucketTracking(params: Protocol.Storage.SetStorageBucketTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Deletes the Storage Bucket with the given storage key and bucket name.
+     */
+    invoke_deleteStorageBucket(params: Protocol.Storage.DeleteStorageBucketRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Deletes state for sites identified as potential bounce trackers, immediately.
+     */
+    invoke_runBounceTrackingMitigations(): Promise<Protocol.Storage.RunBounceTrackingMitigationsResponse>;
+
+    /**
+     * https://wicg.github.io/attribution-reporting-api/
+     */
+    invoke_setAttributionReportingLocalTestingMode(params: Protocol.Storage.SetAttributionReportingLocalTestingModeRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Enables/disables issuing of Attribution Reporting events.
+     */
+    invoke_setAttributionReportingTracking(params: Protocol.Storage.SetAttributionReportingTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface StorageDispatcher {
     /**
@@ -3054,6 +3124,16 @@ declare namespace ProtocolProxyApi {
      * The following parameters are included in all events.
      */
     sharedStorageAccessed(params: Protocol.Storage.SharedStorageAccessedEvent): void;
+
+    storageBucketCreatedOrUpdated(params: Protocol.Storage.StorageBucketCreatedOrUpdatedEvent): void;
+
+    storageBucketDeleted(params: Protocol.Storage.StorageBucketDeletedEvent): void;
+
+    /**
+     * TODO(crbug.com/1458532): Add other Attribution Reporting events, e.g.
+     * trigger registration.
+     */
+    attributionReportingSourceRegistered(params: Protocol.Storage.AttributionReportingSourceRegisteredEvent): void;
 
   }
 
@@ -3609,6 +3689,68 @@ declare namespace ProtocolProxyApi {
      * selectPrompt or cancelPrompt command.
      */
     deviceRequestPrompted(params: Protocol.DeviceAccess.DeviceRequestPromptedEvent): void;
+
+  }
+
+  export interface PreloadApi {
+    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface PreloadDispatcher {
+    /**
+     * Upsert. Currently, it is only emitted when a rule set added.
+     */
+    ruleSetUpdated(params: Protocol.Preload.RuleSetUpdatedEvent): void;
+
+    ruleSetRemoved(params: Protocol.Preload.RuleSetRemovedEvent): void;
+
+    /**
+     * Fired when a prerender attempt is completed.
+     */
+    prerenderAttemptCompleted(params: Protocol.Preload.PrerenderAttemptCompletedEvent): void;
+
+    /**
+     * Fired when a preload enabled state is updated.
+     */
+    preloadEnabledStateUpdated(params: Protocol.Preload.PreloadEnabledStateUpdatedEvent): void;
+
+    /**
+     * Fired when a prefetch attempt is updated.
+     */
+    prefetchStatusUpdated(params: Protocol.Preload.PrefetchStatusUpdatedEvent): void;
+
+    /**
+     * Fired when a prerender attempt is updated.
+     */
+    prerenderStatusUpdated(params: Protocol.Preload.PrerenderStatusUpdatedEvent): void;
+
+    /**
+     * Send a list of sources for all preloading attempts in a document.
+     */
+    preloadingAttemptSourcesUpdated(params: Protocol.Preload.PreloadingAttemptSourcesUpdatedEvent): void;
+
+  }
+
+  export interface FedCmApi {
+    invoke_enable(params: Protocol.FedCm.EnableRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_selectAccount(params: Protocol.FedCm.SelectAccountRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    invoke_dismissDialog(params: Protocol.FedCm.DismissDialogRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Resets the cooldown time, if any, to allow the next FedCM call to show
+     * a dialog even if one was recently dismissed by the user.
+     */
+    invoke_resetCooldown(): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface FedCmDispatcher {
+    dialogShown(params: Protocol.FedCm.DialogShownEvent): void;
 
   }
 

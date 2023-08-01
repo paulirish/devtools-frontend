@@ -98,7 +98,12 @@ it('can highlight JavaScript compatible with CodeMirror 5', testHighlight(`
 [meta <!DOCTYPE html>]
 <[tag button] [attribute style]=[property color]:[atom green]]>Don't click me</[tag button]>`, 'text/html'));
 
-it('can highlight Angular Templates', testHighlight(`
+  it('can highlight SVG', testHighlight(`
+<[tag svg] [attribute viewBox]=[attribute-value "0 0 10 10"]>
+  <[tag circle] />
+</[tag svg]>`, 'image/svg+xml'));
+
+  it('can highlight Angular Templates', testHighlight(`
 <[tag div] [attribute class]=[attribute-value "title"]>{{[variable obj].[property title]}}</[tag div]>
 <[tag app-button] ([attribute clicked])=[variable onClick]()></[tag app-button]>
 `, 'text/x.angular'));
@@ -141,30 +146,30 @@ it('can highlight Angular Templates', testHighlight(`
 `, 'text/x-gss'));
 
   it('can highlight LESS', testHighlight(`
-[definition @width]: [number 10px];
-[definition @height]: [variable @width] + [number 10px];
+[variable @width]: [number 10px];
+[variable @height]: [variable @width] + [number 10px];
 
-[builtin #header] {
+#[atom header] {
   [property width]: [variable @width];
   [property height]: [variable @height];
 }
 `, 'text/x-less'));
 
   it('can highlight SCSS', testHighlight(`
-[definition $width]: [number 10px];
-[definition $height]: [variable $width] + [number 10px];
+[variable $width]: [number 10px];
+[variable $height]: [variable $width] + [number 10px];
 
-[builtin #header] {
+#[atom header] {
   [property width]: [variable $width];
   [property height]: [variable $height];
 }
 `, 'text/x-scss'));
 
   it('can highlight SASS', testHighlight(`
-[variable $width]: [number 10][number px]
-[variable $height]: [variable $width] + [number 10][number px]
+[variable $width]: [number 10px]
+[variable $height]: [variable $width] + [number 10px]
 
-[builtin #header]
+#[atom header]
   [property width]: [variable $width]
   [property height]: [variable $height]
 `, 'text/x-sass'));

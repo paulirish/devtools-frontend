@@ -4,18 +4,18 @@
 
 const {assert} = chai;
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
-import {loadEventsFromTraceFile, setTraceModelTimeout} from '../../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 type DataArgs = TraceModel.Types.TraceEvents.TraceEventSyntheticNetworkRequest['args']['data'];
+type DataArgsProcessedData =
+    TraceModel.Types.TraceEvents.TraceEventSyntheticNetworkRequest['args']['data']['syntheticData'];
 type DataArgsMap = Map<keyof DataArgs, DataArgs[keyof DataArgs]>;
+type DataArgsProcessedDataMap = Map<keyof DataArgsProcessedData, DataArgsProcessedData[keyof DataArgsProcessedData]>;
 
-async function parseAndFinalizeFile(traceFile: string) {
-  const traceEvents = await loadEventsFromTraceFile(traceFile);
-  // The network handler makes use of frame data so we reset and initialize
-  // the meta handler here, and finalize it in the test itself.
-  TraceModel.Handlers.ModelHandlers.Meta.reset();
+async function parseAndFinalizeFile(context: Mocha.Suite|Mocha.Context|null, traceFile: string) {
+  const traceEvents = await TraceLoader.rawEvents(context, traceFile);
   TraceModel.Handlers.ModelHandlers.Meta.initialize();
-  TraceModel.Handlers.ModelHandlers.NetworkRequests.reset();
+  TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
   for (const event of traceEvents) {
     TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
     TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
@@ -24,17 +24,17 @@ async function parseAndFinalizeFile(traceFile: string) {
   await TraceModel.Handlers.ModelHandlers.NetworkRequests.finalize();
   return traceEvents;
 }
+
 describe('NetworkRequestsHandler', function() {
-  setTraceModelTimeout(this);
   describe('error handling', () => {
-    it('throws if handleEvent is called before reset', () => {
+    it('throws if handleEvent is called before it is initialized', () => {
       assert.throws(() => {
         TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(
             {} as TraceModel.Types.TraceEvents.TraceEventData);
       }, 'Network Request handler is not initialized');
     });
 
-    it('throws if finalize is called before reset', async () => {
+    it('throws if finalize is called before initialize', async () => {
       let thrown: Error|null = null;
       try {
         await TraceModel.Handlers.ModelHandlers.NetworkRequests.finalize();
@@ -46,7 +46,7 @@ describe('NetworkRequestsHandler', function() {
   });
 
   it('parses search param strings for network requests', async () => {
-    await parseAndFinalizeFile('request-with-query-param.json.gz');
+    await parseAndFinalizeFile(this, 'request-with-query-param.json.gz');
     const {byTime} = TraceModel.Handlers.ModelHandlers.NetworkRequests.data();
     // Filter to the requests that have search params.
     const withSearchParams = byTime.filter(request => Boolean(request.args.data.search));
@@ -55,15 +55,12 @@ describe('NetworkRequestsHandler', function() {
 
   describe('network requests calculations', () => {
     beforeEach(() => {
-      // The network handler makes use of frame data so we reset and initialize
-      // the meta handler here, and finalize it in the afterEach.
-      TraceModel.Handlers.ModelHandlers.Meta.reset();
       TraceModel.Handlers.ModelHandlers.Meta.initialize();
-      TraceModel.Handlers.ModelHandlers.NetworkRequests.reset();
+      TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
     });
 
     it('calculates network requests correctly', async () => {
-      const traceEvents = await loadEventsFromTraceFile('load-simple.json.gz');
+      const traceEvents = await TraceLoader.rawEvents(this, 'load-simple.json.gz');
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
         TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
@@ -78,7 +75,7 @@ describe('NetworkRequestsHandler', function() {
       assert.strictEqual(topLevelRequests.all.length, 4, 'Incorrect number of requests');
 
       // Page Request.
-      const pageRequestExpected: DataArgsMap = new Map([
+      const pageRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', TraceModel.Types.Timing.MicroSeconds(25085)],
         ['stalled', TraceModel.Types.Timing.MicroSeconds(5670)],
         ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(105)],
@@ -89,18 +86,18 @@ describe('NetworkRequestsHandler', function() {
         ['download', TraceModel.Types.Timing.MicroSeconds(4827)],
         ['networkDuration', TraceModel.Types.Timing.MicroSeconds(38503)],
       ]);
-      assertStats(topLevelRequests.all, 'http://localhost:8080/', pageRequestExpected);
+      assertDataArgsProcessedDataStats(topLevelRequests.all, 'http://localhost:8080/', pageRequestExpected);
 
       // CSS Request.
-      const cssRequestExpected: DataArgsMap = new Map([
+      const cssRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', TraceModel.Types.Timing.MicroSeconds(0)],
-        ['stalled', TraceModel.Types.Timing.MicroSeconds(3916)],
+        ['stalled', TraceModel.Types.Timing.MicroSeconds(2175)],
         ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(0)],
         ['initialConnection', TraceModel.Types.Timing.MicroSeconds(0)],
         ['ssl', TraceModel.Types.Timing.MicroSeconds(0)],
-        ['requestSent', TraceModel.Types.Timing.MicroSeconds(461)],
-        ['waiting', TraceModel.Types.Timing.MicroSeconds(5985)],
-        ['download', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['requestSent', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['waiting', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['download', TraceModel.Types.Timing.MicroSeconds(1294)],
         ['networkDuration', TraceModel.Types.Timing.MicroSeconds(0)],
       ]);
 
@@ -108,19 +105,19 @@ describe('NetworkRequestsHandler', function() {
         ['renderBlocking', 'blocking'],
       ]);
 
-      assertStats(topLevelRequests.all, 'http://localhost:8080/styles.css', cssRequestExpected);
-      assertStats(topLevelRequests.all, 'http://localhost:8080/styles.css', cssRequestBlockingStatusExpected);
+      assertDataArgsProcessedDataStats(topLevelRequests.all, 'http://localhost:8080/styles.css', cssRequestExpected);
+      assertDataArgsStats(topLevelRequests.all, 'http://localhost:8080/styles.css', cssRequestBlockingStatusExpected);
 
       // Blocking JS Request.
-      const blockingJSRequestExpected: DataArgsMap = new Map([
+      const blockingJSRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', TraceModel.Types.Timing.MicroSeconds(0)],
-        ['stalled', TraceModel.Types.Timing.MicroSeconds(14799)],
-        ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(151)],
-        ['initialConnection', TraceModel.Types.Timing.MicroSeconds(720)],
+        ['stalled', TraceModel.Types.Timing.MicroSeconds(2126)],
+        ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['initialConnection', TraceModel.Types.Timing.MicroSeconds(0)],
         ['ssl', TraceModel.Types.Timing.MicroSeconds(0)],
-        ['requestSent', TraceModel.Types.Timing.MicroSeconds(425)],
-        ['waiting', TraceModel.Types.Timing.MicroSeconds(2533)],
-        ['download', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['requestSent', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['waiting', TraceModel.Types.Timing.MicroSeconds(0)],
+        ['download', TraceModel.Types.Timing.MicroSeconds(1207)],
         ['networkDuration', TraceModel.Types.Timing.MicroSeconds(0)],
       ]);
 
@@ -128,11 +125,12 @@ describe('NetworkRequestsHandler', function() {
         ['renderBlocking', 'in_body_parser_blocking'],
       ]);
 
-      assertStats(topLevelRequests.all, 'http://localhost:8080/blocking.js', blockingJSRequestExpected);
-      assertStats(topLevelRequests.all, 'http://localhost:8080/blocking.js', blockingJSBlockingStatusExpected);
+      assertDataArgsProcessedDataStats(
+          topLevelRequests.all, 'http://localhost:8080/blocking.js', blockingJSRequestExpected);
+      assertDataArgsStats(topLevelRequests.all, 'http://localhost:8080/blocking.js', blockingJSBlockingStatusExpected);
 
       // Module JS Request (cached).
-      const moduleRequestExpected: DataArgsMap = new Map([
+      const moduleRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', TraceModel.Types.Timing.MicroSeconds(0)],
         ['stalled', TraceModel.Types.Timing.MicroSeconds(76865)],
         ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(0)],
@@ -148,14 +146,14 @@ describe('NetworkRequestsHandler', function() {
         ['renderBlocking', 'non_blocking'],
       ]);
 
-      assertStats(topLevelRequests.all, 'http://localhost:8080/module.js', moduleRequestExpected);
-      assertStats(topLevelRequests.all, 'http://localhost:8080/module.js', moduleRequestBlockingStatusExpected);
+      assertDataArgsProcessedDataStats(topLevelRequests.all, 'http://localhost:8080/module.js', moduleRequestExpected);
+      assertDataArgsStats(topLevelRequests.all, 'http://localhost:8080/module.js', moduleRequestBlockingStatusExpected);
 
       // Google Fonts CSS Request (cached).
       const fontCSSRequests = requestsByOrigin.get('fonts.googleapis.com') || {all: []};
       assert.strictEqual(fontCSSRequests.all.length, 1, 'Incorrect number of requests');
 
-      const fontCSSRequestExpected: DataArgsMap = new Map([
+      const fontCSSRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', TraceModel.Types.Timing.MicroSeconds(0)],
         ['stalled', TraceModel.Types.Timing.MicroSeconds(3178)],
         ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(0)],
@@ -171,10 +169,10 @@ describe('NetworkRequestsHandler', function() {
         ['renderBlocking', 'blocking'],
       ]);
 
-      assertStats(
+      assertDataArgsProcessedDataStats(
           fontCSSRequests.all, 'https://fonts.googleapis.com/css2?family=Orelega+One&display=swap',
           fontCSSRequestExpected);
-      assertStats(
+      assertDataArgsStats(
           fontCSSRequests.all, 'https://fonts.googleapis.com/css2?family=Orelega+One&display=swap',
           fontCSSBlockingStatusExpected);
 
@@ -182,7 +180,7 @@ describe('NetworkRequestsHandler', function() {
       const fontDataRequests = requestsByOrigin.get('fonts.gstatic.com') || {all: []};
       assert.strictEqual(fontDataRequests.all.length, 1, 'Incorrect number of requests');
 
-      const fontDataRequestExpected: DataArgsMap = new Map([
+      const fontDataRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', TraceModel.Types.Timing.MicroSeconds(0)],
         ['stalled', TraceModel.Types.Timing.MicroSeconds(1929)],
         ['dnsLookup', TraceModel.Types.Timing.MicroSeconds(0)],
@@ -198,27 +196,55 @@ describe('NetworkRequestsHandler', function() {
         ['renderBlocking', 'non_blocking'],
       ]);
 
-      assertStats(
+      assertDataArgsProcessedDataStats(
           fontDataRequests.all, 'https://fonts.gstatic.com/s/orelegaone/v1/3qTpojOggD2XtAdFb-QXZFt93kY.woff2',
           fontDataRequestExpected);
 
-      assertStats(
+      assertDataArgsStats(
           fontDataRequests.all, 'https://fonts.gstatic.com/s/orelegaone/v1/3qTpojOggD2XtAdFb-QXZFt93kY.woff2',
           fontDataRequestBlockingStatusExpected);
     });
   });
 
+  describe('parses the change priority request', () => {
+    beforeEach(() => {
+      TraceModel.Handlers.ModelHandlers.Meta.initialize();
+      TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
+    });
+
+    it('changes priority of the resouce', async () => {
+      const traceEvents = await TraceLoader.rawEvents(this, 'changing-priority.json.gz');
+
+      for (const event of traceEvents) {
+        TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+        TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
+      }
+      await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+      await TraceModel.Handlers.ModelHandlers.NetworkRequests.finalize();
+
+      const {byTime} = TraceModel.Handlers.ModelHandlers.NetworkRequests.data();
+
+      const imageRequest = byTime.find(request => {
+        return request.args.data.url === 'https://via.placeholder.com/3000.jpg';
+      });
+
+      if (!imageRequest) {
+        throw new Error('Could not find expected network request.');
+      }
+
+      assert.strictEqual(imageRequest.args.data.priority, 'High');
+      assert.strictEqual(imageRequest.args.data.initialPriority, 'Medium');
+    });
+  });
+
   describe('redirects', () => {
     beforeEach(() => {
-      // The network handler makes use of frame data so we reset and initialize
-      // the meta handler here, and finalize it in the test itself.
-      TraceModel.Handlers.ModelHandlers.Meta.reset();
       TraceModel.Handlers.ModelHandlers.Meta.initialize();
-      TraceModel.Handlers.ModelHandlers.NetworkRequests.reset();
+      TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
     });
 
     it('calculates redirects correctly (navigations)', async () => {
-      const traceEvents = await loadEventsFromTraceFile('redirects.json.gz');
+      const traceEvents = await TraceLoader.rawEvents(this, 'redirects.json.gz');
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
         TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
@@ -235,21 +261,23 @@ describe('NetworkRequestsHandler', function() {
             {
               url: 'http://localhost:3000/foo',
               priority: 'VeryHigh',
-              ts: 1311223447642,
-              dur: 7845,
+              requestMethod: 'GET',
+              ts: TraceModel.Types.Timing.MicroSeconds(1311223447642),
+              dur: TraceModel.Types.Timing.MicroSeconds(7845),
             },
             {
               url: 'http://localhost:3000/bar',
               priority: 'VeryHigh',
-              ts: 1311223455487,
-              dur: 3771,
+              requestMethod: 'GET',
+              ts: TraceModel.Types.Timing.MicroSeconds(1311223455487),
+              dur: TraceModel.Types.Timing.MicroSeconds(3771),
             },
           ],
           'Incorrect number of redirects (request 1)');
     });
 
     it('calculates redirects correctly (subresources)', async () => {
-      const traceEvents = await loadEventsFromTraceFile('redirects-subresource-multiple.json.gz');
+      const traceEvents = await TraceLoader.rawEvents(this, 'redirects-subresource-multiple.json.gz');
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
         TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
@@ -266,14 +294,16 @@ describe('NetworkRequestsHandler', function() {
             {
               url: 'http://localhost:3000/foo.js',
               priority: 'Low',
-              ts: 183611568786,
-              dur: 506233,
+              requestMethod: 'GET',
+              ts: TraceModel.Types.Timing.MicroSeconds(183611568786),
+              dur: TraceModel.Types.Timing.MicroSeconds(506233),
             },
             {
               url: 'http://localhost:3000/bar.js',
               priority: 'Low',
-              ts: 183612075019,
-              dur: 802726,
+              requestMethod: 'GET',
+              ts: TraceModel.Types.Timing.MicroSeconds(183612075019),
+              dur: TraceModel.Types.Timing.MicroSeconds(802726),
             },
           ],
           'Incorrect number of redirects (request 1)');
@@ -281,7 +311,7 @@ describe('NetworkRequestsHandler', function() {
   });
 });
 
-function assertStats<D extends keyof DataArgs>(
+function assertDataArgsStats<D extends keyof DataArgs>(
     requests: TraceModel.Types.TraceEvents.TraceEventSyntheticNetworkRequest[], url: string,
     stats: Map<D, DataArgs[D]>): void {
   const request = requests.find(request => request.args.data.url === url);
@@ -297,6 +327,27 @@ function assertStats<D extends keyof DataArgs>(
       assert.strictEqual(actualValueRounded, expectedValue, url);
     } else {
       assert.strictEqual(request.args.data[name], value, url);
+    }
+  }
+}
+
+function assertDataArgsProcessedDataStats<D extends keyof DataArgsProcessedData>(
+    requests: TraceModel.Types.TraceEvents.TraceEventSyntheticNetworkRequest[], url: string,
+    stats: Map<D, DataArgsProcessedData[D]>): void {
+  const request = requests.find(request => request.args.data.url === url);
+  if (!request) {
+    assert.fail(`Unable to find request for URL ${url}`);
+    return;
+  }
+
+  for (const [name, value] of stats.entries()) {
+    if (typeof request.args.data.syntheticData[name] === 'number') {
+      const expectedValue = value as DataArgsProcessedData[D];
+      const actualValueRounded =
+          Number((request.args.data.syntheticData[name] as number).toPrecision(5)) as DataArgsProcessedData[D];
+      assert.strictEqual(actualValueRounded, expectedValue, url);
+    } else {
+      assert.strictEqual(request.args.data.syntheticData[name], value, url);
     }
   }
 }

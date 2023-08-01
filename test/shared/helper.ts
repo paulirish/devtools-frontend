@@ -4,7 +4,7 @@
 
 import {assert, AssertionError} from 'chai';
 import * as os from 'os';
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {type DevToolsFrontendReloadOptions} from '../conductor/frontend_tab.js';
 import {getDevToolsFrontendHostname, reloadDevTools} from '../conductor/hooks.js';
@@ -247,11 +247,34 @@ export const getTextContent = async<ElementType extends Element = Element>(selec
   return text ?? undefined;
 };
 
+/**
+ * Match multiple elements based on a selector and return their textContents, but only for those
+ * elements that are visible.
+ *
+ * @param selector jquery selector to match
+ * @returns array containing text contents from visible elements
+ */
+export const getVisibleTextContents = async (selector: string) => {
+  const allElements = await $$(selector);
+  const texts = await Promise.all(
+      allElements.map(el => el.evaluate(node => node.checkVisibility() ? node.textContent?.trim() : undefined)));
+  return texts.filter(content => typeof (content) === 'string');
+};
+
 export const waitFor = async<ElementType extends Element = Element>(
     selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
   return await asyncScope.exec(() => waitForFunction(async () => {
                                  const element = await $<ElementType>(selector, root, handler);
                                  return (element || undefined);
+                               }, asyncScope));
+};
+
+export const waitForVisible = async<ElementType extends Element = Element>(
+    selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
+  return await asyncScope.exec(() => waitForFunction(async () => {
+                                 const element = await $<ElementType>(selector, root, handler);
+                                 const visible = await element.evaluate(node => node.checkVisibility());
+                                 return visible ? element : undefined;
                                }, asyncScope));
 };
 
@@ -415,9 +438,9 @@ export const setDevToolsSettings = async (settings: Record<string, string>) => {
   await reloadDevTools();
 };
 
-export const goTo = async (url: string) => {
+export const goTo = async (url: string, options: puppeteer.WaitForOptions = {}) => {
   const {target} = getBrowserAndPages();
-  await target.goto(url);
+  await target.goto(url, options);
 };
 
 export const overridePermissions = async (permissions: puppeteer.Permission[]) => {
@@ -430,8 +453,8 @@ export const clearPermissionsOverride = async () => {
   await browser.defaultBrowserContext().clearPermissionOverrides();
 };
 
-export const goToResource = async (path: string) => {
-  await goTo(`${getResourcesPath()}/${path}`);
+export const goToResource = async (path: string, options: puppeteer.WaitForOptions = {}) => {
+  await goTo(`${getResourcesPath()}/${path}`, options);
 };
 
 export const goToResourceWithCustomHost = async (host: string, path: string) => {
@@ -799,4 +822,10 @@ export async function setCheckBox(selector: string, wantChecked: boolean): Promi
 
 export const summonSearchBox = async () => {
   await pressKey('f', {control: true});
+};
+
+export const replacePuppeteerUrl = (value: string): string => {
+  return value.replace(/pptr:.*:([0-9]+)$/, (_, match) => {
+    return `(index):${match}`;
+  });
 };

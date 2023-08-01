@@ -38,7 +38,6 @@
  */
 
 (function createTestSuite(window) {
-
   const TestSuite = class {
     /**
      * Test suite for interactive UI tests.
@@ -149,6 +148,7 @@
         self.runtime.loadLegacyModule('core/host/host-legacy.js'),
         self.runtime.loadLegacyModule('ui/legacy/legacy-legacy.js'),
         self.runtime.loadLegacyModule('models/workspace/workspace-legacy.js'),
+        self.runtime.loadLegacyModule('models/trace/trace-legacy.js'),
       ]);
       this.reportOk_();
     } catch (e) {
@@ -339,7 +339,7 @@
   // Tests that debugger works correctly if pause event occurs when DevTools
   // frontend is being loaded.
   TestSuite.prototype.testPauseWhenLoadingDevTools = function() {
-    const debuggerModel = self.SDK.targetManager.mainTarget().model(SDK.DebuggerModel);
+    const debuggerModel = self.SDK.targetManager.primaryPageTarget().model(SDK.DebuggerModel);
     if (debuggerModel.debuggerPausedDetails) {
       return;
     }
@@ -429,8 +429,8 @@
       test.assertTrue(
           request.timing.receiveHeadersEnd - request.timing.connectStart >= 70,
           'Time between receiveHeadersEnd and connectStart should be >=70ms, but was ' +
-              'receiveHeadersEnd=' + request.timing.receiveHeadersEnd + ', connectStart=' +
-              request.timing.connectStart + '.');
+              'receiveHeadersEnd=' + request.timing.receiveHeadersEnd +
+              ', connectStart=' + request.timing.connectStart + '.');
       test.assertTrue(
           request.responseReceivedTime - request.startTime >= 0.07,
           'Time between responseReceivedTime and startTime should be >=0.07s, but was ' +
@@ -484,23 +484,23 @@
   };
 
   TestSuite.prototype.testConsoleOnNavigateBack = function() {
-
     function filteredMessages() {
-      return self.SDK.consoleModel.messages().filter(a => a.source !== Protocol.Log.LogEntrySource.Violation);
+      return SDK.ConsoleModel.allMessagesUnordered().filter(a => a.source !== Protocol.Log.LogEntrySource.Violation);
     }
 
     if (filteredMessages().length === 1) {
       firstConsoleMessageReceived.call(this, null);
     } else {
-      self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, firstConsoleMessageReceived, this);
+      self.SDK.targetManager.addModelListener(
+          SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, firstConsoleMessageReceived, this);
     }
 
     function firstConsoleMessageReceived(event) {
       if (event && event.data.source === Protocol.Log.LogEntrySource.Violation) {
         return;
       }
-      self.SDK.consoleModel.removeEventListener(
-          SDK.ConsoleModel.Events.MessageAdded, firstConsoleMessageReceived, this);
+      self.SDK.targetManager.removeModelListener(
+          SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, firstConsoleMessageReceived, this);
       this.evaluateInConsole_('clickLink();', didClickLink.bind(this));
     }
 
@@ -549,7 +549,8 @@
     function callback() {
       const debuggerModel = self.SDK.targetManager.models(SDK.DebuggerModel)[0];
       if (debuggerModel.isPaused()) {
-        self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
+        self.SDK.targetManager.addModelListener(
+            SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
         debuggerModel.resume();
         return;
       }
@@ -577,12 +578,12 @@
 
   TestSuite.prototype.enableTouchEmulation = function() {
     const deviceModeModel = new Emulation.DeviceModeModel(function() {});
-    deviceModeModel._target = self.SDK.targetManager.mainTarget();
+    deviceModeModel._target = self.SDK.targetManager.primaryPageTarget();
     deviceModeModel._applyTouch(true, true);
   };
 
   TestSuite.prototype.waitForDebuggerPaused = function() {
-    const debuggerModel = self.SDK.targetManager.mainTarget().model(SDK.DebuggerModel);
+    const debuggerModel = self.SDK.targetManager.primaryPageTarget().model(SDK.DebuggerModel);
     if (debuggerModel.debuggerPausedDetails) {
       return;
     }
@@ -606,7 +607,7 @@
     const test = this;
 
     async function testOverrides(params, metrics, callback) {
-      await self.SDK.targetManager.mainTarget().emulationAgent().invoke_setDeviceMetricsOverride(params);
+      await self.SDK.targetManager.primaryPageTarget().emulationAgent().invoke_setDeviceMetricsOverride(params);
       test.evaluateInConsole_('(' + dumpPageMetrics.toString() + ')()', checkMetrics);
 
       function checkMetrics(consoleResult) {
@@ -653,16 +654,16 @@
     let receivedReady = false;
 
     function signalToShowAutofill() {
-      self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+      self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'rawKeyDown', key: 'Down', windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40});
-      self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+      self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'keyUp', key: 'Down', windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40});
     }
 
     function selectTopAutoFill() {
-      self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+      self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'rawKeyDown', key: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13});
-      self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+      self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13});
 
       test.evaluateInConsole_('document.getElementById("name").value', onResultOfInput);
@@ -690,9 +691,10 @@
 
     // It is possible for the ready console messagage to be already received but not handled
     // or received later. This ensures we can catch both cases.
-    self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
+    self.SDK.targetManager.addModelListener(
+        SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
 
-    const messages = self.SDK.consoleModel.messages();
+    const messages = SDK.ConsoleModel.allMessagesUnordered();
     if (messages.length) {
       const text = messages[0].messageText;
       this.assertEquals('ready', text);
@@ -711,7 +713,7 @@
           Host.InspectorFrontendHostAPI.Events.KeyEventUnhandled, onKeyEventUnhandledKeyDown, this);
       Host.InspectorFrontendHost.events.addEventListener(
           Host.InspectorFrontendHostAPI.Events.KeyEventUnhandled, onKeyEventUnhandledKeyUp, this);
-      self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+      self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'keyUp', key: 'F8', code: 'F8', windowsVirtualKeyCode: 119, nativeVirtualKeyCode: 119});
     }
     function onKeyEventUnhandledKeyUp(event) {
@@ -725,7 +727,7 @@
     this.takeControl();
     Host.InspectorFrontendHost.events.addEventListener(
         Host.InspectorFrontendHostAPI.Events.KeyEventUnhandled, onKeyEventUnhandledKeyDown, this);
-    self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+    self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
         {type: 'rawKeyDown', key: 'F8', windowsVirtualKeyCode: 119, nativeVirtualKeyCode: 119});
   };
 
@@ -735,7 +737,7 @@
     this.takeControl();
 
     this.addSniffer(self.UI.shortcutRegistry, 'registerBindings', () => {
-      self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+      self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
           {type: 'rawKeyDown', key: 'F1', windowsVirtualKeyCode: 112, nativeVirtualKeyCode: 112});
     });
     this.addSniffer(self.UI.shortcutRegistry, 'handleKey', key => {
@@ -747,9 +749,9 @@
   };
 
   TestSuite.prototype.testDispatchKeyEventDoesNotCrash = function() {
-    self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+    self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
         {type: 'rawKeyDown', windowsVirtualKeyCode: 0x23, key: 'End'});
-    self.SDK.targetManager.mainTarget().inputAgent().invoke_dispatchKeyEvent(
+    self.SDK.targetManager.primaryPageTarget().inputAgent().invoke_dispatchKeyEvent(
         {type: 'keyUp', windowsVirtualKeyCode: 0x23, key: 'End'});
   };
 
@@ -867,12 +869,14 @@
 
         messages.splice(index, 1);
         if (!messages.length) {
-          self.SDK.consoleModel.removeEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
+          self.SDK.targetManager.removeModelListener(
+              SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
           next();
         }
       }
 
-      self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
+      self.SDK.targetManager.addModelListener(
+          SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
       self.SDK.multitargetNetworkManager.setNetworkConditions(preset);
     }
 
@@ -1030,15 +1034,16 @@
   TestSuite.prototype.testWindowInitializedOnNavigateBack = function() {
     const test = this;
     test.takeControl();
-    const messages = self.SDK.consoleModel.messages();
+    const messages = SDK.ConsoleModel.allMessagesUnordered();
     if (messages.length === 1) {
       checkMessages();
     } else {
-      self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, checkMessages.bind(this), this);
+      self.SDK.targetManager.addModelListener(
+          SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, checkMessages.bind(this), this);
     }
 
     function checkMessages() {
-      const messages = self.SDK.consoleModel.messages();
+      const messages = SDK.ConsoleModel.allMessagesUnordered();
       test.assertEquals(1, messages.length);
       test.assertTrue(messages[0].messageText.indexOf('Uncaught') === -1);
       test.releaseControl();
@@ -1069,11 +1074,13 @@
     self.SDK.targetManager.addModelListener(
         SDK.NetworkManager, SDK.NetworkManager.Events.ResponseReceived, onResponseReceived);
 
-    this.evaluateInConsole_(`
+    this.evaluateInConsole_(
+        `
       let img = document.createElement('img');
       img.src = "${url}";
       document.body.appendChild(img);
-    `, () => {});
+    `,
+        () => {});
 
     let count = 0;
     function onResponseReceived(event) {
@@ -1108,14 +1115,14 @@
   };
 
   TestSuite.prototype.testDOMWarnings = function() {
-    const messages = self.SDK.consoleModel.messages();
+    const messages = SDK.ConsoleModel.allMessagesUnordered();
     this.assertEquals(1, messages.length);
     const expectedPrefix = '[DOM] Found 2 elements with non-unique id #dup:';
     this.assertTrue(messages[0].messageText.startsWith(expectedPrefix));
   };
 
   TestSuite.prototype.waitForTestResultsInConsole = function() {
-    const messages = self.SDK.consoleModel.messages();
+    const messages = SDK.ConsoleModel.allMessagesUnordered();
     for (let i = 0; i < messages.length; ++i) {
       const text = messages[i].messageText;
       if (text === 'PASS') {
@@ -1135,7 +1142,8 @@
       }
     }
 
-    self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
+    self.SDK.targetManager.addModelListener(
+        SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage, this);
     this.takeControl({slownessFactor: 10});
   };
 
@@ -1197,12 +1205,13 @@
         Array.prototype.slice.call(arguments, 1, -1).map(arg => JSON.stringify(arg)).join(',') + ',';
     this.evaluateInConsole_(
         `${functionName}(${argsString} function() { console.log('${doneMessage}'); });`, function() {});
-    self.SDK.consoleModel.addEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage);
+    self.SDK.targetManager.addModelListener(SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage);
 
     function onConsoleMessage(event) {
       const text = event.data.messageText;
       if (text === doneMessage) {
-        self.SDK.consoleModel.removeEventListener(SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage);
+        self.SDK.targetManager.removeModelListener(
+            SDK.ConsoleModel, SDK.ConsoleModel.Events.MessageAdded, onConsoleMessage);
         callback();
       }
     }
@@ -1262,7 +1271,7 @@
 
   TestSuite.prototype.testDisposeEmptyBrowserContext = async function(url) {
     this.takeControl();
-    const targetAgent = self.SDK.targetManager.mainTarget().targetAgent();
+    const targetAgent = self.SDK.targetManager.rootTarget().targetAgent();
     const {browserContextId} = await targetAgent.invoke_createBrowserContext();
     const response1 = await targetAgent.invoke_getBrowserContexts();
     this.assertEquals(response1.browserContextIds.length, 1);
@@ -1275,7 +1284,7 @@
   TestSuite.prototype.testNewWindowFromBrowserContext = async function(url) {
     this.takeControl();
     // Create a BrowserContext.
-    const targetAgent = self.SDK.targetManager.mainTarget().targetAgent();
+    const targetAgent = self.SDK.targetManager.rootTarget().targetAgent();
     const {browserContextId} = await targetAgent.invoke_createBrowserContext();
 
     // Cause a Browser to be created with the temp profile.
@@ -1292,7 +1301,7 @@
   TestSuite.prototype.testCreateBrowserContext = async function(url) {
     this.takeControl();
     const browserContextIds = [];
-    const targetAgent = self.SDK.targetManager.mainTarget().targetAgent();
+    const targetAgent = self.SDK.targetManager.rootTarget().targetAgent();
 
     const target1 = await createIsolatedTarget(url, browserContextIds);
     const target2 = await createIsolatedTarget(url, browserContextIds);
@@ -1326,7 +1335,7 @@
    * @return {!Promise<!SDK.Target>}
    */
   async function createIsolatedTarget(url, opt_browserContextIds) {
-    const targetAgent = self.SDK.targetManager.mainTarget().targetAgent();
+    const targetAgent = self.SDK.targetManager.rootTarget().targetAgent();
     const {browserContextId} = await targetAgent.invoke_createBrowserContext();
     if (opt_browserContextIds) {
       opt_browserContextIds.push(browserContextId);
@@ -1343,7 +1352,7 @@
   }
 
   async function disposeBrowserContext(browserContextId) {
-    const targetAgent = self.SDK.targetManager.mainTarget().targetAgent();
+    const targetAgent = self.SDK.targetManager.rootTarget().targetAgent();
     await targetAgent.invoke_disposeBrowserContext({browserContextId});
   }
 
@@ -1368,8 +1377,8 @@
     let parentFrameOutput;
     let childFrameOutput;
 
-    const inputAgent = self.SDK.targetManager.mainTarget().inputAgent();
-    const runtimeAgent = self.SDK.targetManager.mainTarget().runtimeAgent();
+    const inputAgent = self.SDK.targetManager.primaryPageTarget().inputAgent();
+    const runtimeAgent = self.SDK.targetManager.primaryPageTarget().runtimeAgent();
     await inputAgent.invoke_dispatchMouseEvent({type: 'mousePressed', button: 'left', clickCount: 1, x: 10, y: 10});
     await inputAgent.invoke_dispatchMouseEvent({type: 'mouseMoved', button: 'left', clickCount: 1, x: 10, y: 20});
     await inputAgent.invoke_dispatchMouseEvent({type: 'mouseReleased', button: 'left', clickCount: 1, x: 10, y: 20});
@@ -1382,7 +1391,7 @@
     this.assertEquals(childFrameOutput, await takeLogs(self.SDK.targetManager.targets()[1]));
 
     await inputAgent.invoke_dispatchKeyEvent({type: 'keyDown', key: 'a'});
-    await runtimeAgent.invoke_evaluate({expression: "document.querySelector('iframe').focus()"});
+    await runtimeAgent.invoke_evaluate({expression: 'document.querySelector(\'iframe\').focus()'});
     await inputAgent.invoke_dispatchKeyEvent({type: 'keyDown', key: 'a'});
     parentFrameOutput = 'Event type: keydown';
     this.assertEquals(parentFrameOutput, await takeLogs(self.SDK.targetManager.targets()[0]));
@@ -1432,14 +1441,14 @@
     await testCase(baseURL + 'echoheader?x-devtools-test', {'x-devtools-test': 'Foo'}, 200, ['cache-control'], 'Foo');
     await testCase(baseURL + 'set-header?pragma:%20no-cache', undefined, 200, ['pragma'], 'pragma: no-cache');
 
-    await self.SDK.targetManager.mainTarget().runtimeAgent().invoke_evaluate({
+    await self.SDK.targetManager.primaryPageTarget().runtimeAgent().invoke_evaluate({
       expression: `fetch("/set-cookie?devtools-test-cookie=Bar",
                          {credentials: 'include'})`,
       awaitPromise: true
     });
     await testCase(baseURL + 'echoheader?Cookie', undefined, 200, ['cache-control'], 'devtools-test-cookie=Bar');
 
-    await self.SDK.targetManager.mainTarget().runtimeAgent().invoke_evaluate({
+    await self.SDK.targetManager.primaryPageTarget().runtimeAgent().invoke_evaluate({
       expression: `fetch("/set-cookie?devtools-test-cookie=same-site-cookie;SameSite=Lax",
                          {credentials: 'include'})`,
       awaitPromise: true
@@ -1511,7 +1520,7 @@
 
   TestSuite.prototype.testSourceMapsFromExtension = function(extensionId) {
     this.takeControl();
-    const debuggerModel = self.SDK.targetManager.mainTarget().model(SDK.DebuggerModel);
+    const debuggerModel = self.SDK.targetManager.primaryPageTarget().model(SDK.DebuggerModel);
     debuggerModel.sourceMapManager().addEventListener(
         SDK.SourceMapManager.Events.SourceMapAttached, this.releaseControl.bind(this));
 
@@ -1521,7 +1530,7 @@
 
   TestSuite.prototype.testSourceMapsFromDevtools = function() {
     this.takeControl();
-    const debuggerModel = self.SDK.targetManager.mainTarget().model(SDK.DebuggerModel);
+    const debuggerModel = self.SDK.targetManager.primaryPageTarget().model(SDK.DebuggerModel);
     debuggerModel.sourceMapManager().addEventListener(
         SDK.SourceMapManager.Events.SourceMapWillAttach, this.releaseControl.bind(this));
 
@@ -1638,7 +1647,7 @@
   };
 
   TestSuite.prototype._waitForExecutionContexts = function(n, callback) {
-    const runtimeModel = self.SDK.targetManager.mainTarget().model(SDK.RuntimeModel);
+    const runtimeModel = self.SDK.targetManager.primaryPageTarget().model(SDK.RuntimeModel);
     checkForExecutionContexts.call(this);
 
     function checkForExecutionContexts() {

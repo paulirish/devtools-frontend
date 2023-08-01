@@ -22,7 +22,9 @@ const prepareElementsTab = async () => {
 
 describe('Adornment in the Elements Tab', async function() {
   // This test relies on the context menu which takes a while to appear, so we bump the timeout a bit.
-  this.timeout(10000);
+  if (this.timeout() > 0) {
+    this.timeout(10000);
+  }
 
   it('displays grid and flex adorners', async () => {
     await goToResource('elements/adornment.html');
@@ -30,6 +32,9 @@ describe('Adornment in the Elements Tab', async function() {
 
     await waitForAdorners([
       {textContent: 'grid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
       {textContent: 'grid', isActive: false},
       {textContent: 'flex', isActive: false},
       {textContent: 'flex', isActive: false},
@@ -60,6 +65,9 @@ describe('Adornment in the Elements Tab', async function() {
 
     await waitForAdorners([
       {textContent: 'grid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
       {textContent: 'grid', isActive: false},
       {textContent: 'flex', isActive: false},
       {textContent: 'flex', isActive: false},
@@ -71,7 +79,10 @@ describe('Adornment in the Elements Tab', async function() {
 
     await waitForAdorners([
       {textContent: 'grid', isActive: true},
-      {textContent: 'grid', isActive: true},
+      {textContent: 'subgrid', isActive: true},
+      {textContent: 'subgrid', isActive: false},
+      {textContent: 'subgrid', isActive: false},
+      {textContent: 'grid', isActive: false},
       {textContent: 'flex', isActive: false},
       {textContent: 'flex', isActive: false},
     ]);
@@ -87,8 +98,7 @@ describe('Adornment in the Elements Tab', async function() {
     ]);
   });
 
-  // Flaky on win
-  it.skipOnPlatforms(['win32'], '[crbug.com/1367268] updates when display properties change', async () => {
+  it('updates when display properties change', async () => {
     // Note that this test simulates several property value editing, like a user would type, with delay between
     // keystrokes. So if this test became flaky in the future, we'd likely have to increase the timeout.
     await goToResource('elements/adornment.html');

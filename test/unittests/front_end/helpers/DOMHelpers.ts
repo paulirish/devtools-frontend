@@ -32,7 +32,7 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
   const allowMultipleChildren = Boolean(renderOptions.allowMultipleChildren);
 
   if (container.childNodes.length !== 0 && !allowMultipleChildren) {
-    assert.fail('renderIntoDOM expects the container to be empty');
+    assert.fail('renderIntoDOM expects the container to be empty ' + container.innerHTML);
     return;
   }
 
@@ -40,6 +40,25 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
   return element;
 };
 
+function removeChildren(node: Node): void {
+  while (node.firstChild) {
+    const child = node.firstChild;
+    if (child.__widget) {
+      // Child is a widget, so we have to use the Widget system to remove it from the DOM.
+      child.__widget.detach();
+    } else if (child.__widgetCounter) {
+      // If an element has __widgetCounter, this means it is not a widget
+      // itself, but at least one of its children are, so we now recurse
+      // on this element's children. If we try to just remove this
+      // element, we will get errors about removing widgets using regular
+      // DOM operations.
+      removeChildren(child);
+    } else {
+      // Non-widget element, so remove using normal DOM APIs.
+      node.removeChild(child);
+    }
+  }
+}
 /**
  * Completely cleans out the test DOM to ensure it's empty for the next test run.
  * This is run automatically between tests - you should not be manually calling this yourself.
@@ -47,6 +66,7 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
 export const resetTestDOM = () => {
   const previousContainer = document.getElementById(TEST_CONTAINER_ID);
   if (previousContainer) {
+    removeChildren(previousContainer);
     previousContainer.remove();
   }
 
@@ -259,4 +279,13 @@ export function assertNodeTextContent(component: NodeText.NodeText.NodeText, exp
   assertShadowRoot(component.shadowRoot);
   const content = Array.from(component.shadowRoot.querySelectorAll('span')).map(span => span.textContent).join('');
   assert.strictEqual(content, expectedContent);
+}
+
+export function querySelectorErrorOnMissing<T extends HTMLElement = HTMLElement>(
+    parent: HTMLElement, selector: string): T {
+  const elem = parent.querySelector<T>(selector);
+  if (!elem) {
+    throw new Error(`Expected element with selector ${selector} not found.`);
+  }
+  return elem;
 }

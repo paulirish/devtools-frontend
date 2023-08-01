@@ -27,6 +27,7 @@ import {describeWithMockConnection} from '../../../helpers/MockConnection.js';
 import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
 import {createFileSystemUISourceCode} from '../../../helpers/UISourceCodeHelpers.js';
 import {createWorkspaceProject, setUpEnvironment} from '../../../helpers/OverridesHelpers.js';
+import {recordedMetricsContain, resetRecordedMetrics} from '../../../helpers/UserMetricsHelpers.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -65,11 +66,11 @@ const defaultRequest = {
 } as unknown as SDK.NetworkRequest.NetworkRequest;
 
 async function renderHeadersComponent(request: SDK.NetworkRequest.NetworkRequest) {
-  const component = new NetworkComponents.RequestHeadersView.RequestHeadersComponent();
-  renderElementIntoDOM(component);
   Object.setPrototypeOf(request, SDK.NetworkRequest.NetworkRequest.prototype);
-  component.data = {request} as NetworkComponents.RequestHeadersView.RequestHeadersComponentData;
-  await coordinator.done();
+  const component = new NetworkComponents.RequestHeadersView.RequestHeadersView(request);
+  renderElementIntoDOM(component);
+  component.wasShown();
+  await coordinator.done({waitForWork: true});
   return component;
 }
 
@@ -104,12 +105,12 @@ const getRowHighlightStatus = (container: HTMLElement): boolean[] => {
 };
 
 describeWithMockConnection('RequestHeadersView', () => {
-  let component: HTMLElement|null|undefined = null;
+  let component: NetworkComponents.RequestHeadersView.RequestHeadersView|null|undefined = null;
 
   beforeEach(() => {
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.HEADER_OVERRIDES, '');
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.HEADER_OVERRIDES);
     setUpEnvironment();
+    resetRecordedMetrics();
   });
 
   afterEach(async () => {
@@ -244,29 +245,19 @@ describeWithMockConnection('RequestHeadersView', () => {
         null, null, null);
     request.responseHeaders = [{name: 'originalName', value: 'originalValue'}];
 
-    const view = new NetworkComponents.RequestHeadersView.RequestHeadersView(request);
-    const div = document.createElement('div');
-    renderElementIntoDOM(div);
-    view.markAsRoot();
-    view.show(div);
-    await coordinator.done();
-
-    component = view.element.querySelector('devtools-request-headers');
-    assertElement(component, NetworkComponents.RequestHeadersView.RequestHeadersComponent);
+    component = await renderHeadersComponent(request);
     assertShadowRoot(component.shadowRoot);
     const responseHeadersCategory = component.shadowRoot.querySelector('[aria-label="Response Headers"]');
     assertElement(responseHeadersCategory, HTMLElement);
 
-    const spy = sinon.spy(component, 'data', ['set']);
-    assert.isTrue(spy.set.notCalled);
+    const spy = sinon.spy(component, 'render');
+    assert.isTrue(spy.notCalled);
     assert.deepStrictEqual(getRowsTextFromCategory(responseHeadersCategory), [['originalname:', 'originalValue']]);
 
     request.responseHeaders = [{name: 'updatedName', value: 'updatedValue'}];
+    assert.isTrue(spy.calledOnce);
     await coordinator.done();
-    assert.isTrue(spy.set.calledOnce);
     assert.deepStrictEqual(getRowsTextFromCategory(responseHeadersCategory), [['updatedname:', 'updatedValue']]);
-
-    view.detach();
   });
 
   it('can highlight individual response headers', async () => {
@@ -280,15 +271,7 @@ describeWithMockConnection('RequestHeadersView', () => {
       {name: 'DevTools', value: 'rock'},
     ];
 
-    const view = new NetworkComponents.RequestHeadersView.RequestHeadersView(request);
-    const div = document.createElement('div');
-    renderElementIntoDOM(div);
-    view.markAsRoot();
-    view.show(div);
-    await coordinator.done();
-
-    component = view.element.querySelector('devtools-request-headers');
-    assertElement(component, NetworkComponents.RequestHeadersView.RequestHeadersComponent);
+    component = await renderHeadersComponent(request);
     assertShadowRoot(component.shadowRoot);
 
     const responseHeadersCategory = component.shadowRoot.querySelector('[aria-label="Response Headers"]');
@@ -298,11 +281,9 @@ describeWithMockConnection('RequestHeadersView', () => {
         [['devtools:', 'rock'], ['foo:', 'bar'], ['highlightme:', 'some value']]);
 
     assert.deepStrictEqual(getRowHighlightStatus(responseHeadersCategory), [false, false, false]);
-    view.revealHeader(NetworkForward.UIRequestLocation.UIHeaderSection.Response, 'HiGhLiGhTmE');
+    component.revealHeader(NetworkForward.UIRequestLocation.UIHeaderSection.Response, 'HiGhLiGhTmE');
     await coordinator.done();
     assert.deepStrictEqual(getRowHighlightStatus(responseHeadersCategory), [false, false, true]);
-
-    view.detach();
   });
 
   it('can highlight individual request headers', async () => {
@@ -316,15 +297,7 @@ describeWithMockConnection('RequestHeadersView', () => {
       {name: 'DevTools', value: 'rock'},
     ]);
 
-    const view = new NetworkComponents.RequestHeadersView.RequestHeadersView(request);
-    const div = document.createElement('div');
-    renderElementIntoDOM(div);
-    view.markAsRoot();
-    view.show(div);
-    await coordinator.done();
-
-    component = view.element.querySelector('devtools-request-headers');
-    assertElement(component, NetworkComponents.RequestHeadersView.RequestHeadersComponent);
+    component = await renderHeadersComponent(request);
     assertShadowRoot(component.shadowRoot);
 
     const requestHeadersCategory = component.shadowRoot.querySelector('[aria-label="Request Headers"]');
@@ -334,11 +307,9 @@ describeWithMockConnection('RequestHeadersView', () => {
         [['devtools:', 'rock'], ['foo:', 'bar'], ['highlightme:', 'some value']]);
 
     assert.deepStrictEqual(getRowHighlightStatus(requestHeadersCategory), [false, false, false]);
-    view.revealHeader(NetworkForward.UIRequestLocation.UIHeaderSection.Request, 'HiGhLiGhTmE');
+    component.revealHeader(NetworkForward.UIRequestLocation.UIHeaderSection.Request, 'HiGhLiGhTmE');
     await coordinator.done();
     assert.deepStrictEqual(getRowHighlightStatus(requestHeadersCategory), [false, false, true]);
-
-    view.detach();
   });
 
   it('renders a link to \'.headers\'', async () => {
@@ -357,9 +328,14 @@ describeWithMockConnection('RequestHeadersView', () => {
     assertElement(responseHeadersCategory, HTMLElement);
     assertShadowRoot(responseHeadersCategory.shadowRoot);
 
-    const linkElement = responseHeadersCategory.shadowRoot.querySelector('x-link');
-    assertElement(linkElement, HTMLElement);
-    assert.strictEqual(linkElement.textContent?.trim(), 'Header overrides');
+    const linkElements = responseHeadersCategory.shadowRoot.querySelectorAll('x-link');
+    assert.strictEqual(linkElements.length, 2);
+
+    assertElement(linkElements[0], HTMLElement);
+    assert.strictEqual(linkElements[0].title, 'https://goo.gle/devtools-override');
+
+    assertElement(linkElements[1], HTMLElement);
+    assert.strictEqual(linkElements[1].textContent?.trim(), 'Header overrides');
   });
 
   it('does not render a link to \'.headers\' if a matching \'.headers\' does not exist', async () => {
@@ -433,6 +409,45 @@ describeWithMockConnection('RequestHeadersView', () => {
     await coordinator.done();
 
     checkRow(headerRow.shadowRoot, 'foo:', 'bar', true);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideEnableEditingClicked));
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.PersistenceNetworkOverridesEnabled));
+  });
+
+  it('records metrics when a new \'.headers\' file is created', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId, 'https://www.example.com/' as Platform.DevToolsPath.UrlString,
+        '' as Platform.DevToolsPath.UrlString, null, null, null);
+    request.responseHeaders = [
+      {name: 'foo', value: 'bar'},
+    ];
+    await createWorkspaceProject('file:///path/to/overrides' as Platform.DevToolsPath.UrlString, []);
+
+    component = await renderHeadersComponent(request);
+    assertShadowRoot(component.shadowRoot);
+    const responseHeaderSection = component.shadowRoot.querySelector('devtools-response-header-section');
+    assertElement(responseHeaderSection, HTMLElement);
+    assertShadowRoot(responseHeaderSection.shadowRoot);
+    const headerRow = responseHeaderSection.shadowRoot.querySelector('devtools-header-section-row');
+    assertElement(headerRow, HTMLElement);
+    assertShadowRoot(headerRow.shadowRoot);
+
+    const pencilButton = headerRow.shadowRoot.querySelector('.enable-editing');
+    assertElement(pencilButton, HTMLElement);
+
+    assert.isFalse(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideFileCreated));
+
+    pencilButton.click();
+    await coordinator.done();
+
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideFileCreated));
   });
 });
 

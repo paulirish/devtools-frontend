@@ -88,6 +88,7 @@ interface CommandParameter {
   name: string;
   type: string;
   optional: boolean;
+  description: string;
 }
 
 type Callback = (error: MessageError|null, arg1: Object|null) => void;
@@ -101,6 +102,7 @@ export class InspectorBackend {
   readonly agentPrototypes: Map<ProtocolDomainName, _AgentPrototype> = new Map();
   #initialized: boolean = false;
   #eventParameterNamesForDomain = new Map<ProtocolDomainName, EventParameterNames>();
+  readonly typeMap = new Map<QualifiedName, CommandParameter[]>();
 
   private getOrCreateEventParameterNamesForDomain(domain: ProtocolDomainName): EventParameterNames {
     let map = this.#eventParameterNamesForDomain.get(domain);
@@ -115,7 +117,7 @@ export class InspectorBackend {
     return this.getOrCreateEventParameterNamesForDomain(domain);
   }
 
-  getEventParamterNames(): ReadonlyMap<ProtocolDomainName, ReadonlyEventParameterNames> {
+  getEventParameterNames(): ReadonlyMap<ProtocolDomainName, ReadonlyEventParameterNames> {
     return this.#eventParameterNamesForDomain;
   }
 
@@ -140,9 +142,10 @@ export class InspectorBackend {
     return prototype;
   }
 
-  registerCommand(method: QualifiedName, parameters: CommandParameter[], replyArgs: string[]): void {
+  registerCommand(method: QualifiedName, parameters: CommandParameter[], replyArgs: string[], description: string):
+      void {
     const [domain, command] = splitQualifiedName(method);
-    this.agentPrototype(domain as ProtocolDomainName).registerCommand(command, parameters, replyArgs);
+    this.agentPrototype(domain as ProtocolDomainName).registerCommand(command, parameters, replyArgs, description);
     this.#initialized = true;
   }
 
@@ -156,6 +159,11 @@ export class InspectorBackend {
 
     // @ts-ignore globalThis global namespace pollution
     globalThis.Protocol[domain][name] = values;
+    this.#initialized = true;
+  }
+
+  registerType(method: QualifiedName, parameters: CommandParameter[]): void {
+    this.typeMap.set(method, parameters);
     this.#initialized = true;
   }
 
@@ -539,7 +547,7 @@ export class TargetBase {
       this.#agents.set(domain, agent);
     }
 
-    for (const [domain, eventParameterNames] of inspectorBackend.getEventParamterNames().entries()) {
+    for (const [domain, eventParameterNames] of inspectorBackend.getEventParameterNames().entries()) {
       this.#dispatchers.set(domain, new DispatcherManager(eventParameterNames));
     }
   }
@@ -706,6 +714,10 @@ export class TargetBase {
     return this.getAgent('Page');
   }
 
+  preloadAgent(): ProtocolProxyApi.PreloadApi {
+    return this.getAgent('Preload');
+  }
+
   profilerAgent(): ProtocolProxyApi.ProfilerApi {
     return this.getAgent('Profiler');
   }
@@ -854,6 +866,10 @@ export class TargetBase {
     this.registerDispatcher('Page', dispatcher);
   }
 
+  registerPreloadDispatcher(dispatcher: ProtocolProxyApi.PreloadDispatcher): void {
+    this.registerDispatcher('Preload', dispatcher);
+  }
+
   registerProfilerDispatcher(dispatcher: ProtocolProxyApi.ProfilerDispatcher): void {
     this.registerDispatcher('Profiler', dispatcher);
   }
@@ -910,22 +926,25 @@ class _AgentPrototype {
   replyArgs: {
     [x: string]: string[],
   };
+  description = '';
+  metadata: {[commandName: string]: {parameters: CommandParameter[], description: string, replyArgs: string[]}};
   readonly domain: string;
   target!: TargetBase;
   constructor(domain: string) {
     this.replyArgs = {};
     this.domain = domain;
+    this.metadata = {};
   }
 
-  registerCommand(methodName: UnqualifiedName, parameters: CommandParameter[], replyArgs: string[]): void {
+  registerCommand(
+      methodName: UnqualifiedName, parameters: CommandParameter[], replyArgs: string[], description: string): void {
     const domainAndMethod = qualifyName(this.domain, methodName);
-
     function sendMessagePromise(this: _AgentPrototype, ...args: unknown[]): Promise<unknown> {
       return _AgentPrototype.prototype.sendMessageToBackendPromise.call(this, domainAndMethod, parameters, args);
     }
-
     // @ts-ignore Method code generation
     this[methodName] = sendMessagePromise;
+    this.metadata[domainAndMethod] = {parameters, description, replyArgs};
 
     function invoke(
         this: _AgentPrototype, request: Object|undefined = {}): Promise<Protocol.ProtocolResponseWithError> {
@@ -934,7 +953,6 @@ class _AgentPrototype {
 
     // @ts-ignore Method code generation
     this['invoke_' + methodName] = invoke;
-
     this.replyArgs[domainAndMethod] = replyArgs;
   }
 
@@ -960,8 +978,8 @@ class _AgentPrototype {
       if (optionalFlag && typeof value === 'undefined') {
         continue;
       }
-
-      if (typeof value !== typeName) {
+      const expectedJSType = typeName === 'array' ? 'object' : typeName;
+      if (typeof value !== expectedJSType) {
         errorCallback(
             `Protocol Error: Invalid type of argument '${paramName}' for method '${method}' call. ` +
             `It must be '${typeName}' but it is '${typeof value}'.`);

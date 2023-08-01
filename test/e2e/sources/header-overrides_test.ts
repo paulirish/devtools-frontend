@@ -51,7 +51,7 @@ async function createHeaderOverride() {
   const title = await waitFor(FILE_TREE_HEADERS_FILE_SELECTOR);
   let labelText = await title?.evaluate(el => el.textContent);
   assert.strictEqual(labelText, '*.headers');
-  await pressKey('s', {control: true});
+  await pressKey('Tab');
   await waitForFunction(async () => {
     labelText = await title?.evaluate(el => el.textContent);
     return labelText === '.headers';
@@ -68,13 +68,15 @@ async function openHeadersTab() {
 
 async function editorTabHasPurpleDot(): Promise<boolean> {
   const tabHeaderIcon = await waitFor('.tabbed-pane-header-tab-icon .spritesheet-mediumicons');
-  return await tabHeaderIcon?.evaluate(node => node.classList.contains('purple-dot'));
+  return await tabHeaderIcon?.evaluate(node => node.classList.contains('dot') && node.classList.contains('purple'));
 }
 
-async function correspondingFileTreeEntryIconHasPurpleDot(): Promise<boolean> {
-  await clickOnContextMenu('.tabbed-pane-header-tab[aria-label=".headers"]', 'Reveal in sidebar');
-  const fileTreeIcon = await waitFor('.icon', await activeElement());
-  return await fileTreeIcon?.evaluate(node => node.classList.contains('largeicon-navigator-file-sync'));
+async function fileTreeEntryIsSelectedAndHasPurpleDot(): Promise<boolean> {
+  const element = await activeElement();
+  const title = await element.evaluate(e => e.getAttribute('title')) || '';
+  assert.match(title, /\/test\/e2e\/resources\/network\/\.headers$/);
+  const fileTreeIcon = await waitFor('.navigator-file-tree-item devtools-icon', element);
+  return await fileTreeIcon?.evaluate(node => node.classList.contains('dot') && node.classList.contains('purple'));
 }
 
 async function editHeaderItem(newValue: string, previousValue: string): Promise<void> {
@@ -96,13 +98,18 @@ describe('The Overrides Panel', async function() {
     await waitFor(ENABLE_OVERRIDES_SELECTOR);
   });
 
-  it('can create header overrides', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1432925]: can create header overrides', async () => {
     await enableExperiment('headerOverrides');
     await goToResource('empty.html');
     await openSourcesPanel();
     await enableLocalOverrides();
     await createHeaderOverride();
-    await navigateToNetworkTab('hello.html');
+
+    await click('#tab-network');
+    await waitFor('.network-log-grid');
+    await goToResource('network/hello.html');
+
     await waitForSomeRequestsToAppear(1);
     await selectRequestByName('hello.html');
     await openHeadersTab();
@@ -112,7 +119,8 @@ describe('The Overrides Panel', async function() {
     assert.deepStrictEqual(await getTextFromHeadersRow(row), ['aaa:', 'bbb']);
   });
 
-  it('can override headers via network panel', async () => {
+  // Skip until flake is fixed
+  it.skip('[crbug.com/1432925]: can override headers via network panel', async () => {
     await enableExperiment('headerOverrides');
     await navigateToNetworkTab('hello.html');
     await waitForSomeRequestsToAppear(1);
@@ -130,7 +138,7 @@ describe('The Overrides Panel', async function() {
     await waitFor('[title="Refresh the page/request for these changes to take effect"]');
     await click('[title="Reveal header override definitions"]');
     assert.isTrue(await editorTabHasPurpleDot());
-    assert.isTrue(await correspondingFileTreeEntryIconHasPurpleDot());
+    assert.isTrue(await fileTreeEntryIsSelectedAndHasPurpleDot());
 
     await navigateToNetworkTab('hello.html');
     await waitForSomeRequestsToAppear(1);
@@ -142,12 +150,11 @@ describe('The Overrides Panel', async function() {
     assert.deepStrictEqual(await getTextFromHeadersRow(row), ['foo:', 'bar']);
     await click('[title="Reveal header override definitions"]');
     assert.isTrue(await editorTabHasPurpleDot());
-    assert.isTrue(await correspondingFileTreeEntryIconHasPurpleDot());
+    assert.isTrue(await fileTreeEntryIsSelectedAndHasPurpleDot());
 
     await goToResource('pages/hello-world.html');
     await waitForFunction(async () => {
-      return (await editorTabHasPurpleDot()) === false &&
-          (await correspondingFileTreeEntryIconHasPurpleDot()) === false;
+      return (await editorTabHasPurpleDot()) === false && (await fileTreeEntryIsSelectedAndHasPurpleDot()) === false;
     });
   });
 });

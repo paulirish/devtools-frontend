@@ -13,9 +13,9 @@ import {
   waitForFunction,
 } from '../../shared/helper.js';
 
-import {waitForQuotaUsage} from './application-helpers.js';
+import {getQuotaUsage, waitForQuotaUsage} from './application-helpers.js';
 
-import {type ElementHandle} from 'puppeteer';
+import {type ElementHandle} from 'puppeteer-core';
 import {assert} from 'chai';
 
 export async function navigateToLighthouseTab(path?: string): Promise<ElementHandle<Element>> {
@@ -148,8 +148,10 @@ export async function openStorageView() {
 export async function clearSiteData() {
   await goToResource('empty.html');
   await openStorageView();
-  await click('#storage-view-clear-button');
-  await waitForQuotaUsage(quota => quota === 0);
+  await waitForFunction(async () => {
+    await click('#storage-view-clear-button');
+    return (await getQuotaUsage()) === 0;
+  });
 }
 
 export async function waitForStorageUsage(p: (quota: number) => boolean) {
@@ -212,20 +214,12 @@ export async function getServiceWorkerCount() {
 }
 
 export async function registerServiceWorker() {
-  const {target} = await getBrowserAndPages();
+  const {target} = getBrowserAndPages();
   await target.evaluate(async () => {
     // @ts-expect-error Custom function added to global scope.
     await window.registerServiceWorker();
   });
   assert.strictEqual(await getServiceWorkerCount(), 1);
-}
-
-export async function unregisterAllServiceWorkers() {
-  const {target} = await getBrowserAndPages();
-  await target.evaluate(async () => {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map(r => r.unregister()));
-  });
 }
 
 export async function interceptNextFileSave(): Promise<() => Promise<string>> {

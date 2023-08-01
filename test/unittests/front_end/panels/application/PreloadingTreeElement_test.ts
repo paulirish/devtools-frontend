@@ -14,19 +14,20 @@ import type * as Resources from '../../../../../front_end/panels/application/app
 describeWithMockConnection('PreloadingTreeElement', () => {
   it('shows view even if initialization happens after selection', () => {
     const target = createTarget();
-    const prerenderingModel = target.model(SDK.PrerenderingModel.PrerenderingModel);
-    assertNotNullOrUndefined(prerenderingModel);
+    const model = target.model(SDK.PreloadingModel.PreloadingModel);
+    assertNotNullOrUndefined(model);
 
     const spy = sinon.spy();
     const panel = {
       showView: spy,
     } as unknown as Resources.ResourcesPanel.ResourcesPanel;
-    const preloadingTreeElement = new Application.PreloadingTreeElement.PreloadingTreeElement(panel);
+    const preloadingRuleSetTreeElement =
+        Application.PreloadingTreeElement.PreloadingTreeElement.newForPreloadingRuleSetView(panel);
 
-    preloadingTreeElement.onselect(false);
+    preloadingRuleSetTreeElement.onselect(false);
     assert.isTrue(spy.notCalled);
 
-    preloadingTreeElement.initialize(prerenderingModel);
+    preloadingRuleSetTreeElement.initialize(model);
     assert.isTrue(spy.calledOnce);
   });
 });

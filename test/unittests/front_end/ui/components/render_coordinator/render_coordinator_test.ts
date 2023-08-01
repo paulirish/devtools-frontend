@@ -38,6 +38,26 @@ describe('Render Coordinator', () => {
     await validateRecords(expected);
   });
 
+  it('deduplicates named tasks', async () => {
+    const expected = [
+      '[New frame]',
+      '[Read]: Named Read',
+      '[Write]: Unnamed write',
+      '[Write]: Named Write',
+      '[Write]: Unnamed write',
+      '[Queue empty]',
+    ];
+
+    coordinator.observeOnlyNamed = false;
+    void coordinator.read('Named Read', () => {});
+    void coordinator.write(() => {});
+    void coordinator.write('Named Write', () => {});
+    void coordinator.write(() => {});
+    void coordinator.write('Named Write', () => {});
+
+    await validateRecords(expected);
+  });
+
   it('handles nested reads and writes', async () => {
     const expected = [
       '[New frame]',
@@ -126,7 +146,7 @@ describe('Render Coordinator', () => {
     } catch (err) {
       assert.strictEqual(err.toString(), new Error('Writers took over 1500ms. Possible deadlock?').toString());
     }
-    coordinator.rejectAll([read], new Error());
+    coordinator.cancelPending();
   });
 
   it('throws if there is a write deadlock (blocked on write)', async () => {
@@ -141,14 +161,14 @@ describe('Render Coordinator', () => {
     } catch (err) {
       assert.strictEqual(err.toString(), new Error('Readers took over 1500ms. Possible deadlock?').toString());
     }
-    coordinator.rejectAll([write], new Error());
+    coordinator.cancelPending();
   });
 
-  it('exposes the count of pending work', async () => {
+  it('exposes the presence of pending work', async () => {
     const readDonePromise = coordinator.read('Named Read', () => {});
-    assert.strictEqual(coordinator.pendingFramesCount(), 1);
+    assert.isTrue(coordinator.hasPendingWork());
     await readDonePromise;
-    assert.strictEqual(coordinator.pendingFramesCount(), 0);
+    assert.isFalse(coordinator.hasPendingWork());
   });
 
   it('exposes the pending work count globally for interaction/e2e tests', async () => {
@@ -190,11 +210,14 @@ describe('Render Coordinator', () => {
     });
 
     it('tracks only the last 100 items', async () => {
-      const expected = new Array(99).fill('[Read]: Named read');
+      const expected = [];
+      for (let i = 51; i < 150; i++) {
+        expected.push(`[Read]: Named read ${i}`);
+      }
       expected.push('[Queue empty]');
 
       for (let i = 0; i < 150; i++) {
-        void coordinator.read('Named read', () => {});
+        void coordinator.read(`Named read ${i}`, () => {});
       }
 
       await validateRecords(expected);
@@ -202,11 +225,14 @@ describe('Render Coordinator', () => {
 
     it('supports different log sizes', async () => {
       coordinator.recordStorageLimit = 10;
-      const expected = new Array(9).fill('[Write]: Named write');
+      const expected = [];
+      for (let i = 41; i < 50; i++) {
+        expected.push(`[Write]: Named write ${i}`);
+      }
       expected.push('[Queue empty]');
 
       for (let i = 0; i < 50; i++) {
-        void coordinator.write('Named write', () => {});
+        void coordinator.write(`Named write ${i}`, () => {});
       }
 
       await validateRecords(expected);

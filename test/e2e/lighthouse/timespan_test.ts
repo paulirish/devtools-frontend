@@ -17,7 +17,6 @@ import {
   selectDevice,
   selectMode,
   setThrottlingMethod,
-  unregisterAllServiceWorkers,
   waitForResult,
   waitForTimespanStarted,
 } from '../helpers/lighthouse-helpers.js';
@@ -27,7 +26,9 @@ import {
 
 describe('Timespan', async function() {
   // The tests in this suite are particularly slow
-  this.timeout(60_000);
+  if (this.timeout() !== 0) {
+    this.timeout(60_000);
+  }
 
   beforeEach(() => {
     // https://github.com/GoogleChrome/lighthouse/issues/14572
@@ -39,10 +40,6 @@ describe('Timespan', async function() {
     expectError(/Protocol Error: the message with wrong session id/);
     expectError(/Protocol Error: the message with wrong session id/);
     expectError(/Protocol Error: the message with wrong session id/);
-  });
-
-  afterEach(async () => {
-    await unregisterAllServiceWorkers();
   });
 
   it('successfully returns a Lighthouse report for user interactions', async () => {

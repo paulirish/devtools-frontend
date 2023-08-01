@@ -29,7 +29,7 @@
  */
 
 import * as Common from '../../../../core/common/common.js';
-import type * as SDK from '../../../../core/sdk/sdk.js';
+import type * as TraceEngine from '../../../../models/trace/trace.js';
 import * as UI from '../../legacy.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 
@@ -111,15 +111,15 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.overviewInfo.hide();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.update();
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.overviewInfo.hide();
   }
 
-  onResize(): void {
+  override onResize(): void {
     const width = this.element.offsetWidth;
     if (width === this.lastWidth) {
       return;
@@ -147,7 +147,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.cursorEnabled = true;
   }
 
-  setNavStartTimes(navStartTimes: Map<string, SDK.TracingModel.Event>): void {
+  setNavStartTimes(navStartTimes: Map<string, TraceEngine.Legacy.Event>): void {
     this.overviewCalculator.setNavStartTimes(navStartTimes);
   }
 
@@ -219,8 +219,11 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
       return;
     }
 
-    this.windowStartTime = event.data.rawStartValue;
-    this.windowEndTime = event.data.rawEndValue;
+    this.windowStartTime =
+        event.data.rawStartValue === this.overviewCalculator.minimumBoundary() ? 0 : event.data.rawStartValue;
+    this.windowEndTime =
+        event.data.rawEndValue === this.overviewCalculator.maximumBoundary() ? Infinity : event.data.rawEndValue;
+
     const windowTimes = {startTime: this.windowStartTime, endTime: this.windowEndTime};
 
     this.dispatchEventToListeners(Events.WindowChanged, windowTimes);
@@ -270,7 +273,7 @@ export class TimelineOverviewCalculator implements Calculator {
   private minimumBoundaryInternal!: number;
   private maximumBoundaryInternal!: number;
   private workingArea!: number;
-  private navStartTimes?: Map<string, SDK.TracingModel.Event>;
+  private navStartTimes?: Map<string, TraceEngine.Legacy.Event>;
 
   constructor() {
     this.reset();
@@ -289,7 +292,7 @@ export class TimelineOverviewCalculator implements Calculator {
     this.maximumBoundaryInternal = maximumBoundary;
   }
 
-  setNavStartTimes(navStartTimes: Map<string, SDK.TracingModel.Event>): void {
+  setNavStartTimes(navStartTimes: Map<string, TraceEngine.Legacy.Event>): void {
     this.navStartTimes = navStartTimes;
   }
 

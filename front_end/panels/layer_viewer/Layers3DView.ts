@@ -157,7 +157,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.canvasElement.addEventListener('mouseleave', this.onMouseMove.bind(this), false);
     this.canvasElement.addEventListener('mousemove', this.onMouseMove.bind(this), false);
     this.canvasElement.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
-    UI.ARIAUtils.setAccessibleName(this.canvasElement, i18nString(UIStrings.dLayersView));
+    UI.ARIAUtils.setLabel(this.canvasElement, i18nString(UIStrings.dLayersView));
 
     this.lastSelection = {};
     this.layerTree = null;
@@ -197,16 +197,16 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     });
   }
 
-  onResize(): void {
+  override onResize(): void {
     this.resizeCanvas();
     this.update();
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.textureManager.suspend();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     this.textureManager.resume();
     this.registerCSSFiles([layers3DViewStyles]);
     if (!this.needsUpdate) {
@@ -780,8 +780,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     let closestObject: Selection|null = null;
     const projectionMatrix =
         new WebKitCSSMatrix().scale(1, -1, -1).translate(-1, -1, 0).multiply(this.projectionMatrix);
-    const x0 = (mouseEvent.clientX - this.canvasElement.totalOffsetLeft()) * window.devicePixelRatio;
-    const y0 = -(mouseEvent.clientY - this.canvasElement.totalOffsetTop()) * window.devicePixelRatio;
+    const x0 = (mouseEvent.clientX - this.canvasElement.getBoundingClientRect().left) * window.devicePixelRatio;
+    const y0 = -(mouseEvent.clientY - this.canvasElement.getBoundingClientRect().top) * window.devicePixelRatio;
 
     function checkIntersection(rect: Rectangle): void {
       if (!rect.relatedObject) {

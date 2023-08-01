@@ -59,9 +59,8 @@ describe('Ignore list', async function() {
     await scriptEvaluation;
   });
 
-  // Flaky.
-  it.skip('[crbug.com/1346232] shows no toggle when everything is ignore-listed', async function() {
-    await setIgnoreListPattern('multi|puppeteer');
+  it('shows no toggle when everything is ignore-listed', async function() {
+    await setIgnoreListPattern('multi|pptr');
     const {target, frontend} = getBrowserAndPages();
 
     await openSourceCodeEditorForFile('multi-files-mycode.js', 'multi-files.html');

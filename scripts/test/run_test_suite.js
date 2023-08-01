@@ -32,6 +32,11 @@ const yargsObject =
           desc: 'Path to the source folder containing the tests, relative to the current working directory.',
           demandOption: true
         })
+        .option('autoninja', {
+          type: 'boolean',
+          desc: 'If true, will trigger an autoninja build before executing the test suite',
+          default: false,
+        })
         .option('target', {type: 'string', default: 'Default', desc: 'Name of the Ninja output directory.'})
         .option('node-modules-path', {
           type: 'string',
@@ -50,7 +55,13 @@ const yargsObject =
         .option('mocha-fgrep', {
           type: 'string',
           desc:
-              'Mocha\'s fgrep option [https://mochajs.org/#-fgrep-string-f-string] which only runs teses whose titles contain the provided string',
+              'Mocha\'s fgrep option [https://mochajs.org/#-fgrep-string-f-string] which only runs tests whose titles contain the provided string',
+        })
+        .option('invert', {
+          type: 'boolean',
+          desc:
+              'Mocha\'s invert option [https://mochajs.org/#-invert] which inverts the match specified by mocha-fgrep',
+          default: false,
         })
         .option('mocha-reporter', {
           type: 'string',
@@ -107,6 +118,11 @@ const yargsObject =
           type: 'boolean',
           desc: 'Whether to collect code coverage for this test suite',
           default: false,
+        })
+        .option('swarming-output-file', {
+          type: 'string',
+          desc: 'Path to copy goldens and coverage files',
+          default: '',
         })
         .parserConfiguration({
           // So that if we pass --foo-bar, Yargs only populates
@@ -169,6 +185,19 @@ function setNodeModulesPath(nodeModulesPathsInput) {
   }
 }
 
+function triggerAutoninja(target) {
+  const ninjaCommand = os.platform() === 'win32' ? 'autoninja.bat' : 'autoninja';
+  const ninjaArgs = ['-C', `out/${target}`];
+  const cwd = devtoolsRootPath();
+  const result = childProcess.spawnSync(ninjaCommand, ninjaArgs, {encoding: 'utf-8', stdio: 'inherit', cwd});
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return result.status;
+}
+
 function executeTestSuite({
   absoluteTestSuitePath,
   jobs,
@@ -217,6 +246,9 @@ function executeTestSuite({
       log(`extra mocha flag: --${mochaKey}=${mochaValue}`);
     }
   }
+  if (jobs > 1) {
+    argumentsForNode.push(`--jobs=${jobs}`);
+  }
   const result = childProcess.spawnSync(nodePath(), argumentsForNode, {encoding: 'utf-8', stdio: 'inherit', cwd});
 
   if (result.error) {
@@ -242,6 +274,10 @@ function validateChromeBinaryExistsAndExecutable(chromeBinaryPath) {
 }
 
 function main() {
+  if (yargsObject['autoninja']) {
+    triggerAutoninja(yargsObject['target']);
+  }
+
   const chromeBinaryPath = yargsObject['chrome-binary-path'];
 
   if (!validateChromeBinaryExistsAndExecutable(chromeBinaryPath)) {
@@ -299,6 +335,7 @@ function main() {
       cwd: configurationFlags['cwd'],
       mochaOptions: {
         fgrep: configurationFlags['mocha-fgrep'],
+        invert: configurationFlags['invert'],
         reporter: configurationFlags['mocha-reporter'],
         'reporter-option': configurationFlags['mocha-reporter-option'],
       }
@@ -309,6 +346,13 @@ function main() {
   }
   if (resultStatusCode !== 0) {
     log('ERRORS DETECTED');
+  }
+  if (yargsObject['swarming-output-file']) {
+    if (yargsObject['coverage']) {
+      fs.cpSync(
+          'interactions-coverage', `${yargsObject['swarming-output-file']}/interactions-coverage`, {recursive: true});
+    }
+    fs.cpSync('test/interactions/goldens', `${yargsObject['swarming-output-file']}/goldens`, {recursive: true});
   }
   process.exit(resultStatusCode);
 }

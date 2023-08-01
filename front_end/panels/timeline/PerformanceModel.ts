@@ -4,25 +4,23 @@
 
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import type * as Bindings from '../../models/bindings/bindings.js';
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
+import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import type * as TraceEngine from '../../models/trace/trace.js';
+import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
+const resolveNamesTimeout = 500;
+
 export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private mainTargetInternal: SDK.Target.Target|null;
-  private tracingModelInternal: SDK.TracingModel.TracingModel|null;
+  private tracingModelInternal: TraceEngine.Legacy.TracingModel|null;
   private filtersInternal: TimelineModel.TimelineModelFilter.TimelineModelFilter[];
   private readonly timelineModelInternal: TimelineModel.TimelineModel.TimelineModelImpl;
   private readonly frameModelInternal: TimelineModel.TimelineFrameModel.TimelineFrameModel;
-  private filmStripModelInternal: SDK.FilmStripModel.FilmStripModel|null;
   private windowInternal: Window;
-  private readonly extensionTracingModels: {
-    title: string,
-    model: SDK.TracingModel.TracingModel,
-    timeOffset: number,
-  }[];
+  private willResolveNames = false;
   private recordStartTimeInternal?: number;
 
   constructor() {
@@ -34,11 +32,9 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     this.timelineModelInternal = new TimelineModel.TimelineModel.TimelineModelImpl();
     this.frameModelInternal = new TimelineModel.TimelineFrameModel.TimelineFrameModel(
         event => TimelineUIUtils.eventStyle(event).category.name);
-    this.filmStripModelInternal = null;
 
     this.windowInternal = {left: 0, right: Infinity};
 
-    this.extensionTracingModels = [];
     this.recordStartTimeInternal = undefined;
   }
 
@@ -66,13 +62,13 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.filtersInternal;
   }
 
-  isVisible(event: SDK.TracingModel.Event): boolean {
+  isVisible(event: TraceEngine.Legacy.Event): boolean {
     return this.filtersInternal.every(f => f.accept(event));
   }
 
-  async setTracingModel(model: SDK.TracingModel.TracingModel): Promise<void> {
+  async setTracingModel(model: TraceEngine.Legacy.TracingModel, isFreshRecording = false): Promise<void> {
     this.tracingModelInternal = model;
-    this.timelineModelInternal.setEvents(model);
+    this.timelineModelInternal.setEvents(model, isFreshRecording);
     await this.addSourceMapListeners();
 
     const mainTracks = this.timelineModelInternal.tracks().filter(
@@ -86,30 +82,23 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     this.frameModelInternal.addTraceEvents(
         this.mainTargetInternal, this.timelineModelInternal.inspectedTargetEvents(), threadData);
 
-    for (const entry of this.extensionTracingModels) {
-      entry.model.adjustTime(
-          this.tracingModelInternal.minimumRecordTime() + (entry.timeOffset / 1000) -
-          (this.recordStartTimeInternal as number));
-    }
     this.autoWindowTimes();
-  }
-
-  #cpuProfileNodes(): SDK.CPUProfileDataModel.CPUProfileNode[] {
-    return this.timelineModel().cpuProfiles().flatMap(p => p.nodes() || []);
   }
 
   async addSourceMapListeners(): Promise<void> {
     const debuggerModelsToListen = new Set<SDK.DebuggerModel.DebuggerModel>();
-    for (const node of this.#cpuProfileNodes()) {
-      if (!node) {
-        continue;
-      }
-      const debuggerModelToListen = this.#maybeGetDebuggerModelForNode(node);
-      if (!debuggerModelToListen) {
-        continue;
-      }
+    for (const profile of this.timelineModel().cpuProfiles()) {
+      for (const node of profile.cpuProfileData.nodes() || []) {
+        if (!node) {
+          continue;
+        }
+        const debuggerModelToListen = this.#maybeGetDebuggerModelForNode(node, profile.target);
+        if (!debuggerModelToListen) {
+          continue;
+        }
 
-      debuggerModelsToListen.add(debuggerModelToListen);
+        debuggerModelsToListen.add(debuggerModelToListen);
+      }
     }
     for (const debuggerModel of debuggerModelsToListen) {
       debuggerModel.sourceMapManager().addEventListener(
@@ -121,8 +110,8 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   // If a node corresponds to a script that has not been parsed or a script
   // that has a source map, we should listen to SourceMapAttached events to
   // attempt a function name resolving.
-  #maybeGetDebuggerModelForNode(node: SDK.CPUProfileDataModel.CPUProfileNode): SDK.DebuggerModel.DebuggerModel|null {
-    const target = node.target();
+  #maybeGetDebuggerModelForNode(node: CPUProfile.ProfileTreeModel.ProfileNode, target: SDK.Target.Target|null):
+      SDK.DebuggerModel.DebuggerModel|null {
     const debuggerModel = target?.model(SDK.DebuggerModel.DebuggerModel);
     if (!debuggerModel) {
       return null;
@@ -136,34 +125,35 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   }
 
   async #resolveNamesFromCPUProfile(): Promise<void> {
-    for (const node of this.#cpuProfileNodes()) {
-      const resolvedFunctionName =
-          await SourceMapScopes.NamesResolver.resolveProfileFrameFunctionName(node.callFrame, node.target());
-      node.setFunctionName(resolvedFunctionName);
+    for (const profile of this.timelineModel().cpuProfiles()) {
+      const target = profile.target;
+      for (const node of profile.cpuProfileData.nodes() || []) {
+        const resolvedFunctionName =
+            await SourceMapScopes.NamesResolver.resolveProfileFrameFunctionName(node.callFrame, target);
+        node.setFunctionName(resolvedFunctionName);
+      }
     }
   }
 
-  async #onAttachedSourceMap(
-      event: Common.EventTarget.EventTargetEvent<{client: SDK.Script.Script, sourceMap: SDK.SourceMap.SourceMap}>):
-      Promise<void> {
-    if (!this.#cpuProfileNodes().some(node => node.scriptId === event.data.client.scriptId)) {
-      return;
+  async #onAttachedSourceMap(): Promise<void> {
+    if (!this.willResolveNames) {
+      this.willResolveNames = true;
+      // Resolving names triggers a repaint of the flame chart. Instead of attempting to resolve
+      // names every time a source map is attached, wait for some time once the first source map is
+      // attached. This way we allow for other source maps to be parsed before attempting a name
+      // resolving using the available source maps. Otherwise the UI is blocked when the number
+      // of source maps is particularly large.
+      setTimeout(this.resolveNamesAndUpdate.bind(this), resolveNamesTimeout);
     }
+  }
+
+  async resolveNamesAndUpdate(): Promise<void> {
+    this.willResolveNames = false;
     await this.#resolveNamesFromCPUProfile();
     this.dispatchEventToListeners(Events.NamesResolved);
   }
 
-  addExtensionEvents(title: string, model: SDK.TracingModel.TracingModel, timeOffset: number): void {
-    this.extensionTracingModels.push({model: model, title: title, timeOffset: timeOffset});
-    if (!this.tracingModelInternal) {
-      return;
-    }
-    model.adjustTime(
-        this.tracingModelInternal.minimumRecordTime() + (timeOffset / 1000) - (this.recordStartTimeInternal as number));
-    this.dispatchEventToListeners(Events.ExtensionDataAdded);
-  }
-
-  tracingModel(): SDK.TracingModel.TracingModel {
+  tracingModel(): TraceEngine.Legacy.TracingModel {
     if (!this.tracingModelInternal) {
       throw 'call setTracingModel before accessing PerformanceModel';
     }
@@ -174,55 +164,12 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.timelineModelInternal;
   }
 
-  filmStripModel(): SDK.FilmStripModel.FilmStripModel {
-    if (this.filmStripModelInternal) {
-      return this.filmStripModelInternal;
-    }
-    if (!this.tracingModelInternal) {
-      throw 'call setTracingModel before accessing PerformanceModel';
-    }
-    this.filmStripModelInternal = new SDK.FilmStripModel.FilmStripModel(this.tracingModelInternal);
-    return this.filmStripModelInternal;
-  }
-
   frames(): TimelineModel.TimelineFrameModel.TimelineFrame[] {
     return this.frameModelInternal.getFrames();
   }
 
   frameModel(): TimelineModel.TimelineFrameModel.TimelineFrameModel {
     return this.frameModelInternal;
-  }
-
-  extensionInfo(): {
-    title: string,
-    model: SDK.TracingModel.TracingModel,
-  }[] {
-    return this.extensionTracingModels;
-  }
-
-  dispose(): void {
-    if (this.tracingModelInternal) {
-      this.tracingModelInternal.dispose();
-    }
-    for (const extensionEntry of this.extensionTracingModels) {
-      extensionEntry.model.dispose();
-    }
-  }
-
-  filmStripModelFrame(frame: TimelineModel.TimelineFrameModel.TimelineFrame): SDK.FilmStripModel.Frame|null {
-    // For idle frames, look at the state at the beginning of the frame.
-    const screenshotTime = frame.idle ? frame.startTime : frame.endTime;
-    const filmStripModel = (this.filmStripModelInternal as SDK.FilmStripModel.FilmStripModel);
-    const filmStripFrame = filmStripModel.frameByTimestamp(screenshotTime);
-    return filmStripFrame && filmStripFrame.timestamp - frame.endTime < 10 ? filmStripFrame : null;
-  }
-
-  save(stream: Common.StringOutputStream.OutputStream): Promise<DOMError|null> {
-    if (!this.tracingModelInternal) {
-      throw 'call setTracingModel before accessing PerformanceModel';
-    }
-    const backingStorage = (this.tracingModelInternal.backingStorage() as Bindings.TempFile.TempFileBackingStorage);
-    return backingStorage.writeToStream(stream);
   }
 
   setWindow(window: Window, animate?: boolean): void {
@@ -234,9 +181,17 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.windowInternal;
   }
 
+  minimumRecordTime(): number {
+    return this.timelineModelInternal.minimumRecordTime();
+  }
+
+  maximumRecordTime(): number {
+    return this.timelineModelInternal.maximumRecordTime();
+  }
+
   private autoWindowTimes(): void {
     const timelineModel = this.timelineModelInternal;
-    let tasks: SDK.TracingModel.Event[] = [];
+    let tasks: TraceEngine.Legacy.Event[] = [];
     for (const track of timelineModel.tracks()) {
       // Deliberately pick up last main frame's track.
       if (track.type === TimelineModel.TimelineModel.TrackType.MainThread && track.forMainFrame) {
@@ -287,7 +242,6 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum Events {
-  ExtensionDataAdded = 'ExtensionDataAdded',
   WindowChanged = 'WindowChanged',
   NamesResolved = 'NamesResolved',
 }
@@ -297,7 +251,6 @@ export interface WindowChangedEvent {
 }
 
 export type EventTypes = {
-  [Events.ExtensionDataAdded]: void,
   [Events.WindowChanged]: WindowChangedEvent,
   [Events.NamesResolved]: void,
 };

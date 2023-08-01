@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../../../../front_end/core/host/host.js';
 import * as Workspace from '../../../../../../front_end/models/workspace/workspace.js';
 import * as SourcesComponents from '../../../../../../front_end/panels/sources/components/components.js';
 import * as Coordinator from '../../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
+import * as UI from '../../../../../../front_end/ui/legacy/legacy.js';
 import {
   assertElement,
   assertShadowRoot,
+  dispatchFocusEvent,
   dispatchFocusOutEvent,
   dispatchInputEvent,
   dispatchKeyDownEvent,
@@ -16,6 +19,7 @@ import {
 } from '../../../helpers/DOMHelpers.js';
 import {deinitializeGlobalVars, initializeGlobalVars} from '../../../helpers/EnvironmentHelpers.js';
 import {createFileSystemUISourceCode} from '../../../helpers/UISourceCodeHelpers.js';
+import {recordedMetricsContain, resetRecordedMetrics} from '../../../helpers/UserMetricsHelpers.js';
 
 import type * as Platform from '../../../../../../front_end/core/platform/platform.js';
 
@@ -23,11 +27,19 @@ const {assert} = chai;
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 describe('HeadersView', async () => {
+  const commitWorkingCopySpy = sinon.spy();
+
   before(async () => {
     await initializeGlobalVars();
   });
+
   after(async () => {
     await deinitializeGlobalVars();
+  });
+
+  beforeEach(() => {
+    commitWorkingCopySpy.resetHistory();
+    resetRecordedMetrics();
   });
 
   async function renderEditor(): Promise<SourcesComponents.HeadersView.HeadersViewComponent> {
@@ -61,6 +73,7 @@ describe('HeadersView', async () => {
       uiSourceCode: {
         name: () => '.headers',
         setWorkingCopy: () => {},
+        commitWorkingCopy: commitWorkingCopySpy,
       } as unknown as Workspace.UISourceCode.UISourceCode,
     };
     renderElementIntoDOM(editor);
@@ -98,6 +111,7 @@ describe('HeadersView', async () => {
       mimeType: 'text/html',
       content: headers,
     });
+    uiSourceCode.commitWorkingCopy = commitWorkingCopySpy;
     project.canSetFileContent = () => true;
 
     const editorWrapper = new SourcesComponents.HeadersView.HeadersView(uiSourceCode);
@@ -112,12 +126,14 @@ describe('HeadersView', async () => {
   }
 
   async function changeEditable(editable: HTMLElement, value: string): Promise<void> {
-    editable.focus();
+    dispatchFocusEvent(editable, {bubbles: true});
     editable.innerText = value;
-    dispatchKeyDownEvent(editable, {
-      key: 'Enter',
-    });
+    dispatchInputEvent(editable, {inputType: 'insertText', data: value, bubbles: true, composed: true});
+    dispatchFocusOutEvent(editable, {bubbles: true});
     await coordinator.done();
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
   }
 
   async function pressButton(shadowRoot: ShadowRoot, rowIndex: number, selector: string): Promise<void> {
@@ -191,6 +207,14 @@ describe('HeadersView', async () => {
       'jpg-header:only for jpg files',
     ]);
 
+    const addRuleButton = editor.shadowRoot.querySelector('.add-block');
+    assertElement(addRuleButton, HTMLElement);
+    assert.strictEqual(addRuleButton.textContent?.trim(), 'Add override rule');
+
+    const learnMoreLink = editor.shadowRoot.querySelector('.learn-more-row x-link');
+    assertElement(learnMoreLink, HTMLElement);
+    assert.strictEqual(learnMoreLink.title, 'https://goo.gle/devtools-override');
+
     const editables = editor.shadowRoot.querySelectorAll('.editable');
     await changeEditable(editables[0] as HTMLElement, 'index.html');
     await changeEditable(editables[1] as HTMLElement, 'content-type');
@@ -205,6 +229,7 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:is image',
     ]);
+    assert.strictEqual(commitWorkingCopySpy.callCount, 4);
   });
 
   it('resets edited value to previous state on Escape key', async () => {
@@ -309,6 +334,7 @@ describe('HeadersView', async () => {
 
     dispatchFocusOutEvent(applyTo, {bubbles: true});
     assert.strictEqual(applyTo.innerHTML, '*');
+    assert.strictEqual(commitWorkingCopySpy.callCount, 1);
   });
 
   it('removes the entire header when the header name is deleted', async () => {
@@ -343,6 +369,10 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.strictEqual(commitWorkingCopySpy.callCount, 1);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
   });
 
   it('allows adding headers', async () => {
@@ -370,6 +400,9 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
 
     const editables = editor.shadowRoot.querySelectorAll('.editable');
     await changeEditable(editables[3] as HTMLElement, 'cache-control');
@@ -415,6 +448,9 @@ describe('HeadersView', async () => {
       'Apply to:*',
       'header-name-1:header value',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
 
     const editables = editor.shadowRoot.querySelectorAll('.editable');
     await changeEditable(editables[8] as HTMLElement, 'articles/*');
@@ -456,6 +492,9 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
 
     await pressButton(editor.shadowRoot, 1, '.remove-header');
 
@@ -489,6 +528,9 @@ describe('HeadersView', async () => {
       'Apply to:*.jpg',
       'jpg-header:only for jpg files',
     ]);
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
   });
 
   it('removes formatting for pasted content', async () => {
@@ -506,5 +548,16 @@ describe('HeadersView', async () => {
     dispatchPasteEvent(headerValue, {clipboardData: dt, bubbles: true});
     await coordinator.done();
     assert.deepEqual(getSingleRowContent(editor.shadowRoot, 2), 'access-control-allow-origin:foo bar');
+    assert.isTrue(recordedMetricsContain(
+        Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
+        Host.UserMetrics.Action.HeaderOverrideHeadersFileEdited));
+  });
+
+  it('shows context menu', async () => {
+    const editor = await renderEditor();
+    assertShadowRoot(editor.shadowRoot);
+    const contextMenuShow = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
+    editor.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true}));
+    assert.isTrue(contextMenuShow.calledOnce);
   });
 });

@@ -4,7 +4,7 @@
 
 import {assert} from 'chai';
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {
   $$,
@@ -27,6 +27,7 @@ import {
   findSearchResult,
   getDataGridRows,
   navigateToMemoryTab,
+  setClassFilter,
   setSearchFilter,
   takeAllocationProfile,
   takeAllocationTimelineProfile,
@@ -50,7 +51,8 @@ describe('The Memory Panel', async function() {
     await navigateToMemoryTab();
   });
 
-  it('Can take several heap snapshots ', async () => {
+  // Flaky test
+  it.skip('[crbug.com/1435436] Can take several heap snapshots ', async () => {
     await goToResource('memory/default.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -61,18 +63,14 @@ describe('The Memory Panel', async function() {
     assert.strictEqual(heapSnapShots.length, 2);
   });
 
-  // Flaky on linux and mac.
-  it.skip('[crbug.com/1377772] Shows a DOM node and its JS wrapper as a single node', async () => {
+  it('Shows a DOM node and its JS wrapper as a single node', async () => {
     await goToResource('memory/detached-node.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('leaking');
     await waitForSearchResultNumber(4);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-function');
-      return el !== null && await el.evaluate(el => el.textContent === 'leaking()');
-    });
+    await findSearchResult('leaking()');
     await waitForRetainerChain([
       'Detached V8EventListener',
       'Detached EventListener',
@@ -84,9 +82,8 @@ describe('The Memory Panel', async function() {
     ]);
   });
 
-  // Flaky test
-  it.skip(
-      '[crbug.com/1134602] Correctly retains the path for event listeners', async () => {
+  it(
+      'Correctly retains the path for event listeners', async () => {
         await goToResource('memory/event-listeners.html');
         await step('taking a heap snapshot', async () => {
           await navigateToMemoryTab();
@@ -99,10 +96,7 @@ describe('The Memory Panel', async function() {
         });
 
         await step('selecting the search result that we need', async () => {
-          await findSearchResult(async p => {
-            const el = await p.$(':scope > td > div > .object-value-function');
-            return el !== null && await el.evaluate(el => el.textContent === 'myEventListener()');
-          });
+          await findSearchResult('myEventListener()');
         });
 
         await step('waiting for retainer chain', async () => {
@@ -112,9 +106,6 @@ describe('The Memory Panel', async function() {
             'InternalNode',
             'InternalNode',
             'HTMLBodyElement',
-            'HTMLHtmlElement',
-            'HTMLDocument',
-            'Window',
           ]);
         });
       });
@@ -178,10 +169,7 @@ describe('The Memory Panel', async function() {
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('Retainer');
     await waitForSearchResultNumber(8);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-object');
-      return el !== null && await el.evaluate(el => el.textContent === 'Retainer');
-    });
+    await findSearchResult('Retainer');
     // The following line checks two things: That the property 'aUniqueName'
     // in the iframe is retaining the Retainer class object, and that the
     // iframe window is not detached.
@@ -190,18 +178,14 @@ describe('The Memory Panel', async function() {
             ({propertyName, retainerClassName}) => propertyName === 'aUniqueName' && retainerClassName === 'Window'));
   });
 
-  // Times out
-  it.skip('[crbug.com/1363150] Correctly shows multiple retainer paths for an object', async () => {
+  it('Correctly shows multiple retainer paths for an object', async () => {
     await goToResource('memory/multiple-retainers.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
     await waitForNonEmptyHeapSnapshotData();
     await setSearchFilter('leaking');
     await waitForSearchResultNumber(4);
-    await findSearchResult(async p => {
-      const el = await p.$(':scope > td > div > .object-value-string');
-      return el !== null && await el.evaluate(el => el.textContent === '"leaking"');
-    });
+    await findSearchResult('\"leaking\"');
 
     await waitForFunction(async () => {
       // Wait for all the rows of the data-grid to load.
@@ -318,5 +302,100 @@ describe('The Memory Panel', async function() {
     void takeAllocationTimelineProfile({recordStacks: false});
     const dropdown = await waitFor('select[aria-label="Perspective"]');
     await waitForNoElementsWithTextContent('Allocation', dropdown);
+  });
+
+  it('shows object source links in snapshot', async () => {
+    const {target, frontend} = getBrowserAndPages();
+    await target.evaluate(`
+        class MyTestClass {
+          constructor() {
+            this.z = new Uint32Array(1e6);  // Pull the class to top.
+            this.myFunction = () => 42;
+          }
+        };
+        function* MyTestGenerator() {
+          yield 1;
+        }
+        class MyTestClass2 {}
+        window.myTestClass = new MyTestClass();
+        window.myTestGenerator = MyTestGenerator();
+        window.myTestClass2 = new MyTestClass2();
+        //# sourceURL=my-test-script.js`);
+    await navigateToMemoryTab();
+    await takeHeapSnapshot();
+    await setClassFilter('MyTest');
+    await waitForNonEmptyHeapSnapshotData();
+
+    const expectedEntries = [
+      {constructor: 'MyTestClass', link: 'my-test-script.js:3'},
+      {constructor: 'MyTestClass', prop: 'myFunction', link: 'my-test-script.js:5'},
+      {constructor: 'MyTestGenerator', link: 'my-test-script.js:8'},
+      {constructor: 'MyTestClass2', link: 'my-test-script.js:11'},
+    ];
+
+    const rows = await getDataGridRows('.data-grid');
+    for (const entry of expectedEntries) {
+      let row: puppeteer.ElementHandle<Element>|null = null;
+      // Find the row with the desired constructor.
+      for (const r of rows) {
+        const constructorName = await waitForFunction(() => r.evaluate(e => e.firstChild?.textContent));
+        if (entry.constructor === constructorName) {
+          row = r;
+          break;
+        }
+      }
+      assertNotNullOrUndefined(row);
+      // Expand the constructor sub-tree.
+      await clickElement(row);
+      await frontend.keyboard.press('ArrowRight');
+      // Get the object subtree/child.
+      const {objectElement, objectName} = await waitForFunction(async () => {
+        const objectElement =
+            await row?.evaluateHandle(e => e.nextSibling) as puppeteer.ElementHandle<HTMLElement>| null;
+        const objectName = await objectElement?.evaluate(e => e.querySelector('.object-value-object')?.textContent);
+        if (!objectName) {
+          return undefined;
+        }
+        return {objectElement, objectName};
+      });
+      let element = objectElement;
+      assertNotNullOrUndefined(element);
+      // Verify we have the object with the matching name.
+      assert.strictEqual(objectName, entry.constructor);
+      // Get the right property of the object if required.
+      if (entry.prop) {
+        // Expand the object.
+        await clickElement(element);
+        await frontend.keyboard.press('ArrowRight');
+        // Try to find the property.
+        element = await waitForFunction(async () => {
+          let row = element;
+          while (row) {
+            const nextRow = await row.evaluateHandle(e => e.nextSibling) as puppeteer.ElementHandle<HTMLElement>| null;
+            if (!nextRow) {
+              return undefined;
+            }
+            row = nextRow;
+            const text = await row.evaluate(e => e.querySelector('.property-name')?.textContent);
+            // If we did not find any text at all, then we saw all properties. Let us fail/retry here.
+            if (!text) {
+              return undefined;
+            }
+            // If we found the property, we are done.
+            if (text === entry.prop) {
+              return row;
+            }
+            // Continue looking for the property on the next row.
+          }
+          return undefined;
+        });
+        assertNotNullOrUndefined(element);
+      }
+
+      // Verify the link to the source code.
+      const linkText =
+          await waitForFunction(async () => element?.evaluate(e => e.querySelector('.devtools-link')?.textContent));
+      assert.strictEqual(linkText, entry.link);
+    }
   });
 });

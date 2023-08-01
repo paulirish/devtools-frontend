@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
@@ -155,7 +154,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     const list = element.createChild('div', 'tabbed-pane-placeholder');
     list.addEventListener('keydown', this.placeholderOnKeyDown.bind(this), false);
     UI.ARIAUtils.markAsList(list);
-    UI.ARIAUtils.setAccessibleName(list, i18nString(UIStrings.sourceViewActions));
+    UI.ARIAUtils.setLabel(list, i18nString(UIStrings.sourceViewActions));
 
     for (let i = 0; i < shortcuts.length; i++) {
       const shortcut = shortcuts[i];
@@ -255,13 +254,13 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     }
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([sourcesViewStyles]);
     UI.Context.Context.instance().setFlavor(SourcesView, this);
   }
 
-  willHide(): void {
+  override willHide(): void {
     UI.Context.Context.instance().setFlavor(SourcesView, null);
     super.willHide();
   }
@@ -389,8 +388,6 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
         Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HEADER_OVERRIDES)) {
       sourceView = new Components.HeadersView.HeadersView(uiSourceCode);
     } else {
-      const mediaType = Common.ResourceType.ResourceType.mimeFromURL(uiSourceCode.url());
-      Host.userMetrics.sourcesPanelFileOpened(mediaType);
       sourceFrame = new UISourceCodeFrame(uiSourceCode);
     }
 
@@ -622,18 +619,20 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   save(): void {
-    this.saveSourceView(this.visibleView());
+    this.saveSourceFrame(this.currentSourceFrame());
   }
 
   saveAll(): void {
     const sourceFrames = this.editorContainer.fileViews();
-    sourceFrames.forEach(this.saveSourceView.bind(this));
+    sourceFrames.forEach(this.saveSourceFrame.bind(this));
   }
 
-  private saveSourceView(sourceView: UI.Widget.Widget|null): void {
-    if (sourceView instanceof UISourceCodeFrame || sourceView instanceof Components.HeadersView.HeadersView) {
-      sourceView.commitEditing();
+  private saveSourceFrame(sourceFrame: UI.Widget.Widget|null): void {
+    if (!(sourceFrame instanceof UISourceCodeFrame)) {
+      return;
     }
+    const uiSourceCodeFrame = (sourceFrame as UISourceCodeFrame);
+    uiSourceCodeFrame.commitEditing();
   }
 
   toggleBreakpointsActiveState(active: boolean): void {

@@ -35,7 +35,7 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type * as SDK from '../../../../core/sdk/sdk.js';
+import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import type * as Protocol from '../../../../generated/protocol.js';
 import * as UI from '../../legacy.js';
@@ -53,9 +53,13 @@ const UIStrings = {
    */
   addToIgnore: 'Add script to ignore list',
   /**
-   * @description A context menu item to show more frames when they are available. Never 0.
+   * @description A link to show more frames when they are available. Never 0.
    */
   showSMoreFrames: '{n, plural, =1 {Show # more frame} other {Show # more frames}}',
+  /**
+   * @description A link to rehide frames that are by default hidden.
+   */
+  showLess: 'Show less',
   /**
    *@description Text indicating that source url of a link is currently unknown
    */
@@ -113,11 +117,15 @@ export function buildStackTraceRows(
       stackTraceRows.push(asyncRow);
     }
     let hiddenCallFrames = 0;
+    let previousStackFrameWasBreakpointCondition = false;
     for (const stackFrame of stackTrace.callFrames) {
       let ignoreListHide = false;
       const functionName = UI.UIUtils.beautifyFunctionName(stackFrame.functionName);
-      const link =
-          linkifier.maybeLinkifyConsoleCallFrame(target, stackFrame, {tabStop: Boolean(tabStops), inlineFrameIndex: 0});
+      const link = linkifier.maybeLinkifyConsoleCallFrame(target, stackFrame, {
+        tabStop: Boolean(tabStops),
+        inlineFrameIndex: 0,
+        revealBreakpoint: previousStackFrameWasBreakpointCondition,
+      });
       if (link) {
         link.addEventListener('contextmenu', populateContextMenu.bind(null, link));
         // TODO(crbug.com/1183325): fix race condition with uiLocation still being null here
@@ -138,6 +146,10 @@ export function buildStackTraceRows(
         ++hiddenCallFrames;
       }
       stackTraceRows.push({functionName, link, ignoreListHide});
+      previousStackFrameWasBreakpointCondition = [
+        SDK.DebuggerModel.COND_BREAKPOINT_SOURCE_URL,
+        SDK.DebuggerModel.LOGPOINT_SOURCE_URL,
+      ].includes(stackFrame.url);
     }
     if (asyncRow && hiddenCallFrames > 0 && hiddenCallFrames === stackTrace.callFrames.length) {
       asyncRow.ignoreListHide = true;
@@ -258,6 +270,19 @@ function renderStackTraceTable(
     showAllLink.textContent = i18nString(UIStrings.showSMoreFrames, {n: hiddenCallFramesCount});
     showAllLink.addEventListener('click', () => {
       container.classList.add('show-hidden-rows');
+      // If we are in a popup, this will trigger a re-layout
+      UI.GlassPane.GlassPane.containerMoved(container);
+    }, false);
+    const showLessRow = container.createChild('tr', 'show-less-link');
+    showLessRow.createChild('td').textContent = '\n';
+    const showLesscell = showLessRow.createChild('td') as HTMLTableCellElement;
+    showLesscell.colSpan = 4;
+    const showLessLink = showLesscell.createChild('span', 'link');
+    showLessLink.textContent = i18nString(UIStrings.showLess);
+    showLessLink.addEventListener('click', () => {
+      container.classList.remove('show-hidden-rows');
+      // If we are in a popup, this will trigger a re-layout
+      UI.GlassPane.GlassPane.containerMoved(container);
     }, false);
   }
   return links;

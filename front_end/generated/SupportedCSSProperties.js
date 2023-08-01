@@ -5,6 +5,13 @@
 export const generatedProperties = [
  {
   "longhands": [
+   "animation-delay-start",
+   "animation-delay-end"
+  ],
+  "name": "-alternative-animation-delay"
+ },
+ {
+  "longhands": [
    "animation-duration",
    "animation-timing-function",
    "animation-delay-start",
@@ -14,16 +21,35 @@ export const generatedProperties = [
    "animation-fill-mode",
    "animation-play-state",
    "animation-name",
-   "animation-timeline"
+   "animation-timeline",
+   "animation-range-start",
+   "animation-range-end"
   ],
-  "name": "-alternative-animation"
+  "name": "-alternative-animation-with-delay-start-end"
  },
  {
   "longhands": [
-   "animation-delay-start",
-   "animation-delay-end"
+   "animation-duration",
+   "animation-timing-function",
+   "animation-delay",
+   "animation-iteration-count",
+   "animation-direction",
+   "animation-fill-mode",
+   "animation-play-state",
+   "animation-name",
+   "animation-timeline",
+   "animation-range-start",
+   "animation-range-end"
   ],
-  "name": "-alternative-animation-delay"
+  "name": "-alternative-animation-with-timeline"
+ },
+ {
+  "inherited": true,
+  "longhands": [
+   "white-space-collapse",
+   "text-wrap"
+  ],
+  "name": "-alternative-white-space"
  },
  {
   "inherited": true,
@@ -107,10 +133,6 @@ export const generatedProperties = [
  {
   "inherited": true,
   "name": "-webkit-font-smoothing"
- },
- {
-  "inherited": true,
-  "name": "-webkit-highlight"
  },
  {
   "inherited": true,
@@ -367,12 +389,6 @@ export const generatedProperties = [
    "none"
   ],
   "name": "anchor-name"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "anchor-scroll"
  },
  {
   "longhands": [
@@ -1348,7 +1364,8 @@ export const generatedProperties = [
   "keywords": [
    "normal",
    "inline-size",
-   "size"
+   "size",
+   "sticky"
   ],
   "name": "container-type"
  },
@@ -1470,7 +1487,9 @@ export const generatedProperties = [
    "inline-grid",
    "contents",
    "flow-root",
-   "none"
+   "none",
+   "flow",
+   "math"
   ],
   "name": "display"
  },
@@ -1499,9 +1518,6 @@ export const generatedProperties = [
    "hide"
   ],
   "name": "empty-cells"
- },
- {
-  "name": "end"
  },
  {
   "name": "fallback"
@@ -1678,7 +1694,11 @@ export const generatedProperties = [
  {
   "inherited": true,
   "keywords": [
-   "none"
+   "none",
+   "ex-height",
+   "cap-height",
+   "ch-width",
+   "ic-width"
   ],
   "name": "font-size-adjust"
  },
@@ -2417,7 +2437,8 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "auto"
+   "auto",
+   "normal"
   ],
   "name": "offset-position"
  },
@@ -2545,6 +2566,13 @@ export const generatedProperties = [
    "clip"
   ],
   "name": "overflow-y"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "overlay"
  },
  {
   "name": "override-colors"
@@ -2713,6 +2741,12 @@ export const generatedProperties = [
   "name": "pointer-events"
  },
  {
+  "name": "popover-hide-delay"
+ },
+ {
+  "name": "popover-show-delay"
+ },
+ {
   "keywords": [
    "static",
    "relative",
@@ -2727,6 +2761,12 @@ export const generatedProperties = [
    "none"
   ],
   "name": "position-fallback"
+ },
+ {
+  "keywords": [
+   "normal"
+  ],
+  "name": "position-fallback-bounds"
  },
  {
   "name": "prefix"
@@ -2949,6 +2989,80 @@ export const generatedProperties = [
  },
  {
   "longhands": [
+   "scroll-start-block",
+   "scroll-start-inline"
+  ],
+  "name": "scroll-start"
+ },
+ {
+  "keywords": [
+   "auto",
+   "start",
+   "end",
+   "center",
+   "top",
+   "bottom",
+   "left",
+   "right"
+  ],
+  "name": "scroll-start-block"
+ },
+ {
+  "keywords": [
+   "auto",
+   "start",
+   "end",
+   "center",
+   "top",
+   "bottom",
+   "left",
+   "right"
+  ],
+  "name": "scroll-start-inline"
+ },
+ {
+  "longhands": [
+   "scroll-start-target-block",
+   "scroll-start-target-inline"
+  ],
+  "name": "scroll-start-target"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "scroll-start-target-block"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "scroll-start-target-inline"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "scroll-start-target-x"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "scroll-start-target-y"
+ },
+ {
+  "name": "scroll-start-x"
+ },
+ {
+  "name": "scroll-start-y"
+ },
+ {
+  "longhands": [
    "scroll-timeline-name",
    "scroll-timeline-axis"
   ],
@@ -2959,6 +3073,13 @@ export const generatedProperties = [
  },
  {
   "name": "scroll-timeline-name"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "auto"
+  ],
+  "name": "scrollbar-color"
  },
  {
   "inherited": false,
@@ -3010,9 +3131,6 @@ export const generatedProperties = [
   "name": "size-adjust"
  },
  {
-  "name": "source"
- },
- {
   "inherited": true,
   "keywords": [
    "none",
@@ -3029,9 +3147,6 @@ export const generatedProperties = [
  },
  {
   "name": "src"
- },
- {
-  "name": "start"
  },
  {
   "keywords": [
@@ -3146,6 +3261,15 @@ export const generatedProperties = [
    "end"
   ],
   "name": "text-anchor"
+ },
+ {
+  "keywords": [
+   "none",
+   "start",
+   "end",
+   "both"
+  ],
+  "name": "text-box-trim"
  },
  {
   "inherited": true,
@@ -3306,6 +3430,19 @@ export const generatedProperties = [
   "name": "text-underline-position"
  },
  {
+  "inherited": true,
+  "keywords": [
+   "wrap",
+   "nowrap",
+   "balance",
+   "pretty"
+  ],
+  "name": "text-wrap"
+ },
+ {
+  "name": "timeline-scope"
+ },
+ {
   "longhands": [
    "toggle-root",
    "toggle-trigger"
@@ -3344,13 +3481,6 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "none",
-   "browser"
-  ],
-  "name": "top-layer"
- },
- {
-  "keywords": [
    "auto",
    "none",
    "pan-x",
@@ -3372,7 +3502,10 @@ export const generatedProperties = [
  },
  {
   "keywords": [
+   "content-box",
+   "border-box",
    "fill-box",
+   "stroke-box",
    "view-box"
   ],
   "name": "transform-box"
@@ -3395,6 +3528,9 @@ export const generatedProperties = [
    "transition-delay"
   ],
   "name": "transition"
+ },
+ {
+  "name": "transition-animation-type"
  },
  {
   "name": "transition-delay"
@@ -3509,10 +3645,19 @@ export const generatedProperties = [
    "pre-wrap",
    "pre-line",
    "nowrap",
-   "-webkit-nowrap",
    "break-spaces"
   ],
   "name": "white-space"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "collapse",
+   "preserve",
+   "preserve-breaks",
+   "break-spaces"
+  ],
+  "name": "white-space-collapse"
  },
  {
   "inherited": true,
@@ -3689,11 +3834,6 @@ export const generatedPropertyValues = {
   ]
  },
  "anchor-name": {
-  "values": [
-   "none"
-  ]
- },
- "anchor-scroll": {
   "values": [
    "none"
   ]
@@ -4202,7 +4342,8 @@ export const generatedPropertyValues = {
   "values": [
    "normal",
    "inline-size",
-   "size"
+   "size",
+   "sticky"
   ]
  },
  "content-visibility": {
@@ -4302,7 +4443,9 @@ export const generatedPropertyValues = {
    "inline-grid",
    "contents",
    "flow-root",
-   "none"
+   "none",
+   "flow",
+   "math"
   ]
  },
  "dominant-baseline": {
@@ -4418,7 +4561,11 @@ export const generatedPropertyValues = {
  },
  "font-size-adjust": {
   "values": [
-   "none"
+   "none",
+   "ex-height",
+   "cap-height",
+   "ch-width",
+   "ic-width"
   ]
  },
  "font-stretch": {
@@ -4836,7 +4983,8 @@ export const generatedPropertyValues = {
  },
  "offset-position": {
   "values": [
-   "auto"
+   "auto",
+   "normal"
   ]
  },
  "offset-rotate": {
@@ -4918,6 +5066,12 @@ export const generatedPropertyValues = {
    "clip"
   ]
  },
+ "overlay": {
+  "values": [
+   "none",
+   "auto"
+  ]
+ },
  "overscroll-behavior-x": {
   "values": [
    "auto",
@@ -4977,6 +5131,11 @@ export const generatedPropertyValues = {
  "position-fallback": {
   "values": [
    "none"
+  ]
+ },
+ "position-fallback-bounds": {
+  "values": [
+   "normal"
   ]
  },
  "quotes": {
@@ -5087,6 +5246,59 @@ export const generatedPropertyValues = {
    "proximity"
   ]
  },
+ "scroll-start-block": {
+  "values": [
+   "auto",
+   "start",
+   "end",
+   "center",
+   "top",
+   "bottom",
+   "left",
+   "right"
+  ]
+ },
+ "scroll-start-inline": {
+  "values": [
+   "auto",
+   "start",
+   "end",
+   "center",
+   "top",
+   "bottom",
+   "left",
+   "right"
+  ]
+ },
+ "scroll-start-target-block": {
+  "values": [
+   "none",
+   "auto"
+  ]
+ },
+ "scroll-start-target-inline": {
+  "values": [
+   "none",
+   "auto"
+  ]
+ },
+ "scroll-start-target-x": {
+  "values": [
+   "none",
+   "auto"
+  ]
+ },
+ "scroll-start-target-y": {
+  "values": [
+   "none",
+   "auto"
+  ]
+ },
+ "scrollbar-color": {
+  "values": [
+   "auto"
+  ]
+ },
  "scrollbar-gutter": {
   "values": [
    "auto",
@@ -5188,6 +5400,14 @@ export const generatedPropertyValues = {
    "start",
    "middle",
    "end"
+  ]
+ },
+ "text-box-trim": {
+  "values": [
+   "none",
+   "start",
+   "end",
+   "both"
   ]
  },
  "text-combine-upright": {
@@ -5293,6 +5513,14 @@ export const generatedPropertyValues = {
    "right"
   ]
  },
+ "text-wrap": {
+  "values": [
+   "wrap",
+   "nowrap",
+   "balance",
+   "pretty"
+  ]
+ },
  "toggle-group": {
   "values": [
    "none"
@@ -5318,12 +5546,6 @@ export const generatedPropertyValues = {
    "auto"
   ]
  },
- "top-layer": {
-  "values": [
-   "none",
-   "browser"
-  ]
- },
  "touch-action": {
   "values": [
    "auto",
@@ -5345,7 +5567,10 @@ export const generatedPropertyValues = {
  },
  "transform-box": {
   "values": [
+   "content-box",
+   "border-box",
    "fill-box",
+   "stroke-box",
    "view-box"
   ]
  },
@@ -5429,7 +5654,14 @@ export const generatedPropertyValues = {
    "pre-wrap",
    "pre-line",
    "nowrap",
-   "-webkit-nowrap",
+   "break-spaces"
+  ]
+ },
+ "white-space-collapse": {
+  "values": [
+   "collapse",
+   "preserve",
+   "preserve-breaks",
    "break-spaces"
   ]
  },
@@ -5522,12 +5754,16 @@ export const generatedAliasesFor = new Map([
   "align-self"
  ],
  [
-  "-webkit-alternative-animation",
-  "-alternative-animation"
- ],
- [
   "-webkit-alternative-animation-delay",
   "-alternative-animation-delay"
+ ],
+ [
+  "-webkit-alternative-animation-with-delay-start-end",
+  "-alternative-animation-with-delay-start-end"
+ ],
+ [
+  "-webkit-alternative-animation-with-timeline",
+  "-alternative-animation-with-timeline"
  ],
  [
   "-webkit-animation",

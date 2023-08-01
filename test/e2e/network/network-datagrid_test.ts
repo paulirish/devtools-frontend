@@ -7,6 +7,7 @@ import {type BrowserAndPages} from '../../conductor/puppeteer-state.js';
 
 import {
   click,
+  disableExperiment,
   getBrowserAndPages,
   pressKey,
   step,
@@ -24,6 +25,7 @@ import {
   waitForSelectedRequestChange,
   waitForSomeRequestsToAppear,
 } from '../helpers/network-helpers.js';
+import {unregisterAllServiceWorkers} from '../../conductor/hooks.js';
 
 async function getRequestRowInfo(frontend: BrowserAndPages['frontend'], name: string) {
   const statusColumn = await frontend.evaluate(() => {
@@ -52,18 +54,25 @@ describe('The Network Tab', async function() {
   };
 
   beforeEach(async () => {
+    // Automatic pretty printing doesn't play well with the assertions.
+    await disableExperiment('sourcesPrettyPrint');
+
     await navigateToNetworkTab('empty.html');
     await setCacheDisabled(true);
     await setPersistLog(false);
+  });
+
+  afterEach(async () => {
+    await unregisterAllServiceWorkers();
   });
 
   it('can click on checkbox label to toggle checkbox', async () => {
     await navigateToNetworkTab('resources-from-cache.html');
 
     // Click the label next to the checkbox input element
-    await click('[aria-label="Disable cache"] + label');
+    await click('[title^="Disable cache"] + label');
 
-    const checkbox = await waitFor('[aria-label="Disable cache"]');
+    const checkbox = await waitFor('[title^="Disable cache"]');
     const checked = await checkbox.evaluate(box => (box as HTMLInputElement).checked);
 
     assert.strictEqual(checked, false, 'The disable cache checkbox should be unchecked');
@@ -351,7 +360,7 @@ describe('The Network Tab', async function() {
     const getNetworkRequestIcons = () => frontend.evaluate(() => {
       return Array.from(document.querySelectorAll('.name-column > .icon'))
           .slice(1, 4)
-          .map(node => (node as HTMLImageElement).alt);
+          .map(node => (node as HTMLDivElement).title);
     });
     assert.sameMembers(await getNetworkRequestIcons(), [
       'Script',
@@ -359,7 +368,7 @@ describe('The Network Tab', async function() {
     ]);
     const getFromWebBundleIcons = () => frontend.evaluate(() => {
       return Array.from(document.querySelectorAll('.name-column > [role="link"] > .icon'))
-          .map(node => (node as HTMLImageElement).alt);
+          .map(node => (node as HTMLDivElement).title);
     });
     assert.sameMembers(await getFromWebBundleIcons(), [
       'Served from Web Bundle',

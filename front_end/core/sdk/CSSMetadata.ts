@@ -324,7 +324,7 @@ export class CSSMetadata {
   }
 }
 
-export const VariableRegex = /(var\(\s*--.*?\))/g;
+export const VariableRegex = /(var\(\s*--.*?\))/gs;
 export const CustomVariableRegex = /(var\(*--[\w\d]+-([\w]+-[\w]+)\))/g;
 export const URLRegex = /url\(\s*('.+?'|".+?"|[^)]+)\s*\)/g;
 
@@ -469,6 +469,7 @@ const colorAwareProperties = new Set<string>([
   'list-style-image',
   'outline',
   'outline-color',
+  'scrollbar-color',
   'stop-color',
   'stroke',
   'text-decoration-color',

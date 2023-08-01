@@ -20,16 +20,16 @@ const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/inline_editor/Lin
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const {render, html, Directives} = LitHtml;
 
-interface LinkSwatchRenderData {
+interface BaseLinkSwatchRenderData {
   text: string;
   title: string;
+  showTitle: boolean;
   isDefined: boolean;
   onLinkActivate: (linkText: string) => void;
 }
 
-/* eslint-disable-next-line rulesdir/check_component_naming */
-class LinkSwatch extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-link-swatch`;
+class BaseLinkSwatch extends HTMLElement {
+  static readonly litTagName = LitHtml.literal`devtools-base-link-swatch`;
   protected readonly shadow = this.attachShadow({mode: 'open'});
   protected onLinkActivate: (linkText: string, event: MouseEvent|KeyboardEvent) => void = () => undefined;
 
@@ -37,7 +37,7 @@ class LinkSwatch extends HTMLElement {
     this.shadow.adoptedStyleSheets = [linkSwatchStyles];
   }
 
-  set data(data: LinkSwatchRenderData) {
+  set data(data: BaseLinkSwatchRenderData) {
     this.onLinkActivate = (linkText: string, event: MouseEvent|KeyboardEvent): void => {
       if (event instanceof MouseEvent && event.button !== 0) {
         return;
@@ -50,10 +50,11 @@ class LinkSwatch extends HTMLElement {
       data.onLinkActivate(linkText);
       event.consume(true);
     };
+    data.showTitle = data.showTitle === undefined ? true : data.showTitle;
     this.render(data);
   }
 
-  private render(data: LinkSwatchRenderData): void {
+  private render(data: BaseLinkSwatchRenderData): void {
     const {isDefined, text, title} = data;
     const classes = Directives.classMap({
       'link-swatch-link': true,
@@ -62,8 +63,11 @@ class LinkSwatch extends HTMLElement {
     // The linkText's space must be removed, otherwise it cannot be triggered when clicked.
     const onActivate = isDefined ? this.onLinkActivate.bind(this, text.trim()) : null;
 
+    // We added var popover, so don't need the title attribute when no need for showing title and
+    // only provide the data-title for the popover to get the data.
     render(
-        html`<span class=${classes} title=${title} @mousedown=${onActivate} @keydown=${
+        html`<span class=${classes} title=${LitHtml.Directives.ifDefined(data.showTitle ? title : null)} data-title=${
+            LitHtml.Directives.ifDefined(!data.showTitle ? title : null)} @mousedown=${onActivate} @keydown=${
             onActivate} role="link" tabindex="-1">${text}</span>`,
         this.shadow, {host: this});
   }
@@ -111,7 +115,7 @@ export class CSSVarSwatch extends HTMLElement {
     // When the value of CSS var() is greater than two spaces, only one is
     // always displayed, and the actual number of spaces is displayed when
     // editing is clicked.
-    const result = text.replace(/\s{2,}/g, ' ').match(VARIABLE_FUNCTION_REGEX);
+    const result = text.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').match(VARIABLE_FUNCTION_REGEX);
     if (!result) {
       return null;
     }
@@ -121,7 +125,7 @@ export class CSSVarSwatch extends HTMLElement {
       pre: result[1],
 
       // Returns the CSS variable name, e.g. `--foo`
-      variableName: result[2],
+      variableName: result[2].trim(),
 
       // Returns the fallback value in the CSS variable, including a comma if
       // one is present, e.g. `,50px`
@@ -153,50 +157,51 @@ export class CSSVarSwatch extends HTMLElement {
     const fallbackIncludeComma = functionParts.fallbackIncludeComma ? functionParts.fallbackIncludeComma : '';
 
     render(
-        html`<span title=${data.computedValue || ''}>${functionParts.pre}<${LinkSwatch.litTagName} .data=${
-            {title, text: functionParts.variableName, isDefined, onLinkActivate} as
-            LinkSwatchRenderData}></${LinkSwatch.litTagName}>${fallbackIncludeComma}${functionParts.post}</span>`,
+        html`<span data-title=${data.computedValue || ''}>${functionParts.pre}<${BaseLinkSwatch.litTagName} .data=${
+            {title, showTitle: false, text: functionParts.variableName, isDefined, onLinkActivate} as
+            LinkSwatchRenderData} class="css-var-link"></${BaseLinkSwatch.litTagName}>${fallbackIncludeComma}${
+            functionParts.post}</span>`,
         this.shadow, {host: this});
   }
 }
 
-interface AnimationNameSwatchRenderData {
+interface LinkSwatchRenderData {
   isDefined: boolean;
   text: string;
   onLinkActivate: (linkText: string) => void;
 }
 
-export class AnimationNameSwatch extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-animation-name-swatch`;
+export class LinkSwatch extends HTMLElement {
+  static readonly litTagName = LitHtml.literal`devtools-link-swatch`;
   protected readonly shadow = this.attachShadow({mode: 'open'});
 
-  set data(data: AnimationNameSwatchRenderData) {
+  set data(data: LinkSwatchRenderData) {
     this.render(data);
   }
 
-  protected render(data: AnimationNameSwatchRenderData): void {
+  protected render(data: LinkSwatchRenderData): void {
     const {text, isDefined, onLinkActivate} = data;
     const title = isDefined ? text : i18nString(UIStrings.sIsNotDefined, {PH1: text});
     render(
-        html`<span title=${data.text}><${LinkSwatch.litTagName} .data=${{
+        html`<span title=${data.text}><${BaseLinkSwatch.litTagName} .data=${{
           text,
           isDefined,
           title,
           onLinkActivate,
-        } as LinkSwatchRenderData}></${LinkSwatch.litTagName}></span>`,
+        } as LinkSwatchRenderData}></${BaseLinkSwatch.litTagName}></span>`,
         this.shadow, {host: this});
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-animation-name-swatch', AnimationNameSwatch);
-ComponentHelpers.CustomElements.defineComponent('devtools-css-var-swatch', CSSVarSwatch);
+ComponentHelpers.CustomElements.defineComponent('devtools-base-link-swatch', BaseLinkSwatch);
 ComponentHelpers.CustomElements.defineComponent('devtools-link-swatch', LinkSwatch);
+ComponentHelpers.CustomElements.defineComponent('devtools-css-var-swatch', CSSVarSwatch);
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
+    'devtools-base-link-swatch': BaseLinkSwatch;
     'devtools-link-swatch': LinkSwatch;
-    'devtools-animation-name-swatch': AnimationNameSwatch;
     'devtools-css-var-swatch': CSSVarSwatch;
   }
 }

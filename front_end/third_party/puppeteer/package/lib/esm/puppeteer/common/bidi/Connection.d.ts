@@ -13,24 +13,120 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import { ConnectionTransport } from '../ConnectionTransport.js';
 import { EventEmitter } from '../EventEmitter.js';
-interface CommandResponse {
-    id: number;
-    result: object;
+import { BrowsingContext } from './BrowsingContext.js';
+interface Capability {
+    acceptInsecureCerts?: boolean;
+    browserName?: string;
+    browserVersion?: string;
+}
+/**
+ * @internal
+ */
+interface Commands {
+    'script.evaluate': {
+        params: Bidi.Script.EvaluateParameters;
+        returnType: Bidi.Script.EvaluateResult;
+    };
+    'script.callFunction': {
+        params: Bidi.Script.CallFunctionParameters;
+        returnType: Bidi.Script.CallFunctionResult;
+    };
+    'script.disown': {
+        params: Bidi.Script.DisownParameters;
+        returnType: Bidi.Script.DisownResult;
+    };
+    'script.addPreloadScript': {
+        params: Bidi.Script.AddPreloadScriptParameters;
+        returnType: Bidi.Script.AddPreloadScriptResult;
+    };
+    'browsingContext.create': {
+        params: Bidi.BrowsingContext.CreateParameters;
+        returnType: Bidi.BrowsingContext.CreateResult;
+    };
+    'browsingContext.close': {
+        params: Bidi.BrowsingContext.CloseParameters;
+        returnType: Bidi.Message.EmptyResult;
+    };
+    'browsingContext.getTree': {
+        params: Bidi.BrowsingContext.GetTreeParameters;
+        returnType: Bidi.BrowsingContext.GetTreeResult;
+    };
+    'browsingContext.navigate': {
+        params: Bidi.BrowsingContext.NavigateParameters;
+        returnType: Bidi.BrowsingContext.NavigateResult;
+    };
+    'browsingContext.reload': {
+        params: Bidi.BrowsingContext.ReloadParameters;
+        returnType: Bidi.Message.EmptyResult;
+    };
+    'browsingContext.print': {
+        params: Bidi.BrowsingContext.PrintParameters;
+        returnType: Bidi.BrowsingContext.PrintResult;
+    };
+    'browsingContext.captureScreenshot': {
+        params: Bidi.BrowsingContext.CaptureScreenshotParameters;
+        returnType: Bidi.BrowsingContext.CaptureScreenshotResult;
+    };
+    'input.performActions': {
+        params: Bidi.Input.PerformActionsParameters;
+        returnType: Bidi.Message.EmptyResult;
+    };
+    'input.releaseActions': {
+        params: Bidi.Input.ReleaseActionsParameters;
+        returnType: Bidi.Message.EmptyResult;
+    };
+    'session.new': {
+        params: {
+            capabilities?: {
+                alwaysMatch?: Capability;
+            };
+        };
+        returnType: {
+            result: {
+                sessionId: string;
+                capabilities: Capability;
+            };
+        };
+    };
+    'session.status': {
+        params: object;
+        returnType: Bidi.Session.StatusResult;
+    };
+    'session.subscribe': {
+        params: Bidi.Session.SubscriptionRequest;
+        returnType: Bidi.Message.EmptyResult;
+    };
+    'session.unsubscribe': {
+        params: Bidi.Session.SubscriptionRequest;
+        returnType: Bidi.Message.EmptyResult;
+    };
+    'cdp.sendCommand': {
+        params: Bidi.Cdp.SendCommandParams;
+        returnType: Bidi.Cdp.SendCommandResult;
+    };
+    'cdp.getSession': {
+        params: Bidi.Cdp.GetSessionParams;
+        returnType: Bidi.Cdp.GetSessionResult;
+    };
 }
 /**
  * @internal
  */
 export declare class Connection extends EventEmitter {
     #private;
-    constructor(transport: ConnectionTransport, delay?: number);
+    constructor(url: string, transport: ConnectionTransport, delay?: number, timeout?: number);
     get closed(): boolean;
-    send(method: string, params: object): Promise<CommandResponse['result']>;
+    get url(): string;
+    send<T extends keyof Commands>(method: T, params: Commands[T]['params']): Promise<Commands[T]['returnType']>;
     /**
      * @internal
      */
     protected onMessage(message: string): Promise<void>;
+    registerBrowsingContexts(context: BrowsingContext): void;
+    unregisterBrowsingContexts(id: string): void;
     dispose(): void;
 }
 export {};

@@ -4,12 +4,14 @@
 
 import type * as ComponentsModule from '../../../../../../../front_end/ui/legacy/components/utils/utils.js';
 import type * as BindingsModule from '../../../../../../../front_end/models/bindings/bindings.js';
+import type * as BreakpointsModule from '../../../../../../../front_end/models/breakpoints/breakpoints.js';
 import * as Platform from '../../../../../../../front_end/core/platform/platform.js';
 import type * as SDKModule from '../../../../../../../front_end/core/sdk/sdk.js';
 import type * as WorkspaceModule from '../../../../../../../front_end/models/workspace/workspace.js';
 import type * as Protocol from '../../../../../../../front_end/generated/protocol.js';
+import * as UI from '../../../../../../../front_end/ui/legacy/legacy.js';
 
-import {createTarget} from '../../../../helpers/EnvironmentHelpers.js';
+import {createTarget, describeWithEnvironment} from '../../../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection, dispatchEvent} from '../../../../helpers/MockConnection.js';
 import {assertNotNullOrUndefined} from '../../../../../../../front_end/core/platform/platform.js';
 import {MockProtocolBackend} from '../../../../helpers/MockScopeChain.js';
@@ -31,12 +33,14 @@ describeWithMockConnection('Linkifier', async () => {
   let SDK: typeof SDKModule;
   let Components: typeof ComponentsModule;
   let Bindings: typeof BindingsModule;
+  let Breakpoints: typeof BreakpointsModule;
   let Workspace: typeof WorkspaceModule;
 
   before(async () => {
     SDK = await import('../../../../../../../front_end/core/sdk/sdk.js');
     Components = await import('../../../../../../../front_end/ui/legacy/components/utils/utils.js');
     Bindings = await import('../../../../../../../front_end/models/bindings/bindings.js');
+    Breakpoints = await import('../../../../../../../front_end/models/breakpoints/breakpoints.js');
     Workspace = await import('../../../../../../../front_end/models/workspace/workspace.js');
   });
 
@@ -54,7 +58,7 @@ describeWithMockConnection('Linkifier', async () => {
       targetManager,
     });
     Bindings.IgnoreListManager.IgnoreListManager.instance({forceNew, debuggerWorkspaceBinding});
-    Bindings.BreakpointManager.BreakpointManager.instance(
+    Breakpoints.BreakpointManager.BreakpointManager.instance(
         {forceNew, targetManager, workspace, debuggerWorkspaceBinding});
     const backend = new MockProtocolBackend();
     return {target, linkifier, backend};
@@ -294,7 +298,7 @@ describeWithMockConnection('Linkifier', async () => {
     it('uses the BreakLocation as a revealable if the option is provided and a breakpoint is at the given location',
        async () => {
          const {target, linkifier, backend} = setUpEnvironment();
-         const breakpointManager = Bindings.BreakpointManager.BreakpointManager.instance();
+         const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance();
          const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
          const lineNumber = 1;
          const columnNumber = 0;
@@ -316,8 +320,9 @@ describeWithMockConnection('Linkifier', async () => {
            ],
          });
          const breakpoint = await breakpointManager.setBreakpoint(
-             uiSourceCode, lineNumber, columnNumber, 'x' as BindingsModule.BreakpointManager.UserCondition,
-             /* enabled */ true, /* isLogpoint */ true, Bindings.BreakpointManager.BreakpointOrigin.USER_ACTION);
+             uiSourceCode, lineNumber, columnNumber, 'x' as BreakpointsModule.BreakpointManager.UserCondition,
+             /* enabled */ true, /* isLogpoint */ true, Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION);
+         assertNotNullOrUndefined(breakpoint);
 
          // Create a link that matches exactly the breakpoint location.
          const anchor = linkifier.maybeLinkifyScriptLocation(
@@ -333,5 +338,35 @@ describeWithMockConnection('Linkifier', async () => {
          assertNotNullOrUndefined(linkInfo);
          assert.propertyVal(linkInfo.revealable, 'breakpoint', breakpoint);
        });
+  });
+});
+
+describeWithEnvironment('ContentProviderContextMenuProvider', async () => {
+  let Components: typeof ComponentsModule;
+
+  before(async () => {
+    Components = await import('../../../../../../../front_end/ui/legacy/components/utils/utils.js');
+  });
+
+  it('does not add \'Open in new tab\'-entry for file URLs', async () => {
+    const provider = Components.Linkifier.ContentProviderContextMenuProvider.instance();
+
+    let contextMenu = new UI.ContextMenu.ContextMenu({} as Event);
+    let uiSourceCode = {
+      contentURL: () => 'https://www.example.com/index.html',
+    } as WorkspaceModule.UISourceCode.UISourceCode;
+    provider.appendApplicableItems({} as Event, contextMenu, uiSourceCode);
+    let openInNewTabItem = contextMenu.revealSection().items.find(
+        (item: UI.ContextMenu.Item) => item.buildDescriptor().label === 'Open in new tab');
+    assertNotNullOrUndefined(openInNewTabItem);
+
+    contextMenu = new UI.ContextMenu.ContextMenu({} as Event);
+    uiSourceCode = {
+      contentURL: () => 'file://usr/local/example/index.html',
+    } as WorkspaceModule.UISourceCode.UISourceCode;
+    provider.appendApplicableItems({} as Event, contextMenu, uiSourceCode);
+    openInNewTabItem = contextMenu.revealSection().items.find(
+        (item: UI.ContextMenu.Item) => item.buildDescriptor().label === 'Open in new tab');
+    assert.isUndefined(openInNewTabItem);
   });
 });

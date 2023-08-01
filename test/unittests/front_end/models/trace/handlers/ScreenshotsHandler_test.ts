@@ -4,10 +4,10 @@
 
 const {assert} = chai;
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
-import {loadEventsFromTraceFile, defaultTraceEvent, setTraceModelTimeout} from '../../../helpers/TraceHelpers.js';
+import {defaultTraceEvent} from '../../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 describe('ScreenshotHandler', function() {
-  setTraceModelTimeout(this);
   const baseEvent = {
     ...defaultTraceEvent,
     name: 'Screenshot',
@@ -18,13 +18,13 @@ describe('ScreenshotHandler', function() {
     ts: TraceModel.Types.Timing.MicroSeconds(0),
     args: {},
     cat: 'test',
-    ph: TraceModel.Types.TraceEvents.TraceEventPhase.OBJECT_SNAPSHOT,
+    ph: TraceModel.Types.TraceEvents.Phase.OBJECT_SNAPSHOT,
   };
 
   let baseEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
 
   beforeEach(async () => {
-    const defaultTraceEvents = await loadEventsFromTraceFile('basic.json.gz');
+    const defaultTraceEvents = await TraceLoader.rawEvents(this, 'basic.json.gz');
 
     baseEvents = [
       ...defaultTraceEvents,

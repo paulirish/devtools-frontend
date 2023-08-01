@@ -10,7 +10,13 @@ import * as reports from 'istanbul-reports';
 import * as path from 'path';
 import * as rimraf from 'rimraf';
 
-import {collectCoverageFromPage, postFileTeardown, preFileSetup, resetPages} from './hooks.js';
+import {
+  collectCoverageFromPage,
+  postFileTeardown,
+  preFileSetup,
+  resetPages,
+  unregisterAllServiceWorkers,
+} from './hooks.js';
 import {getTestRunnerConfigSetting} from './test_runner_config.js';
 import {startServer, stopServer} from './test_server.js';
 
@@ -57,7 +63,10 @@ export function mochaGlobalTeardown() {
 }
 
 const testSuiteCoverageMap = createCoverageMap();
-const SHOULD_GATHER_COVERAGE_INFORMATION = process.env.COVERAGE === '1' && DERIVED_SERVER_TYPE === 'component-docs';
+
+const testsRunWithCoverageEnvSet = Boolean(process.env.COVERAGE || process.env.COVERAGE_FOLDERS);
+
+const SHOULD_GATHER_COVERAGE_INFORMATION = testsRunWithCoverageEnvSet && DERIVED_SERVER_TYPE === 'component-docs';
 const INTERACTIONS_COVERAGE_LOCATION = path.join(process.cwd(), 'interactions-coverage/');
 
 let didPauseAtBeginning = false;
@@ -103,6 +112,7 @@ export const mochaHooks = {
     });
     reports.create('html').execute(context);
     reports.create('json').execute(context);
+    reports.create('text', {file: 'coverage.txt'}).execute(context);
     reports.create('json-summary').execute(context);
   },
   // In both modes, run before each test.
@@ -110,6 +120,7 @@ export const mochaHooks = {
     // Sets the timeout higher for this hook only.
     this.timeout(10000);
     await resetPages();
+    await unregisterAllServiceWorkers();
 
     // Pause when running interactively in debug mode. This is mututally
     // exclusive with parallel mode.

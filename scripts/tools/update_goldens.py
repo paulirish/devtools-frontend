@@ -28,6 +28,7 @@ provided you did not perform any additional changes in the code.
 import argparse
 import json
 import os
+import re
 import tempfile
 import time
 import subprocess
@@ -38,14 +39,18 @@ class ProjectConfig:
     def __init__(self,
                  name='devtools-frontend',
                  gs_root='gs://devtools-frontend-screenshots',
-                 builder_prefix='devtools_screenshot'):
+                 builder_prefix='devtools_screenshot',
+                 platforms=None,
+                 ignore_failed_builders=False):
         self.name = name
         self.gs_root = gs_root
         self.gs_folder = self.gs_root + '/screenshots'
         self.builder_prefix = builder_prefix
+        self.platforms = platforms or ['linux', 'mac', 'win']
+        platforms_re = "|".join(self.platforms)
+        self.builder_pattern = (f'{self.builder_prefix}_({platforms_re})_rel')
+        self.ignore_failed_builders = ignore_failed_builders
 
-
-PLATFORMS = ['linux', 'win', 'mac']
 
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.normpath(os.path.join(TOOLS_DIR, '..', '..'))
@@ -59,10 +64,13 @@ WARNING_BUILDERS_STILL_RUNNING = 'Patchset %s has builders that are still ' \
 WARNING_BUILDERS_FAILED = 'Patchset %s has builders that failed:\n  %s\n'
 WARNING_BUILDERS_MISSING = 'Patchset %s does not have screenshot tests for ' \
     'all platform.\nOnly these builders found:\n  %s'
-WARNING_GSUTIL_CONNECTIVITY = 'Ups! gsutil seems to not work for you right ' \
-    'now.\nThis is either a connectivity problem or a configuration issue.\n' \
-    'Try running "./third_party/depot_tools/gsutil.py config" command.\n' \
-    'When prompted for a project id, please use "v8-infra".'
+WARNING_GSUTIL_CONNECTIVITY = (
+    'Ups! gsutil seems to not work for you right '
+    'now.\nThis is either a connectivity problem or a configuration issue.\n'
+    'Make sure you are logged in with your Google account and you are included '
+    'in the devtools-dev@google.com group.\n'
+    'Try running "./third_party/depot_tools/gsutil.py config" command.\n'
+    'When prompted for a project id, please use "v8-infra".\n')
 WARNING_GIT_DIRTY = 'Before attempting to apply screenshot patches, please' \
     'make sure your local repo is clean.\nFolder %s seems to contain ' \
     'un-committed changes.' % GOLDENS_DIR
@@ -178,7 +186,8 @@ def trigger_screenshots(project_config, verbose, builders=None):
     """Trigger screenshot builders for the current patch."""
     if not builders:
         builders = [
-            f'{project_config.builder_prefix}_{p}_rel' for p in PLATFORMS
+            f'{project_config.builder_prefix}_{p}_rel'
+            for p in project_config.platforms
         ]
     try_command = f'git cl try -B {project_config.name}/try ' + ' '.join(
         [f'-b {b}' for b in builders])
@@ -213,9 +222,9 @@ def apply_patch_to_local(project_config, patchset, wait_sec, ignore_failed,
     """Download and apply the patches from the builders."""
     results = screenshot_results(project_config, patchset)
     check_not_empty(results)
-    check_all_platforms(results)
-    retry, should_wait = check_all_success(results, wait_sec, ignore_failed,
-                                           retry)
+    check_all_platforms(project_config, results)
+    retry, should_wait = check_all_success(project_config, results, wait_sec,
+                                           ignore_failed, retry)
     if retry:
         # Avoiding to force the user to run a 'trigger' command
         trigger_screenshots(project_config, retry)
@@ -247,15 +256,22 @@ def read_try_results(patchset):
         results_command.extend(['-p', patchset])
     stdout = subprocess.check_output(results_command)
     if stdout:
-        return json.loads(stdout)
+        try:
+            return json.loads(stdout)
+        except Exception as e:
+            print(f'Unable to parse try-results output. \n{str(e)}\n')
+            print('Usually this goes away if you set SKIP_GCE_AUTH_FOR_GIT=1.')
+            sys.exit(1)
     return {}
 
 
 def filter_screenshots(project_config, results):
     """Remove results comming from other builders."""
     sht_results = []
+
     for r in results:
-        if r['builder']['builder'].startswith(project_config.builder_prefix):
+        if re.fullmatch(project_config.builder_pattern,
+                        r['builder']['builder']):
             sht_results.append(r)
     return sht_results
 
@@ -304,15 +320,15 @@ def check_not_empty(results):
     sys.exit(1)
 
 
-def check_all_platforms(results):
+def check_all_platforms(project_config, results):
     """Warn if any platform was not covered."""
     patchset = list(results.values())[0]['patch']
-    if len(results) < len(PLATFORMS):
+    if len(results) < len(project_config.platforms):
         print(WARNING_BUILDERS_MISSING %
               (patchset, '\n  '.join(results.keys())))
 
 
-def check_all_success(results, wait_sec, ignore_failed, retry):
+def check_all_success(project_config, results, wait_sec, ignore_failed, retry):
     """Verify and react to the presence of in progress or failed builds.
     Returns tuple (list of failed builders, boolean whether to wait)
     The list might be used to re-trigger if --retry options is set.
@@ -324,7 +340,7 @@ def check_all_success(results, wait_sec, ignore_failed, retry):
         warn_on_exceptions(results, in_progress,
                            WARNING_BUILDERS_STILL_RUNNING)
         return builders_in_progress(wait_sec)
-    if failed:
+    if failed and not project_config.ignore_failed_builders:
         warn_on_exceptions(results, failed, WARNING_BUILDERS_FAILED)
         return builders_failed(results, failed, ignore_failed, retry)
     return ([], False)
@@ -435,4 +451,9 @@ def gsutil_cmd(*args):
 
 
 if __name__ == '__main__':
-    main(ProjectConfig(), sys.argv[1:])
+    print(
+        "Deprecation warning: this script is deprecated and will be removed.\n"
+        "Please use `update_goldens_v2.py` instead.\n"
+        "Make sure you familiarize yourself with the new script via "
+        "`update_goldens_v2.py --help.`\n"
+        "Note: removal pending deprecation in other projects.")

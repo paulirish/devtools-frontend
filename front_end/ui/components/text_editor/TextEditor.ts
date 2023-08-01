@@ -52,8 +52,8 @@ export class TextEditor extends HTMLElement {
       state: this.state,
       parent: this.#shadow,
       root: this.#shadow,
-      dispatch: (tr: CodeMirror.Transaction): void => {
-        this.editor.update([tr]);
+      dispatch: (tr: CodeMirror.Transaction, view: CodeMirror.EditorView): void => {
+        view.update([tr]);
         if (tr.reconfigured) {
           this.#ensureSettingListeners();
         }
@@ -194,7 +194,7 @@ export class TextEditor extends HTMLElement {
     }
   }
 
-  focus(): void {
+  override focus(): void {
     if (this.#activeEditor) {
       this.#activeEditor.focus();
     }
@@ -262,6 +262,8 @@ export class TextEditor extends HTMLElement {
     const targetPos = view.coordsAtPos(selection.main.head);
     if (!targetPos || targetPos.top < editorRect.top || targetPos.bottom > editorRect.bottom) {
       effects.push(CodeMirror.EditorView.scrollIntoView(selection.main, {y: 'center'}));
+    } else if (targetPos.left < editorRect.left || targetPos.right > editorRect.right) {
+      effects.push(CodeMirror.EditorView.scrollIntoView(selection.main, {x: 'center'}));
     }
 
     view.dispatch({

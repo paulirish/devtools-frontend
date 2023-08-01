@@ -149,15 +149,15 @@ export class SearchView extends UI.Widget.VBox {
     this.search.setAttribute('type', 'text');
     this.search.setAttribute('results', '0');
     this.search.setAttribute('size', '42');
-    UI.ARIAUtils.setAccessibleName(this.search, i18nString(UIStrings.searchQuery));
+    UI.ARIAUtils.setLabel(this.search, i18nString(UIStrings.searchQuery));
     const searchItem = new UI.Toolbar.ToolbarItem(searchContainer);
 
     const toolbar = new UI.Toolbar.Toolbar('search-toolbar', this.searchPanelElement);
     this.matchCaseButton = SearchView.appendToolbarToggle(toolbar, 'Aa', i18nString(UIStrings.matchCase));
     this.regexButton = SearchView.appendToolbarToggle(toolbar, '.*', i18nString(UIStrings.useRegularExpression));
     toolbar.appendToolbarItem(searchItem);
-    const refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'largeicon-refresh');
-    const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'largeicon-clear');
+    const refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'refresh');
+    const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'clear');
     toolbar.appendToolbarItem(refreshButton);
     toolbar.appendToolbarItem(clearButton);
     refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => this.onAction());
@@ -217,7 +217,7 @@ export class SearchView extends UI.Widget.VBox {
     this.searchScope = this.createScope();
   }
 
-  wasShown(): void {
+  override wasShown(): void {
     if (this.focusOnShow) {
       this.focus();
       this.focusOnShow = false;
@@ -414,12 +414,12 @@ export class SearchView extends UI.Widget.VBox {
         finished ? i18nString(UIStrings.searchFinished) : i18nString(UIStrings.searchInterrupted);
   }
 
-  focus(): void {
+  override focus(): void {
     this.search.focus();
     this.search.select();
   }
 
-  willHide(): void {
+  override willHide(): void {
     this.stopSearch();
   }
 

@@ -17,6 +17,8 @@ const rendererProcessesByFrameId = new Map<
 let mainFrameId: string = '';
 let mainFrameURL: string = '';
 
+const framesByProcessId = new Map<Types.TraceEvents.ProcessID, Map<string, Types.TraceEvents.TraceFrame>>();
+
 // We will often want to key data by the browser process, GPU process and top
 // level renderer IDs, so keep a track on those.
 let browserProcessId: Types.TraceEvents.ProcessID = Types.TraceEvents.ProcessID(-1);
@@ -52,10 +54,10 @@ const threadsInProcess =
 
 let traceStartedTime = Types.Timing.MicroSeconds(-1);
 const eventPhasesOfInterestForTraceBounds = new Set([
-  Types.TraceEvents.TraceEventPhase.BEGIN,
-  Types.TraceEvents.TraceEventPhase.END,
-  Types.TraceEvents.TraceEventPhase.COMPLETE,
-  Types.TraceEvents.TraceEventPhase.INSTANT,
+  Types.TraceEvents.Phase.BEGIN,
+  Types.TraceEvents.Phase.END,
+  Types.TraceEvents.Phase.COMPLETE,
+  Types.TraceEvents.Phase.INSTANT,
 ]);
 
 let handlerState = HandlerState.UNINITIALIZED;
@@ -71,6 +73,7 @@ export function reset(): void {
   topLevelRendererIds.clear();
   threadsInProcess.clear();
   rendererProcessesByFrameId.clear();
+  framesByProcessId.clear();
 
   traceBounds.min = Types.Timing.MicroSeconds(Number.POSITIVE_INFINITY);
   traceBounds.max = Types.Timing.MicroSeconds(Number.NEGATIVE_INFINITY);
@@ -90,6 +93,9 @@ export function initialize(): void {
 
 function updateRendererProcessByFrame(
     event: Types.TraceEvents.TraceEventData, frame: Types.TraceEvents.TraceFrame): void {
+  const framesInProcessById = Platform.MapUtilities.getWithDefault(framesByProcessId, frame.processId, () => new Map());
+  framesInProcessById.set(frame.frame, frame);
+
   const rendererProcessInFrame = Platform.MapUtilities.getWithDefault(
       rendererProcessesByFrameId, frame.frame,
       () => new Map<
@@ -170,7 +176,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
       throw new Error('No frames found in trace data');
     }
 
-    for (const frame of event.args.data.frames) {
+    for (const frame of (event.args.data.frames ?? [])) {
       updateRendererProcessByFrame(event, frame);
 
       if (frame.parent) {
@@ -245,37 +251,8 @@ export async function finalize(): Promise<void> {
     throw new Error('Handler is not initialized');
   }
 
-  // If we haven't seen a TracingStartedInBrowser event then we don't
-  // support this trace file. As such, we throw an error here.
-  if (traceStartedTime === -1) {
-    throw new Error('Error parsing trace data: no TracingStartedInBrowser event found.');
-  }
-
   traceBounds.min = traceStartedTime;
   traceBounds.range = Types.Timing.MicroSeconds(traceBounds.max - traceBounds.min);
-
-  if (topLevelRendererIds.size === 0) {
-    throw new Error('Unable to find renderer processes');
-  }
-
-  if (browserProcessId === Types.TraceEvents.ProcessID(-1)) {
-    throw new Error('Unable to find browser process');
-  }
-
-  if (browserThreadId === Types.TraceEvents.ThreadID(-1)) {
-    throw new Error('Unable to find browser thread');
-  }
-
-  if (gpuProcessId === Types.TraceEvents.ProcessID(-1)) {
-    throw new Error('Unable to find GPU process');
-  }
-
-  // We purposefully don't check for a missing GPU Thread ID; it's possible
-  // that a trace ran and did not use a GPU Thread.
-
-  if (!mainFrameId) {
-    throw new Error('Unable to find main frame ID');
-  }
 
   // If we go from foo.com to example.com we will get a new renderer, and
   // therefore the "top level renderer" will have a different PID as it has
@@ -342,6 +319,7 @@ type MetaHandlerData = {
                       Map<Types.TraceEvents.ProcessID,
                           {frame: Types.TraceEvents.TraceFrame, window: Types.Timing.TraceWindow}>>,
               topLevelRendererIds: Set<Types.TraceEvents.ProcessID>,
+              frameByProcessId: Map<Types.TraceEvents.ProcessID, Map<string, Types.TraceEvents.TraceFrame>>,
 };
 
 export function data(): MetaHandlerData {
@@ -363,5 +341,6 @@ export function data(): MetaHandlerData {
     threadsInProcess: new Map(threadsInProcess),
     rendererProcessesByFrame: new Map(rendererProcessesByFrameId),
     topLevelRendererIds: new Set(topLevelRendererIds),
+    frameByProcessId: new Map(framesByProcessId),
   };
 }

@@ -265,19 +265,18 @@ describe('Source Panel grouping', async function() {
     await click('[aria-label="More options"]');
     await click(`[aria-label="${folderMenuText}, checked"]`);
     await waitForNone('.soft-context-menu');
-    await waitForNone('[aria-label="test/e2e/resources/sources, nw-folder"]');
+    await waitForNone('[aria-label="test/e2e/resources/sources, nw-folder"]:not(.is-from-source-map)');
     await validateNavigationTree();
   }
 
-  // Flaky on mac
-  it.skipOnPlatforms(['mac'], '[crbug.com/1412336] can enable and disable group by authored/deployed', async () => {
+  it('can enable and disable group by authored/deployed', async () => {
     // Have the target load the page.
     await goToResource(targetPage);
     await openSourcesPanel();
 
     // Switch to grouped
     await enableGroupByAuthored();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, sm-folder"]');
+    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
     await expandFileTree(workerFileSelectors(6));
     assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
 
@@ -288,20 +287,19 @@ describe('Source Panel grouping', async function() {
 
     // And switch to grouped again...
     await enableGroupByAuthored();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, sm-folder"]');
+    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
     await expandFileTree(workerFileSelectors(6));
     assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
   });
 
-  // Flaky on mac
-  it.skipOnPlatforms(['mac'], '[crbug.com/1412336] can handle authored script in page and worker', async () => {
+  it('can handle authored script in page and worker', async () => {
     // Have the target load the page.
     await goToResource('sources/redundant-worker-sourcemap.html');
     await openSourcesPanel();
 
     // Switch to grouped
     await enableGroupByAuthored();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, sm-folder"]');
+    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
     await expandFileTree(workerFileSelectors(6));
     assert.deepEqual(await readSourcesTreeView(), groupedRedundantExpectedTree);
   });
@@ -320,14 +318,13 @@ describe('Source Panel grouping', async function() {
     await goToResource(targetPage);
     // Validate source tree
     await validateNavigationTree();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, sm-folder"]');
+    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
     await expandFileTree(workerFileSelectors(6));
 
     assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
   });
 
-  // Flaky test
-  it.skip('[crbug.com/1349268] can mix group by authored/deployed and group by folder', async () => {
+  it('can mix group by authored/deployed and group by folder', async () => {
     // Have the target load the page.
     await goToResource(targetPage);
     await openSourcesPanel();
@@ -336,18 +333,18 @@ describe('Source Panel grouping', async function() {
     await disableGroupByFolder();
     await expandSourceTreeItem(workerFileSelectors(6).rootSelector);
     await expandSourceTreeItem(
-        workerFileSelectors(6).rootSelector + ' + ol > [aria-label="test/e2e/resources/sources, sm-folder"]');
+        workerFileSelectors(6).rootSelector + ' + ol > [aria-label="test/e2e/resources/sources, nw-folder"]');
     assert.deepEqual(await readSourcesTreeView(), folderlessExpectedTree);
 
     // Switch to group by authored, folderless
     await enableGroupByAuthored();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, sm-folder"]');
+    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
     await expandSourceTreeItem(workerFileSelectors(6).rootSelector);
     assert.deepEqual(await readSourcesTreeView(), folderlessGroupedExpectedTree);
 
     // Reenable folders
     await enableGroupByFolder();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, sm-folder"]');
+    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
     await expandFileTree(workerFileSelectors(6));
     assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
   });
