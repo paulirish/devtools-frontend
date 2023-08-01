@@ -90,7 +90,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
     // 'disabled-by-default-v8.cpu_profiler'
     //   └ default: on, option: enableJSSampling
     const categoriesArray = [
-      '*',
+      '-*',
       TimelineModel.TimelineModel.TimelineModelImpl.Category.Console,
       TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming,
       'devtools.timeline',
@@ -102,7 +102,6 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
       TimelineModel.TimelineModel.TimelineModelImpl.Category.LatencyInfo,
       TimelineModel.TimelineModel.TimelineModelImpl.Category.Loading,
       disabledByDefault('lighthouse'),
-      'netlog',  // doesnt collect cuz its a renderer initiated trace
       'v8.execute',
       'v8',
     ];
