@@ -654,6 +654,8 @@ class PreloadingRuleSetSelector implements UI.Toolbar.Provider,
 }
 
 export class PreloadingWarningsView extends UI.Widget.VBox {
+  private warningsProcessed: boolean = false;
+
   constructor() {
     super(/* isWebComponent */ false, /* delegatesFocus */ false);
   }
@@ -668,7 +670,7 @@ export class PreloadingWarningsView extends UI.Widget.VBox {
 
       if (event.disabledByPreference) {
         const preloadingSettingLink = new ChromeLink.ChromeLink.ChromeLink();
-        preloadingSettingLink.href = 'chrome://settings/cookies';
+        preloadingSettingLink.href = 'chrome://settings/preloading';
         preloadingSettingLink.textContent = i18nString(UIStrings.preloadingPageSettings);
         const extensionSettingLink = new ChromeLink.ChromeLink.ChromeLink();
         extensionSettingLink.href = 'chrome://extensions';
@@ -695,6 +697,12 @@ export class PreloadingWarningsView extends UI.Widget.VBox {
 
       return shouldShowWarning ? detailsMessage : null;
     }
+
+    if (this.warningsProcessed) {
+      return;
+    }
+
+    this.warningsProcessed = true;
 
     const event = args.data;
     const detailsMessage = createDisabledMessages(event);

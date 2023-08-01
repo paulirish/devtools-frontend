@@ -21,22 +21,21 @@
 }
 
 .row {
+  flex-wrap: wrap;
+}
+
+.json-input {
+  min-width: 100px;
+}
+
+.row,
+.row-icons {
   display: flex;
   flex-direction: row;
   color: var(--color-syntax-1);
   font-family: var(--monospace-font-family);
   font-size: var(--monospace-font-size);
   align-items: center;
-  line-height: 18px;
-  margin-top: 3px;
-}
-
-.column {
-  display: flex;
-  flex-direction: column;
-  color: var(--color-syntax-1);
-  font-family: var(--monospace-font-family);
-  font-size: var(--monospace-font-size);
   line-height: 18px;
   margin-top: 3px;
 }
@@ -50,16 +49,21 @@ ul {
   padding-left: 2em;
 }
 
-.colorBlue {
+.optionalParameter {
   color: var(--color-syntax-3);
 }
 
+.undefinedParameter {
+  color: var(--color-text-disabled);
+}
+
 .wrapper {
-  padding-left: 2em;
-  overflow: auto;
+  padding-left: 1em;
+  overflow: hidden;
   height: 100%;
   width: 100%;
   padding-bottom: 50px;
+  padding-top: 0.5em;
 }
 
 .deleteButton {

@@ -5,7 +5,8 @@
 import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
 
-import {data as metaHandlerData} from './MetaHandler.js';
+import {data as metaHandlerData, type FrameProcessData} from './MetaHandler.js';
+import {data as samplesHandlerData} from './SamplesHandler.js';
 
 import {KNOWN_EVENTS, type TraceEventHandlerName, HandlerState} from './types.js';
 import * as Types from '../types/types.js';
@@ -23,7 +24,7 @@ import * as Types from '../types/types.js';
  */
 
 const processes = new Map<Types.TraceEvents.ProcessID, RendererProcess>();
-const traceEventToNode = new Map<Types.TraceEvents.SyntheticRendererEntry, RendererEntryNode>();
+const entryToNode = new Map<RendererEntry, RendererEntryNode>();
 const allRendererEvents: Types.TraceEvents.TraceEventRendererEvent[] = [];
 let nodeIdCount = 0;
 const makeRendererEntrytNodeId = (): RendererEntryNodeId => (++nodeIdCount) as RendererEntryNodeId;
@@ -68,7 +69,7 @@ const getOrCreateRendererThread = (process: RendererProcess, tid: Types.TraceEve
 
 export function reset(): void {
   processes.clear();
-  traceEventToNode.clear();
+  entryToNode.clear();
   allRendererEvents.length = 0;
   completeEventStack.length = 0;
   nodeIdCount = -1;
@@ -129,7 +130,7 @@ export function data(): RendererHandlerData {
 
   return {
     processes: new Map(processes),
-    traceEventToNode: new Map(traceEventToNode),
+    entryToNode: new Map(entryToNode),
     allRendererEvents: [...allRendererEvents],
   };
 }
@@ -142,11 +143,11 @@ export function data(): RendererHandlerData {
  */
 export function assignMeta(
     processes: Map<Types.TraceEvents.ProcessID, RendererProcess>, mainFrameId: string,
-    rendererProcessesByFrame: Map<string, Map<Types.TraceEvents.ProcessID, {frame: Types.TraceEvents.TraceFrame}>>,
+    rendererProcessesByFrame: FrameProcessData,
     threadsInProcess:
         Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventThreadName>>):
     void {
-  assignOrigin(processes, mainFrameId, rendererProcessesByFrame);
+  assignOrigin(processes, rendererProcessesByFrame);
   assignIsMainFrame(processes, mainFrameId, rendererProcessesByFrame);
   assignThreadName(processes, rendererProcessesByFrame, threadsInProcess);
 }
@@ -156,26 +157,27 @@ export function assignMeta(
  * @see assignMeta
  */
 export function assignOrigin(
-    processes: Map<Types.TraceEvents.ProcessID, RendererProcess>, mainFrameId: string,
-    rendererProcessesByFrame: Map<string, Map<Types.TraceEvents.ProcessID, {frame: Types.TraceEvents.TraceFrame}>>):
-    void {
-  for (const [frameId, renderProcessesByPid] of rendererProcessesByFrame) {
-    for (const [pid, processInfo] of renderProcessesByPid) {
-      const process = getOrCreateRendererProcess(processes, pid);
-      // Sometimes a single process is responsible with rendering multiple
-      // frames at the same time. For example, see https://crbug.com/1334563.
-      // When this happens, we'd still like to assign a single url per process
-      // so: 1) use the first frame rendered by this process as the url source
-      // and 2) if there's a more "important" frame found, use its url instead.
-      if (process.url === null /* first frame */ || frameId === mainFrameId /* more important frame */) {
-        // If we are here, it's because we care about this process and the URL. But before we store
-        // it, we check if it is a valid URL by trying to create a URL object. If it isn't, we won't
-        // set it, and this process will be filtered out later.
-        try {
-          new URL(processInfo.frame.url);
-          process.url = processInfo.frame.url;
-        } catch (e) {
-          process.url = null;
+    processes: Map<Types.TraceEvents.ProcessID, RendererProcess>, rendererProcessesByFrame: FrameProcessData): void {
+  for (const renderProcessesByPid of rendererProcessesByFrame.values()) {
+    for (const [pid, processWindows] of renderProcessesByPid) {
+      for (const processInfo of processWindows.flat()) {
+        const process = getOrCreateRendererProcess(processes, pid);
+        // Sometimes a single process is responsible with rendering multiple
+        // frames at the same time. For example, see https://crbug.com/1334563.
+        // When this happens, we'd still like to assign a single url per process
+        // so: 1) use the first frame rendered by this process as the url source
+        // and 2) if the last url is "about:blank", use the next frame's url,
+        // data from about:blank is irrelevant.
+        if (process.url === null || process.url === 'about:blank') {
+          // If we are here, it's because we care about this process and the URL. But before we store
+          // it, we check if it is a valid URL by trying to create a URL object. If it isn't, we won't
+          // set it, and this process will be filtered out later.
+          try {
+            new URL(processInfo.frame.url);
+            process.url = processInfo.frame.url;
+          } catch (e) {
+            process.url = null;
+          }
         }
       }
     }
@@ -188,8 +190,7 @@ export function assignOrigin(
  */
 export function assignIsMainFrame(
     processes: Map<Types.TraceEvents.ProcessID, RendererProcess>, mainFrameId: string,
-    rendererProcessesByFrame: Map<string, Map<Types.TraceEvents.ProcessID, {frame: Types.TraceEvents.TraceFrame}>>):
-    void {
+    rendererProcessesByFrame: FrameProcessData): void {
   for (const [frameId, renderProcessesByPid] of rendererProcessesByFrame) {
     for (const [pid] of renderProcessesByPid) {
       const process = getOrCreateRendererProcess(processes, pid);
@@ -209,8 +210,7 @@ export function assignIsMainFrame(
  * @see assignMeta
  */
 export function assignThreadName(
-    processes: Map<Types.TraceEvents.ProcessID, RendererProcess>,
-    rendererProcessesByFrame: Map<string, Map<Types.TraceEvents.ProcessID, {frame: Types.TraceEvents.TraceFrame}>>,
+    processes: Map<Types.TraceEvents.ProcessID, RendererProcess>, rendererProcessesByFrame: FrameProcessData,
     threadsInProcess:
         Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventThreadName>>):
     void {
@@ -289,11 +289,22 @@ export function sanitizeThreads(processes: Map<Types.TraceEvents.ProcessID, Rend
 export function buildHierarchy(
     processes: Map<Types.TraceEvents.ProcessID, RendererProcess>,
     options: {filter: {has: (name: Types.TraceEvents.KnownEventName) => boolean}}): void {
-  for (const [, process] of processes) {
-    for (const [, thread] of process.threads) {
+  for (const [pid, process] of processes) {
+    for (const [tid, thread] of process.threads) {
+      if (!thread.entries.length) {
+        thread.tree = makeEmptyRendererTree();
+        continue;
+      }
       // Step 1. Massage the data.
       Helpers.Trace.sortTraceEventsInPlace(thread.entries);
-      // Step 2. Build the tree.
+      // Step 2. Inject profile calls from samples
+      const cpuProfile = samplesHandlerData().profilesInProcess.get(pid)?.get(tid)?.parsedProfile;
+      const samplesIntegrator = cpuProfile && new Helpers.SamplesIntegrator.SamplesIntegrator(cpuProfile, pid, tid);
+      const profileCalls = samplesIntegrator?.buildProfileCalls(thread.entries);
+      if (profileCalls) {
+        thread.entries = Helpers.Trace.mergeEventsInOrder(thread.entries, profileCalls);
+      }
+      // Step 3. Build the tree.
       thread.tree = treify(thread.entries, options);
     }
   }
@@ -337,15 +348,12 @@ export function treify(
     // If the parent stack is empty, then the current event is a root. Create a
     // node for it, mark it as a root, then proceed with the next event.
     if (stack.length === 0) {
-      if (Types.TraceEvents.isProfileCall(event)) {
-        continue;
-      }
       tree.nodes.set(nodeId, node);
       tree.roots.add(nodeId);
       event.selfTime = Types.Timing.MicroSeconds(duration);
       stack.push(node);
       tree.maxDepth = Math.max(tree.maxDepth, stack.length);
-      traceEventToNode.set(event, node);
+      entryToNode.set(event, node);
       continue;
     }
 
@@ -386,14 +394,12 @@ export function treify(
       nodeIdCount--;
       continue;
     }
-    // 3. If the current event starts during the parent event, but ends after
-    //    it, then the data is messed up some way.
+    // 3. If the current event starts during the parent event, but ends
+    //    after it, then the data is messed up some way, for example a
+    //    profile call was sampled too late after its start, ignore the
+    //    problematic event.
     const endsAfterParent = end > parentEnd;
     if (endsAfterParent) {
-      throw new Error('Impossible: current event starts during the parent event');
-    }
-
-    if (Types.TraceEvents.isProfileCall(event)) {
       continue;
     }
 
@@ -411,7 +417,7 @@ export function treify(
     }
     stack.push(node);
     tree.maxDepth = Math.max(tree.maxDepth, stack.length);
-    traceEventToNode.set(event, node);
+    entryToNode.set(event, node);
   }
   return tree;
 }
@@ -455,7 +461,7 @@ export function deps(): TraceEventHandlerName[] {
 
 export interface RendererHandlerData {
   processes: Map<Types.TraceEvents.ProcessID, RendererProcess>;
-  traceEventToNode: Map<Types.TraceEvents.SyntheticRendererEntry, RendererEntryNode>;
+  entryToNode: Map<RendererEntry, RendererEntryNode>;
   /**
    * All trace events and synthetic profile calls made from
    * samples.
@@ -481,7 +487,7 @@ export interface RendererThread {
   tree?: RendererTree;
 }
 
-export type RendererEntry = Types.TraceEvents.SyntheticRendererEntry|Types.TraceEvents.TraceEventSyntheticProfileCall;
+export type RendererEntry = Types.TraceEvents.SyntheticRendererEvent|Types.TraceEvents.TraceEventSyntheticProfileCall;
 
 export interface RendererTree {
   nodes: Map<RendererEntryNodeId, RendererEntryNode>;

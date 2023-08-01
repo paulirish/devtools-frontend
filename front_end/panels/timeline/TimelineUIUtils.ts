@@ -161,6 +161,10 @@ const UIStrings = {
    */
   updateLayerTree: 'Update Layer Tree',
   /**
+   *@description Text that refers to updated priority of network request
+   */
+  initialPriority: 'Initial Priority',
+  /**
    *@description Noun for a paint event in the Performance panel. A paint event is when the browser draws pixels to the screen.
    */
   paint: 'Paint',
@@ -1963,20 +1967,10 @@ export class TimelineUIUtils {
       contentHelper.appendWarningRow(event, TimelineModel.TimelineModel.TimelineModelImpl.WarningType.V8Deopt);
     }
 
-    // TODO(crbug.com/1434594): it is messy that we have this check for the
-    // duration in the UIUtils. We need to come up with a solution so we canset
-    // this information in the handlers, and read it here.
-    if (event.name === recordTypes.EventTiming && duration > TraceEngine.Types.Timing.MilliSeconds(200)) {
-      // This ensures we do not have a ConstructedEvent which are not ever going to be Interaction events.
-      const eventHasPayload =
-          TraceEngine.Legacy.eventIsFromNewEngine(event) || TraceEngine.Legacy.eventHasPayload(event);
-      if (eventHasPayload) {
-        const payload = TraceEngine.Legacy.eventIsFromNewEngine(event) ? event : event.rawPayload();
-        if (TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(payload)) {
-          contentHelper.appendWarningRow(
-              event, TimelineModel.TimelineModel.TimelineModelImpl.WarningType.LongInteraction);
-        }
-      }
+    if (traceParseData && TraceEngine.Legacy.eventIsFromNewEngine(event) &&
+        TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(event) &&
+        traceParseData.UserInteractions.interactionsOverThreshold.has(event)) {
+      contentHelper.appendWarningRow(event, TimelineModel.TimelineModel.TimelineModelImpl.WarningType.LongInteraction);
     }
 
     if (detailed && !Number.isNaN(duration || 0)) {
@@ -2615,9 +2609,18 @@ export class TimelineUIUtils {
     if (event.args.data.requestMethod) {
       contentHelper.appendTextRow(i18nString(UIStrings.requestMethod), event.args.data.requestMethod);
     }
+
+    if (event.args.data.initialPriority) {
+      const initialPriority = PerfUI.NetworkPriorities.uiLabelForNetworkPriority(
+          event.args.data.initialPriority as Protocol.Network.ResourcePriority);
+      contentHelper.appendTextRow(i18nString(UIStrings.initialPriority), initialPriority);
+    }
+
     const priority = PerfUI.NetworkPriorities.uiLabelForNetworkPriority(
         event.args.data.priority as Protocol.Network.ResourcePriority);
+
     contentHelper.appendTextRow(i18nString(UIStrings.priority), priority);
+
     if (event.args.data.mimeType) {
       contentHelper.appendTextRow(i18nString(UIStrings.mimeType), event.args.data.mimeType);
     }
@@ -3233,7 +3236,7 @@ export class TimelineUIUtils {
     return colorGenerator.colorForID(id);
   }
 
-  static eventWarning(event: TraceEngine.Legacy.CompatibleTraceEvent, warningType?: string): Element|null {
+  static buildEventWarningElement(event: TraceEngine.Legacy.CompatibleTraceEvent, warningType?: string): Element|null {
     const timelineData = event instanceof TraceEngine.Legacy.Event ?
         TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event) :
         null;
@@ -3683,9 +3686,9 @@ export class TimelineDetailsContentHelper {
   }
 
   appendWarningRow(event: TraceEngine.Legacy.CompatibleTraceEvent, warningType?: string): void {
-    const warning = TimelineUIUtils.eventWarning(event, warningType);
-    if (warning) {
-      this.appendElementRow(i18nString(UIStrings.warning), warning, true);
+    const warningElement = TimelineUIUtils.buildEventWarningElement(event, warningType);
+    if (warningElement) {
+      this.appendElementRow(i18nString(UIStrings.warning), warningElement, true);
     }
   }
 }

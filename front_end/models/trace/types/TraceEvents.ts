@@ -198,6 +198,7 @@ export type TraceEventSyntheticCompleteEvent = TraceEventComplete;
 
 export interface TraceEventEventTiming extends TraceEventData {
   ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
+  name: KnownEventName.EventTiming;
   id: string;
   args: TraceEventArgs&{
     frame: string,
@@ -280,6 +281,7 @@ export interface TraceEventSyntheticNetworkRequest extends TraceEventComplete {
       pathname: string,
       search: string,
       priority: Priority,
+      initialPriority: Priority,
       protocol: string,
       redirects: TraceEventSyntheticNetworkRedirect[],
       renderBlocking: RenderBlocking,
@@ -626,6 +628,16 @@ export interface TraceEventResourceSendRequest extends TraceEventInstant {
   };
 }
 
+export interface TraceEventResourceChangePriority extends TraceEventInstant {
+  name: 'ResourceChangePriority';
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      requestId: string,
+      priority: Priority,
+    },
+  };
+}
+
 export interface TraceEventResourceWillSendRequest extends TraceEventInstant {
   name: 'ResourceWillSendRequest';
   args: TraceEventArgs&{
@@ -867,20 +879,18 @@ export interface SyntheticInteractionEvent extends TraceEventSyntheticNestableAs
 }
 
 /**
- * An event created synthetically in the frontend, that can have
- * a reference to its parent and children.
+ * An event created synthetically in the frontend that has a self time
+ * (the time spent running the task itself).
  */
-export interface SyntheticEventWithChildren extends TraceEventData {
+export interface SyntheticEventWithSelfTime extends TraceEventData {
   selfTime?: MicroSeconds;
-  parent?: SyntheticEventWithChildren;
-  children?: SyntheticEventWithChildren[];
 }
 
 /**
  * A profile call created in the frontend from samples disguised as a
  * trace event.
  */
-export interface TraceEventSyntheticProfileCall extends SyntheticEventWithChildren {
+export interface TraceEventSyntheticProfileCall extends SyntheticEventWithSelfTime {
   callFrame: Protocol.Runtime.CallFrame;
   nodeId: Protocol.integer;
   children?: TraceEventSyntheticProfileCall[];
@@ -888,9 +898,9 @@ export interface TraceEventSyntheticProfileCall extends SyntheticEventWithChildr
 
 /**
  * A trace event augmented synthetically in the frontend to contain
- * references to its parent and children.
+ * its self time.
  */
-export type SyntheticRendererEntry = TraceEventRendererEvent&Partial<SyntheticEventWithChildren>;
+export type SyntheticRendererEvent = TraceEventRendererEvent&SyntheticEventWithSelfTime;
 
 export function isSyntheticInteractionEvent(event: TraceEventData): event is SyntheticInteractionEvent {
   return Boolean(
@@ -1061,7 +1071,7 @@ export function isTraceEventInteractiveTime(traceEventData: TraceEventData):
 }
 
 export function isTraceEventEventTiming(traceEventData: TraceEventData): traceEventData is TraceEventEventTiming {
-  return traceEventData.name === 'EventTiming';
+  return traceEventData.name === KnownEventName.EventTiming;
 }
 
 export function isTraceEventEventTimingEnd(traceEventData: TraceEventData): traceEventData is TraceEventEventTimingEnd {
@@ -1082,6 +1092,12 @@ export function isTraceEventProfile(traceEventData: TraceEventData): traceEventD
 
 export function isTraceEventProfileChunk(traceEventData: TraceEventData): traceEventData is TraceEventProfileChunk {
   return traceEventData.name === 'ProfileChunk';
+}
+
+export function isTraceEventResourceChangePriority(
+    traceEventData: TraceEventData,
+    ): traceEventData is TraceEventResourceChangePriority {
+  return traceEventData.name === 'ResourceChangePriority';
 }
 
 export function isTraceEventResourceSendRequest(
@@ -1301,4 +1317,5 @@ export const enum KnownEventName {
   DrawLazyPixelRef = 'Draw LazyPixelRef',
   DecodeLazyPixelRef = 'Decode LazyPixelRef',
   GPUTask = 'GPUTask',
+  EventTiming = 'EventTiming',
 }

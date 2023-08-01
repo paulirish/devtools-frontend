@@ -59,7 +59,7 @@ describe('NetworkRequestsHandler', function() {
       TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
     });
 
-    it('calculates network requests correctly', async () => {
+    it('calculates network requests correctly', async function() {
       const traceEvents = await TraceLoader.rawEvents(this, 'load-simple.json.gz');
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -206,13 +206,44 @@ describe('NetworkRequestsHandler', function() {
     });
   });
 
+  describe('parses the change priority request', () => {
+    beforeEach(() => {
+      TraceModel.Handlers.ModelHandlers.Meta.initialize();
+      TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
+    });
+
+    it('changes priority of the resouce', async function() {
+      const traceEvents = await TraceLoader.rawEvents(this, 'changing-priority.json.gz');
+
+      for (const event of traceEvents) {
+        TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+        TraceModel.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
+      }
+      await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+      await TraceModel.Handlers.ModelHandlers.NetworkRequests.finalize();
+
+      const {byTime} = TraceModel.Handlers.ModelHandlers.NetworkRequests.data();
+
+      const imageRequest = byTime.find(request => {
+        return request.args.data.url === 'https://via.placeholder.com/3000.jpg';
+      });
+
+      if (!imageRequest) {
+        throw new Error('Could not find expected network request.');
+      }
+
+      assert.strictEqual(imageRequest.args.data.priority, 'High');
+      assert.strictEqual(imageRequest.args.data.initialPriority, 'Medium');
+    });
+  });
+
   describe('redirects', () => {
     beforeEach(() => {
       TraceModel.Handlers.ModelHandlers.Meta.initialize();
       TraceModel.Handlers.ModelHandlers.NetworkRequests.initialize();
     });
 
-    it('calculates redirects correctly (navigations)', async () => {
+    it('calculates redirects correctly (navigations)', async function() {
       const traceEvents = await TraceLoader.rawEvents(this, 'redirects.json.gz');
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -245,7 +276,7 @@ describe('NetworkRequestsHandler', function() {
           'Incorrect number of redirects (request 1)');
     });
 
-    it('calculates redirects correctly (subresources)', async () => {
+    it('calculates redirects correctly (subresources)', async function() {
       const traceEvents = await TraceLoader.rawEvents(this, 'redirects-subresource-multiple.json.gz');
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
