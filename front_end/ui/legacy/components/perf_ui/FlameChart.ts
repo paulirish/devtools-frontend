@@ -1155,18 +1155,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const barY = this.levelToOffset(barLevel);
     const barWidth = overrides?.width || this.#eventBarWidth(timelineData, entryIndex);
 
-    // Draw lil arrows on instant events.
-    if (barWidth === 1) {
-      const miniRectSize = 2;
-      const adjX = barX - miniRectSize/4;
-      const adjY = barY + (barHeight - 3 - miniRectSize) / 2; // x pos plus half of the rect width for proper center. or something. the 3 fudge factor is.. shrug.
-      // TODO: these rotate/translates are really expensive and not the best way to do this.
-      context.translate(adjX, adjY);
-      context.rotate(Math.PI / 4);
-      context.rect(1, 0, miniRectSize, miniRectSize);
-      context.rotate(-Math.PI / 4);
-      context.translate(-adjX, -adjY);
-    }
     // We purposefully leave a 1px gap off the height so there is a small gap
     // visually between events vertically in the panel.
     // Similarly, we leave 0.5 pixels off the width so that there is a small
@@ -1174,6 +1162,19 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // like one solid block and is not very easy to distinguish when events
     // start and end.
     context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
+
+    // Draw lil diamonds on instant events.
+    if (barWidth === 1) {
+      const miniRectSize = 2;
+      const half = miniRectSize/2;
+      const adjX = barX + 0.25; // position middle of the 0.5px line.
+      const adjY = barY + (barHeight - 1) / 2 - half;
+      context.moveTo(adjX       , adjY);
+      context.lineTo(adjX + half, adjY + half);
+      context.lineTo(adjX       , adjY + miniRectSize);
+      context.lineTo(adjX - half, adjY + half);
+      context.lineTo(adjX       , adjY);
+    }
   }
 
   #eventBarHeight(timelineData: FlameChartTimelineData, entryIndex: number): number {
