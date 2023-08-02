@@ -1012,7 +1012,7 @@ export class DeferredDOMNode {
   }
 
   highlight(): void {
-    this.#domModelInternal.overlayModel().highlightInOverlay({deferredNode: this, selectorList: undefined});
+    this.#domModelInternal?.overlayModel().highlightInOverlay({deferredNode: this, selectorList: undefined});
   }
 }
 
