@@ -1157,12 +1157,15 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     // Draw lil arrows on instant events.
     if (barWidth === 1) {
-      context.moveTo(barX + 0.25, barY);
-      context.lineTo(barX+1.25, barY+5);
-      context.lineTo(barX-0.75, barY+5);
-      context.moveTo(barX+ 0.25, barY);
-      context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
-      return;
+      const miniRectSize = 2;
+      const adjX = barX - miniRectSize/4;
+      const adjY = barY + (barHeight - 3 - miniRectSize) / 2; // x pos plus half of the rect width for proper center. or something. the 3 fudge factor is.. shrug.
+      // TODO: these rotate/translates are really expensive and not the best way to do this.
+      context.translate(adjX, adjY);
+      context.rotate(Math.PI / 4);
+      context.rect(1, 0, miniRectSize, miniRectSize);
+      context.rotate(-Math.PI / 4);
+      context.translate(-adjX, -adjY);
     }
     // We purposefully leave a 1px gap off the height so there is a small gap
     // visually between events vertically in the panel.
