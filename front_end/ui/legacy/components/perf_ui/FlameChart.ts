@@ -267,10 +267,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (this.highlightedEntryIndex === entryIndex) {
       return;
     }
+    this.highlightedEntryIndex = entryIndex;
     if (!this.dataProvider.entryColor(entryIndex)) {
       return;
     }
-    this.highlightedEntryIndex = entryIndex;
     this.updateElementPosition(this.highlightElement, this.highlightedEntryIndex);
     this.dispatchEventToListeners(Events.EntryHighlighted, entryIndex);
   }

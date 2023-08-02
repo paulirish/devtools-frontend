@@ -931,6 +931,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       } else {
         title = i18nString(UIStrings.frame);
       }
+    } else if (entryType === EntryType.Screenshot) {
+      title = ''; // dumb but avoiding the early return
     } else {
       return null;
     }
@@ -951,6 +953,26 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
     for (const elem of additionalContent) {
       contents.appendChild(elem);
+    }
+
+    // fullsize screenshot in popover
+    if (entryType === EntryType.Screenshot) {
+     const screenshot = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventSnapshot);
+      if (!this.screenshotImageCache.has(screenshot)) {
+        this.screenshotImageCache.set(screenshot, null);
+        const data = screenshot.args.snapshot;
+        void UI.UIUtils.loadImageFromData(data).then(image => {
+          this.screenshotImageCache.set(screenshot, image);
+          this.dispatchEventToListeners(Events.DataChanged);
+        });
+        return element;
+      }
+
+      const image = this.screenshotImageCache.get(screenshot);
+      if (image) {
+        image.style.display = 'block'; // minor thing.
+        contents.append(image);
+      }
     }
     return element;
   }
