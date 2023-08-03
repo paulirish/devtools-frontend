@@ -98,6 +98,27 @@ const someRelevantTraceEventTypes = [
   'Graphics.Pipeline',
 
   // 'EventLatency', // mocny said these are complicated.
+  // 'EventLatency',
+  // 'RendererMainProcessing',
+  // 'SubmitCompositorFrameToPresentationCompositorFrame',
+  // 'StartDrawToSwapStart',
+  // 'RendererMainFinishedToCommit',
+  // 'GenerationToBrowserMain',
+  // 'EndCommitToActivation',
+  // 'Swap',
+  // 'EndActivateToSubmitCompositorFrame',
+  // 'ReceiveCompositorFrameToStartDraw',
+  // 'SubmitToReceiveCompositorFrame',
+  // 'BrowserMainToRendererCompositor',
+  // 'Activation',
+  // 'Commit',
+  // 'RendererCompositorToMain',
+  // 'RendererCompositorQueueingDelay',
+  // 'RendererCompositorProcessing',
+
+  //
+  'EventTiming',
+
 
 ];
 
