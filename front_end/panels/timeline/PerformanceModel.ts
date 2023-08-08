@@ -252,9 +252,11 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       console.log('auto',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
 
       this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
-      setTimeout(() => {
-        this.setWindow({left: leftTime, right: rightTime}, true);
-      }, 20);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setTimeout(() => {
+          this.setWindow({left: leftTime, right: rightTime}, true);
+        }, 900);
+      }));
     }
 
   }

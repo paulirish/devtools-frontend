@@ -15,7 +15,7 @@ import {
   InstantEventVisibleDurationMs,
 } from './TimelineFlameChartDataProvider.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
-import {UberFramesTrackAppender} from './UberFramesTrackAppender.js';
+import {AnnotationTrackAppender} from './AnnotationTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
@@ -79,7 +79,7 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'UberFrames', 'Thread'] as const;
+export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Annotation', 'Thread'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -106,7 +106,7 @@ export class CompatibilityTracksAppender {
   #legacyEntryTypeByLevel: EntryType[];
   #timingsTrackAppender: TimingsTrackAppender;
   #animationsTrackAppender: AnimationsTrackAppender;
-  #uberFramesTrackAppender: UberFramesTrackAppender;
+  #annotationTrackAppender: AnnotationTrackAppender;
   #interactionsTrackAppender: InteractionsTrackAppender;
   #gpuTrackAppender: GPUTrackAppender;
   #layoutShiftsTrackAppender: LayoutShiftsTrackAppender;
@@ -144,9 +144,9 @@ export class CompatibilityTracksAppender {
         new TimingsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
 
-    this.#uberFramesTrackAppender =
-        new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
-    this.#allTrackAppenders.push(this.#uberFramesTrackAppender);
+    this.#annotationTrackAppender =
+        new AnnotationTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
+    this.#allTrackAppenders.push(this.#annotationTrackAppender);
 
     this.#interactionsTrackAppender =
         new InteractionsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
@@ -210,8 +210,8 @@ export class CompatibilityTracksAppender {
   animationsTrackAppender(): AnimationsTrackAppender {
     return this.#animationsTrackAppender;
   }
-  uberFramesTrackAppender(): UberFramesTrackAppender {
-    return this.#uberFramesTrackAppender;
+  annotationTrackAppender(): AnnotationTrackAppender {
+    return this.#annotationTrackAppender;
   }
 
   interactionsTrackAppender(): InteractionsTrackAppender {

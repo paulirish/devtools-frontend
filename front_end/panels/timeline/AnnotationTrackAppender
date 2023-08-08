@@ -20,14 +20,14 @@ const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
-  timings: 'UberFrames',
+  timings: 'Annotation',
 };
 
-const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
+const str_ = i18n.i18n.registerUIStrings('panels/timeline/AnnotationTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export class UberFramesTrackAppender implements TrackAppender {
-  readonly appenderName: TrackAppenderName = 'UberFrames';
+export class AnnotationTrackAppender implements TrackAppender {
+  readonly appenderName: TrackAppenderName = 'Annotation';
 
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
@@ -53,7 +53,7 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFrames;
+    const uberFrameEvts = this.#traceParsedData.Annotation;
 
     if (uberFrameEvts.length === 0) {
       return trackStartLevel;
