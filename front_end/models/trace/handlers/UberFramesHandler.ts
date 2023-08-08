@@ -95,7 +95,9 @@ const someRelevantTraceEventTypes = [
   'Scheduler::BeginFrame',
   'DisplayScheduler::BeginFrame',
   'Scheduler::BeginImplFrame',
-  'Graphics.Pipeline',
+
+
+  // 'Graphics.Pipeline',
 
   // 'EventLatency', // mocny said these are complicated.
   // 'EventLatency',
@@ -119,6 +121,11 @@ const someRelevantTraceEventTypes = [
   //
   'EventTiming',
 
+  // my loaf branch
+  "LongAnimationFrame",
+  "LoAF-renderStart",
+  "LoAF-desiredRenderStart",
+  "LoAF-styleAndLayoutStart",
 
 ];
 
