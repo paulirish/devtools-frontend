@@ -1156,7 +1156,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   decorateEntry(
       entryIndex: number, context: CanvasRenderingContext2D, text: string|null, barX: number, barY: number,
       barWidth: number, barHeight: number, _unclippedBarX: number, _timeToPixels: number): boolean {
-    const data = this.entryData[entryIndex];
     const entryType = this.entryType(entryIndex);
 
     if (entryType === EntryType.Frame) {
@@ -1170,6 +1169,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
 
     if (entryType === EntryType.Event) {
+      const data = this.entryData[entryIndex];
       const event = (data as TraceEngine.Legacy.Event);
       if (TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).warning) {
         this.#addDecorationToEvent(entryIndex, {type: 'WARNING_TRIANGLE'});

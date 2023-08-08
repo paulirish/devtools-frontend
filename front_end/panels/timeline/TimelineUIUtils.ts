@@ -1469,6 +1469,17 @@ export class TimelineUIUtils {
     if (event.name === recordType.EventDispatch && eventData && eventData['type']) {
       return i18nString(UIStrings.sS, {PH1: title, PH2: eventData['type']});
     }
+    const frameSeqId =
+      event.args.frameSeqId ??
+      event.args.frame_sequence ??
+      event.args.begin_frame_id ??
+      event.args.args?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.data?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
+      '';
+
+    if (frameSeqId) return `${title} ${frameSeqId % 1000}`;
+
     return title;
   }
 

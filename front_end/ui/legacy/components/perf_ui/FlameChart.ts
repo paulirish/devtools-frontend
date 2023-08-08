@@ -1222,6 +1222,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const textPadding = this.textPadding;
     // How wide in pixels / long in duration an event needs to be to make it
     // worthwhile rendering the text inside it.
+    // const minTextWidth = 0; // 2 * textPadding + UI.UIUtils.measureTextWidth(context, '…');
+    // PAUL: see also the call to trimTextMiddle()
     const minTextWidth = 2 * textPadding + UI.UIUtils.measureTextWidth(context, '…');
     const minTextWidthDuration = this.chartViewport.pixelToTimeOffset(minTextWidth);
 
