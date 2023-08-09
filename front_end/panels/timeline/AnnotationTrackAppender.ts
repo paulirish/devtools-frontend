@@ -53,20 +53,22 @@ export class AnnotationTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const performanceMeasures = this.#traceParsedData.UserTimings.performanceMeasures;
+    const dummyEvent = {
+      ts: this.#traceParsedData.Meta.traceBounds.min + 1,
+      dur: 10,
+      name: 'RunTask',
+    };
 
-    globalThis.annos = [...performanceMeasures];
-    const annoEvts = globalThis.annos;
+    globalThis.annos = [dummyEvent, ...[]];
 
-    const allEvts = [...performanceMeasures, annoEvts];
-
-    if (allEvts.length === 0) {
-      return trackStartLevel;
-    }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    let newLevel = this.#compatibilityBuilder.appendEventsAtLevel(allEvts, trackStartLevel, this);
-    globalThis.annoLevel = newLevel;
-    return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+    for (const event of globalThis.annos) {
+      this.#compatibilityBuilder.appendEventAtLevel(event, trackStartLevel, this);
+      this.#compatibilityBuilder.legacyEntryTypeByLevel.length = trackStartLevel;
+      this.#compatibilityBuilder.legacyEntryTypeByLevel[trackStartLevel] = 'TrackAppender';
+    }
+    globalThis.annoLevel = trackStartLevel;
+    return trackStartLevel+1;
   }
 
   /**

@@ -761,7 +761,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       if (event.key === 'm') {
         const start = this.chartViewport.rangeSelectionStart;
         const end = this.chartViewport.rangeSelectionEnd;
-        this.rawTimelineData?.entryLevels.push(globalThis.annoLevel - 1);
+        this.rawTimelineData?.entryLevels.push(globalThis.annoLevel);
         this.rawTimelineData?.entryStartTimes.push(start);
         const duration = (end - start);
         this.rawTimelineData?.entryTotalTimes.push(duration);
@@ -769,7 +769,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         const synEvt = {
           ts: start * 1000,
           dur: duration * 1000,
-          name: window.prompt(), // lol
+          name: window.prompt('Name this annotation:'), // lol
           entryIndex: this.rawTimelineData?.entryTotalTimes.length - 1,
         };
         globalThis.annos.push(synEvt);

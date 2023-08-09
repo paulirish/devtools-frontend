@@ -103,7 +103,7 @@ export class CompatibilityTracksAppender {
   // use the new engine and flame chart architecture, the reference can
   // be removed.
   #legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl;
-  #legacyEntryTypeByLevel: EntryType[];
+  legacyEntryTypeByLevel: EntryType[];
   #timingsTrackAppender: TimingsTrackAppender;
   #animationsTrackAppender: AnimationsTrackAppender;
   #annotationTrackAppender: AnnotationTrackAppender;
@@ -138,7 +138,7 @@ export class CompatibilityTracksAppender {
         /* satSpace= */ {min: 70, max: 100, count: 6},
         /* lightnessSpace= */ 50,
         /* alphaSpace= */ 0.7);
-    this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
+    this.legacyEntryTypeByLevel = legacyEntryTypeByLevel;
     this.#legacyTimelineModel = legacyTimelineModel;
 
     this.#timingsTrackAppender =
@@ -406,7 +406,7 @@ export class CompatibilityTracksAppender {
     const index = this.#entryData.length;
     this.#entryData.push(event);
     this.#indexForEvent.set(event, index);
-    this.#legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
+    this.legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
     this.#flameChartData.entryLevels[index] = level;
     this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
     const msDuration = event.dur ||
@@ -448,8 +448,8 @@ export class CompatibilityTracksAppender {
       this.appendEventAtLevel(event, trackStartLevel + level, appender);
     }
 
-    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
-    this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
+    this.legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
+    this.legacyEntryTypeByLevel[trackStartLevel] = EntryType.TrackAppender;
 
     return trackStartLevel + lastUsedTimeByLevel.length;
   }
