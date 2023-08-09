@@ -127,7 +127,7 @@ UI.ViewManager.registerViewExtension({
   order: 50,
   async loadView() {
     const Timeline = await loadTimelineModule();
-    return Timeline.TimelinePanel.TimelinePanel.instance();
+    return Timeline.TimelinePanel.TimelinePanel.instance({fullTraceEngine: true});
   },
 });
 
