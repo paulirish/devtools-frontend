@@ -375,7 +375,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     if (this.coordinatesToGroupIndex(mouseEvent.offsetX, mouseEvent.offsetY, true /* headerOnly */) >= 0) {
       this.hideHighlight();
-      this.viewportElement.style.cursor = 'pointer';
+      // this.viewportElement.style.cursor = 'pointer';
       return;
     }
     this.updateHighlight();
@@ -388,9 +388,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const group = this.coordinatesToGroupIndex(this.lastMouseOffsetX, this.lastMouseOffsetY, false /* headerOnly */);
       if (group >= 0 && this.rawTimelineData && this.rawTimelineData.groups &&
           this.rawTimelineData.groups[group].selectable) {
-        this.viewportElement.style.cursor = 'pointer';
+        // this.viewportElement.style.cursor = 'pointer';
       } else {
-        this.viewportElement.style.cursor = 'default';
+        // this.viewportElement.style.cursor = 'default';
       }
       return;
     }
@@ -757,6 +757,24 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   private handleSelectionNavigation(event: KeyboardEvent): boolean {
     if (this.selectedEntryIndex === -1) {
+      // create range annotation
+      if (event.key === 'm') {
+        const start = this.chartViewport.rangeSelectionStart;
+        const end = this.chartViewport.rangeSelectionEnd;
+        this.rawTimelineData?.entryLevels.push(globalThis.annoLevel - 1);
+        this.rawTimelineData?.entryStartTimes.push(start);
+        const duration = (end - start);
+        this.rawTimelineData?.entryTotalTimes.push(duration);
+
+        const synEvt = {
+          ts: start * 1000,
+          dur: duration * 1000,
+          name: window.prompt(), // lol
+          entryIndex: this.rawTimelineData?.entryTotalTimes.length - 1,
+        };
+        globalThis.annos.push(synEvt);
+        globalThis.entryData.push(synEvt);
+      }
       return false;
     }
     const timelineData = this.timelineData();

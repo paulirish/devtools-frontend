@@ -171,7 +171,8 @@ export class TimelineDetailsView extends UI.Widget.VBox {
 
   private onWindowChanged(): void {
     if (!this.selection) {
-      this.updateContentsFromWindow();
+      // Dont need this cuz TimelinePanel onModelWindowChanged will take care of it
+      // this.updateContentsFromWindow();
     }
   }
 

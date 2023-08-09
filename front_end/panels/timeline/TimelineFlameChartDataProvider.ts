@@ -337,7 +337,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (entryType === entryTypes.TrackAppender) {
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
       const eventLevel = timelineData.entryLevels[entryIndex];
-      const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+      let event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+      if (!event) {
+        const synEvent = globalThis.annos.find(a => a.entryIndex === entryIndex);
+        event = synEvent;
+      }
+
       return this.compatibilityTracksAppender?.titleForEvent(event, eventLevel) || null;
     }
     let title: Common.UIString.LocalizedString|string = this.entryIndexToTitle[entryIndex];
@@ -868,7 +873,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       if (!this.compatibilityTracksAppender) {
         return null;
       }
-      const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+      let event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+
+      if (!event) {
+        const synEvent = globalThis.annos.find(a => a.entryIndex === entryIndex);
+        event = synEvent;
+      }
+
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
       const eventLevel = timelineData.entryLevels[entryIndex];
       const highlightedEntryInfo = this.compatibilityTracksAppender.highlightedEntryInfo(event, eventLevel);
@@ -1000,7 +1011,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (entryType === entryTypes.TrackAppender) {
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
       const eventLevel = timelineData.entryLevels[entryIndex];
-      const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+      let event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+      if (!event) {
+        const synEvent = globalThis.annos.find(a => a.entryIndex === entryIndex);
+        event = synEvent;
+      }
       return this.compatibilityTracksAppender?.colorForEvent(event, eventLevel) || '';
     }
     return '';

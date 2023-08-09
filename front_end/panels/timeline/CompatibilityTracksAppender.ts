@@ -132,6 +132,7 @@ export class CompatibilityTracksAppender {
     this.#flameChartData = flameChartData;
     this.#traceParsedData = traceParsedData;
     this.#entryData = entryData;
+    globalThis.entryData = entryData;
     this.#colorGenerator = new Common.Color.Generator(
         /* hueSpace= */ {min: 30, max: 55, count: undefined},
         /* satSpace= */ {min: 70, max: 100, count: 6},

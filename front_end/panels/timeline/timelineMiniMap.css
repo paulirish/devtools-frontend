@@ -73,6 +73,8 @@
   flex: none;
   position: relative;
   overflow: hidden;
+
+  contain: content;
 }
 
 .timeline-minimap #timeline-overview-container canvas {
