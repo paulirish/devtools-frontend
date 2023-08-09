@@ -80,10 +80,13 @@ export class GPUTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    // if (!TraceEngine.Types.TraceEvents.isTraceEventGPUTask(event)) {
+    if (TraceEngine.Types.TraceEvents.isTraceEventGPUTask(event)) {
+      return 'hsl(109, 33%, 55%)';
+    }
+    return 'hsl(109, 0%, 75%)';
+
     //   throw new Error(`Unexpected GPU Task: The event's type is '${event.name}'`);
     // }
-    return 'hsl(109, 33%, 55%)';
   }
 
   /**

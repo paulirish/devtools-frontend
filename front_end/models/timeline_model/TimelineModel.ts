@@ -661,7 +661,16 @@ export class TimelineModelImpl {
     const browserMain = TraceEngine.Legacy.TracingModel.browserMainThread(tracingModel);
     if (browserMain) {
       browserMain.events().forEach(this.processBrowserEvent, this);
+
+       if (Root.Runtime.experiments.isEnabled('timelineShowAllEvents')) {
+        // const track = this.ensureNamedTrack(TrackType.Browser);
+        // track.thread = browserMain;
+        // track.events = browserMain.events();
+        this.processThreadEvents(tracingModel, browserMain, false /* maybe */, false, false, WorkletType.NotWorklet, null);
+
+      }
     }
+
   }
 
   private processAsyncBrowserEvents(tracingModel: TraceEngine.Legacy.TracingModel): void {
@@ -1807,6 +1816,7 @@ export enum TrackType {
   MainThread = 'MainThread',
   Worker = 'Worker',
   Animation = 'Animation',
+  Browser = 'Browser',
   Raster = 'Raster',
   Experience = 'Experience',
   Other = 'Other',
