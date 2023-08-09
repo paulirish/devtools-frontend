@@ -179,6 +179,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.partialFramePatternCanvas = document.createElement('canvas');
     this.preparePatternCanvas();
     this.timelineDataInternal = null;
+    globalThis.fcdp = this;
     this.currentLevel = 0;
     this.legacyPerformanceModel = null;
     this.legacyTimelineModel = null;
