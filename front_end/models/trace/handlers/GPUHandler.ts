@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Root from '../../../core/root/root.js';
+
 import {data as metaHandlerData} from './MetaHandler.js';
 
 import {type TraceEventHandlerName, HandlerState} from './types.js';
@@ -18,9 +20,16 @@ const eventsInProcessThread =
 
 let mainGPUThreadTasks: Types.TraceEvents.TraceEventGPUTask[] = [];
 
+let gpuProcessId: Types.TraceEvents.ProcessID = Types.TraceEvents.ProcessID(-1);
+let gpuMainThreadId: Types.TraceEvents.ThreadID = Types.TraceEvents.ThreadID(-1);
+let showAllEvents: boolean = false;
+
 export function reset(): void {
   eventsInProcessThread.clear();
   mainGPUThreadTasks = [];
+  gpuProcessId = Types.TraceEvents.ProcessID(-1);
+  gpuMainThreadId = Types.TraceEvents.ThreadID(-1);
+  showAllEvents = false;
 
   handlerState = HandlerState.UNINITIALIZED;
 }
@@ -29,6 +38,7 @@ export function initialize(): void {
   if (handlerState !== HandlerState.UNINITIALIZED) {
     throw new Error('GPU Handler was not reset before being initialized');
   }
+  showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
 
   handlerState = HandlerState.INITIALIZED;
 }
@@ -38,15 +48,31 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     throw new Error('GPU Handler is not initialized');
   }
 
-  // with this ocmmented out.. add every event ever. def overkill
-  // TODO: grab the PID here ! dont neeed to depend on metahandler
+  // The GPU process and thread IDs will be in the very beginning of the JSON trace
+  // So we can rely on having that information before we process all other events
   // https://source.chromium.org/chromium/chromium/src/+/main:third_party/perfetto/src/trace_processor/export_json.cc;l=111;drc=4e2303cb84f29df580d050a410932f406806cdf2
+  if (gpuProcessId === -1 && Types.TraceEvents.isProcessName(event) &&
+      (event.args.name === 'Gpu' || event.args.name === 'GPU Process')) {
+    gpuProcessId = event.pid;
+    return;
+  }
 
-  // if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
-  //   return;
-  // }
+  if (gpuMainThreadId === -1 && Types.TraceEvents.isThreadName(event) && event.args.name === 'CrGpuMain') {
+    gpuMainThreadId = event.tid;
+    return;
+  }
 
-  Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
+  if (event.pid !== gpuProcessId) {
+    return;
+  }
+
+  // TODO(paulirish): We should only show GPU events where event.args.data.renderer_pid is an inspected renderer
+  // It's very possible to have GPU events for other tabs/windows.
+  if (Types.TraceEvents.isTraceEventGPUTask(event)) {
+    Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
+  } else if (showAllEvents) {
+    Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
+  }
 }
 
 export async function finalize(): Promise<void> {
@@ -54,10 +80,15 @@ export async function finalize(): Promise<void> {
     throw new Error('GPU Handler is not initialized');
   }
 
-  const {gpuProcessId, gpuThreadId} = metaHandlerData();
+  const {gpuProcessId: metaGpuPid, gpuThreadId: metaGpuTid} = metaHandlerData();
+  if (metaGpuPid !== gpuProcessId || metaGpuTid !== gpuMainThreadId) {
+    console.assert(false, 'GPU mismatch between handler and meta');
+  }
+
   const gpuThreadsForProcess = eventsInProcessThread.get(gpuProcessId);
-  if (gpuThreadsForProcess && gpuThreadId) {
-    mainGPUThreadTasks = gpuThreadsForProcess.get(gpuThreadId) || [];
+  if (gpuThreadsForProcess && gpuMainThreadId) {
+    // TODO(paulirish): Include other GPU threads in showAllEvents case.
+    mainGPUThreadTasks = gpuThreadsForProcess.get(gpuMainThreadId) || [];
     mainGPUThreadTasks.sort((event1, event2) => event1.ts - event2.ts);
   }
   handlerState = HandlerState.FINALIZED;

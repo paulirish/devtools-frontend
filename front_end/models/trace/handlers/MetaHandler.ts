@@ -138,23 +138,24 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     traceBounds.max = Types.Timing.MicroSeconds(Math.max(event.ts + eventDuration, traceBounds.max));
   }
 
-  if (Types.TraceEvents.isProcessName(event) &&
+  if (browserProcessId === -1 && Types.TraceEvents.isProcessName(event) &&
       (event.args.name === 'Browser' || event.args.name === 'HeadlessBrowser')) {
     browserProcessId = event.pid;
     return;
   }
 
-  if (Types.TraceEvents.isProcessName(event) && (event.args.name === 'Gpu' || event.args.name === 'GPU Process')) {
+  if (gpuProcessId === -1 && Types.TraceEvents.isProcessName(event) &&
+      (event.args.name === 'Gpu' || event.args.name === 'GPU Process')) {
     gpuProcessId = event.pid;
     return;
   }
 
-  if (Types.TraceEvents.isThreadName(event) && event.args.name === 'CrGpuMain') {
+  if (gpuThreadId === -1 && Types.TraceEvents.isThreadName(event) && event.args.name === 'CrGpuMain') {
     gpuThreadId = event.tid;
     return;
   }
 
-  if (Types.TraceEvents.isThreadName(event) && event.args.name === 'CrBrowserMain') {
+  if (browserThreadId === -1 && Types.TraceEvents.isThreadName(event) && event.args.name === 'CrBrowserMain') {
     browserThreadId = event.tid;
   }
 

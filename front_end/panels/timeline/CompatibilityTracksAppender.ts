@@ -423,7 +423,8 @@ export class CompatibilityTracksAppender {
       // Default styles are globally defined for each event name. Some
       // events are hidden by default.
       const shouldShowEvent = Root.Runtime.experiments.isEnabled('timelineShowAllEvents') ? true :
-        eventAsLegacy && visibleNames.has(TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(eventAsLegacy));
+                                                                                            eventAsLegacy &&
+              visibleNames.has(TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(eventAsLegacy));
       if (!shouldShowEvent) {
         continue;
       }
