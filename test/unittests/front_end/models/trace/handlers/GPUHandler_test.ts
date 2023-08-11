@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 const {assert} = chai;
-import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
+import * as Root from '../../../../../../front_end/core/root/root.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 describeWithEnvironment('GPUHandler', function() {
-  beforeEach(() => {
+  it('finds all the GPU Tasks for the main GPU Thread', async function() {
     TraceModel.Handlers.ModelHandlers.Meta.initialize();
     TraceModel.Handlers.ModelHandlers.GPU.initialize();
-  });
-
-  it('finds all the GPU Tasks for the main GPU Thread', async function() {
-    const events = await TraceLoader.rawEvents(this, 'threejs-gpu.json.gz');
+    const events = await TraceLoader.rawEvents(this, 'one-second-interaction.json.gz');
 
     for (const event of events) {
       TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -24,6 +22,25 @@ describeWithEnvironment('GPUHandler', function() {
     await TraceModel.Handlers.ModelHandlers.GPU.finalize();
 
     const gpuEvents = TraceModel.Handlers.ModelHandlers.GPU.data().mainGPUThreadTasks;
-    assert.lengthOf(gpuEvents, 201);
+    assert.lengthOf(gpuEvents, 33);
+  });
+
+  it('finds all the GPU Tasks, with timelineShowAllEvents enabled', async function() {
+    // Need to set the experiment before initializing.
+    Root.Runtime.experiments.enableForTest('timelineShowAllEvents');
+    TraceModel.Handlers.ModelHandlers.Meta.initialize();
+    TraceModel.Handlers.ModelHandlers.GPU.initialize();
+    const events = await TraceLoader.rawEvents(this, 'one-second-interaction.json.gz');
+
+    for (const event of events) {
+      TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+      TraceModel.Handlers.ModelHandlers.GPU.handleEvent(event);
+    }
+    await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+    await TraceModel.Handlers.ModelHandlers.GPU.finalize();
+
+    const gpuEvents = TraceModel.Handlers.ModelHandlers.GPU.data().mainGPUThreadTasks;
+    assert.lengthOf(gpuEvents, 167);
+    Root.Runtime.experiments.disableForTest('timelineShowAllEvents');
   });
 });
