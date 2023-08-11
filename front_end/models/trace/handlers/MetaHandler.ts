@@ -333,6 +333,15 @@ export type FrameProcessData =
     Map<string,
         Map<Types.TraceEvents.ProcessID, {frame: Types.TraceEvents.TraceFrame, window: Types.Timing.TraceWindow}[]>>;
 
+/**
+ * The GPU and Browser process pid/tids are reliably at the start of the JSON trace.
+ * The remainder of MetaHandler however, is likely not reliable until we're finalized.
+ * @url https://source.chromium.org/chromium/chromium/src/+/main:third_party/perfetto/src/trace_processor/export_json.cc;l=111;drc=4e2303cb84f29df580d050a410932f406806cdf2
+ */
+export function initialGpuProcessId(): Types.TraceEvents.ProcessID {
+  return gpuProcessId;
+}
+
 export function data(): MetaHandlerData {
   if (handlerState !== HandlerState.FINALIZED) {
     throw new Error('Meta Handler is not finalized');

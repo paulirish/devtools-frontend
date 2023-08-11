@@ -417,14 +417,16 @@ export class CompatibilityTracksAppender {
       appender: TrackAppender): number {
     const lastUsedTimeByLevel: number[] = [];
     const visibleNames = new Set(TimelineUIUtils.visibleTypes());
+    const showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
       const eventAsLegacy = this.getLegacyEvent(event);
       // Default styles are globally defined for each event name. Some
       // events are hidden by default.
-      const shouldShowEvent = Root.Runtime.experiments.isEnabled('timelineShowAllEvents') ? true :
-                                                                                            eventAsLegacy &&
+      const shouldShowEvent = showAllEvents ? true :
+                                              eventAsLegacy &&
               visibleNames.has(TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(eventAsLegacy));
+
       if (!shouldShowEvent) {
         continue;
       }
