@@ -39,6 +39,8 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   }
 
   // with this ocmmented out.. add every event ever. def overkill
+  // TODO: grab the PID here ! dont neeed to depend on metahandler
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/perfetto/src/trace_processor/export_json.cc;l=111;drc=4e2303cb84f29df580d050a410932f406806cdf2
 
   // if (!Types.TraceEvents.isTraceEventGPUTask(event)) {
   //   return;
