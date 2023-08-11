@@ -182,17 +182,13 @@ export async function finalize(): Promise<void> {
         },
       },
     };
+    if (event.dur < 0) {
+      console.assert(false, `Event pair creates negative duration: ${event.name}`);
+      continue;
+    }
     syntheticEvents.push(event);
   }
-  syntheticEvents.sort((event1, event2) => {
-    if (event1.ts > event2.ts) {
-      return 1;
-    }
-    if (event2.ts > event1.ts) {
-      return -1;
-    }
-    return 0;
-  });
+  syntheticEvents.sort((a, b) => a.ts - b.ts);
   handlerState = HandlerState.FINALIZED;
 }
 
