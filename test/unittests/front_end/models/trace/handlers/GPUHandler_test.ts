@@ -4,9 +4,10 @@
 
 const {assert} = chai;
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
+import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
-describe('GPUHandler', function() {
+describeWithEnvironment('GPUHandler', function() {
   beforeEach(() => {
     TraceModel.Handlers.ModelHandlers.Meta.initialize();
     TraceModel.Handlers.ModelHandlers.GPU.initialize();
