@@ -1468,7 +1468,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
 
   setInterceptionHandlerForPatterns(
       patterns: InterceptionPattern[], requestInterceptor: (arg0: InterceptedRequest) => Promise<void>): Promise<void> {
-    // Note: requestInterceptors may recieve interception #requests for patterns they did not subscribe to.
+    // Note: requestInterceptors may receive interception #requests for patterns they did not subscribe to.
     this.#urlsForRequestInterceptor.deleteAll(requestInterceptor);
     for (const newPattern of patterns) {
       this.#urlsForRequestInterceptor.set(requestInterceptor, newPattern);
@@ -1693,6 +1693,7 @@ export class InterceptedRequest {
       const setCookieHeadersFromOverrides = responseHeaders.filter(header => header.name === 'set-cookie');
       this.networkRequest.setCookieHeaders =
           InterceptedRequest.mergeSetCookieHeaders(originalSetCookieHeaders, setCookieHeadersFromOverrides);
+      this.networkRequest.hasOverriddenContent = isBodyOverridden;
     }
 
     void this.#fetchAgent.invoke_fulfillRequest({requestId: this.requestId, responseCode, body, responseHeaders});

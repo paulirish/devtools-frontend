@@ -400,25 +400,31 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
   async setupAndStartLocalOverrides(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<boolean> {
     // No overrides folder, set it up
     if (this.#shouldPromptSaveForOverridesDialog(uiSourceCode)) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuSetup);
       await new Promise<void>(
           resolve => UI.InspectorView.InspectorView.instance().displaySelectOverrideFolderInfobar(resolve));
       await IsolatedFileSystemManager.instance().addFileSystem('overrides');
     }
 
     if (!this.project()) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuAbandonSetup);
       return false;
     }
 
     // Already have an overrides folder, enable setting
     if (!this.enabledSetting.get()) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuActivateDisabled);
       this.enabledSetting.set(true);
       await this.once(Events.LocalOverridesProjectUpdated);
     }
 
     // Save new file
     if (!this.#isUISourceCodeAlreadyOverridden(uiSourceCode)) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuSaveNewFile);
       uiSourceCode.commitWorkingCopy();
       await this.saveUISourceCodeForOverrides(uiSourceCode as Workspace.UISourceCode.UISourceCode);
+    } else {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuOpenExistingFile);
     }
 
     return true;
@@ -465,6 +471,17 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
       return 'file:///' + path.substring('file:/'.length);
     }
     return 'http?://' + path;
+  }
+
+  // 'chrome://'-URLs and the Chrome Web Store are privileged URLs. We don't want users
+  // to be able to override those. Ideally we'd have a similar check in the backend,
+  // because the fix here has no effect on non-DevTools CDP clients.
+  private isForbiddenUrl(uiSourceCode: Workspace.UISourceCode.UISourceCode): boolean {
+    const relativePathParts = FileSystemWorkspaceBinding.relativePath(uiSourceCode);
+    // Decode twice to handle paths generated on Windows OS.
+    const host = this.decodeLocalPathToUrlPath(this.decodeLocalPathToUrlPath(relativePathParts[0] || ''));
+    const forbiddenUrls = ['chrome:', 'chromewebstore.google.com', 'chrome.google.com'];
+    return forbiddenUrls.includes(host);
   }
 
   private async onUISourceCodeAdded(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
@@ -666,6 +683,9 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     }
     let patterns = new Set<string>();
     for (const uiSourceCode of this.projectInternal.uiSourceCodes()) {
+      if (this.isForbiddenUrl(uiSourceCode)) {
+        continue;
+      }
       const pattern = this.patternForFileSystemUISourceCode(uiSourceCode);
       if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HEADER_OVERRIDES) &&
           uiSourceCode.name() === HEADERS_FILENAME) {

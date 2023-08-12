@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 import '../../recorder/components/components.js';
 
+import * as Host from '../../../core/host/host.js';
+import * as i18n from '../../../core/i18n/i18n.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
@@ -10,6 +12,23 @@ import toolbarStyles from './toolbar.css.js';
 
 const {html, Decorators, LitElement} = LitHtml;
 const {customElement} = Decorators;
+
+const UIStrings = {
+  /**
+   * @description The title of a the button that sends a CDP command.
+   */
+  sendCommandCtrlEnter: 'Send command - Ctrl+Enter',
+  /**
+   * @description The title of a the button that sends a CDP command.
+   */
+  sendCommandCmdEnter: 'Send command - ⌘+Enter',
+  /**
+   * @description he title of a the button that copies a CDP command.
+   */
+  copyCommand: 'Copy command',
+};
+const str_ = i18n.i18n.registerUIStrings('panels/protocol_monitor/components/Toolbar.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -51,6 +70,7 @@ export class Toolbar extends LitElement {
     return html`
         <div class="toolbar">
           <${Buttons.Button.Button.litTagName}
+          title=${i18nString(UIStrings.copyCommand)}
           .size=${Buttons.Button.Size.SMALL}
           .iconUrl=${copyIconUrl}
           .variant=${Buttons.Button.Variant.TOOLBAR}
@@ -58,6 +78,7 @@ export class Toolbar extends LitElement {
         ></${Buttons.Button.Button.litTagName}>
         <${Buttons.Button.Button.litTagName}
           .size=${Buttons.Button.Size.SMALL}
+          title=${Host.Platform.isMac() ? i18nString(UIStrings.sendCommandCmdEnter) : i18nString(UIStrings.sendCommandCtrlEnter)}
           .iconUrl=${sendIconUrl}
           .variant=${Buttons.Button.Variant.PRIMARY_TOOLBAR}
           @click=${this.#handleSend}

@@ -33,15 +33,7 @@ import type * as Platform from '../../core/platform/platform.js';
 import type * as TextUtils from '../text_utils/text_utils.js';
 
 import {UISourceCode, type UISourceCodeMetadata} from './UISourceCode.js';
-
-export interface ProjectSearchConfig {
-  query(): string;
-  ignoreCase(): boolean;
-  isRegex(): boolean;
-  queries(): string[];
-  filePathMatchesFileQuery(filePath: Platform.DevToolsPath.RawPathString|
-                           Platform.DevToolsPath.EncodedPathString|Platform.DevToolsPath.UrlString): boolean;
-}
+import {type SearchConfig} from './SearchConfig.js';
 
 export interface Project {
   workspace(): WorkspaceImpl;
@@ -71,8 +63,8 @@ export interface Project {
   searchInFileContent(uiSourceCode: UISourceCode, query: string, caseSensitive: boolean, isRegex: boolean):
       Promise<TextUtils.ContentProvider.SearchMatch[]>;
   findFilesMatchingSearchRequest(
-      searchConfig: ProjectSearchConfig, filesMatchingFileQuery: Platform.DevToolsPath.UrlString[],
-      progress: Common.Progress.Progress): Promise<string[]>;
+      searchConfig: SearchConfig, filesMatchingFileQuery: UISourceCode[],
+      progress: Common.Progress.Progress): Promise<UISourceCode[]>;
   indexContent(progress: Common.Progress.Progress): void;
   uiSourceCodeForURL(url: Platform.DevToolsPath.UrlString): UISourceCode|null;
 
@@ -208,8 +200,8 @@ export abstract class ProjectStore implements Project {
   abstract searchInFileContent(uiSourceCode: UISourceCode, query: string, caseSensitive: boolean, isRegex: boolean):
       Promise<TextUtils.ContentProvider.SearchMatch[]>;
   abstract findFilesMatchingSearchRequest(
-      searchConfig: ProjectSearchConfig, filesMatchingFileQuery: Platform.DevToolsPath.UrlString[],
-      progress: Common.Progress.Progress): Promise<string[]>;
+      searchConfig: SearchConfig, filesMatchingFileQuery: UISourceCode[],
+      progress: Common.Progress.Progress): Promise<UISourceCode[]>;
 }
 
 let workspaceInstance: WorkspaceImpl|undefined;

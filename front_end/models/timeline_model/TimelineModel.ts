@@ -128,8 +128,6 @@ export class TimelineModelImpl {
   private mainFrame!: PageFrame;
   private minimumRecordTimeInternal: number;
   private maximumRecordTimeInternal: number;
-  private totalBlockingTimeInternal: number;
-  private estimatedTotalBlockingTime: number;
   private asyncEventTracker!: TimelineAsyncEventTracker;
   private invalidationTracker!: InvalidationTracker;
   private layoutInvalidate!: {
@@ -158,8 +156,6 @@ export class TimelineModelImpl {
   constructor() {
     this.minimumRecordTimeInternal = 0;
     this.maximumRecordTimeInternal = 0;
-    this.totalBlockingTimeInternal = 0;
-    this.estimatedTotalBlockingTime = 0;
     this.reset();
     this.resetProcessingState();
 
@@ -320,17 +316,6 @@ export class TimelineModelImpl {
   cpuProfiles():
       {cpuProfileData: CPUProfile.CPUProfileDataModel.CPUProfileDataModel, target: SDK.Target.Target|null}[] {
     return this.cpuProfilesInternal;
-  }
-
-  totalBlockingTime(): {
-    time: number,
-    estimated: boolean,
-  } {
-    if (this.totalBlockingTimeInternal === -1) {
-      return {time: this.estimatedTotalBlockingTime, estimated: true};
-    }
-
-    return {time: this.totalBlockingTimeInternal, estimated: false};
   }
 
   targetByEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): SDK.Target.Target|null {
@@ -878,19 +863,6 @@ export class TimelineModelImpl {
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
 
-      // There may be several TTI events, only take the first one.
-      if (this.isInteractiveTimeEvent(event) && this.totalBlockingTimeInternal === -1) {
-        this.totalBlockingTimeInternal = event.args['args']['total_blocking_time_ms'];
-      }
-
-      const isLongRunningTask = event.name === RecordType.Task && event.duration && event.duration > 50;
-      if (isMainThread && isLongRunningTask && event.duration) {
-        // We only track main thread events that are over 50ms, and the amount of time in the
-        // event (over 50ms) is what constitutes the blocking time. An event of 70ms, therefore,
-        // contributes 20ms to TBT.
-        this.estimatedTotalBlockingTime += event.duration - 50;
-      }
-
       let last: TraceEngine.Legacy.Event = eventStack[eventStack.length - 1];
       while (last && last.endTime !== undefined && last.endTime <= event.startTime) {
         eventStack.pop();
@@ -1436,9 +1408,6 @@ export class TimelineModelImpl {
 
     this.minimumRecordTimeInternal = 0;
     this.maximumRecordTimeInternal = 0;
-
-    this.totalBlockingTimeInternal = -1;
-    this.estimatedTotalBlockingTime = 0;
   }
 
   isGenericTrace(): boolean {
@@ -2317,18 +2286,15 @@ export class TimelineAsyncEventTracker {
 
 export class EventOnTimelineData {
   warning: string|null;
-  previewElement: Element|null;
   url: Platform.DevToolsPath.UrlString|null;
   backendNodeIds: Protocol.DOM.BackendNodeId[];
   stackTrace: Protocol.Runtime.CallFrame[]|null;
   picture: TraceEngine.Legacy.ObjectSnapshot|null;
   private initiatorInternal: TraceEngine.Legacy.Event|null;
   frameId: Protocol.Page.FrameId|null;
-  timeWaitingForMainThread?: number;
 
   constructor() {
     this.warning = null;
-    this.previewElement = null;
     this.url = null;
     this.backendNodeIds = [];
     this.stackTrace = null;

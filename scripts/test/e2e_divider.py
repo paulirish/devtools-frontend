@@ -89,25 +89,25 @@ def divide_run(chunks,
 
         return commands
 
-    divided_test_files = [[] for i in range(chunks)]
+    chunk_size = math.ceil(len(test_files) / chunks)
 
-    for i in range(len(test_files)):
-        divided_test_files[i % chunks].append(test_files[i])
-
-    for l in divided_test_files:
-        if l:
-            commands.append({
-                'env': {},
-                'command': [
-                    node_path(),
-                    str(
-                        Path(
-                            f'{devtools_root_path()}/scripts/test/run_test_suite.js'
-                        )),
-                    f'--config={Path(f"{test_suite_source_dir}/test-runner-config.json")}',
-                    '--test-file-pattern=' + ','.join(l)
-                ]
-            })
+    for l in [
+            test_files[i:i + chunk_size]
+            for i in range(0, len(test_files), chunk_size)
+            if test_files[i:i + chunk_size]
+    ]:
+        commands.append({
+            'env': {},
+            'command': [
+                node_path(),
+                str(
+                    Path(
+                        f'{devtools_root_path()}/scripts/test/run_test_suite.js'
+                    )),
+                f'--config={Path(f"{test_suite_source_dir}/test-runner-config.json")}',
+                '--test-file-pattern=' + ','.join(l)
+            ]
+        })
 
     return commands
 
@@ -120,5 +120,9 @@ if __name__ == '__main__':
                           iterations=int(args.iterations),
                           shuffle=args.shuffle)
     for command in commands:
-        print(' '.join([f'{k}={v}' for k, v in command['env'].items()] +
-                       command['command']))
+        command_text = ' '.join(
+            [f'{k}={v}'
+             for k, v in command['env'].items()] + command['command'])
+        assert len(command_text) < 8191,\
+          'Command is too long for Windows, consider increasing the number of shards'
+        print(command_text)

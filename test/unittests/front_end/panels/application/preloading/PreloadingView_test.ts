@@ -47,32 +47,6 @@ function assertGridContents(gridComponent: HTMLElement, headerExpected: string[]
   assert.deepEqual([headerGot, rowsGot], [headerExpected, rowsExpected]);
 }
 
-async function testWarnings(event: Protocol.Preload.PreloadEnabledStateUpdatedEvent, infoTextsExpected: string[]) {
-  const target = createTarget();
-
-  const warningsUpdatedPromise: Promise<void> = new Promise(resolve => {
-    const model = target.model(SDK.PreloadingModel.PreloadingModel);
-    assertNotNullOrUndefined(model);
-    model.addEventListener(SDK.PreloadingModel.Events.WarningsUpdated, _ => resolve());
-  });
-
-  const view = createRuleSetView(target);
-
-  dispatchEvent(target, 'Preload.preloadEnabledStateUpdated', event);
-
-  await warningsUpdatedPromise;
-  await coordinator.done();
-
-  const infobarContainer = view.getInfobarContainerForTest();
-  const infoTextsGot = Array.from(infobarContainer.children).map(infobarElement => {
-    assertShadowRoot(infobarElement.shadowRoot);
-    const infoText = infobarElement.shadowRoot.querySelector('.infobar-info-text');
-    assertNotNullOrUndefined(infoText);
-    return infoText.textContent;
-  });
-  assert.deepEqual(infoTextsGot, infoTextsExpected);
-}
-
 // Holds targets and ids, and emits events.
 class NavigationEmulator {
   private seq: number = 0;
@@ -360,9 +334,9 @@ describeWithMockConnection('PreloadingRuleSetView', async () => {
 
     assertGridContents(
         ruleSetGridComponent,
-        ['#', 'Validity', 'Location', 'Preloads'],
+        ['Rule set', 'Status'],
         [
-          ['2', 'Valid', '<script>', '1 Running'],
+          ['example.com/', '1 Running'],
         ],
     );
   });
@@ -389,10 +363,11 @@ describeWithMockConnection('PreloadingRuleSetView', async () => {
 
     assertGridContents(
         ruleSetGridComponent,
-        ['#', 'Validity', 'Location', 'Preloads'],
+        ['Rule set', 'Status'],
         [
-          ['2', 'Invalid', '<script>', ''],
+          ['example.com/', '1 error'],
         ],
+
     );
 
     const cells = [
@@ -404,16 +379,10 @@ describeWithMockConnection('PreloadingRuleSetView', async () => {
 
     await coordinator.done();
 
-    const report = getElementWithinComponent(ruleSetDetailsComponent, 'devtools-report', ReportView.ReportView.Report);
-
-    const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
-    const values = getCleanTextContentFromElements(report, 'devtools-report-value');
-    assert.deepEqual(zip2(keys, values), [
-      ['Validity', 'Invalid; source is not a JSON object'],
-      ['Error', 'fake error message'],
-      ['Location', '<script>'],
-      ['Source', '{"prerender":[{"source": "list",'],
-    ]);
+    assert.deepEqual(
+        ruleSetDetailsComponent.shadowRoot?.getElementById('ruleset-url')?.textContent, 'https://example.com/');
+    assert.deepEqual(
+        ruleSetDetailsComponent.shadowRoot?.getElementById('error-message-text')?.textContent, 'fake error message');
   });
 
   // TODO(https://crbug.com/1384419): Check that preloading attempts for
@@ -444,7 +413,7 @@ describeWithMockConnection('PreloadingRuleSetView', async () => {
 
     assertGridContents(
         ruleSetGridComponent,
-        ['#', 'Validity', 'Location', 'Preloads'],
+        ['Rule set', 'Status'],
         [],
     );
   });
@@ -474,7 +443,7 @@ describeWithMockConnection('PreloadingRuleSetView', async () => {
 
     assertGridContents(
         ruleSetGridComponent,
-        ['#', 'Validity', 'Location', 'Preloads'],
+        ['Rule set', 'Status'],
         [],
     );
   });
@@ -523,83 +492,11 @@ describeWithMockConnection('PreloadingRuleSetView', async () => {
 
     assertGridContents(
         ruleSetGridComponent,
-        ['#', 'Validity', 'Location', 'Preloads'],
+        ['Rule set', 'Status'],
         [
-          ['2', 'Valid', '<script>', ''],
+          ['example.com/', ''],
         ],
     );
-  });
-
-  it('shows no warnings if nothing disabled', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: false,
-          disabledByHoldbackPrerenderSpeculationRules: false,
-        },
-        []);
-  });
-
-  it('shows an warning if prefetch is disabled by holdback', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: true,
-          disabledByHoldbackPrerenderSpeculationRules: false,
-        },
-        ['Prefetch was disabled, but is force-enabled now']);
-  });
-
-  it('shows two warnings if prefetch and prerender are disabled by holdback', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: true,
-          disabledByHoldbackPrerenderSpeculationRules: true,
-        },
-        ['Prefetch was disabled, but is force-enabled now', 'Prerendering was disabled, but is force-enabled now']);
-  });
-
-  it('shows an warning if preloading is disabled by preference', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: true,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: false,
-          disabledByHoldbackPrerenderSpeculationRules: false,
-        },
-        ['Preloading is disabled']);
-  });
-
-  it('shows an warning if preloading is disabled by DataSaver', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: true,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: false,
-          disabledByHoldbackPrerenderSpeculationRules: false,
-        },
-        ['Preloading is disabled']);
-  });
-
-  it('shows an warning if preloading is disabled by BatterySaver', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: true,
-          disabledByHoldbackPrefetchSpeculationRules: false,
-          disabledByHoldbackPrerenderSpeculationRules: false,
-        },
-        ['Preloading is disabled']);
   });
 });
 
@@ -630,11 +527,12 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/prerendered.html',
             'prerender',
+            '',
             'Running',
           ],
         ],
@@ -643,43 +541,6 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
     const placeholder = preloadingDetailsComponent.shadowRoot.querySelector('div.preloading-noselected div p');
 
     assert.strictEqual(placeholder?.textContent, 'Select an element for more details');
-  });
-
-  it('shows full URL in attempts grid if cross-domain', async () => {
-    const emulator = new NavigationEmulator();
-    await emulator.openDevTools();
-    const view = createAttemptView(emulator.primaryTarget);
-
-    await emulator.navigateAndDispatchEvents('');
-    await emulator.addSpecRules(`
-{
-  "prerender":[
-    {
-      "source": "list",
-      "urls": ["https://different-domain.example.com/prerendered.html"]
-    }
-  ]
-}
-`);
-
-    await coordinator.done();
-
-    const preloadingGridComponent = view.getPreloadingGridForTest();
-    assertShadowRoot(preloadingGridComponent.shadowRoot);
-    const preloadingDetailsComponent = view.getPreloadingDetailsForTest();
-    assertShadowRoot(preloadingDetailsComponent.shadowRoot);
-
-    assertGridContents(
-        preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
-        [
-          [
-            'https://different-domain.example.com/prerendered.html',
-            'prerender',
-            'Running',
-          ],
-        ],
-    );
   });
 
   // See https://crbug.com/1432880
@@ -728,11 +589,12 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/prerendered.html',
             'prerender',
+            '',
             'Running',
           ],
         ],
@@ -800,20 +662,22 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
     const preloadingGridComponent = view.getPreloadingGridForTest();
     assertShadowRoot(preloadingGridComponent.shadowRoot);
 
-    assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'All rule sets');
+    assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'All preloads');
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/subresource2.js',
             'prefetch',
+            'example.com/',
             'Running',
           ],
           [
             '/prerendered3.html',
             'prerender',
+            'example.com/',
             'Running',
           ],
         ],
@@ -824,15 +688,16 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     await coordinator.done();
 
-    assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'Rule set: 2');
+    assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'example.com/');
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/subresource2.js',
             'prefetch',
+            'example.com/',
             'Running',
           ],
         ],
@@ -843,27 +708,29 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     await coordinator.done();
 
-    assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'All rule sets');
+    assert.strictEqual(ruleSetSelectorToolbarItem.element.querySelector('span')?.textContent, 'All preloads');
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/subresource2.js',
             'prefetch',
+            'example.com/',
             'Running',
           ],
           [
             '/prerendered3.html',
             'prerender',
+            'example.com/',
             'Running',
           ],
         ],
     );
   });
 
-  it('shows prerender details with Investigate and Activate (disabled) buttons for Running', async () => {
+  it('shows prerender details with Investigate button for Running', async () => {
     const emulator = new NavigationEmulator();
     await emulator.openDevTools();
     const view = createAttemptView(emulator.primaryTarget);
@@ -889,11 +756,12 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/prerendered.html',
             'prerender',
+            '',
             'Running',
           ],
         ],
@@ -915,18 +783,16 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', 'https://example.com/prerendered.html'],
-      ['Action', 'prerenderInspectActivate'],
+      ['Action', 'prerenderInspect'],
       ['Status', 'Preloading is running.'],
     ]);
 
     const buttons = report.querySelectorAll('devtools-report-value:nth-of-type(2) devtools-button');
     assert.strictEqual(buttons[0].textContent?.trim(), 'Inspect');
     assert.strictEqual(buttons[0].getAttribute('disabled'), null);
-    assert.strictEqual(buttons[1].textContent?.trim(), 'Activate');
-    assert.strictEqual(buttons[1].getAttribute('disabled'), '');
   });
 
-  it('shows prerender details with Investigate and Activate buttons for Ready', async () => {
+  it('shows prerender details with Investigate button for Ready', async () => {
     const emulator = new NavigationEmulator();
     await emulator.openDevTools();
     const view = createAttemptView(emulator.primaryTarget);
@@ -961,11 +827,12 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/prerendered.html',
             'prerender',
+            '',
             'Ready',
           ],
         ],
@@ -987,18 +854,16 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', 'https://example.com/prerendered.html'],
-      ['Action', 'prerenderInspectActivate'],
+      ['Action', 'prerenderInspect'],
       ['Status', 'Preloading finished and the result is ready for the next navigation.'],
     ]);
 
     const buttons = report.querySelectorAll('devtools-report-value:nth-of-type(2) devtools-button');
     assert.strictEqual(buttons[0].textContent?.trim(), 'Inspect');
     assert.strictEqual(buttons[0].getAttribute('disabled'), null);
-    assert.strictEqual(buttons[1].textContent?.trim(), 'Activate');
-    assert.strictEqual(buttons[1].getAttribute('disabled'), null);
   });
 
-  it('shows prerender details with Investigate (disabled) and Activate (disabled) buttons for Failure', async () => {
+  it('shows prerender details with Investigate (disabled) button for Failure', async () => {
     const emulator = new NavigationEmulator();
     await emulator.openDevTools();
     const view = createAttemptView(emulator.primaryTarget);
@@ -1022,6 +887,8 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
         url: 'https://example.com/prerendered.html',
       },
       status: Protocol.Preload.PreloadingStatus.Failure,
+      prerenderStatus: Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
+      disallowedMojoInterface: 'device.mojom.GamepadMonitor',
     });
     // Note that `TargetManager.removeTarget` is not called on `Target.targetDestroyed`.
     // Here, we manually remove the target for prerendered page from `TargetManager`.
@@ -1039,12 +906,13 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
 
     assertGridContents(
         preloadingGridComponent,
-        ['URL', 'Action', 'Status'],
+        ['URL', 'Action', 'Rule set', 'Status'],
         [
           [
             '/prerendered.html',
             'prerender',
-            'Failure',
+            '',
+            'Failure - The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
           ],
         ],
     );
@@ -1065,15 +933,17 @@ describeWithMockConnection('PreloadingAttemptView', async () => {
     const values = getCleanTextContentFromElements(report, 'devtools-report-value');
     assert.deepEqual(zip2(keys, values), [
       ['URL', 'https://example.com/prerendered.html'],
-      ['Action', 'prerenderInspectActivate'],
+      ['Action', 'prerenderInspect'],
       ['Status', 'Preloading failed.'],
+      [
+        'Failure reason',
+        'The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
+      ],
     ]);
 
     const buttons = report.querySelectorAll('devtools-report-value:nth-of-type(2) devtools-button');
     assert.strictEqual(buttons[0].textContent?.trim(), 'Inspect');
     assert.strictEqual(buttons[0].getAttribute('disabled'), '');
-    assert.strictEqual(buttons[1].textContent?.trim(), 'Activate');
-    assert.strictEqual(buttons[1].getAttribute('disabled'), '');
   });
 });
 
@@ -1105,6 +975,43 @@ describeWithMockConnection('PreloadingResultView', async () => {
   });
 });
 
+async function testWarnings(
+    event: Protocol.Preload.PreloadEnabledStateUpdatedEvent, headerExpected: string|null,
+    sectionsExpected: [string, string][]): Promise<void> {
+  const target = createTarget();
+
+  const warningsUpdatedPromise: Promise<void> = new Promise(resolve => {
+    const model = target.model(SDK.PreloadingModel.PreloadingModel);
+    assertNotNullOrUndefined(model);
+    model.addEventListener(SDK.PreloadingModel.Events.WarningsUpdated, _ => resolve());
+  });
+
+  const view = createRuleSetView(target);
+  view.wasShown();
+
+  dispatchEvent(target, 'Preload.preloadEnabledStateUpdated', event);
+
+  await warningsUpdatedPromise;
+  await coordinator.done();
+
+  const infobarContainer = view.getInfobarContainerForTest();
+  const infobar = infobarContainer.querySelector('devtools-resources-preloading-disabled-infobar');
+  assertNotNullOrUndefined(infobar);
+  assertShadowRoot(infobar.shadowRoot);
+  const headerGot = infobar.shadowRoot.querySelector('#header');
+  assert.strictEqual(headerGot?.textContent?.trim() || null, headerExpected);
+
+  if (headerExpected === null) {
+    return;
+  }
+
+  const headers =
+      [...infobar.shadowRoot.querySelectorAll('#contents div.key')].map(header => header.textContent?.trim());
+  const sections =
+      [...infobar.shadowRoot.querySelectorAll('#contents div.value')].map(section => section.textContent?.trim());
+  assert.deepEqual(zip2(headers, sections), sectionsExpected);
+}
+
 describeWithMockConnection('PreloadingWarningsView', async () => {
   it('shows no warnings if holdback flags are disabled', async () => {
     await testWarnings(
@@ -1115,34 +1022,12 @@ describeWithMockConnection('PreloadingWarningsView', async () => {
           disabledByHoldbackPrefetchSpeculationRules: false,
           disabledByHoldbackPrerenderSpeculationRules: false,
         },
-        []);
+        null,
+        [],
+    );
   });
 
-  it('shows an warning if PreloadingHoldback enabled', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: true,
-          disabledByHoldbackPrerenderSpeculationRules: false,
-        },
-        ['Prefetch was disabled, but is force-enabled now']);
-  });
-
-  it('shows two warnings if PreloadingHoldback and Prerender2Holdback enabled', async () => {
-    await testWarnings(
-        {
-          disabledByPreference: false,
-          disabledByDataSaver: false,
-          disabledByBatterySaver: false,
-          disabledByHoldbackPrefetchSpeculationRules: true,
-          disabledByHoldbackPrerenderSpeculationRules: true,
-        },
-        ['Prefetch was disabled, but is force-enabled now', 'Prerendering was disabled, but is force-enabled now']);
-  });
-
-  it('shows an warning if PreloadEnabledState DisabledByPreference', async () => {
+  it('shows an warning if disabled by user settings', async () => {
     await testWarnings(
         {
           disabledByPreference: true,
@@ -1151,10 +1036,15 @@ describeWithMockConnection('PreloadingWarningsView', async () => {
           disabledByHoldbackPrefetchSpeculationRules: false,
           disabledByHoldbackPrerenderSpeculationRules: false,
         },
-        ['Preloading is disabled']);
+        'Preloading is disabled', [
+          [
+            'User settings or extension',
+            'Preloading is disabled because of user settings or an extension. Go to Preload pages settings to update your preference. Go to Extensions settings to disable any extension that blocks preloading.',
+          ],
+        ]);
   });
 
-  it('shows an warning if Preloading is disabled by DataSaver', async () => {
+  it('shows an warning if disabled disabled by Data Saver', async () => {
     await testWarnings(
         {
           disabledByPreference: false,
@@ -1163,10 +1053,12 @@ describeWithMockConnection('PreloadingWarningsView', async () => {
           disabledByHoldbackPrefetchSpeculationRules: false,
           disabledByHoldbackPrerenderSpeculationRules: false,
         },
-        ['Preloading is disabled']);
+        'Preloading is disabled', [
+          ['Data Saver', 'Preloading is disabled because of the operating system\'s Data Saver mode.'],
+        ]);
   });
 
-  it('shows an warning if Preloading is disabled by BatterySaver', async () => {
+  it('shows an warning if disabled by Battery Saver', async () => {
     await testWarnings(
         {
           disabledByPreference: false,
@@ -1175,51 +1067,69 @@ describeWithMockConnection('PreloadingWarningsView', async () => {
           disabledByHoldbackPrefetchSpeculationRules: false,
           disabledByHoldbackPrerenderSpeculationRules: false,
         },
-        ['Preloading is disabled']);
+        'Preloading is disabled', [
+          ['Battery Saver', 'Preloading is disabled because of the operating system\'s Battery Saver mode.'],
+        ]);
   });
 
-  it('shows warnings only once even if multiple events received', async () => {
-    const event = {
-      disabledByPreference: false,
-      disabledByDataSaver: false,
-      disabledByBatterySaver: false,
-      disabledByHoldbackPrefetchSpeculationRules: true,
-      disabledByHoldbackPrerenderSpeculationRules: false,
-    };
-    const infoTextsExpected = ['Prefetch was disabled, but is force-enabled now'];
+  it('shows an warning if disabled by prefetch holdback', async () => {
+    await testWarnings(
+        {
+          disabledByPreference: false,
+          disabledByDataSaver: false,
+          disabledByBatterySaver: false,
+          disabledByHoldbackPrefetchSpeculationRules: true,
+          disabledByHoldbackPrerenderSpeculationRules: false,
+        },
+        'Preloading is force-enabled', [
+          [
+            'Prefetch was disabled, but is force-enabled now',
+            'Prefetch is forced-enabled because DevTools is open. When DevTools is closed, prefetch will be disabled because this browser session is part of a holdback group used for performance comparisons.',
+          ],
+        ]);
+  });
 
-    const target = createTarget();
-    const view = createRuleSetView(target);
+  it('shows an warning if disabled by prerender holdback', async () => {
+    await testWarnings(
+        {
+          disabledByPreference: false,
+          disabledByDataSaver: false,
+          disabledByBatterySaver: false,
+          disabledByHoldbackPrefetchSpeculationRules: false,
+          disabledByHoldbackPrerenderSpeculationRules: true,
+        },
+        'Preloading is force-enabled', [
+          [
+            'Prerendering was disabled, but is force-enabled now',
+            'Prerendering is forced-enabled because DevTools is open. When DevTools is closed, prerendering will be disabled because this browser session is part of a holdback group used for performance comparisons.',
+          ],
+        ]);
+  });
 
-    const warningsUpdatedPromise: Promise<void> = new Promise(resolve => {
-      const model = target.model(SDK.PreloadingModel.PreloadingModel);
-      assertNotNullOrUndefined(model);
-      model.addEventListener(SDK.PreloadingModel.Events.WarningsUpdated, _ => resolve());
-    });
-
-    dispatchEvent(target, 'Preload.preloadEnabledStateUpdated', event);
-
-    await warningsUpdatedPromise;
-    await coordinator.done();
-
-    const warningsUpdatedPromise2: Promise<void> = new Promise(resolve => {
-      const model = target.model(SDK.PreloadingModel.PreloadingModel);
-      assertNotNullOrUndefined(model);
-      model.addEventListener(SDK.PreloadingModel.Events.WarningsUpdated, _ => resolve());
-    });
-
-    dispatchEvent(target, 'Preload.preloadEnabledStateUpdated', event);
-
-    await warningsUpdatedPromise2;
-    await coordinator.done();
-
-    const infobarContainer = view.getInfobarContainerForTest();
-    const infoTextsGot = Array.from(infobarContainer.children).map(infobarElement => {
-      assertShadowRoot(infobarElement.shadowRoot);
-      const infoText = infobarElement.shadowRoot.querySelector('.infobar-info-text');
-      assertNotNullOrUndefined(infoText);
-      return infoText.textContent;
-    });
-    assert.deepEqual(infoTextsGot, infoTextsExpected);
+  it('shows multiple warnings per reason', async () => {
+    await testWarnings(
+        {
+          disabledByPreference: true,
+          disabledByDataSaver: true,
+          disabledByBatterySaver: true,
+          disabledByHoldbackPrefetchSpeculationRules: true,
+          disabledByHoldbackPrerenderSpeculationRules: true,
+        },
+        'Preloading is disabled', [
+          [
+            'User settings or extension',
+            'Preloading is disabled because of user settings or an extension. Go to Preload pages settings to update your preference. Go to Extensions settings to disable any extension that blocks preloading.',
+          ],
+          ['Data Saver', 'Preloading is disabled because of the operating system\'s Data Saver mode.'],
+          ['Battery Saver', 'Preloading is disabled because of the operating system\'s Battery Saver mode.'],
+          [
+            'Prefetch was disabled, but is force-enabled now',
+            'Prefetch is forced-enabled because DevTools is open. When DevTools is closed, prefetch will be disabled because this browser session is part of a holdback group used for performance comparisons.',
+          ],
+          [
+            'Prerendering was disabled, but is force-enabled now',
+            'Prerendering is forced-enabled because DevTools is open. When DevTools is closed, prerendering will be disabled because this browser session is part of a holdback group used for performance comparisons.',
+          ],
+        ]);
   });
 });

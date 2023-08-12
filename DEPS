@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 use_relative_paths = True
+git_dependencies = 'SYNC'
 gclient_gn_args_file = 'build/config/gclient_args.gni'
 gclient_gn_args = [
 ]
@@ -11,24 +12,24 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'aa4570fe0b3d0b43a65fee02d3f9f2a8995bff81',
+  'build_revision': '4fb90f22dd04845ff72de49b3538d1fd8921823d',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '16be42a9ff1f7e4a3e53b93b3adc181fa7ff9161',
+  'buildtools_revision': 'a9a6f0c49d0e8fa0cda37337430b4736ab3dc944',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'a8946f3d83a1ff940e8bfba85191ceb13c08e379',
+  'depot_tools_revision': '07289ce9416e01b0682696a698282cb22ce6d486',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '916f43c554c65ebf4ccd896b0f4e2ac99a67c434',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
-  'clang_format_revision': 'f97059df7f8b205064625cdb5f97b56668a125ef',
+  'clang_format_revision': 'e5337933f2951cacd3aeacd238ce4578163ca0b9',
 
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:3fccef9033b950e8935e8debeba9fbd71617bc74',
+  'gn_version': 'git_revision:cc56a0f98bb34accd5323316e0292575ff17a5d4',
 
   'cmake_version': 'version:3.16.1',
 
@@ -45,7 +46,11 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '117.0.5922.2',
+  'chrome': '118.0.5941.0',
+
+  # 'magic' text to tell depot_tools that git submodules should be accepted but
+  # but parity with DEPS file is expected.
+  'SUBMODULE_MIGRATION': 'True'
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.

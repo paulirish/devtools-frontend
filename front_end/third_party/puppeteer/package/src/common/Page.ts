@@ -21,11 +21,7 @@ import {Protocol} from 'devtools-protocol';
 import type {Browser} from '../api/Browser.js';
 import type {BrowserContext} from '../api/BrowserContext.js';
 import {ElementHandle} from '../api/ElementHandle.js';
-import {
-  Frame,
-  FrameAddScriptTagOptions,
-  FrameAddStyleTagOptions,
-} from '../api/Frame.js';
+import {Frame} from '../api/Frame.js';
 import {HTTPRequest} from '../api/HTTPRequest.js';
 import {HTTPResponse} from '../api/HTTPResponse.js';
 import {JSHandle} from '../api/JSHandle.js';
@@ -55,13 +51,13 @@ import {
 import {ConsoleMessage, ConsoleMessageType} from './ConsoleMessage.js';
 import {Coverage} from './Coverage.js';
 import {DeviceRequestPrompt} from './DeviceRequestPrompt.js';
-import {Dialog} from './Dialog.js';
+import {CDPDialog} from './Dialog.js';
 import {EmulationManager} from './EmulationManager.js';
 import {TargetCloseError} from './Errors.js';
+import {Handler} from './EventEmitter.js';
 import {FileChooser} from './FileChooser.js';
 import {FrameManager, FrameManagerEmittedEvents} from './FrameManager.js';
 import {CDPKeyboard, CDPMouse, CDPTouchscreen} from './Input.js';
-import {WaitForSelectorOptions} from './IsolatedWorld.js';
 import {MAIN_WORLD} from './IsolatedWorlds.js';
 import {
   Credentials,
@@ -70,7 +66,7 @@ import {
 } from './NetworkManager.js';
 import {PDFOptions} from './PDFOptions.js';
 import {Viewport} from './PuppeteerViewport.js';
-import {Target} from './Target.js';
+import {CDPTarget} from './Target.js';
 import {TargetManagerEmittedEvents} from './TargetManager.js';
 import {TaskQueue} from './TaskQueue.js';
 import {TimeoutSettings} from './TimeoutSettings.js';
@@ -86,6 +82,7 @@ import {
   isString,
   pageBindingInitString,
   releaseObject,
+  validateDialogType,
   valueFromRemoteObject,
   waitForEvent,
   waitWithTimeout,
@@ -102,7 +99,7 @@ export class CDPPage extends Page {
    */
   static async _create(
     client: CDPSession,
-    target: Target,
+    target: CDPTarget,
     ignoreHTTPSErrors: boolean,
     defaultViewport: Viewport | null,
     screenshotTaskQueue: TaskQueue
@@ -130,7 +127,7 @@ export class CDPPage extends Page {
 
   #closed = false;
   #client: CDPSession;
-  #target: Target;
+  #target: CDPTarget;
   #keyboard: CDPKeyboard;
   #mouse: CDPMouse;
   #timeoutSettings = new TimeoutSettings();
@@ -150,12 +147,143 @@ export class CDPPage extends Page {
   #serviceWorkerBypassed = false;
   #userDragInterceptionEnabled = false;
 
+  #frameManagerHandlers = new Map<symbol, Handler<any>>([
+    [
+      FrameManagerEmittedEvents.FrameAttached,
+      event => {
+        return this.emit(PageEmittedEvents.FrameAttached, event);
+      },
+    ],
+    [
+      FrameManagerEmittedEvents.FrameDetached,
+      event => {
+        return this.emit(PageEmittedEvents.FrameDetached, event);
+      },
+    ],
+    [
+      FrameManagerEmittedEvents.FrameNavigated,
+      event => {
+        return this.emit(PageEmittedEvents.FrameNavigated, event);
+      },
+    ],
+  ]);
+
+  #networkManagerHandlers = new Map<symbol, Handler<any>>([
+    [
+      NetworkManagerEmittedEvents.Request,
+      event => {
+        return this.emit(PageEmittedEvents.Request, event);
+      },
+    ],
+    [
+      NetworkManagerEmittedEvents.RequestServedFromCache,
+      event => {
+        return this.emit(PageEmittedEvents.RequestServedFromCache, event);
+      },
+    ],
+    [
+      NetworkManagerEmittedEvents.Response,
+      event => {
+        return this.emit(PageEmittedEvents.Response, event);
+      },
+    ],
+    [
+      NetworkManagerEmittedEvents.RequestFailed,
+      event => {
+        return this.emit(PageEmittedEvents.RequestFailed, event);
+      },
+    ],
+    [
+      NetworkManagerEmittedEvents.RequestFinished,
+      event => {
+        return this.emit(PageEmittedEvents.RequestFinished, event);
+      },
+    ],
+  ]);
+
+  #sessionHandlers = new Map<symbol | string, Handler<any>>([
+    [
+      CDPSessionEmittedEvents.Disconnected,
+      () => {
+        return this.#sessionCloseDeferred.resolve(
+          new TargetCloseError('Target closed')
+        );
+      },
+    ],
+    [
+      'Page.domContentEventFired',
+      () => {
+        return this.emit(PageEmittedEvents.DOMContentLoaded);
+      },
+    ],
+    [
+      'Page.loadEventFired',
+      () => {
+        return this.emit(PageEmittedEvents.Load);
+      },
+    ],
+    [
+      'Page.loadEventFired',
+      () => {
+        return this.emit(PageEmittedEvents.Load);
+      },
+    ],
+    [
+      'Runtime.consoleAPICalled',
+      event => {
+        return this.#onConsoleAPI(event);
+      },
+    ],
+    [
+      'Runtime.bindingCalled',
+      event => {
+        return this.#onBindingCalled(event);
+      },
+    ],
+    [
+      'Page.javascriptDialogOpening',
+      event => {
+        return this.#onDialog(event);
+      },
+    ],
+    [
+      'Runtime.exceptionThrown',
+      exception => {
+        return this.#handleException(exception.exceptionDetails);
+      },
+    ],
+    [
+      'Inspector.targetCrashed',
+      () => {
+        return this.#onTargetCrashed();
+      },
+    ],
+    [
+      'Performance.metrics',
+      event => {
+        return this.#emitMetrics(event);
+      },
+    ],
+    [
+      'Log.entryAdded',
+      event => {
+        return this.#onLogEntryAdded(event);
+      },
+    ],
+    [
+      'Page.fileChooserOpened',
+      event => {
+        return this.#onFileChooser(event);
+      },
+    ],
+  ]);
+
   /**
    * @internal
    */
   constructor(
     client: CDPSession,
-    target: Target,
+    target: CDPTarget,
     ignoreHTTPSErrors: boolean,
     screenshotTaskQueue: TaskQueue
   ) {
@@ -178,6 +306,10 @@ export class CDPPage extends Page {
     this.#screenshotTaskQueue = screenshotTaskQueue;
     this.#viewport = null;
 
+    this.#setupEventListeners();
+  }
+
+  #setupEventListeners() {
     this.#target
       ._targetManager()
       .addTargetInterceptor(this.#client, this.#onAttachedToTarget);
@@ -186,72 +318,18 @@ export class CDPPage extends Page {
       ._targetManager()
       .on(TargetManagerEmittedEvents.TargetGone, this.#onDetachedFromTarget);
 
-    this.#frameManager.on(FrameManagerEmittedEvents.FrameAttached, event => {
-      return this.emit(PageEmittedEvents.FrameAttached, event);
-    });
-    this.#frameManager.on(FrameManagerEmittedEvents.FrameDetached, event => {
-      return this.emit(PageEmittedEvents.FrameDetached, event);
-    });
-    this.#frameManager.on(FrameManagerEmittedEvents.FrameNavigated, event => {
-      return this.emit(PageEmittedEvents.FrameNavigated, event);
-    });
+    for (const [eventName, handler] of this.#frameManagerHandlers) {
+      this.#frameManager.on(eventName, handler);
+    }
 
-    const networkManager = this.#frameManager.networkManager;
-    networkManager.on(NetworkManagerEmittedEvents.Request, event => {
-      return this.emit(PageEmittedEvents.Request, event);
-    });
-    networkManager.on(
-      NetworkManagerEmittedEvents.RequestServedFromCache,
-      event => {
-        return this.emit(PageEmittedEvents.RequestServedFromCache, event);
-      }
-    );
-    networkManager.on(NetworkManagerEmittedEvents.Response, event => {
-      return this.emit(PageEmittedEvents.Response, event);
-    });
-    networkManager.on(NetworkManagerEmittedEvents.RequestFailed, event => {
-      return this.emit(PageEmittedEvents.RequestFailed, event);
-    });
-    networkManager.on(NetworkManagerEmittedEvents.RequestFinished, event => {
-      return this.emit(PageEmittedEvents.RequestFinished, event);
-    });
+    for (const [eventName, handler] of this.#networkManagerHandlers) {
+      this.#frameManager.networkManager.on(eventName, handler);
+    }
 
-    client.once(CDPSessionEmittedEvents.Disconnected, () => {
-      return this.#sessionCloseDeferred.resolve(
-        new TargetCloseError('Target closed')
-      );
-    });
+    for (const [eventName, handler] of this.#sessionHandlers) {
+      this.#client.on(eventName, handler);
+    }
 
-    client.on('Page.domContentEventFired', () => {
-      return this.emit(PageEmittedEvents.DOMContentLoaded);
-    });
-    client.on('Page.loadEventFired', () => {
-      return this.emit(PageEmittedEvents.Load);
-    });
-    client.on('Runtime.consoleAPICalled', event => {
-      return this.#onConsoleAPI(event);
-    });
-    client.on('Runtime.bindingCalled', event => {
-      return this.#onBindingCalled(event);
-    });
-    client.on('Page.javascriptDialogOpening', event => {
-      return this.#onDialog(event);
-    });
-    client.on('Runtime.exceptionThrown', exception => {
-      return this.#handleException(exception.exceptionDetails);
-    });
-    client.on('Inspector.targetCrashed', () => {
-      return this.#onTargetCrashed();
-    });
-    client.on('Performance.metrics', event => {
-      return this.#emitMetrics(event);
-    });
-    client.on('Log.entryAdded', event => {
-      return this.#onLogEntryAdded(event);
-    });
-    client.on('Page.fileChooserOpened', event => {
-      return this.#onFileChooser(event);
-    });
     this.#target._isClosedDeferred
       .valueOrThrow()
       .then(() => {
@@ -265,13 +343,14 @@ export class CDPPage extends Page {
             TargetManagerEmittedEvents.TargetGone,
             this.#onDetachedFromTarget
           );
+
         this.emit(PageEmittedEvents.Close);
         this.#closed = true;
       })
       .catch(debugError);
   }
 
-  #onDetachedFromTarget = (target: Target) => {
+  #onDetachedFromTarget = (target: CDPTarget) => {
     const sessionId = target._session()?.id();
     const worker = this.#workers.get(sessionId!);
     if (!worker) {
@@ -281,7 +360,7 @@ export class CDPPage extends Page {
     this.emit(PageEmittedEvents.WorkerDestroyed, worker);
   };
 
-  #onAttachedToTarget = (createdTarget: Target) => {
+  #onAttachedToTarget = (createdTarget: CDPTarget) => {
     this.#frameManager.onAttachedToTarget(createdTarget);
     if (createdTarget._getTargetInfo().type === 'worker') {
       const session = createdTarget._session();
@@ -392,7 +471,7 @@ export class CDPPage extends Page {
     return await this.#emulationManager.setGeolocation(options);
   }
 
-  override target(): Target {
+  override target(): CDPTarget {
     return this.#target;
   }
 
@@ -581,24 +660,6 @@ export class CDPPage extends Page {
     if (items.length) {
       await this.#client.send('Network.setCookies', {cookies: items});
     }
-  }
-
-  override async addScriptTag(
-    options: FrameAddScriptTagOptions
-  ): Promise<ElementHandle<HTMLScriptElement>> {
-    return this.mainFrame().addScriptTag(options);
-  }
-
-  override async addStyleTag(
-    options: Omit<FrameAddStyleTagOptions, 'url'>
-  ): Promise<ElementHandle<HTMLStyleElement>>;
-  override async addStyleTag(
-    options: FrameAddStyleTagOptions
-  ): Promise<ElementHandle<HTMLLinkElement>>;
-  override async addStyleTag(
-    options: FrameAddStyleTagOptions
-  ): Promise<ElementHandle<HTMLStyleElement | HTMLLinkElement>> {
-    return this.mainFrame().addStyleTag(options);
   }
 
   override async exposeFunction(
@@ -830,22 +891,10 @@ export class CDPPage extends Page {
   }
 
   #onDialog(event: Protocol.Page.JavascriptDialogOpeningEvent): void {
-    let dialogType = null;
-    const validDialogTypes = new Set<Protocol.Page.DialogType>([
-      'alert',
-      'confirm',
-      'prompt',
-      'beforeunload',
-    ]);
-
-    if (validDialogTypes.has(event.type)) {
-      dialogType = event.type as Protocol.Page.DialogType;
-    }
-    assert(dialogType, 'Unknown javascript dialog type: ' + event.type);
-
-    const dialog = new Dialog(
+    const type = validateDialogType(event.type);
+    const dialog = new CDPDialog(
       this.#client,
-      dialogType,
+      type,
       event.message,
       event.defaultPrompt
     );
@@ -883,6 +932,10 @@ export class CDPPage extends Page {
     ]);
 
     return result[0];
+  }
+
+  override async createCDPSession(): Promise<CDPSession> {
+    return await this.target().createCDPSession();
   }
 
   override async waitForRequest(
@@ -1392,13 +1445,6 @@ export class CDPPage extends Page {
 
   override get mouse(): CDPMouse {
     return this.#mouse;
-  }
-
-  override waitForXPath(
-    xpath: string,
-    options: WaitForSelectorOptions = {}
-  ): Promise<ElementHandle<Node> | null> {
-    return this.mainFrame().waitForXPath(xpath, options);
   }
 
   /**

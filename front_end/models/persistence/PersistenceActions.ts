@@ -8,7 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 
 import type * as TextUtils from '../text_utils/text_utils.js';
-import type * as UI from '../../ui/legacy/legacy.js';
+import * as UI from '../../ui/legacy/legacy.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {NetworkPersistenceManager} from './NetworkPersistenceManager.js';
@@ -23,6 +23,10 @@ const UIStrings = {
    *@description Context menu item for saving an image
    */
   saveImage: 'Save image',
+  /**
+   *@description Context menu item for showing all overridden files
+   */
+  showOverrides: 'Show all overrides',
   /**
    *@description A context menu item in the Persistence Actions of the Workspace settings in Settings
    */
@@ -82,22 +86,60 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
     // Retrieve uiSourceCode by URL to pick network resources everywhere.
     const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(contentProvider.contentURL());
     const networkPersistenceManager = NetworkPersistenceManager.instance();
+
+    const binding = uiSourceCode && PersistenceImpl.instance().binding(uiSourceCode);
+    const fileURL = binding ? binding.fileSystem.contentURL() : contentProvider.contentURL();
+
+    if (fileURL.startsWith('file://')) {
+      const path = Common.ParsedURL.ParsedURL.urlToRawPathString(fileURL, Host.Platform.isWin());
+      contextMenu.revealSection().appendItem(
+          i18nString(UIStrings.openInContainingFolder),
+          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.showItemInFolder(path));
+    }
+
+    if (contentProvider instanceof Workspace.UISourceCode.UISourceCode &&
+        contentProvider.project().type() === Workspace.Workspace.projectTypes.FileSystem) {
+      // Do not append in Sources > Filesystem & Overrides tab
+      return;
+    }
+
     if (uiSourceCode && networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode)) {
       contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), async () => {
         const isSuccess = await networkPersistenceManager.setupAndStartLocalOverrides(uiSourceCode);
         if (isSuccess) {
           await Common.Revealer.reveal(uiSourceCode);
         }
+
+        // Collect metrics: Context menu access point
+        if (contentProvider instanceof SDK.NetworkRequest.NetworkRequest) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentFromNetworkContextMenu);
+        } else if (contentProvider instanceof Workspace.UISourceCode.UISourceCode) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentFromSourcesContextMenu);
+        }
+        // Collect metrics: Content type
+        if (uiSourceCode.isFetchXHR()) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideFetchXHR);
+        } else if (contentProvider.contentType().isScript()) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideScript);
+        } else if (contentProvider.contentType().isDocument()) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideDocument);
+        } else if (contentProvider.contentType().isStyleSheet()) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideStyleSheet);
+        } else if (contentProvider.contentType().isImage()) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideImage);
+        } else if (contentProvider.contentType().isFont()) {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideFont);
+        }
       });
+    } else {
+      contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), () => {}, true);
     }
 
-    const binding = uiSourceCode && PersistenceImpl.instance().binding(uiSourceCode);
-    const fileURL = binding ? binding.fileSystem.contentURL() : contentProvider.contentURL();
-    if (fileURL.startsWith('file://')) {
-      const path = Common.ParsedURL.ParsedURL.urlToRawPathString(fileURL, Host.Platform.isWin());
-      contextMenu.revealSection().appendItem(
-          i18nString(UIStrings.openInContainingFolder),
-          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.showItemInFolder(path));
+    if (contentProvider instanceof SDK.NetworkRequest.NetworkRequest) {
+      contextMenu.overrideSection().appendItem(i18nString(UIStrings.showOverrides), async () => {
+        await UI.ViewManager.ViewManager.instance().showView('navigator-overrides');
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.ShowAllOverridesFromNetworkContextMenu);
+      });
     }
   }
 }

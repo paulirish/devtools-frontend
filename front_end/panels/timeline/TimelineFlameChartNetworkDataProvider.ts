@@ -363,7 +363,15 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     return false;
   }
 
-  navStartTimes(): Map<string, TraceEngine.Types.TraceEvents.TraceEventNavigationStart> {
-    return this.#traceEngineData?.Meta.navigationsByNavigationId || new Map();
+  /**
+   * Returns a map of navigations that happened in the main frame, ignoring any
+   * that happened in other frames.
+   * The map's key is the frame ID.
+   **/
+  mainFrameNavigationStartEvents(): readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[] {
+    if (!this.#traceEngineData) {
+      return [];
+    }
+    return this.#traceEngineData.Meta.mainFrameNavigations;
   }
 }

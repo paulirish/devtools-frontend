@@ -632,6 +632,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     await UI.ViewManager.ViewManager.instance().showView('network');
     this.networkLogView.selectRequest(request, options);
     this.showRequestPanel(shownTab);
+    this.networkLogView.revealAndHighlightRequest(request);
     return this.networkItemView;
   }
 
@@ -1088,7 +1089,7 @@ export class SearchNetworkView extends Search.SearchView.SearchView {
     return searchView;
   }
 
-  override createScope(): Search.SearchConfig.SearchScope {
+  override createScope(): Search.SearchScope.SearchScope {
     return new NetworkSearchScope();
   }
 }

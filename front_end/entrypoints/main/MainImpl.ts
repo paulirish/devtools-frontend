@@ -327,6 +327,7 @@ export class MainImpl {
         'evaluateExpressionsWithSourceMaps', 'Resolve variable names in expressions using source maps', undefined);
     Root.Runtime.experiments.register('instrumentationBreakpoints', 'Enable instrumentation breakpoints', true);
     Root.Runtime.experiments.register('setAllBreakpointsEagerly', 'Set all breakpoints eagerly at startup');
+    Root.Runtime.experiments.register('useSourceMapScopes', 'Use scope information from source maps', true);
 
     // Dual-screen
     Root.Runtime.experiments.register(
@@ -403,6 +404,7 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, 'Enable Preloading Status Panel in Application panel',
         true);
+    Root.Runtime.experiments.setEnabled(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, true);
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.DISABLE_COLOR_FORMAT_SETTING,
@@ -415,6 +417,9 @@ export class MainImpl {
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.SELF_XSS_WARNING, 'Show warning about Self-XSS when pasting code');
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.STORAGE_BUCKETS_TREE, 'Enable Storage Buckets Tree in Application panel', true);
 
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',

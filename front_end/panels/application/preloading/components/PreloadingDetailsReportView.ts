@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
@@ -15,9 +16,11 @@ import * as ReportView from '../../../../ui/components/report_view/report_view.j
 import * as RequestLinkIcon from '../../../../ui/components/request_link_icon/request_link_icon.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as PreloadingHelper from '../helper/helper.js';
+import type * as Platform from '../../../../core/platform/platform.js';
 
 import preloadingDetailsReportViewStyles from './preloadingDetailsReportView.css.js';
-import {prefetchFailureReason, prerenderFailureReason} from './PreloadingString.js';
+import {prefetchFailureReason, prerenderFailureReason, ruleSetLocationShort} from './PreloadingString.js';
 
 const UIStrings = {
   /**
@@ -77,13 +80,9 @@ const UIStrings = {
    */
   buttonClickToInspect: 'Click to inspect prerendered page',
   /**
-   *@description button: Contents of button to activate prerendered page
+   *@description button: Title of button to reveal rule set
    */
-  buttonActivate: 'Activate',
-  /**
-   *@description button: Title of button to activate prerendered page
-   */
-  buttonClickToActivate: 'Click to activate prerendered page',
+  buttonClickToRevealRuleSet: 'Click to reveal rule set',
 };
 const str_ =
     i18n.i18n.registerUIStrings('panels/application/preloading/components/PreloadingDetailsReportView.ts', UIStrings);
@@ -132,6 +131,7 @@ export type PreloadingDetailsReportViewData = PreloadingDetailsReportViewDataInt
 interface PreloadingDetailsReportViewDataInternal {
   preloadingAttempt: SDK.PreloadingModel.PreloadingAttempt;
   ruleSets: Protocol.Preload.RuleSet[];
+  pageURL: Platform.DevToolsPath.UrlString;
   requestResolver?: Logs.RequestResolver.RequestResolver;
 }
 
@@ -167,6 +167,7 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
       }
 
       const detailedStatus = PreloadingUIUtils.detailedStatus(this.#data.preloadingAttempt);
+      const pageURL = this.#data.pageURL;
 
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
@@ -187,7 +188,7 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           ${this.#maybePrefetchFailureReason()}
           ${this.#maybePrerenderFailureReason()}
 
-          ${this.#data.ruleSets.map(ruleSet => this.#renderRuleSet(ruleSet))}
+          ${this.#data.ruleSets.map(ruleSet => this.#renderRuleSet(ruleSet, pageURL))}
         </${ReportView.ReportView.Report.litTagName}>
       `, this.#shadow, {host: this});
       // clang-format on
@@ -282,42 +283,6 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
       // clang-format on
     })();
 
-    let maybeActivateButton: LitHtml.LitTemplate = LitHtml.nothing;
-    ((): void => {
-      if (attempt.action !== Protocol.Preload.SpeculationAction.Prerender) {
-        return;
-      }
-
-      const target = SDK.TargetManager.TargetManager.instance().scopeTarget();
-      if (target === null) {
-        return;
-      }
-
-      // Prevents prerender activation for non primary targets.
-      if (target !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
-        return;
-      }
-
-      const disabled = (attempt.status !== SDK.PreloadingModel.PreloadingStatus.Ready);
-      const activate = (): void => {
-        void target.pageAgent().invoke_navigate({url: attempt.key.url});
-      };
-      // Disabled until https://crbug.com/1079231 is fixed.
-      // clang-format off
-      maybeActivateButton = LitHtml.html`
-          <${Buttons.Button.Button.litTagName}
-            @click=${activate}
-            .title=${i18nString(UIStrings.buttonClickToActivate)}
-            .size=${Buttons.Button.Size.SMALL}
-            .variant=${Buttons.Button.Variant.SECONDARY}
-            .disabled=${disabled}
-          >
-            ${i18nString(UIStrings.buttonActivate)}
-          </${Buttons.Button.Button.litTagName}>
-      `;
-      // clang-format on
-    })();
-
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return LitHtml.html`
@@ -327,7 +292,6 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
           <div class="text-ellipsis" title="">
             ${action}
             ${maybeInspectButton}
-            ${maybeActivateButton}
           </div>
         </${ReportView.ReportView.ReportValue.litTagName}>
     `;
@@ -378,20 +342,31 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
     `;
   }
 
-  #renderRuleSet(ruleSet: Protocol.Preload.RuleSet): LitHtml.LitTemplate {
-    // We can assume `sourceText` is a valid JSON because this triggered the preloading attempt.
-    const json = JSON.stringify(JSON.parse(ruleSet.sourceText));
+  #renderRuleSet(ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): LitHtml.LitTemplate {
+    const revealRuleSetView = (): void => {
+      void Common.Revealer.reveal(new PreloadingHelper.PreloadingForward.RuleSetView(ruleSet.id));
+    };
+    const location = ruleSetLocationShort(ruleSet, pageURL);
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return LitHtml.html`
-          <${ReportView.ReportView.ReportKey.litTagName}>${i18nString(UIStrings.detailsRuleSet)}</${
-            ReportView.ReportView.ReportKey.litTagName}>
-          <${ReportView.ReportView.ReportValue.litTagName}>
-            <div class="text-ellipsis" title="">
-              ${json}
-            </div>
-          </${ReportView.ReportView.ReportValue.litTagName}>
+      <${ReportView.ReportView.ReportKey.litTagName}>${i18nString(UIStrings.detailsRuleSet)}</${
+        ReportView.ReportView.ReportKey.litTagName}>
+      <${ReportView.ReportView.ReportValue.litTagName}>
+        <div class="text-ellipsis" title="">
+          <button class="link" role="link"
+            @click=${revealRuleSetView}
+            title=${i18nString(UIStrings.buttonClickToRevealRuleSet)}
+            style=${LitHtml.Directives.styleMap({
+              color: 'var(--color-link)',
+              'text-decoration': 'underline',
+            })}
+          >
+            ${location}
+          </button>
+        </div>
+      </${ReportView.ReportView.ReportValue.litTagName}>
     `;
     // clang-format on
   }

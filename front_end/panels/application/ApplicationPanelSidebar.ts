@@ -81,6 +81,7 @@ import {InterestGroupTreeElement} from './InterestGroupTreeElement.js';
 import {OpenedWindowDetailsView, WorkerDetailsView} from './OpenedWindowDetailsView.js';
 import {type ResourcesPanel} from './ResourcesPanel.js';
 import {ServiceWorkersView} from './ServiceWorkersView.js';
+import {StorageBucketsTreeParentElement} from './StorageBucketsTreeElement.js';
 
 import {SharedStorageListTreeElement} from './SharedStorageListTreeElement.js';
 import {
@@ -262,6 +263,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   trustTokensTreeElement: TrustTokensTreeElement;
   cacheStorageListTreeElement: ServiceWorkerCacheTreeElement;
   sharedStorageListTreeElement: SharedStorageListTreeElement;
+  storageBucketsTreeElement: StorageBucketsTreeParentElement|undefined;
   private backForwardCacheListTreeElement?: BackForwardCacheTreeElement;
   backgroundFetchTreeElement: BackgroundServiceTreeElement;
   backgroundSyncTreeElement: BackgroundServiceTreeElement;
@@ -375,6 +377,11 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     this.cacheStorageListTreeElement = new ServiceWorkerCacheTreeElement(panel);
     storageTreeElement.appendChild(this.cacheStorageListTreeElement);
 
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.STORAGE_BUCKETS_TREE)) {
+      this.storageBucketsTreeElement = new StorageBucketsTreeParentElement(panel);
+      storageTreeElement.appendChild(this.storageBucketsTreeElement);
+    }
+
     const backgroundServiceSectionTitle = i18nString(UIStrings.backgroundServices);
     const backgroundServiceTreeElement = this.addSidebarSection(backgroundServiceSectionTitle);
 
@@ -468,7 +475,12 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
         },
         {scoped: true});
     SDK.TargetManager.TargetManager.instance().observeModels(
-        SDK.StorageBucketsModel.StorageBucketsModel, {modelAdded: model => model.enable(), modelRemoved: () => {}},
+        SDK.StorageBucketsModel.StorageBucketsModel, {
+          modelAdded: (model: SDK.StorageBucketsModel.StorageBucketsModel): void =>
+              this.storageBucketsModelAdded(model),
+          modelRemoved: (model: SDK.StorageBucketsModel.StorageBucketsModel): void =>
+              this.storageBucketsModelRemoved(model),
+        },
         {scoped: true});
 
     this.sharedStorageTreeElementDispatcher =
@@ -573,6 +585,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     this.paymentHandlerTreeElement.initialize(backgroundServiceModel);
     this.periodicBackgroundSyncTreeElement.initialize(backgroundServiceModel);
     this.pushMessagingTreeElement.initialize(backgroundServiceModel);
+    this.storageBucketsTreeElement?.initialize();
 
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL)) {
       const preloadingModel = this.target?.model(SDK.PreloadingModel.PreloadingModel);
@@ -634,6 +647,14 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
     model.removeEventListener(SharedStorageModelEvents.SharedStorageAdded, this.sharedStorageAdded, this);
     model.removeEventListener(SharedStorageModelEvents.SharedStorageRemoved, this.sharedStorageRemoved, this);
     model.removeEventListener(SharedStorageModelEvents.SharedStorageAccess, this.sharedStorageAccess, this);
+  }
+
+  private storageBucketsModelAdded(model: SDK.StorageBucketsModel.StorageBucketsModel): void {
+    model.enable();
+  }
+
+  private storageBucketsModelRemoved(model: SDK.StorageBucketsModel.StorageBucketsModel): void {
+    this.storageBucketsTreeElement?.removeBucketsForModel(model);
   }
 
   private resetWithFrames(): void {
@@ -870,6 +891,13 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
 
   private innerShowView(view: UI.Widget.Widget): void {
     this.panel.showView(view);
+  }
+
+  showPreloadingRuleSetView(revealInfo: PreloadingHelper.PreloadingForward.RuleSetView): void {
+    if (this.preloadingRuleSetTreeElement) {
+      this.preloadingRuleSetTreeElement.select();
+      this.preloadingRuleSetTreeElement.revealRuleSet(revealInfo);
+    }
   }
 
   showPreloadingAttemptViewWithFilter(filter: PreloadingHelper.PreloadingForward.AttemptViewWithFilter): void {
@@ -1245,11 +1273,13 @@ export class ClearStorageTreeElement extends ApplicationPanelTreeElement {
 
 export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement {
   private idbDatabaseTreeElements: IDBDatabaseTreeElement[];
-  constructor(storagePanel: ResourcesPanel) {
+  private storageBucket?: Protocol.Storage.StorageBucket;
+  constructor(storagePanel: ResourcesPanel, storageBucket?: Protocol.Storage.StorageBucket) {
     super(storagePanel, i18nString(UIStrings.indexeddb), 'IndexedDB');
     const icon = UI.Icon.Icon.create('database', 'resource-tree-item');
     this.setLeadingIcons([icon]);
     this.idbDatabaseTreeElements = [];
+    this.storageBucket = storageBucket;
     this.initialize();
   }
 
@@ -1305,6 +1335,13 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
     }
   }
 
+  private databaseInTree(databaseId: DatabaseId): boolean {
+    if (this.storageBucket) {
+      return databaseId.inBucket(this.storageBucket);
+    }
+    return true;
+  }
+
   private indexedDBAdded({
     data: {databaseId, model},
   }: Common.EventTarget.EventTargetEvent<{databaseId: DatabaseId, model: IndexedDBModel}>): void {
@@ -1312,6 +1349,9 @@ export class IndexedDBTreeElement extends ExpandableApplicationPanelTreeElement 
   }
 
   private addIndexedDB(model: IndexedDBModel, databaseId: DatabaseId): void {
+    if (!this.databaseInTree(databaseId)) {
+      return;
+    }
     const idbDatabaseTreeElement = new IDBDatabaseTreeElement(this.resourcesPanel, model, databaseId);
     this.idbDatabaseTreeElements.push(idbDatabaseTreeElement);
     this.appendChild(idbDatabaseTreeElement);

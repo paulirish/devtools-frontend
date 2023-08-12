@@ -13,10 +13,13 @@ import {
   raf,
 } from '../../../helpers/DOMHelpers.js';
 import * as ProtocolComponents from '../../../../../../front_end/panels/protocol_monitor/components/components.js';
+import type * as IconButton from '../../../../../../front_end/ui/components/icon_button/icon_button.js';
+
 import type * as RecorderComponents from '../../../../../../front_end/panels/recorder/components/components.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
 import * as Menus from '../../../../../../front_end/ui/components/menus/menus.js';
 import * as Host from '../../../../../../front_end/core/host/host.js';
+import * as UI from '../../../../../../front_end/ui/legacy/legacy.js';
 
 describeWithEnvironment('JSONEditor', () => {
   const renderJSONEditor = () => {
@@ -116,6 +119,40 @@ describeWithEnvironment('JSONEditor', () => {
             }],
             description: 'Description8.',
             replyArgs: ['Test8'],
+          },
+          'Test.test9': {
+            parameters: [
+              {
+                'name': 'traceConfig',
+                'type': 'object',
+                'optional': true,
+                'description': '',
+                'typeRef': 'Tracing.TraceConfig',
+              },
+            ],
+            description: 'Description9.',
+            replyArgs: ['Test9'],
+          },
+          'Test.test10': {
+            parameters: [
+              {
+                'name': 'NoTypeRef',
+                'type': 'object',
+                'optional': true,
+                'description': '',
+                'typeRef': 'NoTypeRef',
+              },
+            ],
+            description: 'Description9.',
+            replyArgs: ['Test9'],
+          },
+          'Test.test11': {
+            parameters: [{
+              'optional': false,
+              'type': 'array',
+              'name': 'test11',
+              'typeRef': 'Test.arrayTypeRef',
+            }],
           },
         },
       },
@@ -242,6 +279,34 @@ describeWithEnvironment('JSONEditor', () => {
     return paramInput;
   };
 
+  const renderWarningIcon =
+      async(command: string, enumsByName?: Map<string, Record<string, string>>): Promise<IconButton.Icon.Icon> => {
+    const jsonEditor = renderJSONEditor();
+    await populateMetadata(jsonEditor);
+    jsonEditor.command = command;
+    if (enumsByName) {
+      jsonEditor.enumsByName = enumsByName;
+    }
+    jsonEditor.populateParametersForCommandWithDefaultValues();
+    await jsonEditor.updateComplete;
+
+    // inputs[0] corresponds to the devtools-recorder-input of the command
+    const input = jsonEditor.renderRoot.querySelectorAll('devtools-recorder-input')[1];
+    if (!input) {
+      throw Error('No editable content displayed');
+    }
+    input.value = 'Not an accepted value';
+    await jsonEditor.updateComplete;
+    input.focus();
+    input.blur();
+    await jsonEditor.updateComplete;
+    const warningIcon = jsonEditor.renderRoot.querySelector('devtools-icon');
+    if (!warningIcon) {
+      throw Error('No icon displayed');
+    }
+    return warningIcon;
+  };
+
   describe('Binding input bar', () => {
     it('should show the command written in the input bar inside the editor when parameters are strings with the correct value',
        async () => {
@@ -348,6 +413,56 @@ describeWithEnvironment('JSONEditor', () => {
     });
   });
 
+  describe('Display command written in editor inside input bar', () => {
+    it('should display the command edited inside the CDP editor into the input bar', async () => {
+      const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
+      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
+      const jsonEditor = editorWidget.jsonEditor;
+      jsonEditor.command = 'Test.test';
+      jsonEditor.parameters = [
+        {
+          name: 'test',
+          type: ProtocolComponents.JSONEditor.ParameterType.String,
+          description: 'test',
+          optional: false,
+          value: 'test',
+        },
+      ];
+      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
+      split.setMainWidget(dataGrid);
+      split.setSidebarWidget(editorWidget);
+      // Needed to resolve pending promises in the after each hook
+      await new Promise(resolve => {
+        split.toggleSidebar();
+        setTimeout(resolve, 500);
+      });
+
+      // The first input bar corresponds to the filter bar, so we query the second one which corresponds to the CDP one.
+      const toolbarInput = dataGrid.element.shadowRoot?.querySelectorAll('.toolbar')[1].shadowRoot?.querySelector(
+          '.toolbar-input-prompt');
+      assert.deepStrictEqual(toolbarInput?.innerHTML, '{"command":"Test.test","parameters":{"test":"test"}}');
+    });
+
+    it('should not display the command into the input bar if the command is empty string', async () => {
+      const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
+      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
+      const jsonEditor = editorWidget.jsonEditor;
+      jsonEditor.command = '';
+      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
+      split.setMainWidget(dataGrid);
+      split.setSidebarWidget(editorWidget);
+      // Needed to resolve pending promises in the after each hook
+      await new Promise(resolve => {
+        split.toggleSidebar();
+        setTimeout(resolve, 500);
+      });
+
+      // The first input bar corresponds to the filter bar, so we query the second one which corresponds to the CDP one.
+      const toolbarInput = dataGrid.element.shadowRoot?.querySelectorAll('.toolbar')[1].shadowRoot?.querySelector(
+          '.toolbar-input-prompt');
+      assert.deepStrictEqual(toolbarInput?.innerHTML, '');
+    });
+  });
   describe('Descriptions', () => {
     it('should show the popup with the correct description for the description of parameters', async () => {
       const inputParameters = [
@@ -411,6 +526,58 @@ describeWithEnvironment('JSONEditor', () => {
       const suggestions = await renderSuggestionBox(command);
 
       assert.deepStrictEqual(suggestions, ['false', 'true']);
+    });
+
+    it('should show the suggestion box for enum parameters nested inside arrays', async () => {
+      const enumsByName = new Map([
+        ['Test.arrayTypeRef', {'Test': 'test', 'Test1': 'test1', 'Test2': 'test2'}],
+      ]);
+      const command = 'Test.test11';
+
+      const jsonEditor = renderJSONEditor();
+
+      await populateMetadata(jsonEditor);
+      jsonEditor.enumsByName = enumsByName;
+      jsonEditor.command = command;
+      jsonEditor.populateParametersForCommandWithDefaultValues();
+
+      await jsonEditor.updateComplete;
+
+      const param = jsonEditor.renderRoot.querySelector('[data-paramId]');
+      await renderHoveredElement(param);
+
+      const addParamButton = jsonEditor.renderRoot.querySelector('devtools-button[title="Add a parameter"]');
+      if (!addParamButton) {
+        throw new Error('No button');
+      }
+      dispatchClickEvent(addParamButton, {
+        bubbles: true,
+        composed: true,
+      });
+
+      await jsonEditor.updateComplete;
+
+      const inputs = jsonEditor.renderRoot.querySelectorAll('devtools-recorder-input');
+      // inputs[0] corresponds to the devtools-recorder-input of the command
+      const suggestionInput = inputs[1];
+      // Reset the value to empty string because for boolean it will be set to false by default and the correct suggestions will not show
+      suggestionInput.value = '';
+      suggestionInput.focus();
+
+      await suggestionInput.updateComplete;
+      const suggestionBox = suggestionInput.renderRoot.querySelector('devtools-suggestion-box');
+
+      if (!suggestionBox) {
+        throw new Error('No suggestion box shown');
+      }
+      const suggestions = Array.from(suggestionBox.renderRoot.querySelectorAll('li')).map(item => {
+        if (!item.textContent) {
+          throw new Error('No text inside suggestion');
+        }
+        return (item.textContent.replaceAll(/\s/g, ''));
+      });
+
+      assert.deepStrictEqual(suggestions, ['test', 'test1', 'test2']);
     });
 
     it('should not display suggestion box when the parameter is neither a string or a boolean', async () => {
@@ -728,6 +895,30 @@ describeWithEnvironment('JSONEditor', () => {
        });
   });
 
+  describe('Verify the type of the entered value', async () => {
+    it('should show a warning icon if the type of the parameter is number but the entered value is not', async () => {
+      const command = 'Test.test8';
+
+      const warningIcon = await renderWarningIcon(command);
+      assert.isNotNull(warningIcon);
+    });
+    it('should show a warning icon if the type of the parameter is boolean but the entered value is not true or false',
+       async () => {
+         const command = 'Test.test4';
+         const warningIcon = await renderWarningIcon(command);
+         assert.isNotNull(warningIcon);
+       });
+    it('should show a warning icon if the type of the parameter is enum but the entered value is not among the accepted values',
+       async () => {
+         const enumsByName = new Map([
+           ['Test.testRef', {'Test': 'test', 'Test1': 'test1', 'Test2': 'test2'}],
+         ]);
+         const command = 'Test.test';
+         const warningIcon = await renderWarningIcon(command, enumsByName);
+         assert.isNotNull(warningIcon);
+       });
+  });
+
   it('should not display parameters if a command is unknown', async () => {
     const cdpCommand = 'Unknown';
     const jsonEditor = renderJSONEditor();
@@ -789,5 +980,152 @@ describeWithEnvironment('JSONEditor', () => {
 
     assert.isTrue(copyText.calledWith(JSON.stringify({command: 'Test.test', parameters: {'test': 'test'}})));
   });
+
+  it('should display the correct parameters with a command with array nested inside object', async () => {
+    const command = 'Test.test9';
+    const typesByName = new Map();
+    // This nested object contains every subtype including array
+    typesByName.set('Tracing.TraceConfig', [
+      {
+        'name': 'recordMode',
+        'type': 'string',
+        'optional': true,
+        'description': 'Controls how the trace buffer stores data.',
+        'typeRef': null,
+      },
+      {
+        'name': 'traceBufferSizeInKb',
+        'type': 'number',
+        'optional': true,
+        'description':
+            'Size of the trace buffer in kilobytes. If not specified or zero is passed, a default value of 200 MB would be used.',
+        'typeRef': null,
+      },
+      {
+        'name': 'enableSystrace',
+        'type': 'boolean',
+        'optional': true,
+        'description': 'Turns on system tracing.',
+        'typeRef': null,
+      },
+      {
+        'name': 'includedCategories',
+        'type': 'array',
+        'optional': true,
+        'description': 'Included category filters.',
+        'typeRef': 'string',
+      },
+      {
+        'name': 'memoryDumpConfig',
+        'type': 'object',
+        'optional': true,
+        'description': 'Configuration for memory dump triggers. Used only when \\"memory-infra\\" category is enabled.',
+        'typeRef':
+            'Tracing.MemoryDumpConfig',  // This typeref is on purpose not added to show that this param will be treated as a string parameter
+      },
+    ]);
+
+    const jsonEditor = renderJSONEditor();
+
+    await populateMetadata(jsonEditor);
+    jsonEditor.typesByName = typesByName;
+    jsonEditor.command = command;
+    jsonEditor.populateParametersForCommandWithDefaultValues();
+    await jsonEditor.updateComplete;
+    const shadowRoot = jsonEditor.renderRoot;
+    const parameters = shadowRoot.querySelectorAll('.parameter');
+    // This expected value is equal to 6 because there are 5 different parameters inside typesByName + 1
+    // for the name of the parameter (traceConfig)
+    assert.deepStrictEqual(parameters.length, 6);
+  });
+
+  it('should return the parameters in a format understandable by the ProtocolMonitor when sending a command with object parameter that has no typeRef',
+     async () => {
+       const command = 'Test.test10';
+       const typesByName = new Map();
+       // We set the map typesBynames without the key NoTypeRef
+       typesByName.set('Tracing.TraceConfig', [
+         {
+           'name': 'memoryDumpConfig',
+           'type': 'object',
+           'optional': true,
+           'description':
+               'Configuration for memory dump triggers. Used only when \\"memory-infra\\" category is enabled.',
+           'typeRef':
+               'Tracing.MemoryDumpConfig',  // This typeref is on purpose not added to show that this param will be treated as a string parameter
+         },
+       ]);
+
+       const jsonEditor = renderJSONEditor();
+
+       await populateMetadata(jsonEditor);
+       jsonEditor.typesByName = typesByName;
+       jsonEditor.command = command;
+       jsonEditor.populateParametersForCommandWithDefaultValues();
+       await jsonEditor.updateComplete;
+       const shadowRoot = jsonEditor.renderRoot;
+       const parameters = shadowRoot.querySelector('.parameter');
+
+       await renderHoveredElement(parameters);
+
+       const addParamButton = jsonEditor.renderRoot.querySelector('devtools-button[title="Add custom property"]');
+       if (!addParamButton) {
+         throw new Error('No button');
+       }
+       // We click two times to display two parameters with key/value pairs
+       dispatchClickEvent(addParamButton, {
+         bubbles: true,
+         composed: true,
+       });
+       dispatchClickEvent(addParamButton, {
+         bubbles: true,
+         composed: true,
+       });
+
+       await jsonEditor.updateComplete;
+       const editors = shadowRoot.querySelectorAll('devtools-recorder-input');
+
+       // Editors[0] refers to the command editor, so we start at index 1
+       // We populate the key/value pairs
+       editors[1].value = 'testName1';
+       await jsonEditor.updateComplete;
+       editors[1].focus();
+       editors[1].blur();
+       await jsonEditor.updateComplete;
+
+       editors[2].value = 'testValue1';
+       await jsonEditor.updateComplete;
+       editors[2].focus();
+       editors[2].blur();
+       await jsonEditor.updateComplete;
+
+       editors[3].value = 'testName2';
+       await jsonEditor.updateComplete;
+       editors[3].focus();
+       editors[3].blur();
+       await jsonEditor.updateComplete;
+
+       editors[4].value = 'testValue2';
+       await jsonEditor.updateComplete;
+       editors[4].focus();
+       editors[4].blur();
+       await jsonEditor.updateComplete;
+
+       const responsePromise = getEventPromise(jsonEditor, ProtocolComponents.JSONEditor.SubmitEditorEvent.eventName);
+
+       // We send the command
+       dispatchKeyDownEvent(jsonEditor, {key: 'Enter', ctrlKey: true, metaKey: true});
+
+       const response = await responsePromise as ProtocolComponents.JSONEditor.SubmitEditorEvent;
+
+       const expectedParameters = {
+         'NoTypeRef': {
+           'testName1': 'testValue1',
+           'testName2': 'testValue2',
+         },
+       };
+
+       assert.deepStrictEqual(response.data.parameters, expectedParameters);
+     });
 
 });

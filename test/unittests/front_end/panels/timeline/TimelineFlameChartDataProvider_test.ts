@@ -52,7 +52,7 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
       const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
       const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'timings-track.json.gz');
       dataProvider.setModel(performanceModel, traceParsedData);
-      const mainTrack = dataProvider.timelineData().groups.find(g => g.name.includes('Main'));
+      const mainTrack = dataProvider.timelineData().groups.find(g => g.name.includes('Main —'));
       if (!mainTrack) {
         assert.fail('Could not find Main track flame chart group');
       }
@@ -155,5 +155,20 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
       // Ensure that now we have un-ignored the URL that we get the full set of events again.
       assert.strictEqual(dataProvider.timelineData().entryStartTimes.length, eventCountBeforeIgnoreList);
     });
+  });
+
+  it('filters navigations to only return those that happen on the main frame', async function() {
+    const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+    const {traceParsedData, performanceModel} =
+        await TraceLoader.allModels(this, 'multiple-navigations-with-iframes.json.gz');
+
+    dataProvider.setModel(performanceModel, traceParsedData);
+
+    const mainFrameID = traceParsedData.Meta.mainFrameId;
+    const navigationEvents = dataProvider.mainFrameNavigationStartEvents();
+    // Ensure that every navigation event that we return is for the main frame.
+    assert.isTrue(navigationEvents.every(navEvent => {
+      return navEvent.args.frame === mainFrameID;
+    }));
   });
 });

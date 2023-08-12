@@ -85,6 +85,7 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
 `,
         },
       ],
+      pageURL: 'https://example.com/' as Platform.DevToolsPath.UrlString,
     };
 
     const component = await renderPreloadingDetailsReportView(data);
@@ -96,7 +97,7 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
       ['URL', url],
       ['Action', 'prerender'],
       ['Status', 'Preloading is running.'],
-      ['Rule set', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
+      ['Rule set', 'example.com/'],
     ]);
   });
 
@@ -135,6 +136,7 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
 `,
         },
       ],
+      pageURL: 'https://example.com/' as Platform.DevToolsPath.UrlString,
     };
 
     const component = await renderPreloadingDetailsReportView(data);
@@ -150,7 +152,7 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
         'Failure reason',
         'The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
       ],
-      ['Rule set', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
+      ['Rule set', 'example.com/'],
     ]);
   });
 
@@ -193,6 +195,7 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
 `,
         },
       ],
+      pageURL: 'https://example.com/' as Platform.DevToolsPath.UrlString,
       requestResolver: fakeRequestResolver,
     };
 
@@ -209,7 +212,67 @@ describeWithEnvironment('PreloadingDetailsReportView', async () => {
       ['Action', 'prefetch'],
       ['Status', 'Preloading failed.'],
       ['Failure reason', 'The prefetch failed because of a non-2xx HTTP response status code.'],
-      ['Rule set', '{"prefetch":[{"source":"list","urls":["/subresource.js"]}]}'],
+      ['Rule set', 'example.com/'],
+    ]);
+  });
+
+  it('renders prefetch details with out-of-document Speculation Rules', async () => {
+    const fakeRequestResolver = {
+      waitFor: (_requestId: Protocol.Network.RequestId): Promise<void> => {
+        return Promise.reject();
+      },
+    } as unknown as Logs.RequestResolver.RequestResolver;
+
+    const url = 'https://example.com/prefetch.html' as Platform.DevToolsPath.UrlString;
+    const data: PreloadingComponents.PreloadingDetailsReportView.PreloadingDetailsReportViewData = {
+      preloadingAttempt: {
+        action: Protocol.Preload.SpeculationAction.Prefetch,
+        key: {
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          action: Protocol.Preload.SpeculationAction.Prefetch,
+          url,
+          targetHint: undefined,
+        },
+        status: SDK.PreloadingModel.PreloadingStatus.Ready,
+        prefetchStatus: null,
+        requestId: 'requestId:1' as Protocol.Network.RequestId,
+        ruleSetIds: ['ruleSetId'] as Protocol.Preload.RuleSetId[],
+        nodeIds: [1] as Protocol.DOM.BackendNodeId[],
+      },
+      ruleSets: [
+        {
+          id: 'ruleSetId' as Protocol.Preload.RuleSetId,
+          loaderId: 'loaderId' as Protocol.Network.LoaderId,
+          sourceText: `
+{
+  "prefetch": [
+    {
+      "source": "list",
+      "urls": ["/subresource.js"]
+    }
+  ]
+}
+`,
+          url: 'https://example.com/speculation-rules.json',
+        },
+      ],
+      pageURL: 'https://example.com/' as Platform.DevToolsPath.UrlString,
+      requestResolver: fakeRequestResolver,
+    };
+
+    const component = await renderPreloadingDetailsReportView(data);
+    const report = getElementWithinComponent(component, 'devtools-report', ReportView.ReportView.Report);
+
+    const keys = getCleanTextContentFromElements(report, 'devtools-report-key');
+    const values = getCleanTextContentFromElements(report, 'devtools-report-value');
+    values[0] = report.querySelector('devtools-report-value:nth-of-type(1) devtools-request-link-icon')
+                    ?.shadowRoot?.textContent?.trim() ||
+        values[0];
+    assert.deepEqual(zip2(keys, values), [
+      ['URL', url],
+      ['Action', 'prefetch'],
+      ['Status', 'Preloading finished and the result is ready for the next navigation.'],
+      ['Rule set', 'example.com/speculation-rules.json'],
     ]);
   });
 });

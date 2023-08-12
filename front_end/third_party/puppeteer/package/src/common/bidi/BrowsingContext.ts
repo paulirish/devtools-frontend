@@ -4,15 +4,14 @@ import ProtocolMapping from 'devtools-protocol/types/protocol-mapping.js';
 import {WaitForOptions} from '../../api/Page.js';
 import {assert} from '../../util/assert.js';
 import {Deferred} from '../../util/Deferred.js';
-import type {CDPSession, Connection as CDPConnection} from '../Connection.js';
-import {ProtocolError, TimeoutError} from '../Errors.js';
-import {EventEmitter} from '../EventEmitter.js';
+import {CDPSession, Connection as CDPConnection} from '../Connection.js';
+import {ProtocolError, TargetCloseError, TimeoutError} from '../Errors.js';
 import {PuppeteerLifeCycleEvent} from '../LifecycleWatcher.js';
-import {TimeoutSettings} from '../TimeoutSettings.js';
 import {getPageContent, setPageContent, waitWithTimeout} from '../util.js';
 
 import {Connection} from './Connection.js';
 import {Realm} from './Realm.js';
+import {debugError} from './utils.js';
 
 /**
  * @internal
@@ -32,41 +31,59 @@ const lifeCycleToReadinessState = new Map<
   PuppeteerLifeCycleEvent,
   Bidi.BrowsingContext.ReadinessState
 >([
-  ['load', 'complete'],
-  ['domcontentloaded', 'interactive'],
+  ['load', Bidi.BrowsingContext.ReadinessState.Complete],
+  ['domcontentloaded', Bidi.BrowsingContext.ReadinessState.Interactive],
 ]);
 
 /**
  * @internal
  */
-export class CDPSessionWrapper extends EventEmitter implements CDPSession {
+export const cdpSessions = new Map<string, CDPSessionWrapper>();
+
+/**
+ * @internal
+ */
+export class CDPSessionWrapper extends CDPSession {
   #context: BrowsingContext;
   #sessionId = Deferred.create<string>();
+  #detached = false;
 
-  constructor(context: BrowsingContext) {
+  constructor(context: BrowsingContext, sessionId?: string) {
     super();
     this.#context = context;
-    context.connection
-      .send('cdp.getSession', {
-        context: context.id,
-      })
-      .then(session => {
-        this.#sessionId.resolve(session.result.session!);
-      })
-      .catch(err => {
-        this.#sessionId.reject(err);
-      });
+    if (sessionId) {
+      this.#sessionId.resolve(sessionId);
+      cdpSessions.set(sessionId, this);
+    } else {
+      context.connection
+        .send('cdp.getSession', {
+          context: context.id,
+        })
+        .then(session => {
+          this.#sessionId.resolve(session.result.session!);
+          cdpSessions.set(session.result.session!, this);
+        })
+        .catch(err => {
+          this.#sessionId.reject(err);
+        });
+    }
   }
 
-  connection(): CDPConnection | undefined {
+  override connection(): CDPConnection | undefined {
     return undefined;
   }
-  async send<T extends keyof ProtocolMapping.Commands>(
+
+  override async send<T extends keyof ProtocolMapping.Commands>(
     method: T,
     ...paramArgs: ProtocolMapping.Commands[T]['paramsType']
   ): Promise<ProtocolMapping.Commands[T]['returnType']> {
+    if (this.#detached) {
+      throw new TargetCloseError(
+        `Protocol error (${method}): Session closed. Most likely the page has been closed.`
+      );
+    }
     const session = await this.#sessionId.valueOrThrow();
-    const result = await this.#context.connection.send('cdp.sendCommand', {
+    const {result} = await this.#context.connection.send('cdp.sendCommand', {
       method: method,
       params: paramArgs[0],
       session,
@@ -74,43 +91,60 @@ export class CDPSessionWrapper extends EventEmitter implements CDPSession {
     return result.result;
   }
 
-  detach(): Promise<void> {
-    throw new Error('Method not implemented.');
+  override async detach(): Promise<void> {
+    cdpSessions.delete(this.id());
+    await this.#context.cdpSession.send('Target.detachFromTarget', {
+      sessionId: this.id(),
+    });
+    this.#detached = true;
   }
 
-  id(): string {
+  override id(): string {
     const val = this.#sessionId.value();
     return val instanceof Error || val === undefined ? '' : val;
   }
 }
 
 /**
+ * Internal events that the BrowsingContext class emits.
+ *
+ * @internal
+ */
+export const BrowsingContextEmittedEvents = {
+  /**
+   * Emitted on the top-level context, when a descendant context is created.
+   */
+  Created: Symbol('BrowsingContext.created'),
+  /**
+   * Emitted on the top-level context, when a descendant context or the
+   * top-level context itself is destroyed.
+   */
+  Destroyed: Symbol('BrowsingContext.destroyed'),
+} as const;
+
+/**
  * @internal
  */
 export class BrowsingContext extends Realm {
-  #timeoutSettings: TimeoutSettings;
   #id: string;
   #url: string;
   #cdpSession: CDPSession;
+  #parent?: string | null;
 
-  constructor(
-    connection: Connection,
-    timeoutSettings: TimeoutSettings,
-    info: Bidi.BrowsingContext.Info
-  ) {
+  constructor(connection: Connection, info: Bidi.BrowsingContext.Info) {
     super(connection, info.context);
     this.connection = connection;
-    this.#timeoutSettings = timeoutSettings;
     this.#id = info.context;
     this.#url = info.url;
+    this.#parent = info.parent;
     this.#cdpSession = new CDPSessionWrapper(this);
 
-    this.on(
-      'browsingContext.fragmentNavigated',
-      (info: Bidi.BrowsingContext.NavigationInfo) => {
-        this.#url = info.url;
-      }
-    );
+    this.on('browsingContext.domContentLoaded', this.#updateUrl.bind(this));
+    this.on('browsingContext.load', this.#updateUrl.bind(this));
+  }
+
+  #updateUrl(info: Bidi.BrowsingContext.NavigationInfo) {
+    this.url = info.url;
   }
 
   createSandboxRealm(sandbox: string): Realm {
@@ -121,8 +155,16 @@ export class BrowsingContext extends Realm {
     return this.#url;
   }
 
+  set url(value: string) {
+    this.#url = value;
+  }
+
   get id(): string {
     return this.#id;
+  }
+
+  get parent(): string | undefined | null {
+    return this.#parent;
   }
 
   get cdpSession(): CDPSession {
@@ -138,14 +180,11 @@ export class BrowsingContext extends Realm {
     options: {
       referer?: string;
       referrerPolicy?: string;
-      timeout?: number;
+      timeout: number;
       waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    } = {}
+    }
   ): Promise<string | null> {
-    const {
-      waitUntil = 'load',
-      timeout = this.#timeoutSettings.navigationTimeout(),
-    } = options;
+    const {waitUntil = 'load', timeout} = options;
 
     const readinessState = lifeCycleToReadinessState.get(
       getWaitUntilSingle(waitUntil)
@@ -174,11 +213,8 @@ export class BrowsingContext extends Realm {
     }
   }
 
-  async reload(options: WaitForOptions = {}): Promise<void> {
-    const {
-      waitUntil = 'load',
-      timeout = this.#timeoutSettings.navigationTimeout(),
-    } = options;
+  async reload(options: WaitForOptions & {timeout: number}): Promise<void> {
+    const {waitUntil = 'load', timeout} = options;
 
     const readinessState = lifeCycleToReadinessState.get(
       getWaitUntilSingle(waitUntil)
@@ -197,14 +233,11 @@ export class BrowsingContext extends Realm {
   async setContent(
     html: string,
     options: {
-      timeout?: number;
+      timeout: number;
       waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
     }
   ): Promise<void> {
-    const {
-      waitUntil = 'load',
-      timeout = this.#timeoutSettings.navigationTimeout(),
-    } = options;
+    const {waitUntil = 'load', timeout} = options;
 
     const waitUntilEvent = lifeCycleToSubscribedEvent.get(
       getWaitUntilSingle(waitUntil)
@@ -244,6 +277,7 @@ export class BrowsingContext extends Realm {
   dispose(): void {
     this.removeAllListeners();
     this.connection.unregisterBrowsingContexts(this.#id);
+    void this.#cdpSession.detach().catch(debugError);
   }
 }
 

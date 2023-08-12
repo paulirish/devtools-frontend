@@ -399,6 +399,16 @@ export class UserMetrics {
         BreakpointsRestoredFromStorageCount.MaxValue);
   }
 
+  animationPlaybackRateChanged(playbackRate: AnimationsPlaybackRate): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.AnimationPlaybackRateChanged, playbackRate, AnimationsPlaybackRate.MaxValue);
+  }
+
+  animationPointDragged(dragType: AnimationPointDragType): void {
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.AnimationPointDragged, dragType, AnimationPointDragType.MaxValue);
+  }
+
   #breakpointCountToBucket(count: number): BreakpointsRestoredFromStorageCount {
     if (count < 100) {
       return BreakpointsRestoredFromStorageCount.LessThan100;
@@ -543,7 +553,28 @@ export enum Action {
   BreakpointRemovedFromGutterContextMenu = 81,
   BreakpointRemovedFromGutterToggle = 82,
   StylePropertyInsideKeyframeEdited = 83,
-  MaxValue = 84,
+  OverrideContentFromSourcesContextMenu = 84,
+  OverrideContentFromNetworkContextMenu = 85,
+  OverrideScript = 86,
+  OverrideStyleSheet = 87,
+  OverrideDocument = 88,
+  OverrideFetchXHR = 89,
+  OverrideImage = 90,
+  OverrideFont = 91,
+  OverrideContentContextMenuSetup = 92,
+  OverrideContentContextMenuAbandonSetup = 93,
+  OverrideContentContextMenuActivateDisabled = 94,
+  OverrideContentContextMenuOpenExistingFile = 95,
+  OverrideContentContextMenuSaveNewFile = 96,
+  ShowAllOverridesFromSourcesContextMenu = 97,
+  ShowAllOverridesFromNetworkContextMenu = 98,
+  AnimationGroupsCleared = 99,
+  AnimationsPaused = 100,
+  AnimationsResumed = 101,
+  AnimatedNodeDescriptionClicked = 102,
+  AnimationGroupScrubbed = 103,
+  AnimationGroupReplayed = 104,
+  MaxValue = 105,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -887,9 +918,11 @@ export enum DevtoolsExperiments {
   'highlightErrorsElementsPanel' = 73,
   'setAllBreakpointsEagerly' = 74,
   'selfXssWarning' = 75,
+  'useSourceMapScopes' = 76,
+  'storageBucketsTree' = 77,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 76,
+  'MaxValue' = 78,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -1406,4 +1439,27 @@ export const enum BadgeType {
   TOP_LAYER = 7,
   REVEAL = 8,
   MaxValue = 9,
+}
+
+/* eslint-enable @typescript-eslint/naming-convention */
+export const enum AnimationsPlaybackRate {
+  Percent100 = 0,
+  Percent25 = 1,
+  Percent10 = 2,
+  Other = 3,
+  MaxValue = 4,
+}
+
+/* eslint-enable @typescript-eslint/naming-convention */
+export const enum AnimationPointDragType {
+  // Animation is dragged as a whole in the Animations panel.
+  AnimationDrag = 0,
+  // A keyframe point inside animation timeline is dragged.
+  KeyframeMove = 1,
+  // Start point of the animation inside animation timeline is dragged.
+  StartEndpointMove = 2,
+  // Finish point of the animation inside animation timeline is dragged.
+  FinishEndpointMove = 3,
+  Other = 4,
+  MaxValue = 5,
 }

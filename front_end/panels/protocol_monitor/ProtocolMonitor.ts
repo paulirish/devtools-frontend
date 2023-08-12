@@ -67,6 +67,10 @@ const UIStrings = {
    */
   documentation: 'Documentation',
   /**
+   *@description Text to open the CDP editor with the selected command
+   */
+  editAndResend: 'Edit and resend',
+  /**
    *@description Cell text content in Protocol Monitor of the Protocol Monitor tab
    *@example {30} PH1
    */
@@ -290,13 +294,29 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
              row: Readonly<DataGrid.DataGridUtils.Row>): void => {
               const methodColumn = DataGrid.DataGridUtils.getRowEntryForColumnId(row, 'method');
               const typeColumn = DataGrid.DataGridUtils.getRowEntryForColumnId(row, 'type');
+              /**
+               * You can click the "Edit and resend" item in the context menu to be
+               * taken to the CDP editor with the filled with the selected command.
+               */
+              menu.editSection().appendItem(i18nString(UIStrings.editAndResend), () => {
+                if (!methodColumn.value) {
+                  return;
+                }
+                const parameters = this.infoWidget.request;
+                const targetId = this.infoWidget.targetId;
+                const command = String(methodColumn.value);
+                if (splitWidget.showMode() === UI.SplitWidget.ShowMode.OnlyMain) {
+                  splitWidget.toggleSidebar();
+                }
+                this.dispatchEventToListeners(Events.CommandChange, {command, parameters, targetId});
+              });
 
               /**
                * You can click the "Filter" item in the context menu to filter the
                * protocol monitor entries to those that match the method of the
                * current row.
                */
-              menu.defaultSection().appendItem(i18nString(UIStrings.filter), () => {
+              menu.editSection().appendItem(i18nString(UIStrings.filter), () => {
                 const methodColumn = DataGrid.DataGridUtils.getRowEntryForColumnId(row, 'method');
                 this.textFilterUI.setValue(`method:${methodColumn.value}`, true);
               });
@@ -305,7 +325,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                * You can click the "Documentation" item in the context menu to be
                * taken to the CDP Documentation site entry for the given method.
                */
-              menu.defaultSection().appendItem(i18nString(UIStrings.documentation), () => {
+              menu.footerSection().appendItem(i18nString(UIStrings.documentation), () => {
                 if (!methodColumn.value) {
                   return;
                 }
@@ -327,6 +347,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       const infoWidgetData = {
         request: DataGrid.DataGridUtils.getRowEntryForColumnId(focusedRow, 'request'),
         response: DataGrid.DataGridUtils.getRowEntryForColumnId(focusedRow, 'response'),
+        target: DataGrid.DataGridUtils.getRowEntryForColumnId(focusedRow, 'target'),
         type:
             DataGrid.DataGridUtils.getRowEntryForColumnId(focusedRow, 'type').title as 'sent' | 'received' | undefined,
       };
@@ -340,7 +361,6 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     split.show(this.contentElement);
     split.setMainWidget(this.dataGridIntegrator);
     split.setSidebarWidget(this.infoWidget);
-
     const keys = ['method', 'request', 'response', 'type', 'target', 'session'];
     this.filterParser = new TextUtils.TextUtils.FilterParser(keys);
     this.suggestionBuilder = new UI.FilterSuggestionBuilder.FilterSuggestionBuilder(keys);
@@ -364,13 +384,26 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     const inputBar = shadowRoot?.querySelector('.toolbar-input');
     const tabSelector = shadowRoot?.querySelector('.toolbar-select-container');
 
+    const populateToolbarInput = (): void => {
+      const editorWidget = splitWidget.sidebarWidget();
+      if (!(editorWidget instanceof EditorWidget)) {
+        return;
+      }
+      const commandJson = editorWidget.jsonEditor.getCommandJson();
+      if (commandJson) {
+        this.#commandInput.setValue(commandJson);
+      }
+    };
+
     splitWidget.addEventListener(UI.SplitWidget.Events.ShowModeChanged, (event => {
                                    if (event.data === 'OnlyMain') {
+                                     populateToolbarInput();
                                      inputBar?.setAttribute('style', 'display:flex; flex-grow: 1');
                                      tabSelector?.setAttribute('style', 'display:flex');
                                    } else {
                                      const {command, parameters} = parseCommandInput(this.#commandInput.value());
-                                     this.dispatchEventToListeners(Events.CommandChange, {command, parameters});
+                                     this.dispatchEventToListeners(
+                                         Events.CommandChange, {command, parameters, targetId: this.#selectedTargetId});
                                      inputBar?.setAttribute('style', 'display:none');
                                      tabSelector?.setAttribute('style', 'display:none');
                                    }
@@ -579,7 +612,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
         },
         {columnId: 'elapsedTime', value: '(pending)'},
         {columnId: 'type', value: requestResponseIcon, title: 'sent'},
-        {columnId: 'target', value: this.targetToString(sdkTarget)},
+        {columnId: 'target', value: String(sdkTarget?.id())},
         {columnId: 'session', value: message.sessionId || ''},
       ],
       hidden: false,
@@ -623,7 +656,7 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
     this.#split.show(this.contentElement);
     this.#protocolMonitorDataGrid = new ProtocolMonitorDataGrid(this.#split);
     this.#protocolMonitorDataGrid.addEventListener(Events.CommandChange, event => {
-      this.#editorWidget.jsonEditor.displayCommand(event.data.command, event.data.parameters);
+      this.#editorWidget.jsonEditor.displayCommand(event.data.command, event.data.parameters, event.data.targetId);
     });
     this.#editorWidget.element.style.overflow = 'hidden';
     this.#split.setMainWidget(this.#protocolMonitorDataGrid);
@@ -680,6 +713,8 @@ export class CommandAutocompleteSuggestionProvider {
 
 export class InfoWidget extends UI.Widget.VBox {
   private readonly tabbedPane: UI.TabbedPane.TabbedPane;
+  request: {[x: string]: unknown};
+  targetId = '';
   constructor() {
     super();
     this.tabbedPane = new UI.TabbedPane.TabbedPane();
@@ -687,15 +722,17 @@ export class InfoWidget extends UI.Widget.VBox {
     this.tabbedPane.appendTab('response', i18nString(UIStrings.response), new UI.Widget.Widget());
     this.tabbedPane.show(this.contentElement);
     this.tabbedPane.selectTab('response');
+    this.request = {};
     this.render(null);
   }
 
   render(data: {
     request: DataGrid.DataGridUtils.Cell|undefined,
     response: DataGrid.DataGridUtils.Cell|undefined,
+    target: DataGrid.DataGridUtils.Cell|undefined,
     type: 'sent'|'received'|undefined,
   }|null): void {
-    if (!data || !data.request || !data.response) {
+    if (!data || !data.request || !data.response || !data.target) {
       this.tabbedPane.changeTabView('request', new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noMessageSelected)));
       this.tabbedPane.changeTabView(
           'response', new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noMessageSelected)));
@@ -709,6 +746,8 @@ export class InfoWidget extends UI.Widget.VBox {
     }
 
     const requestParsed = JSON.parse(String(data.request.value) || 'null');
+    this.request = requestParsed;
+    this.targetId = String(data.target.value);
     this.tabbedPane.changeTabView('request', SourceFrame.JSONView.JSONView.createViewSync(requestParsed));
     const responseParsed =
         data.response.value === '(pending)' ? null : JSON.parse(String(data.response.value) || 'null');

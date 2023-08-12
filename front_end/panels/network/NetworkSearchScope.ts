@@ -8,6 +8,7 @@ import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Logs from '../../models/logs/logs.js';
 import type * as TextUtils from '../../models/text_utils/text_utils.js';
+import type * as Workspace from '../../models/workspace/workspace.js';
 import type * as Search from '../search/search.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 
@@ -19,7 +20,7 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkSearchScope.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class NetworkSearchScope implements Search.SearchConfig.SearchScope {
+export class NetworkSearchScope implements Search.SearchScope.SearchScope {
   performIndexing(progress: Common.Progress.Progress): void {
     queueMicrotask(() => {
       progress.done();
@@ -27,8 +28,8 @@ export class NetworkSearchScope implements Search.SearchConfig.SearchScope {
   }
 
   async performSearch(
-      searchConfig: Search.SearchConfig.SearchConfig, progress: Common.Progress.Progress,
-      searchResultCallback: (arg0: Search.SearchConfig.SearchResult) => void,
+      searchConfig: Workspace.SearchConfig.SearchConfig, progress: Common.Progress.Progress,
+      searchResultCallback: (arg0: Search.SearchScope.SearchResult) => void,
       searchFinishedCallback: (arg0: boolean) => void): Promise<void> {
     const promises = [];
     const requests = Logs.NetworkLog.NetworkLog.instance().requests().filter(
@@ -54,7 +55,7 @@ export class NetworkSearchScope implements Search.SearchConfig.SearchScope {
   }
 
   private async searchRequest(
-      searchConfig: Search.SearchConfig.SearchConfig, request: SDK.NetworkRequest.NetworkRequest,
+      searchConfig: Workspace.SearchConfig.SearchConfig, request: SDK.NetworkRequest.NetworkRequest,
       progress: Common.Progress.Progress): Promise<NetworkSearchResult|null> {
     let bodyMatches: TextUtils.ContentProvider.SearchMatch[] = [];
     if (request.contentType().isTextType()) {
@@ -108,7 +109,7 @@ export class NetworkSearchScope implements Search.SearchConfig.SearchScope {
   }
 }
 
-export class NetworkSearchResult implements Search.SearchConfig.SearchResult {
+export class NetworkSearchResult implements Search.SearchScope.SearchResult {
   private readonly request: SDK.NetworkRequest.NetworkRequest;
   private readonly locations: NetworkForward.UIRequestLocation.UIRequestLocation[];
 

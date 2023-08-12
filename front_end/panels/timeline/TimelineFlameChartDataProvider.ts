@@ -57,10 +57,6 @@ const UIStrings = {
    */
   onIgnoreList: 'On ignore list',
   /**
-   *@description Text that refers to the animation of the web page
-   */
-  animation: 'Animation',
-  /**
    * @description Text in Timeline Flame Chart Data Provider of the Performance panel *
    * @example{example.com} PH1
    */
@@ -161,7 +157,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private readonly staticHeader: PerfUI.FlameChart.GroupStyle;
   private framesHeader: PerfUI.FlameChart.GroupStyle;
   private readonly screenshotsHeader: PerfUI.FlameChart.GroupStyle;
-  private readonly animationsHeader: PerfUI.FlameChart.GroupStyle;
   private readonly flowEventIndexById: Map<string, number>;
   private entryData!: TimelineFlameChartEntry[];
   private entryTypeByLevel!: EntryType[];
@@ -198,7 +193,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.framesHeader = this.buildGroupStyle({useFirstLineForOverview: true});
     this.screenshotsHeader =
         this.buildGroupStyle({useFirstLineForOverview: true, nestingLevel: 1, collapsible: false, itemsHeight: 150});
-    this.animationsHeader = this.buildGroupStyle({useFirstLineForOverview: false});
 
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       const headers = [
@@ -207,7 +201,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         this.staticHeader,
         this.framesHeader,
         this.screenshotsHeader,
-        this.animationsHeader,
       ];
       for (const header of headers) {
         header.color = ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary');
@@ -316,12 +309,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return eventsFromAppenderSystem || group.track?.eventsForTreeView() || null;
   }
 
-  navStartTimes(): Map<string, TraceEngine.Legacy.PayloadEvent> {
-    if (!this.legacyTimelineModel) {
-      return new Map();
+  mainFrameNavigationStartEvents(): readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[] {
+    if (!this.traceEngineData) {
+      return [];
     }
-
-    return this.legacyTimelineModel.navStartTimes();
+    return this.traceEngineData.Meta.mainFrameNavigations;
   }
 
   entryTitle(entryIndex: number): string|null {
@@ -455,6 +447,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const weight = (track: {type?: string, forMainFrame?: boolean, appenderName?: TrackAppenderName}): number => {
       if (track.appenderName !== undefined) {
         switch (track.appenderName) {
+          case 'Animations':
+            return 0;
           case 'Timings':
             return 1;
           case 'Interactions':
@@ -463,24 +457,24 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             return 3;
           case 'GPU':
             return 8;
+          case 'Thread':
+            return 4;
           default:
             return -1;
         }
       }
 
       switch (track.type) {
-        case TimelineModel.TimelineModel.TrackType.Animation:
-          return 0;
         case TimelineModel.TimelineModel.TrackType.MainThread:
-          return track.forMainFrame ? 4 : 5;
+          return track.forMainFrame ? 5 : 6;
         case TimelineModel.TimelineModel.TrackType.Worker:
-          return 6;
-        case TimelineModel.TimelineModel.TrackType.Raster:
           return 7;
-        case TimelineModel.TimelineModel.TrackType.Other:
+        case TimelineModel.TimelineModel.TrackType.Raster:
           return 9;
         case TimelineModel.TimelineModel.TrackType.Browser:
           return 11;
+        case TimelineModel.TimelineModel.TrackType.Other:
+          return 10;
         default:
           return 15;
       }
@@ -535,13 +529,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.#instantiateTimelineData();
     const eventEntryType = EntryType.Event;
     switch (track.type) {
-      case TimelineModel.TimelineModel.TrackType.Animation: {
-        this.appendAsyncEventsGroup(
-            track, i18nString(UIStrings.animation), track.asyncEvents, this.animationsHeader, eventEntryType,
-            false /* selectable */, expanded);
-        break;
-      }
-
       case TimelineModel.TimelineModel.TrackType.MainThread: {
         if (track.forMainFrame) {
           const group = this.appendSyncEvents(

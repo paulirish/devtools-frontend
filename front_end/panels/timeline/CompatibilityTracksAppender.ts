@@ -8,6 +8,7 @@ import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Common from '../../core/common/common.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as Root from '../../core/root/root.js';
+import {ThreadAppender} from './ThreadAppender.js';
 
 import {
   type TimelineFlameChartEntry,
@@ -21,6 +22,7 @@ import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
 import {getEventLevel} from './AppenderUtils.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
+import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 
 export type HighlightedEntryInfo = {
   title: string,
@@ -78,7 +80,7 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Timings', 'Interactions', 'GPU', 'LayoutShifts', 'UberFrames'] as const;
+export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'UberFrames', 'Thread'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -105,9 +107,11 @@ export class CompatibilityTracksAppender {
   #legacyEntryTypeByLevel: EntryType[];
   #timingsTrackAppender: TimingsTrackAppender;
   #uberFramesTrackAppender: UberFramesTrackAppender;
+  #animationsTrackAppender: AnimationsTrackAppender;
   #interactionsTrackAppender: InteractionsTrackAppender;
   #gpuTrackAppender: GPUTrackAppender;
   #layoutShiftsTrackAppender: LayoutShiftsTrackAppender;
+  #threadAppenders: ThreadAppender[] = [];
 
   /**
    * @param flameChartData the data used by the flame chart renderer on
@@ -154,6 +158,9 @@ export class CompatibilityTracksAppender {
         new InteractionsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#interactionsTrackAppender);
 
+    this.#animationsTrackAppender = new AnimationsTrackAppender(this, this.#traceParsedData);
+    this.#allTrackAppenders.push(this.#animationsTrackAppender);
+
     this.#gpuTrackAppender = new GPUTrackAppender(this, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#gpuTrackAppender);
 
@@ -161,6 +168,23 @@ export class CompatibilityTracksAppender {
     // all it shows are layout shifts.
     this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#flameChartData, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
+
+    if (this.#traceParsedData.Renderer) {
+      for (const [pid, process] of this.#traceParsedData.Renderer.processes) {
+        for (const [tid, thread] of process.threads) {
+          if (thread.name !== 'CrRendererMain') {
+            // At the moment we only support the main thread, since the
+            // title for other tracks is procesed differently. Tackling
+            // other threads will be implemented in the future as part
+            // of crbug.com/1428024
+            continue;
+          }
+          const threadAppender = new ThreadAppender(this, this.#traceParsedData, this.#colorGenerator, pid, tid);
+          this.#threadAppenders.push(threadAppender);
+          this.#allTrackAppenders.push(threadAppender);
+        }
+      }
+    }
 
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       for (const group of this.#flameChartData.groups) {
@@ -192,6 +216,9 @@ export class CompatibilityTracksAppender {
   uberFramesTrackAppender(): UberFramesTrackAppender {
     return this.#uberFramesTrackAppender;
   }
+  animationsTrackAppender(): AnimationsTrackAppender {
+    return this.#animationsTrackAppender;
+  }
 
   interactionsTrackAppender(): InteractionsTrackAppender {
     return this.#interactionsTrackAppender;
@@ -203,6 +230,10 @@ export class CompatibilityTracksAppender {
 
   layoutShiftsTrackAppender(): LayoutShiftsTrackAppender {
     return this.#layoutShiftsTrackAppender;
+  }
+
+  threadAppenders(): ThreadAppender[] {
+    return this.#threadAppenders;
   }
 
   /**

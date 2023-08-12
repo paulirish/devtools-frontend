@@ -265,7 +265,8 @@ export class DebuggerPlugin extends Plugin {
     this.scriptFileForDebuggerModel = new Map();
 
     this.loader = SDK.PageResourceLoader.PageResourceLoader.instance();
-    this.loader.addEventListener(SDK.PageResourceLoader.Events.Update, this.showSourceMapInfobar, this);
+    this.loader.addEventListener(
+        SDK.PageResourceLoader.Events.Update, this.showSourceMapInfobarIfNeeded.bind(this), this);
 
     this.ignoreListCallback = this.showIgnoreListInfobarIfNeeded.bind(this);
     Bindings.IgnoreListManager.IgnoreListManager.instance().addChangeListener(this.ignoreListCallback);
@@ -710,6 +711,17 @@ export class DebuggerPlugin extends Plugin {
               selectedCallFrame, evaluationText, this.uiSourceCode, highlightLine.number - 1,
               highlightRange.from - highlightLine.from, highlightRange.to - highlightLine.from);
         }
+        // We use side-effect free debug-evaluate when the highlighted expression contains a
+        // function/method call. Otherwise we allow side-effects. The motiviation here are
+        // frameworks like Vue, that heavily use proxies for caching:
+        //
+        //   * We deem a simple property access of a proxy as deterministic so it should be
+        //     successful even if V8 thinks its side-effecting.
+        //   * Explicit function calls on the other hand must be side-effect free. The canonical
+        //     example is hovering over {Math.random()} which would result in a different value
+        //     each time the user hovers over it.
+        const throwOnSideEffect = Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps') &&
+            highlightRange.containsCallExpression;
         const result = await selectedCallFrame.evaluate({
           expression: resolvedText || evaluationText,
           objectGroup: 'popover',
@@ -717,7 +729,7 @@ export class DebuggerPlugin extends Plugin {
           silent: true,
           returnByValue: false,
           generatePreview: false,
-          throwOnSideEffect: undefined,
+          throwOnSideEffect,
           timeout: undefined,
           disableBreaks: undefined,
           replMode: undefined,
@@ -1425,6 +1437,7 @@ export class DebuggerPlugin extends Plugin {
         this.updateScriptFile(debuggerModel);
       }
     }
+    this.showSourceMapInfobarIfNeeded();
   }
 
   private updateScriptFile(debuggerModel: SDK.DebuggerModel.DebuggerModel): void {
@@ -1450,9 +1463,6 @@ export class DebuggerPlugin extends Plugin {
     newScriptFile.addEventListener(
         Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidDivergeFromVM, this.didDivergeFromVM, this);
     newScriptFile.checkMapping();
-    if (newScriptFile.hasSourceMapURL()) {
-      this.showSourceMapInfobar();
-    }
 
     void newScriptFile.missingSymbolFiles().then(resources => {
       if (resources) {
@@ -1491,6 +1501,17 @@ export class DebuggerPlugin extends Plugin {
     this.attachInfobar(this.missingDebugInfoBar);
   }
 
+  private scriptHasSourceMap(): boolean {
+    for (const debuggerModel of SDK.TargetManager.TargetManager.instance().models(SDK.DebuggerModel.DebuggerModel)) {
+      const scriptFile = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().scriptFile(
+          this.uiSourceCode, debuggerModel);
+      if (scriptFile && scriptFile.hasSourceMapURL()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private getSourceMapResource(): SDK.PageResourceLoader.PageResource|null {
     const resourceMap = this.loader.getResourcesLoaded();
     for (const [debuggerModel, script] of this.scriptFileForDebuggerModel.entries()) {
@@ -1511,11 +1532,14 @@ export class DebuggerPlugin extends Plugin {
     return null;
   }
 
-  private showSourceMapInfobar(): void {
+  private showSourceMapInfobarIfNeeded(): void {
     if (this.sourceMapInfobar) {
       return;
     }
     if (!Common.Settings.Settings.instance().moduleSetting('jsSourceMapsEnabled').get()) {
+      return;
+    }
+    if (!this.scriptHasSourceMap()) {
       return;
     }
 
@@ -2201,13 +2225,15 @@ export function getVariableValuesByLine(
 export function computePopoverHighlightRange(state: CodeMirror.EditorState, mimeType: string, cursorPos: number): {
   from: number,
   to: number,
+  containsCallExpression: boolean,
 }|null {
   const {main} = state.selection;
   if (!main.empty) {
     if (cursorPos < main.from || main.to < cursorPos) {
       return null;
     }
-    return {from: main.from, to: main.to};
+    // If the user goes through the trouble of manually selecting an expression, we'll allow side-effects.
+    return {from: main.from, to: main.to, containsCallExpression: false};
   }
 
   const tree = CodeMirror.ensureSyntaxTree(state, cursorPos, 5 * 1000);
@@ -2241,7 +2267,7 @@ export function computePopoverHighlightRange(state: CodeMirror.EditorState, mime
           }
         }
       }
-      return {from: node.from, to: node.to};
+      return {from: node.from, to: node.to, containsCallExpression: false};
     }
 
     case 'text/html':
@@ -2261,7 +2287,7 @@ export function computePopoverHighlightRange(state: CodeMirror.EditorState, mime
       if (!current) {
         return null;
       }
-      return {from: current.from, to: current.to};
+      return {from: current.from, to: current.to, containsCallExpression: nodeContainsCallExpression(current)};
     }
 
     default: {
@@ -2270,9 +2296,18 @@ export function computePopoverHighlightRange(state: CodeMirror.EditorState, mime
       if (node.to - node.from > 50 || /[^\w_\-$]/.test(state.sliceDoc(node.from, node.to))) {
         return null;
       }
-      return {from: node.from, to: node.to};
+      return {from: node.from, to: node.to, containsCallExpression: false};
     }
   }
+}
+
+function nodeContainsCallExpression(node: CodeMirror.SyntaxNode): boolean {
+  let containsCallExpression = false;
+  node.cursor().iterate(node => {
+    containsCallExpression ||= node.name === 'CallExpression';
+    return !containsCallExpression;  // No need to recurse into children if we are alraedy done.
+  });
+  return containsCallExpression;
 }
 
 // Evaluated expression mark for pop-over

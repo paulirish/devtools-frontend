@@ -16,10 +16,10 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import type { Readable } from 'stream';
-import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import Protocol from 'devtools-protocol';
 import { GeolocationOptions, MediaFeature, Page as PageBase, ScreenshotOptions, WaitForOptions } from '../../api/Page.js';
 import { Accessibility } from '../Accessibility.js';
+import { CDPSession } from '../Connection.js';
 import { Coverage } from '../Coverage.js';
 import { PDFOptions } from '../PDFOptions.js';
 import { Viewport } from '../PuppeteerViewport.js';
@@ -27,6 +27,7 @@ import { Tracing } from '../Tracing.js';
 import { EvaluateFunc, HandleFor } from '../types.js';
 import { Browser } from './Browser.js';
 import { BrowserContext } from './BrowserContext.js';
+import { BrowsingContext } from './BrowsingContext.js';
 import { Frame } from './Frame.js';
 import { HTTPRequest } from './HTTPRequest.js';
 import { HTTPResponse } from './HTTPResponse.js';
@@ -36,9 +37,9 @@ import { Keyboard, Mouse, Touchscreen } from './Input.js';
  */
 export declare class Page extends PageBase {
     #private;
-    constructor(browserContext: BrowserContext, info: Omit<Bidi.BrowsingContext.Info, 'url'> & {
-        url?: string;
-    });
+    _client(): CDPSession;
+    constructor(browsingContext: BrowsingContext, browserContext: BrowserContext);
+    _setBrowserContext(browserContext: BrowserContext): void;
     get accessibility(): Accessibility;
     get tracing(): Tracing;
     get coverage(): Coverage;
@@ -52,6 +53,7 @@ export declare class Page extends PageBase {
     frame(frameId?: string): Frame | null;
     childFrames(frameId: string): Frame[];
     getNavigationResponse(id: string | null): HTTPResponse | null;
+    isClosed(): boolean;
     close(): Promise<void>;
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
     evaluate<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
@@ -99,5 +101,7 @@ export declare class Page extends PageBase {
         timeout?: number;
     }): Promise<void>;
     title(): Promise<string>;
+    createCDPSession(): Promise<CDPSession>;
+    bringToFront(): Promise<void>;
 }
 //# sourceMappingURL=Page.d.ts.map

@@ -7,6 +7,7 @@ import {scriptInjector} from '../ScriptInjector.js';
 import {EvaluateFunc, HandleFor} from '../types.js';
 import {
   PuppeteerURL,
+  debugError,
   getSourcePuppeteerURLIfAvailable,
   isString,
 } from '../util.js';
@@ -46,6 +47,22 @@ export class Realm extends EventEmitter {
 
   setFrame(frame: Frame): void {
     this.#frame = frame;
+
+    // TODO(jrandolf): We should try to find a less brute-force way of doing
+    // this.
+    this.connection.on(
+      Bidi.ChromiumBidi.Script.EventNames.RealmDestroyed,
+      async () => {
+        const promise = this.internalPuppeteerUtil;
+        this.internalPuppeteerUtil = undefined;
+        try {
+          const util = await promise;
+          await util?.dispose();
+        } catch (error) {
+          debugError(error);
+        }
+      }
+    );
   }
 
   protected internalPuppeteerUtil?: Promise<JSHandle<PuppeteerUtil>>;
@@ -114,7 +131,9 @@ export class Realm extends EventEmitter {
     );
 
     let responsePromise;
-    const resultOwnership = returnByValue ? 'none' : 'root';
+    const resultOwnership = returnByValue
+      ? Bidi.Script.ResultOwnership.None
+      : Bidi.Script.ResultOwnership.Root;
     if (isString(pageFunction)) {
       const expression = SOURCE_URL_REGEX.test(pageFunction)
         ? pageFunction
@@ -125,6 +144,7 @@ export class Realm extends EventEmitter {
         target: this.target,
         resultOwnership,
         awaitPromise: true,
+        userActivation: true,
       });
     } else {
       let functionDeclaration = stringifyFunction(pageFunction);
@@ -141,6 +161,7 @@ export class Realm extends EventEmitter {
         target: this.target,
         resultOwnership,
         awaitPromise: true,
+        userActivation: true,
       });
     }
 
@@ -161,7 +182,7 @@ export class Realm extends EventEmitter {
  */
 export function getBidiHandle(
   realmOrContext: Realm,
-  result: Bidi.CommonDataTypes.RemoteValue,
+  result: Bidi.Script.RemoteValue,
   frame: Frame
 ): JSHandle | ElementHandle<Node> {
   if (result.type === 'node' || result.type === 'window') {

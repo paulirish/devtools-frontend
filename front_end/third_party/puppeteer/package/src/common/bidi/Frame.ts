@@ -19,6 +19,7 @@ import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import {ElementHandle} from '../../api/ElementHandle.js';
 import {Frame as BaseFrame} from '../../api/Frame.js';
 import {Deferred} from '../../util/Deferred.js';
+import {CDPSession} from '../Connection.js';
 import {UTILITY_WORLD_NAME} from '../FrameManager.js';
 import {PuppeteerLifeCycleEvent} from '../LifecycleWatcher.js';
 import {TimeoutSettings} from '../TimeoutSettings.js';
@@ -72,6 +73,10 @@ export class Frame extends BaseFrame {
 
     puppeteerRealm.setFrame(this);
     context.setFrame(this);
+  }
+
+  override _client(): CDPSession {
+    return this.context().cdpSession;
   }
 
   override mainRealm(): Sandbox {
@@ -131,7 +136,10 @@ export class Frame extends BaseFrame {
       waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
     }
   ): Promise<HTTPResponse | null> {
-    const navigationId = await this.#context.goto(url, options);
+    const navigationId = await this.#context.goto(url, {
+      ...options,
+      timeout: options?.timeout ?? this.#timeoutSettings.navigationTimeout(),
+    });
     return this.#page.getNavigationResponse(navigationId);
   }
 
@@ -142,7 +150,10 @@ export class Frame extends BaseFrame {
       waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
     }
   ): Promise<void> {
-    return this.#context.setContent(html, options);
+    return this.#context.setContent(html, {
+      ...options,
+      timeout: options?.timeout ?? this.#timeoutSettings.navigationTimeout(),
+    });
   }
 
   override content(): Promise<string> {
@@ -220,25 +231,40 @@ export class Frame extends BaseFrame {
       getWaitUntilSingle(waitUntil)
     ) as string;
 
-    const [info] = await Promise.all([
+    const [info] = await Deferred.race([
+      // TODO(lightning00blade): Should also keep tack of
+      // navigationAborted and navigationFailed
+      Promise.all([
+        waitForEvent<Bidi.BrowsingContext.NavigationInfo>(
+          this.#context,
+          waitUntilEvent,
+          () => {
+            return true;
+          },
+          timeout,
+          this.#abortDeferred.valueOrThrow()
+        ),
+        waitForEvent(
+          this.#context,
+          Bidi.ChromiumBidi.BrowsingContext.EventNames.NavigationStarted,
+          () => {
+            return true;
+          },
+          timeout,
+          this.#abortDeferred.valueOrThrow()
+        ),
+      ]),
       waitForEvent<Bidi.BrowsingContext.NavigationInfo>(
         this.#context,
-        waitUntilEvent,
+        Bidi.ChromiumBidi.BrowsingContext.EventNames.FragmentNavigated,
         () => {
           return true;
         },
         timeout,
         this.#abortDeferred.valueOrThrow()
-      ),
-      waitForEvent(
-        this.#context,
-        Bidi.BrowsingContext.EventNames.FragmentNavigated,
-        () => {
-          return true;
-        },
-        timeout,
-        this.#abortDeferred.valueOrThrow()
-      ),
+      ).then(info => {
+        return [info, undefined];
+      }),
     ]);
 
     return this.#page.getNavigationResponse(info.navigation);
