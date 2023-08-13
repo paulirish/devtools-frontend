@@ -28,7 +28,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const waterfallTypes = TraceEngine.Handlers.ModelHandlers.UberFramesHandler.waterfallTypes;
+const eventLatencyBreakdownTypeNames = TraceEngine.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
 
 /**
  * Show the frame timeline in an easy to understand manner.
@@ -75,19 +75,25 @@ export class UberFramesTrackAppender implements TrackAppender {
 
     // do waterfall first
     const waterFallEvts = this.#traceParsedData.UberFrames.waterFallEvts;
-    for (const event of waterFallEvts) {
 
-      const levelBump = waterfallTypes.get(event.name);
+    // filter down to just the breakdown types we see. Figure out levelBump for the rising waterfall
+    const actualNames = new Set(waterFallEvts.map(e => e.name));
+    const updatedTypeNames = eventLatencyBreakdownTypeNames.filter(name => actualNames.has(name));
+    const reversed = updatedTypeNames.reverse();
+    const typeNamesToLevel = Object.fromEntries(
+      updatedTypeNames.map(name => [name, reversed.indexOf(name)])
+    );
+
+    for (const event of waterFallEvts) {
+      const levelBump = typeNamesToLevel[event.name];
       this.#compatibilityBuilder.appendEventAtLevel(event, trackStartLevel + levelBump, this);
     }
     // move y axis..
     newLevel += trackStartLevel;
-    newLevel += Math.max(...waterfallTypes.values());
-    newLevel++;
+    newLevel += reversed.length;
     newLevel++;
 
-
-    // then do everythign
+    // Do all events now, (which also includes waterfall again)
     newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, newLevel, this);
     // newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
     return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);

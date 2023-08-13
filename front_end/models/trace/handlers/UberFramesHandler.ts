@@ -150,6 +150,48 @@ const someRelevantTraceEventTypes = [
 
 ];
 
+export const eventLatencyBreakdownTypeNames = [
+'GenerationToBrowserMain',
+'BrowserMainToRendererCompositor',
+'RendererCompositorQueueingDelay',
+'RendererCompositorProcessing',
+'RendererCompositorFinishedToEndActivate',
+'RendererCompositorFinishedToSendBeginMainFrame',
+'RendererCompositorFinishedToBeginImplFrame',
+'BeginImplFrameToSendBeginMainFrame',
+'RendererCompositorFinishedToCommit',
+'RendererCompositorFinishedToEndCommit',
+'RendererCompositorFinishedToActivation',
+'RendererCompositorFinishedToSubmitCompositorFrame',
+
+'RendererCompositorToMain',
+'RendererMainProcessing',
+'RendererMainFinishedToBeginImplFrame',
+'RendererMainFinishedToSendBeginMainFrame',
+'RendererMainFinishedToCommit',
+'RendererMainFinishedToEndCommit',
+'RendererMainFinishedToActivation',
+'RendererMainFinishedToEndActivate',
+'RendererMainFinishedToSubmitCompositorFrame',
+
+'SendBeginMainFrameToCommit',
+'Commit',
+'EndCommitToActivation',
+'Activation',
+'EndActivateToSubmitCompositorFrame',
+
+// 'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase that can overlap
+'SubmitToReceiveCompositorFrame',
+'ReceiveCompositorFrameToStartDraw',
+'StartDrawToSwapStart',
+'Swap',
+'SwapStartToBufferAvailable',
+'BufferAvailableToBufferReady',
+'BufferReadyToLatch',
+'LatchToSwapEnd',
+'SwapEndToPresentationCompositorFrame',
+];
+
 export const waterfallTypes = new Map([
   ['EventLatency', 4],
   ['SendBeginMainFrameToCommit', 3],
@@ -263,7 +305,7 @@ export async function finalize(): Promise<void> {
     // Some eventlatnecy evts are emitted on multiple categories separtely. leave them otu
     if (existingDuplicate) {continue;}
 
-    if (waterfallTypeNames.has(event.name)) {
+    if (eventLatencyBreakdownTypeNames.includes(event.name)) {
       waterFallEvents.push(event);
     }
     syntheticEvents.push(event);
