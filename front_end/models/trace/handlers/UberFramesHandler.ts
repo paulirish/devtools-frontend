@@ -150,6 +150,16 @@ const someRelevantTraceEventTypes = [
 
 ];
 
+export const waterfallTypes = new Map([
+  ['EventLatency', 4],
+  ['SendBeginMainFrameToCommit', 3],
+  ['EndCommitToActivation', 2],
+  ['Activation', 2],
+  ['EndActivateToSubmitCompositorFrame', 2],
+  ['SubmitCompositorFrameToPresentationCompositorFrame', 2],
+]);
+const waterfallTypeNames = new Set([...waterfallTypes.keys()]);
+
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
   if (Types.TraceEvents.isTraceEventGPUTask(event)) {
@@ -225,7 +235,7 @@ export async function finalize(): Promise<void> {
 
     const event: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent = {
       cat: eventsPair.end.cat,
-      ph: eventsPair.end.ph,
+      ph: 'X',
       pid: eventsPair.end.pid,
       tid: eventsPair.end.tid,
       id,
@@ -253,7 +263,7 @@ export async function finalize(): Promise<void> {
     // Some eventlatnecy evts are emitted on multiple categories separtely. leave them otu
     if (existingDuplicate) {continue;}
 
-    if (false) {
+    if (waterfallTypeNames.has(event.name)) {
       waterFallEvents.push(event);
     }
     syntheticEvents.push(event);
@@ -278,7 +288,7 @@ export function data(): UberFramesData {
   }
   return {
     allEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
-    waterFallEvts: [].sort((event1, event2) => event1.ts - event2.ts),
+    waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
   };
 }
 

@@ -16,6 +16,8 @@ import {type TimelineMarkerStyle} from './TimelineUIUtils.js';
 import type * as Common from '../../core/common/common.js';
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 
+
+
 const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
@@ -25,6 +27,8 @@ const UIStrings = {
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+const waterfallTypes = TraceEngine.Handlers.ModelHandlers.UberFramesHandler.waterfallTypes;
 
 /**
  * Show the frame timeline in an easy to understand manner.
@@ -67,10 +71,41 @@ export class UberFramesTrackAppender implements TrackAppender {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    let newLevel;
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, trackStartLevel, this);
+    let newLevel = 0;
+
+    // do waterfall first
+    const waterFallEvts = this.#traceParsedData.UberFrames.waterFallEvts;
+    for (const event of waterFallEvts) {
+
+      const levelBump = waterfallTypes.get(event.name);
+      this.#compatibilityBuilder.appendEventAtLevel(event, trackStartLevel + levelBump, this);
+    }
+    // move y axis..
+    newLevel += trackStartLevel;
+    newLevel += Math.max(...waterfallTypes.values());
+    newLevel++;
+    newLevel++;
+
+
+    // then do everythign
+    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, newLevel, this);
     // newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
     return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+  }
+
+  /**
+   * Adds an event to the flame chart data at a defined level.
+   * @param event the event to be appended,
+   * @param level the level to append the event,
+   * @param appender the track which the event belongs to.
+   * @returns the index of the event in all events to be rendered in the flamechart.
+   */
+  #appendEventAtLevel(event: TraceEngine.Types.TraceEvents.TraceEventData, level: number): number {
+    const index = this.#flameChartData.entryLevels.length;
+    this.#flameChartData.entryLevels[index] = level;
+    this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
+    this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.dur);
+    return level;
   }
 
   /**
