@@ -101,6 +101,7 @@ const someRelevantTraceEventTypes = [
 
   // 'EventLatency', // mocny said these are complicated.
   // https://docs.google.com/spreadsheets/d/1F6BPrtIMgDD4eKH-VxEqzZy8dOeh3U2EZaYjVlIv-Hk/edit?resourcekey=0-UtBlkaCsd0Oi1Z3bQqHqow#gid=557410449
+  // TODO.. some of these are emitted separately on different trace categories.. so there's duplicates. ugh
 'GenerationToBrowserMain',
 'BrowserMainToRendererCompositor',
 'RendererCompositorQueueingDelay',
@@ -244,6 +245,17 @@ export async function finalize(): Promise<void> {
         },
       },
     };
+
+    const existingDuplicate = syntheticEvents.find(e => {
+      return e.name === event.name &&
+      e.ts === event.ts &&
+      e.dur === event.dur &&
+      e.tid === event.tid &&
+      e.pid === event.pid;
+    });
+    // Some eventlatnecy evts are emitted on multiple categories separtely. leave them otu
+    if (existingDuplicate) continue;
+
     syntheticEvents.push(event);
   }
   // drop pipelinereporter that werent presented. or browser process.
