@@ -834,6 +834,8 @@ export class TimelineModelImpl {
       track.name = track.url ? i18nString(UIStrings.workerS, {PH1: track.url}) : i18nString(UIStrings.dedicatedWorker);
     } else if (thread.name().startsWith('CompositorTileWorker')) {
       track.type = TrackType.Raster;
+    } else if (thread.name().startsWith('ThreadPoolForegroundWorker')) {
+      track.type = TrackType.ThreadPool;
     } else if (thread.name() === TimelineModelImpl.AuctionWorkletThreadName) {
       track.url = url || Platform.DevToolsPath.EmptyUrlString;
       track.name = TimelineModelImpl.nameAuctionWorklet(workletType, url);
@@ -1797,6 +1799,7 @@ export enum TrackType {
   Animation = 'Animation',
   Browser = 'Browser',
   Raster = 'Raster',
+  ThreadPool = 'ThreadPool',
   Experience = 'Experience',
   Other = 'Other',
 }

@@ -84,6 +84,11 @@ const UIStrings = {
   rasterizerThreadS: 'Rasterizer Thread {PH1}',
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   *@example {2} PH1
+   */
+  threadPoolWorkerS: 'Thread pool worker {PH1}',
+  /**
+   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   thread: 'Thread',
   /**
@@ -149,6 +154,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
    * rendering a track for thread.
    */
   #rasterCount: number = 0;
+  /**
+   * Thread pool threads are tracked and enumerated with this property. This is also
+   * used to group all threadpool threads together in the same track, instead of
+   * rendering a track for thread.
+   */
+  #threadPoolCount: number = 0;
 
   private minimumBoundaryInternal: number;
   private timeSpan: number;
@@ -369,6 +380,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.compatibilityTracksAppender = null;
     this.#eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
     this.#indexForEvent = new WeakMap<TraceEngine.Legacy.Event, number>();
+    this.#rasterCount = 0;
+    this.#threadPoolCount = 0;
   }
 
   maxStackDepth(): number {
@@ -474,8 +487,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           return 9;
         case TimelineModel.TimelineModel.TrackType.Browser:
           return 11;
+        case TimelineModel.TimelineModel.TrackType.ThreadPool:
+          return 1;
         case TimelineModel.TimelineModel.TrackType.Other:
-          return 10;
+          return 11;
         default:
           return 15;
       }
@@ -561,6 +576,18 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         ++this.#rasterCount;
         this.appendSyncEvents(
             track, track.events, i18nString(UIStrings.rasterizerThreadS, {PH1: this.#rasterCount}), this.headerLevel2,
+            eventEntryType, true /* selectable */, expanded);
+        break;
+      }
+
+      case TimelineModel.TimelineModel.TrackType.ThreadPool: {
+        if (!this.#threadPoolCount) {
+          this.appendHeader('Thread Pool', this.headerLevel1, false /* selectable */, expanded);
+        }
+        ++this.#threadPoolCount;
+        this.appendSyncEvents(
+            // TODO fix thread name
+            track, track.events, i18nString(UIStrings.threadPoolWorkerS, {PH1: this.#threadPoolCount}), this.headerLevel2,
             eventEntryType, true /* selectable */, expanded);
         break;
       }
