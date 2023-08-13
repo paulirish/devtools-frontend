@@ -26,6 +26,13 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+/**
+ * Show the frame timeline in an easy to understand manner.
+ *
+ * Box body (main thread time):         RendererMainProcessing + RendererMainFinishedToCommit
+ * Right leg (actionable raster time):  EndCommitToActivation + Activation
+ * Right whisker (to presentation):     EndActivateToSubmitCompositorFrame
+ */
 export class UberFramesTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'UberFrames';
 
@@ -133,6 +140,11 @@ export class UberFramesTrackAppender implements TrackAppender {
       '';
 
     if (frameSeqId) return `${event.name} ${frameSeqId % 1000}`;
+
+    const localID = event.args?.data?.beginEvent?.id2?.local;
+    if (localID) return `${event.name} ${localID}`;
+
+
     return event.name;
     // if (event.name === 'PipelineReporter') return `PRr ${ % 1000}`;
     // if (event.name === 'Frame') return `Frame ${event.args.data.beginEvent.args.data.values.sequence_number % 1000}`;

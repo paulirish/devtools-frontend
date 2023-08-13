@@ -99,7 +99,7 @@ const someRelevantTraceEventTypes = [
 
   // 'Graphics.Pipeline',
 
-  // 'EventLatency', // mocny said these are complicated.
+  'EventLatency', // mocny said these are complicated. but.. they're also great.
   // https://docs.google.com/spreadsheets/d/1F6BPrtIMgDD4eKH-VxEqzZy8dOeh3U2EZaYjVlIv-Hk/edit?resourcekey=0-UtBlkaCsd0Oi1Z3bQqHqow#gid=557410449
   // TODO.. some of these are emitted separately on different trace categories.. so there's duplicates. ugh
 'GenerationToBrowserMain',
@@ -250,6 +250,7 @@ export async function finalize(): Promise<void> {
       return e.name === event.name &&
       e.ts === event.ts &&
       e.dur === event.dur &&
+      e.id2?.local === event.id2?.local &&
       e.tid === event.tid &&
       e.pid === event.pid;
     });
