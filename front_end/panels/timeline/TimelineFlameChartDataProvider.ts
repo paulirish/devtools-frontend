@@ -456,13 +456,14 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           case 'LayoutShifts':
             return 3;
           case 'GPU':
-            return 8;
+            return 0;
           case 'Thread':
             return 4;
           default:
             return -1;
         }
       }
+      if (track.name === 'Compositor') return 1;
 
       switch (track.type) {
         case TimelineModel.TimelineModel.TrackType.MainThread:
