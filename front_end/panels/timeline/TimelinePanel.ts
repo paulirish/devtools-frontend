@@ -1700,8 +1700,11 @@ export class LoadTimelineHandler implements Common.QueryParamHandler.QueryParamH
   }
 
   handleQueryParam(value: string): void {
+    const traceUrl = window.decodeURIComponent(value) as Platform.DevToolsPath.UrlString;
+    const filename = new URL(traceUrl).pathname.replace(/.*?\//,'');
+    document.title = `PP: ${filename}`;
     void UI.ViewManager.ViewManager.instance().showView('timeline').then(async () => {
-      await TimelinePanel.instance().loadFromURL(window.decodeURIComponent(value) as Platform.DevToolsPath.UrlString);
+      await TimelinePanel.instance().loadFromURL(traceUrl);
     });
   }
 }
