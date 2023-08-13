@@ -145,6 +145,10 @@ export class UserMetrics {
     this.#launchPanelName = (panelName as string);
   }
 
+  performanceTraceLoadEnd(measure: PerformanceMeasure): void {
+        InspectorFrontendHostInstance.recordPerformanceHistogram('DevTools.LoadTrace', measure.duration);
+  }
+
   keybindSetSettingChanged(keybindSet: string): void {
     const value = KeybindSetSettings[keybindSet as keyof typeof KeybindSetSettings] || 0;
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
