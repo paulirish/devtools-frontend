@@ -87,6 +87,7 @@ export class TimelineController implements SDK.TargetManager.SDKModelObserver<SD
       disabledByDefault('devtools.timeline.stack'),
       disabledByDefault('v8.compile'),
       disabledByDefault('v8.cpu_profiler.hires'),
+      disabledByDefault('disabled-by-default-gpu.vulkan.vma'), // extra detail in GPU
       TimelineModel.TimelineModel.TimelineModelImpl.Category.Loading,
       disabledByDefault('lighthouse'),
       'v8.execute',
