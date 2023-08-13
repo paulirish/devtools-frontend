@@ -28,10 +28,10 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 /**
  * Show the frame timeline in an easy to understand manner.
- *
- * Box body (main thread time):         RendererMainProcessing + RendererMainFinishedToCommit
- * Right leg (actionable raster time):  EndCommitToActivation + Activation
- * Right whisker (to presentation):     EndActivateToSubmitCompositorFrame
+ * left whisker (input or (pre BMF stuff?)): EventLatency start. Not sure about loaf.
+ * Box body (main thread time):         SendBeginMainFrameToCommit      (RendererMainProcessing + RendererMainFinishedToCommit are not always there)
+ * Right leg (actionable raster time):  EndCommitToActivation
+ * Right whisker (to presentation):     Activation + EndActivateToSubmitCompositorFrame  SubmitCompositorFrameToPresentationCompositorFrame
  */
 export class UberFramesTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'UberFrames';
@@ -60,7 +60,7 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFrames;
+    const uberFrameEvts = this.#traceParsedData.UberFrames.allEvts;
     // const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
 
     if (uberFrameEvts.length === 0) {
@@ -145,35 +145,6 @@ export class UberFramesTrackAppender implements TrackAppender {
     if (localID) return `${event.name} ${localID}`;
 
 
-    return event.name;
-    // if (event.name === 'PipelineReporter') return `PRr ${ % 1000}`;
-    // if (event.name === 'Frame') return `Frame ${event.args.data.beginEvent.args.data.values.sequence_number % 1000}`;
-
-    const metricsHandler = TraceEngine.Handlers.ModelHandlers.PageLoadMetrics;
-    if (metricsHandler.eventIsPageLoadEvent(event)) {
-      switch (event.name) {
-        case 'MarkDOMContent':
-          return metricsHandler.MetricName.DCL;
-        case 'MarkLoad':
-          return metricsHandler.MetricName.L;
-        case 'firstContentfulPaint':
-          return metricsHandler.MetricName.FCP;
-        case 'firstPaint':
-          return metricsHandler.MetricName.FP;
-        case 'largestContentfulPaint::Candidate':
-          return metricsHandler.MetricName.LCP;
-        case 'navigationStart':
-          return '';
-        default:
-          return event.name;
-      }
-    }
-    if (TraceEngine.Types.TraceEvents.isTraceEventTimeStamp(event)) {
-      return `${event.name}: ${event.args.data.message}`;
-    }
-    if (TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(event)) {
-      return `[mark]: ${event.name}`;
-    }
     return event.name;
   }
 

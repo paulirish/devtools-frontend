@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 import {data as metaHandlerData} from './MetaHandler.js';
-import {type TraceEventHandlerName} from './types.js';
+import {type TraceEventHandlerName,HandlerState} from './types.js';
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
-import {HandlerState} from './types.js';
 
 // Each thread contains events. Events indicate the thread and process IDs, which are
 // used to store the event in the correct process thread entry below.
@@ -17,17 +16,20 @@ const eventsInProcessThread =
 
 // these types are wrong
 let relevantEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
-let gpuEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
-let asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
+const gpuEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
+const asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 let syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
+const waterFallEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 
 // export interface UberFramesData {
 //   relevantEvts: readonly Types.TraceEvents.TraceEventData[],
 //   syntheticEvents: readonly Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[];
 // }
 
-
-export type UberFramesData = readonly Types.TraceEvents.TraceEventData[];
+export type UberFramesData = {
+  allEvts: readonly Types.TraceEvents.TraceEventData[],
+  waterFallEvts: readonly Types.TraceEvents.TraceEventData[],
+};
 
 export function reset(): void {
   eventsInProcessThread.clear();
@@ -35,13 +37,12 @@ export function reset(): void {
   gpuEvents.length = 0;
   syntheticEvents.length = 0;
   asyncEvts.length = 0;
+  waterFallEvents.length = 0;
 
   handlerState = HandlerState.INITIALIZED;
 }
 
-
 let handlerState = HandlerState.UNINITIALIZED;
-
 
 const someStuff  = {
   CompositeLayers : 'CompositeLayers',
@@ -52,7 +53,6 @@ const someStuff  = {
   ResizeImage : 'Resize Image',
   DrawLazyPixelRef : 'Draw LazyPixelRef',
   DecodeLazyPixelRef : 'Decode LazyPixelRef',
-
 
   BeginFrame: 'BeginFrame',
   NeedsBeginFrameChanged: 'NeedsBeginFrameChanged',
@@ -95,7 +95,6 @@ const someRelevantTraceEventTypes = [
   'Scheduler::BeginFrame',
   'DisplayScheduler::BeginFrame',
   'Scheduler::BeginImplFrame',
-
 
   // 'Graphics.Pipeline',
 
@@ -140,15 +139,14 @@ const someRelevantTraceEventTypes = [
 'LatchToSwapEnd',
 'SwapEndToPresentationCompositorFrame',
 
-
   //
   'EventTiming',
 
   // my loaf branch
-  "LongAnimationFrame",
-  "LoAF-renderStart",
-  "LoAF-desiredRenderStart",
-  "LoAF-styleAndLayoutStart",
+  'LongAnimationFrame',
+  'LoAF-renderStart',
+  'LoAF-desiredRenderStart',
+  'LoAF-styleAndLayoutStart',
 
 ];
 
@@ -185,8 +183,6 @@ export async function finalize(): Promise<void> {
   // This cuts down GPU Task count .. 33% of what it was.
   const ourRendererGPUTasks = gpuEvents.filter(e => topLevelRendererIds.has(e.args.data.renderer_pid));
   relevantEvts = [... relevantEvts, ... ourRendererGPUTasks];
-
-
 
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('UberFrames handler is not initialized');
@@ -255,29 +251,35 @@ export async function finalize(): Promise<void> {
       e.pid === event.pid;
     });
     // Some eventlatnecy evts are emitted on multiple categories separtely. leave them otu
-    if (existingDuplicate) continue;
+    if (existingDuplicate) {continue;}
 
+    if (false) {
+      waterFallEvents.push(event);
+    }
     syntheticEvents.push(event);
   }
   // drop pipelinereporter that werent presented. or browser process.
+  // TODO: do this earlier? iunno
   syntheticEvents = syntheticEvents.filter(e => {
-    if (e.name !== 'PipelineReporter') return true;
+    if (e.name !== 'PipelineReporter') {return true;}
     return topLevelRendererIds.has(e.pid) &&
-      e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== "FORKED" &&
+      e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
       e.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL';
   });
 
-
-  syntheticEvents.sort((event1, event2) => event1.ts - event2.ts);
   handlerState = HandlerState.FINALIZED;
 }
 
+// TODO: is it okay to do work here? this is only called once? (or should i put the _work_ in finalize)
+// so far looks like its only called once, so whatev.
 export function data(): UberFramesData {
   if (handlerState !== HandlerState.FINALIZED) {
     throw new Error('UberFrames handler is not finalized');
   }
-  return [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts);
-
+  return {
+    allEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
+    waterFallEvts: [].sort((event1, event2) => event1.ts - event2.ts),
+  };
 }
 
 export function deps(): TraceEventHandlerName[] {
