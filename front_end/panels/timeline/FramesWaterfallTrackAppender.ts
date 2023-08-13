@@ -20,11 +20,13 @@ const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
-  trackTitle: 'UberFrames',
+  trackTitle: 'Frame Waterfall',
 };
 
-const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
+const str_ = i18n.i18n.registerUIStrings('panels/timeline/FramesWaterfallTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+const eventLatencyBreakdownTypeNames = TraceEngine.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
 
 /**
  * Show the frame timeline in an easy to understand manner.
@@ -33,7 +35,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  * Right leg (actionable raster time):  EndCommitToActivation
  * Right whisker (to presentation):     Activation + EndActivateToSubmitCompositorFrame  SubmitCompositorFrameToPresentationCompositorFrame
  */
-export class UberFramesTrackAppender implements TrackAppender {
+export class FramesWaterfallTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'UberFrames';
 
   #colorGenerator: Common.Color.Generator;
@@ -67,12 +69,27 @@ export class UberFramesTrackAppender implements TrackAppender {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
+    let newLevel = 0;
 
-    let newLevel;
-    // Do all events now, (which also includes waterfall again)
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, trackStartLevel, this);
-    // newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
-    return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+    // do waterfall first
+    const waterFallEvts = this.#traceParsedData.UberFrames.waterFallEvts;
+
+    // filter down to just the breakdown types we see. Figure out levelBump for the rising waterfall
+    const actualNames = new Set(waterFallEvts.map(e => e.name));
+    const updatedTypeNames = eventLatencyBreakdownTypeNames.filter(name => actualNames.has(name));
+    const reversed = updatedTypeNames.reverse();
+    const typeNamesToLevel = Object.fromEntries(
+      updatedTypeNames.map(name => [name, reversed.indexOf(name)]),
+    );
+
+    for (const event of waterFallEvts) {
+      const levelBump = typeNamesToLevel[event.name];
+      this.#compatibilityBuilder.appendEventAtLevel(event, trackStartLevel + levelBump, this);
+    }
+    // move y axis..
+    newLevel += trackStartLevel;
+    newLevel += reversed.length;
+    return newLevel;
   }
 
   /**

@@ -54,6 +54,7 @@ devtools_module("timeline") {
     "TimelineUIUtils.ts",
     "TimingsTrackAppender.ts",
     "UberFramesTrackAppender.ts",
+    "FramesWaterfallTrackAppender.ts",
     "UIDevtoolsController.ts",
     "UIDevtoolsUtils.ts",
   ]

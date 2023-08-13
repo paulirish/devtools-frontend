@@ -200,7 +200,7 @@ export const waterfallTypes = new Map([
   ['EndActivateToSubmitCompositorFrame', 2],
   ['SubmitCompositorFrameToPresentationCompositorFrame', 2],
 ]);
-const waterfallTypeNames = new Set([...waterfallTypes.keys()]);
+
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 

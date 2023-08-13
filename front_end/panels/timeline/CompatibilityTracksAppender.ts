@@ -17,6 +17,7 @@ import {
 } from './TimelineFlameChartDataProvider.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
 import {UberFramesTrackAppender} from './UberFramesTrackAppender.js';
+import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
@@ -107,6 +108,7 @@ export class CompatibilityTracksAppender {
   #legacyEntryTypeByLevel: EntryType[];
   #timingsTrackAppender: TimingsTrackAppender;
   #uberFramesTrackAppender: UberFramesTrackAppender;
+  #framesWaterfallTrackAppender: FramesWaterfallTrackAppender;
   #animationsTrackAppender: AnimationsTrackAppender;
   #interactionsTrackAppender: InteractionsTrackAppender;
   #gpuTrackAppender: GPUTrackAppender;
@@ -150,6 +152,10 @@ export class CompatibilityTracksAppender {
         /* satSpace= */ {min: 70, max: 100, count: undefined},
         /* lightnessSpace= */ 50,
         /* alphaSpace= */ 0.7);
+    this.#framesWaterfallTrackAppender =
+        new FramesWaterfallTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
+    this.#allTrackAppenders.push(this.#framesWaterfallTrackAppender);
+
     this.#uberFramesTrackAppender =
         new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#uberFramesTrackAppender);
@@ -211,6 +217,10 @@ export class CompatibilityTracksAppender {
 
   timingsTrackAppender(): TimingsTrackAppender {
     return this.#timingsTrackAppender;
+  }
+
+  framesWaterfallTrackAppender(): FramesWaterfallTrackAppender {
+    return this.#framesWaterfallTrackAppender;
   }
 
   uberFramesTrackAppender(): UberFramesTrackAppender {
