@@ -137,8 +137,10 @@ export class UberFramesTrackAppender implements TrackAppender {
       event.args.frame_sequence ??
       event.args.begin_frame_id ??
       event.args.args?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
       event.args?.data?.beginEvent?.args?.data?.sequence_number ??
       event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
+      event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ??
       '';
 
     if (frameSeqId) {return `${event.name} ${frameSeqId % 1000}`;}
@@ -155,22 +157,6 @@ export class UberFramesTrackAppender implements TrackAppender {
    */
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
-
-    // If an event is a marker event, rather than show a duration of 0, we can instead show the time that the event happened, which is much more useful. We do this currently for:
-    // Page load events: DCL, FCP and LCP
-    // performance.mark() events
-    // console.timestamp() events
-    if (TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.isTraceEventMarkerEvent(event) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(event) ||
-        TraceEngine.Types.TraceEvents.isTraceEventTimeStamp(event)) {
-      const timeOfEvent = TraceEngine.Helpers.Timing.timeStampForEventAdjustedByClosestNavigation(
-          event,
-          this.#traceParsedData.Meta.traceBounds,
-          this.#traceParsedData.Meta.navigationsByNavigationId,
-          this.#traceParsedData.Meta.navigationsByFrameId,
-      );
-      return {title, formattedTime: getFormattedTime(timeOfEvent)};
-    }
 
     return {title, formattedTime: getFormattedTime(event.dur)};
   }
