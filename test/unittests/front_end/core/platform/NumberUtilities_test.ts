@@ -167,7 +167,7 @@ describe('NumberUtilities', () => {
     });
 
     it('does not separates 16+ digit numbers', () => {
-      const separate = (num:number) => {
+      const separate = (num: number) => {
         const formatted = Platform.NumberUtilities.withUnderscoreThousandsSeparator(num.toString());
 
         // Round-trip number back to number and assert it's the same value:
@@ -183,11 +183,11 @@ describe('NumberUtilities', () => {
       assert.strictEqual(separate(123456789012345), '123_456_789_012_345');
       assert.strictEqual(separate(123456789012345.12345), '123456789012345.12');
       assert.strictEqual(separate(1234567890123456), '1234567890123456');
-      assert.strictEqual(separate(9007199254740991), '9007199254740991'); // Number.MAX_SAFE_INTEGER
-      assert.strictEqual(separate(1234567890123456.12345), '1234567890123456'); // Unsafe number
-      assert.strictEqual(separate(12345678901234567), '12345678901234568'); // Unsafe number
-      assert.strictEqual(separate(12345678901234567.12345), '12345678901234568'); // Unsafe number
-      assert.strictEqual(separate(123456789012345678), '123456789012345680'); // Unsafe number
+      assert.strictEqual(separate(9007199254740991), '9007199254740991');          // Number.MAX_SAFE_INTEGER
+      assert.strictEqual(separate(1234567890123456.12345), '1234567890123456');    // Unsafe number
+      assert.strictEqual(separate(12345678901234567), '12345678901234568');        // Unsafe number
+      assert.strictEqual(separate(12345678901234567.12345), '12345678901234568');  // Unsafe number
+      assert.strictEqual(separate(123456789012345678), '123456789012345680');      // Unsafe number
     });
 
     it('does not separate decimal points', () => {
