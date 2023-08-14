@@ -326,18 +326,51 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     if (!this.#networkTrackAppender || !this.#timelineDataInternal) {
       return;
     }
+
+    // TODO: Ideally if there's a this.#lastSelection that's currently within time bounds.. (or 50% is)
+    // we keep it in view as we zoom.
+    // See getDrawableData() in FlameChart t
+
+
+    // repro:
+    // android-gh-load. network like 6-7 rows high. select image in last set. zoom on right edge of main.
+
+    const prevMaxLevel = this.#maxLevel;
+    const prevSelectionlevel = this.#lastSelection ? this.#timelineDataInternal.entryLevels[this.#lastSelection.entryIndex] : undefined;
+    const prevLevels = Array.from(this.#timelineDataInternal.entryLevels);
     this.#maxLevel = this.#networkTrackAppender.filterTimelineDataBetweenTimes(
         TraceEngine.Types.Timing.MilliSeconds(startTime), TraceEngine.Types.Timing.MilliSeconds(endTime));
+
+    const newLevels = Array.from(this.#timelineDataInternal.entryLevels);
+    let levelAdjustment = 0;
+    let newEntryLevels = this.#timelineDataInternal?.entryLevels;
+    if (this.#lastSelection && prevSelectionlevel !== undefined) {
+      const newSelectionlevel = this.#timelineDataInternal.entryLevels[this.#lastSelection.entryIndex];
+      levelAdjustment = newSelectionlevel - prevSelectionlevel;
+      console.log({levelAdjustment, prevSelectionlevel, newSelectionlevel, prevLevels, newLevels});
+
+      newEntryLevels = this.#timelineDataInternal.entryLevels;
+      for (let i = 0; i < newEntryLevels.length; i++ ) {
+        const num = newEntryLevels[i];
+        const newNum = num + levelAdjustment;
+        if (isNaN(newNum)) { debugger;}
+        newEntryLevels[i] = newNum;
+      };
+      this.#maxLevel + levelAdjustment;
+    }
 
     // TODO(crbug.com/1459225): Remove this recreating code.
     // Force to create a new PerfUI.FlameChart.FlameChartTimelineData instance
     // to force the flamechart to re-render. This also causes crbug.com/1459225.
+    // ^^ yeah seems bad.
     this.#timelineDataInternal = PerfUI.FlameChart.FlameChartTimelineData.create({
       entryLevels: this.#timelineDataInternal?.entryLevels,
       entryTotalTimes: this.#timelineDataInternal?.entryTotalTimes,
       entryStartTimes: this.#timelineDataInternal?.entryStartTimes,
       groups: this.#timelineDataInternal?.groups,
     });
+    this.#timelineDataInternal.levelAdjustment = levelAdjustment;
+    console;
   }
 
   preferredHeight(): number {
