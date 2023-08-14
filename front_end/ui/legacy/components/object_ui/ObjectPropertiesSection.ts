@@ -44,7 +44,7 @@ import * as UI from '../../legacy.js';
 
 import {CustomPreviewComponent} from './CustomPreviewComponent.js';
 import {JavaScriptREPL} from './JavaScriptREPL.js';
-import {createSpansForNodeTitle, RemoteObjectPreviewFormatter, formatNumberWithThousandsSeparator} from './RemoteObjectPreviewFormatter.js';
+import {createSpansForNodeTitle, RemoteObjectPreviewFormatter} from './RemoteObjectPreviewFormatter.js';
 import objectValueStyles from './objectValue.css.js';
 import objectPropertiesSectionStyles from './objectPropertiesSection.css.js';
 
@@ -476,7 +476,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
         propertyValue = new ExpandableTextPropertyValue(valueElement, description, EXPANDABLE_MAX_LENGTH);
       } else if (type === 'number') {
         propertyValue = new ObjectPropertyValue(valueElement);
-        propertyValue.element.textContent = formatNumberWithThousandsSeparator(description);
+        propertyValue.element.textContent = Platform.NumberUtilities.withUnderscoreThousandsSeparator(description);
         UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, description);
       } else {
         propertyValue = new ObjectPropertyValue(valueElement);

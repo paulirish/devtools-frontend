@@ -96,9 +96,7 @@ export class ObjectPopoverHelper {
       return new ObjectPopoverHelper(linkifier, resultHighlightedAsDOM);
     }
     if (result.type === 'number') {
-      // Kinda dumb to get the formatting via ObjectPropertiesSection. Maybe go more direct.
-      const propValue = ObjectPropertiesSection.createPropertyValue(result, false, false);
-      description = propValue.element.textContent || description;
+      description = Platform.NumberUtilities.withUnderscoreThousandsSeparator(result.description || '');
     }
 
     popoverContentElement = document.createElement('span');
