@@ -139,4 +139,44 @@ describe('NumberUtilities', () => {
       assert.strictEqual(outputString, '0.0\xA0001');
     });
   });
+
+
+  describe('withUnderscoreThousandsSeparator', () => {
+    it('separates 1000', () => {
+      const inputNumber = 1000;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '1_000');
+    });
+
+    it('does not separate 1', () => {
+      const inputNumber = 1;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '1');
+    });
+
+    it('separates a billion', () => {
+      const inputNumber = 7654321;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '7_654_321');
+    });
+
+    it('separates 15 digit numbers', () => {
+      const inputNumber = 123456789012345;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '123_456_789_012_345');
+    });
+
+    it('does not separates 16+ digit numbers', () => {
+      const inputNumber = 1234567890123456;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '1234567890123456');
+    });
+
+    it('does not separate decimal points', () => {
+
+      const inputNumber = 0.0001;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '0.0001');
+    });
+  });
 });
