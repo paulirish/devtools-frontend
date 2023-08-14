@@ -30,7 +30,6 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/object_ui/RemoteObjectPreviewFormatter.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
 export class RemoteObjectPreviewFormatter {
   private static objectPropertyComparator(a: Protocol.Runtime.PropertyPreview, b: Protocol.Runtime.PropertyPreview):
       number {
@@ -263,7 +262,6 @@ export class RemoteObjectPreviewFormatter {
     return this.renderPropertyPreview(property.type, (property.subtype as string), property.name, property.value);
   }
 
-
   renderPropertyPreview(type: string, subtype?: string, className?: string|null, description?: string): HTMLElement {
     const span = document.createElement('span');
     span.classList.add('object-value-' + (subtype || type));
@@ -295,7 +293,6 @@ export class RemoteObjectPreviewFormatter {
       return span;
     }
 
-    // thousands separators:
     if (type === 'number') {
       UI.UIUtils.createTextChildren(span, formatNumberWithThousandsSeparator(description));
       return span;
@@ -346,7 +343,9 @@ export const createSpanForTrustedType = function(span: Element, description: str
   span.appendChild(trustedContentSpan);
 };
 
-// todo  move to number utilities?
+// TODO(paulirish): move these to number utilities?
+
+// Undefined locale uses the user's preferred locale. Constructing this formatter is costly, just do it once.
 const formatter = Intl.NumberFormat(undefined, { maximumFractionDigits: 20});
 
 export function formatNumberWithThousandsSeparator(num: string): string {

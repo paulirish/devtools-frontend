@@ -57,7 +57,7 @@ export class ObjectPopoverHelper {
 
   static async buildObjectPopover(result: SDK.RemoteObject.RemoteObject, popover: UI.GlassPane.GlassPane):
       Promise<ObjectPopoverHelper|null> {
-    const description = Platform.StringUtilities.trimEndWithMaxLength(result.description || '', MaxPopoverTextLength);
+    let description = Platform.StringUtilities.trimEndWithMaxLength(result.description || '', MaxPopoverTextLength);
     let popoverContentElement: HTMLSpanElement|HTMLDivElement|null = null;
     if (result.type === 'function' || result.type === 'object') {
       let linkifier: Components.Linkifier.Linkifier|null = null;
@@ -94,6 +94,11 @@ export class ObjectPopoverHelper {
       popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SetExactSize);
       popover.contentElement.appendChild(popoverContentElement);
       return new ObjectPopoverHelper(linkifier, resultHighlightedAsDOM);
+    }
+    if (result.type === 'number') {
+      // Kinda dumb to get the formatting via ObjectPropertiesSection. Maybe go more direct.
+      const propValue = ObjectPropertiesSection.createPropertyValue(result, false, false);
+      description = propValue.element.textContent || description;
     }
 
     popoverContentElement = document.createElement('span');

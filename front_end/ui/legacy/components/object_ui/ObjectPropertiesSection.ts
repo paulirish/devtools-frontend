@@ -44,7 +44,7 @@ import * as UI from '../../legacy.js';
 
 import {CustomPreviewComponent} from './CustomPreviewComponent.js';
 import {JavaScriptREPL} from './JavaScriptREPL.js';
-import {createSpansForNodeTitle, RemoteObjectPreviewFormatter} from './RemoteObjectPreviewFormatter.js';
+import {createSpansForNodeTitle, RemoteObjectPreviewFormatter, formatNumberWithThousandsSeparator} from './RemoteObjectPreviewFormatter.js';
 import objectValueStyles from './objectValue.css.js';
 import objectPropertiesSectionStyles from './objectPropertiesSection.css.js';
 
@@ -475,11 +475,8 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       } else if (description.length > maxRenderableStringLength) {
         propertyValue = new ExpandableTextPropertyValue(valueElement, description, EXPANDABLE_MAX_LENGTH);
       } else if (type === 'number') {
-        // reuse cool formatter
-        const previewFormatter = new RemoteObjectPreviewFormatter();
-        const span = previewFormatter.renderPropertyPreview(type, subtype, null, description);
         propertyValue = new ObjectPropertyValue(valueElement);
-        propertyValue.element.textContent = span.textContent;
+        propertyValue.element.textContent = formatNumberWithThousandsSeparator(description);
         UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, description);
       } else {
         propertyValue = new ObjectPropertyValue(valueElement);
