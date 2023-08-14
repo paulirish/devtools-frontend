@@ -304,19 +304,8 @@ export class RemoteObjectPreviewFormatter {
       return span;
     }
 
-    // thousands separators:
     if (type === 'number') {
-      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#parameters:~:text=1%20to%2021%3B-,the%20default%20is%2021,-.
-      const count = this.getSignificantDigitCount(description);
-      // In practice it gets rounded to 17 before now.   the = 17 might be bad
-      if (count <= 17) {
-        const parts = formatter.formatToParts(parseFloat(description));
-        parts.filter(p => p.type === 'group').forEach(p => { p.value = '_';});
-        const reformatted = parts.map(p => p.value).join('');
-        UI.UIUtils.createTextChildren(span, reformatted);
-      } else {
-        span.textContent = description;
-      }
+      UI.UIUtils.createTextChildren(span, Platform.NumberUtilities.withUnderscoreThousandsSeparator(description));
       return span;
     }
 

@@ -139,4 +139,60 @@ describe('NumberUtilities', () => {
       assert.strictEqual(outputString, '0.0\xA0001');
     });
   });
+
+  describe('withUnderscoreThousandsSeparator', () => {
+    it('separates 1000', () => {
+      const inputNumber = 1000;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '1_000');
+    });
+
+    it('does not separate 1', () => {
+      const inputNumber = 1;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '1');
+    });
+
+    it('separates a billion', () => {
+      const inputNumber = 7654321;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '7_654_321');
+    });
+
+    it('separates 15 digit numbers', () => {
+      const inputNumber = 123456789012345;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '123_456_789_012_345');
+    });
+
+    it('does not separates 16+ digit numbers', () => {
+      const separate = (num: number) => {
+        const formatted = Platform.NumberUtilities.withUnderscoreThousandsSeparator(num.toString());
+
+        // Round-trip number back to number and assert it's the same value:
+        const cleaned = formatted.replaceAll('_', '');
+        const roundtripNum = cleaned.includes('.') ? parseFloat(cleaned) : parseInt(cleaned, 10);
+        assert.strictEqual(roundtripNum, num, 'round trip to same value');
+
+        return formatted;
+      };
+      assert.strictEqual(separate(12345678901234.1), '12_345_678_901_234.1');
+      assert.strictEqual(separate(12345678901234.12), '12345678901234.12');
+      assert.strictEqual(separate(12345678901234.123), '12345678901234.123');
+      assert.strictEqual(separate(123456789012345), '123_456_789_012_345');
+      assert.strictEqual(separate(123456789012345.12345), '123456789012345.12');
+      assert.strictEqual(separate(1234567890123456), '1234567890123456');
+      assert.strictEqual(separate(9007199254740991), '9007199254740991');          // Number.MAX_SAFE_INTEGER
+      assert.strictEqual(separate(1234567890123456.12345), '1234567890123456');    // Unsafe number
+      assert.strictEqual(separate(12345678901234567), '12345678901234568');        // Unsafe number
+      assert.strictEqual(separate(12345678901234567.12345), '12345678901234568');  // Unsafe number
+      assert.strictEqual(separate(123456789012345678), '123456789012345680');      // Unsafe number
+    });
+
+    it('does not separate decimal points', () => {
+      const inputNumber = 0.0001;
+      const outputString = Platform.NumberUtilities.withUnderscoreThousandsSeparator(inputNumber.toString());
+      assert.strictEqual(outputString, '0.0001');
+    });
+  });
 });

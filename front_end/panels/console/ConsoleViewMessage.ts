@@ -707,15 +707,9 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       const propertyValue = new ObjectUI.ObjectPropertiesSection.ExpandableTextPropertyValue(
           document.createElement('span'), description, getLongStringVisibleLength());
       result.appendChild(propertyValue.element);
-    } else
-     // thousands separators:
-      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#parameters:~:text=1%20to%2021%3B-,the%20default%20is%2021,-.
-      // 17 for safety. not really sure tbh
-      if (obj.type === 'number' && this.getSignificantDigitCount(description) < 17) {
-          const parts = formatter.formatToParts(parseFloat(description));
-          parts.filter(p => p.type === 'group').forEach(p => { p.value = '_';});
-          const reformatted = parts.map(p => p.value).join('');
-          UI.UIUtils.createTextChildren(result, reformatted);
+    } else if (obj.type === 'number') {
+      const text = Platform.NumberUtilities.withUnderscoreThousandsSeparator(description);
+      UI.UIUtils.createTextChild(result, text);
     } else {
       UI.UIUtils.createTextChild(result, description);
     }

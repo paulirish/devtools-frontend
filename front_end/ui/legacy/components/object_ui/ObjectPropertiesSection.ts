@@ -475,11 +475,8 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       } else if (description.length > maxRenderableStringLength) {
         propertyValue = new ExpandableTextPropertyValue(valueElement, description, EXPANDABLE_MAX_LENGTH);
       } else if (type === 'number') {
-        // reuse cool formatter
-        const previewFormatter = new RemoteObjectPreviewFormatter();
-        const span = previewFormatter.renderPropertyPreview(type, subtype, null, description);
         propertyValue = new ObjectPropertyValue(valueElement);
-        propertyValue.element.textContent = span.textContent;
+        propertyValue.element.textContent = Platform.NumberUtilities.withUnderscoreThousandsSeparator(description);
         UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, description);
       } else {
         propertyValue = new ObjectPropertyValue(valueElement);
