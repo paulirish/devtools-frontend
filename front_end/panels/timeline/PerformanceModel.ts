@@ -208,7 +208,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     // Idle frames are not activity.
     tasks = tasks.filter(t => t.name !== 'JSIdleFrame');
 
-    console.log('full', { dur:timelineModel.maximumRecordTime() - timelineModel.minimumRecordTime(), left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
+    // console.log('full', { dur:timelineModel.maximumRecordTime() - timelineModel.minimumRecordTime(), left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
 
     if (!tasks.length) {
       this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
@@ -245,11 +245,11 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       leftTime = timelineModel.minimumRecordTime();
       rightTime = timelineModel.maximumRecordTime();
       this.setWindow({left: leftTime, right: rightTime});
-      console.log('nothing',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
+      // console.log('nothing',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
     } else {
       leftTime = Math.max(leftTime - 0.05 * autoDur, timelineModel.minimumRecordTime());
       rightTime = Math.min(rightTime + 0.05 * autoDur, timelineModel.maximumRecordTime());
-      console.log('auto',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
+      // console.log('auto',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
 
       this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
       setTimeout(() => {
