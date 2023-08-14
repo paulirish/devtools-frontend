@@ -2426,7 +2426,7 @@ export class Generator {
     const s = this.indexToValueInSpace(hash >> 8, this.#satSpace);
     const l = this.indexToValueInSpace(hash >> 16, this.#lightnessSpace);
     const a = this.indexToValueInSpace(hash >> 24, this.#alphaSpace);
-    const start = `hsl(${h}deg ${s}% ${l}%`;
+    const start = `oklch(${l/100} ${s/4/100} ${h}`; // LCH WHAT UP
     if (a !== 1) {
       return `${start} / ${Math.floor(a * 100)}%)`;
     }

@@ -25,9 +25,9 @@ export function getFontFamilyForCanvas(): string {
 
   const bodyStyles = getComputedStyle(document.body);
   if (bodyStyles.fontFamily) {
-    fontFamily = bodyStyles.fontFamily;
+    fontFamily = '"Roboto Condensed", ' + bodyStyles.fontFamily;
   } else {
-    fontFamily = Host.Platform.fontFamily();
+    fontFamily = '"Roboto Condensed", ' + Host.Platform.fontFamily();
   }
 
   return fontFamily;
