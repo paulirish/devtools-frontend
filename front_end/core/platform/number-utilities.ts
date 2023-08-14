@@ -110,7 +110,7 @@ export function withUnderscoreThousandsSeparator(num: string): string {
   }
 
   // Number.MAX_SAFE_INTEGER is 16 digits, and larger numbers in exponential notation are 17 chars long
-  // While most 16-digit numbers should be ok, better to not risk it, as long as there are no tests ;)
+  // While most 16-digit numbers should be ok, better to not risk it
   if (getSignificantDigitCount(num) < 16) {
     const parts = formatter.formatToParts(parseFloat(num));
     parts.filter(p => p.type === 'group').forEach(p => { p.value = '_';});
