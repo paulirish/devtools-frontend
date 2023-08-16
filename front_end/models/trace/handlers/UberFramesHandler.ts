@@ -148,6 +148,7 @@ const someRelevantTraceEventTypes = [
   'LoAF-desiredRenderStart',
   'LoAF-styleAndLayoutStart',
 
+  'ScreenshotMeta',
 ];
 
 export const eventLatencyBreakdownTypeNames = [
