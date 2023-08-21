@@ -1771,10 +1771,11 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
     super('');
     this.listItemElement.createChild('div', 'selection fill');
     const title = this.listItemElement.createChild('span', 'elements-tree-shortcut-title');
-    let text = nodeShortcut.nodeName.toLowerCase();
-    if (nodeShortcut.nodeType === Node.ELEMENT_NODE) {
-      text = '<' + text + '>';
-    }
+    const text = nodeShortcut.nodeName.toLowerCase();
+    // no more angle brackets
+    // if (nodeShortcut.nodeType === Node.ELEMENT_NODE) {
+    //   text = '<' + text + '>';
+    // }
     title.textContent = '\u21AA ' + text;
     this.nodeShortcut = nodeShortcut;
     this.addRevealAdorner();

@@ -42,6 +42,11 @@
 .webkit-html-close-tag-name {
   /* Keep this in sync with view-source.css (.webkit-html-tag) */
   color: var(--sys-color-token-tag);
+  border-bottom: 1px dotted hsla(304, 37%, 80%, 0.52);
+  border-radius: 2px;
+}
+.webkit-html-close-tag-name {
+  opacity: 0.8;
 }
 
 .webkit-html-pseudo-element {
@@ -58,7 +63,18 @@
 .webkit-html-text-node {
   color: var(--text-primary);
   unicode-bidi: -webkit-isolate;
+  border-radius: 1px;
+  background: hsla(0, 0%, 98%, 1);
 }
+
+.selected .webkit-html-text-node {
+  background: hsla(0, 0%, 98%, 0.22);
+}
+
+.webkit-html-text-node.bogus {
+  background: inherit;
+}
+
 
 .webkit-html-entity-value {
   /* This one is non-standard. */
