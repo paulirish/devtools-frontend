@@ -3235,6 +3235,7 @@ export class TimelineUIUtils {
 
   static colorForId(id: string): string {
     if (!colorGenerator) {
+      // This is the generator for JS frames
       colorGenerator =
           new Common.Color.Generator({min: 30, max: 330, count: undefined}, {min: 50, max: 80, count: 3}, 85);
       colorGenerator.setColorForID('', '#f2ecdc');
