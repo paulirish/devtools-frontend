@@ -44,7 +44,15 @@ import * as TypeScriptUtilities from './typescript-utilities.js';
 import * as UIString from './UIString.js';
 import * as UserVisibleError from './UserVisibleError.js';
 
-export {DCHECK} from './dcheck.js';
+// export {DCHECK} from './dcheck.js';
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export function DCHECK(condition: () => boolean, message: string = 'DCHECK'): void {
+  if (!condition()) {
+    throw new Error(message + ':' + new Error().stack);
+  }
+}
+
 /* `assertNotNull` also need to be exposed, as TypeScript does not
  * allow `asserts` functions to be used with qualified access
  * (e.g. `Platform.TypeScriptUtilities.assertNotNull` causes a
