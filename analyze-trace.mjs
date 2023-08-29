@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Run this first:
+//    front_end/models/trace/build-trace-engine-lib.sh
+
 import fs from 'fs';
 import zlib from 'zlib';
 
 loadBrowserPolyfills(); // Must precede the import (for `location` and `navigator`)
 
-export const TraceModel = await import('./out/Default/gen/cooltrace/trace.mjs');
+export const TraceModel = await import('./out/Default/gen/trace_engine/trace.mjs');
 
 // If run as CLI, parse the argv trace (or a fallback)
 if (import.meta.url.endsWith(process.argv[1])) {
