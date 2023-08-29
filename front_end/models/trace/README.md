@@ -2,6 +2,21 @@
 
 This folder contains the new trace engine that was first implemented for the Performance Insights panel and is now being repurposed as the primary trace engine that we use within DevTools.
 
+## API quickstart
+
+```js
+loadBrowserPolyfills();
+const TraceModel = await import('@paulirish/trace_engine');
+const processor = TraceModel.Processor.TraceProcessor.createWithAllHandlers();
+
+await processor.parse(traceEvents);
+console.log(processor.data)
+```
+
+**Note:** in reality to run in Node, you'll need to polyfill `window.location`, `window.navigator`, and `window.DOMRect`. 😜
+
+See the included `analyze-trace.mjs` a runnable invocation and quick polyfills.
+
 ## High level architecture
 
 ```
