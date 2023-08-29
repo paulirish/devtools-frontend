@@ -22,6 +22,7 @@ if (import.meta.url.endsWith(process.argv[1])) {
   await processor.parse(traceEvents);
 
   console.log(processor.data);
+  console.assert(processor.data.Renderer.allRendererEvents.length);
 }
 
 /**
