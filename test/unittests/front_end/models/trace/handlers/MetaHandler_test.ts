@@ -153,6 +153,23 @@ describe('MetaHandler', function() {
 
       assert.strictEqual(firstNavigation.args.data.documentLoaderURL, 'test1');
     });
+
+    it('provides a list of main frame only navigations', async function() {
+      const events = await TraceLoader.rawEvents(this, 'multiple-navigations-with-iframes.json.gz');
+      TraceModel.Handlers.ModelHandlers.Meta.reset();
+      TraceModel.Handlers.ModelHandlers.Meta.initialize();
+      for (const event of events) {
+        TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+      }
+
+      await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+      const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+      const allNavigationsCount = data.navigationsByNavigationId.size;
+      assert.isTrue(data.mainFrameNavigations.length < allNavigationsCount);
+      assert.isTrue(data.mainFrameNavigations.every(event => {
+        return event.args.frame === data.mainFrameId;
+      }));
+    });
   });
 
   describe('frames', function() {
@@ -195,7 +212,6 @@ describe('MetaHandler', function() {
       const [{url}] = framesInProcess.values();
       assert.strictEqual(url, 'https://example.com/');
     });
-
   });
 
   describe('finding GPU thread and main frame', function() {
@@ -407,6 +423,28 @@ describe('MetaHandler', function() {
     assert.strictEqual(min, expectedMin, 'Min calculated incorrectly');
     assert.strictEqual(max, expectedMax, 'Max calculated incorrectly');
     assert.strictEqual(range, expectedMax - expectedMin, 'Range calculated incorrectly');
+  });
+
+  it('calculates the min trace bound correctly if no TracingStartedInBrowser event is found', async function() {
+    const baseEvents = await TraceLoader.rawEvents(this, 'basic.json.gz');
+    // We are about to mutate these events, so copy them to avoid mutating the
+    // cached events from the TraceLoader.
+    const traceEvents = baseEvents.slice().filter(event => {
+      // Delete the tracing started in browser event to force the min bounds to
+      // be calculated based on the event with the smallest timestamp.
+      return event.name !== 'TracingStartedInBrowser';
+    });
+
+    TraceModel.Handlers.ModelHandlers.Meta.reset();
+    TraceModel.Handlers.ModelHandlers.Meta.initialize();
+    for (const event of traceEvents) {
+      TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+    }
+    await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+
+    const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+    const expectedMin = 50_442_438_976;
+    assert.strictEqual(data.traceBounds.min, expectedMin, 'Min calculated incorrectly');
   });
 
   it('ignores ::UMA Events', async function() {

@@ -118,6 +118,10 @@ const UIStrings = {
   /**
    *@description Tooltip to explain why a cookie was blocked
    */
+  thisSetcookieHadADisallowedCharacter: 'This `Set-Cookie` header contained a disallowed character (a forbidden ASCII control character, or the tab character if it appears in the middle of the cookie name, value, an attribute name, or an attribute value).',
+  /**
+   *@description Tooltip to explain why a cookie was blocked
+   */
   theSchemeOfThisConnectionIsNot: 'The scheme of this connection is not allowed to store cookies.',
   /**
    *@description Tooltip to explain why a cookie was blocked
@@ -1026,6 +1030,20 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     });
   }
 
+  get overrideTypes(): OverrideType[] {
+    const types: OverrideType[] = [];
+
+    if (this.hasOverriddenContent) {
+      types.push('content');
+    }
+
+    if (this.hasOverriddenHeaders()) {
+      types.push('headers');
+    }
+
+    return types;
+  }
+
   get hasOverriddenContent(): boolean {
     return this.#hasOverriddenContent;
   }
@@ -1735,6 +1753,8 @@ export const setCookieBlockedReasonToUiString = function(
       return i18nString(UIStrings.thisSetcookieWasBlockedBecauseItHadTheSamepartyAttribute);
     case Protocol.Network.SetCookieBlockedReason.NameValuePairExceedsMaxSize:
       return i18nString(UIStrings.thisSetcookieWasBlockedBecauseTheNameValuePairExceedsMaxSize);
+    case Protocol.Network.SetCookieBlockedReason.DisallowedCharacter:
+      return i18nString(UIStrings.thisSetcookieHadADisallowedCharacter);
   }
   return '';
 };
@@ -1790,6 +1810,7 @@ export const setCookieBlockedReasonToAttribute = function(blockedReason: Protoco
         case Protocol.Network.SetCookieBlockedReason.SyntaxError:
         case Protocol.Network.SetCookieBlockedReason.SchemeNotSupported:
         case Protocol.Network.SetCookieBlockedReason.UnknownError:
+        case Protocol.Network.SetCookieBlockedReason.DisallowedCharacter:
           return null;
       }
       return null;
@@ -1867,3 +1888,5 @@ export interface WebBundleInnerRequestInfo {
   bundleRequestId?: string;
   errorMessage?: string;
 }
+
+export type OverrideType = 'content'|'headers';

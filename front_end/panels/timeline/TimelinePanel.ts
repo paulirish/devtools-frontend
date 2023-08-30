@@ -39,7 +39,8 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import type * as Protocol from '../../generated/protocol.js';
+import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedback.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -47,24 +48,19 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
-import timelinePanelStyles from './timelinePanel.css.js';
-import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
-
 import {Events, PerformanceModel, type WindowChangedEvent} from './PerformanceModel.js';
-
-import {TimelineController, type Client} from './TimelineController.js';
-import {TimelineMiniMap} from './TimelineMiniMap.js';
-
+import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
+import {type Client, TimelineController} from './TimelineController.js';
 import {TimelineFlameChartView} from './TimelineFlameChartView.js';
 import {TimelineHistoryManager} from './TimelineHistoryManager.js';
 import {TimelineLoader} from './TimelineLoader.js';
+import {TimelineMiniMap} from './TimelineMiniMap.js';
+import timelinePanelStyles from './timelinePanel.css.js';
+import {TimelineSelection} from './TimelineSelection.js';
+import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
 import {UIDevtoolsUtils} from './UIDevtoolsUtils.js';
-import type * as Protocol from '../../generated/protocol.js';
-import {traceJsonGenerator, cpuprofileJsonGenerator} from './SaveFileFormatter.js';
-
-import {TimelineSelection} from './TimelineSelection.js';
 
 const UIStrings = {
   /**
@@ -304,6 +300,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private cpuThrottlingSelect?: UI.Toolbar.ToolbarComboBox;
   private fileSelectorElement?: HTMLInputElement;
   private selection?: TimelineSelection|null;
+  private traceLoadStart!: number|null;
   private primaryPageTargetPromiseCallback = (_target: SDK.Target.Target): void => {};
   // Note: this is technically unused, but we need it to define the promiseCallback function above.
   private primaryPageTargetPromise = new Promise<SDK.Target.Target>(res => {
@@ -336,6 +333,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.#historyManager = new TimelineHistoryManager();
 
     this.performanceModel = null;
+    this.traceLoadStart = null;
 
     this.disableCaptureJSProfileSetting =
         Common.Settings.Settings.instance().createSetting('timelineDisableJSSampling', false);
@@ -656,7 +654,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
     let fileName: Platform.DevToolsPath.RawPathString;
-    if (isNode) {
+    if (metadata?.dataOrigin === TraceEngine.Types.File.DataOrigin.CPUProfile) {
       fileName = `CPU-${traceStart}.cpuprofile` as Platform.DevToolsPath.RawPathString;
     } else {
       fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
@@ -670,7 +668,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
       // TODO(crbug.com/1456818): Extract this logic and add more tests.
       let traceAsString;
-      if (isNode) {
+      if (metadata?.dataOrigin === TraceEngine.Types.File.DataOrigin.CPUProfile) {
         const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
         if (!profileEvent || !profileEvent.args?.data) {
           return;
@@ -746,7 +744,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private updateOverviewControls(): void {
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
 
-    this.#minimapComponent.updateControls({
+    this.#minimapComponent.setData({
       performanceModel: this.performanceModel,
       traceParsedData,
       settings: {
@@ -989,12 +987,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           showTimer: undefined,
         },
         // When recording failed, we should load null to go back to the landing page.
-        () => this.loadingComplete(null));
+        () => this.loadingComplete(/* tracingModel= */ null, /* exclusiveFilter= */ null, /* isCpuProfile= */ false));
     this.statusPane.showPane(this.statusPaneContainer);
     this.statusPane.updateStatus(i18nString(UIStrings.recordingFailed));
 
     this.setState(State.RecordingFailed);
     this.performanceModel = null;
+    this.traceLoadStart = null;
     this.setUIControlsEnabled(true);
     if (this.controller) {
       await this.controller.dispose();
@@ -1095,19 +1094,20 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     this.updateOverviewControls();
     this.#minimapComponent.reset();
+
     if (model && this.performanceModel) {
       this.performanceModel.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
-      this.#minimapComponent.setNavStartTimes(model.timelineModel().navStartTimes());
       this.#minimapComponent.setBounds(
-          model.timelineModel().minimumRecordTime(), model.timelineModel().maximumRecordTime());
+          TraceEngine.Types.Timing.MilliSeconds(model.timelineModel().minimumRecordTime()),
+          TraceEngine.Types.Timing.MilliSeconds(model.timelineModel().maximumRecordTime()));
       PerfUI.LineLevelProfile.Performance.instance().reset();
       for (const profile of model.timelineModel().cpuProfiles()) {
         PerfUI.LineLevelProfile.Performance.instance().appendCPUProfile(profile.cpuProfileData, profile.target);
       }
-      this.setMarkersForMinimap(model.timelineModel());
       this.flameChart.setSelection(null);
       this.#minimapComponent.setWindowTimes(model.window().left, model.window().right);
     }
+
     this.updateOverviewControls();
     if (this.flameChart) {
       this.flameChart.resizeToPreferredHeights();
@@ -1236,6 +1236,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!this.loader) {
       this.statusPane.finish();
     }
+    this.traceLoadStart = performance.now();
     await this.loadingProgress(0);
   }
 
@@ -1261,7 +1262,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   async loadingComplete(
       tracingModel: TraceEngine.Legacy.TracingModel|null,
-      exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null): Promise<void> {
+      exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null,
+      isCpuProfile: boolean): Promise<void> {
     this.#traceEngineModel.resetProcessor();
     delete this.loader;
 
@@ -1286,7 +1288,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // Run the new engine in parallel with the parsing done in the performanceModel
       await Promise.all([
         this.performanceModel.setTracingModel(tracingModel, recordingIsFresh),
-        this.#executeNewTraceEngine(tracingModel, recordingIsFresh, this.performanceModel.recordStartTime()),
+        this.#executeNewTraceEngine(
+            tracingModel, recordingIsFresh, isCpuProfile, this.performanceModel.recordStartTime()),
       ]);
       // This code path is only executed when a new trace is recorded/imported,
       // so we know that the active index will be the size of the model because
@@ -1322,7 +1325,26 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     } catch (error) {
       void this.recordingFailed(error.message);
       console.error(error);
+    } finally {
+      this.recordTraceLoadMetric();
     }
+  }
+
+  recordTraceLoadMetric(): void {
+    if (!this.traceLoadStart) {
+      return;
+    }
+    const start = this.traceLoadStart;
+    // Right *now* is the end of trace parsing and model building, but the flamechart rendering
+    // isn't complete yet. To capture that we'll do a rAF+setTimeout to give the most accurate timestamp
+    // for the first paint of the flamechart
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const end = performance.now();
+        const measure = performance.measure('TraceLoad', {start, end});
+        Host.userMetrics.performanceTraceLoad(measure);
+      }, 0);
+    });
   }
 
   /**
@@ -1336,11 +1358,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * parsing to complete.
    **/
   async #executeNewTraceEngine(
-      tracingModel: TraceEngine.Legacy.TracingModel, isFreshRecording: boolean,
+      tracingModel: TraceEngine.Legacy.TracingModel, isFreshRecording: boolean, isCpuProfile: boolean,
       recordStartTime?: number): Promise<void> {
-    const shouldGatherMetadata = isFreshRecording && !isNode;
-    const metadata =
-        shouldGatherMetadata ? await TraceEngine.Extras.Metadata.forNewRecording(recordStartTime) : undefined;
+    const shouldGatherMetadata = isFreshRecording && !isCpuProfile;
+    const metadata = shouldGatherMetadata ? await TraceEngine.Extras.Metadata.forNewRecording(recordStartTime) : {};
+    metadata.dataOrigin =
+        isCpuProfile ? TraceEngine.Types.File.DataOrigin.CPUProfile : TraceEngine.Types.File.DataOrigin.TraceEvents;
 
     return this.#traceEngineModel.parse(
         // OPP's data layer uses `EventPayload` as the type to represent raw JSON from the trace.
@@ -1378,24 +1401,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.loader) {
       void this.loader.cancel();
     }
-  }
-
-  private setMarkersForMinimap(timelineModel: TimelineModel.TimelineModel.TimelineModelImpl): void {
-    const markers = new Map<number, Element>();
-    const recordTypes = TimelineModel.TimelineModel.RecordType;
-    const zeroTime = timelineModel.minimumRecordTime();
-    for (const event of timelineModel.timeMarkerEvents()) {
-      if (event.name === recordTypes.TimeStamp || event.name === recordTypes.ConsoleTime) {
-        continue;
-      }
-      markers.set(event.startTime, TimelineUIUtils.createEventDivider(event, zeroTime));
-    }
-
-    // Add markers for navigation start times.
-    for (const navStartTimeEvent of timelineModel.navStartTimes().values()) {
-      markers.set(navStartTimeEvent.startTime, TimelineUIUtils.createEventDivider(navStartTimeEvent, zeroTime));
-    }
-    this.#minimapComponent.setMarkers(markers);
   }
 
   private async loadEventFired(

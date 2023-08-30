@@ -113,7 +113,8 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
       setMockConnectionResponseHandler('Storage.setSharedStorageTracking', () => ({}));
     });
 
-    it('shows cookies for all frames', async () => {
+    // Flaking on multiple bots on CQ.
+    it.skip('[crbug.com/1472237] shows cookies for all frames', async () => {
       Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
       const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
       const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
@@ -143,7 +144,8 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
           ['http://www.example.com', 'http://www.example.org']);
     });
 
-    it('shows shared storages and events for origins using shared storage', async () => {
+    // Flaking on windows + subsequence test failing
+    it.skip('[crbug.com/1472651] shows shared storages and events for origins using shared storage', async () => {
       const securityOriginManager = target.model(SDK.SecurityOriginManager.SecurityOriginManager);
       assertNotNullOrUndefined(securityOriginManager);
       sinon.stub(securityOriginManager, 'securityOrigins').returns([
@@ -288,7 +290,6 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
     it('adds indexed db after scope change',
        testUiUpdateOnScopeChange(
            Application.IndexedDBModel.IndexedDBModel, 'databases', 'indexedDBListTreeElement.appendChild'));
-
   };
   describe('without tab target', () => tests(() => createTarget()));
   describe('with tab target', () => tests(() => {

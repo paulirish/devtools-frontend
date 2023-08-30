@@ -335,7 +335,9 @@ describe('Recorder', function() {
     assertRecordingMatchesSnapshot(recording);
   });
 
-  it('should capture a change that causes navigation without blur or change', async () => {
+  // skipped until we figure out why the keyup for Enter is not recorded in
+  // 1% of the runs.
+  it.skip('[crbug.com/1473597] should capture a change that causes navigation without blur or change', async () => {
     await startRecording('recorder/programmatic-navigation-on-keydown.html');
 
     const {target} = getBrowserAndPages();
@@ -572,7 +574,7 @@ describe('Recorder', function() {
     await title.click();
 
     const input = await step.waitForSelector(
-        ':scope >>>> devtools-recorder-step-editor >>>> div:nth-of-type(1) > devtools-recorder-input');
+        ':scope >>>> devtools-recorder-step-editor >>>> div:nth-of-type(1) > devtools-suggestion-input');
     assertNotNullOrUndefined(input);
     await input.focus();
 

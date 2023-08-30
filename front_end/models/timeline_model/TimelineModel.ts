@@ -36,9 +36,9 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TraceEngine from '../trace/trace.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as CPUProfile from '../cpu_profile/cpu_profile.js';
+import * as TraceEngine from '../trace/trace.js';
 
 import {TimelineJSProfileProcessor} from './TimelineJSProfile.js';
 
@@ -116,7 +116,6 @@ export class TimelineModelImpl {
   private tracksInternal!: Track[];
   private namedTracks!: Map<TrackType, Track>;
   private inspectedTargetEventsInternal!: TraceEngine.Legacy.Event[];
-  private timeMarkerEventsInternal!: TraceEngine.Legacy.Event[];
   private sessionId!: string|null;
   private mainFrameNodeId!: number|null;
   private pageFrames!: Map<Protocol.Page.FrameId, PageFrame>;
@@ -128,8 +127,6 @@ export class TimelineModelImpl {
   private mainFrame!: PageFrame;
   private minimumRecordTimeInternal: number;
   private maximumRecordTimeInternal: number;
-  private totalBlockingTimeInternal: number;
-  private estimatedTotalBlockingTime: number;
   private asyncEventTracker!: TimelineAsyncEventTracker;
   private invalidationTracker!: InvalidationTracker;
   private layoutInvalidate!: {
@@ -158,8 +155,6 @@ export class TimelineModelImpl {
   constructor() {
     this.minimumRecordTimeInternal = 0;
     this.maximumRecordTimeInternal = 0;
-    this.totalBlockingTimeInternal = 0;
-    this.estimatedTotalBlockingTime = 0;
     this.reset();
     this.resetProcessingState();
 
@@ -257,10 +252,6 @@ export class TimelineModelImpl {
     return Math.max(index, 0);
   }
 
-  mainFrameID(): string {
-    return this.mainFrame.frameId;
-  }
-
   /**
    * Determines if an event is potentially a marker event. A marker event here
    * is a single moment in time that we want to highlight on the timeline, such as
@@ -321,17 +312,6 @@ export class TimelineModelImpl {
     return this.cpuProfilesInternal;
   }
 
-  totalBlockingTime(): {
-    time: number,
-    estimated: boolean,
-  } {
-    if (this.totalBlockingTimeInternal === -1) {
-      return {time: this.estimatedTotalBlockingTime, estimated: true};
-    }
-
-    return {time: this.totalBlockingTimeInternal, estimated: false};
-  }
-
   targetByEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): SDK.Target.Target|null {
     let thread;
     if (event instanceof TraceEngine.Legacy.Event) {
@@ -347,14 +327,6 @@ export class TimelineModelImpl {
     const workerId = this.workerIdByThread.get(thread);
     const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
     return workerId ? SDK.TargetManager.TargetManager.instance().targetById(workerId) : rootTarget;
-  }
-
-  navStartTimes(): Map<string, TraceEngine.Legacy.PayloadEvent> {
-    if (!this.tracingModelInternal) {
-      return new Map();
-    }
-
-    return this.tracingModelInternal.navStartTimes();
   }
 
   isFreshRecording(): boolean {
@@ -869,19 +841,6 @@ export class TimelineModelImpl {
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
 
-      // There may be several TTI events, only take the first one.
-      if (this.isInteractiveTimeEvent(event) && this.totalBlockingTimeInternal === -1) {
-        this.totalBlockingTimeInternal = event.args['args']['total_blocking_time_ms'];
-      }
-
-      const isLongRunningTask = event.name === RecordType.Task && event.duration && event.duration > 50;
-      if (isMainThread && isLongRunningTask && event.duration) {
-        // We only track main thread events that are over 50ms, and the amount of time in the
-        // event (over 50ms) is what constitutes the blocking time. An event of 70ms, therefore,
-        // contributes 20ms to TBT.
-        this.estimatedTotalBlockingTime += event.duration - 50;
-      }
-
       let last: TraceEngine.Legacy.Event = eventStack[eventStack.length - 1];
       while (last && last.endTime !== undefined && last.endTime <= event.startTime) {
         eventStack.pop();
@@ -905,9 +864,6 @@ export class TimelineModelImpl {
           track.tasks.push(event);
         }
         eventStack.push(event);
-      }
-      if (this.isMarkerEvent(event)) {
-        this.timeMarkerEventsInternal.push(event);
       }
 
       track.events.push(event);
@@ -1406,7 +1362,6 @@ export class TimelineModelImpl {
     this.tracksInternal = [];
     this.namedTracks = new Map();
     this.inspectedTargetEventsInternal = [];
-    this.timeMarkerEventsInternal = [];
     this.sessionId = null;
     this.mainFrameNodeId = null;
     this.cpuProfilesInternal = [];
@@ -1417,9 +1372,6 @@ export class TimelineModelImpl {
 
     this.minimumRecordTimeInternal = 0;
     this.maximumRecordTimeInternal = 0;
-
-    this.totalBlockingTimeInternal = -1;
-    this.estimatedTotalBlockingTime = 0;
   }
 
   isGenericTrace(): boolean {
@@ -1448,10 +1400,6 @@ export class TimelineModelImpl {
 
   isEmpty(): boolean {
     return this.minimumRecordTime() === 0 && this.maximumRecordTime() === 0;
-  }
-
-  timeMarkerEvents(): TraceEngine.Legacy.Event[] {
-    return this.timeMarkerEventsInternal;
   }
 
   rootFrames(): PageFrame[] {

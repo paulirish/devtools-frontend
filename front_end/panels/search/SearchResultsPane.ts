@@ -12,7 +12,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 import searchResultsPaneStyles from './searchResultsPane.css.js';
 
-import {type SearchResult} from './SearchConfig.js';
+import {type SearchResult} from './SearchScope.js';
 
 const UIStrings = {
   /**
@@ -178,10 +178,24 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     for (let i = fromIndex; i < toIndex; ++i) {
-      const lineContent = searchResult.matchLineContent(i).trim();
+      let lineContent = searchResult.matchLineContent(i);
       let matchRanges: TextUtils.TextRange.SourceRange[] = [];
-      for (let j = 0; j < regexes.length; ++j) {
-        matchRanges = matchRanges.concat(this.regexMatchRanges(lineContent, regexes[j]));
+      // Searching in scripts and network response bodies produces one result entry per match. We can skip re-doing the
+      // search since we have the exact match range.
+      // For matches found in headers or the request URL we re-do the search to find all match ranges.
+      const column = searchResult.matchColumn(i);
+      const matchLength = searchResult.matchLength(i);
+      if (column !== undefined && matchLength !== undefined) {
+        const {matchRange, lineSegment} =
+            lineSegmentForMatch(lineContent, new TextUtils.TextRange.SourceRange(column, matchLength));
+        lineContent = lineSegment;
+        matchRanges = [matchRange];
+      } else {
+        lineContent = lineContent.trim();
+        for (let j = 0; j < regexes.length; ++j) {
+          matchRanges = matchRanges.concat(this.regexMatchRanges(lineContent, regexes[j]));
+        }
+        ({lineSegment: lineContent, matchRanges} = lineSegmentForMultipleMatches(lineContent, matchRanges));
       }
 
       const anchor = Components.Linkifier.Linkifier.linkifyRevealable(searchResult.matchRevealable(i), '');
@@ -225,16 +239,6 @@ export class SearchResultsTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private createContentSpan(lineContent: string, matchRanges: TextUtils.TextRange.SourceRange[]): Element {
-    let trimBy = 0;
-    if (matchRanges.length > 0 && matchRanges[0].offset > 20) {
-      trimBy = 15;
-    }
-    lineContent = lineContent.substring(trimBy, 1000 + trimBy);
-    if (trimBy) {
-      matchRanges =
-          matchRanges.map(range => new TextUtils.TextRange.SourceRange(range.offset - trimBy + 1, range.length));
-      lineContent = '…' + lineContent;
-    }
     const contentSpan = document.createElement('span');
     contentSpan.className = 'search-match-content';
     contentSpan.textContent = lineContent;
@@ -302,4 +306,27 @@ export function lineSegmentForMatch(
   const matchRange = new TextUtils.TextRange.SourceRange(rangeOffset, rangeLength);
 
   return {lineSegment, matchRange};
+}
+
+/**
+ * Takes a line and multiple match ranges and trims/cuts the line accordingly.
+ * The match ranges are then adjusted to reflect the transformation.
+ *
+ * Ideally prefer `lineSegmentForMatch`, it can center the line on the match
+ * whereas this method risks cutting matches out of the string.
+ */
+function lineSegmentForMultipleMatches(lineContent: string, ranges: TextUtils.TextRange.SourceRange[]):
+    {lineSegment: string, matchRanges: TextUtils.TextRange.SourceRange[]} {
+  let trimBy = 0;
+  let matchRanges = ranges;
+  if (matchRanges.length > 0 && matchRanges[0].offset > 20) {
+    trimBy = 15;
+  }
+  let lineSegment = lineContent.substring(trimBy, 1000 + trimBy);
+  if (trimBy) {
+    matchRanges =
+        matchRanges.map(range => new TextUtils.TextRange.SourceRange(range.offset - trimBy + 1, range.length));
+    lineSegment = '…' + lineSegment;
+  }
+  return {lineSegment, matchRanges};
 }

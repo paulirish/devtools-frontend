@@ -49,15 +49,13 @@ import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 import * as Search from '../search/search.js';
 
 import {BlockedURLsPane} from './BlockedURLsPane.js';
-
 import {Events, type RequestActivatedEvent} from './NetworkDataGridNode.js';
 import {NetworkItemView} from './NetworkItemView.js';
 import {NetworkLogView} from './NetworkLogView.js';
 import {NetworkOverview} from './NetworkOverview.js';
 import networkPanelStyles from './networkPanel.css.js';
 import {NetworkSearchScope} from './NetworkSearchScope.js';
-
-import {NetworkTransferTimeCalculator, type NetworkTimeCalculator} from './NetworkTimeCalculator.js';
+import {type NetworkTimeCalculator, NetworkTransferTimeCalculator} from './NetworkTimeCalculator.js';
 
 const UIStrings = {
   /**
@@ -632,6 +630,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     await UI.ViewManager.ViewManager.instance().showView('network');
     this.networkLogView.selectRequest(request, options);
     this.showRequestPanel(shownTab);
+    this.networkLogView.revealAndHighlightRequest(request);
     return this.networkItemView;
   }
 
@@ -779,7 +778,9 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const request = event.data;
     this.calculator.updateBoundaries(request);
     // FIXME: Unify all time units across the frontend!
-    this.overviewPane.setBounds(this.calculator.minimumBoundary() * 1000, this.calculator.maximumBoundary() * 1000);
+    this.overviewPane.setBounds(
+        TraceEngine.Types.Timing.MilliSeconds(this.calculator.minimumBoundary() * 1000),
+        TraceEngine.Types.Timing.MilliSeconds(this.calculator.maximumBoundary() * 1000));
     this.networkOverview.updateRequest(request);
     this.overviewPane.scheduleUpdate();
   }
@@ -1055,7 +1056,12 @@ export class RequestLocationRevealer implements Common.Revealer.Revealer {
       return;
     }
     if (location.searchMatch) {
-      await view.revealResponseBody(location.searchMatch.lineNumber);
+      const {lineNumber, columnNumber, matchLength} = location.searchMatch;
+      const revealPosition = {
+        from: {lineNumber, columnNumber},
+        to: {lineNumber, columnNumber: columnNumber + matchLength},
+      };
+      await view.revealResponseBody(revealPosition);
     }
     if (location.header) {
       view.revealHeader(location.header.section, location.header.header?.name);
@@ -1067,7 +1073,7 @@ let searchNetworkViewInstance: SearchNetworkView;
 
 export class SearchNetworkView extends Search.SearchView.SearchView {
   private constructor() {
-    super('network');
+    super('network', new Common.Throttler.Throttler(/* timeoutMs */ 200));
   }
 
   static instance(opts: {
@@ -1088,7 +1094,7 @@ export class SearchNetworkView extends Search.SearchView.SearchView {
     return searchView;
   }
 
-  override createScope(): Search.SearchConfig.SearchScope {
-    return new NetworkSearchScope();
+  override createScope(): Search.SearchScope.SearchScope {
+    return new NetworkSearchScope(Logs.NetworkLog.NetworkLog.instance());
   }
 }

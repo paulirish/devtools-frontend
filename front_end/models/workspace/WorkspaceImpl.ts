@@ -59,12 +59,14 @@ export interface Project {
       Promise<UISourceCode|null>;
   canCreateFile(): boolean;
   deleteFile(uiSourceCode: UISourceCode): void;
+  deleteDirectoryRecursively(path: Platform.DevToolsPath.EncodedPathString): Promise<boolean>;
   remove(): void;
+  removeUISourceCode(url: Platform.DevToolsPath.UrlString): void;
   searchInFileContent(uiSourceCode: UISourceCode, query: string, caseSensitive: boolean, isRegex: boolean):
       Promise<TextUtils.ContentProvider.SearchMatch[]>;
   findFilesMatchingSearchRequest(
       searchConfig: SearchConfig, filesMatchingFileQuery: UISourceCode[],
-      progress: Common.Progress.Progress): Promise<UISourceCode[]>;
+      progress: Common.Progress.Progress): Promise<Map<UISourceCode, TextUtils.ContentProvider.SearchMatch[]|null>>;
   indexContent(progress: Common.Progress.Progress): void;
   uiSourceCodeForURL(url: Platform.DevToolsPath.UrlString): UISourceCode|null;
 
@@ -179,6 +181,9 @@ export abstract class ProjectStore implements Project {
   }
   deleteFile(_uiSourceCode: UISourceCode): void {
   }
+  deleteDirectoryRecursively(_path: Platform.DevToolsPath.EncodedPathString): Promise<boolean> {
+    return Promise.resolve(false);
+  }
   remove(): void {
   }
   indexContent(_progress: Common.Progress.Progress): void {
@@ -201,7 +206,7 @@ export abstract class ProjectStore implements Project {
       Promise<TextUtils.ContentProvider.SearchMatch[]>;
   abstract findFilesMatchingSearchRequest(
       searchConfig: SearchConfig, filesMatchingFileQuery: UISourceCode[],
-      progress: Common.Progress.Progress): Promise<UISourceCode[]>;
+      progress: Common.Progress.Progress): Promise<Map<UISourceCode, TextUtils.ContentProvider.SearchMatch[]|null>>;
 }
 
 let workspaceInstance: WorkspaceImpl|undefined;

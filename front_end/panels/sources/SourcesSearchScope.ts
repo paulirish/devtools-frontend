@@ -36,10 +36,10 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import type * as Search from '../search/search.js';
 
-export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
+export class SourcesSearchScope implements Search.SearchScope.SearchScope {
   private searchId: number;
   private searchResultCandidates: Workspace.UISourceCode.UISourceCode[];
-  private searchResultCallback: ((arg0: Search.SearchConfig.SearchResult) => void)|null;
+  private searchResultCallback: ((arg0: Search.SearchScope.SearchResult) => void)|null;
   private searchFinishedCallback: ((arg0: boolean) => void)|null;
   private searchConfig: Workspace.SearchConfig.SearchConfig|null;
   constructor() {
@@ -116,7 +116,7 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
 
   performSearch(
       searchConfig: Workspace.SearchConfig.SearchConfig, progress: Common.Progress.Progress,
-      searchResultCallback: (arg0: Search.SearchConfig.SearchResult) => void,
+      searchResultCallback: (arg0: Search.SearchScope.SearchResult) => void,
       searchFinishedCallback: (arg0: boolean) => void): void {
     this.stopSearch();
     this.searchResultCandidates = [];
@@ -152,6 +152,10 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
       if (!uiSourceCode.contentType().isTextType()) {
         continue;
       }
+      if (Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
+              uiSourceCode)) {
+        continue;
+      }
       const binding = Persistence.Persistence.PersistenceImpl.instance().binding(uiSourceCode);
       if (binding && binding.network === uiSourceCode) {
         continue;
@@ -172,12 +176,14 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
   private processMatchingFilesForProject(
       searchId: number, project: Workspace.Workspace.Project, searchConfig: Workspace.SearchConfig.SearchConfig,
       filesMatchingFileQuery: Workspace.UISourceCode.UISourceCode[],
-      files: Workspace.UISourceCode.UISourceCode[]): void {
+      filesWithPreliminaryResult:
+          Map<Workspace.UISourceCode.UISourceCode, TextUtils.ContentProvider.SearchMatch[]|null>): void {
     if (searchId !== this.searchId && this.searchFinishedCallback) {
       this.searchFinishedCallback(false);
       return;
     }
 
+    let files = [...filesWithPreliminaryResult.keys()];
     files.sort(SourcesSearchScope.urlComparator);
     files = Platform.ArrayUtilities.intersectOrdered(files, filesMatchingFileQuery, SourcesSearchScope.urlComparator);
     const dirtyFiles = this.projectFilesMatchingFileQuery(project, searchConfig, true);
@@ -246,23 +252,20 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
 
     function contentLoaded(
         this: SourcesSearchScope, uiSourceCode: Workspace.UISourceCode.UISourceCode, content: string): void {
-      function matchesComparator(
-          a: TextUtils.ContentProvider.SearchMatch, b: TextUtils.ContentProvider.SearchMatch): number {
-        return a.lineNumber - b.lineNumber;
-      }
-
       progress.incrementWorked(1);
-      let matches: TextUtils.ContentProvider.SearchMatch[] = [];
+      let matches: TextUtils.ContentProvider.SearchMatchExact[] = [];
       const searchConfig = (this.searchConfig as Workspace.SearchConfig.SearchConfig);
       const queries = searchConfig.queries();
       if (content !== null) {
         for (let i = 0; i < queries.length; ++i) {
-          const nextMatches = TextUtils.TextUtils.performSearchInContent(
+          const nextMatches = TextUtils.TextUtils.performExtendedSearchInContent(
               content, queries[i], !searchConfig.ignoreCase(), searchConfig.isRegex());
-          matches = Platform.ArrayUtilities.mergeOrdered(matches, nextMatches, matchesComparator);
+          matches = Platform.ArrayUtilities.mergeOrdered(
+              matches, nextMatches, TextUtils.ContentProvider.SearchMatchExact.comparator);
         }
         if (!searchConfig.queries().length) {
-          matches = [new TextUtils.ContentProvider.SearchMatch(0, (new TextUtils.Text.Text(content)).lineAt(0))];
+          matches =
+              [new TextUtils.ContentProvider.SearchMatchExact(0, (new TextUtils.Text.Text(content)).lineAt(0), 0, 0)];
         }
       }
       if (matches && this.searchResultCallback) {
@@ -280,11 +283,11 @@ export class SourcesSearchScope implements Search.SearchConfig.SearchScope {
   }
 }
 
-export class FileBasedSearchResult implements Search.SearchConfig.SearchResult {
+export class FileBasedSearchResult implements Search.SearchScope.SearchResult {
   private readonly uiSourceCode: Workspace.UISourceCode.UISourceCode;
-  private readonly searchMatches: TextUtils.ContentProvider.SearchMatch[];
+  private readonly searchMatches: TextUtils.ContentProvider.SearchMatchExact[];
   constructor(
-      uiSourceCode: Workspace.UISourceCode.UISourceCode, searchMatches: TextUtils.ContentProvider.SearchMatch[]) {
+      uiSourceCode: Workspace.UISourceCode.UISourceCode, searchMatches: TextUtils.ContentProvider.SearchMatchExact[]) {
     this.uiSourceCode = uiSourceCode;
     this.searchMatches = searchMatches;
   }
@@ -306,13 +309,22 @@ export class FileBasedSearchResult implements Search.SearchConfig.SearchResult {
   }
 
   matchRevealable(index: number): Object {
-    const match = this.searchMatches[index];
-    return this.uiSourceCode.uiLocation(match.lineNumber, match.columnNumber);
+    const {lineNumber, columnNumber, matchLength} = this.searchMatches[index];
+    const range = new TextUtils.TextRange.TextRange(lineNumber, columnNumber, lineNumber, columnNumber + matchLength);
+    return new Workspace.UISourceCode.UILocationRange(this.uiSourceCode, range);
   }
 
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   matchLabel(index: number): any {
     return this.searchMatches[index].lineNumber + 1;
+  }
+
+  matchColumn(index: number): number {
+    return this.searchMatches[index].columnNumber;
+  }
+
+  matchLength(index: number): number {
+    return this.searchMatches[index].matchLength;
   }
 }
