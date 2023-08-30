@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 import * as Root from '../../../core/root/root.js';
+import * as Helpers from '../helpers/helpers.js';
+import * as Types from '../types/types.js';
 
 import {data as metaHandlerData, initialGpuProcessId} from './MetaHandler.js';
-
-import {type TraceEventHandlerName, HandlerState} from './types.js';
-
-import * as Types from '../types/types.js';
-import * as Helpers from '../helpers/helpers.js';
+import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 let handlerState = HandlerState.UNINITIALIZED;
 

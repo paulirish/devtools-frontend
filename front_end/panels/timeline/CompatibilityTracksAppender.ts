@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
+import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
-import * as Common from '../../core/common/common.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
-import {ThreadAppender} from './ThreadAppender.js';
-import * as Root from '../../core/root/root.js';
 
+import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
+import {getEventLevel} from './AppenderUtils.js';
+import {GPUTrackAppender} from './GPUTrackAppender.js';
+import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
+import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
+import {ThreadAppender} from './ThreadAppender.js';
 import {
-  type TimelineFlameChartEntry,
   EntryType,
   InstantEventVisibleDurationMs,
+  type TimelineFlameChartEntry,
 } from './TimelineFlameChartDataProvider.js';
-import {TimingsTrackAppender} from './TimingsTrackAppender.js';
-import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
-import {GPUTrackAppender} from './GPUTrackAppender.js';
-import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
-import {getEventLevel} from './AppenderUtils.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
-import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
+import {TimingsTrackAppender} from './TimingsTrackAppender.js';
 
 export type HighlightedEntryInfo = {
   title: string,
