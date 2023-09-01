@@ -157,7 +157,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private readonly staticHeader: PerfUI.FlameChart.GroupStyle;
   private framesHeader: PerfUI.FlameChart.GroupStyle;
   private readonly screenshotsHeader: PerfUI.FlameChart.GroupStyle;
-  private readonly flowEventIndexById: Map<string, number>;
   private entryData!: TimelineFlameChartEntry[];
   private entryTypeByLevel!: EntryType[];
   private screenshotImageCache!: Map<TraceEngine.Types.TraceEvents.TraceEventSnapshot, HTMLImageElement|null>;
@@ -208,7 +207,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     });
 
-    this.flowEventIndexById = new Map();
   }
 
   private buildGroupStyle(extra: Object): PerfUI.FlameChart.GroupStyle {
@@ -392,7 +390,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return this.timelineDataInternal;
     }
 
-    this.flowEventIndexById.clear();
     this.currentLevel = 0;
 
     if (this.traceEngineData) {
@@ -506,7 +503,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       this.timelineDataInternal.selectedGroup.expanded = true;
     }
 
-    this.flowEventIndexById.clear();
   }
 
   #addDecorationToEvent(eventIndex: number, decoration: PerfUI.FlameChart.FlameChartDecoration): void {
