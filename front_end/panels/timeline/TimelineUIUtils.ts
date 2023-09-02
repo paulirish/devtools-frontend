@@ -1409,8 +1409,7 @@ export class TimelineUIUtils {
     let result: TimelineRecordStyle = eventStyles[event.name];
 
     // Reclassify futex_wait as idle. Ideally we had the native method in the callstack. :/
-    if (event.name === 'JSFrame' && event.args.data.functionName === 'emscripten_futex_wait') {
-      // event.name = 'JSIdleFrame'; // From thenceforce, I dub thee idle.
+    if (event.name === 'JSFrame' && TimelineUIUtils.isWasmIdleFrame(event.args.data)) {
       result = eventStyles.JSIdleFrame;
     }
 
@@ -1428,8 +1427,7 @@ export class TimelineUIUtils {
     if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {
-        if (event.args.data.functionName === 'emscripten_futex_wait') {
-          // event.name = 'JSIdleFrame'; // From thenceforce, I dub thee idle.
+        if (TimelineUIUtils.isWasmIdleFrame(frame)) {
           return TimelineUIUtils.eventStyle(event).category.color;
         }
         return TimelineUIUtils.colorForId(frame.url);
@@ -1498,6 +1496,10 @@ export class TimelineUIUtils {
 
   static isUserFrame(frame: Protocol.Runtime.CallFrame): boolean {
     return frame.scriptId !== '0' && !(frame.url && frame.url.startsWith('native '));
+  }
+
+  static isWasmIdleFrame(frame: Protocol.Runtime.CallFrame): boolean {
+    return frame.functionName === 'emscripten_futex_wait' || frame.functionName.includes('timedwait');
   }
 
   static syntheticNetworkRequestCategory(request: TraceEngine.Types.TraceEvents.TraceEventSyntheticNetworkRequest):
