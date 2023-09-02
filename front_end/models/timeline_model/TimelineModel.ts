@@ -56,11 +56,56 @@ const UIStrings = {
   */
   dedicatedWorker: 'Dedicated `Worker`',
   /**
-  *@description Title of a worker in the timeline flame chart of the Performance panel
-  *@example {FormatterWorker} PH1
-  *@example {https://google.com} PH2
-  */
+   *@description Title of a worker in the timeline flame chart of the Performance panel
+   *@example {FormatterWorker} PH1
+   *@example {https://google.com} PH2
+   */
   workerSS: '`Worker`: {PH1} {PH2}',
+
+  /**
+   *@description Title of a bidder auction worklet with known URL in the timeline flame chart of the Performance panel
+   *@example {https://google.com} PH1
+   */
+  bidderWorkletS: 'Bidder Worklet — {PH1}',
+
+  /**
+   *@description Title of a seller auction worklet with known URL in the timeline flame chart of the Performance panel
+   *@example {https://google.com} PH1
+   */
+  sellerWorkletS: 'Seller Worklet — {PH1}',
+
+  /**
+   *@description Title of an auction worklet with known URL in the timeline flame chart of the Performance panel
+   *@example {https://google.com} PH1
+   */
+  unknownWorkletS: 'Auction Worklet — {PH1}',
+
+  /**
+   *@description Title of a bidder auction worklet in the timeline flame chart of the Performance panel
+   */
+  bidderWorklet: 'Bidder Worklet',
+
+  /**
+   *@description Title of a seller auction worklet in the timeline flame chart of the Performance panel
+   */
+  sellerWorklet: 'Seller Worklet',
+
+  /**
+   *@description Title of an auction worklet in the timeline flame chart of the Performance panel
+   */
+  unknownWorklet: 'Auction Worklet',
+
+  /**
+   *@description Title of control thread of a service process for an auction worklet in the timeline flame chart of the Performance panel
+   */
+  workletService: 'Auction Worklet Service',
+
+  /**
+   *@description Title of control thread of a service process for an auction worklet with known URL in the timeline flame chart of the Performance panel
+   * @example {https://google.com} PH1
+   */
+  workletServiceS: 'Auction Worklet Service — {PH1}',
+
 };
 const str_ = i18n.i18n.registerUIStrings('models/timeline_model/TimelineModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -723,7 +768,7 @@ export class TimelineModelImpl {
       if (cpuProfileEvent) {
         const target = this.targetByEvent(cpuProfileEvent);
         if (target) {
-          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: ''});
+          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: track.url.includes(target.name()) ? '' : track.url}); // Don't duplicate filename when there's no custom worker name
         }
       }
     }

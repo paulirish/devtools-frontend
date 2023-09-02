@@ -1484,10 +1484,12 @@ export class TimelineUIUtils {
 
   static eventStyle(event: SDK.TracingModel.Event): TimelineRecordStyle {
     const eventStyles = TimelineUIUtils.initEventStyles();
-    if (event.hasCategory(TimelineModel.TimelineModel.TimelineModelImpl.Category.Console) ||
-        event.hasCategory(TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming)) {
-      return new TimelineRecordStyle(event.name, TimelineUIUtils.categories()['scripting']);
-    }
+
+    // this is _fine_ but its too hot so i'm gonna keep the cost exluded for now.
+    // if (TraceEngine.Legacy.eventHasCategory(event, TimelineModel.TimelineModel.TimelineModelImpl.Category.Console) ||
+    //     TraceEngine.Legacy.eventHasCategory(event, TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming)) {
+    //   return new TimelineRecordStyle(event.name, TimelineUIUtils.categories()['scripting']);
+    // }
 
     if (event.hasCategory(TimelineModel.TimelineModel.TimelineModelImpl.Category.LatencyInfo)) {
       /** @const */
@@ -1498,6 +1500,14 @@ export class TimelineUIUtils {
       return new TimelineRecordStyle(displayName || inputEventType, TimelineUIUtils.categories()['scripting']);
     }
     let result: TimelineRecordStyle = eventStyles[event.name];
+
+    // Reclassify futex_wait as idle. Ideally we had the native method in the callstack. :/
+    if (event.name === 'JSFrame' && event.args.data.functionName === 'emscripten_futex_wait') {
+      // event.name = 'JSIdleFrame'; // From thenceforce, I dub thee idle.
+      result = eventStyles.JSIdleFrame;
+    }
+
+    // If there's no defined RecordStyle for this event, define as other & hidden.
     if (!result) {
       result = new TimelineRecordStyle(event.name, TimelineUIUtils.categories()['other'], true);
       eventStyles[event.name] = result;
@@ -1509,11 +1519,10 @@ export class TimelineUIUtils {
     if (event.name === TimelineModel.TimelineModel.RecordType.JSFrame) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {
-        if (frame.callFrame?.functionName.includes('emscripten_futex_wait') ||
-            frame.callFrame?.functionName.includes('timedwait')) {
-          return 'hsl(0deg 0% 73%)';
+        if (event.args.data.functionName === 'emscripten_futex_wait') {
+          // event.name = 'JSIdleFrame'; // From thenceforce, I dub thee idle.
+          return TimelineUIUtils.eventStyle(event).category.color;
         }
-
         return TimelineUIUtils.colorForId(frame.url);
       }
     }
@@ -3010,7 +3019,7 @@ export class TimelineUIUtils {
       async:
           new TimelineCategory('async', i18nString(UIStrings.async), false, 'hsl(0, 100%, 50%)', 'hsl(0, 100%, 40%)'),
       other: new TimelineCategory('other', i18nString(UIStrings.system), false, 'hsl(0, 0%, 87%)', 'hsl(0, 0%, 79%)'),
-      idle: new TimelineCategory('idle', i18nString(UIStrings.idle), false, 'hsl(0, 0%, 98%)', 'hsl(0, 0%, 98%)'),
+      idle: new TimelineCategory('idle', i18nString(UIStrings.idle), false, 'hsl(0, 0%, 98%)', 'hsl(0, 0%, 94%)'),
     };
     return categories;
   }
