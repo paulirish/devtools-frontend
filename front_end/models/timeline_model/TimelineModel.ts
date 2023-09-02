@@ -62,7 +62,7 @@ const UIStrings = {
    *@example {FormatterWorker} PH1
    *@example {https://google.com} PH2
    */
-  workerSS: '{PH1} {PH2}',
+  workerSS: '`Worker`: {PH1} {PH2}',
 
   /**
    *@description Title of a bidder auction worklet with known URL in the timeline flame chart of the Performance panel
