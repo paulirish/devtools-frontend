@@ -1499,7 +1499,7 @@ export class TimelineUIUtils {
   }
 
   static isWasmIdleFrame(frame: Protocol.Runtime.CallFrame): boolean {
-    return frame.functionName === 'emscripten_futex_wait' || frame.functionName.includes('timedwait');
+    return frame.functionName === 'emscripten_futex_wait' || frame.functionName === 'WasmI32AtomicWait' || frame.functionName === 'WasmI64AtomicWait' || frame.functionName.includes('timedwait');
   }
 
   static syntheticNetworkRequestCategory(request: TraceEngine.Types.TraceEvents.TraceEventSyntheticNetworkRequest):
