@@ -62,7 +62,7 @@ const UIStrings = {
    *@example {FormatterWorker} PH1
    *@example {https://google.com} PH2
    */
-  workerSS: '`Worker`: {PH1} — {PH2}',
+  workerSS: '{PH1} {PH2}',
 
   /**
    *@description Title of a bidder auction worklet with known URL in the timeline flame chart of the Performance panel
@@ -857,7 +857,7 @@ export class TimelineModelImpl {
       if (cpuProfileEvent) {
         const target = this.targetByEvent(cpuProfileEvent);
         if (target) {
-          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: track.url});
+          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: track.url.includes(target.name()) ? '' : track.url}); // Don't duplicate filename when there's no custom worker name
         }
       }
     }
