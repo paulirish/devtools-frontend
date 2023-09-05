@@ -79,6 +79,17 @@ export abstract class TimelineEventOverview extends PerfUI.TimelineOverviewPane.
   }
 }
 
+function filterEventsWithinVisibleWindow(
+    events: TraceEngine.Legacy.Event[], start?: TraceEngine.Types.Timing.MilliSeconds,
+    end?: TraceEngine.Types.Timing.MilliSeconds): TraceEngine.Legacy.Event[] {
+  if (!start && !end) {
+    return events;
+  }
+
+  return events.filter(
+      event => (!start || event.startTime >= start) && (!end || !event.endTime || event.endTime <= end));
+}
+
 const HIGH_NETWORK_PRIORITIES = new Set<TraceEngine.Types.TraceEvents.Priority>([
   'VeryHigh',
   'High',
@@ -92,19 +103,26 @@ export class TimelineEventOverviewNetwork extends TimelineEventOverview {
     this.#traceParsedData = traceParsedData;
   }
 
-  override update(): void {
+  override update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     super.update();
-    this.#renderWithTraceParsedData();
+    this.#renderWithTraceParsedData(start, end);
   }
 
-  #renderWithTraceParsedData(): void {
+  #renderWithTraceParsedData(
+      start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     if (!this.#traceParsedData) {
       return;
     }
 
     // Because the UI is in milliseconds, we work with milliseconds through
     // this function to get the right scale and sizing
-    const traceBoundsMilli = TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
+    const traceBoundsMilli = (start && end) ?
+        {
+          min: start,
+          max: end,
+          range: end - start,
+        } :
+        TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
 
     // We draw two paths, so each can take up half the height
     const pathHeight = this.height() / 2;
@@ -158,7 +176,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     this.backgroundCanvas.height = this.element.clientHeight * window.devicePixelRatio;
   }
 
-  override update(): void {
+  override update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     super.update();
     if (!this.#performanceModel) {
       return;
@@ -168,8 +186,8 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     const width = this.width();
     const height = this.height();
     const baseLine = height;
-    const timeOffset = timelineModel.minimumRecordTime();
-    const timeSpan = timelineModel.maximumRecordTime() - timeOffset;
+    const timeOffset = (start) ? start : timelineModel.minimumRecordTime();
+    const timeSpan = (start && end) ? end - start : timelineModel.maximumRecordTime() - timeOffset;
     const scale = width / timeSpan;
     const quantTime = quantSizePx / scale;
     const categories = TimelineUIUtils.categories();
@@ -237,7 +255,8 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
         }
       }
 
-      TimelineModel.TimelineModel.TimelineModelImpl.forEachEvent(events, onEventStart, onEventEnd);
+      TimelineModel.TimelineModel.TimelineModelImpl.forEachEvent(
+          filterEventsWithinVisibleWindow(events), onEventStart, onEventEnd);
       quantizer.appendInterval(timeOffset + timeSpan + quantTime, idleIndex);  // Kick drawing the last bucket.
       for (let i = categoryOrder.length - 1; i > 0; --i) {
         paths[i].lineTo(width, height);
@@ -298,12 +317,16 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
     return allWarningEvents;
   }
 
-  override update(): void {
+  override update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     super.update();
 
     const height = this.height();
-    const {traceBounds} = this.#traceParsedData.Meta;
-    const timeSpan = traceBounds.range;
+    const visibleTimeWindow = !(start && end) ? this.#traceParsedData.Meta.traceBounds : {
+      min: TraceEngine.Helpers.Timing.millisecondsToMicroseconds(start),
+      max: TraceEngine.Helpers.Timing.millisecondsToMicroseconds(end),
+      range: TraceEngine.Helpers.Timing.millisecondsToMicroseconds(TraceEngine.Types.Timing.MilliSeconds(end - start)),
+    };
+    const timeSpan = visibleTimeWindow.range;
     const scale = this.width() / timeSpan;
     const ctx = this.context();
     const fillPath = new Path2D();
@@ -322,7 +345,7 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
 
     function paintWarningDecoration(event: TraceEngine.Types.TraceEvents.TraceEventData): void {
       const {startTime, duration} = TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(event);
-      const x = Math.round(scale * (startTime - traceBounds.min));
+      const x = Math.round(scale * (startTime - visibleTimeWindow.min));
       const width = Math.round(scale * duration);
       fillPath.rect(x, 0, width, height);
       markersPath.moveTo(x + width, 0);
@@ -480,7 +503,7 @@ export class TimelineEventOverviewMemory extends TimelineEventOverview {
     this.heapSizeLabel.textContent = '';
   }
 
-  override update(): void {
+  override update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     super.update();
     const ratio = window.devicePixelRatio;
 
@@ -498,7 +521,13 @@ export class TimelineEventOverviewMemory extends TimelineEventOverview {
     let maxUsedHeapSize = 0;
     let minUsedHeapSize = 100000000000;
 
-    const boundsMs = TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
+    const boundsMs = (start && end) ?
+        {
+          min: start,
+          max: end,
+          range: end - start,
+        } :
+        TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
     const minTime = boundsMs.min;
     const maxTime = boundsMs.max;
 
