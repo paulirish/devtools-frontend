@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 import type * as Types from '../types/types.js';
-import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
 
 export function extractOriginFromTrace(firstNavigationURL: string): string|null {
-  const url = Common.ParsedURL.ParsedURL.fromString(firstNavigationURL);
+  const url = new URL(firstNavigationURL);
   if (url) {
     // We do this to save some space in the toolbar - seeing the `www` is less
     // useful than seeing `foo.com` if it's truncated at narrow widths

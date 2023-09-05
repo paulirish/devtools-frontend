@@ -12,6 +12,7 @@ cp -rp "$trace_engine_out/" "$standalone/"
 
 cp -rp "$dtfe/front_end/models/trace/README.md" "$standalone"
 cp -rp "$dtfe/front_end/models/trace/package-template.json" "$standalone/package.json"
+cp -rp "$dtfe/LICENSE" "$standalone"
 
 
 mkdir -p "$standalone/test"
