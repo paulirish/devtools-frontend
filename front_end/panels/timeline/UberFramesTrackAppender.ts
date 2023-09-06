@@ -26,6 +26,8 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+const eventLatencyBreakdownTypeNames = TraceEngine.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
+
 /**
  * Show the frame timeline in an easy to understand manner.
  * left whisker (input or (pre BMF stuff?)): EventLatency start. Not sure about loaf.
@@ -61,16 +63,19 @@ export class UberFramesTrackAppender implements TrackAppender {
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
     const uberFrameEvts = this.#traceParsedData.UberFrames.allEvts;
+
+    // dont include anything thats in the waterfall track
+    const uberFrameNonWaterFall = uberFrameEvts.filter(e => !eventLatencyBreakdownTypeNames.includes(e.name));
     // const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
 
-    if (uberFrameEvts.length === 0) {
+    if (uberFrameNonWaterFall.length === 0) {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
 
     let newLevel;
     // Do all events now, (which also includes waterfall again)
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameEvts, trackStartLevel, this);
+    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameNonWaterFall, trackStartLevel, this);
     // newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
     return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
   }

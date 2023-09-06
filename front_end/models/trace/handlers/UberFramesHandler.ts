@@ -76,6 +76,7 @@ const someRelevantTraceEventTypes = [
   'PipelineReporter',
   'SendBeginMainFrameToCommit',
   'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
+  'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase in eventlatency
   'Graphics.Pipeline',
 
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
