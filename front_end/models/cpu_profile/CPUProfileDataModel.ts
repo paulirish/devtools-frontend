@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as Protocol from '../../generated/protocol.js';
 
@@ -214,9 +213,7 @@ export class CPUProfileDataModel extends ProfileTreeModel {
     buildChildrenFromParents(nodes);
     this.totalHitCount = nodes.reduce((acc, node) => acc + (node.hitCount || 0), 0);
     const sampleTime = (this.profileEndTime - this.profileStartTime) / this.totalHitCount;
-    const keepNatives = Boolean(
-        Common.Settings.Settings.hasInstance() &&
-        Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get());
+    const keepNatives = true;
     const root = nodes[0];
     // If a node is filtered out, its samples are replaced with its parent,
     // so we keep track of the which id to use in the samples data.
