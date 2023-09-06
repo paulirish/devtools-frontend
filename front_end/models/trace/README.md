@@ -27,8 +27,6 @@ See the included `analyze-trace.mjs` a runnable invocation and quick polyfills.
 front_end/models/trace/build-trace-engine-lib.sh
 
 front_end/models/trace/copy-build-trace-engine-for-publish.sh
-
-madge front_end/models/trace/trace.ts --image tracearch.png --layout dot --exclude="(localized-string-set\/)|(stack-packs\/packs)"
 ```
 
 ## High level architecture
