@@ -1,4 +1,4 @@
-# Trace Model
+# Trace Model (NOT FOR PUBLIC CONSUMPTION)
 
 This folder contains the new trace engine that was first implemented for the Performance Insights panel and is now being repurposed as the primary trace engine that we use within DevTools.
 
@@ -20,6 +20,8 @@ See the included `analyze-trace.mjs` a runnable invocation and quick polyfills.
 ## Building standalone
 
 ```sh
+# parent doc: go/btlax
+
 # these in no particular order..
 
 front_end/models/trace/build-trace-engine-lib.sh
