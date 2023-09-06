@@ -412,6 +412,7 @@ export class SamplesIntegrator {
   }
 
   static showNativeName(name: string): boolean {
+    return false;
     try {
       // Querying for unregistered experiments will error on debug
       // builds.
@@ -440,12 +441,12 @@ export class SamplesIntegrator {
     showNativeFunctionsInJSProfile: boolean,
   }): void {
     let showAllEvents = false;
-    try {
-      // Querying for unregistered experiments will error on debug
-      // builds.
-      showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
-    } catch (_err) {
-    }
+    // try {
+    //   // Querying for unregistered experiments will error on debug
+    //   // builds.
+    //   showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
+    // } catch (_err) {
+    // }
 
     if (showAllEvents) {
       return;
