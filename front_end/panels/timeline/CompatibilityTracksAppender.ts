@@ -150,7 +150,7 @@ export class CompatibilityTracksAppender {
     const uberFramesColorGenerator = new Common.Color.Generator(
         /* hueSpace= */ {min: 0, max: 359, count: undefined},
         /* satSpace= */ {min: 70, max: 100, count: undefined},
-        /* lightnessSpace= */ 50,
+        /* lightnessSpace= */ 70,
         /* alphaSpace= */ 0.7);
     this.#framesWaterfallTrackAppender =
         new FramesWaterfallTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
