@@ -30,8 +30,12 @@ export async function navigateToLighthouseTab(path?: string): Promise<ElementHan
 
   await lighthouseTabButton.click();
   await waitFor('.view-container > .lighthouse');
+
+  const {target, frontend} = getBrowserAndPages();
   if (path) {
+    await target.bringToFront();
     await goToResource(path);
+    await frontend.bringToFront();
   }
 
   return waitFor('.lighthouse-start-view');
@@ -105,10 +109,6 @@ export async function setToolbarCheckboxWithText(enabled: boolean, textContext: 
     checkboxElem.checked = enabled;
     checkboxElem.dispatchEvent(new Event('change'));  // Need change event to update the backing setting.
   }, enabled);
-}
-
-export async function setLegacyNavigation(enabled: boolean) {
-  return setToolbarCheckboxWithText(enabled, 'Legacy navigation');
 }
 
 export async function setThrottlingMethod(throttlingMethod: 'simulate'|'devtools') {

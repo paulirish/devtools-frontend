@@ -266,7 +266,7 @@ export const waitFor = async<ElementType extends Element = Element>(
   return await asyncScope.exec(() => waitForFunction(async () => {
                                  const element = await $<ElementType>(selector, root, handler);
                                  return (element || undefined);
-                               }, asyncScope));
+                               }, asyncScope, `Waiting for element matching selector '${selector}'`));
 };
 
 export const waitForVisible = async<ElementType extends Element = Element>(
@@ -275,7 +275,7 @@ export const waitForVisible = async<ElementType extends Element = Element>(
                                  const element = await $<ElementType>(selector, root, handler);
                                  const visible = await element.evaluate(node => node.checkVisibility());
                                  return visible ? element : undefined;
-                               }, asyncScope));
+                               }, asyncScope, `Waiting for element matching selector '${selector}' to be visible`));
 };
 
 export const waitForMany = async (
@@ -283,7 +283,7 @@ export const waitForMany = async (
   return await asyncScope.exec(() => waitForFunction(async () => {
                                  const elements = await $$(selector, root, handler);
                                  return elements.length >= count ? elements : undefined;
-                               }, asyncScope));
+                               }, asyncScope, `Waiting for ${count} elements to match selector '${selector}'`));
 };
 
 export const waitForNone =
@@ -294,7 +294,7 @@ export const waitForNone =
                                    return true;
                                  }
                                  return false;
-                               }, asyncScope));
+                               }, asyncScope, `Waiting for no elements to match selector '${selector}'`));
 };
 
 export const waitForAria = (selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
@@ -319,7 +319,7 @@ export const waitForElementsWithTextContent =
                                }
 
                                return undefined;
-                             }, asyncScope));
+                             }, asyncScope, `Waiting for elements with textContent '${textContent}'`));
     };
 
 export const waitForNoElementsWithTextContent =
@@ -331,11 +331,12 @@ export const waitForNoElementsWithTextContent =
                                }
 
                                return false;
-                             }, asyncScope));
+                             }, asyncScope, `Waiting for no elements with textContent '${textContent}'`));
     };
 
-export const waitForFunction = async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope()): Promise<T> => {
-  return await asyncScope.exec(async () => {
+export const waitForFunction =
+    async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string): Promise<T> => {
+  let innerFunction = async () => {
     while (true) {
       if (asyncScope.isCanceled()) {
         throw new Error('Test timed out');
@@ -346,7 +347,11 @@ export const waitForFunction = async<T>(fn: () => Promise<T|undefined>, asyncSco
       }
       await timeout(100);
     }
-  });
+  };
+  if (description) {
+    innerFunction = runWithDescription.bind(null, description, innerFunction);
+  }
+  return await asyncScope.exec(innerFunction);
 };
 
 export const waitForFunctionWithTries = async<T>(
@@ -409,18 +414,12 @@ export const logFailure = () => {
 
 async function setExperimentEnabled(experiment: string, enabled: boolean, options?: DevToolsFrontendReloadOptions) {
   const {frontend} = getBrowserAndPages();
-  await frontend.evaluate((experiment, enabled) => {
-    globalThis.Root.Runtime.experiments.setEnabled(experiment, enabled);
-  }, experiment, enabled);
+  await frontend.evaluate(`(async () => {
+    const Root = await import('./core/root/root.js');
+    Root.Runtime.experiments.setEnabled('${experiment}', ${enabled});
+  })()`);
   await reloadDevTools(options);
 }
-
-export const isEnabledExperiment = async (experiment: string) => {
-  const {frontend} = getBrowserAndPages();
-  return await frontend.evaluate((experiment): Promise<boolean> => {
-    return globalThis.Root.Runtime.experiments.isEnabled(experiment);
-  }, experiment);
-};
 
 export const enableExperiment = (experiment: string, options?: DevToolsFrontendReloadOptions) =>
     setExperimentEnabled(experiment, true, options);
@@ -470,9 +469,20 @@ export const getResourcesPath = (host: string = 'localhost') => {
   return `https://${host}:${getTestServerPort()}${resourcesPath}`;
 };
 
-export const step = async (description: string, step: Function) => {
+export let stepDescription: string|null = null;
+const runWithDescription = async (description: string, step: Function) => {
+  const oldDescription = stepDescription;
+  stepDescription = (stepDescription ? stepDescription + ' > ' : '') + description;
   try {
     return await step();
+  } finally {
+    stepDescription = oldDescription;
+  }
+};
+
+export const step = async (description: string, step: Function) => {
+  try {
+    return await runWithDescription(description, step);
   } catch (error) {
     if (error instanceof AssertionError) {
       throw new AssertionError(
@@ -483,6 +493,8 @@ export const step = async (description: string, step: Function) => {
       error.message += ` in Step "${description}"`;
       throw error;
     }
+  } finally {
+    stepDescription = null;
   }
 };
 
@@ -829,3 +841,9 @@ export const replacePuppeteerUrl = (value: string): string => {
     return `(index):${match}`;
   });
 };
+
+export async function raf(page: puppeteer.Page): Promise<void> {
+  await page.evaluate(() => {
+    return new Promise(resolve => window.requestAnimationFrame(resolve));
+  });
+}

@@ -160,8 +160,6 @@ export class MainImpl {
 
   #initializeGlobalsForLayoutTests(): void {
     // @ts-ignore layout test global
-    self.Common = self.Common || {};
-    // @ts-ignore layout test global
     self.UI = self.UI || {};
     // @ts-ignore layout test global
     self.UI.panels = self.UI.panels || {};
@@ -265,9 +263,6 @@ export class MainImpl {
     const syncedStorage = new Common.Settings.SettingsStorage(prefs, hostSyncedStorage, storagePrefix);
     const globalStorage = new Common.Settings.SettingsStorage(prefs, hostUnsyncedStorage, storagePrefix);
     Common.Settings.Settings.instance({forceNew: true, syncedStorage, globalStorage, localStorage});
-
-    // @ts-ignore layout test global
-    self.Common.settings = Common.Settings.Settings.instance();
 
     if (!Host.InspectorFrontendHost.isUnderTest()) {
       new Common.Settings.VersionController().updateVersion();
@@ -379,9 +374,12 @@ export class MainImpl {
         Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
         'Highlights a violating node or attribute in the Elements panel DOM tree');
 
-    // Local overrides for response headers
+    // Local overrides
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.HEADER_OVERRIDES, 'Local overrides for response headers');
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.DELETE_OVERRIDES_TEMP_ENABLE, 'Enable "Delete all overrides" temporarily',
+        undefined, 'https://goo.gle/devtools-overrides', 'https://crbug.com/1473681');
 
     // Enable color picking outside the browser window (using Eyedropper API)
     Root.Runtime.experiments.register(

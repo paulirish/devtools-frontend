@@ -123,8 +123,6 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineFlameChartDataProvider.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const LONG_MAIN_THREAD_TASK_THRESHOLD = TraceEngine.Types.Timing.MilliSeconds(50);
-
 // at the moment there are two types defined for trace events: traceeventdata and
 // SDK.TracingModel.Event. This is only for compatibility between the legacy system
 // and the new system proposed in go/rpp-flamechart-arch. In the future, once all
@@ -214,8 +212,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         this.screenshotsHeader,
       ];
       for (const header of headers) {
-        header.color = ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary');
-        header.backgroundColor = ThemeSupport.ThemeSupport.instance().getComputedValue('--color-background');
+        header.color = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-on-surface');
+        header.backgroundColor =
+            ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
       }
     });
 
@@ -227,8 +226,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       padding: 4,
       height: 17,
       collapsible: true,
-      color: ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary'),
-      backgroundColor: ThemeSupport.ThemeSupport.instance().getComputedValue('--color-background'),
+      color: ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-on-surface'),
+      backgroundColor: ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container'),
       nestingLevel: 0,
       shareHeaderLine: true,
     };
@@ -754,11 +753,18 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       // the candy striping to them. Doing it here avoids having to do another
       // pass through the events at a later point.
       if (trackIsMainThreadMainFrame && event.name === TimelineModel.TimelineModel.RecordType.Task &&
-          eventDuration > LONG_MAIN_THREAD_TASK_THRESHOLD) {
+          TraceEngine.Helpers.Timing.millisecondsToMicroseconds(eventDuration) >
+              TraceEngine.Handlers.ModelHandlers.Warnings.LONG_MAIN_THREAD_TASK_THRESHOLD) {
         this.#addDecorationToEvent(index, {
           type: 'CANDY',
-          startAtTime: TraceEngine.Helpers.Timing.millisecondsToMicroseconds(LONG_MAIN_THREAD_TASK_THRESHOLD),
+          startAtTime: TraceEngine.Handlers.ModelHandlers.Warnings.LONG_MAIN_THREAD_TASK_THRESHOLD,
         });
+      }
+
+      if (entryType === EntryType.Event) {
+        if (TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).warning) {
+          this.#addDecorationToEvent(index, {type: 'WARNING_TRIANGLE'});
+        }
       }
 
       maxStackDepth = Math.max(maxStackDepth, openEvents.length + 1);
@@ -889,7 +895,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   prepareHighlightedEntryInfo(entryIndex: number): Element|null {
     let time = '';
     let title;
-    let warning;
+    let warningElements: Element[] = [];
     let nameSpanTimelineInfoTime = 'timeline-info-time';
 
     const entryType = this.entryType(entryIndex);
@@ -907,6 +913,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       // Add stringified frame to the tooltip.
       title += '\n' + JSON.stringify(event, null, 2).slice(0, 2000);
 
+      warningElements = highlightedEntryInfo.warningElements || warningElements;
     } else if (entryType === EntryType.Event) {
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
       const totalTime = event.duration;
@@ -921,7 +928,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             i18n.TimeUtilities.millisToString(totalTime, true);
       }
       title = this.entryTitle(entryIndex);
-      warning = TimelineUIUtils.buildEventWarningElement(event);
+      const warningElement = TimelineUIUtils.legacyBuildEventWarningElement(event);
+      if (warningElement) {
+        warningElements.push(warningElement);
+      }
 
       if (this.legacyTimelineModel && this.legacyTimelineModel.isParseHTMLEvent(event)) {
         const startLine = event.args['beginData']['startLine'];
@@ -981,9 +991,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const contents = root.createChild('div', 'timeline-flamechart-popover');
     contents.createChild('span', nameSpanTimelineInfoTime).textContent = time;
     contents.createChild('span', 'timeline-info-title').textContent = title;
-    if (warning) {
-      warning.classList.add('timeline-info-warning');
-      contents.appendChild(warning);
+    if (warningElements) {
+      for (const warningElement of warningElements) {
+        warningElement.classList.add('timeline-info-warning');
+        contents.appendChild(warningElement);
+      }
     }
 
     // fullsize screenshot in popover
@@ -1012,14 +1024,28 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     function patchColorAndCache<KEY>(cache: Map<KEY, string>, key: KEY, lookupColor: (arg0: KEY) => string): string {
       let color = cache.get(key);
       if (color) {
-        return color;
+        return parseColor(color);
       }
-      const parsedColor = Common.Color.parse(lookupColor(key));
+      const parsedColor = lookupColor(key);
       if (!parsedColor) {
         throw new Error('Could not parse color from entry');
       }
-      color = parsedColor.setAlpha(0.7).asString(Common.Color.Format.RGBA) || '';
+      color = parsedColor;
       cache.set(key, color);
+      return parseColor(color);
+    }
+
+    function parseColor(color: string): string {
+      // The color is either a css variable var(--app-color-scripting) or a hls color
+      // So if the first character of the color is v, it is a CSS variable.
+      const isColorCSSVariable = color[0] === 'v';
+      if (isColorCSSVariable) {
+        // The color is of this format var(--app-color-scripting) for instance
+        // However the getComputedValue method only accepts --app-color-scripting.
+        // To extract it, we split by "(", get the second value and pop the last ")" from it.
+        color = color.split('(')[1].slice(0, -1);
+        return ThemeSupport.ThemeSupport.instance().getComputedValue(color);
+      }
       return color;
     }
 
@@ -1032,13 +1058,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (entryType === entryTypes.Event) {
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
       if (this.legacyTimelineModel.isGenericTrace()) {
-        return this.genericTraceEventColor(event);
+        return parseColor(this.genericTraceEventColor(event));
       }
       if (this.legacyPerformanceModel.timelineModel().isMarkerEvent(event)) {
-        return TimelineUIUtils.markerStyleForEvent(event).color;
+        return parseColor(TimelineUIUtils.markerStyleForEvent(event).color);
       }
       if (!TraceEngine.Types.TraceEvents.isAsyncPhase(event.phase) && this.colorForEvent) {
-        return this.colorForEvent(event);
+        return parseColor(this.colorForEvent(event));
       }
       const category = TimelineUIUtils.eventStyle(event).category;
       return patchColorAndCache(this.asyncColorByCategory, category, () => category.color);
@@ -1050,7 +1076,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
       const eventLevel = timelineData.entryLevels[entryIndex];
       const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
-      return this.compatibilityTracksAppender?.colorForEvent(event, eventLevel) || '';
+      return parseColor(this.compatibilityTracksAppender?.colorForEvent(event, eventLevel) || '');
     }
     return '';
   }
@@ -1183,14 +1209,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return true;
     }
 
-    if (entryType === EntryType.Event) {
-      const data = this.entryData[entryIndex];
-      const event = (data as TraceEngine.Legacy.Event);
-      if (TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).warning) {
-        this.#addDecorationToEvent(entryIndex, {type: 'WARNING_TRIANGLE'});
-      }
-    }
-
     return false;
   }
 
@@ -1208,7 +1226,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
       return Boolean(TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).warning);
     }
-    return false;
+    const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
+    return Boolean(this.traceEngineData?.Warnings.perEvent.get(event));
   }
 
   private appendHeader(title: string, style: PerfUI.FlameChart.GroupStyle, selectable: boolean, expanded?: boolean):

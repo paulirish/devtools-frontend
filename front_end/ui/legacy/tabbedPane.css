@@ -49,39 +49,34 @@
   font-size: 14px;
   text-align: center;
   width: fit-content;
-  margin: 20px auto 0;
+  margin: 40px auto 0;
   text-shadow: var(--color-background-opacity-80) 0 1px 0;
   line-height: 28px;
 }
 
 .tabbed-pane-placeholder-row {
-  display: flex;
-  white-space: nowrap;
-  padding: 0 5px;
-  margin: 2px;
-}
+  margin-inline: 10px;
 
-.tabbed-pane-placeholder-row:focus-visible {
-  outline-width: unset;
-}
+  & span {
+    display: inline-block;
+    padding-inline: 10px;
+  }
 
-.tabbed-pane-placeholder-key {
-  flex: 1;
-  text-align: right;
-  padding-right: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  &:has(.workspace) {
+    max-width: 400px;
+    border: 2px dashed var(--color-background-elevation-2);
+    margin-block-start: 20px;
+    padding: 10px;
+    margin-inline: 20px;
 
-.tabbed-pane-no-shortcut {
-  flex: 1;
-  text-align: center;
-}
-
-.tabbed-pane-placeholder-value {
-  flex: 1;
-  text-align: left;
-  padding-left: 14px;
+    & button {
+      background: transparent;
+      border: none;
+      padding: 0;
+      text-decoration: underline;
+      margin-inline: 4px;
+    }
+  }
 }
 
 .tabbed-pane-header {

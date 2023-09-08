@@ -50,11 +50,11 @@
 #timeline-overview-panel {
   flex: none;
   position: relative;
-  border-bottom: 1px solid var(--color-details-hairline);
+  border-bottom: 1px solid var(--sys-color-divider);
 }
 
 #timeline-overview-grid {
-  background-color: var(--color-background);
+  background-color: var(--sys-color-cdt-base-container);
 }
 
 #timeline-overview-grid .timeline-grid-header {
@@ -113,7 +113,7 @@
 
 #memory-graphs-container .timeline-memory-header {
   flex: 0 0 26px;
-  background-color: var(--color-background-elevation-1);
+  background-color: var(--sys-color-surface2);
   border-bottom: 1px solid var(--sys-color-divider);
   justify-content: space-between;
 }
@@ -143,27 +143,12 @@
   line-height: 18px;
 }
 
-#timeline-overview-coverage {
-  flex-basis: 20px;
-}
-
-.timeline-overview-coverage-label {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  font-size: 9px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  padding: 0 4px;
-  background-color: var(--color-background-opacity-80);
-}
-
 .timeline-details {
   vertical-align: top;
 }
 
 .timeline-details-view {
-  color: var(--color-text-secondary);
+  color: var(--sys-color-on-surface);
   overflow: hidden;
 }
 
@@ -178,10 +163,10 @@
 .timeline-details-view-block {
   flex: none;
   display: flex;
-  background-color: var(--color-background);
+  background-color: var(--sys-color-cdt-base-container);
   flex-direction: column;
   padding-bottom: 5px;
-  border-bottom: var(--legacy-divider-border);
+  border-bottom: 1px solid var(--sys-color-divider);
 }
 
 .timeline-details-view-row {
@@ -201,7 +186,7 @@
 }
 
 .timeline-details-view-row-title:not(:empty) {
-  color: var(--color-text-secondary);
+  color: var(--sys-color-token-subtle);
   overflow: hidden;
   padding-right: 10px;
   display: inline-block;
@@ -220,7 +205,7 @@
 }
 
 .timeline-details-warning .timeline-details-view-row-title {
-  color: var(--color-red);
+  color: var(--sys-color-error);
 }
 
 .timeline-details-view-row-value {
@@ -258,8 +243,8 @@
 
 .timeline-flamechart-resizer {
   flex: 8px 0 0;
-  background-color: var(--color-background-elevation-1);
-  border: 1px var(--color-details-hairline);
+  background-color: var(--sys-color-surface2);
+  border: 1px var(--sys-color-divider);
   border-style: solid none;
   display: flex;
   flex-direction: row;
@@ -283,7 +268,7 @@
 }
 
 .timeline-layers-view-properties td {
-  border: 1px solid var(--color-details-hairline);
+  border: 1px solid var(--sys-color-divider);
   line-height: 22px;
 }
 
@@ -292,7 +277,7 @@
   max-width: 500px;
   max-height: 300px;
   cursor: pointer;
-  border: 1px solid var(--color-details-hairline);
+  border: 1px solid var(--sys-color-divider);
 }
 
 .timeline-tree-view {
@@ -319,11 +304,15 @@
 }
 
 .timeline-tree-view .data-grid table.data {
-  background: var(--color-background);
+  background: var(--sys-color-cdt-base-container);
+}
+
+.timeline-tree-view .data-grid .odd {
+  background-color: var(--sys-color-surface1);
 }
 
 .timeline-tree-view .data-grid tr:hover td:not(.bottom-filler-td) {
-  background-color: var(--color-background-hover-overlay);
+  background-color: var(--sys-color-state-hover-on-subtle);
 }
 
 .timeline-tree-view .data-grid td.numeric-column {
@@ -333,10 +322,12 @@
 
 .timeline-tree-view .data-grid div.background-percent-bar {
   float: right;
+  position: relative;
+  z-index: 999;
 }
 
 .timeline-tree-view .data-grid span.percent-column {
-  color: var(--color-text-secondary);
+  color: var(--sys-color-token-subtle);
   width: 45px;
   display: inline-block;
 }
@@ -374,11 +365,11 @@
   margin: 0 4px;
   line-height: 12px;
   font-size: 10px;
-  color: var(--color-text-disabled);
+  color: var(--sys-color-state-disabled);
 }
 
 .timeline-tree-view .data-grid tr.selected .name-container .activity-warning::after {
-  color: var(--color-text-secondary-selected);
+  color: var(--sys-color-on-tonal-container);
 }
 
 .timeline-tree-view .data-grid .name-container .activity-link {
@@ -406,8 +397,8 @@
 }
 
 .timeline-tree-view .data-grid .selected .background-bar {
-  background-color: var(--color-background-opacity-50);
-  border-bottom: 1px solid var(--color-background-opacity-80);
+  background-color: var(--app-color-selected);
+  border-bottom: 1px solid var(--app-border-selected);
 }
 
 .-theme-with-dark-background .timeline-tree-view .data-grid .background-bar,
@@ -430,21 +421,21 @@
 
 .timeline-stack-view-header {
   height: 27px;
-  background-color: var(--color-background-elevation-1);
+  background-color: var(--sys-color-cdt-base-container);
   padding: 6px 10px;
-  color: var(--color-text-secondary);
+  color: var(--sys-color-on-surface);
   white-space: nowrap;
-  border-bottom: var(--legacy-divider-border);
+  border-bottom: 1px solid var(--sys-color-divider);
 }
 
 .timeline-landing-page {
   position: absolute;
-  background-color: var(--color-background);
+  background-color: var(--sys-color-cdt-base-container);
   justify-content: center;
   align-items: center;
   overflow: auto;
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: var(--sys-color-token-subtle);
 }
 
 @media (forced-colors: active) {
@@ -488,7 +479,7 @@
 .timeline-details-chip-title > div {
   width: 12px;
   height: 12px;
-  border: 1px solid var(--color-details-hairline);
+  border: 1px solid var(--sys-color-divider);
   display: inline-block;
   margin-right: 4px;
   content: " ";

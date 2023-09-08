@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Root from '../../../core/root/root.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import * as Common from '../../../core/common/common.js';
 import type * as CPUProfile from '../../cpu_profile/cpu_profile.js';
 import * as Types from '../types/types.js';
+
 import {millisecondsToMicroseconds} from './Timing.js';
 import {mergeEventsInOrder} from './Trace.js';
 
 /**
- * This is a helpers that integrates CPU profiling data coming in the
+ * This is a helper that integrates CPU profiling data coming in the
  * shape of samples, with trace events. Samples indicate what the JS
  * stack trace looked at a given point in time, but they don't have
  * duration. The SamplesIntegrator task is to make an approximation
@@ -89,12 +88,16 @@ export class SamplesIntegrator {
    * tracks which node is used for the stack of a GC call.
    */
   #nodeForGC = new Map<Types.TraceEvents.TraceEventSyntheticProfileCall, CPUProfile.ProfileTreeModel.ProfileNode>();
+
+  #engineConfig: Types.Configuration.Configuration;
+
   constructor(
       profileModel: CPUProfile.CPUProfileDataModel.CPUProfileDataModel, pid: Types.TraceEvents.ProcessID,
-      tid: Types.TraceEvents.ThreadID) {
+      tid: Types.TraceEvents.ThreadID, configuration?: Types.Configuration.Configuration) {
     this.#profileModel = profileModel;
     this.#threadId = tid;
     this.#processId = pid;
+    this.#engineConfig = configuration || Types.Configuration.DEFAULT;
   }
 
   buildProfileCalls(traceEvents: Types.TraceEvents.TraceEventData[]):
@@ -278,7 +281,7 @@ export class SamplesIntegrator {
   #extractStackTrace(event: Types.TraceEvents.TraceEventData): void {
     const stackTrace =
         Types.TraceEvents.isProfileCall(event) ? this.#getStackTraceFromProfileCall(event) : this.#currentJSStack;
-    SamplesIntegrator.filterStackFrames(stackTrace);
+    SamplesIntegrator.filterStackFrames(stackTrace, this.#engineConfig);
 
     const endTime = event.ts + (event.dur || 0);
     const minFrames = Math.min(stackTrace.length, this.#currentJSStack.length);
@@ -399,15 +402,8 @@ export class SamplesIntegrator {
         frame1.lineNumber === frame2.lineNumber;
   }
 
-  static showNativeName(name: string): boolean {
-    try {
-      // Querying for unregistered experiments will error on debug
-      // builds.
-      const showRuntimeCallStats = Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats');
-      return showRuntimeCallStats && Boolean(SamplesIntegrator.nativeGroup(name));
-    } catch (error) {
-      return false;
-    }
+  static showNativeName(name: string, runtimeCallStatsEnabled: boolean): boolean {
+    return runtimeCallStatsEnabled && Boolean(SamplesIntegrator.nativeGroup(name));
   }
 
   static nativeGroup(nativeName: string): 'Parse'|'Compile'|null {
@@ -424,16 +420,10 @@ export class SamplesIntegrator {
     return frame.url === 'native V8Runtime';
   }
 
-  static filterStackFrames(stack: Types.TraceEvents.TraceEventSyntheticProfileCall[]): void {
-    let showAllEvents = false;
-    try {
-      // Querying for unregistered experiments will error on debug
-      // builds.
-      showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
-    } catch (_err) {
-    }
-    const showNativeFunctions = Common.Settings.Settings.hasInstance() &&
-        Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get();
+  static filterStackFrames(
+      stack: Types.TraceEvents.TraceEventSyntheticProfileCall[],
+      engineConfig: Types.Configuration.Configuration): void {
+    const showAllEvents = engineConfig.experiments.timelineShowAllEvents;
     if (showAllEvents) {
       return;
     }
@@ -441,13 +431,9 @@ export class SamplesIntegrator {
     let j = 0;
     for (let i = 0; i < stack.length; ++i) {
       const frame = stack[i].callFrame;
-      const url = frame.url;
-      const isNativeFrame = url && url.startsWith('native ');
-      if (!showNativeFunctions && isNativeFrame) {
-        continue;
-      }
       const nativeRuntimeFrame = SamplesIntegrator.isNativeRuntimeFrame(frame);
-      if (nativeRuntimeFrame && !SamplesIntegrator.showNativeName(frame.functionName)) {
+      if (nativeRuntimeFrame &&
+          !SamplesIntegrator.showNativeName(frame.functionName, engineConfig.experiments.timelineV8RuntimeCallStats)) {
         continue;
       }
       const nativeFrameName = nativeRuntimeFrame ? SamplesIntegrator.nativeGroup(frame.functionName) : null;

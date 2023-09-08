@@ -176,12 +176,14 @@ export class SourcesSearchScope implements Search.SearchScope.SearchScope {
   private processMatchingFilesForProject(
       searchId: number, project: Workspace.Workspace.Project, searchConfig: Workspace.SearchConfig.SearchConfig,
       filesMatchingFileQuery: Workspace.UISourceCode.UISourceCode[],
-      files: Workspace.UISourceCode.UISourceCode[]): void {
+      filesWithPreliminaryResult:
+          Map<Workspace.UISourceCode.UISourceCode, TextUtils.ContentProvider.SearchMatch[]|null>): void {
     if (searchId !== this.searchId && this.searchFinishedCallback) {
       this.searchFinishedCallback(false);
       return;
     }
 
+    let files = [...filesWithPreliminaryResult.keys()];
     files.sort(SourcesSearchScope.urlComparator);
     files = Platform.ArrayUtilities.intersectOrdered(files, filesMatchingFileQuery, SourcesSearchScope.urlComparator);
     const dirtyFiles = this.projectFilesMatchingFileQuery(project, searchConfig, true);
@@ -262,7 +264,7 @@ export class SourcesSearchScope implements Search.SearchScope.SearchScope {
               matches, nextMatches, TextUtils.ContentProvider.SearchMatch.comparator);
         }
         if (!searchConfig.queries().length) {
-          matches = [new TextUtils.ContentProvider.SearchMatch(0, (new TextUtils.Text.Text(content)).lineAt(0))];
+          matches = [new TextUtils.ContentProvider.SearchMatch(0, (new TextUtils.Text.Text(content)).lineAt(0), 0, 0)];
         }
       }
       if (matches && this.searchResultCallback) {
@@ -306,13 +308,22 @@ export class FileBasedSearchResult implements Search.SearchScope.SearchResult {
   }
 
   matchRevealable(index: number): Object {
-    const match = this.searchMatches[index];
-    return this.uiSourceCode.uiLocation(match.lineNumber, match.columnNumber);
+    const {lineNumber, columnNumber, matchLength} = this.searchMatches[index];
+    const range = new TextUtils.TextRange.TextRange(lineNumber, columnNumber, lineNumber, columnNumber + matchLength);
+    return new Workspace.UISourceCode.UILocationRange(this.uiSourceCode, range);
   }
 
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   matchLabel(index: number): any {
     return this.searchMatches[index].lineNumber + 1;
+  }
+
+  matchColumn(index: number): number {
+    return this.searchMatches[index].columnNumber;
+  }
+
+  matchLength(index: number): number {
+    return this.searchMatches[index].matchLength;
   }
 }

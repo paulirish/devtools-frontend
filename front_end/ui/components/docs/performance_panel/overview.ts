@@ -4,6 +4,7 @@
 
 import * as EnvironmentHelpers from '../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
 import * as TraceLoader from '../../../../../test/unittests/front_end/helpers/TraceLoader.js';
+import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as Timeline from '../../../../panels/timeline/timeline.js';
 import * as ComponentSetup from '../../helpers/helpers.js';
 
@@ -23,15 +24,17 @@ async function renderMiniMap(containerSelector: string, options: {showMemory: bo
     throw new Error('could not find container');
   }
   const minimap = new Timeline.TimelineMiniMap.TimelineMiniMap();
+  minimap.activateBreadcrumbs();
   minimap.markAsRoot();
   minimap.show(container);
 
   const models = await TraceLoader.TraceLoader.allModels(null, fileName);
 
-  minimap.setNavStartTimes(models.timelineModel.navStartTimes());
-  minimap.setBounds(models.timelineModel.minimumRecordTime(), models.timelineModel.maximumRecordTime());
-  minimap.setWindowTimes(models.performanceModel.window().left, models.performanceModel.window().right);
-  minimap.updateControls({
+  minimap.setBounds(
+      TraceEngine.Types.Timing.MilliSeconds(models.timelineModel.minimumRecordTime()),
+      TraceEngine.Types.Timing.MilliSeconds(models.timelineModel.maximumRecordTime()),
+  );
+  minimap.setData({
     traceParsedData: models.traceParsedData,
     performanceModel: models.performanceModel,
     settings: {
@@ -39,6 +42,7 @@ async function renderMiniMap(containerSelector: string, options: {showMemory: bo
       showScreenshots: true,
     },
   });
+  minimap.setWindowTimes(models.performanceModel.window().left, models.performanceModel.window().right);
 }
 
 await renderMiniMap('.container', {showMemory: false});

@@ -523,4 +523,36 @@ for(let e=0;e<l.lineCount();++e){const t=l.lineAt(e);s.lastIndex=0;const i=s.exe
       assert.strictEqual(isMinified(text), false);
     });
   });
+
+  describe('performExtendedSearchInContent', () => {
+    it('returns an entry for each match on the same line', () => {
+      const lines = ['The first line with a second "the".', 'The second line.'];
+
+      const result = TextUtils.TextUtils.performSearchInContent(lines.join('\n'), 'the', false, false);
+
+      assert.deepEqual(result, [
+        new TextUtils.ContentProvider.SearchMatch(0, lines[0], 0, 3),
+        new TextUtils.ContentProvider.SearchMatch(0, lines[0], 30, 3),
+        new TextUtils.ContentProvider.SearchMatch(1, lines[1], 0, 3),
+      ]);
+    });
+  });
+
+  describe('performExtendedSearchInSearchMatches', () => {
+    it('returns an entry for each match on the same line', () => {
+      const lines = ['The first line with a second "the".', 'The second line.'];
+      const searchMatches = [
+        {lineContent: lines[0], lineNumber: 5},
+        {lineContent: lines[1], lineNumber: 42},
+      ];
+
+      const result = TextUtils.TextUtils.performSearchInSearchMatches(searchMatches, 'the', false, false);
+
+      assert.deepEqual(result, [
+        new TextUtils.ContentProvider.SearchMatch(5, lines[0], 0, 3),
+        new TextUtils.ContentProvider.SearchMatch(5, lines[0], 30, 3),
+        new TextUtils.ContentProvider.SearchMatch(42, lines[1], 0, 3),
+      ]);
+    });
+  });
 });

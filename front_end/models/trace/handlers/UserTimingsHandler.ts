@@ -182,8 +182,10 @@ export async function finalize(): Promise<void> {
         },
       },
     };
+
     if (event.dur < 0) {
-      console.assert(false, `Event pair creates negative duration: ${event.name}`);
+      // Avoid any pairs that have created a negative duration; this is bad
+      // trace data and we should just ignore them.
       continue;
     }
     syntheticEvents.push(event);

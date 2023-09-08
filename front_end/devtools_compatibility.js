@@ -1057,6 +1057,14 @@ const InspectorFrontendHostImpl = class {
   initialTargetId() {
     return DevToolsAPI._initialTargetIdPromise;
   }
+
+  /**
+   * @param {string} request
+   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   */
+  doAidaConversation(request, cb) {
+    DevToolsAPI.sendMessageToEmbedder('doAidaConversation', [request], cb);
+  }
 };
 
 window.InspectorFrontendHost = new InspectorFrontendHostImpl();
@@ -1193,7 +1201,6 @@ function installObjectObserve() {
     'showHeaSnapshotObjectsHiddenProperties',
     'showInheritedComputedStyleProperties',
     'showMediaQueryInspector',
-    'showNativeFunctionsInJSProfile',
     'showUAShadowDOM',
     'showWhitespacesInEditor',
     'sidebarPosition',

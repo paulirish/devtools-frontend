@@ -4,6 +4,7 @@
 
 /* eslint-disable no-unused-private-class-members */
 import type * as Protocol from '../../../generated/protocol.js';
+
 import {type MicroSeconds, type MilliSeconds, type Seconds} from './Timing.js';
 
 // Trace Events.
@@ -179,6 +180,20 @@ export interface TraceEventDispatch extends TraceEventComplete {
   };
 }
 
+export interface TraceEventParseHTML extends TraceEventComplete {
+  name: 'ParseHTML';
+  args: TraceEventArgs&{
+    beginData: {
+      frame: string,
+      startLine: number,
+      url: string,
+    },
+    endData?: {
+      endLine: number,
+    },
+  };
+}
+
 export interface TraceEventBegin extends TraceEventData {
   ph: Phase.BEGIN;
 }
@@ -303,6 +318,92 @@ export interface TraceEventSyntheticNetworkRequest extends TraceEventComplete {
   tts: MicroSeconds;
   pid: ProcessID;
   tid: ThreadID;
+}
+
+export const enum AuctionWorkletType {
+  BIDDER = 'bidder',
+  SELLER = 'seller',
+  // Not expected to be used, but here as a fallback in case new types get
+  // added and we have yet to update the trace engine.
+  UNKNOWN = 'unknown',
+}
+
+export interface SyntheticAuctionWorkletEvent extends TraceEventInstant {
+  name: 'SyntheticAuctionWorkletEvent';
+  // The PID that the AuctionWorklet is running in.
+  pid: ProcessID;
+  // URL
+  host: string;
+  // An ID used to pair up runningInProcessEvents with doneWithProcessEvents
+  target: string;
+  type: AuctionWorkletType;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      // There are two threads for a worklet that we care about, so we gather
+      // the thread_name events so we can know the PID and TID for them (and
+      // hence display the right events in the track for each thread)
+      utilityThread: TraceEventThreadName,
+      v8HelperThread: TraceEventThreadName,
+    } &
+        (
+              // This type looks odd, but this is because these events could either have:
+              // 1. Just the DoneWithProcess event
+              // 2. Just the RunningInProcess event
+              // 3. Both events
+              // But crucially it cannot have both events missing, hence listing all the
+              // allowed cases.
+              // Clang is disabled as the combination of nested types and optional
+              // properties cause it to weirdly indent some of the properties and make it
+              // very unreadable.
+              // clang-format off
+              {
+                runningInProcessEvent: TraceEventAuctionWorkletRunningInProcess,
+                doneWithProcessEvent: TraceEventAuctionWorkletDoneWithProcess,
+              } |
+              {
+                runningInProcessEvent?: TraceEventAuctionWorkletRunningInProcess,
+                doneWithProcessEvent: TraceEventAuctionWorkletDoneWithProcess,
+              } |
+              {
+                doneWithProcessEvent?: TraceEventAuctionWorkletDoneWithProcess,
+                runningInProcessEvent: TraceEventAuctionWorkletRunningInProcess,
+
+              }),
+    // clang-format on
+  };
+}
+export interface TraceEventAuctionWorkletRunningInProcess extends TraceEventData {
+  name: 'AuctionWorkletRunningInProcess';
+  ph: Phase.INSTANT;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      host: string,
+      pid: ProcessID,
+      target: string,
+      type: AuctionWorkletType,
+    },
+  };
+}
+export interface TraceEventAuctionWorkletDoneWithProcess extends TraceEventData {
+  name: 'AuctionWorkletDoneWithProcess';
+  ph: Phase.INSTANT;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      host: string,
+      pid: ProcessID,
+      target: string,
+      type: AuctionWorkletType,
+    },
+  };
+}
+
+export function isTraceEventAuctionWorkletRunningInProcess(event: TraceEventData):
+    event is TraceEventAuctionWorkletRunningInProcess {
+  return event.name === 'AuctionWorkletRunningInProcess';
+}
+export function isTraceEventAuctionWorkletDoneWithProcess(event: TraceEventData):
+    event is TraceEventAuctionWorkletDoneWithProcess {
+  return event.name === 'AuctionWorkletDoneWithProcess';
 }
 
 // Snapshot events.
@@ -496,7 +597,7 @@ export interface TraceEventTracingSessionIdForWorker extends TraceEventInstant {
   args: TraceEventArgs&{
     data?: TraceEventArgsData & {
       url: string,
-      workerId: string,
+      workerId: WorkerId,
       workerThreadId: ThreadID,
       frame: string,
     },
@@ -959,6 +1060,15 @@ export function ThreadID(value: number): ThreadID {
   return value as ThreadID;
 }
 
+class WorkerIdTag {
+  readonly #workerIdTag: (symbol|undefined);
+}
+export type WorkerId = string&WorkerIdTag;
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export function WorkerId(value: string): WorkerId {
+  return value as WorkerId;
+}
+
 export function isTraceEventComplete(event: TraceEventData): event is TraceEventComplete {
   return event.ph === Phase.COMPLETE;
 }
@@ -1218,6 +1328,10 @@ export function isTraceEventTimeStamp(traceEventData: TraceEventData): traceEven
   return traceEventData.ph === Phase.INSTANT && traceEventData.name === 'TimeStamp';
 }
 
+export function isTraceEventParseHTML(traceEventData: TraceEventData): traceEventData is TraceEventParseHTML {
+  return traceEventData.name === 'ParseHTML';
+}
+
 export interface TraceEventAsync extends TraceEventData {
   ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_INSTANT|Phase.ASYNC_NESTABLE_END|Phase.ASYNC_STEP_INTO|
       Phase.ASYNC_BEGIN|Phase.ASYNC_END|Phase.ASYNC_STEP_PAST;
@@ -1247,11 +1361,19 @@ export function isProfileCall(event: TraceEventData): event is TraceEventSynthet
   return 'callFrame' in event;
 }
 
+/**
+ * This is an exhaustive list of events we track in the Performance
+ * panel. Note not all of them are necessarliry shown in the flame
+ * chart, some of them we only use for parsing.
+ * TODO(crbug.com/1428024): Complete this enum.
+ */
 export const enum KnownEventName {
-  /* Task/Other */
+  /* Task */
   Program = 'Program',
   RunTask = 'RunTask',
   AsyncTask = 'AsyncTask',
+  RunMicrotasks = 'RunMicrotasks',
+
   /* Load */
   XHRLoad = 'XHRLoad',
   XHRReadyStateChange = 'XHRReadyStateChange',
@@ -1269,7 +1391,6 @@ export const enum KnownEventName {
   WasmModuleCacheHit = 'v8.wasm.moduleCacheHit',
   WasmModuleCacheInvalid = 'v8.wasm.moduleCacheInvalid',
   /* Js */
-  RunMicrotasks = 'RunMicrotasks',
   ProfileCall = 'ProfileCall',
   EvaluateScript = 'EvaluateScript',
   FunctionCall = 'FunctionCall',
@@ -1307,7 +1428,9 @@ export const enum KnownEventName {
   IncrementalGCMarking = 'V8.GCIncrementalMarking',
   MajorGC = 'MajorGC',
   MinorGC = 'MinorGC',
-  /* Layout (a.k.a "Rendering") */
+  GCCollectGarbage = 'BlinkGC.AtomicPhase',
+
+  /* Layout */
   ScheduleStyleRecalculation = 'ScheduleStyleRecalculation',
   RecalculateStyles = 'RecalculateStyles',
   Layout = 'Layout',
@@ -1317,6 +1440,13 @@ export const enum KnownEventName {
   ComputeIntersections = 'ComputeIntersections',
   HitTest = 'HitTest',
   PrePaint = 'PrePaint',
+  Layerize = 'Layerize',
+  LayoutShift = 'LayoutShift',
+  UpdateLayerTree = 'UpdateLayerTree',
+  ScheduleStyleInvalidationTracking = 'ScheduleStyleInvalidationTracking',
+  StyleRecalcInvalidationTracking = 'StyleRecalcInvalidationTracking',
+  StyleInvalidatorInvalidationTracking = 'StyleInvalidatorInvalidationTracking',
+
   /* Paint */
   ScrollLayer = 'ScrollLayer',
   UpdateLayer = 'UpdateLayer',
@@ -1333,5 +1463,78 @@ export const enum KnownEventName {
   DrawLazyPixelRef = 'Draw LazyPixelRef',
   DecodeLazyPixelRef = 'Decode LazyPixelRef',
   GPUTask = 'GPUTask',
+  Rasterize = 'Rasterize',
   EventTiming = 'EventTiming',
+
+  /* Compile */
+  OptimizeCode = 'V8.OptimizeCode',
+  CacheScript = 'v8.produceCache',
+  CacheModule = 'v8.produceModuleCache',
+  // V8Sample events are coming from tracing and contain raw stacks with function addresses.
+  // After being processed with help of JitCodeAdded and JitCodeMoved events they
+  // get translated into function infos and stored as stacks in JSSample events.
+  V8Sample = 'V8Sample',
+  JitCodeAdded = 'JitCodeAdded',
+  JitCodeMoved = 'JitCodeMoved',
+  StreamingCompileScript = 'v8.parseOnBackground',
+  StreamingCompileScriptWaiting = 'v8.parseOnBackgroundWaiting',
+  StreamingCompileScriptParsing = 'v8.parseOnBackgroundParsing',
+  BackgroundDeserialize = 'v8.deserializeOnBackground',
+  FinalizeDeserialization = 'V8.FinalizeDeserialization',
+
+  /* Markers */
+  CommitLoad = 'CommitLoad',
+  MarkLoad = 'MarkLoad',
+  MarkDOMContent = 'MarkDOMContent',
+  MarkFirstPaint = 'firstPaint',
+  MarkFCP = 'firstContentfulPaint',
+  MarkLCPCandidate = 'largestContentfulPaint::Candidate',
+  MarkLCPInvalidate = 'largestContentfulPaint::Invalidate',
+  NavigationStart = 'navigationStart',
+  TimeStamp = 'TimeStamp',
+  ConsoleTime = 'ConsoleTime',
+  UserTiming = 'UserTiming',
+  InteractiveTime = 'InteractiveTime',
+
+  /* Frames */
+  BeginFrame = 'BeginFrame',
+  NeedsBeginFrameChanged = 'NeedsBeginFrameChanged',
+  BeginMainThreadFrame = 'BeginMainThreadFrame',
+  ActivateLayerTree = 'ActivateLayerTree',
+  DrawFrame = 'DrawFrame',
+  DroppedFrame = 'DroppedFrame',
+  FrameStartedLoading = 'FrameStartedLoading',
+
+  /* Network request events */
+  ResourceWillSendRequest = 'ResourceWillSendRequest',
+  ResourceSendRequest = 'ResourceSendRequest',
+  ResourceReceiveResponse = 'ResourceReceiveResponse',
+  ResourceReceivedData = 'ResourceReceivedData',
+  ResourceFinish = 'ResourceFinish',
+  ResourceMarkAsCached = 'ResourceMarkAsCached',
+
+  /* Web sockets */
+  WebSocketSendHandshakeRequest = 'WebSocketSendHandshakeRequest',
+  WebSocketReceiveHandshakeResponse = 'WebSocketReceiveHandshakeResponse',
+
+  /* CPU Profiling */
+  Profile = 'Profile',
+  StartProfiling = 'CpuProfiler::StartProfiling',
+  ProfileChunk = 'ProfileChunk',
+  UpdateCounters = 'UpdateCounters',
+
+  /* Other */
+  Animation = 'Animation',
+  ParseAuthorStyleSheet = 'ParseAuthorStyleSheet',
+  EmbedderCallback = 'EmbedderCallback',
+  SetLayerTreeId = 'SetLayerTreeId',
+  TracingStartedInPage = 'TracingStartedInPage',
+  TracingSessionIdForWorker = 'TracingSessionIdForWorker',
+  LazyPixelRef = 'LazyPixelRef',
+  LayerTreeHostImplSnapshot = 'cc::LayerTreeHostImpl',
+  PictureSnapshot = 'cc::Picture',
+  DisplayItemListSnapshot = 'cc::DisplayItemList',
+  InputLatencyMouseMove = 'InputLatency::MouseMove',
+  InputLatencyMouseWheel = 'InputLatency::MouseWheel',
+  ImplSideFling = 'InputHandlerProxy::HandleGestureFling::started',
 }

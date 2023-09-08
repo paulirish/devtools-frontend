@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import {expectError} from '../../conductor/events.js';
 import {$textContent, getBrowserAndPages} from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+import {describe} from '../../shared/mocha-extensions.js';
 import {
   clickStartButton,
   getAuditsBreakdown,
@@ -59,6 +59,8 @@ describe('Snapshot', async function() {
     await selectMode('snapshot');
     await clickStartButton();
 
+    await target.bringToFront();
+
     const {lhr, artifacts, reportEl} = await waitForResult();
 
     assert.strictEqual(numNavigations, 0);
@@ -74,7 +76,7 @@ describe('Snapshot', async function() {
     });
 
     const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr);
-    assert.strictEqual(auditResults.length, 83);
+    assert.strictEqual(auditResults.length, 88);
     assert.deepStrictEqual(erroredAudits, []);
     assert.deepStrictEqual(failedAudits.map(audit => audit.id), [
       'document-title',

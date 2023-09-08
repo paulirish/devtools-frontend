@@ -35,10 +35,6 @@ group("front_end") {
 
 group("legacy_entrypoints") {
   public_deps = [
-    "core/common:legacy",
-    "core/host:legacy",
-    "core/protocol_client:legacy",
-    "core/root:legacy",
     "core/sdk:legacy",
     "entrypoints/heap_snapshot_worker:legacy",
     "entrypoints/main:legacy",
@@ -65,7 +61,6 @@ group("legacy_entrypoints") {
     "panels/layer_viewer:legacy",
     "panels/lighthouse:legacy",
     "panels/mobile_throttling:legacy",
-    "panels/network:legacy",
     "panels/profiler:legacy",
     "panels/search:legacy",
     "panels/security:legacy",

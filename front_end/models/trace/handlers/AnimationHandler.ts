@@ -111,8 +111,12 @@ function createSortedAnimationsSyntheticEvents(matchedEvents: Map<string, {
         },
       },
     };
+
     if (event.dur < 0) {
-      console.assert(false, `Event pair creates negative duration: ${event.name}`);
+      // We have seen in the backend that sometimes animation events get
+      // generated with multiple begin entries, or multiple end entries, and this
+      // can cause invalid data on the performance panel, so we drop them.
+      // crbug.com/1472375
       continue;
     }
     animationsSyntheticEvents.push(event);
