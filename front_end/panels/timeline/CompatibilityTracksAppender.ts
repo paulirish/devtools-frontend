@@ -463,13 +463,13 @@ export class CompatibilityTracksAppender {
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      if (!this.entryIsVisibleInTimeline(event)) {
-        continue;
-      }
+      // SHOW ALL FFOR THE WIN.
+      // if (!this.entryIsVisibleInTimeline(event)) {
+      //   continue;
+      // }
 
       const level = getEventLevel(event, lastUsedTimeByLevel);
       this.appendEventAtLevel(event, trackStartLevel + level, appender);
-      lastUsedTimeByLevel[level] =  event.ts + (event.dur || 0); // endTime // I dont know what this is for..
     }
 
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
