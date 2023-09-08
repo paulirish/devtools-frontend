@@ -62,7 +62,7 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFrames.allEvts;
+    const uberFrameEvts = this.#traceParsedData.UberFrames.nonWaterfallEvts;
     // const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
 
     if (uberFrameEvts.length === 0) {

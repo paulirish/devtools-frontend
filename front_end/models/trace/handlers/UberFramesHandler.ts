@@ -27,7 +27,7 @@ const waterFallEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 // }
 
 export type UberFramesData = {
-  allEvts: readonly Types.TraceEvents.TraceEventData[],
+  nonWaterfallEvts: readonly Types.TraceEvents.TraceEventData[],
   waterFallEvts: readonly Types.TraceEvents.TraceEventData[],
 };
 
@@ -144,6 +144,11 @@ const someRelevantTraceEventTypes = [
   'EventTiming',
 
   // my loaf branch
+  'LongAnimationFrame-pi',
+  'LongAnimationFrame-pi2',
+  'LongAnimationFrame-no2',
+  // 'LongAnimationFrame-no',
+  // 'LongAnimationFrame-nopi',
   'LongAnimationFrame',
   'LoAF-renderStart',
   'LoAF-desiredRenderStart',
@@ -217,6 +222,9 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     if (event.ph === 'b' || event.ph === 'e') {
       asyncEvts.push(event);
     } else {
+      if (eventLatencyBreakdownTypeNames.includes(event.name)) {
+        waterFallEvents.push(event);
+      }
       relevantEvts.push(event);
     }
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
@@ -333,7 +341,7 @@ export function data(): UberFramesData {
     throw new Error('UberFrames handler is not finalized');
   }
   return {
-    allEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
+    nonWaterfallEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
     waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
   };
 }

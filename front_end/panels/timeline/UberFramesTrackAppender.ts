@@ -62,20 +62,16 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFrames.allEvts;
+    const uberNonWaterfallEvts = this.#traceParsedData.UberFrames.nonWaterfallEvts;
 
-    // dont include anything thats in the waterfall track
-    const uberFrameNonWaterFall = uberFrameEvts.filter(e => !eventLatencyBreakdownTypeNames.includes(e.name));
-    // const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
-
-    if (uberFrameNonWaterFall.length === 0) {
+    if (uberNonWaterfallEvts.length === 0) {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
 
     let newLevel;
     // Do all events now, (which also includes waterfall again)
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameNonWaterFall, trackStartLevel, this);
+    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberNonWaterfallEvts, trackStartLevel, this);
     // newLevel = this.#compatibilityBuilder.appendEventsAtLevel(uberFrameAsyncEvts, trackStartLevel, this);
     return newLevel; // this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
   }

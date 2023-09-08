@@ -1135,8 +1135,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.fillStyle = color;
     context.fill();
     // add stroke for my waterfall cuz they overlap often.
-    context.strokeStyle = 'hsl(0, 0%, 60%)';
-    context.stroke();
+    // context.strokeStyle = 'hsl(0, 0%, 60%)';
+    // context.stroke();
     context.restore();
   }
 
