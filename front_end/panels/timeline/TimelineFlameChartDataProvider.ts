@@ -468,14 +468,18 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           case 'LayoutShifts':
             return 3;
           case 'GPU':
-            return 0;
+            return 8;
           case 'Thread':
             return 4;
+          case 'UberFrames':
+            return 6;
+          case 'FramesWaterfall':
+            return 0;
           default:
             return -1;
         }
       }
-      if (track.name === 'Compositor') return 1;
+      if (track.name === 'Compositor') return 7;
 
       switch (track.type) {
         case TimelineModel.TimelineModel.TrackType.MainThread:
@@ -487,11 +491,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         case TimelineModel.TimelineModel.TrackType.Browser:
           return 11;
         case TimelineModel.TimelineModel.TrackType.ThreadPool:
-          return 1;
+          return 7;
         case TimelineModel.TimelineModel.TrackType.Other:
-          return 11;
+          return 10;
         default:
-          return 15;
+          return -1;
       }
     };
 

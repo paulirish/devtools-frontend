@@ -36,7 +36,7 @@ const eventLatencyBreakdownTypeNames = TraceEngine.Handlers.ModelHandlers.UberFr
  * Right whisker (to presentation):     Activation + EndActivateToSubmitCompositorFrame  SubmitCompositorFrameToPresentationCompositorFrame
  */
 export class FramesWaterfallTrackAppender implements TrackAppender {
-  readonly appenderName: TrackAppenderName = 'UberFrames';
+  readonly appenderName: TrackAppenderName = 'FramesWaterfall';
 
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;

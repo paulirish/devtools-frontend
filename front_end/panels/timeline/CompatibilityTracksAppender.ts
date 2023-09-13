@@ -80,7 +80,7 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames'] as const;
+export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames', 'FramesWaterfall'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
