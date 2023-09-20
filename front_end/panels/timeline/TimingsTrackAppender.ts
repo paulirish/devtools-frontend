@@ -53,22 +53,22 @@ export class TimingsTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const allMarkerEvents = this.#traceParsedData.PageLoadMetrics.allMarkerEvents;
+    const pageLoadMarkers = this.#traceParsedData.PageLoadMetrics.allMarkerEvents;
     const performanceMarks = this.#traceParsedData.UserTimings.performanceMarks;
     const performanceMeasures = this.#traceParsedData.UserTimings.performanceMeasures;
     const timestampEvents = this.#traceParsedData.UserTimings.timestampEvents;
     const consoleTimings = this.#traceParsedData.UserTimings.consoleTimings;
 
-    if (allMarkerEvents.length === 0 && performanceMarks.length === 0 && performanceMeasures.length === 0 &&
-        timestampEvents.length === 0 && consoleTimings.length === 0) {
+    const userTimingEvents = [
+      performanceMarks, performanceMeasures, timestampEvents, consoleTimings
+    ].flat().sort((a, b) => a.ts - b.ts);
+
+    if (pageLoadMarkers.length === 0 && userTimingEvents.length === 0) {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    let newLevel = this.#appendMarkersAtLevel(trackStartLevel);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMarks, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMeasures, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(timestampEvents, newLevel, this);
-    return this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+    const newLevel = pageLoadMarkers.length ? this.#appendMarkersAtLevel(trackStartLevel) : trackStartLevel;
+    return this.#compatibilityBuilder.appendEventsAtLevel(userTimingEvents, newLevel, this);
   }
 
   /**
