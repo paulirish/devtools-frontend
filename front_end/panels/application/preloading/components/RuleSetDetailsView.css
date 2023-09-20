@@ -5,12 +5,11 @@
  */
 
 .ruleset-header {
-  padding: 12px 24px;
+  padding: 4px 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   border-bottom: 1px solid var(--sys-color-divider);
-  grid-template-columns: min-content 1fr;
 }
 
 .ruleset-header devtools-icon {

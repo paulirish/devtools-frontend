@@ -36,9 +36,9 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TraceEngine from '../trace/trace.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as CPUProfile from '../cpu_profile/cpu_profile.js';
+import * as TraceEngine from '../trace/trace.js';
 
 import {TimelineJSProfileProcessor} from './TimelineJSProfile.js';
 
@@ -62,7 +62,7 @@ const UIStrings = {
    *@example {FormatterWorker} PH1
    *@example {https://google.com} PH2
    */
-  workerSS: '`Worker`: {PH1} — {PH2}',
+  workerSS: '`Worker`: {PH1} {PH2}',
 
   /**
    *@description Title of a bidder auction worklet with known URL in the timeline flame chart of the Performance panel
@@ -116,7 +116,6 @@ export class TimelineModelImpl {
   private tracksInternal!: Track[];
   private namedTracks!: Map<TrackType, Track>;
   private inspectedTargetEventsInternal!: TraceEngine.Legacy.Event[];
-  private timeMarkerEventsInternal!: TraceEngine.Legacy.Event[];
   private sessionId!: string|null;
   private mainFrameNodeId!: number|null;
   private pageFrames!: Map<Protocol.Page.FrameId, PageFrame>;
@@ -253,10 +252,6 @@ export class TimelineModelImpl {
     return Math.max(index, 0);
   }
 
-  mainFrameID(): string {
-    return this.mainFrame.frameId;
-  }
-
   /**
    * Determines if an event is potentially a marker event. A marker event here
    * is a single moment in time that we want to highlight on the timeline, such as
@@ -333,14 +328,6 @@ export class TimelineModelImpl {
     const workerId = this.workerIdByThread.get(thread);
     const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
     return workerId ? SDK.TargetManager.TargetManager.instance().targetById(workerId) : rootTarget;
-  }
-
-  navStartTimes(): Map<string, TraceEngine.Legacy.PayloadEvent> {
-    if (!this.tracingModelInternal) {
-      return new Map();
-    }
-
-    return this.tracingModelInternal.navStartTimes();
   }
 
   isFreshRecording(): boolean {
@@ -793,7 +780,6 @@ export class TimelineModelImpl {
       const jsFrameEvents = TimelineJSProfileProcessor.generateJSFrameEvents(events, {
         showAllEvents: Root.Runtime.experiments.isEnabled('timelineShowAllEvents'),
         showRuntimeCallStats: Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats'),
-        showNativeFunctions: Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get(),
       });
       if (jsFrameEvents && jsFrameEvents.length) {
         events = Platform.ArrayUtilities.mergeOrdered(
@@ -857,7 +843,7 @@ export class TimelineModelImpl {
       if (cpuProfileEvent) {
         const target = this.targetByEvent(cpuProfileEvent);
         if (target) {
-          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: track.url});
+          track.name = i18nString(UIStrings.workerSS, {PH1: target.name(), PH2: track.url.includes(target.name()) ? '' : track.url}); // Don't duplicate filename when there's no custom worker name
         }
       }
     }
@@ -888,9 +874,6 @@ export class TimelineModelImpl {
           track.tasks.push(event);
         }
         eventStack.push(event);
-      }
-      if (this.isMarkerEvent(event)) {
-        this.timeMarkerEventsInternal.push(event);
       }
 
       track.events.push(event);
@@ -1399,7 +1382,6 @@ export class TimelineModelImpl {
     this.tracksInternal = [];
     this.namedTracks = new Map();
     this.inspectedTargetEventsInternal = [];
-    this.timeMarkerEventsInternal = [];
     this.sessionId = null;
     this.mainFrameNodeId = null;
     this.cpuProfilesInternal = [];
@@ -1438,10 +1420,6 @@ export class TimelineModelImpl {
 
   isEmpty(): boolean {
     return this.minimumRecordTime() === 0 && this.maximumRecordTime() === 0;
-  }
-
-  timeMarkerEvents(): TraceEngine.Legacy.Event[] {
-    return this.timeMarkerEventsInternal;
   }
 
   rootFrames(): PageFrame[] {

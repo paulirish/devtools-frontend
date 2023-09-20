@@ -145,8 +145,8 @@ export class UserMetrics {
     this.#launchPanelName = (panelName as string);
   }
 
-  performanceTraceLoadEnd(measure: PerformanceMeasure): void {
-        InspectorFrontendHostInstance.recordPerformanceHistogram('DevTools.LoadTrace', measure.duration);
+  performanceTraceLoad(measure: PerformanceMeasure): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram('DevTools.TraceLoad', measure.duration);
   }
 
   keybindSetSettingChanged(keybindSet: string): void {
@@ -448,13 +448,6 @@ export class UserMetrics {
     InspectorFrontendHostInstance.recordPerformanceHistogram(
         'DevTools.Workspaces.PopulateWallClocktime', wallClockTimeInMilliseconds);
   }
-
-  workspacesNumberOfFiles(numberOfFilesLoaded: number, numberOfDirectoriesTraversed: number): void {
-    InspectorFrontendHostInstance.recordCountHistogram(
-        'DevTools.Workspaces.NumberOfFilesLoaded', numberOfFilesLoaded, 0, 100_000, 100);
-    InspectorFrontendHostInstance.recordCountHistogram(
-        'DevTools.Workspaces.NumberOfDirectoriesTraversed', numberOfDirectoriesTraversed, 0, 10_000, 100);
-  }
 }
 
 /**
@@ -547,11 +540,11 @@ export enum Action {
   BreakpointsInFileCheckboxToggled = 71,
   BreakpointsInFileEnabledDisabledFromContextMenu = 72,
   BreakpointConditionEditedFromSidebar = 73,
-  AddFileSystemToWorkspace = 74,
-  RemoveFileSystemFromWorkspace = 75,
-  AddFileSystemForOverrides = 76,
-  RemoveFileSystemForOverrides = 77,
-  FileSystemSourceSelected = 78,
+  WorkspaceTabAddFolder = 74,
+  WorkspaceTabRemoveFolder = 75,
+  OverrideTabAddFolder = 76,
+  OverrideTabRemoveFolder = 77,
+  WorkspaceSourceSelected = 78,
   OverridesSourceSelected = 79,
   StyleSheetInitiatorLinkClicked = 80,
   BreakpointRemovedFromGutterContextMenu = 81,
@@ -578,7 +571,13 @@ export enum Action {
   AnimatedNodeDescriptionClicked = 102,
   AnimationGroupScrubbed = 103,
   AnimationGroupReplayed = 104,
-  MaxValue = 105,
+  OverrideTabDeleteFolderContextMenu = 105,
+  OverrideTabDeleteOverridesContextMenu = 106,
+  WorkspaceDropFolder = 107,
+  WorkspaceSelectFolder = 108,
+  OverrideContentContextMenuSourceMappedWarning = 109,
+  OverrideContentContextMenuRedirectToDeployed = 110,
+  MaxValue = 111,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -924,9 +923,10 @@ export enum DevtoolsExperiments {
   'selfXssWarning' = 75,
   'useSourceMapScopes' = 76,
   'storageBucketsTree' = 77,
+  'deleteOverridesTemporarilyEnable' = 78,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 78,
+  'MaxValue' = 79,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

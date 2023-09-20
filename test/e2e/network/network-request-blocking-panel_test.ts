@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, expect} from 'chai';
-
+import {expect} from 'chai';
 import {type ElementHandle} from 'puppeteer-core';
 
-import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 import {
-  getBrowserAndPages,
   waitFor,
   waitForAria,
   waitForAriaNone,
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
+import {describe, it} from '../../shared/mocha-extensions.js';
+import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 
 async function navigateToNetworkRequestBlockingTab() {
   await openPanelViaMoreTools('Network request blocking');
@@ -73,18 +72,10 @@ describe('Network request blocking panel', async () => {
     await disableNetworkRequestBlocking();
 
     const list = await waitFor('.list');
-    const listBB = await list.boundingBox();
-    if (listBB) {
-      const {frontend} = getBrowserAndPages();
-      // +20 to move from the top left point so we are definitely scrolling
-      // within the container
-      await frontend.mouse.move(listBB.x + 20, listBB.y + 20);
-      await frontend.mouse.wheel({deltaY: 450});
-    } else {
-      assert.fail('Could not obtain a bounding box for the pattern list.');
-    }
-
     const lastListItem = await waitForElementWithTextContent('19');
+    // TODO: this is not completely fair way to scroll but mouseWheel does not
+    // seem to work here in the new-headless on Windows and Linux.
+    await lastListItem.scrollIntoView();
     await waitForFunction(() => isVisible(lastListItem, list));
   });
 });

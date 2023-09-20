@@ -75,7 +75,7 @@ export class RuleSetDetailsView extends LegacyWrapper.LegacyWrapper.WrappableCom
       <div class="ruleset-header">
         <${IconButton.Icon.Icon.litTagName}
           .data=${{
-            iconName: 'cross-circle-filled',
+            iconName: 'cross-circle',
             color: 'var(--icon-error)',
             width: '16px',
             height: '16px',
@@ -93,6 +93,7 @@ export class RuleSetDetailsView extends LegacyWrapper.LegacyWrapper.WrappableCom
       extensions: [
         TextEditor.Config.baseConfiguration(this.#data?.sourceText || ''),
         CodeMirror.lineNumbers(),
+        CodeMirror.EditorState.readOnly.of(true),
         codeMirrorJsonType as CodeMirror.Extension,
         CodeMirror.syntaxHighlighting(CodeHighlighter.CodeHighlighter.highlightStyle),
       ],

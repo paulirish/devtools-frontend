@@ -1686,7 +1686,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       classes.push('close');
     }
     const tagElement = parentElement.createChild('span', classes.join(' '));
-    UI.UIUtils.createTextChild(tagElement, '<');
+    UI.UIUtils.createTextChild(tagElement, '');
     const tagNameElement =
         tagElement.createChild('span', isClosingTag ? 'webkit-html-close-tag-name' : 'webkit-html-tag-name');
     tagNameElement.textContent = (isClosingTag ? '/' : '') + tagName;
@@ -1698,6 +1698,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           UI.UIUtils.createTextChild(tagElement, ' ');
           this.buildAttributeDOM(tagElement, attr.name, attr.value, updateRecord, false, node);
         }
+        UI.UIUtils.createTextChild(tagElement, ' ');
       }
       if (updateRecord) {
         let hasUpdates: boolean = updateRecord.hasRemovedAttributes() || updateRecord.hasRemovedChildren();
@@ -1708,8 +1709,10 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       }
     }
 
-    UI.UIUtils.createTextChild(tagElement, '>');
-    UI.UIUtils.createTextChild(parentElement, '\u200B');
+    // UI.UIUtils.createTextChild(tagElement, '>');
+    // UI.UIUtils.createTextChild(parentElement, '\u200B');
+    if (!node.hasAttributes())
+      {UI.UIUtils.createTextChild(tagElement, ' ');}
     if (tagElement.textContent) {
       UI.ARIAUtils.setLabel(tagElement, tagElement.textContent);
     }
@@ -1788,7 +1791,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
             titleDOM.appendChild(hidden);
 
             UI.UIUtils.createTextChild(titleDOM, '\u200B');
-            this.buildTagDOM(titleDOM, tagName, true, false, updateRecord);
+            // dont neeed closing tags when non-expanded
+            // this.buildTagDOM(titleDOM, tagName, true, false, updateRecord);
           }
           break;
         }
@@ -1851,7 +1855,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
 
       case Node.DOCUMENT_TYPE_NODE: {
         const docTypeElement = titleDOM.createChild('span', 'webkit-html-doctype');
-        UI.UIUtils.createTextChild(docTypeElement, '<!DOCTYPE ' + node.nodeName());
+        UI.UIUtils.createTextChild(docTypeElement, '<!doctype ' + node.nodeName());
         if (node.publicId) {
           UI.UIUtils.createTextChild(docTypeElement, ' PUBLIC "' + node.publicId + '"');
           if (node.systemId) {

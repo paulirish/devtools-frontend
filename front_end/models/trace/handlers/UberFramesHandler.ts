@@ -27,7 +27,7 @@ const waterFallEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 // }
 
 export type UberFramesData = {
-  allEvts: readonly Types.TraceEvents.TraceEventData[],
+  nonWaterfallEvts: readonly Types.TraceEvents.TraceEventData[],
   waterFallEvts: readonly Types.TraceEvents.TraceEventData[],
 };
 
@@ -72,9 +72,12 @@ const someRelevantTraceEventTypes = [
   'TileManager::FlushAndIssueSignals',
   'ProxyImpl::ScheduledActionDraw',
 
-  // LONG ones
-  // 'PipelineReporter',
-  // 'SendBeginMainFrameToCommit',
+  // LONG ones and ones i typically comment out
+  'PipelineReporter',
+  'SendBeginMainFrameToCommit',
+  'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
+  'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase in eventlatency
+  'Graphics.Pipeline',
 
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
   'Frame',
@@ -88,7 +91,6 @@ const someRelevantTraceEventTypes = [
   'ActivateLayerTree',
   'DrawFrame',
 
-  // 'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
   'EndCommitToActivation',
   'Swap',
   'SwapBuffers', // the gpu one
@@ -96,7 +98,6 @@ const someRelevantTraceEventTypes = [
   'DisplayScheduler::BeginFrame',
   'Scheduler::BeginImplFrame',
 
-  // 'Graphics.Pipeline',
 
   'EventLatency', // mocny said these are complicated. but.. they're also great.
   // https://docs.google.com/spreadsheets/d/1F6BPrtIMgDD4eKH-VxEqzZy8dOeh3U2EZaYjVlIv-Hk/edit?resourcekey=0-UtBlkaCsd0Oi1Z3bQqHqow#gid=557410449
@@ -143,6 +144,11 @@ const someRelevantTraceEventTypes = [
   'EventTiming',
 
   // my loaf branch
+  'LongAnimationFrame-pi',
+  'LongAnimationFrame-pi2',
+  'LongAnimationFrame-no2',
+  // 'LongAnimationFrame-no',
+  // 'LongAnimationFrame-nopi',
   'LongAnimationFrame',
   'LoAF-renderStart',
   'LoAF-desiredRenderStart',
@@ -216,6 +222,9 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     if (event.ph === 'b' || event.ph === 'e') {
       asyncEvts.push(event);
     } else {
+      if (eventLatencyBreakdownTypeNames.includes(event.name)) {
+        waterFallEvents.push(event);
+      }
       relevantEvts.push(event);
     }
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
@@ -233,7 +242,7 @@ export async function finalize(): Promise<void> {
   // TODO: somehow exclude PipelineReporter events that are perfectly nested. (end ts's are often identical in these cases.)
 
   const {gpuProcessId, gpuThreadId, topLevelRendererIds} = metaHandlerData();
-  // This cuts down GPU Task count .. 33% of what it was.
+  // This cuts down GPU Task count .. 33% of what ift was.
   const ourRendererGPUTasks = gpuEvents.filter(e => topLevelRendererIds.has(e.args.data.renderer_pid));
   relevantEvts = [... relevantEvts, ... ourRendererGPUTasks];
 
@@ -313,7 +322,9 @@ export async function finalize(): Promise<void> {
   }
   // drop pipelinereporter that werent presented. or browser process.
   // TODO: do this earlier? iunno
+  // EDIT: disabled filtering since ubeframes is a mess anyway.
   syntheticEvents = syntheticEvents.filter(e => {
+    return true;
     if (e.name !== 'PipelineReporter') {return true;}
     return topLevelRendererIds.has(e.pid) &&
       e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
@@ -330,7 +341,7 @@ export function data(): UberFramesData {
     throw new Error('UberFrames handler is not finalized');
   }
   return {
-    allEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
+    nonWaterfallEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
     waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
   };
 }

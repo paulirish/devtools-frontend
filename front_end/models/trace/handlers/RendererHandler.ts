@@ -4,12 +4,11 @@
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
+import * as Types from '../types/types.js';
 
 import {data as metaHandlerData, type FrameProcessData} from './MetaHandler.js';
 import {data as samplesHandlerData} from './SamplesHandler.js';
-
-import {KNOWN_EVENTS, type TraceEventHandlerName, HandlerState} from './types.js';
-import * as Types from '../types/types.js';
+import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 /**
  * This handler builds the hierarchy of trace events and profile calls
@@ -39,6 +38,7 @@ const makeRendererEntrytNodeId = (): RendererEntryNodeId => (++nodeIdCount) as R
 const completeEventStack: (Types.TraceEvents.TraceEventSyntheticCompleteEvent)[] = [];
 
 let handlerState = HandlerState.UNINITIALIZED;
+let config: Types.Configuration.Configuration = Types.Configuration.DEFAULT;
 
 const makeRendererProcess = (): RendererProcess => ({
   url: null,
@@ -74,6 +74,10 @@ const getOrCreateRendererProcess =
 const getOrCreateRendererThread = (process: RendererProcess, tid: Types.TraceEvents.ThreadID): RendererThread => {
   return Platform.MapUtilities.getWithDefault(process.threads, tid, makeRendererThread);
 };
+
+export function handleUserConfig(userConfig: Types.Configuration.Configuration): void {
+  config = userConfig;
+}
 
 export function reset(): void {
   processes.clear();
@@ -133,7 +137,7 @@ export async function finalize(): Promise<void> {
   const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metaHandlerData();
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);
-  buildHierarchy(processes, {filter: KNOWN_EVENTS});
+  buildHierarchy(processes);
   sanitizeThreads(processes);
 
   handlerState = HandlerState.FINALIZED;
@@ -315,7 +319,7 @@ export function sanitizeThreads(processes: Map<Types.TraceEvents.ProcessID, Rend
  */
 export function buildHierarchy(
     processes: Map<Types.TraceEvents.ProcessID, RendererProcess>,
-    options: {filter: {has: (name: Types.TraceEvents.KnownEventName) => boolean}}): void {
+    options?: {filter: {has: (name: Types.TraceEvents.KnownEventName) => boolean}}): void {
   for (const [pid, process] of processes) {
     for (const [tid, thread] of process.threads) {
       if (!thread.entries.length) {
@@ -326,7 +330,8 @@ export function buildHierarchy(
       Helpers.Trace.sortTraceEventsInPlace(thread.entries);
       // Step 2. Inject profile calls from samples
       const cpuProfile = samplesHandlerData().profilesInProcess.get(pid)?.get(tid)?.parsedProfile;
-      const samplesIntegrator = cpuProfile && new Helpers.SamplesIntegrator.SamplesIntegrator(cpuProfile, pid, tid);
+      const samplesIntegrator =
+          cpuProfile && new Helpers.SamplesIntegrator.SamplesIntegrator(cpuProfile, pid, tid, config);
       const profileCalls = samplesIntegrator?.buildProfileCalls(thread.entries);
       if (profileCalls) {
         thread.entries = Helpers.Trace.mergeEventsInOrder(thread.entries, profileCalls);
@@ -355,7 +360,7 @@ export function buildHierarchy(
  */
 export function treify(
     entries: RendererEntry[],
-    options: {filter: {has: (name: Types.TraceEvents.KnownEventName) => boolean}}): RendererTree {
+    options?: {filter: {has: (name: Types.TraceEvents.KnownEventName) => boolean}}): RendererTree {
   const stack = [];
   // Reset the node id counter for every new renderer.
   nodeIdCount = -1;
@@ -364,7 +369,7 @@ export function treify(
     const event = entries[i];
     // If the current event should not be part of the tree, then simply proceed
     // with the next event.
-    if (!options.filter.has(event.name as Types.TraceEvents.KnownEventName)) {
+    if (options && !options.filter.has(event.name as Types.TraceEvents.KnownEventName)) {
       continue;
     }
 
