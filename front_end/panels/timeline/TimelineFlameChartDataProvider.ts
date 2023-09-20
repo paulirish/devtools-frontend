@@ -489,6 +489,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             return 6;
           case 'FramesWaterfall':
             return 0;
+          case 'NewFrames':
+            return 0;
           default:
             return -1;
         }

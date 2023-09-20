@@ -36,6 +36,7 @@ import * as TimelineUIUtils from './TimelineUIUtils.js';
 import * as TimingsTrackAppender from './TimingsTrackAppender.js';
 import * as UberFramesTrackAppender from './UberFramesTrackAppender.js';
 import * as FramesWaterfallTrackAppender from './FramesWaterfallTrackAppender.js';
+import * as NewFramesTrackAppender from './NewFramesTrackAppender.js';
 import * as UIDevtoolsController from './UIDevtoolsController.js';
 import * as UIDevtoolsUtils from './UIDevtoolsUtils.js';
 
@@ -73,6 +74,7 @@ export {
   TimelineUIUtils,
   TimingsTrackAppender,
   UberFramesTrackAppender,
+  NewFramesTrackAppender,
   FramesWaterfallTrackAppender,
   UIDevtoolsController,
   UIDevtoolsUtils,

@@ -16,6 +16,7 @@ import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
 import {UberFramesTrackAppender} from './UberFramesTrackAppender.js';
 import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
+import {NewFramesTrackAppender} from './NewFramesTrackAppender.js';
 import {ThreadAppender, ThreadType} from './ThreadAppender.js';
 import {
   EntryType,
@@ -80,7 +81,7 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames', 'FramesWaterfall'] as const;
+export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames', 'FramesWaterfall','NewFrames'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -108,6 +109,7 @@ export class CompatibilityTracksAppender {
   #timingsTrackAppender: TimingsTrackAppender;
   #uberFramesTrackAppender: UberFramesTrackAppender;
   #framesWaterfallTrackAppender: FramesWaterfallTrackAppender;
+  #newFramesTrackAppender: NewFramesTrackAppender;
   #animationsTrackAppender: AnimationsTrackAppender;
   #interactionsTrackAppender: InteractionsTrackAppender;
   #gpuTrackAppender: GPUTrackAppender;
@@ -154,6 +156,11 @@ export class CompatibilityTracksAppender {
     this.#framesWaterfallTrackAppender =
         new FramesWaterfallTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#framesWaterfallTrackAppender);
+
+
+    this.#newFramesTrackAppender =
+        new NewFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
+    this.#allTrackAppenders.push(this.#newFramesTrackAppender);
 
     this.#uberFramesTrackAppender =
         new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
@@ -241,6 +248,10 @@ export class CompatibilityTracksAppender {
 
   framesWaterfallTrackAppender(): FramesWaterfallTrackAppender {
     return this.#framesWaterfallTrackAppender;
+  }
+
+  newFramesTrackAppender(): NewFramesTrackAppender {
+    return this.#newFramesTrackAppender;
   }
 
   uberFramesTrackAppender(): UberFramesTrackAppender {
