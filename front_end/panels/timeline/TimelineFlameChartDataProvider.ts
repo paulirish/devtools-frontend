@@ -40,16 +40,13 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
-
-import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
-
 import {type PerformanceModel} from './PerformanceModel.js';
-
+import {ThreadAppender, ThreadType} from './ThreadAppender.js';
+import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
-
+import {ThreadTracksSource} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
-
-import {TimelineUIUtils, type TimelineCategory} from './TimelineUIUtils.js';
+import {type TimelineCategory, TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -179,8 +176,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   #eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
   #indexForEvent = new WeakMap<TraceEngine.Legacy.Event, number>();
   #font: string;
+  #threadTracksSource: ThreadTracksSource;
 
-  constructor() {
+  constructor(threadTracksSource: ThreadTracksSource = ThreadTracksSource.BOTH_ENGINES) {
     super();
     this.reset();
     this.#font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
@@ -195,6 +193,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.traceEngineData = null;
     this.minimumBoundaryInternal = 0;
     this.timeSpan = 0;
+    this.#threadTracksSource = threadTracksSource;
 
     this.headerLevel1 = this.buildGroupStyle({shareHeaderLine: false});
     this.headerLevel2 = this.buildGroupStyle({padding: 2, nestingLevel: 1, collapsible: false});
@@ -299,13 +298,18 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   /**
    * Builds the flame chart data using the track appenders
    */
-  buildFromTrackAppenders(expandedTracks?: Set<TrackAppenderName>): void {
+  buildFromTrackAppenders(options?: {filterThreadsByName?: string, expandedTracks?: Set<TrackAppenderName>}): void {
     if (!this.compatibilityTracksAppender) {
       return;
     }
     const appenders = this.compatibilityTracksAppender.allVisibleTrackAppenders();
     for (const appender of appenders) {
-      const expanded = expandedTracks?.has(appender.appenderName);
+      const skipThreadAppenderByName =
+          appender instanceof ThreadAppender && !appender.trackName().includes(options?.filterThreadsByName || '');
+      if (skipThreadAppenderByName) {
+        continue;
+      }
+      const expanded = Boolean(options?.expandedTracks?.has(appender.appenderName));
       this.currentLevel = appender.appendTrackAtLevel(this.currentLevel, expanded);
     }
   }
@@ -359,8 +363,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
 
   textColor(index: number): string {
     const event = this.entryData[index];
-    return event && this.#eventToDisallowRoot.get((event as TraceEngine.Legacy.Event)) ? '#888' :
-                                                                                         FlameChartStyle.textColor;
+    if (!TimelineFlameChartDataProvider.isEntryRegularEvent(event)) {
+      return FlameChartStyle.textColor;
+    }
+    return this.isIgnoreListedEvent(event) ? '#888' : FlameChartStyle.textColor;
   }
 
   entryFont(_index: number): string|null {
@@ -452,6 +458,14 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     }
   }
+  private legacyTrackIsForAuctionWorklet(legacyTrack: TimelineModel.TimelineModel.Track): boolean {
+    const threadName = legacyTrack.thread?.name();
+    if (!threadName) {
+      return false;
+    }
+    return threadName === TimelineModel.TimelineModel.TimelineModelImpl.AuctionWorkletThreadName ||
+        threadName.endsWith(TimelineModel.TimelineModel.TimelineModelImpl.UtilityMainThreadNameSuffix);
+  }
 
   private processInspectorTrace(): void {
     this.appendFrames();
@@ -502,11 +516,30 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (!this.legacyTimelineModel) {
       return;
     }
-    const trackAppenders =
+    const allTrackAppenders =
         this.compatibilityTracksAppender ? this.compatibilityTracksAppender.allVisibleTrackAppenders() : [];
+
+    // TODO(crbug.com/1478710) Use auction workers data from the new engine
+    // in thread appenders. We have not migrated auction worklet tracks to the
+    // new engine, so we need to always make sure they are included, regardless
+    // of the threadTracksSource setting.
+    const fledgeTracks = this.legacyTimelineModel.tracks().filter(this.legacyTrackIsForAuctionWorklet);
+    const legacyTracks =
+        this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE ? fledgeTracks : this.legacyTimelineModel.tracks();
+
+    const newTracks = allTrackAppenders.filter(trackAppender => {
+      if (trackAppender instanceof ThreadAppender) {
+        // We only include the ThreadAppender tracks if the source has been set to either NEW_ENGINE or BOTH_ENGINES.
+        // If the source is set to OLD_ENGINE, we explictly do not want these tracks to be rendered.
+        return this.#threadTracksSource !== ThreadTracksSource.OLD_ENGINE;
+      }
+      // All other TrackAppenders are fully released and migrated, so we always include them.
+      return true;
+    });
+
     // Due to tracks having a predefined order, we cannot render legacy
     // and new tracks separately.
-    const tracksAndAppenders = [...this.legacyTimelineModel.tracks(), ...trackAppenders].slice();
+    const tracksAndAppenders = [...legacyTracks, ...newTracks].slice();
     tracksAndAppenders.sort((a, b) => weight(a) - weight(b));
 
     // TODO(crbug.com/1386091) Remove interim state to use only new track
@@ -522,6 +555,19 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         continue;
       }
       this.currentLevel = trackOrAppender.appendTrackAtLevel(this.currentLevel);
+
+      // If there is not a selected group, we want to default to selecting the
+      // main thread track. Therefore in this check we look to see if the
+      // current appender is a ThreadAppender and represnets the Main Thread.
+      // If it is, we mark the group as selected.
+      if (this.timelineDataInternal && !this.timelineDataInternal.selectedGroup) {
+        if (trackOrAppender instanceof ThreadAppender && trackOrAppender.threadType === ThreadType.MAIN_THREAD) {
+          const group = this.compatibilityTracksAppender?.groupForAppender(trackOrAppender);
+          if (group) {
+            this.timelineDataInternal.selectedGroup = group;
+          }
+        }
+      }
     }
     if (this.timelineDataInternal && this.timelineDataInternal.selectedGroup) {
       this.timelineDataInternal.selectedGroup.expanded = true;
@@ -617,8 +663,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
    * Narrows an entry of type TimelineFlameChartEntry to the 2 types of
    * simple trace events (legacy and new engine definitions).
    */
-  isEntryRegularEvent(entry: TimelineFlameChartEntry): entry is(TraceEngine.Types.TraceEvents.TraceEventData|
-                                                                TraceEngine.Legacy.Event) {
+  static isEntryRegularEvent(entry: TimelineFlameChartEntry):
+      entry is(TraceEngine.Types.TraceEvents.TraceEventData|TraceEngine.Legacy.Event) {
     return 'name' in entry;
   }
 
@@ -627,7 +673,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.timelineData();
     for (let i = 0; i < this.entryData.length; ++i) {
       const entry = this.entryData[i];
-      if (!this.isEntryRegularEvent(entry)) {
+      if (!TimelineFlameChartDataProvider.isEntryRegularEvent(entry)) {
         continue;
       }
       let event: TraceEngine.Legacy.Event|null;
@@ -662,7 +708,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     result.sort((a, b) => {
       let firstEvent: TimelineFlameChartEntry|null = this.entryData[a];
       let secondEvent: TimelineFlameChartEntry|null = this.entryData[b];
-      if (!this.isEntryRegularEvent(firstEvent) || !this.isEntryRegularEvent(secondEvent)) {
+      if (!TimelineFlameChartDataProvider.isEntryRegularEvent(firstEvent) ||
+          !TimelineFlameChartDataProvider.isEntryRegularEvent(secondEvent)) {
         return 0;
       }
       firstEvent = firstEvent instanceof TraceEngine.Legacy.Event ?
@@ -782,7 +829,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return group;
   }
 
-  isIgnoreListedEvent(event: TraceEngine.Legacy.Event): boolean {
+  isIgnoreListedEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): boolean {
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event) && TraceEngine.Types.TraceEvents.isProfileCall(event)) {
+      return this.isIgnoreListedURL(event.callFrame.url as Platform.DevToolsPath.UrlString);
+    }
     if (!TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       return false;
     }
@@ -1028,7 +1078,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     function patchColorAndCache<KEY>(cache: Map<KEY, string>, key: KEY, lookupColor: (arg0: KEY) => string): string {
       let color = cache.get(key);
       if (color) {
-        return parseColor(color);
+        return color;
       }
       const parsedColor = lookupColor(key);
       if (!parsedColor) {
@@ -1036,21 +1086,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
       color = parsedColor;
       cache.set(key, color);
-      return parseColor(color);
-    }
-
-    function parseColor(color: string): string {
-      // The color is either a css variable var(--app-color-scripting) or a hls color
-      // So if the first character of the color is v, it is a CSS variable.
-      const isColorCSSVariable = color[0] === 'v';
-      if (isColorCSSVariable) {
-        // The color is of this format var(--app-color-scripting) for instance
-        // However the getComputedValue method only accepts --app-color-scripting.
-        // To extract it, we split by "(", get the second value and pop the last ")" from it.
-        color = color.split('(')[1].slice(0, -1);
-        return ThemeSupport.ThemeSupport.instance().getComputedValue(color);
-      }
-      return color;
+      return (color);
     }
 
     if (!this.legacyPerformanceModel || !this.legacyTimelineModel) {
@@ -1062,16 +1098,16 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (entryType === entryTypes.Event) {
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
       if (this.legacyTimelineModel.isGenericTrace()) {
-        return parseColor(this.genericTraceEventColor(event));
+        return this.genericTraceEventColor(event);
       }
       if (this.legacyPerformanceModel.timelineModel().isMarkerEvent(event)) {
-        return parseColor(TimelineUIUtils.markerStyleForEvent(event).color);
+        return TimelineUIUtils.markerStyleForEvent(event).color;
       }
       if (!TraceEngine.Types.TraceEvents.isAsyncPhase(event.phase) && this.colorForEvent) {
-        return parseColor(this.colorForEvent(event));
+        return this.colorForEvent(event);
       }
       const category = TimelineUIUtils.eventStyle(event).category;
-      return patchColorAndCache(this.asyncColorByCategory, category, () => category.color);
+      return patchColorAndCache(this.asyncColorByCategory, category, () => category.getComputedValue(category.color));
     }
     if (entryType === entryTypes.Frame) {
       return 'white';
@@ -1080,7 +1116,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
       const eventLevel = timelineData.entryLevels[entryIndex];
       const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
-      return parseColor(this.compatibilityTracksAppender?.colorForEvent(event, eventLevel) || '');
+      return this.compatibilityTracksAppender?.colorForEvent(event, eventLevel) || '';
     }
     return '';
   }
@@ -1286,7 +1322,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const entryType = this.entryType(entryIndex);
     let timelineSelection: TimelineSelection|null = null;
     const entry = this.entryData[entryIndex];
-    if (entry && this.isEntryRegularEvent(entry)) {
+    if (entry && TimelineFlameChartDataProvider.isEntryRegularEvent(entry)) {
 
       // adding this here for debug logging
       let initiator = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(entry).initiator();

@@ -17,7 +17,8 @@ import {getCurrentUrl} from '../helpers/layers-helpers.js';
 import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 
 describe('The Layers Panel', async () => {
-  it('should keep the currently inspected url as an attribute', async () => {
+  // See crbug.com/1261763 for details.
+  it.skip('[crbug.com/1261763] should keep the currently inspected url as an attribute', async () => {
     const {target, frontend} = getBrowserAndPages();
 
     const targetUrl = 'layers/default.html';
@@ -61,7 +62,9 @@ describe('The Layers Panel', async () => {
     await raf(target);
     await frontend.bringToFront();
     await waitFor(`[aria-label="layers"]:not([test-current-url="${targetUrl}"])`);
-    assert.strictEqual(await getCurrentUrl(), 'chrome-error://chromewebdata/');
+    await waitForFunction(async () => {
+      return (await getCurrentUrl()) === 'chrome-error://chromewebdata/';
+    });
     await session.detach();
   });
 });

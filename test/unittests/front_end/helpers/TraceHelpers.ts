@@ -32,11 +32,13 @@ export class MockFlameChartDelegate implements PerfUI.FlameChart.FlameChartDeleg
  * flame chart.
  * @param trackAppenderNames A Set with the names of the tracks to be
  * rendered. For example, Set("Timings").
+ * @param expanded whether the track should be expanded
+ * @param trackName optional param to filter tracks by their name.
  * @returns a flame chart element and its corresponding data provider.
  */
 export async function getMainFlameChartWithTracks(
     traceFileName: string, trackAppenderNames: Set<Timeline.CompatibilityTracksAppender.TrackAppenderName>,
-    expanded: boolean): Promise<{
+    expanded: boolean, trackName?: string): Promise<{
   flameChart: PerfUI.FlameChart.FlameChart,
   dataProvider: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider,
 }> {
@@ -51,7 +53,8 @@ export async function getMainFlameChartWithTracks(
   dataProvider.setModel(performanceModel, traceParsedData);
   const tracksAppender = dataProvider.compatibilityTracksAppenderInstance();
   tracksAppender.setVisibleTracks(trackAppenderNames);
-  dataProvider.buildFromTrackAppenders(/* expandedTracks?= */ expanded ? trackAppenderNames : undefined);
+  dataProvider.buildFromTrackAppenders(
+      {filterThreadsByName: trackName, expandedTracks: expanded ? trackAppenderNames : undefined});
   const delegate = new MockFlameChartDelegate();
   const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
   const minTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
@@ -206,12 +209,12 @@ export function getTree(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Rend
 export function getRootAt(thread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread, index: number):
     TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode {
   const tree = getTree(thread);
-  const nodeId = [...tree.roots][index];
-  if (nodeId === undefined) {
+  const node = [...tree.roots][index];
+  if (node === undefined) {
     assert(false, `Couldn't get the id of the root at index ${index} in thread ${thread.name}`);
     return null as never;
   }
-  return getNodeFor(thread, nodeId);
+  return node;
 }
 
 /**
@@ -232,15 +235,11 @@ export function getNodeFor(
 }
 
 /**
- * Gets all the `events` for the `nodes` with `ids`.
+ * Gets all the `events` for the `nodes`.
  */
-export function getEventsIn(
-    ids: IterableIterator<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId>,
-    nodes:
-        Map<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId,
-            TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode>):
+export function getEventsIn(nodes: IterableIterator<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode>):
     TraceEngine.Types.TraceEvents.TraceEventData[] {
-  return [...ids].map(id => nodes.get(id)).flatMap(node => node ? node.entry : []);
+  return [...nodes].flatMap(node => node ? node.entry : []);
 }
 /**
  * Pretty-prints a tree.
@@ -249,20 +248,12 @@ export function prettyPrint(
     tree: TraceEngine.Handlers.ModelHandlers.Renderer.RendererTree,
     predicate: (
         node: TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode,
-        event: TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntry) => boolean = () => true,
+        event: TraceEngine.Types.TraceEvents.RendererEntry) => boolean = () => true,
     indentation: number = 2, delimiter: string = ' ', prefix: string = '-', newline: string = '\n',
     out: string = ''): string {
   let skipped = false;
   return printNodes(tree.roots);
-  function printNodes(nodeIds: Set<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId>): string {
-    const nodes = [];
-    for (const nodeId of nodeIds) {
-      const child = tree.nodes.get(nodeId);
-      if (!child) {
-        continue;
-      }
-      nodes.push(child);
-    }
+  function printNodes(nodes: Set<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode>): string {
     for (const node of nodes) {
       const event = node.entry;
       if (!predicate(node, event)) {
@@ -280,15 +271,7 @@ export function prettyPrint(
       const duration = `[${(event.dur || 0) / 1000}ms]`;
       const info = [jsFunctionName, eventType, duration].filter(Boolean);
       out += `${newline}${spacing}${prefix}${event.name} ${info.join(' ')}`;
-      const children = [];
-      for (const childId of node.childrenIds) {
-        const child = tree.nodes.get(childId);
-        if (!child) {
-          continue;
-        }
-        children.push(child);
-      }
-      out = printNodes(node.childrenIds);
+      out = printNodes(node.children);
     }
     return out;
   }
@@ -474,12 +457,50 @@ export function makeFakeEventPayload(payload: FakeEventPayload): TraceEngine.Tra
  * function will create a fake SDK Event with a stubbed thread that tries to
  * mimic the real thing. It is not designed to be used to emulate entire traces,
  * but more to create single events that can be used in unit tests.
- **/
+ */
 export function makeFakeSDKEventFromPayload(payloadOptions: FakeEventPayload): TraceEngine.Legacy.PayloadEvent {
   const payload = makeFakeEventPayload(payloadOptions);
   const thread = StubbedThread.make(payload.tid);
   const event = TraceEngine.Legacy.PayloadEvent.fromPayload(payload, thread);
   return event;
+}
+
+/**
+ * Mocks an object compatible with the return type of the
+ * RendererHandler using only an array of ordered entries.
+ */
+export function makeMockRendererHandlerData(entries: TraceEngine.Types.TraceEvents.RendererEntry[]):
+    TraceEngine.Handlers.ModelHandlers.Renderer.RendererHandlerData {
+  const tree = TraceEngine.Handlers.ModelHandlers.Renderer.treify(entries, {filter: {has: () => true}});
+  const entryToNode = new Map();
+  for (const node of tree.nodes.values()) {
+    entryToNode.set(node.entry, node);
+  }
+  const mockThread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread = {
+    tree,
+    name: 'thread',
+    entries,
+  };
+
+  const mockProcess: TraceEngine.Handlers.ModelHandlers.Renderer.RendererProcess = {
+    url: 'url',
+    isOnMainFrame: true,
+    threads: new Map([[1 as TraceEngine.Types.TraceEvents.ThreadID, mockThread]]),
+  };
+
+  const renderereEvents: TraceEngine.Types.TraceEvents.TraceEventRendererEvent[] = [];
+  for (const entry of entries) {
+    if (TraceEngine.Types.TraceEvents.isTraceEventRendererEvent(entry)) {
+      renderereEvents.push(entry);
+    }
+  }
+
+  return {
+    processes: new Map([[1 as TraceEngine.Types.TraceEvents.ProcessID, mockProcess]]),
+    compositorTileWorkers: new Map(),
+    entryToNode,
+    allRendererEvents: renderereEvents,
+  };
 }
 
 export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataProvider {

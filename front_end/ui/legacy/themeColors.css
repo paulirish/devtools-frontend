@@ -267,9 +267,11 @@
 
   /* Outlines */
 
-  --sys-color-color-outline: var(--ref-palette-neutral-variant50);
+  --sys-color-outline: var(--ref-palette-neutral-variant50);
   --sys-color-tonal-outline: var(--ref-palette-primary80);
   --sys-color-neutral-outline: var(--ref-palette-neutral80);
+  --sys-color-yellow-outline: var(--ref-palette-yellow70);
+  --sys-color-error-outline: var(--ref-palette-error80);
   --sys-color-divider: var(--ref-palette-primary90);
 
   /* States */
@@ -304,8 +306,8 @@
   --sys-color-blue-bright: var(--ref-palette-blue50);
   --sys-color-green-bright: var(--ref-palette-green50);
   --sys-color-error-bright: var(--ref-palette-error50);
-  --sys-color-orange-bright: var(--ref-palette-orange65);
-  --sys-color-yellow-bright: var(--ref-palette-yellow55);
+  --sys-color-orange-bright: var(--ref-palette-orange60);
+  --sys-color-yellow-bright: var(--ref-palette-yellow60);
   --sys-color-cyan-bright: var(--ref-palette-cyan50);
   --sys-color-purple-bright: var(--ref-palette-purple50);
   --sys-color-neutral-bright: var(--ref-palette-neutral70);
@@ -337,7 +339,7 @@
 
   /* Tinted surfaces */
 
-  --sys-color-surface-yellow: rgb(254 243 220 / 100%);
+  --sys-color-surface-yellow: rgb(254 246 213 / 100%);
   --sys-color-surface-error: rgb(252 235 235 / 100%);
 
   /* Corresponding on colors */
@@ -375,8 +377,8 @@
 
   /* Colors for data grid in Performance Panel */
 
-  --app-color-selected: var(--ref-palette-primary80);
-  --app-border-selected: var(--ref-palette-primary70);
+  --app-color-selected-progress-bar: var(--ref-palette-primary80);
+  --app-border-selected-progress-bar: var(--ref-palette-primary70);
 
   /* Colors for timeline in Performance Panel */
 
@@ -620,8 +622,10 @@
   /* Outlines */
 
   --sys-color-outline: var(--ref-palette-neutral-variant60);
-  --sys-color-tonal-outline: var(--ref-palette-secondary40);
-  --sys-color-neutral-outline: var(--ref-palette-neutral40);
+  --sys-color-tonal-outline: var(--ref-palette-secondary50);
+  --sys-color-neutral-outline: var(--ref-palette-neutral50);
+  --sys-color-yellow-outline: var(--ref-palette-yellow40);
+  --sys-color-error-outline: var(--ref-palette-error80);
   --sys-color-divider: var(--ref-palette-neutral30);
 
   /* States */
@@ -689,7 +693,7 @@
 
   /* Tinted surfaces */
 
-  --sys-color-surface-yellow: rgb(65 58 42 / 100%);
+  --sys-color-surface-yellow: rgb(65 60 38 / 100%);
   --sys-color-surface-error: rgb(78 53 52 / 100%);
 
   /* Corresponding on colors */
@@ -727,8 +731,8 @@
 
   /* Colors for data grid in Performance Panel */
 
-  --app-color-selected: var(--ref-palette-secondary40);
-  --app-border-selected: var(--ref-palette-secondary50);
+  --app-color-selected-progress-bar: var(--ref-palette-secondary40);
+  --app-border-selected-progress-bar: var(--ref-palette-secondary50);
 
   /* Colors for timeline in Performance Panel */
 
