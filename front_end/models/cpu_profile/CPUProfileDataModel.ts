@@ -92,10 +92,12 @@ export class CPUProfileDataModel extends ProfileTreeModel {
     // profile.
     this.lines = profile.lines;
     this.totalHitCount = 0;
-    this.profileHead = this.translateProfileTree(profile.nodes);
-    this.initialize(this.profileHead);
-    this.extractMetaNodes();
-    if (this.samples) {
+    if (profile.nodes.length) {
+      this.profileHead = this.translateProfileTree(profile.nodes);
+      this.initialize(this.profileHead);
+      this.extractMetaNodes();
+    }
+    if (this.samples?.length) {
       this.sortSamples();
       this.normalizeTimestamps();
       this.fixMissingSamples();
