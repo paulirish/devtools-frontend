@@ -1481,11 +1481,18 @@ export class TimelineUIUtils {
       event.args.frame_sequence ??
       event.args.begin_frame_id ??
       event.args.args?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
       event.args?.data?.beginEvent?.args?.data?.sequence_number ??
+      event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??
       event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
+      event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ??
       '';
 
-    if (frameSeqId) return `${title} ${frameSeqId % 1000}`;
+    if (frameSeqId) return `${title} sq${frameSeqId % 1000}`;
+
+    const localID = event.args?.data?.beginEvent?.id2?.local;
+    if (localID) {return `${event.name} c${localID}`;}
+
 
     return title;
   }

@@ -164,12 +164,12 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
   async addEvents(events: TraceEngine.TracingManager.EventPayload[]): Promise<void> {
     await this.client?.loadingStarted();
-    const eventsPerChunk = 15_000;
+    const eventsPerChunk = 25_000;
     for (let i = 0; i < events.length; i += eventsPerChunk) {
       const chunk = events.slice(i, i + eventsPerChunk);
       (this.tracingModel as TraceEngine.Legacy.TracingModel).addEvents(chunk);
       await this.client?.loadingProgress((i + chunk.length) / events.length);
-      await new Promise(r => window.setTimeout(r));  // Yield event loop to paint.
+      await new Promise(r => window.setTimeout(r, 0));  // Yield event loop to paint.
     }
     void this.close();
   }
