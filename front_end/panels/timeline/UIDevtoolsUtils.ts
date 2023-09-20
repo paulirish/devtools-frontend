@@ -144,21 +144,17 @@ export class UIDevtoolsUtils {
     }
     _categories = {
       layout: new TimelineCategory(
-          'layout', i18nString(UIStrings.layout), true, 'var(--app-color-loading-children)',
-          'var(--app-color-loading)'),
+          'layout', i18nString(UIStrings.layout), true, '--app-color-loading-children', '--app-color-loading'),
       rasterizing: new TimelineCategory(
-          'rasterizing', i18nString(UIStrings.rasterizing), true, 'var(--app-color-children)',
-          'var(--app-color-scripting)'),
+          'rasterizing', i18nString(UIStrings.rasterizing), true, '--app-color-children', '--app-color-scripting'),
       drawing: new TimelineCategory(
-          'drawing', i18nString(UIStrings.drawing), true, 'var(--app-color-rendering-children)',
-          'var(--app-color-rendering)'),
+          'drawing', i18nString(UIStrings.drawing), true, '--app-color-rendering-children', '--app-color-rendering'),
       painting: new TimelineCategory(
-          'painting', i18nString(UIStrings.painting), true, 'var(--app-color-painting-children)',
-          'var(--app-color-painting)'),
+          'painting', i18nString(UIStrings.painting), true, '--app-color-painting-children', '--app-color-painting'),
       other: new TimelineCategory(
-          'other', i18nString(UIStrings.system), false, 'var(--app-color-system-children)', 'var(--app-color-system)'),
+          'other', i18nString(UIStrings.system), false, '--app-color-system-children', '--app-color-system'),
       idle: new TimelineCategory(
-          'idle', i18nString(UIStrings.idle), false, 'var(--app-color-idle-children)', 'var(--app-color-idle)'),
+          'idle', i18nString(UIStrings.idle), false, '--app-color-idle-children', '--app-color-idle'),
     };
     return _categories;
   }

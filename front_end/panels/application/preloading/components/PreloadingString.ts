@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
+import type * as Platform from '../../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
-import type * as Platform from '../../../../core/platform/platform.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 
 const UIStrings = {
@@ -179,11 +180,6 @@ const UIStrings = {
    */
   prerenderFinalStatusNavigationRequestNetworkError: 'The prerendering navigation encountered a network error.',
   /**
-   *  Description text for PrerenderFinalStatus::kMaxNumOfRunningPrerendersExceeded.
-   */
-  prerenderFinalStatusMaxNumOfRunningPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules to enable further prerendering.',
-  /**
    *  Description text for PrerenderFinalStatus::kSslCertificateError.
    */
   prerenderFinalStatusSslCertificateError: 'The prerendering navigation failed because of an invalid SSL certificate.',
@@ -219,11 +215,6 @@ const UIStrings = {
    */
   prerenderFinalStatusMemoryLimitExceeded:
       'The prerender was not performed because the browser exceeded the prerendering memory limit.',
-  /**
-   *  Description text for PrerenderFinalStatus::kFailToGetMemoryUsage.
-   */
-  prerenderFinalStatusFailToGetMemoryUsage:
-      'The prerender was not performed because the browser encountered an internal error attempting to determine current memory usage.',
   /**
    *  Description text for PrerenderFinalStatus::kDataSaverEnabled.
    */
@@ -340,6 +331,21 @@ const UIStrings = {
    */
   prerenderFinalStatusActivatedWithAuxiliaryBrowsingContexts:
       'The prerender was not used because during activation time, there were other windows with an active opener reference to the initiating page, which is currently not supported.',
+  /**
+   * Description text for PrerenderFinalStatus::kMaxNumOfRunningEagerPrerendersExceeded.
+   */
+  prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded:
+      'The prerender was not performed because the initiating page already has too many eager prerenders ongoing. Remove other speculation rules to enable further prerendering.',
+  /**
+   * Description text for PrerenderFinalStatus::kMaxNumOfRunningEmbedderPrerendersExceeded.
+   */
+  prerenderFinalStatusMaxNumOfRunningEmbedderPrerendersExceeded:
+      'The prerender was not performed because the initiating page already has too many embedder prerenders ongoing. Remove other speculation rules to enable further prerendering.',
+  /**
+   * Description text for PrerenderFinalStatus::kMaxNumOfRunningNonEagerPrerendersExceeded.
+   */
+  prerenderFinalStatusMaxNumOfRunningNonEagerPrerendersExceeded:
+      'The prerender was not performed because the initiating page already has too many non-eager prerenders ongoing. Remove other speculation rules to enable further prerendering.',
   /**
    *@description Text in grid and details: Preloading attempt is not yet triggered.
    */
@@ -528,8 +534,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusClientCertRequested);
     case Protocol.Preload.PrerenderFinalStatus.NavigationRequestNetworkError:
       return i18nString(UIStrings.prerenderFinalStatusNavigationRequestNetworkError);
-    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningPrerendersExceeded:
-      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningPrerendersExceeded);
     case Protocol.Preload.PrerenderFinalStatus.CancelAllHostsForTesting:
       // Used only in tests.
       throw new Error('unreachable');
@@ -555,8 +559,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusTriggerBackgrounded);
     case Protocol.Preload.PrerenderFinalStatus.MemoryLimitExceeded:
       return i18nString(UIStrings.prerenderFinalStatusMemoryLimitExceeded);
-    case Protocol.Preload.PrerenderFinalStatus.FailToGetMemoryUsage:
-      return i18nString(UIStrings.prerenderFinalStatusFailToGetMemoryUsage);
     case Protocol.Preload.PrerenderFinalStatus.DataSaverEnabled:
       return i18nString(UIStrings.prerenderFinalStatusDataSaverEnabled);
     case Protocol.Preload.PrerenderFinalStatus.HasEffectiveUrl:
@@ -636,6 +638,12 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusSpeculationRuleRemoved);
     case Protocol.Preload.PrerenderFinalStatus.ActivatedWithAuxiliaryBrowsingContexts:
       return i18nString(UIStrings.prerenderFinalStatusActivatedWithAuxiliaryBrowsingContexts);
+    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningEagerPrerendersExceeded:
+      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded);
+    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningEmbedderPrerendersExceeded:
+      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningEmbedderPrerendersExceeded);
+    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningNonEagerPrerendersExceeded:
+      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningNonEagerPrerendersExceeded);
     default:
       // Note that we use switch and exhaustiveness check to prevent to
       // forget updating these strings, but allow to handle unknown
@@ -652,13 +660,13 @@ export function ruleSetLocationShort(
   return Bindings.ResourceUtils.displayNameForURL(url);
 }
 
-export function action({key}: SDK.PreloadingModel.PreloadingAttempt): string {
+export function capitalizedAction(action: Protocol.Preload.SpeculationAction): Common.UIString.LocalizedString {
   // Use "prefetch"/"prerender" as is in SpeculationRules.
-  switch (key.action) {
+  switch (action) {
     case Protocol.Preload.SpeculationAction.Prefetch:
-      return i18n.i18n.lockedString('prefetch');
+      return i18n.i18n.lockedString('Prefetch');
     case Protocol.Preload.SpeculationAction.Prerender:
-      return i18n.i18n.lockedString('prerender');
+      return i18n.i18n.lockedString('Prerender');
   }
 }
 

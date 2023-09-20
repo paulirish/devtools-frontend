@@ -132,7 +132,7 @@ describeWithEnvironment('RendererHandler', function() {
       assert(false, 'Main thread has no tree of events');
       return;
     }
-    assert.deepEqual([...tree.roots], [
+    assert.deepEqual([...tree.roots].map(root => root.id), [
       0,    1,    2,    3,    4,    5,    16,   18,   29,   38,   49,   58,   77,   183,  184,  185,  186,  188,  189,
       190,  199,  200,  201,  202,  211,  212,  213,  214,  229,  230,  232,  237,  239,  240,  242,  251,  252,  261,
       264,  265,  266,  267,  268,  279,  282,  284,  285,  286,  287,  288,  289,  290,  293,  294,  295,  296,  297,
@@ -175,7 +175,8 @@ describeWithEnvironment('RendererHandler', function() {
       assert(false, 'Main thread has no tree of events');
       return;
     }
-    assert.deepEqual([...tree.roots], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20]);
+    assert.deepEqual(
+        [...tree.roots].map(root => root.id), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20]);
   });
 
   it('builds a hierarchy for the main frame\'s main thread in a real world profile', async () => {
@@ -195,14 +196,13 @@ describeWithEnvironment('RendererHandler', function() {
     }
 
     const isRoot = (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode) => node.depth === 0;
-    const isInstant = (event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
+    const isInstant = (event: TraceModel.Types.TraceEvents.RendererEntry) =>
         TraceModel.Types.TraceEvents.isTraceEventInstant(event);
-    const isLong = (event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
+    const isLong = (event: TraceModel.Types.TraceEvents.RendererEntry) =>
         TraceModel.Types.TraceEvents.isTraceEventComplete(event) && event.dur > 1000;
     const isIncluded =
         (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
-         event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
-            (!isRoot(node) || isInstant(event) || isLong(event)) &&
+         event: TraceModel.Types.TraceEvents.RendererEntry) => (!isRoot(node) || isInstant(event) || isLong(event)) &&
         Timeline.EventUICategory.EventStyles.has(event.name as TraceModel.Types.TraceEvents.KnownEventName);
     assert.strictEqual(prettyPrint(tree, isIncluded), `
 ............
@@ -405,7 +405,7 @@ describeWithEnvironment('RendererHandler', function() {
     }
     const isIncluded =
         (_node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
-         event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) =>
+         event: TraceModel.Types.TraceEvents.RendererEntry) =>
             Timeline.EventUICategory.EventStyles.has(event.name as TraceModel.Types.TraceEvents.KnownEventName);
     assert.strictEqual(prettyPrint(tree, isIncluded), `
 -RunTask [0.13ms]
@@ -649,50 +649,50 @@ describeWithEnvironment('RendererHandler', function() {
 
     assert.strictEqual(tree.maxDepth, 3, 'Got the correct tree max depth');
 
-    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? n.entry : null);
+    const rootsEvents = [...tree.roots].map(n => n ? n.entry : null);
     assert.deepEqual(rootsEvents.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
       {'name': 'E', 'ts': 11, 'dur': 3},
     ]);
 
-    const nodeA = tree.nodes.get([...tree.roots][0]);
-    const nodeE = tree.nodes.get([...tree.roots][1]);
+    const nodeA = [...tree.roots].at(0);
+    const nodeE = [...tree.roots].at(1);
     if (!nodeA || !nodeE) {
       assert(false, 'Root nodes were not found');
       return;
     }
 
-    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes);
+    const childrenOfA = getEventsIn(nodeA.children.values());
     assert.deepEqual(childrenOfA.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'B', 'ts': 1, 'dur': 3},
       {'name': 'D', 'ts': 5, 'dur': 3},
     ]);
 
-    const childrenOfE = getEventsIn(nodeE.childrenIds.values(), tree.nodes);
+    const childrenOfE = getEventsIn(nodeE.children.values());
     assert.deepEqual(childrenOfE, []);
 
-    const nodeB = tree.nodes.get([...nodeA.childrenIds][0]);
-    const nodeD = tree.nodes.get([...nodeA.childrenIds][1]);
+    const nodeB = [...nodeA.children].at(0);
+    const nodeD = [...nodeA.children].at(1);
     if (!nodeB || !nodeD) {
       assert(false, 'Child nodes were not found');
       return;
     }
 
-    const childrenOfB = getEventsIn(nodeB.childrenIds.values(), tree.nodes);
+    const childrenOfB = getEventsIn(nodeB.children.values());
     assert.deepEqual(childrenOfB.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'C', 'ts': 2, 'dur': 1},
     ]);
 
-    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes);
+    const childrenOfD = getEventsIn(nodeD.children.values());
     assert.deepEqual(childrenOfD, []);
 
-    const nodeC = tree.nodes.get([...nodeB.childrenIds][0]);
+    const nodeC = [...nodeB.children].at(0);
     if (!nodeC) {
       assert(false, 'Child nodes were not found');
       return;
     }
 
-    const childrenOfC = getEventsIn(nodeC.childrenIds.values(), tree.nodes);
+    const childrenOfC = getEventsIn(nodeC.children.values());
     assert.deepEqual(childrenOfC, []);
   });
 
@@ -716,29 +716,29 @@ describeWithEnvironment('RendererHandler', function() {
 
     assert.strictEqual(tree.maxDepth, 2, 'Got the correct tree max depth');
 
-    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? n.entry : null);
+    const rootsEvents = [...tree.roots].map(n => n.entry);
     assert.deepEqual(rootsEvents.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
     ]);
 
-    const nodeA = tree.nodes.get([...tree.roots][0]);
+    const nodeA = [...tree.roots].at(0);
     if (!nodeA) {
       assert(false, 'Root nodes were not found');
       return;
     }
 
-    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes);
+    const childrenOfA = getEventsIn(nodeA.children.values());
     assert.deepEqual(childrenOfA.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'D', 'ts': 5, 'dur': 3},
     ]);
 
-    const nodeD = tree.nodes.get([...nodeA.childrenIds][0]);
+    const nodeD = [...nodeA.children].at(0);
     if (!nodeD) {
       assert(false, 'Child nodes were not found');
       return;
     }
 
-    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes);
+    const childrenOfD = getEventsIn(nodeD.children.values());
     assert.deepEqual(childrenOfD, []);
   });
 
@@ -761,50 +761,50 @@ describeWithEnvironment('RendererHandler', function() {
 
     assert.strictEqual(tree.maxDepth, 3, 'Got the correct tree max depth');
 
-    const rootsEvents = [...tree.roots].map(id => tree.nodes.get(id)).map(n => n ? n.entry : null);
+    const rootsEvents = [...tree.roots].map(n => n.entry);
     assert.deepEqual(rootsEvents.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
       {'name': 'E', 'ts': 10, 'dur': 3},
     ]);
 
-    const nodeA = tree.nodes.get([...tree.roots][0]);
-    const nodeE = tree.nodes.get([...tree.roots][1]);
+    const nodeA = [...tree.roots].at(0);
+    const nodeE = [...tree.roots].at(1);
     if (!nodeA || !nodeE) {
       assert(false, 'Root nodes were not found');
       return;
     }
 
-    const childrenOfA = getEventsIn(nodeA.childrenIds.values(), tree.nodes);
+    const childrenOfA = getEventsIn(nodeA.children.values());
     assert.deepEqual(childrenOfA.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'B', 'ts': 0, 'dur': 3},
       {'name': 'D', 'ts': 3, 'dur': 3},
     ]);
 
-    const childrenOfE = getEventsIn(nodeE.childrenIds.values(), tree.nodes);
+    const childrenOfE = getEventsIn(nodeE.children.values());
     assert.deepEqual(childrenOfE, []);
 
-    const nodeB = tree.nodes.get([...nodeA.childrenIds][0]);
-    const nodeD = tree.nodes.get([...nodeA.childrenIds][1]);
+    const nodeB = [...nodeA.children].at(0);
+    const nodeD = [...nodeA.children].at(1);
     if (!nodeB || !nodeD) {
       assert(false, 'Child nodes were not found');
       return;
     }
 
-    const childrenOfB = getEventsIn(nodeB.childrenIds.values(), tree.nodes);
+    const childrenOfB = getEventsIn(nodeB.children.values());
     assert.deepEqual(childrenOfB.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'C', 'ts': 2, 'dur': 1},
     ]);
 
-    const childrenOfD = getEventsIn(nodeD.childrenIds.values(), tree.nodes);
+    const childrenOfD = getEventsIn(nodeD.children.values());
     assert.deepEqual(childrenOfD, []);
 
-    const nodeC = tree.nodes.get([...nodeB.childrenIds][0]);
+    const nodeC = [...nodeB.children].at(0);
     if (!nodeC) {
       assert(false, 'Child nodes were not found');
       return;
     }
 
-    const childrenOfC = getEventsIn(nodeC.childrenIds.values(), tree.nodes);
+    const childrenOfC = getEventsIn(nodeC.children.values());
     assert.deepEqual(childrenOfC, []);
   });
 
@@ -820,21 +820,21 @@ describeWithEnvironment('RendererHandler', function() {
       makeCompleteEvent('D', 3, 3),   // 3..6 (starts when B finishes)
       makeCompleteEvent('C', 2, 1),   // 2..3 (finishes when B finishes)
       makeCompleteEvent('E', 10, 3),  // 10..13 (starts when A finishes)
-    ] as TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry[];
+    ] as TraceModel.Types.TraceEvents.RendererEntry[];
 
     TraceModel.Helpers.Trace.sortTraceEventsInPlace(data);
     const tree = TraceModel.Handlers.ModelHandlers.Renderer.treify(data, {filter: {has: () => true}});
 
-    const nodeA = tree.nodes.get([...tree.roots][0]);
-    const nodeE = tree.nodes.get([...tree.roots][1]);
+    const nodeA = [...tree.roots].at(0);
+    const nodeE = [...tree.roots].at(1);
     if (!nodeA || !nodeE) {
       assert(false, 'Root nodes were not found');
       return;
     }
     const taskA = nodeA.entry;
     const taskE = nodeE.entry;
-    const nodeD = tree.nodes.get([...nodeA.childrenIds][1]);
-    const nodeB = tree.nodes.get([...nodeA.childrenIds][0]);
+    const nodeD = [...nodeA.children].at(1);
+    const nodeB = [...nodeA.children].at(0);
     if (!nodeB || !nodeD) {
       assert(false, 'Child nodes were not found');
       return;
@@ -842,7 +842,7 @@ describeWithEnvironment('RendererHandler', function() {
     const taskD = nodeD.entry;
     const taskB = nodeB.entry;
 
-    const nodeC = tree.nodes.get([...nodeB.childrenIds][0]);
+    const nodeC = [...nodeB.children].at(0);
 
     if (!nodeC) {
       assert(false, 'Child nodes were not found');
@@ -959,13 +959,13 @@ describeWithEnvironment('RendererHandler', function() {
     assert.strictEqual(firstThread.tree.maxDepth, 3, 'Got the correct tree max depth for the first thread');
     assert.strictEqual(secondThread.tree.maxDepth, 3, 'Got the correct tree max depth for the second thread');
 
-    const firstRoots = getEventsIn(firstThread.tree.roots.values(), firstThread.tree.nodes);
+    const firstRoots = getEventsIn(firstThread.tree.roots.values());
     assert.deepEqual(firstRoots.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'A', 'ts': 0, 'dur': 10},
       {'name': 'E', 'ts': 11, 'dur': 3},
     ]);
 
-    const secondRoots = getEventsIn(secondThread.tree.roots.values(), secondThread.tree.nodes);
+    const secondRoots = getEventsIn(secondThread.tree.roots.values());
     assert.deepEqual(secondRoots.map(e => e ? {name: e.name, ts: e.ts, dur: e.dur} : null) as unknown[], [
       {'name': 'F', 'ts': 0, 'dur': 3},
       {'name': 'G', 'ts': 3, 'dur': 10},
@@ -1183,8 +1183,7 @@ describeWithEnvironment('RendererHandler', function() {
       const v8Run = makeCompleteEvent('v8.run', 10, 490);
       const parseFunction = makeCompleteEvent('V8.ParseFunction', 12, 1);
 
-      const traceEvents: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry[] =
-          [evaluateScript, v8Run, parseFunction];
+      const traceEvents: TraceModel.Types.TraceEvents.RendererEntry[] = [evaluateScript, v8Run, parseFunction];
 
       const profileCalls = [makeProfileCall('a', 100, 200), makeProfileCall('b', 300, 200)];
       const allEntries = TraceModel.Helpers.Trace.mergeEventsInOrder(traceEvents, profileCalls);
@@ -1220,7 +1219,7 @@ describeWithEnvironment('RendererHandler', function() {
       }
       const onlyLongTasksPredicate =
           (_node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
-           event: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntry) => Boolean(event.dur && event.dur > 1000) &&
+           event: TraceModel.Types.TraceEvents.RendererEntry) => Boolean(event.dur && event.dur > 1000) &&
           Timeline.EventUICategory.EventStyles.has(event.name as TraceModel.Types.TraceEvents.KnownEventName);
       assert.strictEqual(prettyPrint(thread.tree, onlyLongTasksPredicate), `
 .............
@@ -1236,24 +1235,24 @@ describeWithEnvironment('RendererHandler', function() {
   -TimerFire [1058.77ms]
     -FunctionCall [1058.693ms]
 .
-      -ProfileCall (anonymous) [1058.548ms]
-        -ProfileCall (foo) [1058.548ms]
-          -ProfileCall (foo) [1058.548ms]
-            -ProfileCall (foo) [1058.548ms]
-              -ProfileCall (foo) [1058.548ms]
+      -ProfileCall (anonymous) [1058.589ms]
+        -ProfileCall (foo) [1058.589ms]
+          -ProfileCall (foo) [1058.589ms]
+            -ProfileCall (foo) [1058.589ms]
+              -ProfileCall (foo) [1058.589ms]
 ..
-                -ProfileCall (count) [1058.422ms]
+                -ProfileCall (count) [1058.453ms]
 ........
 -RunTask [1057.455ms]
   -TimerFire [1057.391ms]
     -FunctionCall [1057.27ms]
 .
-      -ProfileCall (anonymous) [1056.51ms]
-        -ProfileCall (foo) [1056.51ms]
-          -ProfileCall (foo) [1056.51ms]
-            -ProfileCall (foo) [1056.51ms]
-              -ProfileCall (foo) [1056.51ms]
-                -ProfileCall (count) [1056.51ms]
+      -ProfileCall (anonymous) [1056.579ms]
+        -ProfileCall (foo) [1056.579ms]
+          -ProfileCall (foo) [1056.579ms]
+            -ProfileCall (foo) [1056.579ms]
+              -ProfileCall (foo) [1056.579ms]
+                -ProfileCall (count) [1056.538ms]
 ........`);
     });
   });

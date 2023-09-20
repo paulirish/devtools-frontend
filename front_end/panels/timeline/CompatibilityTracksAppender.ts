@@ -80,7 +80,7 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames'] as const;
+export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames', 'FramesWaterfall'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -397,6 +397,20 @@ export class CompatibilityTracksAppender {
   }
 
   /**
+   * Looks up a FlameChart group for a given appender.
+   */
+  groupForAppender(targetAppender: TrackAppender): PerfUI.FlameChart.Group|null {
+    let foundGroup: PerfUI.FlameChart.Group|null = null;
+    for (const [group, appender] of this.#trackForGroup) {
+      if (appender === targetAppender) {
+        foundGroup = group;
+        break;
+      }
+    }
+    return foundGroup;
+  }
+
+  /**
    * Given a FlameChart group, gets the events to be shown in the tree
    * views if that group was registered by the appender system.
    */
@@ -431,7 +445,6 @@ export class CompatibilityTracksAppender {
       number {
     // TODO(crbug.com/1442454) Figure out how to avoid the circular calls.
     this.#trackForLevel.set(level, appender);
-
     const index = this.#entryData.length;
     this.#entryData.push(event);
     this.#indexForEvent.set(event, index);
