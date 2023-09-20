@@ -20,7 +20,7 @@ const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
-  trackTitle: 'Frame Waterfall',
+  trackTitle: 'Frames (NEW)',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/NewFramesTrackAppender.ts', UIStrings);
@@ -30,7 +30,7 @@ const eventLatencyBreakdownTypeNames = TraceEngine.Handlers.ModelHandlers.UberFr
 
 /**
  * Show the frame timeline in an easy to understand manner.
- * left whisker (input or (pre BMF stuff?)): EventLatency start. Not sure about loaf.
+ * left whisker (input or (pre BMF stuff?)): EventLatency start. Better. Loaf's desiredRenderStart:
  * Box body (main thread time):         SendBeginMainFrameToCommit      (RendererMainProcessing + RendererMainFinishedToCommit are not always there)
  * Right leg (actionable raster time):  EndCommitToActivation
  * Right whisker (to presentation):     Activation + EndActivateToSubmitCompositorFrame  SubmitCompositorFrameToPresentationCompositorFrame

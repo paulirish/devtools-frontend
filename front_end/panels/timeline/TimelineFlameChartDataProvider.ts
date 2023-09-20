@@ -482,11 +482,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           case 'LayoutShifts':
             return 3;
           case 'GPU':
-            return 8;
+            return 0;
           case 'Thread':
             return 4;
           case 'UberFrames':
-            return 6;
+            return 1;
           case 'FramesWaterfall':
             return 0;
           case 'NewFrames':
