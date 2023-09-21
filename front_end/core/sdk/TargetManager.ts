@@ -287,6 +287,7 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     return this.targets().find(target => target.id() === id) || null;
   }
 
+  /** The 'tab' target if debugging a page.  */
   rootTarget(): Target|null {
     return this.#targetsInternal.size ? this.#targetsInternal.values().next().value : null;
   }

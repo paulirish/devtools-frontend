@@ -150,7 +150,6 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
    * Gets the title an event added by this appender should be rendered with.
    */
   titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    UberFramesTrackAppender.
     const frameSeqId =
       event.args.frameSeqId ??
       event.args.frame_sequence ??
@@ -166,7 +165,13 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
     if (frameSeqId) {return `${event.name} sq${frameSeqId % 1000}`;}
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
-    if (localID) {return `${event.name} c${localID}`;}
+
+    if (localID) {
+      const frameSeq = this.#traceParsedData.UberFrames.eventLatencyIdToFrameSeq[localID];
+      if (frameSeq) {return `${event.name} res${frameSeq % 1000}`;}
+
+      return `${event.name} c${localID}`;
+    }
 
     return event.name;
   }

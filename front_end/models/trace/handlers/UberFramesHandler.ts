@@ -20,7 +20,7 @@ const gpuEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 const asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
 let syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
 const waterFallEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
-
+let eventLatencyIdToFrameSeq: Record<string, string> = {};
 // export interface UberFramesData {
 //   relevantEvts: readonly Types.TraceEvents.TraceEventData[],
 //   syntheticEvents: readonly Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[];
@@ -29,6 +29,7 @@ const waterFallEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
 export type UberFramesData = {
   nonWaterfallEvts: readonly Types.TraceEvents.TraceEventData[],
   waterFallEvts: readonly Types.TraceEvents.TraceEventData[],
+  eventLatencyIdToFrameSeq: Record<string, string>,
 };
 
 export function reset(): void {
@@ -38,7 +39,7 @@ export function reset(): void {
   syntheticEvents.length = 0;
   asyncEvts.length = 0;
   waterFallEvents.length = 0;
-
+  eventLatencyIdToFrameSeq = {};
   handlerState = HandlerState.INITIALIZED;
 }
 
@@ -222,6 +223,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     if (event.ph === 'b' || event.ph === 'e') {
       asyncEvts.push(event);
     } else {
+
       if (eventLatencyBreakdownTypeNames.includes(event.name)) {
         waterFallEvents.push(event);
       }
@@ -304,6 +306,10 @@ export async function finalize(): Promise<void> {
       },
     };
 
+    if (event.name === 'EventLatency') {
+      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence;
+    }
+
     const existingDuplicate = syntheticEvents.find(e => {
       return e.name === event.name &&
       e.ts === event.ts &&
@@ -343,6 +349,7 @@ export function data(): UberFramesData {
   return {
     nonWaterfallEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
     waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
+    eventLatencyIdToFrameSeq,
   };
 }
 

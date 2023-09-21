@@ -148,7 +148,13 @@ export class UberFramesTrackAppender implements TrackAppender {
     if (frameSeqId) {return `${event.name} sq${frameSeqId % 1000}`;}
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
-    if (localID) {return `${event.name} c${localID}`;}
+
+    if (localID) {
+      const frameSeq = this.#traceParsedData.UberFrames.eventLatencyIdToFrameSeq[localID];
+      if (frameSeq) {return `${event.name} res${frameSeq % 1000}`;}
+
+      return `${event.name} c${localID}`;
+    }
 
     return event.name;
   }
