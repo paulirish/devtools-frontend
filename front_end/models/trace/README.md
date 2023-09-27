@@ -28,6 +28,9 @@ See the included `analyze-trace.mjs` a runnable invocation.
 front_end/models/trace/build-trace-engine-lib.sh
 
 front_end/models/trace/copy-build-trace-engine-for-publish.sh
+
+node out/Typed/../../third_party/typescript/../../node_modules/typescript/bin/tsc -p out/Typed/gen/front_end/models/trace/trace-tsconfig.json  # this then has js/map/d.ts.  should be able to use for typs
+
 ```
 
 ## High level architecture
