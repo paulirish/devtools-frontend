@@ -550,6 +550,8 @@ describe('User Metrics for Issue Panel', () => {
   });
 
   it('dispatch events when a "Learn More" link is clicked', async () => {
+    const {browser} = getBrowserAndPages();
+
     await goToResource('elements/element-reveal-inline-issue.html');
     await waitFor('.issue');
     await click('.issue');
@@ -558,28 +560,33 @@ describe('User Metrics for Issue Panel', () => {
     await scrollElementIntoView('.link-list x-link');
     await click('.link-list x-link');
 
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.IssueCreated',
-        actionCode: 1,  // ContentSecurityPolicyIssue
-      },
-      {
-        actionName: 'DevTools.IssueCreated',
-        actionCode: 1,  // ContentSecurityPolicyIssue
-      },
-      {
-        actionName: 'DevTools.IssuesPanelIssueExpanded',
-        actionCode: 4,  // ContentSecurityPolicy
-      },
-      {
-        actionName: 'DevTools.IssuesPanelResourceOpened',
-        actionCode: 12,  // ContentSecurityPolicyLearnMore
-      },
-    ]);
+    try {
+      await assertHistogramEventsInclude([
+        {
+          actionName: 'DevTools.IssueCreated',
+          actionCode: 1,  // ContentSecurityPolicyIssue
+        },
+        {
+          actionName: 'DevTools.IssueCreated',
+          actionCode: 1,  // ContentSecurityPolicyIssue
+        },
+        {
+          actionName: 'DevTools.IssuesPanelIssueExpanded',
+          actionCode: 4,  // ContentSecurityPolicy
+        },
+        {
+          actionName: 'DevTools.IssuesPanelResourceOpened',
+          actionCode: 12,  // ContentSecurityPolicyLearnMore
+        },
+      ]);
+    } finally {
+      const target = await browser.waitForTarget(target => target.url().includes('web.dev'));
+      const page = await target.page();
+      await page?.close();
+    }
   });
 
-  // Consistently failing on both Linux and Windows after a recent roll of Chrome for Testing.
-  it.skip('[crbug.com/1478136] dispatches events when Quirks Mode issues are created', async () => {
+  it('dispatches events when Quirks Mode issues are created', async () => {
     await goToResource('elements/quirks-mode-iframes.html');
     await waitFor('.issue');
 
@@ -629,7 +636,8 @@ describe('User Metrics for CSS custom properties in the Styles pane', () => {
     await focusElementsTree();
   });
 
-  it('dispatch events when capture overview button hit', async () => {
+  // Flaky test.
+  it.skip('[crbug.com/1483974]: dispatch events when capture overview button hit', async () => {
     const {frontend} = getBrowserAndPages();
     await frontend.keyboard.press('ArrowRight');
     await waitForContentOfSelectedElementsNode('<div id=\u200B"properties-to-inspect">\u200B</div>\u200B');

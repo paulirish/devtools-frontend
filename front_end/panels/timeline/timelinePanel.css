@@ -324,7 +324,7 @@
 .timeline-tree-view .data-grid div.background-percent-bar {
   float: right;
   position: relative;
-  z-index: 999;
+  z-index: 1;
 }
 
 .timeline-tree-view .data-grid span.percent-column {
@@ -335,6 +335,10 @@
 
 .timeline-tree-view .data-grid tr.selected span {
   color: inherit;
+}
+
+.timeline-tree-view .data-grid tr.selected {
+  background-color: var(--sys-color-tonal-container);
 }
 
 .timeline-tree-view .data-grid .name-container {
@@ -388,24 +392,15 @@
 }
 
 .timeline-tree-view .data-grid .background-bar {
-  --override-background-bar-background-color: hsl(43deg 84% 64% / 20%);
-  --override-background-bar-border-color: hsl(43deg 84% 64%);
-
   float: right;
   height: 18px;
-  background-color: var(--override-background-bar-background-color);
-  border-bottom: 1px solid var(--override-background-bar-border-color);
+  background-color: var(--sys-color-yellow-container);
+  border-bottom: 1px solid var(--sys-color-yellow-outline);
 }
 
 .timeline-tree-view .data-grid .selected .background-bar {
-  background-color: var(--app-color-selected);
-  border-bottom: 1px solid var(--app-border-selected);
-}
-
-.-theme-with-dark-background .timeline-tree-view .data-grid .background-bar,
-:host-context(.-theme-with-dark-background) .timeline-tree-view .data-grid .background-bar {
-  --override-background-bar-background-color: rgb(169 126 15 / 20%);
-  --override-background-bar-border-color: rgb(169 126 15);
+  background-color: var(--app-color-selected-progress-bar);
+  border-bottom: 1px solid var(--app-border-selected-progress-bar);
 }
 
 .timeline-tree-view .timeline-details-view-body .full-widget-dimmed-banner {
@@ -418,6 +413,8 @@
 
 .timeline-tree-view .data-grid thead {
   height: 21px;
+  /* so the header is always above any body rows that the user has scrolled past */
+  z-index: 2;
 }
 
 .timeline-stack-view-header {
@@ -436,7 +433,7 @@
   align-items: center;
   overflow: auto;
   font-size: 13px;
-  color: var(--sys-color-token-subtle);
+  color: var(--sys-color-on-surface-subtle);
 }
 
 @media (forced-colors: active) {

@@ -372,6 +372,20 @@ export class CompatibilityTracksAppender {
   }
 
   /**
+   * Looks up a FlameChart group for a given appender.
+   */
+  groupForAppender(targetAppender: TrackAppender): PerfUI.FlameChart.Group|null {
+    let foundGroup: PerfUI.FlameChart.Group|null = null;
+    for (const [group, appender] of this.#trackForGroup) {
+      if (appender === targetAppender) {
+        foundGroup = group;
+        break;
+      }
+    }
+    return foundGroup;
+  }
+
+  /**
    * Given a FlameChart group, gets the events to be shown in the tree
    * views if that group was registered by the appender system.
    */
@@ -406,7 +420,6 @@ export class CompatibilityTracksAppender {
       number {
     // TODO(crbug.com/1442454) Figure out how to avoid the circular calls.
     this.#trackForLevel.set(level, appender);
-
     const index = this.#entryData.length;
     this.#entryData.push(event);
     this.#indexForEvent.set(event, index);
@@ -438,14 +451,7 @@ export class CompatibilityTracksAppender {
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      // Default styles are globally defined for each event name. Some
-      // events are hidden by default.
-      const eventStyle = EventStyles.get(event.name as TraceEngine.Types.TraceEvents.KnownEventName);
-      const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(event) ||
-          TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(event) ||
-          TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(event);
-      const eventIsVisible = (eventStyle && !eventStyle.hidden) || eventIsTiming;
-      if (!eventIsVisible) {
+      if (!this.entryIsVisibleInTimeline(event)) {
         continue;
       }
 
@@ -456,6 +462,16 @@ export class CompatibilityTracksAppender {
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
     return trackStartLevel + lastUsedTimeByLevel.length;
+  }
+
+  entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+    // Default styles are globally defined for each event name. Some
+    // events are hidden by default.
+    const eventStyle = EventStyles.get(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
+    const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
+    return (eventStyle && !eventStyle.hidden) || eventIsTiming;
   }
 
   /**

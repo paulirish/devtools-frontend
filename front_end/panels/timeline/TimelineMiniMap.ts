@@ -52,22 +52,56 @@ export class TimelineMiniMap extends
     this.#overviewComponent.show(this.element);
     // Push the event up into the parent component so the panel knows when the window is changed.
     this.#overviewComponent.addEventListener(PerfUI.TimelineOverviewPane.Events.WindowChanged, event => {
-      this.dispatchEventToListeners(PerfUI.TimelineOverviewPane.Events.WindowChanged, event.data);
+      // Create first breadcrumb from the initial full window
+      if (this.#breadcrumbs === null) {
+        this.addBreadcrumb(this.breadcrumbWindowBounds({
+          startTime: TraceEngine.Types.Timing.MilliSeconds(event.data.startTime),
+          endTime: TraceEngine.Types.Timing.MilliSeconds(event.data.endTime),
+        }));
+      }
+
+      if (this.#breadcrumbs) {
+        this.dispatchEventToListeners(PerfUI.TimelineOverviewPane.Events.WindowChanged, {
+          ...event.data,
+          breadcrumb: {
+            min: TraceEngine.Types.Timing.MicroSeconds(this.#breadcrumbs?.lastBreadcrumb.window.min + this.#minTime),
+            max: TraceEngine.Types.Timing.MicroSeconds(this.#breadcrumbs?.lastBreadcrumb.window.max + this.#minTime),
+            range: TraceEngine.Types.Timing.MicroSeconds(
+                this.#breadcrumbs?.lastBreadcrumb.window.max - this.#breadcrumbs?.lastBreadcrumb.window.min),
+          },
+        });
+      }
     });
   }
 
   activateBreadcrumbs(): void {
     this.element.prepend(this.#breadcrumbsUI);
-    this.#overviewComponent.addEventListener(PerfUI.TimelineOverviewPane.Events.WindowChanged, event => {
-      this.addBreadcrumb(
-          TraceEngine.Types.Timing.MilliSeconds(event.data.startTime),
-          TraceEngine.Types.Timing.MilliSeconds(event.data.endTime));
+    this.#overviewComponent.addEventListener(PerfUI.TimelineOverviewPane.Events.BreadcrumbAdded, event => {
+      this.addBreadcrumb(this.breadcrumbWindowBounds(event.data));
     });
+
+    this.#breadcrumbsUI.addEventListener(TimelineComponents.BreadcrumbsUI.BreadcrumbRemovedEvent.eventName, event => {
+      const breadcrumb = (event as TimelineComponents.BreadcrumbsUI.BreadcrumbRemovedEvent).breadcrumb;
+      this.removeBreadcrumb(breadcrumb);
+    });
+    this.#overviewComponent.enableCreateBreadcrumbsButton();
   }
 
-  addBreadcrumb(start: TraceEngine.Types.Timing.MilliSeconds, end: TraceEngine.Types.Timing.MilliSeconds): void {
-    const startWithoutMin = start - this.#minTime;
-    const endWithoutMin = end - this.#minTime;
+  // If the window sliders are on the edges of the window, the window values are set to 0 or Infity.
+  // This behaviour is not needed for breadcrumbs so we reset them to the maximum or minimum window boundary.
+  breadcrumbWindowBounds(breadcrumbWindow: PerfUI.TimelineOverviewPane.BreadcrumbAddedEvent):
+      PerfUI.TimelineOverviewPane.BreadcrumbAddedEvent {
+    breadcrumbWindow.endTime = TraceEngine.Types.Timing.MilliSeconds(
+        Math.min(this.#overviewComponent.overviewCalculator.maximumBoundary(), breadcrumbWindow.endTime));
+    breadcrumbWindow.startTime = TraceEngine.Types.Timing.MilliSeconds(
+        Math.max(this.#overviewComponent.overviewCalculator.minimumBoundary(), breadcrumbWindow.startTime));
+
+    return breadcrumbWindow;
+  }
+
+  addBreadcrumb({startTime, endTime}: PerfUI.TimelineOverviewPane.BreadcrumbAddedEvent): void {
+    const startWithoutMin = startTime - this.#minTime;
+    const endWithoutMin = endTime - this.#minTime;
 
     const traceWindow: TraceEngine.Types.Timing.TraceWindow = {
       min: TraceEngine.Types.Timing.MicroSeconds(startWithoutMin),
@@ -79,14 +113,30 @@ export class TimelineMiniMap extends
 
     } else {
       this.#breadcrumbs.add(traceWindow);
-      this.setBounds(start, end);
-
-      this.#overviewComponent.scheduleUpdate(start, end);
+      this.setBounds(startTime, endTime);
+      this.#overviewComponent.scheduleUpdate(startTime, endTime);
     }
 
     this.#breadcrumbsUI.data = {
       breadcrumb: this.#breadcrumbs.initialBreadcrumb,
     };
+  }
+
+  removeBreadcrumb(breadcrumb: TimelineComponents.Breadcrumbs.Breadcrumb): void {
+    const startMSWithMin = TraceEngine.Types.Timing.MilliSeconds(breadcrumb.window.min + this.#minTime);
+    const endMSWithMin = TraceEngine.Types.Timing.MilliSeconds(breadcrumb.window.max + this.#minTime);
+
+    if (this.#breadcrumbs) {
+      this.#breadcrumbs.makeBreadcrumbActive(breadcrumb);
+      // Only the initial breadcrumb is passed in because breadcrumbs are stored in a linked list and breadcrumbsUI component iterates through them
+      this.#breadcrumbsUI.data = {
+        breadcrumb: this.#breadcrumbs.initialBreadcrumb,
+      };
+    }
+
+    this.setBounds(startMSWithMin, endMSWithMin);
+    this.#overviewComponent.scheduleUpdate(startMSWithMin, endMSWithMin);
+    this.#overviewComponent.setWindowTimes(startMSWithMin, endMSWithMin);
   }
 
   override wasShown(): void {

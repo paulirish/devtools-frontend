@@ -325,8 +325,8 @@ export class TimelineModelImpl {
     }
     // FIXME: Consider returning null for loaded traces.
     const workerId = this.workerIdByThread.get(thread);
-    const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
-    return workerId ? SDK.TargetManager.TargetManager.instance().targetById(workerId) : rootTarget;
+    const primaryPageTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    return workerId ? SDK.TargetManager.TargetManager.instance().targetById(workerId) : primaryPageTarget;
   }
 
   isFreshRecording(): boolean {
@@ -771,7 +771,6 @@ export class TimelineModelImpl {
       const jsFrameEvents = TimelineJSProfileProcessor.generateJSFrameEvents(events, {
         showAllEvents: Root.Runtime.experiments.isEnabled('timelineShowAllEvents'),
         showRuntimeCallStats: Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats'),
-        showNativeFunctions: Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get(),
       });
       if (jsFrameEvents && jsFrameEvents.length) {
         events = Platform.ArrayUtilities.mergeOrdered(

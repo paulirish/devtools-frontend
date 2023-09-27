@@ -46,9 +46,11 @@ import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CLSRect} from './CLSLinkifier.js';
 import * as TimelineComponents from './components/components.js';
+import {EventStyles} from './EventUICategory.js';
 import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
 import invalidationsTreeStyles from './invalidationsTree.css.js';
 import {TimelinePanel} from './TimelinePanel.js';
@@ -1384,18 +1386,6 @@ export class TimelineUIUtils {
     }
   }
 
-  static eventURL(event: TraceEngine.Legacy.Event): Platform.DevToolsPath.UrlString|null {
-    const data = event.args['data'] || event.args['beginData'];
-    const url = data && data.url;
-    if (url) {
-      return url;
-    }
-    const stackTrace = data && data['stackTrace'];
-    const frame = stackTrace && stackTrace.length && stackTrace[0] ||
-        TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).topFrame();
-    return frame && frame.url as Platform.DevToolsPath.UrlString || null;
-  }
-
   static eventStyle(event: TraceEngine.Legacy.CompatibleTraceEvent): TimelineRecordStyle {
     const eventStyles = TimelineUIUtils.initEventStyles();
     if (TraceEngine.Legacy.eventHasCategory(event, TimelineModel.TimelineModel.TimelineModelImpl.Category.Console) ||
@@ -1420,21 +1410,26 @@ export class TimelineUIUtils {
       }
     }
     const color = TimelineUIUtils.eventStyle(event).category.color;
-
+    let parsedColor = TimelineUIUtils.eventStyle(event).category.getComputedValue(color);
     // This event is considered idle time but still rendered as a scripting event here
     // to connect the StreamingCompileScriptParsing events it belongs to.
     if (event.name === TimelineModel.TimelineModel.RecordType.StreamingCompileScriptWaiting) {
-      const color = Common.Color.parse(TimelineUIUtils.categories().scripting.color);
-      if (!color) {
+      const rawColor = TimelineUIUtils.categories().scripting.color;
+      parsedColor = TimelineUIUtils.categories().scripting.getComputedValue(rawColor);
+      if (!parsedColor) {
         throw new Error('Unable to parse color from TimelineUIUtils.categories().scripting.color');
       }
-      return color.setAlpha(0.3).asString() as string;
     }
-
-    return color;
+    return parsedColor;
   }
 
   static eventTitle(event: TraceEngine.Legacy.CompatibleTraceEvent): string {
+    // Profile call events do not have a args.data property, thus, we
+    // need to check for profile calls in the beginning of this
+    // function.
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event) && TraceEngine.Types.TraceEvents.isProfileCall(event)) {
+      return TimelineUIUtils.frameDisplayName(event.callFrame);
+    }
     const recordType = TimelineModel.TimelineModel.RecordType;
     const eventData = event.args['data'];
     if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
@@ -1494,6 +1489,7 @@ export class TimelineUIUtils {
       case 'image/x-icon':
       case 'font/opentype':
       case 'font/woff2':
+      case 'font/ttf':
       case 'application/font-woff':
         return categories.Media;
       default:
@@ -1505,15 +1501,15 @@ export class TimelineUIUtils {
     const categories = NetworkCategory;
     switch (category) {
       case categories.HTML:
-        return 'hsl(214, 67%, 66%)';
+        return '--app-color-loading';
       case categories.Script:
-        return 'hsl(43, 83%, 64%)';
+        return '--app-color-scripting';
       case categories.Style:
-        return 'hsl(256, 67%, 70%)';
+        return '--app-color-rendering';
       case categories.Media:
-        return 'hsl(109, 33%, 55%)';
+        return '--app-color-painting';
       default:
-        return 'hsl(0, 0%, 70%)';
+        return '--app-color-system';
     }
   }
 
@@ -1770,6 +1766,28 @@ export class TimelineUIUtils {
         }
         break;
       }
+      case TraceEngine.Types.TraceEvents.KnownEventName.ProfileCall: {
+        details = document.createElement('span');
+        // This check is only added for convenience with the type checker.
+        if (!TraceEngine.Legacy.eventIsFromNewEngine(event) || !TraceEngine.Types.TraceEvents.isProfileCall(event)) {
+          break;
+        }
+        UI.UIUtils.createTextChild(details, TimelineUIUtils.frameDisplayName(event.callFrame));
+        const location = this.linkifyLocation({
+          scriptId: event.callFrame['scriptId'],
+          url: event.callFrame['url'],
+          lineNumber: event.callFrame['lineNumber'],
+          columnNumber: event.callFrame['columnNumber'],
+          target,
+          isFreshRecording,
+          linkifier,
+        });
+        if (location) {
+          UI.UIUtils.createTextChild(details, ' @ ');
+          details.appendChild(location);
+        }
+        break;
+      }
 
       default: {
         if (TraceEngine.Legacy.eventHasCategory(
@@ -1940,8 +1958,12 @@ export class TimelineUIUtils {
     let relatedNodeLabel;
 
     const contentHelper = new TimelineDetailsContentHelper(model.targetByEvent(event), linkifier);
-    const color = model.isMarkerEvent(event) ? TimelineUIUtils.markerStyleForEvent(event).color :
-                                               TimelineUIUtils.eventStyle(event).category.color;
+
+    const defaultColorForEvent = TraceEngine.Legacy.eventIsFromNewEngine(event) ?
+        EventStyles.get(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.categoryStyle.color :
+        TimelineUIUtils.eventStyle(event).category.color;
+    const color = model.isMarkerEvent(event) ? TimelineUIUtils.markerStyleForEvent(event).color : defaultColorForEvent;
+
     contentHelper.addSection(TimelineUIUtils.eventTitle(event), color);
 
     const eventData = event.args['data'];
@@ -1996,6 +2018,7 @@ export class TimelineUIUtils {
 
       case recordTypes.JSRoot:
       case recordTypes.JSFrame:
+      case TraceEngine.Types.TraceEvents.KnownEventName.ProfileCall:
       case recordTypes.JSIdleFrame:
       case recordTypes.JSSystemFrame:
       case recordTypes.FunctionCall: {
@@ -2947,20 +2970,26 @@ export class TimelineUIUtils {
     }
     categories = {
       loading: new TimelineCategory(
-          'loading', i18nString(UIStrings.loading), true, 'hsl(214, 67%, 74%)', 'hsl(214, 67%, 66%)'),
+          'loading', i18nString(UIStrings.loading), true, '--app-color-loading-children', '--app-color-loading'),
       experience: new TimelineCategory(
-          'experience', i18nString(UIStrings.experience), false, 'hsl(5, 80%, 74%)', 'hsl(5, 80%, 66%)'),
+          'experience', i18nString(UIStrings.experience), false, '--app-color-rendering-children',
+          '--app-color-rendering'),
       scripting: new TimelineCategory(
-          'scripting', i18nString(UIStrings.scripting), true, 'hsl(43, 83%, 72%)', 'hsl(43, 83%, 64%) '),
+          'scripting', i18nString(UIStrings.scripting), true, '--app-color-scripting-children',
+          '--app-color-scripting'),
       rendering: new TimelineCategory(
-          'rendering', i18nString(UIStrings.rendering), true, 'hsl(256, 67%, 76%)', 'hsl(256, 67%, 70%)'),
+          'rendering', i18nString(UIStrings.rendering), true, '--app-color-rendering-children',
+          '--app-color-rendering'),
       painting: new TimelineCategory(
-          'painting', i18nString(UIStrings.painting), true, 'hsl(109, 33%, 64%)', 'hsl(109, 33%, 55%)'),
-      gpu: new TimelineCategory('gpu', i18nString(UIStrings.gpu), false, 'hsl(109, 33%, 64%)', 'hsl(109, 33%, 55%)'),
-      async:
-          new TimelineCategory('async', i18nString(UIStrings.async), false, 'hsl(0, 100%, 50%)', 'hsl(0, 100%, 40%)'),
-      other: new TimelineCategory('other', i18nString(UIStrings.system), false, 'hsl(0, 0%, 87%)', 'hsl(0, 0%, 79%)'),
-      idle: new TimelineCategory('idle', i18nString(UIStrings.idle), false, 'hsl(0, 0%, 98%)', 'hsl(0, 0%, 98%)'),
+          'painting', i18nString(UIStrings.painting), true, '--app-color-painting-children', '--app-color-painting'),
+      gpu: new TimelineCategory(
+          'gpu', i18nString(UIStrings.gpu), false, '--app-color-painting-children', '--app-color-painting'),
+      async: new TimelineCategory(
+          'async', i18nString(UIStrings.async), false, '--app-color-async-children', '--app-color-async'),
+      other: new TimelineCategory(
+          'other', i18nString(UIStrings.system), false, '--app-color-system-children', '--app-color-system'),
+      idle: new TimelineCategory(
+          'idle', i18nString(UIStrings.idle), false, '--app-color-idle-children', '--app-color-idle'),
     };
     return categories;
   }
@@ -3015,7 +3044,8 @@ export class TimelineUIUtils {
     if (selfCategory) {
       if (selfTime) {
         appendLegendRow(
-            selfCategory.name, i18nString(UIStrings.sSelf, {PH1: selfCategory.title}), selfTime, selfCategory.color);
+            selfCategory.name, i18nString(UIStrings.sSelf, {PH1: selfCategory.title}), selfTime,
+            selfCategory.getCSSValue(selfCategory.color));
       }
       // Children of the same category.
       const categoryTime = aggregatedStats[selfCategory.name];
@@ -3023,7 +3053,7 @@ export class TimelineUIUtils {
       if (value > 0) {
         appendLegendRow(
             selfCategory.name, i18nString(UIStrings.sChildren, {PH1: selfCategory.title}), value,
-            selfCategory.childColor);
+            selfCategory.getCSSValue(selfCategory.childColor));
       }
     }
 
@@ -3033,7 +3063,8 @@ export class TimelineUIUtils {
       if (category === selfCategory) {
         continue;
       }
-      appendLegendRow(category.name, category.title, aggregatedStats[category.name], category.childColor);
+      appendLegendRow(
+          category.name, category.title, aggregatedStats[category.name], category.getCSSValue(category.color));
     }
 
     pieChart.data = {
@@ -3529,6 +3560,14 @@ export class TimelineCategory {
 
   get hidden(): boolean {
     return Boolean(this.hiddenInternal);
+  }
+
+  getCSSValue(color: string): string {
+    return `var(${color})`;
+  }
+
+  getComputedValue(color: string): string {
+    return ThemeSupport.ThemeSupport.instance().getComputedValue(color);
   }
 
   set hidden(hidden: boolean) {

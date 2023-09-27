@@ -4,12 +4,18 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
-import {addDecorationToEvent, buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
+import {
+  addDecorationToEvent,
+  buildGroupStyle,
+  buildTrackHeader,
+  getFormattedTime,
+} from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
   type HighlightedEntryInfo,
@@ -20,6 +26,11 @@ import * as TimelineComponents from './components/components.js';
 import {DEFAULT_CATEGORY_STYLES_PALETTE, EventStyles} from './EventUICategory.js';
 
 const UIStrings = {
+  /**
+   *@description Text shown for an entry in the flame chart that is ignored because it matches
+   * a predefined ignore list.
+   */
+  onIgnoreList: 'On ignore list',
   /**
    * @description Refers to the "Main frame", meaning the top level frame. See https://www.w3.org/TR/html401/present/frames.html
    * @example{example.com} PH1
@@ -89,17 +100,20 @@ export class ThreadAppender implements TrackAppender {
   #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
 
   #entries: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
+  #tree: TraceEngine.Handlers.ModelHandlers.Renderer.RendererTree;
   #processId: TraceEngine.Types.TraceEvents.ProcessID;
   #threadId: TraceEngine.Types.TraceEvents.ThreadID;
   #threadDefaultName: string;
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
+  #expanded = false;
   // Raster threads are rendered together under a singler header, so
   // the header is added for the first raster thread and skipped
   // thereafter.
   #rasterIndex: number;
+  #headerAppended: boolean = false;
   readonly threadType: ThreadType = ThreadType.MAIN_THREAD;
   readonly isOnMainFrame: boolean;
-
+  #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignoreListJSFramesOnTimeline');
   // TODO(crbug.com/1428024) Clean up API so that we don't have to pass
   // a raster index to the appender (for instance, by querying the flame
   // chart data in the appender or by passing data about the flamechart
@@ -126,10 +140,15 @@ export class ThreadAppender implements TrackAppender {
     this.#rasterIndex = rasterCount;
     this.#flameChartData = flameChartData;
     const entries = this.#traceParsedData.Renderer?.processes.get(processId)?.threads?.get(threadId)?.entries;
+    const tree = this.#traceParsedData.Renderer?.processes.get(processId)?.threads?.get(threadId)?.tree;
     if (!entries) {
       throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
     }
+    if (!tree) {
+      throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
+    }
     this.#entries = entries;
+    this.#tree = tree;
     this.#threadDefaultName = threadName || i18nString(UIStrings.threadS, {PH1: threadId});
     this.isOnMainFrame = Boolean(this.#traceParsedData.Renderer?.processes.get(processId)?.isOnMainFrame);
     this.threadType = type;
@@ -144,16 +163,30 @@ export class ThreadAppender implements TrackAppender {
    * @returns the first available level to append more data after having
    * appended the track's events.
    */
-  appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
+  appendTrackAtLevel(trackStartLevel: number, expanded: boolean = false): number {
     if (this.#entries.length === 0) {
       return trackStartLevel;
     }
-    if (this.threadType === ThreadType.RASTERIZER) {
-      this.#appendRasterHeaderAndTitle(trackStartLevel, expanded);
-    } else {
-      this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
+    this.#expanded = expanded;
+    return this.#appendTreeAtLevel(trackStartLevel);
+  }
+
+  /**
+   * Track header is appended only if there are events visible on it.
+   * Otherwise we don't append any track. So, instead of preemptively
+   * appending a track before appending its events, we only do so once
+   * we have detected that the track contains an event that is visible.
+   */
+  #ensureTrackHeaderAppended(trackStartLevel: number): void {
+    if (this.#headerAppended) {
+      return;
     }
-    return this.#appendThreadEntriesAtLevel(trackStartLevel);
+    this.#headerAppended = true;
+    if (this.threadType === ThreadType.RASTERIZER) {
+      this.#appendRasterHeaderAndTitle(trackStartLevel);
+    } else {
+      this.#appendTrackHeaderAtLevel(trackStartLevel);
+    }
   }
 
   /**
@@ -165,10 +198,10 @@ export class ThreadAppender implements TrackAppender {
    * @param currentLevel the flame chart level at which the header is
    * appended.
    */
-  #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
+  #appendTrackHeaderAtLevel(currentLevel: number): void {
     const trackIsCollapsible = this.#entries.length > 0;
     const style = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
-    const group = buildTrackHeader(currentLevel, this.#buildNameForTrack(), style, /* selectable= */ true, expanded);
+    const group = buildTrackHeader(currentLevel, this.trackName(), style, /* selectable= */ true, this.#expanded);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
   }
   /**
@@ -176,34 +209,28 @@ export class ThreadAppender implements TrackAppender {
    * flamechart. However, each thread has a unique title which needs to
    * be added to the flamechart data.
    */
-  #appendRasterHeaderAndTitle(trackStartLevel: number, expanded?: boolean): void {
+  #appendRasterHeaderAndTitle(trackStartLevel: number): void {
     if (this.#rasterIndex === 1) {
       const trackIsCollapsible = this.#entries.length > 0;
       const headerStyle = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
       const headerGroup =
-          buildTrackHeader(trackStartLevel, this.#buildNameForTrack(), headerStyle, /* selectable= */ false, expanded);
+          buildTrackHeader(trackStartLevel, this.trackName(), headerStyle, /* selectable= */ false, this.#expanded);
       this.#flameChartData.groups.push(headerGroup);
     }
     // Nesting is set to 1 because the track is appended inside the
     // header for all raster threads.
     const titleStyle = buildGroupStyle({padding: 2, nestingLevel: 1, collapsible: false});
-    // TODO(crbug.com/1428024) Once the thread appenders are ready to
-    // be shipped, use the i18n API.
-    const rasterizerTitle = `[RPP] ${i18nString(UIStrings.rasterizerThreadS, {PH1: this.#rasterIndex})}`;
-    const titleGroup = buildTrackHeader(trackStartLevel, rasterizerTitle, titleStyle, /* selectable= */ true, expanded);
+    const rasterizerTitle = i18nString(UIStrings.rasterizerThreadS, {PH1: this.#rasterIndex});
+    const titleGroup =
+        buildTrackHeader(trackStartLevel, rasterizerTitle, titleStyle, /* selectable= */ true, this.#expanded);
     this.#compatibilityBuilder.registerTrackForGroup(titleGroup, this);
   }
 
-  #buildNameForTrack(): string {
+  trackName(): string {
     // This UI string doesn't yet use the i18n API because it is not
     // shown in production, only in the component server, reason being
     // it is not ready to be shipped.
-    // TODO(crbug.com/1428024) Once the thread appenders are ready to
-    // be shipped, use the i18n API.
-    const newEnginePrefix = '[RPP] ';
-    let name = newEnginePrefix;
     const url = this.#traceParsedData.Renderer?.processes.get(this.#processId)?.url || '';
-
     let threadTypeLabel: string|null = null;
     switch (this.threadType) {
       case ThreadType.MAIN_THREAD:
@@ -221,8 +248,7 @@ export class ThreadAppender implements TrackAppender {
       default:
         return Platform.assertNever(this.threadType, `Unknown thread type: ${this.threadType}`);
     }
-    name += threadTypeLabel || this.#threadDefaultName;
-    return name;
+    return threadTypeLabel || this.#threadDefaultName;
   }
 
   #buildNameForWorker(): string {
@@ -249,30 +275,98 @@ export class ThreadAppender implements TrackAppender {
    * @returns the next level after the last occupied by the appended
    * entries (the first available level to append more data).
    */
-  #appendThreadEntriesAtLevel(trackStartLevel: number): number {
-    const newLevel = this.#compatibilityBuilder.appendEventsAtLevel(this.#entries, trackStartLevel, this);
-    this.#addDecorations();
-    return newLevel;
+  #appendTreeAtLevel(trackStartLevel: number): number {
+    // We can not used the tree maxDepth in the tree from the
+    // RendererHandler because ignore listing and visibility of events
+    // alter the final depth of the flame chart.
+    return this.#appendNodesAtLevel(this.#tree.roots, trackStartLevel);
   }
-  #addDecorations(): void {
-    for (const entry of this.#entries) {
-      const index = this.#compatibilityBuilder.indexForEvent(entry);
-      if (!index) {
-        continue;
+
+  /**
+   * Traverses the trees formed by the provided nodes in breadth first
+   * fashion and appends each node's entry on each iteration. As each
+   * entry is handled, a check for the its visibility or if it's ignore
+   * listed is done before appending.
+   */
+  #appendNodesAtLevel(
+      nodes: Iterable<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode>, startingLevel: number,
+      parentIsIgnoredListed: boolean = false): number {
+    let maxDepthInTree = startingLevel;
+    for (const node of nodes) {
+      let nextLevel = startingLevel;
+      const entry = node.entry;
+      const entryIsIgnoreListed = this.isIgnoreListedEntry(entry);
+      const entryIsVisible = this.#compatibilityBuilder.entryIsVisibleInTimeline(entry);
+      // For ignore listing support, these two conditions need to be met
+      // to not append a profile call to the flame chart:
+      // 1. It is ignore listed
+      // 2. It is NOT the bottom-most call in an ignore listed stack (a
+      //    set of chained profile calls that belong to ignore listed
+      //    URLs).
+      // This means that all of the ignore listed calls are ignored (not
+      // appended), except if it is the bottom call of an ignored stack.
+      // This is becaue to represent ignore listed stack frames, we add
+      // a flame chart entry with the length and position of the bottom
+      // frame, which is distictively marked to denote an ignored listed
+      // stack.
+      const skipEventDueToIgnoreListing = entryIsIgnoreListed && parentIsIgnoredListed;
+      if (entryIsVisible && !skipEventDueToIgnoreListing) {
+        this.#appendEntryAtLevel(entry, startingLevel);
+        nextLevel++;
       }
-      const warnings = this.#traceParsedData.Warnings.perEvent.get(entry);
-      if (!warnings) {
-        continue;
-      }
-      addDecorationToEvent(this.#flameChartData, index, {type: 'WARNING_TRIANGLE'});
-      if (!warnings.includes('LONG_TASK')) {
-        continue;
-      }
-      addDecorationToEvent(this.#flameChartData, index, {
-        type: 'CANDY',
-        startAtTime: TraceEngine.Handlers.ModelHandlers.Warnings.LONG_MAIN_THREAD_TASK_THRESHOLD,
-      });
+
+      const depthInChildTree = this.#appendNodesAtLevel(node.children, nextLevel, entryIsIgnoreListed);
+      maxDepthInTree = Math.max(depthInChildTree, maxDepthInTree);
     }
+    return maxDepthInTree;
+  }
+
+  #appendEntryAtLevel(entry: TraceEngine.Types.TraceEvents.TraceEventData, level: number): void {
+    // Events' visibility is determined from their predefined styles,
+    // which is something that's not available in the engine data.
+    // Thus it needs to be checked in the appenders, but preemptively
+    // checking if there are visible events and returning early if not
+    // is potentially expensive since, in theory, we would be adding
+    // another traversal to the entries array (which could grow
+    // large). To avoid the extra cost we  add the check in the
+    // traversal we already need to append events.
+    if (!this.#compatibilityBuilder.entryIsVisibleInTimeline(entry)) {
+      return;
+    }
+    this.#ensureTrackHeaderAppended(level);
+    const index = this.#compatibilityBuilder.appendEventAtLevel(entry, level, this);
+    this.#addDecorationsToEntry(entry, index);
+  }
+
+  #addDecorationsToEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData, index: number): void {
+    const warnings = this.#traceParsedData.Warnings.perEvent.get(entry);
+    if (!warnings) {
+      return;
+    }
+    addDecorationToEvent(this.#flameChartData, index, {type: 'WARNING_TRIANGLE'});
+    if (!warnings.includes('LONG_TASK')) {
+      return;
+    }
+    addDecorationToEvent(this.#flameChartData, index, {
+      type: 'CANDY',
+      startAtTime: TraceEngine.Handlers.ModelHandlers.Warnings.LONG_MAIN_THREAD_TASK_THRESHOLD,
+    });
+  }
+
+  isIgnoreListedEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+    if (!this.#ignoreListingEnabled) {
+      return false;
+    }
+
+    if (!TraceEngine.Types.TraceEvents.isProfileCall(entry)) {
+      return false;
+    }
+    const url = entry.callFrame.url as Platform.DevToolsPath.UrlString;
+    return url && this.isIgnoreListedURL(url);
+  }
+
+  private isIgnoreListedURL(url: Platform.DevToolsPath.UrlString): boolean {
+    return Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url);
   }
 
   /*
@@ -304,12 +398,29 @@ export class ThreadAppender implements TrackAppender {
   /**
    * Gets the title an event added by this appender should be rendered with.
    */
-  titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    if (TraceEngine.Types.TraceEvents.isProfileCall(event)) {
-      return event.callFrame.functionName || i18nString(UIStrings.anonymous);
+  titleForEvent(entry: TraceEngine.Types.TraceEvents.TraceEventData): string {
+    if (this.isIgnoreListedEntry(entry)) {
+      return i18nString(UIStrings.onIgnoreList);
     }
-    const defaultName = EventStyles.get(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.label();
-    return defaultName || event.name;
+
+    if (TraceEngine.Types.TraceEvents.isProfileCall(entry)) {
+      // If we have a profile call, we need to check the CPU Profile to see if
+      // we have set a function name for this entry. This can happen when
+      // source maps are resolved. But we might not have resolved it, so we
+      // only use this name if it exists and is not undefined/an empty string.
+      if (this.#traceParsedData.Samples) {
+        const profile = this.#traceParsedData.Samples.profilesInProcess.get(entry.pid)?.get(entry.tid);
+        const node = profile?.parsedProfile.nodeById(entry.nodeId);
+        if (node?.functionName) {
+          return node.functionName;
+        }
+      }
+
+      return entry.callFrame.functionName || i18nString(UIStrings.anonymous);
+    }
+
+    const defaultName = EventStyles.get(entry.name as TraceEngine.Types.TraceEvents.KnownEventName)?.label();
+    return defaultName || entry.name;
   }
 
   /**

@@ -91,7 +91,7 @@ describeWithEnvironment('PreloadingGrid', async () => {
         },
         ['URL', 'Action', 'Rule set', 'Status'],
         [
-          ['/prefetched.html', 'prefetch', 'example.com/', 'Running'],
+          ['/prefetched.html', 'Prefetch', 'example.com/', 'Running'],
         ],
     );
   });
@@ -135,7 +135,7 @@ describeWithEnvironment('PreloadingGrid', async () => {
         },
         ['URL', 'Action', 'Rule set', 'Status'],
         [
-          ['https://cross-origin.example.com/prefetched.html', 'prefetch', 'example.com/', 'Running'],
+          ['https://cross-origin.example.com/prefetched.html', 'Prefetch', 'example.com/', 'Running'],
         ],
     );
   });
@@ -180,7 +180,7 @@ describeWithEnvironment('PreloadingGrid', async () => {
         },
         ['URL', 'Action', 'Rule set', 'Status'],
         [
-          ['/prefetched.html', 'prefetch', 'example.com/assets/speculation-rules.json', 'Running'],
+          ['/prefetched.html', 'Prefetch', 'example.com/assets/speculation-rules.json', 'Running'],
         ],
     );
   });
@@ -258,8 +258,8 @@ describeWithEnvironment('PreloadingGrid', async () => {
         },
         ['URL', 'Action', 'Rule set', 'Status'],
         [
-          ['/rule-set-missing.html', 'prefetch', '', 'Running'],
-          ['/multiple-rule-sets.html', 'prefetch', 'example.com/', 'Running'],
+          ['/rule-set-missing.html', 'Prefetch', '', 'Running'],
+          ['/multiple-rule-sets.html', 'Prefetch', 'example.com/', 'Running'],
         ],
     );
   });
@@ -306,7 +306,7 @@ describeWithEnvironment('PreloadingGrid', async () => {
         [
           [
             '/prerendered.html',
-            'prerender',
+            'Prerender',
             'example.com/',
             ' Failure - The prerendered page used a forbidden JavaScript API that is currently not supported. (Internal Mojo interface: device.mojom.GamepadMonitor)',
           ],
@@ -317,7 +317,7 @@ describeWithEnvironment('PreloadingGrid', async () => {
     const cell = getCellByIndexes(grid.shadowRoot, {row: 1, column: 3});
     const div = cell.querySelector('div');
     assertNotNullOrUndefined(div);
-    assert.strictEqual(div.getAttribute('style'), 'color: var(--color-error);');
+    assert.strictEqual(div.getAttribute('style'), 'color: var(--sys-color-error);');
     const icon = div.children[0];
     assertNotNullOrUndefined(icon);
     assertShadowRoot(icon.shadowRoot);

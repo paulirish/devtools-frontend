@@ -14,7 +14,6 @@ import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {CountersGraph} from './CountersGraph.js';
-
 import {Events as PerformanceModelEvents, type PerformanceModel, type WindowChangedEvent} from './PerformanceModel.js';
 import {TimelineDetailsView} from './TimelineDetailsView.js';
 import {TimelineRegExp} from './TimelineFilters.js';
@@ -23,13 +22,10 @@ import {
   TimelineFlameChartDataProvider,
 } from './TimelineFlameChartDataProvider.js';
 import {TimelineFlameChartNetworkDataProvider} from './TimelineFlameChartNetworkDataProvider.js';
-
-import {type TimelineModeViewDelegate} from './TimelinePanel.js';
-
+import {ThreadTracksSource, type TimelineModeViewDelegate} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 import {AggregatedTimelineTreeView} from './TimelineTreeView.js';
-
-import {TimelineUIUtils, type TimelineMarkerStyle} from './TimelineUIUtils.js';
+import {type TimelineMarkerStyle, TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -48,6 +44,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private model: PerformanceModel|null;
   private searchResults!: number[]|undefined;
   private eventListeners: Common.EventTarget.EventDescriptor[];
+  private currBreadcrumbTimeWindow?: TraceEngine.Types.Timing.TraceWindow;
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly showMemoryGraphSetting: Common.Settings.Setting<any>;
@@ -78,7 +75,8 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private searchRegex?: RegExp;
   #traceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null;
 
-  constructor(delegate: TimelineModeViewDelegate) {
+  constructor(
+      delegate: TimelineModeViewDelegate, threadTracksSource: ThreadTracksSource = ThreadTracksSource.BOTH_ENGINES) {
     super();
     this.element.classList.add('timeline-flamechart');
     this.delegate = delegate;
@@ -96,7 +94,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
 
     const mainViewGroupExpansionSetting =
         Common.Settings.Settings.instance().createSetting('timelineFlamechartMainViewGroupExpansion', {});
-    this.mainDataProvider = new TimelineFlameChartDataProvider();
+    this.mainDataProvider = new TimelineFlameChartDataProvider(threadTracksSource);
     this.mainDataProvider.addEventListener(
         TimelineFlameChartDataProviderEvents.DataChanged, () => this.mainFlameChart.scheduleUpdate());
     this.mainFlameChart = new PerfUI.FlameChart.FlameChart(this.mainDataProvider, this, mainViewGroupExpansionSetting);
@@ -108,7 +106,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.networkDataProvider = new TimelineFlameChartNetworkDataProvider();
     this.networkFlameChart =
         new PerfUI.FlameChart.FlameChart(this.networkDataProvider, this, this.networkFlameChartGroupExpansionSetting);
-    this.networkFlameChart.alwaysShowVerticalScroll();
+    this.networkFlameChart.showVerticalScrollOnExpand();
 
     this.networkPane = new UI.Widget.VBox();
     this.networkPane.setMinimumSize(23, 23);
@@ -169,9 +167,23 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
 
   private onWindowChanged(event: Common.EventTarget.EventTargetEvent<WindowChangedEvent>): void {
     const {window, animate} = event.data;
-    this.mainFlameChart.setWindowTimes(window.left, window.right, animate);
-    this.networkFlameChart.setWindowTimes(window.left, window.right, animate);
-    this.networkDataProvider.setWindowTimes(window.left, window.right);
+
+    if (event.data.breadcrumbWindow) {
+      this.currBreadcrumbTimeWindow = event.data.breadcrumbWindow;
+      this.mainFlameChart.setTotalAndMinimumBreadcrumbValues(
+          event.data.breadcrumbWindow.min, event.data.breadcrumbWindow.range);
+      this.networkFlameChart.setTotalAndMinimumBreadcrumbValues(
+          event.data.breadcrumbWindow.min, event.data.breadcrumbWindow.range);
+      this.mainFlameChart.update();
+    }
+
+    if (this.currBreadcrumbTimeWindow &&
+        !(this.currBreadcrumbTimeWindow.min > window.left || this.currBreadcrumbTimeWindow.max < window.right)) {
+      this.mainFlameChart.setWindowTimes(window.left, window.right, animate);
+      this.networkFlameChart.setWindowTimes(window.left, window.right, animate);
+      this.networkDataProvider.setWindowTimes(window.left, window.right);
+    }
+
     this.updateSearchResults(false, false);
   }
 

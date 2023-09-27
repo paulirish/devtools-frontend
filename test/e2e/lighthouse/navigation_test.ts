@@ -82,17 +82,12 @@ describe('Navigation', async function() {
     ]);
 
     let numNavigations = 0;
-    const {target, frontend} = getBrowserAndPages();
+    const {target} = getBrowserAndPages();
     target.on('framenavigated', () => {
       ++numNavigations;
-      if (numNavigations === 6) {
-        void frontend.bringToFront();
-      }
     });
 
     await clickStartButton();
-
-    await target.bringToFront();
 
     const {lhr, artifacts, reportEl} = await waitForResult();
 
@@ -102,7 +97,7 @@ describe('Navigation', async function() {
     // 1 navigation after auditing to reset state
     assert.strictEqual(numNavigations, 6);
 
-    assert.strictEqual(lhr.lighthouseVersion, '11.0.0');
+    assert.strictEqual(lhr.lighthouseVersion, '11.1.0');
     assert.match(lhr.finalUrl, /^https:\/\/localhost:[0-9]+\/test\/e2e\/resources\/lighthouse\/hello.html/);
 
     assert.strictEqual(lhr.configSettings.throttlingMethod, 'simulate');
@@ -132,7 +127,6 @@ describe('Navigation', async function() {
       'document-title',
       'html-has-lang',
       'meta-description',
-      'bf-cache',
     ]);
 
     const viewTraceButton = await $textContent('View Trace', reportEl);
@@ -194,9 +188,6 @@ describe('Navigation', async function() {
 
     await clickStartButton();
 
-    const {target} = getBrowserAndPages();
-    await target.bringToFront();
-
     const {lhr, reportEl} = await waitForResult();
 
     assert.strictEqual(lhr.configSettings.throttlingMethod, 'devtools');
@@ -205,6 +196,7 @@ describe('Navigation', async function() {
     const flakyAudits = [
       'server-response-time',
       'render-blocking-resources',
+      'max-potential-fid',
     ];
 
     const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, flakyAudits);
@@ -218,7 +210,6 @@ describe('Navigation', async function() {
       'document-title',
       'html-has-lang',
       'meta-description',
-      'bf-cache',
     ]);
 
     const viewTraceButton = await $textContent('View Trace', reportEl);
@@ -235,9 +226,6 @@ describe('Navigation', async function() {
     await selectDevice('desktop');
 
     await clickStartButton();
-
-    const {target} = getBrowserAndPages();
-    await target.bringToFront();
 
     const {reportEl, lhr, artifacts} = await waitForResult();
 

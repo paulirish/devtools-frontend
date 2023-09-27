@@ -32,6 +32,7 @@ import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -69,6 +70,10 @@ export class OverviewGrid {
     this.element.appendChild(this.grid.element);
 
     this.window = new Window(this.element, this.grid.dividersLabelBarElement, calculator);
+  }
+
+  enableCreateBreadcrumbsButton(): void {
+    this.window.enableCreateBreadcrumbsButton();
   }
 
   clientWidth(): number {
@@ -134,6 +139,10 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private rightResizeElement: HTMLElement;
   private leftCurtainElement: HTMLElement;
   private rightCurtainElement: HTMLElement;
+  private breadcrumbButtonContainerElement: HTMLElement;
+  private createBreadcrumbButton: HTMLElement;
+  private curtainsRange?: HTMLElement;
+
   private overviewWindowSelector!: WindowSelector|undefined;
   private offsetLeft!: number;
   private dragStartPoint!: number;
@@ -144,6 +153,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private enabled?: boolean;
   private clickHandler?: ((arg0: Event) => boolean)|null;
   private resizerParentOffsetLeft?: number;
+  private breadcrumbsEnabled: boolean = false;
   constructor(parentElement: Element, dividersLabelBarElement?: Element, calculator?: Calculator) {
     super();
     this.parentElement = parentElement;
@@ -187,7 +197,30 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     this.rightResizeElement.addEventListener('focus', this.onRightResizeElementFocused.bind(this));
     this.leftCurtainElement = (parentElement.createChild('div', 'window-curtain-left') as HTMLElement);
     this.rightCurtainElement = (parentElement.createChild('div', 'window-curtain-right') as HTMLElement);
+
+    this.breadcrumbButtonContainerElement = (parentElement.createChild('div') as HTMLElement);
+    this.createBreadcrumbButton = (this.breadcrumbButtonContainerElement.createChild('div') as HTMLElement);
     this.reset();
+  }
+
+  enableCreateBreadcrumbsButton(): void {
+    this.curtainsRange = (this.createBreadcrumbButton.createChild('div') as HTMLElement);
+    this.breadcrumbButtonContainerElement.classList.add('create-breadcrumb-button-container');
+    this.createBreadcrumbButton.classList.add('create-breadcrumb-button');
+
+    const zoomIcon = new IconButton.Icon.Icon();
+    zoomIcon.data = {
+      iconName: 'zoom-in',
+      color: 'var(--icon-default)',
+      width: '20px',
+      height: '20px',
+    };
+    this.createBreadcrumbButton.appendChild(zoomIcon);
+    this.createBreadcrumbButton.addEventListener('click', () => {
+      this.createBreadcrumb();
+    });
+
+    this.breadcrumbsEnabled = true;
   }
 
   private onRightResizeElementFocused(): void {
@@ -297,6 +330,12 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     }
     const mouseEvent = (event as MouseEvent);
     const window = this.overviewWindowSelector.close(mouseEvent.x - this.offsetLeft);
+
+    // prevent selecting a window on clicking the minimap if breadcrumbs are enabled
+    if (this.breadcrumbsEnabled && window.start === window.end) {
+      return;
+    }
+
     delete this.overviewWindowSelector;
     const clickThreshold = 3;
     if (window.end - window.start < clickThreshold) {
@@ -425,6 +464,17 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
       this.dispatchEventToListeners(Events.WindowChangedWithPosition, this.calculateWindowPosition());
     }
     this.dispatchEventToListeners(Events.WindowChanged);
+    this.changeBreadcrumbButtonVisibility(windowLeft, windowRight);
+  }
+
+  // Add breadcrumb button is only visible when the window is set to something other than the full range
+  private changeBreadcrumbButtonVisibility(windowLeft: number, windowRight: number): void {
+    this.breadcrumbButtonContainerElement.style.visibility =
+        (windowRight >= 1 && windowLeft <= 0) ? 'hidden' : 'visible';
+  }
+
+  createBreadcrumb(): void {
+    this.dispatchEventToListeners(Events.BreadcrumbAdded, this.calculateWindowPosition());
   }
 
   private updateCurtains(): void {
@@ -457,6 +507,13 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
 
     this.leftCurtainElement.style.width = leftResizerPercLeftOffsetString;
     this.rightCurtainElement.style.width = rightResizerPercRightOffset + '%';
+
+    this.breadcrumbButtonContainerElement.style.marginLeft = leftResizerPercLeftOffsetString;
+    this.breadcrumbButtonContainerElement.style.marginRight = (100 - rightResizerPercLeftOffset) + '%';
+
+    if (this.curtainsRange) {
+      this.curtainsRange.textContent = (this.getRawSliderValue(false) - this.getRawSliderValue(true)).toFixed(0) + 'ms';
+    }
 
     this.updateResizeElementPositionValue(leftResizerPercLeftOffset, rightResizerPercLeftOffset);
     if (this.calculator) {
@@ -527,6 +584,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
 export enum Events {
   WindowChanged = 'WindowChanged',
   WindowChangedWithPosition = 'WindowChangedWithPosition',
+  BreadcrumbAdded = 'BreadcrumbAdded',
 }
 
 export interface WindowChangedWithPositionEvent {
@@ -536,6 +594,7 @@ export interface WindowChangedWithPositionEvent {
 
 export type EventTypes = {
   [Events.WindowChanged]: void,
+  [Events.BreadcrumbAdded]: WindowChangedWithPositionEvent,
   [Events.WindowChangedWithPosition]: WindowChangedWithPositionEvent,
 };
 

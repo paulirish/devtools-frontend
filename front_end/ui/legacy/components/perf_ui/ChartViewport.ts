@@ -45,13 +45,13 @@ export class ChartViewport extends UI.Widget.VBox {
   private targetLeftTime!: number;
   private targetRightTime!: number;
   private selectionOffsetShiftX!: number;
-  private selectionOffsetShiftY!: number;
   private selectionStartX!: number|null;
-  private lastMouseOffsetX!: number;
+  private lastMouseOffsetX?: number;
   private minimumBoundary!: number;
   private totalTime!: number;
   private isUpdateScheduled?: boolean;
   private cancelWindowTimesAnimation?: (() => void)|null;
+  #showVerticalScrollOnExpandInternal: boolean;
 
   constructor(delegate: ChartViewportDelegate) {
     super();
@@ -74,6 +74,7 @@ export class ChartViewport extends UI.Widget.VBox {
         this.endRangeSelection.bind(this), 'text', null);
 
     this.alwaysShowVerticalScrollInternal = false;
+    this.#showVerticalScrollOnExpandInternal = false;
     this.rangeSelectionEnabled = true;
     this.vScrollElement = this.contentElement.createChild('div', 'chart-viewport-v-scroll');
     this.vScrollContent = this.vScrollElement.createChild('div');
@@ -94,6 +95,10 @@ export class ChartViewport extends UI.Widget.VBox {
   alwaysShowVerticalScroll(): void {
     this.alwaysShowVerticalScrollInternal = true;
     this.vScrollElement.classList.add('always-show-scrollbar');
+  }
+
+  showVerticalScrollOnExpand(): void {
+    this.#showVerticalScrollOnExpandInternal = true;
   }
 
   disableRangeSelection(): void {
@@ -120,8 +125,14 @@ export class ChartViewport extends UI.Widget.VBox {
     this.updateContentElementSize();
   }
 
+  toggleScrollbar(expanded: boolean): void {
+    this.vScrollElement.classList.toggle('hidden', expanded);
+  }
+
   override onResize(): void {
-    this.updateScrollBar();
+    if (!this.#showVerticalScrollOnExpandInternal) {
+      this.updateScrollBar();
+    }
     this.updateContentElementSize();
     this.scheduleUpdate();
   }
@@ -159,7 +170,9 @@ export class ChartViewport extends UI.Widget.VBox {
   setContentHeight(totalHeight: number): void {
     this.totalHeight = totalHeight;
     this.vScrollContent.style.height = totalHeight + 'px';
-    this.updateScrollBar();
+    if (!this.#showVerticalScrollOnExpandInternal) {
+      this.updateScrollBar();
+    }
     this.updateContentElementSize();
     if (this.scrollTop + this.offsetHeight <= totalHeight) {
       return;
@@ -239,7 +252,6 @@ export class ChartViewport extends UI.Widget.VBox {
     }
     this.isDraggingInternal = true;
     this.selectionOffsetShiftX = event.offsetX - event.pageX;
-    this.selectionOffsetShiftY = event.offsetY - event.pageY;
     this.selectionStartX = event.offsetX;
     const style = this.selectionOverlay.style;
     style.left = this.selectionStartX + 'px';
@@ -379,7 +391,10 @@ export class ChartViewport extends UI.Widget.VBox {
 
   private handleZoomGesture(zoom: number): void {
     const bounds = {left: this.targetLeftTime, right: this.targetRightTime};
-    const cursorTime = this.pixelToTime(this.lastMouseOffsetX);
+    // If the user has not moved their mouse over the panel (unlikely but
+    // possible!), the offsetX will be undefined. In that case, let's just use
+    // the minimum time / pixel 0 as their mouse point.
+    const cursorTime = this.pixelToTime(this.lastMouseOffsetX || 0);
     bounds.left += (bounds.left - cursorTime) * zoom;
     bounds.right += (bounds.right - cursorTime) * zoom;
     this.requestWindowTimes(bounds, /* animate */ true);

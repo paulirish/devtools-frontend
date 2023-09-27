@@ -65,11 +65,15 @@ describe('Timespan', async function() {
     await target.click('button');
     await target.click('button');
 
+    // Wait for content to be painted so that the INP event gets emitted.
+    // If we don't do this, `frontend.bringToFront()` can disable paints on the target page before INP is emitted.
+    await target.evaluate(() => {
+      return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+
     await frontend.bringToFront();
 
     await endTimespan();
-
-    await target.bringToFront();
 
     const {lhr, artifacts, reportEl} = await waitForResult();
 
