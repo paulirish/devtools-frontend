@@ -7,28 +7,13 @@ import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
 import {DevToolsLocale} from './DevToolsLocale.js';
-
-// import {
-//   BUNDLED_LOCALES as BUNDLED_LOCALES_GENERATED,
-//   DEFAULT_LOCALE,
-//   LOCAL_FETCH_PATTERN,
-//   LOCALES,
-//   REMOTE_FETCH_PATTERN,
-// } from './locales.js';
-
-const LOCALES = ['en-GB'];
-const BUNDLED_LOCALES_GENERATED = [
-  'en-US',
-  'zh',
-  'en-XL',
-];
-
-const DEFAULT_LOCALE = 'en-US';
-
-const REMOTE_FETCH_PATTERN = '@HOST@/remote/serve_file/@VERSION@/core/i18n/locales/@LOCALE@.json';
-
-const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';
-
+import {
+  BUNDLED_LOCALES as BUNDLED_LOCALES_GENERATED,
+  DEFAULT_LOCALE,
+  LOCAL_FETCH_PATTERN,
+  LOCALES,
+  REMOTE_FETCH_PATTERN,
+} from './locales.js';
 
 import type * as i18nTypes from './i18nTypes.js';
 

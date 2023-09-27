@@ -7,10 +7,10 @@
 
 import fs from 'fs';
 import zlib from 'zlib';
+// eslint-disable-next-line rulesdir/es_modules_import
+import * as TraceModel from './out/Default/gen/trace_engine/trace.mjs';
 
-loadBrowserPolyfills(); // Must precede the import (for `location` and `navigator`)
-
-export const TraceModel = await import('./out/Default/gen/trace_engine/trace.mjs');
+polyfillDOMRect();
 
 // If run as CLI, parse the argv trace (or a fallback)
 if (import.meta.url.endsWith(process.argv[1])) {
@@ -57,13 +57,9 @@ function isGzip(ab) {
   return buf[0] === 0x1F && buf[1] === 0x8B && buf[2] === 0x08;
 }
 
-function loadBrowserPolyfills() {
+function polyfillDOMRect() {
 
   // devtools assumes clientside :(
-  globalThis.location = new URL('devtools://devtools/bundled/devtools_app.html');
-  globalThis.navigator = {
-    language: 'en-US'
-  };
 
   // Everything else in here is the DOMRect polyfill
   // https://raw.githubusercontent.com/JakeChampion/polyfill-library/master/polyfills/DOMRect/polyfill.js
