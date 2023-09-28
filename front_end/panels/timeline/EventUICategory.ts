@@ -78,7 +78,7 @@ const UIStrings = {
    *@description Noun for an event in the Performance panel. This marks time
     spent in an operation that only happens when the profiler is active.
    */
-  profilingOverhead: 'Profiling Overhead',
+  jsProfilerStartup: 'JS Profiler Startup',
   /**
    *@description The process the browser uses to determine a target element for a
    *pointer event. Typically, this is determined by considering the pointer's
@@ -548,7 +548,7 @@ export const EventStyles: Map<
       ],
       [
         TraceEngine.Types.TraceEvents.KnownEventName.StartProfiling,
-        {categoryStyle: DEFAULT_CATEGORY_STYLES_PALETTE.Other, label: i18nLazyString(UIStrings.profilingOverhead)},
+        {categoryStyle: DEFAULT_CATEGORY_STYLES_PALETTE.Other, label: i18nLazyString(UIStrings.jsProfilerStartup)},
       ],
       [
         TraceEngine.Types.TraceEvents.KnownEventName.Animation,
@@ -764,7 +764,7 @@ export const EventStyles: Map<
       ],
       [
         TraceEngine.Types.TraceEvents.KnownEventName.FinalizeDeserialization,
-        {categoryStyle: DEFAULT_CATEGORY_STYLES_PALETTE.Other, label: i18nLazyString(UIStrings.profilingOverhead)},
+        {categoryStyle: DEFAULT_CATEGORY_STYLES_PALETTE.Other, label: i18nLazyString(UIStrings.jsProfilerStartup)},
       ],
       [
         TraceEngine.Types.TraceEvents.KnownEventName.WasmStreamFromResponseCallback,

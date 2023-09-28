@@ -948,7 +948,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         const startLine = event.args['beginData']['startLine'];
         const endLine = event.args['endData'] && event.args['endData']['endLine'];
         const url = Bindings.ResourceUtils.displayNameForURL(event.args['beginData']['url']);
-        const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
+        const range = (endLine !== -1 || endLine === startLine) ? `${startLine}…${endLine}` : startLine;
         title += ` - ${url} [${range}]`;
       }
 

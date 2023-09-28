@@ -105,7 +105,7 @@ const UIStrings = {
    *@description Noun for an event in the Performance panel. This marks time
    spent in an operation that only happens when the profiler is active.
    */
-  profilingOverhead: 'Profiling Overhead',
+  jsProfilerStartup: 'JS Profiler Startup',
   /**
    *@description The process the browser uses to determine a target element for a
    *pointer event. Typically, this is determined by considering the pointer's
@@ -1198,7 +1198,7 @@ export class TimelineUIUtils {
     const eventStyles: EventStylesMap = {};
     eventStyles[type.Task] = new TimelineRecordStyle(i18nString(UIStrings.task), other);
     eventStyles[type.Program] = new TimelineRecordStyle(i18nString(UIStrings.other), other);
-    eventStyles[type.StartProfiling] = new TimelineRecordStyle(UIStrings.profilingOverhead, other);
+    eventStyles[type.StartProfiling] = new TimelineRecordStyle(UIStrings.jsProfilerStartup, other);
     eventStyles[type.Animation] = new TimelineRecordStyle(i18nString(UIStrings.animation), rendering);
     eventStyles[type.EventDispatch] = new TimelineRecordStyle(i18nString(UIStrings.event), scripting);
     eventStyles[type.RequestMainThreadFrame] =
@@ -1252,7 +1252,7 @@ export class TimelineUIUtils {
         new TimelineRecordStyle(i18nString(UIStrings.parseAndCompile), scripting);
     eventStyles[type.BackgroundDeserialize] =
         new TimelineRecordStyle(i18nString(UIStrings.deserializeCodeCache), scripting);
-    eventStyles[type.FinalizeDeserialization] = new TimelineRecordStyle(UIStrings.profilingOverhead, other);
+    eventStyles[type.FinalizeDeserialization] = new TimelineRecordStyle(UIStrings.jsProfilerStartup, other);
     eventStyles[type.WasmStreamFromResponseCallback] =
         new TimelineRecordStyle(i18nString(UIStrings.streamingWasmResponse), scripting);
     eventStyles[type.WasmCompiledModule] = new TimelineRecordStyle(i18nString(UIStrings.compiledWasmModule), scripting);

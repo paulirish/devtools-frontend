@@ -437,7 +437,7 @@ export class ThreadAppender implements TrackAppender {
       const endLine = event.args['endData'] && event.args['endData']['endLine'];
       const eventURL = event.args['beginData']['url'] as Platform.DevToolsPath.UrlString;
       const url = Bindings.ResourceUtils.displayNameForURL(eventURL);
-      const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
+      const range = (endLine !== -1 || endLine === startLine) ? `${startLine}…${endLine}` : startLine;
       title += ` - ${url} [${range}]`;
     }
     const warningElements: HTMLSpanElement[] =
