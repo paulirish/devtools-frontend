@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Bindings from '../../models/bindings/bindings.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
@@ -23,8 +25,9 @@ let originalRequestMetadata;
 BindingsTestRunner.overrideNetworkModificationTime = function(urlToTime) {
   if (!timeOverrides) {
     timeOverrides = new Map();
-    originalRequestMetadata =
-        TestRunner.override(Bindings.ContentProviderBasedProject.prototype, 'requestMetadata', overrideTime, true);
+    originalRequestMetadata = TestRunner.override(
+        Bindings.ContentProviderBasedProject.ContentProviderBasedProject.prototype, 'requestMetadata', overrideTime,
+        true);
   }
 
   for (const url in urlToTime) {
@@ -51,7 +54,7 @@ BindingsTestRunner.overrideNetworkModificationTime = function(urlToTime) {
 
 BindingsTestRunner.AutomappingTest = function(workspace) {
   this.workspace = workspace;
-  this.networkProject = new Bindings.ContentProviderBasedProject(
+  this.networkProject = new Bindings.ContentProviderBasedProject.ContentProviderBasedProject(
       this.workspace, 'AUTOMAPPING', Workspace.projectTypes.Network, 'simple website');
 
   if (workspace !== self.Workspace.workspace) {
@@ -76,7 +79,8 @@ BindingsTestRunner.AutomappingTest.prototype = {
     for (const url in assets) {
       const asset = assets[url];
       const contentType = asset.contentType || Common.ResourceType.resourceTypes.Script;
-      const contentProvider = TextUtils.StaticContentProvider.fromString(url, contentType, asset.content);
+      const contentProvider =
+          TextUtils.StaticContentProvider.StaticContentProvider.fromString(url, contentType, asset.content);
       const metadata =
           (typeof asset.content === 'string' || asset.time ?
                new Workspace.UISourceCodeMetadata(asset.time, asset.content.length) :

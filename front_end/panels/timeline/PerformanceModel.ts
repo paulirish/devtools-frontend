@@ -85,8 +85,6 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     });
     this.frameModelInternal.addTraceEvents(
         this.mainTargetInternal, this.timelineModelInternal.inspectedTargetEvents(), threadData);
-
-    this.autoWindowTimes();
   }
 
   async addSourceMapListeners(): Promise<void> {
@@ -180,9 +178,12 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.frameModelInternal;
   }
 
-  setWindow(window: Window, animate?: boolean, breadcrumb?: TraceEngine.Types.Timing.TraceWindow): void {
+  setWindow(window: Window, animate?: boolean): void {
+    const didWindowChange = this.windowInternal.left !== window.left || this.windowInternal.right !== window.right;
     this.windowInternal = window;
-    this.dispatchEventToListeners(Events.WindowChanged, {window, animate, breadcrumbWindow: breadcrumb});
+    if (didWindowChange) {
+      this.dispatchEventToListeners(Events.WindowChanged, {window, animate});
+    }
   }
 
   window(): Window {
@@ -200,11 +201,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   // Set the window time selection to exclude any large 'empty' activity
   // Introduced in https://codereview.chromium.org/1428823004
   // TODO: also consider network activity.
-  private autoWindowTimes(): void {
-    // const leftTime = this.timelineModelInternal.minimumRecordTime();
-    // const rightTime = this.timelineModelInternal.maximumRecordTime();
-    // this.setWindow({left: leftTime, right: rightTime});
-    // return;
+  zoomWindowToMainThreadActivity(): void {
     const timelineModel = this.timelineModelInternal;
     let tasks: TraceEngine.Legacy.Event[] = [];
     for (const track of timelineModel.tracks()) {
@@ -290,7 +287,6 @@ export enum Events {
 export interface WindowChangedEvent {
   window: Window;
   animate: boolean|undefined;
-  breadcrumbWindow?: TraceEngine.Types.Timing.TraceWindow;
 }
 
 export type EventTypes = {

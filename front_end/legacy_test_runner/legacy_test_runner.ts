@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../models/text_utils/text_utils-legacy.js';
 import '../ui/legacy/legacy-legacy.js';
 import '../models/workspace/workspace-legacy.js';
-import '../models/bindings/bindings-legacy.js';
 import '../ui/legacy/components/utils/utils-legacy.js';
 import '../models/persistence/persistence-legacy.js';
-import '../models/extensions/extensions-legacy.js';
 import '../entrypoints/devtools_app/devtools_app.js';
 import '../panels/accessibility/accessibility-legacy.js';
 import '../panels/animation/animation-legacy.js';
