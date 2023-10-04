@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -95,6 +96,7 @@ export class CompatibilityTracksAppender {
   #indexForEvent = new WeakMap<TraceEngine.Types.TraceEvents.TraceEventData, number>();
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
+  #showAllEvents: boolean;
 
   // TODO(crbug.com/1416533)
   // These are used only for compatibility with the legacy flame chart
@@ -137,6 +139,7 @@ export class CompatibilityTracksAppender {
         /* alphaSpace= */ 0.7);
     this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
     this.#legacyTimelineModel = legacyTimelineModel;
+    this.#showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
 
     this.#timingsTrackAppender =
         new TimingsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
@@ -472,6 +475,9 @@ export class CompatibilityTracksAppender {
   }
 
   entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+    if (this.#showAllEvents) {
+      return true;
+    }
     // Default styles are globally defined for each event name. Some
     // events are hidden by default.
     const eventStyle = EventStyles.get(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);

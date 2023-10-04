@@ -392,7 +392,7 @@ export class ThreadAppender implements TrackAppender {
     const idForColorGeneration = this.titleForEvent(event);
     const defaultColor =
         EventStyles.get(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.categoryStyle.color;
-    return defaultColor || this.#colorGenerator.colorForID(idForColorGeneration);
+    return defaultColor || '#ccc'; // this.#colorGenerator.colorForID(idForColorGeneration);
   }
 
   /**
