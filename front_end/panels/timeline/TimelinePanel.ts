@@ -486,6 +486,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.loader = TimelineLoader.loadFromEvents(events, this);
   }
 
+  getFlameChart(): TimelineFlameChartView {
+    return this.flameChart;
+  }
+
   private loadFromCpuProfile(profile: Protocol.Profiler.Profile|null, title?: string): void {
     if (this.state !== State.Idle) {
       return;
@@ -1337,6 +1341,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           // If we are using the new engine for everything, we do not need to
           // resolve sourcemaps within the old engine.
           resolveSourceMaps: this.#threadTracksSource !== ThreadTracksSource.NEW_ENGINE,
+          isCpuProfile,
         }),
         this.#executeNewTraceEngine(
             tracingModel, recordingIsFresh, isCpuProfile, this.performanceModel.recordStartTime()),

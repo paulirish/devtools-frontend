@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 import {waitFor} from '../../../../shared/helper.js';
-import {describe} from '../../../../shared/mocha-extensions.js';
-import {assertElementScreenshotUnchanged, itScreenshot} from '../../../../shared/screenshots.js';
+import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
+import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
 
 describe('Performance panel overview/minimap', () => {
@@ -25,6 +25,13 @@ describe('Performance panel overview/minimap', () => {
     await loadComponentDocExample('performance_panel/overview.html?trace=many-requests');
     const pane = await waitFor('.container #timeline-overview-pane');
     await assertElementScreenshotUnchanged(pane, 'performance/timeline-overview-busy-network.png', 3);
+  });
+
+  itScreenshot('shows the resizers in the overview', async () => {
+    await loadComponentDocExample(
+        'performance_panel/overview.html?trace=one-second-interaction&windowStart=141251500&windowEnd=141253500');
+    const pane = await waitFor('.container #timeline-overview-pane');
+    await assertElementScreenshotUnchanged(pane, 'performance/timeline-overview-resizers.png', 3);
   });
 
   itScreenshot('shows the memory usage', async () => {

@@ -10,7 +10,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getEventLevel} from './AppenderUtils.js';
-import {EventStyles} from './EventUICategory.js';
+import {getEventStyle} from './EventUICategory.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
@@ -81,7 +81,8 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'UberFrames', 'FramesWaterfall','NewFrames'] as const;
+export const TrackNames =
+    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet', 'UberFrames', 'FramesWaterfall', 'NewFrames'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -201,15 +202,36 @@ export class CompatibilityTracksAppender {
           return 2;
         case ThreadType.RASTERIZER:
           return 3;
-        case ThreadType.OTHER:
+        case ThreadType.AUCTION_WORKLET:
           return 4;
-        default:
+        case ThreadType.OTHER:
           return 5;
+        default:
+          return 6;
       }
     };
     if (this.#traceParsedData.Renderer) {
       let rasterCount = 0;
       for (const [pid, process] of this.#traceParsedData.Renderer.processes) {
+        if (this.#traceParsedData.AuctionWorklets.worklets.has(pid)) {
+          const workletEvent = this.#traceParsedData.AuctionWorklets.worklets.get(pid);
+          if (!workletEvent) {
+            continue;
+          }
+
+          // Each AuctionWorklet event represents two threads:
+          // 1. the Utility Thread
+          // 2. the V8 Helper Thread
+          // Note that the names passed here are not used visually. TODO: remove this name?
+          this.#threadAppenders.push(new ThreadAppender(
+              this, this.#flameChartData, this.#traceParsedData, pid, workletEvent.args.data.utilityThread.tid,
+              'auction-worket-utility', ThreadType.AUCTION_WORKLET, 0));
+          this.#threadAppenders.push(new ThreadAppender(
+              this, this.#flameChartData, this.#traceParsedData, pid, workletEvent.args.data.v8HelperThread.tid,
+              'auction-worklet-v8helper', ThreadType.AUCTION_WORKLET, 0));
+          continue;
+        }
+
         for (const [tid, thread] of process.threads) {
           let threadType = ThreadType.OTHER;
           if (thread.name === 'CrRendererMain') {
@@ -504,7 +526,7 @@ export class CompatibilityTracksAppender {
   entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
     // Default styles are globally defined for each event name. Some
     // events are hidden by default.
-    const eventStyle = EventStyles.get(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
+    const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
     const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
         TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
         TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);

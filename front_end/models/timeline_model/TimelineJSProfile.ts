@@ -105,6 +105,7 @@ export class TimelineJSProfileProcessor {
   static generateJSFrameEvents(events: TraceEngine.Legacy.Event[], config: {
     showAllEvents: boolean,
     showRuntimeCallStats: boolean,
+    isDataOriginCpuProfile: boolean,
   }): TraceEngine.Legacy.Event[] {
     function equalFrames(frame1: Protocol.Runtime.CallFrame, frame2: Protocol.Runtime.CallFrame): boolean {
       return frame1.scriptId === frame2.scriptId && frame1.functionName === frame2.functionName &&
@@ -128,6 +129,7 @@ export class TimelineJSProfileProcessor {
       return false;
     }
 
+    const isDataOriginCpuProfile = config.isDataOriginCpuProfile;
     const jsFrameEvents: TraceEngine.Legacy.Event[] = [];
     const jsFramesStack: TraceEngine.Legacy.Event[] = [];
     let lockedJsStackDepth: number[] = [];
@@ -336,10 +338,15 @@ export class TimelineJSProfileProcessor {
         let jsFrameType = RecordType.JSFrame;
         switch (e.name) {
           case RecordType.JSIdleSample:
-            // continue;
+            if (!isDataOriginCpuProfile) {  // Dont make synthetic JSIldeFrame events if its a browser trace
+              continue;
+            }
             jsFrameType = RecordType.JSIdleFrame;
             break;
           case RecordType.JSSystemSample:
+            if (!isDataOriginCpuProfile) {  // Dont make synthetic JsSystemFrame events if its a browser trace
+              continue;
+            }
             jsFrameType = RecordType.JSSystemFrame;
             break;
         }

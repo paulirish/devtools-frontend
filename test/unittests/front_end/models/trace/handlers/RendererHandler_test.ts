@@ -203,7 +203,7 @@ describeWithEnvironment('RendererHandler', function() {
     const isIncluded =
         (node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
          event: TraceModel.Types.TraceEvents.RendererEntry) => (!isRoot(node) || isInstant(event) || isLong(event)) &&
-        Timeline.EventUICategory.EventStyles.has(event.name as TraceModel.Types.TraceEvents.KnownEventName);
+        Boolean(Timeline.EventUICategory.getEventStyle(event.name as TraceModel.Types.TraceEvents.KnownEventName));
     assert.strictEqual(prettyPrint(tree, isIncluded), `
 ............
 -RunTask [2.21ms]
@@ -406,7 +406,7 @@ describeWithEnvironment('RendererHandler', function() {
     const isIncluded =
         (_node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
          event: TraceModel.Types.TraceEvents.RendererEntry) =>
-            Timeline.EventUICategory.EventStyles.has(event.name as TraceModel.Types.TraceEvents.KnownEventName);
+            Boolean(Timeline.EventUICategory.getEventStyle(event.name as TraceModel.Types.TraceEvents.KnownEventName));
     assert.strictEqual(prettyPrint(tree, isIncluded), `
 -RunTask [0.13ms]
 -RunTask [0.005ms]
@@ -1220,7 +1220,7 @@ describeWithEnvironment('RendererHandler', function() {
       const onlyLongTasksPredicate =
           (_node: TraceModel.Handlers.ModelHandlers.Renderer.RendererEntryNode,
            event: TraceModel.Types.TraceEvents.RendererEntry) => Boolean(event.dur && event.dur > 1000) &&
-          Timeline.EventUICategory.EventStyles.has(event.name as TraceModel.Types.TraceEvents.KnownEventName);
+          Boolean(Timeline.EventUICategory.getEventStyle(event.name as TraceModel.Types.TraceEvents.KnownEventName));
       assert.strictEqual(prettyPrint(thread.tree, onlyLongTasksPredicate), `
 .............
 -RunTask [17.269ms]
@@ -1277,5 +1277,16 @@ describeWithEnvironment('RendererHandler', function() {
         ],
       ],
     ]);
+  });
+
+  it('keeps the processes associated with AuctionWorklets and assigns them URLs', async () => {
+    const {Renderer, AuctionWorklets} = await handleEventsFromTraceFile(this, 'fenced-frame-fledge.json.gz');
+    assert.strictEqual(AuctionWorklets.worklets.size, 3);
+    for (const [pid] of AuctionWorklets.worklets) {
+      const process = Renderer.processes.get(pid);
+      assert.isDefined(process);
+      // Ensure that the URL was set properly based on the AuctionWorklets metadata event.
+      assert.isTrue(process?.url?.includes('fledge-demo.glitch.me'));
+    }
   });
 });

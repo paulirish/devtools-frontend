@@ -37,7 +37,6 @@ group("legacy_entrypoints") {
   public_deps = [
     "core/sdk:legacy",
     "models/breakpoints:legacy",
-    "models/formatter:legacy",
     "models/persistence:legacy",
     "models/timeline_model:legacy",
     "models/trace:legacy",
@@ -58,9 +57,7 @@ group("legacy_entrypoints") {
     "panels/security:legacy",
     "panels/settings:legacy",
     "panels/snippets:legacy",
-    "panels/web_audio:legacy",
     "third_party/diff:legacy",
-    "ui/legacy:legacy",
     "ui/legacy/components/color_picker:legacy",
     "ui/legacy/components/cookie_table:legacy",
     "ui/legacy/components/data_grid:legacy",
