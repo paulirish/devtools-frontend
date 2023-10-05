@@ -35,8 +35,9 @@ import * as TraceEngine from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
+import {type TimelineCategory} from './EventUICategory.js';
 import {type PerformanceModel} from './PerformanceModel.js';
-import {type TimelineCategory, TimelineUIUtils} from './TimelineUIUtils.js';
+import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -260,7 +261,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
       quantizer.appendInterval(timeOffset + timeSpan + quantTime, idleIndex);  // Kick drawing the last bucket.
       for (let i = categoryOrder.length - 1; i > 0; --i) {
         paths[i].lineTo(width, height);
-        const computedColorValue = categories[categoryOrder[i]].getComputedValue(categories[categoryOrder[i]].color);
+        const computedColorValue = categories[categoryOrder[i]].getComputedValue();
         ctx.fillStyle = computedColorValue;
         ctx.fill(paths[i]);
       }

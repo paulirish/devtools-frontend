@@ -40,13 +40,14 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
+import {type TimelineCategory} from './EventUICategory.js';
 import {type PerformanceModel} from './PerformanceModel.js';
 import {ThreadAppender, ThreadType} from './ThreadAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
 import {ThreadTracksSource} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
-import {type TimelineCategory, TimelineUIUtils} from './TimelineUIUtils.js';
+import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -472,6 +473,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             return 8;
           case 'Thread':
             return 4;
+          case 'Thread_AuctionWorklet':
+            return 10;
           default:
             return -1;
         }
@@ -485,7 +488,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         case TimelineModel.TimelineModel.TrackType.Raster:
           return 9;
         case TimelineModel.TimelineModel.TrackType.Other:
-          return 10;
+          return 11;
         default:
           return -1;
       }
@@ -497,13 +500,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const allTrackAppenders =
         this.compatibilityTracksAppender ? this.compatibilityTracksAppender.allVisibleTrackAppenders() : [];
 
-    // TODO(crbug.com/1478710) Use auction workers data from the new engine
-    // in thread appenders. We have not migrated auction worklet tracks to the
-    // new engine, so we need to always make sure they are included, regardless
-    // of the threadTracksSource setting.
-    const fledgeTracks = this.legacyTimelineModel.tracks().filter(this.legacyTrackIsForAuctionWorklet);
     const legacyTracks =
-        this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE ? fledgeTracks : this.legacyTimelineModel.tracks();
+        this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE ? [] : this.legacyTimelineModel.tracks();
 
     const newTracks = allTrackAppenders.filter(trackAppender => {
       if (trackAppender instanceof ThreadAppender) {
@@ -1022,7 +1020,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         return this.colorForEvent(event);
       }
       const category = TimelineUIUtils.eventStyle(event).category;
-      return patchColorAndCache(this.asyncColorByCategory, category, () => category.getComputedValue(category.color));
+      return patchColorAndCache(this.asyncColorByCategory, category, () => category.getComputedValue());
     }
     if (entryType === entryTypes.Frame) {
       return 'white';

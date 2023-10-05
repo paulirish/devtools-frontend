@@ -307,14 +307,12 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
 
     it('should return the correct rgb value for a corresponding CSS variable', function() {
-      const rawColor = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.color;
-      const parsedColor = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.getComputedValue(rawColor);
+      const parsedColor = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.getComputedValue();
       assert.strictEqual('rgb(2 2 2)', parsedColor);
     });
 
     it('should return the color as a CSS variable', function() {
-      const rawColor = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.color;
-      const cssVariable = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.getCSSValue(rawColor);
+      const cssVariable = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.getCSSValue();
       assert.strictEqual('var(--app-color-scripting)', cssVariable);
     });
 
@@ -569,6 +567,21 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const interactionEvent = data.traceParsedData.UserInteractions.interactionEventsWithNoNesting[0];
       const details = Timeline.TimelineUIUtils.TimelineUIUtils.eventTitle(interactionEvent);
       assert.deepEqual(details, 'Pointer');
+    });
+  });
+  describe('eventStyle', function() {
+    it('returns the correct style for profile calls', async function() {
+      const data = await TraceLoader.allModels(this, 'simple-js-program.json.gz');
+      const rendererHandler = data.traceParsedData.Renderer;
+      if (!rendererHandler) {
+        throw new Error('RendererHandler is undefined');
+      }
+      const [process] = rendererHandler.processes.values();
+      const [thread] = process.threads.values();
+      const profileCalls = thread.entries.filter(entry => TraceEngine.Types.TraceEvents.isProfileCall(entry));
+      const style = Timeline.TimelineUIUtils.TimelineUIUtils.eventStyle(profileCalls[0]);
+      assert.strictEqual(style.category.name, 'scripting');
+      assert.strictEqual(style.category.color, '--app-color-scripting');
     });
   });
 });
