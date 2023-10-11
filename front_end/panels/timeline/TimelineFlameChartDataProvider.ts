@@ -962,16 +962,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       } else {
         title = i18nString(UIStrings.frame);
       }
-
-    // Avoid the early return for screenshots. We handle them below.
-    } else if (entryType === EntryType.Screenshot) {
-      title = '';
     } else {
       return null;
     }
 
     const debugModeEnabled = true;
-    if (debugModeEnabled && entryType !== EntryType.Screenshot) {
+    if (debugModeEnabled) {
       const entry = this.entryData[entryIndex];
       try {
         title += '\n' + JSON.stringify(entry, null, 2).slice(0, 2000);
@@ -992,16 +988,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       for (const warningElement of warningElements) {
         warningElement.classList.add('timeline-info-warning');
         contents.appendChild(warningElement);
-      }
-    }
-
-    // Show fullsize screenshot in popover
-    if (entryType === EntryType.Screenshot) {
-     const screenshot = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventSnapshot);
-      const image = this.screenshotImageCache.get(screenshot);
-      if (image) {
-        image.style.display = 'block'; // minor thing.
-        contents.append(image);
       }
     }
     return element;
