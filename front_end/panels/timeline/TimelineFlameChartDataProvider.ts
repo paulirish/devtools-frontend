@@ -981,12 +981,19 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
 
       // Add stringified frame to the tooltip.
-      title += '\n' + JSON.stringify(frame, null, 2).slice(0, 2000);
 
     } else {
       return null;
     }
-
+    const debugModeEnabled = true;
+    if (debugModeEnabled) {
+      const entry = this.entryData[entryIndex];
+      try {
+        title += '\n' + JSON.stringify(entry, null, 2).slice(0, 2000);
+      } catch (e) {
+        console.warn(e);
+      }
+    }
     const element = document.createElement('div');
     const root = UI.Utils.createShadowRootWithCoreStyles(element, {
       cssFile: [timelineFlamechartPopoverStyles],
