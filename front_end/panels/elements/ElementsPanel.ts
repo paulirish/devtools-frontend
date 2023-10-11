@@ -57,7 +57,6 @@ import {ElementsTreeElementHighlighter} from './ElementsTreeElementHighlighter.j
 import {ElementsTreeOutline} from './ElementsTreeOutline.js';
 import {type MarkerDecorator} from './MarkerDecorator.js';
 import {MetricsSidebarPane} from './MetricsSidebarPane.js';
-import {LayoutSidebarPane} from './LayoutSidebarPane.js';
 import {
   Events as StylesSidebarPaneEvents,
   StylesSidebarPane,
@@ -242,7 +241,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     stackElement.appendChild(crumbsContainer);
 
     UI.ARIAUtils.markAsMain(this.domTreeContainer);
-    UI.ARIAUtils.setAccessibleName(this.domTreeContainer, i18nString(UIStrings.domTreeExplorer));
+    UI.ARIAUtils.setLabel(this.domTreeContainer, i18nString(UIStrings.domTreeExplorer));
 
     this.splitWidget.setMainWidget(this.searchableViewInternal);
     this.splitMode = null;
@@ -1045,11 +1044,11 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
 
     const headerElement = tabbedPane.headerElement();
     UI.ARIAUtils.markAsNavigation(headerElement);
-    UI.ARIAUtils.setAccessibleName(headerElement, i18nString(UIStrings.sidePanelToolbar));
+    UI.ARIAUtils.setLabel(headerElement, i18nString(UIStrings.sidePanelToolbar));
 
     const contentElement = tabbedPane.tabbedPaneContentElement();
     UI.ARIAUtils.markAsComplementary(contentElement);
-    UI.ARIAUtils.setAccessibleName(contentElement, i18nString(UIStrings.sidePanelContent));
+    UI.ARIAUtils.setLabel(contentElement, i18nString(UIStrings.sidePanelContent));
 
     const stylesView =
         new UI.View.SimpleView(i18nString(UIStrings.styles), /* isWebComponent */ undefined, SidebarPaneTabId.Styles);
@@ -1151,7 +1150,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
         void treeElement.updateStyleAdorners();
       }
 
-      LayoutSidebarPane.instance().update();
+      void ElementsComponents.LayoutPane.LayoutPane.instance().render();
     }
   }
 
@@ -1263,8 +1262,8 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
     if (ElementsPanel.instance().element.isAncestor((event.target as Node))) {
       return;
     }
-    const commandCallback: () => void = Common.Revealer.reveal.bind(Common.Revealer.Revealer, object);
-    contextMenu.revealSection().appendItem(i18nString(UIStrings.revealInElementsPanel), commandCallback);
+    contextMenu.revealSection().appendItem(
+        i18nString(UIStrings.revealInElementsPanel), () => Common.Revealer.reveal(object));
   }
 
   static instance(): ContextMenuProvider {
@@ -1479,7 +1478,9 @@ export class PseudoStateMarkerDecorator implements MarkerDecorator {
     if (!pseudoState) {
       return null;
     }
-
-    return {color: 'orange', title: i18nString(UIStrings.elementStateS, {PH1: ':' + pseudoState.join(', :')})};
+    return {
+      color: '--sys-color-orange-bright',
+      title: i18nString(UIStrings.elementStateS, {PH1: ':' + pseudoState.join(', :')}),
+    };
   }
 }

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import type Debug from 'debug';
 declare global {
     var __PUPPETEER_DEBUG: string;
 }
 /**
  * @internal
  */
-export declare function importDebug(): Promise<typeof import('debug')>;
+export declare function importDebug(): Promise<typeof Debug>;
 /**
  * A debug function that can be used in any environment.
  *
@@ -59,4 +60,12 @@ export declare function importDebug(): Promise<typeof import('debug')>;
  * @internal
  */
 export declare const debug: (prefix: string) => (...args: unknown[]) => void;
+/**
+ * @internal
+ */
+export declare function setLogCapture(value: boolean): void;
+/**
+ * @internal
+ */
+export declare function getCapturedLogs(): string[];
 //# sourceMappingURL=Debug.d.ts.map

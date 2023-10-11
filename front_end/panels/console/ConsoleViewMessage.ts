@@ -40,6 +40,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Logs from '../../models/logs/logs.js';
+import * as Host from '../../core/host/host.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
@@ -423,8 +424,9 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       if (request.statusCode !== 0) {
         UI.UIUtils.createTextChildren(messageElement, ' ', String(request.statusCode));
       }
-      if (request.statusText) {
-        UI.UIUtils.createTextChildren(messageElement, ' (', request.statusText, ')');
+      const statusText = request.getInferredStatusText();
+      if (statusText) {
+        UI.UIUtils.createTextChildren(messageElement, ' (', statusText, ')');
       }
     } else {
       const messageText = this.message.messageText;
@@ -466,6 +468,14 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     return elements;
   }
 
+  #getLinkifierMetric(): Host.UserMetrics.Action|undefined {
+    const request = Logs.NetworkLog.NetworkLog.requestForConsoleMessage(this.message);
+    if (request?.resourceType().isStyleSheet()) {
+      return Host.UserMetrics.Action.StyleSheetInitiatorLinkClicked;
+    }
+    return undefined;
+  }
+
   protected buildMessageAnchor(): HTMLElement|null {
     const runtimeModel = this.message.runtimeModel();
     if (!runtimeModel) {
@@ -474,23 +484,26 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
 
     const linkify = ({stackFrameWithBreakpoint, scriptId, stackTrace, url, line, column}:
                          SDK.ConsoleModel.ConsoleMessage): HTMLElement|null => {
+      const userMetric = this.#getLinkifierMetric();
       if (stackFrameWithBreakpoint) {
         return this.linkifier.maybeLinkifyConsoleCallFrame(runtimeModel.target(), stackFrameWithBreakpoint, {
           inlineFrameIndex: 0,
           revealBreakpoint: true,
+          userMetric,
         });
       }
       if (scriptId) {
         return this.linkifier.linkifyScriptLocation(
             runtimeModel.target(), scriptId, url || Platform.DevToolsPath.EmptyUrlString, line,
-            {columnNumber: column, inlineFrameIndex: 0});
+            {columnNumber: column, inlineFrameIndex: 0, userMetric});
       }
       if (stackTrace && stackTrace.callFrames.length) {
         return this.linkifier.linkifyStackTraceTopFrame(runtimeModel.target(), stackTrace);
       }
       if (url && url !== 'undefined') {
         return this.linkifier.linkifyScriptLocation(
-            runtimeModel.target(), /* scriptId */ null, url, line, {columnNumber: column, inlineFrameIndex: 0});
+            runtimeModel.target(), /* scriptId */ null, url, line,
+            {columnNumber: column, inlineFrameIndex: 0, userMetric});
       }
       return null;
     };
@@ -538,7 +551,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       this.selectableChildren.push({element: linkElement, forceSelect: (): void => linkElement.focus()});
     }
     stackTraceElement.classList.add('hidden');
-    UI.ARIAUtils.setAccessibleName(
+    UI.ARIAUtils.setLabel(
         contentElement, `${messageElement.textContent} ${i18nString(UIStrings.stackMessageCollapsed)}`);
     UI.ARIAUtils.markAsGroup(stackTraceElement);
     this.expandTrace = (expand: boolean): void => {
@@ -546,7 +559,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       stackTraceElement.classList.toggle('hidden', !expand);
       const stackTableState =
           expand ? i18nString(UIStrings.stackMessageExpanded) : i18nString(UIStrings.stackMessageCollapsed);
-      UI.ARIAUtils.setAccessibleName(contentElement, `${messageElement.textContent} ${stackTableState}`);
+      UI.ARIAUtils.setLabel(contentElement, `${messageElement.textContent} ${stackTableState}`);
       UI.ARIAUtils.alert(stackTableState);
       UI.ARIAUtils.setExpanded(clickableElement, expand);
       this.traceExpanded = expand;
@@ -981,7 +994,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
   }
 
   setConsoleGroup(group: ConsoleGroupViewMessage): void {
-    console.assert(this.consoleGroupInternal === null);
+    // TODO(crbug.com/1477675): Figure out why `this.consoleGroupInternal` is
+    //     not null here and add an assertion.
     this.consoleGroupInternal = group;
   }
 
@@ -1220,9 +1234,11 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
         break;
       case Protocol.Log.LogEntryLevel.Warning:
         this.elementInternal.classList.add('console-warning-level');
+        this.elementInternal.role = 'log';
         break;
       case Protocol.Log.LogEntryLevel.Error:
         this.elementInternal.classList.add('console-error-level');
+        this.elementInternal.role = 'log';
         break;
     }
     this.updateMessageIcon();
@@ -1286,7 +1302,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     if (this.contentElementInternal) {
       this.contentElementInternal.insertBefore(this.messageIcon, this.contentElementInternal.firstChild);
     }
-    UI.ARIAUtils.setAccessibleName(this.messageIcon, accessibleName);
+    UI.ARIAUtils.setLabel(this.messageIcon, accessibleName);
   }
 
   setAdjacentUserCommandResult(adjacentUserCommandResult: boolean): void {
@@ -1360,7 +1376,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     } else {
       accessibleName = i18nString(UIStrings.repeatS, {n: this.repeatCountInternal});
     }
-    UI.ARIAUtils.setAccessibleName(this.repeatCountElement, accessibleName);
+    UI.ARIAUtils.setLabel(this.repeatCountElement, accessibleName);
   }
 
   get text(): string {

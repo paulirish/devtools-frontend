@@ -29,7 +29,7 @@ export function startTrackingAsyncActivity() {
 export async function checkForPendingActivity() {
   let stillPending: AsyncActivity[] = [];
   const wait = 5;
-  let retries = 10;
+  let retries = 20;
   // We will perform multiple iteration of waiting and forced completions to see
   // if all promises are eventually resolved.
   while (retries > 0) {
@@ -188,7 +188,8 @@ function cancelTrackingActivity(id: string) {
 // which never settles.
 const TrackingPromise: PromiseConstructor = Object.assign(
     function<T>(arg: (resolve: (value: T|PromiseLike<T>) => void, reject: (reason?: unknown) => void) => void) {
-      const promise = new (original(Promise))(arg);
+      const originalPromiseType = original(Promise);
+      const promise = new (originalPromiseType)(arg);
       const activity: AsyncActivity = {
         promise,
         stack: getStack(new Error()),
@@ -199,7 +200,7 @@ const TrackingPromise: PromiseConstructor = Object.assign(
           onRejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>)|undefined|
           null): Promise<TResult1|TResult2> {
         activity.pending = true;
-        return original(Promise).prototype.then.apply(this, [
+        return originalPromiseType.prototype.then.apply(this, [
           result => {
             if (!onFullfilled) {
               return this;

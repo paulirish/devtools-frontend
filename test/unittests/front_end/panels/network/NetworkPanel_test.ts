@@ -6,11 +6,12 @@ import * as Common from '../../../../../front_end/core/common/common.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Logs from '../../../../../front_end/models/logs/logs.js';
+import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
 import * as Network from '../../../../../front_end/panels/network/network.js';
 import * as Coordinator from '../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import {assertElement, assertShadowRoot} from '../../helpers/DOMHelpers.js';
-import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {createTarget, registerNoopActions} from '../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
@@ -20,14 +21,7 @@ describeWithMockConnection('NetworkPanel', () => {
   let networkPanel: Network.NetworkPanel.NetworkPanel;
 
   beforeEach(async () => {
-    UI.ActionRegistration.maybeRemoveActionExtension('network.toggle-recording');
-    UI.ActionRegistration.maybeRemoveActionExtension('network.clear');
-    UI.ActionRegistration.registerActionExtension(
-        {actionId: 'network.toggle-recording', category: UI.ActionRegistration.ActionCategory.NETWORK});
-    UI.ActionRegistration.registerActionExtension(
-        {actionId: 'network.clear', category: UI.ActionRegistration.ActionCategory.NETWORK});
-    const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
-    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
+    registerNoopActions(['network.toggle-recording', 'network.clear']);
 
     target = createTarget();
     const dummyStorage = new Common.Settings.SettingsStorage({});
@@ -62,7 +56,7 @@ describeWithMockConnection('NetworkPanel', () => {
       Common.Settings.Settings.instance().moduleSetting('networkRecordFilmStripSetting').set(true);
       const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
       assertNotNullOrUndefined(resourceTreeModel);
-      const tracingManager = target.model(SDK.TracingManager.TracingManager);
+      const tracingManager = target.model(TraceEngine.TracingManager.TracingManager);
       assertNotNullOrUndefined(tracingManager);
       const tracingStart = sinon.spy(tracingManager, 'start');
       resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.WillReloadPage);
@@ -74,7 +68,7 @@ describeWithMockConnection('NetworkPanel', () => {
       Common.Settings.Settings.instance().moduleSetting('networkRecordFilmStripSetting').set(true);
       const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
       assertNotNullOrUndefined(resourceTreeModel);
-      const tracingManager = target.model(SDK.TracingManager.TracingManager);
+      const tracingManager = target.model(TraceEngine.TracingManager.TracingManager);
       assertNotNullOrUndefined(tracingManager);
       resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.WillReloadPage);
       SDK.TargetManager.TargetManager.instance().setScopeTarget(inScope ? target : null);

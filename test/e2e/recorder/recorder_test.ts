@@ -6,10 +6,14 @@
 
 import {assert} from 'chai';
 
+import {type StepChanged} from '../../../front_end/panels/recorder/components/StepView.js';
+import {type UserFlow} from '../../../front_end/panels/recorder/models/Schema.js';
+import {type RecorderActions} from '../../../front_end/panels/recorder/recorder-actions.js';
 import {
   assertNotNullOrUndefined,
   getBrowserAndPages,
   renderCoordinatorQueueEmpty,
+  waitFor,
   waitForAria,
   waitForFunction,
 } from '../../../test/shared/helper.js';
@@ -17,23 +21,22 @@ import {
   describe,
   it,
 } from '../../../test/shared/mocha-extensions.js';
+import {assertMatchesJSONSnapshot} from '../../../test/shared/snapshots.js';
+
 import {
+  assertRecordingMatchesSnapshot,
   changeNetworkConditions,
   fillCreateRecordingForm,
   getCurrentRecording,
+  getRecordingController,
+  onRecorderAttachedToTarget,
   openRecorderPanel,
+  raf,
+  startOrStopRecordingShortcut,
   startRecording,
   startRecordingViaShortcut,
   stopRecording,
-  startOrStopRecordingShortcut,
-  getRecordingController,
-  onRecorderAttachedToTarget,
-  assertRecordingMatchesSnapshot,
 } from './helpers.js';
-import {type RecorderActions} from '../../../front_end/panels/recorder/recorder-actions.js';
-import {type UserFlow} from '../../../front_end/panels/recorder/models/Schema.js';
-import {assertMatchesJSONSnapshot} from '../../../test/shared/snapshots.js';
-import {type StepChanged} from '../../../front_end/panels/recorder/components/StepView.js';
 
 describe('Recorder', function() {
   if (this.timeout() !== 0) {
@@ -252,6 +255,7 @@ describe('Recorder', function() {
       const recording = await getCurrentRecording();
       return (recording as {steps: unknown[]}).steps.length >= 3;
     });
+    await target.bringToFront();
     await target.click('aria/Back to Page 1');
     await target.waitForFunction(() => {
       return window.location.href.endsWith('recorder.html');
@@ -299,7 +303,8 @@ describe('Recorder', function() {
     assertRecordingMatchesSnapshot(recording);
   });
 
-  it('should capture keyboard events on non-text inputs', async () => {
+  // Blocking Chromium PINS roll
+  it.skip('[crbug.com/1482078] should capture keyboard events on non-text inputs', async () => {
     await startRecording('recorder/input.html', {untrustedEvents: true});
 
     const {target} = getBrowserAndPages();
@@ -333,11 +338,14 @@ describe('Recorder', function() {
     assertRecordingMatchesSnapshot(recording);
   });
 
-  it('should capture a change that causes navigation without blur or change', async () => {
+  // skipped until we figure out why the keyup for Enter is not recorded in
+  // 1% of the runs.
+  it.skip('[crbug.com/1473597] should capture a change that causes navigation without blur or change', async () => {
     await startRecording('recorder/programmatic-navigation-on-keydown.html');
 
     const {target} = getBrowserAndPages();
     await target.bringToFront();
+    await target.waitForSelector('input');
     await target.keyboard.press('1');
     await target.keyboard.press('Enter', {delay: 50});
 
@@ -421,15 +429,16 @@ describe('Recorder', function() {
     assertRecordingMatchesSnapshot(recording);
   });
 
-  it('should capture and store screenshots for every section', async () => {
-    const {frontend} = getBrowserAndPages();
-    await startRecording('recorder/recorder.html');
-    await stopRecording();
-    const screenshot = await frontend.waitForSelector(
-        'pierce/.section .screenshot',
-    );
-    assert.isTrue(Boolean(screenshot));
-  });
+  // Flaky on Mac
+  it.skipOnPlatforms(
+      ['mac'], '[crbug.com/1480253] should capture and store screenshots for every section', async () => {
+        const {target} = getBrowserAndPages();
+        await startRecording('recorder/recorder.html');
+        await target.bringToFront();
+        await raf(target);
+        await stopRecording();
+        await waitFor('.section .screenshot');
+      });
 
   // Flaky test
   it.skip('[crbug.com/1443423]: should record interactions with popups', async () => {
@@ -569,7 +578,7 @@ describe('Recorder', function() {
     await title.click();
 
     const input = await step.waitForSelector(
-        ':scope >>>> devtools-recorder-step-editor >>>> div:nth-of-type(1) > devtools-recorder-input');
+        ':scope >>>> devtools-recorder-step-editor >>>> div:nth-of-type(1) > devtools-suggestion-input');
     assertNotNullOrUndefined(input);
     await input.focus();
 

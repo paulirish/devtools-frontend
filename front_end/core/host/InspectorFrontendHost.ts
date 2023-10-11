@@ -37,14 +37,19 @@ import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
 import {
+  type CanShowSurveyResult,
+  type ChangeEvent,
+  type ClickEvent,
+  type ContextMenuDescriptor,
+  type DoAidaConversationResult,
+  type EnumeratedHistogram,
   EventDescriptors,
   Events,
-  type CanShowSurveyResult,
-  type ContextMenuDescriptor,
-  type EnumeratedHistogram,
   type EventTypes,
   type ExtensionDescriptor,
+  type ImpressionEvent,
   type InspectorFrontendHostAPI,
+  type KeyDownEvent,
   type LoadNetworkResourceResult,
   type ShowSurveyResult,
   type SyncInformation,
@@ -77,6 +82,8 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   events!: Common.EventTarget.EventTarget<EventTypes>;
   #fileSystem: FileSystem|null = null;
 
+  recordedCountHistograms:
+      {histogramName: string, sample: number, min: number, exclusiveMax: number, bucketSize: number}[] = [];
   recordedEnumeratedHistograms: {actionName: EnumeratedHistogram, actionCode: number}[] = [];
   recordedPerformanceHistograms: {histogramName: string, duration: number}[] = [];
 
@@ -216,6 +223,14 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   sendMessageToBackend(message: string): void {
+  }
+
+  recordCountHistogram(histogramName: string, sample: number, min: number, exclusiveMax: number, bucketSize: number):
+      void {
+    if (this.recordedCountHistograms.length >= MAX_RECORDED_HISTOGRAMS_SIZE) {
+      this.recordedCountHistograms.shift();
+    }
+    this.recordedCountHistograms.push({histogramName, sample, min, exclusiveMax, bucketSize});
   }
 
   recordEnumeratedHistogram(actionName: EnumeratedHistogram, actionCode: number, bucketSize: number): void {
@@ -438,6 +453,21 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 
   async initialTargetId(): Promise<string|null> {
     return null;
+  }
+
+  doAidaConversation(request: string, callback: (result: DoAidaConversationResult) => void): void {
+    callback({
+      response: '{}',
+    });
+  }
+
+  recordImpression(event: ImpressionEvent): void {
+  }
+  recordClick(event: ClickEvent): void {
+  }
+  recordChange(event: ChangeEvent): void {
+  }
+  recordKeyDown(event: KeyDownEvent): void {
   }
 }
 

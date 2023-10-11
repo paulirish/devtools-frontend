@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 import * as ProtocolClient from '../../../../front_end/core/protocol_client/protocol_client.js';
-
+import type * as SDK from '../../../../front_end/core/sdk/sdk.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import {type ProtocolMapping} from '../../../../front_end/generated/protocol-mapping.js';
 import type * as ProtocolProxyApi from '../../../../front_end/generated/protocol-proxy-api.js';
 
+import {resetTestDOM} from './DOMHelpers.js';
 import {deinitializeGlobalVars, initializeGlobalVars} from './EnvironmentHelpers.js';
-
-import type * as SDK from '../../../../front_end/core/sdk/sdk.js';
 
 export type ProtocolCommand = keyof ProtocolMapping.Commands;
 export type ProtocolCommandParams<C extends ProtocolCommand> = ProtocolMapping.Commands[C]['paramsType'];
@@ -123,15 +122,16 @@ class MockConnection extends ProtocolClient.InspectorBackend.Connection {
         result = await result;
       }
 
-      // Since we allow the test author to omit the getError call, we
-      // need to add it in here on their behalf so that the calling code
-      // will succeed.
-      if (!('getError' in result)) {
-        result.getError = () => undefined;
-      }
-      this.messageCallback?.call(
-          undefined,
-          {id: outgoingMessage.id, method: outgoingMessage.method, result, sessionId: outgoingMessage.sessionId});
+      const errorMessage: string = ('getError' in result) ? result.getError() : undefined;
+      const error = errorMessage ? {message: errorMessage, code: -32000} : undefined;
+
+      this.messageCallback?.call(undefined, {
+        id: outgoingMessage.id,
+        method: outgoingMessage.method,
+        result,
+        error,
+        sessionId: outgoingMessage.sessionId,
+      });
     })();
   }
 }
@@ -140,6 +140,7 @@ async function disable() {
   if (outgoingMessageListenerEntryMap.size > 0) {
     throw new Error('MockConnection still has pending listeners. All promises should be awaited.');
   }
+  resetTestDOM();
   await deinitializeGlobalVars();
   // @ts-ignore Setting back to undefined as a hard reset.
   ProtocolClient.InspectorBackend.Connection.setFactory(undefined);

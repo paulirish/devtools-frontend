@@ -35,6 +35,10 @@ export namespace ProtocolMapping {
     'Animation.animationStarted': [Protocol.Animation.AnimationStartedEvent];
     'Audits.issueAdded': [Protocol.Audits.IssueAddedEvent];
     /**
+     * Emitted when an address form is filled.
+     */
+    'Autofill.addressFormFilled': [Protocol.Autofill.AddressFormFilledEvent];
+    /**
      * Called when the recording state for the service has been updated.
      */
     'BackgroundService.recordingStateChanged': [Protocol.BackgroundService.RecordingStateChangedEvent];
@@ -479,6 +483,11 @@ export namespace ProtocolMapping {
     'Storage.storageBucketCreatedOrUpdated': [Protocol.Storage.StorageBucketCreatedOrUpdatedEvent];
     'Storage.storageBucketDeleted': [Protocol.Storage.StorageBucketDeletedEvent];
     /**
+     * TODO(crbug.com/1458532): Add other Attribution Reporting events, e.g.
+     * trigger registration.
+     */
+    'Storage.attributionReportingSourceRegistered': [Protocol.Storage.AttributionReportingSourceRegisteredEvent];
+    /**
      * Issued when attached to target because of auto-attach or `attachToTarget` command.
      */
     'Target.attachedToTarget': [Protocol.Target.AttachedToTargetEvent];
@@ -531,6 +540,11 @@ export namespace ProtocolMapping {
      * The stage of the request can be determined by presence of responseErrorReason
      * and responseStatusCode -- the request is at the response stage if either
      * of these fields is present and in the request stage otherwise.
+     * Redirect responses and subsequent requests are reported similarly to regular
+     * responses and requests. Redirect responses may be distinguished by the value
+     * of `responseStatusCode` (which is one of 301, 302, 303, 307, 308) along with
+     * presence of the `location` header. Requests resulting from a redirect will
+     * have `redirectedRequestId` field set.
      */
     'Fetch.requestPaused': [Protocol.Fetch.RequestPausedEvent];
     /**
@@ -632,10 +646,6 @@ export namespace ProtocolMapping {
      */
     'Preload.ruleSetUpdated': [Protocol.Preload.RuleSetUpdatedEvent];
     'Preload.ruleSetRemoved': [Protocol.Preload.RuleSetRemovedEvent];
-    /**
-     * Fired when a prerender attempt is completed.
-     */
-    'Preload.prerenderAttemptCompleted': [Protocol.Preload.PrerenderAttemptCompletedEvent];
     /**
      * Fired when a preload enabled state is updated.
      */
@@ -914,6 +924,27 @@ export namespace ProtocolMapping {
      */
     'Autofill.trigger': {
       paramsType: [Protocol.Autofill.TriggerRequest];
+      returnType: void;
+    };
+    /**
+     * Set addresses so that developers can verify their forms implementation.
+     */
+    'Autofill.setAddresses': {
+      paramsType: [Protocol.Autofill.SetAddressesRequest];
+      returnType: void;
+    };
+    /**
+     * Disables autofill domain notifications.
+     */
+    'Autofill.disable': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Enables autofill domain notifications.
+     */
+    'Autofill.enable': {
+      paramsType: [];
       returnType: void;
     };
     /**
@@ -1201,6 +1232,13 @@ export namespace ProtocolMapping {
     'CSS.setEffectivePropertyValueForNode': {
       paramsType: [Protocol.CSS.SetEffectivePropertyValueForNodeRequest];
       returnType: void;
+    };
+    /**
+     * Modifies the property rule property name.
+     */
+    'CSS.setPropertyRulePropertyName': {
+      paramsType: [Protocol.CSS.SetPropertyRulePropertyNameRequest];
+      returnType: Protocol.CSS.SetPropertyRulePropertyNameResponse;
     };
     /**
      * Modifies the keyframe rule key text.
@@ -2268,6 +2306,13 @@ export namespace ProtocolMapping {
      */
     'Input.dispatchTouchEvent': {
       paramsType: [Protocol.Input.DispatchTouchEventRequest];
+      returnType: void;
+    };
+    /**
+     * Cancels any active dragging in the page.
+     */
+    'Input.cancelDragging': {
+      paramsType: [];
       returnType: void;
     };
     /**
@@ -3707,6 +3752,20 @@ export namespace ProtocolMapping {
       returnType: Protocol.Storage.RunBounceTrackingMitigationsResponse;
     };
     /**
+     * https://wicg.github.io/attribution-reporting-api/
+     */
+    'Storage.setAttributionReportingLocalTestingMode': {
+      paramsType: [Protocol.Storage.SetAttributionReportingLocalTestingModeRequest];
+      returnType: void;
+    };
+    /**
+     * Enables/disables issuing of Attribution Reporting events.
+     */
+    'Storage.setAttributionReportingTracking': {
+      paramsType: [Protocol.Storage.SetAttributionReportingTrackingRequest];
+      returnType: void;
+    };
+    /**
      * Returns information about the system.
      */
     'SystemInfo.getInfo': {
@@ -3975,6 +4034,10 @@ export namespace ProtocolMapping {
      * takeResponseBodyForInterceptionAsStream. Calling other methods that
      * affect the request or disabling fetch domain before body is received
      * results in an undefined behavior.
+     * Note that the response body is not available for redirects. Requests
+     * paused in the _redirect received_ state may be differentiated by
+     * `responseCode` and presence of `location` response header, see
+     * comments to `requestPaused` for details.
      */
     'Fetch.getResponseBody': {
       paramsType: [Protocol.Fetch.GetResponseBodyRequest];
@@ -4165,6 +4228,14 @@ export namespace ProtocolMapping {
     };
     'FedCm.selectAccount': {
       paramsType: [Protocol.FedCm.SelectAccountRequest];
+      returnType: void;
+    };
+    /**
+     * Only valid if the dialog type is ConfirmIdpSignin. Acts as if the user had
+     * clicked the continue button.
+     */
+    'FedCm.confirmIdpSignin': {
+      paramsType: [Protocol.FedCm.ConfirmIdpSigninRequest];
       returnType: void;
     };
     'FedCm.dismissDialog': {

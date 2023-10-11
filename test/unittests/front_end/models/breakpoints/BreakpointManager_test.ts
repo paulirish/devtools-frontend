@@ -19,6 +19,7 @@ import * as Persistence from '../../../../../front_end/models/persistence/persis
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {TestPlugin} from '../../helpers/LanguagePluginHelpers.js';
 import {
+  clearMockConnectionResponseHandler,
   describeWithMockConnection,
   dispatchEvent,
   registerListenerOnOutgoingMessage,
@@ -280,6 +281,124 @@ describeWithMockConnection('BreakpointManager', () => {
 
       assert.notInclude(breakpoint.backendCondition(), '//# sourceURL=');
     });
+
+    it('substitutes source-mapped variables', async () => {
+      Root.Runtime.experiments.enableForTest('evaluateExpressionsWithSourceMaps');
+      const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+      assertNotNullOrUndefined(debuggerModel);
+
+      const scriptInfo = {url: URL, content: 'function adder(n,r){const t=n+r;return t}'};
+      // Created with `terser -m -o script.min.js --source-map "includeSources;url=script.min.js.map" original-script.js`
+      const sourceMapContent = JSON.stringify({
+        'version': 3,
+        'names': ['adder', 'param1', 'param2', 'result'],
+        'sources': ['/original-script.js'],
+        'sourcesContent':
+            ['function adder(param1, param2) {\n  const result = param1 + param2;\n  return result;\n}\n\n'],
+        'mappings': 'AAAA,SAASA,MAAMC,EAAQC,GACrB,MAAMC,EAASF,EAASC,EACxB,OAAOC,CACT',
+      });
+      const sourceMapInfo = {url: SOURCE_MAP_URL, content: sourceMapContent};
+      const script = await backend.addScript(target, scriptInfo, sourceMapInfo);
+
+      // Get the uiSourceCode for the original source.
+      const uiSourceCode = await debuggerWorkspaceBinding.uiSourceCodeForSourceMapSourceURLPromise(
+          debuggerModel, ORIGINAL_SCRIPT_SOURCE_URL, script.isContentScript());
+      assertNotNullOrUndefined(uiSourceCode);
+
+      // Mock out "Debugger.setBreakpointByUrl and just echo back the request".
+      const cdpSetBreakpointPromise = new Promise<Protocol.Debugger.SetBreakpointByUrlRequest>(res => {
+        clearMockConnectionResponseHandler('Debugger.setBreakpointByUrl');
+        setMockConnectionResponseHandler('Debugger.setBreakpointByUrl', request => {
+          res(request);
+          return {};
+        });
+      });
+
+      // Set the breakpoint on the `const result = ...` line with a condition using
+      // "authored" variable names.
+      const breakpoint = await breakpointManager.setBreakpoint(
+          uiSourceCode, 1, 0, 'param1 > 0' as Breakpoints.BreakpointManager.UserCondition, /* enabled */ true,
+          /* isLogpoint */ false, Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION);
+      assertNotNullOrUndefined(breakpoint);
+
+      await breakpoint.updateBreakpoint();
+
+      const {url, lineNumber, columnNumber, condition} = await cdpSetBreakpointPromise;
+      assert.strictEqual(url, URL);
+      assert.strictEqual(lineNumber, 0);
+      assert.strictEqual(columnNumber, 20);
+      assert.strictEqual(condition, 'n > 0\n\n//# sourceURL=debugger://breakpoint');
+
+      Root.Runtime.experiments.disableForTest('evaluateExpressionsWithSourceMaps');
+    });
+  });
+
+  it('substitutes source-mapped variables for the same original script in different bundles correctly', async () => {
+    Root.Runtime.experiments.enableForTest('evaluateExpressionsWithSourceMaps');
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    assertNotNullOrUndefined(debuggerModel);
+
+    // Create two 'bundles' that are identical modulo variable names.
+    const url1 = 'http://site/script1.js' as Platform.DevToolsPath.UrlString;
+    const url2 = 'http://site/script2.js' as Platform.DevToolsPath.UrlString;
+    const scriptInfo1 = {url: url1, content: 'function adder(n,r){const t=n+r;return t}'};
+    const scriptInfo2 = {url: url2, content: 'function adder(o,p){const t=o+p;return t}'};
+
+    // The source map is the same for both 'bundles'.
+    // Created with `terser -m -o script.min.js --source-map "includeSources;url=script.min.js.map" original-script.js`
+    const sourceMapContent = JSON.stringify({
+      'version': 3,
+      'names': ['adder', 'param1', 'param2', 'result'],
+      'sources': ['/original-script.js'],
+      'sourcesContent':
+          ['function adder(param1, param2) {\n  const result = param1 + param2;\n  return result;\n}\n\n'],
+      'mappings': 'AAAA,SAASA,MAAMC,EAAQC,GACrB,MAAMC,EAASF,EAASC,EACxB,OAAOC,CACT',
+    });
+    const sourceMapInfo = {url: SOURCE_MAP_URL, content: sourceMapContent};
+    await Promise.all([
+      backend.addScript(target, scriptInfo1, sourceMapInfo),
+      backend.addScript(target, scriptInfo2, sourceMapInfo),
+    ]);
+
+    // Get the uiSourceCode for the original source.
+    const uiSourceCode = await debuggerWorkspaceBinding.uiSourceCodeForSourceMapSourceURLPromise(
+        debuggerModel, ORIGINAL_SCRIPT_SOURCE_URL, /* isContentScript */ false);
+    assertNotNullOrUndefined(uiSourceCode);
+
+    // Mock out "Debugger.setBreakpointByUrl and echo back the first two 'Debugger.setBreakpointByUrl' requests.
+    const cdpSetBreakpointPromise = new Promise<Map<string, Protocol.Debugger.SetBreakpointByUrlRequest>>(res => {
+      clearMockConnectionResponseHandler('Debugger.setBreakpointByUrl');
+      const requests = new Map<string, Protocol.Debugger.SetBreakpointByUrlRequest>();
+      setMockConnectionResponseHandler('Debugger.setBreakpointByUrl', request => {
+        requests.set(request.url, request);
+        if (requests.size === 2) {
+          res(requests);
+        }
+        return {};
+      });
+    });
+
+    // Set the breakpoint on the `const result = ...` line with a condition using
+    // "authored" variable names.
+    const breakpoint = await breakpointManager.setBreakpoint(
+        uiSourceCode, 1, 0, 'param1 > 0' as Breakpoints.BreakpointManager.UserCondition, /* enabled */ true,
+        /* isLogpoint */ false, Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION);
+    assertNotNullOrUndefined(breakpoint);
+
+    await breakpoint.updateBreakpoint();
+
+    const requests = await cdpSetBreakpointPromise;
+    const req1 = requests.get(url1);
+    assertNotNullOrUndefined(req1);
+    assert.strictEqual(req1.url, url1);
+    assert.strictEqual(req1.condition, 'n > 0\n\n//# sourceURL=debugger://breakpoint');
+
+    const req2 = requests.get(url2);
+    assertNotNullOrUndefined(req2);
+    assert.strictEqual(req2.url, url2);
+    assert.strictEqual(req2.condition, 'o > 0\n\n//# sourceURL=debugger://breakpoint');
+
+    Root.Runtime.experiments.disableForTest('evaluateExpressionsWithSourceMaps');
   });
 
   it('allows awaiting the restoration of breakpoints', async () => {
@@ -714,6 +833,71 @@ describeWithMockConnection('BreakpointManager', () => {
                        columnNumber: 15,
                        condition: '' as SDK.DebuggerModel.BackendCondition,
                      }]);
+
+    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
+  });
+
+  it('restores latest breakpoints from storage', async () => {
+    // Remove the default target so that we can simulate starting the debugger afresh.
+    targetManager.removeTarget(target);
+
+    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
+
+    const expectedBreakpointLines = [1, 2];
+
+    const breakpointRequestLines = new Promise<number[]>((resolve, reject) => {
+      const breakpoints: Breakpoints.BreakpointManager.BreakpointStorageState[] = [];
+
+      // Accumulator for breakpoint lines from setBreakpointByUrl requests.
+      const breakpointRequestLinesReceived = new Set<number>();
+
+      // Create three breakpoints in the storage and register the corresponding
+      // request handler in the mock backend. The handler will resolve the promise
+      // (and thus finish up the test) once it receives two breakpoint requests.
+      // The idea is to check that the front-end requested the two latest breakpoints
+      // from the backend.
+      for (let i = 0; i < 3; i++) {
+        const lineNumber = i;
+        // Push the breakpoint to our mock storage. The storage will be then used
+        // to initialize the breakpoint manager.
+        breakpoints.push({
+          url: URL,
+          resourceTypeName: 'script',
+          lineNumber,
+          condition: '' as Breakpoints.BreakpointManager.UserCondition,
+          enabled: true,
+          isLogpoint: false,
+        });
+
+        // When the mock backend receives a request for this breakpoint, it will
+        // respond and record the request. Also, once we receive the
+        void backend
+            .responderToBreakpointByUrlRequest(
+                URL, lineNumber)({breakpointId: 'BREAK_ID' as Protocol.Debugger.BreakpointId, locations: []})
+            .then(() => {
+              breakpointRequestLinesReceived.add(lineNumber);
+              if (breakpointRequestLinesReceived.size === expectedBreakpointLines.length) {
+                resolve(Array.from(breakpointRequestLinesReceived).sort((l, r) => l - r));
+              }
+            }, reject);
+      }
+
+      // Re-create the breakpoint manager and the target.
+      const setting = Common.Settings.Settings.instance().createLocalSetting('breakpoints', breakpoints);
+      setting.set(breakpoints);
+      // Create the breakpoint manager, request placing on the two latest breakpoints in the backend.
+      Breakpoints.BreakpointManager.BreakpointManager.instance({
+        forceNew: true,
+        targetManager,
+        workspace,
+        debuggerWorkspaceBinding,
+        restoreInitialBreakpointCount: expectedBreakpointLines.length,
+      });
+      target = createTarget();
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+    });
+
+    assert.deepEqual(Array.from(await breakpointRequestLines), expectedBreakpointLines);
 
     Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
   });
@@ -1447,6 +1631,58 @@ describeWithMockConnection('BreakpointManager', () => {
     Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS);
   });
 
+  it('Breakpoints are set only into network project', async () => {
+    const breakpointLine = 0;
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const persistence =
+        Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
+    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance(
+        {forceNew: true, workspace: Workspace.Workspace.WorkspaceImpl.instance()});
+
+    // Create a file system project and source code.
+    const fileName = Common.ParsedURL.ParsedURL.extractName(scriptDescription.url);
+    const fileSystemPath = 'file://path/to/filesystem' as Platform.DevToolsPath.UrlString;
+    const fileSystemFileUrl = fileSystemPath + '/' + fileName as Platform.DevToolsPath.UrlString;
+    createFileSystemFileForPersistenceTests(
+        {fileSystemFileUrl, fileSystemPath}, scriptDescription.url, scriptDescription.content, target);
+
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
+    assertNotNullOrUndefined(debuggerModel);
+
+    // Add the same script with the same URL via the debugger protocol.
+    const bindingCreatedPromise = persistence.once(Persistence.Persistence.Events.BindingCreated);
+    const fileScriptDescription = {...scriptDescription, url: fileSystemFileUrl};
+    const script = await backend.addScript(target, fileScriptDescription, null);
+    const uiSourceCode = await uiSourceCodeFromScript(debuggerModel, script);
+    await bindingCreatedPromise;
+    assertNotNullOrUndefined(uiSourceCode);
+
+    let addedBreakpoint: Breakpoints.BreakpointManager.Breakpoint|null = null;
+    breakpointManager.addEventListener(Breakpoints.BreakpointManager.Events.BreakpointAdded, ({data: {breakpoint}}) => {
+      assert.isNull(addedBreakpoint, 'More than one breakpoint was added');
+      addedBreakpoint = breakpoint;
+    });
+
+    // Set the breakpoint on the (network) script.
+    void backend.responderToBreakpointByUrlRequest(fileSystemFileUrl, breakpointLine)({
+      breakpointId: 'BREAK_ID' as Protocol.Debugger.BreakpointId,
+      locations: [
+        {
+          scriptId: script.scriptId,
+          lineNumber: 3,
+          columnNumber: 3,
+        },
+      ],
+    });
+    const breakpoint =
+        await breakpointManager.setBreakpoint(uiSourceCode, breakpointLine, undefined, ...DEFAULT_BREAKPOINT);
+    assertNotNullOrUndefined(breakpoint);
+
+    // Expect that the breakpoint is only added to the network UI source code.
+    assert.strictEqual(breakpoint, addedBreakpoint);
+    assert.deepStrictEqual(Array.from(breakpoint.getUiSourceCodes()), [uiSourceCode]);
+  });
+
   it('updates a breakpoint after live editing the underlying script', async () => {
     const scriptInfo = {url: URL, content: 'console.log(\'hello\');'};
     const script = await backend.addScript(target, scriptInfo, null);
@@ -1477,7 +1713,7 @@ describeWithMockConnection('BreakpointManager', () => {
     await breakpoint.refreshInDebugger();
 
     // Simulate live editing. We do this from the UISourceCode instead of the `Script`
-    // so the the `ResourceScriptFile` updates the LiveLocation of the `ModelBreakpoint`
+    // so the `ResourceScriptFile` updates the LiveLocation of the `ModelBreakpoint`
     // (which in turn updates the UILocation on the breakpoint).
     uiSourceCode.setWorkingCopy('\n\nconsole.log(\'hello\');');
     uiSourceCode.commitWorkingCopy();

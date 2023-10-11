@@ -1,19 +1,26 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 import * as Common from '../../../../../front_end/core/common/common.js';
-import * as Network from '../../../../../front_end/panels/network/network.js';
-import type * as Protocol from '../../../../../front_end/generated/protocol.js';
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
-import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
-import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
-import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
-import * as Logs from '../../../../../front_end/models/logs/logs.js';
-import * as HAR from '../../../../../front_end/models/har/har.js';
-import * as Coordinator from '../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
-
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import * as Root from '../../../../../front_end/core/root/root.js';
+import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as HAR from '../../../../../front_end/models/har/har.js';
+import * as Logs from '../../../../../front_end/models/logs/logs.js';
+import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
+import * as Network from '../../../../../front_end/panels/network/network.js';
+import type * as IconButton from '../../../../../front_end/ui/components/icon_button/icon_button.js';
+import * as Coordinator from '../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
+import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
+import {
+  assertElement,
+  assertShadowRoot,
+  dispatchClickEvent,
+  dispatchMouseUpEvent,
+  raf,
+} from '../../helpers/DOMHelpers.js';
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection, dispatchEvent} from '../../helpers/MockConnection.js';
 
@@ -23,6 +30,7 @@ describeWithMockConnection('NetworkLogView', () => {
   const tests = (targetFactory: () => SDK.Target.Target) => {
     let target: SDK.Target.Target;
     let networkLogView: Network.NetworkLogView.NetworkLogView;
+    let networkLog: Logs.NetworkLog.NetworkLog;
 
     beforeEach(() => {
       const dummyStorage = new Common.Settings.SettingsStorage({});
@@ -44,7 +52,7 @@ describeWithMockConnection('NetworkLogView', () => {
         shortcutTitleForAction: () => {},
         shortcutsForAction: () => [],
       } as unknown as UI.ShortcutRegistry.ShortcutRegistry);
-      Logs.NetworkLog.NetworkLog.instance();
+      networkLog = Logs.NetworkLog.NetworkLog.instance();
       target = targetFactory();
     });
 
@@ -77,6 +85,16 @@ describeWithMockConnection('NetworkLogView', () => {
       return request;
     }
 
+    function createEnvironment() {
+      const filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+      networkLogView = createNetworkLogView(filterBar);
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+      return {rootNode, filterBar, networkLogView};
+    }
+
     it('can create curl command parameters when some headers do not have value', async () => {
       const request = createNetworkRequest('https://www.example.com/file.html' as Platform.DevToolsPath.UrlString, {
         requestHeaders: [
@@ -90,11 +108,13 @@ describeWithMockConnection('NetworkLogView', () => {
       assert.strictEqual(actual, expected);
     });
 
-    function createNetworkLogView(): Network.NetworkLogView.NetworkLogView {
+    function createNetworkLogView(filterBar?: UI.FilterBar.FilterBar): Network.NetworkLogView.NetworkLogView {
+      if (!filterBar) {
+        filterBar = {addFilter: () => {}, filterButton: () => ({addEventListener: () => {}}), addDivider: () => {}} as
+            unknown as UI.FilterBar.FilterBar;
+      }
       return new Network.NetworkLogView.NetworkLogView(
-          {addFilter: () => {}, filterButton: () => ({addEventListener: () => {}})} as unknown as
-              UI.FilterBar.FilterBar,
-          document.createElement('div'),
+          filterBar, document.createElement('div'),
           Common.Settings.Settings.instance().createSetting('networkLogLargeRows', false));
     }
 
@@ -153,6 +173,44 @@ describeWithMockConnection('NetworkLogView', () => {
           assert.isFalse(fileManagerSave.called);
           assert.isFalse(fileManagerClose.called);
         }
+      });
+
+      it('can import and filter from HAR', async () => {
+        const URL_1 = 'http://example.com/' as Platform.DevToolsPath.UrlString;
+        const URL_2 = 'http://example.com/favicon.ico' as Platform.DevToolsPath.UrlString;
+        function makeHarEntry(url: Platform.DevToolsPath.UrlString) {
+          return {
+            request: {method: 'GET', url: url, headersSize: -1, bodySize: 0},
+            response: {status: 0, content: {'size': 0, 'mimeType': 'x-unknown'}, headersSize: -1, bodySize: -1},
+            startedDateTime: null,
+            time: null,
+            timings: {blocked: null, dns: -1, ssl: -1, connect: -1, send: 0, wait: 0, receive: 0},
+          };
+        }
+        const har = {
+          log: {
+            version: '1.2',
+            creator: {name: 'WebInspector', version: '537.36'},
+            entries: [makeHarEntry(URL_1), makeHarEntry(URL_2)],
+          },
+        };
+        networkLogView.markAsRoot();
+        networkLogView.show(document.body);
+        const blob = new Blob([JSON.stringify(har)], {type: 'text/plain'});
+        const file = new File([blob], 'log.har');
+        await networkLogView.onLoadFromFile(file);
+        await coordinator.done({waitForWork: true});
+
+        const rootNode = networkLogView.columns().dataGrid().rootNode();
+        assert.deepEqual(
+            rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+            [URL_1, URL_2]);
+
+        networkLogView.setTextFilterValue('favicon');
+        assert.deepEqual(
+            rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [URL_2]);
+
+        networkLogView.detach();
       });
 
       it('shows summary toolbar with content', () => {
@@ -222,6 +280,379 @@ describeWithMockConnection('NetworkLogView', () => {
 
     it('replaces requests when switching scope with preserve log off', handlesSwitchingScope(false));
     it('appends requests when switching scope with preserve log on', handlesSwitchingScope(true));
+
+    it('hide Chrome extension requests from checkbox', async () => {
+      createNetworkRequest('chrome-extension://url1', {target});
+      createNetworkRequest('url2', {target});
+      let rootNode;
+      let filterBar;
+      ({rootNode, filterBar, networkLogView} = createEnvironment());
+      const hideExtCheckbox = getCheckbox(filterBar, 'Hide \'chrome-extension://\' URLs');
+
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+          ['chrome-extension://url1' as Platform.DevToolsPath.UrlString, 'url2' as Platform.DevToolsPath.UrlString]);
+
+      clickCheckbox(hideExtCheckbox);
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+          ['url2' as Platform.DevToolsPath.UrlString]);
+
+      networkLogView.detach();
+    });
+
+    it('can hide Chrome extension requests from dropdown', async () => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN);
+      createNetworkRequest('chrome-extension://url1', {target});
+      createNetworkRequest('url2', {target});
+      let rootNode;
+      let filterBar;
+      ({rootNode, filterBar, networkLogView} = createEnvironment());
+
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+          ['chrome-extension://url1' as Platform.DevToolsPath.UrlString, 'url2' as Platform.DevToolsPath.UrlString]);
+
+      const dropdown = await openMoreTypesDropdown(filterBar, networkLogView);
+      if (!dropdown) {
+        return;
+      }
+      const softMenu = getSoftMenu();
+      const hideExtensionURL = getDropdownItem(softMenu, 'Hide extension URLs');
+      const hideExtensionURLCheckmark = getCheckmark(hideExtensionURL);
+      assert.strictEqual(hideExtensionURLCheckmark.style.opacity, '0');
+      dispatchMouseUpEvent(hideExtensionURL);
+      await raf();
+      assert.strictEqual(hideExtensionURLCheckmark.style.opacity, '1');
+
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+          ['url2' as Platform.DevToolsPath.UrlString]);
+
+      dropdown.discard();
+      networkLogView.detach();
+    });
+
+    it('displays correct count for more filters', async () => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN);
+      let filterBar;
+      ({filterBar, networkLogView} = createEnvironment());
+      const dropdown = await openMoreTypesDropdown(filterBar, networkLogView);
+      if (!dropdown) {
+        return;
+      }
+
+      assert.strictEqual(getMoreFiltersActiveCount(filterBar), '0');
+      assert.isTrue(getCountAdorner(filterBar)?.classList.contains('hidden'));
+
+      const softMenu = getSoftMenu();
+      const hideExtensionURL = getDropdownItem(softMenu, 'Hide extension URLs');
+      dispatchMouseUpEvent(hideExtensionURL);
+      await raf();
+
+      assert.strictEqual(getMoreFiltersActiveCount(filterBar), '1');
+      assert.isFalse(getCountAdorner(filterBar)?.classList.contains('hidden'));
+
+      dropdown.discard();
+      networkLogView.detach();
+    });
+
+    it('can automatically check the `All` option in the `Request Type` when the only type checked becomes unchecked',
+       async () => {
+         Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN);
+
+         const dropdown = setupRequestTypesDropdown();
+         const button = dropdown.element().querySelector('.toolbar-button');
+
+         assertElement(button, HTMLElement);
+         dispatchClickEvent(button, {bubbles: true, composed: true});
+         await raf();
+
+         const optionImg = getRequestTypeDropdownOption('Images');
+         const optionImgCheckmark = optionImg?.querySelector('.checkmark') || null;
+         const optionAll = getRequestTypeDropdownOption('All');
+         const optionAllCheckmark = optionAll?.querySelector('.checkmark') || null;
+
+         assertElement(optionImg, HTMLElement);
+         assertElement(optionImgCheckmark, HTMLElement);
+         assertElement(optionAll, HTMLElement);
+         assertElement(optionAllCheckmark, HTMLElement);
+
+         assert.isTrue(optionAll.ariaLabel === 'All, checked');
+         assert.isTrue(optionImg.ariaLabel === 'Images, unchecked');
+         assert.isTrue(window.getComputedStyle(optionAllCheckmark).getPropertyValue('opacity') === '1');
+         assert.isTrue(window.getComputedStyle(optionImgCheckmark).getPropertyValue('opacity') === '0');
+
+         dispatchMouseUpEvent(optionImg, {bubbles: true, composed: true});
+         await raf();
+
+         assert.isTrue(optionAll.ariaLabel === 'All, unchecked');
+         assert.isTrue(optionImg.ariaLabel === 'Images, checked');
+         assert.isTrue(window.getComputedStyle(optionAllCheckmark).getPropertyValue('opacity') === '0');
+         assert.isTrue(window.getComputedStyle(optionImgCheckmark).getPropertyValue('opacity') === '1');
+
+         dispatchMouseUpEvent(optionImg, {bubbles: true, composed: true});
+         await raf();
+
+         assert.isTrue(optionAll.ariaLabel === 'All, checked');
+         assert.isTrue(optionImg.ariaLabel === 'Images, unchecked');
+         assert.isTrue(window.getComputedStyle(optionAllCheckmark).getPropertyValue('opacity') === '1');
+         assert.isTrue(window.getComputedStyle(optionImgCheckmark).getPropertyValue('opacity') === '0');
+
+         dropdown.discard();
+         await raf();
+       });
+
+    it('shows correct selected request types count', async () => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN);
+
+      const dropdown = setupRequestTypesDropdown();
+      const button = dropdown.element().querySelector('.toolbar-button');
+      assertElement(button, HTMLElement);
+
+      let countAdorner = button.querySelector('.active-filters-count');
+      assert.isTrue(countAdorner?.classList.contains('hidden'));
+
+      dispatchClickEvent(button, {bubbles: true, composed: true});
+      await raf();
+      const optionImg = getRequestTypeDropdownOption('Images');
+      assertElement(optionImg, HTMLElement);
+      dispatchMouseUpEvent(optionImg, {bubbles: true, composed: true});
+      await raf();
+
+      countAdorner = button.querySelector('.active-filters-count');
+      assert.isFalse(countAdorner?.classList.contains('hidden'));
+      assert.strictEqual(countAdorner?.querySelector('[slot="content"]')?.textContent, '1');
+
+      dropdown.discard();
+      await raf();
+    });
+
+    it('adjusts request types label dynamically', async () => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN);
+
+      const dropdown = setupRequestTypesDropdown();
+      const button = dropdown.element().querySelector('.toolbar-button');
+      assertElement(button, HTMLElement);
+
+      let toolbarText = button.querySelector('.toolbar-text')?.textContent;
+      assert.strictEqual(toolbarText, 'Request types');
+
+      dispatchClickEvent(button, {bubbles: true, composed: true});
+      await raf();
+      const optionImg = getRequestTypeDropdownOption('Images');
+      assertElement(optionImg, HTMLElement);
+      dispatchMouseUpEvent(optionImg, {bubbles: true, composed: true});
+      await raf();
+      const optionJS = getRequestTypeDropdownOption('Scripts');
+      assertElement(optionJS, HTMLElement);
+      dispatchMouseUpEvent(optionJS, {bubbles: true, composed: true});
+      await raf();
+
+      toolbarText = button.querySelector('.toolbar-text')?.textContent;
+      assert.strictEqual(toolbarText, 'JS, Img');
+
+      const optionCSS = getRequestTypeDropdownOption('Stylesheets');
+      assertElement(optionCSS, HTMLElement);
+      dispatchMouseUpEvent(optionCSS, {bubbles: true, composed: true});
+      await raf();
+
+      toolbarText = button.querySelector('.toolbar-text')?.textContent;
+      assert.strictEqual(toolbarText, 'CSS, JS...');
+
+      dropdown.discard();
+      await raf();
+    });
+
+    it('can filter requests with blocked response cookies from checkbox', async () => {
+      const request1 = createNetworkRequest('url1', {target});
+      request1.blockedResponseCookies = () => [{
+        blockedReasons: [Protocol.Network.SetCookieBlockedReason.SameSiteNoneInsecure],
+        cookie: null,
+        cookieLine: 'foo=bar; SameSite=None',
+      }];
+      createNetworkRequest('url2', {target});
+      let rootNode;
+      let filterBar;
+      ({rootNode, filterBar, networkLogView} = createEnvironment());
+      const blockedCookiesCheckbox = getCheckbox(filterBar, 'Show only the requests with blocked response cookies');
+      clickCheckbox(blockedCookiesCheckbox);
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        'url1' as Platform.DevToolsPath.UrlString,
+      ]);
+
+      networkLogView.detach();
+    });
+
+    it('can filter requests with blocked response cookies from dropdown', async () => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN);
+
+      const request1 = createNetworkRequest('url1', {target});
+      request1.blockedResponseCookies = () => [{
+        blockedReasons: [Protocol.Network.SetCookieBlockedReason.SameSiteNoneInsecure],
+        cookie: null,
+        cookieLine: 'foo=bar; SameSite=None',
+      }];
+      createNetworkRequest('url2', {target});
+      let rootNode;
+      let filterBar;
+      ({rootNode, filterBar, networkLogView} = createEnvironment());
+
+      assert.deepEqual(
+          rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()),
+          ['url1' as Platform.DevToolsPath.UrlString, 'url2' as Platform.DevToolsPath.UrlString]);
+
+      const dropdown = await openMoreTypesDropdown(filterBar, networkLogView);
+      if (!dropdown) {
+        return;
+      }
+      const softMenu = getSoftMenu();
+      const blockedResponseCookies = getDropdownItem(softMenu, 'Blocked response cookies');
+      const blockedResponseCookiesCheckmark = getCheckmark(blockedResponseCookies);
+      assert.strictEqual(blockedResponseCookiesCheckmark.style.opacity, '0');
+      dispatchMouseUpEvent(blockedResponseCookies);
+      await raf();
+      assert.strictEqual(blockedResponseCookiesCheckmark.style.opacity, '1');
+
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        'url1' as Platform.DevToolsPath.UrlString,
+      ]);
+
+      dropdown.discard();
+      networkLogView.detach();
+    });
+
+    it('can remove requests', async () => {
+      networkLogView = createNetworkLogView();
+      const request = createNetworkRequest('url1', {target});
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+      assert.strictEqual(rootNode.children.length, 1);
+
+      networkLog.dispatchEventToListeners(Logs.NetworkLog.Events.RequestRemoved, request);
+      assert.strictEqual(rootNode.children.length, 0);
+
+      networkLogView.detach();
+    });
+
+    function createOverrideRequests() {
+      const urlNotOverridden = 'url-not-overridden' as Platform.DevToolsPath.UrlString;
+      const urlHeaderOverridden = 'url-header-overridden' as Platform.DevToolsPath.UrlString;
+      const urlContentOverridden = 'url-content-overridden' as Platform.DevToolsPath.UrlString;
+      const urlHeaderAndContentOverridden = 'url-header-und-content-overridden' as Platform.DevToolsPath.UrlString;
+
+      createNetworkRequest(urlNotOverridden, {target});
+      const r2 = createNetworkRequest(urlHeaderOverridden, {target});
+      const r3 = createNetworkRequest(urlContentOverridden, {target});
+      const r4 = createNetworkRequest(urlHeaderAndContentOverridden, {target});
+
+      // set up overrides
+      r2.originalResponseHeaders = [{name: 'content-type', value: 'x'}];
+      r2.responseHeaders = [{name: 'content-type', value: 'overriden'}];
+      r3.hasOverriddenContent = true;
+      r4.originalResponseHeaders = [{name: 'age', value: 'x'}];
+      r4.responseHeaders = [{name: 'age', value: 'overriden'}];
+      r4.hasOverriddenContent = true;
+
+      return {urlNotOverridden, urlHeaderOverridden, urlContentOverridden, urlHeaderAndContentOverridden};
+    }
+
+    it('can apply filter - has-overrides:yes', async () => {
+      const {urlHeaderOverridden, urlContentOverridden, urlHeaderAndContentOverridden} = createOverrideRequests();
+
+      const filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+      networkLogView = createNetworkLogView(filterBar);
+      networkLogView.setTextFilterValue('has-overrides:yes');
+
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        urlHeaderOverridden,
+        urlContentOverridden,
+        urlHeaderAndContentOverridden,
+      ]);
+
+      networkLogView.detach();
+    });
+
+    it('can apply filter - has-overrides:no', async () => {
+      const {urlNotOverridden} = createOverrideRequests();
+
+      const filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+      networkLogView = createNetworkLogView(filterBar);
+      networkLogView.setTextFilterValue('has-overrides:no');
+
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        urlNotOverridden,
+      ]);
+
+      networkLogView.detach();
+    });
+
+    it('can apply filter - has-overrides:headers', async () => {
+      const {urlHeaderOverridden, urlHeaderAndContentOverridden} = createOverrideRequests();
+
+      const filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+      networkLogView = createNetworkLogView(filterBar);
+      networkLogView.setTextFilterValue('has-overrides:headers');
+
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        urlHeaderOverridden,
+        urlHeaderAndContentOverridden,
+      ]);
+
+      networkLogView.detach();
+    });
+
+    it('can apply filter - has-overrides:content', async () => {
+      const {urlContentOverridden, urlHeaderAndContentOverridden} = createOverrideRequests();
+
+      const filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+      networkLogView = createNetworkLogView(filterBar);
+      networkLogView.setTextFilterValue('has-overrides:content');
+
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        urlContentOverridden,
+        urlHeaderAndContentOverridden,
+      ]);
+
+      networkLogView.detach();
+    });
+
+    it('can apply filter - has-overrides:tent', async () => {
+      const {urlHeaderAndContentOverridden, urlContentOverridden} = createOverrideRequests();
+
+      const filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+      networkLogView = createNetworkLogView(filterBar);
+      networkLogView.setTextFilterValue('has-overrides:tent');  // partial text
+
+      networkLogView.markAsRoot();
+      networkLogView.show(document.body);
+      const rootNode = networkLogView.columns().dataGrid().rootNode();
+
+      assert.deepEqual(rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()?.url()), [
+        urlContentOverridden,
+        urlHeaderAndContentOverridden,
+      ]);
+
+      networkLogView.detach();
+    });
   };
 
   describe('without tab target', () => tests(createTarget));
@@ -231,3 +662,79 @@ describeWithMockConnection('NetworkLogView', () => {
                                 return createTarget({parentTarget: tabTarget});
                               }));
 });
+
+function clickCheckbox(checkbox: HTMLInputElement) {
+  checkbox.checked = true;
+  const event = new Event('change');
+  checkbox.dispatchEvent(event);
+}
+
+function getCheckbox(filterBar: UI.FilterBar.FilterBar, title: string) {
+  const checkbox =
+      filterBar.element.querySelector(`[title="${title}"] span`)?.shadowRoot?.querySelector('input') || null;
+  assertElement(checkbox, HTMLInputElement);
+  return checkbox;
+}
+
+function getRequestTypeDropdownOption(requestType: string): Element|null {
+  const dropDownVbox = document.querySelector('.vbox')?.shadowRoot?.querySelectorAll('.soft-context-menu-item') || [];
+  const dropdownOptions = Array.from(dropDownVbox);
+  return dropdownOptions.find(el => el.textContent?.includes(requestType)) || null;
+}
+
+async function openMoreTypesDropdown(
+    filterBar: UI.FilterBar.FilterBar, networkLogView: Network.NetworkLogView.NetworkLogView):
+    Promise<Network.NetworkLogView.MoreFiltersDropDownUI|undefined> {
+  const button = filterBar.element.querySelector('[aria-label="Show only/hide requests dropdown"]')
+                     ?.querySelector('.toolbar-button');
+  button?.dispatchEvent(new Event('click'));
+  await raf();
+  const dropdown = networkLogView.getMoreFiltersDropdown();
+  return dropdown;
+}
+
+function setupRequestTypesDropdown() {
+  const filterItems =
+      Object.values(Common.ResourceType.resourceCategories).map(category => ({
+                                                                  name: category.title(),
+                                                                  label: (): string => category.shortTitle(),
+                                                                  title: category.title(),
+                                                                }));
+
+  const setting = Common.Settings.Settings.instance().createSetting('networkResourceTypeFilters', {all: true});
+  const dropdown = new Network.NetworkLogView.DropDownTypesUI(filterItems, /* callback*/ () => {}, setting);
+  return dropdown;
+}
+
+function getCountAdorner(filterBar: UI.FilterBar.FilterBar): HTMLElement|null {
+  const button = filterBar.element.querySelector('[aria-label="Show only/hide requests dropdown"]')
+                     ?.querySelector('.toolbar-button');
+  return button?.querySelector('.active-filters-count') ?? null;
+}
+
+function getMoreFiltersActiveCount(filterBar: UI.FilterBar.FilterBar): string {
+  const countAdorner = getCountAdorner(filterBar);
+  const count = countAdorner?.querySelector('[slot="content"]')?.textContent ?? '';
+  return count;
+}
+
+function getSoftMenu(): HTMLElement {
+  const container = document.querySelector('div[data-devtools-glass-pane]');
+  assertElement(container, HTMLElement);
+  assertShadowRoot(container.shadowRoot);
+  const softMenu = container.shadowRoot.querySelector('.soft-context-menu');
+  assertElement(softMenu, HTMLElement);
+  return softMenu;
+}
+
+function getDropdownItem(softMenu: HTMLElement, label: string) {
+  const item = softMenu?.querySelector(`[aria-label^="${label}"]`);
+  assertElement(item, HTMLElement);
+  return item;
+}
+
+function getCheckmark(item: HTMLElement) {
+  const checkmark = item.querySelector<IconButton.Icon.Icon>('.checkmark');
+  assertElement(checkmark, HTMLElement);
+  return checkmark;
+}

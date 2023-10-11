@@ -6,7 +6,7 @@
 
 // use require here due to
 // https://github.com/evanw/esbuild/issues/587#issuecomment-901397213
-import puppeteer = require('puppeteer');
+import puppeteer = require('puppeteer-core');
 
 import {type CoverageMapData} from 'istanbul-lib-coverage';
 
@@ -31,7 +31,7 @@ import {
 import {TargetTab} from './target_tab.js';
 
 // Workaround for mismatching versions of puppeteer types and puppeteer library.
-declare module 'puppeteer' {
+declare module 'puppeteer-core' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ConsoleMessage {
     stackTrace(): ConsoleMessageLocation[];
@@ -85,7 +85,7 @@ function launchChrome() {
     '--enable-blink-features=CSSContainerQueries,HighlightInheritance',  // TODO(crbug.com/1218390) Remove globally enabled flags and conditionally enable them
   ];
   const opts: puppeteer.LaunchOptions&puppeteer.BrowserLaunchArgumentOptions&puppeteer.BrowserConnectOptions = {
-    headless,
+    headless: headless ? 'new' : false,
     executablePath: envChromeBinary,
     dumpio: !headless,
     slowMo: envSlowMo,
@@ -144,6 +144,17 @@ async function loadTargetPageAndFrontend(testServerPort: number) {
   setBrowserAndPages({target: targetTab.page, frontend, browser});
 }
 
+export async function unregisterAllServiceWorkers() {
+  const {target} = getBrowserAndPages();
+  await target.evaluate(async () => {
+    if (!navigator.serviceWorker) {
+      return;
+    }
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(r => r.unregister()));
+  });
+}
+
 export async function resetPages() {
   await targetTab.reset();
 
@@ -151,6 +162,7 @@ export async function resetPages() {
   await throttleCPUIfRequired(frontend);
   await delayPromisesIfRequired(frontend);
 
+  await frontend.bringToFront();
   if (TEST_SERVER_TYPE === 'hosted-mode') {
     await frontendTab.reset();
   } else if (TEST_SERVER_TYPE === 'component-docs') {

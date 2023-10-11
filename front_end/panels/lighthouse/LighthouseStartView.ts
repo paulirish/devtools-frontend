@@ -95,7 +95,7 @@ export class StartView extends UI.Widget.Widget {
         runtimeSetting.options, runtimeSetting.setting as Common.Settings.Setting<string>,
         runtimeSetting.description());
     parentElement.appendChild(control.element);
-    UI.ARIAUtils.setAccessibleName(control.element, label);
+    UI.ARIAUtils.setLabel(control.element, label);
   }
 
   private populateRuntimeSettingAsToolbarCheckbox(settingName: string, toolbar: UI.Toolbar.Toolbar): void {
@@ -164,13 +164,12 @@ export class StartView extends UI.Widget.Widget {
       }
     }
     UI.ARIAUtils.markAsGroup(categoryFormElements);
-    UI.ARIAUtils.setAccessibleName(categoryFormElements, i18nString(UIStrings.categories));
+    UI.ARIAUtils.setLabel(categoryFormElements, i18nString(UIStrings.categories));
     UI.ARIAUtils.markAsGroup(pluginFormElements);
-    UI.ARIAUtils.setAccessibleName(pluginFormElements, i18nString(UIStrings.plugins));
+    UI.ARIAUtils.setLabel(pluginFormElements, i18nString(UIStrings.plugins));
   }
 
   private render(): void {
-    this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.legacy_navigation', this.settingsToolbarInternal);
     this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.clear_storage', this.settingsToolbarInternal);
     this.populateRuntimeSettingAsToolbarDropdown('lighthouse.throttling', this.settingsToolbarInternal);
 

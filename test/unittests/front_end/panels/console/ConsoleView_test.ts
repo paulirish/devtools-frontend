@@ -4,12 +4,14 @@
 
 import * as Common from '../../../../../front_end/core/common/common.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import * as Root from '../../../../../front_end/core/root/root.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Console from '../../../../../front_end/panels/console/console.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
-import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {assertElement, dispatchPasteEvent} from '../../helpers/DOMHelpers.js';
+import {createTarget, registerNoopActions} from '../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
@@ -20,34 +22,12 @@ describeWithMockConnection('ConsoleView', () => {
   let consoleView: Console.ConsoleView.ConsoleView;
 
   beforeEach(() => {
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear.history');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.create-pin');
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'console.clear',
-      category: UI.ActionRegistration.ActionCategory.CONSOLE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
-    });
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'console.clear.history',
-      category: UI.ActionRegistration.ActionCategory.CONSOLE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
-    });
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'console.create-pin',
-      category: UI.ActionRegistration.ActionCategory.CONSOLE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
-    });
-    const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
-    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
+    registerNoopActions(['console.clear', 'console.clear.history', 'console.create-pin']);
     consoleView = Console.ConsoleView.ConsoleView.instance({forceNew: true, viewportThrottlerTimeout: 0});
   });
 
   afterEach(() => {
     consoleView.detach();
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.clear.history');
-    UI.ActionRegistration.maybeRemoveActionExtension('console.create-pin');
   });
 
   it('adds a title to every checkbox label in the settings view', async () => {
@@ -192,4 +172,48 @@ describeWithMockConnection('ConsoleView', () => {
 
   it('replaces messages when switching scope with preserve log off', handlesSwitchingScope(false));
   it('appends messages when switching scope with preserve log on', handlesSwitchingScope(true));
+
+  describe('self-XSS warning', () => {
+    let target: SDK.Target.Target;
+
+    beforeEach(() => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SELF_XSS_WARNING);
+      target = createTarget();
+      SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
+      consoleView.markAsRoot();
+      consoleView.show(document.body);
+    });
+
+    it('shows', async () => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'foo');
+
+      const messagesElement = consoleView.element.querySelector('#console-messages');
+      assertElement(messagesElement, HTMLElement);
+      dispatchPasteEvent(messagesElement, {clipboardData: dt, bubbles: true});
+      assert.strictEqual(
+          Common.Console.Console.instance().messages()[0].text,
+          'Warning: Don’t paste code into the DevTools Console that you don’t understand or haven’t reviewed yourself. This could allow attackers to steal your identity or take control of your computer. Please type ‘allow pasting’ below to allow pasting.');
+    });
+
+    it('is turned off when console history reaches a length of 5', async () => {
+      const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
+      assertNotNullOrUndefined(consoleModel);
+      const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+      assertNotNullOrUndefined(runtimeModel);
+      SDK.ConsoleModel.ConsoleModel.requestClearMessages();
+
+      const selfXssWarningDisabledSetting = Common.Settings.Settings.instance().createSetting(
+          'disableSelfXssWarning', false, Common.Settings.SettingStorageType.Synced);
+
+      for (let i = 0; i < 5; i++) {
+        assert.isFalse(selfXssWarningDisabledSetting.get());
+        consoleModel.dispatchEventToListeners(SDK.ConsoleModel.Events.CommandEvaluated, {
+          result: new SDK.RemoteObject.RemoteObjectImpl(runtimeModel, undefined, 'number', undefined, 42),
+          commandMessage: createConsoleMessage(target, String(i)),
+        });
+      }
+      assert.isTrue(selfXssWarningDisabledSetting.get());
+    });
+  });
 });

@@ -6,7 +6,7 @@ import {assert} from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 import {requireTestRunnerConfigSetting} from '../../conductor/test_runner_config.js';
 
 import {
@@ -40,6 +40,7 @@ export const PAUSE_INDICATOR_SELECTOR = '.paused-status';
 export const CODE_LINE_COLUMN_SELECTOR = '.cm-lineNumbers';
 export const CODE_LINE_SELECTOR = '.cm-lineNumbers .cm-gutterElement';
 export const SCOPE_LOCAL_VALUES_SELECTOR = 'li[aria-label="Local"] + ol';
+export const THREADS_SELECTOR = '[aria-label="Threads"]';
 export const SELECTED_THREAD_SELECTOR = 'div.thread-item.selected > div.thread-item-title';
 export const STEP_INTO_BUTTON = '[aria-label="Step into next function call"]';
 export const STEP_OVER_BUTTON = '[aria-label="Step over next function call"]';
@@ -49,7 +50,7 @@ export const TURNED_ON_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-on';
 export const DEBUGGER_PAUSED_EVENT = 'DevTools.DebuggerPaused';
 const WATCH_EXPRESSION_VALUE_SELECTOR = '.watch-expression-tree-item .object-value-string.value';
 export const MORE_TABS_SELECTOR = '[aria-label="More tabs"]';
-const OVERRIDES_TAB_SELECTOR = '[aria-label="Overrides"]';
+export const OVERRIDES_TAB_SELECTOR = '[aria-label="Overrides"]';
 export const ENABLE_OVERRIDES_SELECTOR = '[aria-label="Select folder for overrides"]';
 const CLEAR_CONFIGURATION_SELECTOR = '[aria-label="Clear configuration"]';
 export const PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR = '.pause-on-uncaught-exceptions';
@@ -88,12 +89,16 @@ export async function doubleClickSourceTreeItem(selector: string) {
   await click(selector, {clickOptions: {clickCount: 2, offset: {x: 40, y: 10}}});
 }
 
+export async function waitForSourcesPanel(): Promise<void> {
+  // Wait for the navigation panel to show up
+  await waitFor('.navigator-file-tree-item');
+}
+
 export async function openSourcesPanel() {
   // Locate the button for switching to the sources tab.
   await click('#tab-sources');
 
-  // Wait for the navigation panel to show up
-  await waitFor('.navigator-file-tree-item');
+  await waitForSourcesPanel();
 }
 
 export async function openFileInSourcesPanel(testInput: string) {
@@ -279,6 +284,39 @@ export async function isBreakpointSet(lineNumber: number|string) {
   return breakpointLineParentClasses?.includes('cm-breakpoint');
 }
 
+/**
+ * @param lineNumber 1-based line number
+ * @param index 1-based index of the inline breakpoint in the given line
+ */
+export async function enableInlineBreakpointForLine(line: number, index: number) {
+  const {frontend} = getBrowserAndPages();
+  const decorationSelector = `pierce/.cm-content > :nth-child(${line}) > :nth-child(${index} of .cm-inlineBreakpoint)`;
+  await click(decorationSelector);
+  await waitForFunction(
+      () => frontend.$eval(decorationSelector, element => !element.classList.contains('cm-inlineBreakpoint-disabled')));
+}
+
+/**
+ * @param lineNumber 1-based line number
+ * @param index 1-based index of the inline breakpoint in the given line
+ * @param expectNoBreakpoint If we should wait for the line to not have any inline breakpoints after
+ *                           the click instead of a disabled one.
+ */
+export async function disableInlineBreakpointForLine(line: number, index: number, expectNoBreakpoint: boolean = false) {
+  const {frontend} = getBrowserAndPages();
+  const decorationSelector = `pierce/.cm-content > :nth-child(${line}) > :nth-child(${index} of .cm-inlineBreakpoint)`;
+  await click(decorationSelector);
+  if (expectNoBreakpoint) {
+    await waitForFunction(
+        () => frontend.$$eval(
+            `pierce/.cm-content > :nth-child(${line}) > .cm-inlineBreakpoint`, elements => elements.length === 0));
+  } else {
+    await waitForFunction(
+        () =>
+            frontend.$eval(decorationSelector, element => element.classList.contains('cm-inlineBreakpoint-disabled')));
+  }
+}
+
 export async function checkBreakpointDidNotActivate() {
   await step('check that the script did not pause', async () => {
     // TODO(almuthanna): make sure this check happens at a point where the pause indicator appears if it was active
@@ -410,7 +448,7 @@ export async function waitForSourceFiles<T>(
     }
     const handler = (event: Event) => {
       const {detail} = event as CustomEvent<string>;
-      if (!detail.includes('__puppeteer_evaluation_script__')) {
+      if (!detail.includes('pptr:')) {
         window.__sourceFileEvents.get(eventHandlerId)?.files.push(detail);
       }
     };
@@ -832,4 +870,10 @@ export async function retrieveCodeMirrorEditorContent(): Promise<Array<string>> 
 
 export async function waitForLines(lineCount: number): Promise<void> {
   await waitFor(new Array(lineCount).fill('.cm-line').join(' ~ '));
+}
+
+export async function isPrettyPrinted(): Promise<boolean> {
+  const prettyButton = await waitFor('[aria-label="Pretty print"]');
+  const isPretty = await prettyButton.evaluate(e => e.ariaPressed);
+  return isPretty === 'true';
 }

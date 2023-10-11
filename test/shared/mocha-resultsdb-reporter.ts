@@ -4,16 +4,27 @@
 
 import * as Mocha from 'mocha';
 
+import {
+  ScreenshotError,
+} from '../shared/screenshots.js';
+
 import * as ResultsDb from './resultsdb.js';
 
 const {
-  EVENT_RUN_END,
   EVENT_TEST_FAIL,
   EVENT_TEST_PASS,
   EVENT_TEST_PENDING,
 } = Mocha.Runner.constants;
 
-function getErrorMessage(error: Error|unknown) {
+function sanitize(message: string): string {
+  return message.replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('\'', '&#39;');
+}
+
+function getErrorMessage(error: Error|unknown): string {
   if (error instanceof Error) {
     if (error.cause) {
       // TypeScript types error.cause as {}, which doesn't allow us to access
@@ -21,14 +32,17 @@ function getErrorMessage(error: Error|unknown) {
       // to read the `message` property.
       const cause = error.cause as {message?: string};
       const causeMessage = cause.message || '';
-      return `${error.message}\n${causeMessage}`;
+      return sanitize(`${error.message}\n${causeMessage}`);
     }
-    return error.stack;
+    return sanitize(error.stack ?? error.message);
   }
-  return `${error}`;
+  return sanitize(`${error}`);
 }
 
 class ResultsDbReporter extends Mocha.reporters.Spec {
+  // The max length of the summary is 4000, but we need to leave some room for
+  // the rest of the HTML formatting (e.g. <pre> and </pre>).
+  static readonly SUMMARY_LENGTH_CUTOFF = 3985;
   private suitePrefix?: string;
 
   constructor(runner: Mocha.Runner, options?: Mocha.MochaOptions) {
@@ -40,33 +54,32 @@ class ResultsDbReporter extends Mocha.reporters.Spec {
     runner.on(EVENT_TEST_PASS, this.onTestPass.bind(this));
     runner.on(EVENT_TEST_FAIL, this.onTestFail.bind(this));
     runner.on(EVENT_TEST_PENDING, this.onTestSkip.bind(this));
-    runner.on(EVENT_RUN_END, this.onceEventRunEnds.bind(this));
   }
 
   private onTestPass(test: Mocha.Test) {
     const testResult = this.buildDefaultTestResultFrom(test);
     testResult.status = 'PASS';
     testResult.expected = true;
-    ResultsDb.recordTestResult(testResult);
+    ResultsDb.sendTestResult(testResult);
   }
 
-  private onTestFail(test: Mocha.Test, error: Error|unknown) {
+  private onTestFail(test: Mocha.Test, error: Error|ScreenshotError|unknown) {
     const testResult = this.buildDefaultTestResultFrom(test);
     testResult.status = 'FAIL';
     testResult.expected = false;
-    testResult.summaryHtml = `<pre>${getErrorMessage(error)}</pre>`;
-    ResultsDb.recordTestResult(testResult);
+    if (error instanceof ScreenshotError) {
+      [testResult.artifacts, testResult.summaryHtml] = error.toMiloArtifacts();
+    } else {
+      testResult.summaryHtml = `<pre>${getErrorMessage(error).slice(0, ResultsDbReporter.SUMMARY_LENGTH_CUTOFF)}</pre>`;
+    }
+    ResultsDb.sendTestResult(testResult);
   }
 
   private onTestSkip(test: Mocha.Test) {
     const testResult = this.buildDefaultTestResultFrom(test);
     testResult.status = 'SKIP';
     testResult.expected = true;
-    ResultsDb.recordTestResult(testResult);
-  }
-
-  private onceEventRunEnds() {
-    ResultsDb.sendCollectedTestResultsIfSinkIsAvailable();
+    ResultsDb.sendTestResult(testResult);
   }
 
   private buildDefaultTestResultFrom(test: Mocha.Test): ResultsDb.TestResult {

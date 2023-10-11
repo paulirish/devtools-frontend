@@ -12,7 +12,7 @@ import {
   waitForAria,
   waitForElementWithTextContent,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+import {describe} from '../../shared/mocha-extensions.js';
 import {openDeviceToolbar, reloadDockableFrontEnd, selectDevice} from '../helpers/emulation-helpers.js';
 import {
   clickStartButton,
@@ -33,7 +33,7 @@ const IPAD_MINI_LANDSCAPE_VIEWPORT_DIMENSIONS = {
   devicePixelRatio: 2,
 };
 
-describe.skipOnParallel('DevTools', function() {
+describe('DevTools', function() {
   // The tests in this suite are particularly slow
   if (this.timeout() !== 0) {
     this.timeout(60_000);

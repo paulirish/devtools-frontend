@@ -77,6 +77,7 @@ export interface DataGridData {
   label?: string;
   paddingRowsCount?: number;
   showScrollbar?: boolean;
+  striped?: boolean;
 }
 
 const enum UserScrollState {
@@ -87,7 +88,7 @@ const enum UserScrollState {
 
 const KEYS_TREATED_AS_CLICKS = new Set([' ', 'Enter']);
 
-const ROW_HEIGHT_PIXELS = 18;
+const ROW_HEIGHT_PIXELS = 20;
 
 export class DataGrid extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-data-grid`;
@@ -102,6 +103,7 @@ export class DataGrid extends HTMLElement {
   #label?: string = undefined;
   #paddingRowsCount = 10;
   #showScrollbar?: boolean = false;
+  #striped?: boolean = false;
   #currentResize: {
     rightCellCol: HTMLTableColElement,
     leftCellCol: HTMLTableColElement,
@@ -150,6 +152,7 @@ export class DataGrid extends HTMLElement {
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [dataGridStyles];
     ComponentHelpers.SetCSSProperty.set(this, '--table-row-height', `${ROW_HEIGHT_PIXELS}px`);
+    void this.#render();
   }
 
   get data(): DataGridData {
@@ -161,6 +164,7 @@ export class DataGrid extends HTMLElement {
       label: this.#label,
       paddingRowsCount: this.#paddingRowsCount,
       showScrollbar: this.#showScrollbar,
+      striped: this.#striped,
     };
   }
 
@@ -174,6 +178,7 @@ export class DataGrid extends HTMLElement {
     this.#contextMenus = data.contextMenus;
     this.#label = data.label;
     this.#showScrollbar = data.showScrollbar;
+    this.#striped = data.striped;
 
     /**
      * On first render, now we have data, we can figure out which cell is the
@@ -732,6 +737,9 @@ export class DataGrid extends HTMLElement {
    * padding).
    */
   async #render(): Promise<void> {
+    if (!this.isConnected) {
+      return;
+    }
     if (this.#isRendering) {
       // If we receive a request to render during a previous render call, we block
       // the newly requested render (since we could receive a lot of them in quick
@@ -750,6 +758,7 @@ export class DataGrid extends HTMLElement {
     const containerClassMap = {
       'wrapping-container': true,
       'show-scrollbar': this.#showScrollbar === true,
+      'striped': this.#striped === true,
     };
 
     await coordinator.write(() => {

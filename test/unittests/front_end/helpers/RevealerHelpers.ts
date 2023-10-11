@@ -4,14 +4,19 @@
 
 import * as Common from '../../../../front_end/core/common/common.js';
 
-export class TestRevealer extends Common.Revealer.Revealer {
+let originalReveal: null|((object: Object|null, omitFocus?: boolean|undefined) => Promise<void>) = null;
+
+export class TestRevealer implements Common.Revealer.Revealer {
   #callback: (object: Object, omitFocus?: boolean|undefined) => Promise<void>;
   private constructor(callback: (object: Object, omitFocus?: boolean|undefined) => Promise<void>) {
-    super();
     this.#callback = callback;
   }
 
   static install(callback: (object: Object, omitFocus?: boolean|undefined) => Promise<void>) {
+    if (originalReveal) {
+      throw new Error('Test revealer already installed');
+    }
+    originalReveal = Common.Revealer.reveal;
     const revealer = new TestRevealer(callback);
     Common.Revealer.setRevealForTest((object, omitFocus) => {
       if (!object) {
@@ -19,6 +24,14 @@ export class TestRevealer extends Common.Revealer.Revealer {
       }
       return revealer.reveal(object, omitFocus).then(() => undefined);
     });
+  }
+
+  static reset() {
+    if (!originalReveal) {
+      throw new Error('No test revealer installed');
+    }
+    Common.Revealer.setRevealForTest(originalReveal);
+    originalReveal = null;
   }
 
   reveal(object: Object, omitFocus?: boolean|undefined): Promise<void> {

@@ -1229,7 +1229,7 @@ self.injectedExtensionAPI = function(
 
     eval: function(
               expression: string,
-              evaluateOptions: {contextSecurityOrigin?: string, frameURL?: string, useContentScriptContext?: boolean}):
+              evaluateOptions: {scriptExecutionContext?: string, frameURL?: string, useContentScriptContext?: boolean}):
               Object |
         null {
           const callback = extractCallbackArgument(arguments);
@@ -1259,14 +1259,14 @@ self.injectedExtensionAPI = function(
         return new (Constructor(Resource))(resourceData);
       }
       function callbackWrapper(resources: unknown): void {
-        callback && callback((resources as APIImpl.ResourceData[]).map(wrapResource).filter(canAccessResource));
+        callback && callback((resources as APIImpl.ResourceData[]).filter(canAccessResource).map(wrapResource));
       }
       extensionServer.sendRequest({command: PrivateAPI.Commands.GetPageResources}, callback && callbackWrapper);
     },
   };
 
   function ResourceImpl(this: APIImpl.Resource, resourceData: APIImpl.ResourceData): void {
-    if (!canAccessResource) {
+    if (!canAccessResource(resourceData)) {
       throw new Error('Resource access not allowed');
     }
     this._url = resourceData.url;

@@ -31,6 +31,13 @@
     milestone: {
       valid_type: "int",
     },
+    // Deprecations that launched to stable but no longer need to dispatch
+    // warnings to developers must be kept around for at least 12 milestones.
+    // Use this field to indicate that codegen should no longer occur, and to
+    // note the milestone at which this metadata can safely be removed.
+    obsolete_to_be_removed_after_milestone: {
+      valid_type: "int",
+    },
     //
     // Here are a couple examples for reference:
     // {
@@ -153,9 +160,27 @@
       chrome_status_feature: 5714245488476160,
     },
     {
+      name: "CSSValueAppearanceNonStandard",
+      message: "CSS appearance values  `inner-spin-button`, `media-slider`, `media-sliderthumb`, `media-volume-slider`, `media-volume-sliderthumb`, `push-button`, `searchfield-cancel-button`, `slider-horizontal`, `sliderthumb-horizontal`, `sliderthumb-vertical`, `square-button` are not standardized and will be removed.",
+      translation_note: "Warning displayed to developers to let them know the CSS appearance property values they used are deprecated and will be removed.",
+      web_features: [
+        "kCSSValueAppearanceNonStandard",
+      ],
+      chrome_status_feature: 5066630972833792,
+    },
+    {
+      name: "CSSValueAppearanceSliderVertical",
+      message: "CSS appearance value `slider-vertical` is not standardized and will be removed.",
+      translation_note: "Warning displayed to developers to let them know the CSS appearance property value they used is not standard and will be removed.",
+      web_features: [
+        "kCSSValueAppearanceSliderVertical",
+      ],
+      chrome_status_feature: 6001359429566464,
+    },
+    {
       name: "DataUrlInSvgUse",
-      message: "Support for data: URLs in SVG <use> element is deprecated and it will be removed in the future.",
-      translation_note: "Warning displayed to developers when a data: URL is assigned to SVG <use> to let them know that the support is deprecated.",
+      message: "Support for data: URLs in SVGUseElement is deprecated and it will be removed in the future.",
+      translation_note: "Warning displayed to developers when a data: URL is assigned to SVGUseElement to let them know that the support is deprecated.",
       web_features: [
         "kDataUrlInSvgUse",
       ],
@@ -185,6 +210,17 @@
       ],
       chrome_status_feature: 5083947249172480,
       milestone: 127,
+    },
+    {
+      name: "EventPath",
+      message: "`Event.path` is deprecated and will be removed. Please use `Event.composedPath()` instead.",
+      translation_note: "Warning displayed to developers when the non-standard `Event.path` API is used to notify them that this API is deprecated.",
+      web_features: [
+        "kOBSOLETE_EventPath",
+      ],
+      chrome_status_feature: 5726124632965120,
+      milestone: 109,
+      obsolete_to_be_removed_after_milestone: 127,
     },
     {
       name: "ExpectCTHeader",
@@ -226,7 +262,7 @@
     {
       name: "HostCandidateAttributeGetter",
       message: "`RTCPeerConnectionIceErrorEvent.hostCandidate` is deprecated. Please use `RTCPeerConnectionIceErrorEvent.address` or `RTCPeerConnectionIceErrorEvent.port` instead.",
-      translation_note: "A deprecation warning shown to developers in the DevTools Issues tab when code tries to use the deprecated hostCandidate field, guiding developers to use the the equivalent information in the .address and .port fields instead.",
+      translation_note: "A deprecation warning shown to developers in the DevTools Issues tab when code tries to use the deprecated hostCandidate field, guiding developers to use the equivalent information in the .address and .port fields instead.",
       web_features: [
         "kHostCandidateAttributeGetter",
       ],

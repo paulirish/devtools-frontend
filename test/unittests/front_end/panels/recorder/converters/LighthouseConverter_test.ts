@@ -19,12 +19,11 @@ describe('LighthouseConverter', () => {
         {type: Models.Schema.StepType.Scroll, selectors: [['.cls']]},
       ],
     });
-    assert.isTrue(
-        result.startsWith(`const fs = require('fs');
-const puppeteer = require('puppeteer'); // v13.0.0 or later
+    const expected = `const fs = require('fs');
+const puppeteer = require('puppeteer'); // v20.7.4 or later
 
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({headless: 'new'});
   const page = await browser.newPage();
   const timeout = 5000;
   page.setDefaultTimeout(timeout);
@@ -46,25 +45,20 @@ const puppeteer = require('puppeteer'); // v13.0.0 or later
   await lhFlow.startTimespan();
   {
     const targetPage = page;
-    await scrollIntoViewIfNeeded([
-      [
-        '.cls'
-      ]
-    ], targetPage, timeout);
-    const element = await waitForSelectors([
-      [
-        '.cls'
-      ]
-    ], targetPage, { timeout, visible: true });
-    await element.evaluate((el, x, y) => { el.scrollTop = y; el.scrollLeft = x; }, undefined, undefined);
+    await puppeteer.Locator.race([
+      targetPage.locator('.cls')
+    ])
+      .setTimeout(timeout)
+      .scroll({ scrollTop: undefined, scrollLeft: undefined});
   }
   await lhFlow.endTimespan();
   const lhFlowReport = await lhFlow.generateReport();
   fs.writeFileSync(__dirname + '/flow.report.html', lhFlowReport)
 
-  await browser.close();`),
-    );
-    assert.deepStrictEqual(sourceMap, [1, 17, 6, 23, 15]);
+  await browser.close();`;
+    const actual = result.substring(0, expected.length);
+    assert.strictEqual(actual, expected, `Unexpected start of generated result:\n${actual}`);
+    assert.deepStrictEqual(sourceMap, [1, 17, 6, 23, 9]);
   });
 
   it('should stringify a step', async () => {

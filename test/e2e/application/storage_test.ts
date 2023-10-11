@@ -20,7 +20,7 @@ import {
 const COOKIES_SELECTOR = '[aria-label="Cookies"].parent';
 const STORAGE_SELECTOR = '[aria-label="Storage"]';
 const CLEAR_SITE_DATA_BUTTON_SELECTOR = '#storage-view-clear-button';
-const INCLUDE_3RD_PARTY_COOKIES_SELECTOR = '[aria-label="including third-party cookies"]';
+const INCLUDE_3RD_PARTY_COOKIES_SELECTOR = '[title="including third-party cookies"]';
 
 let DOMAIN_SELECTOR: string;
 
@@ -44,7 +44,7 @@ describe('The Application Tab', async () => {
     await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
 
     const dataGridRowValuesBefore = await waitForFunction(async () => {
-      const data = await getStorageItemsData(['name', 'value']);
+      const data = await getStorageItemsData(['name', 'value'], 3);
       return data.length ? data : undefined;
     });
 
@@ -88,7 +88,7 @@ describe('The Application Tab', async () => {
     await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
 
     const dataGridRowValuesBefore = await waitForFunction(async () => {
-      const data = await getStorageItemsData(['name', 'value']);
+      const data = await getStorageItemsData(['name', 'value'], 3);
       return data.length ? data : undefined;
     });
 
@@ -115,7 +115,7 @@ describe('The Application Tab', async () => {
     await doubleClickSourceTreeItem(DOMAIN_SELECTOR);
 
     await waitForFunction(async () => {
-      const data = await getStorageItemsData(['name', 'value']);
+      const data = await getStorageItemsData(['name', 'value'], 0);
       return data.length === 0;
     });
   });
@@ -131,6 +131,7 @@ describe('The Application Tab', async () => {
 
     it('clear button clears storage correctly', async () => {
       const {target} = getBrowserAndPages();
+      await target.bringToFront();
       await target.evaluate(async () => {
         const array: number[] = [];
         for (let i = 0; i < 20000; i++) {
@@ -144,9 +145,9 @@ describe('The Application Tab', async () => {
         await new Promise(resolve => addIDBValue(resolve, 'Database1', 'Store1', {key: 1, value: array}, ''));
       });
 
-      await waitForQuotaUsage(quota => quota > 20000);
+      await waitForQuotaUsage(quota => quota > 2999);
 
-      // We may click too early. If the total quota exceeds 20000, some remaining
+      // We may click too early. If the total quota exceeds 2999, some remaining
       // quota may show. Instead,
       // try to click another time, if necessary.
       await waitForFunction(async () => {
@@ -172,7 +173,7 @@ describe('The Application Tab', async () => {
         await new Promise(resolve => addIDBValue(resolve, 'Database1', 'Store1', {key: 1, value: array}, ''));
       });
 
-      await waitForQuotaUsage(quota => quota > 20000);
+      await waitForQuotaUsage(quota => quota > 2999);
 
       const rows = await getPieChartLegendRows();
       // Only assert that the legend entries are correct.

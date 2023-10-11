@@ -73,6 +73,7 @@ describeWithMockConnection('PreloadingModel', async () => {
         url: 'https://example.com/subresource.js',
       },
       status: SDK.PreloadingModel.PreloadingStatus.Running,
+      requestId: 'requestId:1',
     });
 
     assert.deepEqual(model.getAllRuleSets(), [
@@ -106,6 +107,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1] as Protocol.DOM.BackendNodeId[],
         },
@@ -209,6 +211,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1] as Protocol.DOM.BackendNodeId[],
         },
@@ -224,6 +227,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prerenderStatus: null,
+          disallowedMojoInterface: null,
           ruleSetIds: ['ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [2] as Protocol.DOM.BackendNodeId[],
         },
@@ -254,6 +258,7 @@ describeWithMockConnection('PreloadingModel', async () => {
         url: 'https://example.com/subresource.js',
       },
       status: SDK.PreloadingModel.PreloadingStatus.Failure,
+      requestId: 'requestId:1',
     });
 
     assert.deepEqual(model.getAllRuleSets(), [
@@ -287,6 +292,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Failure,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           // Note that current implementation doesn't show associated
           // rule sets when preloading is cancelled by rule sets
           // deletion. One can treat this case special, i.e. associated
@@ -309,6 +315,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prerenderStatus: null,
+          disallowedMojoInterface: null,
           ruleSetIds: ['ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [2] as Protocol.DOM.BackendNodeId[],
         },
@@ -380,6 +387,8 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.NotTriggered,
           prefetchStatus: null,
+          // Invalid request id
+          requestId: '' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1] as Protocol.DOM.BackendNodeId[],
         },
@@ -499,6 +508,7 @@ describeWithMockConnection('PreloadingModel', async () => {
         url: 'https://example.com/subresource2.js',
       },
       status: SDK.PreloadingModel.PreloadingStatus.Running,
+      requestId: 'requestId:1',
     });
 
     assert.deepEqual(model.getAllRuleSets(), [
@@ -532,6 +542,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [2] as Protocol.DOM.BackendNodeId[],
         },
@@ -625,6 +636,7 @@ describeWithMockConnection('PreloadingModel', async () => {
         url: 'https://example.com/subresource12.js',
       },
       status: SDK.PreloadingModel.PreloadingStatus.Running,
+      requestId: 'requestId:1',
     });
     dispatchEvent(target, 'Preload.prefetchStatusUpdated', {
       key: {
@@ -633,6 +645,7 @@ describeWithMockConnection('PreloadingModel', async () => {
         url: 'https://example.com/subresource2.js',
       },
       status: SDK.PreloadingModel.PreloadingStatus.Running,
+      requestId: 'requestId:2',
     });
 
     assert.deepEqual(model.getPreloadingAttempts(null), [
@@ -647,6 +660,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1', 'ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1, 2] as Protocol.DOM.BackendNodeId[],
         },
@@ -662,6 +676,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:2' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [2] as Protocol.DOM.BackendNodeId[],
         },
@@ -680,6 +695,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1', 'ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1, 2] as Protocol.DOM.BackendNodeId[],
         },
@@ -698,6 +714,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1', 'ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1, 2] as Protocol.DOM.BackendNodeId[],
         },
@@ -713,6 +730,7 @@ describeWithMockConnection('PreloadingModel', async () => {
           },
           status: SDK.PreloadingModel.PreloadingStatus.Running,
           prefetchStatus: null,
+          requestId: 'requestId:2' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:2'] as Protocol.Preload.RuleSetId[],
           nodeIds: [2] as Protocol.DOM.BackendNodeId[],
         },

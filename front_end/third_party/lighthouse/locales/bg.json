@@ -17,6 +17,15 @@
   "core/audits/accessibility/aria-allowed-attr.js | title": {
     "message": "Атрибутите `[aria-*]` съответстват на ролите си"
   },
+  "core/audits/accessibility/aria-allowed-role.js | description": {
+    "message": "Ролите на ARIA, задавани чрез атрибута `role`, информират помощните технологии каква функция изпълнява всеки елемент в уеб страницата. Ако стойностите на `role` са изписани неправилно, не са сред съществуващите за `role` или са абстрактни роли, предназначението на елемента няма да се съобщава на потребителите на помощни технологии. [Научете повече за ролите на ARIA](https://dequeuniversity.com/rules/axe/4.7/aria-allowed-roles)."
+  },
+  "core/audits/accessibility/aria-allowed-role.js | failureTitle": {
+    "message": "Стойностите, зададени за `role=\"\"`, не са валидни роли на ARIA."
+  },
+  "core/audits/accessibility/aria-allowed-role.js | title": {
+    "message": "Стойностите, зададени за `role=\"\"`, са валидни роли на ARIA."
+  },
   "core/audits/accessibility/aria-command-name.js | description": {
     "message": "Когато даден елемент няма достъпно име, екранните четци ще произнасят за него общо име и той ще бъде неизползваем за потребителите, разчитащи на тази технология. [Научете как да направите по-достъпни елементите, свързани с команди](https://dequeuniversity.com/rules/axe/4.7/aria-command-name)."
   },
@@ -25,6 +34,15 @@
   },
   "core/audits/accessibility/aria-command-name.js | title": {
     "message": "Елементите `button`, `link` и `menuitem` имат достъпни имена"
+  },
+  "core/audits/accessibility/aria-dialog-name.js | description": {
+    "message": "Елементите ARIA в диалоговите прозорци без достъпни имена може да попречат на потребителите на екранни четци да разберат целта на тези елементи. [Научете как да направите по-достъпни елементите ARIA в диалоговите прозорци](https://dequeuniversity.com/rules/axe/4.7/aria-dialog-name)."
+  },
+  "core/audits/accessibility/aria-dialog-name.js | failureTitle": {
+    "message": "Елементите с `role=\"dialog\"` или `role=\"alertdialog\"` нямат достъпни имена."
+  },
+  "core/audits/accessibility/aria-dialog-name.js | title": {
+    "message": "Елементите с `role=\"dialog\"` или `role=\"alertdialog\"` имат достъпни имена."
   },
   "core/audits/accessibility/aria-hidden-body.js | description": {
     "message": "Помощните технологии, например екранни четци, работят непоследователно, когато за `<body>` за документа е зададено `aria-hidden=\"true\"`. [Научете как `aria-hidden` влияе върху основния текст на документа](https://dequeuniversity.com/rules/axe/4.7/aria-hidden-body)."
@@ -106,6 +124,15 @@
   },
   "core/audits/accessibility/aria-roles.js | title": {
     "message": "Стойностите на `[role]` са валидни"
+  },
+  "core/audits/accessibility/aria-text.js | description": {
+    "message": "Добавянето на `role=text` около текстов възел, разделен с маркиране, дава възможност на VoiceOver да го третира като една фраза, но дъщерните елементи, които могат да се откроят, няма да бъдат съобщени. [Научете повече за атрибута `role=text`](https://dequeuniversity.com/rules/axe/4.7/aria-text)."
+  },
+  "core/audits/accessibility/aria-text.js | failureTitle": {
+    "message": "Елементите с атрибута `role=text` имат дъщерни елементи, които могат да се откроят."
+  },
+  "core/audits/accessibility/aria-text.js | title": {
+    "message": "Елементите с атрибута `role=text` нямат дъщерни елементи, които могат да се откроят."
   },
   "core/audits/accessibility/aria-toggle-field-name.js | description": {
     "message": "Когато дадено поле за превключване няма достъпно име, екранните четци ще произнасят за него общо име и то ще бъде неизползваемо за потребителите, разчитащи на тази технология. [Научете повече за полетата за превключване](https://dequeuniversity.com/rules/axe/4.7/aria-toggle-field-name)."
@@ -227,6 +254,15 @@
   "core/audits/accessibility/duplicate-id-aria.js | title": {
     "message": "Идентификаторите за ARIA са уникални"
   },
+  "core/audits/accessibility/empty-heading.js | description": {
+    "message": "Заглавие без съдържание или недостъпен текст не позволяват на потребителите на екранни четци да стигнат до информация за структурата на страницата. [Научете повече за заглавията](https://dequeuniversity.com/rules/axe/4.7/empty-heading)."
+  },
+  "core/audits/accessibility/empty-heading.js | failureTitle": {
+    "message": "Заглавните елементи нямат съдържание."
+  },
+  "core/audits/accessibility/empty-heading.js | title": {
+    "message": "Всички елементи heading имат съдържание."
+  },
   "core/audits/accessibility/form-field-multiple-labels.js | description": {
     "message": "Когато полетата във формуляри имат няколко етикета, е възможно да бъдат произнесени объркващо от помощните технологии, например екранни четци, които използват първия, последния или всички етикети. [Научете как да използвате етикети за формуляри](https://dequeuniversity.com/rules/axe/4.7/form-field-multiple-labels)."
   },
@@ -272,6 +308,24 @@
   "core/audits/accessibility/html-lang-valid.js | title": {
     "message": "Елементът `<html>` има валидна стойност за атрибута `[lang]`"
   },
+  "core/audits/accessibility/html-xml-lang-mismatch.js | description": {
+    "message": "Ако уеб страницата не посочва език по еднороден начин, екранният четец може да не прочете текста ѝ правилно. [Научете повече за атрибута `lang`](https://dequeuniversity.com/rules/axe/4.7/html-xml-lang-mismatch)."
+  },
+  "core/audits/accessibility/html-xml-lang-mismatch.js | failureTitle": {
+    "message": "Елементът `<html>` няма атрибут `[xml:lang]` със същия основен език като атрибута `[lang]`."
+  },
+  "core/audits/accessibility/html-xml-lang-mismatch.js | title": {
+    "message": "Елементът `<html>` има атрибут `[xml:lang]` със същия основен език като атрибута `[lang]`."
+  },
+  "core/audits/accessibility/identical-links-same-purpose.js | description": {
+    "message": "Връзките с една и съща дестинация трябва да имат едно и също описание, за да могат потребителите да разберат целта на връзката и да решат дали да я отворят. [Научете повече за идентичните връзки](https://dequeuniversity.com/rules/axe/4.7/identical-links-same-purpose)."
+  },
+  "core/audits/accessibility/identical-links-same-purpose.js | failureTitle": {
+    "message": "Идентичните връзки нямат една и съща цел."
+  },
+  "core/audits/accessibility/identical-links-same-purpose.js | title": {
+    "message": "Идентичните връзки имат една и съща цел."
+  },
   "core/audits/accessibility/image-alt.js | description": {
     "message": "Информативните елементи трябва да имат кратък, описателен алтернативен текст. При декоративните елементи атрибутът alt може да бъде оставен без стойност. [Научете повече за атрибута `alt`](https://dequeuniversity.com/rules/axe/4.7/image-alt)."
   },
@@ -280,6 +334,24 @@
   },
   "core/audits/accessibility/image-alt.js | title": {
     "message": "Графичните елементи имат атрибути `[alt]`"
+  },
+  "core/audits/accessibility/image-redundant-alt.js | description": {
+    "message": "Информативните елементи трябва да имат кратък, описателен алтернативен текст. Ако той е идентичен на текста до връзката или изображението, това може да бъде объркващо за потребителите на екранни четци, тъй като текстът ще бъде прочетен два пъти. [Научете повече за атрибута `alt`](https://dequeuniversity.com/rules/axe/4.7/image-redundant-alt)."
+  },
+  "core/audits/accessibility/image-redundant-alt.js | failureTitle": {
+    "message": "Има атрибути `[alt]` с излишен текст за графичните елементи."
+  },
+  "core/audits/accessibility/image-redundant-alt.js | title": {
+    "message": "Няма атрибути `[alt]` с излишен текст за графичните елементи."
+  },
+  "core/audits/accessibility/input-button-name.js | description": {
+    "message": "Добавянето на забележим и достъпен текст към бутоните за въвеждане може да помогне на потребителите на екранни четци да разберат за какво служи съответният бутон. [Научете повече за бутоните за въвеждане](https://dequeuniversity.com/rules/axe/4.7/input-button-name)."
+  },
+  "core/audits/accessibility/input-button-name.js | failureTitle": {
+    "message": "Бутоните за въвеждане нямат забележим текст."
+  },
+  "core/audits/accessibility/input-button-name.js | title": {
+    "message": "Бутоните за въвеждане са със забележим текст."
   },
   "core/audits/accessibility/input-image-alt.js | description": {
     "message": "Когато за бутон от тип `<input>` се използва изображение, предоставянето на алтернативен текст помага на потребителите на екранни четци да разберат за какво служи бутонът. [Научете повече за алтернативния текст на изображение за елемент input](https://dequeuniversity.com/rules/axe/4.7/input-image-alt)."
@@ -290,6 +362,15 @@
   "core/audits/accessibility/input-image-alt.js | title": {
     "message": "Елементите `<input type=\"image\">` имат алтернативен текст (`[alt]`)"
   },
+  "core/audits/accessibility/label-content-name-mismatch.js | description": {
+    "message": "Видимите текстови етикети, които не съответстват на достъпното име, може да са объркващи за потребителите на екранни четци. [Научете повече за достъпните имена](https://dequeuniversity.com/rules/axe/4.7/label-content-name-mismatch)."
+  },
+  "core/audits/accessibility/label-content-name-mismatch.js | failureTitle": {
+    "message": "Елементите с видими текстови етикети нямат съответстващи достъпни имена."
+  },
+  "core/audits/accessibility/label-content-name-mismatch.js | title": {
+    "message": "Елементите с видими текстови етикети имат съответстващи достъпни имена."
+  },
   "core/audits/accessibility/label.js | description": {
     "message": "Етикетите дават възможност на помощните технологии, като например екранни четци, да четат правилно контролите във формуляри. [Научете повече за етикетите на елементи във формуляри](https://dequeuniversity.com/rules/axe/4.7/label)."
   },
@@ -298,6 +379,24 @@
   },
   "core/audits/accessibility/label.js | title": {
     "message": "Елементите на формуляра имат свързани етикети"
+  },
+  "core/audits/accessibility/landmark-one-main.js | description": {
+    "message": "Един главен участък помага на потребителите на екранни четци да навигират в дадена уеб страница. [Научете повече за участъците](https://dequeuniversity.com/rules/axe/4.7/landmark-one-main)."
+  },
+  "core/audits/accessibility/landmark-one-main.js | failureTitle": {
+    "message": "Документът няма главен участък."
+  },
+  "core/audits/accessibility/landmark-one-main.js | title": {
+    "message": "Документът има главен участък."
+  },
+  "core/audits/accessibility/link-in-text-block.js | description": {
+    "message": "Четенето на текст с нисък контраст е трудно или невъзможно за много потребители. Текстът на връзките, който се отличава, подобрява практическата работа за потребителите със слабо зрение. [Научете как да направите връзките да се отличават от текста](https://dequeuniversity.com/rules/axe/4.7/link-in-text-block)."
+  },
+  "core/audits/accessibility/link-in-text-block.js | failureTitle": {
+    "message": "Връзките разчитат на цвят, за да се отличават от текста."
+  },
+  "core/audits/accessibility/link-in-text-block.js | title": {
+    "message": "Връзките се отличават от текста, без да разчитат на цвета."
   },
   "core/audits/accessibility/link-name.js | description": {
     "message": "Текстът на връзките (и алтернативният текст за изображения, когато се използват за връзки), който е различим, уникален и дава възможност фокусът да бъде поставен върху него, подобрява навигирането за потребителите на екранни четци. [Научете как да направите връзките достъпни](https://dequeuniversity.com/rules/axe/4.7/link-name)."
@@ -353,6 +452,24 @@
   "core/audits/accessibility/object-alt.js | title": {
     "message": "`<object>` елемента имат алтернативен текст"
   },
+  "core/audits/accessibility/select-name.js | description": {
+    "message": "Елементите на формуляра без ефективни етикети могат да влошат практическата работа на потребителите на екранни четци. [Научете повече за елемента `select`](https://dequeuniversity.com/rules/axe/4.7/select-name)."
+  },
+  "core/audits/accessibility/select-name.js | failureTitle": {
+    "message": "С елементите select не са свързани елементи label."
+  },
+  "core/audits/accessibility/select-name.js | title": {
+    "message": "С елементите select са свързани елементи label."
+  },
+  "core/audits/accessibility/skip-link.js | description": {
+    "message": "Включването на връзка за пропускане може да помогне на потребителите да преминат към основното съдържание, за да спестят време. [Научете повече за връзките за пропускане](https://dequeuniversity.com/rules/axe/4.7/skip-link)."
+  },
+  "core/audits/accessibility/skip-link.js | failureTitle": {
+    "message": "Фокусът не може да бъде поставен върху връзките за пропускане."
+  },
+  "core/audits/accessibility/skip-link.js | title": {
+    "message": "Фокусът може да бъде поставен върху връзките за пропускане."
+  },
   "core/audits/accessibility/tabindex.js | description": {
     "message": "Ако стойността е по-голяма от 0, значи се използва изричен ред на навигиране. Въпреки че е технически валидно, това често създава неудобства за потребителите, които разчитат на помощни технологии. [Научете повече за атрибута `tabindex`](https://dequeuniversity.com/rules/axe/4.7/tabindex)."
   },
@@ -361,6 +478,42 @@
   },
   "core/audits/accessibility/tabindex.js | title": {
     "message": "Никой от елементите няма атрибут `[tabindex]` със стойност, по-голяма от 0"
+  },
+  "core/audits/accessibility/table-duplicate-name.js | description": {
+    "message": "Атрибутът summary трябва да описва структурата на таблицата, a `<caption>` трябва да съдържа заглавието, което се показва на екрана. Точното маркиране на елементите на таблицата улеснява потребителите на екранни четци. [Научете повече за атрибута summary и елемента caption](https://dequeuniversity.com/rules/axe/4.7/table-duplicate-name)."
+  },
+  "core/audits/accessibility/table-duplicate-name.js | failureTitle": {
+    "message": "Таблиците имат едно и също съдържание в атрибута summary и в елемента `<caption>.`"
+  },
+  "core/audits/accessibility/table-duplicate-name.js | title": {
+    "message": "Таблиците имат различно съдържание в атрибута summary и в елемента `<caption>`."
+  },
+  "core/audits/accessibility/table-fake-caption.js | description": {
+    "message": "Екранните четци имат функции за улесняване на навигирането в таблици. Когато в таблиците се използва елементът caption вместо клетки с атрибута `[colspan]`, това може да подобри практическата работа за потребителите на екранни четци. [Научете повече за надписите](https://dequeuniversity.com/rules/axe/4.7/table-fake-caption)."
+  },
+  "core/audits/accessibility/table-fake-caption.js | failureTitle": {
+    "message": "Таблиците не използват `<caption>` вместо клетки с атрибута `[colspan]`, за да посочат надпис."
+  },
+  "core/audits/accessibility/table-fake-caption.js | title": {
+    "message": "В таблиците се използва `<caption>` вместо клетки с атрибута `[colspan]`, за да се посочи надпис."
+  },
+  "core/audits/accessibility/target-size.js | description": {
+    "message": "Целите за докосване с достатъчна големина и разстояние помежду им помагат на потребителите, които се затрудняват да работят с малки контроли, да ги активират. [Научете повече за целите за докосване](https://dequeuniversity.com/rules/axe/4.7/target-size)."
+  },
+  "core/audits/accessibility/target-size.js | failureTitle": {
+    "message": "Целите за докосване не са достатъчно големи или разстоянието помежду им не е достатъчно."
+  },
+  "core/audits/accessibility/target-size.js | title": {
+    "message": "Целите за докосване са с достатъчна големина и разстояние помежду им."
+  },
+  "core/audits/accessibility/td-has-header.js | description": {
+    "message": "Екранните четци имат функции за улесняване на навигирането в таблици. Когато елементите `<td>` в голяма таблица (с повече от 3 колони или реда) имат свързана заглавка на таблицата, това може да подобри практическата работа за потребителите на екранни четци. [Научете повече за заглавките на таблиците](https://dequeuniversity.com/rules/axe/4.7/td-has-header)."
+  },
+  "core/audits/accessibility/td-has-header.js | failureTitle": {
+    "message": "`<td>` елемента в голям елемент `<table>` нямат заглавки на таблицата."
+  },
+  "core/audits/accessibility/td-has-header.js | title": {
+    "message": "Елементите `<td>` в голям елемент `<table>` имат една или повече заглавки на таблицата."
   },
   "core/audits/accessibility/td-headers-attr.js | description": {
     "message": "Екранните четци имат функции за улесняване на навигирането в таблици. Когато клетките от типа `<td>`, използващи атрибута `[headers]`, сочат само към други клетки от същата таблица, това може да подобри практическата работа за потребителите на екранни четци. [Научете повече за атрибута `headers`](https://dequeuniversity.com/rules/axe/4.7/td-headers-attr)."
@@ -902,9 +1055,6 @@
   "core/audits/installable-manifest.js | no-manifest": {
     "message": "В страницата не е зададен URL адрес на манифеста чрез маркера <link>"
   },
-  "core/audits/installable-manifest.js | no-matching-service-worker": {
-    "message": "Не бе открит съответстващ файл service worker. Може да се наложи да презаредите страницата или да се уверите, че зададените в манифеста обхват и URL адрес за стартиране попадат в обхвата на service worker за текущата страница."
-  },
   "core/audits/installable-manifest.js | no-url-for-service-worker": {
     "message": "Файлът service worker не бе проверен, тъй като за него липсваше поле start_url в манифеста"
   },
@@ -933,10 +1083,7 @@
     "message": "prefer_related_applications се поддържа само в бета- и стабилния канал на Chrome за Android."
   },
   "core/audits/installable-manifest.js | protocol-timeout": {
-    "message": "Lighthouse не успя да установи дали е налице service worker. Опитайте с по-нова версия на Chrome."
-  },
-  "core/audits/installable-manifest.js | scheme-not-supported-for-webapk": {
-    "message": "Схемата ({scheme}) на URL адреса на манифеста не се поддържа под Android."
+    "message": "Lighthouse не успя да установи дали страницата може да се инсталира. Опитайте с по-нова версия на Chrome."
   },
   "core/audits/installable-manifest.js | start-url-not-valid": {
     "message": "URL адресът за стартиране в манифеста не е валиден"
@@ -981,25 +1128,25 @@
     "message": "Разрешено с предупреждение"
   },
   "core/audits/largest-contentful-paint-element.js | columnPercentOfLCP": {
-    "message": "% of LCP"
+    "message": "% от LCP"
   },
   "core/audits/largest-contentful-paint-element.js | columnPhase": {
-    "message": "Phase"
+    "message": "Фаза"
   },
   "core/audits/largest-contentful-paint-element.js | columnTiming": {
-    "message": "Timing"
+    "message": "Време"
   },
   "core/audits/largest-contentful-paint-element.js | description": {
     "message": "Този елемент е най-голямото съдържание, изобразено в прозоречния изглед. [Научете повече за елемента, рендериран при изобразяване на най-голямото съдържание (LCP)](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-largest-contentful-paint/)"
   },
   "core/audits/largest-contentful-paint-element.js | itemLoadDelay": {
-    "message": "Load Delay"
+    "message": "Забавяне на зареждането"
   },
   "core/audits/largest-contentful-paint-element.js | itemLoadTime": {
-    "message": "Load Time"
+    "message": "Време за зареждане"
   },
   "core/audits/largest-contentful-paint-element.js | itemRenderDelay": {
-    "message": "Render Delay"
+    "message": "Забавяне при рендерирането"
   },
   "core/audits/largest-contentful-paint-element.js | itemTTFB": {
     "message": "TTFB"
@@ -1076,14 +1223,14 @@
   "core/audits/metrics/cumulative-layout-shift.js | description": {
     "message": "Показателят „Кумулативни структурни промени (CLS)“ измерва движението на видимите елементи в прозоречния изглед. [Научете повече за този показател](https://web.dev/cls/)."
   },
-  "core/audits/metrics/experimental-interaction-to-next-paint.js | description": {
-    "message": "Показателят „Изобразяване след взаимодействие“ измерва колко време е необходимо на страницата, за да реагира визуално след входящи данни от действие на потребител. [Научете повече за този показател](https://web.dev/inp/)."
-  },
   "core/audits/metrics/first-contentful-paint.js | description": {
     "message": "Показателят „Първо изобразяване на съдържание (FCP)“ указва след колко време се изобразява първият текстов или графичен елемент. [Научете повече за този показател](https://developer.chrome.com/docs/lighthouse/performance/first-contentful-paint/)."
   },
   "core/audits/metrics/first-meaningful-paint.js | description": {
     "message": "Показателят „Първо значимо изобразяване“ измерва времето, за което основното съдържание на страницата става видимо. [Научете повече за този показател](https://developer.chrome.com/docs/lighthouse/performance/first-meaningful-paint/)."
+  },
+  "core/audits/metrics/interaction-to-next-paint.js | description": {
+    "message": "Показателят „Изобразяване след взаимодействие“ измерва колко време е необходимо на страницата, за да реагира визуално след входящи данни от действие на потребител. [Научете повече за този показател](https://web.dev/inp/)."
   },
   "core/audits/metrics/interactive.js | description": {
     "message": "Времето до интерактивност показва след колко време страницата става напълно интерактивна. [Научете повече за този показател](https://developer.chrome.com/docs/lighthouse/performance/interactive/)."
@@ -1177,15 +1324,6 @@
   },
   "core/audits/redirects.js | title": {
     "message": "Не използвайте пренасочвания през няколко страници"
-  },
-  "core/audits/resource-summary.js | description": {
-    "message": "За да определите лимити за количеството и размера на ресурсите на страницата, добавете файл budget.json. [Научете повече за лимитите за показатели с въздействие върху ефективността](https://web.dev/use-lighthouse-for-performance-budgets/)."
-  },
-  "core/audits/resource-summary.js | displayValue": {
-    "message": "{requestCount,plural, =1{1 заявка • {byteCount, number, bytes} KiB}other{# заявки • {byteCount, number, bytes} KiB}}"
-  },
-  "core/audits/resource-summary.js | title": {
-    "message": "Поддържайте малък брой заявки и неголям обем на прехвърляните данни"
   },
   "core/audits/seo/canonical.js | description": {
     "message": "Каноничните връзки указват кой URL адрес да се показва в резултатите от търсенето. [Научете повече за каноничните връзки](https://developer.chrome.com/docs/lighthouse/seo/canonical/)."
@@ -1375,27 +1513,6 @@
   },
   "core/audits/server-response-time.js | title": {
     "message": "Началното време за реакция на сървъра бе кратко"
-  },
-  "core/audits/service-worker.js | description": {
-    "message": "Service worker е технологията, която дава възможност на приложението ви да използва много от функциите на прогресивните уеб приложения (PWA), като например работа офлайн, добавяне към началния екран и насочени известия. [Научете повече за service worker](https://developer.chrome.com/docs/lighthouse/pwa/service-worker/)."
-  },
-  "core/audits/service-worker.js | explanationBadManifest": {
-    "message": "Тази страница е контролирана от service worker, но не бе намерен параметър `start_url`, тъй като при синтактичния анализ бе установено, че манифестът не е във валиден формат JSON"
-  },
-  "core/audits/service-worker.js | explanationBadStartUrl": {
-    "message": "Тази страница се контролира от файл service worker, но `start_url` ({startUrl}) не е в обхвата му ({scopeUrl})"
-  },
-  "core/audits/service-worker.js | explanationNoManifest": {
-    "message": "Тази страница се контролира от service worker, но не бе намерен параметър `start_url`, тъй като не бе извлечен манифест."
-  },
-  "core/audits/service-worker.js | explanationOutOfScope": {
-    "message": "Този източник има един или повече файлове service worker, но страницата ({pageUrl}) не е в обхвата им."
-  },
-  "core/audits/service-worker.js | failureTitle": {
-    "message": "Няма регистриран service worker, който контролира страницата и `start_url`"
-  },
-  "core/audits/service-worker.js | title": {
-    "message": "Регистриран е service worker, който контролира страницата и `start_url`"
   },
   "core/audits/splash-screen.js | description": {
     "message": "Тематичният първоначален екран гарантира висококачествена практическа работа, когато потребителите стартират приложението ви от началния екран. [Научете повече за първоначалните екрани](https://developer.chrome.com/docs/lighthouse/pwa/splash-screen/)."
@@ -1587,7 +1704,7 @@
     "message": "Най-добри практики"
   },
   "core/config/default-config.js | a11yCategoryDescription": {
-    "message": "Тези проверки открояват възможности за [подобряване на достъпността на уеб приложението ви](https://developer.chrome.com/docs/lighthouse/accessibility/). Само определени проблеми с достъпността могат да бъдат открити автоматично. Затова ръчното тестване също е препоръчително."
+    "message": "Тези проверки открояват възможности за [подобряване на достъпността на уеб приложението ви](https://developer.chrome.com/docs/lighthouse/accessibility/). Само определени проблеми могат да бъдат открити автоматично и това не гарантира достъпността на уеб приложението. Затова [ръчното тестване](https://web.dev/how-to-review/) също е препоръчително."
   },
   "core/config/default-config.js | a11yCategoryManualDescription": {
     "message": "Тези проверки покриват области, които са извън обхвата на автоматичните инструменти за тестване. Научете повече в ръководството ни за [извършване на преглед на достъпността](https://web.dev/how-to-review/)."
@@ -1751,6 +1868,9 @@
   "core/lib/bf-cache-strings.js | appBanner": {
     "message": "Страниците, които са заявили AppBanner, понастоящем не отговарят на условията за кеша за назад/напред."
   },
+  "core/lib/bf-cache-strings.js | authorizationHeader": {
+    "message": "Кешът за назад/напред е деактивиран поради заявка за проверка на връзката."
+  },
   "core/lib/bf-cache-strings.js | backForwardCacheDisabled": {
     "message": "Кешът за назад/напред е деактивиран чрез флагове. За да го активирате локално на това устройство, отворете chrome://flags/#back-forward-cache."
   },
@@ -1816,6 +1936,9 @@
   },
   "core/lib/bf-cache-strings.js | contentWebUSB": {
     "message": "Страниците, които използват WebUSB API, не отговарят на условията за кеша за назад/напред."
+  },
+  "core/lib/bf-cache-strings.js | cookieDisabled": {
+    "message": "Кешът за назад/напред е деактивиран, защото „бисквитките“ са деактивирани на страница, която използва `Cache-Control: no-store`."
   },
   "core/lib/bf-cache-strings.js | dedicatedWorkerOrWorklet": {
     "message": "Страниците, които използват worker или worklet само за себе си, понастоящем не отговарят на условията за кеша за назад/напред."
@@ -1892,14 +2015,17 @@
   "core/lib/bf-cache-strings.js | indexedDBConnection": {
     "message": "Страниците, които имат отворена връзка към IndexedDB, понастоящем не отговарят на условията за кеша за назад/напред."
   },
+  "core/lib/bf-cache-strings.js | indexedDBEvent": {
+    "message": "Кешът за назад/напред е деактивиран поради събитие за IndexedDB."
+  },
   "core/lib/bf-cache-strings.js | ineligibleAPI": {
     "message": "Използвани са неотговарящи на условията API."
   },
   "core/lib/bf-cache-strings.js | injectedJavascript": {
-    "message": "Страниците, в които JavaScript е вмъкнат от разширение, понастоящем не отговарят на условията за кеша за назад/напред."
+    "message": "Страниците, в които `JavaScript` е вмъкнат от разширение, понастоящем не отговарят на условията за кеша за назад/напред."
   },
   "core/lib/bf-cache-strings.js | injectedStyleSheet": {
-    "message": "Страниците, в които стиловият лист е вмъкнат от разширение, понастоящем не отговарят на условията за кеша за назад/напред."
+    "message": "Страниците, в които `StyleSheet` е вмъкнат от разширение, понастоящем не отговарят на условията за кеша за назад/напред."
   },
   "core/lib/bf-cache-strings.js | internalError": {
     "message": "Вътрешна грешка."
@@ -2138,154 +2264,190 @@
   "core/lib/csp-evaluator.js | unsafeInlineFallback": {
     "message": "Обмислете дали да не добавите unsafe-inline (пренебрегва се от браузъри, които поддържат nonce и хешове), за да се обезпечи обратна съвместимост с по-стари браузъри."
   },
-  "core/lib/deprecations-strings.js | authorizationCoveredByWildcard": {
-    "message": "Заместващият знак (*) няма да обхваща заглавката Authorization при обработване на `Access-Control-Allow-Headers` в CORS."
-  },
-  "core/lib/deprecations-strings.js | canRequestURLHTTPContainingNewline": {
-    "message": "Заявките за ресурси, чиито URL адреси съдържат премахнатите знаци за интервал (`(n|r|t)`) и знака за по-малко (`<`), са блокирани. За да се заредят тези ресурси, премахнете новите редове и кодирайте знаците за по-малко, използвани например в стойности на атрибути за елементи."
-  },
-  "core/lib/deprecations-strings.js | chromeLoadTimesConnectionInfo": {
-    "message": "Приложният програмен интерфейс `chrome.loadTimes()` е оттеглен. Вместо него използвайте стандартизирания API Navigation Timing 2."
-  },
-  "core/lib/deprecations-strings.js | chromeLoadTimesFirstPaintAfterLoadTime": {
-    "message": "Приложният програмен интерфейс `chrome.loadTimes()` е оттеглен. Вместо него използвайте стандартизирания API Paint Timing."
-  },
-  "core/lib/deprecations-strings.js | chromeLoadTimesWasAlternateProtocolAvailable": {
-    "message": "Приложният програмен интерфейс `chrome.loadTimes()` е оттеглен. Вместо него използвайте стандартизирания API `nextHopProtocol` в Navigation Timing 2."
-  },
-  "core/lib/deprecations-strings.js | cookieWithTruncatingChar": {
-    "message": "„Бисквитките“, съдържащи знак `(0|r|n)`, ще бъдат отхвърляни вместо скъсявани."
-  },
-  "core/lib/deprecations-strings.js | crossOriginAccessBasedOnDocumentDomain": {
-    "message": "Възможността за отмяна на правилото за един и същ източник чрез задаване на `document.domain` е оттеглена и ще бъде деактивирана по подразбиране. Това предупреждение за оттегляне се отнася за достъпа от външни източници, активиран чрез настройката `document.domain`."
-  },
-  "core/lib/deprecations-strings.js | crossOriginWindowApi": {
-    "message": "Възможността за задействане на {PH1} от вложени рамки от външни източници е оттеглена и ще бъде премахната в бъдеще."
-  },
-  "core/lib/deprecations-strings.js | cssSelectorInternalMediaControlsOverlayCastButton": {
-    "message": "За деактивиране на стандартната интеграция на функцията за предаване трябва да се използва атрибутът `disableRemotePlayback`, а не селекторът `-internal-media-controls-overlay-cast-button`."
-  },
-  "core/lib/deprecations-strings.js | deprecatedWithReplacement": {
-    "message": "Приложният програмен интерфейс {PH1} е оттеглен. Вместо него използвайте {PH2}."
-  },
-  "core/lib/deprecations-strings.js | deprecationExample": {
-    "message": "Това е пример на преведено съобщение за оттегляне."
-  },
-  "core/lib/deprecations-strings.js | documentDomainSettingWithoutOriginAgentClusterHeader": {
-    "message": "Възможността за отмяна на правилото за един и същ източник чрез задаване на `document.domain` е оттеглена и ще бъде деактивирана по подразбиране. За да продължите да използвате тази функция, откажете се от групите агенти с ключ източник, като изпратите заглавка `Origin-Agent-Cluster: ?0` заедно с HTTP отговора за документа и рамките. За повече подробности вижте https://developer.chrome.com/blog/immutable-document-domain/."
-  },
-  "core/lib/deprecations-strings.js | eventPath": {
-    "message": "Приложният програмен интерфейс `Event.path` е оттеглен и ще бъде премахнат. Вместо него използвайте `Event.composedPath()`."
-  },
-  "core/lib/deprecations-strings.js | expectCTHeader": {
-    "message": "Заглавката `Expect-CT` е оттеглена и ще бъде премахната. Chrome изисква Прозрачност на сертификатите за всички публично надеждни сертификати, издадени след 30 април 2018 г."
-  },
-  "core/lib/deprecations-strings.js | feature": {
+  "core/lib/deprecation-description.js | feature": {
     "message": "Проверете страницата за състояние на функцията за още подробности."
   },
-  "core/lib/deprecations-strings.js | geolocationInsecureOrigin": {
-    "message": "`getCurrentPosition()` и `watchPosition()` вече не работят за незащитени източници. За да използвате тази функция, препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
-  },
-  "core/lib/deprecations-strings.js | geolocationInsecureOriginDeprecatedNotRemoved": {
-    "message": "`getCurrentPosition()` и `watchPosition()` са оттеглени за незащитени източници. За да използвате тази функция, препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
-  },
-  "core/lib/deprecations-strings.js | getUserMediaInsecureOrigin": {
-    "message": "`getUserMedia()` вече не работи за незащитени източници. За да използвате тази функция, препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
-  },
-  "core/lib/deprecations-strings.js | hostCandidateAttributeGetter": {
-    "message": "Полето `RTCPeerConnectionIceErrorEvent.hostCandidate` е оттеглено. Вместо него използвайте `RTCPeerConnectionIceErrorEvent.address` или `RTCPeerConnectionIceErrorEvent.port`."
-  },
-  "core/lib/deprecations-strings.js | identityInCanMakePaymentEvent": {
-    "message": "Източникът на търговеца и произволни данни от събитието `canmakepayment` на service worker са оттеглени и ще бъдат премахнати: `topOrigin`, `paymentRequestOrigin`, `methodData`, `modifiers`."
-  },
-  "core/lib/deprecations-strings.js | insecurePrivateNetworkSubresourceRequest": {
-    "message": "Уебсайтът заяви подресурс от мрежа, до която успя да осъществи достъп само заради специалните разрешения на потребителите в нея. Тези заявки разкриват в интернет информация за непублични устройства и сървъри. Това повишава риска от атаки чрез фалшифициране на заявки от друг сайт (CSRF) и/или от изтичане на информация. За да намали този риск, Chrome оттегля инициираните от незащитен контекст заявки до непублични подресурси и ще започне да ги блокира."
-  },
-  "core/lib/deprecations-strings.js | localCSSFileExtensionRejected": {
-    "message": "CSS не може да се зареди от URL адреси със схема `file:`, освен ако не завършват с файловото разширение `.css`."
-  },
-  "core/lib/deprecations-strings.js | mediaSourceAbortRemove": {
-    "message": "Възможността за използване на `SourceBuffer.abort()` за прекратяване на асинхронното премахване на периоди чрез `remove()` е оттеглена поради промяна на спецификацията. Поддръжката ще бъде премахната в бъдеще. Вместо това трябва да използвате приемател за събитието `updateend`. Функцията `abort()` е предназначена за прекратяване само на асинхронно добавяне на мултимедия или нулиране на състоянието на инструмента за синтактичен анализ."
-  },
-  "core/lib/deprecations-strings.js | mediaSourceDurationTruncatingBuffered": {
-    "message": "Възможността за задаване на стойност за `MediaSource.duration`, по-малка от най-голямото клеймо за дата и час за представяне на буферирани кодирани рамки, е оттеглена поради промяна на спецификацията. Поддръжката за неявно премахване на скъсена буферирана мултимедия ще бъде премахната в бъдеще. Вместо това трябва да извършвате изрично премахване чрез `remove(newDuration, oldDuration)` за всички елементи `sourceBuffers`, за които `newDuration < oldDuration`."
-  },
-  "core/lib/deprecations-strings.js | milestone": {
+  "core/lib/deprecation-description.js | milestone": {
     "message": "Тази промяна ще влезе в сила с важния етап {milestone}."
   },
-  "core/lib/deprecations-strings.js | noSysexWebMIDIWithoutPermission": {
-    "message": "Уеб MIDI ще иска разрешение за използване на специални системни съобщения дори ако опцията sysex не е посочена в `MIDIOptions`."
-  },
-  "core/lib/deprecations-strings.js | notificationInsecureOrigin": {
-    "message": "API за известия вече не може да се използва от незащитени източници. Препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
-  },
-  "core/lib/deprecations-strings.js | notificationPermissionRequestedIframe": {
-    "message": "Разрешението за достъп до API за известия вече не може да се заявява от вложени рамки от външни източници. Препоръчваме да го заявявате от рамка от първо ниво или да отваряте нов прозорец."
-  },
-  "core/lib/deprecations-strings.js | obsoleteWebRtcCipherSuite": {
-    "message": "Партньорът ви договаря връзка през остаряла версия на (D)TLS. Помолете го да отстрани проблема."
-  },
-  "core/lib/deprecations-strings.js | openWebDatabaseInsecureContext": {
-    "message": "Възможността за използване на WebSQL в незащитен контекст е оттеглена и скоро ще бъде премахната. Моля, използвайте уеб хранилище или индексирана база от данни."
-  },
-  "core/lib/deprecations-strings.js | overflowVisibleOnReplacedElement": {
-    "message": "Посочването на `overflow: visible` в маркери img, video и canvas може да доведе до показване на визуално съдържание извън границите на елемента. Вижте https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md."
-  },
-  "core/lib/deprecations-strings.js | paymentInstruments": {
-    "message": "Приложният програмен интерфейс `paymentManager.instruments` е оттеглен. Вместо него използвайте функцията за навременно инсталиране на инструменти за обработване на плащания."
-  },
-  "core/lib/deprecations-strings.js | paymentRequestCSPViolation": {
-    "message": "Начинът, по който извиквате `PaymentRequest`, заобикаля директивата `connect-src` на правилата за сигурност на съдържанието (CSP). Тази възможност за заобикаляне е оттеглена. От `PaymentRequest` API (в полето `supportedMethods`) добавете идентификатора на начина на плащане към директивата `connect-src` на CSP."
-  },
-  "core/lib/deprecations-strings.js | persistentQuotaType": {
-    "message": "Типът `StorageType.persistent` е оттеглен. Вместо него използвайте стандартизирания `navigator.storage`."
-  },
-  "core/lib/deprecations-strings.js | pictureSourceSrc": {
-    "message": "Комбинацията от `<source src>` и родителски елемент `<picture>` е невалидна и следователно бе пренебрегната. Вместо това използвайте `<source srcset>`."
-  },
-  "core/lib/deprecations-strings.js | prefixedStorageInfo": {
-    "message": "Приложният програмен интерфейс `window.webkitStorageInfo` е оттеглен. Вместо него използвайте стандартизирания `navigator.storage`."
-  },
-  "core/lib/deprecations-strings.js | requestedSubresourceWithEmbeddedCredentials": {
-    "message": "Заявките за подресурси, чиито URL адреси съдържат вградени идентификационни данни (напр. `https://user:pass@host/`), са блокирани."
-  },
-  "core/lib/deprecations-strings.js | rtcConstraintEnableDtlsSrtpFalse": {
-    "message": "Ограничението `DtlsSrtpKeyAgreement` е премахнато. Посочихте за него стойност `false`, която се тълкува като опит за използване на оттегления метод `SDES key negotiation`. Тази функционалност е премахната. Вместо нея използвайте услуга, която поддържа `DTLS key negotiation`."
-  },
-  "core/lib/deprecations-strings.js | rtcConstraintEnableDtlsSrtpTrue": {
-    "message": "Ограничението `DtlsSrtpKeyAgreement` е премахнато. Посочихте за него стойност `true`, която няма ефект, но можете да премахнете това ограничение с цел опростяване."
-  },
-  "core/lib/deprecations-strings.js | rtcPeerConnectionComplexPlanBSdpUsingDefaultSdpSemantics": {
-    "message": "Установено е използване на `Complex Plan B SDP`. Тази версия на `Session Description Protocol` вече не се поддържа. Вместо нея използвайте `Unified Plan SDP`."
-  },
-  "core/lib/deprecations-strings.js | rtcPeerConnectionSdpSemanticsPlanB": {
-    "message": "Версията `Plan B SDP semantics`, която се използва за изграждане на връзка от типа `RTCPeerConnection` с `{sdpSemantics:plan-b}`, е предишна, нестандартна версия на `Session Description Protocol`, която е изтрита за постоянно от уеб платформата. Тя все още е налична при създаване на връзки чрез `IS_FUCHSIA`, но планираме да я изтрием възможно най-скоро. Спрете да разчитате на нея. За информация относно състоянието вижте https://crbug.com/1302249."
-  },
-  "core/lib/deprecations-strings.js | rtcpMuxPolicyNegotiate": {
-    "message": "Опцията `rtcpMuxPolicy` е оттеглена и ще бъде премахната."
-  },
-  "core/lib/deprecations-strings.js | sharedArrayBufferConstructedWithoutIsolation": {
-    "message": "`SharedArrayBuffer` ще изисква изолиране от външни източници. За повече подробности вижте https://developer.chrome.com/blog/enabling-shared-array-buffer/."
-  },
-  "core/lib/deprecations-strings.js | textToSpeech_DisallowedByAutoplay": {
-    "message": "Възможността за използване на `speechSynthesis.speak()` без активиране от потребител е оттеглена и ще бъде премахната."
-  },
-  "core/lib/deprecations-strings.js | title": {
+  "core/lib/deprecation-description.js | title": {
     "message": "Използвана е оттеглена функция"
   },
-  "core/lib/deprecations-strings.js | v8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
+  "core/lib/deprecations-strings.js | AuthorizationCoveredByWildcard": {
+    "message": "Заместващият знак (*) няма да обхваща заглавката Authorization при обработване на `Access-Control-Allow-Headers` в CORS."
+  },
+  "core/lib/deprecations-strings.js | CSSSelectorInternalMediaControlsOverlayCastButton": {
+    "message": "За деактивиране на стандартната интеграция на функцията за предаване трябва да се използва атрибутът `disableRemotePlayback`, а не селекторът `-internal-media-controls-overlay-cast-button`."
+  },
+  "core/lib/deprecations-strings.js | CanRequestURLHTTPContainingNewline": {
+    "message": "Заявките за ресурси, чиито URL адреси съдържат премахнатите знаци за интервал (`(n|r|t)`) и знака за по-малко (`<`), са блокирани. За да се заредят тези ресурси, премахнете новите редове и кодирайте знаците за по-малко, използвани например в стойности на атрибути за елементи."
+  },
+  "core/lib/deprecations-strings.js | ChromeLoadTimesConnectionInfo": {
+    "message": "Приложният програмен интерфейс `chrome.loadTimes()` е оттеглен. Вместо него използвайте стандартизирания API Navigation Timing 2."
+  },
+  "core/lib/deprecations-strings.js | ChromeLoadTimesFirstPaintAfterLoadTime": {
+    "message": "Приложният програмен интерфейс `chrome.loadTimes()` е оттеглен. Вместо него използвайте стандартизирания API Paint Timing."
+  },
+  "core/lib/deprecations-strings.js | ChromeLoadTimesWasAlternateProtocolAvailable": {
+    "message": "Приложният програмен интерфейс `chrome.loadTimes()` е оттеглен. Вместо него използвайте стандартизирания API `nextHopProtocol` в Navigation Timing 2."
+  },
+  "core/lib/deprecations-strings.js | CookieWithTruncatingChar": {
+    "message": "„Бисквитките“, съдържащи знак `(0|r|n)`, ще бъдат отхвърляни вместо скъсявани."
+  },
+  "core/lib/deprecations-strings.js | CrossOriginAccessBasedOnDocumentDomain": {
+    "message": "Възможността за отмяна на правилото за един и същ източник чрез задаване на `document.domain` е оттеглена и ще бъде деактивирана по подразбиране. Това предупреждение за оттегляне се отнася за достъпа от външни източници, активиран чрез настройката `document.domain`."
+  },
+  "core/lib/deprecations-strings.js | CrossOriginWindowAlert": {
+    "message": "Възможността за задействане на window.alert от вложени рамки от външни източници е оттеглена и ще бъде премахната в бъдеще."
+  },
+  "core/lib/deprecations-strings.js | CrossOriginWindowConfirm": {
+    "message": "Възможността за задействане на window.confirm от вложени рамки от външни източници е оттеглена и ще бъде премахната в бъдеще."
+  },
+  "core/lib/deprecations-strings.js | DOMMutationEvents": {
+    "message": "Събития за промяна на DOM, включително `DOMSubtreeModified`, `DOMNodeInserted`, `DOMNodeRemoved`, `DOMNodeRemovedFromDocument`, `DOMNodeInsertedIntoDocument` и `DOMCharacterDataModified`, са оттеглени (https://w3c.github.io/uievents/#legacy-event-types) и ще бъдат премахнати. Вместо това използвайте `MutationObserver`."
+  },
+  "core/lib/deprecations-strings.js | DataUrlInSvgUse": {
+    "message": "Поддръжката на данни: URL адресите в елемента <use> в SVG са оттеглени и ще бъдат премахнати в бъдеще."
+  },
+  "core/lib/deprecations-strings.js | DocumentDomainSettingWithoutOriginAgentClusterHeader": {
+    "message": "Възможността за отмяна на правилото за един и същ източник чрез задаване на `document.domain` е оттеглена и ще бъде деактивирана по подразбиране. За да продължите да използвате тази функция, откажете се от групите агенти с ключ източник, като изпратите заглавка `Origin-Agent-Cluster: ?0` заедно с HTTP отговора за документа и рамките. За повече подробности вижте https://developer.chrome.com/blog/immutable-document-domain/."
+  },
+  "core/lib/deprecations-strings.js | ExpectCTHeader": {
+    "message": "Заглавката `Expect-CT` е оттеглена и ще бъде премахната. Chrome изисква Прозрачност на сертификатите за всички публично надеждни сертификати, издадени след 30 април 2018 г."
+  },
+  "core/lib/deprecations-strings.js | GeolocationInsecureOrigin": {
+    "message": "`getCurrentPosition()` и `watchPosition()` вече не работят за незащитени източници. За да използвате тази функция, препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
+  },
+  "core/lib/deprecations-strings.js | GeolocationInsecureOriginDeprecatedNotRemoved": {
+    "message": "`getCurrentPosition()` и `watchPosition()` са оттеглени за незащитени източници. За да използвате тази функция, препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
+  },
+  "core/lib/deprecations-strings.js | GetUserMediaInsecureOrigin": {
+    "message": "`getUserMedia()` вече не работи за незащитени източници. За да използвате тази функция, препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
+  },
+  "core/lib/deprecations-strings.js | HostCandidateAttributeGetter": {
+    "message": "Полето `RTCPeerConnectionIceErrorEvent.hostCandidate` е оттеглено. Вместо него използвайте `RTCPeerConnectionIceErrorEvent.address` или `RTCPeerConnectionIceErrorEvent.port`."
+  },
+  "core/lib/deprecations-strings.js | IdentityInCanMakePaymentEvent": {
+    "message": "Източникът на търговеца и произволни данни от събитието `canmakepayment` на service worker са оттеглени и ще бъдат премахнати: `topOrigin`, `paymentRequestOrigin`, `methodData`, `modifiers`."
+  },
+  "core/lib/deprecations-strings.js | InsecurePrivateNetworkSubresourceRequest": {
+    "message": "Уебсайтът заяви подресурс от мрежа, до която успя да осъществи достъп само заради специалните разрешения на потребителите в нея. Тези заявки разкриват в интернет информация за непублични устройства и сървъри. Това повишава риска от атаки чрез фалшифициране на заявки от друг сайт (CSRF) и/или от изтичане на информация. За да намали този риск, Chrome оттегля инициираните от незащитен контекст заявки до непублични подресурси и ще започне да ги блокира."
+  },
+  "core/lib/deprecations-strings.js | InterestGroupDailyUpdateUrl": {
+    "message": "Полето `dailyUpdateUrl` на `InterestGroups`, което се предава на `joinAdInterestGroup()`, бе преименувано на `updateUrl`, за да се отрази по-точно поведението му."
+  },
+  "core/lib/deprecations-strings.js | LocalCSSFileExtensionRejected": {
+    "message": "CSS не може да се зареди от URL адреси със схема `file:`, освен ако не завършват с файловото разширение `.css`."
+  },
+  "core/lib/deprecations-strings.js | MediaSourceAbortRemove": {
+    "message": "Възможността за използване на `SourceBuffer.abort()` за прекратяване на асинхронното премахване на периоди чрез `remove()` е оттеглена поради промяна на спецификацията. Поддръжката ще бъде премахната в бъдеще. Вместо това трябва да използвате приемател за събитието `updateend`. Функцията `abort()` е предназначена за прекратяване само на асинхронно добавяне на мултимедия или нулиране на състоянието на инструмента за синтактичен анализ."
+  },
+  "core/lib/deprecations-strings.js | MediaSourceDurationTruncatingBuffered": {
+    "message": "Възможността за задаване на стойност за `MediaSource.duration`, по-малка от най-голямото клеймо за дата и час за представяне на буферирани кодирани рамки, е оттеглена поради промяна на спецификацията. Поддръжката за неявно премахване на скъсена буферирана мултимедия ще бъде премахната в бъдеще. Вместо това трябва да извършвате изрично премахване чрез `remove(newDuration, oldDuration)` за всички елементи `sourceBuffers`, за които `newDuration < oldDuration`."
+  },
+  "core/lib/deprecations-strings.js | NoSysexWebMIDIWithoutPermission": {
+    "message": "Уеб MIDI ще иска разрешение за използване на специални системни съобщения дори ако опцията sysex не е посочена в `MIDIOptions`."
+  },
+  "core/lib/deprecations-strings.js | NonStandardDeclarativeShadowDOM": {
+    "message": "По-старият, нестандартизиран атрибут `shadowroot` е оттеглен и *вече няма да функционира* във версия M119. Вместо него използвайте новия, стандартизиран атрибут `shadowrootmode`."
+  },
+  "core/lib/deprecations-strings.js | NotificationInsecureOrigin": {
+    "message": "API за известия вече не може да се използва от незащитени източници. Препоръчваме да прехвърлите приложението си към защитен източник, като например HTTPS. За повече подробности вижте https://goo.gle/chrome-insecure-origins."
+  },
+  "core/lib/deprecations-strings.js | NotificationPermissionRequestedIframe": {
+    "message": "Разрешението за достъп до API за известия вече не може да се заявява от вложени рамки от външни източници. Препоръчваме да го заявявате от рамка от първо ниво или да отваряте нов прозорец."
+  },
+  "core/lib/deprecations-strings.js | ObsoleteCreateImageBitmapImageOrientationNone": {
+    "message": "Опцията `imageOrientation: 'none'` в createImageBitmap е оттеглена. Вместо това използвайте createImageBitmap с опцията \\{imageOrientation: 'from-image'\\}."
+  },
+  "core/lib/deprecations-strings.js | ObsoleteWebRtcCipherSuite": {
+    "message": "Партньорът ви договаря връзка през остаряла версия на (D)TLS. Помолете го да отстрани проблема."
+  },
+  "core/lib/deprecations-strings.js | OverflowVisibleOnReplacedElement": {
+    "message": "Посочването на `overflow: visible` в маркери img, video и canvas може да доведе до показване на визуално съдържание извън границите на елемента. Вижте https://github.com/WICG/shared-element-transitions/blob/main/debugging_overflow_on_images.md."
+  },
+  "core/lib/deprecations-strings.js | PaymentInstruments": {
+    "message": "Приложният програмен интерфейс `paymentManager.instruments` е оттеглен. Вместо него използвайте функцията за навременно инсталиране на инструменти за обработване на плащания."
+  },
+  "core/lib/deprecations-strings.js | PaymentRequestCSPViolation": {
+    "message": "Начинът, по който извиквате `PaymentRequest`, заобикаля директивата `connect-src` на правилата за сигурност на съдържанието (CSP). Тази възможност за заобикаляне е оттеглена. От `PaymentRequest` API (в полето `supportedMethods`) добавете идентификатора на начина на плащане към директивата `connect-src` на CSP."
+  },
+  "core/lib/deprecations-strings.js | PersistentQuotaType": {
+    "message": "`StorageType.persistent` е оттеглено. Вместо него използвайте стандартизираното `navigator.storage`."
+  },
+  "core/lib/deprecations-strings.js | PictureSourceSrc": {
+    "message": "Комбинацията от `<source src>` и родителски елемент `<picture>` е невалидна и следователно бе пренебрегната. Вместо това използвайте `<source srcset>`."
+  },
+  "core/lib/deprecations-strings.js | PrefixedCancelAnimationFrame": {
+    "message": "Методът webkitCancelAnimationFrame е ограничен до конкретен доставчик. Вместо него използвайте стандартния cancelAnimationFrame."
+  },
+  "core/lib/deprecations-strings.js | PrefixedRequestAnimationFrame": {
+    "message": "Методът webkitRequestAnimationFrame е ограничен до конкретен доставчик. Вместо него използвайте стандартния requestAnimationFrame."
+  },
+  "core/lib/deprecations-strings.js | PrefixedVideoDisplayingFullscreen": {
+    "message": "Свойството HTMLVideoElement.webkitDisplayingFullscreen е оттеглено. Вместо него използвайте Document.fullscreenElement."
+  },
+  "core/lib/deprecations-strings.js | PrefixedVideoEnterFullScreen": {
+    "message": "Методът HTMLVideoElement.webkitEnterFullScreen() е оттеглен. Вместо него използвайте Element.requestFullscreen()."
+  },
+  "core/lib/deprecations-strings.js | PrefixedVideoEnterFullscreen": {
+    "message": "Методът HTMLVideoElement.webkitEnterFullscreen() е оттеглен. Вместо него използвайте Element.requestFullscreen()."
+  },
+  "core/lib/deprecations-strings.js | PrefixedVideoExitFullScreen": {
+    "message": "Методът HTMLVideoElement.webkitExitFullScreen() е оттеглен. Вместо него използвайте Document.exitFullscreen()."
+  },
+  "core/lib/deprecations-strings.js | PrefixedVideoExitFullscreen": {
+    "message": "Методът HTMLVideoElement.webkitExitFullscreen() е оттеглен. Вместо него използвайте Document.exitFullscreen()."
+  },
+  "core/lib/deprecations-strings.js | PrefixedVideoSupportsFullscreen": {
+    "message": "Свойството HTMLVideoElement.webkitSupportsFullscreen е оттеглено. Вместо него използвайте Document.fullscreenEnabled."
+  },
+  "core/lib/deprecations-strings.js | PrivacySandboxExtensionsAPI": {
+    "message": "Оттегляме API `chrome.privacy.websites.privacySandboxEnabled`, въпреки че ще остане активен с цел наследена съвместимост до пускането на версия M113. Вместо него използвайте `chrome.privacy.websites.topicsEnabled`, `chrome.privacy.websites.fledgeEnabled` и `chrome.privacy.websites.adMeasurementEnabled`. Вижте https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled."
+  },
+  "core/lib/deprecations-strings.js | RTCConstraintEnableDtlsSrtpFalse": {
+    "message": "Ограничението `DtlsSrtpKeyAgreement` е премахнато. Посочихте за него стойност `false`, която се тълкува като опит за използване на оттегления метод `SDES key negotiation`. Тази функционалност е премахната. Вместо нея използвайте услуга, която поддържа `DTLS key negotiation`."
+  },
+  "core/lib/deprecations-strings.js | RTCConstraintEnableDtlsSrtpTrue": {
+    "message": "Ограничението `DtlsSrtpKeyAgreement` е премахнато. Посочихте за него стойност `true`, която няма ефект, но можете да премахнете това ограничение с цел опростяване."
+  },
+  "core/lib/deprecations-strings.js | RTCPeerConnectionGetStatsLegacyNonCompliant": {
+    "message": "Базираният на обратно извикване метод getStats() е оттеглен и ще бъде премахнат. Вместо това използвайте отговарящия на спецификациите getStats()."
+  },
+  "core/lib/deprecations-strings.js | RangeExpand": {
+    "message": "Методът Range.expand() е оттеглен. Вместо него използвайте Selection.modify()."
+  },
+  "core/lib/deprecations-strings.js | RequestedSubresourceWithEmbeddedCredentials": {
+    "message": "Заявките за подресурси, чиито URL адреси съдържат вградени идентификационни данни (напр. `https://user:pass@host/`), са блокирани."
+  },
+  "core/lib/deprecations-strings.js | RtcpMuxPolicyNegotiate": {
+    "message": "Опцията `rtcpMuxPolicy` е оттеглена и ще бъде премахната."
+  },
+  "core/lib/deprecations-strings.js | SharedArrayBufferConstructedWithoutIsolation": {
+    "message": "`SharedArrayBuffer` ще изисква изолиране от външни източници. За повече подробности вижте https://developer.chrome.com/blog/enabling-shared-array-buffer/."
+  },
+  "core/lib/deprecations-strings.js | TextToSpeech_DisallowedByAutoplay": {
+    "message": "Възможността за използване на `speechSynthesis.speak()` без активиране от потребител е оттеглена и ще бъде премахната."
+  },
+  "core/lib/deprecations-strings.js | V8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
     "message": "Разширенията трябва да се включат в изолирането от външни източници, за да продължат да използват `SharedArrayBuffer`. Вижте https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/."
   },
-  "core/lib/deprecations-strings.js | vendorSpecificApi": {
-    "message": "Методът {PH1} е за конкретен доставчик. Вместо него използвайте стандартния {PH2}."
+  "core/lib/deprecations-strings.js | WebSQL": {
+    "message": "Web SQL се оттегля. Моля, използвайте SQLite WebAssembly или индексирана база от данни"
   },
-  "core/lib/deprecations-strings.js | xhrJSONEncodingDetection": {
+  "core/lib/deprecations-strings.js | WindowPlacementPermissionDescriptorUsed": {
+    "message": "Дескрипторът на разрешение `window-placement` е оттеглен. Вместо него използвайте `window-management`. За допълнителна помощ посетете https://bit.ly/window-placement-rename."
+  },
+  "core/lib/deprecations-strings.js | WindowPlacementPermissionPolicyParsed": {
+    "message": "Правилото за разрешения `window-placement` е оттеглено. Вместо него използвайте `window-management`. За допълнителна помощ посетете https://bit.ly/window-placement-rename."
+  },
+  "core/lib/deprecations-strings.js | XHRJSONEncodingDetection": {
     "message": "UTF-16 не се поддържа от JSON отговора в `XMLHttpRequest`"
   },
-  "core/lib/deprecations-strings.js | xmlHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
+  "core/lib/deprecations-strings.js | XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
     "message": "Възможността за използване на синхронни обекти `XMLHttpRequest` в основната нишка е оттеглена, тъй като влошава практическата работа на крайните потребители. За повече помощ посетете https://xhr.spec.whatwg.org/."
   },
-  "core/lib/deprecations-strings.js | xrSupportsSession": {
+  "core/lib/deprecations-strings.js | XRSupportsSession": {
     "message": "Методът `supportsSession()` е оттеглен. Вместо него използвайте `isSessionSupported()` и проверете получената логическа стойност."
   },
   "core/lib/i18n/i18n.js | columnBlockingTime": {
@@ -2688,7 +2850,7 @@
     "message": "Инсталирайте [модул на Drupal](https://www.drupal.org/project/project_module?f%5B0%5D=&f%5B1%5D=&f%5B2%5D=im_vid_3%3A67&f%5B3%5D=&f%5B4%5D=sm_field_project_type%3Afull&f%5B5%5D=&f%5B6%5D=&text=%22lazy+load%22&solrsort=iss_project_release_usage+desc&op=Search), който поддържа забавено зареждане на изображенията. Тези модули дават възможност за отлагане на зареждането на изображенията извън видимата част на екрана, за да се подобри ефективността."
   },
   "node_modules/lighthouse-stack-packs/packs/drupal.js | render-blocking-resources": {
-    "message": "Добре е да използвате модул за вграждане на важния CSS и JavaScript код или за потенциално асинхронно зареждане на активите чрез JavaScript, като например модула [Advanced CSS/JS Aggregation](https://www.drupal.org/project/advagg). Имайте предвид, че оптимизациите, които той извършва, може да възпрепятстват работата на сайта ви, така че вероятно ще се наложи да промените кода."
+    "message": "Добре е да използвате модул за вграждане на важния CSS и JavaScript код и да отложите зареждането на второстепенните елементи на CSS или JavaScript чрез атрибута defer."
   },
   "node_modules/lighthouse-stack-packs/packs/drupal.js | server-response-time": {
     "message": "Времето за реакция на сървъра зависи от спецификациите му, темите и модулите. Добре е да намерите по-оптимизирана тема, внимателно да изберете модул за оптимизиране и/или да надстроите сървъра си. Сървърите ви за хостинг трябва да използват функциите на PHP за кеширане на операционните кодове и кеширане в паметта чрез услуги като Redis или Memcached, за да се намали времето за подаване на заявки към базата от данни, както и оптимизирана логика за приложенията, така че страниците да се подготвят по-бързо."
@@ -2697,10 +2859,10 @@
     "message": "Бихте могли да използвате [стилове за адаптивни изображения](https://www.drupal.org/docs/8/mobile-guide/responsive-images-in-drupal-8), за да намалите размера на графичните файлове, зареждани на страницата ви. Ако си служите с изгледи, за да показвате няколко елемента със съдържание на една страница, можете да внедрите функция за страниране, за да ограничите броя елементи, които да се извеждат на страница."
   },
   "node_modules/lighthouse-stack-packs/packs/drupal.js | unminified-css": {
-    "message": "Трябва да активирате опцията Aggregate CSS files на страницата Administration » Configuration » Development. Можете също да конфигурирате по-разширени опции за агрегиране чрез [допълнителни модули](https://www.drupal.org/project/project_module?f%5B0%5D=&f%5B1%5D=&f%5B2%5D=im_vid_3%3A123&f%5B3%5D=&f%5B4%5D=sm_field_project_type%3Afull&f%5B5%5D=&f%5B6%5D=&text=css+aggregation&solrsort=iss_project_release_usage+desc&op=Search), за да подобрите скоростта на сайта си чрез обединяване, минимизиране и компресиране на CSS стиловете."
+    "message": "Трябва да активирате опцията Aggregate CSS files на страницата Administration » Configuration » Development.  Сайтът ви на Drupal трябва да работи поне с версия 10.1 на Drupal, за да се възползва от подобрена поддръжка за агрегиране на активите."
   },
   "node_modules/lighthouse-stack-packs/packs/drupal.js | unminified-javascript": {
-    "message": "Трябва да активирате опцията Aggregate JavaScript files на страницата Administration » Configuration » Development. Можете също да конфигурирате по-разширени опции за агрегиране чрез [допълнителни модули](https://www.drupal.org/project/project_module?f%5B0%5D=&f%5B1%5D=&f%5B2%5D=im_vid_3%3A123&f%5B3%5D=&f%5B4%5D=sm_field_project_type%3Afull&f%5B5%5D=&f%5B6%5D=&text=javascript+aggregation&solrsort=iss_project_release_usage+desc&op=Search), за да подобрите скоростта на сайта си чрез обединяване, минимизиране и компресиране на JavaScript активите."
+    "message": "Трябва да активирате опцията Aggregate JavaScript files на страницата Administration » Configuration » Development.  Сайтът ви на Drupal трябва да работи поне с версия 10.1 на Drupal, за да се възползва от подобрена поддръжка за агрегиране на активите."
   },
   "node_modules/lighthouse-stack-packs/packs/drupal.js | unused-css-rules": {
     "message": "Бихте могли да премахнете неизползваните правила на CSS и да добавите само необходимите библиотеки на Drupal към съответната страница или компонент в нея. За подробности отворете връзката към [документацията на Drupal](https://www.drupal.org/docs/8/creating-custom-modules/adding-stylesheets-css-and-javascript-js-to-a-drupal-8-module#library). За да откриете включените библиотеки, които добавят ненужен CSS код, стартирайте инструмента за [покритие на кода](https://developers.google.com/web/updates/2017/04/devtools-release-notes#coverage) в Chrome DevTools. Можете да намерите проблемните тема/модул в URL адреса на листа със стилове, когато агрегирането на CSS е деактивирано в сайта ви на Drupal. Търсете теми/модули с много листове със стилове в списъка, за които преобладава червеният цвят в диаграмата на инструмента. Даден лист със стилове трябва да бъде поставен в опашката на тема/модул само ако действително се използва в страницата."
@@ -2760,31 +2922,31 @@
     "message": "Използвайте [Ezoic Leap](https://pubdash.ezoic.com/speed) и активирайте `Resize Images` с цел преоразмеряване на изображенията до размер, подходящ за конкретно устройство, за да намалите необходимите мрежови ресурси."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | modern-image-formats": {
-    "message": "Use the `gatsby-plugin-image` component instead of `<img>` to automatically optimize image format. [Learn more](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
+    "message": "Използвайте компонента `gatsby-plugin-image` вместо `<img>` с цел автоматично оптимизиране на графичния формат. [Научете повече](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | offscreen-images": {
-    "message": "Use the `gatsby-plugin-image` component instead of `<img>` to automatically lazy-load images. [Learn more](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
+    "message": "Използвайте компонента `gatsby-plugin-image` вместо `<img>` с цел автоматично забавяне на зареждането на изображенията. [Научете повече](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | prioritize-lcp-image": {
-    "message": "Use the `gatsby-plugin-image` component and set the `loading` prop to `eager`. [Learn more](https://www.gatsbyjs.com/docs/reference/built-in-components/gatsby-plugin-image#shared-props)."
+    "message": "Използвайте компонента `gatsby-plugin-image` и задайте `eager` за свойството `loading`. [Научете повече](https://www.gatsbyjs.com/docs/reference/built-in-components/gatsby-plugin-image#shared-props)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | render-blocking-resources": {
-    "message": "Use the `Gatsby Script API` to defer loading of non-critical third-party scripts. [Learn more](https://www.gatsbyjs.com/docs/reference/built-in-components/gatsby-script/)."
+    "message": "Използвайте `Gatsby Script API`, за да отложите зареждането на некритични скриптове от трети страни. [Научете повече](https://www.gatsbyjs.com/docs/reference/built-in-components/gatsby-script/)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | unused-css-rules": {
-    "message": "Use the `PurgeCSS` `Gatsby` plugin to remove unused rules from stylesheets. [Learn more](https://purgecss.com/plugins/gatsby.html)."
+    "message": "Използвайте приставката `Gatsby` за `PurgeCSS`, за да премахнете неизползваните правила от стиловите листове. [Научете повече](https://purgecss.com/plugins/gatsby.html)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | unused-javascript": {
-    "message": "Use `Webpack Bundle Analyzer` to detect unused JavaScript code. [Learn more](https://www.gatsbyjs.com/plugins/gatsby-plugin-webpack-bundle-analyser-v2/)"
+    "message": "Използвайте `Webpack Bundle Analyzer`, за да откриете неизползван JavaScript код. [Научете повече](https://www.gatsbyjs.com/plugins/gatsby-plugin-webpack-bundle-analyser-v2/)"
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | uses-long-cache-ttl": {
-    "message": "Configure caching for immutable assets. [Learn more](https://www.gatsbyjs.com/docs/how-to/previews-deploys-hosting/caching/)."
+    "message": "Конфигурирайте кеширането на непроменливите активи. [Научете повече](https://www.gatsbyjs.com/docs/how-to/previews-deploys-hosting/caching/)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | uses-optimized-images": {
-    "message": "Use the `gatsby-plugin-image` component instead of `<img>` to adjust image quality. [Learn more](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
+    "message": "Използвайте компонента `gatsby-plugin-image` вместо `<img>`, за да коригирате качеството на изображенията. [Научете повече](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
   },
   "node_modules/lighthouse-stack-packs/packs/gatsby.js | uses-responsive-images": {
-    "message": "Use the `gatsby-plugin-image` component to set appropriate `sizes`. [Learn more](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
+    "message": "Използвайте компонента `gatsby-plugin-image`, за да зададете подходяща стойност за `sizes`. [Научете повече](https://www.gatsbyjs.com/docs/how-to/images-and-media/using-gatsby-plugin-image)."
   },
   "node_modules/lighthouse-stack-packs/packs/joomla.js | efficient-animated-content": {
     "message": "Добре е да качите GIF файла си в услуга, която ще даде възможност да бъде вграден като видеоклип с HTML5."
@@ -2865,10 +3027,10 @@
     "message": "Можете да добавите маркери `<link rel=preload>`, като [промените оформлението на дадената тема](https://devdocs.magento.com/guides/v2.3/frontend-dev-guide/layouts/xml-manage.html)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | modern-image-formats": {
-    "message": "Use the `next/image` component instead of `<img>` to automatically optimize image format. [Learn more](https://nextjs.org/docs/basic-features/image-optimization)."
+    "message": "Използвайте компонента `next/image` вместо `<img>` с цел автоматично оптимизиране на графичния формат. [Научете повече](https://nextjs.org/docs/basic-features/image-optimization)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | offscreen-images": {
-    "message": "Use the `next/image` component instead of `<img>` to automatically lazy-load images. [Learn more](https://nextjs.org/docs/basic-features/image-optimization)."
+    "message": "Използвайте компонента `next/image` вместо `<img>` с цел автоматично забавяне на зареждането на изображенията. [Научете повече](https://nextjs.org/docs/basic-features/image-optimization)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | prioritize-lcp-image": {
     "message": "Използвайте компонента `next/image` и задайте true за priority с цел предварително зареждане на най-голямото изображение (LCP). [Научете повече](https://nextjs.org/docs/api-reference/next/image#priority)."
@@ -2883,7 +3045,7 @@
     "message": "Добре е да настроите `PurgeCSS` в конфигурацията с `Next.js`, за да премахнете неизползваните правила от стиловите листове. [Научете повече](https://purgecss.com/guides/next.html)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | unused-javascript": {
-    "message": "Use `Webpack Bundle Analyzer` to detect unused JavaScript code. [Learn more](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer)"
+    "message": "Използвайте `Webpack Bundle Analyzer`, за да откриете неизползван JavaScript код. [Научете повече](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer)"
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | user-timings": {
     "message": "Добре е да използвате `Next.js Analytics`, за да измервате действителната ефективност на приложението си. [Научете повече](https://nextjs.org/docs/advanced-features/measuring-performance)."
@@ -2892,13 +3054,55 @@
     "message": "Конфигурирайте кеширането на непроменливите активи и SSR (`Server-side Rendered`) страници. [Научете повече](https://nextjs.org/docs/going-to-production#caching)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | uses-optimized-images": {
-    "message": "Use the `next/image` component instead of `<img>` to adjust image quality. [Learn more](https://nextjs.org/docs/basic-features/image-optimization)."
+    "message": "Използвайте компонента `next/image` вместо `<img>`, за да коригирате качеството на изображенията. [Научете повече](https://nextjs.org/docs/basic-features/image-optimization)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | uses-responsive-images": {
     "message": "Използвайте компонента `next/image`, за да зададете подходяща стойност за `sizes`. [Научете повече](https://nextjs.org/docs/api-reference/next/image#sizes)."
   },
   "node_modules/lighthouse-stack-packs/packs/next.js | uses-text-compression": {
     "message": "Активирайте компресирането в Next.js сървъра си. [Научете повече](https://nextjs.org/docs/api-reference/next.config.js/compression)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | dom-size": {
+    "message": "Свържете се с мениджъра на профила си, за да активира функцията [`HTML Lazy Load`](https://support.nitropack.io/hc/en-us/articles/17144942904337). Конфигурирането ѝ ще приоритизира и оптимизира рендерирането на страницата."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | font-display": {
+    "message": "Използвайте опцията [`Override Font Rendering Behavior`](https://support.nitropack.io/hc/en-us/articles/16547358865041) в NitroPack, за да зададете желана стойност за правилото font-display на CSS."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | modern-image-formats": {
+    "message": "Използвайте функцията [`Image Optimization`](https://support.nitropack.io/hc/en-us/articles/16547237162513), така че изображенията да се преобразуват автоматично във формат WebP."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | offscreen-images": {
+    "message": "Отложете зареждането на изображенията извън видимата част на екрана, като активирате функцията [`Automatic Image Lazy Loading`](https://support.nitropack.io/hc/en-us/articles/12457493524369-NitroPack-Lazy-Loading-Feature-for-Images)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | render-blocking-resources": {
+    "message": "Активирайте функцията [`Remove render-blocking resources`](https://support.nitropack.io/hc/en-us/articles/13820893500049-How-to-Deal-with-Render-Blocking-Resources-in-NitroPack) в NitroPack с цел по-бързо първоначално зареждане."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | server-response-time": {
+    "message": "Намалете времето за реакция на сървъра и оптимизирайте възприеманата ефективност, като активирате функцията [`Instant Load`](https://support.nitropack.io/hc/en-us/articles/16547340617361)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | unminified-css": {
+    "message": "Активирайте функцията [`Minify resources`](https://support.nitropack.io/hc/en-us/articles/360061059394-Minify-Resources) в настройките за кеширане, за да намалите размера на CSS, HTML и JavaScript файловете с цел по-бързо зареждане."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | unminified-javascript": {
+    "message": "Активирайте функцията [`Minify resources`](https://support.nitropack.io/hc/en-us/articles/360061059394-Minify-Resources) в настройките за кеширане, за да намалите размера на JS, HTML и CSS файловете с цел по-бързо зареждане."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | unused-css-rules": {
+    "message": "Активирайте функцията [`Reduce Unused CSS`](https://support.nitropack.io/hc/en-us/articles/360020418457-Reduce-Unused-CSS), за да премахнете правилата на CSS, които не са приложими за тази страница."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | unused-javascript": {
+    "message": "Конфигурирайте функцията [`Delayed Scripts`](https://support.nitropack.io/hc/en-us/articles/1500002600942-Delayed-Scripts) в NitroPack, така че зареждането на скриптовете да се забавя до момента, в който станат необходими."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | uses-long-cache-ttl": {
+    "message": "Навигирайте до функцията [`Improve Server Response Time`](https://support.nitropack.io/hc/en-us/articles/1500002321821-Improve-Server-Response-Time) в менюто `Caching` и коригирайте срока на валидност на кеша на страниците си, за да ускорите зареждането и да подобрите практическата работа на потребителите."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | uses-optimized-images": {
+    "message": "Автоматично компресирайте, оптимизирайте и преобразувайте изображенията си във формат WebP, като активирате настройката [`Image Optimization`](https://support.nitropack.io/hc/en-us/articles/14177271695121-How-to-serve-images-in-next-gen-formats-using-NitroPack)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | uses-responsive-images": {
+    "message": "Активирайте функцията [`Adaptive Image Sizing`](https://support.nitropack.io/hc/en-us/articles/10123833029905-How-to-Enable-Adaptive-Image-Sizing-For-Your-Site), така че изображенията ви да се оптимизират предварително спрямо размерите на контейнерите, в които се показват, на всички устройства."
+  },
+  "node_modules/lighthouse-stack-packs/packs/nitropack.js | uses-text-compression": {
+    "message": "Използвайте функцията [`Gzip compression`](https://support.nitropack.io/hc/en-us/articles/13229297479313-Enabling-GZIP-compression) в NitroPack, за да намалите размера на файловете, които се изпращат до браузъра."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | modern-image-formats": {
     "message": "Използвайте компонента `nuxt/image` и задайте `format=\"webp\"`. [Научете повече](https://image.nuxtjs.org/components/nuxt-img#format)."
@@ -2980,6 +3184,21 @@
   },
   "node_modules/lighthouse-stack-packs/packs/react.js | user-timings": {
     "message": "Използвайте инструмента за анализ в React DevTools, който използва съответното API, за да измерите ефективността на компонентите си при рендериране. [Научете повече](https://reactjs.org/blog/2018/09/10/introducing-the-react-profiler.html)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/wix.js | efficient-animated-content": {
+    "message": "Поставете видеоклиповете във `VideoBoxes`, персонализирайте ги чрез `Video Masks` или добавете `Transparent Videos`. [Научете повече](https://support.wix.com/en/article/wix-video-about-wix-video)."
+  },
+  "node_modules/lighthouse-stack-packs/packs/wix.js | modern-image-formats": {
+    "message": "Качете изображения чрез `Wix Media Manager`, за да се показват автоматично като WebP. Намерете [още начини за оптимизиране](https://support.wix.com/en/article/site-performance-optimizing-your-media) на мултимедийното съдържание на сайта си."
+  },
+  "node_modules/lighthouse-stack-packs/packs/wix.js | render-blocking-resources": {
+    "message": "Когато [добавяте код на трета страна](https://support.wix.com/en/article/site-performance-using-third-party-code-on-your-site) в раздела „`Custom Code`“ на таблото за управление на сайта си, постарайте се зареждането му да бъде отложено или той да се зарежда в края на основния код. Където е възможно, използвайте [интеграциите](https://support.wix.com/en/article/about-marketing-integrations) на Wix, за да вградите маркетингови инструменти в сайта си. "
+  },
+  "node_modules/lighthouse-stack-packs/packs/wix.js | server-response-time": {
+    "message": "Wix използва CDN и кеширане, за да изпраща отговори възможно най-бързо за повечето посетители. Помислете дали да не [активирате ръчно кеширането](https://support.wix.com/en/article/site-performance-caching-pages-to-optimize-loading-speed) на сайта си, особено ако използвате `Velo`."
+  },
+  "node_modules/lighthouse-stack-packs/packs/wix.js | unused-javascript": {
+    "message": "В раздела „`Custom Code`“ на таблото за управление прегледайте кода на трети страни, който сте добавили към сайта, и запазете само услугите, които са необходими за сайта. [Научете повече](https://support.wix.com/en/article/site-performance-removing-unused-javascript)."
   },
   "node_modules/lighthouse-stack-packs/packs/wordpress.js | efficient-animated-content": {
     "message": "Добре е да качите GIF файла си в услуга, която ще даде възможност да бъде вграден като видеоклип с HTML5."
@@ -3085,6 +3304,9 @@
   },
   "report/renderer/report-utils.js | dropdownSaveJSON": {
     "message": "Запазване като JSON"
+  },
+  "report/renderer/report-utils.js | dropdownViewUnthrottledTrace": {
+    "message": "Преглед на оригиналното трасиране"
   },
   "report/renderer/report-utils.js | dropdownViewer": {
     "message": "Отваряне във визуализатора"
@@ -3205,9 +3427,6 @@
   },
   "report/renderer/report-utils.js | varianceDisclaimer": {
     "message": "Стойностите са приблизителни и може да варират. [Рейтингът за ефективността се изчислява](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) директно от тези показатели."
-  },
-  "report/renderer/report-utils.js | viewOriginalTraceLabel": {
-    "message": "Преглед на първоначалното трасиране"
   },
   "report/renderer/report-utils.js | viewTraceLabel": {
     "message": "Преглед на трасирането"

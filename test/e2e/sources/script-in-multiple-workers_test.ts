@@ -12,16 +12,12 @@ import {
   getPendingEvents,
   goToResource,
   installEventListener,
-  pressKey,
   step,
   timeout,
-  typeText,
   waitFor,
   waitForFunction,
-  waitForNone,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {openCommandMenu} from '../helpers/quick_open-helpers.js';
 import {
   addBreakpointForLine,
   BREAKPOINT_ITEM_SELECTOR,
@@ -35,6 +31,7 @@ import {
   RESUME_BUTTON,
   retrieveTopCallFrameWithoutResuming,
   SourceFileEvents,
+  THREADS_SELECTOR,
   waitForLines,
   waitForSourceFiles,
 } from '../helpers/sources-helpers.js';
@@ -91,14 +88,6 @@ describe('Multi-Workers', async function() {
         const {target, frontend} = getBrowserAndPages();
         installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
 
-        await step('Enable reveal in sidebar', async () => {
-          await openCommandMenu();
-          await typeText('reveal files');
-          await waitFor('.filtered-list-widget-title');
-          await pressKey('Enter');
-          await waitForNone('.filtered-list-widget-title');
-        });
-
         await step('Send message to a worker to trigger break', async () => {
           await target.evaluate('workers[3].postMessage({command:"break"});');
         });
@@ -129,6 +118,10 @@ describe('Multi-Workers', async function() {
 
           // This typically happens too quickly to cause DevTools to switch to the other thread, so
           // click on the other paused thread.
+          await Promise.all([
+            click(THREADS_SELECTOR),
+            waitFor(THREADS_SELECTOR + '[aria-expanded="true"]'),
+          ]);
           await click('.thread-item:has( .thread-item-paused-state:not(:empty)):not(.selected)');
         });
 

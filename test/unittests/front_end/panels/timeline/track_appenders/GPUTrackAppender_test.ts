@@ -6,10 +6,8 @@ import * as TraceEngine from '../../../../../../front_end/models/trace/trace.js'
 import * as Timeline from '../../../../../../front_end/panels/timeline/timeline.js';
 import * as PerfUI from '../../../../../../front_end/ui/legacy/components/perf_ui/perf_ui.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
-import {traceModelFromTraceFile} from '../../../helpers/TimelineHelpers.js';
-import {loadModelDataFromTraceFile} from '../../../helpers/TraceHelpers.js';
-
 import type * as TimelineModel from '../../../../../../front_end/models/timeline_model/timeline_model.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
@@ -24,7 +22,7 @@ function initTrackAppender(
   return compatibilityTracksAppender.gpuTrackAppender();
 }
 
-describeWithEnvironment('GPUTrackAppender', () => {
+describeWithEnvironment('GPUTrackAppender', function() {
   let traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
   let timelineModel: TimelineModel.TimelineModel.TimelineModelImpl;
   let gpuTrackAppender: Timeline.GPUTrackAppender.GPUTrackAppender;
@@ -32,9 +30,10 @@ describeWithEnvironment('GPUTrackAppender', () => {
   let flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
   let entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[] = [];
 
-  beforeEach(async () => {
-    traceParsedData = await loadModelDataFromTraceFile('threejs-gpu.json.gz');
-    timelineModel = (await traceModelFromTraceFile('threejs-gpu.json.gz')).timelineModel;
+  beforeEach(async function() {
+    const data = await TraceLoader.allModels(this, 'threejs-gpu.json.gz');
+    traceParsedData = data.traceParsedData;
+    timelineModel = data.timelineModel;
     gpuTrackAppender = initTrackAppender(flameChartData, traceParsedData, entryData, entryTypeByLevel, timelineModel);
     gpuTrackAppender.appendTrackAtLevel(0);
   });
@@ -88,11 +87,33 @@ describeWithEnvironment('GPUTrackAppender', () => {
   });
 
   describe('colorForEvent and titleForEvent', () => {
+    before(() => {
+      // Rather than use the real colours here and burden the test with having to
+      // inject loads of CSS, we fake out the colours. this is fine for our tests as
+      // the exact value of the colours is not important; we just make sure that it
+      // parses them out correctly. Each variable is given a different rgb() value to
+      // ensure we know the code is working and using the right one.
+      const styleElement = document.createElement('style');
+      styleElement.id = 'fake-perf-panel-colors';
+      styleElement.textContent = `
+        :root {
+          --app-color-painting: rgb(6 6 6);
+        }
+      `;
+      document.documentElement.appendChild(styleElement);
+    });
+
+    after(() => {
+      const styleElementToRemove = document.documentElement.querySelector('#fake-perf-panel-colors');
+      if (styleElementToRemove) {
+        document.documentElement.removeChild(styleElementToRemove);
+      }
+    });
     it('returns the correct color and title for GPU tasks', () => {
       const gpuEvents = traceParsedData.GPU.mainGPUThreadTasks;
       for (const event of gpuEvents) {
         assert.strictEqual(gpuTrackAppender.titleForEvent(event), 'GPU');
-        assert.strictEqual(gpuTrackAppender.colorForEvent(event), 'hsl(109, 33%, 55%)');
+        assert.strictEqual(gpuTrackAppender.colorForEvent(event), 'rgb(6 6 6)');
       }
     });
   });

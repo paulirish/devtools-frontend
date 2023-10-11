@@ -4,7 +4,6 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
-import type * as SDK from '../../core/sdk/sdk.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
@@ -13,7 +12,7 @@ import {Bounds, formatMillisecondsToSeconds} from './TickingFlameChartHelpers.js
 
 const defaultFont = '11px ' + Host.Platform.fontFamily();
 function getGroupDefaultTextColor(): string {
-  return ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary');
+  return ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-on-surface');
 }
 
 const DefaultStyle: () => PerfUI.FlameChart.GroupStyle = () => ({
@@ -516,9 +515,5 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
 
   canJumpToEntry(_entryIndex: number): boolean {
     return false;
-  }
-
-  navStartTimes(): Map<string, SDK.TracingModel.Event> {
-    return new Map();
   }
 }

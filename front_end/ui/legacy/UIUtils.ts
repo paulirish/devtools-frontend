@@ -1104,7 +1104,7 @@ export function createInput(className?: string, type?: string): HTMLInputElement
 export function createSelect(name: string, options: string[]|Map<string, string[]>[]|Set<string>): HTMLSelectElement {
   const select = document.createElement('select');
   select.classList.add('chrome-select');
-  ARIAUtils.setAccessibleName(select, name);
+  ARIAUtils.setLabel(select, name);
   for (const option of options) {
     if (option instanceof Map) {
       for (const [key, value] of option) {
@@ -1170,7 +1170,7 @@ export function createSlider(min: number, max: number, tabIndex: number): Elemen
 }
 
 export function setTitle(element: HTMLElement, title: string): void {
-  ARIAUtils.setAccessibleName(element, title);
+  ARIAUtils.setLabel(element, title);
   Tooltip.install(element, title);
 }
 
@@ -1201,7 +1201,7 @@ export class CheckboxLabel extends HTMLSpanElement {
     element.checkboxElement.checked = Boolean(checked);
     if (title !== undefined) {
       element.textElement.textContent = title;
-      ARIAUtils.setAccessibleName(element.checkboxElement, title);
+      element.checkboxElement.title = title;
       if (subtitle !== undefined) {
         element.textElement.createChild('div', 'dt-checkbox-subtitle').textContent = subtitle;
       }
@@ -1321,14 +1321,14 @@ export class DevToolsCloseButton extends HTMLDivElement {
     const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: closeButtonStyles, delegatesFocus: undefined});
     this.buttonElement = (root.createChild('div', 'close-button') as HTMLElement);
     Tooltip.install(this.buttonElement, i18nString(UIStrings.close));
-    ARIAUtils.setAccessibleName(this.buttonElement, i18nString(UIStrings.close));
+    ARIAUtils.setLabel(this.buttonElement, i18nString(UIStrings.close));
     ARIAUtils.markAsButton(this.buttonElement);
     const regularIcon = Icon.create('cross', 'default-icon');
     this.buttonElement.appendChild(regularIcon);
   }
 
   setAccessibleName(name: string): void {
-    ARIAUtils.setAccessibleName(this.buttonElement, name);
+    ARIAUtils.setLabel(this.buttonElement, name);
   }
 
   setTabbable(tabbable: boolean): void {
@@ -1551,11 +1551,11 @@ export class MessageDialog {
 }
 
 export class ConfirmDialog {
-  static async show(message: string, where?: Element|Document): Promise<boolean> {
+  static async show(message: string, where?: Element|Document, options?: ConfirmDialogOptions): Promise<boolean> {
     const dialog = new Dialog();
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
-    ARIAUtils.setAccessibleName(dialog.contentElement, message);
+    ARIAUtils.setLabel(dialog.contentElement, message);
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
         dialog.contentElement, {cssFile: confirmDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');
@@ -1563,10 +1563,12 @@ export class ConfirmDialog {
     const buttonsBar = content.createChild('div', 'button');
     const result = await new Promise<boolean>(resolve => {
       const okButton = createTextButton(
-          /* text= */ i18nString(UIStrings.ok), /* clickHandler= */ () => resolve(true), /* className= */ '',
+          /* text= */ options?.okButtonLabel || i18nString(UIStrings.ok), /* clickHandler= */ () => resolve(true),
+          /* className= */ '',
           /* primary= */ true);
       buttonsBar.appendChild(okButton);
-      buttonsBar.appendChild(createTextButton(i18nString(UIStrings.cancel), () => resolve(false)));
+      buttonsBar.appendChild(
+          createTextButton(options?.cancelButtonLabel || i18nString(UIStrings.cancel), () => resolve(false)));
       dialog.setOutsideClickCallback(event => {
         event.consume();
         resolve(false);
@@ -1722,4 +1724,9 @@ export function getApplicableRegisteredRenderers(object: Object): RendererRegist
 export interface RendererRegistration {
   loadRenderer: () => Promise<Renderer>;
   contextTypes: () => Array<Function>;
+}
+
+export interface ConfirmDialogOptions {
+  okButtonLabel?: string;
+  cancelButtonLabel?: string;
 }

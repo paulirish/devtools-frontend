@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
-import type * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import type * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
-import {allModelsFromFile} from '../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
@@ -15,14 +15,15 @@ class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegat
   select(selection: Timeline.TimelineSelection.TimelineSelection|null): void {
     this.selection = selection;
   }
-  selectEntryAtTime(_events: SDK.TracingModel.Event[]|null, _time: number): void {
+  selectEntryAtTime(_events: TraceEngine.Legacy.Event[]|null, _time: number): void {
   }
-  highlightEvent(_event: SDK.TracingModel.Event|null): void {
+  highlightEvent(_event: TraceEngine.Legacy.Event|null): void {
   }
 }
-describeWithEnvironment('TimelineFlameChartView', () => {
-  it('Can search for events by name in the timeline', async () => {
-    const {traceParsedData, performanceModel} = await allModelsFromFile('lcp-images.json.gz');
+
+describeWithEnvironment('TimelineFlameChartView', function() {
+  it('Can search for events by name in the timeline', async function() {
+    const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'lcp-images.json.gz');
     // The timeline flamechart view will invoke the `select` method
     // of this delegate every time an event has matched on a search.
     const mockViewDelegate = new MockViewDelegate();
@@ -37,17 +38,19 @@ describeWithEnvironment('TimelineFlameChartView', () => {
         new UI.SearchableView.SearchConfig(/* query */ searchQuery, /* caseSensitive */ false, /* isRegex */ false);
     flameChartView.performSearch(searchConfig, true);
 
-    assert.strictEqual(flameChartView.getSearchResults()?.length, 23);
+    assert.strictEqual(flameChartView.getSearchResults()?.length, 35);
+    assertSelectionName('PrePaint');
+
+    flameChartView.jumpToNextSearchResult();
     assertSelectionName('PrePaint');
 
     flameChartView.jumpToNextSearchResult();
     assertSelectionName('Paint');
 
-    flameChartView.jumpToNextSearchResult();
-    assertSelectionName('PaintImage');
-
     flameChartView.jumpToPreviousSearchResult();
-    assertSelectionName('Paint');
+    assertSelectionName('PrePaint');
+    flameChartView.jumpToPreviousSearchResult();
+    assertSelectionName('PrePaint');
 
     function assertSelectionName(name: string) {
       const selection = mockViewDelegate.selection;
@@ -57,5 +60,29 @@ describeWithEnvironment('TimelineFlameChartView', () => {
       const object = selection.object;
       assert.strictEqual(object.name, name);
     }
+  });
+
+  it('Shows the network track correctly', async function() {
+    const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'load-simple.json.gz');
+    // The timeline flamechart view will invoke the `select` method
+    // of this delegate every time an event has matched on a search.
+    const mockViewDelegate = new MockViewDelegate();
+
+    const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
+    flameChartView.setModel(performanceModel, traceParsedData);
+
+    assert.isTrue(flameChartView.isNetworkTrackShownForTests());
+  });
+
+  it('Does not show the network track when there is no network request', async function() {
+    const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'basic.json.gz');
+    // The timeline flamechart view will invoke the `select` method
+    // of this delegate every time an event has matched on a search.
+    const mockViewDelegate = new MockViewDelegate();
+
+    const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
+    flameChartView.setModel(performanceModel, traceParsedData);
+
+    assert.isFalse(flameChartView.isNetworkTrackShownForTests());
   });
 });

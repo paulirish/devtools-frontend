@@ -365,7 +365,8 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     let currentPageLoad: SDK.PageLoad.PageLoad|null = null;
     const requestsToAdd = [];
     for (const request of oldManagerRequests) {
-      if (request.loaderId !== mainFrame.loaderId) {
+      if (event.data.type !== SDK.ResourceTreeModel.PrimaryPageChangeType.Activation &&
+          request.loaderId !== mainFrame.loaderId) {
         continue;
       }
       if (!currentPageLoad) {
@@ -424,6 +425,16 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     }
     this.tryResolvePreflightRequests(request);
     this.dispatchEventToListeners(Events.RequestAdded, request);
+  }
+
+  private removeRequest(request: SDK.NetworkRequest.NetworkRequest): void {
+    const index = this.requestsInternal.indexOf(request);
+    if (index > -1) {
+      this.requestsInternal.splice(index, 1);
+    }
+    this.requestsSet.delete(request);
+    this.requestsMap.delete(request.requestId());
+    this.dispatchEventToListeners(Events.RequestRemoved, request);
   }
 
   private tryResolvePreflightRequests(request: SDK.NetworkRequest.NetworkRequest): void {
@@ -492,6 +503,16 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     if (!this.requestsSet.has(request)) {
       return;
     }
+
+    // This is only triggered in an edge case in which Chrome reports 2 preflight requests. The
+    // first preflight gets aborted and should not be shown in DevTools.
+    // (see https://crbug.com/1290390 for details)
+    if (request.isPreflightRequest() &&
+        request.corsErrorStatus()?.corsError === Protocol.Network.CorsError.UnexpectedPrivateNetworkAccess) {
+      this.removeRequest(request);
+      return;
+    }
+
     this.dispatchEventToListeners(Events.RequestUpdated, request);
   }
 
@@ -587,6 +608,7 @@ export enum Events {
   Reset = 'Reset',
   RequestAdded = 'RequestAdded',
   RequestUpdated = 'RequestUpdated',
+  RequestRemoved = 'RequestRemoved',
 }
 
 export interface ResetEvent {
@@ -597,6 +619,7 @@ export type EventTypes = {
   [Events.Reset]: ResetEvent,
   [Events.RequestAdded]: SDK.NetworkRequest.NetworkRequest,
   [Events.RequestUpdated]: SDK.NetworkRequest.NetworkRequest,
+  [Events.RequestRemoved]: SDK.NetworkRequest.NetworkRequest,
 };
 
 export interface InitiatorData {

@@ -6,6 +6,12 @@
 
 // DevToolsAPI ----------------------------------------------------------------
 
+/**
+ * @typedef {{runtimeAllowedHosts: !Array<string>, runtimeBlockedHosts: !Array<string>}} ExtensionHostsPolicy
+ */
+/**
+ * @typedef {{startPage: string, name: string, exposeExperimentalAPIs: boolean, hostsPolicy?: ExtensionHostsPolicy}} ExtensionDescriptor
+ */
 const DevToolsAPIImpl = class {
   constructor() {
     /**
@@ -24,7 +30,7 @@ const DevToolsAPIImpl = class {
     this._pendingExtensionDescriptors = [];
 
     /**
-     * @type {?function(!ExtensionDescriptor)}
+     * @type {?function(!ExtensionDescriptor): void}
      */
     this._addExtensionCallback = null;
 
@@ -402,6 +408,7 @@ const EnumeratedHistogram = {
   DeveloperResourceScheme: 'DevTools.DeveloperResourceScheme',
   ElementsSidebarTabShown: 'DevTools.Elements.SidebarTabShown',
   ExperimentDisabled: 'DevTools.ExperimentDisabled',
+  ExperimentDisabledAtLaunch: 'DevTools.ExperimentDisabledAtLaunch',
   ExperimentEnabled: 'DevTools.ExperimentEnabled',
   ExperimentEnabledAtLaunch: 'DevTools.ExperimentEnabledAtLaunch',
   IssueCreated: 'DevTools.IssueCreated',
@@ -440,6 +447,9 @@ const EnumeratedHistogram = {
   VMInlineScriptTypeShown: 'DevTools.VMInlineScriptShown',
   BreakpointsRestoredFromStorageCount: 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated: 'DevTools.SwatchActivated',
+  BadgeActivated: 'DevTools.BadgeActivated',
+  AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
+  AnimationPointDragged: 'DevTools.AnimationPointDragged',
 };
 
 /**
@@ -696,6 +706,19 @@ const InspectorFrontendHostImpl = class {
    */
   sendMessageToBackend(message) {
     DevToolsAPI.sendMessageToEmbedder('dispatchProtocolMessage', [message], null);
+  }
+
+  /**
+   * @override
+   * @param {string} histogramName
+   * @param {number} sample
+   * @param {number} min
+   * @param {number} exclusiveMax
+   * @param {number} bucketSize
+   */
+  recordCountHistogram(histogramName, sample, min, exclusiveMax, bucketSize) {
+    DevToolsAPI.sendMessageToEmbedder(
+        'recordCountHistogram', [histogramName, sample, min, exclusiveMax, bucketSize], null);
   }
 
   /**
@@ -958,6 +981,38 @@ const InspectorFrontendHostImpl = class {
     DevToolsAPI.setAddExtensionCallback(callback);
   }
 
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ImpressionEvent} impressionEvent
+   */
+  recordImpression(impressionEvent) {
+    DevToolsHost.sendMessageToEmbedder('recordImpression', [impressionEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ClickEvent} clickEvent
+   */
+  recordClick(clickEvent) {
+    DevToolsHost.sendMessageToEmbedder('recordClick', [clickEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ChangeEvent} changeEvent
+   */
+  recordChange(changeEvent) {
+    DevToolsHost.sendMessageToEmbedder('recordChange', [changeEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.KeyDownEvent} keyDownEvent
+   */
+  recordKeyDown(keyDownEvent) {
+    DevToolsHost.sendMessageToEmbedder('recordKeyDown', [keyDownEvent], null);
+  }
+
   // Backward-compatible methods below this line --------------------------------------------
 
   /**
@@ -1033,6 +1088,14 @@ const InspectorFrontendHostImpl = class {
    */
   initialTargetId() {
     return DevToolsAPI._initialTargetIdPromise;
+  }
+
+  /**
+   * @param {string} request
+   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   */
+  doAidaConversation(request, cb) {
+    DevToolsAPI.sendMessageToEmbedder('doAidaConversation', [request], cb);
   }
 };
 
@@ -1170,7 +1233,6 @@ function installObjectObserve() {
     'showHeaSnapshotObjectsHiddenProperties',
     'showInheritedComputedStyleProperties',
     'showMediaQueryInspector',
-    'showNativeFunctionsInJSProfile',
     'showUAShadowDOM',
     'showWhitespacesInEditor',
     'sidebarPosition',
@@ -1178,6 +1240,7 @@ function installObjectObserve() {
     'automaticallyIgnoreListKnownThirdPartyScripts',
     'skipStackFramesPattern',
     'sourceMapInfobarDisabled',
+    'sourceMapSkippedInfobarDisabled',
     'sourcesPanelDebuggerSidebarSplitViewState',
     'sourcesPanelNavigatorSplitViewState',
     'sourcesPanelSplitSidebarRatio',

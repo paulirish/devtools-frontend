@@ -137,7 +137,7 @@ describe('HTMLFormatter', () => {
 `);
   });
 
-  it('formats inline javascript correctly', () => {
+  it('formats inline JavaScript classic scripts correctly', () => {
     const formattedCode = formatHTML(
         '<html><script type="text/javascript">for(var i=0;i<10;++i)console.log(\'test \'+i);<\/script></html>');
     assert.strictEqual(formattedCode, `<html>
@@ -145,6 +145,64 @@ describe('HTMLFormatter', () => {
     for (var i = 0; i < 10; ++i)
       console.log('test ' + i);
   <\/script>
+</html>
+`);
+  });
+
+  it('formats inline JavaScript modules correctly', () => {
+    const formattedCode = formatHTML(
+        '<html><script type="module">import foo from"foo";foo();</script><script type=module>bar();foo();</script></html>');
+    assert.strictEqual(formattedCode, `<html>
+  <script type="module">
+    import foo from "foo";
+    foo();
+  </script>
+  <script type=module>
+    bar();
+    foo();
+  </script>
+</html>
+`);
+  });
+
+  it('formats inline <script>s with speculation rules correctly', () => {
+    const formattedCode = formatHTML(
+        '<html><script type="speculationrules">{"prefetch": [{"source": "list","urls": ["prefetch.html?2"]}],"prerender": [{"source": "list","urls": ["prerender.html?2"]}]}</script></html>');
+    assert.strictEqual(formattedCode, `<html>
+  <script type="speculationrules">
+    {
+      "prefetch": [
+        {
+          "source": "list",
+          "urls": [
+            "prefetch.html?2"
+          ]
+        }
+      ],
+      "prerender": [
+        {
+          "source": "list",
+          "urls": [
+            "prerender.html?2"
+          ]
+        }
+      ]
+    }</script>
+</html>
+`);
+  });
+
+  it('formats inline <script>s with import maps correctly', () => {
+    const formattedCode = formatHTML(
+        '<html><script type=importmap>{"imports": {"moment": "/node_modules/moment/src/moment.js","lodash": "/node_modules/lodash-es/lodash.js"}}</script></html>');
+    assert.strictEqual(formattedCode, `<html>
+  <script type=importmap>
+    {
+      "imports": {
+        "moment": "/node_modules/moment/src/moment.js",
+        "lodash": "/node_modules/lodash-es/lodash.js"
+      }
+    }</script>
 </html>
 `);
   });
@@ -217,5 +275,62 @@ describe('HTMLFormatter', () => {
 <link rel=alternate hreflang=es href=https://web.dev/i18n/es/>
 `;
     assert.strictEqual(formatHTML(code), code);
+  });
+
+  it('formats inline JSON script tag correctly', () => {
+    const formattedCode = formatHTML(
+        '<div><script type=\'application\/json\'>{"foo":"bar","data":{"hello":"world","meaning":42}}<\/script></div>');
+    assert.strictEqual(formattedCode, `<div>
+  <script type=\'application/json\'>
+    {
+      "foo": "bar",
+      "data": {
+        "hello": "world",
+        "meaning": 42
+      }
+    }<\/script>
+</div>
+`);
+  });
+
+  it('formats inline JSON-LD script tag correctly', () => {
+    const formattedCode = formatHTML(
+        '<div><script type=\'application\/ld+json\'>{  "@context": "https://json-ld.org/contexts/person.jsonld","@id": "http://dbpedia.org/resource/John_Lennon","name": "John Lennon","born": "1940-10-09","spouse": "http://dbpedia.org/resource/Cynthia_Lennon"}<\/script></div>');
+    assert.strictEqual(formattedCode, `<div>
+  <script type=\'application/ld+json\'>
+    {
+      "@context": "https://json-ld.org/contexts/person.jsonld",
+      "@id": "http://dbpedia.org/resource/John_Lennon",
+      "name": "John Lennon",
+      "born": "1940-10-09",
+      "spouse": "http://dbpedia.org/resource/Cynthia_Lennon"
+    }<\/script>
+</div>
+`);
+  });
+
+  it('formats ampersands in text correctly', () => {
+    assert.strictEqual(formatHTML('This&'), `This&
+`);
+    assert.strictEqual(formatHTML('Me&You'), `Me&You
+`);
+
+    const url = 'http://www.example.com/index.html?a=1&b=2&c=3&d=1234567890abcdef1234567890abcdef1';
+    assert.strictEqual(formatHTML(url).trimEnd(), url);
+  });
+
+  it('formats ampersands in attribute values correctly', () => {
+    assert.strictEqual(
+        formatHTML('<link href="http://www.example.com/index.html?a=1&b=2">'),
+        `<link href="http://www.example.com/index.html?a=1&b=2">
+`);
+    assert.strictEqual(
+        formatHTML('<link href=http://www.example.com/index.html?a&b/>'),
+        `<link href=http://www.example.com/index.html?a&b/>
+`);
+    assert.strictEqual(
+        formatHTML('<link href=http://www.example.com/index.html?a&b/ rel=canonical>'),
+        `<link href=http://www.example.com/index.html?a&b/ rel=canonical>
+`);
   });
 });

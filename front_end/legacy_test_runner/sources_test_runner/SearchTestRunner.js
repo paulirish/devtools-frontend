@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../core/common/common.js';
+import * as Sources from '../../panels/sources/sources.js';
+
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
  */
@@ -36,7 +39,7 @@ SourcesTestRunner.dumpSearchMatches = function(searchMatches) {
 
 SourcesTestRunner.runSearchAndDumpResults = function(scope, searchConfig, callback) {
   const searchResults = [];
-  const progress = new Common.Progress();
+  const progress = new Common.Progress.Progress();
   scope.performSearch(searchConfig, progress, searchResultCallback, searchFinishedCallback);
 
   function searchResultCallback(searchResult) {
@@ -101,7 +104,7 @@ SourcesTestRunner.replaceAndDumpChange = function(sourceFrame, searchConfig, rep
     oldLines.push(editor.line(i));
   }
 
-  const searchableView = UI.panels.sources.sourcesView().searchableView();
+  const searchableView = Sources.SourcesPanel.SourcesPanel.instance().sourcesView().searchableView();
   searchableView.showSearchField();
   searchableView.caseSensitiveButton.setToggled(searchConfig.caseSensitive);
   searchableView.regexButton.setToggled(searchConfig.isRegex);

@@ -38,6 +38,7 @@ import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 
+import * as HttpReasonPhraseStrings from './HttpReasonPhraseStrings.js';
 import {Attributes, type Cookie} from './Cookie.js';
 import {CookieParser} from './CookieParser.js';
 import {NetworkManager, Events as NetworkManagerEvents} from './NetworkManager.js';
@@ -114,6 +115,10 @@ const UIStrings = {
    *@description Tooltip to explain why an attempt to set a cookie via `Set-Cookie` HTTP header on a request's response was blocked.
    */
   thisSetcookieHadInvalidSyntax: 'This `Set-Cookie` header had invalid syntax.',
+  /**
+   *@description Tooltip to explain why a cookie was blocked
+   */
+  thisSetcookieHadADisallowedCharacter: 'This `Set-Cookie` header contained a disallowed character (a forbidden ASCII control character, or the tab character if it appears in the middle of the cookie name, value, an attribute name, or an attribute value).',
   /**
    *@description Tooltip to explain why a cookie was blocked
    */
@@ -303,6 +308,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #isSameSiteInternal: boolean|null;
   #wasIntercepted: boolean;
   #associatedData = new Map<string, object>();
+  #hasOverriddenContent: boolean;
 
   private constructor(
       requestId: string, backendRequestId: Protocol.Network.RequestId|undefined, url: Platform.DevToolsPath.UrlString,
@@ -385,6 +391,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     this.#isSameSiteInternal = null;
 
     this.#wasIntercepted = false;
+    this.#hasOverriddenContent = false;
   }
 
   static create(
@@ -848,6 +855,10 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     return this.#parsedURLInternal.scheme;
   }
 
+  getInferredStatusText(): string {
+    return this.statusText || HttpReasonPhraseStrings.getStatusText(this.statusCode);
+  }
+
   redirectSource(): NetworkRequest|null {
     return this.#redirectSourceInternal;
   }
@@ -1010,6 +1021,28 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
       return Platform.StringUtilities.compare(a.name.toLowerCase(), b.name.toLowerCase()) ||
           Platform.StringUtilities.compare(a.value, b.value);
     });
+  }
+
+  get overrideTypes(): OverrideType[] {
+    const types: OverrideType[] = [];
+
+    if (this.hasOverriddenContent) {
+      types.push('content');
+    }
+
+    if (this.hasOverriddenHeaders()) {
+      types.push('headers');
+    }
+
+    return types;
+  }
+
+  get hasOverriddenContent(): boolean {
+    return this.#hasOverriddenContent;
+  }
+
+  set hasOverriddenContent(value: boolean) {
+    this.#hasOverriddenContent = value;
   }
 
   hasOverriddenHeaders(): boolean {
@@ -1540,6 +1573,22 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     return this.#blockedResponseCookiesInternal;
   }
 
+  nonBlockedResponseCookies(): Cookie[] {
+    const blockedCookieLines: (string|null)[] =
+        this.blockedResponseCookies().map(blockedCookie => blockedCookie.cookieLine);
+    // Use array and remove 1 by 1 to handle the (potential) case of multiple
+    // identical cookies, only some of which are blocked.
+    const responseCookies = this.responseCookies.filter(cookie => {
+      const index = blockedCookieLines.indexOf(cookie.getCookieLine());
+      if (index !== -1) {
+        blockedCookieLines[index] = null;
+        return false;
+      }
+      return true;
+    });
+    return responseCookies;
+  }
+
   responseCookiesPartitionKey(): string|null {
     return this.#responseCookiesPartitionKey;
   }
@@ -1713,6 +1762,8 @@ export const setCookieBlockedReasonToUiString = function(
       return i18nString(UIStrings.thisSetcookieWasBlockedBecauseItHadTheSamepartyAttribute);
     case Protocol.Network.SetCookieBlockedReason.NameValuePairExceedsMaxSize:
       return i18nString(UIStrings.thisSetcookieWasBlockedBecauseTheNameValuePairExceedsMaxSize);
+    case Protocol.Network.SetCookieBlockedReason.DisallowedCharacter:
+      return i18nString(UIStrings.thisSetcookieHadADisallowedCharacter);
   }
   return '';
 };
@@ -1768,6 +1819,7 @@ export const setCookieBlockedReasonToAttribute = function(blockedReason: Protoco
         case Protocol.Network.SetCookieBlockedReason.SyntaxError:
         case Protocol.Network.SetCookieBlockedReason.SchemeNotSupported:
         case Protocol.Network.SetCookieBlockedReason.UnknownError:
+        case Protocol.Network.SetCookieBlockedReason.DisallowedCharacter:
           return null;
       }
       return null;
@@ -1845,3 +1897,5 @@ export interface WebBundleInnerRequestInfo {
   bundleRequestId?: string;
   errorMessage?: string;
 }
+
+export type OverrideType = 'content'|'headers';

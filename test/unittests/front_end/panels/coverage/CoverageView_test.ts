@@ -4,9 +4,10 @@
 
 const {assert} = chai;
 
+import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Coverage from '../../../../../front_end/panels/coverage/coverage.js';
-import {createTarget} from '../../helpers/EnvironmentHelpers.js';
-import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
+import {createTarget, registerNoopActions} from '../../helpers/EnvironmentHelpers.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
@@ -32,6 +33,17 @@ const isShowingBfcachePage = (view: Coverage.CoverageView.CoverageView) => {
 
 const setupTargetAndModels = () => {
   const target = createTarget();
+
+  const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
+  const targetManager = SDK.TargetManager.TargetManager.instance();
+  const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+  const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+    forceNew: true,
+    resourceMapping,
+    targetManager,
+  });
+  Bindings.IgnoreListManager.IgnoreListManager.instance({forceNew: true, debuggerWorkspaceBinding});
+  Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance({forceNew: true, resourceMapping, targetManager});
 
   const coverageModel = target.model(Coverage.CoverageModel.CoverageModel);
   assertNotNullOrUndefined(coverageModel);
@@ -75,26 +87,7 @@ const setupTargetAndModels = () => {
 
 describeWithMockConnection('CoverageView', () => {
   beforeEach(() => {
-    UI.ActionRegistration.maybeRemoveActionExtension('coverage.toggle-recording');
-    UI.ActionRegistration.maybeRemoveActionExtension('coverage.reload');
-    UI.ActionRegistration.maybeRemoveActionExtension('coverage.start-with-reload');
-
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'coverage.toggle-recording',
-      toggleable: true,
-      category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-    });
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'coverage.reload',
-      category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-      toggleable: false,
-    });
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'coverage.start-with-reload',
-      category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-      toggleable: false,
-    });
-    UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+    registerNoopActions(['coverage.toggle-recording', 'coverage.reload', 'coverage.start-with-reload']);
   });
 
   it('can handle back/forward cache navigations', async () => {

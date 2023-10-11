@@ -5,6 +5,7 @@
 import timelinePaintProfilerStyles from './timelinePaintProfiler.css.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import type * as TraceEngine from '../../models/trace/trace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LayerViewer from '../layer_viewer/layer_viewer.js';
 import type * as Protocol from '../../generated/protocol.js';
@@ -17,7 +18,7 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
   private readonly logTreeView: LayerViewer.PaintProfilerView.PaintProfilerCommandLogView;
   private needsUpdateWhenVisible: boolean;
   private pendingSnapshot: SDK.PaintProfiler.PaintProfilerSnapshot|null;
-  private event: SDK.TracingModel.Event|null;
+  private event: TraceEngine.Legacy.Event|null;
   private paintProfilerModel: SDK.PaintProfiler.PaintProfilerModel|null;
   private lastLoadedSnapshot: SDK.PaintProfiler.PaintProfilerSnapshot|null;
   constructor(frameModel: TimelineModel.TimelineFrameModel.TimelineFrameModel) {
@@ -64,7 +65,7 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
     this.updateWhenVisible();
   }
 
-  setEvent(paintProfilerModel: SDK.PaintProfiler.PaintProfilerModel, event: SDK.TracingModel.Event): boolean {
+  setEvent(paintProfilerModel: SDK.PaintProfiler.PaintProfilerModel, event: TraceEngine.Legacy.Event): boolean {
     this.releaseSnapshot();
     this.paintProfilerModel = paintProfilerModel;
     this.pendingSnapshot = null;
@@ -98,18 +99,21 @@ export class TimelinePaintProfilerView extends UI.SplitWidget.SplitWidget {
     }|null>;
     if (this.pendingSnapshot) {
       snapshotPromise = Promise.resolve({rect: null, snapshot: this.pendingSnapshot});
-    } else if (this.event && this.event.name === TimelineModel.TimelineModel.RecordType.Paint) {
+    } else if (
+        this.event && this.event.name === TimelineModel.TimelineModel.RecordType.Paint && this.paintProfilerModel) {
+      // When we process events (TimelineModel#processEvent) and find a
+      // snapshot event, we look for the last paint that occurred and link the
+      // snapshot to that paint event. That is why here if the event is a Paint
+      // event, we look to see if it has had a matching picture event set for
+      // it.
       const picture =
           (TimelineModel.TimelineModel.EventOnTimelineData.forEvent(this.event).picture as
-           SDK.TracingModel.ObjectSnapshot);
-      snapshotPromise =
-          picture.objectPromise()
-              .then(
-                  data =>
-                      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-                  // @ts-expect-error
-                  (this.paintProfilerModel as SDK.PaintProfiler.PaintProfilerModel).loadSnapshot(data['skp64']))
-              .then(snapshot => snapshot && {rect: null, snapshot: snapshot});
+           TraceEngine.Legacy.ObjectSnapshot);
+      const snapshotData = picture.getSnapshot() as unknown as {skp64: string};
+      snapshotPromise = this.paintProfilerModel.loadSnapshot(snapshotData['skp64']).then(snapshot => {
+        return snapshot && {rect: null, snapshot: snapshot};
+      });
+
     } else if (this.event && this.event.name === TimelineModel.TimelineModel.RecordType.RasterTask) {
       snapshotPromise = this.frameModel.rasterTilePromise(this.event);
     } else {

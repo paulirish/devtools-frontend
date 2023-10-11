@@ -33,11 +33,10 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
+import * as Adorners from '../components/adorners/adorners.js';
 import * as IconButton from '../components/icon_button/icon_button.js';
 
-import * as Utils from './utils/utils.js';
-
-import {Events as ActionEvents, type Action} from './ActionRegistration.js';
+import {type Action, Events as ActionEvents} from './ActionRegistration.js';
 import {ActionRegistry} from './ActionRegistry.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import {ContextMenu} from './ContextMenu.js';
@@ -49,6 +48,7 @@ import {Events as TextPromptEvents, TextPrompt} from './TextPrompt.js';
 import toolbarStyles from './toolbar.css.legacy.js';
 import {Tooltip} from './Tooltip.js';
 import {CheckboxLabel, LongClickController} from './UIUtils.js';
+import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
@@ -221,7 +221,7 @@ export class Toolbar {
     const button = action.toggleable() ? makeToggle() : makeButton();
 
     if (options.showLabel) {
-      button.setText(action.title());
+      button.setText(options.label?.() || action.title());
     }
 
     let handler = (_event: {
@@ -413,12 +413,13 @@ export class Toolbar {
 
     const filtered = extensions.filter(e => e.location === location);
     const items = await Promise.all(filtered.map(extension => {
-      const {separator, actionId, showLabel, loadItem} = extension;
+      const {separator, actionId, showLabel, label, loadItem} = extension;
       if (separator) {
         return new ToolbarSeparator();
       }
       if (actionId) {
-        return Toolbar.createActionButtonForId(actionId, {showLabel: Boolean(showLabel), userActionCode: undefined});
+        return Toolbar.createActionButtonForId(
+            actionId, {label, showLabel: Boolean(showLabel), userActionCode: undefined});
       }
       // TODO(crbug.com/1134103) constratint the case checked with this if using TS type definitions once UI is TS-authored.
       if (!loadItem) {
@@ -435,6 +436,7 @@ export class Toolbar {
   }
 }
 export interface ToolbarButtonOptions {
+  label?: () => Platform.UIString.LocalizedString;
   showLabel: boolean;
   userActionCode?: Host.UserMetrics.Action;
 }
@@ -471,7 +473,7 @@ export class ToolbarItem<T = any> extends Common.ObjectWrapper.ObjectWrapper<T> 
       return;
     }
     this.title = title;
-    ARIAUtils.setAccessibleName(this.element, title);
+    ARIAUtils.setLabel(this.element, title);
     if (actionId === undefined) {
       Tooltip.install(this.element, title);
     } else {
@@ -558,6 +560,7 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
   private text?: string;
   private glyph?: string;
   private icon?: HTMLElement;
+  private adorner?: HTMLElement;
   /**
    * TODO(crbug.com/1126026): remove glyph parameter in favor of icon.
    */
@@ -594,7 +597,14 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
   }
 
   setGlyphOrIcon(glyphOrIcon: string|HTMLElement): void {
-    if (glyphOrIcon instanceof HTMLElement) {
+    if (glyphOrIcon instanceof Adorners.Adorner.Adorner) {
+      if (this.adorner) {
+        this.adorner.replaceWith(glyphOrIcon);
+      } else {
+        this.element.prepend(glyphOrIcon);
+      }
+      this.adorner = glyphOrIcon;
+    } else if (glyphOrIcon instanceof HTMLElement) {
       glyphOrIcon.classList.add('toolbar-icon');
       if (this.icon) {
         this.icon.replaceWith(glyphOrIcon);
@@ -681,7 +691,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
     super(element);
 
     const internalPromptElement = this.element.createChild('div', 'toolbar-input-prompt');
-    ARIAUtils.setAccessibleName(internalPromptElement, placeholder);
+    ARIAUtils.setLabel(internalPromptElement, placeholder);
     internalPromptElement.addEventListener('focus', () => this.element.classList.add('focused'));
     internalPromptElement.addEventListener('blur', () => this.element.classList.remove('focused'));
 
@@ -927,7 +937,7 @@ export class ToolbarComboBox extends ToolbarItem<void> {
     if (changeHandler) {
       this.selectElementInternal.addEventListener('change', changeHandler, false);
     }
-    ARIAUtils.setAccessibleName(this.selectElementInternal, title);
+    ARIAUtils.setLabel(this.selectElementInternal, title);
     super.setTitle(title);
     if (className) {
       this.selectElementInternal.classList.add(className);
@@ -1117,6 +1127,7 @@ export interface ToolbarItemRegistration {
   order?: number;
   location: ToolbarItemLocation;
   separator?: boolean;
+  label?: () => Platform.UIString.LocalizedString;
   showLabel?: boolean;
   actionId?: string;
   condition?: string;

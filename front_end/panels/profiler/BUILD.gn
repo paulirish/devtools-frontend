@@ -50,6 +50,7 @@ devtools_module("profiler") {
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../models/bindings:bundle",
+    "../../models/cpu_profile:bundle",
     "../../models/heap_snapshot_model:bundle",
     "../../models/workspace:bundle",
     "../../panels/settings:bundle",
@@ -83,14 +84,6 @@ devtools_entrypoint("bundle") {
   ]
 
   visibility += devtools_panels_visibility
-}
-
-devtools_entrypoint("legacy") {
-  entrypoint = "profiler-legacy.ts"
-
-  deps = [ ":bundle" ]
-
-  visibility = [ "../..:legacy_entrypoints" ]
 }
 
 devtools_entrypoint("meta") {

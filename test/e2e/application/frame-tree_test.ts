@@ -26,7 +26,7 @@ import {setIgnoreListPattern} from '../helpers/settings-helpers.js';
 
 const TOP_FRAME_SELECTOR = '[aria-label="top"]';
 const WEB_WORKERS_SELECTOR = '[aria-label="Web Workers"]';
-const SERVICE_WORKERS_SELECTOR = '[aria-label="top"] ~ ol [aria-label="Service Workers"]';
+const SERVICE_WORKERS_SELECTOR = '[aria-label="top"] ~ ol [aria-label="Service workers"]';
 const OPENED_WINDOWS_SELECTOR = '[aria-label="Opened Windows"]';
 const IFRAME_FRAME_ID_SELECTOR = '[aria-label="frameId (iframe.html)"]';
 const MAIN_FRAME_SELECTOR = '[aria-label="frameId (main-frame.html)"]';
@@ -188,36 +188,46 @@ describe('The Application Tab', async () => {
     assert.deepEqual(stackTraceRowsTextContent, expectedCollapsed);
   });
 
-  it('shows details for opened windows in the frame tree', async () => {
-    const {target} = getBrowserAndPages();
-    await navigateToApplicationTab(target, 'frame-tree');
-    await click('#tab-resources');
-    await doubleClickSourceTreeItem(TOP_FRAME_SELECTOR);
-
-    await target.evaluate(() => {
-      window.iFrameWindow = window.open('iframe.html');
+  describe('', async () => {
+    after(async () => {
+      const {target} = getBrowserAndPages();
+      await target.evaluate(() => {
+        window.iFrameWindow?.close();
+      });
     });
 
-    await doubleClickSourceTreeItem(OPENED_WINDOWS_SELECTOR);
-    await waitFor(`${OPENED_WINDOWS_SELECTOR} + ol li:first-child`);
-    void pressKey('ArrowDown');
+    it('shows details for opened windows in the frame tree', async () => {
+      const {target, frontend} = getBrowserAndPages();
+      await navigateToApplicationTab(target, 'frame-tree');
+      await click('#tab-resources');
+      await doubleClickSourceTreeItem(TOP_FRAME_SELECTOR);
 
-    const fieldValuesTextContent = await waitForFunction(async () => {
-      const fieldValues = await getTrimmedTextContent('.report-field-value');
-      // Make sure the length is equivalent to the expected value below
-      if (fieldValues.length === 3) {
-        return fieldValues;
-      }
-      return undefined;
-    });
-    const expected = [
-      `https://localhost:${getTestServerPort()}/test/e2e/resources/application/iframe.html`,
-      '<#document>',
-      'Yes',
-    ];
-    assert.deepEqual(fieldValuesTextContent, expected);
-    await target.evaluate(() => {
-      window.iFrameWindow?.close();
+      await target.evaluate(() => {
+        window.iFrameWindow = window.open('iframe.html');
+      });
+
+      // window.open above would put DevTools in the background stopping updates
+      // to the application panel.
+      await frontend.bringToFront();
+
+      await doubleClickSourceTreeItem(OPENED_WINDOWS_SELECTOR);
+      await waitFor(`${OPENED_WINDOWS_SELECTOR} + ol li:first-child`);
+      void pressKey('ArrowDown');
+
+      const fieldValuesTextContent = await waitForFunction(async () => {
+        const fieldValues = await getTrimmedTextContent('.report-field-value');
+        // Make sure the length is equivalent to the expected value below
+        if (fieldValues.length === 3 && !fieldValues.includes('')) {
+          return fieldValues;
+        }
+        return undefined;
+      });
+      const expected = [
+        `https://localhost:${getTestServerPort()}/test/e2e/resources/application/iframe.html`,
+        '<#document>',
+        'Yes',
+      ];
+      assert.deepEqual(fieldValuesTextContent, expected);
     });
   });
 

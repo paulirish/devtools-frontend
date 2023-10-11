@@ -15,7 +15,7 @@ import {
   waitForStorageUsage,
 } from '../helpers/lighthouse-helpers.js';
 
-describe.skipOnParallel('The Lighthouse start view', async () => {
+describe('The Lighthouse start view', async () => {
   it('shows a button to generate a new report', async () => {
     await navigateToLighthouseTab('empty.html');
 
@@ -47,7 +47,8 @@ describe.skipOnParallel('The Lighthouse start view', async () => {
     assert.strictEqual(helpText, '');
   });
 
-  it('disables the start button for internal pages', async () => {
+  // Flaky test.
+  it.skipOnPlatforms(['mac'], '[crbug.com/1484942]: disables the start button for internal pages', async () => {
     await navigateToLighthouseTab();
     await goTo('about:blank');
 

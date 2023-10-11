@@ -1049,13 +1049,8 @@ export const NativeFunctions = [
   },
   {
     name: 'connect',
-    signatures: [['readerName','accessMode','?preferredProtocols']],
+    signatures: [['readerName','accessMode','?options']],
     receivers: ['SmartCardContext']
-  },
-  {
-    name: 'connect',
-    signatures: [['accessMode','?preferredProtocols']],
-    receivers: ['SmartCardReader']
   },
   {
     name: 'disconnect',
@@ -1375,7 +1370,7 @@ export const NativeFunctions = [
   },
   {
     name: 'delete',
-    signatures: [['name','?ignored']],
+    signatures: [['name','?value']],
     receivers: ['URLSearchParams']
   },
   {
@@ -1455,7 +1450,7 @@ export const NativeFunctions = [
   },
   {
     name: 'has',
-    signatures: [['name','?ignored']],
+    signatures: [['name','?value']],
     receivers: ['URLSearchParams']
   },
   {
@@ -2359,7 +2354,13 @@ export const NativeFunctions = [
   },
   {
     name: 'setAttribute',
-    signatures: [['qualifiedName','value'],['name','value']]
+    signatures: [['qualifiedName','value'],['name','value']],
+    receivers: ['Element']
+  },
+  {
+    name: 'setAttribute',
+    signatures: [['tag','value']],
+    receivers: ['SmartCardConnection']
   },
   {
     name: 'setAttributeNS',
@@ -2934,8 +2935,19 @@ export const NativeFunctions = [
     receivers: ['PerformanceObserver']
   },
   {
+    name: 'observe',
+    signatures: [['handle','?options']],
+    receivers: ['FileSystemObserver']
+  },
+  {
     name: 'unobserve',
-    signatures: [['target']]
+    signatures: [['target']],
+    receivers: ['IntersectionObserver','ResizeObserver']
+  },
+  {
+    name: 'unobserve',
+    signatures: [['handle']],
+    receivers: ['FileSystemObserver']
   },
   {
     name: 'getModifierState',
@@ -3234,13 +3246,7 @@ export const NativeFunctions = [
   },
   {
     name: 'lookupNamespaceURI',
-    signatures: [['prefix']],
-    receivers: ['Node']
-  },
-  {
-    name: 'lookupNamespaceURI',
-    signatures: [['?prefix']],
-    receivers: ['NativeXPathNSResolver']
+    signatures: [['prefix']]
   },
   {
     name: 'lookupPrefix',
@@ -5579,7 +5585,13 @@ export const NativeFunctions = [
   },
   {
     name: 'tanh',
-    signatures: [['x']]
+    signatures: [['x']],
+    receivers: ['Math']
+  },
+  {
+    name: 'tanh',
+    signatures: [['?input']],
+    receivers: ['MLGraphBuilder']
   },
   {
     name: 'acosh',
@@ -5734,6 +5746,10 @@ export const NativeFunctions = [
     receivers: ['PaymentRequestEvent']
   },
   {
+    name: 'createSyncAccessHandle',
+    signatures: [['?options']]
+  },
+  {
     name: 'navigate',
     signatures: [['url']],
     receivers: ['WindowClient']
@@ -5775,7 +5791,7 @@ export const NativeFunctions = [
   {
     name: '',
     signatures: [['index']],
-    receivers: ['DataTransferItemList','CSSKeyframesRule','CSSNumericArray','HTMLFormControlsCollection','RadioNodeList','HTMLAllCollection','AudioTrackList','TextTrackCueList','TextTrackList','VideoTrackList','SourceBufferList','TrackDefaultList','ImageTrackList','XRInputSourceArray']
+    receivers: ['DataTransferItemList','CSSKeyframesRule','CSSNumericArray','Window','HTMLFormControlsCollection','RadioNodeList','HTMLAllCollection','AudioTrackList','TextTrackCueList','TextTrackList','VideoTrackList','SourceBufferList','TrackDefaultList','ImageTrackList','XRInputSourceArray']
   },
   {
     name: '',
@@ -5790,7 +5806,7 @@ export const NativeFunctions = [
   {
     name: '',
     signatures: [['name']],
-    receivers: ['StyleSheetList','RTCStatsResponse']
+    receivers: ['StyleSheetList','WindowProperties','RTCStatsResponse']
   },
   {
     name: '',
@@ -5800,7 +5816,7 @@ export const NativeFunctions = [
   {
     name: '',
     signatures: [['index'],['name']],
-    receivers: ['Window','HTMLFormElement']
+    receivers: ['HTMLFormElement']
   },
   {
     name: '',
@@ -5926,7 +5942,15 @@ export const NativeFunctions = [
     signatures: [['value']]
   },
   {
+    name: 'rem',
+    signatures: [['value']]
+  },
+  {
     name: 'ex',
+    signatures: [['value']]
+  },
+  {
+    name: 'rex',
     signatures: [['value']]
   },
   {
@@ -5934,7 +5958,31 @@ export const NativeFunctions = [
     signatures: [['value']]
   },
   {
-    name: 'rem',
+    name: 'rch',
+    signatures: [['value']]
+  },
+  {
+    name: 'ic',
+    signatures: [['value']]
+  },
+  {
+    name: 'ric',
+    signatures: [['value']]
+  },
+  {
+    name: 'lh',
+    signatures: [['value']]
+  },
+  {
+    name: 'rlh',
+    signatures: [['value']]
+  },
+  {
+    name: 'cap',
+    signatures: [['value']]
+  },
+  {
+    name: 'rcap',
     signatures: [['value']]
   },
   {
@@ -6130,6 +6178,10 @@ export const NativeFunctions = [
     signatures: [['value']]
   },
   {
+    name: 'x',
+    signatures: [['value']]
+  },
+  {
     name: 'fr',
     signatures: [['value']]
   },
@@ -6166,6 +6218,10 @@ export const NativeFunctions = [
     signatures: [['milliseconds']]
   },
   {
+    name: 'ChildNodePart',
+    signatures: [['root','previousSibling','nextSibling','?init']]
+  },
+  {
     name: 'Comment',
     signatures: [['?data']]
   },
@@ -6194,6 +6250,10 @@ export const NativeFunctions = [
     signatures: [['announcement','?options']]
   },
   {
+    name: 'setSequentialFocusStartingPoint',
+    signatures: [['element']]
+  },
+  {
     name: 'DOMException',
     signatures: [['?message','?name']]
   },
@@ -6216,6 +6276,10 @@ export const NativeFunctions = [
   {
     name: 'MutationObserver',
     signatures: [['callback']]
+  },
+  {
+    name: 'NodePart',
+    signatures: [['root','node','?init']]
   },
   {
     name: 'setApplyScroll',
@@ -6378,6 +6442,10 @@ export const NativeFunctions = [
     signatures: [['type','?eventInitDict']]
   },
   {
+    name: 'fetchLater',
+    signatures: [['input','?init']]
+  },
+  {
     name: 'Headers',
     signatures: [['?init']]
   },
@@ -6530,6 +6598,10 @@ export const NativeFunctions = [
     signatures: [['?options']]
   },
   {
+    name: 'getName',
+    signatures: [['constructor']]
+  },
+  {
     name: 'reportEvent',
     signatures: [['event']]
   },
@@ -6596,10 +6668,6 @@ export const NativeFunctions = [
   {
     name: 'sendMessageToEmbedder',
     signatures: [['message']]
-  },
-  {
-    name: 'IntersectionObserver',
-    signatures: [['callback','?options']]
   },
   {
     name: 'layoutNextFragment',
@@ -6858,42 +6926,6 @@ export const NativeFunctions = [
     signatures: [['attributionReporting']]
   },
   {
-    name: 'joinAdInterestGroup',
-    signatures: [['group','durationSeconds']]
-  },
-  {
-    name: 'leaveAdInterestGroup',
-    signatures: [['?group']]
-  },
-  {
-    name: 'runAdAuction',
-    signatures: [['config']]
-  },
-  {
-    name: 'adAuctionComponents',
-    signatures: [['numComponents']]
-  },
-  {
-    name: 'deprecatedURNToURL',
-    signatures: [['urn_or_config','?send_reports']]
-  },
-  {
-    name: 'deprecatedReplaceInURN',
-    signatures: [['urn_or_config','replacements']]
-  },
-  {
-    name: 'getInterestGroupAdAuctionData',
-    signatures: [['config']]
-  },
-  {
-    name: 'createAdRequest',
-    signatures: [['config']]
-  },
-  {
-    name: 'finalizeAd',
-    signatures: [['ads','config']]
-  },
-  {
     name: 'registerAnimator',
     signatures: [['name','animatorCtor']]
   },
@@ -7034,7 +7066,7 @@ export const NativeFunctions = [
   },
   {
     name: 'beginLayer',
-    signatures: [['?filter']]
+    signatures: [['?options']]
   },
   {
     name: 'scrollPathIntoView',
@@ -7069,12 +7101,12 @@ export const NativeFunctions = [
     signatures: [['data']]
   },
   {
-    name: 'logoutRPs',
-    signatures: [['?logout_requests']]
-  },
-  {
     name: 'getUserInfo',
     signatures: [['config']]
+  },
+  {
+    name: 'setStatus',
+    signatures: [['status']]
   },
   {
     name: 'PasswordCredential',
@@ -7165,6 +7197,10 @@ export const NativeFunctions = [
   {
     name: 'queryPermission',
     signatures: [['?descriptor']]
+  },
+  {
+    name: 'FileSystemObserver',
+    signatures: [['callback']]
   },
   {
     name: 'showOpenFilePicker',
@@ -7291,10 +7327,6 @@ export const NativeFunctions = [
     signatures: [['?photoSettings']]
   },
   {
-    name: 'batchGetAll',
-    signatures: [['?keys','?count']]
-  },
-  {
     name: 'only',
     signatures: [['value']]
   },
@@ -7361,6 +7393,10 @@ export const NativeFunctions = [
   {
     name: 'setFocusBehavior',
     signatures: [['focusBehavior']]
+  },
+  {
+    name: 'CapturedMouseEvent',
+    signatures: [['type','?eventInitDict']]
   },
   {
     name: 'fromElement',
@@ -7475,6 +7511,14 @@ export const NativeFunctions = [
   {
     name: 'prelu',
     signatures: [['x','slope']]
+  },
+  {
+    name: 'reduceSum',
+    signatures: [['input','?options']]
+  },
+  {
+    name: 'reduceMean',
+    signatures: [['input','?options']]
   },
   {
     name: 'relu',
@@ -7611,6 +7655,10 @@ export const NativeFunctions = [
   {
     name: 'RTCDTMFToneChangeEvent',
     signatures: [['type','eventInitDict']]
+  },
+  {
+    name: 'setTimestamp',
+    signatures: [['timestamp']]
   },
   {
     name: 'setMetadata',
@@ -7821,6 +7869,10 @@ export const NativeFunctions = [
     signatures: [['type','?eventInitDict']]
   },
   {
+    name: 'registerRouter',
+    signatures: [['rules']]
+  },
+  {
     name: 'BarcodeDetector',
     signatures: [['?barcodeDetectorOptions']]
   },
@@ -7842,15 +7894,19 @@ export const NativeFunctions = [
   },
   {
     name: 'transmit',
-    signatures: [['sendBuffer']]
+    signatures: [['sendBuffer','?options']]
   },
   {
     name: 'control',
     signatures: [['controlCode','data']]
   },
   {
+    name: 'startTransaction',
+    signatures: [['transaction','?options']]
+  },
+  {
     name: 'getStatusChange',
-    signatures: [['readerStates','signal']]
+    signatures: [['readerStates','?options']]
   },
   {
     name: 'SmartCardError',
@@ -8037,6 +8093,10 @@ export const NativeFunctions = [
     signatures: [['name','version','displayName','estimatedSize','?creationCallback']]
   },
   {
+    name: 'clipControlEXT',
+    signatures: [['origin','depth']]
+  },
+  {
     name: 'queryCounterEXT',
     signatures: [['query','target']]
   },
@@ -8065,6 +8125,10 @@ export const NativeFunctions = [
     signatures: [['query','pname']]
   },
   {
+    name: 'polygonOffsetClampEXT',
+    signatures: [['factor','units','clamp']]
+  },
+  {
     name: 'WebGLContextEvent',
     signatures: [['type','?eventInit']]
   },
@@ -8085,6 +8149,10 @@ export const NativeFunctions = [
     signatures: [['mode','countsList','countsOffset','type','offsetsList','offsetsOffset','instanceCountsList','instanceCountsOffset','baseVerticesList','baseVerticesOffset','baseInstancesList','baseInstancesOffset','drawcount']]
   },
   {
+    name: 'polygonModeWEBGL',
+    signatures: [['face','mode']]
+  },
+  {
     name: 'provokingVertexWEBGL',
     signatures: [['provokeMode']]
   },
@@ -8093,20 +8161,40 @@ export const NativeFunctions = [
     signatures: [['sizedformat','width','height']]
   },
   {
+    name: 'framebufferTexturePixelLocalStorageWEBGL',
+    signatures: [['plane','texture','level','layer']]
+  },
+  {
+    name: 'framebufferPixelLocalClearValuefvWEBGL',
+    signatures: [['plane','value','?srcOffset']]
+  },
+  {
+    name: 'framebufferPixelLocalClearValueivWEBGL',
+    signatures: [['plane','value','?srcOffset']]
+  },
+  {
+    name: 'framebufferPixelLocalClearValueuivWEBGL',
+    signatures: [['plane','value','?srcOffset']]
+  },
+  {
+    name: 'beginPixelLocalStorageWEBGL',
+    signatures: [['loadops']]
+  },
+  {
+    name: 'endPixelLocalStorageWEBGL',
+    signatures: [['storeops']]
+  },
+  {
+    name: 'getFramebufferPixelLocalStorageParameterWEBGL',
+    signatures: [['plane','pname']]
+  },
+  {
     name: 'shareVideoImageWEBGL',
     signatures: [['target','video']]
   },
   {
     name: 'releaseVideoImageWEBGL',
     signatures: [['target']]
-  },
-  {
-    name: 'importVideoFrame',
-    signatures: [['videoFrame']]
-  },
-  {
-    name: 'releaseVideoFrame',
-    signatures: [['handle']]
   },
   {
     name: 'requestAdapterInfo',
@@ -8242,7 +8330,7 @@ export const NativeFunctions = [
   },
   {
     name: 'GPUPipelineError',
-    signatures: [['message','options']]
+    signatures: [['?message','options']]
   },
   {
     name: 'setBindGroup',

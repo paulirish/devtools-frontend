@@ -23,6 +23,8 @@ devtools_module("timeline_model") {
     "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../generated:protocol",
+    "../../models/trace:bundle",
+    "../cpu_profile:bundle",
   ]
 }
 
@@ -42,12 +44,4 @@ devtools_entrypoint("bundle") {
   ]
 
   visibility += devtools_models_visibility
-}
-
-devtools_entrypoint("legacy") {
-  entrypoint = "timeline_model-legacy.ts"
-
-  deps = [ ":bundle" ]
-
-  visibility = [ "../..:legacy_entrypoints" ]
 }

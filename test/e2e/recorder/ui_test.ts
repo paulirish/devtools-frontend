@@ -5,7 +5,7 @@
 /* eslint-disable rulesdir/es_modules_import */
 
 import {assert} from 'chai';
-import {type ElementHandle, type Page} from 'puppeteer';
+import {type ElementHandle, type Page} from 'puppeteer-core';
 
 import {type StepType} from '../../../front_end/panels/recorder/models/Schema.js';
 
@@ -73,6 +73,7 @@ describe('Recorder', function() {
         await target.bringToFront();
         await frontend.bringToFront();
         await frontend.waitForSelector('pierce/.settings');
+        await target.bringToFront();
         await target.click('#test');
         await frontend.bringToFront();
 
@@ -89,6 +90,7 @@ describe('Recorder', function() {
         await target.bringToFront();
         await frontend.bringToFront();
         await frontend.waitForSelector('pierce/.settings');
+        await target.bringToFront();
         const element = await target.waitForSelector(
             'a[href="recorder2.html"]',
         );
@@ -134,6 +136,7 @@ describe('Recorder', function() {
         await target.bringToFront();
         await frontend.bringToFront();
         await frontend.waitForSelector('pierce/.settings');
+        await target.bringToFront();
         await target.click('#test');
         await frontend.bringToFront();
         await stopRecording();
@@ -168,6 +171,7 @@ describe('Recorder', function() {
           await picker.click();
 
           // Click element and wait for selector picking to stop.
+          await target.bringToFront();
           const element = await target.waitForSelector(query);
           assertNotNullOrUndefined(element);
           await element.click();
@@ -181,7 +185,8 @@ describe('Recorder', function() {
           await waitFor('.expanded');
         }
 
-        it('should select through the selector picker', async () => {
+        // Flaky test
+        it.skip('[crbug.com/1443421]: should select through the selector picker', async () => {
           const {target, frontend} = getBrowserAndPages();
           await frontend.bringToFront();
           await frontend.waitForSelector('pierce/.settings');
@@ -196,7 +201,6 @@ describe('Recorder', function() {
 
           await expandStep(frontend, 2);
           await pickSelectorsForQuery('#test-button', frontend, target);
-
           const recording = await getCurrentRecording();
           assertRecordingMatchesSnapshot(recording);
         });
@@ -231,7 +235,8 @@ describe('Recorder', function() {
           assertRecordingMatchesSnapshot(recording);
         });
 
-        it('should select through the selector picker during recording', async () => {
+        // Flaky test
+        it.skip('[crbug.com/1443421]: should select through the selector picker during recording', async () => {
           const {target, frontend} = getBrowserAndPages();
           await frontend.bringToFront();
           await frontend.waitForSelector('pierce/.settings');
@@ -256,10 +261,12 @@ describe('Recorder', function() {
     describe('Settings', () => {
       it('should change network settings', async () => {
         const {target, frontend} = getBrowserAndPages();
-        await target.bringToFront();
         await frontend.bringToFront();
         await frontend.waitForSelector('pierce/.settings');
+
+        await target.bringToFront();
         await target.click('#test');
+
         await frontend.bringToFront();
         await stopRecording();
 

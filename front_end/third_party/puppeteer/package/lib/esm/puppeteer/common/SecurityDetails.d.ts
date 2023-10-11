@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Protocol } from 'devtools-protocol';
+import type { Protocol } from 'devtools-protocol';
 /**
  * The SecurityDetails class represents the security details of a
  * response that was received over a secure connection.
@@ -27,29 +27,29 @@ export declare class SecurityDetails {
      */
     constructor(securityPayload: Protocol.Network.SecurityDetails);
     /**
-     * @returns The name of the issuer of the certificate.
+     * The name of the issuer of the certificate.
      */
     issuer(): string;
     /**
-     * @returns {@link https://en.wikipedia.org/wiki/Unix_time | Unix timestamp}
+     * {@link https://en.wikipedia.org/wiki/Unix_time | Unix timestamp}
      * marking the start of the certificate's validity.
      */
     validFrom(): number;
     /**
-     * @returns {@link https://en.wikipedia.org/wiki/Unix_time | Unix timestamp}
+     * {@link https://en.wikipedia.org/wiki/Unix_time | Unix timestamp}
      * marking the end of the certificate's validity.
      */
     validTo(): number;
     /**
-     * @returns The security protocol being used, e.g. "TLS 1.2".
+     * The security protocol being used, e.g. "TLS 1.2".
      */
     protocol(): string;
     /**
-     * @returns The name of the subject to which the certificate was issued.
+     * The name of the subject to which the certificate was issued.
      */
     subjectName(): string;
     /**
-     * @returns The list of {@link https://en.wikipedia.org/wiki/Subject_Alternative_Name | subject alternative names (SANs)} of the certificate.
+     * The list of {@link https://en.wikipedia.org/wiki/Subject_Alternative_Name | subject alternative names (SANs)} of the certificate.
      */
     subjectAlternativeNames(): string[];
 }

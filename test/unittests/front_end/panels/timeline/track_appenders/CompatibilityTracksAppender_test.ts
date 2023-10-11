@@ -6,43 +6,45 @@ import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 import * as Timeline from '../../../../../../front_end/panels/timeline/timeline.js';
 import * as PerfUI from '../../../../../../front_end/ui/legacy/components/perf_ui/perf_ui.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
-import {traceModelFromTraceFile} from '../../../helpers/TimelineHelpers.js';
-import {loadModelDataFromTraceFile} from '../../../helpers/TraceHelpers.js';
-
-import type * as TimelineModel from '../../../../../../front_end/models/timeline_model/timeline_model.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
-describeWithEnvironment('TimingTrackAppender', () => {
+describeWithEnvironment('TimingTrackAppender', function() {
   let traceParsedData: TraceModel.Handlers.Types.TraceParseData;
-  let timelineModel: TimelineModel.TimelineModel.TimelineModelImpl;
   let tracksAppender: Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender;
   let entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[] = [];
   let flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
   let entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[] = [];
 
-  async function initTrackAppender(fixture = 'timings-track.json.gz'): Promise<void> {
+  async function initTrackAppender(
+      context: Mocha.Suite|Mocha.Context, fixture = 'timings-track.json.gz'): Promise<void> {
     entryData = [];
     flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
     entryTypeByLevel = [];
-    traceParsedData = await loadModelDataFromTraceFile(fixture);
-    timelineModel = (await traceModelFromTraceFile(fixture)).timelineModel;
+    const data = await TraceLoader.allModels(context, fixture);
+    traceParsedData = data.traceParsedData;
     tracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
-        flameChartData, traceParsedData, entryData, entryTypeByLevel, timelineModel);
+        flameChartData, traceParsedData, entryData, entryTypeByLevel, data.timelineModel);
     const timingsTrack = tracksAppender.timingsTrackAppender();
     const gpuTrack = tracksAppender.gpuTrackAppender();
-    const nextLevel = timingsTrack.appendTrackAtLevel(0);
-    gpuTrack.appendTrackAtLevel(nextLevel);
+    const threadAppenders = tracksAppender.threadAppenders();
+    let currentLevel = timingsTrack.appendTrackAtLevel(0);
+    currentLevel = gpuTrack.appendTrackAtLevel(currentLevel);
+    for (const threadAppender of threadAppenders) {
+      currentLevel = threadAppender.appendTrackAtLevel(currentLevel);
+    }
   }
 
   beforeEach(async () => {
-    await initTrackAppender();
+    await initTrackAppender(this);
   });
 
   describe('CompatibilityTracksAppender', () => {
     describe('eventsInTrack', () => {
       it('returns all the events appended by a track with multiple levels', () => {
-        const timingsTrackEvents = tracksAppender.eventsInTrack('Timings');
+        const timingsTrack = tracksAppender.timingsTrackAppender();
+        const timingsTrackEvents = tracksAppender.eventsInTrack(timingsTrack);
         const allTimingEvents = [
           ...traceParsedData.UserTimings.consoleTimings,
           ...traceParsedData.UserTimings.timestampEvents,
@@ -53,32 +55,56 @@ describeWithEnvironment('TimingTrackAppender', () => {
         assert.deepEqual(timingsTrackEvents, allTimingEvents);
       });
       it('returns all the events appended by a track with one level', () => {
+        const gpuTrack = tracksAppender.gpuTrackAppender();
         const gpuTrackEvents =
-            tracksAppender.eventsInTrack('GPU') as readonly TraceModel.Types.TraceEvents.TraceEventData[];
+            tracksAppender.eventsInTrack(gpuTrack) as readonly TraceModel.Types.TraceEvents.TraceEventData[];
         assert.deepEqual(gpuTrackEvents, traceParsedData.GPU.mainGPUThreadTasks);
       });
     });
     describe('eventsForTreeView', () => {
       it('returns only sync events if using async events means a tree cannot be built', () => {
-        const timingsEvents = tracksAppender.eventsInTrack('Timings');
+        const timingsTrack = tracksAppender.timingsTrackAppender();
+        const timingsEvents = tracksAppender.eventsInTrack(timingsTrack);
         assert.isFalse(tracksAppender.canBuildTreesFromEvents(timingsEvents));
-        const treeEvents = tracksAppender.eventsForTreeView('Timings');
+        const treeEvents = tracksAppender.eventsForTreeView(timingsTrack);
         const allEventsAreSync = treeEvents.every(event => !TraceModel.Types.TraceEvents.isAsyncPhase(event.ph));
         assert.isTrue(allEventsAreSync);
       });
       it('returns both sync and async events if a tree can be built with them', async () => {
         // This file contains events in the timings track that can be assembled as a tree
-        await initTrackAppender('sync-like-timings.json.gz');
-        const timingsEvents = tracksAppender.eventsInTrack('Timings');
+        await initTrackAppender(this, 'sync-like-timings.json.gz');
+        const timingsTrack = tracksAppender.timingsTrackAppender();
+        const timingsEvents = tracksAppender.eventsInTrack(timingsTrack);
         assert.isTrue(tracksAppender.canBuildTreesFromEvents(timingsEvents));
-        const treeEvents = tracksAppender.eventsForTreeView('Timings');
+        const treeEvents = tracksAppender.eventsForTreeView(timingsTrack);
         assert.deepEqual(treeEvents, timingsEvents);
+      });
+
+      it('returns events for tree view for nested tracks', async () => {
+        // This file contains two rasterizer threads which should be
+        // nested inside the same header.
+        await initTrackAppender(this, 'lcp-images.json.gz');
+        const rasterTracks = tracksAppender.threadAppenders().filter(
+            threadAppender => threadAppender.threadType === Timeline.ThreadAppender.ThreadType.RASTERIZER);
+        assert.strictEqual(rasterTracks.length, 2);
+
+        const raster1Events = tracksAppender.eventsInTrack(rasterTracks[0]);
+        assert.strictEqual(raster1Events.length, 6);
+        assert.isTrue(tracksAppender.canBuildTreesFromEvents(raster1Events));
+        const raster1TreeEvents = tracksAppender.eventsForTreeView(rasterTracks[0]);
+        assert.deepEqual(raster1TreeEvents, raster1Events);
+
+        const raster2Events = tracksAppender.eventsInTrack(rasterTracks[1]);
+        assert.strictEqual(raster2Events.length, 1);
+        assert.isTrue(tracksAppender.canBuildTreesFromEvents(raster2Events));
+        const raster2TreeEvents = tracksAppender.eventsForTreeView(rasterTracks[1]);
+        assert.deepEqual(raster2TreeEvents, raster2Events);
       });
     });
     describe('groupEventsForTreeView', () => {
       it('returns all the events of a flame chart group with multiple levels', async () => {
         // This file contains events in the timings track that can be assembled as a tree
-        await initTrackAppender('sync-like-timings.json.gz');
+        await initTrackAppender(this, 'sync-like-timings.json.gz');
         const timingsGroupEvents = tracksAppender.groupEventsForTreeView(flameChartData.groups[0]);
         if (!timingsGroupEvents) {
           assert.fail('Could not find events for group');

@@ -33,6 +33,7 @@
  */
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -140,7 +141,7 @@ export class ElementsTreeOutline extends
     if (hideGutter) {
       this.elementInternal.classList.add('elements-hide-gutter');
     }
-    UI.ARIAUtils.setAccessibleName(this.elementInternal, i18nString(UIStrings.pageDom));
+    UI.ARIAUtils.setLabel(this.elementInternal, i18nString(UIStrings.pageDom));
     this.elementInternal.addEventListener('focusout', this.onfocusout.bind(this), false);
     this.elementInternal.addEventListener('mousedown', this.onmousedown.bind(this), false);
     this.elementInternal.addEventListener('mousemove', this.onmousemove.bind(this), false);
@@ -597,8 +598,9 @@ export class ElementsTreeOutline extends
         this.appendChild(treeElement);
       }
     }
-
-    void this.createTopLayerContainer(this.rootElement(), this.rootDOMNode.domModel());
+    if (this.rootDOMNode instanceof SDK.DOMModel.DOMDocument) {
+      void this.createTopLayerContainer(this.rootElement(), this.rootDOMNode);
+    }
 
     if (selectedNode) {
       this.revealAndSelectNode(selectedNode, true);
@@ -1323,11 +1325,11 @@ export class ElementsTreeOutline extends
     });
   }
 
-  async createTopLayerContainer(parent: UI.TreeOutline.TreeElement, domModel: SDK.DOMModel.DOMModel): Promise<void> {
+  async createTopLayerContainer(parent: UI.TreeOutline.TreeElement, document: SDK.DOMModel.DOMDocument): Promise<void> {
     if (!parent.treeOutline || !(parent.treeOutline instanceof ElementsTreeOutline)) {
       return;
     }
-    const container = new TopLayerContainer(parent.treeOutline, domModel);
+    const container = new TopLayerContainer(parent.treeOutline, document);
     await container.throttledUpdateTopLayerElements();
     if (container.currentTopLayerDOMNodes.size > 0) {
       parent.appendChild(container);
@@ -1489,8 +1491,8 @@ export class ElementsTreeOutline extends
       isClosingTag?: boolean): ElementsTreeElement {
     const newElement = this.createElementTreeElement(child, isClosingTag);
     treeElement.insertChild(newElement, index);
-    if (child.nodeType() === Node.DOCUMENT_NODE) {
-      void this.createTopLayerContainer(newElement, child.domModel());
+    if (child instanceof SDK.DOMModel.DOMDocument) {
+      void this.createTopLayerContainer(newElement, child);
     }
     return newElement;
   }
@@ -1795,6 +1797,7 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
     };
     this.listItemElement.appendChild(adorner);
     const onClick = (((): void => {
+                       Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.REVEAL);
                        this.nodeShortcut.deferredNode.resolve(
                            node => {
                              void Common.Revealer.reveal(node);

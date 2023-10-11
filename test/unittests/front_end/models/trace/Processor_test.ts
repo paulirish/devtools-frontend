@@ -3,17 +3,15 @@
 // found in the LICENSE file.
 
 import * as TraceModel from '../../../../../front_end/models/trace/trace.js';
+import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
+import {TraceLoader} from '../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
-import {loadEventsFromTraceFile, setTraceModelTimeout} from '../../helpers/TraceHelpers.js';
-
-describe('TraceProcessor', async function() {
-  setTraceModelTimeout(this);
-
-  it('can use a trace processor', async () => {
+describeWithEnvironment('TraceProcessor', async function() {
+  it('can use a trace processor', async function() {
     const processor = TraceModel.Processor.TraceProcessor.createWithAllHandlers();
-    const file = await loadEventsFromTraceFile('basic.json.gz');
+    const file = await TraceLoader.rawEvents(this, 'basic.json.gz');
 
     // Check parsing after instantiation.
     assert.isNull(processor.data);
@@ -78,17 +76,17 @@ describe('TraceProcessor', async function() {
     assert.isNotNull(processor.data);
   });
 
-  it('can be given a subset of handlers to run and will run just those along with the meta handler', async () => {
+  it('can be given a subset of handlers to run and will run just those along with the meta handler', async function() {
     const processor = new TraceModel.Processor.TraceProcessor({
-      Animation: TraceModel.Handlers.ModelHandlers.Animation,
+      Animation: TraceModel.Handlers.ModelHandlers.Animations,
     });
-    const file = await loadEventsFromTraceFile('animation.json.gz');
-    await processor.parse(file);
+    const events = await TraceLoader.rawEvents(this, 'animation.json.gz');
+    await processor.parse(events);
     assert.isNotNull(processor.data);
     assert.deepEqual(Object.keys(processor.data || {}), ['Meta', 'Animation']);
   });
 
-  it('does not error if the user does not enable the Meta handler when it is a dependency', async () => {
+  it('does not error if the user does not enable the Meta handler when it is a dependency', async function() {
     assert.doesNotThrow(() => {
       new TraceModel.Processor.TraceProcessor({
         // Screenshots handler depends on Meta handler, so this is invalid.
@@ -99,7 +97,7 @@ describe('TraceProcessor', async function() {
     });
   });
 
-  it('errors if the user does not provide the right handler dependencies', async () => {
+  it('errors if the user does not provide the right handler dependencies', async function() {
     assert.throws(() => {
       new TraceModel.Processor.TraceProcessor({
         Renderer: TraceModel.Handlers.ModelHandlers.Renderer,
@@ -108,15 +106,20 @@ describe('TraceProcessor', async function() {
     }, /Required handler Samples not provided/);
   });
 
-  it('emits periodic trace updates', async () => {
+  it('emits periodic trace updates', async function() {
     const processor = new TraceModel.Processor.TraceProcessor(
         {
           Renderer: TraceModel.Handlers.ModelHandlers.Renderer,
           Samples: TraceModel.Handlers.ModelHandlers.Samples,
+          AuctionWorklets: TraceModel.Handlers.ModelHandlers.AuctionWorklets,
         },
         {
-          // This trace is 8252 events long, lets emit 8 updates
-          eventsPerChunk: 1_000,
+          ...TraceModel.Types.Configuration.DEFAULT,
+          processing: {
+            ...TraceModel.Types.Configuration.DEFAULT.processing,
+            // This trace is 8252 events long, lets emit 8 updates
+            eventsPerChunk: 1_000,
+          },
         });
 
     let updateEventCount = 0;
@@ -125,7 +128,7 @@ describe('TraceProcessor', async function() {
       updateEventCount++;
     });
 
-    const rawEvents = await loadEventsFromTraceFile('web-dev.json.gz');
+    const rawEvents = await TraceLoader.rawEvents(this, 'web-dev.json.gz');
     await processor.parse(rawEvents).then(() => {
       assert.strictEqual(updateEventCount, 8);
     });
@@ -148,7 +151,7 @@ describe('TraceProcessor', async function() {
       return handlers;
     }
 
-    it('sorts handlers satisfying their dependencies 1', () => {
+    it('sorts handlers satisfying their dependencies 1', function() {
       const handlersDeps: {[key: string]: {deps ? () : TraceModel.Handlers.Types.TraceEventHandlerName[]}} = {
         'Meta': {},
         'GPU': {
@@ -188,7 +191,7 @@ describe('TraceProcessor', async function() {
           ['Meta', 'GPU', 'LayoutShifts', 'NetworkRequests', 'Screenshots', 'Renderer', 'PageLoadMetrics'];
       assert.deepEqual([...TraceModel.Processor.sortHandlers(handlers).keys()], expectedOrder);
     });
-    it('sorts handlers satisfying their dependencies 2', () => {
+    it('sorts handlers satisfying their dependencies 2', function() {
       const handlersDeps: {[key: string]: {deps ? () : TraceModel.Handlers.Types.TraceEventHandlerName[]}} = {
         'GPU': {
           deps() {
@@ -207,7 +210,7 @@ describe('TraceProcessor', async function() {
       const expectedOrder = ['NetworkRequests', 'LayoutShifts', 'GPU'];
       assert.deepEqual([...TraceModel.Processor.sortHandlers(handlers).keys()], expectedOrder);
     });
-    it('throws an error when a dependency cycle is present among handlers', () => {
+    it('throws an error when a dependency cycle is present among handlers', function() {
       const handlersDeps: {[key: string]: {deps ? () : TraceModel.Handlers.Types.TraceEventHandlerName[]}} = {
         'Meta': {},
         'GPU': {

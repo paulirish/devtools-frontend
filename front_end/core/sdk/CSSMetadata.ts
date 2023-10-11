@@ -88,7 +88,7 @@ export class CSSMetadata {
         }
       }
     }
-    this.#values.sort(CSSMetadata.sortPrefixesToEnd);
+    this.#values.sort(CSSMetadata.sortPrefixesAndCSSWideKeywordsToEnd);
     this.#valuesSet = new Set(this.#values);
 
     // Reads in auto-generated property names and #values from blink/public/renderer/core/css/css_properties.json5
@@ -123,7 +123,7 @@ export class CSSMetadata {
     for (const name of this.#valuesSet) {
       const values = this.specificPropertyValues(name)
                          .filter(value => CSS.supports(name, value))
-                         .sort(CSSMetadata.sortPrefixesToEnd);
+                         .sort(CSSMetadata.sortPrefixesAndCSSWideKeywordsToEnd);
       const presets = values.map(value => `${name}: ${value}`);
       if (!this.isSVGProperty(name)) {
         this.#nameValuePresetsInternal.push(...presets);
@@ -132,7 +132,17 @@ export class CSSMetadata {
     }
   }
 
-  private static sortPrefixesToEnd(a: string, b: string): 1|- 1|0 {
+  private static sortPrefixesAndCSSWideKeywordsToEnd(a: string, b: string): 1|- 1|0 {
+    const aIsCSSWideKeyword = CSSWideKeywords.includes(a);
+    const bIsCSSWideKeyword = CSSWideKeywords.includes(b);
+
+    if (aIsCSSWideKeyword && !bIsCSSWideKeyword) {
+      return 1;
+    }
+    if (!aIsCSSWideKeyword && bIsCSSWideKeyword) {
+      return -1;
+    }
+
     const aIsPrefixed = a.startsWith('-webkit-');
     const bIsPrefixed = b.startsWith('-webkit-');
     if (aIsPrefixed && !bIsPrefixed) {
@@ -279,16 +289,17 @@ export class CSSMetadata {
   }
 
   getPropertyValues(propertyName: string): string[] {
-    const acceptedKeywords = ['inherit', 'initial', 'revert', 'unset'];
     propertyName = propertyName.toLowerCase();
-    acceptedKeywords.push(...this.specificPropertyValues(propertyName));
+    // Add CSS-wide keywords to all properties.
+    const acceptedKeywords = [...this.specificPropertyValues(propertyName), ...CSSWideKeywords];
+
     if (this.isColorAwareProperty(propertyName)) {
       acceptedKeywords.push('currentColor');
       for (const color of Common.Color.Nicknames.keys()) {
         acceptedKeywords.push(color);
       }
     }
-    return acceptedKeywords.sort(CSSMetadata.sortPrefixesToEnd);
+    return acceptedKeywords.sort(CSSMetadata.sortPrefixesAndCSSWideKeywordsToEnd);
   }
 
   propertyUsageWeight(property: string): number {
@@ -324,7 +335,13 @@ export class CSSMetadata {
   }
 }
 
-export const VariableRegex = /(var\(\s*--.*?\))/g;
+// CSS-wide keywords.
+// Spec: https://drafts.csswg.org/css-cascade/#defaulting-keywords
+// https://drafts.csswg.org/css-cascade-5/#revert-layer
+export const CSSWideKeywords = ['inherit', 'initial', 'revert', 'revert-layer', 'unset'];
+
+export const VariableNameRegex = /(\s*--.*?)/gs;
+export const VariableRegex = /(var\(\s*--.*?\))/gs;
 export const CustomVariableRegex = /(var\(*--[\w\d]+-([\w]+-[\w]+)\))/g;
 export const URLRegex = /url\(\s*('.+?'|".+?"|[^)]+)\s*\)/g;
 
@@ -469,6 +486,7 @@ const colorAwareProperties = new Set<string>([
   'list-style-image',
   'outline',
   'outline-color',
+  'scrollbar-color',
   'stop-color',
   'stroke',
   'text-decoration-color',
@@ -489,7 +507,6 @@ const colorAwareProperties = new Set<string>([
   '-webkit-mask-box-image-source',
   '-webkit-mask-image',
   '-webkit-tap-highlight-color',
-  '-webkit-text-decoration-color',
   '-webkit-text-emphasis',
   '-webkit-text-emphasis-color',
   '-webkit-text-fill-color',
@@ -782,8 +799,6 @@ const extraPropertyValues = {
       'sepia',
     ],
   },
-  'mix-blend-mode': {values: ['unset']},
-  'background-blend-mode': {values: ['unset']},
   'grid-template-columns': {values: ['min-content', 'max-content']},
   'grid-template-rows': {values: ['min-content', 'max-content']},
   'grid-auto-flow': {values: ['dense']},
@@ -1079,7 +1094,6 @@ const extraPropertyValues = {
   '-webkit-border-start-width': {values: ['medium', 'thick', 'thin']},
   '-webkit-logical-height': {values: ['-webkit-fill-available', 'min-content', 'max-content', 'fit-content']},
   '-webkit-logical-width': {values: ['-webkit-fill-available', 'min-content', 'max-content', 'fit-content']},
-  '-webkit-margin-collapse': {values: ['collapse', 'separate', 'discard']},
   '-webkit-mask-box-image': {values: ['repeat', 'stretch', 'space', 'round']},
   '-webkit-mask-box-image-repeat': {values: ['repeat', 'stretch', 'space', 'round']},
   '-webkit-mask-clip': {values: ['text', 'border', 'border-box', 'content', 'content-box', 'padding', 'padding-box']},
@@ -1119,6 +1133,11 @@ const extraPropertyValues = {
   '-webkit-transform-origin-x': {values: ['left', 'right', 'center']},
   '-webkit-transform-origin-y': {values: ['top', 'bottom', 'center']},
   'width': {values: ['-webkit-fill-available']},
+  'contain-intrinsic-width': {values: ['auto none', 'auto 100px']},
+  'contain-intrinsic-height': {values: ['auto none', 'auto 100px']},
+  'contain-intrinsic-size': {values: ['auto none', 'auto 100px']},
+  'contain-intrinsic-inline-size': {values: ['auto none', 'auto 100px']},
+  'contain-intrinsic-block-size': {values: ['auto none', 'auto 100px']},
 };
 
 // Weight of CSS properties based on their usage from https://www.chromestatus.com/metrics/css/popularity
@@ -1334,7 +1353,6 @@ const Weight = new Map([
   ['-webkit-filter', 159],
   ['-webkit-font-feature-settings', 59],
   ['-webkit-font-smoothing', 177],
-  ['-webkit-highlight', 1],
   ['-webkit-line-break', 45],
   ['-webkit-line-clamp', 126],
   ['-webkit-margin-after', 67],
@@ -1342,7 +1360,6 @@ const Weight = new Map([
   ['-webkit-margin-collapse', 14],
   ['-webkit-margin-end', 65],
   ['-webkit-margin-start', 100],
-  ['-webkit-margin-top-collapse', 78],
   ['-webkit-mask', 19],
   ['-webkit-mask-box-image', 72],
   ['-webkit-mask-image', 88],

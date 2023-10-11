@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 import {
+  $,
   click,
   clickElement,
+  getBrowserAndPages,
+  hover,
   scrollElementIntoView,
   waitFor,
   waitForAria,
@@ -12,12 +15,18 @@ import {
 } from '../../shared/helper.js';
 
 export const openPanelViaMoreTools = async (panelTitle: string) => {
+  const {frontend} = getBrowserAndPages();
+
+  await frontend.bringToFront();
+
   // Head to the triple dot menu.
   await click('aria/Customize and control DevTools');
 
-  // Open the “More Tools” option.
-  const moreTools = await waitForAria('More tools[role="menuitem"]');
-  await moreTools.hover();
+  await waitForFunction(async () => {
+    // Open the “More Tools” option.
+    await hover('aria/More tools[role="menuitem"]');
+    return $(`${panelTitle}[role="menuitem"]`, undefined, 'aria');
+  });
 
   // Click the desired menu item
   await click(`aria/${panelTitle}[role="menuitem"]`);
@@ -81,7 +90,7 @@ export const toggleIgnoreListing = async (enable: boolean) => {
   const enabledPattern = '.ignore-list-options:not(.ignore-listing-disabled)';
   const disabledPattern = '.ignore-list-options.ignore-listing-disabled';
   await waitFor(enable ? disabledPattern : enabledPattern);
-  await click('[aria-label="Enable Ignore Listing"]');
+  await click('[title="Enable Ignore Listing"]');
   await waitFor(enable ? enabledPattern : disabledPattern);
   await closeSettings();
 };

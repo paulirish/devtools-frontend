@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../core/common/common.js';
+import * as Application from '../../panels/application/application.js';
+
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
  */
@@ -17,7 +20,7 @@ ApplicationTestRunner.resetState = async function() {
     if (target.type() === 'tab') {
       continue;
     }
-    const securityOrigin = new Common.ParsedURL(target.inspectedURL()).securityOrigin();
+    const securityOrigin = new Common.ParsedURL.ParsedURL(target.inspectedURL()).securityOrigin();
     await target.storageAgent().clearDataForOrigin(securityOrigin, Resources.StorageView.AllStorageTypes.join(','));
   }
 };
@@ -82,8 +85,8 @@ ApplicationTestRunner.showResource = function(resourceURL, callback) {
       return;
     }
 
-    UI.panels.resources.showResource(resource, 1);
-    const sourceFrame = UI.panels.resources.resourceViewForResource(resource);
+    Application.ResourcesPanel.ResourcesPanel.instance().showResource(resource, 1);
+    const sourceFrame = Application.ResourcesPanel.ResourcesPanel.instance().resourceViewForResource(resource);
 
     if (sourceFrame.loaded) {
       callbackWrapper(sourceFrame);
@@ -128,7 +131,8 @@ ApplicationTestRunner.waitForCookies = function() {
 };
 
 ApplicationTestRunner.dumpCookieDomains = function() {
-  const cookieListChildren = UI.panels.resources.sidebar.cookieListTreeElement.children();
+  const cookieListChildren =
+      Application.ResourcesPanel.ResourcesPanel.instance().sidebar.cookieListTreeElement.children();
   TestRunner.addResult('Available cookie domains:');
   for (const child of cookieListChildren) {
     TestRunner.addResult(child.cookieDomain);
@@ -136,13 +140,13 @@ ApplicationTestRunner.dumpCookieDomains = function() {
 };
 
 ApplicationTestRunner.dumpCookies = function() {
-  if (!UI.panels.resources.cookieView || !UI.panels.resources.cookieView.isShowing()) {
+  if (!Application.ResourcesPanel.ResourcesPanel.instance().cookieView || !UI.panels.resources.cookieView.isShowing()) {
     TestRunner.addResult('No cookies visible');
     return;
   }
 
   TestRunner.addResult('Visible cookies');
-  for (const item of UI.panels.resources.cookieView.cookiesTable.data) {
+  for (const item of Application.ResourcesPanel.ResourcesPanel.instance().cookieView.cookiesTable.data) {
     const cookies = item.cookies || [];
     for (const cookie of cookies) {
       TestRunner.addResult(`${cookie.name()}=${cookie.value()}`);

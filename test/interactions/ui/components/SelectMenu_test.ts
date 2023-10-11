@@ -4,6 +4,7 @@
 
 import {assert} from 'chai';
 
+import type * as Menus from '../../../../front_end/ui/components/menus/menus.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../../../../test/interactions/helpers/shared.js';
 import {
   $,
@@ -15,13 +16,11 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../../../test/shared/helper.js';
-import {describe, it} from '../../../../test/shared/mocha-extensions.js';
+import {describe, it, itScreenshot} from '../../../../test/shared/mocha-extensions.js';
 import {
   assertElementScreenshotUnchanged,
-  itScreenshot,
   waitForDialogAnimationEnd,
 } from '../../../shared/screenshots.js';
-import type * as Menus from '../../../../front_end/ui/components/menus/menus.js';
 
 type GetSelectMenuOptions = {
   placeholderSelector?: string,
@@ -195,7 +194,6 @@ describe('SelectMenu', () => {
     // Focus the second select menu, which deploys upwards and open it using the
     // up arrow key.
     await frontend.keyboard.press('Tab');
-    await frontend.keyboard.press('Tab');
     await frontend.keyboard.press('ArrowUp');
     await waitFor('dialog[open]');
   });
@@ -203,7 +201,6 @@ describe('SelectMenu', () => {
   it('can close a menu with ESC and open it again using the keyboard', async () => {
     const {frontend} = getBrowserAndPages();
     await loadComponentDocExample('select_menu/basic.html');
-
     // Focus the first select menu, which deploys downwards and open it using the
     // down arrow key.
     await frontend.keyboard.press('Tab');
@@ -214,7 +211,6 @@ describe('SelectMenu', () => {
     await frontend.keyboard.press('Escape');
     await waitFor('dialog:not([open])', placeHolder1);
 
-    await frontend.keyboard.press('Tab');
     // Wait until the focus is set on the button that opens the menu.
     await waitForFunction(async () => {
       const activeElementHandle = await activeElement();

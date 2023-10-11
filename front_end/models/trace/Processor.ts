@@ -1,8 +1,8 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import type * as Types from './types/types.js';
 import * as Handlers from './handlers/handlers.js';
+import * as Types from './types/types.js';
 
 const enum Status {
   IDLE = 'IDLE',
@@ -34,15 +34,14 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
   // the model handlers the user passes in and the Meta handler.
   // eslint-disable-next-line @typescript-eslint/naming-convention
   readonly #traceHandlers: Handlers.Types.HandlersWithMeta<EnabledModelHandlers>;
-  #pauseDuration: number;
-  #eventsPerChunk: number;
   #status = Status.IDLE;
+  #modelConfiguration = Types.Configuration.DEFAULT;
 
   static createWithAllHandlers(): TraceProcessor<typeof Handlers.ModelHandlers> {
-    return new TraceProcessor(Handlers.ModelHandlers);
+    return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.DEFAULT);
   }
 
-  constructor(traceHandlers: EnabledModelHandlers, {pauseDuration = 1, eventsPerChunk = 15_000} = {}) {
+  constructor(traceHandlers: EnabledModelHandlers, modelConfiguration?: Types.Configuration.Configuration) {
     super();
 
     this.#verifyHandlers(traceHandlers);
@@ -50,8 +49,25 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
       Meta: Handlers.ModelHandlers.Meta,
       ...traceHandlers,
     };
-    this.#pauseDuration = pauseDuration;
-    this.#eventsPerChunk = eventsPerChunk;
+    if (modelConfiguration) {
+      this.#modelConfiguration = modelConfiguration;
+    }
+    this.#passConfigToHandlers();
+  }
+
+  updateConfiguration(config: Types.Configuration.Configuration): void {
+    this.#modelConfiguration = config;
+    this.#passConfigToHandlers();
+  }
+
+  #passConfigToHandlers(): void {
+    for (const handler of Object.values(this.#traceHandlers)) {
+      // Bit of an odd double check, but without this TypeScript refuses to let
+      // you call the function as it thinks it might be undefined.
+      if ('handleUserConfig' in handler && handler.handleUserConfig) {
+        handler.handleUserConfig(this.#modelConfiguration);
+      }
+    }
   }
 
   /**
@@ -123,7 +139,8 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     // main thread to avoid blocking execution. It uses `dispatchEvent` to
     // provide status update events, and other various bits of config like the
     // pause duration and frequency.
-    const traceEventIterator = new TraceEventIterator(traceEvents, this.#pauseDuration, this.#eventsPerChunk);
+    const {pauseDuration, eventsPerChunk} = this.#modelConfiguration.processing;
+    const traceEventIterator = new TraceEventIterator(traceEvents, pauseDuration, eventsPerChunk);
 
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];

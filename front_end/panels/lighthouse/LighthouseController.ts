@@ -11,7 +11,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as EmulationModel from '../../models/emulation/emulation.js';
 import * as Emulation from '../emulation/emulation.js';
 
-import {type ProtocolService, type LighthouseRun} from './LighthouseProtocolService.js';
+import {type LighthouseRun, type ProtocolService} from './LighthouseProtocolService.js';
 import {type RunnerResult} from './LighthouseReporterTypes.js';
 
 const UIStrings = {
@@ -43,7 +43,7 @@ const UIStrings = {
   /**
    *@description Text in Application Panel Sidebar of the Application panel
    */
-  localStorage: 'Local Storage',
+  localStorage: 'Local storage',
   /**
    *@description Text in Application Panel Sidebar of the Application panel
    */
@@ -169,14 +169,6 @@ const UIStrings = {
    *@description Text of checkbox to reset storage features prior to running audits in Lighthouse
    */
   clearStorage: 'Clear storage',
-  /**
-   * @description Text of checkbox to use the legacy Lighthouse navigation mode
-   */
-  legacyNavigation: 'Legacy navigation',
-  /**
-   * @description Tooltip text that appears when hovering over the 'Legacy navigation' checkbox in the settings pane opened by clicking the setting cog in the start view of the audits panel. "Navigation mode" is a Lighthouse mode that analyzes a page navigation.
-   */
-  useLegacyNavigation: 'Analyze the page using classic Lighthouse when in navigation mode.',
   /**
    * @description Tooltip text of checkbox to reset storage features prior to running audits in
    * Lighthouse. Resetting the storage clears/empties it to a neutral state.
@@ -397,7 +389,6 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
 
   getFlags(): {
     formFactor: (string|undefined),
-    legacyNavigation: boolean,
     mode: string,
   } {
     const flags = {};
@@ -406,7 +397,6 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
     }
     return flags as {
       formFactor: (string | undefined),
-      legacyNavigation: boolean,
       mode: string,
     };
   }
@@ -455,16 +445,19 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
     });
   }
 
-  private recordMetrics(flags: {mode: string, legacyNavigation: boolean}): void {
+  private recordMetrics(flags: {mode: string}, categoryIds: string[]): void {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.LighthouseStarted);
+
+    for (const preset of Presets) {
+      if (!categoryIds.includes(preset.configID)) {
+        continue;
+      }
+      Host.userMetrics.lighthouseCategoryUsed(preset.userMetric);
+    }
 
     switch (flags.mode) {
       case 'navigation':
-        if (flags.legacyNavigation) {
-          Host.userMetrics.lighthouseModeRun(Host.UserMetrics.LighthouseModeRun.LegacyNavigation);
-        } else {
-          Host.userMetrics.lighthouseModeRun(Host.UserMetrics.LighthouseModeRun.Navigation);
-        }
+        Host.userMetrics.lighthouseModeRun(Host.UserMetrics.LighthouseModeRun.Navigation);
         break;
       case 'timespan':
         Host.userMetrics.lighthouseModeRun(Host.UserMetrics.LighthouseModeRun.Timespan);
@@ -481,7 +474,7 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
       const categoryIDs = this.getCategoryIDs();
       const flags = this.getFlags();
 
-      this.recordMetrics(flags);
+      this.recordMetrics(flags, categoryIDs);
 
       this.currentLighthouseRun = {inspectedURL, categoryIDs, flags};
 
@@ -641,6 +634,7 @@ export const Presets: Preset[] = [
     description: i18nLazyString(UIStrings.howLongDoesThisAppTakeToShow),
     plugin: false,
     supportedModes: ['navigation', 'timespan', 'snapshot'],
+    userMetric: Host.UserMetrics.LighthouseCategoryUsed.Performance,
   },
   {
     setting: Common.Settings.Settings.instance().createSetting(
@@ -650,6 +644,7 @@ export const Presets: Preset[] = [
     description: i18nLazyString(UIStrings.isThisPageUsableByPeopleWith),
     plugin: false,
     supportedModes: ['navigation', 'snapshot'],
+    userMetric: Host.UserMetrics.LighthouseCategoryUsed.Accessibility,
   },
   {
     setting: Common.Settings.Settings.instance().createSetting(
@@ -659,6 +654,7 @@ export const Presets: Preset[] = [
     description: i18nLazyString(UIStrings.doesThisPageFollowBestPractices),
     plugin: false,
     supportedModes: ['navigation', 'timespan', 'snapshot'],
+    userMetric: Host.UserMetrics.LighthouseCategoryUsed.BestPractices,
   },
   {
     setting: Common.Settings.Settings.instance().createSetting(
@@ -668,6 +664,7 @@ export const Presets: Preset[] = [
     description: i18nLazyString(UIStrings.isThisPageOptimizedForSearch),
     plugin: false,
     supportedModes: ['navigation', 'snapshot'],
+    userMetric: Host.UserMetrics.LighthouseCategoryUsed.SEO,
   },
   {
     setting: Common.Settings.Settings.instance().createSetting(
@@ -677,6 +674,7 @@ export const Presets: Preset[] = [
     description: i18nLazyString(UIStrings.doesThisPageMeetTheStandardOfA),
     plugin: false,
     supportedModes: ['navigation'],
+    userMetric: Host.UserMetrics.LighthouseCategoryUsed.PWA,
   },
   {
     setting: Common.Settings.Settings.instance().createSetting(
@@ -686,6 +684,7 @@ export const Presets: Preset[] = [
     title: i18nLazyString(UIStrings.publisherAds),
     description: i18nLazyString(UIStrings.isThisPageOptimizedForAdSpeedAnd),
     supportedModes: ['navigation'],
+    userMetric: Host.UserMetrics.LighthouseCategoryUsed.PubAds,
   },
 ];
 
@@ -770,17 +769,6 @@ export const RuntimeSettings: RuntimeSetting[] = [
     options: undefined,
     learnMore: undefined,
   },
-  {
-    setting: Common.Settings.Settings.instance().createSetting(
-        'lighthouse.legacy_navigation', false, Common.Settings.SettingStorageType.Synced),
-    title: i18nLazyString(UIStrings.legacyNavigation),
-    description: i18nLazyString(UIStrings.useLegacyNavigation),
-    setFlags: (flags: Flags, value: string|boolean): void => {
-      flags.legacyNavigation = value;
-    },
-    options: undefined,
-    learnMore: undefined,
-  },
 ];
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -816,6 +804,7 @@ export interface Preset {
   description: () => Common.UIString.LocalizedString;
   plugin: boolean;
   supportedModes: string[];
+  userMetric: Host.UserMetrics.LighthouseCategoryUsed;
 }
 export interface RuntimeSetting {
   setting: Common.Settings.Setting<string|boolean>;

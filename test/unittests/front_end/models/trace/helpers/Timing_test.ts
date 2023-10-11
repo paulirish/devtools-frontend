@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
-import {loadModelDataFromTraceFile} from '../../../helpers/TraceHelpers.js';
+import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 function milliToMicro(value: number) {
@@ -13,7 +14,7 @@ function secToMicro(value: TraceModel.Types.Timing.Seconds): TraceModel.Types.Ti
   return milliToMicro(value * 1000);
 }
 
-describe('Timing helpers', () => {
+describeWithEnvironment('Timing helpers', () => {
   describe('Timing conversions', () => {
     it('can convert milliseconds to microseconds', () => {
       const input = TraceModel.Types.Timing.MilliSeconds(1);
@@ -41,6 +42,46 @@ describe('Timing helpers', () => {
       assert.strictEqual(TraceModel.Helpers.Timing.microSecondsToMilliseconds(input), expected);
     });
   });
+
+  it('eventTimingsMicroSeconds returns the right numbers', async () => {
+    const event = {
+      ts: 10,
+      dur: 5,
+    } as unknown as TraceModel.Types.TraceEvents.TraceEventData;
+    assert.deepEqual(TraceModel.Helpers.Timing.eventTimingsMicroSeconds(event), {
+      startTime: TraceModel.Types.Timing.MicroSeconds(10),
+      endTime: TraceModel.Types.Timing.MicroSeconds(15),
+      duration: TraceModel.Types.Timing.MicroSeconds(5),
+      selfTime: TraceModel.Types.Timing.MicroSeconds(5),
+    });
+  });
+
+  it('eventTimingsMilliSeconds returns the right numbers', async () => {
+    const event = {
+      ts: 10_000,
+      dur: 5_000,
+    } as unknown as TraceModel.Types.TraceEvents.TraceEventData;
+    assert.deepEqual(TraceModel.Helpers.Timing.eventTimingsMilliSeconds(event), {
+      startTime: TraceModel.Types.Timing.MilliSeconds(10),
+      endTime: TraceModel.Types.Timing.MilliSeconds(15),
+      duration: TraceModel.Types.Timing.MilliSeconds(5),
+      selfTime: TraceModel.Types.Timing.MilliSeconds(5),
+    });
+  });
+
+  it('eventTimingsSeconds returns the right numbers', async () => {
+    const event = {
+      ts: 100_000,  // 100k microseconds = 100ms = 0.1second
+      dur: 50_000,  // 50k microseconds = 50ms = 0.05second
+    } as unknown as TraceModel.Types.TraceEvents.TraceEventData;
+    assert.deepEqual(TraceModel.Helpers.Timing.eventTimingsSeconds(event), {
+      startTime: TraceModel.Types.Timing.Seconds(0.1),
+      endTime: TraceModel.Types.Timing.Seconds(0.15),
+      duration: TraceModel.Types.Timing.Seconds(0.05),
+      selfTime: TraceModel.Types.Timing.Seconds(0.05),
+    });
+  });
+
   describe('detectBestTimeUnit', () => {
     it('detects microseconds', () => {
       const time = TraceModel.Types.Timing.MicroSeconds(890);
@@ -88,8 +129,8 @@ describe('Timing helpers', () => {
   });
 
   describe('timeStampForEventAdjustedByClosestNavigation', () => {
-    it('can use the navigation ID to adjust the time correctly', async () => {
-      const traceParsedData = await loadModelDataFromTraceFile('web-dev.json.gz');
+    it('can use the navigation ID to adjust the time correctly', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       const lcpEvent = traceParsedData.PageLoadMetrics.allMarkerEvents.find(event => {
         // Just one LCP Event so we do not need to worry about ordering and finding the right one.
         return event.name === 'largestContentfulPaint::Candidate';
@@ -116,8 +157,8 @@ describe('Timing helpers', () => {
       assert.strictEqual(timeAsMS.toFixed(2), String(118.44));
     });
 
-    it('can use the frame ID to adjust the time correctly', async () => {
-      const traceParsedData = await loadModelDataFromTraceFile('web-dev.json.gz');
+    it('can use the frame ID to adjust the time correctly', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       const dclEvent = traceParsedData.PageLoadMetrics.allMarkerEvents.find(event => {
         return event.name === 'MarkDOMContent' && event.args.data?.frame === traceParsedData.Meta.mainFrameId;
       });

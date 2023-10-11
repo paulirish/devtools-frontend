@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as puppeteer from 'puppeteer';
+import type * as puppeteer from 'puppeteer-core';
 
 import {
   $,
@@ -17,14 +17,22 @@ import {
 
 const REQUEST_LIST_SELECTOR = '.network-log-grid tbody';
 
+export async function waitForNetworkTab(): Promise<void> {
+  // Make sure the network tab is shown on the screen
+  await waitFor('.network-log-grid');
+}
+
+export async function openNetworkTab(): Promise<void> {
+  await click('#tab-network');
+  await waitForNetworkTab();
+}
+
 /**
  * Select the Network tab in DevTools
  */
 export async function navigateToNetworkTab(testName: string) {
   await goToResource(`network/${testName}`);
-  await click('#tab-network');
-  // Make sure the network tab is shown on the screen
-  await waitFor('.network-log-grid');
+  await openNetworkTab();
 }
 
 /**
@@ -93,11 +101,11 @@ export async function waitForSelectedRequestChange(initialRequestName: string|nu
 }
 
 export async function setPersistLog(persist: boolean) {
-  await setCheckBox('[aria-label="Preserve log"]', persist);
+  await setCheckBox('[title="Do not clear log on page reload / navigation"]', persist);
 }
 
 export async function setCacheDisabled(disabled: boolean): Promise<void> {
-  await setCheckBox('[aria-label="Disable cache"]', disabled);
+  await setCheckBox('[title^="Disable cache"]', disabled);
 }
 
 export async function setTimeWindow(): Promise<void> {
@@ -123,4 +131,12 @@ export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element
   }
 
   return [headerNameText.trim(), headerValueText];
+}
+
+export async function elementContainsTextWithSelector(
+    element: puppeteer.ElementHandle<Element>, textContent: string, selector: string): Promise<boolean> {
+  const selectedElements = await element.evaluate((node, selector) => {
+    return [...node.querySelectorAll(selector)].map(node => node.textContent || '') || [];
+  }, selector);
+  return selectedElements.includes(textContent);
 }

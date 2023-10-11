@@ -397,8 +397,28 @@ declare namespace ProtocolProxyApi {
      */
     invoke_trigger(params: Protocol.Autofill.TriggerRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Set addresses so that developers can verify their forms implementation.
+     */
+    invoke_setAddresses(params: Protocol.Autofill.SetAddressesRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Disables autofill domain notifications.
+     */
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Enables autofill domain notifications.
+     */
+    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface AutofillDispatcher {
+    /**
+     * Emitted when an address form is filled.
+     */
+    addressFormFilled(params: Protocol.Autofill.AddressFormFilledEvent): void;
+
   }
 
   export interface BackgroundServiceApi {
@@ -640,6 +660,11 @@ declare namespace ProtocolProxyApi {
      * property
      */
     invoke_setEffectivePropertyValueForNode(params: Protocol.CSS.SetEffectivePropertyValueForNodeRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Modifies the property rule property name.
+     */
+    invoke_setPropertyRulePropertyName(params: Protocol.CSS.SetPropertyRulePropertyNameRequest): Promise<Protocol.CSS.SetPropertyRulePropertyNameResponse>;
 
     /**
      * Modifies the keyframe rule key text.
@@ -1614,6 +1639,11 @@ declare namespace ProtocolProxyApi {
      * Dispatches a touch event to the page.
      */
     invoke_dispatchTouchEvent(params: Protocol.Input.DispatchTouchEventRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Cancels any active dragging in the page.
+     */
+    invoke_cancelDragging(): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Emulates touch event from the mouse event parameters.
@@ -3072,6 +3102,16 @@ declare namespace ProtocolProxyApi {
      */
     invoke_runBounceTrackingMitigations(): Promise<Protocol.Storage.RunBounceTrackingMitigationsResponse>;
 
+    /**
+     * https://wicg.github.io/attribution-reporting-api/
+     */
+    invoke_setAttributionReportingLocalTestingMode(params: Protocol.Storage.SetAttributionReportingLocalTestingModeRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Enables/disables issuing of Attribution Reporting events.
+     */
+    invoke_setAttributionReportingTracking(params: Protocol.Storage.SetAttributionReportingTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface StorageDispatcher {
     /**
@@ -3108,6 +3148,12 @@ declare namespace ProtocolProxyApi {
     storageBucketCreatedOrUpdated(params: Protocol.Storage.StorageBucketCreatedOrUpdatedEvent): void;
 
     storageBucketDeleted(params: Protocol.Storage.StorageBucketDeletedEvent): void;
+
+    /**
+     * TODO(crbug.com/1458532): Add other Attribution Reporting events, e.g.
+     * trigger registration.
+     */
+    attributionReportingSourceRegistered(params: Protocol.Storage.AttributionReportingSourceRegisteredEvent): void;
 
   }
 
@@ -3390,6 +3436,10 @@ declare namespace ProtocolProxyApi {
      * takeResponseBodyForInterceptionAsStream. Calling other methods that
      * affect the request or disabling fetch domain before body is received
      * results in an undefined behavior.
+     * Note that the response body is not available for redirects. Requests
+     * paused in the _redirect received_ state may be differentiated by
+     * `responseCode` and presence of `location` response header, see
+     * comments to `requestPaused` for details.
      */
     invoke_getResponseBody(params: Protocol.Fetch.GetResponseBodyRequest): Promise<Protocol.Fetch.GetResponseBodyResponse>;
 
@@ -3416,6 +3466,11 @@ declare namespace ProtocolProxyApi {
      * The stage of the request can be determined by presence of responseErrorReason
      * and responseStatusCode -- the request is at the response stage if either
      * of these fields is present and in the request stage otherwise.
+     * Redirect responses and subsequent requests are reported similarly to regular
+     * responses and requests. Redirect responses may be distinguished by the value
+     * of `responseStatusCode` (which is one of 301, 302, 303, 307, 308) along with
+     * presence of the `location` header. Requests resulting from a redirect will
+     * have `redirectedRequestId` field set.
      */
     requestPaused(params: Protocol.Fetch.RequestPausedEvent): void;
 
@@ -3681,11 +3736,6 @@ declare namespace ProtocolProxyApi {
     ruleSetRemoved(params: Protocol.Preload.RuleSetRemovedEvent): void;
 
     /**
-     * Fired when a prerender attempt is completed.
-     */
-    prerenderAttemptCompleted(params: Protocol.Preload.PrerenderAttemptCompletedEvent): void;
-
-    /**
      * Fired when a preload enabled state is updated.
      */
     preloadEnabledStateUpdated(params: Protocol.Preload.PreloadEnabledStateUpdatedEvent): void;
@@ -3713,6 +3763,12 @@ declare namespace ProtocolProxyApi {
     invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_selectAccount(params: Protocol.FedCm.SelectAccountRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Only valid if the dialog type is ConfirmIdpSignin. Acts as if the user had
+     * clicked the continue button.
+     */
+    invoke_confirmIdpSignin(params: Protocol.FedCm.ConfirmIdpSigninRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_dismissDialog(params: Protocol.FedCm.DismissDialogRequest): Promise<Protocol.ProtocolResponseWithError>;
 

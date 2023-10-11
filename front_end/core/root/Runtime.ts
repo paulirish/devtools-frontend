@@ -141,10 +141,6 @@ export class ExperimentsSupport {
     return result;
   }
 
-  enabledExperiments(): Experiment[] {
-    return this.#experiments.filter(experiment => experiment.isEnabled());
-  }
-
   private setExperimentsSetting(value: Object): void {
     if (!self.localStorage) {
       return;
@@ -313,6 +309,12 @@ export enum ExperimentName {
   JS_PROFILER_TEMP_ENABLE = 'jsProfilerTemporarilyEnable',
   HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlightErrorsElementsPanel',
   SET_ALL_BREAKPOINTS_EAGERLY = 'setAllBreakpointsEagerly',
+  SELF_XSS_WARNING = 'selfXssWarning',
+  USE_SOURCE_MAP_SCOPES = 'useSourceMapScopes',
+  STORAGE_BUCKETS_TREE = 'storageBucketsTree',
+  DELETE_OVERRIDES_TEMP_ENABLE = 'deleteOverridesTemporarilyEnable',
+  NETWORK_PANEL_FILTER_BAR_REDESIGN = 'networkPanelFilterBarRedesign',
+  BREADCRUMBS_PERFORMANCE_PANEL = 'breadcrumbsPerformancePanel',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

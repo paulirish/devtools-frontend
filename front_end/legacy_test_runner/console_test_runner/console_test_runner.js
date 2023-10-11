@@ -5,7 +5,9 @@
 import '../../panels/console/console-legacy.js';
 import '../../ui/legacy/components/object_ui/object_ui-legacy.js';
 
+import * as Bindings from '../../models/bindings/bindings.js';
 import * as ConsoleCounters from '../../panels/console_counters/console_counters.js';
+import * as UI from '../../ui/legacy/legacy.js';
 import {TestRunner} from '../test_runner/test_runner.js';
 
 /**
@@ -198,7 +200,7 @@ ConsoleTestRunner.selectMainExecutionContext = function() {
   const executionContexts = TestRunner.runtimeModel.executionContexts();
   for (const context of executionContexts) {
     if (context.isDefault) {
-      self.UI.context.setFlavor(SDK.ExecutionContext, context);
+      UI.Context.Context.instance().setFlavor(SDK.ExecutionContext, context);
       return;
     }
   }
@@ -581,7 +583,7 @@ ConsoleTestRunner.changeExecutionContext = function(namePrefix) {
   const selector = Console.ConsoleView.instance().consoleContextSelector;
   for (const executionContext of selector.items) {
     if (selector.titleFor(executionContext).startsWith(namePrefix)) {
-      self.UI.context.setFlavor(SDK.ExecutionContext, executionContext);
+      UI.Context.Context.instance().setFlavor(SDK.ExecutionContext, executionContext);
       return;
     }
   }
@@ -684,7 +686,8 @@ ConsoleTestRunner.dumpStackTraces = function() {
   for (let i = 0; i < viewMessages.length; ++i) {
     const m = viewMessages[i].consoleMessage();
     TestRunner.addResult(
-        'Message[' + i + ']: ' + Bindings.displayNameForURL(m.url || '') + ':' + m.line + ' ' + m.messageText);
+        'Message[' + i + ']: ' + Bindings.ResourceUtils.displayNameForURL(m.url || '') + ':' + m.line + ' ' +
+        m.messageText);
     const trace = m.stackTrace ? m.stackTrace.callFrames : null;
     if (!trace) {
       TestRunner.addResult('FAIL: no stack trace attached to message #' + i);

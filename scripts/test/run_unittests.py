@@ -8,8 +8,10 @@ Run unit tests on a pinned version of chrome.
 """
 
 import os
+import shutil
 import sys
 import argparse
+from pathlib import Path
 
 scripts_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(scripts_path)
@@ -27,7 +29,8 @@ def log_message(message, message_log_level, user_set_log_level):
 
 
 def run_tests(chrome_binary, target, no_text_coverage, no_html_coverage,
-              coverage, expanded_reporting, cwd, log_level, mocha_fgrep):
+              coverage, expanded_reporting, cwd, log_level, mocha_fgrep,
+              shuffle):
     karmaconfig_path = os.path.join(cwd, 'out', target, 'gen', 'test',
                                     'unittests', 'karma.conf.js')
 
@@ -63,6 +66,8 @@ def run_tests(chrome_binary, target, no_text_coverage, no_html_coverage,
     if (mocha_fgrep is not None):
         print('Using Mocha --fgrep flag ' + mocha_fgrep)
         env['MOCHA_FGREP'] = mocha_fgrep
+    if (shuffle is not False):
+        env['SHUFFLE'] = '1'
     exit_code = test_helpers.popen(exec_command, cwd=cwd, env=env)
     if exit_code == 1:
         return True
@@ -77,7 +82,9 @@ def run_unit_tests_on_ninja_build_target(target,
                                          chrome_binary=None,
                                          cwd=None,
                                          log_level=None,
-                                         mocha_fgrep=None):
+                                         mocha_fgrep=None,
+                                         shuffle=False,
+                                         swarming_output_file=None):
     if chrome_binary and not test_helpers.check_chrome_binary(chrome_binary):
         log_message(
             'Chrome binary argument path does not exist or is not executable, reverting to downloaded binary',
@@ -106,12 +113,16 @@ def run_unit_tests_on_ninja_build_target(target,
 
     errors_found = run_tests(chrome_binary, target, no_text_coverage,
                              no_html_coverage, coverage, expanded_reporting,
-                             cwd, log_level, mocha_fgrep)
+                             cwd, log_level, mocha_fgrep, shuffle)
 
     if coverage and not no_html_coverage:
         log_message(
             '\nYou can see the coverage results by opening \033[1mkarma-coverage/index.html\033[0m in a browser\n',
             'info', log_level)
+        if swarming_output_file:
+            shutil.copytree('karma-coverage',
+                            Path(f'{swarming_output_file}/karma-coverage'),
+                            dirs_exist_ok=True)
 
     if errors_found:
         log_message('ERRORS DETECTED', 'error', log_level)
@@ -158,6 +169,11 @@ def main():
                         dest='invert',
                         default=False,
                         help='Invert the match specified by mocha-fgrep.')
+    parser.add_argument('--shuffle',
+                        action='store_true',
+                        default=False,
+                        dest='shuffle',
+                        help='Shuffle tests order.')
     parser.add_argument(
         '--log-level',
         dest='log_level',
@@ -166,13 +182,17 @@ def main():
         help=
         'Set the desired level of logging. This configures logging for the run_auto_unittests and for Karma'
     )
+    parser.add_argument('--swarming-output-file',
+                        dest='swarming_output_file',
+                        default=None,
+                        help='Save coverage files to swarming output.')
     args = parser.parse_args(sys.argv[1:])
 
-    run_unit_tests_on_ninja_build_target(args.target, args.no_text_coverage,
-                                         args.no_html_coverage, args.coverage,
-                                         args.expanded_reporting,
-                                         args.chrome_binary, args.cwd,
-                                         args.log_level, args.mocha_fgrep)
+    run_unit_tests_on_ninja_build_target(
+        args.target, args.no_text_coverage, args.no_html_coverage,
+        args.coverage, args.expanded_reporting, args.chrome_binary, args.cwd,
+        args.log_level, args.mocha_fgrep, args.shuffle,
+        args.swarming_output_file)
 
 
 if __name__ == '__main__':

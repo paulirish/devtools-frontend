@@ -32,12 +32,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import * as Platform from '../platform/platform.js';
-import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
-import type * as Protocol from '../../generated/protocol.js';
 
 import {CSSFontFace} from './CSSFontFace.js';
 import {CSSMatchedStyles} from './CSSMatchedStyles.js';
@@ -45,19 +45,16 @@ import {CSSMedia} from './CSSMedia.js';
 import {CSSStyleRule} from './CSSRule.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
 import {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
-
 import {DOMModel, type DOMNode} from './DOMModel.js';
-
 import {
   Events as ResourceTreeModelEvents,
-  ResourceTreeModel,
+  PrimaryPageChangeType,
   type ResourceTreeFrame,
-  type PrimaryPageChangeType,
+  ResourceTreeModel,
 } from './ResourceTreeModel.js';
-
-import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 import {SourceMapManager} from './SourceMapManager.js';
+import {Capability, type Target} from './Target.js';
 
 export class CSSModel extends SDKModel<EventTypes> {
   readonly agent: ProtocolProxyApi.CSSApi;
@@ -226,6 +223,27 @@ export class CSSModel extends SDKModel<EventTypes> {
     }
   }
 
+  async setPropertyRulePropertyName(
+      styleSheetId: Protocol.CSS.StyleSheetId, range: TextUtils.TextRange.TextRange, text: string): Promise<boolean> {
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.StyleRuleEdited);
+
+    try {
+      await this.ensureOriginalStyleSheetText(styleSheetId);
+      const {propertyName} =
+          await this.agent.invoke_setPropertyRulePropertyName({styleSheetId, range, propertyName: text});
+
+      if (!propertyName) {
+        return false;
+      }
+      this.#domModel.markUndoableState();
+      const edit = new Edit(styleSheetId, range, text, propertyName);
+      this.fireStyleSheetChanged(styleSheetId, edit);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async setKeyframeKey(styleSheetId: Protocol.CSS.StyleSheetId, range: TextUtils.TextRange.TextRange, text: string):
       Promise<boolean> {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.StyleRuleEdited);
@@ -319,6 +337,8 @@ export class CSSModel extends SDKModel<EventTypes> {
       animationsPayload: response.cssKeyframesRules || [],
       parentLayoutNodeId: response.parentLayoutNodeId,
       positionFallbackRules: response.cssPositionFallbackRules || [],
+      propertyRules: response.cssPropertyRules ?? [],
+      cssPropertyRegistrations: response.cssPropertyRegistrations ?? [],
     });
   }
 
@@ -719,7 +739,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     if (event.data.frame.backForwardCacheDetails.restoredFromCache) {
       await this.suspendModel();
       await this.resumeModel();
-    } else {
+    } else if (event.data.type !== PrimaryPageChangeType.Activation) {
       this.resetStyleSheets();
       this.resetFontFaces();
     }

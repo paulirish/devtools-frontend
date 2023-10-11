@@ -5,22 +5,27 @@
 const {assert} = chai;
 
 // eslint-disable-next-line rulesdir/es_modules_import
-import * as DOMHelpers from '../../../../../../test/unittests/front_end/helpers/DOMHelpers.js';
-// eslint-disable-next-line rulesdir/es_modules_import
 import * as EnvironmentHelpers from '../../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
 import type * as Components from '../../../../../../front_end/panels/recorder/components/components.js';
 import * as Models from '../../../../../../front_end/panels/recorder/models/models.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import * as RecorderHelpers from '../helpers/RecorderHelpers.js';
+import type * as SuggestionInput from '../../../../../../front_end/ui/components/suggestion_input/suggestion_input.js';
+
+import {
+  renderElementIntoDOM,
+  getEventPromise,
+  assertElement,
+  dispatchKeyDownEvent,
+} from '../../../helpers/DOMHelpers.js';
 
 const {describeWithLocale} = EnvironmentHelpers;
 
 function getStepEditedPromise(editor: Components.StepEditor.StepEditor) {
-  return DOMHelpers
-      .getEventPromise<Components.StepEditor.StepEditedEvent>(
-          editor,
-          'stepedited',
-          )
+  return getEventPromise<Components.StepEditor.StepEditedEvent>(
+             editor,
+             'stepedited',
+             )
       .then(({data}) => data);
 }
 
@@ -37,7 +42,7 @@ describeWithLocale('StepEditor', () => {
       ): Promise<Components.StepEditor.StepEditor> {
     const editor = document.createElement('devtools-recorder-step-editor');
     editor.step = structuredClone(step) as typeof editor.step;
-    DOMHelpers.renderElementIntoDOM(editor, {});
+    renderElementIntoDOM(editor, {});
     await editor.updateComplete;
     return editor;
   }
@@ -45,14 +50,14 @@ describeWithLocale('StepEditor', () => {
   function getInputByAttribute(
       editor: Components.StepEditor.StepEditor,
       attribute: string,
-      ): Components.RecorderInput.RecorderInput {
+      ): SuggestionInput.SuggestionInput.SuggestionInput {
     const input = editor.renderRoot.querySelector(
-        `.attribute[data-attribute="${attribute}"] devtools-recorder-input`,
+        `.attribute[data-attribute="${attribute}"] devtools-suggestion-input`,
     );
     if (!input) {
-      throw new Error(`${attribute} devtools-recorder-input not found`);
+      throw new Error(`${attribute} devtools-suggestion-input not found`);
     }
-    return input as Components.RecorderInput.RecorderInput;
+    return input as SuggestionInput.SuggestionInput.SuggestionInput;
   }
 
   function getAllInputValues(
@@ -60,7 +65,7 @@ describeWithLocale('StepEditor', () => {
       ): string[] {
     const result = [];
     const inputs = editor.renderRoot.querySelectorAll(
-        'devtools-recorder-input',
+        'devtools-suggestion-input',
     );
     for (const input of inputs) {
       result.push(input.value);
@@ -75,7 +80,7 @@ describeWithLocale('StepEditor', () => {
     const button = editor.renderRoot.querySelector(
         `devtools-button.add-row[data-attribute="${attribute}"]`,
     );
-    DOMHelpers.assertElement(button, HTMLElement);
+    assertElement(button, HTMLElement);
     button.click();
     await triggerMicroTaskQueue();
     await editor.updateComplete;
@@ -88,7 +93,7 @@ describeWithLocale('StepEditor', () => {
     const button = editor.renderRoot.querySelector(
         `devtools-button.delete-row[data-attribute="${attribute}"]`,
     );
-    DOMHelpers.assertElement(button, HTMLElement);
+    assertElement(button, HTMLElement);
     button.click();
     await triggerMicroTaskQueue();
     await editor.updateComplete;
@@ -101,7 +106,7 @@ describeWithLocale('StepEditor', () => {
     const button = editor.renderRoot.querySelector(
         `.attribute[data-attribute="frame"] devtools-button${className}`,
     );
-    DOMHelpers.assertElement(button, HTMLElement);
+    assertElement(button, HTMLElement);
     button.click();
     await editor.updateComplete;
   }
@@ -114,7 +119,7 @@ describeWithLocale('StepEditor', () => {
     const button = editor.renderRoot.querySelector(
         `[data-selector-path="${path.join('.')}"] devtools-button${className}`,
     );
-    DOMHelpers.assertElement(button, HTMLElement);
+    assertElement(button, HTMLElement);
     button.click();
     await editor.updateComplete;
   }
@@ -126,7 +131,7 @@ describeWithLocale('StepEditor', () => {
   function createFocusOutsideButton() {
     const button = document.createElement('button');
     button.innerText = 'click';
-    DOMHelpers.renderElementIntoDOM(button, {allowMultipleChildren: true});
+    renderElementIntoDOM(button, {allowMultipleChildren: true});
 
     return {
       focus() {
@@ -263,8 +268,8 @@ describeWithLocale('StepEditor', () => {
       throw new Error('Failed to find element');
     }
     assert.strictEqual(
-        window.getComputedStyle(suggestions).visibility,
-        'visible',
+        window.getComputedStyle(suggestions).display,
+        'block',
     );
 
     input.dispatchEvent(
@@ -275,8 +280,8 @@ describeWithLocale('StepEditor', () => {
         }),
     );
     assert.strictEqual(
-        window.getComputedStyle(suggestions).visibility,
-        'hidden',
+        window.getComputedStyle(suggestions).display,
+        'none',
     );
   });
 
@@ -296,14 +301,14 @@ describeWithLocale('StepEditor', () => {
       throw new Error('Failed to find element');
     }
     assert.strictEqual(
-        window.getComputedStyle(suggestions).visibility,
-        'visible',
+        window.getComputedStyle(suggestions).display,
+        'block',
     );
 
     button.focus();
     assert.strictEqual(
-        window.getComputedStyle(suggestions).visibility,
-        'hidden',
+        window.getComputedStyle(suggestions).display,
+        'none',
     );
   });
 
@@ -420,7 +425,7 @@ describeWithLocale('StepEditor', () => {
 
       assert.isTrue(
           editor.shadowRoot?.activeElement?.matches(
-              'devtools-recorder-input[data-path="frame.1"]',
+              'devtools-suggestion-input[data-path="frame.1"]',
               ),
       );
     }
@@ -437,7 +442,7 @@ describeWithLocale('StepEditor', () => {
 
       assert.isTrue(
           editor.shadowRoot?.activeElement?.matches(
-              'devtools-recorder-input[data-path="frame.0"]',
+              'devtools-suggestion-input[data-path="frame.0"]',
               ),
       );
     }
@@ -466,7 +471,7 @@ describeWithLocale('StepEditor', () => {
 
       assert.isTrue(
           editor.shadowRoot?.activeElement?.matches(
-              'devtools-recorder-input[data-path="selectors.0.1"]',
+              'devtools-suggestion-input[data-path="selectors.0.1"]',
               ),
       );
     }
@@ -484,7 +489,7 @@ describeWithLocale('StepEditor', () => {
 
       assert.isTrue(
           editor.shadowRoot?.activeElement?.matches(
-              'devtools-recorder-input[data-path="selectors.0.0"]',
+              'devtools-suggestion-input[data-path="selectors.0.0"]',
               ),
       );
     }
@@ -511,7 +516,7 @@ describeWithLocale('StepEditor', () => {
       ]);
       assert.isTrue(
           editor.shadowRoot?.activeElement?.matches(
-              'devtools-recorder-input[data-path="selectors.1.0"]',
+              'devtools-suggestion-input[data-path="selectors.1.0"]',
               ),
       );
     }
@@ -527,7 +532,7 @@ describeWithLocale('StepEditor', () => {
       assert.deepStrictEqual(getAllInputValues(editor), ['scroll', '.part1']);
       assert.isTrue(
           editor.shadowRoot?.activeElement?.matches(
-              'devtools-recorder-input[data-path="selectors.0.0"]',
+              'devtools-suggestion-input[data-path="selectors.0.0"]',
               ),
       );
     }
@@ -542,23 +547,23 @@ describeWithLocale('StepEditor', () => {
     await editor.updateComplete;
 
     for (const input of editor.renderRoot.querySelectorAll(
-             'devtools-recorder-input',
+             'devtools-suggestion-input',
              )) {
       assert.isTrue(input.disabled);
     }
   });
 
-  it('clears text selection when navigating away from devtools-recorder-input', async () => {
+  it('clears text selection when navigating away from devtools-suggestion-input', async () => {
     const editor = await renderEditor({type: Models.Schema.StepType.Scroll});
 
-    // Clicking on the type devtools-recorder-input should select the entire text in the field.
+    // Clicking on the type devtools-suggestion-input should select the entire text in the field.
     const input = getInputByAttribute(editor, 'type');
     input.focus();
     input.click();
     assert.strictEqual(window.getSelection()?.toString(), 'scroll');
 
     // Navigating away should remove the selection.
-    DOMHelpers.dispatchKeyDownEvent(input, {
+    dispatchKeyDownEvent(input, {
       key: 'Enter',
       bubbles: true,
       composed: true,

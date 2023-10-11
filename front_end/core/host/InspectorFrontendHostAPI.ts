@@ -136,6 +136,37 @@ export interface SearchCompletedEvent {
   files: Platform.DevToolsPath.RawPathString[];
 }
 
+export interface DoAidaConversationResult {
+  response: string;
+}
+
+export interface VisualElementImpression {
+  id: number;
+  type: number;
+  parent?: number;
+  context?: number;
+}
+
+export interface ImpressionEvent {
+  impressions: VisualElementImpression[];
+}
+
+export interface ClickEvent {
+  veid: number;
+  mouseButton: number;
+  context?: number;
+}
+
+export interface ChangeEvent {
+  veid: number;
+  context?: number;
+}
+
+export interface KeyDownEvent {
+  veid: number;
+  context?: number;
+}
+
 // While `EventDescriptors` are used to dynamically dispatch host binding events,
 // the `EventTypes` "type map" is used for type-checking said events by TypeScript.
 // `EventTypes` is not used at runtime.
@@ -248,6 +279,9 @@ export interface InspectorFrontendHostAPI {
 
   platform(): string;
 
+  recordCountHistogram(histogramName: string, sample: number, min: number, exclusiveMax: number, bucketSize: number):
+      void;
+
   recordEnumeratedHistogram(actionName: EnumeratedHistogram, actionCode: number, bucketSize: number): void;
 
   recordPerformanceHistogram(histogramName: string, duration: number): void;
@@ -297,6 +331,13 @@ export interface InspectorFrontendHostAPI {
   setAddExtensionCallback(callback: (arg0: ExtensionDescriptor) => void): void;
 
   initialTargetId(): Promise<string|null>;
+
+  doAidaConversation: (request: string, cb: (result: DoAidaConversationResult) => void) => void;
+
+  recordImpression(event: ImpressionEvent): void;
+  recordClick(event: ClickEvent): void;
+  recordChange(event: ChangeEvent): void;
+  recordKeyDown(event: KeyDownEvent): void;
 }
 
 export interface ContextMenuDescriptor {
@@ -321,6 +362,12 @@ export interface ExtensionDescriptor {
   startPage: string;
   name: string;
   exposeExperimentalAPIs: boolean;
+  hostsPolicy?: ExtensionHostsPolicy;
+  allowFileAccess?: boolean;
+}
+export interface ExtensionHostsPolicy {
+  runtimeAllowedHosts: string[];
+  runtimeBlockedHosts: string[];
 }
 export interface ShowSurveyResult {
   surveyShown: boolean;
@@ -363,6 +410,7 @@ export enum EnumeratedHistogram {
   KeybindSetSettingChanged = 'DevTools.KeybindSetSettingChanged',
   ElementsSidebarTabShown = 'DevTools.Elements.SidebarTabShown',
   ExperimentEnabledAtLaunch = 'DevTools.ExperimentEnabledAtLaunch',
+  ExperimentDisabledAtLaunch = 'DevTools.ExperimentDisabledAtLaunch',
   ExperimentEnabled = 'DevTools.ExperimentEnabled',
   ExperimentDisabled = 'DevTools.ExperimentDisabled',
   DeveloperResourceLoaded = 'DevTools.DeveloperResourceLoaded',
@@ -388,6 +436,7 @@ export enum EnumeratedHistogram {
   ManifestSectionSelected = 'DevTools.ManifestSectionSelected',
   CSSHintShown = 'DevTools.CSSHintShown',
   LighthouseModeRun = 'DevTools.LighthouseModeRun',
+  LighthouseCategoryUsed = 'DevTools.LighthouseCategoryUsed',
   ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
@@ -395,4 +444,7 @@ export enum EnumeratedHistogram {
   VMInlineScriptTypeShown = 'DevTools.VMInlineScriptShown',
   BreakpointsRestoredFromStorageCount = 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated = 'DevTools.SwatchActivated',
+  BadgeActivated = 'DevTools.BadgeActivated',
+  AnimationPlaybackRateChanged = 'DevTools.AnimationPlaybackRateChanged',
+  AnimationPointDragged = 'DevTools.AnimationPointDragged',
 }

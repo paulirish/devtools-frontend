@@ -17,7 +17,7 @@ const UIStrings = {
   /**
    *@description Text in Main
    */
-  focusDebuggee: 'Focus debuggee',
+  focusDebuggee: 'Focus page',
   /**
    *@description Text in the Shortcuts page in settings to explain a keyboard shortcut
    */
@@ -904,20 +904,6 @@ UI.Toolbar.registerToolbarItem({
   actionId: undefined,
   condition: undefined,
   loadItem: undefined,
-});
-
-UI.Toolbar.registerToolbarItem({
-  async loadItem() {
-    const Main = await loadMainModule();
-    return Main.OutermostTargetSelector.OutermostTargetSelector.instance();
-  },
-  order: 98,
-  location: UI.Toolbar.ToolbarItemLocation.MAIN_TOOLBAR_RIGHT,
-  showLabel: undefined,
-  condition: undefined,
-  separator: undefined,
-  actionId: undefined,
-  experiment: Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
 });
 
 UI.Toolbar.registerToolbarItem({

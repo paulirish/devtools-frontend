@@ -15,13 +15,16 @@
  */
 /// <reference types="node" />
 /// <reference types="node" />
-import { Protocol } from 'devtools-protocol';
+/// <reference types="node" />
+/// <reference types="node" />
+import type FS from 'fs/promises';
 import type { Readable } from 'stream';
-import { CDPSession } from './Connection.js';
-import { ElementHandle } from './ElementHandle.js';
-import { CommonEventEmitter } from './EventEmitter.js';
-import { ExecutionContext } from './ExecutionContext.js';
-import { JSHandle } from './JSHandle.js';
+import type { Protocol } from 'devtools-protocol';
+import { type Observable } from '../../third_party/rxjs/rxjs.js';
+import type { CDPSession } from '../api/CDPSession.js';
+import type { Page } from '../api/Page.js';
+import { Deferred } from '../util/Deferred.js';
+import type { Awaitable } from './types.js';
 /**
  * @internal
  */
@@ -29,35 +32,36 @@ export declare const debugError: (...args: unknown[]) => void;
 /**
  * @internal
  */
-export declare function getExceptionMessage(exceptionDetails: Protocol.Runtime.ExceptionDetails): string;
+export declare function createEvaluationError(details: Protocol.Runtime.ExceptionDetails): unknown;
 /**
  * @internal
  */
-export declare function valueFromRemoteObject(remoteObject: Protocol.Runtime.RemoteObject): any;
+export declare function createClientError(details: Protocol.Runtime.ExceptionDetails): Error;
 /**
  * @internal
  */
-export declare function releaseObject(client: CDPSession, remoteObject: Protocol.Runtime.RemoteObject): Promise<void>;
-/**
- * @internal
- */
-export interface PuppeteerEventListener {
-    emitter: CommonEventEmitter;
-    eventName: string | symbol;
-    handler: (...args: any[]) => void;
+export declare class PuppeteerURL {
+    #private;
+    static INTERNAL_URL: string;
+    static fromCallSite(functionName: string, site: NodeJS.CallSite): PuppeteerURL;
+    static parse: (url: string) => PuppeteerURL;
+    static isPuppeteerURL: (url: string) => boolean;
+    get functionName(): string;
+    get siteString(): string;
+    toString(): string;
 }
 /**
  * @internal
  */
-export declare function addEventListener(emitter: CommonEventEmitter, eventName: string | symbol, handler: (...args: any[]) => void): PuppeteerEventListener;
+export declare const withSourcePuppeteerURLIfNone: <T extends {}>(functionName: string, object: T) => T;
 /**
  * @internal
  */
-export declare function removeEventListeners(listeners: Array<{
-    emitter: CommonEventEmitter;
-    eventName: string | symbol;
-    handler: (...args: any[]) => void;
-}>): void;
+export declare const getSourcePuppeteerURLIfAvailable: <T extends {}>(object: T) => PuppeteerURL | undefined;
+/**
+ * @internal
+ */
+export declare function valueFromRemoteObject(remoteObject: Protocol.Runtime.RemoteObject): any;
 /**
  * @internal
  */
@@ -69,11 +73,19 @@ export declare const isNumber: (obj: unknown) => obj is number;
 /**
  * @internal
  */
-export declare function waitForEvent<T>(emitter: CommonEventEmitter, eventName: string | symbol, predicate: (event: T) => Promise<boolean> | boolean, timeout: number, abortPromise: Promise<Error>): Promise<T>;
+export declare const isPlainObject: (obj: unknown) => obj is Record<any, unknown>;
 /**
  * @internal
  */
-export declare function createJSHandle(context: ExecutionContext, remoteObject: Protocol.Runtime.RemoteObject): JSHandle | ElementHandle<Node>;
+export declare const isRegExp: (obj: unknown) => obj is RegExp;
+/**
+ * @internal
+ */
+export declare const isDate: (obj: unknown) => obj is Date;
+/**
+ * @internal
+ */
+export declare function waitForEvent<T>(emitter: any, eventName: string | symbol, predicate: (event: T) => Awaitable<boolean>, timeout: number, abortPromise: Promise<Error> | Deferred<Error>): Promise<T>;
 /**
  * @internal
  */
@@ -81,19 +93,11 @@ export declare function evaluationString(fun: Function | string, ...args: unknow
 /**
  * @internal
  */
+export declare function addPageBinding(type: string, name: string): void;
+/**
+ * @internal
+ */
 export declare function pageBindingInitString(type: string, name: string): string;
-/**
- * @internal
- */
-export declare function pageBindingDeliverResultString(name: string, seq: number, result: unknown): string;
-/**
- * @internal
- */
-export declare function pageBindingDeliverErrorString(name: string, seq: number, message: string, stack?: string): string;
-/**
- * @internal
- */
-export declare function pageBindingDeliverErrorValueString(name: string, seq: number, value: unknown): string;
 /**
  * @internal
  */
@@ -101,7 +105,7 @@ export declare function waitWithTimeout<T>(promise: Promise<T>, taskName: string
 /**
  * @internal
  */
-export declare function importFS(): Promise<typeof import('fs')>;
+export declare function importFSPromises(): Promise<typeof FS>;
 /**
  * @internal
  */
@@ -110,4 +114,32 @@ export declare function getReadableAsBuffer(readable: Readable, path?: string): 
  * @internal
  */
 export declare function getReadableFromProtocolStream(client: CDPSession, handle: string): Promise<Readable>;
+/**
+ * @internal
+ */
+export declare function setPageContent(page: Pick<Page, 'evaluate'>, content: string): Promise<void>;
+/**
+ * @internal
+ */
+export declare function getPageContent(): string;
+/**
+ * @internal
+ */
+export declare function validateDialogType(type: string): 'alert' | 'confirm' | 'prompt' | 'beforeunload';
+/**
+ * @internal
+ */
+export declare function timeout(ms: number): Observable<never>;
+/**
+ * @internal
+ */
+export declare const UTILITY_WORLD_NAME = "__puppeteer_utility_world__";
+/**
+ * @internal
+ */
+export declare const SOURCE_URL_REGEX: RegExp;
+/**
+ * @internal
+ */
+export declare function getSourceUrlComment(url: string): string;
 //# sourceMappingURL=util.d.ts.map

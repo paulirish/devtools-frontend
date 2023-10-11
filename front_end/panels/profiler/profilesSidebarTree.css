@@ -37,8 +37,7 @@ ol.tree-outline {
   padding: 0 10px;
   white-space: nowrap;
   margin-top: 1px;
-  color: var(--color-text-secondary);
-  text-shadow: var(--color-background-opacity-80) 0 1px 0;
+  color: var(--sys-color-token-subtle);
   line-height: 18px;
 }
 
@@ -55,6 +54,10 @@ ol.tree-outline {
   text-decoration: underline;
   margin-left: auto;
   display: none;
+}
+
+.title-container > .save-link:focus-visible {
+  outline-width: unset;
 }
 
 li.selected .title-container > .save-link {
@@ -89,7 +92,7 @@ li.wait.small .spinner::before {
 }
 
 li.wait.selected .spinner::before {
-  --override-spinner-color: #fff;
+  --override-spinner-color: var(--ref-palette-neutral100);
 }
 
 @keyframes spinner-animation {
@@ -168,28 +171,6 @@ li.wait .icon {
 .heap-snapshot-sidebar-tree-item.wait .icon {
   -webkit-mask-image: unset;
   background-color: inherit;
-}
-
-/* stylelint-disable no-descending-specificity */
-.force-white-icons .heap-snapshot-sidebar-tree-item:not(.wait) .icon,
-.force-white-icons .profile-sidebar-tree-item:not(.wait) .icon,
-:host-context(.force-white-icons) .heap-snapshot-sidebar-tree-item:not(.wait) .icon,
-:host-context(.force-white-icons) .profile-sidebar-tree-item:not(.wait) .icon,
-.force-white-icons.profile-sidebar-tree-item:not(.wait) .icon,
-.force-white-icons.heap-snapshot-sidebar-tree-item:not(.wait) .icon,
-.-theme-preserve {
-  -webkit-mask-image: var(--image-file-heap-snapshot);
-  -webkit-mask-position: var(--spritesheet-position);
-  background: var(--icon-force-white) !important; /* stylelint-disable-line declaration-no-important */
-}
-
-.force-white-icons .profile-group-sidebar-tree-item:not(.wait) .icon,
-:host-context(.force-white-icons) .profile-group-sidebar-tree-item:not(.wait) .icon,
-.force-white-icons.profile-group-sidebar-tree-item:not(.wait) .icon,
-.-theme-preserve {
-  -webkit-mask-image: var(--image-file-heap-snapshots);
-  -webkit-mask-position: var(--spritesheet-position);
-  background: var(--icon-force-white) !important; /* stylelint-disable-line declaration-no-important */
 }
 
 .heap-snapshot-sidebar-tree-item.small .icon {

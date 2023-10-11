@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 const {assert} = chai;
-
 import * as ProtocolMonitor from '../../../../../front_end/panels/protocol_monitor/protocol_monitor.js';
 
 describe('ProtocolMonitor', () => {
@@ -13,7 +12,6 @@ describe('ProtocolMonitor', () => {
         command: 'Input.dispatchMouseEvent',
         parameters: {parameter1: 'value1'},
       };
-
       // "command" variations.
       assert.deepStrictEqual(
           ProtocolMonitor.ProtocolMonitor.parseCommandInput(JSON.stringify({
@@ -61,6 +59,80 @@ describe('ProtocolMonitor', () => {
         parameters: {},
       });
     });
+
+    it('should correctly creates a map of CDP commands with their corresponding metadata', async () => {
+      const domains = [
+        {
+          domain: 'Test',
+          metadata: {
+            'Test.test': {
+              parameters: [{
+                name: 'test',
+                type: 'test',
+                optional: true,
+              }],
+              description: 'Description1',
+              replyArgs: ['Test1'],
+            },
+          },
+        },
+        {
+          domain: 'Test2',
+          metadata: {
+            'Test2.test2': {
+              parameters: [{
+                name: 'test2',
+                type: 'test2',
+                optional: true,
+              }],
+              description: 'Description2',
+              replyArgs: ['Test2'],
+            },
+            'Test2.test3': {
+              parameters: [{
+                name: 'test3',
+                type: 'test3',
+                optional: true,
+              }],
+              description: 'Description3',
+              replyArgs: ['Test3'],
+            },
+          },
+        },
+      ] as Iterable<ProtocolMonitor.ProtocolMonitor.ProtocolDomain>;
+
+      const expectedCommands = new Map();
+      expectedCommands.set('Test.test', {
+        parameters: [{
+          name: 'test',
+          type: 'test',
+          optional: true,
+        }],
+        description: 'Description1',
+        replyArgs: ['Test1'],
+      });
+      expectedCommands.set('Test2.test2', {
+        parameters: [{
+          name: 'test2',
+          type: 'test2',
+          optional: true,
+        }],
+        description: 'Description2',
+        replyArgs: ['Test2'],
+      });
+      expectedCommands.set('Test2.test3', {
+        parameters: [{
+          name: 'test3',
+          type: 'test3',
+          optional: true,
+        }],
+        description: 'Description3',
+        replyArgs: ['Test3'],
+      });
+
+      const metadataByCommand = ProtocolMonitor.ProtocolMonitor.buildProtocolMetadata(domains);
+      assert.deepStrictEqual(metadataByCommand, expectedCommands);
+    });
   });
 
   describe('HistoryAutocompleteDataProvider', () => {
@@ -100,73 +172,6 @@ describe('ProtocolMonitor', () => {
         {text: 'test3'},
         {text: 'test2'},
       ]);
-    });
-
-    it('should correctly creates a set of CDP commands', async () => {
-      const provider = new ProtocolMonitor.ProtocolMonitor.CommandAutocompleteSuggestionProvider(2);
-      const domains = [
-        {
-          domain: 'Test',
-          commandParameters: {
-            'Test.test': [{
-              name: 'test',
-              type: 'test',
-              optional: true,
-            }],
-          },
-        },
-        {
-          domain: 'Test2',
-          commandParameters: {
-            'Test2.test2': [{
-              name: 'test2',
-              type: 'test2',
-              optional: true,
-            }],
-            'Test2.test3': [{
-              name: 'test3',
-              type: 'test3',
-              optional: true,
-            }],
-          },
-        },
-      ] as Iterable<ProtocolMonitor.ProtocolMonitor.ProtocolDomain>;
-
-      const expectedCommands = new Set([
-        'Test.test',
-        'Test2.test2',
-        'Test2.test3',
-      ]);
-      assert.deepStrictEqual(provider.buildProtocolCommands(domains), expectedCommands);
-    });
-  });
-
-  describe('EditorWidget', () => {
-    it('output correctly the CDP commands inside the Sidebar Panel', async () => {
-      const command = 'Network.continueInterceptedRequest';
-      const parameters = {
-        'interceptionId': 'test',
-        'errorReason': 'Failed',
-        'rawResponse': 'response',
-        'url': 'www.google.com',
-        'method': 'method',
-        'postData': 'data',
-        'headers': {
-          'Content-Type': 'application/json',
-          'Authorization':
-              'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
-          'X-Custom-Header': 'some value',
-          'X-Another-Custom-Header': 'another value',
-        },
-      };
-
-      const commandAutocompleteSuggestionProvider =
-          new ProtocolMonitor.ProtocolMonitor.CommandAutocompleteSuggestionProvider(2);
-      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget(commandAutocompleteSuggestionProvider);
-      editorWidget.setCommand(command, parameters);
-      const JSONPromptEditors = editorWidget.promptList?.querySelectorAll('.json-prompt');
-      const numberOfCommandPromptEditor = 1;
-      assert.deepStrictEqual(JSONPromptEditors.length, Object.keys(parameters).length + numberOfCommandPromptEditor);
     });
   });
 });

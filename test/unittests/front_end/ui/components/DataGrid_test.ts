@@ -4,6 +4,7 @@
 
 import * as Platform from '../../../../../front_end/core/platform/platform.js';
 import * as DataGrid from '../../../../../front_end/ui/components/data_grid/data_grid.js';
+import * as IconButton from '../../../../../front_end/ui/components/icon_button/icon_button.js';
 import * as Coordinator from '../../../../../front_end/ui/components/render_coordinator/render_coordinator.js';
 import * as LitHtml from '../../../../../front_end/ui/lit-html/lit-html.js';
 import {
@@ -92,6 +93,7 @@ const renderDataGrid = (data: Partial<DataGrid.DataGrid.DataGridData>): DataGrid
     activeSort: data.activeSort || null,
     label: data.label,
   };
+  renderElementIntoDOM(component);
   return component;
 };
 
@@ -99,7 +101,6 @@ describe('DataGrid', () => {
   describe('rendering and hiding rows/columns', () => {
     it('renders the right headers and values', async () => {
       const component = renderDataGrid({rows, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -120,7 +121,6 @@ describe('DataGrid', () => {
       columnsWithFirstHidden[0].hideable = true;
       columnsWithFirstHidden[0].visible = false;
       const component = renderDataGrid({rows, columns: columnsWithFirstHidden});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -143,7 +143,6 @@ describe('DataGrid', () => {
 
     it('uses the cell\'s value as its title attribute by default', async () => {
       const component = renderDataGrid({rows, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -162,7 +161,6 @@ describe('DataGrid', () => {
       const rowsWithTitleSpecified = createRows();
       rowsWithTitleSpecified[0].cells[0].title = 'EXPLICITLY_PROVIDED_TITLE';
       const component = renderDataGrid({rows: rowsWithTitleSpecified, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -181,7 +179,6 @@ describe('DataGrid', () => {
       const columnsWithCityHidden = createColumns();
       columnsWithCityHidden[0].visible = false;
       const component = renderDataGrid({rows, columns: columnsWithCityHidden});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -201,7 +198,6 @@ describe('DataGrid', () => {
       const rowsWithLondonHidden = createRows();
       rowsWithLondonHidden[0].hidden = true;
       const component = renderDataGrid({rows: rowsWithLondonHidden, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -219,14 +215,13 @@ describe('DataGrid', () => {
           [{id: 'key', title: 'Key', widthWeighting: 1, visible: true, hideable: false}];
       const rows: DataGrid.DataGridUtils.Row[] = [{cells: [{columnId: 'key', value: 'Hello World'}]}];
       const component = renderDataGrid({columns, rows});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
       const cell = getCellByIndexes(component.shadowRoot, {column: 0, row: 1});
       assert.deepEqual(stripLitHtmlCommentNodes(cell.innerHTML), 'Hello World');
     });
 
-    it('can use the code block render to render text in a <code> tag', async () => {
+    it('can use the code block renderer to render text in a <code> tag', async () => {
       const columns: DataGrid.DataGridUtils.Column[] =
           [{id: 'key', title: 'Key', widthWeighting: 1, visible: true, hideable: false}];
       const rows: DataGrid.DataGridUtils.Row[] = [{
@@ -240,11 +235,35 @@ describe('DataGrid', () => {
         ],
       }];
       const component = renderDataGrid({columns, rows});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
       const cell = getCellByIndexes(component.shadowRoot, {column: 0, row: 1});
       assert.deepEqual(stripLitHtmlCommentNodes(cell.innerHTML), '<code>Hello World</code>');
+    });
+
+    it('can use the icon renderer for rendering icons', async () => {
+      const icon = new IconButton.Icon.Icon();
+      icon.data = {iconName: 'arrow-down', color: 'var(--icon-request)', width: '16px', height: '16px'};
+
+      const columns: DataGrid.DataGridUtils.Column[] =
+          [{id: 'type', title: 'Type', widthWeighting: 1, visible: true, hideable: false}];
+      const rows: DataGrid.DataGridUtils.Row[] = [{
+        cells: [
+          {
+            columnId: 'type',
+            value: icon,
+            title: 'received',
+            renderer: DataGrid.DataGridRenderers.iconRenderer,
+          },
+        ],
+      }];
+      const component = renderDataGrid({columns, rows});
+      assertShadowRoot(component.shadowRoot);
+      await coordinator.done();
+      const cell = getCellByIndexes(component.shadowRoot, {column: 0, row: 1});
+      assert.deepEqual(
+          stripLitHtmlCommentNodes(cell.innerHTML),
+          '<div style="display: flex; justify-content: center;"><devtools-icon></devtools-icon></div>');
     });
 
     it('accepts any custom renderer', async () => {
@@ -259,7 +278,6 @@ describe('DataGrid', () => {
         }],
       }];
       const component = renderDataGrid({columns, rows});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
       const cell = getCellByIndexes(component.shadowRoot, {column: 0, row: 1});
@@ -542,7 +560,6 @@ describe('DataGrid', () => {
   describeWithLocale('emits an event', () => {
     it('when the user clicks a column header', async () => {
       const component = renderDataGrid({rows, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -557,7 +574,6 @@ describe('DataGrid', () => {
 
     it('when the user "clicks" a column header with the enter key', async () => {
       const component = renderDataGrid({rows, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -580,7 +596,6 @@ describe('DataGrid', () => {
 
     it('when the user focuses a cell', async () => {
       const component = renderDataGrid({rows, columns: columnsWithNoneSortable});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 
@@ -596,7 +611,6 @@ describe('DataGrid', () => {
   describe('adding new rows', () => {
     it('only has one DOM mutation to add the new row', async () => {
       const component = renderDataGrid({rows, columns});
-      renderElementIntoDOM(component);
       assertShadowRoot(component.shadowRoot);
       await coordinator.done();
 

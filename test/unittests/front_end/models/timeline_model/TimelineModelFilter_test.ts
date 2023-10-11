@@ -5,12 +5,11 @@
 const {assert} = chai;
 
 import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
-import type * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
 import {
   DevToolsTimelineCategory,
   makeFakeSDKEventFromPayload,
-} from '../../helpers/TimelineHelpers.js';
+} from '../../helpers/TraceHelpers.js';
 
 const consoleEvent = makeFakeSDKEventFromPayload({
   categories: [DevToolsTimelineCategory, TimelineModel.TimelineModel.TimelineModelImpl.Category.Console],
@@ -81,7 +80,7 @@ describe('TimelineModelFilter', () => {
   });
 
   describe('ExclusiveNameFilter', () => {
-    function makeEventWithName(name: string): SDK.TracingModel.Event {
+    function makeEventWithName(name: string): TraceEngine.Legacy.Event {
       return makeFakeSDKEventFromPayload({
         categories: [DevToolsTimelineCategory],
         name,

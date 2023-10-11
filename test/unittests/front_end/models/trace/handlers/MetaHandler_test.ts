@@ -6,14 +6,15 @@ import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 
 const {assert} = chai;
 
-import {loadEventsFromTraceFile, defaultTraceEvent} from '../../../helpers/TraceHelpers.js';
+import {defaultTraceEvent} from '../../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
-describe('MetaHandler', () => {
+describe('MetaHandler', function() {
   let baseEvents: TraceModel.Types.TraceEvents.TraceEventData[];
-  beforeEach(async () => {
+  beforeEach(async function() {
     let defaultTraceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
     try {
-      defaultTraceEvents = await loadEventsFromTraceFile('basic.json.gz');
+      defaultTraceEvents = await TraceLoader.rawEvents(this, 'basic.json.gz');
     } catch (error) {
       assert.fail(error);
       return;
@@ -74,8 +75,8 @@ describe('MetaHandler', () => {
     TraceModel.Handlers.ModelHandlers.Meta.initialize();
   });
 
-  describe('error handling', () => {
-    it('throws if data is called before finalize', () => {
+  describe('error handling', function() {
+    it('throws if data is called before finalize', function() {
       for (const event of baseEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
       }
@@ -85,7 +86,7 @@ describe('MetaHandler', () => {
       }, 'Handler is not finalized');
     });
 
-    it('throws if initialize is called without a reset', () => {
+    it('throws if initialize is called without a reset', function() {
       // Due to the beforeEach the handler is already initialized, so calling
       // it a second time should throw an error.
       assert.throws(() => {
@@ -94,7 +95,7 @@ describe('MetaHandler', () => {
     });
   });
 
-  describe('browser process ID', () => {
+  describe('browser process ID', function() {
     it('obtains the PID if present', async () => {
       for (const event of baseEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -104,10 +105,9 @@ describe('MetaHandler', () => {
       const data = TraceModel.Handlers.ModelHandlers.Meta.data();
       assert.strictEqual(data.browserProcessId, TraceModel.Types.TraceEvents.ProcessID(8017));
     });
-
   });
 
-  describe('browser thread ID', () => {
+  describe('browser thread ID', function() {
     it('obtains the TID if present', async () => {
       for (const event of baseEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -119,7 +119,7 @@ describe('MetaHandler', () => {
     });
   });
 
-  describe('renderer process ID', () => {
+  describe('renderer process ID', function() {
     it('obtains the PID if present', async () => {
       for (const event of baseEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -132,7 +132,7 @@ describe('MetaHandler', () => {
     });
   });
 
-  describe('navigations', () => {
+  describe('navigations', function() {
     it('obtains them if present', async () => {
       for (const event of baseEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -153,9 +153,26 @@ describe('MetaHandler', () => {
 
       assert.strictEqual(firstNavigation.args.data.documentLoaderURL, 'test1');
     });
+
+    it('provides a list of main frame only navigations', async function() {
+      const events = await TraceLoader.rawEvents(this, 'multiple-navigations-with-iframes.json.gz');
+      TraceModel.Handlers.ModelHandlers.Meta.reset();
+      TraceModel.Handlers.ModelHandlers.Meta.initialize();
+      for (const event of events) {
+        TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+      }
+
+      await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+      const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+      const allNavigationsCount = data.navigationsByNavigationId.size;
+      assert.isTrue(data.mainFrameNavigations.length < allNavigationsCount);
+      assert.isTrue(data.mainFrameNavigations.every(event => {
+        return event.args.frame === data.mainFrameId;
+      }));
+    });
   });
 
-  describe('frames', () => {
+  describe('frames', function() {
     it('finds the main frame ID', async () => {
       for (const event of baseEvents) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
@@ -166,8 +183,8 @@ describe('MetaHandler', () => {
       assert.strictEqual(data.mainFrameId, '3E1717BE677B75D0536E292E00D6A34A');
     });
 
-    it('finds the main frame ID for a trace that started with a page reload', async () => {
-      const events = await loadEventsFromTraceFile('reload-and-trace-page.json.gz');
+    it('finds the main frame ID for a trace that started with a page reload', async function() {
+      const events = await TraceLoader.rawEvents(this, 'reload-and-trace-page.json.gz');
       TraceModel.Handlers.ModelHandlers.Meta.reset();
       TraceModel.Handlers.ModelHandlers.Meta.initialize();
       for (const event of events) {
@@ -178,11 +195,28 @@ describe('MetaHandler', () => {
       const data = TraceModel.Handlers.ModelHandlers.Meta.data();
       assert.strictEqual(data.mainFrameId, '1D148CB660D1F96ED70D78DC6A53267B');
     });
+    it('tracks the frames for found processes', async function() {
+      const events = await TraceLoader.rawEvents(this, 'reload-and-trace-page.json.gz');
+      TraceModel.Handlers.ModelHandlers.Meta.reset();
+      TraceModel.Handlers.ModelHandlers.Meta.initialize();
+      for (const event of events) {
+        TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+      }
+
+      await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+      const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+      assert.strictEqual(data.frameByProcessId.size, 1);
+      const [[processId, framesInProcess]] = data.frameByProcessId.entries();
+      assert.strictEqual(processId, 3581385);
+      assert.strictEqual(framesInProcess.size, 1);
+      const [{url}] = framesInProcess.values();
+      assert.strictEqual(url, 'https://example.com/');
+    });
   });
 
-  describe('finding GPU thread and main frame', () => {
-    it('finds the GPU process and GPU Thread', async () => {
-      const events = await loadEventsFromTraceFile('threejs-gpu.json.gz');
+  describe('finding GPU thread and main frame', function() {
+    it('finds the GPU process and GPU Thread', async function() {
+      const events = await TraceLoader.rawEvents(this, 'threejs-gpu.json.gz');
       TraceModel.Handlers.ModelHandlers.Meta.reset();
       TraceModel.Handlers.ModelHandlers.Meta.initialize();
       for (const event of events) {
@@ -194,8 +228,8 @@ describe('MetaHandler', () => {
       assert.strictEqual(gpuThreadId, TraceModel.Types.TraceEvents.ThreadID(3581327));
     });
 
-    it('handles traces that do not have a GPU thread and returns undefined for the thread ID', async () => {
-      const traceEventsWithNoGPUThread = await loadEventsFromTraceFile('forced-layouts-and-no-gpu.json.gz');
+    it('handles traces that do not have a GPU thread and returns undefined for the thread ID', async function() {
+      const traceEventsWithNoGPUThread = await TraceLoader.rawEvents(this, 'forced-layouts-and-no-gpu.json.gz');
       for (const event of traceEventsWithNoGPUThread) {
         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
       }
@@ -209,10 +243,10 @@ describe('MetaHandler', () => {
     });
   });
 
-  it('obtains renderer process IDs when there are no navigations', async () => {
+  it('obtains renderer process IDs when there are no navigations', async function() {
     let traceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
     try {
-      traceEvents = await loadEventsFromTraceFile('threejs-gpu.json.gz');
+      traceEvents = await TraceLoader.rawEvents(this, 'threejs-gpu.json.gz');
     } catch (error) {
       assert.fail(error);
       return;
@@ -236,7 +270,7 @@ describe('MetaHandler', () => {
     assert.deepStrictEqual([...rendererProcesses?.keys()], [3601132]);
     const windowMinTime = 1143381875846;
     assert.deepStrictEqual(
-        [...rendererProcesses?.values()], [{
+        [...rendererProcesses?.values()], [[{
           'frame': {
             'frame': '1D148CB660D1F96ED70D78DC6A53267B',
             'name': '',
@@ -244,13 +278,13 @@ describe('MetaHandler', () => {
             'url': 'https://threejs.org/examples/',
           },
           'window': {'min': windowMinTime, 'max': data.traceBounds.max, 'range': data.traceBounds.max - windowMinTime},
-        }]);
+        }]]);
   });
 
-  it('handles multiple renderers from navigations', async () => {
+  it('handles multiple renderers from navigations', async function() {
     let traceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
     try {
-      traceEvents = await loadEventsFromTraceFile('multiple-top-level-renderers.json.gz');
+      traceEvents = await TraceLoader.rawEvents(this, 'multiple-top-level-renderers.json.gz');
     } catch (error) {
       assert.fail(error);
       return;
@@ -275,7 +309,7 @@ describe('MetaHandler', () => {
     const windowMinTime = 3550807444741;
     assert.deepStrictEqual([...rendererProcesses?.keys()], [78450, 78473, 79194]);
     assert.deepStrictEqual([...rendererProcesses?.values()], [
-      {
+      [{
         'frame': {
           'frame': 'E70A9327100EBD78F1C03582BBBE8E5F',
           'name': '',
@@ -283,8 +317,8 @@ describe('MetaHandler', () => {
           'url': 'http://127.0.0.1:8081/',
         },
         'window': {'min': 3550803491779, 'max': 3550805534872, 'range': 2043093},
-      },
-      {
+      }],
+      [{
         'frame': {
           'frame': 'E70A9327100EBD78F1C03582BBBE8E5F',
           'name': '',
@@ -292,8 +326,8 @@ describe('MetaHandler', () => {
           'url': 'http://localhost:8080/',
         },
         'window': {'min': 3550805534873, 'max': 3550807444740, 'range': 1909867},
-      },
-      {
+      }],
+      [{
         'frame': {
           'frame': 'E70A9327100EBD78F1C03582BBBE8E5F',
           'name': '',
@@ -301,14 +335,71 @@ describe('MetaHandler', () => {
           'url': 'https://www.google.com/',
         },
         'window': {'min': windowMinTime, 'max': data.traceBounds.max, 'range': data.traceBounds.max - windowMinTime},
-      },
+      }],
+    ]);
+  });
+  it('handles multiple renderers from navigations where a process handled multiple URLs ', async function() {
+    let traceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
+    try {
+      traceEvents = await TraceLoader.rawEvents(this, 'simple-js-program.json.gz');
+    } catch (error) {
+      assert.fail(error);
+      return;
+    }
+
+    TraceModel.Handlers.ModelHandlers.Meta.reset();
+    TraceModel.Handlers.ModelHandlers.Meta.initialize();
+    for (const event of traceEvents) {
+      TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+    }
+    await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+
+    const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+    assert.deepStrictEqual([...data.topLevelRendererIds], [2080]);
+
+    const rendererProcesses = data.rendererProcessesByFrame.get(data.mainFrameId);
+    if (!rendererProcesses) {
+      assert.fail('No renderer processes found');
+      return;
+    }
+
+    assert.deepStrictEqual([...rendererProcesses?.keys()], [2080]);
+    assert.deepStrictEqual([...rendererProcesses?.values()], [
+      [
+        {
+          'frame': {
+            'frame': '1F729458403A23CF1D8D246095129AC4',
+            'name': '',
+            'processId': 2080,
+            'url': 'about:blank',
+          },
+          'window': {
+            'min': 251126654355,
+            'max': 251126663397,
+            'range': 9042,
+          },
+        },
+        {
+          'frame': {
+            'frame': '1F729458403A23CF1D8D246095129AC4',
+            'name': '',
+            'processId': 2080,
+            'url': 'https://www.google.com',
+          },
+          'window': {
+            'min': 251126663398,
+            'max': 251128073034,
+            'range': 1409636,
+          },
+        },
+      ],
     ]);
   });
 
-  it('calculates trace bounds correctly', async () => {
+  it('calculates trace bounds correctly', async function() {
     let traceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
     try {
-      traceEvents = await loadEventsFromTraceFile('basic.json.gz');
+      traceEvents = await TraceLoader.rawEvents(this, 'basic.json.gz');
     } catch (error) {
       assert.fail(error);
       return;
@@ -334,11 +425,33 @@ describe('MetaHandler', () => {
     assert.strictEqual(range, expectedMax - expectedMin, 'Range calculated incorrectly');
   });
 
-  it('ignores ::UMA Events', async () => {
+  it('calculates the min trace bound correctly if no TracingStartedInBrowser event is found', async function() {
+    const baseEvents = await TraceLoader.rawEvents(this, 'basic.json.gz');
+    // We are about to mutate these events, so copy them to avoid mutating the
+    // cached events from the TraceLoader.
+    const traceEvents = baseEvents.slice().filter(event => {
+      // Delete the tracing started in browser event to force the min bounds to
+      // be calculated based on the event with the smallest timestamp.
+      return event.name !== 'TracingStartedInBrowser';
+    });
+
+    TraceModel.Handlers.ModelHandlers.Meta.reset();
+    TraceModel.Handlers.ModelHandlers.Meta.initialize();
+    for (const event of traceEvents) {
+      TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+    }
+    await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+
+    const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+    const expectedMin = 50_442_438_976;
+    assert.strictEqual(data.traceBounds.min, expectedMin, 'Min calculated incorrectly');
+  });
+
+  it('ignores ::UMA Events', async function() {
     let traceEvents: readonly TraceModel.Types.TraceEvents.TraceEventData[];
     try {
       // This file contains UMA events which need to be ignored.
-      traceEvents = await loadEventsFromTraceFile('web-dev.json.gz');
+      traceEvents = await TraceLoader.rawEvents(this, 'web-dev.json.gz');
     } catch (error) {
       assert.fail(error);
       return;

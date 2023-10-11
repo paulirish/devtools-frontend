@@ -15,14 +15,14 @@
 }
 
 .diff-line-number {
-  color: var(--color-line-number);
+  color: var(--sys-color-token-subtle);
   padding: 0 3px 0 9px;
   text-align: right;
   user-select: none;
 }
 
 .diff-line-marker {
-  border-right: 1px solid var(--color-details-hairline);
+  border-right: 1px solid var(--sys-color-divider);
   width: 20px;
   text-align: center;
 }

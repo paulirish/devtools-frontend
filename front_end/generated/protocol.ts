@@ -101,7 +101,7 @@ export namespace Accessibility {
      */
     superseded?: boolean;
     /**
-     * The native markup source for this value, e.g. a <label> element.
+     * The native markup source for this value, e.g. a `<label>` element.
      */
     nativeSource?: AXValueNativeSourceType;
     /**
@@ -705,6 +705,7 @@ export namespace Audits {
     ExcludeSamePartyCrossPartyContext = 'ExcludeSamePartyCrossPartyContext',
     ExcludeDomainNonASCII = 'ExcludeDomainNonASCII',
     ExcludeThirdPartyCookieBlockedInFirstPartySet = 'ExcludeThirdPartyCookieBlockedInFirstPartySet',
+    ExcludeThirdPartyPhaseout = 'ExcludeThirdPartyPhaseout',
   }
 
   export const enum CookieWarningReason {
@@ -718,6 +719,7 @@ export namespace Audits {
     WarnSameSiteLaxCrossDowngradeLax = 'WarnSameSiteLaxCrossDowngradeLax',
     WarnAttributeValueExceedsMaxSize = 'WarnAttributeValueExceedsMaxSize',
     WarnDomainNonASCII = 'WarnDomainNonASCII',
+    WarnThirdPartyPhaseout = 'WarnThirdPartyPhaseout',
   }
 
   export const enum CookieOperation {
@@ -954,6 +956,7 @@ export namespace Audits {
     InvalidRegisterOsTriggerHeader = 'InvalidRegisterOsTriggerHeader',
     WebAndOsHeaders = 'WebAndOsHeaders',
     NoWebOrOsSupport = 'NoWebOrOsSupport',
+    NavigationRegistrationWithoutTransientUserActivation = 'NavigationRegistrationWithoutTransientUserActivation',
   }
 
   /**
@@ -1000,6 +1003,7 @@ export namespace Audits {
     FormLabelHasNeitherForNorNestedInput = 'FormLabelHasNeitherForNorNestedInput',
     FormLabelForMatchesNonExistingIdError = 'FormLabelForMatchesNonExistingIdError',
     FormInputHasWrongButWellIntendedAutocompleteValueError = 'FormInputHasWrongButWellIntendedAutocompleteValueError',
+    ResponseWasBlockedByORB = 'ResponseWasBlockedByORB',
   }
 
   /**
@@ -1013,6 +1017,7 @@ export namespace Audits {
     frameId?: Page.FrameId;
     violatingNodeId?: DOM.BackendNodeId;
     violatingNodeAttribute?: string;
+    request?: AffectedRequest;
   }
 
   /**
@@ -1092,6 +1097,27 @@ export namespace Audits {
     ThirdPartyCookiesBlocked = 'ThirdPartyCookiesBlocked',
   }
 
+  export interface FederatedAuthUserInfoRequestIssueDetails {
+    federatedAuthUserInfoRequestIssueReason: FederatedAuthUserInfoRequestIssueReason;
+  }
+
+  /**
+   * Represents the failure reason when a getUserInfo() call fails.
+   * Should be updated alongside FederatedAuthUserInfoRequestResult in
+   * third_party/blink/public/mojom/devtools/inspector_issue.mojom.
+   */
+  export const enum FederatedAuthUserInfoRequestIssueReason {
+    NotSameOrigin = 'NotSameOrigin',
+    NotIframe = 'NotIframe',
+    NotPotentiallyTrustworthy = 'NotPotentiallyTrustworthy',
+    NoAPIPermission = 'NoApiPermission',
+    NotSignedInWithIdp = 'NotSignedInWithIdp',
+    NoAccountSharingPermission = 'NoAccountSharingPermission',
+    InvalidConfigOrWellKnown = 'InvalidConfigOrWellKnown',
+    InvalidAccountsResponse = 'InvalidAccountsResponse',
+    NoReturningUserFromFetchedAccounts = 'NoReturningUserFromFetchedAccounts',
+  }
+
   /**
    * This issue tracks client hints related issues. It's used to deprecate old
    * features, encourage the use of new ones, and provide general guidance.
@@ -1099,6 +1125,67 @@ export namespace Audits {
   export interface ClientHintIssueDetails {
     sourceCodeLocation: SourceCodeLocation;
     clientHintIssueReason: ClientHintIssueReason;
+  }
+
+  export interface FailedRequestInfo {
+    /**
+     * The URL that failed to load.
+     */
+    url: string;
+    /**
+     * The failure message for the failed request.
+     */
+    failureMessage: string;
+    requestId?: Network.RequestId;
+  }
+
+  export const enum StyleSheetLoadingIssueReason {
+    LateImportRule = 'LateImportRule',
+    RequestFailed = 'RequestFailed',
+  }
+
+  /**
+   * This issue warns when a referenced stylesheet couldn't be loaded.
+   */
+  export interface StylesheetLoadingIssueDetails {
+    /**
+     * Source code position that referenced the failing stylesheet.
+     */
+    sourceCodeLocation: SourceCodeLocation;
+    /**
+     * Reason why the stylesheet couldn't be loaded.
+     */
+    styleSheetLoadingIssueReason: StyleSheetLoadingIssueReason;
+    /**
+     * Contains additional info when the failure was due to a request.
+     */
+    failedRequestInfo?: FailedRequestInfo;
+  }
+
+  export const enum PropertyRuleIssueReason {
+    InvalidSyntax = 'InvalidSyntax',
+    InvalidInitialValue = 'InvalidInitialValue',
+    InvalidInherits = 'InvalidInherits',
+    InvalidName = 'InvalidName',
+  }
+
+  /**
+   * This issue warns about errors in property rules that lead to property
+   * registrations being ignored.
+   */
+  export interface PropertyRuleIssueDetails {
+    /**
+     * Source code position of the property rule.
+     */
+    sourceCodeLocation: SourceCodeLocation;
+    /**
+     * Reason why the property rule was discarded.
+     */
+    propertyRuleIssueReason: PropertyRuleIssueReason;
+    /**
+     * The value of the property rule property that failed to parse
+     */
+    propertyValue?: string;
   }
 
   /**
@@ -1123,6 +1210,9 @@ export namespace Audits {
     ClientHintIssue = 'ClientHintIssue',
     FederatedAuthRequestIssue = 'FederatedAuthRequestIssue',
     BounceTrackingIssue = 'BounceTrackingIssue',
+    StylesheetLoadingIssue = 'StylesheetLoadingIssue',
+    FederatedAuthUserInfoRequestIssue = 'FederatedAuthUserInfoRequestIssue',
+    PropertyRuleIssue = 'PropertyRuleIssue',
   }
 
   /**
@@ -1147,6 +1237,9 @@ export namespace Audits {
     clientHintIssueDetails?: ClientHintIssueDetails;
     federatedAuthRequestIssueDetails?: FederatedAuthRequestIssueDetails;
     bounceTrackingIssueDetails?: BounceTrackingIssueDetails;
+    stylesheetLoadingIssueDetails?: StylesheetLoadingIssueDetails;
+    propertyRuleIssueDetails?: PropertyRuleIssueDetails;
+    federatedAuthUserInfoRequestIssueDetails?: FederatedAuthUserInfoRequestIssueDetails;
   }
 
   /**
@@ -1252,6 +1345,82 @@ export namespace Autofill {
     cvc: string;
   }
 
+  export interface AddressField {
+    /**
+     * address field name, for example GIVEN_NAME.
+     */
+    name: string;
+    /**
+     * address field value, for example Jon Doe.
+     */
+    value: string;
+  }
+
+  /**
+   * A list of address fields.
+   */
+  export interface AddressFields {
+    fields: AddressField[];
+  }
+
+  export interface Address {
+    /**
+     * fields and values defining an address.
+     */
+    fields: AddressField[];
+  }
+
+  /**
+   * Defines how an address can be displayed like in chrome://settings/addresses.
+   * Address UI is a two dimensional array, each inner array is an "address information line", and when rendered in a UI surface should be displayed as such.
+   * The following address UI for instance:
+   * [[{name: "GIVE_NAME", value: "Jon"}, {name: "FAMILY_NAME", value: "Doe"}], [{name: "CITY", value: "Munich"}, {name: "ZIP", value: "81456"}]]
+   * should allow the receiver to render:
+   * Jon Doe
+   * Munich 81456
+   */
+  export interface AddressUI {
+    /**
+     * A two dimension array containing the repesentation of values from an address profile.
+     */
+    addressFields: AddressFields[];
+  }
+
+  /**
+   * Specified whether a filled field was done so by using the html autocomplete attribute or autofill heuristics.
+   */
+  export const enum FillingStrategy {
+    AutocompleteAttribute = 'autocompleteAttribute',
+    AutofillInferred = 'autofillInferred',
+  }
+
+  export interface FilledField {
+    /**
+     * The type of the field, e.g text, password etc.
+     */
+    htmlType: string;
+    /**
+     * the html id
+     */
+    id: string;
+    /**
+     * the html name
+     */
+    name: string;
+    /**
+     * the field value
+     */
+    value: string;
+    /**
+     * The actual field type, e.g FAMILY_NAME
+     */
+    autofillType: string;
+    /**
+     * The filling strategy
+     */
+    fillingStrategy: FillingStrategy;
+  }
+
   export interface TriggerRequest {
     /**
      * Identifies a field that serves as an anchor for autofill.
@@ -1265,6 +1434,25 @@ export namespace Autofill {
      * Credit card information to fill out the form. Credit card data is not saved.
      */
     card: CreditCard;
+  }
+
+  export interface SetAddressesRequest {
+    addresses: Address[];
+  }
+
+  /**
+   * Emitted when an address form is filled.
+   */
+  export interface AddressFormFilledEvent {
+    /**
+     * Information about the fields that were filled
+     */
+    filledFields: FilledField[];
+    /**
+     * An UI representation of the address used to fill the form.
+     * Consists of a 2D array where each child represents an address/profile line.
+     */
+    addressUi: AddressUI;
   }
 }
 
@@ -1963,7 +2151,7 @@ export namespace CSS {
     /**
      * Whether this stylesheet is mutable. Inline stylesheets become mutable
      * after they have been modified via CSSOM API.
-     * <link> element's stylesheets become mutable only if DevTools modifies them.
+     * `<link>` element's stylesheets become mutable only if DevTools modifies them.
      * Constructed stylesheets (new CSSStyleSheet()) are mutable immediately after creation.
      */
     isMutable: boolean;
@@ -2048,6 +2236,23 @@ export namespace CSS {
      * The array enumerates @scope at-rules starting with the innermost one, going outwards.
      */
     scopes?: CSSScope[];
+    /**
+     * The array keeps the types of ancestor CSSRules from the innermost going outwards.
+     */
+    ruleTypes?: CSSRuleType[];
+  }
+
+  /**
+   * Enum indicating the type of a CSS rule, used to represent the order of a style rule's ancestors.
+   * This list only contains rule types that are collected during the ancestor rule collection.
+   */
+  export const enum CSSRuleType {
+    MediaRule = 'MediaRule',
+    SupportsRule = 'SupportsRule',
+    ContainerRule = 'ContainerRule',
+    LayerRule = 'LayerRule',
+    ScopeRule = 'ScopeRule',
+    StyleRule = 'StyleRule',
   }
 
   /**
@@ -2519,6 +2724,39 @@ export namespace CSS {
   }
 
   /**
+   * Representation of a custom property registration through CSS.registerProperty
+   */
+  export interface CSSPropertyRegistration {
+    propertyName: string;
+    initialValue?: Value;
+    inherits: boolean;
+    syntax: string;
+  }
+
+  /**
+   * CSS property at-rule representation.
+   */
+  export interface CSSPropertyRule {
+    /**
+     * The css style sheet identifier (absent for user agent stylesheet and user-specified
+     * stylesheet rules) this rule came from.
+     */
+    styleSheetId?: StyleSheetId;
+    /**
+     * Parent stylesheet's origin.
+     */
+    origin: StyleSheetOrigin;
+    /**
+     * Associated property name.
+     */
+    propertyName: Value;
+    /**
+     * Associated style declaration.
+     */
+    style: CSSStyle;
+  }
+
+  /**
    * CSS keyframe rule representation.
    */
   export interface CSSKeyframeRule {
@@ -2708,6 +2946,14 @@ export namespace CSS {
      */
     cssPositionFallbackRules?: CSSPositionFallbackRule[];
     /**
+     * A list of CSS at-property rules matching this node.
+     */
+    cssPropertyRules?: CSSPropertyRule[];
+    /**
+     * A list of CSS property registrations matching this node.
+     */
+    cssPropertyRegistrations?: CSSPropertyRegistration[];
+    /**
      * Id of the first parent element that does not have display: contents.
      */
     parentLayoutNodeId?: DOM.NodeId;
@@ -2765,6 +3011,19 @@ export namespace CSS {
     nodeId: DOM.NodeId;
     propertyName: string;
     value: string;
+  }
+
+  export interface SetPropertyRulePropertyNameRequest {
+    styleSheetId: StyleSheetId;
+    range: SourceRange;
+    propertyName: string;
+  }
+
+  export interface SetPropertyRulePropertyNameResponse extends ProtocolResponseWithError {
+    /**
+     * The resulting key text after modification.
+     */
+    propertyName: Value;
   }
 
   export interface SetKeyframeKeyRequest {
@@ -3178,8 +3437,8 @@ export namespace Cast {
  * the JavaScript object wrapper, etc. It is important that client receives DOM events only for the
  * nodes that are known to the client. Backend keeps track of the nodes that were sent to the client
  * and never sends the same node twice. It is client's responsibility to collect information about
- * the nodes that were sent to the client.<p>Note that `iframe` owner elements will return
- * corresponding document elements as their child nodes.</p>
+ * the nodes that were sent to the client. Note that `iframe` owner elements will return
+ * corresponding document elements as their child nodes.
  */
 export namespace DOM {
 
@@ -5776,8 +6035,8 @@ export namespace HeadlessExperimental {
 export namespace IO {
 
   /**
-   * This is either obtained from another method or specified as `blob:&lt;uuid&gt;` where
-   * `&lt;uuid&gt` is an UUID of a Blob.
+   * This is either obtained from another method or specified as `blob:<uuid>` where
+   * `<uuid>` is an UUID of a Blob.
    */
   export type StreamHandle = OpaqueIdentifier<string, 'Protocol.IO.StreamHandle'>;
 
@@ -7712,6 +7971,10 @@ export namespace Network {
     InvalidPrivateNetworkAccess = 'InvalidPrivateNetworkAccess',
     UnexpectedPrivateNetworkAccess = 'UnexpectedPrivateNetworkAccess',
     NoCorsRedirectModeNotFollow = 'NoCorsRedirectModeNotFollow',
+    PreflightMissingPrivateNetworkAccessId = 'PreflightMissingPrivateNetworkAccessId',
+    PreflightMissingPrivateNetworkAccessName = 'PreflightMissingPrivateNetworkAccessName',
+    PrivateNetworkAccessPermissionUnavailable = 'PrivateNetworkAccessPermissionUnavailable',
+    PrivateNetworkAccessPermissionDenied = 'PrivateNetworkAccessPermissionDenied',
   }
 
   export interface CorsErrorStatus {
@@ -8081,6 +8344,7 @@ export namespace Network {
     SameSiteUnspecifiedTreatedAsLax = 'SameSiteUnspecifiedTreatedAsLax',
     SameSiteNoneInsecure = 'SameSiteNoneInsecure',
     UserPreferences = 'UserPreferences',
+    ThirdPartyPhaseout = 'ThirdPartyPhaseout',
     ThirdPartyBlockedInFirstPartySet = 'ThirdPartyBlockedInFirstPartySet',
     SyntaxError = 'SyntaxError',
     SchemeNotSupported = 'SchemeNotSupported',
@@ -8094,6 +8358,8 @@ export namespace Network {
     SamePartyFromCrossPartyContext = 'SamePartyFromCrossPartyContext',
     SamePartyConflictsWithOtherAttributes = 'SamePartyConflictsWithOtherAttributes',
     NameValuePairExceedsMaxSize = 'NameValuePairExceedsMaxSize',
+    DisallowedCharacter = 'DisallowedCharacter',
+    NoCookieContent = 'NoCookieContent',
   }
 
   /**
@@ -8108,6 +8374,7 @@ export namespace Network {
     SameSiteUnspecifiedTreatedAsLax = 'SameSiteUnspecifiedTreatedAsLax',
     SameSiteNoneInsecure = 'SameSiteNoneInsecure',
     UserPreferences = 'UserPreferences',
+    ThirdPartyPhaseout = 'ThirdPartyPhaseout',
     ThirdPartyBlockedInFirstPartySet = 'ThirdPartyBlockedInFirstPartySet',
     UnknownError = 'UnknownError',
     SchemefulSameSiteStrict = 'SchemefulSameSiteStrict',
@@ -8367,7 +8634,7 @@ export namespace Network {
      */
     signatures: SignedExchangeSignature[];
     /**
-     * Signed exchange header integrity hash in the form of "sha256-<base64-hash-value>".
+     * Signed exchange header integrity hash in the form of `sha256-<base64-hash-value>`.
      */
     headerIntegrity: string;
   }
@@ -8431,6 +8698,7 @@ export namespace Network {
     Deflate = 'deflate',
     Gzip = 'gzip',
     Br = 'br',
+    Zstd = 'zstd',
   }
 
   export const enum PrivateNetworkRequestPolicy {
@@ -9120,11 +9388,6 @@ export namespace Network {
      * Total number of bytes received for this request.
      */
     encodedDataLength: number;
-    /**
-     * Set when 1) response was blocked by Cross-Origin Read Blocking and also
-     * 2) this needs to be reported to the DevTools console.
-     */
-    shouldReportCorbBlocking?: boolean;
   }
 
   /**
@@ -9581,6 +9844,7 @@ export namespace Network {
   export const enum TrustTokenOperationDoneEventStatus {
     Ok = 'Ok',
     InvalidArgument = 'InvalidArgument',
+    MissingIssuerKeys = 'MissingIssuerKeys',
     FailedPrecondition = 'FailedPrecondition',
     ResourceExhausted = 'ResourceExhausted',
     AlreadyExists = 'AlreadyExists',
@@ -10535,6 +10799,7 @@ export namespace Page {
     ChEct = 'ch-ect',
     ChPrefersColorScheme = 'ch-prefers-color-scheme',
     ChPrefersReducedMotion = 'ch-prefers-reduced-motion',
+    ChPrefersReducedTransparency = 'ch-prefers-reduced-transparency',
     ChRtt = 'ch-rtt',
     ChSaveData = 'ch-save-data',
     ChUa = 'ch-ua',
@@ -10543,11 +10808,10 @@ export namespace Page {
     ChUaPlatform = 'ch-ua-platform',
     ChUaModel = 'ch-ua-model',
     ChUaMobile = 'ch-ua-mobile',
-    ChUaFull = 'ch-ua-full',
+    ChUaFormFactor = 'ch-ua-form-factor',
     ChUaFullVersion = 'ch-ua-full-version',
     ChUaFullVersionList = 'ch-ua-full-version-list',
     ChUaPlatformVersion = 'ch-ua-platform-version',
-    ChUaReduced = 'ch-ua-reduced',
     ChUaWow64 = 'ch-ua-wow64',
     ChViewportHeight = 'ch-viewport-height',
     ChViewportWidth = 'ch-viewport-width',
@@ -11236,6 +11500,8 @@ export namespace Page {
     ErrorDocument = 'ErrorDocument',
     FencedFramesEmbedder = 'FencedFramesEmbedder',
     CookieDisabled = 'CookieDisabled',
+    HTTPAuthRequired = 'HTTPAuthRequired',
+    CookieFlushed = 'CookieFlushed',
     WebSocket = 'WebSocket',
     WebTransport = 'WebTransport',
     WebRTC = 'WebRTC',
@@ -11247,14 +11513,12 @@ export namespace Page {
     DocumentLoaded = 'DocumentLoaded',
     DedicatedWorkerOrWorklet = 'DedicatedWorkerOrWorklet',
     OutstandingNetworkRequestOthers = 'OutstandingNetworkRequestOthers',
-    OutstandingIndexedDBTransaction = 'OutstandingIndexedDBTransaction',
     RequestedMIDIPermission = 'RequestedMIDIPermission',
     RequestedAudioCapturePermission = 'RequestedAudioCapturePermission',
     RequestedVideoCapturePermission = 'RequestedVideoCapturePermission',
     RequestedBackForwardCacheBlockedSensors = 'RequestedBackForwardCacheBlockedSensors',
     RequestedBackgroundWorkPermission = 'RequestedBackgroundWorkPermission',
     BroadcastChannel = 'BroadcastChannel',
-    IndexedDBConnection = 'IndexedDBConnection',
     WebXR = 'WebXR',
     SharedWorker = 'SharedWorker',
     WebLocks = 'WebLocks',
@@ -11281,7 +11545,10 @@ export namespace Page {
     KeepaliveRequest = 'KeepaliveRequest',
     IndexedDBEvent = 'IndexedDBEvent',
     Dummy = 'Dummy',
-    AuthorizationHeader = 'AuthorizationHeader',
+    JsNetworkRequestReceivedCacheControlNoStoreResource = 'JsNetworkRequestReceivedCacheControlNoStoreResource',
+    WebRTCSticky = 'WebRTCSticky',
+    WebTransportSticky = 'WebTransportSticky',
+    WebSocketSticky = 'WebSocketSticky',
     ContentSecurityHandler = 'ContentSecurityHandler',
     ContentWebAuthenticationAPI = 'ContentWebAuthenticationAPI',
     ContentFileChooser = 'ContentFileChooser',
@@ -11374,6 +11641,11 @@ export namespace Page {
      * to false.
      */
     includeCommandLineAPI?: boolean;
+    /**
+     * If true, runs the script immediately on existing execution contexts or worlds.
+     * Default: false.
+     */
+    runImmediately?: boolean;
   }
 
   export interface AddScriptToEvaluateOnNewDocumentResponse extends ProtocolResponseWithError {
@@ -11743,6 +12015,10 @@ export namespace Page {
      * return as stream
      */
     transferMode?: PrintToPDFRequestTransferMode;
+    /**
+     * Whether or not to generate tagged (accessible) PDF. Defaults to embedder choice.
+     */
+    generateTaggedPDF?: boolean;
   }
 
   export interface PrintToPDFResponse extends ProtocolResponseWithError {
@@ -12096,7 +12372,7 @@ export namespace Page {
      */
     mode: FileChooserOpenedEventMode;
     /**
-     * Input node id. Only present for file choosers opened via an <input type="file"> element.
+     * Input node id. Only present for file choosers opened via an `<input type="file">` element.
      */
     backendNodeId?: DOM.BackendNodeId;
   }
@@ -13093,13 +13369,15 @@ export namespace Storage {
     Loaded = 'loaded',
     Bid = 'bid',
     Win = 'win',
+    AdditionalBid = 'additionalBid',
+    AdditionalBidWin = 'additionalBidWin',
   }
 
   /**
    * Ad advertising element inside an interest group.
    */
   export interface InterestGroupAd {
-    renderUrl: string;
+    renderURL: string;
     metadata?: string;
   }
 
@@ -13111,10 +13389,10 @@ export namespace Storage {
     name: string;
     expirationTime: Network.TimeSinceEpoch;
     joiningOrigin: string;
-    biddingUrl?: string;
-    biddingWasmHelperUrl?: string;
-    updateUrl?: string;
-    trustedBiddingSignalsUrl?: string;
+    biddingLogicURL?: string;
+    biddingWasmHelperURL?: string;
+    updateURL?: string;
+    trustedBiddingSignalsURL?: string;
     trustedBiddingSignalsKeys: string[];
     userBiddingSignals?: string;
     ads: InterestGroupAd[];
@@ -13259,6 +13537,80 @@ export namespace Storage {
     quota: number;
     persistent: boolean;
     durability: StorageBucketsDurability;
+  }
+
+  export const enum AttributionReportingSourceType {
+    Navigation = 'navigation',
+    Event = 'event',
+  }
+
+  export type UnsignedInt64AsBase10 = string;
+
+  export type UnsignedInt128AsBase16 = string;
+
+  export type SignedInt64AsBase10 = string;
+
+  export interface AttributionReportingFilterDataEntry {
+    key: string;
+    values: string[];
+  }
+
+  export interface AttributionReportingAggregationKeysEntry {
+    key: string;
+    value: UnsignedInt128AsBase16;
+  }
+
+  export interface AttributionReportingEventReportWindows {
+    /**
+     * duration in seconds
+     */
+    start: integer;
+    /**
+     * duration in seconds
+     */
+    ends: integer[];
+  }
+
+  export interface AttributionReportingSourceRegistration {
+    time: Network.TimeSinceEpoch;
+    /**
+     * duration in seconds
+     */
+    expiry?: integer;
+    /**
+     * eventReportWindow and eventReportWindows are mutually exclusive
+     * duration in seconds
+     */
+    eventReportWindow?: integer;
+    eventReportWindows?: AttributionReportingEventReportWindows;
+    /**
+     * duration in seconds
+     */
+    aggregatableReportWindow?: integer;
+    type: AttributionReportingSourceType;
+    sourceOrigin: string;
+    reportingOrigin: string;
+    destinationSites: string[];
+    eventId: UnsignedInt64AsBase10;
+    priority: SignedInt64AsBase10;
+    filterData: AttributionReportingFilterDataEntry[];
+    aggregationKeys: AttributionReportingAggregationKeysEntry[];
+    debugKey?: UnsignedInt64AsBase10;
+  }
+
+  export const enum AttributionReportingSourceRegistrationResult {
+    Success = 'success',
+    InternalError = 'internalError',
+    InsufficientSourceCapacity = 'insufficientSourceCapacity',
+    InsufficientUniqueDestinationCapacity = 'insufficientUniqueDestinationCapacity',
+    ExcessiveReportingOrigins = 'excessiveReportingOrigins',
+    ProhibitedByBrowserPolicy = 'prohibitedByBrowserPolicy',
+    SuccessNoised = 'successNoised',
+    DestinationReportingLimitReached = 'destinationReportingLimitReached',
+    DestinationGlobalLimitReached = 'destinationGlobalLimitReached',
+    DestinationBothLimitsReached = 'destinationBothLimitsReached',
+    ReportingOriginsPerSiteLimitReached = 'reportingOriginsPerSiteLimitReached',
+    ExceedsMaxChannelCapacity = 'exceedsMaxChannelCapacity',
   }
 
   export interface GetStorageKeyForFrameRequest {
@@ -13507,6 +13859,17 @@ export namespace Storage {
     deletedSites: string[];
   }
 
+  export interface SetAttributionReportingLocalTestingModeRequest {
+    /**
+     * If enabled, noise is suppressed and reports are sent immediately.
+     */
+    enabled: boolean;
+  }
+
+  export interface SetAttributionReportingTrackingRequest {
+    enable: boolean;
+  }
+
   /**
    * A cache's contents have been modified.
    */
@@ -13635,6 +13998,15 @@ export namespace Storage {
 
   export interface StorageBucketDeletedEvent {
     bucketId: string;
+  }
+
+  /**
+   * TODO(crbug.com/1458532): Add other Attribution Reporting events, e.g.
+   * trigger registration.
+   */
+  export interface AttributionReportingSourceRegisteredEvent {
+    registration: AttributionReportingSourceRegistration;
+    result: AttributionReportingSourceRegistrationResult;
   }
 }
 
@@ -14769,6 +15141,11 @@ export namespace Fetch {
    * The stage of the request can be determined by presence of responseErrorReason
    * and responseStatusCode -- the request is at the response stage if either
    * of these fields is present and in the request stage otherwise.
+   * Redirect responses and subsequent requests are reported similarly to regular
+   * responses and requests. Redirect responses may be distinguished by the value
+   * of `responseStatusCode` (which is one of 301, 302, 303, 307, 308) along with
+   * presence of the `location` header. Requests resulting from a redirect will
+   * have `redirectedRequestId` field set.
    */
   export interface RequestPausedEvent {
     /**
@@ -15508,7 +15885,7 @@ export namespace Preload {
     loaderId: Network.LoaderId;
     /**
      * Source text of JSON representing the rule set. If it comes from
-     * <script> tag, it is the textContent of the node. Note that it is
+     * `<script>` tag, it is the textContent of the node. Note that it is
      * a JSON for valid case.
      *
      * See also:
@@ -15518,9 +15895,9 @@ export namespace Preload {
     sourceText: string;
     /**
      * A speculation rule set is either added through an inline
-     * <script> tag or through an external resource via the
+     * `<script>` tag or through an external resource via the
      * 'Speculation-Rules' HTTP header. For the first case, we include
-     * the BackendNodeId of the relevant <script> tag. For the second
+     * the BackendNodeId of the relevant `<script>` tag. For the second
      * case, we include the external URL where the rule set was loaded
      * from, and also RequestId if Network domain is enabled.
      *
@@ -15603,7 +15980,6 @@ export namespace Preload {
     LowEndDevice = 'LowEndDevice',
     InvalidSchemeRedirect = 'InvalidSchemeRedirect',
     InvalidSchemeNavigation = 'InvalidSchemeNavigation',
-    InProgressNavigation = 'InProgressNavigation',
     NavigationRequestBlockedByCsp = 'NavigationRequestBlockedByCsp',
     MainFrameNavigation = 'MainFrameNavigation',
     MojoBinderPolicy = 'MojoBinderPolicy',
@@ -15615,7 +15991,6 @@ export namespace Preload {
     NavigationBadHttpStatus = 'NavigationBadHttpStatus',
     ClientCertRequested = 'ClientCertRequested',
     NavigationRequestNetworkError = 'NavigationRequestNetworkError',
-    MaxNumOfRunningPrerendersExceeded = 'MaxNumOfRunningPrerendersExceeded',
     CancelAllHostsForTesting = 'CancelAllHostsForTesting',
     DidFailLoad = 'DidFailLoad',
     Stop = 'Stop',
@@ -15626,11 +16001,9 @@ export namespace Preload {
     AudioOutputDeviceRequested = 'AudioOutputDeviceRequested',
     MixedContent = 'MixedContent',
     TriggerBackgrounded = 'TriggerBackgrounded',
-    EmbedderTriggeredAndCrossOriginRedirected = 'EmbedderTriggeredAndCrossOriginRedirected',
     MemoryLimitExceeded = 'MemoryLimitExceeded',
-    FailToGetMemoryUsage = 'FailToGetMemoryUsage',
     DataSaverEnabled = 'DataSaverEnabled',
-    HasEffectiveUrl = 'HasEffectiveUrl',
+    TriggerUrlHasEffectiveUrl = 'TriggerUrlHasEffectiveUrl',
     ActivatedBeforeStarted = 'ActivatedBeforeStarted',
     InactivePageRestriction = 'InactivePageRestriction',
     StartFailed = 'StartFailed',
@@ -15659,6 +16032,15 @@ export namespace Preload {
     MemoryPressureOnTrigger = 'MemoryPressureOnTrigger',
     MemoryPressureAfterTriggered = 'MemoryPressureAfterTriggered',
     PrerenderingDisabledByDevTools = 'PrerenderingDisabledByDevTools',
+    ResourceLoadBlockedByClient = 'ResourceLoadBlockedByClient',
+    SpeculationRuleRemoved = 'SpeculationRuleRemoved',
+    ActivatedWithAuxiliaryBrowsingContexts = 'ActivatedWithAuxiliaryBrowsingContexts',
+    MaxNumOfRunningEagerPrerendersExceeded = 'MaxNumOfRunningEagerPrerendersExceeded',
+    MaxNumOfRunningNonEagerPrerendersExceeded = 'MaxNumOfRunningNonEagerPrerendersExceeded',
+    MaxNumOfRunningEmbedderPrerendersExceeded = 'MaxNumOfRunningEmbedderPrerendersExceeded',
+    PrerenderingUrlHasEffectiveUrl = 'PrerenderingUrlHasEffectiveUrl',
+    RedirectedPrerenderingUrlHasEffectiveUrl = 'RedirectedPrerenderingUrlHasEffectiveUrl',
+    ActivationUrlHasEffectiveUrl = 'ActivationUrlHasEffectiveUrl',
   }
 
   /**
@@ -15723,30 +16105,14 @@ export namespace Preload {
   }
 
   /**
-   * Fired when a prerender attempt is completed.
-   */
-  export interface PrerenderAttemptCompletedEvent {
-    key: PreloadingAttemptKey;
-    /**
-     * The frame id of the frame initiating prerendering.
-     */
-    initiatingFrameId: Page.FrameId;
-    prerenderingUrl: string;
-    finalStatus: PrerenderFinalStatus;
-    /**
-     * This is used to give users more information about the name of the API call
-     * that is incompatible with prerender and has caused the cancellation of the attempt
-     */
-    disallowedApiMethod?: string;
-  }
-
-  /**
    * Fired when a preload enabled state is updated.
    */
   export interface PreloadEnabledStateUpdatedEvent {
     disabledByPreference: boolean;
     disabledByDataSaver: boolean;
     disabledByBatterySaver: boolean;
+    disabledByHoldbackPrefetchSpeculationRules: boolean;
+    disabledByHoldbackPrerenderSpeculationRules: boolean;
   }
 
   /**
@@ -15761,6 +16127,7 @@ export namespace Preload {
     prefetchUrl: string;
     status: PreloadingStatus;
     prefetchStatus: PrefetchStatus;
+    requestId: Network.RequestId;
   }
 
   /**
@@ -15770,6 +16137,11 @@ export namespace Preload {
     key: PreloadingAttemptKey;
     status: PreloadingStatus;
     prerenderStatus?: PrerenderFinalStatus;
+    /**
+     * This is used to give users more information about the name of Mojo interface
+     * that is incompatible with prerender and has caused the cancellation of the attempt.
+     */
+    disallowedMojoInterface?: string;
   }
 
   /**
@@ -15801,6 +16173,7 @@ export namespace FedCm {
   export const enum DialogType {
     AccountChooser = 'AccountChooser',
     AutoReauthn = 'AutoReauthn',
+    ConfirmIdpSignin = 'ConfirmIdpSignin',
   }
 
   /**
@@ -15834,6 +16207,10 @@ export namespace FedCm {
   export interface SelectAccountRequest {
     dialogId: string;
     accountIndex: integer;
+  }
+
+  export interface ConfirmIdpSigninRequest {
+    dialogId: string;
   }
 
   export interface DismissDialogRequest {
@@ -17270,8 +17647,7 @@ export namespace Runtime {
   }
 
   /**
-   * Represents options for serialization. Overrides `generatePreview`, `returnByValue` and
-   * `generateWebDriverValue`.
+   * Represents options for serialization. Overrides `generatePreview` and `returnByValue`.
    */
   export interface SerializationOptions {
     serialization: SerializationOptionsSerialization;
@@ -17279,6 +17655,12 @@ export namespace Runtime {
      * Deep serialization depth. Default is full depth. Respected only in `deep` serialization mode.
      */
     maxDepth?: integer;
+    /**
+     * Embedder-specific parameters. For example if connected to V8 in Chrome these control DOM
+     * serialization via `maxNodeDepth: integer` and `includeShadowTree: "none" | "open" | "all"`.
+     * Values can be only of type string or integer.
+     */
+    additionalParameters?: any;
   }
 
   export const enum DeepSerializedValueType {
@@ -17305,6 +17687,7 @@ export namespace Runtime {
     Arraybuffer = 'arraybuffer',
     Node = 'node',
     Window = 'window',
+    Generator = 'generator',
   }
 
   /**
@@ -17397,10 +17780,6 @@ export namespace Runtime {
      * String representation of the object.
      */
     description?: string;
-    /**
-     * Deprecated. Use `deepSerializedValue` instead. WebDriver BiDi representation of the value.
-     */
-    webDriverValue?: DeepSerializedValue;
     /**
      * Deep serialized value.
      */
@@ -17912,15 +18291,8 @@ export namespace Runtime {
      */
     uniqueContextId?: string;
     /**
-     * Deprecated. Use `serializationOptions: {serialization:"deep"}` instead.
-     * Whether the result should contain `webDriverValue`, serialized according to
-     * https://w3c.github.io/webdriver-bidi. This is mutually exclusive with `returnByValue`, but
-     * resulting `objectId` is still provided.
-     */
-    generateWebDriverValue?: boolean;
-    /**
      * Specifies the result serialization. If provided, overrides
-     * `generatePreview`, `returnByValue` and `generateWebDriverValue`.
+     * `generatePreview` and `returnByValue`.
      */
     serializationOptions?: SerializationOptions;
   }
@@ -18046,16 +18418,8 @@ export namespace Runtime {
      */
     uniqueContextId?: string;
     /**
-     * Deprecated. Use `serializationOptions: {serialization:"deep"}` instead.
-     * Whether the result should contain `webDriverValue`, serialized
-     * according to
-     * https://w3c.github.io/webdriver-bidi. This is mutually exclusive with `returnByValue`, but
-     * resulting `objectId` is still provided.
-     */
-    generateWebDriverValue?: boolean;
-    /**
      * Specifies the result serialization. If provided, overrides
-     * `generatePreview`, `returnByValue` and `generateWebDriverValue`.
+     * `generatePreview` and `returnByValue`.
      */
     serializationOptions?: SerializationOptions;
   }

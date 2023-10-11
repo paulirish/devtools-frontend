@@ -5,14 +5,9 @@
 const {assert} = chai;
 
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
-import {loadEventsFromTraceFile, setTraceModelTimeout} from '../../../helpers/TraceHelpers.js';
+import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 describe('UserInteractionsHandler', function() {
-  setTraceModelTimeout(this);
-  beforeEach(async () => {
-    TraceModel.Handlers.ModelHandlers.UserInteractions.reset();
-  });
-
   describe('error handling', () => {
     it('throws if not initialized', async () => {
       // Finalize the handler by calling data and then finalize on it.
@@ -26,8 +21,8 @@ describe('UserInteractionsHandler', function() {
     });
   });
 
-  it('returns all user interactions', async () => {
-    const traceEvents = await loadEventsFromTraceFile('slow-interaction-button-click.json.gz');
+  it('returns all user interactions', async function() {
+    const traceEvents = await TraceLoader.rawEvents(this, 'slow-interaction-button-click.json.gz');
     for (const event of traceEvents) {
       TraceModel.Handlers.ModelHandlers.UserInteractions.handleEvent(event);
     }
@@ -45,9 +40,9 @@ describe('UserInteractionsHandler', function() {
     assert.strictEqual(clicks.length, 1);
   });
 
-  describe('interactions', () => {
-    async function processTrace(path: string): Promise<void> {
-      const traceEvents = await loadEventsFromTraceFile(path);
+  describe('interactions', function() {
+    async function processTrace(context: Mocha.Suite|Mocha.Context|null, path: string): Promise<void> {
+      const traceEvents = await TraceLoader.rawEvents(context, path);
       for (const event of traceEvents) {
         TraceModel.Handlers.ModelHandlers.UserInteractions.handleEvent(event);
       }
@@ -55,7 +50,7 @@ describe('UserInteractionsHandler', function() {
     }
 
     it('returns all interaction events', async () => {
-      await processTrace('slow-interaction-button-click.json.gz');
+      await processTrace(this, 'slow-interaction-button-click.json.gz');
       const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
       // There are three inct interactions:
       // pointerdown on the button (start of the click)
@@ -64,7 +59,7 @@ describe('UserInteractionsHandler', function() {
     });
 
     it('identifies the longest interaction', async () => {
-      await processTrace('slow-interaction-keydown.json.gz');
+      await processTrace(this, 'slow-interaction-keydown.json.gz');
       const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
       assert.lengthOf(data.interactionEvents, 5);
 
@@ -75,8 +70,22 @@ describe('UserInteractionsHandler', function() {
       assert.strictEqual(data.longestInteractionEvent, expectedLongestEvent);
     });
 
+    it('returns a set of all interactions that exceed the threshold', async () => {
+      await processTrace(this, 'one-second-interaction.json.gz');
+      const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
+      // There are two long interactions: the pointerup, and the click.
+      assert.strictEqual(data.interactionsOverThreshold.size, 2);
+    });
+
+    it('does not include interactions below the threshold', async () => {
+      await processTrace(this, 'slow-interaction-keydown.json.gz');
+      const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
+      // All the interactions in this trace are < 200ms
+      assert.strictEqual(data.interactionsOverThreshold.size, 0);
+    });
+
     it('sets the `dur` key on each event by finding the begin and end events and subtracting the ts', async () => {
-      await processTrace('slow-interaction-button-click.json.gz');
+      await processTrace(this, 'slow-interaction-button-click.json.gz');
       const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
       for (const syntheticEvent of data.interactionEvents) {
         assert.strictEqual(
@@ -85,7 +94,7 @@ describe('UserInteractionsHandler', function() {
     });
 
     it('gets the right interaction IDs for each interaction', async () => {
-      await processTrace('slow-interaction-button-click.json.gz');
+      await processTrace(this, 'slow-interaction-button-click.json.gz');
       const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
       assert.deepEqual(data.interactionEvents.map(i => i.interactionId), [
         // pointerdown, pointerup and click are all from the same interaction
@@ -96,7 +105,7 @@ describe('UserInteractionsHandler', function() {
     });
 
     it('gets the right interaction IDs for a keypress interaction', async () => {
-      await processTrace('slow-interaction-keydown.json.gz');
+      await processTrace(this, 'slow-interaction-keydown.json.gz');
       const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
       assert.deepEqual(data.interactionEvents.map(i => i.interactionId), [
         // pointerdown from clicking on the input
@@ -112,7 +121,7 @@ describe('UserInteractionsHandler', function() {
       ]);
 
       it('detects correct events for a click and keydown interaction', async () => {
-        await processTrace('slow-interaction-keydown.json.gz');
+        await processTrace(this, 'slow-interaction-keydown.json.gz');
         const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
         const foundInteractions = data.allEvents;
         // We expect there to be 3 interactions:
@@ -323,7 +332,7 @@ describe('UserInteractionsHandler', function() {
       });
 
       it('can remove nested interactions in a real trace', async () => {
-        await processTrace('nested-interactions.json.gz');
+        await processTrace(this, 'nested-interactions.json.gz');
         const data = TraceModel.Handlers.ModelHandlers.UserInteractions.data();
 
         const visibleEventInteractionIds = data.interactionEventsWithNoNesting.map(event => {

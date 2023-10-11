@@ -4,41 +4,15 @@
 
 import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
-import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
-import {traceModelFromTraceFile} from '../../helpers/TimelineHelpers.js';
-import {loadModelDataFromTraceFile, setTraceModelTimeout} from '../../helpers/TraceHelpers.js';
-
-import type * as Platform from '../../../../../front_end/core/platform/platform.js';
+import {describeWithEnvironment, registerNoopActions} from '../../helpers/EnvironmentHelpers.js';
+import {TraceLoader} from '../../helpers/TraceLoader.js';
 
 const {assert} = chai;
 
 describeWithEnvironment('TimelineHistoryManager', function() {
-  setTraceModelTimeout(this);
-
   let historyManager: Timeline.TimelineHistoryManager.TimelineHistoryManager;
   beforeEach(() => {
-    UI.ActionRegistration.registerActionExtension({
-      actionId: 'timeline.show-history',
-      async loadActionDelegate() {
-        return Timeline.TimelinePanel.ActionDelegate.instance();
-      },
-      category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-      title: () => '' as Platform.UIString.LocalizedString,
-      contextTypes() {
-        return [Timeline.TimelinePanel.TimelinePanel];
-      },
-      bindings: [
-        {
-          platform: UI.ActionRegistration.Platforms.WindowsLinux,
-          shortcut: 'Ctrl+H',
-        },
-        {
-          platform: UI.ActionRegistration.Platforms.Mac,
-          shortcut: 'Meta+Y',
-        },
-      ],
-    });
-    UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
+    registerNoopActions(['timeline.show-history']);
     historyManager = new Timeline.TimelineHistoryManager.TimelineHistoryManager();
   });
 
@@ -46,26 +20,38 @@ describeWithEnvironment('TimelineHistoryManager', function() {
     UI.ActionRegistry.ActionRegistry.reset();
   });
 
-  it('can select from multiple parsed data objects', async () => {
+  it('can select from multiple parsed data objects', async function() {
     // Add two parsed data objects to the history manager.
-    const firstTraceFileName = 'slow-interaction-button-click.json.gz';
-    const firstLegacyModel = await traceModelFromTraceFile(firstTraceFileName);
-    const firstTraceParsedData = await loadModelDataFromTraceFile(firstTraceFileName);
-    historyManager.addRecording(firstLegacyModel.performanceModel, firstTraceParsedData);
+    const firstFileModels = await TraceLoader.allModels(this, 'slow-interaction-button-click.json.gz');
+    historyManager.addRecording(
+        {
+          data: {
+            legacyModel: firstFileModels.performanceModel,
+            traceParseDataIndex: 1,
+          },
+          filmStripForPreview: null,
+          traceParsedData: firstFileModels.traceParsedData,
+        },
+    );
 
-    const secondTraceFileName = 'slow-interaction-keydown.json.gz';
-    const secondLegacyModel = await traceModelFromTraceFile(secondTraceFileName);
-    const secondTraceParsedData = await loadModelDataFromTraceFile(secondTraceFileName);
-    historyManager.addRecording(secondLegacyModel.performanceModel, secondTraceParsedData);
+    const secondFileModels = await TraceLoader.allModels(this, 'slow-interaction-keydown.json.gz');
+    historyManager.addRecording({
+      data: {
+        legacyModel: secondFileModels.performanceModel,
+        traceParseDataIndex: 2,
+      },
+      filmStripForPreview: null,
+      traceParsedData: secondFileModels.traceParsedData,
+    });
 
     // Make sure the correct model tuples (legacy and new engine) are returned when
     // using the history manager to navigate between trace files..
     const previousRecording = historyManager.navigate(1);
-    assert.strictEqual(previousRecording?.legacyModel, firstLegacyModel.performanceModel);
-    assert.strictEqual(previousRecording?.traceParseData, firstTraceParsedData);
+    assert.strictEqual(previousRecording?.legacyModel, firstFileModels.performanceModel);
+    assert.strictEqual(previousRecording?.traceParseDataIndex, 1);
 
     const nextRecording = historyManager.navigate(-1);
-    assert.strictEqual(nextRecording?.legacyModel, secondLegacyModel.performanceModel);
-    assert.strictEqual(nextRecording?.traceParseData, secondTraceParsedData);
+    assert.strictEqual(nextRecording?.legacyModel, secondFileModels.performanceModel);
+    assert.strictEqual(nextRecording?.traceParseDataIndex, 2);
   });
 });

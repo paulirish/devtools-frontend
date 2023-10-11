@@ -95,9 +95,21 @@ const UIStrings = {
    */
   delete: 'Delete',
   /**
+   *@description A button text to confirm an action to remove a folder. This is not the same as delete. It removes the folder from UI but do not delete them.
+   */
+  remove: 'Remove',
+  /**
    *@description Text in Navigator View of the Sources panel
    */
-  areYouSureYouWantToDeleteAll: 'Are you sure you want to delete all overrides contained in this folder?',
+  areYouSureYouWantToDeleteAllOverrides: 'Are you sure you want to delete all overrides in this folder?',
+  /**
+   *@description Text in Navigator View of the Sources panel
+   */
+  areYouSureYouWantToDeleteFolder: 'Are you sure you want to delete this folder and its contents?',
+  /**
+   *@description Text in Navigator View of the Sources panel. A confirmation message on action to delete a folder.
+   */
+  actionCannotBeUndone: 'This action cannot be undone.',
   /**
    *@description A context menu item in the Navigator View of the Sources panel
    */
@@ -107,17 +119,22 @@ const UIStrings = {
    */
   newFile: 'New file',
   /**
-   *@description A context menu item in the Navigator View of the Sources panel
+   *@description A context menu item in the Navigator View of the Sources panel to exclude a folder from workspace
    */
-  excludeFolder: 'Exclude folder',
+  excludeFolder: 'Exclude from workspace',
   /**
    *@description A context menu item in the Navigator View of the Sources panel
    */
-  removeFolderFromWorkspace: 'Remove folder from workspace',
+  removeFolderFromWorkspace: 'Remove from workspace',
   /**
    *@description Text in Navigator View of the Sources panel
+   * @example {a-folder-name} PH1
    */
-  areYouSureYouWantToRemoveThis: 'Are you sure you want to remove this folder?',
+  areYouSureYouWantToRemoveThis: 'Remove ‘{PH1}’ from Workspace?',
+  /**
+   *@description Text in Navigator View of the Sources panel. Warning message when user remove a folder.
+   */
+  workspaceStopSyncing: 'This will stop syncing changes from DevTools to your sources.',
   /**
    *@description A context menu item in the Navigator View of the Sources panel
    */
@@ -133,6 +150,7 @@ const UIStrings = {
    */
   sIgnoreListed: '{PH1} (ignore listed)',
 };
+
 const str_ = i18n.i18n.registerUIStrings('panels/sources/NavigatorView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export const Types = {
@@ -145,7 +163,6 @@ export const Types = {
   Frame: 'frame',
   NetworkFolder: 'nw-folder',
   Root: 'root',
-  SourceMapFolder: 'sm-folder',
   Worker: 'worker',
 };
 
@@ -156,7 +173,6 @@ const TYPE_ORDERS = new Map([
   [Types.Domain, 10],
   [Types.FileSystemFolder, 1],
   [Types.NetworkFolder, 1],
-  [Types.SourceMapFolder, 2],
   [Types.File, 10],
   [Types.Frame, 70],
   [Types.Worker, 90],
@@ -472,6 +488,10 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
       return;
     }
 
+    if (uiSourceCode.isFetchXHR()) {
+      return;
+    }
+
     const frames = Bindings.NetworkProject.NetworkProject.framesForUISourceCode(uiSourceCode);
     if (frames.length) {
       for (const frame of frames) {
@@ -507,6 +527,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     } else {
       folderNode.appendChild(uiSourceCodeNode);
       this.uiSourceCodeNodes.set(uiSourceCode, uiSourceCodeNode);
+      uiSourceCodeNode.updateTitleBubbleUp();
     }
     this.selectDefaultTreeNode();
   }
@@ -644,7 +665,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
 
     const parentNode =
         this.folderNode(uiSourceCode, project, target, frame, projectOrigin, path.slice(0, -1), fromSourceMap);
-    let type: string = fromSourceMap ? Types.SourceMapFolder : Types.NetworkFolder;
+    let type: string = Types.NetworkFolder;
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
       type = Types.FileSystemFolder;
     }
@@ -791,6 +812,13 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
       return null;
     }
     if (this.scriptsTree.selectedTreeElement) {
+      // If the tree outline is being marked as "being edited" (i.e. we're renaming a file
+      // or chosing the name for a new snippet), we shall not proceed with revealing here,
+      // as that will steal focus from the input widget and thus cancel editing. The
+      // test/e2e/snippets/breakpoint_test.ts exercises this.
+      if (UI.UIUtils.isBeingEdited(this.scriptsTree.selectedTreeElement.treeOutline?.element)) {
+        return null;
+      }
       this.scriptsTree.selectedTreeElement.deselect();
     }
     this.lastSelectedUISourceCode = uiSourceCode;
@@ -843,7 +871,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     this.uiSourceCodeNodes.delete(uiSourceCode, node);
     const project = uiSourceCode.project();
     const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
-    const frame = node.frame();
+    let frame = node.frame();
 
     let parentNode: (NavigatorTreeNode|null) = node.parent;
     if (!parentNode) {
@@ -854,7 +882,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
 
     while (currentNode) {
       parentNode = currentNode.parent;
-      if (!parentNode || !currentNode.isEmpty()) {
+      if (!parentNode) {
         break;
       }
       if ((parentNode === this.rootNode || parentNode === this.deployedNode) &&
@@ -864,19 +892,23 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
       if (!(currentNode instanceof NavigatorGroupTreeNode || currentNode instanceof NavigatorFolderTreeNode)) {
         break;
       }
+      if (!currentNode.isEmpty()) {
+        currentNode.updateTitleBubbleUp();
+        break;
+      }
       if (currentNode.type === Types.Frame) {
         this.discardFrame(
             frame as SDK.ResourceTreeModel.ResourceTreeFrame,
             Boolean(this.groupByAuthored) && uiSourceCode.contentType().isFromSourceMap());
-        break;
+        frame = (frame as SDK.ResourceTreeModel.ResourceTreeFrame).parentFrame();
+      } else {
+        const folderId = this.folderNodeId(
+            project, target, frame, uiSourceCode.origin(), uiSourceCode.contentType().isFromSourceMap(),
+            currentNode instanceof NavigatorFolderTreeNode && currentNode.folderPath ||
+                Platform.DevToolsPath.EmptyEncodedPathString);
+        this.subfolderNodes.delete(folderId);
+        parentNode.removeChild(currentNode);
       }
-
-      const folderId = this.folderNodeId(
-          project, target, frame, uiSourceCode.origin(), uiSourceCode.contentType().isFromSourceMap(),
-          currentNode instanceof NavigatorFolderTreeNode && currentNode.folderPath ||
-              Platform.DevToolsPath.EmptyEncodedPathString);
-      this.subfolderNodes.delete(folderId);
-      parentNode.removeChild(currentNode);
 
       if (currentNode === this.authoredNode) {
         this.authoredNode = undefined;
@@ -972,8 +1004,10 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
   }
 
   private async handleDeleteOverrides(node: NavigatorTreeNode): Promise<void> {
-    const shouldRemove = await UI.UIUtils.ConfirmDialog.show(i18nString(UIStrings.areYouSureYouWantToDeleteAll));
+    const shouldRemove =
+        await UI.UIUtils.ConfirmDialog.show(i18nString(UIStrings.areYouSureYouWantToDeleteAllOverrides));
     if (shouldRemove) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideTabDeleteOverridesContextMenu);
       this.handleDeleteOverridesHelper(node);
     }
   }
@@ -982,13 +1016,65 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     node.children().forEach(child => {
       this.handleDeleteOverridesHelper(child);
     });
+
     if (node instanceof NavigatorUISourceCodeTreeNode) {
       // Only delete confirmed overrides and not just any file that happens to be in the folder.
       const binding = Persistence.Persistence.PersistenceImpl.instance().binding(node.uiSourceCode());
-      if (binding) {
+      const headerBinding =
+          Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().isActiveHeaderOverrides(
+              node.uiSourceCode());
+      if (binding || headerBinding) {
         node.uiSourceCode().project().deleteFile(node.uiSourceCode());
       }
     }
+  }
+
+  private async handleDeleteFolder(node: NavigatorTreeNode): Promise<void> {
+    const warningMsg =
+        `${i18nString(UIStrings.areYouSureYouWantToDeleteFolder)}\n${i18nString(UIStrings.actionCannotBeUndone)}`;
+    const shouldRemove = await UI.UIUtils.ConfirmDialog.show(warningMsg);
+    if (shouldRemove) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideTabDeleteFolderContextMenu);
+      const topNode = this.findTopNonMergedNode(node);
+      await this.removeUISourceCodeFromProject(topNode);
+      await this.deleteDirectoryRecursively(topNode);
+    }
+  }
+
+  private async removeUISourceCodeFromProject(node: NavigatorTreeNode): Promise<void> {
+    node.children().forEach(async child => {
+      await this.removeUISourceCodeFromProject(child);
+    });
+
+    if (node instanceof NavigatorUISourceCodeTreeNode) {
+      node.uiSourceCode().project().removeUISourceCode(node.uiSourceCode().url());
+    }
+  }
+
+  private async deleteDirectoryRecursively(node: NavigatorTreeNode): Promise<void> {
+    if (!(node instanceof NavigatorFolderTreeNode)) {
+      return;
+    }
+
+    await Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance()
+        .project()
+        ?.deleteDirectoryRecursively(node.folderPath);
+  }
+
+  private findTopNonMergedNode(node: NavigatorTreeNode): NavigatorTreeNode {
+    // multiple folder nodes can be merged into one if it only contains one file
+    // e.g. the folder of "abc.com/assets/css/button.css" can be "abc.com/assets/css"
+    // find the top non-merged node (abc.com) recursively
+
+    if (!node.isMerged) {
+      return node;
+    }
+
+    if (!(node.parent instanceof NavigatorFolderTreeNode)) {
+      return node;
+    }
+
+    return this.findTopNonMergedNode(node.parent);
   }
 
   handleFolderContextMenu(event: Event, node: NavigatorFolderTreeNode): void {
@@ -1016,8 +1102,12 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
       }
     } else if (node.origin && node.folderPath) {
       const url = Common.ParsedURL.ParsedURL.concatenate(node.origin, '/', node.folderPath);
+      const options = {
+        isContentScript: node.recursiveProperties.exclusivelyContentScripts || false,
+        isKnownThirdParty: node.recursiveProperties.exclusivelyThirdParty || false,
+      };
       for (const {text, callback} of Bindings.IgnoreListManager.IgnoreListManager.instance()
-               .getIgnoreListFolderContextMenuItems(url)) {
+               .getIgnoreListFolderContextMenuItems(url, options)) {
         contextMenu.defaultSection().appendItem(text, callback);
       }
     }
@@ -1028,18 +1118,33 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     }
 
     if (project.type() === Workspace.Workspace.projectTypes.FileSystem) {
-      contextMenu.defaultSection().appendAction('sources.add-folder-to-workspace', undefined, true);
-      if (node instanceof NavigatorGroupTreeNode) {
-        contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeFolderFromWorkspace), async () => {
-          const shouldRemove = await UI.UIUtils.ConfirmDialog.show(i18nString(UIStrings.areYouSureYouWantToRemoveThis));
-          if (shouldRemove) {
-            project.remove();
-          }
-        });
-      }
-      if ((project as Persistence.FileSystemWorkspaceBinding.FileSystem).fileSystem().type() === 'overrides') {
-        contextMenu.defaultSection().appendItem(
-            i18nString(UIStrings.deleteAllOverrides), this.handleDeleteOverrides.bind(this, node));
+      const isFileOverrides =
+          (project as Persistence.FileSystemWorkspaceBinding.FileSystem).fileSystem().type() === 'overrides';
+
+      if (!isFileOverrides) {
+        if (node instanceof NavigatorGroupTreeNode) {
+          contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeFolderFromWorkspace), async () => {
+            const warningMessage = `${i18nString(UIStrings.areYouSureYouWantToRemoveThis, {
+              PH1: (node as NavigatorGroupTreeNode).title,
+            })}\n${i18nString(UIStrings.workspaceStopSyncing)}`;
+            const shouldRemove = await UI.UIUtils.ConfirmDialog.show(warningMessage, undefined, {
+              okButtonLabel: i18nString(UIStrings.remove),
+            });
+            if (shouldRemove) {
+              project.remove();
+            }
+          });
+        }
+      } else {
+        if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.DELETE_OVERRIDES_TEMP_ENABLE)) {
+          contextMenu.defaultSection().appendItem(
+              i18nString(UIStrings.deleteAllOverrides), this.handleDeleteOverrides.bind(this, node));
+        }
+
+        if (!(node instanceof NavigatorGroupTreeNode)) {
+          contextMenu.defaultSection().appendItem(
+              i18nString(UIStrings.delete), this.handleDeleteFolder.bind(this, node));
+        }
       }
     }
 
@@ -1164,16 +1269,18 @@ export class NavigatorFolderTreeElement extends UI.TreeOutline.TreeElement {
   node!: NavigatorTreeNode;
   private hovered?: boolean;
   private isIgnoreListed?: boolean;
+  private isFromSourceMap: boolean;
 
   constructor(navigatorView: NavigatorView, type: string, title: string, hoverCallback?: ((arg0: boolean) => void)) {
     super('', true);
     this.listItemElement.classList.add('navigator-' + type + '-tree-item', 'navigator-folder-tree-item');
-    UI.ARIAUtils.setAccessibleName(this.listItemElement, `${title}, ${type}`);
+    UI.ARIAUtils.setLabel(this.listItemElement, `${title}, ${type}`);
     this.nodeType = type;
     this.title = title;
     this.tooltip = title;
     this.navigatorView = navigatorView;
     this.hoverCallback = hoverCallback;
+    this.isFromSourceMap = false;
 
     let iconType = 'folder';
 
@@ -1215,10 +1322,15 @@ export class NavigatorFolderTreeElement extends UI.TreeOutline.TreeElement {
     }
   }
 
+  setFromSourceMap(isFromSourceMap: boolean): void {
+    this.isFromSourceMap = isFromSourceMap;
+    this.listItemElement.classList.toggle('is-from-source-map', isFromSourceMap);
+  }
+
   setNode(node: NavigatorTreeNode): void {
     this.node = node;
     this.updateTooltip();
-    UI.ARIAUtils.setAccessibleName(this.listItemElement, `${this.title}, ${this.nodeType}`);
+    UI.ARIAUtils.setLabel(this.listItemElement, `${this.title}, ${this.nodeType}`);
   }
 
   private updateTooltip(): void {
@@ -1281,7 +1393,7 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
     this.listItemElement.classList.add(
         'navigator-' + uiSourceCode.contentType().name() + '-tree-item', 'navigator-file-tree-item');
     this.tooltip = uiSourceCode.url();
-    UI.ARIAUtils.setAccessibleName(this.listItemElement, `${uiSourceCode.name()}, ${this.nodeType}`);
+    UI.ARIAUtils.setLabel(this.listItemElement, `${uiSourceCode.name()}, ${this.nodeType}`);
     Common.EventTarget.fireEvent('source-tree-file-added', uiSourceCode.fullDisplayName());
     this.navigatorView = navigatorView;
     this.uiSourceCodeInternal = uiSourceCode;
@@ -1290,19 +1402,16 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
 
   updateIcon(): void {
     const binding = Persistence.Persistence.PersistenceImpl.instance().binding(this.uiSourceCodeInternal);
+    const networkPersistenceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
     let iconType = 'document';
     let iconStyles: string[] = [];
     if (binding) {
       if (Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(binding.fileSystem)) {
         iconType = 'snippet';
       }
-      const badgeIsPurple = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project() ===
-          binding.fileSystem.project();
+      const badgeIsPurple = networkPersistenceManager.project() === binding.fileSystem.project();
       iconStyles = badgeIsPurple ? ['dot', 'purple'] : ['dot', 'green'];
-    } else if (
-        this.uiSourceCodeInternal.url().endsWith(Persistence.NetworkPersistenceManager.HEADERS_FILENAME) &&
-        Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance()
-            .hasMatchingNetworkUISourceCodeForHeaderOverridesFile(this.uiSourceCodeInternal)) {
+    } else if (networkPersistenceManager.isActiveHeaderOverrides(this.uiSourceCode)) {
       iconStyles = ['dot', 'purple'];
     } else {
       if (Snippets.ScriptSnippetFileSystem.isSnippetsUISourceCode(this.uiSourceCodeInternal)) {
@@ -1324,7 +1433,7 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   updateAccessibleName(): void {
-    UI.ARIAUtils.setAccessibleName(this.listItemElement, `${this.uiSourceCodeInternal.name()}, ${this.nodeType}`);
+    UI.ARIAUtils.setLabel(this.listItemElement, `${this.uiSourceCodeInternal.name()}, ${this.nodeType}`);
   }
 
   get uiSourceCode(): Workspace.UISourceCode.UISourceCode {
@@ -1401,6 +1510,13 @@ export class NavigatorSourceTreeElement extends UI.TreeOutline.TreeElement {
   }
 }
 
+export type NavigatorRecursiveTreeNodeProperties = {
+  exclusivelySourceMapped: boolean|null,
+  exclusivelyIgnored: boolean|null,
+  exclusivelyThirdParty: boolean|null,
+  exclusivelyContentScripts: boolean|null,
+};
+
 export class NavigatorTreeNode {
   id: string;
   protected navigatorView: NavigatorView;
@@ -1411,6 +1527,7 @@ export class NavigatorTreeNode {
   parent!: NavigatorTreeNode|null;
   title!: string;
   tooltip?: string;
+  recursiveProperties: NavigatorRecursiveTreeNodeProperties;
 
   constructor(navigatorView: NavigatorView, id: string, type: string, tooltip?: string) {
     this.id = id;
@@ -1421,6 +1538,12 @@ export class NavigatorTreeNode {
 
     this.populated = false;
     this.isMerged = false;
+    this.recursiveProperties = {
+      exclusivelySourceMapped: null,
+      exclusivelyIgnored: null,
+      exclusivelyContentScripts: null,
+      exclusivelyThirdParty: null,
+    };
   }
 
   treeNode(): UI.TreeOutline.TreeElement {
@@ -1434,9 +1557,16 @@ export class NavigatorTreeNode {
   }
 
   updateTitleRecursive(): void {
-    this.updateTitle();
     for (const child of this.children()) {
       child.updateTitleRecursive();
+    }
+    this.updateTitle();
+  }
+
+  updateTitleBubbleUp(): void {
+    this.updateTitle();
+    if (this.parent) {
+      this.parent.updateTitleBubbleUp();
     }
   }
 
@@ -1546,6 +1676,13 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
     this.treeElement = null;
     this.eventListeners = [];
     this.frameInternal = frame;
+    this.recursiveProperties.exclusivelySourceMapped = uiSourceCode.contentType().isFromSourceMap();
+    if (uiSourceCode.contentType().isScript()) {
+      // These properties affect ignore-listing menus and only matter when the UISourceCode is a script
+      this.recursiveProperties.exclusivelyThirdParty = uiSourceCode.isKnownThirdParty();
+      this.recursiveProperties.exclusivelyContentScripts =
+          uiSourceCode.project().type() === Workspace.Workspace.projectTypes.ContentScripts;
+    }
   }
 
   frame(): SDK.ResourceTreeModel.ResourceTreeFrame|null {
@@ -1574,6 +1711,13 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
   }
 
   override updateTitle(ignoreIsDirty?: boolean): void {
+    const isIgnoreListed =
+        Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
+            this.uiSourceCodeInternal);
+    if (this.uiSourceCodeInternal.contentType().isScript() || isIgnoreListed) {
+      this.recursiveProperties.exclusivelyIgnored = isIgnoreListed;
+    }
+
     if (!this.treeElement) {
       return;
     }
@@ -1586,9 +1730,6 @@ export class NavigatorUISourceCodeTreeNode extends NavigatorTreeNode {
     this.treeElement.title = titleText;
     this.treeElement.updateIcon();
 
-    const isIgnoreListed =
-        Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
-            this.uiSourceCodeInternal);
     this.treeElement.listItemElement.classList.toggle('is-ignore-listed', isIgnoreListed);
 
     let tooltip: string = this.uiSourceCodeInternal.url();
@@ -1715,13 +1856,26 @@ export class NavigatorFolderTreeNode extends NavigatorTreeNode {
   }
 
   override updateTitle(): void {
+    let propName: keyof NavigatorRecursiveTreeNodeProperties;
+    for (propName in this.recursiveProperties) {
+      let propValue: boolean|null = null;
+      for (const child of this.children()) {
+        if (child.recursiveProperties[propName] === false) {
+          propValue = false;
+          break;
+        } else if (child.recursiveProperties[propName]) {
+          propValue = true;
+        }
+      }
+      this.recursiveProperties[propName] = propValue;
+    }
+
     if (!this.treeElement) {
       return;
     }
 
-    const url = Common.ParsedURL.ParsedURL.concatenate(this.origin, '/', this.folderPath, '/');
-    const isIgnoreListed = Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url);
-    this.treeElement.setIgnoreListed(isIgnoreListed);
+    this.treeElement.setFromSourceMap(this.recursiveProperties.exclusivelySourceMapped || false);
+    this.treeElement.setIgnoreListed(this.recursiveProperties.exclusivelyIgnored || false);
 
     if (!this.project || this.project.type() !== Workspace.Workspace.projectTypes.FileSystem) {
       return;

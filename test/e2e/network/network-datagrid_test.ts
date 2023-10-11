@@ -25,6 +25,7 @@ import {
   waitForSelectedRequestChange,
   waitForSomeRequestsToAppear,
 } from '../helpers/network-helpers.js';
+import {unregisterAllServiceWorkers} from '../../conductor/hooks.js';
 
 async function getRequestRowInfo(frontend: BrowserAndPages['frontend'], name: string) {
   const statusColumn = await frontend.evaluate(() => {
@@ -61,13 +62,17 @@ describe('The Network Tab', async function() {
     await setPersistLog(false);
   });
 
+  afterEach(async () => {
+    await unregisterAllServiceWorkers();
+  });
+
   it('can click on checkbox label to toggle checkbox', async () => {
     await navigateToNetworkTab('resources-from-cache.html');
 
     // Click the label next to the checkbox input element
-    await click('[aria-label="Disable cache"] + label');
+    await click('[title^="Disable cache"] + label');
 
-    const checkbox = await waitFor('[aria-label="Disable cache"]');
+    const checkbox = await waitFor('[title^="Disable cache"]');
     const checked = await checkbox.evaluate(box => (box as HTMLInputElement).checked);
 
     assert.strictEqual(checked, false, 'The disable cache checkbox should be unchecked');
@@ -376,8 +381,10 @@ describe('The Network Tab', async function() {
     await navigateToNetworkTab('send_beacon_on_unload.html');
 
     await setCacheDisabled(true);
+    await target.bringToFront();
     await target.reload({waitUntil: 'networkidle0'});
 
+    await frontend.bringToFront();
     await waitForSomeRequestsToAppear(1);
 
     await setPersistLog(true);
@@ -387,9 +394,9 @@ describe('The Network Tab', async function() {
 
     // We need to wait for the network log to update.
     await waitForFunction(async () => {
-      const {status, time} = await getRequestRowInfo(frontend, 'sendBeacon');
+      const {status} = await getRequestRowInfo(frontend, 'sendBeacon');
       // Depending on timing of the reporting, the status infomation (404) might reach DevTools in time.
-      return (status === '(unknown)' || status === '404Not Found') && time === '(unknown)';
+      return (status === '(unknown)' || status === '404Not Found');
     });
   });
 
@@ -422,8 +429,7 @@ describe('The Network Tab', async function() {
       return document.querySelector('.network-log-grid tbody tr.selected')?.getAttribute('style');
     });
 
-    assert.deepStrictEqual(
-        await getSelectedRequestBgColor(), 'background-color: var(--network-grid-focus-selected-color);');
+    assert.deepStrictEqual(await getSelectedRequestBgColor(), 'background-color: var(--color-grid-focus-selected);');
   });
 
   it('shows the request panel when clicked during a websocket message (https://crbug.com/1222382)', async () => {

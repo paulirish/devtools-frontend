@@ -14,7 +14,7 @@ import {
   selectStorageItemAtIndex,
 } from '../helpers/application-helpers.js';
 
-const SESSION_STORAGE_SELECTOR = '[aria-label="Session Storage"].parent';
+const SESSION_STORAGE_SELECTOR = '[aria-label="Session storage"].parent';
 let DOMAIN_SELECTOR: string;
 
 describe('The Application Tab', async () => {
@@ -35,7 +35,7 @@ describe('The Application Tab', async () => {
     });
 
     await step('check that storage data values are correct', async () => {
-      const dataGridRowValues = await getStorageItemsData(['key', 'value']);
+      const dataGridRowValues = await getStorageItemsData(['key', 'value'], 2);
       assert.deepEqual(dataGridRowValues, [
         {
           key: 'firstKey',
@@ -60,7 +60,7 @@ describe('The Application Tab', async () => {
     await selectStorageItemAtIndex(0);
     await deleteSelectedStorageItem();
 
-    const dataGridRowValues = await getStorageItemsData(['key', 'value']);
+    const dataGridRowValues = await getStorageItemsData(['key', 'value'], 1);
     assert.deepEqual(dataGridRowValues, [
       {
         key: 'secondKey',

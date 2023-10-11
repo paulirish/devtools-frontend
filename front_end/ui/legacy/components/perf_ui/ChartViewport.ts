@@ -45,11 +45,11 @@ export class ChartViewport extends UI.Widget.VBox {
   private targetLeftTime!: number;
   private targetRightTime!: number;
   private selectionOffsetShiftX!: number;
-  private selectionOffsetShiftY!: number;
   private selectionStartX!: number|null;
-  private lastMouseOffsetX!: number;
+  private lastMouseOffsetX?: number;
   private minimumBoundary!: number;
   private totalTime!: number;
+  private isUpdateScheduled?: boolean;
   private cancelWindowTimesAnimation?: (() => void)|null;
 
   constructor(delegate: ChartViewportDelegate) {
@@ -141,6 +141,7 @@ export class ChartViewport extends UI.Widget.VBox {
     this.totalHeight = 0;
     this.targetLeftTime = 0;
     this.targetRightTime = 0;
+    this.isUpdateScheduled = false;
     this.updateContentElementSize();
   }
 
@@ -237,7 +238,6 @@ export class ChartViewport extends UI.Widget.VBox {
     }
     this.isDraggingInternal = true;
     this.selectionOffsetShiftX = event.offsetX - event.pageX;
-    this.selectionOffsetShiftY = event.offsetY - event.pageY;
     this.selectionStartX = event.offsetX;
     const style = this.selectionOverlay.style;
     style.left = this.selectionStartX + 'px';
@@ -377,7 +377,10 @@ export class ChartViewport extends UI.Widget.VBox {
 
   private handleZoomGesture(zoom: number): void {
     const bounds = {left: this.targetLeftTime, right: this.targetRightTime};
-    const cursorTime = this.pixelToTime(this.lastMouseOffsetX);
+    // If the user has not moved their mouse over the panel (unlikely but
+    // possible!), the offsetX will be undefined. In that case, let's just use
+    // the minimum time / pixel 0 as their mouse point.
+    const cursorTime = this.pixelToTime(this.lastMouseOffsetX || 0);
     bounds.left += (bounds.left - cursorTime) * zoom;
     bounds.right += (bounds.right - cursorTime) * zoom;
     this.requestWindowTimes(bounds, /* animate */ true);
@@ -414,10 +417,14 @@ export class ChartViewport extends UI.Widget.VBox {
   }
 
   scheduleUpdate(): void {
-    if (this.cancelWindowTimesAnimation) {
+    if (this.cancelWindowTimesAnimation || this.isUpdateScheduled) {
       return;
     }
-    void coordinator.write(() => this.update());
+    this.isUpdateScheduled = true;
+    void coordinator.write(() => {
+      this.isUpdateScheduled = false;
+      this.update();
+    });
   }
 
   private update(): void {

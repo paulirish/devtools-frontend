@@ -109,74 +109,6 @@ describe('TextUtils', () => {
       assert.strictEqual(result[0].text, testVal, 'text value was not returned correctly');
       assert.strictEqual(result[0].negative, false, 'negative value was not returned correctly');
     });
-  });
-
-  describe('BalancedJSONTokenizer', () => {
-    it('can be instantiated successfully', () => {
-      const callback = () => {};
-      const findMultiple = false;
-      const tokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(callback, findMultiple);
-      assert.strictEqual(tokenizer.remainder(), '', 'remainder was not empty');
-    });
-
-    it('can balance simple patterns', () => {
-      const callbackResults: string[] = [];
-      const callback = (str: string) => {
-        callbackResults.push(str);
-      };
-      const findMultiple = false;
-      const tokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(callback, findMultiple);
-
-      let result = tokenizer.write('a');
-      assert.strictEqual(result, true, 'return value was incorrect');
-      assert.deepEqual(callbackResults, [], 'callback was called');
-
-      result = tokenizer.write('{}');
-      assert.strictEqual(result, true, 'return value was incorrect');
-      assert.deepEqual(callbackResults, ['a{}'], 'callback had unexpected results');
-    });
-
-    it('can find simple unbalanced patterns', () => {
-      const callbackResults: string[] = [];
-      const callback = (str: string) => {
-        callbackResults.push(str);
-      };
-      const findMultiple = false;
-      const tokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(callback, findMultiple);
-
-      const result = tokenizer.write('{}}');
-      assert.strictEqual(result, true, 'return value was incorrect');
-      assert.deepEqual(callbackResults, ['{}'], 'callback had unexpected results');
-      assert.strictEqual(tokenizer.remainder(), '}', 'remainder was incorrect');
-    });
-
-    it('can find simple unbalanced quote patterns', () => {
-      const callbackResults: string[] = [];
-      const callback = (str: string) => {
-        callbackResults.push(str);
-      };
-      const findMultiple = false;
-      const tokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(callback, findMultiple);
-
-      const result = tokenizer.write('"""');
-      assert.strictEqual(result, true, 'return value was incorrect');
-      assert.deepEqual(callbackResults, [], 'callback had unexpected results');
-      assert.strictEqual(tokenizer.remainder(), '"""', 'remainder was incorrect');
-    });
-
-    it('can find unbalanced patterns that start with }', () => {
-      const callbackResults: string[] = [];
-      const callback = (str: string) => {
-        callbackResults.push(str);
-      };
-      const findMultiple = false;
-      const tokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(callback, findMultiple);
-
-      const result = tokenizer.write('}}');
-      assert.strictEqual(result, false, 'return value was incorrect');
-      assert.deepEqual(callbackResults, [], 'callback had unexpected results');
-      assert.strictEqual(tokenizer.remainder(), '}}', 'remainder was incorrect');
-    });
 
     describe('parse', () => {
       it('returns empty for empty string', () => {
@@ -226,14 +158,26 @@ describe('TextUtils', () => {
         assert.deepEqual(
             result[1], {key: undefined, regex: /another/i, text: undefined, negative: false}, 'result was incorrect');
 
-        result = parse('/complex\/regex/');
+        result = parse(String.raw`/complex\/regex/`);
         assert.deepEqual(
             result[0], {key: undefined, regex: /complex\/regex/i, text: undefined, negative: false},
+            'result was incorrect');
+
+        result = parse('/regex with spaces/');
+        assert.deepEqual(
+            result[0], {key: undefined, regex: /regex with spaces/i, text: undefined, negative: false},
             'result was incorrect');
 
         result = parse('/regex/ text');
         assert.deepEqual(
             result[0], {key: undefined, regex: /regex/i, text: undefined, negative: false}, 'result was incorrect');
+        assert.deepEqual(
+            result[1], {key: undefined, regex: undefined, text: 'text', negative: false}, 'result was incorrect');
+
+        result = parse('/regex with spaces/ text');
+        assert.deepEqual(
+            result[0], {key: undefined, regex: /regex with spaces/i, text: undefined, negative: false},
+            'result was incorrect');
         assert.deepEqual(
             result[1], {key: undefined, regex: undefined, text: 'text', negative: false}, 'result was incorrect');
 
@@ -509,6 +453,38 @@ for(let e=0;e<l.lineCount();++e){const t=l.lineAt(e);s.lastIndex=0;const i=s.exe
       exports += '};\n';
       const text = `${functions}${exports}`;
       assert.strictEqual(isMinified(text), false);
+    });
+  });
+
+  describe('performExtendedSearchInContent', () => {
+    it('returns an entry for each match on the same line', () => {
+      const lines = ['The first line with a second "the".', 'The second line.'];
+
+      const result = TextUtils.TextUtils.performSearchInContent(lines.join('\n'), 'the', false, false);
+
+      assert.deepEqual(result, [
+        new TextUtils.ContentProvider.SearchMatch(0, lines[0], 0, 3),
+        new TextUtils.ContentProvider.SearchMatch(0, lines[0], 30, 3),
+        new TextUtils.ContentProvider.SearchMatch(1, lines[1], 0, 3),
+      ]);
+    });
+  });
+
+  describe('performExtendedSearchInSearchMatches', () => {
+    it('returns an entry for each match on the same line', () => {
+      const lines = ['The first line with a second "the".', 'The second line.'];
+      const searchMatches = [
+        {lineContent: lines[0], lineNumber: 5},
+        {lineContent: lines[1], lineNumber: 42},
+      ];
+
+      const result = TextUtils.TextUtils.performSearchInSearchMatches(searchMatches, 'the', false, false);
+
+      assert.deepEqual(result, [
+        new TextUtils.ContentProvider.SearchMatch(5, lines[0], 0, 3),
+        new TextUtils.ContentProvider.SearchMatch(5, lines[0], 30, 3),
+        new TextUtils.ContentProvider.SearchMatch(42, lines[1], 0, 3),
+      ]);
     });
   });
 });

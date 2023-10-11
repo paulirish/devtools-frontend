@@ -32,12 +32,11 @@ export class TimingsTrackAppender implements TrackAppender {
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
-  #traceParsedData: Readonly<TraceEngine.TraceModel.PartialTraceParseDataDuringMigration>;
+  #traceParsedData: Readonly<TraceEngine.Handlers.Migration.PartialTraceData>;
 
   constructor(
       compatibilityBuilder: CompatibilityTracksAppender, flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
-      traceParsedData: TraceEngine.TraceModel.PartialTraceParseDataDuringMigration,
-      colorGenerator: Common.Color.Generator) {
+      traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData, colorGenerator: Common.Color.Generator) {
     this.#compatibilityBuilder = compatibilityBuilder;
     this.#colorGenerator = colorGenerator;
     this.#flameChartData = flameChartData;
@@ -149,6 +148,10 @@ export class TimingsTrackAppender implements TrackAppender {
       color = '#1A3422';
       title = TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP;
     }
+    if (TraceEngine.Types.TraceEvents.isTraceEventNavigationStart(markerEvent)) {
+      color = '#FF9800';
+      title = '';
+    }
     return {
       title: title,
       dashStyle: tallMarkerDashStyle,
@@ -187,6 +190,8 @@ export class TimingsTrackAppender implements TrackAppender {
           return metricsHandler.MetricName.FP;
         case 'largestContentfulPaint::Candidate':
           return metricsHandler.MetricName.LCP;
+        case 'navigationStart':
+          return '';
         default:
           return event.name;
       }

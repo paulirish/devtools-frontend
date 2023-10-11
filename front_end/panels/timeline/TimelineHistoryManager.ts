@@ -5,17 +5,17 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import type * as TraceEngine from '../../models/trace/trace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import timelineHistoryManagerStyles from './timelineHistoryManager.css.js';
-
-import type * as TraceEngine from '../../models/trace/trace.js';
 import {type PerformanceModel} from './PerformanceModel.js';
 import {
+  type TimelineEventOverview,
   TimelineEventOverviewCPUActivity,
   TimelineEventOverviewNetwork,
   TimelineEventOverviewResponsiveness,
 } from './TimelineEventOverview.js';
+import timelineHistoryManagerStyles from './timelineHistoryManager.css.js';
 
 const UIStrings = {
   /**
@@ -65,8 +65,17 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type RecordingData = {
   legacyModel: PerformanceModel,
-  traceParseData: TraceEngine.TraceModel.PartialTraceParseDataDuringMigration|null,
+  traceParseDataIndex: number,
 };
+
+export interface NewHistoryRecordingData {
+  // The data we will save to restore later.
+  data: RecordingData;
+  // We do not store this, but need it to build the thumbnail preview.
+  filmStripForPreview: TraceEngine.Extras.FilmStrip.Data|null;
+  // Also not stored, but used to create the preview overview for a new trace.
+  traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+}
 
 export class TimelineHistoryManager {
   private recordings: RecordingData[];
@@ -74,7 +83,9 @@ export class TimelineHistoryManager {
   private readonly nextNumberByDomain: Map<string, number>;
   private readonly buttonInternal: ToolbarButton;
   private readonly allOverviews: {
-    constructor: typeof TimelineEventOverviewResponsiveness,
+    constructor:
+        (traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData, performanceModel: PerformanceModel) =>
+            TimelineEventOverview,
     height: number,
   }[];
   private totalHeight: number;
@@ -91,25 +102,39 @@ export class TimelineHistoryManager {
     this.clear();
 
     this.allOverviews = [
-      {constructor: TimelineEventOverviewResponsiveness, height: 3},
-      {constructor: TimelineEventOverviewCPUActivity, height: 20},
-      {constructor: TimelineEventOverviewNetwork, height: 8},
+      {
+        constructor: (traceParsedData): TimelineEventOverviewResponsiveness => {
+          return new TimelineEventOverviewResponsiveness(traceParsedData);
+        },
+        height: 3,
+      },
+      {
+        constructor: (_traceParsedData, performanceModel): TimelineEventOverviewCPUActivity =>
+            new TimelineEventOverviewCPUActivity(performanceModel),
+        height: 20,
+      },
+      {
+        constructor: (traceParsedData): TimelineEventOverviewNetwork =>
+            new TimelineEventOverviewNetwork(traceParsedData),
+        height: 8,
+      },
     ];
     this.totalHeight = this.allOverviews.reduce((acc, entry) => acc + entry.height, 0);
     this.enabled = true;
     this.lastActiveModel = null;
   }
 
-  addRecording(
-      performanceModel: PerformanceModel,
-      traceParseData: TraceEngine.TraceModel.PartialTraceParseDataDuringMigration|null): void {
-    this.lastActiveModel = performanceModel;
-    this.recordings.unshift({legacyModel: performanceModel, traceParseData});
-    this.buildPreview(performanceModel);
-    const modelTitle = this.title(performanceModel);
+  addRecording(newInput: NewHistoryRecordingData): void {
+    const {legacyModel, traceParseDataIndex} = newInput.data;
+    const filmStrip = newInput.filmStripForPreview;
+    this.lastActiveModel = legacyModel;
+    this.recordings.unshift({legacyModel: legacyModel, traceParseDataIndex});
+
+    this.buildPreview(legacyModel, newInput.traceParsedData, filmStrip);
+    const modelTitle = this.title(legacyModel);
     this.buttonInternal.setText(modelTitle);
     const buttonTitle = this.action.title();
-    UI.ARIAUtils.setAccessibleName(
+    UI.ARIAUtils.setLabel(
         this.buttonInternal.element, i18nString(UIStrings.currentSessionSS, {PH1: modelTitle, PH2: buttonTitle}));
     this.updateState();
     if (this.recordings.length <= maxRecordings) {
@@ -194,7 +219,7 @@ export class TimelineHistoryManager {
     const modelTitle = this.title(model);
     const buttonTitle = this.action.title();
     this.buttonInternal.setText(modelTitle);
-    UI.ARIAUtils.setAccessibleName(
+    UI.ARIAUtils.setLabel(
         this.buttonInternal.element, i18nString(UIStrings.currentSessionSS, {PH1: modelTitle, PH2: buttonTitle}));
   }
 
@@ -234,7 +259,9 @@ export class TimelineHistoryManager {
     return data.title;
   }
 
-  private buildPreview(performanceModel: PerformanceModel): HTMLDivElement {
+  private buildPreview(
+      performanceModel: PerformanceModel, traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData,
+      filmStrip: TraceEngine.Extras.FilmStrip.Data|null): HTMLDivElement {
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(performanceModel.timelineModel().pageURL());
     const domain = parsedURL ? parsedURL.host : '';
     const title = performanceModel.tracingModel().title() || domain;
@@ -252,8 +279,8 @@ export class TimelineHistoryManager {
 
     preview.appendChild(this.buildTextDetails(performanceModel, title, timeElement));
     const screenshotAndOverview = preview.createChild('div', 'hbox');
-    screenshotAndOverview.appendChild(this.buildScreenshotThumbnail(performanceModel));
-    screenshotAndOverview.appendChild(this.buildOverview(performanceModel));
+    screenshotAndOverview.appendChild(this.buildScreenshotThumbnail(filmStrip));
+    screenshotAndOverview.appendChild(this.buildOverview(performanceModel, traceParsedData));
     return data.preview;
   }
 
@@ -263,7 +290,7 @@ export class TimelineHistoryManager {
     container.classList.add('hbox');
     const nameSpan = container.createChild('span', 'name');
     nameSpan.textContent = title;
-    UI.ARIAUtils.setAccessibleName(nameSpan, title);
+    UI.ARIAUtils.setLabel(nameSpan, title);
     const tracingModel = performanceModel.tracingModel();
     const duration =
         i18n.TimeUtilities.millisToString(tracingModel.maximumRecordTime() - tracingModel.minimumRecordTime(), false);
@@ -273,27 +300,29 @@ export class TimelineHistoryManager {
     return container;
   }
 
-  private buildScreenshotThumbnail(performanceModel: PerformanceModel): Element {
+  private buildScreenshotThumbnail(filmStrip: TraceEngine.Extras.FilmStrip.Data|null): Element {
     const container = document.createElement('div');
     container.classList.add('screenshot-thumb');
     const thumbnailAspectRatio = 3 / 2;
     container.style.width = this.totalHeight * thumbnailAspectRatio + 'px';
     container.style.height = this.totalHeight + 'px';
-    const filmStripModel = performanceModel.filmStripModel();
-    const frames = filmStripModel.frames();
-    const lastFrame = frames[frames.length - 1];
+    if (!filmStrip) {
+      return container;
+    }
+    const lastFrame = filmStrip.frames.at(-1);
     if (!lastFrame) {
       return container;
     }
-    void lastFrame.imageDataPromise()
-        .then(data => UI.UIUtils.loadImageFromData(data))
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then(image => image && container.appendChild((image as any)));
+    void UI.UIUtils.loadImageFromData(lastFrame.screenshotAsString).then(img => {
+      if (img) {
+        container.appendChild(img);
+      }
+    });
     return container;
   }
 
-  private buildOverview(performanceModel: PerformanceModel): Element {
+  private buildOverview(
+      performanceModel: PerformanceModel, traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData): Element {
     const container = document.createElement('div');
 
     container.style.width = previewWidth + 'px';
@@ -304,12 +333,12 @@ export class TimelineHistoryManager {
 
     const ctx = canvas.getContext('2d');
     let yOffset = 0;
+
     for (const overview of this.allOverviews) {
-      const timelineOverview = new overview.constructor();
-      timelineOverview.setCanvasSize(previewWidth, overview.height);
-      timelineOverview.setModel(performanceModel);
-      timelineOverview.update();
-      const sourceContext = timelineOverview.context();
+      const timelineOverviewComponent = overview.constructor(traceParsedData, performanceModel);
+      timelineOverviewComponent.setCanvasSize(previewWidth, overview.height);
+      timelineOverviewComponent.update();
+      const sourceContext = timelineOverviewComponent.context();
       const imageData = sourceContext.getImageData(0, 0, sourceContext.canvas.width, sourceContext.canvas.height);
       if (ctx) {
         ctx.putImageData(imageData, 0, yOffset);
@@ -360,7 +389,7 @@ export class DropDown implements UI.ListControl.ListDelegate<PerformanceModel> {
     listModel.replaceAll(models);
 
     UI.ARIAUtils.markAsMenu(this.listControl.element);
-    UI.ARIAUtils.setAccessibleName(this.listControl.element, i18nString(UIStrings.selectTimelineSession));
+    UI.ARIAUtils.setLabel(this.listControl.element, i18nString(UIStrings.selectTimelineSession));
     contentElement.appendChild(this.listControl.element);
     contentElement.addEventListener('keydown', this.onKeyDown.bind(this), false);
     contentElement.addEventListener('click', this.onClick.bind(this), false);

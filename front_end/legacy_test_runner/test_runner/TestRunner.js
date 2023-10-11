@@ -6,7 +6,7 @@
 
 import * as Common from '../../core/common/common.js';  // eslint-disable-line no-unused-vars
 import * as Platform from '../../core/platform/platform.js';
-import * as ProtocolClientModule from '../../core/protocol_client/protocol_client.js';
+import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as Root from '../../core/root/root.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
@@ -262,18 +262,14 @@ const mappingForLayoutTests = new Map([
   ['panels/browser_debugger', 'browser_debugger'],
   ['panels/changes', 'changes'],
   ['panels/console', 'console'],
-  ['panels/elements', 'elements'],
   ['panels/emulation', 'emulation'],
   ['panels/mobile_throttling', 'mobile_throttling'],
   ['panels/network', 'network'],
-  ['panels/profiler', 'profiler'],
   ['panels/application', 'resources'],
   ['panels/search', 'search'],
   ['panels/sources', 'sources'],
   ['panels/snippets', 'snippets'],
   ['panels/settings', 'settings'],
-  ['panels/timeline', 'timeline'],
-  ['panels/web_audio', 'web_audio'],
   ['models/persistence', 'persistence'],
   ['models/workspace_diff', 'workspace_diff'],
   ['entrypoints/main', 'main'],
@@ -299,6 +295,7 @@ export async function loadLegacyModule(module) {
       containingFolder = remappedFolder;
     }
   }
+
   await import(`../../${containingFolder}/${containingFolder.split('/').reverse()[0]}-legacy.js`);
 }
 
@@ -498,7 +495,7 @@ export async function _evaluateInPage(code) {
     code += `//# sourceURL=${sourceURL}`;
   }
   const response = await TestRunner.RuntimeAgent.invoke_evaluate({expression: code, objectGroup: 'console'});
-  const error = response[ProtocolClientModule.InspectorBackend.ProtocolError];
+  const error = response[ProtocolClient.InspectorBackend.ProtocolError];
   if (error) {
     addResult('Error: ' + error);
     completeTest();
@@ -517,7 +514,7 @@ export async function _evaluateInPage(code) {
 export async function evaluateInPageAnonymously(code, userGesture) {
   const response =
       await TestRunner.RuntimeAgent.invoke_evaluate({expression: code, objectGroup: 'console', userGesture});
-  if (!response[ProtocolClientModule.InspectorBackend.ProtocolError]) {
+  if (!response[ProtocolClient.InspectorBackend.ProtocolError]) {
     return response.result.value;
   }
   addResult(
@@ -542,7 +539,7 @@ export async function evaluateInPageAsync(code) {
   const response = await TestRunner.RuntimeAgent.invoke_evaluate(
       {expression: code, objectGroup: 'console', includeCommandLineAPI: false, awaitPromise: true});
 
-  const error = response[ProtocolClientModule.InspectorBackend.ProtocolError];
+  const error = response[ProtocolClient.InspectorBackend.ProtocolError];
   if (!error && !response.exceptionDetails) {
     return response.result.value;
   }
@@ -613,7 +610,7 @@ export function check(passCondition, failureText) {
  * @param {!Function} callback
  */
 export function deprecatedRunAfterPendingDispatches(callback) {
-  ProtocolClient.test.deprecatedRunAfterPendingDispatches(callback);
+  ProtocolClient.InspectorBackend.test.deprecatedRunAfterPendingDispatches(callback);
 }
 
 /**
@@ -727,7 +724,7 @@ export function markStep(title) {
 }
 
 export function startDumpingProtocolMessages() {
-  ProtocolClient.test.dumpProtocol = self.testRunner.logToStderr.bind(self.testRunner);
+  ProtocolClient.InspectorBackend.test.dumpProtocol = self.testRunner.logToStderr.bind(self.testRunner);
 }
 
 /**

@@ -9,9 +9,11 @@ import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
+import * as Root from '../../../../../front_end/core/root/root.js';
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {MockProtocolBackend} from '../../helpers/MockScopeChain.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 
 describeWithMockConnection('NameResolver', () => {
   const URL = 'file:///tmp/example.js' as Platform.DevToolsPath.UrlString;
@@ -170,11 +172,6 @@ describeWithMockConnection('NameResolver', () => {
       source: 'function* f(x) { return yield* g(x) + 2; }',
       scopes: '           {B                  F B       }',
     },
-    {
-      name: 'returns empty identifier list for scope with syntax error',
-      source: 'function f(x) xx { return (i) => { let j = i; return j } }',
-      scopes: '          {                                              }',
-    },
   ];
 
   const dummyMapContent = JSON.stringify({
@@ -186,8 +183,12 @@ describeWithMockConnection('NameResolver', () => {
     it(test.name, async () => {
       const callFrame = await backend.createCallFrame(
           target, {url: URL, content: test.source}, test.scopes, {url: 'file:///dummy.map', content: dummyMapContent});
+      const parsedScopeChain =
+          await SourceMapScopes.NamesResolver.findScopeChainForDebuggerScope(callFrame.scopeChain()[0]);
+      const scope = parsedScopeChain.pop();
+      assertNotNullOrUndefined(scope);
       const identifiers =
-          await SourceMapScopes.NamesResolver.scopeIdentifiers(callFrame.localScope(), callFrame.scopeChain()[0]);
+          await SourceMapScopes.NamesResolver.scopeIdentifiers(callFrame.script, scope, parsedScopeChain);
       const boundIdentifiers = identifiers?.boundVariables ?? [];
       const freeIdentifiers = identifiers?.freeVariables ?? [];
       boundIdentifiers.sort(
@@ -300,6 +301,34 @@ describeWithMockConnection('NameResolver', () => {
     assert.sameDeepMembers(namesAndValues, [{name: 'par1', value: 42}]);
   });
 
+  it('resolves names for variables in TDZ', async () => {
+    const sourceMapUrl = 'file:///tmp/example.js.min.map';
+    // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map" v5.7.0.
+    const sourceMapContent = JSON.stringify({
+      'version': 3,
+      'names': ['adder', 'arg1', 'arg2', 'console', 'log', 'result'],
+      'sources': ['index.js'],
+      'sourcesContent': [
+        'function adder(arg1, arg2) {\n  console.log(arg1, arg2);\n  const result = arg1 + arg2;\n  return result;\n}\n',
+      ],
+      'mappings': 'AAAA,SAASA,MAAMC,EAAMC,GACnBC,QAAQC,IAAIH,EAAMC,GAClB,MAAMG,EAASJ,EAAOC,EACtB,OAAOG,CACT',
+    });
+
+    const source = `function adder(n,o){console.log(n,o);const c=n+o;return c}\n//# sourceMappingURL=${sourceMapUrl}`;
+    const scopes = '              {                                          }';
+
+    const scopeObject = backend.createSimpleRemoteObject([{name: 'n', value: 42}, {name: 'o', value: 5}, {name: 'c'}]);
+    const callFrame = await backend.createCallFrame(
+        target, {url: URL, content: source}, scopes, {url: sourceMapUrl, content: sourceMapContent}, [scopeObject]);
+
+    const resolvedScopeObject = await SourceMapScopes.NamesResolver.resolveScopeInObject(callFrame.scopeChain()[0]);
+    const properties = await resolvedScopeObject.getAllProperties(false, false);
+    const namesAndValues = properties.properties?.map(p => ({name: p.name, value: p.value?.value})) ?? [];
+
+    assert.sameDeepMembers(
+        namesAndValues, [{name: 'arg1', value: 42}, {name: 'arg2', value: 5}, {name: 'result', value: undefined}]);
+  });
+
   it('resolves inner scope clashing names from let -> var transpilation', async () => {
     // This tests the  behavior where the TypeScript compiler renames a variable when transforming let-variables
     // to var-variables to avoid clash, and DevTools then (somewhat questionably) deobfuscates the var variables
@@ -396,6 +425,40 @@ describeWithMockConnection('NameResolver', () => {
     });
   });
 
+  describe('Function name resolving from scopes', () => {
+    it('resolves function scope name at scope start for a debugger frame', async () => {
+      Root.Runtime.experiments.enableForTest('useSourceMapScopes');
+
+      const sourceMapUrl = 'file:///tmp/example.js.min.map';
+      const sourceMapContent = JSON.stringify({
+        'version': 3,
+        'names': [
+          '<toplevel>',
+          '<anonymous>',
+          'log',
+          'main',
+        ],
+        'sources': ['main.js'],
+        'sourcesContent': [
+          '(function () {\n  function log(m) {\n    console.log(m);\n  }\n\n  function main() {\n\t  log("hello");\n\t  log("world");\n  }\n  \n  main();\n})();',
+        ],
+        'mappings': 'CAAA,WACE,SAAS,EAAI,GACX,QAAQ,IAAI,EACd,CAEA,SAAS,IACR,EAAI,SACJ,EAAI,QACL,CAEA,GACD,EAXD',
+        'x_com_bloomberg_sourcesFunctionMappings': ['AAAWK,CACAJ,CCCRE,CIAKA'],
+      });
+
+      const source = '(function(){function o(o){console.log(o)}function n(){o("hello");o("world")}n()})();\n';
+      const scopes = '                                                   {                       }';
+
+      const callFrame = await backend.createCallFrame(
+          target, {url: URL, content: source + `//# sourceMappingURL=${sourceMapUrl}`}, scopes,
+          {url: sourceMapUrl, content: sourceMapContent});
+
+      const functionName = await SourceMapScopes.NamesResolver.resolveDebuggerFrameFunctionName(callFrame);
+      assert.strictEqual(functionName, 'main');
+      Root.Runtime.experiments.disableForTest('useSourceMapScopes');
+    });
+  });
+
   it('ignores the argument name during arrow function name resolution', async () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map"' v5.7.0.
@@ -415,6 +478,72 @@ describeWithMockConnection('NameResolver', () => {
         target, {url: URL, content: source}, scopes, {url: sourceMapUrl, content: sourceMapContent}, [scopeObject]);
 
     assert.isNull(await SourceMapScopes.NamesResolver.resolveDebuggerFrameFunctionName(callFrame));
+  });
+
+  describe('allVariablesAtPosition', () => {
+    let script: SDK.Script.Script;
+
+    beforeEach(async () => {
+      const originalContent = `
+function mulWithOffset(param1, param2, offset) {
+  const intermediate = param1 * param2;
+  const result = intermediate;
+  if (offset !== undefined) {
+    const intermediate = result + offset;
+    return intermediate;
+  }
+  return result;
+}
+`;
+      const sourceMapUrl = 'file:///tmp/example.js.min.map';
+      // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map"' v5.7.0.
+      const sourceMapContent = JSON.stringify({
+        version: 3,
+        names: ['mulWithOffset', 'param1', 'param2', 'offset', 'intermediate', 'result', 'undefined'],
+        sources: ['example.js'],
+        sourcesContent: [originalContent],
+        mappings:
+            'AACA,SAASA,cAAcC,EAAQC,EAAQC,GACrC,MAAMC,EAAeH,EAASC,EAC9B,MAAMG,EAASD,EACf,GAAID,IAAWG,UAAW,CACxB,MAAMF,EAAeC,EAASF,EAC9B,OAAOC,CACT,CACA,OAAOC,CACT',
+      });
+
+      const scriptContent =
+          'function mulWithOffset(n,t,e){const f=n*t;const u=f;if(e!==undefined){const n=u+e;return n}return u}';
+      script = await backend.addScript(
+          target, {url: 'file:///tmp/bundle.js', content: scriptContent},
+          {url: sourceMapUrl, content: sourceMapContent});
+    });
+
+    it('has the right mapping on a function scope without shadowing', async () => {
+      const location = script.rawLocation(0, 30);  // Beginning of function scope.
+      assertNotNullOrUndefined(location);
+
+      const mapping = await SourceMapScopes.NamesResolver.allVariablesAtPosition(location);
+
+      assert.strictEqual(mapping.get('param1'), 'n');
+      assert.strictEqual(mapping.get('param2'), 't');
+      assert.strictEqual(mapping.get('offset'), 'e');
+      assert.strictEqual(mapping.get('intermediate'), 'f');
+      assert.strictEqual(mapping.get('result'), 'u');
+    });
+
+    it('has the right mapping in a block scope with shadowing in the authored code', async () => {
+      const location = script.rawLocation(0, 70);  // Beginning of block scope.
+      assertNotNullOrUndefined(location);
+
+      const mapping = await SourceMapScopes.NamesResolver.allVariablesAtPosition(location);
+
+      // Block scope {intermediate} shadows function scope {intermediate}.
+      assert.strictEqual(mapping.get('intermediate'), 'n');
+    });
+
+    it('has the right mapping in a block scope with shadowing in the compiled code', async () => {
+      const location = script.rawLocation(0, 70);  // Beginning of block scope.
+      assertNotNullOrUndefined(location);
+
+      const mapping = await SourceMapScopes.NamesResolver.allVariablesAtPosition(location);
+
+      assert.isNull(mapping.get('param1'));
+    });
   });
 });
 

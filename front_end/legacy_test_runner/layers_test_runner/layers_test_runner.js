@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 import '../../panels/layer_viewer/layer_viewer-legacy.js';
-import '../../panels/elements/elements-legacy.js';
 import '../../ui/legacy/components/utils/utils-legacy.js';
 
+import * as Elements from '../../panels/elements/elements.js';
 import * as Layers from '../../panels/layers/layers.js';
 import {TestRunner} from '../test_runner/test_runner.js';
 
@@ -64,7 +64,7 @@ LayersTestRunner.dumpLayers3DView = function(prefix, root) {
   }
 
   if (!root) {
-    root = UI.panels.layers.layers3DView.rotatingContainerElement;
+    root = Layers.LayersPanel.LayersPanel.instance().layers3DView.rotatingContainerElement;
   }
 
   if (root._layer) {

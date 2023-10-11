@@ -34,7 +34,9 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/unittests/front_end/models/formatter/*",
+    "../../../test/unittests/front_end/models/source_map_scopes/*",
     "../../entrypoints/formatter_worker/*",
+    "../../models/breakpoints/*",
     "../../models/source_map_scopes/*",
     "../../models/workspace_diff/*",
     "../../panels/coverage/*",
@@ -48,15 +50,4 @@ devtools_entrypoint("bundle") {
   ]
 
   visibility += devtools_models_visibility
-}
-
-devtools_entrypoint("legacy") {
-  entrypoint = "formatter-legacy.ts"
-
-  deps = [ ":bundle" ]
-
-  visibility = [
-    "../..:legacy_entrypoints",
-    "../../legacy_test_runner/*",
-  ]
 }

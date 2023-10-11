@@ -7,6 +7,7 @@
 
 const {assert} = chai;
 
+import * as Common from '../../../../../front_end/core/common/common.js';
 import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
 import * as Breakpoints from '../../../../../front_end/models/breakpoints/breakpoints.js';
 import * as Persistence from '../../../../../front_end/models/persistence/persistence.js';
@@ -16,9 +17,13 @@ import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Sources from '../../../../../front_end/panels/sources/sources.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
-import {describeWithMockConnection, dispatchEvent} from '../../helpers/MockConnection.js';
+import {
+  describeWithMockConnection,
+  dispatchEvent,
+  setMockConnectionResponseHandler,
+} from '../../helpers/MockConnection.js';
 import {MockProtocolBackend} from '../../helpers/MockScopeChain.js';
-import {createTarget, stubNoopSettings} from '../../helpers/EnvironmentHelpers.js';
+import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {createContentProviderUISourceCodes} from '../../helpers/UISourceCodeHelpers.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 
@@ -40,7 +45,6 @@ describeWithMockConnection('NetworkNavigatorView', () => {
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
     Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance({forceNew: true, workspace});
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
-    stubNoopSettings();
     Root.Runtime.experiments.register(Root.Runtime.ExperimentName.AUTHORED_DEPLOYED_GROUPING, '');
     Root.Runtime.experiments.register(Root.Runtime.ExperimentName.JUST_MY_CODE, '');
   });
@@ -64,6 +68,60 @@ describeWithMockConnection('NetworkNavigatorView', () => {
 
     afterEach(() => {
       Workspace.Workspace.WorkspaceImpl.instance().removeProject(project);
+    });
+
+    it('shows folder with scripts requests', async () => {
+      const {project} = createContentProviderUISourceCodes({
+        items: [
+          {
+            url: 'http://example.com/script.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+            resourceType: Common.ResourceType.resourceTypes.Script,
+          },
+        ],
+        projectType: Workspace.Workspace.projectTypes.Network,
+        target,
+      });
+
+      const navigatorView = Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+      const rootElement = navigatorView.scriptsTree.rootElement();
+
+      assertNotNullOrUndefined(rootElement);
+
+      const folder = rootElement.firstChild();
+      const file = folder?.firstChild();
+
+      assert.strictEqual(folder?.title, 'example.com');
+      assert.strictEqual(file?.title, 'script.js');
+
+      project.removeProject();
+    });
+
+    it('does not show XHR and Fetch requests', async () => {
+      const {project} = createContentProviderUISourceCodes({
+        items: [
+          {
+            url: 'http://example.com/list-xhr.json' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/json',
+            resourceType: Common.ResourceType.resourceTypes.XHR,
+          },
+          {
+            url: 'http://example.com/list-fetch.json' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/json',
+            resourceType: Common.ResourceType.resourceTypes.Fetch,
+          },
+        ],
+        projectType: Workspace.Workspace.projectTypes.Network,
+        target,
+      });
+
+      const navigatorView = Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+      const rootElement = navigatorView.scriptsTree.rootElement();
+
+      assertNotNullOrUndefined(rootElement);
+      assert.strictEqual(rootElement.children().length, 0);
+
+      project.removeProject();
     });
 
     it('reveals main frame target on navigation', async () => {
@@ -409,6 +467,181 @@ describeWithMockConnection('NetworkNavigatorView', () => {
 
       // Sanity check - we should have only one source now.
       assert.strictEqual(exampleComNode.childCount(), 1);
+    });
+  });
+
+  describe('with ignore listing', async () => {
+    let target: SDK.Target.Target;
+    let resolveFn: (() => void)|null = null;
+
+    beforeEach(() => {
+      target = createTarget();
+      Bindings.IgnoreListManager.IgnoreListManager.instance().addChangeListener(() => {
+        if (resolveFn) {
+          resolveFn();
+          resolveFn = null;
+        }
+      });
+      setMockConnectionResponseHandler('Debugger.setBlackboxPatterns', () => ({}));
+    });
+
+    const updatePatternSetting = async (settingValue: Common.Settings.RegExpSettingItem[]) => {
+      const setting =
+          Common.Settings.Settings.instance().moduleSetting('skipStackFramesPattern') as Common.Settings.RegExpSetting;
+      const promise = new Promise<void>(resolve => {
+        resolveFn = resolve;
+      });
+      setting.setAsArray(settingValue);
+      void await promise;
+    };
+    const enableIgnoreListing = () => updatePatternSetting([{pattern: '-hidden', disabled: false}]);
+    const disableIgnoreListing = () => updatePatternSetting([]);
+
+    it('shows folder with only ignore listed content as ignore listed', async () => {
+      await enableIgnoreListing();
+      const {project} = createContentProviderUISourceCodes({
+        items: [
+          {
+            url: 'http://example.com/ignored/a/a-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/ignored/b/b-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/mixed/a/a-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/mixed/b/b.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+        ],
+        projectType: Workspace.Workspace.projectTypes.Network,
+        target,
+      });
+
+      const navigatorView = Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+      const rootElement = navigatorView.scriptsTree.rootElement();
+      assertNotNullOrUndefined(rootElement);
+
+      const nodeExampleCom = rootElement.firstChild();
+      assertNotNullOrUndefined(nodeExampleCom);
+
+      const ignoredFolder = nodeExampleCom.childAt(0);
+      const mixedFolder = nodeExampleCom.childAt(1);
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored (ignore listed)');
+
+      project.removeProject();
+    });
+
+    it('updates folders when ignore listing rules change', async () => {
+      const {project} = createContentProviderUISourceCodes({
+        items: [
+          {
+            url: 'http://example.com/ignored/a/a-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/ignored/b/b-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/mixed/a/a-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/mixed/b/b.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+        ],
+        projectType: Workspace.Workspace.projectTypes.Network,
+        target,
+      });
+
+      const navigatorView = Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+      const rootElement = navigatorView.scriptsTree.rootElement();
+      assertNotNullOrUndefined(rootElement);
+
+      const nodeExampleCom = rootElement.firstChild();
+      assertNotNullOrUndefined(nodeExampleCom);
+
+      const ignoredFolder = nodeExampleCom.childAt(0);
+      const mixedFolder = nodeExampleCom.childAt(1);
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored');
+
+      await enableIgnoreListing();
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored (ignore listed)');
+
+      await disableIgnoreListing();
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored');
+
+      project.removeProject();
+    });
+
+    it('updates folders when files are added or removed', async () => {
+      await enableIgnoreListing();
+      const {project} = createContentProviderUISourceCodes({
+        items: [
+          {
+            url: 'http://example.com/ignored/a/a-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/ignored/b/b-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+          {
+            url: 'http://example.com/mixed/a/a-hidden.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+        ],
+        projectType: Workspace.Workspace.projectTypes.Network,
+        target,
+      });
+
+      const navigatorView = Sources.SourcesNavigator.NetworkNavigatorView.instance({forceNew: true});
+      const rootElement = navigatorView.scriptsTree.rootElement();
+      assertNotNullOrUndefined(rootElement);
+
+      const nodeExampleCom = rootElement.firstChild();
+      assertNotNullOrUndefined(nodeExampleCom);
+
+      const ignoredFolder = nodeExampleCom.childAt(0);
+      const mixedFolder = nodeExampleCom.childAt(1);
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed/a (ignore listed)');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored (ignore listed)');
+
+      const {project: otherProject} = createContentProviderUISourceCodes({
+        items: [
+          {
+            url: 'http://example.com/mixed/b/b.js' as Platform.DevToolsPath.UrlString,
+            mimeType: 'application/javascript',
+          },
+        ],
+        projectType: Workspace.Workspace.projectTypes.Network,
+        target,
+      });
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored (ignore listed)');
+
+      otherProject.removeProject();
+
+      assert.strictEqual(mixedFolder?.tooltip, 'mixed (ignore listed)');
+      assert.strictEqual(ignoredFolder?.tooltip, 'ignored (ignore listed)');
+
+      project.removeProject();
     });
   });
 });
