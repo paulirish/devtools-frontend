@@ -946,23 +946,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
         title += ` - ${url} [${range}]`;
       }
-
-      // Remove circular references so we can stringify it.
-      const eventClone = {...event};
-      delete eventClone?.children;
-      delete eventClone?.parent;
-      delete eventClone?.thread;
-      delete eventClone.args?.data?.children;
-      delete eventClone.args?.data?.parent;
-      eventClone.args?.data?.stackTrace?.forEach(f => {
-        delete f.children;
-        delete f.parent;
-        delete f.target;
-      });
-      delete eventClone.steps;
-      // Add stringified event to the tooltip.
-      title += '\n' + JSON.stringify(eventClone, null, 2).slice(0, 2000);
-
     } else if (entryType === EntryType.Frame) {
       const frame = (this.entryData[entryIndex] as TimelineModel.TimelineFrameModel.TimelineFrame);
       time = i18n.TimeUtilities.preciseMillisToString(frame.duration, 1);
@@ -988,7 +971,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return null;
     }
     const debugModeEnabled = true;
-    if (debugModeEnabled) {
+    if (debugModeEnabled && entryType !== EntryType.Screenshot) {
       const entry = this.entryData[entryIndex];
       try {
         title += '\n' + JSON.stringify(entry, null, 2).slice(0, 2000);
