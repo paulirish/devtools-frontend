@@ -963,13 +963,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         title = i18nString(UIStrings.frame);
       }
 
-      // Add stringified frame to the tooltip.
-
+    // Avoid the early return for screenshots. We handle them below.
     } else if (entryType === EntryType.Screenshot) {
-      title = ''; // dumb but avoiding the early return
+      title = '';
     } else {
       return null;
     }
+
     const debugModeEnabled = true;
     if (debugModeEnabled && entryType !== EntryType.Screenshot) {
       const entry = this.entryData[entryIndex];
@@ -979,6 +979,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         console.warn(e);
       }
     }
+
     const element = document.createElement('div');
     const root = UI.Utils.createShadowRootWithCoreStyles(element, {
       cssFile: [timelineFlamechartPopoverStyles],
@@ -994,19 +995,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     }
 
-    // fullsize screenshot in popover
+    // Show fullsize screenshot in popover
     if (entryType === EntryType.Screenshot) {
      const screenshot = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventSnapshot);
-      if (!this.screenshotImageCache.has(screenshot)) {
-        this.screenshotImageCache.set(screenshot, null);
-        const data = screenshot.args.snapshot;
-        void UI.UIUtils.loadImageFromData(data).then(image => {
-          this.screenshotImageCache.set(screenshot, image);
-          this.dispatchEventToListeners(Events.DataChanged);
-        });
-        return element;
-      }
-
       const image = this.screenshotImageCache.get(screenshot);
       if (image) {
         image.style.display = 'block'; // minor thing.

@@ -229,22 +229,6 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     return frameTimeMilliSeconds - frame.endTime < 10 ? filmStripFrame : null;
   }
 
-  // When selected, copy traceEvent ts to clipboard and log the event.
-  copyToClipboard(event: TimelineSelection|null): void {
-    if (TimelineSelection.isRangeSelection(event)) {
-      return;
-    }
-    const ts = (event.ts ?? (event.startTime * 1000)).toString();
-    const textBlob = new Blob([ts], {type: 'text/plain'});
-    const cpItem = new ClipboardItem({[textBlob.type]: textBlob});
-    navigator.clipboard.write([cpItem])
-        .then(() => {
-          // eslint-disable-next-line no-console
-          console.log(event.name, `microsec ts of (${ts}) written to clipboard`, event);
-        })
-        .catch(console.warn);
-  }
-
   async setSelection(selection: TimelineSelection|null): Promise<void> {
     this.detailsLinkifier.reset();
     this.selection = selection;
@@ -255,7 +239,6 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       return;
     }
     const selectionObject = this.selection.object;
-    this.copyToClipboard(selectionObject);
     if (TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selectionObject)) {
       const event = selectionObject;
       const networkDetails = await TimelineUIUtils.buildSyntheticNetworkRequestDetails(
