@@ -5,6 +5,7 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -282,10 +283,10 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     div.style.color = this.#colorForPriority(event.args.data.priority) || 'black';
     contents.createChild('span').textContent = Platform.StringUtilities.trimMiddle(event.args.data.url, maxURLChars);
 
-    const debugModeEnabled = true;
-    if (debugModeEnabled) {
+    if (Root.Runtime.experiments.isEnabled('timelineShowTraceEventDetails')) {
       try {
-        contents.createChild('span').textContent += '\n' + JSON.stringify(event, null, 2).slice(0, 2000);
+        const extraTooltipText = '\n' + JSON.stringify(event, null, 2).slice(0, 1000).replace(/{\n  /, '{ ');
+        contents.createChild('span').textContent = extraTooltipText;
       } catch (e) {
         console.warn(e);
       }

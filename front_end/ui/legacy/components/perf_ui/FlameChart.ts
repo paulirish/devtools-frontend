@@ -1417,7 +1417,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     for (let levelNum = 0; levelNum <= max; levelNum++) {
       const y = this.levelToOffset(levelNum) + this.levelHeight(levelNum) - this.textBaseline - 6;  // 6 fudge factor
       const x = 5;
-      context.fillText(`${levelNum}`, x, y + this.textBaseline);
+      context.fillText(levelNum.toString(), x, y + this.textBaseline);
     }
   }
 

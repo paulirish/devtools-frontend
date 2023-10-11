@@ -301,6 +301,8 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timelineV8RuntimeCallStats', 'Timeline: V8 Runtime Call Stats on Timeline', true);
     Root.Runtime.experiments.register(
+        'timelineShowTraceEventDetails', 'Timeline: Show trace event details in tooltip/summary', true);
+    Root.Runtime.experiments.register(
         'timelineAsConsoleProfileResultPanel', 'View console.profile() results in the Performance panel for Node.js',
         true);
 

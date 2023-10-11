@@ -5,7 +5,7 @@
  */
 
 .timeline-flamechart-popover {
-  /* overflow: hidden; */
+  overflow: hidden;
   max-height: 90vh;
 }
 

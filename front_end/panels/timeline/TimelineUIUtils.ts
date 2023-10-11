@@ -2452,7 +2452,7 @@ export class TimelineUIUtils {
     }
 
     // trace event args.
-    contentHelper.addSection('Trace event args');
+    contentHelper.addSection('Trace event');
     const argsContainer = document.createElement('div');
     const shadowRoot = argsContainer.attachShadow({mode: 'open'});
     shadowRoot.adoptedStyleSheets = [CodeHighlighter.Style.default];
@@ -2466,7 +2466,7 @@ export class TimelineUIUtils {
       line-height: 1;
       display: inline-block;
     `;
-    const argsTxt = Object.keys(event.args).length ? JSON.stringify(event.args, null, 2) : '';
+    const argsTxt = JSON.stringify(event, null, 2).slice(0, 3000);
     argsEl.textContent = argsTxt.replace(/{\n  /, '{ ');
     void CodeHighlighter.CodeHighlighter.highlightNode(argsEl, 'text/javascript');
     contentHelper.appendElementRow('', argsContainer);

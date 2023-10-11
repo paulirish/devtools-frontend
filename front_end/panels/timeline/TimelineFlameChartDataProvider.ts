@@ -966,11 +966,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return null;
     }
 
-    const debugModeEnabled = true;
-    if (debugModeEnabled) {
+    if (Root.Runtime.experiments.isEnabled('timelineShowTraceEventDetails')) {
       const entry = this.entryData[entryIndex];
       try {
-        title += '\n' + JSON.stringify(entry, null, 2).slice(0, 2000);
+        const extraTooltipText = '\n' + JSON.stringify(entry, null, 2).slice(0, 1000).replace(/{\n  /, '{ ');
+        title += extraTooltipText;
       } catch (e) {
         console.warn(e);
       }

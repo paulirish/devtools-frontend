@@ -932,9 +932,10 @@ export enum DevtoolsExperiments {
   'deleteOverridesTemporarilyEnable' = 78,
   'networkPanelFilterBarRedesign' = 79,
   'breadcrumbsPerformancePanel' = 80,
+  'timelineShowTraceEventDetails' = 81,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 81,
+  'MaxValue' = 82,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
