@@ -41,10 +41,8 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
-
-
+import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
@@ -2467,7 +2465,7 @@ export class TimelineUIUtils {
       white-space: pre-wrap;
       line-height: 1;
       display: inline-block;
-    `
+    `;
     const argsTxt = Object.keys(event.args).length ? JSON.stringify(event.args, null, 2) : '';
     argsEl.textContent = argsTxt.replace(/{\n  /, '{ ');
     void CodeHighlighter.CodeHighlighter.highlightNode(argsEl, 'text/javascript');

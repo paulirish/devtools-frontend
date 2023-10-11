@@ -983,10 +983,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       // Add stringified frame to the tooltip.
       title += '\n' + JSON.stringify(frame, null, 2).slice(0, 2000);
 
-      if (frame.hasWarnings()) {
-        warning = document.createElement('span');
-        warning.textContent = i18nString(UIStrings.longFrame);
-      }
     } else {
       return null;
     }
