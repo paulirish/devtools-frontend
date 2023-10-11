@@ -2451,14 +2451,14 @@ export class TimelineUIUtils {
       TimelineUIUtils.generateCauses(event, model.targetByEvent(event), relatedNodesMap, contentHelper);
     }
 
-    // trace event args.
+    // Trace event details
     contentHelper.addSection('Trace event');
     const argsContainer = document.createElement('div');
     const shadowRoot = argsContainer.attachShadow({mode: 'open'});
     shadowRoot.adoptedStyleSheets = [CodeHighlighter.Style.default];
     const argsEl = shadowRoot.createChild('div') as HTMLDivElement;
     argsEl.classList.add('traceargs');
-    // I cant figure out styles and shadow dom. nastyhack.
+    // Inline styles hack, as we're within a shadow root
     argsEl.style.cssText = `
       font-family: var(--monospace-font-family);
       font-size: var(--monospace-font-size) !important;
@@ -2466,8 +2466,8 @@ export class TimelineUIUtils {
       line-height: 1;
       display: inline-block;
     `;
-    const argsTxt = JSON.stringify(event, null, 2).slice(0, 3000);
-    argsEl.textContent = argsTxt.replace(/{\n  /, '{ ');
+    const argsTxt = JSON.stringify(event, null, 2).slice(0, 3000).replace(/{\n  /, '{ ');
+    argsEl.textContent = argsTxt;
     void CodeHighlighter.CodeHighlighter.highlightNode(argsEl, 'text/javascript');
     contentHelper.appendElementRow('', argsContainer);
 
