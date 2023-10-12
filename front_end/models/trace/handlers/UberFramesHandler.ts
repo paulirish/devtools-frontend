@@ -56,6 +56,7 @@ const someStuff  = {
   DecodeLazyPixelRef : 'Decode LazyPixelRef',
 
   BeginFrame: 'BeginFrame',
+  RequestMainThreadFrame: 'RequestMainThreadFrame',
   NeedsBeginFrameChanged: 'NeedsBeginFrameChanged',
   BeginMainThreadFrame: 'BeginMainThreadFrame',
   ActivateLayerTree: 'ActivateLayerTree',
@@ -65,6 +66,24 @@ const someStuff  = {
 const someRelevantTraceEventTypes = [
 
   ... Object.values(someStuff),
+
+  // timeline frame model
+  'ActivateLayerTree',
+  'BeginFrame',
+  'BeginMainThreadFrame,',
+  'CompositeLayers',
+  'Commit',
+  'DrawFrame',
+  'DroppedFrame',
+  'InvalidateLayout,',
+  'LayerTreeHostImplSnapshot',
+  'NeedsBeginFrameChanged',
+  'Paint',
+  'RequestMainThreadFrame',
+  'ScheduleStyleRecalculation,',
+  'ScrollLayer,',
+  'SetLayerTreeId',
+
 
   'MainFrame.NotifyReadyToCommitOnImpl',
   'MainFrame.CommitComplete',
