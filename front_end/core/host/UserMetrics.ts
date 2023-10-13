@@ -582,7 +582,8 @@ export enum Action {
   WorkspaceSelectFolder = 108,
   OverrideContentContextMenuSourceMappedWarning = 109,
   OverrideContentContextMenuRedirectToDeployed = 110,
-  MaxValue = 111,
+  NewStyleRuleAdded = 111,
+  MaxValue = 112,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -930,9 +931,10 @@ export enum DevtoolsExperiments {
   'storageBucketsTree' = 77,
   'deleteOverridesTemporarilyEnable' = 78,
   'networkPanelFilterBarRedesign' = 79,
+  'breadcrumbsPerformancePanel' = 80,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 80,
+  'MaxValue' = 81,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

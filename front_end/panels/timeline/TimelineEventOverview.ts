@@ -123,7 +123,7 @@ export class TimelineEventOverviewNetwork extends TimelineEventOverview {
           max: end,
           range: end - start,
         } :
-        TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
+        TraceEngine.Helpers.Timing.traceWindowMilliSeconds(this.#traceParsedData.Meta.traceBounds);
 
     // We draw two paths, so each can take up half the height
     const pathHeight = this.height() / 2;
@@ -264,6 +264,10 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
         const computedColorValue = categories[categoryOrder[i]].getComputedValue();
         ctx.fillStyle = computedColorValue;
         ctx.fill(paths[i]);
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1;
+        ctx.stroke(paths[i]);
       }
     }
 
@@ -529,7 +533,7 @@ export class TimelineEventOverviewMemory extends TimelineEventOverview {
           max: end,
           range: end - start,
         } :
-        TraceEngine.Helpers.Timing.traceBoundsMilliseconds(this.#traceParsedData.Meta.traceBounds);
+        TraceEngine.Helpers.Timing.traceWindowMilliSeconds(this.#traceParsedData.Meta.traceBounds);
     const minTime = boundsMs.min;
     const maxTime = boundsMs.max;
 

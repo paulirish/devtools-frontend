@@ -10,6 +10,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -73,6 +74,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private selectedSearchResult?: number;
   private searchRegex?: RegExp;
   #traceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null;
+  #currentBreadcrumbTimeWindow?: TraceEngine.Types.Timing.TraceWindow;
 
   constructor(
       delegate: TimelineModeViewDelegate, threadTracksSource: ThreadTracksSource = ThreadTracksSource.BOTH_ENGINES) {
@@ -166,9 +168,28 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
 
   private onWindowChanged(event: Common.EventTarget.EventTargetEvent<WindowChangedEvent>): void {
     const {window, animate} = event.data;
-    this.mainFlameChart.setWindowTimes(window.left, window.right, animate);
-    this.networkFlameChart.setWindowTimes(window.left, window.right, animate);
-    this.networkDataProvider.setWindowTimes(window.left, window.right);
+
+    if (event.data.breadcrumbWindow) {
+      this.#currentBreadcrumbTimeWindow = event.data.breadcrumbWindow;
+      const minMilliseconds = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.data.breadcrumbWindow.min);
+      const maxMilliseconds = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.data.breadcrumbWindow.max);
+      this.mainFlameChart.setTotalAndMinimumBreadcrumbValues(minMilliseconds, maxMilliseconds);
+      this.networkFlameChart.setTotalAndMinimumBreadcrumbValues(minMilliseconds, maxMilliseconds);
+      this.mainFlameChart.update();
+    }
+
+    // If breadcrumbs are not activated, update window times at all times,
+    // If breadcrumbs exist, do not update to window times outside the breadcrumb
+    const isWindowWithinBreadcrumb =
+        (this.#currentBreadcrumbTimeWindow &&
+         !(this.#currentBreadcrumbTimeWindow.min > window.left ||
+           this.#currentBreadcrumbTimeWindow.max < window.right));
+    if (!this.#currentBreadcrumbTimeWindow || isWindowWithinBreadcrumb) {
+      this.mainFlameChart.setWindowTimes(window.left, window.right, animate);
+      this.networkFlameChart.setWindowTimes(window.left, window.right, animate);
+      this.networkDataProvider.setWindowTimes(window.left, window.right);
+    }
+
     this.updateSearchResults(false, false);
   }
 
@@ -176,6 +197,13 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     if (this.model) {
       this.model.setWindow({left: windowStartTime, right: windowEndTime}, animate);
     }
+    TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+        TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
+            TraceEngine.Types.Timing.MilliSeconds(windowStartTime),
+            TraceEngine.Types.Timing.MilliSeconds(windowEndTime),
+            ),
+        {shouldAnimate: animate},
+    );
   }
 
   updateRangeSelection(startTime: number, endTime: number): void {
@@ -194,8 +222,9 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.updateTrack();
   }
 
-  setModel(model: PerformanceModel|null, newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null):
-      void {
+  setModel(
+      model: PerformanceModel|null, newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null,
+      isCpuProfile = false): void {
     if (model === this.model) {
       return;
     }
@@ -203,7 +232,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     Common.EventTarget.removeEventListeners(this.eventListeners);
     this.model = model;
     this.#selectedEvents = null;
-    this.mainDataProvider.setModel(this.model, newTraceEngineData);
+    this.mainDataProvider.setModel(this.model, newTraceEngineData, isCpuProfile);
     this.networkDataProvider.setModel(newTraceEngineData);
     if (this.model) {
       this.eventListeners = [

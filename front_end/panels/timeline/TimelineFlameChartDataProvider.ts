@@ -144,6 +144,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private compatibilityTracksAppender: CompatibilityTracksAppender|null;
   private legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl|null;
   private traceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null;
+  private isCpuProfile = false;
   /**
    * Raster threads are tracked and enumerated with this property. This is also
    * used to group all raster threads together in the same track, instead of
@@ -235,12 +236,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 
   setModel(
-      performanceModel: PerformanceModel|null,
-      newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null): void {
+      performanceModel: PerformanceModel|null, newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null,
+      isCpuProfile = false): void {
     this.reset();
     this.legacyPerformanceModel = performanceModel;
     this.legacyTimelineModel = performanceModel && performanceModel.timelineModel();
     this.traceEngineData = newTraceEngineData;
+    this.isCpuProfile = isCpuProfile;
     if (this.legacyTimelineModel) {
       this.minimumBoundaryInternal = this.legacyTimelineModel.minimumRecordTime();
       this.timeSpan = this.legacyTimelineModel.isEmpty() ?
@@ -279,7 +281,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       this.timelineDataInternal = this.#instantiateTimelineData();
       this.compatibilityTracksAppender = new CompatibilityTracksAppender(
           this.timelineDataInternal, this.traceEngineData, this.entryData, this.entryTypeByLevel,
-          this.legacyTimelineModel);
+          this.legacyTimelineModel, this.isCpuProfile);
     }
     return this.compatibilityTracksAppender;
   }
@@ -459,17 +461,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     }
   }
-  private legacyTrackIsForAuctionWorklet(legacyTrack: TimelineModel.TimelineModel.Track): boolean {
-    const threadName = legacyTrack.thread?.name();
-    if (!threadName) {
-      return false;
-    }
-    return threadName === TimelineModel.TimelineModel.TimelineModelImpl.AuctionWorkletThreadName ||
-        threadName.endsWith(TimelineModel.TimelineModel.TimelineModelImpl.UtilityMainThreadNameSuffix);
-  }
 
   private processInspectorTrace(): void {
-    this.appendFrames();
+    if (!this.isCpuProfile) {
+      this.appendFrames();
+    }
 
     const weight = (track: {type?: string, forMainFrame?: boolean, appenderName?: TrackAppenderName}): number => {
       if (track.appenderName !== undefined) {
@@ -561,7 +557,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       // current appender is a ThreadAppender and represnets the Main Thread.
       // If it is, we mark the group as selected.
       if (this.timelineDataInternal && !this.timelineDataInternal.selectedGroup) {
-        if (trackOrAppender instanceof ThreadAppender && trackOrAppender.threadType === ThreadType.MAIN_THREAD) {
+        if (trackOrAppender instanceof ThreadAppender &&
+            (trackOrAppender.threadType === ThreadType.MAIN_THREAD ||
+             trackOrAppender.threadType === ThreadType.CPU_PROFILE)) {
           const group = this.compatibilityTracksAppender?.groupForAppender(trackOrAppender);
           if (group) {
             this.timelineDataInternal.selectedGroup = group;

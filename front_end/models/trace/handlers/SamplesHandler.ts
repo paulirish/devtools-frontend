@@ -32,65 +32,70 @@ export function buildProfileCalls(): void {
   for (const [processId, profiles] of preprocessedData) {
     for (const [profileId, preProcessedData] of profiles) {
       const threadId = preProcessedData.threadId;
-      if (!preProcessedData.rawProfile.nodes.length || !threadId) {
+      if (!preProcessedData.rawProfile.nodes.length || threadId === undefined) {
         continue;
       }
-      const trackingStack: Partial<Types.TraceEvents.TraceEventSyntheticProfileCall>[] = [];
+      const indexStack: number[] = [];
 
       const profileModel = new CPUProfile.CPUProfileDataModel.CPUProfileDataModel(preProcessedData.rawProfile);
+      const profileTree = Helpers.TreeHelpers.makeEmptyTraceEntryTree();
+      profileTree.maxDepth = profileModel.maxDepth;
 
-      const finalizedData:
-          ProfileData = {rawProfile: preProcessedData.rawProfile, parsedProfile: profileModel, profileCalls: []};
+      const finalizedData: ProfileData =
+          {rawProfile: preProcessedData.rawProfile, parsedProfile: profileModel, profileCalls: [], profileTree};
 
-      profileModel.forEachFrame(openFrameCallback, closeFrameCallback);
-      Helpers.Trace.sortTraceEventsInPlace(finalizedData.profileCalls);
+      const entryToNode = new Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode>();
       const dataByThread = Platform.MapUtilities.getWithDefault(profilesInProcess, processId, () => new Map());
+      profileModel.forEachFrame(openFrameCallback, closeFrameCallback);
       dataByThread.set(threadId, finalizedData);
 
       function openFrameCallback(
-          _depth: number, node: CPUProfile.ProfileTreeModel.ProfileNode, timeStampMs: number): void {
-        const ts = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(timeStampMs));
-        trackingStack.push({callFrame: node.callFrame, ts, pid: processId, children: [], tid: threadId});
-      }
-      function closeFrameCallback(
-          depth: number, node: CPUProfile.ProfileTreeModel.ProfileNode, _timeStamp: number, durMs: number,
-          selfTimeMs: number): void {
-        const partialProfileCall = trackingStack.pop();
-        if (!partialProfileCall) {
+          depth: number, node: CPUProfile.ProfileTreeModel.ProfileNode, timeStampMs: number): void {
+        if (threadId === undefined) {
           return;
         }
-        const {callFrame, ts, pid, children, tid} = partialProfileCall;
+        const ts = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(timeStampMs));
+        const nodeId = node.id as Helpers.TreeHelpers.TraceEntryNodeId;
+
+        const profileCall = Helpers.Trace.makeProfileCall(node, ts, processId, threadId);
+        finalizedData.profileCalls.push(profileCall);
+        indexStack.push(finalizedData.profileCalls.length - 1);
+        const traceEntryNode = Helpers.TreeHelpers.makeEmptyTraceEntryNode(profileCall, nodeId);
+        finalizedData.profileTree?.nodes.set(nodeId, traceEntryNode);
+        entryToNode.set(profileCall, traceEntryNode);
+        traceEntryNode.depth = depth;
+        if (indexStack.length === 1) {
+          // First call in the stack is a root call.
+          finalizedData.profileTree?.roots.add(traceEntryNode);
+        }
+      }
+      function closeFrameCallback(
+          _depth: number, node: CPUProfile.ProfileTreeModel.ProfileNode, _timeStamp: number, durMs: number,
+          selfTimeMs: number): void {
+        const profileCallIndex = indexStack.pop();
+        const profileCall = profileCallIndex !== undefined && finalizedData.profileCalls[profileCallIndex];
+        if (!profileCall) {
+          return;
+        }
+        const {callFrame, ts, pid, tid} = profileCall;
+        const traceEntryNode = entryToNode.get(profileCall);
         if (callFrame === undefined || ts === undefined || pid === undefined || profileId === undefined ||
-            children === undefined || tid === undefined) {
+            tid === undefined || traceEntryNode === undefined) {
           return;
         }
         const dur = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(durMs));
         const selfTime = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(selfTimeMs));
-        const completeProfileCall: Types.TraceEvents.TraceEventSyntheticProfileCall = {
-          callFrame,
-          ts,
-          pid,
-          dur,
-          selfTime,
-          children,
-          ph: Types.TraceEvents.Phase.COMPLETE,
-          cat: '',
-          args: {},
-          name: 'ProfileCall',
-          tid,
-          nodeId: node.id,
-        };
-        const parent = trackingStack.at(-1);
-        const calls = finalizedData.profileCalls;
-        calls.push(completeProfileCall);
-        if (!parent) {
+        profileCall.dur = dur;
+        profileCall.selfTime = selfTime;
+
+        const parentIndex = indexStack.at(-1);
+        const parent = parentIndex !== undefined && finalizedData.profileCalls.at(parentIndex);
+        const parentNode = parent && entryToNode.get(parent);
+        if (!parentNode) {
           return;
         }
-        parent.children = parent.children || [];
-        parent.children.push(completeProfileCall);
-        if (parent.selfTime) {
-          parent.selfTime = Types.Timing.MicroSeconds(parent.selfTime - dur);
-        }
+        traceEntryNode.parentId = parentNode.id;
+        parentNode.children.add(traceEntryNode);
       }
     }
   }
@@ -114,6 +119,26 @@ export function initialize(): void {
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('Samples Handler is not initialized');
+  }
+
+  /**
+   * A fake trace event created to support CDP.Profiler.Profiles in the
+   * trace engine.
+   */
+  if (Types.TraceEvents.isSyntheticTraceEventCpuProfile(event)) {
+    // At the moment we are attaching to a single node target so we
+    // should only get a single CPU profile. The values of the process
+    // id and thread id are not really important, so we use the data
+    // in the fake event. Should multi-thread CPU profiling be supported
+    // we could use these fields in the event to pass thread info.
+    const pid = event.pid;
+    const tid = event.tid;
+    // Create an arbitrary profile id.
+    const profileId = '0x1' as Types.TraceEvents.ProfileID;
+    const profileData = getOrCreatePreProcessedData(pid, profileId);
+    profileData.rawProfile = event.args.data.cpuProfile;
+    profileData.threadId = tid;
+    return;
   }
 
   if (Types.TraceEvents.isTraceEventProfile(event)) {
@@ -176,6 +201,7 @@ export async function finalize(): Promise<void> {
     throw new Error('Samples Handler is not initialized');
   }
   buildProfileCalls();
+
   handlerState = HandlerState.FINALIZED;
 }
 
@@ -213,7 +239,24 @@ export interface SamplesHandlerData {
 export type ProfileData = {
   rawProfile: CPUProfile.CPUProfileDataModel.ExtendedProfile,
   parsedProfile: CPUProfile.CPUProfileDataModel.CPUProfileDataModel,
+  /**
+   * Contains the calls built from the CPU profile samples.
+   * Note: This doesn't contain real trace events coming from the
+   * browser, only calls synthetically typed as trace events for
+   * compatibility, as such it only makes sense to use them in pure CPU
+   * profiles.
+   *
+   * If you need the profile calls from a CPU profile obtained from a
+   * web trace, use the data exported by the RendererHandler instead.
+   */
   profileCalls: Types.TraceEvents.TraceEventSyntheticProfileCall[],
+  /**
+   * Contains the call tree built from the CPU profile samples.
+   * Similar to the profileCalls field, this tree does not contain nor
+   * take into account trace events, as such it only makes sense to use
+   * them in pure CPU profiles.
+   */
+  profileTree?: Helpers.TreeHelpers.TraceEntryTree,
 };
 
 type PreprocessedData = {

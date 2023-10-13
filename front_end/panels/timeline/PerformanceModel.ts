@@ -7,7 +7,8 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
-import type * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
@@ -22,6 +23,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   private windowInternal: Window;
   private willResolveNames = false;
   private recordStartTimeInternal?: number;
+  #activeBreadcrumbWindow?: TraceEngine.Types.Timing.TraceWindow;
 
   constructor() {
     super();
@@ -179,11 +181,25 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.frameModelInternal;
   }
 
-  setWindow(window: Window, animate?: boolean): void {
-    const didWindowChange = this.windowInternal.left !== window.left || this.windowInternal.right !== window.right;
+  setWindow(window: Window, animate?: boolean, breadcrumb?: TraceEngine.Types.Timing.TraceWindow): void {
+    const didWindowOrBreadcrumbChange = this.windowInternal.left !== window.left ||
+        this.windowInternal.right !== window.right || (breadcrumb && (this.#activeBreadcrumbWindow !== breadcrumb));
     this.windowInternal = window;
-    if (didWindowChange) {
-      this.dispatchEventToListeners(Events.WindowChanged, {window, animate});
+    if (breadcrumb) {
+      this.#activeBreadcrumbWindow = breadcrumb;
+    }
+    if (didWindowOrBreadcrumbChange) {
+      this.dispatchEventToListeners(Events.WindowChanged, {window, animate, breadcrumbWindow: breadcrumb});
+      TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+          TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
+              TraceEngine.Types.Timing.MilliSeconds(window.left),
+              TraceEngine.Types.Timing.MilliSeconds(window.right),
+              ),
+          {shouldAnimate: Boolean(animate)},
+      );
+      if (breadcrumb) {
+        TraceBounds.TraceBounds.BoundsManager.instance().setMiniMapBounds(breadcrumb);
+      }
     }
   }
 
@@ -202,7 +218,10 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   // Set the window time selection to exclude any large 'empty' activity
   // Introduced in https://codereview.chromium.org/1428823004
   // TODO: also consider network activity.
-  zoomWindowToMainThreadActivity(): void {
+  calculateWindowForMainThreadActivity(): {
+    left: TraceEngine.Types.Timing.MilliSeconds,
+    right: TraceEngine.Types.Timing.MilliSeconds,
+  } {
     const timelineModel = this.timelineModelInternal;
     let tasks: TraceEngine.Legacy.Event[] = [];
     for (const track of timelineModel.tracks()) {
@@ -217,8 +236,10 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     // console.log('full', { dur:timelineModel.maximumRecordTime() - timelineModel.minimumRecordTime(), left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
 
     if (!tasks.length) {
-      this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
-      return;
+      return {
+        left: TraceEngine.Types.Timing.MilliSeconds(timelineModel.minimumRecordTime()),
+        right: TraceEngine.Types.Timing.MilliSeconds(timelineModel.maximumRecordTime()),
+      };
     }
 
     /**
@@ -259,7 +280,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       // purposefully recorded a trace that contains empty periods of time.
       leftTime = timelineModel.minimumRecordTime();
       rightTime = timelineModel.maximumRecordTime();
-      this.setWindow({left: leftTime, right: rightTime});
+
       // console.log('nothing',{dur: rightTime - leftTime, left: leftTime, right: rightTime});
     } else {
       // Adjust the left time down by 5%, and the right time up by 5%, so that
@@ -268,14 +289,12 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       // min/max time of the entire trace.
       leftTime = Math.max(leftTime - 0.05 * zoomedInSpan, timelineModel.minimumRecordTime());
       rightTime = Math.min(rightTime + 0.05 * zoomedInSpan, timelineModel.maximumRecordTime());
-      // Animate the zoom-in.
-      performance.mark('SET WINDOW FIRST');
-      this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
-      setTimeout(() => {
-        performance.mark('SET WINDOW ANIMATED');
-        this.setWindow({left: leftTime, right: rightTime}, true);
-      }, 100);
+
     }
+    return {
+      left: TraceEngine.Types.Timing.MilliSeconds(leftTime),
+      right: TraceEngine.Types.Timing.MilliSeconds(rightTime),
+    };
   }
 }
 
@@ -288,6 +307,7 @@ export enum Events {
 export interface WindowChangedEvent {
   window: Window;
   animate: boolean|undefined;
+  breadcrumbWindow?: TraceEngine.Types.Timing.TraceWindow;
 }
 
 export type EventTypes = {

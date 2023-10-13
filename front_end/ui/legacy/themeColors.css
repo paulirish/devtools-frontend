@@ -284,6 +284,7 @@
   --sys-color-state-ripple-neutral-on-subtle: rgb(31 31 31 / 8%);
   --sys-color-state-ripple-primary: rgb(124 172 248 / 32%);
   --sys-color-state-focus-ring: var(--ref-palette-primary40);
+  --sys-color-state-focus-select: var(--ref-palette-primary80);
   --sys-color-state-focus-highlight: rgb(31 31 31 / 6%);
   --sys-color-state-disabled: rgb(31 31 31 / 38%);
   --sys-color-state-disabled-container: rgb(31 31 31 / 12%);
@@ -399,6 +400,11 @@
   --app-color-async: var(--ref-palette-error60);
   --app-color-async-children: var(--ref-palette-error70);
   --app-color-other: var(--ref-palette-neutral87);
+
+  /**
+   * Color for the active breadcrumb in the Performance Panel timeline.
+   */
+  --app-color-active-breadcrumb: var(--ref-palette-blue40);
 }
 
 .-theme-with-dark-background {
@@ -588,7 +594,7 @@
   --sys-color-on-tertiary-container: var(--ref-palette-tertiary90);
   --sys-color-error-container: var(--ref-palette-error30);
   --sys-color-on-error-container: var(--ref-palette-error90);
-  --sys-color-neutral-container: var(--ref-palette-neutral15);
+  --sys-color-neutral-container: var(--ref-palette-neutral10);
   --sys-color-omnibox-container: var(--ref-palette-neutral15);
 
   /* Prominent accent colors */
@@ -638,6 +644,7 @@
   --sys-color-state-ripple-neutral-on-subtle: rgb(253 252 251 / 16%);
   --sys-color-state-ripple-primary: rgb(76 141 246 / 32%);
   --sys-color-state-focus-ring: var(--ref-palette-primary80);
+  --sys-color-state-focus-select: var(--ref-palette-secondary50);
   --sys-color-state-focus-highlight: rgb(253 252 251 / 10%);
   --sys-color-state-disabled: rgb(227 227 227 / 100%);
   --sys-color-state-disabled-container: rgb(227 227 227 / 12%);
@@ -757,5 +764,5 @@
   /**
    * Color for the active breadcrumb in the Performance Panel timeline.
    */
-  --app-color-active-breadcrumb: rgb(11 87 208);
+  --app-color-active-breadcrumb: var(--ref-palette-blue40);
 }

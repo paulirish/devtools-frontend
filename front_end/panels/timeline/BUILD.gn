@@ -74,6 +74,7 @@ devtools_module("timeline") {
     "../../panels/layer_viewer:bundle",
     "../../panels/mobile_throttling:bundle",
     "../../panels/profiler:bundle",
+    "../../services/trace_bounds:bundle",
     "../../ui/components/panel_feedback:bundle",
     "../../ui/components/code_highlighter:bundle", # traceargs highlighting
     "../../ui/legacy/components/data_grid:bundle",
