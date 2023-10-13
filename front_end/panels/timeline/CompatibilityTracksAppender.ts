@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -97,6 +98,7 @@ export class CompatibilityTracksAppender {
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
   #isCpuProfile = false;
+  #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
 
   // TODO(crbug.com/1416533)
   // These are used only for compatibility with the legacy flame chart
@@ -496,6 +498,9 @@ export class CompatibilityTracksAppender {
   }
 
   entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+    if (this.#showAllEventsEnabled) {
+      return true;
+    }
     // Default styles are globally defined for each event name. Some
     // events are hidden by default.
     const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
