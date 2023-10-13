@@ -58,7 +58,7 @@ export class InteractionsTrackAppender implements TrackAppender {
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
     newLevel =  this.#appendInteractionsAtLevel(trackStartLevel);
 
-    const uberFrameEvts = this.#traceParsedData.UberFrames.nonWaterfallEvts;
+    const uberFrameEvts = this.#traceParsedData.UberFramesHandler.nonWaterfallEvts;
     const loafs = uberFrameEvts.filter(e => e.name === 'LongAnimationFrame');
     newLevel = this.#compatibilityBuilder.appendEventsAtLevel(loafs, newLevel, this);
     return newLevel;

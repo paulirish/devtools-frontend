@@ -62,7 +62,7 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberNonWaterfallEvts = this.#traceParsedData.UberFrames.nonWaterfallEvts;
+    const uberNonWaterfallEvts = this.#traceParsedData.UberFramesHandler.nonWaterfallEvts;
 
     if (uberNonWaterfallEvts.length === 0) {
       return trackStartLevel;
@@ -150,7 +150,7 @@ export class UberFramesTrackAppender implements TrackAppender {
     const localID = event.args?.data?.beginEvent?.id2?.local;
 
     if (localID) {
-      const frameSeq = this.#traceParsedData.UberFrames.eventLatencyIdToFrameSeq[localID];
+      const frameSeq = this.#traceParsedData.UberFramesHandler.eventLatencyIdToFrameSeq[localID];
       if (frameSeq) {return `${event.name} res${frameSeq % 1000}`;}
 
       return `${event.name} c${localID}`;

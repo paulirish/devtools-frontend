@@ -1167,6 +1167,15 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       }
       this.flameChart.setSelection(null);
       const {left, right} = model.calculateWindowForMainThreadActivity();
+
+      // Animate the zoom-in.
+      performance.mark('SET WINDOW FIRST');
+      model.setWindow({left: model.minimumRecordTime(), right: model.maximumRecordTime()});
+      setTimeout(() => {
+        performance.mark('SET WINDOW ANIMATED');
+        model.setWindow({left, right}, true);
+      }, 100);
+
       model.setWindow({left, right});
       this.#minimapComponent.setWindowTimes(left, right);
       if (traceParsedData) {

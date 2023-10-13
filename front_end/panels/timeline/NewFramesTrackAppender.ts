@@ -62,8 +62,8 @@ export class NewFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFrames.nonWaterfallEvts;
-    // const uberFrameAsyncEvts = this.#traceParsedData.UberFrames.syntheticEvents;
+    const uberFrameEvts = this.#traceParsedData.UberFramesHandler.nonWaterfallEvts;
+    // const uberFrameAsyncEvts = this.#traceParsedData.UberFramesHandler.syntheticEvents;
 
     if (uberFrameEvts.length === 0) {
       return trackStartLevel;
@@ -72,7 +72,7 @@ export class NewFramesTrackAppender implements TrackAppender {
     let newLevel = 0;
 
     // do waterfall first
-    const waterFallEvts = this.#traceParsedData.UberFrames.waterFallEvts;
+    const waterFallEvts = this.#traceParsedData.UberFramesHandler.waterFallEvts;
 
     // filter down to just the breakdown types we see. Figure out levelBump for the rising waterfall
     const actualNames = new Set(waterFallEvts.map(e => e.name));
