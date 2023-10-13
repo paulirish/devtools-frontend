@@ -168,7 +168,7 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
 
     if (localID) {
       const frameSeq = this.#traceParsedData.UberFramesHandler.eventLatencyIdToFrameSeq[localID];
-      if (frameSeq) {return `${event.name} res${frameSeq % 1000}`;}
+      if (frameSeq) {return `${event.name} SQ${frameSeq % 1000}`;}
 
       return `${event.name} c${localID}`;
     }
