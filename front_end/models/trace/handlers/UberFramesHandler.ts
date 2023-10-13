@@ -97,10 +97,25 @@ const someRelevantTraceEventTypes = [
   'SendBeginMainFrameToCommit',
   'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
   'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase in eventlatency
-  'Graphics.Pipeline',
+  // 'Graphics.Pipeline',
 
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
   'Frame',
+
+
+  // these are all pipeline reporter subitems. HOEVER they are also included in the eventlatency children too.
+  'Activation',
+  'BeginImplFrameToSendBeginMainFrame',
+  'Commit',
+  'EndActivateToSubmitCompositorFrame',
+  'EndCommitToActivation',
+  'ReceiveCompositorFrameToStartDraw',
+  'SendBeginMainFrameToCommit',
+  'StartDrawToSwapStart',
+  'SubmitCompositorFrameToPresentationCompositorFrame',
+  'SubmitToReceiveCompositorFrame',
+  'Swap',
+
 
   'BeginFrame',
   'DroppedFrame',
@@ -244,7 +259,12 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     } else {
 
       if (eventLatencyBreakdownTypeNames.includes(event.name)) {
-        waterFallEvents.push(event);
+        // we have two diff events named Commit, we'll exclude the normal mainthread one.
+        if (event.name === 'Commit' && !event.cat.includes('cc')) {
+
+        } else {
+          waterFallEvents.push(event);
+        }
       }
       relevantEvts.push(event);
     }
@@ -325,8 +345,13 @@ export async function finalize(): Promise<void> {
       },
     };
 
+
+    // still I do see some 0's in the real trace. i messed up the c++ side.
     if (event.name === 'EventLatency') {
-      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence;
+      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence ?? null;
+    }
+    if (event.name === 'PipelineReporter') {
+      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.chrome_frame_reporter.frame_sequence ?? null;
     }
 
     const existingDuplicate = syntheticEvents.find(e => {
