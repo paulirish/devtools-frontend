@@ -288,9 +288,6 @@ export class MainImpl {
         'sourceOrderViewer', 'Source order viewer', undefined,
         'https://developer.chrome.com/blog/new-in-devtools-92/#source-order');
     Root.Runtime.experiments.register('webauthnPane', 'WebAuthn Pane');
-    Root.Runtime.experiments.register(
-        'keyboardShortcutEditor', 'Enable keyboard shortcut editor', false,
-        'https://developer.chrome.com/blog/new-in-devtools-88/#keyboard-shortcuts');
 
     // Back/forward cache
     Root.Runtime.experiments.register(
@@ -321,12 +318,6 @@ export class MainImpl {
     Root.Runtime.experiments.register('instrumentationBreakpoints', 'Enable instrumentation breakpoints', true);
     Root.Runtime.experiments.register('setAllBreakpointsEagerly', 'Set all breakpoints eagerly at startup');
     Root.Runtime.experiments.register('useSourceMapScopes', 'Use scope information from source maps', true);
-
-    // Dual-screen
-    Root.Runtime.experiments.register(
-        'dualScreenSupport', 'Emulation: Support dual screen mode', undefined,
-        'https://developer.chrome.com/blog/new-in-devtools-89#dual-screen');
-    Root.Runtime.experiments.setEnabled('dualScreenSupport', true);
 
     // Advanced Perceptual Contrast Algorithm.
     Root.Runtime.experiments.register(
@@ -400,12 +391,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, 'Enable Preloading Status Panel in Application panel',
         true);
-    Root.Runtime.experiments.setEnabled(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, true);
-
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.DISABLE_COLOR_FORMAT_SETTING,
-        // Adding the reload hint here because users getting here are likely coming from inside the settings UI, but the regular reminder bar is only shown after the UI is closed which they're not going to see.
-        'Disable the deprecated `Color format` setting (requires reloading DevTools)', false);
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
@@ -426,20 +411,23 @@ export class MainImpl {
         Root.Runtime.ExperimentName.BREADCRUMBS_PERFORMANCE_PANEL, 'Enable breadcrumbs in the Performance Panel',
         false);
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
+        'Enable context menu that allows to modify trees in the Flame Chart', true);
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',
       'cssTypeComponentLength',
       Root.Runtime.ExperimentName.PRECISE_CHANGES,
       ...('EyeDropper' in window ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
-      'keyboardShortcutEditor',
       'sourcesPrettyPrint',
       'setAllBreakpointsEagerly',
-      Root.Runtime.ExperimentName.DISABLE_COLOR_FORMAT_SETTING,
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
       Root.Runtime.ExperimentName.WASM_DWARF_DEBUGGING,
       Root.Runtime.ExperimentName.HEADER_OVERRIDES,
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.SELF_XSS_WARNING,
+      Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
     ]);
 
     Root.Runtime.experiments.setNonConfigurableExperiments([
@@ -527,10 +515,8 @@ export class MainImpl {
     IssuesManager.ContrastCheckTrigger.ContrastCheckTrigger.instance();
 
     UI.DockController.DockController.instance({forceNew: true, canDock});
-    // @ts-ignore layout test global
-    self.SDK.multitargetNetworkManager = SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
-    // @ts-ignore layout test global
-    self.SDK.domDebuggerManager = SDK.DOMDebuggerModel.DOMDebuggerManager.instance({forceNew: true});
+    SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
+    SDK.DOMDebuggerModel.DOMDebuggerManager.instance({forceNew: true});
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.SuspendStateChanged, this.#onSuspendStateChanged.bind(this));
 
@@ -566,8 +552,7 @@ export class MainImpl {
       const outermostTarget = data?.outermostTarget();
       SDK.TargetManager.TargetManager.instance().setScopeTarget(outermostTarget);
     });
-    // @ts-ignore layout test global
-    self.Bindings.breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
+    Breakpoints.BreakpointManager.BreakpointManager.instance({
       forceNew: true,
       workspace: Workspace.Workspace.WorkspaceImpl.instance(),
       targetManager: SDK.TargetManager.TargetManager.instance(),

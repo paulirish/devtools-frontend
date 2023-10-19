@@ -52,6 +52,19 @@ export const generatedProperties = [
   "name": "-alternative-view-timeline-with-inset"
  },
  {
+  "longhands": [
+   "mask-image",
+   "-webkit-mask-position-x",
+   "-webkit-mask-position-y",
+   "mask-size",
+   "-webkit-mask-repeat-x",
+   "-webkit-mask-repeat-y",
+   "mask-origin",
+   "mask-clip"
+  ],
+  "name": "-webkit-alternative-mask"
+ },
+ {
   "inherited": true,
   "name": "-webkit-border-horizontal-spacing"
  },
@@ -584,7 +597,8 @@ export const generatedProperties = [
   "keywords": [
    "border-box",
    "padding-box",
-   "content-box"
+   "content-box",
+   "text"
   ],
   "name": "background-clip"
  },
@@ -1545,6 +1559,13 @@ export const generatedProperties = [
   "name": "fallback"
  },
  {
+  "keywords": [
+   "fixed",
+   "content"
+  ],
+  "name": "field-sizing"
+ },
+ {
   "inherited": true,
   "name": "fill"
  },
@@ -1895,13 +1916,6 @@ export const generatedProperties = [
    "preserve-parent-color"
   ],
   "name": "forced-color-adjust"
- },
- {
-  "keywords": [
-   "auto",
-   "normal"
-  ],
-  "name": "form-sizing"
  },
  {
   "longhands": [
@@ -2332,6 +2346,18 @@ export const generatedProperties = [
  },
  {
   "name": "mask"
+ },
+ {
+  "name": "mask-clip"
+ },
+ {
+  "name": "mask-image"
+ },
+ {
+  "name": "mask-origin"
+ },
+ {
+  "name": "mask-size"
  },
  {
   "keywords": [
@@ -2869,9 +2895,6 @@ export const generatedProperties = [
    "smooth"
   ],
   "name": "scroll-behavior"
- },
- {
-  "name": "scroll-customization"
  },
  {
   "longhands": [
@@ -3443,6 +3466,14 @@ export const generatedProperties = [
  },
  {
   "inherited": true,
+  "longhands": [
+   "text-autospace",
+   "text-spacing-trim"
+  ],
+  "name": "text-spacing"
+ },
+ {
+  "inherited": true,
   "keywords": [
    "space-first",
    "space-all"
@@ -4005,7 +4036,8 @@ export const generatedPropertyValues = {
   "values": [
    "border-box",
    "padding-box",
-   "content-box"
+   "content-box",
+   "text"
   ]
  },
  "background-color": {
@@ -4536,6 +4568,12 @@ export const generatedPropertyValues = {
    "hide"
   ]
  },
+ "field-sizing": {
+  "values": [
+   "fixed",
+   "content"
+  ]
+ },
  "fill-rule": {
   "values": [
    "nonzero",
@@ -4755,12 +4793,6 @@ export const generatedPropertyValues = {
    "auto",
    "none",
    "preserve-parent-color"
-  ]
- },
- "form-sizing": {
-  "values": [
-   "auto",
-   "normal"
   ]
  },
  "grid-auto-columns": {
@@ -5840,6 +5872,22 @@ export const generatedAliasesFor = new Map([
  [
   "-webkit-alternative-animation-with-timeline",
   "-alternative-animation-with-timeline"
+ ],
+ [
+  "-webkit-alternative-mask-clip",
+  "mask-clip"
+ ],
+ [
+  "-webkit-alternative-mask-image",
+  "mask-image"
+ ],
+ [
+  "-webkit-alternative-mask-origin",
+  "mask-origin"
+ ],
+ [
+  "-webkit-alternative-mask-size",
+  "mask-size"
  ],
  [
   "-webkit-animation",

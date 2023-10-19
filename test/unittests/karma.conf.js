@@ -212,6 +212,7 @@ module.exports = function(config) {
       // Inject the CSS color theme variables into the page so any rendered
       // components have access to them.
       {pattern: path.join(GEN_DIRECTORY, 'front_end/ui/legacy/themeColors.css'), served: true, included: true},
+      {pattern: path.join(GEN_DIRECTORY, 'front_end/ui/legacy/tokens.css'), served: true, included: true},
       {pattern: path.join(GEN_DIRECTORY, 'front_end/**/*.css'), served: true, included: false},
       {pattern: path.join(GEN_DIRECTORY, 'front_end/**/*.js'), served: true, included: false},
       {pattern: path.join(GEN_DIRECTORY, 'front_end/**/*.js.map'), served: true, included: false},
@@ -293,7 +294,7 @@ module.exports = function(config) {
 
     singleRun,
 
-    pingTimeout: KARMA_TIMEOUT,
+    pingTimeout: KARMA_TIMEOUT ?? 4000,
     browserNoActivityTimeout: KARMA_TIMEOUT,
     browserSocketTimeout: KARMA_TIMEOUT,
 

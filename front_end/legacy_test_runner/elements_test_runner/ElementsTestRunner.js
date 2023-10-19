@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import * as Animation from '../../panels/animation/animation.js';
 import * as Elements from '../../panels/elements/elements.js';
 import * as EventListeners from '../../panels/event_listeners/event_listeners.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 /**
@@ -550,7 +553,7 @@ async function extractLinkText(element) {
   }
 
   const anchorText = anchor.textContent;
-  const info = Components.Linkifier.linkInfo(anchor);
+  const info = Components.Linkifier.Linkifier.linkInfo(anchor);
   const uiLocation = info && info.uiLocation;
   const anchorTarget =
       (uiLocation ?
@@ -988,7 +991,7 @@ ElementsTestRunner.generateUndoTest = function(testBody) {
           ElementsTestRunner.dumpElementsTree(testNode);
         }
 
-        self.SDK.domModelUndoStack.undo().then(redo);
+        SDK.DOMModel.DOMModelUndoStack.instance().undo().then(redo);
       }
     }
 
@@ -1003,7 +1006,7 @@ ElementsTestRunner.generateUndoTest = function(testBody) {
           ElementsTestRunner.dumpElementsTree(testNode);
         }
 
-        self.SDK.domModelUndoStack.redo().then(done);
+        SDK.DOMModel.DOMModelUndoStack.instance().redo().then(done);
       }
     }
 
@@ -1294,7 +1297,7 @@ ElementsTestRunner.dumpInspectorHighlightStyleJSON = async function(idValue) {
 };
 
 ElementsTestRunner.waitForAnimationAdded = function(callback) {
-  TestRunner.addSniffer(Animation.AnimationTimeline.prototype, 'addAnimationGroup', callback);
+  TestRunner.addSniffer(Animation.AnimationTimeline.AnimationTimeline.prototype, 'addAnimationGroup', callback);
 };
 
 ElementsTestRunner.dumpAnimationTimeline = function(timeline) {
@@ -1314,7 +1317,7 @@ ElementsTestRunner.ignoreSidebarUpdates = function() {
 
 ElementsTestRunner.getDocumentElements = function() {
   const map = TestRunner.domModel.idToDOMNode;
-  const documents = Array.from(map.values()).filter(n => n instanceof SDK.DOMDocument);
+  const documents = Array.from(map.values()).filter(n => n instanceof SDK.DOMModel.DOMDocument);
   return documents;
 };
 

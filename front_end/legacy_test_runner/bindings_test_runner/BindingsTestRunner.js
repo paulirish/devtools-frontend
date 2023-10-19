@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as SDK from '../../core/sdk/sdk.js';
+import * as Workspace from '../../models/workspace/workspace.js';
+
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
  */
 self.BindingsTestRunner = self.BindingsTestRunner || {};
 
 import * as Bindings from '../../models/bindings/bindings.js';
+import * as Diff from '../../third_party/diff/diff.js';
 
 BindingsTestRunner.cleanupURL = function(url) {
   if (!url.startsWith('debugger://')) {
@@ -18,7 +22,7 @@ BindingsTestRunner.cleanupURL = function(url) {
 };
 
 BindingsTestRunner.dumpWorkspace = function(previousSnapshot) {
-  const uiSourceCodes = self.Workspace.workspace.uiSourceCodes().slice();
+  const uiSourceCodes = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodes().slice();
   let urls = uiSourceCodes.map(code => code.url());
 
   urls = urls.map(BindingsTestRunner.cleanupURL);
@@ -28,7 +32,7 @@ BindingsTestRunner.dumpWorkspace = function(previousSnapshot) {
   let removedLines = [];
 
   if (previousSnapshot) {
-    const diff = Diff.Diff.lineDiff(previousSnapshot, urls);
+    const diff = Diff.Diff.DiffWrapper.lineDiff(previousSnapshot, urls);
     const removedEntries = diff.filter(entry => entry[0] === Diff.Diff.Operation.Delete).map(entry => entry[1]);
     removedLines = [].concat.apply([], removedEntries);
     let index = 0;
@@ -215,7 +219,7 @@ BindingsTestRunner.createDebuggerLiveLocation = function(
 
 BindingsTestRunner.createCSSLiveLocation = function(name, urlSuffix, lineNumber, columnNumber, dumpOnUpdate = true) {
   const header = TestRunner.cssModel.styleSheetHeaders().find(header => header.resourceURL().endsWith(urlSuffix));
-  const rawLocation = new SDK.CSSLocation(header, lineNumber || 0, columnNumber || 0);
+  const rawLocation = new SDK.CSSModel.CSSLocation(header, lineNumber || 0, columnNumber || 0);
   return Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance().createLiveLocation(
       rawLocation, updateDelegate.bind(null, name, dumpOnUpdate), locationPool);
 };

@@ -177,22 +177,19 @@
   --color-highlighted-line: rgb(255 255 0 / 50%);
   --color-completion-hover: rgb(56 121 217 / 10%);
   --color-search-match-border: rgb(128 128 128);
-  --color-selected-search-match: var(--color-text-primary);
+  --color-selected-search-match: var(--sys-color-on-surface);
   --color-selected-search-match-background: rgb(241 234 0);
   --color-coverage-used: #63acbe;
-  --color-execution-line-background: rgb(0 59 255 / 10%);
-  --color-execution-line-outline: rgb(64 115 244);
-  --color-execution-token-background: rgb(15 72 252 / 35%);
-  --color-continue-to-location: rgb(5 65 255 / 10%);
-  --color-continue-to-location-hover: rgb(15 72 252 / 35%);
-  --color-continue-to-location-hover-border: rgb(121 141 254);
-  --color-continue-to-location-async: rgb(58 162 8 / 30%);
-  --color-continue-to-location-async-hover: rgb(75 179 6 / 55%);
-  --color-continue-to-location-async-hover-border: rgb(100 154 100);
-  --color-evaluated-expression: rgb(255 255 11 / 25%);
-  --color-evaluated-expression-border: rgb(163 41 34);
-  --color-variable-values: #ffe3c7;
-  --color-non-breakable-line: rgb(128 128 128 / 40%);
+  --color-continue-to-location: var(--ref-palette-blue90);
+  --color-continue-to-location-hover: var(--ref-palette-blue80);
+  --color-continue-to-location-hover-border: var(--ref-palette-blue70);
+  --color-continue-to-location-async: var(--ref-palette-green90);
+  --color-continue-to-location-async-hover: var(--ref-palette-green80);
+  --color-continue-to-location-async-hover-border: var(--ref-palette-green70);
+  --color-evaluated-expression: var(--ref-palette-yellow95);
+  --color-evaluated-expression-border: var(--ref-palette-yellow70);
+  --color-variable-values: var(--ref-palette-orange90);
+  --color-non-breakable-line: var(--ref-palette-neutral80);
 
   /* Color tokens for icons */
   --color-on-surface: rgb(32 33 36);
@@ -312,6 +309,7 @@
   --sys-color-cyan-bright: var(--ref-palette-cyan50);
   --sys-color-purple-bright: var(--ref-palette-purple50);
   --sys-color-neutral-bright: var(--ref-palette-neutral70);
+  --sys-color-pink-bright: var(--ref-palette-pink60);
 
   /* Prominent accent colors for text */
 
@@ -327,6 +325,8 @@
   --sys-color-on-cyan: var(--ref-palette-cyan100);
   --sys-color-purple: var(--ref-palette-purple40);
   --sys-color-on-purple: var(--ref-palette-purple100);
+  --sys-color-pink: var(--ref-palette-pink40);
+  --sys-color-on-pink: var(--ref-palette-pink100);
 
   /* Containers */
 
@@ -539,19 +539,16 @@
   --color-selected-search-match: #eee;
   --color-selected-search-match-background: hsl(133deg 100% 30%);
   --color-coverage-used: rgb(65 138 156);
-  --color-execution-line-background: rgb(0 154 17 / 30%);
-  --color-execution-line-outline: #33cc6b;
-  --color-execution-token-background: rgb(132 237 78 / 20%);
-  --color-continue-to-location: rgb(0 173 56 / 35%);
-  --color-continue-to-location-hover: rgb(0 173 56 / 35%);
-  --color-continue-to-location-hover-border: #33cc6b;
-  --color-continue-to-location-async: rgb(87 238 0 / 20%);
-  --color-continue-to-location-async-hover: rgb(128 241 48 / 50%);
-  --color-continue-to-location-async-hover-border: rgb(101 155 101);
-  --color-evaluated-expression: rgb(71 70 0 / 75%);
-  --color-evaluated-expression-border: rgb(221 99 92);
-  --color-variable-values: rgb(56 28 0);
-  --color-non-breakable-line: rgb(127 127 127 / 40%);
+  --color-continue-to-location: var(--ref-palette-yellow30);
+  --color-continue-to-location-hover: var(--ref-palette-yellow40);
+  --color-continue-to-location-hover-border: var(--ref-palette-yellow50);
+  --color-continue-to-location-async: var(--ref-palette-green30);
+  --color-continue-to-location-async-hover: var(--ref-palette-green4);
+  --color-continue-to-location-async-hover-border: var(--ref-palette-green50);
+  --color-evaluated-expression: var(--ref-palette-yellow30);
+  --color-evaluated-expression-border: var(--ref-palette-yellow40);
+  --color-variable-values: var(--sys-color-surface-error);
+  --color-non-breakable-line: var(--ref-palette-neutral30);
 
   /* Color tokens for icons */
   --color-on-surface: rgb(232 234 237);
@@ -717,7 +714,7 @@
   --sys-color-token-definition: var(--ref-palette-primary70);
   --sys-color-token-variable-special: var(--ref-palette-primary40);
   --sys-color-token-builtin: var(--ref-palette-primary80);
-  --sys-color-token-keyword: var(--ref-palette-primary40);
+  --sys-color-token-keyword: var(--ref-palette-purple60);
   --sys-color-token-number: var(--ref-palette-tertiary90);
   --sys-color-token-string: var(--ref-palette-orange70);
   --sys-color-token-string-special: var(--ref-palette-orange70);

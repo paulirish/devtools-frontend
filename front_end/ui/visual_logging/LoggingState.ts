@@ -22,6 +22,10 @@ export function resetStateForTesting(): void {
 
 export function getLoggingState(element: Element, parent?: Element): LoggingState {
   const config = getLoggingConfig(element);
+  if (config.parent && parentProviders.has(config.parent)) {
+    parent = parentProviders.get(config.parent)?.(element);
+  }
+
   const elementState = state.get(element) || {
     impressionLogged: false,
     processed: false,
@@ -58,6 +62,18 @@ const resolveContext = (context?: string): ContextProvider => {
   }
   const encoder = new TextEncoder();
   const data = encoder.encode(context);
-  const hash = crypto.subtle.digest('SHA-1', data).then(x => (new DataView(x)).getUint32(0, true));
+  const hash = crypto.subtle ? crypto.subtle.digest('SHA-1', data).then(x => (new DataView(x)).getUint32(0, true)) :
+                               // Layout tests run in an insecure context where crypto.subtle is not available.
+                               Promise.resolve(0xDEADBEEF);
   return () => hash;
 };
+
+type ParentProvider = (e: Element) => Element|undefined;
+const parentProviders = new Map<string, ParentProvider>();
+
+export function registerParentProvider(name: string, provider: ParentProvider): void {
+  if (parentProviders.has(name)) {
+    throw new Error(`Parent provider with the name '${name} is already registered'`);
+  }
+  parentProviders.set(name, provider);
+}

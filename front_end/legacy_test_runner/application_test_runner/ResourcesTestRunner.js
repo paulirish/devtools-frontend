@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as Application from '../../panels/application/application.js';
 
 /**
@@ -15,13 +16,13 @@ self.ApplicationTestRunner = self.ApplicationTestRunner || {};
  * doesn't get reset between tests.
  */
 ApplicationTestRunner.resetState = async function() {
-  const targets = self.SDK.targetManager.targets();
+  const targets = SDK.TargetManager.TargetManager.instance().targets();
   for (const target of targets) {
     if (target.type() === 'tab') {
       continue;
     }
     const securityOrigin = new Common.ParsedURL.ParsedURL(target.inspectedURL()).securityOrigin();
-    await target.storageAgent().clearDataForOrigin(securityOrigin, Resources.StorageView.AllStorageTypes.join(','));
+    await target.storageAgent().clearDataForOrigin(securityOrigin, Application.StorageView.AllStorageTypes.join(','));
   }
 };
 
@@ -155,15 +156,15 @@ ApplicationTestRunner.dumpCookies = function() {
 };
 
 ApplicationTestRunner.databaseModel = function() {
-  return TestRunner.mainTarget.model(Resources.DatabaseModel);
+  return TestRunner.mainTarget.model(Application.DatabaseModel.DatabaseModel);
 };
 
 ApplicationTestRunner.domStorageModel = function() {
-  return TestRunner.mainTarget.model(Resources.DOMStorageModel);
+  return TestRunner.mainTarget.model(Application.DOMStorageModel.DOMStorageModel);
 };
 
 ApplicationTestRunner.indexedDBModel = function() {
-  return TestRunner.mainTarget.model(Resources.IndexedDBModel);
+  return TestRunner.mainTarget.model(Application.IndexedDBModel.IndexedDBModel);
 };
 
 TestRunner.deprecatedInitAsync(`

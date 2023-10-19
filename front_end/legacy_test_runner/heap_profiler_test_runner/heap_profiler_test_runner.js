@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../ui/legacy/components/data_grid/data_grid-legacy.js';
-
+import * as SDK from '../../core/sdk/sdk.js';
 import * as HeapSnapshotWorker from '../../entrypoints/heap_snapshot_worker/heap_snapshot_worker.js';
 import * as Profiler from '../../panels/profiler/profiler.js';
+import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {TestRunner} from '../test_runner/test_runner.js';
 
@@ -646,8 +646,10 @@ HeapProfilerTestRunner.takeAndOpenSnapshot = async function(generator, callback)
 
   HeapProfilerTestRunner.takeAndOpenSnapshotCallback = callback;
   TestRunner.override(TestRunner.HeapProfilerAgent, 'invoke_takeHeapSnapshot', pushGeneratedSnapshot);
-  if (!UI.Context.Context.instance().flavor(SDK.HeapProfilerModel)) {
-    await new Promise(resolve => UI.Context.Context.instance().addFlavorChangeListener(SDK.HeapProfilerModel, resolve));
+  if (!UI.Context.Context.instance().flavor(SDK.HeapProfilerModel.HeapProfilerModel)) {
+    await new Promise(
+        resolve =>
+            UI.Context.Context.instance().addFlavorChangeListener(SDK.HeapProfilerModel.HeapProfilerModel, resolve));
   }
   profileType.takeHeapSnapshot();
 };
@@ -748,8 +750,10 @@ HeapProfilerTestRunner.profileViewRefresh = function() {
 };
 
 HeapProfilerTestRunner.startSamplingHeapProfiler = async function() {
-  if (!UI.Context.Context.instance().flavor(SDK.HeapProfilerModel)) {
-    await new Promise(resolve => UI.Context.Context.instance().addFlavorChangeListener(SDK.HeapProfilerModel, resolve));
+  if (!UI.Context.Context.instance().flavor(SDK.HeapProfilerModel.HeapProfilerModel)) {
+    await new Promise(
+        resolve =>
+            UI.Context.Context.instance().addFlavorChangeListener(SDK.HeapProfilerModel.HeapProfilerModel, resolve));
   }
   Profiler.HeapProfileView.SamplingHeapProfileType.instance.startRecordingProfile();
 };

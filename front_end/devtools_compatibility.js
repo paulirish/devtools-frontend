@@ -419,6 +419,7 @@ const EnumeratedHistogram = {
   KeyboardShortcutFired: 'DevTools.KeyboardShortcutFired',
   Language: 'DevTools.Language',
   LighthouseModeRun: 'DevTools.LighthouseModeRun',
+  LighthouseCategoryUsed: 'DevTools.LighthouseCategoryUsed',
   LinearMemoryInspectorRevealedFrom: 'DevTools.LinearMemoryInspector.RevealedFrom',
   LinearMemoryInspectorTarget: 'DevTools.LinearMemoryInspector.Target',
   ManifestSectionSelected: 'DevTools.ManifestSectionSelected',
@@ -986,7 +987,7 @@ const InspectorFrontendHostImpl = class {
    * @param {InspectorFrontendHostAPI.ImpressionEvent} impressionEvent
    */
   recordImpression(impressionEvent) {
-    DevToolsHost.sendMessageToEmbedder('recordImpression', [impressionEvent], null);
+    DevToolsAPI.sendMessageToEmbedder('recordImpression', [impressionEvent], null);
   }
 
   /**
@@ -994,7 +995,15 @@ const InspectorFrontendHostImpl = class {
    * @param {InspectorFrontendHostAPI.ClickEvent} clickEvent
    */
   recordClick(clickEvent) {
-    DevToolsHost.sendMessageToEmbedder('recordClick', [clickEvent], null);
+    DevToolsAPI.sendMessageToEmbedder('recordClick', [clickEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.HoverEvent} hoverEvent
+   */
+  recordHover(hoverEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordHover', [hoverEvent], null);
   }
 
   /**
@@ -1002,7 +1011,7 @@ const InspectorFrontendHostImpl = class {
    * @param {InspectorFrontendHostAPI.ChangeEvent} changeEvent
    */
   recordChange(changeEvent) {
-    DevToolsHost.sendMessageToEmbedder('recordChange', [changeEvent], null);
+    DevToolsAPI.sendMessageToEmbedder('recordChange', [changeEvent], null);
   }
 
   /**
@@ -1010,7 +1019,7 @@ const InspectorFrontendHostImpl = class {
    * @param {InspectorFrontendHostAPI.KeyDownEvent} keyDownEvent
    */
   recordKeyDown(keyDownEvent) {
-    DevToolsHost.sendMessageToEmbedder('recordKeyDown', [keyDownEvent], null);
+    DevToolsAPI.sendMessageToEmbedder('recordKeyDown', [keyDownEvent], null);
   }
 
   // Backward-compatible methods below this line --------------------------------------------
