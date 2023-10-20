@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as Helpers from '../helpers/helpers.js';
-import * as Types from '../types/types.js';
+import type * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
 import {type TraceEventHandlerName} from './types.js';
@@ -20,7 +20,7 @@ export function reset(): void {
 }
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
-  if (event.ph !== Types.TraceEvents.Phase.OBJECT_SNAPSHOT || event.name !== 'Screenshot') {
+  if (event.name !== 'Screenshot') {
     return;
   }
 
