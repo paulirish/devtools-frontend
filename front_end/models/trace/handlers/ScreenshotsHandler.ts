@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as Helpers from '../helpers/helpers.js';
-import type * as Types from '../types/types.js';
+import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
 import {type TraceEventHandlerName} from './types.js';
@@ -13,14 +13,14 @@ import {type TraceEventHandlerName} from './types.js';
 const eventsInProcessThread =
     new Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventSnapshot[]>>();
 
-let snapshots: Types.TraceEvents.TraceEventSnapshot[]|Types.TraceEvents.TraceEventScreenshot[] = [];
+let snapshots: Types.TraceEvents.TraceEventSnapshot[] = [];
 export function reset(): void {
   eventsInProcessThread.clear();
   snapshots.length = 0;
 }
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
-  if (event.name !== 'Screenshot') {
+  if (event.ph !== Types.TraceEvents.Phase.OBJECT_SNAPSHOT || event.name !== 'Screenshot') {
     return;
   }
 
@@ -35,7 +35,7 @@ export async function finalize(): Promise<void> {
   }
 }
 
-export function data(): Types.TraceEvents.TraceEventSnapshot[]|Types.TraceEvents.TraceEventScreenshot[] {
+export function data(): Types.TraceEvents.TraceEventSnapshot[] {
   return [...snapshots];
 }
 
