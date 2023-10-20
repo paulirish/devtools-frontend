@@ -160,7 +160,6 @@ export class CompatibilityTracksAppender {
         new FramesWaterfallTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#framesWaterfallTrackAppender);
 
-
     this.#newFramesTrackAppender =
         new NewFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#newFramesTrackAppender);

@@ -432,7 +432,7 @@ export interface TraceEventSnapshot extends TraceEventData {
 
 export interface TraceEventScreenshot extends TraceEventData {
   args: TraceEventArgs&{
-    data:TraceEventArgsData&{
+    data: TraceEventArgsData & {
       snapshot: string,
     },
   };

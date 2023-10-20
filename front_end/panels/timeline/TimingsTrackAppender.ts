@@ -60,7 +60,10 @@ export class TimingsTrackAppender implements TrackAppender {
     const consoleTimings = this.#traceParsedData.UserTimings.consoleTimings;
 
     const userTimingEvents = [
-      performanceMarks, performanceMeasures, timestampEvents, consoleTimings
+      performanceMarks,
+      performanceMeasures,
+      timestampEvents,
+      consoleTimings,
     ].flat().sort((a, b) => a.ts - b.ts);
 
     if (pageLoadMarkers.length === 0 && userTimingEvents.length === 0) {

@@ -1433,7 +1433,9 @@ export class TimelineUIUtils {
   }
 
   static eventColor(event: TraceEngine.Legacy.CompatibleTraceEvent): string {
-    if (event.omg === 2) return 'red';
+    if (event.omg === 2) {
+      return 'red';
+    }
     if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {
@@ -1511,11 +1513,12 @@ export class TimelineUIUtils {
       event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ??
       '';
 
-    if (frameSeqId) return `${title} sq${frameSeqId % 1000}`;
+    if (frameSeqId) {
+      return `${title} sq${frameSeqId % 1000}`;
+    }
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
     if (localID) {return `${event.name} c${localID}`;}
-
 
     return title;
   }
@@ -2503,7 +2506,7 @@ export class TimelineUIUtils {
       white-space: pre-wrap;
       line-height: 1;
       display: inline-block;
-    `
+    `;
     const argsTxt = Object.keys(event.args).length ? JSON.stringify(event.args, null, 2) : '';
     argsEl.textContent = argsTxt.replace(/{\n  /, '{ ');
     void CodeHighlighter.CodeHighlighter.highlightNode(argsEl, 'text/javascript');

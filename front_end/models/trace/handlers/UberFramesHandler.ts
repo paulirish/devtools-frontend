@@ -101,7 +101,6 @@ const someRelevantTraceEventTypes = [
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
   'Frame',
 
-
   // these are all pipeline reporter subitems. HOEVER they are also included in the eventlatency children too.
   'Activation',
   'BeginImplFrameToSendBeginMainFrame',
@@ -114,7 +113,6 @@ const someRelevantTraceEventTypes = [
   'SubmitCompositorFrameToPresentationCompositorFrame',
   'SubmitToReceiveCompositorFrame',
   'Swap',
-
 
   'BeginFrame',
   'DroppedFrame',
@@ -131,7 +129,6 @@ const someRelevantTraceEventTypes = [
   'Scheduler::BeginFrame',
   'DisplayScheduler::BeginFrame',
   'Scheduler::BeginImplFrame',
-
 
   'EventLatency', // mocny said these are complicated. but.. they're also great.
   // https://docs.google.com/spreadsheets/d/1F6BPrtIMgDD4eKH-VxEqzZy8dOeh3U2EZaYjVlIv-Hk/edit?resourcekey=0-UtBlkaCsd0Oi1Z3bQqHqow#gid=557410449
@@ -242,7 +239,6 @@ export const waterfallTypes = new Map([
   ['SubmitCompositorFrameToPresentationCompositorFrame', 2],
 ]);
 
-
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
   if (Types.TraceEvents.isTraceEventGPUTask(event)) {
@@ -343,7 +339,6 @@ export async function finalize(): Promise<void> {
         },
       },
     };
-
 
     // still I do see some 0's in the real trace. i messed up the c++ side.
     if (event.name === 'EventLatency') {

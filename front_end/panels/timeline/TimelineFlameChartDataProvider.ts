@@ -494,7 +494,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             return -1;
         }
       }
-      if (track.name === 'Compositor') return 7;
+      if (track.name === 'Compositor') {
+        return 7;
+      }
 
       switch (track.type) {
         case TimelineModel.TimelineModel.TrackType.MainThread:
@@ -1327,7 +1329,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         i++;
         initiator = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(initiator).initiator();
       }
-
 
       timelineSelection = TimelineSelection.fromTraceEvent(entry);
     } else if (entryType === EntryType.Frame) {

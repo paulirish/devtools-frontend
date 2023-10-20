@@ -13,7 +13,7 @@ export interface Data {
 }
 
 export interface Frame {
-  screenshotEvent: Types.TraceEvents.TraceEventSnapshot | Types.TraceEvents.TraceEventScreenshot;
+  screenshotEvent: Types.TraceEvents.TraceEventSnapshot|Types.TraceEvents.TraceEventScreenshot;
   screenshotAsString: string;
   index: number;
 }

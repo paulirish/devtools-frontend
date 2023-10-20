@@ -132,7 +132,9 @@ export class InteractionsTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    if (event.name === 'LongAnimationFrame') return 'blue';
+    if (event.name === 'LongAnimationFrame') {
+      return 'blue';
+    }
     let idForColorGeneration = this.titleForEvent(event);
     if (TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(event)) {
       // Append the ID so that we vary the colours, ensuring that two events of

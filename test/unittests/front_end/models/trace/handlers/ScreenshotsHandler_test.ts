@@ -7,7 +7,6 @@ import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 import {defaultTraceEvent} from '../../../helpers/TraceHelpers.js';
 import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
-
 describe('ScreenshotHandler', function() {
   const baseEvent = {
     ...defaultTraceEvent,

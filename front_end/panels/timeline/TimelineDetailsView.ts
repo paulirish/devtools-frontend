@@ -231,7 +231,9 @@ export class TimelineDetailsView extends UI.Widget.VBox {
 
   // When selected, copy traceEvent ts to clipboard and log the event.
   copyToClipboard(event: TimelineSelection|null): void {
-    if (TimelineSelection.isRangeSelection(event)) return;
+    if (TimelineSelection.isRangeSelection(event)) {
+      return;
+    }
     const ts = (event.ts ?? (event.startTime * 1000)).toString();
     const textBlob = new Blob([ts], {type: 'text/plain'});
     const cpItem = new ClipboardItem({[textBlob.type]: textBlob});

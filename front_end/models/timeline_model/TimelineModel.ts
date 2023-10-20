@@ -295,7 +295,9 @@ export class TimelineModelImpl {
   }
 
   static globalEventId(event: TraceEngine.Legacy.Event, field: string): string {
-    if (typeof field === 'function') return field(event);
+    if (typeof field === 'function') {
+      return field(event);
+    }
     const data = event.args['data'] || event.args['beginData'];
     const id = data && data[field];
     if (!id) {
@@ -2218,7 +2220,6 @@ export class TimelineAsyncEventTracker {
   //  events.set('Commit', {subsequents: ['DrawFrame'], joinBy: frameSequenceJoiner}); // this is main
   //  events.set('DrawFrame', {subsequents: ['DisplayScheduler::BeginFrame'], joinBy: frameSequenceJoiner});
 
-
     TimelineAsyncEventTracker.asyncEventInfo = events;
     TimelineAsyncEventTracker.typeToInitiatorType = new Map();
     for (const [rootType, {subsequents}] of events) {
@@ -2247,10 +2248,18 @@ export class TimelineAsyncEventTracker {
     }
     const initiatorMapFromIdToEvent: Map<RecordType, TraceEngine.Legacy.Event>|undefined = this.initiatorMapsByRecordType.get(initiatorType);
 
-    if (id === 7353) { /// frame seq number of interest (example-dotcom-allevents)
+    if (id === 7353) {  // / frame seq number of interest (example-dotcom-allevents)
       const instEv = initiatorMapFromIdToEvent?.get(id);
       event.omg = 2;
-      console.log({name: event.name, start: event.startTime - 235510170.514, event, isInitiator, initiatorInfo, instEvName: instEv?.name, initiatorEvent: instEv})
+      console.log({
+        name: event.name,
+        start: event.startTime - 235510170.514,
+        event,
+        isInitiator,
+        initiatorInfo,
+        instEvName: instEv?.name,
+        initiatorEvent: instEv,
+      });
     }
     if (initiatorMapFromIdToEvent) {
       if (isInitiator) {
