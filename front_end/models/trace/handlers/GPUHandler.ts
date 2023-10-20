@@ -6,7 +6,7 @@ import {data as metaHandlerData} from './MetaHandler.js';
 
 import {type TraceEventHandlerName, HandlerState} from './types.js';
 
-import * as Types from '../types/types.js';
+import type * as Types from '../types/types.js';
 import * as Helpers from '../helpers/helpers.js';
 
 let handlerState = HandlerState.UNINITIALIZED;

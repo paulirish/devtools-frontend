@@ -430,6 +430,17 @@ export interface TraceEventSnapshot extends TraceEventData {
   ph: Phase.OBJECT_SNAPSHOT;
 }
 
+export interface TraceEventScreenshot extends TraceEventData {
+  args: TraceEventArgs&{
+    data:TraceEventArgsData&{
+      snapshot: string,
+    },
+  };
+  name: 'Screenshot';
+  cat: 'disabled-by-default-devtools.screenshot';
+  ph: Phase.INSTANT;
+}
+
 // Animation events.
 
 export interface TraceEventAnimation extends TraceEventData {

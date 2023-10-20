@@ -84,7 +84,6 @@ const someRelevantTraceEventTypes = [
   'ScrollLayer,',
   'SetLayerTreeId',
 
-
   'MainFrame.NotifyReadyToCommitOnImpl',
   'MainFrame.CommitComplete',
   'RasterizerTaskImpl::RunOnWorkerThread',

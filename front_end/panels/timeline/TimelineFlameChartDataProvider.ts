@@ -1050,7 +1050,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
      const screenshot = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventSnapshot);
       if (!this.screenshotImageCache.has(screenshot)) {
         this.screenshotImageCache.set(screenshot, null);
-        const data = screenshot.args.snapshot;
+        // TODO(paulirish): remove args.snapshot case in 2024
+        const data = screenshot.args.snapshot ?? screenshot.args.data;
         void UI.UIUtils.loadImageFromData(data).then(image => {
           this.screenshotImageCache.set(screenshot, image);
           this.dispatchEventToListeners(Events.DataChanged);
@@ -1201,7 +1202,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const screenshot = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventSnapshot);
     if (!this.screenshotImageCache.has(screenshot)) {
       this.screenshotImageCache.set(screenshot, null);
-      const data = screenshot.args.snapshot;
+      // TODO(paulirish): remove args.snapshot case in 2024
+      const data = screenshot.args.snapshot ?? screenshot.args.data;
       const image = await UI.UIUtils.loadImageFromData(data);
       this.screenshotImageCache.set(screenshot, image);
       this.dispatchEventToListeners(Events.DataChanged);

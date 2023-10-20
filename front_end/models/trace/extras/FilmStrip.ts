@@ -13,7 +13,7 @@ export interface Data {
 }
 
 export interface Frame {
-  screenshotEvent: Types.TraceEvents.TraceEventSnapshot;
+  screenshotEvent: Types.TraceEvents.TraceEventSnapshot | Types.TraceEvents.TraceEventScreenshot;
   screenshotAsString: string;
   index: number;
 }
@@ -50,7 +50,7 @@ export function fromTraceData(traceData: HandlerDataWithScreenshots, customZeroT
     const frame: Frame = {
       index: frames.length,
       screenshotEvent: screenshot,
-      screenshotAsString: screenshot.args.snapshot,
+      screenshotAsString: screenshot.args.data ?? screenshot.args.snapshot,
     };
     frames.push(frame);
   }
