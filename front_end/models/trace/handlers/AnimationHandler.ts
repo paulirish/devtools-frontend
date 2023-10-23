@@ -28,14 +28,13 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 }
 
 export async function finalize(): Promise<void> {
-  const matchedEvents = matchBeginningAndEndEvents();
-
-  createSortedAnimationsSyntheticEvents(matchedEvents);
-
+  const matchedEvents = matchBeginningAndEndEvents(animations);
+  const syntheticEvents = createSortedAnimationsSyntheticEvents(matchedEvents);
+  animationsSyntheticEvents.push(...syntheticEvents);
   handlerState = HandlerState.FINALIZED;
 }
 
-function matchBeginningAndEndEvents(): Map<string, {
+export function matchBeginningAndEndEvents(unpairedEvents: Types.TraceEvents.TraceEventNestableAsync[]): Map<string, {
   begin: Types.TraceEvents.TraceEventNestableAsyncBegin | null,
   end: Types.TraceEvents.TraceEventNestableAsyncEnd | null,
 }> {
@@ -46,7 +45,7 @@ function matchBeginningAndEndEvents(): Map<string, {
   }> = new Map();
 
   // looking for start and end
-  for (const event of animations) {
+  for (const event of unpairedEvents) {
     const id = event.id2;
 
     if (id === undefined) {
@@ -86,10 +85,11 @@ function matchBeginningAndEndEvents(): Map<string, {
   return matchedEvents;
 }
 
-function createSortedAnimationsSyntheticEvents(matchedEvents: Map<string, {
+export function createSortedAnimationsSyntheticEvents(matchedEvents: Map<string, {
   begin: Types.TraceEvents.TraceEventNestableAsyncBegin | null,
   end: Types.TraceEvents.TraceEventNestableAsyncEnd | null,
-}>): void {
+}>): Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] {
+  const syntheticEvents: Types.TraceEvents.TraceEventNestableAsync[] = [];
   for (const [id, eventsPair] of matchedEvents.entries()) {
     if (!eventsPair.begin || !eventsPair.end) {
       continue;
@@ -119,10 +119,9 @@ function createSortedAnimationsSyntheticEvents(matchedEvents: Map<string, {
       // crbug.com/1472375
       continue;
     }
-    animationsSyntheticEvents.push(event);
+    syntheticEvents.push(event);
   }
-
-  animationsSyntheticEvents.sort((a, b) => a.ts - b.ts);
+  return syntheticEvents.sort((a, b) => a.ts - b.ts);
 }
 
 export function data(): AnimationData {
