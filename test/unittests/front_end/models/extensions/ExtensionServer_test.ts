@@ -40,6 +40,17 @@ describeWithDevtoolsExtension('Extensions', {}, context => {
     createTarget().setInspectedURL('chrome://version' as Platform.DevToolsPath.UrlString);
     assert.isTrue(addExtensionStub.notCalled);
   });
+
+  it('defers loading extensions until after navigation from a privileged to a non-privileged host', async () => {
+    const addExtensionSpy = sinon.spy(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
+    const target = createTarget({type: SDK.Target.Type.Frame});
+    target.setInspectedURL('chrome://abcdef' as Platform.DevToolsPath.UrlString);
+    assert.isTrue(addExtensionSpy.notCalled, 'addExtension not called');
+
+    target.setInspectedURL(allowedUrl);
+    assert.isTrue(addExtensionSpy.calledOnce, 'addExtension called once');
+    assert.isTrue(addExtensionSpy.returned(undefined), 'addExtension returned undefined');
+  });
 });
 
 describeWithDevtoolsExtension('Extensions', {}, context => {
@@ -259,7 +270,7 @@ function waitForFunction<T>(fn: () => T): Promise<T> {
 describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => {
   expectConsoleLogs({error: ['Extension server error: Operation failed: Permission denied']});
 
-  for (const protocol of ['devtools', 'chrome', 'chrome-untrusted']) {
+  for (const protocol of ['devtools', 'chrome', 'chrome-untrusted', 'chrome-error']) {
     it(`blocks API calls on blocked protocols: ${protocol}`, async () => {
       assert.isUndefined(context.chrome.devtools);
       const target = createTarget({type: SDK.Target.Type.Frame});
@@ -274,7 +285,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
   it('blocks API calls on blocked hosts', async () => {
     assert.isUndefined(context.chrome.devtools);
     const target = createTarget({type: SDK.Target.Type.Frame});
-    const addExtensionStub = sinon.stub(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
+    const addExtensionStub = sinon.spy(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
 
     target.setInspectedURL(blockedUrl);
     assert.isTrue(addExtensionStub.alwaysReturned(undefined));
@@ -299,6 +310,18 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
       // eslint-disable-next-line rulesdir/compare_arrays_with_assert_deepequal
       assert.hasAnyKeys(result, ['entries']);
     }
+  });
+
+  it('defers loading extensions until after navigation from a blocked to an allowed host', async () => {
+    const addExtensionSpy = sinon.spy(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
+    const target = createTarget({type: SDK.Target.Type.Frame});
+    target.setInspectedURL(blockedUrl);
+    assert.isTrue(addExtensionSpy.calledOnce, 'addExtension called once');
+    assert.deepStrictEqual(addExtensionSpy.returnValues, [undefined]);
+
+    target.setInspectedURL(allowedUrl);
+    assert.isTrue(addExtensionSpy.calledTwice, 'addExtension called twice');
+    assert.deepStrictEqual(addExtensionSpy.returnValues, [undefined, true]);
   });
 
   it('does not include blocked hosts in the HAR entries', async () => {
@@ -505,13 +528,18 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.RequestFinished, request);
   }
 
-  it('blocks getting request contents on blocked urls', async () => {
+  it('does not include blocked hosts in onRequestFinished event listener', async () => {
     const frameId = 'frame-id' as Protocol.Page.FrameId;
     const target = createTarget({id: 'target' as Protocol.Target.TargetID});
     target.setInspectedURL(allowedUrl);
 
-    const requests: Chrome.DevTools.Request[] = [];
-    context.chrome.devtools?.network.onRequestFinished.addListener(r => requests.push(r));
+    const requests: HAR.Log.EntryDTO[] = [];
+    // onRequestFinished returns a type of Request. However in actual fact, the returned object contains HAR data
+    // which result type mismatch due to the Request type not containing the respective fields in HAR.Log.EntryDTO.
+    // Therefore, cast through unknown to resolve this.
+    // TODO: (crbug.com/1482763) Update Request type to match HAR.Log.EntryDTO
+    context.chrome.devtools?.network.onRequestFinished.addListener(
+        r => requests.push(r as unknown as HAR.Log.EntryDTO));
     await waitForFunction(
         () => Extensions.ExtensionServer.ExtensionServer.instance().hasSubscribers(
             Extensions.ExtensionAPI.PrivateAPI.Events.NetworkRequestFinished));
@@ -521,11 +549,11 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     createRequest(networkManager, frameId, 'blocked-url-request-id' as Protocol.Network.RequestId, blockedUrl);
     createRequest(networkManager, frameId, 'allowed-url-request-id' as Protocol.Network.RequestId, allowedUrl);
 
-    await waitForFunction(() => requests.length >= 2);
-    const requestContents = await Promise.all(
-        requests.map(request => new Promise(r => request.getContent((content, encoding) => r({content, encoding})))));
-    assert.deepStrictEqual(
-        requestContents, [{content: undefined, encoding: undefined}, {content: 'content', encoding: ''}]);
+    await waitForFunction(() => requests.length >= 1);
+
+    assert.strictEqual(requests.length, 1);
+    assert.exists(requests.find(e => e.request.url === allowedUrl));
+    assert.notExists(requests.find(e => e.request.url === blockedUrl));
   });
 
   it('blocks setting resource contents on blocked urls', async () => {

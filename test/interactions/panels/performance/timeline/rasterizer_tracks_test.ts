@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 import {waitFor} from '../../../../shared/helper.js';
-import {describe} from '../../../../shared/mocha-extensions.js';
-import {assertElementScreenshotUnchanged, itScreenshot} from '../../../../shared/screenshots.js';
+import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
+import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
 
-describe('Rasterizer tracks', () => {
+describe('Rasterizer tracks', function() {
+  // TODO(crbug.com/1492405): Improve perf panel trace load speed to
+  // prevent timeout bump.
+  this.timeout(20_000);
   preloadForCodeCoverage('performance_panel/track_example.html');
 
   // Times here are so that we zoom into the panel a bit rather than have a screenshot with loads of whitespace.

@@ -21,14 +21,6 @@ import type * as UIModule from '../../../../front_end/ui/legacy/legacy.js';
 // initialization phase.
 let UI: typeof UIModule;
 
-let targetManager: SDK.TargetManager.TargetManager|null;
-
-function initializeTargetManagerIfNecessary(): SDK.TargetManager.TargetManager {
-  // Create the target manager.
-  targetManager = targetManager || SDK.TargetManager.TargetManager.instance({forceNew: true});
-  return targetManager;
-}
-
 let uniqueTargetId = 0;
 
 export function createTarget(
@@ -47,7 +39,7 @@ export function createTarget(
       id = ('test' + uniqueTargetId) as Protocol.Target.TargetID;
     }
   }
-  const targetManager = initializeTargetManagerIfNecessary();
+  const targetManager = SDK.TargetManager.TargetManager.instance();
   return targetManager.createTarget(
       id, name ?? id, type, parentTarget ? parentTarget : null, /* sessionId=*/ parentTarget ? id : undefined,
       /* suspended=*/ false,
@@ -75,6 +67,18 @@ export function stubNoopSettings() {
       getAsArray: () => [],
     }),
     moduleSetting: () => ({
+      get: () => [],
+      set: () => {},
+      addChangeListener: () => {},
+      removeChangeListener: () => {},
+      setDisabled: () => {},
+      setTitle: () => {},
+      title: () => {},
+      asRegExp: () => {},
+      type: () => Common.Settings.SettingType.BOOLEAN,
+      getAsArray: () => [],
+    }),
+    createLocalSetting: () => ({
       get: () => [],
       set: () => {},
       addChangeListener: () => {},
@@ -125,6 +129,9 @@ const REGISTERED_EXPERIMENTS = [
   'selfXssWarning',
   'evaluateExpressionsWithSourceMaps',
   'useSourceMapScopes',
+  'fontEditor',
+  'networkPanelFilterBarRedesign',
+  'breadcrumbsPerformancePanel',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -257,9 +264,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'consoleTraceExpand', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.PERFORMANCE, 'showNativeFunctionsInJSProfile', false,
-        Common.Settings.SettingType.BOOLEAN),
-    createSettingValue(
         Common.Settings.SettingCategory.PERFORMANCE, 'flamechartMouseWheelAction', false,
         Common.Settings.SettingType.ENUM),
   ];
@@ -284,8 +288,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
   // Initialize theme support and context menus.
   Common.Settings.Settings.instance().createSetting('uiTheme', 'systemPreferred');
   UI.UIUtils.initializeUIUtils(document);
-
-  initializeTargetManagerIfNecessary();
 }
 
 export async function deinitializeGlobalVars() {
@@ -295,16 +297,14 @@ export async function deinitializeGlobalVars() {
   delete globalObject.SDK;
   delete globalObject.ls;
 
-  Root.Runtime.experiments.clearForTest();
-
   for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
     target.dispose('deinitializeGlobalVars');
   }
+
   // Remove instances.
   await deinitializeGlobalLocaleVars();
   Logs.NetworkLog.NetworkLog.removeInstance();
   SDK.TargetManager.TargetManager.removeInstance();
-  targetManager = null;
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
   Common.Console.Console.removeInstance();
@@ -326,6 +326,8 @@ export async function deinitializeGlobalVars() {
     UI.InspectorView.InspectorView.removeInstance();
     UI.ActionRegistry.ActionRegistry.reset();
   }
+
+  Root.Runtime.experiments.clearForTest();
 }
 
 export function describeWithEnvironment(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {

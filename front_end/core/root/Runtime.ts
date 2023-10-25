@@ -313,6 +313,8 @@ export enum ExperimentName {
   USE_SOURCE_MAP_SCOPES = 'useSourceMapScopes',
   STORAGE_BUCKETS_TREE = 'storageBucketsTree',
   DELETE_OVERRIDES_TEMP_ENABLE = 'deleteOverridesTemporarilyEnable',
+  NETWORK_PANEL_FILTER_BAR_REDESIGN = 'networkPanelFilterBarRedesign',
+  BREADCRUMBS_PERFORMANCE_PANEL = 'breadcrumbsPerformancePanel',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

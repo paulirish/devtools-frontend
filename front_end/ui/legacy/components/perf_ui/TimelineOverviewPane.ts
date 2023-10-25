@@ -38,7 +38,7 @@ import timelineOverviewInfoStyles from './timelineOverviewInfo.css.js';
 
 export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
     UI.Widget.VBox) {
-  private readonly overviewCalculator: TimelineOverviewCalculator;
+  readonly overviewCalculator: TimelineOverviewCalculator;
   private readonly overviewGrid: OverviewGrid;
   private readonly cursorArea: HTMLElement;
   private cursorElement: HTMLElement;
@@ -67,6 +67,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 
     this.overviewGrid.setResizeEnabled(false);
     this.overviewGrid.addEventListener(OverviewGridEvents.WindowChangedWithPosition, this.onWindowChanged, this);
+    this.overviewGrid.addEventListener(OverviewGridEvents.BreadcrumbAdded, this.onBreadcrumbAdded, this);
     this.overviewGrid.setClickHandler(this.onClick.bind(this));
     this.overviewControls = [];
     this.markers = new Map();
@@ -81,6 +82,10 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.windowStartTime = 0;
     this.windowEndTime = Infinity;
     this.muteOnWindowChanged = false;
+  }
+
+  enableCreateBreadcrumbsButton(): void {
+    this.overviewGrid.enableCreateBreadcrumbsButton();
   }
 
   private onMouseMove(event: Event): void {
@@ -152,19 +157,19 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.overviewCalculator.setNavStartTimes(navStartTimes);
   }
 
-  scheduleUpdate(): void {
+  scheduleUpdate(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     void this.updateThrottler.schedule(async () => {
-      this.update();
+      this.update(start, end);
     });
   }
 
-  private update(): void {
+  private update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
     if (!this.isShowing()) {
       return;
     }
     this.overviewCalculator.setDisplayWidth(this.overviewGrid.clientWidth());
     for (let i = 0; i < this.overviewControls.length; ++i) {
-      this.overviewControls[i].update();
+      this.overviewControls[i].update(start, end);
     }
     this.overviewGrid.updateDividers(this.overviewCalculator);
     this.updateMarkers();
@@ -209,6 +214,13 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 
   private onClick(event: Event): boolean {
     return this.overviewControls.some(control => control.onClick(event));
+  }
+
+  private onBreadcrumbAdded(): void {
+    this.dispatchEventToListeners(Events.BreadcrumbAdded, {
+      startTime: TraceEngine.Types.Timing.MilliSeconds(this.windowStartTime),
+      endTime: TraceEngine.Types.Timing.MilliSeconds(this.windowEndTime),
+    });
   }
 
   private onWindowChanged(event: Common.EventTarget.EventTargetEvent<WindowChangedWithPositionEvent>): void {
@@ -259,20 +271,30 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 // eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   WindowChanged = 'WindowChanged',
+  BreadcrumbAdded = 'BreadcrumbAdded',
 }
 
+// TODO(alinavarkki): Replace this event with PerformanceModel WindowChanged event
 export interface WindowChangedEvent {
   startTime: number;
   endTime: number;
+  breadcrumb?: TraceEngine.Types.Timing.TraceWindow;
+}
+
+export interface BreadcrumbAddedEvent {
+  startTime: TraceEngine.Types.Timing.MilliSeconds;
+  endTime: TraceEngine.Types.Timing.MilliSeconds;
 }
 
 export type EventTypes = {
   [Events.WindowChanged]: WindowChangedEvent,
+  [Events.BreadcrumbAdded]: BreadcrumbAddedEvent,
 };
 
 export interface TimelineOverview {
   show(parentElement: Element, insertBefore?: Element|null): void;
-  update(): void;
+  // if start and end are specified, data will be filtered and only data within those bound will be displayed
+  update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void;
   dispose(): void;
   reset(): void;
   overviewInfoPromise(x: number): Promise<Element|null>;

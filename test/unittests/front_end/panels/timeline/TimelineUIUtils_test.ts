@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
-import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
+import * as Common from '../../../../../front_end/core/common/common.js';
 import type * as Platform from '../../../../../front_end/core/platform/platform.js';
-import * as Components from '../../../../../front_end/ui/legacy/components/utils/utils.js';
+import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
+import type * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as TimelineModel from '../../../../../front_end/models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
+import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
+import * as Components from '../../../../../front_end/ui/legacy/components/utils/utils.js';
+import {doubleRaf, renderElementIntoDOM} from '../../helpers/DOMHelpers.js';
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
-import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
-import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
 import {setupPageResourceLoaderForSourceMap} from '../../helpers/SourceMapHelpers.js';
-import type * as Protocol from '../../../../../front_end/generated/protocol.js';
-import * as Common from '../../../../../front_end/core/common/common.js';
-import {doubleRaf, renderElementIntoDOM} from '../../helpers/DOMHelpers.js';
+import {getMainThread} from '../../helpers/TraceHelpers.js';
 import {TraceLoader} from '../../helpers/TraceLoader.js';
 
 const {assert} = chai;
@@ -265,6 +266,144 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
   }
 
+  describe('colors', function() {
+    before(() => {
+      // Rather than use the real colours here and burden the test with having to
+      // inject loads of CSS, we fake out the colours. this is fine for our tests as
+      // the exact value of the colours is not important; we just make sure that it
+      // parses them out correctly. Each variable is given a different rgb() value to
+      // ensure we know the code is working and using the right one.
+      const styleElement = document.createElement('style');
+      styleElement.id = 'fake-perf-panel-colors';
+      styleElement.textContent = `
+:root {
+  --app-color-loading: rgb(0 0 0);
+  --app-color-loading-children: rgb(1 1 1);
+  --app-color-scripting: rgb(2 2 2);
+  --app-color-scripting-children: rgb(3 3 3);
+  --app-color-rendering: rgb(4 4 4);
+  --app-color-rendering-children: rgb(5 5 5);
+  --app-color-painting: rgb(6 6 6);
+  --app-color-painting-children: rgb(7 7 7);
+  --app-color-task: rgb(8 8 8);
+  --app-color-task-children: rgb(9 9 9);
+  --app-color-system: rgb(10 10 10);
+  --app-color-system-children: rgb(11 11 11);
+  --app-color-idle: rgb(12 12 12);
+  --app-color-idle-children: rgb(13 13 13);
+  --app-color-async: rgb(14 14 14);
+  --app-color-async-children: rgb(15 15 15);
+  --app-color-other: rgb(16 16 16);
+}
+`;
+      document.documentElement.appendChild(styleElement);
+    });
+
+    after(() => {
+      const styleElementToRemove = document.documentElement.querySelector('#fake-perf-panel-colors');
+      if (styleElementToRemove) {
+        document.documentElement.removeChild(styleElementToRemove);
+      }
+    });
+
+    it('should return the correct rgb value for a corresponding CSS variable', function() {
+      const parsedColor = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.getComputedValue();
+      assert.strictEqual('rgb(2 2 2)', parsedColor);
+    });
+
+    it('should return the color as a CSS variable', function() {
+      const cssVariable = Timeline.TimelineUIUtils.TimelineUIUtils.categories().scripting.getCSSValue();
+      assert.strictEqual('var(--app-color-scripting)', cssVariable);
+    });
+
+    it('treats the v8.parseOnBackgroundWaiting as scripting even though it would usually be idle', function() {
+      const event = new TraceEngine.Legacy.ConstructedEvent(
+          'v8,devtools.timeline,disabled-by-default-v8.compile',
+          TimelineModel.TimelineModel.RecordType.StreamingCompileScriptWaiting,
+          TraceEngine.Types.TraceEvents.Phase.COMPLETE, 10, thread);
+
+      assert.strictEqual('rgb(2 2 2)', Timeline.TimelineUIUtils.TimelineUIUtils.eventColor(event));
+    });
+    it('assigns the correct color to the swatch of an event\'s title', async function() {
+      const data = await TraceLoader.allModels(this, 'lcp-web-font.json.gz');
+      const events = data.traceParsedData.Renderer.allRendererEvents;
+      const task = events.find(event => {
+        return event.name.includes('RunTask');
+      });
+      if (!task) {
+        throw new Error('Could not find expected event.');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          task,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          false,
+      );
+      const titleSwatch: HTMLElement|null = details.querySelector('.timeline-details-chip-title div');
+      assert.strictEqual(titleSwatch?.style.backgroundColor, 'rgb(10, 10, 10)');
+    });
+    it('assigns the correct color to the swatch of a network request title', async function() {
+      const data = await TraceLoader.allModels(this, 'lcp-web-font.json.gz');
+      const networkRequests = data.traceParsedData.NetworkRequests.byTime;
+      const cssRequest = networkRequests.find(request => {
+        return request.args.data.url === 'http://localhost:3000/app.css';
+      });
+      if (!cssRequest) {
+        throw new Error('Could not find expected network request.');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildSyntheticNetworkRequestDetails(
+          cssRequest,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+      );
+      const titleSwatch: HTMLElement|null = details.querySelector('.timeline-details-chip-title div');
+      assert.strictEqual(titleSwatch?.style.backgroundColor, 'rgb(4, 4, 4)');
+    });
+  });
+
+  describe('testContentMatching', () => {
+    it('[for legacy sync tracks] matches call frame events based on a regular expression and the contents of the event',
+       async function() {
+         const data = await TraceLoader.allModels(this, 'react-hello-world.json.gz');
+         const mainThread =
+             data.timelineModel.tracks().find(t => t.type === TimelineModel.TimelineModel.TrackType.MainThread);
+         // Find an event from the trace that represents some work that React did. This
+         // event is not chosen for any particular reason other than it was the example
+         // used in the bug report: crbug.com/1484504
+         const performConcurrentWorkEvent =
+             mainThread?.events.find(e => e.args?.data?.functionName === 'performConcurrentWorkOnRoot');
+         if (!performConcurrentWorkEvent) {
+           throw new Error('Could not find expected event');
+         }
+         assert.isTrue(
+             Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(performConcurrentWorkEvent, /perfo/));
+         assert.isFalse(Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(
+             performConcurrentWorkEvent, /does not match/));
+       });
+
+    it('[for new sync tracks] matches call frame events based on a regular expression and the contents of the event',
+       async function() {
+         const data = await TraceLoader.allModels(this, 'react-hello-world.json.gz');
+         // Find an event from the trace that represents some work that React did. This
+         // event is not chosen for any particular reason other than it was the example
+         // used in the bug report: crbug.com/1484504
+         const mainThread = getMainThread(data.traceParsedData.Renderer);
+         const performConcurrentWorkEvent = mainThread.entries.find(entry => {
+           if (TraceEngine.Types.TraceEvents.isProfileCall(entry)) {
+             return entry.callFrame.functionName === 'performConcurrentWorkOnRoot';
+           }
+           return false;
+         });
+         if (!performConcurrentWorkEvent) {
+           throw new Error('Could not find expected event');
+         }
+         assert.isTrue(Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(
+             performConcurrentWorkEvent, /perfo/, data.traceParsedData));
+       });
+  });
+
   describe('traceEventDetails', function() {
     it('shows the interaction ID for EventTiming events that have an interaction ID', async function() {
       const data = await TraceLoader.allModels(this, 'slow-interaction-button-click.json.gz');
@@ -321,6 +460,80 @@ describeWithMockConnection('TimelineUIUtils', function() {
             {title: 'Had recent input', value: 'No'},
             {title: 'Moved from', value: 'Location: [120,670], Size: [900x900]'},
             {title: 'Moved to', value: 'Location: [120,1270], Size: [900x478]'},
+          ],
+      );
+    });
+
+    it('renders the details for a profile call properly', async function() {
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+
+      const data = await TraceLoader.allModels(this, 'simple-js-program.json.gz');
+      const rendererHandler = data.traceParsedData.Renderer;
+      if (!rendererHandler) {
+        throw new Error('RendererHandler is undefined');
+      }
+      const [process] = rendererHandler.processes.values();
+      const [thread] = process.threads.values();
+      const profileCalls = thread.entries.filter(entry => TraceEngine.Types.TraceEvents.isProfileCall(entry));
+
+      if (!profileCalls) {
+        throw new Error('Could not find renderer events');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          profileCalls[0],
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          false,
+          data.traceParsedData,
+      );
+      const rowData = getRowDataForDetailsElement(details);
+      assert.deepEqual(
+          rowData,
+          [
+            {
+              title: 'Function',
+              value: '(anonymous) @ www.google.com:21:17',
+            },
+          ],
+      );
+    });
+
+    it('renders the warning for a trace event in its details', async function() {
+      const data = await TraceLoader.allModels(this, 'simple-js-program.json.gz');
+
+      const events = data.traceParsedData.Renderer?.allRendererEvents;
+      if (!events) {
+        throw new Error('Could not find renderer events');
+      }
+
+      const longTask = events.find(e => (e.dur || 0) > 1_000_000);
+      if (!longTask) {
+        throw new Error('Could not find Long Task event.');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          longTask,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          false,
+          data.traceParsedData,
+      );
+      const rowData = getRowDataForDetailsElement(details);
+      assert.deepEqual(
+          rowData,
+          [
+            {
+              title: 'Warning',
+              value: 'Long task took 1.30\u00A0s.',
+            },
           ],
       );
     });
@@ -391,6 +604,21 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const interactionEvent = data.traceParsedData.UserInteractions.interactionEventsWithNoNesting[0];
       const details = Timeline.TimelineUIUtils.TimelineUIUtils.eventTitle(interactionEvent);
       assert.deepEqual(details, 'Pointer');
+    });
+  });
+  describe('eventStyle', function() {
+    it('returns the correct style for profile calls', async function() {
+      const data = await TraceLoader.allModels(this, 'simple-js-program.json.gz');
+      const rendererHandler = data.traceParsedData.Renderer;
+      if (!rendererHandler) {
+        throw new Error('RendererHandler is undefined');
+      }
+      const [process] = rendererHandler.processes.values();
+      const [thread] = process.threads.values();
+      const profileCalls = thread.entries.filter(entry => TraceEngine.Types.TraceEvents.isProfileCall(entry));
+      const style = Timeline.TimelineUIUtils.TimelineUIUtils.eventStyle(profileCalls[0]);
+      assert.strictEqual(style.category.name, 'scripting');
+      assert.strictEqual(style.category.color, '--app-color-scripting');
     });
   });
 });

@@ -3246,13 +3246,7 @@ export const NativeFunctions = [
   },
   {
     name: 'lookupNamespaceURI',
-    signatures: [['prefix']],
-    receivers: ['Node']
-  },
-  {
-    name: 'lookupNamespaceURI',
-    signatures: [['?prefix']],
-    receivers: ['NativeXPathNSResolver']
+    signatures: [['prefix']]
   },
   {
     name: 'lookupPrefix',
@@ -5752,6 +5746,10 @@ export const NativeFunctions = [
     receivers: ['PaymentRequestEvent']
   },
   {
+    name: 'createSyncAccessHandle',
+    signatures: [['?options']]
+  },
+  {
     name: 'navigate',
     signatures: [['url']],
     receivers: ['WindowClient']
@@ -5793,7 +5791,7 @@ export const NativeFunctions = [
   {
     name: '',
     signatures: [['index']],
-    receivers: ['DataTransferItemList','CSSKeyframesRule','CSSNumericArray','HTMLFormControlsCollection','RadioNodeList','HTMLAllCollection','AudioTrackList','TextTrackCueList','TextTrackList','VideoTrackList','SourceBufferList','TrackDefaultList','ImageTrackList','XRInputSourceArray']
+    receivers: ['DataTransferItemList','CSSKeyframesRule','CSSNumericArray','Window','HTMLFormControlsCollection','RadioNodeList','HTMLAllCollection','AudioTrackList','TextTrackCueList','TextTrackList','VideoTrackList','SourceBufferList','TrackDefaultList','ImageTrackList','XRInputSourceArray']
   },
   {
     name: '',
@@ -5808,7 +5806,7 @@ export const NativeFunctions = [
   {
     name: '',
     signatures: [['name']],
-    receivers: ['StyleSheetList','RTCStatsResponse']
+    receivers: ['StyleSheetList','WindowProperties','RTCStatsResponse']
   },
   {
     name: '',
@@ -5818,7 +5816,7 @@ export const NativeFunctions = [
   {
     name: '',
     signatures: [['index'],['name']],
-    receivers: ['Window','HTMLFormElement']
+    receivers: ['HTMLFormElement']
   },
   {
     name: '',
@@ -5944,7 +5942,15 @@ export const NativeFunctions = [
     signatures: [['value']]
   },
   {
+    name: 'rem',
+    signatures: [['value']]
+  },
+  {
     name: 'ex',
+    signatures: [['value']]
+  },
+  {
+    name: 'rex',
     signatures: [['value']]
   },
   {
@@ -5952,7 +5958,31 @@ export const NativeFunctions = [
     signatures: [['value']]
   },
   {
-    name: 'rem',
+    name: 'rch',
+    signatures: [['value']]
+  },
+  {
+    name: 'ic',
+    signatures: [['value']]
+  },
+  {
+    name: 'ric',
+    signatures: [['value']]
+  },
+  {
+    name: 'lh',
+    signatures: [['value']]
+  },
+  {
+    name: 'rlh',
+    signatures: [['value']]
+  },
+  {
+    name: 'cap',
+    signatures: [['value']]
+  },
+  {
+    name: 'rcap',
     signatures: [['value']]
   },
   {
@@ -6148,6 +6178,10 @@ export const NativeFunctions = [
     signatures: [['value']]
   },
   {
+    name: 'x',
+    signatures: [['value']]
+  },
+  {
     name: 'fr',
     signatures: [['value']]
   },
@@ -6214,6 +6248,10 @@ export const NativeFunctions = [
   {
     name: 'ariaNotify',
     signatures: [['announcement','?options']]
+  },
+  {
+    name: 'setSequentialFocusStartingPoint',
+    signatures: [['element']]
   },
   {
     name: 'DOMException',
@@ -6632,10 +6670,6 @@ export const NativeFunctions = [
     signatures: [['message']]
   },
   {
-    name: 'IntersectionObserver',
-    signatures: [['callback','?options']]
-  },
-  {
     name: 'layoutNextFragment',
     signatures: [['?options']]
   },
@@ -6892,42 +6926,6 @@ export const NativeFunctions = [
     signatures: [['attributionReporting']]
   },
   {
-    name: 'joinAdInterestGroup',
-    signatures: [['group','?durationSeconds']]
-  },
-  {
-    name: 'leaveAdInterestGroup',
-    signatures: [['?group']]
-  },
-  {
-    name: 'runAdAuction',
-    signatures: [['config']]
-  },
-  {
-    name: 'adAuctionComponents',
-    signatures: [['numComponents']]
-  },
-  {
-    name: 'deprecatedURNToURL',
-    signatures: [['urn_or_config','?send_reports']]
-  },
-  {
-    name: 'deprecatedReplaceInURN',
-    signatures: [['urn_or_config','replacements']]
-  },
-  {
-    name: 'getInterestGroupAdAuctionData',
-    signatures: [['config']]
-  },
-  {
-    name: 'createAdRequest',
-    signatures: [['config']]
-  },
-  {
-    name: 'finalizeAd',
-    signatures: [['ads','config']]
-  },
-  {
     name: 'registerAnimator',
     signatures: [['name','animatorCtor']]
   },
@@ -7103,12 +7101,12 @@ export const NativeFunctions = [
     signatures: [['data']]
   },
   {
-    name: 'logoutRPs',
-    signatures: [['?logout_requests']]
-  },
-  {
     name: 'getUserInfo',
     signatures: [['config']]
+  },
+  {
+    name: 'setStatus',
+    signatures: [['status']]
   },
   {
     name: 'PasswordCredential',
@@ -7896,7 +7894,7 @@ export const NativeFunctions = [
   },
   {
     name: 'transmit',
-    signatures: [['sendBuffer']]
+    signatures: [['sendBuffer','?options']]
   },
   {
     name: 'control',
@@ -8095,6 +8093,10 @@ export const NativeFunctions = [
     signatures: [['name','version','displayName','estimatedSize','?creationCallback']]
   },
   {
+    name: 'clipControlEXT',
+    signatures: [['origin','depth']]
+  },
+  {
     name: 'queryCounterEXT',
     signatures: [['query','target']]
   },
@@ -8123,6 +8125,10 @@ export const NativeFunctions = [
     signatures: [['query','pname']]
   },
   {
+    name: 'polygonOffsetClampEXT',
+    signatures: [['factor','units','clamp']]
+  },
+  {
     name: 'WebGLContextEvent',
     signatures: [['type','?eventInit']]
   },
@@ -8141,6 +8147,10 @@ export const NativeFunctions = [
   {
     name: 'multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL',
     signatures: [['mode','countsList','countsOffset','type','offsetsList','offsetsOffset','instanceCountsList','instanceCountsOffset','baseVerticesList','baseVerticesOffset','baseInstancesList','baseInstancesOffset','drawcount']]
+  },
+  {
+    name: 'polygonModeWEBGL',
+    signatures: [['face','mode']]
   },
   {
     name: 'provokingVertexWEBGL',

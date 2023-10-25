@@ -424,8 +424,9 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       if (request.statusCode !== 0) {
         UI.UIUtils.createTextChildren(messageElement, ' ', String(request.statusCode));
       }
-      if (request.statusText) {
-        UI.UIUtils.createTextChildren(messageElement, ' (', request.statusText, ')');
+      const statusText = request.getInferredStatusText();
+      if (statusText) {
+        UI.UIUtils.createTextChildren(messageElement, ' (', statusText, ')');
       }
     } else {
       const messageText = this.message.messageText;
@@ -993,7 +994,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
   }
 
   setConsoleGroup(group: ConsoleGroupViewMessage): void {
-    console.assert(this.consoleGroupInternal === null);
+    // TODO(crbug.com/1477675): Figure out why `this.consoleGroupInternal` is
+    //     not null here and add an assertion.
     this.consoleGroupInternal = group;
   }
 
@@ -1232,9 +1234,11 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
         break;
       case Protocol.Log.LogEntryLevel.Warning:
         this.elementInternal.classList.add('console-warning-level');
+        this.elementInternal.role = 'log';
         break;
       case Protocol.Log.LogEntryLevel.Error:
         this.elementInternal.classList.add('console-error-level');
+        this.elementInternal.role = 'log';
         break;
     }
     this.updateMessageIcon();

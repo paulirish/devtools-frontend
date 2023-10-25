@@ -402,8 +402,23 @@ declare namespace ProtocolProxyApi {
      */
     invoke_setAddresses(params: Protocol.Autofill.SetAddressesRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Disables autofill domain notifications.
+     */
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Enables autofill domain notifications.
+     */
+    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface AutofillDispatcher {
+    /**
+     * Emitted when an address form is filled.
+     */
+    addressFormFilled(params: Protocol.Autofill.AddressFormFilledEvent): void;
+
   }
 
   export interface BackgroundServiceApi {
@@ -645,6 +660,11 @@ declare namespace ProtocolProxyApi {
      * property
      */
     invoke_setEffectivePropertyValueForNode(params: Protocol.CSS.SetEffectivePropertyValueForNodeRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Modifies the property rule property name.
+     */
+    invoke_setPropertyRulePropertyName(params: Protocol.CSS.SetPropertyRulePropertyNameRequest): Promise<Protocol.CSS.SetPropertyRulePropertyNameResponse>;
 
     /**
      * Modifies the keyframe rule key text.
@@ -2313,6 +2333,11 @@ declare namespace ProtocolProxyApi {
      */
     invoke_setShowIsolatedElements(params: Protocol.Overlay.SetShowIsolatedElementsRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Show Window Controls Overlay for PWA
+     */
+    invoke_setShowWindowControlsOverlay(params: Protocol.Overlay.SetShowWindowControlsOverlayRequest): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface OverlayDispatcher {
     /**
@@ -3716,11 +3741,6 @@ declare namespace ProtocolProxyApi {
     ruleSetRemoved(params: Protocol.Preload.RuleSetRemovedEvent): void;
 
     /**
-     * Fired when a prerender attempt is completed.
-     */
-    prerenderAttemptCompleted(params: Protocol.Preload.PrerenderAttemptCompletedEvent): void;
-
-    /**
      * Fired when a preload enabled state is updated.
      */
     preloadEnabledStateUpdated(params: Protocol.Preload.PreloadEnabledStateUpdatedEvent): void;
@@ -3748,6 +3768,12 @@ declare namespace ProtocolProxyApi {
     invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_selectAccount(params: Protocol.FedCm.SelectAccountRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Only valid if the dialog type is ConfirmIdpSignin. Acts as if the user had
+     * clicked the continue button.
+     */
+    invoke_confirmIdpSignin(params: Protocol.FedCm.ConfirmIdpSigninRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_dismissDialog(params: Protocol.FedCm.DismissDialogRequest): Promise<Protocol.ProtocolResponseWithError>;
 

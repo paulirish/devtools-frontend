@@ -8,6 +8,11 @@
 self.SourcesTestRunner = self.SourcesTestRunner || {};
 
 import * as Common from '../../core/common/common.js';
+import * as Sources from '../../panels/sources/sources.js';
+import * as Bindings from '../../models/bindings/bindings.js';
+import * as UI from '../../ui/legacy/legacy.js';
+
+import * as SDKModule from '../../core/sdk/sdk.js';
 
 SourcesTestRunner.startDebuggerTest = async function(callback, quiet) {
   console.assert(TestRunner.debuggerModel.debuggerEnabled(), 'Debugger has to be enabled');
@@ -136,8 +141,8 @@ SourcesTestRunner.waitUntilResumedPromise = function() {
 };
 
 SourcesTestRunner.resumeExecution = function(callback) {
-  if (UI.panels.sources.paused()) {
-    UI.panels.sources.togglePause();
+  if (Sources.SourcesPanel.SourcesPanel.instance().paused()) {
+    Sources.SourcesPanel.SourcesPanel.instance().togglePause();
   }
 
   SourcesTestRunner.waitUntilResumed(callback);
@@ -145,7 +150,8 @@ SourcesTestRunner.resumeExecution = function(callback) {
 
 SourcesTestRunner.waitUntilPausedAndDumpStackAndResume = function(callback, options) {
   SourcesTestRunner.waitUntilPaused(paused);
-  TestRunner.addSniffer(Sources.SourcesPanel.prototype, 'updateDebuggerButtonsAndStatusForTest', setStatus);
+  TestRunner.addSniffer(
+      Sources.SourcesPanel.SourcesPanel.prototype, 'updateDebuggerButtonsAndStatusForTest', setStatus);
   let caption;
   let callFrames;
   let asyncStackTrace;
@@ -181,31 +187,31 @@ SourcesTestRunner.waitUntilPausedAndDumpStackAndResume = function(callback, opti
 
 SourcesTestRunner.stepOver = function() {
   queueMicrotask(function() {
-    UI.panels.sources.stepOver();
+    Sources.SourcesPanel.SourcesPanel.instance().stepOver();
   });
 };
 
 SourcesTestRunner.stepInto = function() {
   queueMicrotask(function() {
-    UI.panels.sources.stepInto();
+    Sources.SourcesPanel.SourcesPanel.instance().stepInto();
   });
 };
 
 SourcesTestRunner.stepIntoAsync = function() {
   queueMicrotask(function() {
-    UI.panels.sources.stepIntoAsync();
+    Sources.SourcesPanel.SourcesPanel.instance().stepIntoAsync();
   });
 };
 
 SourcesTestRunner.stepOut = function() {
   queueMicrotask(function() {
-    UI.panels.sources.stepOut();
+    Sources.SourcesPanel.SourcesPanel.instance().stepOut();
   });
 };
 
 SourcesTestRunner.togglePause = function() {
   queueMicrotask(function() {
-    UI.panels.sources.togglePause();
+    Sources.SourcesPanel.SourcesPanel.instance().togglePause();
   });
 };
 
@@ -271,9 +277,11 @@ SourcesTestRunner.captureStackTraceIntoString = async function(callFrames, async
       const frame = callFrames[i];
       const location = locationFunction.call(frame);
       const script = location.script();
-      const uiLocation = await self.Bindings.debuggerWorkspaceBinding.rawLocationToUILocation(location);
-      const isFramework =
-          uiLocation ? self.Bindings.ignoreListManager.isUserIgnoreListedURL(uiLocation.uiSourceCode.url()) : false;
+      const uiLocation =
+          await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().rawLocationToUILocation(location);
+      const isFramework = uiLocation ?
+          Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(uiLocation.uiSourceCode.url()) :
+          false;
 
       if (options.dropFrameworkCallFrames && isFramework) {
         continue;
@@ -286,7 +294,7 @@ SourcesTestRunner.captureStackTraceIntoString = async function(callFrames, async
         url = uiLocation.uiSourceCode.name();
         lineNumber = uiLocation.lineNumber + 1;
       } else {
-        url = Bindings.displayNameForURL(script.sourceURL);
+        url = Bindings.ResourceUtils.displayNameForURL(script.sourceURL);
         lineNumber = location.lineNumber + 1;
       }
 
@@ -380,7 +388,7 @@ SourcesTestRunner.resumedScript = function() {
 };
 
 SourcesTestRunner.showUISourceCode = function(uiSourceCode, callback) {
-  const panel = UI.panels.sources;
+  const panel = Sources.SourcesPanel.SourcesPanel.instance();
   panel.showUISourceCode(uiSourceCode);
   const sourceFrame = panel.visibleView;
 
@@ -413,7 +421,7 @@ SourcesTestRunner.showScriptSourcePromise = function(scriptName) {
 };
 
 SourcesTestRunner.waitForScriptSource = function(scriptName, callback, contentType) {
-  const panel = UI.panels.sources;
+  const panel = Sources.SourcesPanel.SourcesPanel.instance();
   const uiSourceCodes = panel.workspace.uiSourceCodes();
 
   for (let i = 0; i < uiSourceCodes.length; ++i) {
@@ -429,7 +437,7 @@ SourcesTestRunner.waitForScriptSource = function(scriptName, callback, contentTy
   }
 
   TestRunner.addSniffer(
-      Sources.SourcesView.prototype, 'addUISourceCode',
+      Sources.SourcesView.SourcesView.prototype, 'addUISourceCode',
       SourcesTestRunner.waitForScriptSource.bind(SourcesTestRunner, scriptName, callback, contentType));
 };
 
@@ -491,7 +499,7 @@ SourcesTestRunner.dumpSectionsWithIndent = function(treeElements, depth) {
 };
 
 SourcesTestRunner.scopeChainSections = function() {
-  return Sources.ScopeChainSidebarPane.instance().treeOutline.rootElement().children();
+  return Sources.ScopeChainSidebarPane.ScopeChainSidebarPane.instance().treeOutline.rootElement().children();
 };
 
 SourcesTestRunner.expandScopeVariablesSidebarPane = function(callback) {
@@ -604,7 +612,7 @@ SourcesTestRunner.waitForExecutionContextInTarget = function(target, callback) {
 };
 
 SourcesTestRunner.selectThread = function(target) {
-  self.UI.context.setFlavor(SDK.Target, target);
+  UI.Context.Context.instance().setFlavor(SDK.Target, target);
 };
 
 SourcesTestRunner.evaluateOnCurrentCallFrame = function(code) {
@@ -612,7 +620,7 @@ SourcesTestRunner.evaluateOnCurrentCallFrame = function(code) {
 };
 
 SourcesTestRunner.debuggerPlugin = function(sourceFrame) {
-  return sourceFrame.plugins.find(plugin => plugin instanceof Sources.DebuggerPlugin);
+  return sourceFrame.plugins.find(plugin => plugin instanceof Sources.DebuggerPlugin.DebuggerPlugin);
 };
 
 SourcesTestRunner.setEventListenerBreakpoint = function(id, enabled, targetName) {
@@ -624,7 +632,11 @@ SourcesTestRunner.setEventListenerBreakpoint = function(id, enabled, targetName)
     auxData.targetName = targetName;
   }
 
-  const breakpoint = self.SDK.domDebuggerManager.resolveEventListenerBreakpoint(auxData);
+  let breakpoint = SDKModule.DOMDebuggerModel.DOMDebuggerManager.instance().resolveEventListenerBreakpoint(auxData);
+  if (!breakpoint) {
+    breakpoint =
+        SDKModule.EventBreakpointsModel.EventBreakpointsManager.instance().resolveEventListenerBreakpoint(auxData);
+  }
 
   if (breakpoint.enabled() !== enabled) {
     pane.breakpoints.get(breakpoint).checkbox.checked = enabled;

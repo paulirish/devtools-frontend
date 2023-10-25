@@ -406,6 +406,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
           return {
             box: element.boxInWindow(),
             show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
+              popover.contentElement.classList.add('borderless-popover');
               popover.contentElement.appendChild(contents);
               return true;
             },
@@ -2103,7 +2104,7 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
         iconName: iconInfo.iconName,
         width,
         height,
-        color: 'black',
+        color: 'var(--icon-default)',
       };
       icon.style.transform = `rotate(${iconInfo.rotate}deg) scale(${iconInfo.scaleX * 1.1}, ${iconInfo.scaleY * 1.1})`;
       icon.style.maxHeight = height;
@@ -2467,6 +2468,7 @@ export class ButtonProvider implements UI.Toolbar.Provider {
   }
 
   private clicked(): void {
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.NewStyleRuleAdded);
     void StylesSidebarPane.instance().createNewRuleInViaInspectorStyleSheet();
   }
 

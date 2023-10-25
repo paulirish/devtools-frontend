@@ -53,6 +53,7 @@ import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ExecutionContextSelector} from './ExecutionContextSelector.js';
 
@@ -154,15 +155,12 @@ export class MainImpl {
     await this.requestAndRegisterLocaleData();
 
     Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync_preferences').get());
+    void VisualLogging.startLogging();
 
     void this.#createAppUI();
   }
 
   #initializeGlobalsForLayoutTests(): void {
-    // @ts-ignore layout test global
-    self.UI = self.UI || {};
-    // @ts-ignore layout test global
-    self.UI.panels = self.UI.panels || {};
     // @ts-ignore layout test global
     self.SDK = self.SDK || {};
     // @ts-ignore layout test global
@@ -402,7 +400,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, 'Enable Preloading Status Panel in Application panel',
         true);
-    Root.Runtime.experiments.setEnabled(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, true);
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.DISABLE_COLOR_FORMAT_SETTING,
@@ -419,6 +416,15 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.STORAGE_BUCKETS_TREE, 'Enable Storage Buckets Tree in Application panel', true);
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
+        'Redesign of the filter bar in the Network Panel',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.BREADCRUMBS_PERFORMANCE_PANEL, 'Enable breadcrumbs in the Performance Panel',
+        false);
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',
       'cssTypeComponentLength',
@@ -432,6 +438,8 @@ export class MainImpl {
       Root.Runtime.ExperimentName.WASM_DWARF_DEBUGGING,
       Root.Runtime.ExperimentName.HEADER_OVERRIDES,
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
+      Root.Runtime.ExperimentName.SELF_XSS_WARNING,
+      Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
     ]);
 
     Root.Runtime.experiments.setNonConfigurableExperiments([
@@ -467,9 +475,6 @@ export class MainImpl {
   async #createAppUI(): Promise<void> {
     MainImpl.time('Main._createAppUI');
 
-    // @ts-ignore layout test global
-    self.UI.viewManager = UI.ViewManager.ViewManager.instance();
-
     // Request filesystems early, we won't create connections until callback is fired. Things will happen in parallel.
     // @ts-ignore layout test global
     self.Persistence.isolatedFileSystemManager =
@@ -504,11 +509,8 @@ export class MainImpl {
     this.#addMainEventListeners(document);
 
     const canDock = Boolean(Root.Runtime.Runtime.queryParam('can_dock'));
-    // @ts-ignore layout test global
-    self.UI.zoomManager = UI.ZoomManager.ZoomManager.instance(
+    UI.ZoomManager.ZoomManager.instance(
         {forceNew: true, win: window, frontendHost: Host.InspectorFrontendHost.InspectorFrontendHostInstance});
-    // @ts-ignore layout test global
-    self.UI.inspectorView = UI.InspectorView.InspectorView.instance();
     UI.ContextMenu.ContextMenu.initialize();
     UI.ContextMenu.ContextMenu.installHandler(document);
 
@@ -524,8 +526,7 @@ export class MainImpl {
     });
     IssuesManager.ContrastCheckTrigger.ContrastCheckTrigger.instance();
 
-    // @ts-ignore layout test global
-    self.UI.dockController = UI.DockController.DockController.instance({forceNew: true, canDock});
+    UI.DockController.DockController.instance({forceNew: true, canDock});
     // @ts-ignore layout test global
     self.SDK.multitargetNetworkManager = SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
     // @ts-ignore layout test global
@@ -606,11 +607,7 @@ export class MainImpl {
 
     const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
     // Required for legacy a11y layout tests
-    // @ts-ignore layout test global
-    self.UI.actionRegistry = actionRegistryInstance;
-    // @ts-ignore layout test global
-    self.UI.shortcutRegistry =
-        UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
+    UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
     this.#registerMessageSinkListener();
 
     MainImpl.timeEnd('Main._createAppUI');

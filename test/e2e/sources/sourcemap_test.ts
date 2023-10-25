@@ -13,6 +13,7 @@ import {
   getVisibleTextContents,
   goToResource,
   pasteText,
+  pressKey,
   step,
   typeText,
   waitFor,
@@ -236,10 +237,10 @@ describe('The Sources Tab', async function() {
     });
 
     await step('Check that expression evaluation understands unminified name', async () => {
-      await frontend.evaluate(() => {
-        // @ts-ignore
-        globalThis.Root.Runtime.experiments.setEnabled('evaluateExpressionsWithSourceMaps', true);
-      });
+      await frontend.evaluate(`(async () => {
+        const Root = await import('./core/root/root.js');
+        Root.Runtime.experiments.setEnabled('evaluateExpressionsWithSourceMaps', true);
+      })()`);
 
       await click(CONSOLE_TAB_SELECTOR);
       await focusConsolePrompt();
@@ -660,6 +661,18 @@ describe('The Sources Tab', async function() {
       // Check that the breakpoint still exists on line 2.
       assert.isTrue(await isBreakpointSet(2));
     });
+  });
+
+  it('can attach sourcemaps to CSS files from a context menu', async () => {
+    await openSourceCodeEditorForFile('sourcemap-css.css', 'sourcemap-css-noinline.html');
+
+    await click('aria/Code editor', {clickOptions: {button: 'right'}});
+    await click('aria/Add source map…');
+    await waitFor('.add-source-map');
+    await typeText('sourcemap-css-absolute.map');
+    await pressKey('Enter');
+
+    await waitFor('[aria-label="app.scss, file"]');
   });
 });
 

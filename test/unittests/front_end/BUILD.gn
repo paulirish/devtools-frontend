@@ -75,6 +75,7 @@ group("front_end") {
     "panels/timeline",
     "panels/utils",
     "panels/webauthn",
+    "services/trace_bounds",
     "test_setup",
     "third_party/i18n",
     "ui",
@@ -99,5 +100,6 @@ group("front_end") {
     "ui/legacy/components/utils",
     "ui/legacy/theme_support",
     "ui/lit-html",
+    "ui/visual_logging",
   ]
 }

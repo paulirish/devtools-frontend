@@ -304,7 +304,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   protected onPaste(): boolean {
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SELF_XSS_WARNING) &&
-        !this.selfXssWarningDisabledSetting.get()) {
+        !Root.Runtime.Runtime.queryParam('isChromeForTesting') && !this.selfXssWarningDisabledSetting.get()) {
       void this.showSelfXssWarning();
       return true;
     }
@@ -1069,10 +1069,12 @@ export class SelfXssWarningDialog {
     const result = await new Promise<boolean>(resolve => {
       const closeButton =
           content.createChild('div', 'dialog-close-button', 'dt-close-button') as UI.UIUtils.DevToolsCloseButton;
-      closeButton.addEventListener('click', () => {
+      closeButton.setTabbable(true);
+      self.onInvokeElement(closeButton, event => {
         dialog.hide();
+        event.consume(true);
         resolve(false);
-      }, false);
+      });
 
       content.createChild('div', 'title').textContent = i18nString(UIStrings.doYouTrustThisCode);
       content.createChild('div', 'message').textContent =
@@ -1094,13 +1096,14 @@ export class SelfXssWarningDialog {
       input.addEventListener('input', () => {
         allowButton.disabled = !Boolean(input.value);
       }, false);
+      input.addEventListener('paste', e => e.preventDefault());
+      input.addEventListener('drop', e => e.preventDefault());
 
       dialog.setOutsideClickCallback(event => {
         event.consume();
         resolve(false);
       });
       dialog.show();
-      input.focus();
     });
     dialog.hide();
     return result;

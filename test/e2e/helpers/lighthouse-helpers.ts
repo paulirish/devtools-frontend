@@ -30,8 +30,12 @@ export async function navigateToLighthouseTab(path?: string): Promise<ElementHan
 
   await lighthouseTabButton.click();
   await waitFor('.view-container > .lighthouse');
+
+  const {target, frontend} = getBrowserAndPages();
   if (path) {
+    await target.bringToFront();
     await goToResource(path);
+    await frontend.bringToFront();
   }
 
   return waitFor('.lighthouse-start-view');
@@ -40,22 +44,35 @@ export async function navigateToLighthouseTab(path?: string): Promise<ElementHan
 // Instead of watching the worker or controller/panel internals, we wait for the Lighthouse renderer
 // to create the new report DOM. And we pull the LHR and artifacts off the lh-root node.
 export async function waitForResult() {
-  return await waitForFunction(async () => {
-    const reportEl = await waitFor('.lh-root');
-    const result = await reportEl.evaluate(elem => {
-      // @ts-expect-error we installed this obj on a DOM element
-      const lhr = elem._lighthouseResultForTesting;
-      // @ts-expect-error we installed this obj on a DOM element
-      const artifacts = elem._lighthouseArtifactsForTesting;
-      // Delete so any subsequent runs don't accidentally reuse this.
-      // @ts-expect-error
-      delete elem._lighthouseResultForTesting;
-      // @ts-expect-error
-      delete elem._lighthouseArtifactsForTesting;
-      return {lhr, artifacts};
-    });
-    return {...result, reportEl};
+  const {target, frontend} = await getBrowserAndPages();
+
+  // Ensure the target page is in front so the Lighthouse run can finish.
+  await target.bringToFront();
+
+  await waitForFunction(() => {
+    return frontend.evaluate(`(async () => {
+      const Lighthouse = await import('./panels/lighthouse/lighthouse.js');
+      return Lighthouse.LighthousePanel.LighthousePanel.instance().reportSelector.hasItems();
+    })()`);
   });
+
+  // Bring the DT frontend back in front to render the Lighthouse report.
+  await frontend.bringToFront();
+
+  const reportEl = await waitFor('.lh-root');
+  const result = await reportEl.evaluate(elem => {
+    // @ts-expect-error we installed this obj on a DOM element
+    const lhr = elem._lighthouseResultForTesting;
+    // @ts-expect-error we installed this obj on a DOM element
+    const artifacts = elem._lighthouseArtifactsForTesting;
+    // Delete so any subsequent runs don't accidentally reuse this.
+    // @ts-expect-error
+    delete elem._lighthouseResultForTesting;
+    // @ts-expect-error
+    delete elem._lighthouseArtifactsForTesting;
+    return {lhr, artifacts};
+  });
+  return {...result, reportEl};
 }
 
 // Can't reference ToolbarSettingCheckbox inside e2e

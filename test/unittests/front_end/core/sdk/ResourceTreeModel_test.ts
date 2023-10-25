@@ -30,7 +30,7 @@ function navigateFrameWithMockConnection(
 }
 
 describeWithMockConnection('ResourceTreeModel', () => {
-  let beforeGetResourceTree = Promise.resolve();
+  const beforeGetResourceTree = Promise.resolve();
 
   beforeEach(async () => {
     setMockConnectionResponseHandler('Page.getResourceTree', async () => {
@@ -96,104 +96,6 @@ describeWithMockConnection('ResourceTreeModel', () => {
     assert.isTrue(clearRequests.notCalled, 'Called unexpctedly');
   });
 
-  it('records prerenderingStatus', () => {
-    const target = createTarget();
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    dispatchEvent(target, 'Page.frameNavigated', frameNavigatedEvent());
-    dispatchEvent(
-        target,
-        'Preload.prerenderAttemptCompleted',
-        {
-          'initiatingFrameId': 'main',
-          'prerenderingUrl': 'http://example.com/page.html',
-          'finalStatus': Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
-        },
-    );
-    dispatchEvent(
-        target,
-        'Preload.prerenderAttemptCompleted',
-        {
-          'initiatingFrameId': 'next',
-          'prerenderingUrl': 'http://example.com/page.html',
-          'finalStatus': Protocol.Preload.PrerenderFinalStatus.ClientCertRequested,
-        },
-    );
-    assertNotNullOrUndefined(resourceTreeModel);
-    assertNotNullOrUndefined(resourceTreeModel.mainFrame);
-    assert.strictEqual(
-        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed);
-    dispatchEvent(target, 'Page.frameNavigated', frameNavigatedEvent(undefined, 'next'));
-    assertNotNullOrUndefined(resourceTreeModel);
-    assertNotNullOrUndefined(resourceTreeModel.mainFrame);
-    assert.strictEqual(
-        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.ClientCertRequested);
-  });
-  describe('prerender event before getResourceTree', () => {
-    let resolveGetResourceTree: () => void;
-    before(() => {
-      beforeGetResourceTree = new Promise(resolve => {
-        resolveGetResourceTree = resolve;
-      });
-    });
-
-    it('process prending event', async () => {
-      const target = createTarget();
-      const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-      dispatchEvent(
-          target,
-          'Preload.prerenderAttemptCompleted',
-          {
-            'initiatingFrameId': 'main',
-            'prerenderingUrl': 'http://example.com/page.html',
-            'finalStatus': Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
-          },
-      );
-      assertNotNullOrUndefined(resourceTreeModel);
-      assert.isNull(resourceTreeModel.mainFrame);
-      resolveGetResourceTree();
-      await new Promise(resolve => {
-        resourceTreeModel?.addEventListener(SDK.ResourceTreeModel.Events.FrameAdded, resolve);
-      });
-      assertNotNullOrUndefined(resourceTreeModel.mainFrame);
-      assert.strictEqual(
-          resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed);
-    });
-  });
-
-  it('records prerendering disallowedApiMethod', () => {
-    const target = createTarget();
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    dispatchEvent(target, 'Page.frameNavigated', {
-      frame: {
-        id: 'main',
-        loaderId: 'foo',
-        url: 'http://example.com',
-        domainAndRegistry: 'example.com',
-        securityOrigin: 'http://example.com',
-        mimeType: 'text/html',
-        secureContextType: Protocol.Page.SecureContextType.Secure,
-        crossOriginIsolatedContextType: Protocol.Page.CrossOriginIsolatedContextType.Isolated,
-        gatedAPIFeatures: [],
-      },
-    });
-    dispatchEvent(
-        target,
-        'Preload.prerenderAttemptCompleted',
-        {
-          'initiatingFrameId': 'main',
-          'prerenderingUrl': 'http://example.com/page.html',
-          'finalStatus': Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
-          'disallowedApiMethod': 'device.mojom.GamepadMonitor',
-        },
-    );
-
-    assertNotNullOrUndefined(resourceTreeModel);
-    assertNotNullOrUndefined(resourceTreeModel.mainFrame);
-    assert.strictEqual(
-        resourceTreeModel.mainFrame.prerenderFinalStatus, Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy);
-    assert.strictEqual(resourceTreeModel.mainFrame.prerenderDisallowedApiMethod, 'device.mojom.GamepadMonitor');
-  });
-
   it('added frame has storageKey when navigated', async () => {
     const testKey = 'test-storage-key';
 
@@ -243,7 +145,7 @@ describeWithMockConnection('ResourceTreeModel', () => {
     await Promise.all([mainStorageKeyChangedPromise, storageKeyRemovedPromise]);
   });
 
-  function getResourceTeeModel(target: SDK.Target.Target): SDK.ResourceTreeModel.ResourceTreeModel {
+  function getResourceTreeModel(target: SDK.Target.Target): SDK.ResourceTreeModel.ResourceTreeModel {
     const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
     assertNotNullOrUndefined(resourceTreeModel);
     return resourceTreeModel;
@@ -252,8 +154,8 @@ describeWithMockConnection('ResourceTreeModel', () => {
   it('calls reloads only top frames without tab target', () => {
     const mainFrameTarget = createTarget();
     const subframeTarget = createTarget({parentTarget: mainFrameTarget});
-    const reloadMainFramePage = sinon.spy(getResourceTeeModel(mainFrameTarget), 'reloadPage');
-    const reloadSubframePage = sinon.spy(getResourceTeeModel(subframeTarget), 'reloadPage');
+    const reloadMainFramePage = sinon.spy(getResourceTreeModel(mainFrameTarget), 'reloadPage');
+    const reloadSubframePage = sinon.spy(getResourceTreeModel(subframeTarget), 'reloadPage');
     SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages();
 
     assert.isTrue(reloadMainFramePage.calledOnce);
@@ -264,8 +166,8 @@ describeWithMockConnection('ResourceTreeModel', () => {
     const tabTarget = createTarget({type: SDK.Target.Type.Tab});
     const mainFrameTarget = createTarget({parentTarget: tabTarget});
     const subframeTarget = createTarget({parentTarget: mainFrameTarget});
-    const reloadMainFramePage = sinon.spy(getResourceTeeModel(mainFrameTarget), 'reloadPage');
-    const reloadSubframePage = sinon.spy(getResourceTeeModel(subframeTarget), 'reloadPage');
+    const reloadMainFramePage = sinon.spy(getResourceTreeModel(mainFrameTarget), 'reloadPage');
+    const reloadSubframePage = sinon.spy(getResourceTreeModel(subframeTarget), 'reloadPage');
     SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages();
 
     assert.isTrue(reloadMainFramePage.calledOnce);
@@ -278,9 +180,9 @@ describeWithMockConnection('ResourceTreeModel', () => {
 
     dispatchEvent(mainFrameTarget, 'Page.frameNavigated', frameNavigatedEvent());
     dispatchEvent(subframeTarget, 'Page.frameNavigated', frameNavigatedEvent('parentId'));
-    assert.isTrue(getResourceTeeModel(mainFrameTarget).mainFrame?.isOutermostFrame());
-    assertNotNullOrUndefined(getResourceTeeModel(subframeTarget));
-    assert.isFalse(getResourceTeeModel(subframeTarget).mainFrame?.isOutermostFrame());
+    assert.isTrue(getResourceTreeModel(mainFrameTarget).mainFrame?.isOutermostFrame());
+    assertNotNullOrUndefined(getResourceTreeModel(subframeTarget));
+    assert.isFalse(getResourceTreeModel(subframeTarget).mainFrame?.isOutermostFrame());
   });
 
   it('identifies not top frame with tab target', async () => {
@@ -290,9 +192,9 @@ describeWithMockConnection('ResourceTreeModel', () => {
 
     dispatchEvent(mainFrameTarget, 'Page.frameNavigated', frameNavigatedEvent());
     dispatchEvent(subframeTarget, 'Page.frameNavigated', frameNavigatedEvent('parentId'));
-    assert.isTrue(getResourceTeeModel(mainFrameTarget).mainFrame?.isOutermostFrame());
-    assertNotNullOrUndefined(getResourceTeeModel(subframeTarget));
-    assert.isFalse(getResourceTeeModel(subframeTarget).mainFrame?.isOutermostFrame());
+    assert.isTrue(getResourceTreeModel(mainFrameTarget).mainFrame?.isOutermostFrame());
+    assertNotNullOrUndefined(getResourceTreeModel(subframeTarget));
+    assert.isFalse(getResourceTreeModel(subframeTarget).mainFrame?.isOutermostFrame());
   });
 
   it('emits PrimaryPageChanged event upon prerender activation', async () => {
@@ -341,7 +243,7 @@ describeWithMockConnection('ResourceTreeModel', () => {
     const primaryPageChangedEvents:
         {frame: SDK.ResourceTreeModel.ResourceTreeFrame, type: SDK.ResourceTreeModel.PrimaryPageChangeType}[] = [];
 
-    [getResourceTeeModel(mainFrameTarget), getResourceTeeModel(subframeTarget), getResourceTeeModel(prerenderTarget)]
+    [getResourceTreeModel(mainFrameTarget), getResourceTreeModel(subframeTarget), getResourceTreeModel(prerenderTarget)]
         .forEach(resourceTreeModel => {
           resourceTreeModel.addEventListener(
               SDK.ResourceTreeModel.Events.PrimaryPageChanged, event => primaryPageChangedEvents.push(event.data));
@@ -364,7 +266,7 @@ describeWithMockConnection('ResourceTreeModel', () => {
     const frameManager = SDK.FrameManager.FrameManager.instance();
     const removedFromFrameManagerSpy = sinon.spy(frameManager, 'modelRemoved');
     const addedToFrameManagerSpy = sinon.spy(frameManager, 'modelAdded');
-    const resourceTreeModel = getResourceTeeModel(target);
+    const resourceTreeModel = getResourceTreeModel(target);
     await resourceTreeModel.once(SDK.ResourceTreeModel.Events.CachedResourcesLoaded);
     const cachedResourcesLoaded = resourceTreeModel.once(SDK.ResourceTreeModel.Events.CachedResourcesLoaded);
     const processPendingEventsSpy = sinon.spy(resourceTreeModel, 'processPendingEvents');

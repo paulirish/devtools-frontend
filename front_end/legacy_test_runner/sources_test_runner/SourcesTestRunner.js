@@ -7,8 +7,10 @@
  */
 self.SourcesTestRunner = self.SourcesTestRunner || {};
 
+import * as Sources from '../../panels/sources/sources.js';
+
 /**
- * @param {!Sources.NavigatorView} navigatorView
+ * @param {!Sources.NavigatorView.NavigatorView} navigatorView
  * @param {boolean=} dumpIcons
  */
 SourcesTestRunner.dumpNavigatorView = function(navigatorView, dumpIcons) {
@@ -56,7 +58,7 @@ SourcesTestRunner.dumpNavigatorView = function(navigatorView, dumpIcons) {
 };
 
 /**
- * @param {!Sources.NavigatorView} view
+ * @param {!Sources.NavigatorView.NavigatorView} view
  */
 SourcesTestRunner.dumpNavigatorViewInAllModes = function(view) {
   ['frame', 'frame/domain', 'frame/domain/folder', 'domain', 'domain/folder'].forEach(
@@ -64,11 +66,11 @@ SourcesTestRunner.dumpNavigatorViewInAllModes = function(view) {
 };
 
 /**
- * @param {!Sources.NavigatorView} view
+ * @param {!Sources.NavigatorView.NavigatorView} view
  * @param {string} mode
  */
 SourcesTestRunner.dumpNavigatorViewInMode = function(view, mode) {
-  TestRunner.addResult(view instanceof Sources.NetworkNavigatorView ? 'Sources:' : 'Content Scripts:');
+  TestRunner.addResult(view instanceof Sources.SourcesNavigator.NetworkNavigatorView ? 'Sources:' : 'Content Scripts:');
   view.groupByFrame = mode.includes('frame');
   view.groupByDomain = mode.includes('domain');
   view.groupByFolder = mode.includes('folder');
@@ -91,42 +93,6 @@ SourcesTestRunner.addScriptUISourceCode = function(url, content, isContentScript
   }
   TestRunner.evaluateInPageAnonymously(content);
   return TestRunner.waitForUISourceCode(url);
-};
-
-function testSourceMapping(text1, text2, mapping, testToken) {
-  const originalPosition = text1.indexOf(testToken);
-  TestRunner.assertTrue(originalPosition !== -1);
-
-  const text1LineEndings = TestRunner.findLineEndingIndexes(text1);
-  const text2LineEndings = TestRunner.findLineEndingIndexes(text2);
-
-  const originalLocation = Formatter.Formatter.positionToLocation(text1LineEndings, originalPosition);
-  const formattedLocation = mapping.originalToFormatted(originalLocation[0], originalLocation[1]);
-  const formattedPosition =
-      Formatter.Formatter.locationToPosition(text2LineEndings, formattedLocation[0], formattedLocation[1]);
-  const expectedFormattedPosition = text2.indexOf(testToken);
-
-  if (expectedFormattedPosition === formattedPosition) {
-    TestRunner.addResult(String.sprintf('Correct mapping for <%s>', testToken));
-  } else {
-    TestRunner.addResult(String.sprintf('ERROR: Wrong mapping for <%s>', testToken));
-  }
-}
-
-SourcesTestRunner.testPrettyPrint = function(mimeType, text, mappingQueries, next) {
-  new Formatter.ScriptFormatter(mimeType, text, didFormatContent);
-
-  function didFormatContent(formattedSource, mapping) {
-    TestRunner.addResult('====== 8< ------');
-    TestRunner.addResult(formattedSource);
-    TestRunner.addResult('------ >8 ======');
-
-    while (mappingQueries && mappingQueries.length) {
-      testSourceMapping(text, formattedSource, mapping, mappingQueries.shift());
-    }
-
-    next();
-  }
 };
 
 SourcesTestRunner.dumpSwatchPositions = function(sourceFrame, bookmarkType) {

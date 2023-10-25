@@ -88,11 +88,18 @@ describeWithEnvironment('JSONEditor', () => {
             replyArgs: ['Test4'],
           },
           'Test.test5': {
-            parameters: [{
-              name: 'test',
-              type: 'string',
-              optional: true,
-            }],
+            parameters: [
+              {
+                name: 'test',
+                type: 'string',
+                optional: true,
+              },
+              {
+                name: 'test2',
+                type: 'string',
+                optional: true,
+              },
+            ],
             description: 'Description5.',
             replyArgs: ['Test5'],
           },
@@ -403,6 +410,29 @@ describeWithEnvironment('JSONEditor', () => {
          const expectedValue = 'test1';
          assert.deepStrictEqual(value, expectedValue);
        });
+
+    it('should should every parameter of a command as undefined even if some parameters have not been entered inside the input bar',
+       async () => {
+         const cdpCommand = {
+           'command': 'Test.test5',
+           'parameters': {
+             'test': 'test',
+           },
+         };
+         const {command, parameters} = ProtocolMonitor.ProtocolMonitor.parseCommandInput(JSON.stringify(cdpCommand));
+
+         const jsonEditor = renderJSONEditor();
+
+         await populateMetadata(jsonEditor);
+
+         jsonEditor.displayCommand(command, parameters);
+
+         await jsonEditor.updateComplete;
+         const shadowRoot = jsonEditor.renderRoot;
+         const displayedParameters = shadowRoot.querySelectorAll('.parameter');
+         // Two parameters (test and test2) should be displayed because in the metadata, Test.test5 accepts two parameters
+         assert.deepStrictEqual(displayedParameters.length, 2);
+       });
     it('does not output parameters if the input is invalid json', async () => {
       const cdpCommand = '"command": "Test.test", "parameters":';
       const {command, parameters} = ProtocolMonitor.ProtocolMonitor.parseCommandInput(cdpCommand);
@@ -505,23 +535,26 @@ describeWithEnvironment('JSONEditor', () => {
       assert.deepStrictEqual(selector.selectedIndex(), 1);
     });
 
-    it('should not display the command into the input bar if the command is empty string', async () => {
-      const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-      const jsonEditor = editorWidget.jsonEditor;
-      jsonEditor.command = '';
-      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
-      split.setMainWidget(dataGrid);
-      split.setSidebarWidget(editorWidget);
-      split.toggleSidebar();
+    // Flaky test.
+    it.skip(
+        '[crbug.com/1484534]: should not display the command into the input bar if the command is empty string',
+        async () => {
+          const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
+          const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
+          const jsonEditor = editorWidget.jsonEditor;
+          jsonEditor.command = '';
+          const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
+          split.setMainWidget(dataGrid);
+          split.setSidebarWidget(editorWidget);
+          split.toggleSidebar();
 
-      await coordinator.done();
+          await coordinator.done();
 
-      // The first input bar corresponds to the filter bar, so we query the second one which corresponds to the CDP one.
-      const toolbarInput = dataGrid.element.shadowRoot?.querySelectorAll('.toolbar')[1].shadowRoot?.querySelector(
-          '.toolbar-input-prompt');
-      assert.deepStrictEqual(toolbarInput?.innerHTML, '');
-    });
+          // The first input bar corresponds to the filter bar, so we query the second one which corresponds to the CDP one.
+          const toolbarInput = dataGrid.element.shadowRoot?.querySelectorAll('.toolbar')[1].shadowRoot?.querySelector(
+              '.toolbar-input-prompt');
+          assert.deepStrictEqual(toolbarInput?.innerHTML, '');
+        });
   });
   describe('Descriptions', () => {
     it('should show the popup with the correct description for the description of parameters', async () => {

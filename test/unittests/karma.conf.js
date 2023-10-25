@@ -56,6 +56,8 @@ target with is_debug = true in the args.gn file.`;
 const TEXT_COVERAGE_ENABLED = coverageEnabled && !process.env['NO_TEXT_COVERAGE'];
 // true by default
 const HTML_COVERAGE_ENABLED = coverageEnabled && !process.env['NO_HTML_COVERAGE'];
+// false by default
+const SHUFFLE = process.env['SHUFFLE'];
 
 const GEN_DIRECTORY = path.join(__dirname, '..', '..');
 const ROOT_DIRECTORY = path.join(GEN_DIRECTORY, '..', '..', '..');
@@ -98,6 +100,13 @@ const TEST_FILES =
           });
         })
         .flat();
+
+if (SHUFFLE) {
+  for (let i = TEST_FILES.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [TEST_FILES[i], TEST_FILES[j]] = [TEST_FILES[j], TEST_FILES[i]];
+  }
+}
 
 const TEST_FILES_SOURCE_MAPS = TEST_FILES.map(fileName => `${fileName}.map`);
 
@@ -143,7 +152,10 @@ const ResultsDBReporter = function(baseReporterDecorator, formatError, config) {
     const testId = ResultsDb.sanitizedTestId([...suite, description].join('/'));
     const expected = success || skipped;
     const status = skipped ? 'SKIP' : success ? 'PASS' : 'FAIL';
-    const duration = endTime - startTime;
+    let duration = '1ms';
+    if (startTime < endTime) {
+      duration = (endTime - startTime).toString() + 'ms';
+    }
 
     const consoleLog = capturedLog.map(({type, log}) => `${type.toUpperCase()}: ${log}`);
     capturedLog.length = 0;
@@ -161,8 +173,10 @@ const ResultsDBReporter = function(baseReporterDecorator, formatError, config) {
       this.write(`==== ${status}: ${testId}\n\n`);
     }
 
-    const testResult = {status, expected, summaryHtml, testId, duration};
-    ResultsDb.recordTestResult(testResult);
+    const testResult = {testId, duration, status, expected, summaryHtml};
+    if (status !== 'SKIP') {
+      ResultsDb.sendTestResult(testResult);
+    }
   };
   this.specSuccess = specComplete;
   this.specSkipped = specComplete;
@@ -176,7 +190,6 @@ const ResultsDBReporter = function(baseReporterDecorator, formatError, config) {
         this.write('FAILED: %d failed, %d passed (%d skipped)\n', results.failed, results.success, results.skipped);
       }
     }
-    ResultsDb.sendCollectedTestResultsIfSinkIsAvailable();
   };
 };
 ResultsDBReporter.$inject = ['baseReporterDecorator', 'formatError', 'config'];

@@ -7,12 +7,13 @@ import * as Mocha from 'mocha';
 import * as Path from 'path';
 
 import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
+import {ScreenshotError} from '../shared/screenshots.js';
 
 import {AsyncScope} from './async-scope.js';
 import {getEnvVar} from './config.js';
-import {platform, type Platform, stepDescription} from './helper.js';
+import {platform, type Platform} from './helper.js';
 
-export {beforeEach} from 'mocha';
+export {after, beforeEach} from 'mocha';
 
 let didInitializeHtmlOutputFile = false;
 
@@ -20,13 +21,15 @@ function htmlEscape(raw: string) {
   return raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
-export async function takeScreenshots(testName: string) {
+export async function takeScreenshots(testName: string): Promise<{target?: string, frontend?: string}> {
   try {
     const {target, frontend} = getBrowserAndPages();
     const opts = {
       encoding: 'base64' as 'base64',
     };
+    await target.bringToFront();
     const targetScreenshot = await target.screenshot(opts);
+    await frontend.bringToFront();
     const frontendScreenshot = await frontend.screenshot(opts);
     const prefix = 'data:image/png;base64,';
     const screenshotFile = getEnvVar('HTML_OUTPUT_FILE');
@@ -47,8 +50,10 @@ export async function takeScreenshots(testName: string) {
       console.error('Frontend screenshot (copy the next line and open in the browser):');
       console.error(prefix + frontendScreenshot);
     }
+    return {target: targetScreenshot, frontend: frontendScreenshot};
   } catch (err) {
     console.error('Error taking a screenshot', err);
+    return {};
   }
 }
 
@@ -136,33 +141,27 @@ async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err
       return;
     }
     for (const scope of scopes.values()) {
-      const stack = scope.stack;
+      const {descriptions, stack} = scope;
       scope.setCanceled();
       if (stack) {
-        yield `${stack.join('\n')}\n`;
+        const stepDescription = descriptions ? `${descriptions.join(' > ')}:\n` : '';
+        yield `${stepDescription}${stack.join('\n')}\n`;
       }
     }
   }
 
-  const msgs = [];
-  if (stepDescription) {
-    msgs.push(`Timed out during step: ${stepDescription}`);
-  }
-
   const stacks = Array.from(joinStacks());
   if (stacks.length > 0) {
-    msgs.push(`Pending async operations during timeout:\n${stacks.join('\n\n')}`);
-  }
-  if (msgs.length) {
-    for (const msg of msgs) {
-      console.error(msg);
-    }
+    const msg = `Pending async operations during timeout:\n${stacks.join('\n\n')}`;
+    console.error(msg);
+
     if (err && err instanceof Error) {
-      err.cause = new Error(msgs.join('\n'));
+      err.cause = new Error(msg);
     }
   }
-  if (err && !getEnvVar('DEBUG_TEST')) {
-    await takeScreenshots(this.fullTitle());
+  if (err && !getEnvVar('DEBUG_TEST') && !(err instanceof ScreenshotError)) {
+    const {target, frontend} = await takeScreenshots(this.fullTitle());
+    err = ScreenshotError.fromBase64Images(err, target, frontend);
   }
   if (done) {
     // This workaround is needed to allow timeoutHook to be async.
@@ -254,8 +253,9 @@ function wrapMochaCall(
 
     if (callback.length === 0) {
       async function onError(this: unknown, err?: unknown) {
-        if (err && !getEnvVar('DEBUG_TEST')) {
-          await takeScreenshots(name);
+        if (err && !getEnvVar('DEBUG_TEST') && !(err instanceof ScreenshotError)) {
+          const {target, frontend} = await takeScreenshots(name);
+          err = ScreenshotError.fromBase64Images(err, target, frontend);
         }
         done.call(this, err);
       }
@@ -265,3 +265,5 @@ function wrapMochaCall(
     }
   });
 }
+
+export const itScreenshot = makeCustomWrappedIt('[screenshot]:');

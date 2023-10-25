@@ -224,7 +224,7 @@ export class JSONEditor extends LitElement {
           for (const subParameter of parameter.value) {
             nestedArrayParameters.push(formatParameterValue(subParameter));
           }
-          return nestedArrayParameters.length === 0 ? undefined : nestedArrayParameters;
+          return nestedArrayParameters.length === 0 ? [] : nestedArrayParameters;
         }
         default: {
           return parameter.value;
@@ -253,17 +253,28 @@ export class JSONEditor extends LitElement {
     if (!schema?.parameters) {
       return;
     }
-    this.parameters = this.#convertObjectToParameterSchema(
-                              '', parameters, {
-                                'typeRef': DUMMY_DATA,
-                                'type': ParameterType.Object,
-                                'name': '',
-                                'description': '',
-                                'optional': true,
-                                'value': [],
-                              },
-                              schema.parameters)
-                          .value as Parameter[];
+    this.populateParametersForCommandWithDefaultValues();
+
+    const displayedParameters = this.#convertObjectToParameterSchema(
+                                        '', parameters, {
+                                          'typeRef': DUMMY_DATA,
+                                          'type': ParameterType.Object,
+                                          'name': '',
+                                          'description': '',
+                                          'optional': true,
+                                          'value': [],
+                                        },
+                                        schema.parameters)
+                                    .value as Parameter[];
+
+    const valueByName = new Map(this.parameters.map(param => [param.name, param]));
+    for (const param of displayedParameters) {
+      const existingParam = valueByName.get(param.name);
+      if (existingParam) {
+        existingParam.value = param.value;
+      }
+    }
+
     this.requestUpdate();
   }
 
@@ -651,7 +662,7 @@ export class JSONEditor extends LitElement {
       optional: type.optional,
       isCorrectType: true,
       typeRef: type.typeRef,
-      value: defaultValueByType.get(type.type),
+      value: type.optional ? undefined : defaultValueByType.get(type.type),
       description: type.description,
     } as Parameter;
   }
@@ -687,7 +698,7 @@ export class JSONEditor extends LitElement {
           name: String(parameter.value.length),
           optional: true,
           typeRef: typeRef,
-          value: nestedValue.length !== 0 ? nestedValue : '',
+          value: nestedValue.length !== 0 ? nestedValue : defaultValueByType.get(parameter.type),
           description: '',
           isCorrectType: true,
         } as Parameter);

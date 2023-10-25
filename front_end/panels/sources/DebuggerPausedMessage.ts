@@ -147,10 +147,10 @@ export class DebuggerPausedMessage {
     const mainElement = messageWrapper.createChild('div', 'status-main');
     const mainIcon = new IconButton.Icon.Icon();
     mainIcon.data = {
-      iconName: 'info-filled',
-      color: 'var(--icon-default)',
-      width: '14px',
-      height: '14px',
+      iconName: 'info',
+      color: 'var(--sys-color-on-yellow-container)',
+      width: '16px',
+      height: '16px',
     };
     mainElement.appendChild(mainIcon);
     const breakpointType = BreakpointTypeNouns.get(data.type);
@@ -203,7 +203,11 @@ export class DebuggerPausedMessage {
       if (details.auxData) {
         const maybeNonDomEventNameForUI =
             SDK.EventBreakpointsModel.EventBreakpointsManager.instance().resolveEventListenerBreakpointTitle(
-                (details.auxData as {eventName: string}));
+                (details.auxData as {
+                  directiveText: string,
+                  eventName: string,
+                  webglErrorName: string,
+                }));
         if (maybeNonDomEventNameForUI) {
           eventNameForUI = maybeNonDomEventNameForUI;
         } else {
@@ -268,10 +272,10 @@ export class DebuggerPausedMessage {
       const mainElement = messageWrapper.createChild('div', 'status-main');
       const mainIcon = new IconButton.Icon.Icon();
       mainIcon.data = {
-        iconName: errorLike ? 'cross-circle-filled' : 'info-filled',
-        color: errorLike ? 'var(--icon-error)' : 'var(--icon-default)',
-        width: '14px',
-        height: '14px',
+        iconName: errorLike ? 'cross-circle-filled' : 'info',
+        color: errorLike ? 'var(--icon-error)' : 'var(--sys-color-on-yellow-container)',
+        width: '16px',
+        height: '16px',
       };
       mainElement.appendChild(mainIcon);
       mainElement.appendChild(document.createTextNode(mainText));

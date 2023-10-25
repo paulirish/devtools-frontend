@@ -85,7 +85,7 @@ function launchChrome() {
     '--enable-blink-features=CSSContainerQueries,HighlightInheritance',  // TODO(crbug.com/1218390) Remove globally enabled flags and conditionally enable them
   ];
   const opts: puppeteer.LaunchOptions&puppeteer.BrowserLaunchArgumentOptions&puppeteer.BrowserConnectOptions = {
-    headless,
+    headless: headless ? 'new' : false,
     executablePath: envChromeBinary,
     dumpio: !headless,
     slowMo: envSlowMo,
@@ -162,6 +162,7 @@ export async function resetPages() {
   await throttleCPUIfRequired(frontend);
   await delayPromisesIfRequired(frontend);
 
+  await frontend.bringToFront();
   if (TEST_SERVER_TYPE === 'hosted-mode') {
     await frontendTab.reset();
   } else if (TEST_SERVER_TYPE === 'component-docs') {

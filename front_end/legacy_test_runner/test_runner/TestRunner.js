@@ -67,7 +67,7 @@ self['onerror'] = (message, source, lineno, colno, error) => {
 };
 (() => {
   self.addEventListener('unhandledrejection', event => {
-    addResult(`PROMISE FAILURE: ${event.reason.stack}`);
+    addResult(`PROMISE FAILURE: ${event.reason.stack ?? event.reason}`);
     completeTest();
   });
 })();
@@ -261,21 +261,14 @@ const mappingForLayoutTests = new Map([
   ['panels/animation', 'animation'],
   ['panels/browser_debugger', 'browser_debugger'],
   ['panels/changes', 'changes'],
-  ['panels/console', 'console'],
-  ['panels/elements', 'elements'],
   ['panels/emulation', 'emulation'],
   ['panels/mobile_throttling', 'mobile_throttling'],
   ['panels/network', 'network'],
-  ['panels/profiler', 'profiler'],
-  ['panels/application', 'resources'],
   ['panels/search', 'search'],
   ['panels/sources', 'sources'],
   ['panels/snippets', 'snippets'],
   ['panels/settings', 'settings'],
-  ['panels/timeline', 'timeline'],
-  ['panels/web_audio', 'web_audio'],
   ['models/persistence', 'persistence'],
-  ['models/workspace_diff', 'workspace_diff'],
   ['entrypoints/main', 'main'],
   ['third_party/diff', 'diff'],
   ['ui/legacy/components/inline_editor', 'inline_editor'],
@@ -299,6 +292,7 @@ export async function loadLegacyModule(module) {
       containingFolder = remappedFolder;
     }
   }
+
   await import(`../../${containingFolder}/${containingFolder.split('/').reverse()[0]}-legacy.js`);
 }
 

@@ -47,7 +47,7 @@ button {
   --button-width: 100%;
 
   align-items: center;
-  border-radius: 4px calc(var(--button-has-right-border-radius) * 4px) calc(var(--button-has-right-border-radius) * 4px) 4px;
+  border-radius: 12px calc(var(--button-has-right-border-radius) * 12px) calc(var(--button-has-right-border-radius) * 12px) 12px;
   display: inline-flex;
   font-family: inherit;
   font-size: 12px;
@@ -67,7 +67,8 @@ button.small {
 }
 
 button:focus-visible {
-  box-shadow: 0 0 0 2px var(--color-button-outline-focus);
+  outline: 2px solid var(--sys-color-state-focus-ring);
+  outline-offset: 2px;
 }
 
 button.toolbar,
@@ -76,11 +77,14 @@ button.round {
   --button-width: 24px;
 
   background: transparent;
-  border-radius: 2px calc(var(--button-has-right-border-radius) * 2px) calc(var(--button-has-right-border-radius) * 2px) 2px;
   border: none;
   overflow: hidden;
   padding: 0;
   white-space: nowrap;
+}
+
+button.toolbar {
+  border-radius: 2px calc(var(--button-has-right-border-radius) * 2px) calc(var(--button-has-right-border-radius) * 2px) 2px;
 }
 
 button.round {
@@ -99,61 +103,62 @@ button.round.tiny {
 }
 
 button.primary {
-  border: var(--button-border-size) solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-background);
+  border: var(--button-border-size) solid var(--sys-color-primary);
+  background: var(--sys-color-primary);
+  color: var(--sys-color-on-primary);
 }
 
 button.primary:hover {
-  background: var(--color-button-primary-background-hovering);
-  border: var(--button-border-size) solid var(--color-button-primary-background-hovering);
+  background: color-mix(in sRGB, var(--sys-color-primary), var(--sys-color-state-hover-on-prominent) 6%);
+  border: var(--button-border-size) solid color-mix(in sRGB, var(--sys-color-primary), var(--sys-color-state-hover-on-prominent) 6%);
 }
 
 button.primary.active,
 button.primary:active {
-  background: var(--color-button-primary-background-pressed);
-  border: var(--button-border-size) solid var(--color-button-primary-background-pressed);
+  background: color-mix(in sRGB, var(--sys-color-primary), var(--sys-color-state-ripple-primary) 32%);
+  border: var(--button-border-size) solid color-mix(in sRGB, var(--sys-color-primary), var(--sys-color-state-ripple-primary) 32%);
+}
+
+button.primary:focus-visible {
+  outline: 2px solid var(--sys-color-state-focus-ring);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 button.primary:disabled,
 button.primary:disabled:hover {
-  border: var(--button-border-size) solid transparent;
-  background: var(--color-background-elevation-1);
-  color: var(--color-text-disabled);
+  border: var(--button-border-size) solid var(--sys-color-state-disabled-container);
+  background: var(--sys-color-state-disabled-container);
+  color: var(--sys-color-state-disabled);
   cursor: not-allowed;
 }
 
 button.secondary {
-  border: var(--button-border-size) solid var(--color-details-hairline);
-  background: var(--color-background);
-  color: var(--color-primary);
+  border: var(--button-border-size) solid var(--sys-color-tonal-outline);
+  background: var(--sys-color-cdt-base-container);
+  color: var(--sys-color-primary);
 }
 
 button.secondary:hover {
-  background: var(--color-button-secondary-background-hovering);
+  background: var(--sys-color-state-hover-on-subtle);
 }
 
 button.secondary.active,
 button.secondary:active {
-  background: var(--color-button-secondary-background-pressed);
-  border: var(--button-border-size) solid var(--color-button-secondary-background-pressed);
+  background-color: var(--sys-color-surface-variant);
 }
 
 button.secondary:focus-visible {
-  border: var(--button-border-size) solid var(--color-background);
+  outline: 2px solid var(--sys-color-state-focus-ring);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 button.secondary:disabled,
 button.secondary:disabled:hover {
-  border: var(--button-border-size) solid var(--color-background-elevation-1);
-  background: var(--color-background);
-  color: var(--color-text-disabled);
+  border: var(--button-border-size) solid var(--sys-color-state-disabled-container);
+  color: var(--sys-color-state-disabled);
   cursor: not-allowed;
-}
-
-button.secondary.active:focus-visible,
-button.secondary:active:focus-visible {
-  border: var(--button-border-size) solid var(--color-button-secondary-background-pressed);
 }
 
 button.toolbar:hover,
@@ -170,15 +175,15 @@ button.round:active {
 
 button.toolbar:focus-visible,
 button.round:focus-visible {
-  background-color: var(--color-background-elevation-2);
+  background-color: var(--sys-color-tonal-container);
 }
 
 button.toolbar:disabled,
 button.toolbar:disabled:hover,
 button.round:disabled,
 button.round:disabled:hover {
-  background: var(--color-background);
-  color: var(--color-text-disabled);
+  background: var(--sys-color-cdt-base-container);
+  color: var(--sys-color-state-disabled);
   cursor: not-allowed;
 }
 
@@ -215,7 +220,7 @@ button.primary-toolbar devtools-icon {
 }
 
 button.primary devtools-icon {
-  --icon-color: var(--color-background);
+  --icon-color: var(--sys-color-cdt-base-container);
 }
 
 button.secondary devtools-icon {
@@ -270,12 +275,12 @@ button.secondary:disabled devtools-icon {
 }
 
 .spinner-component.secondary {
-  border: 2px solid var(--color-primary);
+  border: 2px solid var(--sys-color-primary);
   border-right-color: transparent;
 }
 
 .spinner-component.disabled {
-  border: 2px solid var(--color-text-disabled);
+  border: 2px solid var(--sys-color-state-disabled);
   border-right-color: transparent;
 }
 
@@ -284,7 +289,7 @@ button.secondary:disabled devtools-icon {
   width: 12px;
   height: 12px;
   border-radius: 6px;
-  border: 2px solid var(--color-background);
+  border: 2px solid var(--sys-color-cdt-base-container);
   animation: spinner-animation 1s linear infinite;
   border-right-color: transparent;
   margin-right: 4px;

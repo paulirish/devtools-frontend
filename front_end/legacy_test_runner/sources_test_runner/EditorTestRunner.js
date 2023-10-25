@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as UI from '../../ui/legacy/legacy.js';
+
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
  */
@@ -13,7 +16,7 @@ SourcesTestRunner.createTestEditor = function(clientHeight, textEditorDelegate) 
   clientHeight = clientHeight || 100;
   textEditor.element.style.height = clientHeight + 'px';
   textEditor.element.style.flex = 'none';
-  textEditor.show(self.UI.inspectorView.element);
+  textEditor.show(UI.InspectorView.InspectorView.instance().element);
   return textEditor;
 };
 
@@ -27,7 +30,7 @@ function textWithSelection(text, selections) {
   }
 
   const lines = text.split('\n');
-  selections.sort(TextUtils.TextRange.comparator);
+  selections.sort(TextUtils.TextRange.TextRange.comparator);
 
   for (let i = selections.length - 1; i >= 0; --i) {
     let selection = selections[i];
@@ -64,7 +67,7 @@ SourcesTestRunner.setLineSelections = function(editor, selections) {
       selection.to = selection.column;
     }
 
-    coords.push(new TextUtils.TextRange(selection.line, selection.from, selection.line, selection.to));
+    coords.push(new TextUtils.TextRange.TextRange(selection.line, selection.from, selection.line, selection.to));
   }
 
   editor.setSelections(coords);

@@ -4,17 +4,18 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Root from '../../core/root/root.js';
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getEventLevel} from './AppenderUtils.js';
+import {getEventStyle} from './EventUICategory.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
-import {ThreadAppender} from './ThreadAppender.js';
+import {ThreadAppender, ThreadType} from './ThreadAppender.js';
 import {
   EntryType,
   InstantEventVisibleDurationMs,
@@ -26,7 +27,7 @@ import {TimingsTrackAppender} from './TimingsTrackAppender.js';
 export type HighlightedEntryInfo = {
   title: string,
   formattedTime: string,
-  warning?: string,
+  warningElements?: HTMLSpanElement[],
 };
 
 /**
@@ -79,7 +80,8 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames = ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread'] as const;
+export const TrackNames =
+    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet'] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -87,8 +89,8 @@ export type TrackAppenderName = typeof TrackNames[number]|'Network';
 export class CompatibilityTracksAppender {
   #trackForLevel = new Map<number, TrackAppender>();
   #trackForGroup = new Map<PerfUI.FlameChart.Group, TrackAppender>();
-  #eventsForTrack = new Map<TrackAppenderName, TraceEngine.Types.TraceEvents.TraceEventData[]>();
-  #trackEventsForTreeview = new Map<TrackAppenderName, TraceEngine.Types.TraceEvents.TraceEventData[]>();
+  #eventsForTrack = new Map<TrackAppender, TraceEngine.Types.TraceEvents.TraceEventData[]>();
+  #trackEventsForTreeview = new Map<TrackAppender, TraceEngine.Types.TraceEvents.TraceEventData[]>();
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
   #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
   #entryData: TimelineFlameChartEntry[];
@@ -96,6 +98,8 @@ export class CompatibilityTracksAppender {
   #indexForEvent = new WeakMap<TraceEngine.Types.TraceEvents.TraceEventData, number>();
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
+  #isCpuProfile = false;
+  #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
 
   // TODO(crbug.com/1416533)
   // These are used only for compatibility with the legacy flame chart
@@ -127,7 +131,8 @@ export class CompatibilityTracksAppender {
   constructor(
       flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
       traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData, entryData: TimelineFlameChartEntry[],
-      legacyEntryTypeByLevel: EntryType[], legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl) {
+      legacyEntryTypeByLevel: EntryType[], legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl,
+      isCpuProfile = false) {
     this.#flameChartData = flameChartData;
     this.#traceParsedData = traceParsedData;
     this.#entryData = entryData;
@@ -138,7 +143,7 @@ export class CompatibilityTracksAppender {
         /* alphaSpace= */ 0.7);
     this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
     this.#legacyTimelineModel = legacyTimelineModel;
-
+    this.#isCpuProfile = isCpuProfile;
     this.#timingsTrackAppender =
         new TimingsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
@@ -158,32 +163,81 @@ export class CompatibilityTracksAppender {
     this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#flameChartData, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
-    if (this.#traceParsedData.Renderer) {
-      for (const [pid, process] of this.#traceParsedData.Renderer.processes) {
-        for (const [tid, thread] of process.threads) {
-          if (thread.name !== 'CrRendererMain') {
-            // At the moment we only support the main thread, since the
-            // title for other tracks is procesed differently. Tackling
-            // other threads will be implemented in the future as part
-            // of crbug.com/1428024
-            continue;
-          }
-          const threadAppender = new ThreadAppender(this, this.#traceParsedData, this.#colorGenerator, pid, tid);
-          this.#threadAppenders.push(threadAppender);
-          this.#allTrackAppenders.push(threadAppender);
-        }
-      }
-    }
-
+    this.#addThreadAppenders();
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       for (const group of this.#flameChartData.groups) {
         // We only need to update the color here, because FlameChart will call `scheduleUpdate()` when theme is changed.
-        group.style.color = ThemeSupport.ThemeSupport.instance().getComputedValue('--color-text-primary');
-        group.style.backgroundColor = ThemeSupport.ThemeSupport.instance().getComputedValue('--color-background');
+        group.style.color = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-on-surface');
+        group.style.backgroundColor =
+            ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
       }
     });
   }
 
+  #addThreadAppenders(): void {
+    const weight = (appender: ThreadAppender): number => {
+      switch (appender.threadType) {
+        case ThreadType.MAIN_THREAD:
+          return appender.isOnMainFrame ? 0 : 1;
+        case ThreadType.WORKER:
+          return 2;
+        case ThreadType.RASTERIZER:
+          return 3;
+        case ThreadType.AUCTION_WORKLET:
+          return 4;
+        case ThreadType.OTHER:
+          return 5;
+        default:
+          return 6;
+      }
+    };
+    if (this.#isCpuProfile && this.#traceParsedData.Samples) {
+      for (const [pid, process] of this.#traceParsedData.Samples.profilesInProcess) {
+        for (const tid of process.keys()) {
+          this.#threadAppenders.push(new ThreadAppender(
+              this, this.#flameChartData, this.#traceParsedData, pid, tid, null, ThreadType.CPU_PROFILE));
+        }
+      }
+    } else if (this.#traceParsedData.Renderer) {
+      let rasterCount = 0;
+      for (const [pid, process] of this.#traceParsedData.Renderer.processes) {
+        if (this.#traceParsedData.AuctionWorklets.worklets.has(pid)) {
+          const workletEvent = this.#traceParsedData.AuctionWorklets.worklets.get(pid);
+          if (!workletEvent) {
+            continue;
+          }
+
+          // Each AuctionWorklet event represents two threads:
+          // 1. the Utility Thread
+          // 2. the V8 Helper Thread
+          // Note that the names passed here are not used visually. TODO: remove this name?
+          this.#threadAppenders.push(new ThreadAppender(
+              this, this.#flameChartData, this.#traceParsedData, pid, workletEvent.args.data.utilityThread.tid,
+              'auction-worket-utility', ThreadType.AUCTION_WORKLET));
+          this.#threadAppenders.push(new ThreadAppender(
+              this, this.#flameChartData, this.#traceParsedData, pid, workletEvent.args.data.v8HelperThread.tid,
+              'auction-worklet-v8helper', ThreadType.AUCTION_WORKLET));
+          continue;
+        }
+
+        for (const [tid, thread] of process.threads) {
+          let threadType = ThreadType.OTHER;
+          if (thread.name === 'CrRendererMain') {
+            threadType = ThreadType.MAIN_THREAD;
+          } else if (thread.name === 'DedicatedWorker thread') {
+            threadType = ThreadType.WORKER;
+          } else if (thread.name?.startsWith('CompositorTileWorker')) {
+            threadType = ThreadType.RASTERIZER;
+            rasterCount++;
+          }
+          this.#threadAppenders.push(new ThreadAppender(
+              this, this.#flameChartData, this.#traceParsedData, pid, tid, thread.name, threadType, rasterCount));
+        }
+      }
+    }
+    this.#threadAppenders.sort((a, b) => weight(a) - weight(b));
+    this.#allTrackAppenders.push(...this.#threadAppenders);
+  }
   /**
    * Given a trace event returns instantiates a legacy SDK.Event. This should
    * be used for compatibility purposes only.
@@ -231,8 +285,8 @@ export class CompatibilityTracksAppender {
     return this.#indexForEvent.get(event);
   }
 
-  eventsInTrack(trackAppenderName: TrackAppenderName): TraceEngine.Types.TraceEvents.TraceEventData[] {
-    const cachedData = this.#eventsForTrack.get(trackAppenderName);
+  eventsInTrack(trackAppender: TrackAppender): TraceEngine.Types.TraceEvents.TraceEventData[] {
+    const cachedData = this.#eventsForTrack.get(trackAppender);
     if (cachedData) {
       return cachedData;
     }
@@ -241,7 +295,7 @@ export class CompatibilityTracksAppender {
     let trackStartLevel = null;
     let trackEndLevel = null;
     for (const [level, track] of this.#trackForLevel) {
-      if (track.appenderName !== trackAppenderName) {
+      if (track !== trackAppender) {
         continue;
       }
       if (trackStartLevel === null) {
@@ -251,7 +305,7 @@ export class CompatibilityTracksAppender {
     }
 
     if (trackStartLevel === null || trackEndLevel === null) {
-      throw new Error(`Could not find events for track: ${trackAppenderName}`);
+      throw new Error(`Could not find events for track: ${trackAppender}`);
     }
     const entryLevels = this.#flameChartData.entryLevels;
     const events = [];
@@ -261,7 +315,7 @@ export class CompatibilityTracksAppender {
       }
     }
     events.sort((a, b) => a.ts - b.ts);
-    this.#eventsForTrack.set(trackAppenderName, events);
+    this.#eventsForTrack.set(trackAppender, events);
     return events;
   }
 
@@ -320,13 +374,13 @@ export class CompatibilityTracksAppender {
    * (Bottom-up, Call tree, etc.). These are the events from the track
    * that can be arranged in a tree shape.
    */
-  eventsForTreeView(trackAppenderName: TrackAppenderName): TraceEngine.Types.TraceEvents.TraceEventData[] {
-    const cachedData = this.#trackEventsForTreeview.get(trackAppenderName);
+  eventsForTreeView(trackAppender: TrackAppender): TraceEngine.Types.TraceEvents.TraceEventData[] {
+    const cachedData = this.#trackEventsForTreeview.get(trackAppender);
     if (cachedData) {
       return cachedData;
     }
 
-    let trackEvents = this.eventsInTrack(trackAppenderName);
+    let trackEvents = this.eventsInTrack(trackAppender);
     if (!this.canBuildTreesFromEvents(trackEvents)) {
       // Some tracks can include both async and sync events. When this
       // happens, we use all events for the tree views if a trees can be
@@ -336,7 +390,7 @@ export class CompatibilityTracksAppender {
       // events).
       trackEvents = trackEvents.filter(e => !TraceEngine.Types.TraceEvents.isAsyncPhase(e.ph));
     }
-    this.#trackEventsForTreeview.set(trackAppenderName, trackEvents);
+    this.#trackEventsForTreeview.set(trackAppender, trackEvents);
     return trackEvents;
   }
 
@@ -352,6 +406,20 @@ export class CompatibilityTracksAppender {
   }
 
   /**
+   * Looks up a FlameChart group for a given appender.
+   */
+  groupForAppender(targetAppender: TrackAppender): PerfUI.FlameChart.Group|null {
+    let foundGroup: PerfUI.FlameChart.Group|null = null;
+    for (const [group, appender] of this.#trackForGroup) {
+      if (appender === targetAppender) {
+        foundGroup = group;
+        break;
+      }
+    }
+    return foundGroup;
+  }
+
+  /**
    * Given a FlameChart group, gets the events to be shown in the tree
    * views if that group was registered by the appender system.
    */
@@ -360,7 +428,7 @@ export class CompatibilityTracksAppender {
     if (!track) {
       return null;
     }
-    return this.eventsForTreeView(track.appenderName);
+    return this.eventsForTreeView(track);
   }
 
   /**
@@ -386,7 +454,6 @@ export class CompatibilityTracksAppender {
       number {
     // TODO(crbug.com/1442454) Figure out how to avoid the circular calls.
     this.#trackForLevel.set(level, appender);
-
     const index = this.#entryData.length;
     this.#entryData.push(event);
     this.#indexForEvent.set(event, index);
@@ -420,14 +487,7 @@ export class CompatibilityTracksAppender {
     const showAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      const eventAsLegacy = this.getLegacyEvent(event);
-      // Default styles are globally defined for each event name. Some
-      // events are hidden by default.
-      const shouldShowEvent = showAllEvents ? true :
-                                              eventAsLegacy &&
-              visibleNames.has(TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter.eventType(eventAsLegacy));
-
-      if (!shouldShowEvent) {
+      if (!this.entryIsVisibleInTimeline(event)) {
         continue;
       }
 
@@ -437,8 +497,20 @@ export class CompatibilityTracksAppender {
 
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
-
     return trackStartLevel + lastUsedTimeByLevel.length;
+  }
+
+  entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+    if (this.#showAllEventsEnabled) {
+      return true;
+    }
+    // Default styles are globally defined for each event name. Some
+    // events are hidden by default.
+    const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
+    const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
+    return (eventStyle && !eventStyle.hidden) || eventIsTiming;
   }
 
   /**

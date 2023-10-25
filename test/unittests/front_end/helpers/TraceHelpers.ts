@@ -1,11 +1,11 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import type * as Protocol from '../../../../front_end/generated/protocol.js';
 import type * as TimelineModel from '../../../../front_end/models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../../../front_end/models/trace/trace.js';
 import * as Timeline from '../../../../front_end/panels/timeline/timeline.js';
 import * as PerfUI from '../../../../front_end/ui/legacy/components/perf_ui/perf_ui.js';
-import type * as Protocol from '../../../../front_end/generated/protocol.js';
 
 import {initializeGlobalVars} from './EnvironmentHelpers.js';
 import {TraceLoader} from './TraceLoader.js';
@@ -32,11 +32,13 @@ export class MockFlameChartDelegate implements PerfUI.FlameChart.FlameChartDeleg
  * flame chart.
  * @param trackAppenderNames A Set with the names of the tracks to be
  * rendered. For example, Set("Timings").
+ * @param expanded whether the track should be expanded
+ * @param trackName optional param to filter tracks by their name.
  * @returns a flame chart element and its corresponding data provider.
  */
 export async function getMainFlameChartWithTracks(
     traceFileName: string, trackAppenderNames: Set<Timeline.CompatibilityTracksAppender.TrackAppenderName>,
-    expanded: boolean): Promise<{
+    expanded: boolean, trackName?: string): Promise<{
   flameChart: PerfUI.FlameChart.FlameChart,
   dataProvider: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider,
 }> {
@@ -51,7 +53,8 @@ export async function getMainFlameChartWithTracks(
   dataProvider.setModel(performanceModel, traceParsedData);
   const tracksAppender = dataProvider.compatibilityTracksAppenderInstance();
   tracksAppender.setVisibleTracks(trackAppenderNames);
-  dataProvider.buildFromTrackAppenders(/* expandedTracks?= */ expanded ? trackAppenderNames : undefined);
+  dataProvider.buildFromTrackAppenders(
+      {filterThreadsByName: trackName, expandedTracks: expanded ? trackAppenderNames : undefined});
   const delegate = new MockFlameChartDelegate();
   const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
   const minTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
@@ -72,10 +75,12 @@ export async function getMainFlameChartWithTracks(
  * @param trackType the legacy "type" of the track to be rendered. For
  * example: "GPU"
  * @param expanded if the track is expanded
+ * @param trackNameFilter used to further filter down the tracks rendered by seeing if their name contains this string.
  * @returns a flame chart element and its corresponding data provider.
  */
-export async function getMainFlameChartWithLegacyTrack(
-    traceFileName: string, trackType: TimelineModel.TimelineModel.TrackType, expanded: boolean): Promise<{
+export async function getMainFlameChartWithLegacyTrackTypes(
+    traceFileName: string, trackType: TimelineModel.TimelineModel.TrackType, expanded: boolean,
+    trackNameFilter?: string): Promise<{
   flameChart: PerfUI.FlameChart.FlameChart,
   dataProvider: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider,
 }> {
@@ -93,7 +98,15 @@ export async function getMainFlameChartWithLegacyTrack(
   // have N tracks for a given trace, depending on how many
   // CompositorTileWorker threads there were. So in this case, we want to
   // render all of them, not just the first one we find.
-  const tracks = timelineModel.tracks().filter(track => track.type === trackType);
+  const tracks = timelineModel.tracks().filter(track => {
+    const isRightType = track.type === trackType;
+    if (!trackNameFilter) {
+      return isRightType;
+    }
+
+    return isRightType && track.name.includes(trackNameFilter);
+  });
+
   if (tracks.length === 0) {
     throw new Error(`Legacy track with of type ${trackType} not found in timeline model.`);
   }
@@ -180,7 +193,7 @@ export const defaultTraceEvent: TraceEngine.Types.TraceEvents.TraceEventData = {
  * @see RendererHandler.ts
  */
 export function getTree(thread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread):
-    TraceEngine.Handlers.ModelHandlers.Renderer.RendererTree {
+    TraceEngine.Helpers.TreeHelpers.TraceEntryTree {
   const tree = thread.tree;
   if (!tree) {
     assert(false, `Couldn't get tree in thread ${thread.name}`);
@@ -194,14 +207,14 @@ export function getTree(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Rend
  * @see RendererHandler.ts
  */
 export function getRootAt(thread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread, index: number):
-    TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode {
+    TraceEngine.Helpers.TreeHelpers.TraceEntryNode {
   const tree = getTree(thread);
-  const nodeId = [...tree.roots][index];
-  if (nodeId === undefined) {
+  const node = [...tree.roots][index];
+  if (node === undefined) {
     assert(false, `Couldn't get the id of the root at index ${index} in thread ${thread.name}`);
     return null as never;
   }
-  return getNodeFor(thread, nodeId);
+  return node;
 }
 
 /**
@@ -210,8 +223,7 @@ export function getRootAt(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Re
  */
 export function getNodeFor(
     thread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread,
-    nodeId: TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId):
-    TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode {
+    nodeId: TraceEngine.Helpers.TreeHelpers.TraceEntryNodeId): TraceEngine.Helpers.TreeHelpers.TraceEntryNode {
   const tree = getTree(thread);
   const node = tree.nodes.get(nodeId);
   if (!node) {
@@ -222,37 +234,25 @@ export function getNodeFor(
 }
 
 /**
- * Gets all the `events` for the `nodes` with `ids`.
+ * Gets all the `events` for the `nodes`.
  */
-export function getEventsIn(
-    ids: IterableIterator<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId>,
-    nodes:
-        Map<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId,
-            TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode>):
+export function getEventsIn(nodes: IterableIterator<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>):
     TraceEngine.Types.TraceEvents.TraceEventData[] {
-  return [...ids].map(id => nodes.get(id)).flatMap(node => node ? node.entry : []);
+  return [...nodes].flatMap(node => node ? node.entry : []);
 }
 /**
  * Pretty-prints a tree.
  */
 export function prettyPrint(
-    tree: TraceEngine.Handlers.ModelHandlers.Renderer.RendererTree,
-    predicate: (
-        node: TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode,
-        event: TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntry) => boolean = () => true,
+    tree: TraceEngine.Helpers.TreeHelpers.TraceEntryTree,
+    predicate:
+        (node: TraceEngine.Helpers.TreeHelpers.TraceEntryNode, event: TraceEngine.Types.TraceEvents.TraceEntry) =>
+            boolean = () => true,
     indentation: number = 2, delimiter: string = ' ', prefix: string = '-', newline: string = '\n',
     out: string = ''): string {
   let skipped = false;
   return printNodes(tree.roots);
-  function printNodes(nodeIds: Set<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNodeId>): string {
-    const nodes = [];
-    for (const nodeId of nodeIds) {
-      const child = tree.nodes.get(nodeId);
-      if (!child) {
-        continue;
-      }
-      nodes.push(child);
-    }
+  function printNodes(nodes: Set<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>): string {
     for (const node of nodes) {
       const event = node.entry;
       if (!predicate(node, event)) {
@@ -270,15 +270,7 @@ export function prettyPrint(
       const duration = `[${(event.dur || 0) / 1000}ms]`;
       const info = [jsFunctionName, eventType, duration].filter(Boolean);
       out += `${newline}${spacing}${prefix}${event.name} ${info.join(' ')}`;
-      const children = [];
-      for (const childId of node.childrenIds) {
-        const child = tree.nodes.get(childId);
-        if (!child) {
-          continue;
-        }
-        children.push(child);
-      }
-      out = printNodes(node.childrenIds);
+      out = printNodes(node.children);
     }
     return out;
   }
@@ -464,12 +456,46 @@ export function makeFakeEventPayload(payload: FakeEventPayload): TraceEngine.Tra
  * function will create a fake SDK Event with a stubbed thread that tries to
  * mimic the real thing. It is not designed to be used to emulate entire traces,
  * but more to create single events that can be used in unit tests.
- **/
+ */
 export function makeFakeSDKEventFromPayload(payloadOptions: FakeEventPayload): TraceEngine.Legacy.PayloadEvent {
   const payload = makeFakeEventPayload(payloadOptions);
   const thread = StubbedThread.make(payload.tid);
   const event = TraceEngine.Legacy.PayloadEvent.fromPayload(payload, thread);
   return event;
+}
+
+/**
+ * Mocks an object compatible with the return type of the
+ * RendererHandler using only an array of ordered entries.
+ */
+export function makeMockRendererHandlerData(entries: TraceEngine.Types.TraceEvents.TraceEntry[]):
+    TraceEngine.Handlers.ModelHandlers.Renderer.RendererHandlerData {
+  const {tree, entryToNode} = TraceEngine.Helpers.TreeHelpers.treify(entries, {filter: {has: () => true}});
+  const mockThread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread = {
+    tree,
+    name: 'thread',
+    entries,
+  };
+
+  const mockProcess: TraceEngine.Handlers.ModelHandlers.Renderer.RendererProcess = {
+    url: 'url',
+    isOnMainFrame: true,
+    threads: new Map([[1 as TraceEngine.Types.TraceEvents.ThreadID, mockThread]]),
+  };
+
+  const renderereEvents: TraceEngine.Types.TraceEvents.TraceEventRendererEvent[] = [];
+  for (const entry of entries) {
+    if (TraceEngine.Types.TraceEvents.isTraceEventRendererEvent(entry)) {
+      renderereEvents.push(entry);
+    }
+  }
+
+  return {
+    processes: new Map([[1 as TraceEngine.Types.TraceEvents.ProcessID, mockProcess]]),
+    compositorTileWorkers: new Map(),
+    entryToNode,
+    allRendererEvents: renderereEvents,
+  };
 }
 
 export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataProvider {
@@ -505,8 +531,17 @@ export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataP
     return null;
   }
 
-  entryColor(_entryIndex: number): string {
-    return 'lightblue';
+  entryColor(entryIndex: number): string {
+    return [
+      'lightblue',
+      'lightpink',
+      'yellow',
+      'lightgray',
+      'lightgreen',
+      'lightsalmon',
+      'orange',
+      'pink',
+    ][entryIndex % 8];
   }
 
   decorateEntry(): boolean {
@@ -524,4 +559,21 @@ export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataP
   timelineData(): PerfUI.FlameChart.FlameChartTimelineData|null {
     return PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
   }
+}
+
+export function getMainThread(data: TraceEngine.Handlers.ModelHandlers.Renderer.RendererHandlerData):
+    TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread {
+  let mainThread: TraceEngine.Handlers.ModelHandlers.Renderer.RendererThread|null = null;
+  for (const [, process] of data.processes) {
+    for (const [, thread] of process.threads) {
+      if (thread.name === 'CrRendererMain') {
+        mainThread = thread;
+        break;
+      }
+    }
+  }
+  if (!mainThread) {
+    throw new Error('Could not find main thread.');
+  }
+  return mainThread;
 }

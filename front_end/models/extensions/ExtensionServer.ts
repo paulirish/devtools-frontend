@@ -419,12 +419,25 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.requests = new Map();
     const url = event.data.inspectedURL();
     this.postNotification(PrivateAPI.Events.InspectedURLChanged, url);
-    this.#pendingExtensions.forEach(e => this.addExtension(e));
-    this.#pendingExtensions.splice(0);
+    const extensions = this.#pendingExtensions.splice(0);
+    extensions.forEach(e => this.addExtension(e));
   }
 
   hasSubscribers(type: string): boolean {
     return this.subscribers.has(type);
+  }
+
+  private isNotificationAllowedForExtension(port: MessagePort, type: string, ..._args: unknown[]): boolean {
+    if (type === PrivateAPI.Events.NetworkRequestFinished) {
+      const entry = _args[1] as HAR.Log.EntryDTO;
+      const origin = extensionOrigins.get(port);
+      const extension = origin && this.registeredExtensions.get(origin);
+      if (extension?.isAllowedOnTarget(entry.request.url)) {
+        return true;
+      }
+      return false;
+    }
+    return true;
   }
 
   private postNotification(type: string, ..._vararg: unknown[]): void {
@@ -437,7 +450,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
     const message = {command: 'notify-' + type, arguments: Array.prototype.slice.call(arguments, 1)};
     for (const subscriber of subscribers) {
-      if (this.extensionEnabled(subscriber)) {
+      if (this.extensionEnabled(subscriber) && this.isNotificationAllowedForExtension(subscriber, type, ..._vararg)) {
         subscriber.postMessage(message);
       }
     }
@@ -1058,6 +1071,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       this.disableExtensions();
     }
     if (!this.extensionsEnabled) {
+      this.#pendingExtensions.push(extensionInfo);
       return;
     }
     const hostsPolicy = HostsPolicy.create(extensionInfo.hostsPolicy);
@@ -1070,6 +1084,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       const name = extensionInfo.name || `Extension ${extensionOrigin}`;
       const extensionRegistration = new RegisteredExtension(name, hostsPolicy, Boolean(extensionInfo.allowFileAccess));
       if (!extensionRegistration.isAllowedOnTarget(inspectedURL)) {
+        this.#pendingExtensions.push(extensionInfo);
         return;
       }
       if (!this.registeredExtensions.get(extensionOrigin)) {
@@ -1318,7 +1333,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return true;
     }
     if (parsedURL.protocol === 'chrome:' || parsedURL.protocol === 'devtools:' ||
-        parsedURL.protocol === 'chrome-untrusted:') {
+        parsedURL.protocol === 'chrome-untrusted:' || parsedURL.protocol === 'chrome-error:') {
       return false;
     }
     if (parsedURL.protocol.startsWith('http') && parsedURL.hostname === 'chrome.google.com' &&

@@ -48,7 +48,7 @@ import {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
 import {DOMModel, type DOMNode} from './DOMModel.js';
 import {
   Events as ResourceTreeModelEvents,
-  type PrimaryPageChangeType,
+  PrimaryPageChangeType,
   type ResourceTreeFrame,
   ResourceTreeModel,
 } from './ResourceTreeModel.js';
@@ -216,6 +216,27 @@ export class CSSModel extends SDKModel<EventTypes> {
       }
       this.#domModel.markUndoableState();
       const edit = new Edit(styleSheetId, range, text, selectorList);
+      this.fireStyleSheetChanged(styleSheetId, edit);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async setPropertyRulePropertyName(
+      styleSheetId: Protocol.CSS.StyleSheetId, range: TextUtils.TextRange.TextRange, text: string): Promise<boolean> {
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.StyleRuleEdited);
+
+    try {
+      await this.ensureOriginalStyleSheetText(styleSheetId);
+      const {propertyName} =
+          await this.agent.invoke_setPropertyRulePropertyName({styleSheetId, range, propertyName: text});
+
+      if (!propertyName) {
+        return false;
+      }
+      this.#domModel.markUndoableState();
+      const edit = new Edit(styleSheetId, range, text, propertyName);
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
@@ -718,7 +739,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     if (event.data.frame.backForwardCacheDetails.restoredFromCache) {
       await this.suspendModel();
       await this.resumeModel();
-    } else {
+    } else if (event.data.type !== PrimaryPageChangeType.Activation) {
       this.resetStyleSheets();
       this.resetFontFaces();
     }

@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Elements from '../../panels/elements/elements.js';
 import * as EventListeners from '../../panels/event_listeners/event_listeners.js';
+import * as UI from '../../ui/legacy/legacy.js';
 
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
@@ -175,11 +177,11 @@ ElementsTestRunner.expandAndDumpEventListenersPromise = function(eventListenersV
 };
 
 ElementsTestRunner.inlineStyleSection = function() {
-  return UI.panels.elements.stylesWidget.sectionBlocks[0].sections[0];
+  return Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.sectionBlocks[0].sections[0];
 };
 
 ElementsTestRunner.computedStyleWidget = function() {
-  return UI.panels.elements.computedStyleWidget;
+  return Elements.ElementsPanel.ElementsPanel.instance().computedStyleWidget;
 };
 
 ElementsTestRunner.dumpComputedStyle = async function(doNotAutoExpand, printInnerText) {
@@ -246,7 +248,7 @@ ElementsTestRunner.findComputedPropertyWithName = function(name) {
 };
 
 ElementsTestRunner.firstMatchedStyleSection = function() {
-  return UI.panels.elements.stylesWidget.sectionBlocks[0].sections[1];
+  return Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.sectionBlocks[0].sections[1];
 };
 
 ElementsTestRunner.firstMediaTextElementInSection = function(section) {
@@ -292,7 +294,7 @@ globalThis.waitForStylesRebuild = function(matchFunction, callback, requireRebui
       return;
     }
 
-    TestRunner.addSniffer(Elements.StylesSidebarPane.prototype, 'nodeStylesUpdatedForTest', sniff);
+    TestRunner.addSniffer(Elements.StylesSidebarPane.StylesSidebarPane.prototype, 'nodeStylesUpdatedForTest', sniff);
   })(null);
 };
 
@@ -307,9 +309,10 @@ ElementsTestRunner.waitForStyles = function(idValue, callback, requireRebuild) {
 };
 
 ElementsTestRunner.waitForStyleCommitted = function(next) {
-  TestRunner.addSniffer(Elements.StylePropertyTreeElement.prototype, 'editingCommitted', (...args) => {
-    Promise.all(args).then(next);
-  });
+  TestRunner.addSniffer(
+      Elements.StylePropertyTreeElement.StylePropertyTreeElement.prototype, 'editingCommitted', (...args) => {
+        Promise.all(args).then(next);
+      });
 };
 
 ElementsTestRunner.waitForStylesForClass = function(classValue, callback, requireRebuild) {
@@ -324,15 +327,18 @@ ElementsTestRunner.waitForStylesForClass = function(classValue, callback, requir
 };
 
 ElementsTestRunner.waitForSelectorCommitted = function(callback) {
-  TestRunner.addSniffer(Elements.StylePropertiesSection.prototype, 'editingSelectorCommittedForTest', callback);
+  TestRunner.addSniffer(
+      Elements.StylePropertiesSection.StylePropertiesSection.prototype, 'editingSelectorCommittedForTest', callback);
 };
 
 ElementsTestRunner.waitForMediaTextCommitted = function(callback) {
-  TestRunner.addSniffer(Elements.StylePropertiesSection.prototype, 'editingMediaTextCommittedForTest', callback);
+  TestRunner.addSniffer(
+      Elements.StylePropertiesSection.StylePropertiesSection.prototype, 'editingMediaTextCommittedForTest', callback);
 };
 
 ElementsTestRunner.waitForStyleApplied = function(callback) {
-  TestRunner.addSniffer(Elements.StylePropertyTreeElement.prototype, 'styleTextAppliedForTest', callback);
+  TestRunner.addSniffer(
+      Elements.StylePropertyTreeElement.StylePropertyTreeElement.prototype, 'styleTextAppliedForTest', callback);
 };
 
 ElementsTestRunner.waitForStyleAppliedPromise = function() {
@@ -388,17 +394,17 @@ ElementsTestRunner.selectNodeAndWaitForStylesWithComputed = function(idValue, ca
 };
 
 ElementsTestRunner.firstElementsTreeOutline = function() {
-  return UI.panels.elements.treeOutlines.values().next().value;
+  return Elements.ElementsPanel.ElementsPanel.instance().treeOutlines.values().next().value;
 };
 
 ElementsTestRunner.filterMatchedStyles = function(text) {
   const regex = (text ? new RegExp(text, 'i') : null);
   TestRunner.addResult('Filtering styles by: ' + text);
-  UI.panels.elements.stylesWidget.onFilterChanged(regex);
+  Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.onFilterChanged(regex);
 };
 
 ElementsTestRunner.dumpRenderedMatchedStyles = function() {
-  const sectionBlocks = UI.panels.elements.stylesWidget.sectionBlocks;
+  const sectionBlocks = Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.sectionBlocks;
 
   for (const block of sectionBlocks) {
     for (const section of block.sections) {
@@ -462,7 +468,7 @@ ElementsTestRunner.dumpRenderedMatchedStyles = function() {
 
 ElementsTestRunner.dumpSelectedElementStyles =
     async function(excludeComputed, excludeMatched, omitLonghands, includeSelectorGroupMarks, printInnerText) {
-  const sectionBlocks = UI.panels.elements.stylesWidget.sectionBlocks;
+  const sectionBlocks = Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.sectionBlocks;
 
   if (!excludeComputed) {
     await ElementsTestRunner.dumpComputedStyle(false /* doNotAutoExpand */, printInnerText);
@@ -580,19 +586,19 @@ ElementsTestRunner.toggleMatchedStyleProperty = function(propertyName, checked) 
 };
 
 ElementsTestRunner.eventListenersWidget = function() {
-  self.UI.viewManager.showView('elements.eventListeners');
-  return Elements.EventListenersWidget.instance();
+  UI.ViewManager.ViewManager.instance().showView('elements.eventListeners');
+  return Elements.EventListenersWidget.EventListenersWidget.instance();
 };
 
 ElementsTestRunner.showEventListenersWidget = function() {
-  return self.UI.viewManager.showView('elements.eventListeners');
+  return UI.ViewManager.ViewManager.instance().showView('elements.eventListeners');
 };
 
 /**
  * @return {Promise}
  */
 ElementsTestRunner.showComputedStyles = function() {
-  UI.panels.elements.sidebarPaneView.tabbedPane().selectTab('Computed', true);
+  Elements.ElementsPanel.ElementsPanel.instance().sidebarPaneView.tabbedPane().selectTab('Computed', true);
   return ElementsTestRunner.computedStyleWidget().doUpdate();
 };
 
@@ -649,7 +655,7 @@ ElementsTestRunner.getElementStylePropertyTreeItem = function(propertyName) {
 };
 
 ElementsTestRunner.getMatchedStylePropertyTreeItem = function(propertyName) {
-  const sectionBlocks = UI.panels.elements.stylesWidget.sectionBlocks;
+  const sectionBlocks = Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.sectionBlocks;
 
   for (const block of sectionBlocks) {
     for (const section of block.sections) {
@@ -826,7 +832,7 @@ ElementsTestRunner.dumpElementsTree = function(rootNode, depth, resultsArray) {
 
 ElementsTestRunner.dumpDOMUpdateHighlights = function(rootNode, callback, depth) {
   let hasHighlights = false;
-  TestRunner.addSniffer(Elements.ElementsTreeOutline.prototype, 'updateModifiedNodes', didUpdate);
+  TestRunner.addSniffer(Elements.ElementsTreeOutline.ElementsTreeOutline.prototype, 'updateModifiedNodes', didUpdate);
 
   function didUpdate() {
     const treeOutline = ElementsTestRunner.firstElementsTreeOutline();
@@ -1167,7 +1173,7 @@ ElementsTestRunner.dumpBreadcrumb = function(message) {
   }
 
   const result = [];
-  const crumbs = UI.panels.elements.breadcrumbs.crumbsElement;
+  const crumbs = Elements.ElementsPanel.ElementsPanel.instance().breadcrumbs.crumbsElement;
   let crumb = crumbs.lastChild;
 
   while (crumb) {
@@ -1191,16 +1197,19 @@ ElementsTestRunner.matchingSelectors = function(matchedStyles, rule) {
 
 ElementsTestRunner.addNewRuleInStyleSheet = function(styleSheetHeader, selector, callback) {
   TestRunner.addSniffer(
-      Elements.StylesSidebarPane.prototype, 'addBlankSection', onBlankSection.bind(null, selector, callback));
-  UI.panels.elements.stylesWidget.createNewRuleInStyleSheet(styleSheetHeader);
+      Elements.StylesSidebarPane.StylesSidebarPane.prototype, 'addBlankSection',
+      onBlankSection.bind(null, selector, callback));
+  Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.createNewRuleInStyleSheet(styleSheetHeader);
 };
 
 ElementsTestRunner.addNewRule = function(selector, callback) {
-  UI.panels.elements.stylesWidget.contentElement.querySelector('.styles-pane-toolbar')
+  Elements.ElementsPanel.ElementsPanel.instance()
+      .stylesWidget.contentElement.querySelector('.styles-pane-toolbar')
       .shadowRoot.querySelector('.plus')
       .click();
   TestRunner.addSniffer(
-      Elements.StylesSidebarPane.prototype, 'addBlankSection', onBlankSection.bind(null, selector, callback));
+      Elements.StylesSidebarPane.StylesSidebarPane.prototype, 'addBlankSection',
+      onBlankSection.bind(null, selector, callback));
 };
 
 function onBlankSection(selector, callback) {
@@ -1299,8 +1308,8 @@ ElementsTestRunner.dumpAnimationTimeline = function(timeline) {
 // Saves time by ignoring sidebar updates, use in tests that don't interact
 // with these sidebars.
 ElementsTestRunner.ignoreSidebarUpdates = function() {
-  Elements.StylesSidebarPane.prototype.update = function() {};
-  Elements.MetricsSidebarPane.prototype.update = function() {};
+  Elements.StylesSidebarPane.StylesSidebarPane.prototype.update = function() {};
+  Elements.MetricsSidebarPane.MetricsSidebarPane.prototype.update = function() {};
 };
 
 ElementsTestRunner.getDocumentElements = function() {

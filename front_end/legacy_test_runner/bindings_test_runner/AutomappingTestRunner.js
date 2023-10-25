@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Bindings from '../../models/bindings/bindings.js';
+import * as Persistence from '../../models/persistence/persistence.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 
 /**
  * @fileoverview using private properties isn't a Closure violation in tests.
@@ -23,8 +26,9 @@ let originalRequestMetadata;
 BindingsTestRunner.overrideNetworkModificationTime = function(urlToTime) {
   if (!timeOverrides) {
     timeOverrides = new Map();
-    originalRequestMetadata =
-        TestRunner.override(Bindings.ContentProviderBasedProject.prototype, 'requestMetadata', overrideTime, true);
+    originalRequestMetadata = TestRunner.override(
+        Bindings.ContentProviderBasedProject.ContentProviderBasedProject.prototype, 'requestMetadata', overrideTime,
+        true);
   }
 
   for (const url in urlToTime) {
@@ -51,16 +55,17 @@ BindingsTestRunner.overrideNetworkModificationTime = function(urlToTime) {
 
 BindingsTestRunner.AutomappingTest = function(workspace) {
   this.workspace = workspace;
-  this.networkProject = new Bindings.ContentProviderBasedProject(
+  this.networkProject = new Bindings.ContentProviderBasedProject.ContentProviderBasedProject(
       this.workspace, 'AUTOMAPPING', Workspace.projectTypes.Network, 'simple website');
 
   if (workspace !== self.Workspace.workspace) {
-    new Persistence.FileSystemWorkspaceBinding(self.Persistence.isolatedFileSystemManager, this.workspace);
+    new Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding(
+        Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.instance(), this.workspace);
   }
 
   this.failedBindingsCount = 0;
-  this.automapping =
-      new Persistence.Automapping(this.workspace, this._onStatusAdded.bind(this), this._onStatusRemoved.bind(this));
+  this.automapping = new Persistence.Automapping.Automapping(
+      this.workspace, this._onStatusAdded.bind(this), this._onStatusRemoved.bind(this));
   TestRunner.addSniffer(this.automapping, 'onBindingFailedForTest', this._onBindingFailed.bind(this), true);
   TestRunner.addSniffer(this.automapping, 'onSweepHappenedForTest', this._onSweepHappened.bind(this), true);
 };
@@ -76,7 +81,8 @@ BindingsTestRunner.AutomappingTest.prototype = {
     for (const url in assets) {
       const asset = assets[url];
       const contentType = asset.contentType || Common.ResourceType.resourceTypes.Script;
-      const contentProvider = TextUtils.StaticContentProvider.fromString(url, contentType, asset.content);
+      const contentProvider =
+          TextUtils.StaticContentProvider.StaticContentProvider.fromString(url, contentType, asset.content);
       const metadata =
           (typeof asset.content === 'string' || asset.time ?
                new Workspace.UISourceCodeMetadata(asset.time, asset.content.length) :
