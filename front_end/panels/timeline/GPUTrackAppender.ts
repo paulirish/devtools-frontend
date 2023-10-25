@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import * as i18n from '../../core/i18n/i18n.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import {getCategoryStyles} from './EventUICategory.js';
 
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 import {
@@ -84,7 +84,7 @@ export class GPUTrackAppender implements TrackAppender {
     if (TraceEngine.Types.TraceEvents.isTraceEventGPUTask(event)) {
       return 'hsl(109, 33%, 55%)';
     }
-    return ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-painting');
+    return getCategoryStyles().Other.getComputedValue();
   }
 
   /**
