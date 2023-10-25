@@ -109,7 +109,6 @@ export function registerNoopActions(actionIds: string[]): void {
 const REGISTERED_EXPERIMENTS = [
   'bfcacheDisplayTree',
   'captureNodeCreationStacks',
-  'keyboardShortcutEditor',
   'preciseChanges',
   'protocolMonitor',
   'sourcesPrettyPrint',
@@ -132,6 +131,7 @@ const REGISTERED_EXPERIMENTS = [
   'fontEditor',
   'networkPanelFilterBarRedesign',
   'breadcrumbsPerformancePanel',
+  'trackContextMenu',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {

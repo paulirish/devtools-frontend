@@ -318,10 +318,6 @@ const UIStrings = {
   prerenderFinalStatusPrerenderingDisabledByDevTools:
       'The prerender was not performed because DevTools has been used to disable prerendering.',
   /**
-   *  Description text for PrerenderFinalStatus::kResourceLoadBlockedByClient.
-   */
-  prerenderFinalStatusResourceLoadBlockedByClient: 'Some resource load was blocked.',
-  /**
    * Description text for PrerenderFinalStatus::kSpeculationRuleRemoved.
    */
   prerenderFinalStatusSpeculationRuleRemoved:
@@ -335,17 +331,17 @@ const UIStrings = {
    * Description text for PrerenderFinalStatus::kMaxNumOfRunningEagerPrerendersExceeded.
    */
   prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules to enable further prerendering.',
+      'The prerender whose eagerness is "eager" was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules with "eager" to enable further prerendering.',
   /**
    * Description text for PrerenderFinalStatus::kMaxNumOfRunningEmbedderPrerendersExceeded.
    */
   prerenderFinalStatusMaxNumOfRunningEmbedderPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing.',
+      'The browser-triggered prerender was not performed because the initiating page already has too many prerenders ongoing.',
   /**
    * Description text for PrerenderFinalStatus::kMaxNumOfRunningNonEagerPrerendersExceeded.
    */
   prerenderFinalStatusMaxNumOfRunningNonEagerPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules to enable further prerendering.',
+      'The old non-eager prerender (with a "moderate" or "conservative" eagerness and triggered by hovering or clicking links) was automatically canceled due to starting a new non-eager prerender. It can be retriggered by interacting with the link again.',
   /**
    * Description text for PrenderFinalStatus::kPrerenderingUrlHasEffectiveUrl.
    */
@@ -645,8 +641,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusMemoryPressureAfterTriggered);
     case Protocol.Preload.PrerenderFinalStatus.PrerenderingDisabledByDevTools:
       return i18nString(UIStrings.prerenderFinalStatusPrerenderingDisabledByDevTools);
-    case Protocol.Preload.PrerenderFinalStatus.ResourceLoadBlockedByClient:
-      return i18nString(UIStrings.prerenderFinalStatusResourceLoadBlockedByClient);
     case Protocol.Preload.PrerenderFinalStatus.SpeculationRuleRemoved:
       return i18nString(UIStrings.prerenderFinalStatusSpeculationRuleRemoved);
     case Protocol.Preload.PrerenderFinalStatus.ActivatedWithAuxiliaryBrowsingContexts:

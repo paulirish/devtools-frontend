@@ -184,10 +184,6 @@ describe('User Metrics', () => {
     await assertHistogramEventsInclude([
       {
         actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // 'console-view'.
-      },
-      {
-        actionName: 'DevTools.PanelShown',
         actionCode: 11,  // 'animations'.
       },
     ]);
@@ -200,10 +196,6 @@ describe('User Metrics', () => {
       {
         actionName: 'DevTools.IssuesPanelOpenedFrom',
         actionCode: 3,  // 'HamburgerMenu'.
-      },
-      {
-        actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // 'console-view'.
       },
       {
         actionName: 'DevTools.PanelShown',
@@ -395,8 +387,7 @@ describe('User Metrics', () => {
 
     const events = await retrieveRecordedPerformanceHistogramEvents(frontend);
 
-    assert.strictEqual(events.length, 1);
-    assert.strictEqual(events[0].histogramName, 'DevTools.Launch.Timeline');
+    assert.include(events.map(e => e.histogramName), 'DevTools.Launch.Timeline');
   });
 
   it('records the selected language', async () => {

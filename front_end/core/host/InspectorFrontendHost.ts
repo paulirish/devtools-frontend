@@ -42,11 +42,13 @@ import {
   type ClickEvent,
   type ContextMenuDescriptor,
   type DoAidaConversationResult,
+  type DragEvent,
   type EnumeratedHistogram,
   EventDescriptors,
   Events,
   type EventTypes,
   type ExtensionDescriptor,
+  type HoverEvent,
   type ImpressionEvent,
   type InspectorFrontendHostAPI,
   type KeyDownEvent,
@@ -464,6 +466,10 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   recordImpression(event: ImpressionEvent): void {
   }
   recordClick(event: ClickEvent): void {
+  }
+  recordHover(event: HoverEvent): void {
+  }
+  recordDrag(event: DragEvent): void {
   }
   recordChange(event: ChangeEvent): void {
   }

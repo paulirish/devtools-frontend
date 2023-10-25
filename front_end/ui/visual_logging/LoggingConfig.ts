@@ -8,6 +8,7 @@ export interface LoggingConfig {
   ve: number;
   track?: Map<string, string>;
   context?: string;
+  parent?: string;
 }
 
 export function needsLogging(element: Element): boolean {
@@ -26,6 +27,66 @@ enum VisualElements {
   AccessibilityPane = 4,
   AccessibilitySourceOrder = 5,
   Toggle = 6,
+  AddStylesRule = 7,
+  FilterTextField = 8,
+  ShowAllStyleProperties = 9,
+  StylePropertiesSection = 10,
+  StylePropertiesSectionSeparator = 11,
+  StylesPane = 12,
+  StylesSelector = 13,
+  TreeItemExpand = 14,
+  ToggleSubpane = 15,
+  ElementClassesPane = 16,
+  AddElementClassPrompt = 17,
+  ElementStatesPan = 18,
+  CssLayersPane = 19,
+  DropDown = 20,
+  StylesMetricsPane = 21,
+  JumpToSource = 22,
+  MetricsBox = 23,
+  MetricsBoxPart = 24,
+  DOMBreakpointsPane = 25,
+  DOMBreakpoint = 26,
+  ElementPropertiesPane = 27,
+  EventListenersPane = 28,
+  Refresh = 29,
+  FilterDropdown = 30,
+  AddColor = 31,
+  BezierCurveEditor = 32,
+  BezierEditor = 33,
+  BezierPresetCategory = 34,
+  BezierPreview = 35,
+  ColorCanvas = 36,
+  ColorEyeDropper = 37,
+  ColorPicker = 38,
+  CopyColor = 39,
+  CssAngleEditor = 40,
+  CssFlexboxEditor = 41,
+  CssGridEditor = 42,
+  CssShadowEditor = 43,
+  Link = 44,
+  Next = 45,
+  Item = 46,
+  PaletteColorShades = 47,
+  PalettePanel = 48,
+  Previous = 49,
+  ShowStyleEditor = 50,
+  Slider = 51,
+  CssColorMix = 52,
+  Value = 53,
+  Key = 54,
+  GridSettings = 55,
+  FlexboxOverlays = 56,
+  GridOverlays = 57,
+  JumpToElement = 58,
+  ElementsPanel = 59,
+  ElementsTreeOutline = 60,
+  Toolbar = 61,
+  ElementsBreadcrumbs = 62,
+  FullAccessibilityTree = 63,
+  ToggleDeviceMode = 64,
+  ToggleElementSearch = 65,
+  PanelTabHeader = 66,
 }
 
 function resolveVe(ve: string): number {
@@ -45,6 +106,12 @@ function parseJsLog(jslog: string): LoggingConfig {
   if (context) {
     config.context = context;
   }
+
+  const parent = getComponent('parent:');
+  if (parent) {
+    config.parent = parent;
+  }
+
   const trackString = getComponent('track:');
   if (trackString) {
     config.track = new Map<string, string>(trackString.split(',').map(t => t.split(':') as [string, string]));
@@ -55,7 +122,15 @@ function parseJsLog(jslog: string): LoggingConfig {
 
 export interface ConfigStringBuilder {
   context: (value: string|number) => ConfigStringBuilder;
-  track: (options: {click?: boolean, change?: boolean, keydown?: boolean|string}) => ConfigStringBuilder;
+  parent: (value: string) => ConfigStringBuilder;
+  track: (options: {
+    click?: boolean,
+    dblclick?: boolean,
+    hover?: boolean,
+    drag?: boolean,
+    change?: boolean,
+    keydown?: boolean|string,
+  }) => ConfigStringBuilder;
   toString: () => string;
 }
 
@@ -66,7 +141,18 @@ export function makeConfigStringBuilder(veName: string): ConfigStringBuilder {
       components.push(`context: ${value}`);
       return this;
     },
-    track: function(options: {click?: boolean, change?: boolean, keydown?: boolean|string}): ConfigStringBuilder {
+    parent: function(value: string): ConfigStringBuilder {
+      components.push(`parent: ${value}`);
+      return this;
+    },
+    track: function(options: {
+      click?: boolean,
+      dblclick?: boolean,
+      hover?: boolean,
+      drag?: boolean,
+      change?: boolean,
+      keydown?: boolean|string,
+    }): ConfigStringBuilder {
       components.push(`track: ${
           Object.entries(options).map(([key, value]) => value !== true ? `${key}: ${value}` : key).join(', ')}`);
       return this;

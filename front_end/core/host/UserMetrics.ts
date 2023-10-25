@@ -453,6 +453,11 @@ export class UserMetrics {
     InspectorFrontendHostInstance.recordPerformanceHistogram(
         'DevTools.Workspaces.PopulateWallClocktime', wallClockTimeInMilliseconds);
   }
+
+  visualLoggingProcessingDone(timeInMilliseconds: number): void {
+    InspectorFrontendHostInstance.recordPerformanceHistogram(
+        'DevTools.VisualLogging.ProcessingTime', timeInMilliseconds);
+  }
 }
 
 /**
@@ -577,13 +582,13 @@ export enum Action {
   AnimationGroupScrubbed = 103,
   AnimationGroupReplayed = 104,
   OverrideTabDeleteFolderContextMenu = 105,
-  OverrideTabDeleteOverridesContextMenu = 106,
   WorkspaceDropFolder = 107,
   WorkspaceSelectFolder = 108,
   OverrideContentContextMenuSourceMappedWarning = 109,
   OverrideContentContextMenuRedirectToDeployed = 110,
   NewStyleRuleAdded = 111,
-  MaxValue = 112,
+  TraceExpanded = 112,
+  MaxValue = 113,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -899,8 +904,6 @@ export enum DevtoolsExperiments {
   'timelineShowAllEvents' = 27,
   'timelineV8RuntimeCallStats' = 28,
   'wasmDWARFDebugging' = 31,
-  'dualScreenSupport' = 32,
-  'keyboardShortcutEditor' = 35,
   'APCA' = 39,
   'cspViolationsView' = 40,
   'fontEditor' = 41,
@@ -921,7 +924,6 @@ export enum DevtoolsExperiments {
   'justMyCode' = 65,
   'timelineAsConsoleProfileResultPanel' = 67,
   'preloadingStatusPanel' = 68,
-  'disableColorFormatSetting' = 69,
   'outermostTargetSelector' = 71,
   'jsProfilerTemporarilyEnable' = 72,
   'highlightErrorsElementsPanel' = 73,
@@ -929,12 +931,12 @@ export enum DevtoolsExperiments {
   'selfXssWarning' = 75,
   'useSourceMapScopes' = 76,
   'storageBucketsTree' = 77,
-  'deleteOverridesTemporarilyEnable' = 78,
   'networkPanelFilterBarRedesign' = 79,
   'breadcrumbsPerformancePanel' = 80,
+  'trackContextMenu' = 81,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 81,
+  'MaxValue' = 82,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
