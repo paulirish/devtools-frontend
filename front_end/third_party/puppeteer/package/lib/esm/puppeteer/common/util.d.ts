@@ -16,13 +16,16 @@
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
+/// <reference types="node" />
+import type FS from 'fs/promises';
 import type { Readable } from 'stream';
 import type { Protocol } from 'devtools-protocol';
 import { type Observable } from '../../third_party/rxjs/rxjs.js';
 import type { CDPSession } from '../api/CDPSession.js';
-import { type Page } from '../api/Page.js';
+import type { Page } from '../api/Page.js';
 import { Deferred } from '../util/Deferred.js';
-import { type Awaitable } from './types.js';
+import type { EventEmitter, EventType } from './EventEmitter.js';
+import type { NetworkManagerEvents } from './NetworkManagerEvents.js';
 /**
  * @internal
  */
@@ -83,10 +86,6 @@ export declare const isDate: (obj: unknown) => obj is Date;
 /**
  * @internal
  */
-export declare function waitForEvent<T>(emitter: any, eventName: string | symbol, predicate: (event: T) => Awaitable<boolean>, timeout: number, abortPromise: Promise<Error> | Deferred<Error>): Promise<T>;
-/**
- * @internal
- */
 export declare function evaluationString(fun: Function | string, ...args: unknown[]): string;
 /**
  * @internal
@@ -103,7 +102,7 @@ export declare function waitWithTimeout<T>(promise: Promise<T>, taskName: string
 /**
  * @internal
  */
-export declare function importFSPromises(): Promise<typeof import('fs/promises')>;
+export declare function importFSPromises(): Promise<typeof FS>;
 /**
  * @internal
  */
@@ -140,4 +139,12 @@ export declare const SOURCE_URL_REGEX: RegExp;
  * @internal
  */
 export declare function getSourceUrlComment(url: string): string;
+/**
+ * @internal
+ */
+export declare function waitForHTTP<T extends {
+    url(): string;
+}>(networkManager: EventEmitter<NetworkManagerEvents>, eventName: EventType, urlOrPredicate: string | ((res: T) => boolean | Promise<boolean>), 
+/** Time after the function will timeout */
+ms: number, cancelation: Deferred<never>): Promise<T>;
 //# sourceMappingURL=util.d.ts.map

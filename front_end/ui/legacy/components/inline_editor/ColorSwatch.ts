@@ -8,6 +8,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as ComponentHelpers from '../../../components/helpers/helpers.js';
 import * as ColorPicker from '../../../legacy/components/color_picker/color_picker.js';
 import * as LitHtml from '../../../lit-html/lit-html.js';
+import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 
 import colorSwatchStyles from './colorSwatch.css.js';
 
@@ -98,9 +99,7 @@ export class ColorSwatch extends HTMLElement {
       this.color = color;
     }
 
-    if (typeof formatOrUseUserSetting === 'boolean' && formatOrUseUserSetting) {
-      this.format = Common.Settings.detectColorFormat(this.color);
-    } else if (typeof formatOrUseUserSetting === 'string') {
+    if (typeof formatOrUseUserSetting === 'string') {
       this.format = Common.Color.getFormat(formatOrUseUserSetting);
     } else {
       this.format = this.color.format();
@@ -131,6 +130,7 @@ export class ColorSwatch extends HTMLElement {
     LitHtml.render(
       LitHtml.html`<span class="color-swatch" title=${this.tooltip}><span class="color-swatch-inner"
         style="background-color: ${this.text};"
+        jslog=${VisualLogging.showStyleEditor().track({click: true}).context('color')}
         @click=${this.onClick}
         @mousedown=${this.consume}
         @dblclick=${this.consume}></span></span><slot><span>${this.text}</span></slot>`,

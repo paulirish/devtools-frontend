@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 /// <reference types="node" />
-import { type ChildProcess } from 'child_process';
-import { type Protocol } from 'devtools-protocol';
+import type { ChildProcess } from 'child_process';
+import type { Protocol } from 'devtools-protocol';
 import { EventEmitter, type EventType } from '../common/EventEmitter.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
 import type { BrowserContext } from './BrowserContext.js';
@@ -182,10 +182,6 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
      * @internal
      */
     _detach(): void;
-    /**
-     * @internal
-     */
-    get _targets(): Map<string, Target>;
     /**
      * Gets the associated
      * {@link https://nodejs.org/api/child_process.html#class-childprocess | ChildProcess}.

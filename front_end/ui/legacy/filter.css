@@ -56,7 +56,7 @@
 }
 
 .filter-bitset-filter span {
-  color: var(--color-text-primary);
+  color: var(--sys-color-on-surface);
   outline: 1px solid var(--sys-color-tonal-outline);
   outline-offset: -1px;
   box-sizing: border-box;
@@ -214,6 +214,11 @@
 
 .filter-input-clear-button:hover {
   opacity: 99%;
+}
+
+button.toolbar-item:focus-visible {
+  background: var(--sys-color-state-hover-on-subtle);
+  border-radius: 2px;
 }
 
 @media (forced-colors: active) {

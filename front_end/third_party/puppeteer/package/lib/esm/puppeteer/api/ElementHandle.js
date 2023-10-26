@@ -98,6 +98,7 @@ import { isString, withSourcePuppeteerURLIfNone } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { AsyncIterableUtil } from '../util/AsyncIterableUtil.js';
 import { throwIfDisposed } from '../util/decorators.js';
+import { _isElementHandle } from './ElementHandleSymbol.js';
 import { JSHandle } from './JSHandle.js';
 /**
  * ElementHandle represents an in-page DOM element.
@@ -301,6 +302,7 @@ let ElementHandle = (() => {
         constructor(handle) {
             super();
             this.handle = handle;
+            this[_isElementHandle] = true;
         }
         /**
          * @internal
@@ -857,8 +859,7 @@ let ElementHandle = (() => {
         async tap() {
             await this.scrollIntoViewIfNeeded();
             const { x, y } = await this.clickablePoint();
-            await this.frame.page().touchscreen.touchStart(x, y);
-            await this.frame.page().touchscreen.touchEnd();
+            await this.frame.page().touchscreen.tap(x, y);
         }
         async touchStart() {
             await this.scrollIntoViewIfNeeded();
@@ -1187,7 +1188,7 @@ let ElementHandle = (() => {
         }
         /**
          * This method scrolls element into view if needed, and then uses
-         * {@link Page.(screenshot:3) } to take a screenshot of the element.
+         * {@link Page.(screenshot:2) } to take a screenshot of the element.
          * If the element is detached from DOM, the method throws an error.
          */
         async screenshot(options = {}) {

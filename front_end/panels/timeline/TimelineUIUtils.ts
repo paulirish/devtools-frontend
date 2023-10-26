@@ -50,7 +50,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CLSRect} from './CLSLinkifier.js';
 import * as TimelineComponents from './components/components.js';
-import {EventStyles} from './EventUICategory.js';
+import {getCategoryStyles, getEventStyle, TimelineCategory, TimelineRecordStyle} from './EventUICategory.js';
 import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
 import invalidationsTreeStyles from './invalidationsTree.css.js';
 import {TimelinePanel} from './TimelinePanel.js';
@@ -1003,10 +1003,6 @@ const UIStrings = {
   /**
    *@description Text in Timeline UIUtils of the Performance panel
    */
-  cpuTime: 'CPU time',
-  /**
-   *@description Text in Timeline UIUtils of the Performance panel
-   */
   layerTree: 'Layer tree',
   /**
    *@description Text in Timeline UIUtils of the Performance panel
@@ -1356,13 +1352,32 @@ export class TimelineUIUtils {
     return frame.functionName;
   }
 
-  static testContentMatching(traceEvent: TraceEngine.Legacy.CompatibleTraceEvent, regExp: RegExp): boolean {
+  static testContentMatching(
+      traceEvent: TraceEngine.Legacy.CompatibleTraceEvent, regExp: RegExp,
+      traceParsedData?: TraceEngine.Handlers.Migration.PartialTraceData): boolean {
     const title = TimelineUIUtils.eventStyle(traceEvent).title;
     const tokens = [title];
+
+    if (TraceEngine.Legacy.eventIsFromNewEngine(traceEvent) &&
+        TraceEngine.Types.TraceEvents.isProfileCall(traceEvent)) {
+      // In the future this case will not be possible - wherever we call this
+      // function we will be able to pass in the data from the new engine. But
+      // currently this is called in a variety of places including from the
+      // legacy model which does not have a reference to the new engine's data.
+      // So if we are missing the data, we just fallback to the name from the
+      // callFrame.
+      if (!traceParsedData || !traceParsedData.Samples) {
+        tokens.push(traceEvent.callFrame.functionName);
+      } else {
+        tokens.push(
+            TraceEngine.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceParsedData.Samples, traceEvent));
+      }
+    }
     const url = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(traceEvent).url;
     if (url) {
       tokens.push(url);
     }
+    // This works for both legacy and new engine events.
     appendObjectProperties(traceEvent.args, 2);
     return regExp.test(tokens.join('|'));
 
@@ -1393,6 +1408,16 @@ export class TimelineUIUtils {
       return new TimelineRecordStyle(event.name, TimelineUIUtils.categories()['scripting']);
     }
 
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event)) {
+      if (TraceEngine.Types.TraceEvents.isProfileCall(event)) {
+        if (event.callFrame.functionName === '(idle)') {
+          return new TimelineRecordStyle(event.name, getCategoryStyles().Idle);
+        }
+      }
+      const defaultStyles = new TimelineRecordStyle(event.name, getCategoryStyles().Other);
+      return getEventStyle(event.name as TraceEngine.Types.TraceEvents.KnownEventName) || defaultStyles;
+    }
+
     let result: TimelineRecordStyle = eventStyles[event.name];
     // If there's no defined RecordStyle for this event, define as other & hidden.
     if (!result) {
@@ -1402,20 +1427,24 @@ export class TimelineUIUtils {
     return result;
   }
 
-  static eventColor(event: TraceEngine.Legacy.Event): string {
+  static eventColor(event: TraceEngine.Legacy.CompatibleTraceEvent): string {
     if (TimelineModel.TimelineModel.TimelineModelImpl.isJsFrameEvent(event)) {
       const frame = event.args['data'];
       if (TimelineUIUtils.isUserFrame(frame)) {
         return TimelineUIUtils.colorForId(frame.url);
       }
     }
-    const color = TimelineUIUtils.eventStyle(event).category.color;
-    let parsedColor = TimelineUIUtils.eventStyle(event).category.getComputedValue(color);
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event) && TraceEngine.Types.TraceEvents.isProfileCall(event)) {
+      const frame = event.callFrame;
+      if (TimelineUIUtils.isUserFrame(frame)) {
+        return TimelineUIUtils.colorForId(frame.url);
+      }
+    }
+    let parsedColor = TimelineUIUtils.eventStyle(event).category.getComputedValue();
     // This event is considered idle time but still rendered as a scripting event here
     // to connect the StreamingCompileScriptParsing events it belongs to.
     if (event.name === TimelineModel.TimelineModel.RecordType.StreamingCompileScriptWaiting) {
-      const rawColor = TimelineUIUtils.categories().scripting.color;
-      parsedColor = TimelineUIUtils.categories().scripting.getComputedValue(rawColor);
+      parsedColor = TimelineUIUtils.categories().scripting.getComputedValue();
       if (!parsedColor) {
         throw new Error('Unable to parse color from TimelineUIUtils.categories().scripting.color');
       }
@@ -1499,18 +1528,25 @@ export class TimelineUIUtils {
 
   static networkCategoryColor(category: NetworkCategory): string {
     const categories = NetworkCategory;
+    let cssVarName = '--app-color-system';
     switch (category) {
       case categories.HTML:
-        return '--app-color-loading';
+        cssVarName = '--app-color-loading';
+        break;
       case categories.Script:
-        return '--app-color-scripting';
+        cssVarName = '--app-color-scripting';
+        break;
       case categories.Style:
-        return '--app-color-rendering';
+        cssVarName = '--app-color-rendering';
+        break;
       case categories.Media:
-        return '--app-color-painting';
+        cssVarName = '--app-color-painting';
+        break;
       default:
-        return '--app-color-system';
+        cssVarName = '--app-color-system';
+        break;
     }
+    return ThemeSupport.ThemeSupport.instance().getComputedValue(cssVarName);
   }
 
   static async buildDetailsTextForTraceEvent(event: TraceEngine.Legacy.Event|
@@ -1960,8 +1996,8 @@ export class TimelineUIUtils {
     const contentHelper = new TimelineDetailsContentHelper(model.targetByEvent(event), linkifier);
 
     const defaultColorForEvent = TraceEngine.Legacy.eventIsFromNewEngine(event) ?
-        EventStyles.get(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.categoryStyle.color :
-        TimelineUIUtils.eventStyle(event).category.color;
+        getEventStyle(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category.getComputedValue() :
+        TimelineUIUtils.eventStyle(event).category.getComputedValue();
     const color = model.isMarkerEvent(event) ? TimelineUIUtils.markerStyleForEvent(event).color : defaultColorForEvent;
 
     contentHelper.addSection(TimelineUIUtils.eventTitle(event), color);
@@ -2234,7 +2270,7 @@ export class TimelineUIUtils {
       case recordTypes.WebSocketSendHandshakeRequest:
       case recordTypes.WebSocketReceiveHandshakeResponse:
       case recordTypes.WebSocketDestroy: {
-        const initiatorData = initiator ? initiator.args['data'] : eventData;
+        const initiatorData = initiator ? initiator.args?.['data'] : eventData;
         if (typeof initiatorData['webSocketURL'] !== 'undefined') {
           contentHelper.appendTextRow(i18n.i18n.lockedString('URL'), initiatorData['webSocketURL']);
         }
@@ -2734,7 +2770,8 @@ export class TimelineUIUtils {
       contentHelper.addSection(i18nString(UIStrings.invalidations));
       TimelineUIUtils.generateInvalidations(event, target, relatedNodesMap, contentHelper);
     } else if (initiator) {  // Partial invalidation tracking.
-      const delay = startTime - initiator.startTime;
+      const {startTime: initiatorStartTime} = TraceEngine.Legacy.timesForEventInMilliseconds(initiator);
+      const delay = startTime - initiatorStartTime;
       contentHelper.appendTextRow(i18nString(UIStrings.pendingFor), i18n.TimeUtilities.preciseMillisToString(delay, 1));
 
       const link = document.createElement('span');
@@ -2743,11 +2780,11 @@ export class TimelineUIUtils {
       link.tabIndex = 0;
       link.textContent = i18nString(UIStrings.reveal);
       link.addEventListener('click', () => {
-        TimelinePanel.instance().select(TimelineSelection.fromTraceEvent((initiator as TraceEngine.Legacy.Event)));
+        TimelinePanel.instance().select(TimelineSelection.fromTraceEvent((initiator)));
       });
       link.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
-          TimelinePanel.instance().select(TimelineSelection.fromTraceEvent((initiator as TraceEngine.Legacy.Event)));
+          TimelinePanel.instance().select(TimelineSelection.fromTraceEvent((initiator)));
           event.consume(true);
         }
       });
@@ -3045,7 +3082,7 @@ export class TimelineUIUtils {
       if (selfTime) {
         appendLegendRow(
             selfCategory.name, i18nString(UIStrings.sSelf, {PH1: selfCategory.title}), selfTime,
-            selfCategory.getCSSValue(selfCategory.color));
+            selfCategory.getCSSValue());
       }
       // Children of the same category.
       const categoryTime = aggregatedStats[selfCategory.name];
@@ -3053,7 +3090,7 @@ export class TimelineUIUtils {
       if (value > 0) {
         appendLegendRow(
             selfCategory.name, i18nString(UIStrings.sChildren, {PH1: selfCategory.title}), value,
-            selfCategory.getCSSValue(selfCategory.childColor));
+            selfCategory.getCSSValue());
       }
     }
 
@@ -3063,8 +3100,7 @@ export class TimelineUIUtils {
       if (category === selfCategory) {
         continue;
       }
-      appendLegendRow(
-          category.name, category.title, aggregatedStats[category.name], category.getCSSValue(category.color));
+      appendLegendRow(category.name, category.title, aggregatedStats[category.name], category.getCSSValue());
     }
 
     pieChart.data = {
@@ -3089,7 +3125,6 @@ export class TimelineUIUtils {
 
     const duration = TimelineUIUtils.frameDuration(frame);
     contentHelper.appendElementRow(i18nString(UIStrings.duration), duration);
-    contentHelper.appendTextRow(i18nString(UIStrings.cpuTime), i18n.TimeUtilities.millisToString(frame.cpuTime, true));
     if (filmStrip && filmStripFrame) {
       const filmStripPreview = document.createElement('div');
       filmStripPreview.classList.add('timeline-filmstrip-preview');
@@ -3327,18 +3362,6 @@ export class TimelineUIUtils {
   }
 }
 
-export class TimelineRecordStyle {
-  title: string;
-  category: TimelineCategory;
-  hidden: boolean;
-
-  constructor(title: string, category: TimelineCategory, hidden: boolean|undefined = false) {
-    this.title = title;
-    this.category = category;
-    this.hidden = hidden;
-  }
-}
-
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum NetworkCategory {
@@ -3538,40 +3561,6 @@ export class EventDispatchTypeDescriptor {
     this.priority = priority;
     this.color = color;
     this.eventTypes = eventTypes;
-  }
-}
-
-export class TimelineCategory {
-  name: string;
-  title: string;
-  visible: boolean;
-  childColor: string;
-  color: string;
-  private hiddenInternal?: boolean;
-
-  constructor(name: string, title: string, visible: boolean, childColor: string, color: string) {
-    this.name = name;
-    this.title = title;
-    this.visible = visible;
-    this.childColor = childColor;
-    this.color = color;
-    this.hidden = false;
-  }
-
-  get hidden(): boolean {
-    return Boolean(this.hiddenInternal);
-  }
-
-  getCSSValue(color: string): string {
-    return `var(${color})`;
-  }
-
-  getComputedValue(color: string): string {
-    return ThemeSupport.ThemeSupport.instance().getComputedValue(color);
-  }
-
-  set hidden(hidden: boolean) {
-    this.hiddenInternal = hidden;
   }
 }
 

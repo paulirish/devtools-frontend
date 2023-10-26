@@ -13,43 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { type Protocol } from 'devtools-protocol';
-import { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping.js';
+import type { Protocol } from 'devtools-protocol';
+import type { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping.js';
 import { type CDPSession, type CDPSessionEvents } from '../api/CDPSession.js';
-import { ConnectionTransport } from '../common/ConnectionTransport.js';
-import { ProtocolError } from '../common/Errors.js';
+import { CallbackRegistry } from '../common/CallbackRegistry.js';
+import type { ConnectionTransport } from '../common/ConnectionTransport.js';
 import { EventEmitter } from '../common/EventEmitter.js';
-import { Deferred } from '../util/Deferred.js';
 /**
  * @public
  */
-export { ConnectionTransport, ProtocolMapping };
-/**
- * @internal
- */
-export declare class Callback {
-    #private;
-    constructor(id: number, label: string, timeout?: number);
-    resolve(value: unknown): void;
-    reject(error: Error): void;
-    get id(): number;
-    get promise(): Deferred<unknown>;
-    get error(): ProtocolError;
-    get label(): string;
-}
-/**
- * Manages callbacks and their IDs for the protocol request/response communication.
- *
- * @internal
- */
-export declare class CallbackRegistry {
-    #private;
-    create(label: string, timeout: number | undefined, request: (id: number) => void): Promise<unknown>;
-    reject(id: number, message: string, originalMessage?: string): void;
-    _reject(callback: Callback, errorMessage: string | ProtocolError, originalMessage?: string): void;
-    resolve(id: number, value: unknown): void;
-    clear(): void;
-}
+export type { ConnectionTransport, ProtocolMapping };
 /**
  * @public
  */
@@ -100,16 +73,6 @@ export declare class Connection extends EventEmitter<CDPSessionEvents> {
      */
     createSession(targetInfo: Protocol.Target.TargetInfo): Promise<CDPSession>;
 }
-/**
- * @internal
- */
-export declare function createProtocolErrorMessage(object: {
-    error: {
-        message: string;
-        data: any;
-        code: number;
-    };
-}): string;
 /**
  * @internal
  */

@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { type Protocol } from 'devtools-protocol';
-import { type CDPSession } from '../api/CDPSession.js';
-import { type Point } from '../api/ElementHandle.js';
+import type { Protocol } from 'devtools-protocol';
+import type { CDPSession } from '../api/CDPSession.js';
+import type { Point } from '../api/ElementHandle.js';
 import { Keyboard, type KeyDownOptions, type KeyPressOptions, Mouse, type MouseClickOptions, type MouseMoveOptions, type MouseOptions, type MouseWheelOptions, Touchscreen, type KeyboardTypeOptions } from '../api/Input.js';
 import { type KeyInput } from '../common/USKeyboardLayout.js';
 /**
@@ -61,7 +61,6 @@ export declare class CdpTouchscreen extends Touchscreen {
     #private;
     constructor(client: CDPSession, keyboard: CdpKeyboard);
     updateClient(client: CDPSession): void;
-    tap(x: number, y: number): Promise<void>;
     touchStart(x: number, y: number): Promise<void>;
     touchMove(x: number, y: number): Promise<void>;
     touchEnd(): Promise<void>;

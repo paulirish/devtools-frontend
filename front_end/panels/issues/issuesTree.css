@@ -72,6 +72,18 @@
   }
 }
 
+.tree-outline li:not(.selected):hover .selection {
+  background-color: unset;
+}
+
+.tree-outline li.issue:not(.expanded):not(.selected):hover .selection {
+  background-color: var(--sys-color-state-hover-on-subtle);
+}
+
+.tree-outline li.issue.expanded:not(.selected):hover {
+  background-color: var(--sys-color-state-hover-on-subtle);
+}
+
 .unhide-all-issues-button {
   margin: 0;
   height: 20px;
@@ -103,7 +115,8 @@ p {
   visibility: hidden;
 }
 
-.header:hover devtools-hide-issues-menu {
+.header:hover devtools-hide-issues-menu,
+.issue.selected devtools-hide-issues-menu {
   visibility: visible;
 }
 

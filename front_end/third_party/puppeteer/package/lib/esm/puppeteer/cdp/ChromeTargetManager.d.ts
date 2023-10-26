@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { type TargetFilterCallback } from '../api/Browser.js';
+import type { TargetFilterCallback } from '../api/Browser.js';
 import { EventEmitter } from '../common/EventEmitter.js';
-import { type Connection } from './Connection.js';
+import type { Connection } from './Connection.js';
 import { CdpTarget } from './Target.js';
 import { type TargetFactory, type TargetManager, type TargetManagerEvents } from './TargetManager.js';
 /**
@@ -27,9 +27,9 @@ import { type TargetFactory, type TargetManager, type TargetManagerEvents } from
  */
 export declare class ChromeTargetManager extends EventEmitter<TargetManagerEvents> implements TargetManager {
     #private;
-    constructor(connection: Connection, targetFactory: TargetFactory, targetFilterCallback?: TargetFilterCallback, waitForInitiallyDiscoveredTargets?: boolean, useTabTarget?: boolean);
+    constructor(connection: Connection, targetFactory: TargetFactory, targetFilterCallback?: TargetFilterCallback, waitForInitiallyDiscoveredTargets?: boolean);
     initialize(): Promise<void>;
     dispose(): void;
-    getAvailableTargets(): Map<string, CdpTarget>;
+    getAvailableTargets(): ReadonlyMap<string, CdpTarget>;
 }
 //# sourceMappingURL=ChromeTargetManager.d.ts.map

@@ -40,13 +40,14 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
+import {type TimelineCategory} from './EventUICategory.js';
 import {type PerformanceModel} from './PerformanceModel.js';
 import {ThreadAppender, ThreadType} from './ThreadAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
 import {ThreadTracksSource} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
-import {type TimelineCategory, TimelineUIUtils} from './TimelineUIUtils.js';
+import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -138,6 +139,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private compatibilityTracksAppender: CompatibilityTracksAppender|null;
   private legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl|null;
   private traceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null;
+  private isCpuProfile = false;
   /**
    * Raster threads are tracked and enumerated with this property. This is also
    * used to group all raster threads together in the same track, instead of
@@ -163,7 +165,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private lastSelection?: Selection;
   private colorForEvent?: ((arg0: TraceEngine.Legacy.Event) => string);
   #eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
-  #indexForEvent = new WeakMap<TraceEngine.Legacy.Event, number>();
+  #indexForEvent = new WeakMap<TraceEngine.Legacy.CompatibleTraceEvent, number>();
   #font: string;
   #threadTracksSource: ThreadTracksSource;
 
@@ -223,12 +225,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 
   setModel(
-      performanceModel: PerformanceModel|null,
-      newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null): void {
+      performanceModel: PerformanceModel|null, newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null,
+      isCpuProfile = false): void {
     this.reset();
     this.legacyPerformanceModel = performanceModel;
     this.legacyTimelineModel = performanceModel && performanceModel.timelineModel();
     this.traceEngineData = newTraceEngineData;
+    this.isCpuProfile = isCpuProfile;
     if (this.legacyTimelineModel) {
       this.minimumBoundaryInternal = this.legacyTimelineModel.minimumRecordTime();
       this.timeSpan = this.legacyTimelineModel.isEmpty() ?
@@ -267,7 +270,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       this.timelineDataInternal = this.#instantiateTimelineData();
       this.compatibilityTracksAppender = new CompatibilityTracksAppender(
           this.timelineDataInternal, this.traceEngineData, this.entryData, this.entryTypeByLevel,
-          this.legacyTimelineModel);
+          this.legacyTimelineModel, this.isCpuProfile);
     }
     return this.compatibilityTracksAppender;
   }
@@ -445,17 +448,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     }
   }
-  private legacyTrackIsForAuctionWorklet(legacyTrack: TimelineModel.TimelineModel.Track): boolean {
-    const threadName = legacyTrack.thread?.name();
-    if (!threadName) {
-      return false;
-    }
-    return threadName === TimelineModel.TimelineModel.TimelineModelImpl.AuctionWorkletThreadName ||
-        threadName.endsWith(TimelineModel.TimelineModel.TimelineModelImpl.UtilityMainThreadNameSuffix);
-  }
 
   private processInspectorTrace(): void {
-    this.appendFrames();
+    if (!this.isCpuProfile) {
+      this.appendFrames();
+    }
 
     const weight = (track: {type?: string, forMainFrame?: boolean, appenderName?: TrackAppenderName}): number => {
       if (track.appenderName !== undefined) {
@@ -472,6 +469,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             return 8;
           case 'Thread':
             return 4;
+          case 'Thread_AuctionWorklet':
+            return 10;
           default:
             return -1;
         }
@@ -485,7 +484,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         case TimelineModel.TimelineModel.TrackType.Raster:
           return 9;
         case TimelineModel.TimelineModel.TrackType.Other:
-          return 10;
+          return 11;
         default:
           return -1;
       }
@@ -497,13 +496,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const allTrackAppenders =
         this.compatibilityTracksAppender ? this.compatibilityTracksAppender.allVisibleTrackAppenders() : [];
 
-    // TODO(crbug.com/1478710) Use auction workers data from the new engine
-    // in thread appenders. We have not migrated auction worklet tracks to the
-    // new engine, so we need to always make sure they are included, regardless
-    // of the threadTracksSource setting.
-    const fledgeTracks = this.legacyTimelineModel.tracks().filter(this.legacyTrackIsForAuctionWorklet);
     const legacyTracks =
-        this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE ? fledgeTracks : this.legacyTimelineModel.tracks();
+        this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE ? [] : this.legacyTimelineModel.tracks();
 
     const newTracks = allTrackAppenders.filter(trackAppender => {
       if (trackAppender instanceof ThreadAppender) {
@@ -539,7 +533,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       // current appender is a ThreadAppender and represnets the Main Thread.
       // If it is, we mark the group as selected.
       if (this.timelineDataInternal && !this.timelineDataInternal.selectedGroup) {
-        if (trackOrAppender instanceof ThreadAppender && trackOrAppender.threadType === ThreadType.MAIN_THREAD) {
+        if (trackOrAppender instanceof ThreadAppender &&
+            (trackOrAppender.threadType === ThreadType.MAIN_THREAD ||
+             trackOrAppender.threadType === ThreadType.CPU_PROFILE)) {
           const group = this.compatibilityTracksAppender?.groupForAppender(trackOrAppender);
           if (group) {
             this.timelineDataInternal.selectedGroup = group;
@@ -642,32 +638,27 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       if (!TimelineFlameChartDataProvider.isEntryRegularEvent(entry)) {
         continue;
       }
-      let event: TraceEngine.Legacy.Event|null;
-      // The search features are implemented for SDK Event types only. Until we haven't fully
-      // transitioned to use the types of the new engine, we need to use legacy representation
-      // for events coming from the new engine.
-      if (entry instanceof TraceEngine.Legacy.Event) {
-        event = entry;
-      } else {
-        if (!this.compatibilityTracksAppender) {
-          // This should not happen.
-          console.error('compatibilityTracksAppender was unexpectedly not set.');
-          continue;
-        }
-        event = this.compatibilityTracksAppender.getLegacyEvent(entry);
-      }
-
-      if (!event) {
+      if (!entry) {
         continue;
       }
 
-      if (event.startTime > endTime) {
+      // Until all the tracks are powered by the new engine, we need to
+      // consider that these entries could be either new engine or legacy
+      // engine.
+      const entryStartTime = TraceEngine.Legacy.eventIsFromNewEngine(entry) ?
+          TraceEngine.Helpers.Timing.eventTimingsMilliSeconds(entry).startTime :
+          entry.startTime;
+      const entryEndTime = TraceEngine.Legacy.eventIsFromNewEngine(entry) ?
+          TraceEngine.Helpers.Timing.eventTimingsMilliSeconds(entry).endTime :
+          entry.endTime;
+
+      if (entryStartTime > endTime) {
         continue;
       }
-      if ((event.endTime || event.startTime) < startTime) {
+      if ((entryEndTime || entryStartTime) < startTime) {
         continue;
       }
-      if (filter.accept(event)) {
+      if (filter.accept(entry, this.traceEngineData || undefined)) {
         result.push(i);
       }
     }
@@ -1027,7 +1018,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         return this.colorForEvent(event);
       }
       const category = TimelineUIUtils.eventStyle(event).category;
-      return patchColorAndCache(this.asyncColorByCategory, category, () => category.getComputedValue(category.color));
+      return patchColorAndCache(this.asyncColorByCategory, category, () => category.getComputedValue());
     }
     if (entryType === entryTypes.Frame) {
       return 'white';
@@ -1311,16 +1302,20 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
       const eventIndex = (this.#indexForEvent.get(event) as number);
       const initiatorIndex = (this.#indexForEvent.get(initiator) as number);
-      td.flowStartTimes.push(initiator.endTime || initiator.startTime);
+      const {startTime} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
+      const {endTime: initiatorEndTime, startTime: initiatorStartTime} =
+          TraceEngine.Legacy.timesForEventInMilliseconds(initiator);
+
+      td.flowStartTimes.push(initiatorEndTime || initiatorStartTime);
       td.flowStartLevels.push(td.entryLevels[initiatorIndex]);
-      td.flowEndTimes.push(event.startTime);
+      td.flowEndTimes.push(startTime);
       td.flowEndLevels.push(td.entryLevels[eventIndex]);
       event = initiator;
     }
     return true;
   }
 
-  private eventParent(event: TraceEngine.Legacy.Event): TraceEngine.Legacy.Event|null {
+  private eventParent(event: TraceEngine.Legacy.CompatibleTraceEvent): TraceEngine.Legacy.Event|null {
     const eventIndex = this.#indexForEvent.get(event);
     if (eventIndex === undefined) {
       return null;

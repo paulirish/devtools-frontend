@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {waitFor, waitForFunction} from '../../../../shared/helper.js';
-import {describe} from '../../../../shared/mocha-extensions.js';
-import {assertElementScreenshotUnchanged, itScreenshot} from '../../../../shared/screenshots.js';
-import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
 import type * as puppeteer from 'puppeteer-core';
 
-describe('FlameChart', () => {
+import {waitFor, waitForFunction} from '../../../../shared/helper.js';
+import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
+import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
+import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
+
+describe('FlameChart', function() {
+  // TODO(crbug.com/1492405): Improve perf panel trace load speed to
+  // prevent timeout bump.
+  this.timeout(20_000);
   preloadForCodeCoverage('performance_panel/flamechart.html');
 
   async function getFlameChartContainerWhenReady(selector: string): Promise<puppeteer.ElementHandle<HTMLDivElement>> {

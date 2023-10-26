@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { type TargetFilterCallback } from '../api/Browser.js';
+import type { TargetFilterCallback } from '../api/Browser.js';
 import { type CDPSession } from '../api/CDPSession.js';
 import { EventEmitter } from '../common/EventEmitter.js';
-import { type Connection } from './Connection.js';
-import { type CdpTarget } from './Target.js';
+import type { Connection } from './Connection.js';
+import type { CdpTarget } from './Target.js';
 import { type TargetFactory, type TargetManager, type TargetManagerEvents } from './TargetManager.js';
 /**
  * FirefoxTargetManager implements target management using
@@ -38,7 +38,7 @@ export declare class FirefoxTargetManager extends EventEmitter<TargetManagerEven
     constructor(connection: Connection, targetFactory: TargetFactory, targetFilterCallback?: TargetFilterCallback);
     setupAttachmentListeners(session: CDPSession | Connection): void;
     removeSessionListeners(session: CDPSession): void;
-    getAvailableTargets(): Map<string, CdpTarget>;
+    getAvailableTargets(): ReadonlyMap<string, CdpTarget>;
     dispose(): void;
     initialize(): Promise<void>;
 }

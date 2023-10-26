@@ -16,33 +16,35 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import type { Readable } from 'stream';
-import { type Protocol } from 'devtools-protocol';
+import type { Protocol } from 'devtools-protocol';
 import type { HTTPRequest } from '../api/HTTPRequest.js';
 import type { HTTPResponse } from '../api/HTTPResponse.js';
 import type { BidiNetworkManager } from '../bidi/NetworkManager.js';
 import type { Accessibility } from '../cdp/Accessibility.js';
 import type { Coverage } from '../cdp/Coverage.js';
-import { type DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
-import { type NetworkManager as CdpNetworkManager, type Credentials, type NetworkConditions } from '../cdp/NetworkManager.js';
+import type { DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
+import type { NetworkManager as CdpNetworkManager, Credentials, NetworkConditions } from '../cdp/NetworkManager.js';
 import type { Tracing } from '../cdp/Tracing.js';
 import type { WebWorker } from '../cdp/WebWorker.js';
 import type { ConsoleMessage } from '../common/ConsoleMessage.js';
-import { type Device } from '../common/Device.js';
+import type { Device } from '../common/Device.js';
 import { TargetCloseError } from '../common/Errors.js';
 import { EventEmitter, type EventsWithWildcard, type EventType } from '../common/EventEmitter.js';
 import type { FileChooser } from '../common/FileChooser.js';
 import { type ParsedPDFOptions, type PDFOptions } from '../common/PDFOptions.js';
+import { TimeoutSettings } from '../common/TimeoutSettings.js';
 import type { Awaitable, EvaluateFunc, EvaluateFuncWith, HandleFor, NodeFor } from '../common/types.js';
 import type { Viewport } from '../common/Viewport.js';
-import { type Deferred } from '../util/Deferred.js';
+import type { ScreenRecorder } from '../node/ScreenRecorder.js';
+import type { Deferred } from '../util/Deferred.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
 import type { Browser } from './Browser.js';
 import type { BrowserContext } from './BrowserContext.js';
 import type { CDPSession } from './CDPSession.js';
 import type { Dialog } from './Dialog.js';
-import type { ClickOptions, ElementHandle } from './ElementHandle.js';
+import type { BoundingBox, ClickOptions, ElementHandle } from './ElementHandle.js';
 import type { Frame, FrameAddScriptTagOptions, FrameAddStyleTagOptions, FrameWaitForFunctionOptions, GoToOptions, WaitForOptions } from './Frame.js';
-import { type Keyboard, type KeyboardTypeOptions, type Mouse, type Touchscreen } from './Input.js';
+import type { Keyboard, KeyboardTypeOptions, Mouse, Touchscreen } from './Input.js';
 import type { JSHandle } from './JSHandle.js';
 import { Locator, type AwaitedLocator } from './locators/locators.js';
 import type { Target } from './Target.js';
@@ -136,11 +138,7 @@ export interface MediaFeature {
 /**
  * @public
  */
-export interface ScreenshotClip {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+export interface ScreenshotClip extends BoundingBox {
     /**
      * @defaultValue `1`
      */
@@ -165,7 +163,7 @@ export interface ScreenshotOptions {
     /**
      * Capture the screenshot from the surface, rather than the view.
      *
-     * @defaultValue `false`
+     * @defaultValue `true`
      */
     fromSurface?: boolean;
     /**
@@ -211,6 +209,43 @@ export interface ScreenshotOptions {
      * @internal
      */
     allowViewportExpansion?: boolean;
+}
+/**
+ * @experimental
+ */
+export interface ScreencastOptions {
+    /**
+     * File path to save the screencast to.
+     */
+    path?: `${string}.webm`;
+    /**
+     * Specifies the region of the viewport to crop.
+     */
+    crop?: BoundingBox;
+    /**
+     * Scales the output video.
+     *
+     * For example, `0.5` will shrink the width and height of the output video by
+     * half. `2` will double the width and height of the output video.
+     *
+     * @defaultValue `1`
+     */
+    scale?: number;
+    /**
+     * Specifies the speed to record at.
+     *
+     * For example, `0.5` will slowdown the output video by 50%. `2` will double the
+     * speed of the output video.
+     *
+     * @defaultValue `1`
+     */
+    speed?: number;
+    /**
+     * Path to the [ffmpeg](https://ffmpeg.org/).
+     *
+     * Required if `ffmpeg` is not in your PATH.
+     */
+    ffmpegPath?: string;
 }
 /**
  * All the events that a page instance may emit.
@@ -402,7 +437,7 @@ export interface PageEvents extends Record<EventType, unknown> {
     [PageEvent.WorkerCreated]: WebWorker;
     [PageEvent.WorkerDestroyed]: WebWorker;
 }
-export { 
+export type { 
 /**
  * @deprecated Use {@link PageEvents}.
  */
@@ -413,6 +448,10 @@ PageEvents as PageEventObject, };
 export interface NewDocumentScriptEvaluation {
     identifier: string;
 }
+/**
+ * @internal
+ */
+export declare function setDefaultScreenshotOptions(options: ScreenshotOptions): void;
 /**
  * Page provides methods to interact with a single tab or
  * {@link https://developer.chrome.com/extensions/background_pages | extension background page}
@@ -468,6 +507,10 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @internal
      */
     _isDragging: boolean;
+    /**
+     * @internal
+     */
+    _timeoutSettings: TimeoutSettings;
     /**
      * @internal
      */
@@ -1772,6 +1815,55 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @internal
      */
     _maybeWriteBufferToFile(path: string | undefined, buffer: Buffer): Promise<void>;
+    /**
+     * Captures a screencast of this {@link Page | page}.
+     *
+     * @remarks
+     *
+     * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
+     * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+     *
+     * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
+     *
+     * @example
+     * Recording a {@link Page | page}:
+     *
+     * ```
+     * import puppeteer from 'puppeteer';
+     *
+     * // Launch a browser
+     * const browser = await puppeteer.launch();
+     *
+     * // Create a new page
+     * const page = await browser.newPage();
+     *
+     * // Go to your site.
+     * await page.goto("https://www.example.com");
+     *
+     * // Start recording.
+     * const recorder = await page.screencast({path: 'recording.webm'});
+     *
+     * // Do something.
+     *
+     * // Stop recording.
+     * await recorder.stop();
+     *
+     * browser.close();
+     * ```
+     *
+     * @param options - Configures screencast behavior.
+     *
+     * @experimental
+     */
+    screencast(options?: Readonly<ScreencastOptions>): Promise<ScreenRecorder>;
+    /**
+     * @internal
+     */
+    _startScreencast(): Promise<void>;
+    /**
+     * @internal
+     */
+    _stopScreencast(): Promise<void>;
     /**
      * Captures a screenshot of this {@link Page | page}.
      *

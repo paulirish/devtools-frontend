@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { type Protocol } from 'devtools-protocol';
-import { type CDPSession } from '../api/CDPSession.js';
+import type { Protocol } from 'devtools-protocol';
+import type { CDPSession } from '../api/CDPSession.js';
 import { JSHandle } from '../api/JSHandle.js';
 import type { CdpElementHandle } from './ElementHandle.js';
-import { type IsolatedWorld } from './IsolatedWorld.js';
+import type { IsolatedWorld } from './IsolatedWorld.js';
 /**
  * @internal
  */
@@ -38,4 +38,8 @@ export declare class CdpJSHandle<T = unknown> extends JSHandle<T> {
     get id(): string | undefined;
     remoteObject(): Protocol.Runtime.RemoteObject;
 }
+/**
+ * @internal
+ */
+export declare function releaseObject(client: CDPSession, remoteObject: Protocol.Runtime.RemoteObject): Promise<void>;
 //# sourceMappingURL=JSHandle.d.ts.map

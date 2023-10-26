@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import type * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
-import { type Sandbox } from './Sandbox.js';
+import type { Sandbox } from './Sandbox.js';
 /**
  * @internal
  */
@@ -23,15 +23,5 @@ export declare class BidiSerializer {
     static serializeObject(arg: object | null): Bidi.Script.LocalValue;
     static serializeRemoteValue(arg: unknown): Bidi.Script.LocalValue;
     static serialize(sandbox: Sandbox, arg: unknown): Promise<Bidi.Script.LocalValue>;
-    static deserializeNumber(value: Bidi.Script.SpecialNumber | number): number;
-    static deserializeLocalValue(result: Bidi.Script.RemoteValue): unknown;
-    static deserializeTuple([serializedKey, serializedValue]: [
-        Bidi.Script.RemoteValue | string,
-        Bidi.Script.RemoteValue
-    ]): {
-        key: unknown;
-        value: unknown;
-    };
-    static deserialize(result: Bidi.Script.RemoteValue): any;
 }
 //# sourceMappingURL=Serializer.d.ts.map

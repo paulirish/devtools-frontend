@@ -56,6 +56,8 @@ target with is_debug = true in the args.gn file.`;
 const TEXT_COVERAGE_ENABLED = coverageEnabled && !process.env['NO_TEXT_COVERAGE'];
 // true by default
 const HTML_COVERAGE_ENABLED = coverageEnabled && !process.env['NO_HTML_COVERAGE'];
+// false by default
+const SHUFFLE = process.env['SHUFFLE'];
 
 const GEN_DIRECTORY = path.join(__dirname, '..', '..');
 const ROOT_DIRECTORY = path.join(GEN_DIRECTORY, '..', '..', '..');
@@ -98,6 +100,13 @@ const TEST_FILES =
           });
         })
         .flat();
+
+if (SHUFFLE) {
+  for (let i = TEST_FILES.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [TEST_FILES[i], TEST_FILES[j]] = [TEST_FILES[j], TEST_FILES[i]];
+  }
+}
 
 const TEST_FILES_SOURCE_MAPS = TEST_FILES.map(fileName => `${fileName}.map`);
 
@@ -166,7 +175,7 @@ const ResultsDBReporter = function(baseReporterDecorator, formatError, config) {
 
     const testResult = {testId, duration, status, expected, summaryHtml};
     if (status !== 'SKIP') {
-      ResultsDb.recordTestResult(testResult);
+      ResultsDb.sendTestResult(testResult);
     }
   };
   this.specSuccess = specComplete;
@@ -181,7 +190,6 @@ const ResultsDBReporter = function(baseReporterDecorator, formatError, config) {
         this.write('FAILED: %d failed, %d passed (%d skipped)\n', results.failed, results.success, results.skipped);
       }
     }
-    ResultsDb.sendCollectedTestResultsIfSinkIsAvailable();
   };
 };
 ResultsDBReporter.$inject = ['baseReporterDecorator', 'formatError', 'config'];
@@ -204,6 +212,7 @@ module.exports = function(config) {
       // Inject the CSS color theme variables into the page so any rendered
       // components have access to them.
       {pattern: path.join(GEN_DIRECTORY, 'front_end/ui/legacy/themeColors.css'), served: true, included: true},
+      {pattern: path.join(GEN_DIRECTORY, 'front_end/ui/legacy/tokens.css'), served: true, included: true},
       {pattern: path.join(GEN_DIRECTORY, 'front_end/**/*.css'), served: true, included: false},
       {pattern: path.join(GEN_DIRECTORY, 'front_end/**/*.js'), served: true, included: false},
       {pattern: path.join(GEN_DIRECTORY, 'front_end/**/*.js.map'), served: true, included: false},
@@ -285,7 +294,7 @@ module.exports = function(config) {
 
     singleRun,
 
-    pingTimeout: KARMA_TIMEOUT,
+    pingTimeout: KARMA_TIMEOUT ?? 4000,
     browserNoActivityTimeout: KARMA_TIMEOUT,
     browserSocketTimeout: KARMA_TIMEOUT,
 

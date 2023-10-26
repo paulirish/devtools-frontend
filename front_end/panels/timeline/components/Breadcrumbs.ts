@@ -42,8 +42,10 @@ export class Breadcrumbs {
         window: newBreadcrumbTraceWindow,
         child: null,
       };
+      // To add a new Breadcrumb to the Breadcrumbs Linked List, set the child of last breadcrumb
+      // to the new breadcrumb and update the last Breadcrumb
       this.lastBreadcrumb.child = newBreadcrumb;
-      this.lastBreadcrumb = newBreadcrumb;
+      this.lastBreadcrumb = this.lastBreadcrumb.child;
     } else {
       throw new Error('Can not add a breadcrumb that is equal to or is outside of the parent breadcrumb TimeWindow');
     }
@@ -58,13 +60,7 @@ export class Breadcrumbs {
 
   // Make breadcrumb active by removing all of its children and making it the last breadcrumb
   makeBreadcrumbActive(newLastBreadcrumb: Breadcrumb): void {
-    let breadcrumbsIter: Breadcrumb = this.initialBreadcrumb;
-
-    while (breadcrumbsIter !== newLastBreadcrumb && breadcrumbsIter.child !== null) {
-      breadcrumbsIter = breadcrumbsIter.child;
-    }
-
-    breadcrumbsIter.child = null;
-    this.lastBreadcrumb = breadcrumbsIter;
+    this.lastBreadcrumb = newLastBreadcrumb;
+    this.lastBreadcrumb.child = null;
   }
 }

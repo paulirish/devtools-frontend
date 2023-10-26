@@ -5,8 +5,10 @@
 const {assert} = chai;
 
 import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
+import type * as CPUProfile from '../../../../../../front_end/models/cpu_profile/cpu_profile.js';
 
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
+import {getMainThread} from '../../../helpers/TraceHelpers.js';
 import {TraceLoader} from '../../../helpers/TraceLoader.js';
 
 async function handleEventsFromTraceFile(context: Mocha.Context|Mocha.Suite|null, name: string):
@@ -150,6 +152,7 @@ describeWithEnvironment('SamplesHandler', function() {
       await TraceModel.Handlers.ModelHandlers.Samples.finalize();
       const data = TraceModel.Handlers.ModelHandlers.Samples.data();
       const calls = data.profilesInProcess.get(pid)?.get(tid)?.profileCalls;
+      const tree = data.profilesInProcess.get(pid)?.get(tid)?.profileTree;
       const expectedResult = [
         {id: A, ts: 0, dur: 154, selfTime: 58, children: [B, D]},
         {id: B, ts: 1, dur: 27, selfTime: 9, children: [C]},
@@ -157,13 +160,19 @@ describeWithEnvironment('SamplesHandler', function() {
         {id: D, ts: 36, dur: 69, selfTime: 69, children: []},
         {id: E, ts: 154, dur: 117, selfTime: 117, children: []},
       ];
-      const callsTestData = calls?.map(c => ({
-                                         id: c.nodeId,
-                                         dur: Math.round(c.dur || 0),
-                                         ts: c.ts,
-                                         selfTime: Math.round(c.selfTime || 0),
-                                         children: c.children?.map(child => child.nodeId) || [],
-                                       }));
+      const callsTestData = calls?.map(
+          c => {
+            const children =
+                tree?.nodes.get(c.nodeId as TraceModel.Helpers.TreeHelpers.TraceEntryNodeId)?.children || new Set();
+            return ({
+              id: c.nodeId,
+              dur: Math.round(c.dur || 0),
+              ts: c.ts,
+              selfTime: Math.round(c.selfTime || 0),
+              children: [...children].map(child => child.id) || [],
+            });
+          },
+      );
 
       assert.deepEqual(callsTestData, expectedResult);
     });
@@ -174,20 +183,25 @@ describeWithEnvironment('SamplesHandler', function() {
       const firstProcessId = TraceModel.Types.TraceEvents.ProcessID(2236123);
       const profilesFirstProcess = data.profilesInProcess.get(firstProcessId);
       const calls = profilesFirstProcess?.get(threadId)?.profileCalls.slice(0, 5);
+      const tree = profilesFirstProcess?.get(threadId)?.profileTree;
       const expectedResult = [
         {'id': 2, 'dur': 392, 'ts': 643496962681, 'selfTime': 392, 'children': []},
-        {'id': 4, 'dur': 682, 'ts': 643496963073, 'selfTime': 160, 'children': [5]},
         {'id': 3, 'dur': 682, 'ts': 643496963073, 'selfTime': 0, 'children': [4]},
+        {'id': 4, 'dur': 682, 'ts': 643496963073, 'selfTime': 160, 'children': [5]},
         {'id': 5, 'dur': 522, 'ts': 643496963233, 'selfTime': 178, 'children': [6, 7]},
         {'id': 6, 'dur': 175, 'ts': 643496963411, 'selfTime': 175, 'children': []},
       ];
-      const callsTestData = calls?.map(c => ({
-                                         id: c.nodeId,
-                                         dur: Math.round(c.dur || 0),
-                                         ts: c.ts,
-                                         selfTime: Math.round(c.selfTime || 0),
-                                         children: c.children?.map(child => child.nodeId) || [],
-                                       }));
+      const callsTestData = calls?.map(c => {
+        const children =
+            tree?.nodes.get(c.nodeId as TraceModel.Helpers.TreeHelpers.TraceEntryNodeId)?.children || new Set();
+        return {
+          id: c.nodeId,
+          dur: Math.round(c.dur || 0),
+          ts: c.ts,
+          selfTime: Math.round(c.selfTime || 0),
+          children: [...children].map(child => child.id) || [],
+        };
+      });
       assert.deepEqual(callsTestData, expectedResult);
     });
   });
@@ -229,6 +243,72 @@ describeWithEnvironment('SamplesHandler', function() {
       assert.strictEqual(parsedProfile.profileEndTime, 287515908.9025441);
       assert.strictEqual(parsedProfile.maxDepth, 14);
       assert.strictEqual(parsedProfile.samples?.length, 39471);
+    });
+  });
+
+  describe('getProfileCallFunctionName', () => {
+    // Find an event from the trace that represents some work. The use of
+    // this specific call frame event is not for any real reason.
+    function getProfileEventAndNode(traceData: TraceModel.Handlers.Types.TraceParseData): {
+      entry: TraceModel.Types.TraceEvents.TraceEventSyntheticProfileCall,
+      profileNode: CPUProfile.ProfileTreeModel.ProfileNode,
+    } {
+      const mainThread = getMainThread(traceData.Renderer);
+      let foundNode: CPUProfile.ProfileTreeModel.ProfileNode|null = null;
+      let foundEntry: TraceModel.Types.TraceEvents.TraceEventSyntheticProfileCall|null = null;
+
+      for (const entry of mainThread.entries) {
+        if (TraceModel.Types.TraceEvents.isProfileCall(entry) &&
+            entry.callFrame.functionName === 'performConcurrentWorkOnRoot') {
+          const profile = traceData.Samples.profilesInProcess.get(entry.pid)?.get(entry.tid);
+          const node = profile?.parsedProfile.nodeById(entry.nodeId);
+          if (node) {
+            foundNode = node;
+          }
+          foundEntry = entry;
+          break;
+        }
+      }
+      if (!foundNode) {
+        throw new Error('Could not find CPU Profile node.');
+      }
+      if (!foundEntry) {
+        throw new Error('Could not find expected entry.');
+      }
+
+      return {
+        entry: foundEntry,
+        profileNode: foundNode,
+      };
+    }
+
+    it('falls back to the call frame name if the ProfileNode name is empty', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
+      const {entry, profileNode} = getProfileEventAndNode(traceParsedData);
+      // Store and then reset this: we are doing this to test the fallback to
+      // the entry callFrame.functionName property. After the assertion we
+      // reset this to avoid impacting other tests.
+      const originalProfileNodeName = profileNode.functionName;
+      profileNode.setFunctionName('');
+      assert.strictEqual(
+          TraceModel.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceParsedData.Samples, entry),
+          'performConcurrentWorkOnRoot');
+      // St
+      profileNode.setFunctionName(originalProfileNodeName);
+    });
+
+    it('uses the profile name if it has been set', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
+      const {entry, profileNode} = getProfileEventAndNode(traceParsedData);
+      // Store and then reset this: we are doing this to test the fallback to
+      // the entry callFrame.functionName property. After the assertion we
+      // reset this to avoid impacting other tests.
+      const originalProfileNodeName = profileNode.functionName;
+      profileNode.setFunctionName('testing-profile-name');
+      assert.strictEqual(
+          TraceModel.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceParsedData.Samples, entry),
+          'testing-profile-name');
+      profileNode.setFunctionName(originalProfileNodeName);
     });
   });
 });

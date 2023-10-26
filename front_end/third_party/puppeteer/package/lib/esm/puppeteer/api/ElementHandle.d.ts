@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 /// <reference types="node" />
-import { type Protocol } from 'devtools-protocol';
-import { type Frame } from '../api/Frame.js';
-import { type ElementFor, type EvaluateFuncWith, type HandleFor, type HandleOr, type NodeFor } from '../common/types.js';
-import { type KeyInput } from '../common/USKeyboardLayout.js';
-import { type KeyboardTypeOptions, type KeyPressOptions, type MouseClickOptions } from './Input.js';
+import type { Protocol } from 'devtools-protocol';
+import type { Frame } from '../api/Frame.js';
+import type { ElementFor, EvaluateFuncWith, HandleFor, HandleOr, NodeFor } from '../common/types.js';
+import type { KeyInput } from '../common/USKeyboardLayout.js';
+import { _isElementHandle } from './ElementHandleSymbol.js';
+import type { KeyboardTypeOptions, KeyPressOptions, MouseClickOptions } from './Input.js';
 import { JSHandle } from './JSHandle.js';
-import { type ScreenshotOptions, type WaitForSelectorOptions } from './Page.js';
+import type { ScreenshotOptions, WaitForSelectorOptions } from './Page.js';
 /**
  * @public
  */
@@ -122,6 +123,10 @@ export interface ElementScreenshotOptions extends ScreenshotOptions {
  */
 export declare abstract class ElementHandle<ElementType extends Node = Element> extends JSHandle<ElementType> {
     #private;
+    /**
+     * @internal
+     */
+    [_isElementHandle]: boolean;
     /**
      * A given method will have it's `this` replaced with an isolated version of
      * `this` when decorated with this decorator.
@@ -561,7 +566,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
     boxModel(): Promise<BoxModel | null>;
     /**
      * This method scrolls element into view if needed, and then uses
-     * {@link Page.(screenshot:3) } to take a screenshot of the element.
+     * {@link Page.(screenshot:2) } to take a screenshot of the element.
      * If the element is detached from DOM, the method throws an error.
      */
     screenshot(this: ElementHandle<Element>, options?: Readonly<ElementScreenshotOptions>): Promise<string | Buffer>;

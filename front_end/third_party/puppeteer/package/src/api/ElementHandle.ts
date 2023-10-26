@@ -14,31 +14,32 @@
  * limitations under the License.
  */
 
-import {type Protocol} from 'devtools-protocol';
+import type {Protocol} from 'devtools-protocol';
 
-import {type Frame} from '../api/Frame.js';
+import type {Frame} from '../api/Frame.js';
 import {getQueryHandlerAndSelector} from '../common/GetQueryHandler.js';
 import {LazyArg} from '../common/LazyArg.js';
-import {
-  type ElementFor,
-  type EvaluateFuncWith,
-  type HandleFor,
-  type HandleOr,
-  type NodeFor,
+import type {
+  ElementFor,
+  EvaluateFuncWith,
+  HandleFor,
+  HandleOr,
+  NodeFor,
 } from '../common/types.js';
-import {type KeyInput} from '../common/USKeyboardLayout.js';
+import type {KeyInput} from '../common/USKeyboardLayout.js';
 import {isString, withSourcePuppeteerURLIfNone} from '../common/util.js';
 import {assert} from '../util/assert.js';
 import {AsyncIterableUtil} from '../util/AsyncIterableUtil.js';
 import {throwIfDisposed} from '../util/decorators.js';
 
-import {
-  type KeyboardTypeOptions,
-  type KeyPressOptions,
-  type MouseClickOptions,
+import {_isElementHandle} from './ElementHandleSymbol.js';
+import type {
+  KeyboardTypeOptions,
+  KeyPressOptions,
+  MouseClickOptions,
 } from './Input.js';
 import {JSHandle} from './JSHandle.js';
-import {type ScreenshotOptions, type WaitForSelectorOptions} from './Page.js';
+import type {ScreenshotOptions, WaitForSelectorOptions} from './Page.js';
 
 /**
  * @public
@@ -150,6 +151,11 @@ export abstract class ElementHandle<
   ElementType extends Node = Element,
 > extends JSHandle<ElementType> {
   /**
+   * @internal
+   */
+  declare [_isElementHandle]: boolean;
+
+  /**
    * A given method will have it's `this` replaced with an isolated version of
    * `this` when decorated with this decorator.
    *
@@ -212,6 +218,7 @@ export abstract class ElementHandle<
   constructor(handle: JSHandle<ElementType>) {
     super();
     this.handle = handle;
+    this[_isElementHandle] = true;
   }
 
   /**
@@ -974,8 +981,7 @@ export abstract class ElementHandle<
   async tap(this: ElementHandle<Element>): Promise<void> {
     await this.scrollIntoViewIfNeeded();
     const {x, y} = await this.clickablePoint();
-    await this.frame.page().touchscreen.touchStart(x, y);
-    await this.frame.page().touchscreen.touchEnd();
+    await this.frame.page().touchscreen.tap(x, y);
   }
 
   @throwIfDisposed()
@@ -1326,7 +1332,7 @@ export abstract class ElementHandle<
 
   /**
    * This method scrolls element into view if needed, and then uses
-   * {@link Page.(screenshot:3) } to take a screenshot of the element.
+   * {@link Page.(screenshot:2) } to take a screenshot of the element.
    * If the element is detached from DOM, the method throws an error.
    */
   @throwIfDisposed()

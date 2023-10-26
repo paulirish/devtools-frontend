@@ -101,14 +101,16 @@ describeWithEnvironment('ThreadAppender', function() {
 
   it('creates a flamechart groups for track headers and titles', async function() {
     const {flameChartData} = await renderThreadAppendersFromTrace(this, 'cls-single-frame.json.gz');
-    assert.strictEqual(flameChartData.groups.length, 7);
-    assert.strictEqual(flameChartData.groups[0].name, 'Main — https://output.jsbin.com/zajamil/quiet');
-    assert.strictEqual(flameChartData.groups[1].name, 'Raster');
-    assert.strictEqual(flameChartData.groups[2].name, 'Rasterizer Thread 1');
-    assert.strictEqual(flameChartData.groups[3].name, 'Rasterizer Thread 2');
-    assert.strictEqual(flameChartData.groups[4].name, 'Chrome_ChildIOThread');
-    assert.strictEqual(flameChartData.groups[5].name, 'Compositor');
-    assert.strictEqual(flameChartData.groups[6].name, 'ThreadPoolServiceThread');
+    const expectedTrackNames = [
+      'Main — https://output.jsbin.com/zajamil/quiet',
+      'Raster',
+      'Rasterizer Thread 1',
+      'Rasterizer Thread 2',
+      'Chrome_ChildIOThread',
+      'Compositor',
+      'ThreadPoolServiceThread',
+    ];
+    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   it('builds flamechart groups for nested tracks correctly', async function() {
@@ -133,26 +135,28 @@ describeWithEnvironment('ThreadAppender', function() {
 
   it('assigns correct names to multiple types of threads', async function() {
     const {flameChartData} = await renderThreadAppendersFromTrace(this, 'simple-js-program.json.gz');
-    assert.strictEqual(flameChartData.groups[0].name, 'Main — https://www.google.com');
-    assert.strictEqual(flameChartData.groups[1].name, 'Compositor');
-    assert.strictEqual(flameChartData.groups[2].name, 'Chrome_ChildIOThread');
-    assert.strictEqual(flameChartData.groups[3].name, 'ThreadPoolForegroundWorker');
-    assert.strictEqual(flameChartData.groups[4].name, 'ThreadPoolServiceThread');
+    const expectedTrackNames = [
+      'Main — https://www.google.com',
+      'Compositor',
+      'Chrome_ChildIOThread',
+      'ThreadPoolForegroundWorker',
+      'ThreadPoolServiceThread',
+    ];
+    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   it('assigns correct names to worker threads', async function() {
     const {flameChartData} = await renderThreadAppendersFromTrace(this, 'two-workers.json.gz');
-    assert.strictEqual(flameChartData.groups.length, 7);
-    assert.strictEqual(
-        flameChartData.groups[0].name,
-        'Main — https://chromedevtools.github.io/performance-stories/two-workers/index.html');
-    assert.strictEqual(
-        flameChartData.groups[1].name,
-        'Worker — https://chromedevtools.github.io/performance-stories/two-workers/fib-worker.js');
-    assert.strictEqual(
-        flameChartData.groups[2].name,
-        'Worker — https://chromedevtools.github.io/performance-stories/two-workers/fib-worker.js');
-    assert.strictEqual(flameChartData.groups[3].name, 'Compositor');
+    const expectedTrackNames = [
+      'Main — https://chromedevtools.github.io/performance-stories/two-workers/index.html',
+      'Worker — https://chromedevtools.github.io/performance-stories/two-workers/fib-worker.js',
+      'Worker — https://chromedevtools.github.io/performance-stories/two-workers/fib-worker.js',
+      'Compositor',
+      'Chrome_ChildIOThread',
+      'ThreadPoolForegroundWorker',
+      'ThreadPoolServiceThread',
+    ];
+    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   it('returns the correct title for a renderer event', async function() {
@@ -163,6 +167,23 @@ describeWithEnvironment('ThreadAppender', function() {
     }
     const title = threadAppenders[0].titleForEvent(events[0]);
     assert.strictEqual(title, 'Task');
+  });
+
+  it('adds the type for EventDispatch events to the title', async function() {
+    const {threadAppenders, traceParsedData} =
+        await renderThreadAppendersFromTrace(this, 'one-second-interaction.json.gz');
+    const events = traceParsedData.Renderer?.allRendererEvents;
+    if (!events) {
+      throw new Error('Could not find renderer events');
+    }
+    const clickEvent = events.find(event => {
+      return TraceModel.Types.TraceEvents.isTraceEventDispatch(event) && event.args.data.type === 'click';
+    });
+    if (!clickEvent) {
+      throw new Error('Could not find expected click event');
+    }
+    const title = threadAppenders[0].titleForEvent(clickEvent);
+    assert.strictEqual(title, 'Event: click');
   });
 
   it('returns the correct title for a profile call', async function() {
@@ -202,10 +223,11 @@ describeWithEnvironment('ThreadAppender', function() {
     }
     const anonymousCall = threadAppenders[0].titleForEvent(entry);
     assert.strictEqual(anonymousCall, '(anonymous)');
+    const originalName = cpuProfileNode.functionName;
     cpuProfileNode.setFunctionName('new-resolved-function-name');
     assert.strictEqual(threadAppenders[0].titleForEvent(entry), 'new-resolved-function-name');
     // Reset the value for future tests.
-    cpuProfileNode.setFunctionName('');
+    cpuProfileNode.setFunctionName(originalName);
   });
 
   it('shows the correct title for a trace event when hovered', async function() {
@@ -393,19 +415,21 @@ describeWithEnvironment('ThreadAppender', function() {
 
   it('does not append a track if there are no visible events on it', async function() {
     const {flameChartData} = await renderThreadAppendersFromTrace(this, 'one-second-interaction.json.gz');
-    assert.strictEqual(flameChartData.groups.length, 5);
-    assert.strictEqual(
-        flameChartData.groups[0].name,
-        'Main — https://chromedevtools.github.io/performance-stories/long-interaction/index.html?x=40');
-    assert.strictEqual(flameChartData.groups[1].name, 'Compositor');
-    assert.strictEqual(flameChartData.groups[2].name, 'Chrome_ChildIOThread');
-    // There are multiple ThreadPoolForegroundWorker threads present in
-    // the trace, but only one of these has trace events we deem as
-    // "visible". Therefore, only one ThreadPoolForegroundWorker track
-    // should be drawn.
-    assert.strictEqual(flameChartData.groups[3].name, 'ThreadPoolForegroundWorker');
-    assert.strictEqual(flameChartData.groups[4].name, 'ThreadPoolServiceThread');
+    const expectedTrackNames = [
+      'Main — https://chromedevtools.github.io/performance-stories/long-interaction/index.html?x=40',
+      'Compositor',
+      'Chrome_ChildIOThread',
+      // There are multiple ThreadPoolForegroundWorker threads present in
+      // the trace, but only one of these has trace events we deem as
+      // "visible". Therefore, only one ThreadPoolForegroundWorker track
+      // should be drawn.
+      'ThreadPoolForegroundWorker',
+      'ThreadPoolServiceThread',
+    ];
+    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
+
   });
+
   describe('ignore listing', () => {
     let ignoreListManager: Bindings.IgnoreListManager.IgnoreListManager;
     beforeEach(() => {
@@ -495,6 +519,7 @@ describeWithEnvironment('ThreadAppender', function() {
         Renderer: rendererData,
         Workers: workersData,
         Warnings: warningsData,
+        AuctionWorklets: {worklets: new Map()},
       } as TraceModel.Handlers.Types.TraceParseData;
 
       // Add the script to ignore list and then append the flamechart data
@@ -518,6 +543,125 @@ describeWithEnvironment('ThreadAppender', function() {
       assert.deepEqual(flameChartData.entryTotalTimes, [0.2, 0.1, 0.025, 0.1]);
       assert.strictEqual(threadAppenders.length, 1);
       assert.strictEqual(threadAppenders[0].titleForEvent(callFrameB), 'On ignore list');
+    });
+  });
+  describe('showAllEvents', () => {
+    beforeEach(() => {
+      const targetManager = SDK.TargetManager.TargetManager.instance({forceNew: true});
+      const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
+      const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+      const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+        forceNew: true,
+        resourceMapping,
+        targetManager,
+      });
+      Bindings.IgnoreListManager.IgnoreListManager.instance({
+        forceNew: true,
+        debuggerWorkspaceBinding,
+      });
+    });
+    afterEach(() => {
+      SDK.TargetManager.TargetManager.removeInstance();
+      Workspace.Workspace.WorkspaceImpl.removeInstance();
+      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.removeInstance();
+      Bindings.IgnoreListManager.IgnoreListManager.removeInstance();
+    });
+    it('appends unknown events to the flame chart data only when the experiment is enabled', async function() {
+      const fileName = 'react-hello-world.json.gz';
+      const bizarreName = 'BackForwardCacheBufferLimitTracker::DidRemoveFrameOrWorkerFromBackForwardCache';
+      // Look up a trace event with an name we are not tracking anywhere and make sure it's not
+      // appended to the timeline data.
+      const initialTimelineData = await renderThreadAppendersFromTrace(this, fileName);
+      let unknownEventIndex = initialTimelineData.entryData.findIndex(entry => {
+        const event = entry as TraceModel.Types.TraceEvents.TraceEventData;
+        return event.name === bizarreName;
+      });
+      assert.strictEqual(unknownEventIndex, -1);
+
+      // Now enable the experiment and make sure the event is appended to the timeline data this time
+      Root.Runtime.experiments.enableForTest('timelineShowAllEvents');
+      const finalTimelineData = await renderThreadAppendersFromTrace(this, fileName);
+      const finalFlamechartData = finalTimelineData.flameChartData;
+      unknownEventIndex = finalTimelineData.entryData.findIndex(entry => {
+        const event = entry as TraceModel.Types.TraceEvents.TraceEventData;
+        return event.name === bizarreName;
+      });
+      assert.isAbove(unknownEventIndex, -1);
+      assert.isDefined(finalFlamechartData.entryStartTimes);
+      assert.isDefined(finalFlamechartData.entryTotalTimes);
+      Root.Runtime.experiments.disableForTest('timelineShowAllEvents');
+    });
+  });
+  describe('AuctionWorklet threads', () => {
+    // We have to set these up because the ThreadAppender includes logic for
+    // ignoring events that relies on the IgnoreListManager.
+    beforeEach(() => {
+      const targetManager = SDK.TargetManager.TargetManager.instance({forceNew: true});
+      const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
+      const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+      const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+        forceNew: true,
+        resourceMapping,
+        targetManager,
+      });
+      Bindings.IgnoreListManager.IgnoreListManager.instance({
+        forceNew: true,
+        debuggerWorkspaceBinding,
+      });
+    });
+
+    afterEach(() => {
+      SDK.TargetManager.TargetManager.removeInstance();
+      Workspace.Workspace.WorkspaceImpl.removeInstance();
+      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.removeInstance();
+      Bindings.IgnoreListManager.IgnoreListManager.removeInstance();
+    });
+
+    it('finds all the worklet threads', async function() {
+      const {threadAppenders} = await renderThreadAppendersFromTrace(this, 'fenced-frame-fledge.json.gz');
+      const workletAppenders = threadAppenders.filter(threadAppender => {
+        return threadAppender.trackName().includes('Worklet');
+      });
+      assert.lengthOf(workletAppenders, 6);
+    });
+
+    it('sets the title correctly for an Auction Worklet service', async function() {
+      const UTILITY_THREAD_PID = 776435 as TraceModel.Types.TraceEvents.ProcessID;
+      const UTILITY_THREAD_TID = 1 as TraceModel.Types.TraceEvents.ThreadID;
+      const {threadAppenders} = await renderThreadAppendersFromTrace(this, 'fenced-frame-fledge.json.gz');
+      const appender = threadAppenders.find(threadAppender => {
+        return threadAppender.processId() === UTILITY_THREAD_PID && threadAppender.threadId() === UTILITY_THREAD_TID;
+      });
+      if (!appender) {
+        throw new Error('Could not find expected thread appender');
+      }
+      assert.strictEqual(appender.trackName(), 'Auction Worklet Service — https://ssp-fledge-demo.glitch.me');
+    });
+
+    it('sets the title correctly for an Auction Worklet seller service', async function() {
+      const SELLER_THREAD_PID = 776435 as TraceModel.Types.TraceEvents.ProcessID;
+      const SELLER_THREAD_TID = 6 as TraceModel.Types.TraceEvents.ThreadID;
+      const {threadAppenders} = await renderThreadAppendersFromTrace(this, 'fenced-frame-fledge.json.gz');
+      const appender = threadAppenders.find(threadAppender => {
+        return threadAppender.processId() === SELLER_THREAD_PID && threadAppender.threadId() === SELLER_THREAD_TID;
+      });
+      if (!appender) {
+        throw new Error('Could not find expected thread appender');
+      }
+      assert.strictEqual(appender.trackName(), 'Seller Worklet — https://ssp-fledge-demo.glitch.me');
+    });
+
+    it('sets the title correctly for an Auction Worklet bidder service', async function() {
+      const BIDDER_THREAD_PID = 776436 as TraceModel.Types.TraceEvents.ProcessID;
+      const BIDDER_THREAD_TID = 6 as TraceModel.Types.TraceEvents.ThreadID;
+      const {threadAppenders} = await renderThreadAppendersFromTrace(this, 'fenced-frame-fledge.json.gz');
+      const appender = threadAppenders.find(threadAppender => {
+        return threadAppender.processId() === BIDDER_THREAD_PID && threadAppender.threadId() === BIDDER_THREAD_TID;
+      });
+      if (!appender) {
+        throw new Error('Could not find expected thread appender');
+      }
+      assert.strictEqual(appender.trackName(), 'Bidder Worklet — https://dsp-fledge-demo.glitch.me');
     });
   });
 });

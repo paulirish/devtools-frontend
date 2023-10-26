@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { type Protocol } from 'devtools-protocol';
-import { type CDPSession } from '../api/CDPSession.js';
+import type { Protocol } from 'devtools-protocol';
+import type { CDPSession } from '../api/CDPSession.js';
 import { Frame } from '../api/Frame.js';
-import { type HTTPResponse } from '../api/HTTPResponse.js';
-import { type Page, type WaitTimeoutOptions } from '../api/Page.js';
+import type { HTTPResponse } from '../api/HTTPResponse.js';
+import type { WaitTimeoutOptions } from '../api/Page.js';
 import { disposeSymbol } from '../util/disposable.js';
-import { type DeviceRequestPrompt } from './DeviceRequestPrompt.js';
-import { type FrameManager } from './FrameManager.js';
+import type { DeviceRequestPrompt } from './DeviceRequestPrompt.js';
+import type { FrameManager } from './FrameManager.js';
 import { IsolatedWorld } from './IsolatedWorld.js';
 import { type PuppeteerLifeCycleEvent } from './LifecycleWatcher.js';
+import type { CdpPage } from './Page.js';
 /**
  * @internal
  */
@@ -46,7 +47,7 @@ export declare class CdpFrame extends Frame {
      */
     updateId(id: string): void;
     updateClient(client: CDPSession, keepWorlds?: boolean): void;
-    page(): Page;
+    page(): CdpPage;
     isOOPFrame(): boolean;
     goto(url: string, options?: {
         referer?: string;

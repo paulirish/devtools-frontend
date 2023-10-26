@@ -42,6 +42,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedback.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -255,7 +256,7 @@ export enum ThreadTracksSource {
 }
 
 // TODO(crbug.com/1428024): Use the new engine.
-const DEFAULT_THREAD_TRACKS_SOURCE = ThreadTracksSource.OLD_ENGINE;
+const DEFAULT_THREAD_TRACKS_SOURCE = ThreadTracksSource.NEW_ENGINE;
 
 // TypeScript will presumably get these types at some stage, and when it
 // does these temporary types should be removed.
@@ -292,7 +293,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private readonly panelToolbar: UI.Toolbar.Toolbar;
   private readonly panelRightToolbar: UI.Toolbar.Toolbar;
   private readonly timelinePane: UI.Widget.VBox;
-  readonly #minimapComponent = new TimelineMiniMap();
+  readonly #minimapComponent;
   private readonly statusPaneContainer: HTMLElement;
   private readonly flameChart: TimelineFlameChartView;
   private readonly searchableViewInternal: UI.SearchableView.SearchableView;
@@ -325,12 +326,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   #traceEngineActiveTraceIndex = -1;
   #threadTracksSource: ThreadTracksSource;
   #sourceMapsResolver: SourceMapsResolver|null = null;
-
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
 
   constructor(threadTracksSource: ThreadTracksSource) {
     super('timeline');
     this.#threadTracksSource = threadTracksSource;
+    this.#minimapComponent = new TimelineMiniMap(threadTracksSource);
     switch (threadTracksSource) {
       case ThreadTracksSource.BOTH_ENGINES:
       case ThreadTracksSource.NEW_ENGINE:
@@ -354,7 +355,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.recordReloadAction =
         (UI.ActionRegistry.ActionRegistry.instance().action('timeline.record-reload') as UI.ActionRegistration.Action);
 
-    this.#historyManager = new TimelineHistoryManager();
+    this.#historyManager = new TimelineHistoryManager(threadTracksSource);
 
     this.performanceModel = null;
     this.traceLoadStart = null;
@@ -486,6 +487,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.loader = TimelineLoader.loadFromEvents(events, this);
   }
 
+  getFlameChart(): TimelineFlameChartView {
+    return this.flameChart;
+  }
+
   private loadFromCpuProfile(profile: Protocol.Profiler.Profile|null, title?: string): void {
     if (this.state !== State.Idle) {
       return;
@@ -503,6 +508,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const left = (event.data.startTime > 0) ? event.data.startTime : this.performanceModel.minimumRecordTime();
     const right = Number.isFinite(event.data.endTime) ? event.data.endTime : this.performanceModel.maximumRecordTime();
     this.performanceModel.setWindow({left, right}, /* animate */ true, event.data.breadcrumb);
+
+    TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+        TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
+            TraceEngine.Types.Timing.MilliSeconds(left),
+            TraceEngine.Types.Timing.MilliSeconds(right),
+            ),
+        {
+          shouldAnimate: true,
+        },
+    );
   }
 
   private onModelWindowChanged(event: Common.EventTarget.EventTargetEvent<WindowChangedEvent>): void {
@@ -767,10 +782,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private updateOverviewControls(): void {
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
+    const isCpuProfile = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex)?.dataOrigin ===
+        TraceEngine.Types.File.DataOrigin.CPUProfile;
 
     this.#minimapComponent.setData({
       performanceModel: this.performanceModel,
       traceParsedData,
+      isCpuProfile,
       settings: {
         showScreenshots: this.showScreenshotsSetting.get(),
         showMemory: this.showMemorySetting.get(),
@@ -1020,7 +1038,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           showTimer: undefined,
         },
         // When recording failed, we should load null to go back to the landing page.
-        () => this.loadingComplete(/* tracingModel= */ null, /* exclusiveFilter= */ null, /* isCpuProfile= */ false));
+        async () => {
+          this.statusPane?.remove();
+          await this.loadingComplete(/* tracingModel= */ null, /* exclusiveFilter= */ null, /* isCpuProfile= */ false);
+        });
     this.statusPane.showPane(this.statusPaneContainer);
     this.statusPane.updateStatus(i18nString(UIStrings.recordingFailed));
 
@@ -1129,13 +1150,20 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     this.#traceEngineActiveTraceIndex = traceEngineIndex;
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
-    this.flameChart.setModel(model, traceParsedData);
+    const isCpuProfile = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex)?.dataOrigin ===
+        TraceEngine.Types.File.DataOrigin.CPUProfile;
+    if (traceParsedData) {
+      TraceBounds.TraceBounds.BoundsManager.instance({
+        forceNew: true,
+        initialBounds: traceParsedData.Meta.traceBounds,
+      });
+    }
+    this.flameChart.setModel(model, traceParsedData, isCpuProfile);
 
     this.updateOverviewControls();
     this.#minimapComponent.reset();
-
-    if (model && this.performanceModel) {
-      this.performanceModel.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
+    if (model) {
+      model.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
       this.#minimapComponent.setBounds(
           TraceEngine.Types.Timing.MilliSeconds(model.timelineModel().minimumRecordTime()),
           TraceEngine.Types.Timing.MilliSeconds(model.timelineModel().maximumRecordTime()));
@@ -1144,7 +1172,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         PerfUI.LineLevelProfile.Performance.instance().appendCPUProfile(profile.cpuProfileData, profile.target);
       }
       this.flameChart.setSelection(null);
-      this.#minimapComponent.setWindowTimes(model.window().left, model.window().right);
+      const {left, right} = model.calculateWindowForMainThreadActivity();
+      model.setWindow({left, right});
+      this.#minimapComponent.setWindowTimes(left, right);
+      if (traceParsedData) {
+        TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+            TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(left, right),
+        );
+      }
     }
 
     this.updateOverviewControls();
@@ -1330,10 +1365,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     try {
       // Run the new engine in parallel with the parsing done in the performanceModel
       await Promise.all([
+        // Calling setTracingModel now and setModel so much later, leads to several problems due to addEventListener order being unexpected
+        // TODO(paulirish): Resolve this, or just wait for the death of tracingModel. :)
         this.performanceModel.setTracingModel(tracingModel, recordingIsFresh, {
           // If we are using the new engine for everything, we do not need to
           // resolve sourcemaps within the old engine.
           resolveSourceMaps: this.#threadTracksSource !== ThreadTracksSource.NEW_ENGINE,
+          isCpuProfile,
         }),
         this.#executeNewTraceEngine(
             tracingModel, recordingIsFresh, isCpuProfile, this.performanceModel.recordStartTime()),
@@ -1381,6 +1419,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         filmStripForPreview: TraceEngine.Extras.FilmStrip.fromTraceData(traceData),
         traceParsedData: traceData,
       });
+      if (this.#minimapComponent.breadcrumbsActivated) {
+        this.#minimapComponent.addInitialBreadcrumb();
+      }
     } catch (error) {
       void this.recordingFailed(error.message);
       console.error(error);
@@ -1554,6 +1595,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       offset = startTime - window.left;
     }
     this.performanceModel.setWindow({left: window.left + offset, right: window.right + offset}, /* animate */ true);
+
+    TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+        TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
+            TraceEngine.Types.Timing.MilliSeconds(window.left + offset),
+            TraceEngine.Types.Timing.MilliSeconds(window.right + offset),
+            ),
+        {
+          shouldAnimate: true,
+        },
+    );
   }
 
   private handleDrop(dataTransfer: DataTransfer): void {

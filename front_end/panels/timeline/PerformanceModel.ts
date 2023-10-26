@@ -7,7 +7,8 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 import * as SourceMapScopes from '../../models/source_map_scopes/source_map_scopes.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
-import type * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
@@ -22,6 +23,7 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   private windowInternal: Window;
   private willResolveNames = false;
   private recordStartTimeInternal?: number;
+  #activeBreadcrumbWindow?: TraceEngine.Types.Timing.TraceWindow;
 
   constructor() {
     super();
@@ -68,9 +70,10 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
 
   async setTracingModel(model: TraceEngine.Legacy.TracingModel, isFreshRecording = false, options = {
     resolveSourceMaps: true,
+    isCpuProfile: false,
   }): Promise<void> {
     this.tracingModelInternal = model;
-    this.timelineModelInternal.setEvents(model, isFreshRecording);
+    this.timelineModelInternal.setEvents(model, isFreshRecording, options.isCpuProfile);
     if (options.resolveSourceMaps) {
       await this.addSourceMapListeners();
     }
@@ -85,8 +88,6 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     });
     this.frameModelInternal.addTraceEvents(
         this.mainTargetInternal, this.timelineModelInternal.inspectedTargetEvents(), threadData);
-
-    this.autoWindowTimes();
   }
 
   async addSourceMapListeners(): Promise<void> {
@@ -181,8 +182,25 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
   }
 
   setWindow(window: Window, animate?: boolean, breadcrumb?: TraceEngine.Types.Timing.TraceWindow): void {
+    const didWindowOrBreadcrumbChange = this.windowInternal.left !== window.left ||
+        this.windowInternal.right !== window.right || (breadcrumb && (this.#activeBreadcrumbWindow !== breadcrumb));
     this.windowInternal = window;
-    this.dispatchEventToListeners(Events.WindowChanged, {window, animate, breadcrumbWindow: breadcrumb});
+    if (breadcrumb) {
+      this.#activeBreadcrumbWindow = breadcrumb;
+    }
+    if (didWindowOrBreadcrumbChange) {
+      this.dispatchEventToListeners(Events.WindowChanged, {window, animate, breadcrumbWindow: breadcrumb});
+      TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+          TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
+              TraceEngine.Types.Timing.MilliSeconds(window.left),
+              TraceEngine.Types.Timing.MilliSeconds(window.right),
+              ),
+          {shouldAnimate: Boolean(animate)},
+      );
+      if (breadcrumb) {
+        TraceBounds.TraceBounds.BoundsManager.instance().setMiniMapBounds(breadcrumb);
+      }
+    }
   }
 
   window(): Window {
@@ -197,7 +215,10 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
     return this.timelineModelInternal.maximumRecordTime();
   }
 
-  private autoWindowTimes(): void {
+  calculateWindowForMainThreadActivity(): {
+    left: TraceEngine.Types.Timing.MilliSeconds,
+    right: TraceEngine.Types.Timing.MilliSeconds,
+  } {
     const timelineModel = this.timelineModelInternal;
     let tasks: TraceEngine.Legacy.Event[] = [];
     for (const track of timelineModel.tracks()) {
@@ -207,8 +228,10 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       }
     }
     if (!tasks.length) {
-      this.setWindow({left: timelineModel.minimumRecordTime(), right: timelineModel.maximumRecordTime()});
-      return;
+      return {
+        left: TraceEngine.Types.Timing.MilliSeconds(timelineModel.minimumRecordTime()),
+        right: TraceEngine.Types.Timing.MilliSeconds(timelineModel.maximumRecordTime()),
+      };
     }
 
     /**
@@ -257,7 +280,10 @@ export class PerformanceModel extends Common.ObjectWrapper.ObjectWrapper<EventTy
       leftTime = Math.max(leftTime - 0.05 * zoomedInSpan, timelineModel.minimumRecordTime());
       rightTime = Math.min(rightTime + 0.05 * zoomedInSpan, timelineModel.maximumRecordTime());
     }
-    this.setWindow({left: leftTime, right: rightTime});
+    return {
+      left: TraceEngine.Types.Timing.MilliSeconds(leftTime),
+      right: TraceEngine.Types.Timing.MilliSeconds(rightTime),
+    };
   }
 }
 

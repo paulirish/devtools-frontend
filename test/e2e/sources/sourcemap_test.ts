@@ -13,6 +13,7 @@ import {
   getVisibleTextContents,
   goToResource,
   pasteText,
+  pressKey,
   step,
   typeText,
   waitFor,
@@ -565,6 +566,26 @@ describe('The Sources Tab', async function() {
       });
       await click(RESUME_BUTTON);
     });
+
+    it('hits breakpoints reliably after reload in case of code-splitting (crbug.com/1490369)', async () => {
+      const {target, frontend} = getBrowserAndPages();
+
+      // Set the breakpoint inside `shared()` in `shared.js`.
+      await openSourceCodeEditorForFile('shared.js', 'codesplitting-race.html');
+      await addBreakpointForLine(frontend, 2);
+      await waitForFunction(async () => await isBreakpointSet(2));
+
+      // Reload the page.
+      const reloadPromise = target.reload();
+
+      // Now the debugger should pause twice reliably.
+      await waitFor(PAUSE_INDICATOR_SELECTOR);
+      await click(RESUME_BUTTON);
+      await waitFor(PAUSE_INDICATOR_SELECTOR);
+      await click(RESUME_BUTTON);
+
+      await reloadPromise;
+    });
   });
 
   describe('can deal with hot module replacement', () => {
@@ -660,6 +681,18 @@ describe('The Sources Tab', async function() {
       // Check that the breakpoint still exists on line 2.
       assert.isTrue(await isBreakpointSet(2));
     });
+  });
+
+  it('can attach sourcemaps to CSS files from a context menu', async () => {
+    await openSourceCodeEditorForFile('sourcemap-css.css', 'sourcemap-css-noinline.html');
+
+    await click('aria/Code editor', {clickOptions: {button: 'right'}});
+    await click('aria/Add source map…');
+    await waitFor('.add-source-map');
+    await typeText('sourcemap-css-absolute.map');
+    await pressKey('Enter');
+
+    await waitFor('[aria-label="app.scss, file"]');
   });
 });
 

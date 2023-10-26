@@ -15,9 +15,9 @@
  */
 import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import { Keyboard, Mouse, Touchscreen, type KeyDownOptions, type KeyPressOptions, type KeyboardTypeOptions, type MouseClickOptions, type MouseMoveOptions, type MouseOptions, type MouseWheelOptions } from '../api/Input.js';
-import { type KeyInput } from '../common/USKeyboardLayout.js';
-import { type BrowsingContext } from './BrowsingContext.js';
-import { type BidiPage } from './Page.js';
+import type { KeyInput } from '../common/USKeyboardLayout.js';
+import type { BrowsingContext } from './BrowsingContext.js';
+import type { BidiPage } from './Page.js';
 /**
  * @internal
  */
@@ -67,7 +67,6 @@ export declare class BidiMouse extends Mouse {
 export declare class BidiTouchscreen extends Touchscreen {
     #private;
     constructor(context: BrowsingContext);
-    tap(x: number, y: number, options?: BidiTouchMoveOptions): Promise<void>;
     touchStart(x: number, y: number, options?: BidiTouchMoveOptions): Promise<void>;
     touchMove(x: number, y: number, options?: BidiTouchMoveOptions): Promise<void>;
     touchEnd(): Promise<void>;

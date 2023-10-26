@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 import {waitFor} from '../../../../shared/helper.js';
-import {describe} from '../../../../shared/mocha-extensions.js';
-import {assertElementScreenshotUnchanged, itScreenshot} from '../../../../shared/screenshots.js';
+import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
+import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
 
 describe('Network track', function() {
@@ -16,7 +16,9 @@ describe('Network track', function() {
   itScreenshot('renders the expanded Network track correctly', async () => {
     await loadComponentDocExample(`${urlForTest}&expanded=true`);
     const flameChart = await waitFor('.flame-chart-main-pane');
-    await assertElementScreenshotUnchanged(flameChart, 'performance/network_track_expanded.png', 4);
+    await assertElementScreenshotUnchanged(flameChart, 'performance/network_track_expanded.png', 4, {
+      captureBeyondViewport: true,
+    });
   });
 
   itScreenshot('renders the collapsed Network track correctly', async () => {
@@ -28,7 +30,9 @@ describe('Network track', function() {
   itScreenshot('renders the track (dark mode and expanded)', async () => {
     await loadComponentDocExample(`${urlForTest}&expanded=true&darkMode=true`);
     const flameChart = await waitFor('.flame-chart-main-pane');
-    await assertElementScreenshotUnchanged(flameChart, 'performance/network_track_expanded_dark_mode.png', 4);
+    await assertElementScreenshotUnchanged(flameChart, 'performance/network_track_expanded_dark_mode.png', 4, {
+      captureBeyondViewport: true,
+    });
   });
 
   itScreenshot('renders the track (dark mode and collapsed)', async () => {

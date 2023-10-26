@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 import {waitFor} from '../../../../shared/helper.js';
-import {describe} from '../../../../shared/mocha-extensions.js';
-import {assertElementScreenshotUnchanged, itScreenshot} from '../../../../shared/screenshots.js';
+import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
+import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
 
-describe('Perf Panel Main Thread', () => {
+describe('Perf Panel Main Thread', function() {
+  // TODO(crbug.com/1492405): Improve perf panel trace load speed to
+  // prevent timeout bump.
+  this.timeout(20_000);
   preloadForCodeCoverage('performance_panel/flamechart.html');
 
   itScreenshot('renders some events onto the timeline', async () => {
@@ -61,7 +64,9 @@ describe('Workers', () => {
         'performance_panel/track_example.html?track=Thread&fileName=two-workers&trackFilter=Worker&windowStart=107351290.697&windowEnd=107351401.004';
     await loadComponentDocExample(`${urlForTest}&expanded=true`);
     const flameChart = await waitFor('.flame-chart-main-pane');
-    await assertElementScreenshotUnchanged(flameChart, 'performance/worker-track.png');
+    await assertElementScreenshotUnchanged(flameChart, 'performance/worker-track.png', undefined, {
+      captureBeyondViewport: true,
+    });
   });
 });
 
