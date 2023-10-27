@@ -18,19 +18,36 @@ console.log(processor.data)
 
 See the included `analyze-trace.mjs` a runnable invocation.
 
-## Building standalone
+## Maintainer cheatsheet
+
+parent doc: go/btlax
+
+Build and run
 
 ```sh
-# parent doc: go/btlax
-
-# these in no particular order..
-
+# build bundle with esbuild
 front_end/models/trace/build-trace-engine-lib.sh
 
+# run
+node scripts/analyze-trace.mjs test/unittests/fixtures/traces/web-dev.json.gz
+
+# test
+node scripts/test/test-trace-engine.mjs
+```
+
+Extract and publish
+
+```sh
+# copy built files to $HOME/code/trace_engine
 front_end/models/trace/copy-build-trace-engine-for-publish.sh
 
-node out/Typed/../../third_party/typescript/../../node_modules/typescript/bin/tsc -p out/Typed/gen/front_end/models/trace/trace-tsconfig.json  # this then has js/map/d.ts.  should be able to use for typs
+# test
+node test/test-trace-engine.mjs
 
+# bump and publish
+npm version patch
+npm publish --access public --dry-run
+npm publish --access public
 ```
 
 ## High level architecture

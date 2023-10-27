@@ -5,25 +5,34 @@
 // Run this first:
 //    front_end/models/trace/build-trace-engine-lib.sh
 
-import fs from 'fs';
-import zlib from 'zlib';
+import fs from 'node:fs';
+import zlib from 'node:zlib';
 // eslint-disable-next-line rulesdir/es_modules_import
-import * as TraceModel from './out/Default/gen/trace_engine/trace.mjs';
+import * as TraceModel from '../out/Default/gen/trace_engine/trace.mjs';
 
 polyfillDOMRect();
 
-// If run as CLI, parse the argv trace (or a fallback)
-if (import.meta.url.endsWith(process.argv[1])) {
-  const filename = process.argv.at(2) ?? './test/unittests/fixtures/traces/invalid-animation-events.json.gz';
+
+export async function analyzeTrace(filename) {
   const traceEvents = loadTraceEventsFromFile(filename);
 
   // Primary usage:
   const processor = TraceModel.Processor.TraceProcessor.createWithAllHandlers(); // aka `fullTraceEngine`
   await processor.parse(traceEvents);
-
-  console.log(processor.data);
-  console.assert(processor.data.Renderer.allRendererEvents.length);
+  return processor.data;
 }
+
+// If run as CLI, parse the argv trace (or a fallback)
+if (import.meta.url.endsWith(process?.argv[1])) {
+  cli();
+}
+
+async function cli() {
+  const filename = process.argv.at(2);
+  const traceModel = await analyzeTrace(filename);
+  console.log(traceModel);
+}
+
 
 /**
  * @param {string=} filename

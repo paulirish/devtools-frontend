@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
-
-# Usage:
-#   watchexec "front_end/models/trace/build-trace-engine-lib.sh && node analyze-trace.mjs"
-
+set -euo pipefail
 
 #########
 # TODO: #
 # - create declaration file i guess? https://esbuild.github.io/content-types/#no-type-system
-# - exclude Common namespace.
 
 
 dtfe=$(realpath "$HOME/chromium-devtools/devtools-frontend")

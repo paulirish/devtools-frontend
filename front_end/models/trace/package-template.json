@@ -4,7 +4,7 @@
   "description": "",
   "main": "trace.mjs",
   "scripts": {
-    "test": "node analyze-trace.mjs"
+    "test": "node test/test-trace-engine.mjs"
   },
   "type": "module",
   "keywords": [],
