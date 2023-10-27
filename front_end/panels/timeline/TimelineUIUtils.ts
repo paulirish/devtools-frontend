@@ -1620,15 +1620,12 @@ export class TimelineUIUtils {
 
       case recordType.StreamingCompileScript:
       case recordType.BackgroundDeserialize:
-      // case recordType.XHRReadyStateChange:
+      case recordType.XHRReadyStateChange:
       case recordType.XHRLoad: {
         const url = eventData['url'];
         if (url) {
           detailsText = Bindings.ResourceUtils.displayNameForURL(url);
         }
-        // contentHelper.appendStackTrace(
-        //   stackLabel || i18nString(UIStrings.stackTrace),
-        //   TimelineUIUtils.stackTraceFromCallFrames(timelineData.stackTrace));
         break;
       }
       case recordType.TimeStamp:
@@ -1696,27 +1693,27 @@ export class TimelineUIUtils {
     let details: HTMLElement|HTMLSpanElement|(Element | null)|Text|null = null;
     let detailsText;
     const eventData = event.args['data'];
-    detailsText = await TimelineUIUtils.buildDetailsCellTextForTraceEvent(event);
     switch (event.name) {
-      // case recordType.GCEvent:
-      // case recordType.MajorGC:
-      // case recordType.MinorGC:
-      // case recordType.EventDispatch:
-      // case recordType.Paint:
-      // case recordType.Animation:
-      // case recordType.EmbedderCallback:
-      // case recordType.ParseHTML:
-      // case recordType.WasmStreamFromResponseCallback:
-      // case recordType.WasmCompiledModule:
-      // case recordType.WasmModuleCacheHit:
-      // case recordType.WasmCachedModule:
-      // case recordType.WasmModuleCacheInvalid:
-      // case recordType.WebSocketCreate:
-      // case recordType.WebSocketSendHandshakeRequest:
-      // case recordType.WebSocketReceiveHandshakeResponse:
-      // case recordType.WebSocketDestroy: {
-      //   break;
-      // }
+      case recordType.GCEvent:
+      case recordType.MajorGC:
+      case recordType.MinorGC:
+      case recordType.EventDispatch:
+      case recordType.Paint:
+      case recordType.Animation:
+      case recordType.EmbedderCallback:
+      case recordType.ParseHTML:
+      case recordType.WasmStreamFromResponseCallback:
+      case recordType.WasmCompiledModule:
+      case recordType.WasmModuleCacheHit:
+      case recordType.WasmCachedModule:
+      case recordType.WasmModuleCacheInvalid:
+      case recordType.WebSocketCreate:
+      case recordType.WebSocketSendHandshakeRequest:
+      case recordType.WebSocketReceiveHandshakeResponse:
+      case recordType.WebSocketDestroy: {
+        detailsText = await TimelineUIUtils.buildDetailsTextForTraceEvent(event);
+        break;
+      }
 
       case recordType.PaintImage:
       case recordType.DecodeImage:
@@ -1856,13 +1853,8 @@ export class TimelineUIUtils {
       tabStop: true,
     };
     if (isFreshRecording) {
-      const devToolsLinkEl = linkifier.linkifyScriptLocation(
+      return linkifier.linkifyScriptLocation(
           target, scriptId, url as Platform.DevToolsPath.UrlString, lineNumber, options);
-      // Starting with `functionName @ linkifiedUrl:line:col` append ` (hostname)`
-      const spanEl = document.createElement('span');
-      const parsedURL = new Common.ParsedURL.ParsedURL(url);
-      spanEl.append(devToolsLinkEl, ` (${parsedURL.host})`);
-      return spanEl;
     }
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(url as Platform.DevToolsPath.UrlString, options);
   }
