@@ -1549,6 +1549,15 @@ export class TimelineUIUtils {
     return ThemeSupport.ThemeSupport.instance().getComputedValue(cssVarName);
   }
 
+  // This function is mostly dead code. The parents `buildDetailsForTraceEvent`
+  // and `buildDetailsCellForTraceEvent` handle almost all cases
+  // The only cases that are deliberately handled here are likely:
+  //     StreamingCompileScript BackgroundDeserialize XHRReadyStateChange XHRLoad TimeStamp AsyncTask
+  // .... but........... they're not even handled.
+
+  // according to https://docs.google.com/spreadsheets/d/1UnDazoCSQCZCm4Ve6gfsMUWTUBQ6demOvlJ4tPaIdRw/edit?resourcekey=0-IlpoVuWeJYJjL6jEeTvdUg#gid=0
+  // This is all fucked up. :)
+  // there are 10 cases in `buildDetailsCellForTraceEvent` that.. if moved up to `buildDetailsForTraceEvent`... then both Cell and CellText could be deleted.
   static async buildDetailsCellTextForTraceEvent(event: TraceEngine.Legacy.Event|
                                              TraceEngine.Types.TraceEvents.TraceEventData): Promise<string|null> {
     const recordType = TimelineModel.TimelineModel.RecordType;
@@ -1711,7 +1720,7 @@ export class TimelineUIUtils {
       case recordType.WebSocketSendHandshakeRequest:
       case recordType.WebSocketReceiveHandshakeResponse:
       case recordType.WebSocketDestroy: {
-        detailsText = await TimelineUIUtils.buildDetailsTextForTraceEvent(event);
+        detailsText = await TimelineUIUtils.buildDetailsCellTextForTraceEvent(event);
         break;
       }
 
