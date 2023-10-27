@@ -4,7 +4,8 @@
   "description": "",
   "main": "trace.mjs",
   "scripts": {
-    "test": "node test/test-trace-engine.mjs"
+    "test": "node test/test-trace-engine.mjs",
+    "prepublishOnly": "npm test"
   },
   "type": "module",
   "keywords": [],

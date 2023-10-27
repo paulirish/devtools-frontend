@@ -20,9 +20,9 @@ See the included `analyze-trace.mjs` a runnable invocation.
 
 ## Maintainer cheatsheet
 
-parent doc: go/btlax
+See also http://go/btlax
 
-Build and run
+#### Build, run, extract
 
 ```sh
 # build bundle with esbuild
@@ -33,19 +33,22 @@ node scripts/analyze-trace.mjs test/unittests/fixtures/traces/web-dev.json.gz
 
 # test
 node scripts/test/test-trace-engine.mjs
-```
 
-Extract and publish
-
-```sh
 # copy built files to $HOME/code/trace_engine
 front_end/models/trace/copy-build-trace-engine-for-publish.sh
+```
+
+#### Test and publish
+
+```sh
+# switch to standalone
+cd $HOME/code/trace_engine
 
 # test
 node test/test-trace-engine.mjs
 
 # bump and publish
-npm version patch
+npm version v0.0.XXX   # Manually determine next version
 npm publish --access public --dry-run
 npm publish --access public
 ```
