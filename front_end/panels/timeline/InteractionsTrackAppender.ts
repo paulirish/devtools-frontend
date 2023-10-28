@@ -85,11 +85,15 @@ export class InteractionsTrackAppender implements TrackAppender {
    * interactions (the first available level to append more data).
    */
   #appendInteractionsAtLevel(trackStartLevel: number): number {
-    const {interactionEventsWithNoNesting, interactionsOverThreshold} = this.#traceParsedData.UserInteractions;
+    const {interactionEventsWithNoNesting, interactionsOverThreshold, interactionEvents} = this.#traceParsedData.UserInteractions;
 
     // Render all top level interactions (see UserInteractionsHandler for an explanation on the nesting) onto the track.
-    const newLevel =
+    let newLevel =
         this.#compatibilityBuilder.appendEventsAtLevel(interactionEventsWithNoNesting, trackStartLevel, this);
+
+
+    newLevel =
+        this.#compatibilityBuilder.appendEventsAtLevel(interactionEvents, newLevel, this);
 
     // Each interaction that we drew that is over the INP threshold needs to be
     // candy-striped.
