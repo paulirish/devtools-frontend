@@ -68,20 +68,10 @@ ${exportStatement}
   return newContents;
 }
 
-// Exported only so it can be unit tested.
-exports.codeForFile = codeForFile;
-
-async function runMain() {
-  const [, , buildTimestamp, isDebugString, legacyString, targetName, srcDir, targetGenDir, files, hotReloadEnabledString] =
-      process.argv;
-
-  const filenames = files.split(',');
+async function generateCssJsFiles(
+    {buildTimestamp, isDebug, isLegacy, targetName, srcDir, targetGenDir, fileNames, hotReloadEnabled}) {
   const configFiles = [];
-  const isDebug = isDebugString === 'true';
-  const isLegacy = legacyString === 'true';
-  const hotReloadEnabled = hotReloadEnabledString === 'true';
-
-  for (const fileName of filenames) {
+  for (const fileName of fileNames) {
     const contents = fs.readFileSync(path.join(srcDir, fileName), {encoding: 'utf8', flag: 'r'});
     const newContents =
         await codeForFile({srcDir, fileName, isDebug, hotReloadEnabled, input: contents, isLegacy, buildTimestamp});
@@ -103,6 +93,24 @@ async function runMain() {
     ]
 }
 `);
+}
+
+// Exported only so it can be unit tested.
+exports.codeForFile = codeForFile;
+// Exported for `watch_build` script.
+exports.generateCssJsFiles = generateCssJsFiles;
+
+async function runMain() {
+  const [buildTimestamp, isDebugString, legacyString, targetName, srcDir, targetGenDir, files, hotReloadEnabledString] =
+      process.argv.slice(2);
+
+  const fileNames = files.split(',');
+  const isDebug = isDebugString === 'true';
+  const isLegacy = legacyString === 'true';
+  const hotReloadEnabled = hotReloadEnabledString === 'true';
+
+  await generateCssJsFiles(
+      {buildTimestamp, isDebug, isLegacy, hotReloadEnabled, targetName, srcDir, targetGenDir, fileNames});
 }
 
 if (require.main === module) {
