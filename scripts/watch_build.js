@@ -110,7 +110,7 @@ const onFileChange = fileName => {
 
 // Run build initially before starting to watch for changes.
 console.log('Running initial build before watching changes');
-childProcess.spawnSync('autoninja', ['-C', `out/${target}`], {cwd, env, stdio: 'inherit'});
+childProcess.spawnSync('autoninja', ['-C', `out/${target}`, '-d', 'explain'], {cwd, env, stdio: 'inherit'});
 
 // Watch the front_end and test folder and build on any change.
 console.log(`Watching for changes in ${frontEndDir} and ${testsDir}`);
