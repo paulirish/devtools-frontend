@@ -696,6 +696,8 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       return;
     }
 
+    networkRequest.receivedBlobs = networkRequest.receivedBlobs ?? [];
+    networkRequest.receivedBlobs.push({timestamp, dataLength, encodedDataLength});
     networkRequest.resourceSize += dataLength;
     if (encodedDataLength !== -1) {
       networkRequest.increaseTransferSize(encodedDataLength);

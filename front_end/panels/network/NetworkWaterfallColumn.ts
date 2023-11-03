@@ -411,7 +411,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
       drawNodes.push(node);
       for (const drawNode of drawNodes) {
         if (useTimingBars) {
-          this.buildTimingBarLayers(drawNode, rowOffset - this.scrollTop);
+          this.buildTimingBarLayers(drawNode, rowOffset - this.scrollTop, context);
         } else {
           this.buildSimplifiedBarLayers(context, drawNode, rowOffset - this.scrollTop);
         }
@@ -587,7 +587,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     }
   }
 
-  private buildTimingBarLayers(node: NetworkNode, y: number): void {
+  private buildTimingBarLayers(node: NetworkNode, y: number, context: CanvasRenderingContext2D): void {
     const request = node.request();
     if (!request) {
       return;
@@ -609,6 +609,12 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
       const end = this.timeToPosition(range.end);
       path.rect(start + (index * BAR_SPACING), middleBarY, end - start, height - lineWidth);
       index++;
+    }
+    for (const blob of request.receivedBlobs) {
+      const x = this.timeToPosition(blob.timestamp);
+
+      const middleBarY = y + Math.floor(this.rowHeight);
+      context.fillRect(x, middleBarY, 2, 10);
     }
   }
 

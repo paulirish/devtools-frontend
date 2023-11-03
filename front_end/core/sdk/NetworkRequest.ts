@@ -346,6 +346,8 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     this.#initialPriorityInternal = null;
     this.#currentPriority = null;
 
+    this.receivedBlobs = [];
+
     this.#signedExchangeInfoInternal = null;
     this.#webBundleInfoInternal = null;
     this.#webBundleInnerRequestInfoInternal = null;
