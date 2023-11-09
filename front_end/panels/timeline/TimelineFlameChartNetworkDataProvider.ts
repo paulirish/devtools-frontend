@@ -225,8 +225,12 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     const lineY = Math.floor(barY + barHeight / 2) + 0.5;
     const leftTick = start + 0.5;
     const rightTick = end - 0.5;
-    drawTick(leftTick, sendStart, lineY);
-    drawTick(rightTick, finish, lineY);
+    if (leftTick < sendStart) {
+      drawTick(leftTick, sendStart, lineY);
+    }
+    if (rightTick > finish) {
+      drawTick(rightTick, finish, lineY);
+    }
     context.stroke();
 
     const color = this.#colorForPriority(event.args.data.priority);

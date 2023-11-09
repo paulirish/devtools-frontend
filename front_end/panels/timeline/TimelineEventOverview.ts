@@ -316,7 +316,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     // engine if the Renderer data is present. Once that migratin is complete,
     // the Renderer data will always be present and we can remove this check.
     if (this.#traceParsedData) {
-      this.#drawWithNewEngine(this.#traceParsedData, start, end);
+      // this.#drawWithNewEngine(this.#traceParsedData, start, end);
       return;
     }
 
