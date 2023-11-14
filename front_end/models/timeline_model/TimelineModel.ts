@@ -1625,7 +1625,6 @@ export namespace TimelineModelImpl {
     LongHandler = 'LongHandler',
     LongRecurringHandler = 'LongRecurringHandler',
     V8Deopt = 'V8Deopt',
-    LongInteraction = 'LongInteraction',
   }
 
   export const WorkerThreadName = 'DedicatedWorker thread';
@@ -2066,7 +2065,10 @@ export class InvalidationTracker {
   }
 
   didLayout(layoutEvent: TraceEngine.Legacy.Event): void {
-    const layoutFrameId = layoutEvent.args['beginData']['frame'];
+    const layoutFrameId = layoutEvent.args?.beginData?.frame;
+    if (!layoutFrameId) {
+      return;
+    }
     for (const invalidation of this.invalidationsOfTypes([RecordType.LayoutInvalidationTracking])) {
       if (invalidation.linkedLayoutEvent) {
         continue;

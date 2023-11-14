@@ -53,6 +53,7 @@ import * as TimelineComponents from './components/components.js';
 import {getCategoryStyles, getEventStyle, TimelineCategory, TimelineRecordStyle} from './EventUICategory.js';
 import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
 import invalidationsTreeStyles from './invalidationsTree.css.js';
+import {SourceMapsResolver} from './SourceMapsResolver.js';
 import {TimelinePanel} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 
@@ -404,6 +405,18 @@ const UIStrings = {
    *@description Text shown next to the interaction event's ID in the detail view.
    */
   interactionID: 'ID',
+  /**
+   *@description Text shown next to the interaction event's input delay time in the detail view.
+   */
+  inputDelay: 'Input delay',
+  /**
+   *@description Text shown next to the interaction event's main thread processing time in the detail view.
+   */
+  mainThreadHandling: 'Main thread processing',
+  /**
+   *@description Text shown next to the interaction event's presentation delay time in the detail view.
+   */
+  presentationDelay: 'Presentation delay',
   /**
    *@description Text to cancel the animation frame
    */
@@ -1024,16 +1037,6 @@ const UIStrings = {
    */
   forcedReflow: 'Forced reflow',
   /**
-   *@description Text used to highlight a long interaction and link to web.dev/inp
-   */
-  longInteractionINP: 'Long interaction',
-  /**
-   *@description Text in Timeline UIUtils of the Performance panel when the
-   *             user clicks on a long interaction.
-   *@example {Long interaction} PH1
-   */
-  sIsLikelyPoorPageResponsiveness: '{PH1} is indicating poor page responsiveness.',
-  /**
    *@description Text in Timeline UIUtils of the Performance panel
    *@example {Forced reflow} PH1
    */
@@ -1457,7 +1460,9 @@ export class TimelineUIUtils {
     // need to check for profile calls in the beginning of this
     // function.
     if (TraceEngine.Legacy.eventIsFromNewEngine(event) && TraceEngine.Types.TraceEvents.isProfileCall(event)) {
-      return TimelineUIUtils.frameDisplayName(event.callFrame);
+      const maybeResolvedName = SourceMapsResolver.resolvedNodeNameForEntry(event);
+      const displayName = maybeResolvedName || TimelineUIUtils.frameDisplayName(event.callFrame);
+      return displayName;
     }
     const recordType = TimelineModel.TimelineModel.RecordType;
     const eventData = event.args['data'];
@@ -2020,12 +2025,6 @@ export class TimelineUIUtils {
       contentHelper.appendWarningRow(event, TimelineModel.TimelineModel.TimelineModelImpl.WarningType.V8Deopt);
     }
 
-    if (traceParseData && TraceEngine.Legacy.eventIsFromNewEngine(event) &&
-        TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(event) &&
-        traceParseData.UserInteractions.interactionsOverThreshold.has(event)) {
-      contentHelper.appendWarningRow(event, TimelineModel.TimelineModel.TimelineModelImpl.WarningType.LongInteraction);
-    }
-
     if (detailed && !Number.isNaN(duration || 0)) {
       contentHelper.appendTextRow(
           i18nString(UIStrings.totalTime), i18n.TimeUtilities.millisToString(duration || 0, true));
@@ -2368,7 +2367,13 @@ export class TimelineUIUtils {
         }
 
         if (payload && TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(payload)) {
+          const inputDelay = TraceEngine.Helpers.Timing.formatMicrosecondsTime(payload.inputDelay);
+          const mainThreadTime = TraceEngine.Helpers.Timing.formatMicrosecondsTime(payload.mainThreadHandling);
+          const presentationDelay = TraceEngine.Helpers.Timing.formatMicrosecondsTime(payload.presentationDelay);
           contentHelper.appendTextRow(i18nString(UIStrings.interactionID), payload.interactionId);
+          contentHelper.appendTextRow(i18nString(UIStrings.inputDelay), inputDelay);
+          contentHelper.appendTextRow(i18nString(UIStrings.mainThreadHandling), mainThreadTime);
+          contentHelper.appendTextRow(i18nString(UIStrings.presentationDelay), presentationDelay);
         }
         break;
       }
@@ -3312,14 +3317,6 @@ export class TimelineUIUtils {
       case warnings.LongHandler: {
         span.textContent =
             i18nString(UIStrings.handlerTookS, {PH1: i18n.TimeUtilities.millisToString((duration || 0), true)});
-        break;
-      }
-
-      case warnings.LongInteraction: {
-        const longInteractionINPLink =
-            UI.XLink.XLink.create('https://web.dev/inp', i18nString(UIStrings.longInteractionINP));
-        span.appendChild(i18n.i18n.getFormatLocalizedString(
-            str_, UIStrings.sIsLikelyPoorPageResponsiveness, {PH1: longInteractionINPLink}));
         break;
       }
 

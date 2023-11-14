@@ -405,9 +405,14 @@ describeWithMockConnection('TimelineUIUtils', function() {
   });
 
   describe('traceEventDetails', function() {
-    it('shows the interaction ID for EventTiming events that have an interaction ID', async function() {
-      const data = await TraceLoader.allModels(this, 'slow-interaction-button-click.json.gz');
-      const interactionEvent = data.traceParsedData.UserInteractions.interactionEventsWithNoNesting[0];
+    it('shows the interaction ID and INP breakdown metrics for a given interaction', async function() {
+      const data = await TraceLoader.allModels(this, 'one-second-interaction.json.gz');
+      const interactionEvent = data.traceParsedData.UserInteractions.interactionEventsWithNoNesting.find(entry => {
+        return entry.dur === 979974 && entry.type === 'click';
+      });
+      if (!interactionEvent) {
+        throw new Error('Could not find expected event');
+      }
       const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
           interactionEvent,
           data.timelineModel,
@@ -416,10 +421,28 @@ describeWithMockConnection('TimelineUIUtils', function() {
           data.traceParsedData,
       );
       const rowData = getRowDataForDetailsElement(details);
-      assert.deepEqual(rowData, [{
-                         title: 'ID',
-                         value: '1540',
-                       }]);
+      assert.deepEqual(rowData, [
+        {
+          title: 'Warning',
+          value: 'Long interaction is indicating poor page responsiveness.',
+        },
+        {
+          title: 'ID',
+          value: '4122',
+        },
+        {
+          title: 'Input delay',
+          value: '1ms',
+        },
+        {
+          title: 'Main thread processing',
+          value: '977ms',
+        },
+        {
+          title: 'Presentation delay',
+          value: '1.974ms',
+        },
+      ]);
     });
 
     it('renders the details for a layout shift properly', async function() {
@@ -605,7 +628,28 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const details = Timeline.TimelineUIUtils.TimelineUIUtils.eventTitle(interactionEvent);
       assert.deepEqual(details, 'Pointer');
     });
+
+    it('will use the resolved function name for a profile node that has a sourcemap', async function() {
+      // Timeline.SourceMapsResolver.SourceMapsResolver.
+      const traceParsedData = await TraceLoader.traceEngine(this, 'slow-interaction-button-click.json.gz');
+
+      const mainThread = getMainThread(traceParsedData.Renderer);
+      const profileEntry = mainThread.entries.find(entry => {
+        return TraceEngine.Types.TraceEvents.isProfileCall(entry);
+      });
+      if (!profileEntry || !TraceEngine.Types.TraceEvents.isProfileCall(profileEntry)) {
+        throw new Error('Could not find a profile entry');
+      }
+
+      // Fake that we resolved the entry's name from a sourcemap.
+      Timeline.SourceMapsResolver.SourceMapsResolver.storeResolvedNodeNameForEntry(
+          profileEntry.pid, profileEntry.tid, profileEntry.nodeId, 'resolved-function-test');
+
+      const title = Timeline.TimelineUIUtils.TimelineUIUtils.eventTitle(profileEntry);
+      assert.strictEqual(title, 'resolved-function-test');
+    });
   });
+
   describe('eventStyle', function() {
     it('returns the correct style for profile calls', async function() {
       const data = await TraceLoader.allModels(this, 'simple-js-program.json.gz');

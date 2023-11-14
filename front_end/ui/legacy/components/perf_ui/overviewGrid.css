@@ -93,11 +93,17 @@
   visibility: hidden;
   display: flex;
   position: absolute;
-  top: 20px;
+  top: 15px;
   justify-content: center;
   z-index: 600;
   left: 0;
   right: 0;
+}
+
+.create-breadcrumb-button-container.with-screenshots {
+  /* We have more room when screenshots are enabled,
+   * so push the button down slightly */
+  top: 20px;
 }
 
 .create-breadcrumb-button {
