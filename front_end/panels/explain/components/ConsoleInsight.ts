@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../core/host/host.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
@@ -10,7 +12,7 @@ import * as MarkdownView from '../../../ui/components/markdown_view/markdown_vie
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import {type InsightProvider} from '../InsightProvider.js';
-import {type PromptBuilder} from '../PromptBuilder.js';
+import {type PromptBuilder, type Source, SourceType} from '../PromptBuilder.js';
 
 import styles from './consoleInsight.css.js';
 
@@ -36,6 +38,33 @@ const negativeRatingReasons = [
   ['other', 'Other'],
 ];
 
+function buildLink(
+    rating: 'Good'|'Bad', reasonKeys: string[], comment: string, context: string): Platform.DevToolsPath.UrlString {
+  return `https://docs.google.com/forms/d/e/1FAIpQLSen1K-Uli0CSvlsNkI-L0Wq5iJ0FO9zFv0_mjM-3m5I8AKQGg/viewform?usp=pp_url&entry.1465663861=${
+             encodeURIComponent(rating)}&entry.166041694=${encodeURIComponent(reasonKeys.join(','))}&entry.109342357=${
+             encodeURIComponent(comment)}&entry.1805879004=${encodeURIComponent(context)}` as
+      Platform.DevToolsPath.UrlString;
+}
+
+function localizeType(sourceType: SourceType): string {
+  // TODO: localize.
+  switch (sourceType) {
+    case SourceType.MESSAGE:
+      return 'Console message';
+    case SourceType.STACKTRACE:
+      return 'Stacktrace';
+    case SourceType.NETWORK_REQUEST:
+      return 'Network request';
+    case SourceType.RELATED_CODE:
+      return 'Related code';
+    case SourceType.SEARCH_ANSWERS:
+      return 'Google Search results';
+  }
+}
+
+const DOGFOODFEEDBACK_URL =
+    'https://docs.google.com/forms/d/e/1FAIpQLSePjpPA0BUSbyG_xrsLR_HtrVixLqu5gAKOxgV-YfztVTf8Vg/viewform?usp=published_options';
+
 export class ConsoleInsight extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-console-insight`;
   readonly #shadow = this.attachShadow({mode: 'open'});
@@ -47,6 +76,13 @@ export class ConsoleInsight extends HTMLElement {
   #ratingFormOpened = false;
   #selectedRating?: boolean;
   #selectedRatingReasons = new Set<string>();
+  #context = {
+    prompt: '',
+    result: '',
+  };
+  #loading = true;
+  #dogfood = true;
+  #sources: Source[] = [];
 
   constructor(promptBuilder: PublicPromptBuilder, insightProvider: PublicInsightProvider) {
     super();
@@ -57,6 +93,16 @@ export class ConsoleInsight extends HTMLElement {
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [styles];
+    this.classList.add('opening');
+  }
+
+  set dogfood(value: boolean) {
+    this.#dogfood = value;
+    this.#render();
+  }
+
+  get dogfood(): boolean {
+    return this.#dogfood;
   }
 
   #renderMarkdown(content: string): void {
@@ -64,18 +110,33 @@ export class ConsoleInsight extends HTMLElement {
     this.#render();
   }
 
+  #setLoading(loading: boolean): void {
+    this.#loading = loading;
+    this.#render();
+  }
+
   async update(): Promise<void> {
-    this.#renderMarkdown('loading...');
+    this.#sources = [];
+    this.#setLoading(true);
     try {
-      const prompt = await this.#promptBuilder.buildPrompt();
+      const {prompt, sources} = await this.#promptBuilder.buildPrompt();
       const result = await this.#insightProvider.getInsights(prompt);
+      this.#context = {
+        prompt,
+        result,
+      };
+      this.#sources = sources;
       this.#renderMarkdown(result);
     } catch (err) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightErrored);
       this.#renderMarkdown(`loading failed: ${err.message}`);
+    } finally {
+      this.#setLoading(false);
     }
   }
 
   #onClose(): void {
+    this.classList.add('closing');
     this.dispatchEvent(new CloseEvent());
   }
 
@@ -86,9 +147,33 @@ export class ConsoleInsight extends HTMLElement {
     this.#render();
   }
 
+  #onSubmit(): void {
+    if (this.#dogfood) {
+      this.#openFeedbackFrom();
+    }
+    this.#onCloseRating();
+  }
+
+  #openFeedbackFrom(): void {
+    const link = buildLink(
+        this.#selectedRating ? 'Good' : 'Bad', Array.from(this.#selectedRatingReasons),
+        this.#shadow.querySelector('textarea')?.value || '', JSON.stringify(this.#context));
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(link);
+  }
+
   #onRating(event: Event): void {
-    this.#ratingFormOpened = true;
     this.#selectedRating = (event.target as HTMLElement).dataset.rating === 'true';
+    if (this.#selectedRating) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRatedPositive);
+    } else {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRatedNegative);
+    }
+    if (this.#dogfood) {
+      this.#openFeedbackFrom();
+      return;
+    }
+    this.#ratingFormOpened = true;
+
     this.#render();
   }
 
@@ -127,7 +212,7 @@ export class ConsoleInsight extends HTMLElement {
               }>
             </${IconButton.Icon.Icon.litTagName}>
           </div>
-          <div class="filler">Insights</div>
+          <div class="filler">${this.#loading ? 'Generating…' : 'Insight'}</div>
           <div>
             <${Buttons.Button.Button.litTagName}
               title=${'Close'}
@@ -142,10 +227,24 @@ export class ConsoleInsight extends HTMLElement {
             ></${Buttons.Button.Button.litTagName}>
           </div>
         </header>
+        ${this.#loading ? html`
         <main>
-        <${MarkdownView.MarkdownView.MarkdownView.litTagName}
-          .data=${{tokens: this.#tokens, renderer: this.#renderer} as MarkdownView.MarkdownView.MarkdownViewData}>
-        </${MarkdownView.MarkdownView.MarkdownView.litTagName}>
+          <div class="loader"></div>
+        </main>` : html`
+        <main>
+          <${MarkdownView.MarkdownView.MarkdownView.litTagName}
+            .data=${{tokens: this.#tokens, renderer: this.#renderer} as MarkdownView.MarkdownView.MarkdownViewData}>
+          </${MarkdownView.MarkdownView.MarkdownView.litTagName}>
+          <details>
+            <summary>Sources</summary>
+            <ul>
+              ${Directives.repeat(this.#sources, item => item.value, item => {
+                const icon = new IconButton.Icon.Icon();
+                icon.data = {iconName: 'open-externally', color: 'var(--sys-color-primary)', width: '14px', height: '14px'};
+                return html`<li><x-link class="link" href=${`data:text/plain,${encodeURIComponent(item.value)}`}>${localizeType(item.type)}${icon}</x-link></li>`;
+              })}
+            </ul>
+          </details>
         </main>
         <footer>
           <div>
@@ -177,8 +276,22 @@ export class ConsoleInsight extends HTMLElement {
             ></${Buttons.Button.Button.litTagName}>
           </div>
           <div class="filler"></div>
-          <div>TODO</div>
+          ${this.#dogfood ? html`<div class="dogfood-feedback">
+              <${IconButton.Icon.Icon.litTagName}
+                .data=${
+                  {
+                    iconName: 'dog-paw',
+                    color: 'var(--icon-default)',
+                    width: '16px',
+                    height: '16px',
+                  } as IconButton.Icon.IconData
+                }>
+              </${IconButton.Icon.Icon.litTagName}>
+              <span>Dogfood - </span>
+              <x-link href=${DOGFOODFEEDBACK_URL} class="link">Submit feedback</x-link>
+          </div>`: ''}
         </footer>
+        `}
       </div>
       ${this.#ratingFormOpened ? html`
         <div class=${bottomWrapper}>
@@ -233,7 +346,7 @@ export class ConsoleInsight extends HTMLElement {
                     size: Buttons.Button.Size.MEDIUM,
                   } as Buttons.Button.ButtonData
                 }
-                @click=${this.#onCloseRating}
+                @click=${this.#onSubmit}
               >
                 Submit
               </${Buttons.Button.Button.litTagName}>

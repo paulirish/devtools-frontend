@@ -64,10 +64,13 @@
 
 devtools-issue-counter.toolbar-item {
   margin-top: -4px;
+  padding-left: 1px;
 }
 
 devtools-issue-counter.main-toolbar {
   margin-top: 1px;
+  margin-left: 1px;
+  margin-right: 1px;
 }
 
 .toolbar-dropdown-arrow {
@@ -448,6 +451,10 @@ select.toolbar-item:focus-visible > * {
 
 .toolbar-shadow:not(.floating) .toolbar-item:last-child:not(:first-child, .toolbar-select-container) {
   flex-shrink: 1;
+  justify-content: left;
+}
+
+.toolbar-shadow:not(.floating) .toolbar-button.toolbar-item:last-child:not(:first-child, .toolbar-select-container) {
   justify-content: center;
   margin-right: 2px;
 }

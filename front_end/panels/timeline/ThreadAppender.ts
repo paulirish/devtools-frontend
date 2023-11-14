@@ -8,7 +8,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {
   addDecorationToEvent,
@@ -160,23 +160,22 @@ export class ThreadAppender implements TrackAppender {
 
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
-  #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+  #traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
 
   #entries: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
   #tree: TraceEngine.Helpers.TreeHelpers.TraceEntryTree;
   #processId: TraceEngine.Types.TraceEvents.ProcessID;
   #threadId: TraceEngine.Types.TraceEvents.ThreadID;
   #threadDefaultName: string;
-  #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
   #expanded = false;
   #headerAppended: boolean = false;
   readonly threadType: ThreadType = ThreadType.MAIN_THREAD;
   readonly isOnMainFrame: boolean;
   #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignoreListJSFramesOnTimeline');
   #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
+  #treeManipulator?: TraceEngine.TreeManipulator.TreeManipulator;
   constructor(
-      compatibilityBuilder: CompatibilityTracksAppender, flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
-      traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData,
+      compatibilityBuilder: CompatibilityTracksAppender, traceParsedData: TraceEngine.Handlers.Types.TraceParseData,
       processId: TraceEngine.Types.TraceEvents.ProcessID, threadId: TraceEngine.Types.TraceEvents.ThreadID,
       threadName: string|null, type: ThreadType) {
     this.#compatibilityBuilder = compatibilityBuilder;
@@ -193,7 +192,6 @@ export class ThreadAppender implements TrackAppender {
     this.#traceParsedData = traceParsedData;
     this.#processId = processId;
     this.#threadId = threadId;
-    this.#flameChartData = flameChartData;
 
     // When loading a CPU profile, only CPU data will be available, thus
     // we get the data from the SamplesHandler.
@@ -217,6 +215,22 @@ export class ThreadAppender implements TrackAppender {
     if (this.#traceParsedData.AuctionWorklets.worklets.has(processId)) {
       this.appenderName = 'Thread_AuctionWorklet';
     }
+
+    this.#treeManipulator = new TraceEngine.TreeManipulator.TreeManipulator(
+        this.threadType === ThreadType.CPU_PROFILE ? traceParsedData.Samples.entryToNode :
+                                                     traceParsedData.Renderer.entryToNode);
+  }
+
+  modifyTree(
+      traceEvent: TraceEngine.Types.TraceEvents.TraceEntry, action: TraceEngine.TreeManipulator.TreeAction,
+      flameChartView: PerfUI.FlameChart.FlameChart): void {
+    if (!this.#treeManipulator) {
+      return;
+    }
+    // TODO(crbug.com/1469887): Change MERGE_FUNCTION to the user selected operation
+    this.#treeManipulator.applyAction({type: action, entry: traceEvent});
+    this.#entries = this.#treeManipulator.invisibleEntries();
+    flameChartView.dispatchEventToListeners(PerfUI.FlameChart.Events.EntriesModified);
   }
 
   processId(): TraceEngine.Types.TraceEvents.ProcessID {
@@ -237,6 +251,7 @@ export class ThreadAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded: boolean = false): number {
+    this.#headerAppended = false;
     if (this.#entries.length === 0) {
       return trackStartLevel;
     }
@@ -296,7 +311,7 @@ export class ThreadAppender implements TrackAppender {
       const headerStyle = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
       const headerGroup =
           buildTrackHeader(trackStartLevel, this.trackName(), headerStyle, /* selectable= */ false, this.#expanded);
-      this.#flameChartData.groups.push(headerGroup);
+      this.#compatibilityBuilder.getFlameChartTimelineData().groups.push(headerGroup);
     }
 
     // Nesting is set to 1 because the track is appended inside the
@@ -438,6 +453,7 @@ export class ThreadAppender implements TrackAppender {
   #appendNodesAtLevel(
       nodes: Iterable<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
+    const invisibleEntries = this.#treeManipulator?.invisibleEntries() ?? [];
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
@@ -451,7 +467,9 @@ export class ThreadAppender implements TrackAppender {
       // another traversal to the entries array (which could grow
       // large). To avoid the extra cost we  add the check in the
       // traversal we already need to append events.
-      const entryIsVisible = this.#compatibilityBuilder.entryIsVisibleInTimeline(entry) || this.#showAllEventsEnabled;
+      const entryIsVisible =
+          (!invisibleEntries.includes(entry) && this.#compatibilityBuilder.entryIsVisibleInTimeline(entry)) ||
+          this.#showAllEventsEnabled;
       // For ignore listing support, these two conditions need to be met
       // to not append a profile call to the flame chart:
       // 1. It is ignore listed
@@ -487,11 +505,12 @@ export class ThreadAppender implements TrackAppender {
     if (!warnings) {
       return;
     }
-    addDecorationToEvent(this.#flameChartData, index, {type: 'WARNING_TRIANGLE'});
+    const flameChartData = this.#compatibilityBuilder.getFlameChartTimelineData();
+    addDecorationToEvent(flameChartData, index, {type: 'WARNING_TRIANGLE'});
     if (!warnings.includes('LONG_TASK')) {
       return;
     }
-    addDecorationToEvent(this.#flameChartData, index, {
+    addDecorationToEvent(flameChartData, index, {
       type: 'CANDY',
       startAtTime: TraceEngine.Handlers.ModelHandlers.Warnings.LONG_MAIN_THREAD_TASK_THRESHOLD,
     });

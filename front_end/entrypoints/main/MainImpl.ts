@@ -155,7 +155,9 @@ export class MainImpl {
     await this.requestAndRegisterLocaleData();
 
     Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync_preferences').get());
-    void VisualLogging.startLogging();
+    if (Root.Runtime.Runtime.queryParam('veLogging')) {
+      void VisualLogging.startLogging();
+    }
 
     void this.#createAppUI();
   }
@@ -301,6 +303,12 @@ export class MainImpl {
         'https://developer.chrome.com/blog/js-profiler-deprecation/',
         'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548');
 
+    // Sources
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE, 'Disable Indentation Markers temporarily',
+        /* unstable= */ false, 'https://developer.chrome.com/blog/new-in-devtools-121/#indentation',
+        'https://crbug.com/1479986');
+
     // Debugging
     Root.Runtime.experiments.register(
         'wasmDWARFDebugging', 'WebAssembly Debugging: Enable DWARF support', undefined,
@@ -394,6 +402,9 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
         'Redesign of the filter bar in the Network Panel',
+        false,
+        'https://goo.gle/devtools-network-filter-redesign',
+        'https://crbug.com/1500573',
     );
 
     Root.Runtime.experiments.register(
@@ -403,6 +414,11 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
         'Enable context menu that allows to modify trees in the Flame Chart', true);
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.AUTOFILL_VIEW,
+        'Enable Autofill view',
+    );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',
@@ -417,6 +433,7 @@ export class MainImpl {
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
+      ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocolMonitor'] : []),
     ]);
 
     Root.Runtime.experiments.setNonConfigurableExperiments([
@@ -907,7 +924,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         buttons[index].element.focus();
         event.consume(true);
       });
-      contextMenu.headerSection().appendCustomItem(dockItemElement);
+      contextMenu.headerSection().appendCustomItem(dockItemElement, 'dockSide');
     }
 
     const button = (this.#itemInternal.element as HTMLButtonElement);
@@ -932,7 +949,8 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         UI.InspectorView.InspectorView.instance().drawerVisible() ? i18nString(UIStrings.hideConsoleDrawer) :
                                                                     i18nString(UIStrings.showConsoleDrawer));
     contextMenu.appendItemsAtLocation('mainMenu');
-    const moreTools = contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools));
+    const moreTools =
+        contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools), false, 'moreTools');
     const viewExtensions = UI.ViewManager.getRegisteredViewExtensions();
     viewExtensions.sort((extension1, extension2) => {
       const title1 = extension1.title();
@@ -950,7 +968,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         moreTools.defaultSection().appendItem(title, () => {
           Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
           void UI.ViewManager.ViewManager.instance().showView('issues-pane', /* userGesture */ true);
-        });
+        }, {jslogContext: id});
         continue;
       }
 
@@ -966,16 +984,16 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         previewIcon.data = {iconName: 'experiment', color: 'var(--icon-default)', width: '16px', height: '16px'};
         moreTools.defaultSection().appendItem(title, () => {
           void UI.ViewManager.ViewManager.instance().showView(id, true, false);
-        }, /* disabled=*/ false, previewIcon);
+        }, {disabled: false, additionalElement: previewIcon, jslogContext: id});
         continue;
       }
 
       moreTools.defaultSection().appendItem(title, () => {
         void UI.ViewManager.ViewManager.instance().showView(id, true, false);
-      });
+      }, {jslogContext: id});
     }
 
-    const helpSubMenu = contextMenu.footerSection().appendSubMenuItem(i18nString(UIStrings.help));
+    const helpSubMenu = contextMenu.footerSection().appendSubMenuItem(i18nString(UIStrings.help), false, 'help');
     helpSubMenu.appendItemsAtLocation('mainMenuHelp');
   }
 }

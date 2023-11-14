@@ -40,6 +40,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
+import * as Components from './components/components.js';
 import {type TimelineCategory} from './EventUICategory.js';
 import {type PerformanceModel} from './PerformanceModel.js';
 import {ThreadAppender, ThreadType} from './ThreadAppender.js';
@@ -138,7 +139,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private legacyPerformanceModel: PerformanceModel|null;
   private compatibilityTracksAppender: CompatibilityTracksAppender|null;
   private legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl|null;
-  private traceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null;
+  private traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null;
   private isCpuProfile = false;
   /**
    * Raster threads are tracked and enumerated with this property. This is also
@@ -211,6 +212,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.flowEventIndexById = new Map();
   }
 
+  modifyTree(
+      group: PerfUI.FlameChart.Group, node: number, action: TraceEngine.TreeManipulator.TreeAction,
+      flameChartView: PerfUI.FlameChart.FlameChart): void {
+    const entry = this.entryData[node] as TraceEngine.Types.TraceEvents.TraceEntry;
+    this.compatibilityTracksAppender?.modifyTree(group, entry, action, flameChartView);
+  }
+
   private buildGroupStyle(extra: Object): PerfUI.FlameChart.GroupStyle {
     const defaultGroupStyle = {
       padding: 4,
@@ -225,7 +233,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 
   setModel(
-      performanceModel: PerformanceModel|null, newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData|null,
+      performanceModel: PerformanceModel|null, newTraceEngineData: TraceEngine.Handlers.Types.TraceParseData|null,
       isCpuProfile = false): void {
     this.reset();
     this.legacyPerformanceModel = performanceModel;
@@ -246,7 +254,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
    * Sets the minimum time and total time span of a trace using the
    * new engine data.
    */
-  setTimingBoundsData(newTraceEngineData: TraceEngine.Handlers.Migration.PartialTraceData): void {
+  setTimingBoundsData(newTraceEngineData: TraceEngine.Handlers.Types.TraceParseData): void {
     const {traceBounds} = newTraceEngineData.Meta;
     const minTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceBounds.min);
     const maxTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceBounds.max);
@@ -365,18 +373,24 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return this.#font;
   }
 
-  reset(): void {
+  // resetCompatibilityTracksAppender boolean set to false does not recreate the thread appenders
+  reset(resetCompatibilityTracksAppender: boolean = true): void {
     this.currentLevel = 0;
-    this.timelineDataInternal = null;
     this.entryData = [];
     this.entryParent = [];
     this.entryTypeByLevel = [];
     this.entryIndexToTitle = [];
     this.asyncColorByCategory = new Map();
     this.screenshotImageCache = new Map();
-    this.compatibilityTracksAppender = null;
     this.#eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
     this.#indexForEvent = new WeakMap<TraceEngine.Legacy.Event, number>();
+    if (resetCompatibilityTracksAppender) {
+      this.compatibilityTracksAppender = null;
+      this.timelineDataInternal = null;
+    } else if (!resetCompatibilityTracksAppender && this.timelineDataInternal) {
+      this.compatibilityTracksAppender?.setFlameChartDataAndEntryData(
+          this.timelineDataInternal, this.entryData, this.entryTypeByLevel);
+    }
   }
 
   maxStackDepth(): number {
@@ -388,8 +402,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
    * the new trace engine) and the legacy code paths present in this
    * file. The result built data is cached and returned.
    */
-  timelineData(): PerfUI.FlameChart.FlameChartTimelineData {
-    if (this.timelineDataInternal && this.timelineDataInternal.entryLevels.length !== 0) {
+  timelineData(rebuild: boolean = false): PerfUI.FlameChart.FlameChartTimelineData {
+    if (this.timelineDataInternal && this.timelineDataInternal.entryLevels.length !== 0 && !rebuild) {
       // The flame chart data is built already, so return the cached
       // data.
       return this.timelineDataInternal;
@@ -398,6 +412,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.timelineDataInternal = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
     if (!this.legacyTimelineModel) {
       return this.timelineDataInternal;
+    }
+
+    if (rebuild) {
+      this.reset(false);
     }
 
     this.flowEventIndexById.clear();
@@ -908,6 +926,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     let warningElements: Element[] = [];
     let nameSpanTimelineInfoTime = 'timeline-info-time';
 
+    const additionalContent: HTMLElement[] = [];
+
     const entryType = this.entryType(entryIndex);
     if (entryType === EntryType.TrackAppender) {
       if (!this.compatibilityTracksAppender) {
@@ -920,6 +940,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       title = highlightedEntryInfo.title;
       time = highlightedEntryInfo.formattedTime;
       warningElements = highlightedEntryInfo.warningElements || warningElements;
+      if (TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(event)) {
+        const breakdown = new Components.InteractionBreakdown.InteractionBreakdown();
+        breakdown.entry = event;
+        additionalContent.push(breakdown);
+      }
     } else if (entryType === EntryType.Event) {
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
       const totalTime = event.duration;
@@ -980,6 +1005,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         warningElement.classList.add('timeline-info-warning');
         contents.appendChild(warningElement);
       }
+    }
+    for (const elem of additionalContent) {
+      contents.appendChild(elem);
     }
     return element;
   }

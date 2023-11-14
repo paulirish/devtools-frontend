@@ -215,6 +215,16 @@ const parameterToRemoteObject = (runtimeModel: SDK.RuntimeModel.RuntimeModel|nul
       return runtimeModel.createRemoteObjectFromPrimitiveValue(parameter);
     };
 
+const EXPLAIN_HOVER_ACTION_ID = 'explain.consoleMessage:hover';
+
+const hoverButtonObserver = new IntersectionObserver(results => {
+  for (const result of results) {
+    if (result.intersectionRatio > 0) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightHoverButtonShown);
+    }
+  }
+});
+
 export class ConsoleViewMessage implements ConsoleViewportElement {
   protected message: SDK.ConsoleModel.ConsoleMessage;
   private readonly linkifier: Components.Linkifier.Linkifier;
@@ -226,7 +236,10 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     forceSelect: () => void,
   }[];
   private readonly messageResized: (arg0: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>) => void;
+  // The wrapper that contains consoleRowWrapper and other elements in a column.
   protected elementInternal: HTMLElement|null;
+  // The element that wraps console message elements in a row.
+  protected consoleRowWrapper: HTMLElement|null = null;
   private readonly previewFormatter: ObjectUI.RemoteObjectPreviewFormatter.RemoteObjectPreviewFormatter;
   private searchRegexInternal: RegExp|null;
   protected messageIcon: IconButton.Icon.Icon|null;
@@ -293,7 +306,12 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     this.elementInternal?.querySelector('devtools-console-insight')?.remove();
     this.elementInternal?.append(insight);
     insight.addEventListener('close', () => {
-      this.elementInternal?.removeChild(insight);
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightClosed);
+      insight.addEventListener('animationend', () => {
+        this.elementInternal?.removeChild(insight);
+      }, {
+        once: true,
+      });
     }, {once: true});
   }
 
@@ -1035,7 +1053,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     } else if (this.elementInternal && !this.similarGroupMarker && inSimilarGroup) {
       this.similarGroupMarker = document.createElement('div');
       this.similarGroupMarker.classList.add('nesting-level-marker');
-      this.elementInternal.insertBefore(this.similarGroupMarker, this.elementInternal.firstChild);
+      this.consoleRowWrapper?.insertBefore(this.similarGroupMarker, this.consoleRowWrapper.firstChild);
       this.similarGroupMarker.classList.toggle('group-closed', this.lastInSimilarGroup);
     }
   }
@@ -1223,6 +1241,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
 
     this.elementInternal.className = 'console-message-wrapper';
     this.elementInternal.removeChildren();
+    this.consoleRowWrapper = this.elementInternal.createChild('div');
+    this.consoleRowWrapper.classList.add('console-row-wrapper');
     if (this.message.isGroupStartMessage()) {
       this.elementInternal.classList.add('console-group-title');
     }
@@ -1230,7 +1250,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       this.elementInternal.classList.add('console-from-api');
     }
     if (this.inSimilarGroup) {
-      this.similarGroupMarker = (this.elementInternal.createChild('div', 'nesting-level-marker') as HTMLElement);
+      this.similarGroupMarker = (this.consoleRowWrapper.createChild('div', 'nesting-level-marker') as HTMLElement);
       this.similarGroupMarker.classList.toggle('group-closed', this.lastInSimilarGroup);
     }
 
@@ -1265,10 +1285,47 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       this.elementInternal.classList.add('console-warning-level');
     }
 
-    this.elementInternal.appendChild(this.contentElement());
+    this.consoleRowWrapper.appendChild(this.contentElement());
+
+    const action = UI.ActionRegistry.ActionRegistry.instance().action(EXPLAIN_HOVER_ACTION_ID);
+    if (action) {
+      if (document.documentElement.matches('.aida-available')) {
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightConsoleMessageShown);
+      }
+      this.consoleRowWrapper.append(this.#createHoverButton());
+    }
+
     if (this.repeatCountInternal > 1) {
       this.showRepeatCountElement();
     }
+  }
+
+  #createHoverButton(): HTMLButtonElement {
+    const icon = new IconButton.Icon.Icon();
+    icon.data = {
+      iconName: 'spark-info',
+      color: 'var(--sys-color-primary)',
+      width: '16px',
+      height: '16px',
+    };
+    const button = document.createElement('button');
+    button.append(icon);
+    button.onclick = (event: Event): void => {
+      event.stopPropagation();
+      UI.Context.Context.instance().setFlavor(ConsoleViewMessage, this);
+      const action = UI.ActionRegistry.ActionRegistry.instance().action(EXPLAIN_HOVER_ACTION_ID);
+      if (!action) {
+        return;
+      }
+      void action.execute();
+    };
+    const text = document.createElement('span');
+    // TODO: localize.
+    text.innerText = 'Explain this error';
+    button.append(text);
+    button.classList.add('hover-button');
+    hoverButtonObserver.observe(button);
+    return button;
   }
 
   private shouldRenderAsWarning(): boolean {
@@ -1382,7 +1439,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
         this.repeatCountElement.type = 'warning';
       }
 
-      this.elementInternal.insertBefore(this.repeatCountElement, this.contentElementInternal);
+      this.consoleRowWrapper?.insertBefore(this.repeatCountElement, this.contentElementInternal);
       this.contentElement().classList.add('repeated-message');
     }
     this.repeatCountElement.textContent = `${this.repeatCountInternal}`;
@@ -1780,7 +1837,7 @@ export class ConsoleGroupViewMessage extends ConsoleViewMessage {
       if (this.repeatCountElement) {
         this.repeatCountElement.insertBefore(this.expandGroupIcon, this.repeatCountElement.firstChild);
       } else {
-        element.insertBefore(this.expandGroupIcon, this.contentElementInternal);
+        this.consoleRowWrapper?.insertBefore(this.expandGroupIcon, this.contentElementInternal);
       }
       element.addEventListener('click', () => this.setCollapsed(!this.collapsedInternal));
     }

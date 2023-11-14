@@ -28,7 +28,7 @@ enum VisualElements {
   AccessibilitySourceOrder = 5,
   Toggle = 6,
   AddStylesRule = 7,
-  FilterTextField = 8,
+  TextField = 8,
   ShowAllStyleProperties = 9,
   StylePropertiesSection = 10,
   StylePropertiesSectionSeparator = 11,
@@ -87,13 +87,14 @@ enum VisualElements {
   ToggleDeviceMode = 64,
   ToggleElementSearch = 65,
   PanelTabHeader = 66,
+  Menu = 67,
 }
 
 function resolveVe(ve: string): number {
   return VisualElements[ve as keyof typeof VisualElements] || 0;
 }
 
-function parseJsLog(jslog: string): LoggingConfig {
+export function parseJsLog(jslog: string): LoggingConfig {
   const components = jslog.replace(/ /g, '').split(';');
   const getComponent = (name: string): string|undefined =>
       components.find(c => c.startsWith(name))?.substr(name.length);

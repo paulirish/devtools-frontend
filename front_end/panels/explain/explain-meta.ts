@@ -10,7 +10,7 @@ const UIStrings = {
   /**
    *@description Title of an action to explain a console message.
    */
-  explainConsoleMessage: '✨ Explain console message',
+  explainConsoleMessage: 'Explain this error',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/explain/explain-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -19,7 +19,7 @@ if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
   const Console = await import('../console/console.js');
 
   UI.ActionRegistration.registerActionExtension({
-    actionId: 'explain.consoleMessage',
+    actionId: 'explain.consoleMessage:hover',
     category: UI.ActionRegistration.ActionCategory.EXPLAIN,
     async loadActionDelegate() {
       const Explain = await import('./explain.js');
@@ -30,4 +30,38 @@ if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
       return [Console.ConsoleViewMessage.ConsoleViewMessage];
     },
   });
+
+  UI.ActionRegistration.registerActionExtension({
+    actionId: 'explain.consoleMessage:context',
+    category: UI.ActionRegistration.ActionCategory.EXPLAIN,
+    async loadActionDelegate() {
+      const Explain = await import('./explain.js');
+      return Explain.ActionDelegate.instance();
+    },
+    title: i18nLazyString(UIStrings.explainConsoleMessage),
+    contextTypes() {
+      return [Console.ConsoleViewMessage.ConsoleViewMessage];
+    },
+  });
+
+  void isAidaAvailable().then(async result => {
+    if (result) {
+      document.documentElement.classList.add('aida-available');
+    }
+  });
+}
+
+async function isAidaAvailable(): Promise<boolean> {
+  const Explain = await import('./explain.js');
+  const provider = new Explain.InsightProvider();
+  /* eslint-disable no-console */
+  try {
+    const result = await provider.getInsights('Hello world in JavaScript');
+    console.info('AIDA is available', result);
+    return true;
+  } catch (err) {
+    console.warn('AIDA is not available', err);
+    return false;
+  }
+  /* eslint-enable no-console */
 }

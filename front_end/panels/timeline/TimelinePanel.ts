@@ -324,7 +324,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.primaryPageTargetPromiseCallback = res;
   });
 
-  #traceEngineModel: TraceEngine.TraceModel.Model<typeof TraceEngine.Handlers.Migration.ENABLED_TRACE_HANDLERS>;
+  #traceEngineModel: TraceEngine.TraceModel.Model<typeof TraceEngine.Handlers.ModelHandlers>;
   // Tracks the index of the trace that the user is currently viewing.
   #traceEngineActiveTraceIndex = -1;
   #threadTracksSource: ThreadTracksSource;
@@ -335,13 +335,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     super('timeline');
     this.#threadTracksSource = threadTracksSource;
     this.#minimapComponent = new TimelineMiniMap(threadTracksSource);
-    switch (threadTracksSource) {
-      case ThreadTracksSource.NEW_ENGINE:
-        this.#traceEngineModel = TraceEngine.TraceModel.Model.createWithAllHandlers();
-        break;
-      default:
-        this.#traceEngineModel = TraceEngine.TraceModel.Model.createWithRequiredHandlersForMigration();
-    }
+    this.#traceEngineModel = TraceEngine.TraceModel.Model.createWithAllHandlers();
     this.element.addEventListener('contextmenu', this.contextMenu.bind(this), false);
     this.dropTarget = new UI.DropTarget.DropTarget(
         this.element, [UI.DropTarget.Type.File, UI.DropTarget.Type.URI],
@@ -357,7 +351,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.recordReloadAction =
         (UI.ActionRegistry.ActionRegistry.instance().action('timeline.record-reload') as UI.ActionRegistration.Action);
 
-    this.#historyManager = new TimelineHistoryManager(threadTracksSource);
+    this.#historyManager = new TimelineHistoryManager(threadTracksSource, this.#minimapComponent);
 
     this.performanceModel = null;
     this.traceLoadStart = null;
@@ -1122,7 +1116,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private reset(): void {
     PerfUI.LineLevelProfile.Performance.instance().reset();
     if (this.performanceModel) {
-      this.performanceModel.removeEventListener(Events.NamesResolved, this.updateModelAndFlameChart, this);
+      this.performanceModel.removeEventListener(Events.NamesResolved, this.#onSourceMapsNodeNamesResolved, this);
     }
     if (this.#sourceMapsResolver) {
       this.#sourceMapsResolver.removeEventListener(
@@ -1167,7 +1161,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     this.flameChart.setModel(model, traceParsedData, isCpuProfile);
 
-    this.updateOverviewControls();
     this.#minimapComponent.reset();
     if (model) {
       model.addEventListener(Events.WindowChanged, this.onModelWindowChanged, this);
@@ -1334,14 +1327,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #onSourceMapsNodeNamesResolved(): void {
-    this.updateModelAndFlameChart();
-  }
-
-  updateModelAndFlameChart(): void {
-    if (!this.performanceModel) {
-      return;
-    }
-    this.setModel(this.performanceModel, null, this.#traceEngineActiveTraceIndex);
     this.flameChart.updateColorMapper();
   }
 
@@ -1408,7 +1393,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // and update the flamechart on any sourcemap resolution.
       if (this.#threadTracksSource !== ThreadTracksSource.NEW_ENGINE &&
           !this.performanceModel.hasEventListeners(Events.NamesResolved)) {
-        this.performanceModel.addEventListener(Events.NamesResolved, this.updateModelAndFlameChart, this);
+        this.performanceModel.addEventListener(Events.NamesResolved, this.#onSourceMapsNodeNamesResolved, this);
       }
 
       // Otherwise if we are running the new engine, instantiate it with the

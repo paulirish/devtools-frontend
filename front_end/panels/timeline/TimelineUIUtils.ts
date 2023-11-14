@@ -410,9 +410,9 @@ const UIStrings = {
    */
   inputDelay: 'Input delay',
   /**
-   *@description Text shown next to the interaction event's main thread processing time in the detail view.
+   *@description Text shown next to the interaction event's thread processing time in the detail view.
    */
-  mainThreadHandling: 'Main thread processing',
+  processingTime: 'Processing time',
   /**
    *@description Text shown next to the interaction event's presentation delay time in the detail view.
    */
@@ -1357,7 +1357,7 @@ export class TimelineUIUtils {
 
   static testContentMatching(
       traceEvent: TraceEngine.Legacy.CompatibleTraceEvent, regExp: RegExp,
-      traceParsedData?: TraceEngine.Handlers.Migration.PartialTraceData): boolean {
+      traceParsedData?: TraceEngine.Handlers.Types.TraceParseData): boolean {
     const title = TimelineUIUtils.eventStyle(traceEvent).title;
     const tokens = [title];
 
@@ -1944,7 +1944,7 @@ export class TimelineUIUtils {
       // awkward because to change them is to cause a lot of layout tests to be
       // updated. We should rewrite those tests as unit tests in this codebase,
       // and then we can more easily change this method.
-      traceParseData: TraceEngine.Handlers.Migration.PartialTraceData|null = null,
+      traceParseData: TraceEngine.Handlers.Types.TraceParseData|null = null,
       ): Promise<DocumentFragment> {
     const maybeTarget = model.targetByEvent(event);
     const {duration, selfTime} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
@@ -2374,7 +2374,7 @@ export class TimelineUIUtils {
           const presentationDelay = TraceEngine.Helpers.Timing.formatMicrosecondsTime(payload.presentationDelay);
           contentHelper.appendTextRow(i18nString(UIStrings.interactionID), payload.interactionId);
           contentHelper.appendTextRow(i18nString(UIStrings.inputDelay), inputDelay);
-          contentHelper.appendTextRow(i18nString(UIStrings.mainThreadHandling), mainThreadTime);
+          contentHelper.appendTextRow(i18nString(UIStrings.processingTime), mainThreadTime);
           contentHelper.appendTextRow(i18nString(UIStrings.presentationDelay), presentationDelay);
         }
         break;
@@ -2543,14 +2543,7 @@ export class TimelineUIUtils {
       } = {};
       const categoryStack: string[] = [];
       let lastTime = 0;
-      TimelineModel.TimelineModel.TimelineModelImpl.forEachEvent(
-          events, onStartEvent, onEndEvent, undefined, undefined, undefined, filterForStats());
-
-      function filterForStats(): (arg0: TraceEngine.Legacy.CompatibleTraceEvent) => boolean {
-        const visibleEventsFilter = TimelineUIUtils.visibleEventsFilter();
-        return (event: TraceEngine.Legacy.CompatibleTraceEvent): boolean =>
-                   visibleEventsFilter.accept(event) || TraceEngine.Legacy.TracingModel.isTopLevelEvent(event);
-      }
+      TimelineModel.TimelineModel.TimelineModelImpl.forEachEvent(events, onStartEvent, onEndEvent);
 
       function updateCategory(category: string, time: number): void {
         let statsArrays: {
@@ -2581,7 +2574,8 @@ export class TimelineUIUtils {
 
       function onStartEvent(e: TraceEngine.Legacy.CompatibleTraceEvent): void {
         const {startTime} = TraceEngine.Legacy.timesForEventInMilliseconds(e);
-        const category = TimelineUIUtils.eventStyle(e).category.name;
+        const category = getEventStyle(e.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category.name ||
+            getCategoryStyles().Other.name;
         const parentCategory = categoryStack.length ? categoryStack[categoryStack.length - 1] : null;
         if (category !== parentCategory) {
           categoryChange(parentCategory || null, category, startTime);
@@ -2896,7 +2890,7 @@ export class TimelineUIUtils {
       total: {
         [x: string]: number,
       },
-      traceParseData: TraceEngine.Handlers.Migration.PartialTraceData,
+      traceParseData: TraceEngine.Handlers.Types.TraceParseData,
       event: TraceEngine.Legacy.CompatibleTraceEvent): boolean {
     const events = traceParseData.Renderer?.allTraceEntries || [];
     const {startTime, endTime} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
@@ -3719,7 +3713,7 @@ export interface TimelineMarkerStyle {
  **/
 export function timeStampForEventAdjustedForClosestNavigationIfPossible(
     event: TraceEngine.Types.TraceEvents.TraceEventData,
-    traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData|null): TraceEngine.Types.Timing.MilliSeconds {
+    traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null): TraceEngine.Types.Timing.MilliSeconds {
   if (!traceParsedData) {
     const {startTime} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
     return startTime;

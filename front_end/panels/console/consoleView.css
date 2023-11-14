@@ -189,7 +189,7 @@
 
 .console-message-wrapper {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   margin: 4px;
   border-radius: 5px;
 
@@ -218,6 +218,11 @@
       background-color: var(--sys-color-state-focus-select);
     }
   }
+}
+
+.console-row-wrapper {
+  display: flex;
+  flex-direction: row;
 }
 
 .-theme-with-dark-background .console-message-wrapper {
@@ -356,11 +361,11 @@
 #console-messages .link {
   cursor: pointer;
   text-decoration: underline;
+  color: var(--text-link);
 }
 
 #console-messages .link,
 #console-messages .devtools-link {
-  color: var(--sys-color-primary);
   word-break: break-all;
 }
 
@@ -467,6 +472,68 @@
 
 devtools-console-insight {
   margin: 9px 22px 11px 24px;
+}
+
+.hover-button {
+  --width: 24px;
+
+  align-items: center;
+  background-color: var(--sys-color-cdt-base-container);
+  border-radius: 50%;
+  border: none;
+  box-shadow: var(--drop-shadow-depth-3);
+  box-sizing: border-box;
+  color: var(--sys-color-primary);
+  font-family: var(--default-font-family);
+  height: var(--width);
+  justify-content: center;
+  margin: 0;
+  max-height: var(--width);
+  max-width: var(--width);
+  min-height: var(--width);
+  min-width: var(--width);
+  overflow: hidden;
+  padding: 4px;
+  position: absolute;
+  right: 6px;
+  display: none;
+  width: var(--width);
+}
+
+.hover-button span {
+  display: none;
+  white-space: nowrap;
+}
+
+.hover-button:hover {
+  border-radius: 100px;
+  max-width: 200px;
+  transition: max-width 0.3s ease;
+  width: fit-content;
+  gap: 3px;
+}
+
+.hover-button devtools-icon {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  height: 16px;
+  min-height: 16px;
+  min-width: 16px;
+  width: 16px;
+}
+
+.hover-button:hover span {
+  display: block;
+}
+
+.aida-available .console-message-wrapper:hover .hover-button,
+.aida-available .console-message-wrapper:focus .hover-button {
+  display: block;
+}
+
+.aida-available .console-message-wrapper:hover .hover-button:hover,
+.aida-available .console-message-wrapper:focus .hover-button:hover {
+  display: inline-flex;
 }
 
 @media (forced-colors: active) {

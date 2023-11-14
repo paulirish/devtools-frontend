@@ -1,12 +1,20 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import type * as LoggableModule from './Loggable.js';
 import * as LoggingConfig from './LoggingConfig.js';
 import * as LoggingDriver from './LoggingDriver.js';
+import * as LoggingEvents from './LoggingEvents.js';
 import * as LoggingState from './LoggingState.js';
 
+type Loggable = LoggableModule.Loggable;
 const {startLogging, stopLogging} = LoggingDriver;
 const {registerContextProvider, registerParentProvider} = LoggingState;
+const {logImpressions, logClick} = LoggingEvents;
+
+function registerLoggable(loggable: Loggable, config: string, parent: Loggable|null): void {
+  void LoggingState.getOrCreateLoggingState(loggable, LoggingConfig.parseJsLog(config), parent || undefined);
+}
 
 const accessibilityComputedProperties =
     LoggingConfig.makeConfigStringBuilder.bind(null, 'AccessibilityComputedProperties');
@@ -41,7 +49,6 @@ const elementsPanel = LoggingConfig.makeConfigStringBuilder.bind(null, 'Elements
 const elementsTreeOutline = LoggingConfig.makeConfigStringBuilder.bind(null, 'ElementsTreeOutline');
 const eventListenersPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'EventListenersPane');
 const filterDropdown = LoggingConfig.makeConfigStringBuilder.bind(null, 'FilterDropdown');
-const filterTextField = LoggingConfig.makeConfigStringBuilder.bind(null, 'FilterTextField');
 const flexboxOverlays = LoggingConfig.makeConfigStringBuilder.bind(null, 'FlexboxOverlays');
 const fullAccessibilityTree = LoggingConfig.makeConfigStringBuilder.bind(null, 'FullAccessibilityTree');
 const gridOverlays = LoggingConfig.makeConfigStringBuilder.bind(null, 'GridOverlays');
@@ -51,6 +58,7 @@ const jumpToElement = LoggingConfig.makeConfigStringBuilder.bind(null, 'JumpToEl
 const jumpToSource = LoggingConfig.makeConfigStringBuilder.bind(null, 'JumpToSource');
 const key = LoggingConfig.makeConfigStringBuilder.bind(null, 'Key');
 const link = LoggingConfig.makeConfigStringBuilder.bind(null, 'Link');
+const menu = LoggingConfig.makeConfigStringBuilder.bind(null, 'Menu');
 const metricsBox = LoggingConfig.makeConfigStringBuilder.bind(null, 'MetricsBox');
 const next = LoggingConfig.makeConfigStringBuilder.bind(null, 'Next');
 const paletteColorShades = LoggingConfig.makeConfigStringBuilder.bind(null, 'PaletteColorShades');
@@ -61,12 +69,14 @@ const refresh = LoggingConfig.makeConfigStringBuilder.bind(null, 'Refresh');
 const showAllStyleProperties = LoggingConfig.makeConfigStringBuilder.bind(null, 'ShowAllStyleProperties');
 const showStyleEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'ShowStyleEditor');
 const slider = LoggingConfig.makeConfigStringBuilder.bind(null, 'Slider');
+const stylesComputedPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesComputedPane');
 const stylePropertiesSection = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylePropertiesSection');
 const stylePropertiesSectionSeparator =
     LoggingConfig.makeConfigStringBuilder.bind(null, 'StylePropertiesSectionSeparator');
 const stylesMetricsPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesMetricsPane');
 const stylesPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesPane');
 const stylesSelector = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesSelector');
+const textField = LoggingConfig.makeConfigStringBuilder.bind(null, 'TextField');
 const toggle = LoggingConfig.makeConfigStringBuilder.bind(null, 'Toggle');
 const toggleDeviceMode = LoggingConfig.makeConfigStringBuilder.bind(null, 'ToggleDeviceMode');
 const toggleElementSearch = LoggingConfig.makeConfigStringBuilder.bind(null, 'ToggleElementSearch');
@@ -77,10 +87,14 @@ const treeItemExpand = LoggingConfig.makeConfigStringBuilder.bind(null, 'TreeIte
 const value = LoggingConfig.makeConfigStringBuilder.bind(null, 'Value');
 
 export {
+  Loggable,
+  logClick,
+  logImpressions,
   startLogging,
   stopLogging,
   registerContextProvider,
   registerParentProvider,
+  registerLoggable,
 
   accessibilityComputedProperties,
   accessibilityPane,
@@ -114,7 +128,6 @@ export {
   elementsTreeOutline,
   eventListenersPane,
   filterDropdown,
-  filterTextField,
   flexboxOverlays,
   fullAccessibilityTree,
   gridOverlays,
@@ -124,6 +137,7 @@ export {
   jumpToSource,
   key,
   link,
+  menu,
   metricsBox,
   next,
   paletteColorShades,
@@ -134,11 +148,13 @@ export {
   showAllStyleProperties,
   showStyleEditor,
   slider,
+  stylesComputedPane,
   stylePropertiesSection,
   stylePropertiesSectionSeparator,
   stylesMetricsPane,
   stylesPane,
   stylesSelector,
+  textField,
   toggle,
   toggleDeviceMode,
   toggleElementSearch,

@@ -458,6 +458,21 @@ export class UserMetrics {
     InspectorFrontendHostInstance.recordPerformanceHistogram(
         'DevTools.VisualLogging.ProcessingTime', timeInMilliseconds);
   }
+
+  legacyResourceTypeFilterNumberOfSelectedChanged(itemCount: number): void {
+    const boundItemCount = Math.max(Math.min(itemCount, ResourceType.MaxValue - 1), 1);
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.LegacyResourceTypeFilterNumberOfSelectedChanged, boundItemCount, ResourceType.MaxValue);
+  }
+
+  legacyResourceTypeFilterItemSelected(resourceTypeName: string): void {
+    const resourceType = ResourceType[resourceTypeName as keyof typeof ResourceType];
+    if (resourceType === undefined) {
+      return;
+    }
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.LegacyResourceTypeFilterItemSelected, resourceType, ResourceType.MaxValue);
+  }
 }
 
 /**
@@ -588,7 +603,16 @@ export enum Action {
   OverrideContentContextMenuRedirectToDeployed = 110,
   NewStyleRuleAdded = 111,
   TraceExpanded = 112,
-  MaxValue = 113,
+  InsightConsoleMessageShown = 113,
+  InsightRequestedViaContextMenu = 114,
+  InsightRequestedViaHoverButton = 115,
+  InsightRefined = 116,
+  InsightRatedPositive = 117,
+  InsightRatedNegative = 118,
+  InsightClosed = 119,
+  InsightErrored = 120,
+  InsightHoverButtonShown = 121,
+  MaxValue = 122,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -660,7 +684,8 @@ export enum PanelCodes {
   'preloading' = 64,
   'bounce_tracking_mitigations' = 65,
   'resource-loading-pane' = 66,
-  MaxValue = 67,
+  'autofill-view' = 67,
+  MaxValue = 68,
 }
 
 /* eslint-enable @typescript-eslint/naming-convention */
@@ -934,9 +959,11 @@ export enum DevtoolsExperiments {
   'networkPanelFilterBarRedesign' = 79,
   'breadcrumbsPerformancePanel' = 80,
   'trackContextMenu' = 81,
+  'autofillView' = 82,
+  'sourcesFrameIndentationMarkersTemporarilyDisable' = 83,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 82,
+  'MaxValue' = 84,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -1140,6 +1167,26 @@ export enum DeveloperResourceScheme {
   SchemeFile = 7,
   SchemeBlob = 8,
   MaxValue = 9,
+}
+
+// TODO(crbug.com/1167717): Make this a const enum again
+// eslint-disable-next-line rulesdir/const_enum
+export enum ResourceType {
+  /* eslint-disable @typescript-eslint/naming-convention */
+  all = 0,
+  /* eslint-enable @typescript-eslint/naming-convention */
+  Documents = 1,
+  Scripts = 2,
+  'XHR and Fetch' = 3,
+  Stylesheets = 4,
+  Fonts = 5,
+  Images = 6,
+  Media = 7,
+  Manifest = 8,
+  WebSockets = 9,
+  WebAssembly = 10,
+  Other = 11,
+  MaxValue = 12,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

@@ -270,6 +270,7 @@
   --sys-color-yellow-outline: var(--ref-palette-yellow70);
   --sys-color-error-outline: var(--ref-palette-error80);
   --sys-color-divider: var(--ref-palette-primary90);
+  --sys-color-divider-prominent: var(--ref-palette-primary70);
 
   /* States */
 
@@ -408,6 +409,12 @@
    * Color for the active breadcrumb in the Performance Panel timeline.
    */
   --app-color-active-breadcrumb: var(--ref-palette-blue40);
+
+  /**
+  * Gradients
+  */
+  --sys-color-gradient-primary: var(--ref-palette-primary90);
+  --sys-color-gradient-tertiary: var(--ref-palette-tertiary95);
 }
 
 .-theme-with-dark-background {
@@ -633,6 +640,7 @@
   --sys-color-yellow-outline: var(--ref-palette-yellow40);
   --sys-color-error-outline: var(--ref-palette-error80);
   --sys-color-divider: var(--ref-palette-neutral30);
+  --sys-color-divider-prominent: var(--ref-palette-neutral50);
 
   /* States */
 
@@ -768,4 +776,10 @@
    * Color for the active breadcrumb in the Performance Panel timeline.
    */
   --app-color-active-breadcrumb: var(--ref-palette-blue40);
+
+  /**
+  * Gradients
+  */
+  --sys-color-gradient-primary: var(--ref-palette-primary30);
+  --sys-color-gradient-tertiary: var(--ref-palette-tertiary30);
 }

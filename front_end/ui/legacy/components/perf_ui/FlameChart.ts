@@ -138,7 +138,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     width: number,
   }>;
   private lastMouseOffsetX: number;
-  private selectedGroup: number;
+  private selectedGroupIndex: number;
   private keyboardFocusedGroup: number;
   private offsetWidth!: number;
   private offsetHeight!: number;
@@ -225,7 +225,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.markerPositions = new Map();
 
     this.lastMouseOffsetX = 0;
-    this.selectedGroup = -1;
+    this.selectedGroupIndex = -1;
 
     // Keyboard focused group is used to navigate groups irrespective of whether they are selectable or not
     this.keyboardFocusedGroup = -1;
@@ -354,11 +354,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.#groupTreeRoot = null;
   }
 
-  timelineData(): FlameChartTimelineData|null {
+  timelineData(rebuid?: boolean): FlameChartTimelineData|null {
     if (!this.dataProvider) {
       return null;
     }
-    const timelineData = this.dataProvider.timelineData();
+    const timelineData = this.dataProvider.timelineData(rebuid);
     if (timelineData !== this.rawTimelineData ||
         (timelineData && timelineData.entryStartTimes.length !== this.rawTimelineDataLength)) {
       this.processTimelineData(timelineData);
@@ -505,7 +505,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private selectGroup(groupIndex: number): void {
-    if (groupIndex < 0 || this.selectedGroup === groupIndex) {
+    if (groupIndex < 0 || this.selectedGroupIndex === groupIndex) {
       return;
     }
     if (!this.rawTimelineData) {
@@ -524,7 +524,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.deselectAllGroups();
       UI.ARIAUtils.alert(i18nString(UIStrings.sHovered, {PH1: groupName}));
     } else {
-      this.selectedGroup = groupIndex;
+      this.selectedGroupIndex = groupIndex;
       this.flameChartDelegate.updateSelectedGroup(this, groups[groupIndex]);
       this.resetCanvas();
       this.draw();
@@ -533,7 +533,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private deselectAllGroups(): void {
-    this.selectedGroup = -1;
+    this.selectedGroupIndex = -1;
     this.flameChartDelegate.updateSelectedGroup(this, null);
     this.resetCanvas();
     this.draw();
@@ -546,7 +546,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private isGroupFocused(index: number): boolean {
-    return index === this.selectedGroup || index === this.keyboardFocusedGroup;
+    return index === this.selectedGroupIndex || index === this.keyboardFocusedGroup;
   }
 
   private scrollGroupIntoView(index: number): void {
@@ -753,7 +753,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (!data) {
       return;
     }
-    const group = data.groups.at(this.selectedGroup);
+    const group = data.groups.at(this.selectedGroupIndex);
     // Early exit here if there is no group or:
     // 1. The group is not expanded: it needs to be expanded to allow the
     //    context menu actions to occur.
@@ -763,6 +763,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
     // TODO(crbug.com/1469887): implement context menu actions that allow to modify flame chart trees.
+    // TODO(crbug.com/1469887): keep selectedTrack and Y scroll poisition when context menu action is applied.
 
     // Update the selected index to match the highlighted index, which
     // represents the entry under the cursor where the user has right clicked
@@ -770,10 +771,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.dispatchEventToListeners(Events.EntryInvoked, this.highlightedEntryIndex);
     const contextMenu = new UI.ContextMenu.ContextMenu(_event);
 
-    // TODO(crbug.com/1469887): Change text/ui to the final designs when they are complete.
-    contextMenu.headerSection().appendItem('Merge function', () => {});
+    const dispatchTreeModifiedEvent = (treeAction: TraceEngine.TreeManipulator.TreeAction): void => {
+      this.dispatchEventToListeners(Events.TreeModified, {
+        group: group,
+        node: this.selectedEntryIndex,
+        action: treeAction,
+      });
+    };
 
-    contextMenu.headerSection().appendItem('Collapse function', () => {});
+    // TODO(crbug.com/1469887): Change text/ui to the final designs when they are complete.
+    contextMenu.headerSection().appendItem('Merge function', () => {
+      dispatchTreeModifiedEvent(TraceEngine.TreeManipulator.TreeAction.MERGE_FUNCTION);
+    });
+
+    contextMenu.headerSection().appendItem('Collapse function', () => {
+      dispatchTreeModifiedEvent(TraceEngine.TreeManipulator.TreeAction.COLLAPSE_FUNCTION);
+    });
 
     contextMenu.headerSection().appendItem('Collapse recursion', () => {});
 
@@ -2091,7 +2104,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.entryColorsCache = null;
       this.rawTimelineDataLength = 0;
       this.#groupTreeRoot = null;
-      this.selectedGroup = -1;
+      this.selectedGroupIndex = -1;
       this.keyboardFocusedGroup = -1;
       this.flameChartDelegate.updateSelectedGroup(this, null);
       return;
@@ -2135,8 +2148,15 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateLevelPositions();
     this.updateHeight();
 
-    this.selectedGroup = timelineData.selectedGroup ? groups.indexOf(timelineData.selectedGroup) : -1;
-    this.keyboardFocusedGroup = this.selectedGroup;
+    // If this is a new trace, we will call the reset()(See TimelineFlameChartView > setModel()), which will set the
+    // |selectedGroupIndex| to -1.
+    // So when |selectedGroupIndex| is not -1, it means it is the same trace file, but might have some modification
+    // (like reorder the track, merge an entry, etc).
+    if (this.selectedGroupIndex === -1) {
+      this.selectedGroupIndex = timelineData.selectedGroup ? groups.indexOf(timelineData.selectedGroup) : -1;
+    }
+
+    this.keyboardFocusedGroup = this.selectedGroupIndex;
     this.flameChartDelegate.updateSelectedGroup(this, timelineData.selectedGroup);
   }
 
@@ -2521,6 +2541,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.highlightedMarkerIndex = -1;
     this.highlightedEntryIndex = -1;
     this.selectedEntryIndex = -1;
+    this.selectedGroupIndex = -1;
   }
 
   scheduleUpdate(): void {
@@ -2626,6 +2647,8 @@ export class FlameChartTimelineData {
     this.selectedGroup = null;
   }
 
+  // TODO(crbug.com/1501055) Thinking about refactor this class, so we can avoid create a new object when modifying the
+  // flame chart.
   static create(data: {
     entryLevels: FlameChartTimelineData['entryLevels'],
     entryTotalTimes: FlameChartTimelineData['entryTotalTimes'],
@@ -2637,6 +2660,8 @@ export class FlameChartTimelineData {
         data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || []);
   }
 
+  // TODO(crbug.com/1501055) Thinking about refactor this class, so we can avoid create a new object when modifying the
+  // flame chart.
   static createEmpty(): FlameChartTimelineData {
     return new FlameChartTimelineData(
         [],  // entry levels: what level on the timeline is an event on,
@@ -2656,7 +2681,7 @@ export interface FlameChartDataProvider {
 
   maxStackDepth(): number;
 
-  timelineData(): FlameChartTimelineData|null;
+  timelineData(rebuild?: boolean): FlameChartTimelineData|null;
 
   prepareHighlightedEntryInfo(entryIndex: number): Element|null;
 
@@ -2719,6 +2744,16 @@ export enum Events {
    * mouse off the event)
    */
   EntryHighlighted = 'EntryHighlighted',
+  /**
+   * Emitted when a there is a modify actioned(ex. merge, collapse recursion)
+   * chosen from the flame chart context  menu
+   */
+  TreeModified = 'TreeModified',
+  /**
+   * Emitted when a there is a modify actioned(ex. merge, collapse recursion)
+   * chosen from the flame chart context  menu
+   */
+  EntriesModified = 'EntriesModified',
 }
 
 export type EventTypes = {
@@ -2726,6 +2761,12 @@ export type EventTypes = {
   [Events.EntryInvoked]: number,
   [Events.EntrySelected]: number,
   [Events.EntryHighlighted]: number,
+  [Events.TreeModified]: {
+    group: Group,
+    node: number,
+    action: TraceEngine.TreeManipulator.TreeAction,
+  },
+  [Events.EntriesModified]: void,
 };
 
 export interface Group {
