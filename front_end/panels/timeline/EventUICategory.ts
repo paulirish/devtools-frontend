@@ -458,6 +458,14 @@ const UIStrings = {
    */
   layoutShift: 'Layout Shift',
   /**
+   *@description Text in Timeline for Web Neural Network Compute MLGraph
+   */
+  mlGraphCompute: 'Compute MLGraph',
+  /**
+   *@description Text in Timeline for Web Neural Network Build MLGraph
+   */
+  mlGraphBuild: 'Build MLGraph',
+  /**
    *@description Text in Timeline for an Event Timing record
    */
   eventTiming: 'Event Timing',
@@ -1065,6 +1073,14 @@ function maybeInitSylesMap(): EventStylesMap {
     [
       TraceEngine.Types.TraceEvents.KnownEventName.AsyncTask,
       new TimelineRecordStyle(i18nString(UIStrings.asyncTask), defaultCategoryStyles.Async),
+    ],
+    [
+      TraceEngine.Types.TraceEvents.KnownEventName.MLGraphCompute,
+      new TimelineRecordStyle(i18nString(UIStrings.mlGraphCompute), defaultCategoryStyles.Scripting),
+    ],
+    [
+      TraceEngine.Types.TraceEvents.KnownEventName.MLGraphBuild,
+      new TimelineRecordStyle(i18nString(UIStrings.mlGraphBuild), defaultCategoryStyles.Scripting),
     ],
     [
       TraceEngine.Types.TraceEvents.KnownEventName.LayoutShift,

@@ -1618,6 +1618,12 @@ export const enum KnownEventName {
   ProfileChunk = 'ProfileChunk',
   UpdateCounters = 'UpdateCounters',
 
+  /* Web Neural Network API */
+  // TODO: Swap to the new trace event names..
+  MLGraphCompute = 'XnnRuntimeWrapper::Invoke', //'Compute MLGraph',
+  MLGraphBuild = 'XnnRuntimeWrapper::Create', // 'Build MLGraph',
+
+
   /* Other */
   Animation = 'Animation',
   ParseAuthorStyleSheet = 'ParseAuthorStyleSheet',

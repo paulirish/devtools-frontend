@@ -103,3 +103,19 @@ The object returned from `traceParsedData()` is an object of key-value pairs whe
   // and so on for each enabled Handler
 }
 ```
+
+# Chromium Dev guide for showing trace events in DevTools
+
+## Guidelines
+
+1. Unlike the majority of regular trace events consumed in chrome:tracing or Perfetto, we prefer to treat the DevTools-visible trace events *as* the API, implying that:
+   - we should aim at making them stable across chrome versions, when practical
+   - they should not depend on implementation too much (i.e. **avoid `Class::Method` in their names**, as this will get confusing when the class is renamed);
+1. Events should be meaningful to and actionable by the web developers
+1. We should provide precise attribution for most events -- i.e. resources, DOM elements etc. This is especially critical where pages other than the one being inspected may cause interference (for interactive DevTools users) and for differentiating third-party scripts or frames.
+
+## How-to
+
+1. Choose a trace event name that won't need to be renamed when the implementation is refactored.
+1. Ensure the trace event is emitted [with a category we use](https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts;l=94-105;drc=2f825c15dca3b7cdb4b065aec3613b7ca272b248).  `devtools.timeline` is a good choice.
+1.
