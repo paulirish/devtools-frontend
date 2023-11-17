@@ -538,13 +538,10 @@ export class TimelineModelImpl {
     if (browserMain) {
       browserMain.events().forEach(this.processBrowserEvent, this);
 
-      if (Root.Runtime.experiments.isEnabled('timelineShowAllEvents')) {
-        // const track = this.ensureNamedTrack(TrackType.Browser);
-        // track.thread = browserMain;
-        // track.events = browserMain.events();
-        this.processThreadEvents(tracingModel, browserMain, false /* maybe */, false, false, WorkletType.NotWorklet, null);
-
-      }
+      // if (Root.Runtime.experiments.isEnabled('timelineShowAllEvents')) {
+      //   // show browser process
+      //   this.processThreadEvents(tracingModel, browserMain, false /* maybe */, false, false, WorkletType.NotWorklet, null);
+      // }
     }
   }
 

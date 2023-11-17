@@ -230,13 +230,21 @@ export function assignThreadName(
     threadsInProcess:
         Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventThreadName>>):
     void {
-  for (const [, renderProcessesByPid] of rendererProcessesByFrame) {
-    for (const [pid] of renderProcessesByPid) {
-      const process = getOrCreateRendererProcess(processes, pid);
-      for (const [tid, threadInfo] of threadsInProcess.get(pid) ?? []) {
-        const thread = getOrCreateRendererThread(process, tid);
-        thread.name = threadInfo?.args.name ?? `${tid}`;
-      }
+  // for (const [, renderProcessesByPid] of rendererProcessesByFrame) {
+  //   for (const [pid] of renderProcessesByPid) {
+  //     const process = getOrCreateRendererProcess(processes, pid);
+  //     for (const [tid, threadInfo] of threadsInProcess.get(pid) ?? []) {
+  //       const thread = getOrCreateRendererThread(process, tid);
+  //       thread.name = threadInfo?.args.name ?? `${tid}`;
+  //     }
+  //   }
+  // }
+  // This does all processes/threads, not just renderers.
+  for (const [pid, threadInfoByTid] of threadsInProcess) {
+    const process = getOrCreateRendererProcess(processes, pid);
+    for (const [tid, threadInfo] of threadInfoByTid) {
+      const thread = getOrCreateRendererThread(process, tid);
+      thread.name = threadInfo?.args.name ?? `${tid}`;
     }
   }
 }
@@ -247,6 +255,11 @@ export function assignThreadName(
  *  - Deletes processes with an unkonwn origin.
  */
 export function sanitizeProcesses(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
+  // Don't delete anything if we want to show it all.
+  if (config.experiments.timelineShowAllEvents) {
+    return;
+  }
+
   const auctionWorklets = auctionWorkletsData().worklets;
   for (const [pid, process] of processes) {
     // If the process had no url, or if it had a malformed url that could not be
@@ -281,6 +294,10 @@ export function sanitizeProcesses(processes: Map<Types.TraceEvents.ProcessID, Re
  *  - Deletes threads with no roots.
  */
 export function sanitizeThreads(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
+  // Don't delete anything if we want to show it all. (Not sure about this one)
+  if (config.experiments.timelineShowAllEvents) {
+    return;
+  }
   for (const [, process] of processes) {
     for (const [tid, thread] of process.threads) {
       // If the thread has no roots, delete it. Otherwise, there's going to
