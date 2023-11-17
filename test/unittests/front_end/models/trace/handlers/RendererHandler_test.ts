@@ -8,6 +8,7 @@ import * as TraceModel from '../../../../../../front_end/models/trace/trace.js';
 import * as Timeline from '../../../../../../front_end/panels/timeline/timeline.js';
 import {describeWithEnvironment} from '../../../helpers/EnvironmentHelpers.js';
 import {
+  getAllNodes,
   getEventsIn,
   getRootAt,
   makeBeginEvent,
@@ -862,13 +863,18 @@ describeWithEnvironment('RendererHandler', function() {
 
       const data = await handleEvents(traceEvents);
 
-      assert.strictEqual(data.allRendererEvents.length, 7);
+      assert.strictEqual(data.allTraceEntries.length, 7);
       assert.strictEqual(data.processes.size, 1);
       const [process] = data.processes.values();
       assert.strictEqual(process.threads.size, 1);
       const [thread] = process.threads.values();
       assert.strictEqual(thread.tree?.roots.size, 2);
-      assert.strictEqual(thread.tree?.nodes.size, 5);
+      if (!thread.tree?.roots) {
+        // This shouldn't happen, since the tree.roots.size is 2, but add this if check to pass ts check.
+        return;
+      }
+      const allNodes = getAllNodes(thread.tree?.roots);
+      assert.strictEqual(allNodes.length, 5);
       if (!thread.tree) {
         return;
       }
@@ -896,13 +902,18 @@ describeWithEnvironment('RendererHandler', function() {
 
       const data = await handleEvents(traceEvents);
 
-      assert.strictEqual(data.allRendererEvents.length, 6);
+      assert.strictEqual(data.allTraceEntries.length, 6);
       assert.strictEqual(data.processes.size, 1);
       const [process] = data.processes.values();
       assert.strictEqual(process.threads.size, 1);
       const [thread] = process.threads.values();
       assert.strictEqual(thread.tree?.roots.size, 1);
-      assert.strictEqual(thread.tree?.nodes.size, 4);
+      if (!thread.tree?.roots) {
+        // This shouldn't happen, since the tree.roots.size is 1, but add this if check to pass ts check.
+        return;
+      }
+      const allNodes = getAllNodes(thread.tree?.roots);
+      assert.strictEqual(allNodes.length, 4);
       if (!thread.tree) {
         return;
       }

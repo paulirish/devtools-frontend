@@ -17,7 +17,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BidiJSHandle = void 0;
 const JSHandle_js_1 = require("../api/JSHandle.js");
-const Serializer_js_1 = require("./Serializer.js");
+const Errors_js_1 = require("../common/Errors.js");
+const Deserializer_js_1 = require("./Deserializer.js");
 const util_js_1 = require("./util.js");
 /**
  * @internal
@@ -72,7 +73,7 @@ class BidiJSHandle extends JSHandle_js_1.JSHandle {
     }
     toString() {
         if (this.isPrimitiveValue) {
-            return 'JSHandle:' + Serializer_js_1.BidiSerializer.deserialize(this.#remoteValue);
+            return 'JSHandle:' + Deserializer_js_1.BidiDeserializer.deserialize(this.#remoteValue);
         }
         return 'JSHandle@' + this.#remoteValue.type;
     }
@@ -83,7 +84,7 @@ class BidiJSHandle extends JSHandle_js_1.JSHandle {
         return this.#remoteValue;
     }
     remoteObject() {
-        throw new Error('Not available in WebDriver BiDi');
+        throw new Errors_js_1.UnsupportedOperation('Not available in WebDriver BiDi');
     }
 }
 exports.BidiJSHandle = BidiJSHandle;

@@ -18,6 +18,7 @@ import { debugError } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { Deferred } from '../util/Deferred.js';
 import { interpolateFunction, stringifyFunction } from '../util/Function.js';
+import { BidiDeserializer } from './Deserializer.js';
 import { BidiSerializer } from './Serializer.js';
 /**
  * @internal
@@ -28,6 +29,7 @@ export class ExposeableFunction {
     #apply;
     #channels;
     #callerInfos = new Map();
+    #preloadScriptId;
     constructor(frame, name, apply) {
         this.#frame = frame;
         this.name = name;
@@ -59,16 +61,23 @@ export class ExposeableFunction {
                 },
             });
         }, { name: JSON.stringify(name) }));
-        await connection.send('script.addPreloadScript', {
+        const { result } = await connection.send('script.addPreloadScript', {
             functionDeclaration,
             arguments: channelArguments,
+            contexts: [this.#frame.page().mainFrame()._id],
         });
-        await connection.send('script.callFunction', {
-            functionDeclaration,
-            arguments: channelArguments,
-            awaitPromise: false,
-            target: this.#frame.mainRealm().realm.target,
-        });
+        this.#preloadScriptId = result.script;
+        await Promise.all(this.#frame
+            .page()
+            .frames()
+            .map(async (frame) => {
+            return await connection.send('script.callFunction', {
+                functionDeclaration,
+                arguments: channelArguments,
+                awaitPromise: false,
+                target: frame.mainRealm().realm.target,
+            });
+        }));
     }
     #handleArgumentsMessage = async (params) => {
         if (params.channel !== this.#channels.args) {
@@ -79,7 +88,7 @@ export class ExposeableFunction {
         const args = remoteValue.value?.[1];
         assert(args);
         try {
-            const result = await this.#apply(...BidiSerializer.deserialize(args));
+            const result = await this.#apply(...BidiDeserializer.deserialize(args));
             await connection.send('script.callFunction', {
                 functionDeclaration: stringifyFunction(([_, resolve], result) => {
                     resolve(result);
@@ -198,6 +207,16 @@ export class ExposeableFunction {
             bindingMap.set(callerId, callbacks);
         }
         return { callbacks, remoteValue: data };
+    }
+    [Symbol.dispose]() {
+        void this[Symbol.asyncDispose]().catch(debugError);
+    }
+    async [Symbol.asyncDispose]() {
+        if (this.#preloadScriptId) {
+            await this.#connection.send('script.removePreloadScript', {
+                script: this.#preloadScriptId,
+            });
+        }
     }
 }
 //# sourceMappingURL=ExposedFunction.js.map

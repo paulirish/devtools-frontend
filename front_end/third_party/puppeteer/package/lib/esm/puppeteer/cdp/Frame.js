@@ -48,8 +48,8 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     done = true;
 };
 import { Frame, FrameEvent, throwIfDetached } from '../api/Frame.js';
+import { UnsupportedOperation } from '../common/Errors.js';
 import { setPageContent } from '../common/util.js';
-import { assert } from '../util/assert.js';
 import { Deferred } from '../util/Deferred.js';
 import { disposeSymbol } from '../util/disposable.js';
 import { isErrorLike } from '../util/ErrorLike.js';
@@ -231,12 +231,13 @@ let CdpFrame = (() => {
             return this._frameManager._frameTree.childFrames(this._id);
         }
         #deviceRequestPromptManager() {
-            if (this.isOOPFrame()) {
+            const rootFrame = this.page().mainFrame();
+            if (this.isOOPFrame() || rootFrame === null) {
                 return this._frameManager._deviceRequestPromptManager(this.#client);
             }
-            const parentFrame = this.parentFrame();
-            assert(parentFrame !== null);
-            return parentFrame.#deviceRequestPromptManager();
+            else {
+                return rootFrame._frameManager._deviceRequestPromptManager(this.#client);
+            }
         }
         async waitForDevicePrompt(options = {}) {
             return await this.#deviceRequestPromptManager().waitForDevicePrompt(options);
@@ -272,6 +273,9 @@ let CdpFrame = (() => {
             this.#detached = true;
             this.worlds[MAIN_WORLD][disposeSymbol]();
             this.worlds[PUPPETEER_WORLD][disposeSymbol]();
+        }
+        exposeFunction() {
+            throw new UnsupportedOperation();
         }
     };
 })();

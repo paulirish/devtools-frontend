@@ -93,10 +93,9 @@ export class CompatibilityTracksAppender {
   #eventsForTrack = new Map<TrackAppender, TraceEngine.Types.TraceEvents.TraceEventData[]>();
   #trackEventsForTreeview = new Map<TrackAppender, TraceEngine.Types.TraceEvents.TraceEventData[]>();
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
-  #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+  #traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
   #entryData: TimelineFlameChartEntry[];
   #colorGenerator: Common.Color.Generator;
-  #indexForEvent = new WeakMap<TraceEngine.Types.TraceEvents.TraceEventData, number>();
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
   #isCpuProfile = false;
@@ -133,7 +132,7 @@ export class CompatibilityTracksAppender {
    */
   constructor(
       flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
-      traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData, entryData: TimelineFlameChartEntry[],
+      traceParsedData: TraceEngine.Handlers.Types.TraceParseData, entryData: TimelineFlameChartEntry[],
       legacyEntryTypeByLevel: EntryType[], legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl,
       isCpuProfile = false) {
     this.#flameChartData = flameChartData;
@@ -147,8 +146,7 @@ export class CompatibilityTracksAppender {
     this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
     this.#legacyTimelineModel = legacyTimelineModel;
     this.#isCpuProfile = isCpuProfile;
-    this.#timingsTrackAppender =
-        new TimingsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
+    this.#timingsTrackAppender = new TimingsTrackAppender(this, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
 
       const uberFramesColorGenerator = new Common.Color.Generator(
@@ -168,8 +166,7 @@ export class CompatibilityTracksAppender {
         new UberFramesTrackAppender(this, this.#flameChartData, this.#traceParsedData, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#uberFramesTrackAppender);
 
-    this.#interactionsTrackAppender =
-        new InteractionsTrackAppender(this, this.#flameChartData, this.#traceParsedData, this.#colorGenerator);
+    this.#interactionsTrackAppender = new InteractionsTrackAppender(this, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#interactionsTrackAppender);
 
     this.#animationsTrackAppender = new AnimationsTrackAppender(this, this.#traceParsedData);
@@ -180,7 +177,7 @@ export class CompatibilityTracksAppender {
 
     // Layout Shifts track in OPP was called the "Experience" track even though
     // all it shows are layout shifts.
-    this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#flameChartData, this.#traceParsedData);
+    this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
     this.#addThreadAppenders();
@@ -194,6 +191,30 @@ export class CompatibilityTracksAppender {
     });
   }
 
+  setFlameChartDataAndEntryData(
+      flameChartData: PerfUI.FlameChart.FlameChartTimelineData, entryData: TimelineFlameChartEntry[],
+      legacyEntryTypeByLevel: EntryType[]): void {
+    this.#trackForGroup.clear();
+    this.#flameChartData = flameChartData;
+    this.#entryData = entryData;
+    this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
+  }
+
+  getFlameChartTimelineData(): PerfUI.FlameChart.FlameChartTimelineData {
+    return this.#flameChartData;
+  }
+
+  modifyTree(
+      group: PerfUI.FlameChart.Group, node: TraceEngine.Types.TraceEvents.TraceEntry,
+      action: TraceEngine.TreeManipulator.TreeAction, flameChartView: PerfUI.FlameChart.FlameChart): void {
+    const threadTrackAppender = this.#trackForGroup.get(group);
+    if (threadTrackAppender instanceof ThreadAppender) {
+      threadTrackAppender.modifyTree(node, action, flameChartView);
+    } else {
+      console.warn('Could not modify tree in not thread track');
+    }
+  }
+
   #addThreadAppenders(): void {
     const weight = (appender: ThreadAppender): number => {
       switch (appender.threadType) {
@@ -203,6 +224,8 @@ export class CompatibilityTracksAppender {
           return 2;
         case ThreadType.RASTERIZER:
           return 3;
+        case ThreadType.THREAD_POOL:
+          return 4;
         case ThreadType.AUCTION_WORKLET:
           return 4;
         case ThreadType.OTHER:
@@ -214,12 +237,11 @@ export class CompatibilityTracksAppender {
     if (this.#isCpuProfile && this.#traceParsedData.Samples) {
       for (const [pid, process] of this.#traceParsedData.Samples.profilesInProcess) {
         for (const tid of process.keys()) {
-          this.#threadAppenders.push(new ThreadAppender(
-              this, this.#flameChartData, this.#traceParsedData, pid, tid, null, ThreadType.CPU_PROFILE));
+          this.#threadAppenders.push(
+              new ThreadAppender(this, this.#traceParsedData, pid, tid, null, ThreadType.CPU_PROFILE));
         }
       }
     } else if (this.#traceParsedData.Renderer) {
-      let rasterCount = 0;
       for (const [pid, process] of this.#traceParsedData.Renderer.processes) {
         if (this.#traceParsedData.AuctionWorklets.worklets.has(pid)) {
           const workletEvent = this.#traceParsedData.AuctionWorklets.worklets.get(pid);
@@ -232,11 +254,11 @@ export class CompatibilityTracksAppender {
           // 2. the V8 Helper Thread
           // Note that the names passed here are not used visually. TODO: remove this name?
           this.#threadAppenders.push(new ThreadAppender(
-              this, this.#flameChartData, this.#traceParsedData, pid, workletEvent.args.data.utilityThread.tid,
-              'auction-worket-utility', ThreadType.AUCTION_WORKLET));
+              this, this.#traceParsedData, pid, workletEvent.args.data.utilityThread.tid, 'auction-worket-utility',
+              ThreadType.AUCTION_WORKLET));
           this.#threadAppenders.push(new ThreadAppender(
-              this, this.#flameChartData, this.#traceParsedData, pid, workletEvent.args.data.v8HelperThread.tid,
-              'auction-worklet-v8helper', ThreadType.AUCTION_WORKLET));
+              this, this.#traceParsedData, pid, workletEvent.args.data.v8HelperThread.tid, 'auction-worklet-v8helper',
+              ThreadType.AUCTION_WORKLET));
           continue;
         }
 
@@ -248,10 +270,12 @@ export class CompatibilityTracksAppender {
             threadType = ThreadType.WORKER;
           } else if (thread.name?.startsWith('CompositorTileWorker')) {
             threadType = ThreadType.RASTERIZER;
-            rasterCount++;
+          } else if (thread.name?.startsWith('ThreadPool')) {
+            // TODO(paulirish): perhaps exclude ThreadPoolServiceThread entirely
+            threadType = ThreadType.THREAD_POOL;
           }
-          this.#threadAppenders.push(new ThreadAppender(
-              this, this.#flameChartData, this.#traceParsedData, pid, tid, thread.name, threadType, rasterCount));
+          this.#threadAppenders.push(
+              new ThreadAppender(this, this.#traceParsedData, pid, tid, thread.name, threadType));
         }
       }
     }
@@ -306,15 +330,6 @@ export class CompatibilityTracksAppender {
 
   threadAppenders(): ThreadAppender[] {
     return this.#threadAppenders;
-  }
-
-  /**
-   * Get the index of the event.
-   * This ${index}-th elements in entryData, flameChartData.entryLevels, flameChartData.entryTotalTimes,
-   * flameChartData.entryStartTimes are all related to this event.
-   */
-  indexForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): number|undefined {
-    return this.#indexForEvent.get(event);
   }
 
   eventsInTrack(trackAppender: TrackAppender): TraceEngine.Types.TraceEvents.TraceEventData[] {
@@ -438,6 +453,15 @@ export class CompatibilityTracksAppender {
   }
 
   /**
+   * Returns number of tracks of given type already appended.
+   * Used to name the "Raster Thread 6" tracks, etc
+   */
+  getCurrentTrackCountForThreadType(threadType: ThreadType.RASTERIZER|ThreadType.THREAD_POOL): number {
+    return this.#threadAppenders.filter(appender => appender.threadType === threadType && appender.headerAppended())
+        .length;
+  }
+
+  /**
    * Looks up a FlameChart group for a given appender.
    */
   groupForAppender(targetAppender: TrackAppender): PerfUI.FlameChart.Group|null {
@@ -488,7 +512,6 @@ export class CompatibilityTracksAppender {
     this.#trackForLevel.set(level, appender);
     const index = this.#entryData.length;
     this.#entryData.push(event);
-    this.#indexForEvent.set(event, index);
     this.#legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
     this.#flameChartData.entryLevels[index] = level;
     this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
@@ -508,12 +531,17 @@ export class CompatibilityTracksAppender {
    * @param trackStartLevel the flame chart level from which the events will
    * be appended.
    * @param appender the track that the trace events belong to.
+   * @param eventAppendedCallback an optional function called after the
+   * event has been added to the timeline data. This allows the caller
+   * to know f.e. the position of the event in the entry data. Use this
+   * hook to customize the data after it has been appended, f.e. to add
+   * decorations to a set of the entries.
    * @returns the next level after the last occupied by the appended these
    * trace events (the first available level to append next track).
    */
-  appendEventsAtLevel(
-      events: readonly TraceEngine.Types.TraceEvents.TraceEventData[], trackStartLevel: number,
-      appender: TrackAppender): number {
+  appendEventsAtLevel<T extends TraceEngine.Types.TraceEvents.TraceEventData>(
+      events: readonly T[], trackStartLevel: number, appender: TrackAppender,
+      eventAppendedCallback?: (event: T, index: number) => void): number {
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
@@ -523,7 +551,8 @@ export class CompatibilityTracksAppender {
       // }
 
       const level = getEventLevel(event, lastUsedTimeByLevel);
-      this.appendEventAtLevel(event, trackStartLevel + level, appender);
+      const index = this.appendEventAtLevel(event, trackStartLevel + level, appender);
+      eventAppendedCallback?.(event, index);
     }
 
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;

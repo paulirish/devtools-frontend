@@ -270,6 +270,7 @@
   --sys-color-yellow-outline: var(--ref-palette-yellow70);
   --sys-color-error-outline: var(--ref-palette-error80);
   --sys-color-divider: var(--ref-palette-primary90);
+  --sys-color-divider-prominent: var(--ref-palette-primary70);
 
   /* States */
 
@@ -341,12 +342,15 @@
   /* Tinted surfaces */
 
   --sys-color-surface-yellow: rgb(254 246 213 / 100%);
+  --sys-color-surface-yellow-high: rgb(253 240 185 / 100%);
   --sys-color-surface-error: rgb(252 235 235 / 100%);
+  --sys-color-surface-green: rgb(219 243 226 / 100%);
 
   /* Corresponding on colors */
 
   --sys-color-on-surface-yellow: var(--ref-palette-yellow20);
   --sys-color-on-surface-error: var(--ref-palette-error30);
+  --sys-color-on-surface-green: var(--ref-palette-green20);
 
   /* Syntax highlighting */
 
@@ -405,6 +409,12 @@
    * Color for the active breadcrumb in the Performance Panel timeline.
    */
   --app-color-active-breadcrumb: var(--ref-palette-blue40);
+
+  /**
+  * Gradients
+  */
+  --sys-color-gradient-primary: var(--ref-palette-primary90);
+  --sys-color-gradient-tertiary: var(--ref-palette-tertiary95);
 }
 
 .-theme-with-dark-background {
@@ -630,6 +640,7 @@
   --sys-color-yellow-outline: var(--ref-palette-yellow40);
   --sys-color-error-outline: var(--ref-palette-error80);
   --sys-color-divider: var(--ref-palette-neutral30);
+  --sys-color-divider-prominent: var(--ref-palette-neutral50);
 
   /* States */
 
@@ -643,7 +654,7 @@
   --sys-color-state-focus-ring: var(--ref-palette-primary80);
   --sys-color-state-focus-select: var(--ref-palette-secondary50);
   --sys-color-state-focus-highlight: rgb(253 252 251 / 10%);
-  --sys-color-state-disabled: rgb(227 227 227 / 100%);
+  --sys-color-state-disabled: rgb(227 227 227 / 38%);
   --sys-color-state-disabled-container: rgb(227 227 227 / 12%);
   --sys-color-state-header-hover: var(--ref-palette-secondary30);
   --sys-color-state-on-header-hover: var(--ref-palette-secondary90);
@@ -698,12 +709,15 @@
   /* Tinted surfaces */
 
   --sys-color-surface-yellow: rgb(65 60 38 / 100%);
+  --sys-color-surface-yellow-high: rgb(76 68 37 / 100%);
   --sys-color-surface-error: rgb(78 53 52 / 100%);
+  --sys-color-surface-green: rgb(43 70 51 / 100%);
 
   /* Corresponding on colors */
 
   --sys-color-on-surface-yellow: var(--ref-palette-yellow90);
   --sys-color-on-surface-error: var(--ref-palette-error90);
+  --sys-color-on-surface-green: var(--ref-palette-green90);
 
   /* Syntax highlighting */
 
@@ -762,4 +776,10 @@
    * Color for the active breadcrumb in the Performance Panel timeline.
    */
   --app-color-active-breadcrumb: var(--ref-palette-blue40);
+
+  /**
+  * Gradients
+  */
+  --sys-color-gradient-primary: var(--ref-palette-primary30);
+  --sys-color-gradient-tertiary: var(--ref-palette-tertiary30);
 }

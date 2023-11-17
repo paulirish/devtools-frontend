@@ -13,21 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import type { CDPSession } from '../api/CDPSession.js';
 import { Frame, type GoToOptions, type WaitForOptions } from '../api/Frame.js';
-import type { PuppeteerLifeCycleEvent } from '../cdp/LifecycleWatcher.js';
 import type { TimeoutSettings } from '../common/TimeoutSettings.js';
 import type { Awaitable } from '../common/types.js';
 import { disposeSymbol } from '../util/disposable.js';
-import { type BrowsingContext } from './BrowsingContext.js';
+import type { BrowsingContext } from './BrowsingContext.js';
 import type { BidiHTTPResponse } from './HTTPResponse.js';
 import type { BidiPage } from './Page.js';
 import { Sandbox, type SandboxChart } from './Sandbox.js';
-/**
- * @internal
- */
-export declare const lifeCycleToReadinessState: Map<PuppeteerLifeCycleEvent, Bidi.BrowsingContext.ReadinessState>;
 /**
  * Puppeteer's Frame class could be viewed as a BiDi BrowsingContext implementation
  * @internal
@@ -41,6 +35,7 @@ export declare class BidiFrame extends Frame {
     mainRealm(): Sandbox;
     isolatedRealm(): Sandbox;
     page(): BidiPage;
+    isOOPFrame(): never;
     url(): string;
     parentFrame(): BidiFrame | null;
     childFrames(): BidiFrame[];
@@ -48,6 +43,7 @@ export declare class BidiFrame extends Frame {
     setContent(html: string, options?: WaitForOptions): Promise<void>;
     context(): BrowsingContext;
     waitForNavigation(options?: WaitForOptions): Promise<BidiHTTPResponse | null>;
+    waitForDevicePrompt(): never;
     get detached(): boolean;
     [disposeSymbol](): void;
     exposeFunction<Args extends unknown[], Ret>(name: string, apply: (...args: Args) => Awaitable<Ret>): Promise<void>;

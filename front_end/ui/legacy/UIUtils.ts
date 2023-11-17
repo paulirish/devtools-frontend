@@ -1092,7 +1092,7 @@ export function createTextButton(
   return element;
 }
 
-export function createInput(className?: string, type?: string): HTMLInputElement {
+export function createInput(className?: string, type?: string, jslogContext?: string): HTMLInputElement {
   const element = document.createElement('input');
   if (className) {
     element.className = className;
@@ -1101,6 +1101,9 @@ export function createInput(className?: string, type?: string): HTMLInputElement
   element.classList.add('harmony-input');
   if (type) {
     element.type = type;
+  }
+  if (jslogContext) {
+    element.setAttribute('jslog', `${VisualLogging.textField().track({keydown: true}).context(jslogContext)}`);
   }
   return element;
 }
@@ -1197,12 +1200,16 @@ export class CheckboxLabel extends HTMLSpanElement {
     this.shadowRootInternal.createChild('slot');
   }
 
-  static create(title?: string, checked?: boolean, subtitle?: string): CheckboxLabel {
+  static create(title?: string, checked?: boolean, subtitle?: string, jslogContext?: string): CheckboxLabel {
     if (!CheckboxLabel.constructorInternal) {
       CheckboxLabel.constructorInternal = Utils.registerCustomElement('span', 'dt-checkbox', CheckboxLabel);
     }
     const element = (CheckboxLabel.constructorInternal() as CheckboxLabel);
     element.checkboxElement.checked = Boolean(checked);
+    if (jslogContext) {
+      element.checkboxElement.setAttribute(
+          'jslog', `${VisualLogging.toggle().track({click: true}).context(jslogContext)}`);
+    }
     if (title !== undefined) {
       element.textElement.textContent = title;
       element.checkboxElement.title = title;

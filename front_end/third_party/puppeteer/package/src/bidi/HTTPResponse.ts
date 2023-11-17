@@ -21,6 +21,7 @@ import {
   HTTPResponse as HTTPResponse,
   type RemoteAddress,
 } from '../api/HTTPResponse.js';
+import {UnsupportedOperation} from '../common/Errors.js';
 
 import type {BidiHTTPRequest} from './HTTPRequest.js';
 
@@ -104,5 +105,13 @@ export class BidiHTTPResponse extends HTTPResponse {
 
   override fromServiceWorker(): boolean {
     return false;
+  }
+
+  override securityDetails(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override buffer(): never {
+    throw new UnsupportedOperation();
   }
 }

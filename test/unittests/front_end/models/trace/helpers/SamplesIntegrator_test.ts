@@ -67,12 +67,12 @@ describeWithEnvironment('SamplesIntegrator', function() {
       const [[tid, cpuProfileData]] = profileByThread.entries();
       const parsedProfile = cpuProfileData.parsedProfile;
       const samplesIntegrator = new TraceModel.Helpers.SamplesIntegrator.SamplesIntegrator(parsedProfile, pid, tid);
-      const traceEvents = data.Renderer.allRendererEvents.filter(event => event.pid === pid && event.tid === tid);
+      const traceEvents = data.Renderer.allTraceEntries.filter(event => event.pid === pid && event.tid === tid);
       if (!traceEvents) {
         throw new Error('Trace events were unexpectedly not found.');
       }
       const constructedCalls = samplesIntegrator.buildProfileCalls(traceEvents);
-      assert.strictEqual(constructedCalls.length, 5161);
+      assert.strictEqual(constructedCalls.length, 5131);
     });
 
     it('creates JS profile calls with a top-level V8 invocation', () => {
@@ -245,7 +245,7 @@ describeWithEnvironment('SamplesIntegrator', function() {
       const [[tid, cpuProfileData]] = profileByThread.entries();
       const parsedProfile = cpuProfileData.parsedProfile;
       const samplesIntegrator = new TraceModel.Helpers.SamplesIntegrator.SamplesIntegrator(parsedProfile, pid, tid);
-      const traceEvents = data.Renderer.allRendererEvents.filter(event => event.pid === pid && event.tid === tid);
+      const traceEvents = data.Renderer.allTraceEntries.filter(event => event.pid === pid && event.tid === tid);
       if (!traceEvents) {
         throw new Error('Trace events were unexpectedly not found.');
       }

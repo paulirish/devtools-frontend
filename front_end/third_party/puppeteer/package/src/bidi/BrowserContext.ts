@@ -16,9 +16,11 @@
 
 import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 
+import type {WaitForTargetOptions} from '../api/Browser.js';
 import {BrowserContext} from '../api/BrowserContext.js';
 import type {Page} from '../api/Page.js';
 import type {Target} from '../api/Target.js';
+import {UnsupportedOperation} from '../common/Errors.js';
 import type {Viewport} from '../common/Viewport.js';
 
 import type {BidiBrowser} from './Browser.js';
@@ -58,7 +60,7 @@ export class BidiBrowserContext extends BrowserContext {
 
   override waitForTarget(
     predicate: (x: Target) => boolean | Promise<boolean>,
-    options: {timeout?: number} = {}
+    options: WaitForTargetOptions = {}
   ): Promise<Target> {
     return this.#browser.waitForTarget(target => {
       return target.browserContext() === this && predicate(target);
@@ -122,5 +124,13 @@ export class BidiBrowserContext extends BrowserContext {
 
   override isIncognito(): boolean {
     return !this.#isDefault;
+  }
+
+  override overridePermissions(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override clearPermissionOverrides(): never {
+    throw new UnsupportedOperation();
   }
 }

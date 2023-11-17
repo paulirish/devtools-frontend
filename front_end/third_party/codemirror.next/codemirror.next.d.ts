@@ -1900,9 +1900,8 @@ declare class Facet<Input, Output = readonly Input[]> implements FacetReader<Out
     */
     from<T extends Input>(field: StateField<T>): Extension;
     from<T>(field: StateField<T>, get: (value: T) => Input): Extension;
-    tag: typeof FacetTag;
+    tag: Output;
 }
-declare const FacetTag: unique symbol;
 /**
 A facet reader can be used to fetch the value of a facet, though
 [`EditorState.facet`](https://codemirror.net/6/docs/ref/#state.EditorState.facet) or as a dependency
@@ -1912,9 +1911,10 @@ values for the facet.
 type FacetReader<Output> = {
     /**
     Dummy tag that makes sure TypeScript doesn't consider all object
-    types as conforming to this type.
+    types as conforming to this type. Not actually present on the
+    object.
     */
-    tag: typeof FacetTag;
+    tag: Output;
 };
 type Slot<T> = FacetReader<T> | StateField<T> | "doc" | "selection";
 type StateFieldSpec<Value> = {
@@ -3334,6 +3334,17 @@ apply to the editor, and if it can, perform it as a side effect
 transaction) and return `true`.
 */
 type Command = (target: EditorView) => boolean;
+declare class ScrollTarget {
+    readonly range: SelectionRange;
+    readonly y: ScrollStrategy;
+    readonly x: ScrollStrategy;
+    readonly yMargin: number;
+    readonly xMargin: number;
+    readonly isSnapshot: boolean;
+    constructor(range: SelectionRange, y?: ScrollStrategy, x?: ScrollStrategy, yMargin?: number, xMargin?: number, isSnapshot?: boolean);
+    map(changes: ChangeDesc): ScrollTarget;
+    clip(state: EditorState): ScrollTarget;
+}
 /**
 This is the interface plugin objects conform to.
 */
@@ -3592,6 +3603,13 @@ interface EditorViewConfig extends EditorStateConfig {
     from the parent.
     */
     root?: Document | ShadowRoot;
+    /**
+    Pass an effect created with
+    [`EditorView.scrollIntoView`](https://codemirror.net/6/docs/ref/#view.EditorView^scrollIntoView) or
+    [`EditorView.scrollSnapshot`](https://codemirror.net/6/docs/ref/#view.EditorView.scrollSnapshot)
+    here to set an initial scroll position.
+    */
+    scrollTo?: StateEffect<any>;
     /**
     Override the way transactions are
     [dispatched](https://codemirror.net/6/docs/ref/#view.EditorView.dispatch) for this editor view.
@@ -3992,14 +4010,29 @@ declare class EditorView {
         /**
         Extra vertical distance to add when moving something into
         view. Not used with the `"center"` strategy. Defaults to 5.
+        Must be less than the height of the editor.
         */
         yMargin?: number;
         /**
         Extra horizontal distance to add. Not used with the `"center"`
-        strategy. Defaults to 5.
+        strategy. Defaults to 5. Must be less than the width of the
+        editor.
         */
         xMargin?: number;
     }): StateEffect<unknown>;
+    /**
+    Return an effect that resets the editor to its current (at the
+    time this method was called) scroll position. Note that this
+    only affects the editor's own scrollable element, not parents.
+    See also
+    [`EditorViewConfig.scrollTo`](https://codemirror.net/6/docs/ref/#view.EditorViewConfig.scrollTo).
+
+    The effect should be used with a document identical to the one
+    it was created for. Failing to do so is not an error, but may
+    not scroll to the expected position. You can
+    [map](https://codemirror.net/6/docs/ref/#state.StateEffect.map) the effect to account for changes.
+    */
+    scrollSnapshot(): StateEffect<ScrollTarget>;
     /**
     Facet to add a [style
     module](https://github.com/marijnh/style-mod#documentation) to
@@ -7516,6 +7549,48 @@ to the surrounding word when the selection is empty.
 */
 declare const selectNextOccurrence: StateCommand;
 
+interface IndentationMarkerConfiguration {
+    /**
+     * Determines whether active block marker is styled differently.
+     */
+    highlightActiveBlock?: boolean;
+    /**
+     * Determines whether markers in the first column are omitted.
+     */
+    hideFirstIndent?: boolean;
+    /**
+     * Determines the type of indentation marker.
+     */
+    markerType?: "fullScope" | "codeOnly";
+    /**
+     * Determines the thickness of marker (in pixels).
+     */
+    thickness?: number;
+    /**
+     * Determines the color of marker.
+     */
+    colors?: {
+        /**
+         * Color of inactive indent markers when using a light theme.
+         */
+        light?: string;
+        /**
+         * Color of inactive indent markers when using a dark theme.
+         */
+        dark?: string;
+        /**
+         * Color of active indent markers when using a light theme.
+         */
+        activeLight?: string;
+        /**
+         * Color of active indent markers when using a dark theme.
+         */
+        activeDark?: string;
+    };
+}
+
+declare function indentationMarkers(config?: IndentationMarkerConfiguration): Extension[];
+
 declare function angular(): Promise<typeof _codemirror_lang_angular>;
 declare function clojure(): Promise<StreamLanguage<unknown>>;
 declare function coffeescript(): Promise<StreamLanguage<unknown>>;
@@ -7544,4 +7619,4 @@ declare function vue(): Promise<typeof _codemirror_lang_vue>;
 declare function wast(): Promise<typeof _codemirror_lang_wast>;
 declare function xml(): Promise<typeof _codemirror_lang_xml>;
 
-export { Annotation, AnnotationType, ChangeDesc, ChangeSet, ChangeSpec, Command, Compartment, Completion, CompletionContext, CompletionResult, CompletionSource, Decoration, DecorationSet, EditorSelection, EditorState, EditorStateConfig, EditorView, Extension, Facet, GutterMarker, HighlightStyle, KeyBinding, LRParser, Language, LanguageSupport, Line$1 as Line, MapMode, MatchDecorator, NodeProp, NodeSet, NodeType, Panel, Parser, Prec, Range, RangeSet, RangeSetBuilder, SelectionRange, StateEffect, StateEffectType, StateField, StreamLanguage, StreamParser, StringStream, StyleModule, SyntaxNode, Tag, TagStyle, Text, TextIterator, Tooltip, TooltipView, Transaction, TransactionSpec, Tree, TreeCursor, ViewPlugin, ViewUpdate, WidgetType, acceptCompletion, angular, autocompletion, bracketMatching, clojure, closeBrackets, closeBracketsKeymap, closeCompletion, codeFolding, coffeescript, completeAnyWord, completionStatus, cpp, css, cssStreamParser, currentCompletions, cursorGroupLeft, cursorGroupRight, cursorMatchingBracket, cursorSyntaxLeft, cursorSyntaxRight, dart, drawSelection, ensureSyntaxTree, foldGutter, foldKeymap, go, gss, gutter, gutters, highlightSelectionMatches, highlightSpecialChars, highlightTree, history, historyKeymap, index_d$1 as html, ifNotIn, indentLess, indentMore, indentOnInput, indentUnit, insertNewlineAndIndent, java, index_d as javascript, json, keymap, kotlin, less, lineNumberMarkers, lineNumbers, markdown, moveCompletionSelection, php, placeholder, python, redo, redoSelection, repositionTooltips, sass, scala, scrollPastEnd, selectGroupLeft, selectGroupRight, selectMatchingBracket, selectNextOccurrence, selectSyntaxLeft, selectSyntaxRight, selectedCompletion, selectedCompletionIndex, shell, showPanel, showTooltip, standardKeymap, startCompletion, svelte, syntaxHighlighting, syntaxTree, tags, toggleComment, tooltips, undo, undoSelection, vue, wast, xml };
+export { Annotation, AnnotationType, ChangeDesc, ChangeSet, ChangeSpec, Command, Compartment, Completion, CompletionContext, CompletionResult, CompletionSource, Decoration, DecorationSet, EditorSelection, EditorState, EditorStateConfig, EditorView, Extension, Facet, GutterMarker, HighlightStyle, KeyBinding, LRParser, Language, LanguageSupport, Line$1 as Line, MapMode, MatchDecorator, NodeProp, NodeSet, NodeType, Panel, Parser, Prec, Range, RangeSet, RangeSetBuilder, SelectionRange, StateEffect, StateEffectType, StateField, StreamLanguage, StreamParser, StringStream, StyleModule, SyntaxNode, Tag, TagStyle, Text, TextIterator, Tooltip, TooltipView, Transaction, TransactionSpec, Tree, TreeCursor, ViewPlugin, ViewUpdate, WidgetType, acceptCompletion, angular, autocompletion, bracketMatching, clojure, closeBrackets, closeBracketsKeymap, closeCompletion, codeFolding, coffeescript, completeAnyWord, completionStatus, cpp, css, cssStreamParser, currentCompletions, cursorGroupLeft, cursorGroupRight, cursorMatchingBracket, cursorSyntaxLeft, cursorSyntaxRight, dart, drawSelection, ensureSyntaxTree, foldGutter, foldKeymap, go, gss, gutter, gutters, highlightSelectionMatches, highlightSpecialChars, highlightTree, history, historyKeymap, index_d$1 as html, ifNotIn, indentLess, indentMore, indentOnInput, indentUnit, indentationMarkers, insertNewlineAndIndent, java, index_d as javascript, json, keymap, kotlin, less, lineNumberMarkers, lineNumbers, markdown, moveCompletionSelection, php, placeholder, python, redo, redoSelection, repositionTooltips, sass, scala, scrollPastEnd, selectGroupLeft, selectGroupRight, selectMatchingBracket, selectNextOccurrence, selectSyntaxLeft, selectSyntaxRight, selectedCompletion, selectedCompletionIndex, shell, showPanel, showTooltip, standardKeymap, startCompletion, svelte, syntaxHighlighting, syntaxTree, tags, toggleComment, tooltips, undo, undoSelection, vue, wast, xml };

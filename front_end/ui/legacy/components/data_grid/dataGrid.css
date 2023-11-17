@@ -113,10 +113,13 @@
   user-select: text;
 }
 
-.data-grid th {
-  text-align: left;
+.data-grid tr:has(th) {
   background-color: var(--sys-color-surface1);
+}
+
+.data-grid th {
   border-bottom: 1px solid var(--sys-color-divider);
+  text-align: left;
   font-weight: normal;
   vertical-align: middle;
 }
@@ -177,7 +180,7 @@
 }
 
 .data-grid th.sortable:hover {
-  background-color: var(--app-color-idle);
+  background-color: var(--sys-color-state-hover-on-subtle);
 }
 
 .data-grid .top-filler-td {
@@ -219,6 +222,10 @@
 .data-grid tbody tr.revealed.selected {
   background-color: var(--sys-color-neutral-container);
   color: inherit;
+
+  & ::selection {
+    background-color: var(--sys-color-state-focus-select);
+  }
 }
 
 .data-grid tbody tr.revealed:focus-within {

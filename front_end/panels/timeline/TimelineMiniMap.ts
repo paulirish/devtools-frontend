@@ -21,11 +21,13 @@ import {
   TimelineFilmStripOverview,
 } from './TimelineEventOverview.js';
 import miniMapStyles from './timelineMiniMap.css.js';
+import {ThreadTracksSource} from './TimelinePanel.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 export interface OverviewData {
   performanceModel: PerformanceModel|null;
-  traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData|null;
+  traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null;
+  isCpuProfile?: boolean;
   settings: {
     showScreenshots: boolean,
     showMemory: boolean,
@@ -45,9 +47,13 @@ export class TimelineMiniMap extends
   breadcrumbs: TimelineComponents.Breadcrumbs.Breadcrumbs|null = null;
   #breadcrumbsUI: TimelineComponents.BreadcrumbsUI.BreadcrumbsUI;
   #minTime: TimingTypes.Timing.MilliSeconds = TimingTypes.Timing.MilliSeconds(0);
+  // Once the sync tracks migration is completely shipped, this can be removed.
+  #threadTracksSource: ThreadTracksSource;
+  #data: OverviewData|null = null;
 
-  constructor() {
+  constructor(threadTracksSource: ThreadTracksSource) {
     super();
+    this.#threadTracksSource = threadTracksSource;
     this.element.classList.add('timeline-minimap');
     this.#breadcrumbsUI = new TimelineComponents.BreadcrumbsUI.BreadcrumbsUI();
 
@@ -146,6 +152,7 @@ export class TimelineMiniMap extends
   }
 
   reset(): void {
+    this.#data = null;
     this.#overviewComponent.reset();
   }
 
@@ -157,7 +164,7 @@ export class TimelineMiniMap extends
     this.#overviewComponent.setWindowTimes(left, right);
   }
 
-  #setMarkers(traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData): void {
+  #setMarkers(traceParsedData: TraceEngine.Handlers.Types.TraceParseData): void {
     const markers = new Map<number, Element>();
 
     const {Meta, PageLoadMetrics} = traceParsedData;
@@ -180,11 +187,17 @@ export class TimelineMiniMap extends
     this.#overviewComponent.setMarkers(markers);
   }
 
-  #setNavigationStartEvents(traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData): void {
+  #setNavigationStartEvents(traceParsedData: TraceEngine.Handlers.Types.TraceParseData): void {
     this.#overviewComponent.setNavStartTimes(traceParsedData.Meta.mainFrameNavigations);
   }
-
+  getControls(): TimelineEventOverview[] {
+    return this.#controls;
+  }
   setData(data: OverviewData): void {
+    if (this.#data?.traceParsedData === data.traceParsedData) {
+      return;
+    }
+    this.#data = data;
     this.#controls = [];
     if (data.traceParsedData?.Meta.traceBounds.min !== undefined) {
       this.#minTime = Helpers.Timing.microSecondsToMilliseconds(data.traceParsedData?.Meta.traceBounds.min);
@@ -194,14 +207,17 @@ export class TimelineMiniMap extends
       this.#setMarkers(data.traceParsedData);
       this.#setNavigationStartEvents(data.traceParsedData);
       this.#controls.push(new TimelineEventOverviewResponsiveness(data.traceParsedData));
+      // TODO: Once we commit to shipping sync tracks, we can remove this
+      // conditional and update the CPUActivity component to not be given the
+      // PerformanceModel instance.
+      if (this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE) {
+        this.#controls.push(new TimelineEventOverviewCPUActivity(null, data.traceParsedData));
+      }
     }
 
-    // CPU Activity is the only component that relies on the old model and will
-    // do so until we have finished migrating the Main Thread track to the new
-    // trace engine
-    // TODO(crbug.com/1428024) Migrate CPU track to the new model once the Main thread is migrated to the trace engine
-    if (data.performanceModel) {
-      this.#controls.push(new TimelineEventOverviewCPUActivity(data.performanceModel));
+    const useOldEngineForCpu = this.#threadTracksSource !== ThreadTracksSource.NEW_ENGINE;
+    if (data.performanceModel && useOldEngineForCpu) {
+      this.#controls.push(new TimelineEventOverviewCPUActivity(data.performanceModel, null));
     }
 
     if (data.traceParsedData) {
@@ -217,6 +233,7 @@ export class TimelineMiniMap extends
       this.#controls.push(new TimelineEventOverviewMemory(data.traceParsedData));
     }
     this.#overviewComponent.setOverviewControls(this.#controls);
+    this.#overviewComponent.showingScreenshots = data.settings.showScreenshots;
   }
 
   addInitialBreadcrumb(): void {

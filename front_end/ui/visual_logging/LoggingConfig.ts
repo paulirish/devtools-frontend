@@ -27,10 +27,10 @@ enum VisualElements {
   AccessibilityPane = 4,
   AccessibilitySourceOrder = 5,
   Toggle = 6,
-  AddStylesRule = 7,
-  FilterTextField = 8,
+  /* 7 used to be AddStylesRule, but free to grab now */
+  TextField = 8,
   ShowAllStyleProperties = 9,
-  StylePropertiesSection = 10,
+  Section = 10,
   StylePropertiesSectionSeparator = 11,
   StylesPane = 12,
   StylesSelector = 13,
@@ -40,7 +40,7 @@ enum VisualElements {
   AddElementClassPrompt = 17,
   ElementStatesPan = 18,
   CssLayersPane = 19,
-  DropDownButton = 20,
+  DropDown = 20,
   StylesMetricsPane = 21,
   JumpToSource = 22,
   MetricsBox = 23,
@@ -49,15 +49,55 @@ enum VisualElements {
   DOMBreakpoint = 26,
   ElementPropertiesPane = 27,
   EventListenersPane = 28,
-  Refresh = 29,
+  Action = 29,
   FilterDropdown = 30,
+  /* 31 used to be AddColor, but free to grab now */
+  BezierCurveEditor = 32,
+  BezierEditor = 33,
+  BezierPresetCategory = 34,
+  Preview = 35,
+  ColorCanvas = 36,
+  ColorEyeDropper = 37,
+  ColorPicker = 38,
+  CopyColor = 39,
+  CssAngleEditor = 40,
+  CssFlexboxEditor = 41,
+  CssGridEditor = 42,
+  CssShadowEditor = 43,
+  Link = 44,
+  Next = 45,
+  Item = 46,
+  PaletteColorShades = 47,
+  Panel = 48,
+  Previous = 49,
+  ShowStyleEditor = 50,
+  Slider = 51,
+  CssColorMix = 52,
+  Value = 53,
+  Key = 54,
+  GridSettings = 55,
+  FlexboxOverlays = 56,
+  GridOverlays = 57,
+  JumpToElement = 58,
+  /* 59 used to be ElementsPanel, but free to grab now */
+  ElementsTreeOutline = 60,
+  /* 61 used to be RenderingPanel, but free to grab now */
+  ElementsBreadcrumbs = 62,
+  FullAccessibilityTree = 63,
+  /* 64 used to be ToggleDeviceMode, but free to grab now */
+  /* 65 used to be ToggleElementSearch, but free to grab now */
+  PanelTabHeader = 66,
+  Menu = 67,
+  /* 68 used to be DeveloperResourcesPanel, but free to grab now */
+  TableHeader = 69,
+  TableCell = 70,
 }
 
 function resolveVe(ve: string): number {
   return VisualElements[ve as keyof typeof VisualElements] || 0;
 }
 
-function parseJsLog(jslog: string): LoggingConfig {
+export function parseJsLog(jslog: string): LoggingConfig {
   const components = jslog.replace(/ /g, '').split(';');
   const getComponent = (name: string): string|undefined =>
       components.find(c => c.startsWith(name))?.substr(name.length);

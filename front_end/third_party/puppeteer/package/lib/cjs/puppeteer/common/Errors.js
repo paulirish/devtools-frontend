@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.errors = exports.TargetCloseError = exports.ProtocolError = exports.TimeoutError = exports.CustomError = void 0;
+exports.errors = exports.TargetCloseError = exports.UnsupportedOperation = exports.ProtocolError = exports.TimeoutError = exports.CustomError = void 0;
 /**
  * @deprecated Do not use.
  *
@@ -28,7 +28,12 @@ class CustomError extends Error {
     constructor(message) {
         super(message);
         this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
+    }
+    /**
+     * @internal
+     */
+    get [Symbol.toStringTag]() {
+        return this.constructor.name;
     }
 }
 exports.CustomError = CustomError;
@@ -75,6 +80,15 @@ class ProtocolError extends CustomError {
     }
 }
 exports.ProtocolError = ProtocolError;
+/**
+ * Puppeteer will throw this error if a method is not
+ * supported by the currently used protocol
+ *
+ * @public
+ */
+class UnsupportedOperation extends CustomError {
+}
+exports.UnsupportedOperation = UnsupportedOperation;
 /**
  * @internal
  */

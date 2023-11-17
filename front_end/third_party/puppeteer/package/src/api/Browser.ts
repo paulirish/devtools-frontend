@@ -18,15 +18,23 @@ import type {ChildProcess} from 'child_process';
 
 import type {Protocol} from 'devtools-protocol';
 
+import {
+  firstValueFrom,
+  from,
+  merge,
+  raceWith,
+  filterAsync,
+  fromEvent,
+  type Observable,
+} from '../../third_party/rxjs/rxjs.js';
 import {EventEmitter, type EventType} from '../common/EventEmitter.js';
-import {debugError, waitWithTimeout} from '../common/util.js';
-import {Deferred} from '../util/Deferred.js';
+import {debugError} from '../common/util.js';
+import {timeout} from '../common/util.js';
 import {asyncDisposeSymbol, disposeSymbol} from '../util/disposable.js';
 
 import type {BrowserContext} from './BrowserContext.js';
 import type {Page} from './Page.js';
 import type {Target} from './Target.js';
-
 /**
  * @public
  */
@@ -238,43 +246,13 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
   }
 
   /**
-   * @internal
-   */
-  _attach(): Promise<void> {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * @internal
-   */
-  _detach(): void {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * @internal
-   */
-  get _targets(): Map<string, Target> {
-    throw new Error('Not implemented');
-  }
-
-  /**
    * Gets the associated
    * {@link https://nodejs.org/api/child_process.html#class-childprocess | ChildProcess}.
    *
    * @returns `null` if this instance was connected to via
    * {@link Puppeteer.connect}.
    */
-  process(): ChildProcess | null {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * @internal
-   */
-  _getIsPageTargetCallback(): IsPageTargetCallback | undefined {
-    throw new Error('Not implemented');
-  }
+  abstract process(): ChildProcess | null;
 
   /**
    * Creates a new incognito {@link BrowserContext | browser context}.
@@ -316,14 +294,6 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
   abstract defaultBrowserContext(): BrowserContext;
 
   /**
-   * @internal
-   */
-  _disposeContext(contextId?: string): Promise<void>;
-  _disposeContext(): Promise<void> {
-    throw new Error('Not implemented');
-  }
-
-  /**
    * Gets the WebSocket URL to connect to this {@link Browser | browser}.
    *
    * This is usually used with {@link Puppeteer.connect}.
@@ -344,14 +314,6 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    * {@link Browser.defaultBrowserContext | default browser context}.
    */
   abstract newPage(): Promise<Page>;
-
-  /**
-   * @internal
-   */
-  _createPageInContext(contextId?: string): Promise<Page>;
-  _createPageInContext(): Promise<Page> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * Gets all active {@link Target | targets}.
@@ -387,31 +349,14 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
     predicate: (x: Target) => boolean | Promise<boolean>,
     options: WaitForTargetOptions = {}
   ): Promise<Target> {
-    const {timeout = 30000} = options;
-    const targetDeferred = Deferred.create<Target | PromiseLike<Target>>();
-
-    this.on(BrowserEvent.TargetCreated, check);
-    this.on(BrowserEvent.TargetChanged, check);
-    try {
-      this.targets().forEach(check);
-      if (!timeout) {
-        return await targetDeferred.valueOrThrow();
-      }
-      return await waitWithTimeout(
-        targetDeferred.valueOrThrow(),
-        'target',
-        timeout
-      );
-    } finally {
-      this.off(BrowserEvent.TargetCreated, check);
-      this.off(BrowserEvent.TargetChanged, check);
-    }
-
-    async function check(target: Target): Promise<void> {
-      if ((await predicate(target)) && !targetDeferred.resolved()) {
-        targetDeferred.resolve(target);
-      }
-    }
+    const {timeout: ms = 30000} = options;
+    return await firstValueFrom(
+      merge(
+        fromEvent(this, BrowserEvent.TargetCreated) as Observable<Target>,
+        fromEvent(this, BrowserEvent.TargetChanged) as Observable<Target>,
+        from(this.targets())
+      ).pipe(filterAsync(predicate), raceWith(timeout(ms)))
+    );
   }
 
   /**
@@ -455,9 +400,7 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    * {@link Page | Pages} can override the user agent with
    * {@link Page.setUserAgent}.
    */
-  userAgent(): Promise<string> {
-    throw new Error('Not implemented');
-  }
+  abstract userAgent(): Promise<string>;
 
   /**
    * Closes this {@link Browser | browser} and all associated
@@ -469,9 +412,7 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    * Disconnects Puppeteer from this {@link Browser | browser}, but leaves the
    * process running.
    */
-  disconnect(): void {
-    throw new Error('Not implemented');
-  }
+  abstract disconnect(): void;
 
   /**
    * Whether Puppeteer is connected to this {@link Browser | browser}.
@@ -496,4 +437,9 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
   [asyncDisposeSymbol](): Promise<void> {
     return this.close();
   }
+
+  /**
+   * @internal
+   */
+  abstract get protocol(): 'cdp' | 'webDriverBiDi';
 }

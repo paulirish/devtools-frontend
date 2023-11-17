@@ -40,11 +40,10 @@ import type {BidiNetworkManager} from '../bidi/NetworkManager.js';
 import type {Accessibility} from '../cdp/Accessibility.js';
 import type {Coverage} from '../cdp/Coverage.js';
 import type {DeviceRequestPrompt} from '../cdp/DeviceRequestPrompt.js';
-import {
-  NetworkManagerEvent,
-  type NetworkManager as CdpNetworkManager,
-  type Credentials,
-  type NetworkConditions,
+import type {
+  NetworkManager as CdpNetworkManager,
+  Credentials,
+  NetworkConditions,
 } from '../cdp/NetworkManager.js';
 import type {Tracing} from '../cdp/Tracing.js';
 import type {WebWorker} from '../cdp/WebWorker.js';
@@ -58,12 +57,14 @@ import {
   type Handler,
 } from '../common/EventEmitter.js';
 import type {FileChooser} from '../common/FileChooser.js';
+import {NetworkManagerEvent} from '../common/NetworkManagerEvents.js';
 import {
   paperFormats,
   type LowerCasePaperFormat,
   type ParsedPDFOptions,
   type PDFOptions,
 } from '../common/PDFOptions.js';
+import {TimeoutSettings} from '../common/TimeoutSettings.js';
 import type {
   Awaitable,
   EvaluateFunc,
@@ -80,12 +81,13 @@ import {
   withSourcePuppeteerURLIfNone,
 } from '../common/util.js';
 import type {Viewport} from '../common/Viewport.js';
+import type {ScreenRecorder} from '../node/ScreenRecorder.js';
 import {assert} from '../util/assert.js';
 import {guarded} from '../util/decorators.js';
-import type {Deferred} from '../util/Deferred.js';
 import {
   AsyncDisposableStack,
   asyncDisposeSymbol,
+  DisposableStack,
   disposeSymbol,
 } from '../util/disposable.js';
 
@@ -93,7 +95,11 @@ import type {Browser} from './Browser.js';
 import type {BrowserContext} from './BrowserContext.js';
 import type {CDPSession} from './CDPSession.js';
 import type {Dialog} from './Dialog.js';
-import type {ClickOptions, ElementHandle} from './ElementHandle.js';
+import type {
+  BoundingBox,
+  ClickOptions,
+  ElementHandle,
+} from './ElementHandle.js';
 import type {
   Frame,
   FrameAddScriptTagOptions,
@@ -212,11 +218,7 @@ export interface MediaFeature {
 /**
  * @public
  */
-export interface ScreenshotClip {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export interface ScreenshotClip extends BoundingBox {
   /**
    * @defaultValue `1`
    */
@@ -288,6 +290,44 @@ export interface ScreenshotOptions {
    * @internal
    */
   allowViewportExpansion?: boolean;
+}
+
+/**
+ * @experimental
+ */
+export interface ScreencastOptions {
+  /**
+   * File path to save the screencast to.
+   */
+  path?: `${string}.webm`;
+  /**
+   * Specifies the region of the viewport to crop.
+   */
+  crop?: BoundingBox;
+  /**
+   * Scales the output video.
+   *
+   * For example, `0.5` will shrink the width and height of the output video by
+   * half. `2` will double the width and height of the output video.
+   *
+   * @defaultValue `1`
+   */
+  scale?: number;
+  /**
+   * Specifies the speed to record at.
+   *
+   * For example, `0.5` will slowdown the output video by 50%. `2` will double the
+   * speed of the output video.
+   *
+   * @defaultValue `1`
+   */
+  speed?: number;
+  /**
+   * Path to the [ffmpeg](https://ffmpeg.org/).
+   *
+   * Required if `ffmpeg` is not in your PATH.
+   */
+  ffmpegPath?: string;
 }
 
 /**
@@ -563,6 +603,10 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * @internal
    */
   _isDragging = false;
+  /**
+   * @internal
+   */
+  _timeoutSettings = new TimeoutSettings();
 
   #requestHandlers = new WeakMap<Handler<HTTPRequest>, Handler<HTTPRequest>>();
 
@@ -576,9 +620,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
   /**
    * `true` if the service worker are being bypassed, `false` otherwise.
    */
-  isServiceWorkerBypassed(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isServiceWorkerBypassed(): boolean;
 
   /**
    * `true` if drag events are being intercepted, `false` otherwise.
@@ -587,16 +629,12 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * drag APIs found on {@link ElementHandle} to drag (or just use the
    * {@link Page.mouse}).
    */
-  isDragInterceptionEnabled(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isDragInterceptionEnabled(): boolean;
 
   /**
    * `true` if the page has JavaScript enabled, `false` otherwise.
    */
-  isJavaScriptEnabled(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isJavaScriptEnabled(): boolean;
 
   /**
    * Listen to page events.
@@ -681,10 +719,9 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * await fileChooser.accept(['/tmp/myfile.pdf']);
    * ```
    */
-  waitForFileChooser(options?: WaitTimeoutOptions): Promise<FileChooser>;
-  waitForFileChooser(): Promise<FileChooser> {
-    throw new Error('Not implemented');
-  }
+  abstract waitForFileChooser(
+    options?: WaitTimeoutOptions
+  ): Promise<FileChooser>;
 
   /**
    * Sets the page's geolocation.
@@ -699,17 +736,12 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * await page.setGeolocation({latitude: 59.95, longitude: 30.31667});
    * ```
    */
-  async setGeolocation(options: GeolocationOptions): Promise<void>;
-  async setGeolocation(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setGeolocation(options: GeolocationOptions): Promise<void>;
 
   /**
    * A target this page was created from.
    */
-  target(): Target {
-    throw new Error('Not implemented');
-  }
+  abstract target(): Target;
 
   /**
    * Get the browser the page belongs to.
@@ -732,9 +764,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
   /**
    * Creates a Chrome Devtools Protocol session attached to the page.
    */
-  createCDPSession(): Promise<CDPSession> {
-    throw new Error('Not implemented');
-  }
+  abstract createCDPSession(): Promise<CDPSession>;
 
   /**
    * {@inheritDoc Keyboard}
@@ -744,9 +774,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
   /**
    * {@inheritDoc Touchscreen}
    */
-  get touchscreen(): Touchscreen {
-    throw new Error('Not implemented');
-  }
+  abstract get touchscreen(): Touchscreen;
 
   /**
    * {@inheritDoc Coverage}
@@ -776,9 +804,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * @remarks
    * This does not contain ServiceWorkers
    */
-  workers(): WebWorker[] {
-    throw new Error('Not implemented');
-  }
+  abstract workers(): WebWorker[];
 
   /**
    * Activating request interception enables {@link HTTPRequest.abort},
@@ -816,20 +842,14 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param value - Whether to enable request interception.
    */
-  async setRequestInterception(value: boolean): Promise<void>;
-  async setRequestInterception(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setRequestInterception(value: boolean): Promise<void>;
 
   /**
    * Toggles ignoring of service worker for each request.
    *
    * @param bypass - Whether to bypass service worker and load from network.
    */
-  async setBypassServiceWorker(bypass: boolean): Promise<void>;
-  async setBypassServiceWorker(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setBypassServiceWorker(bypass: boolean): Promise<void>;
 
   /**
    * @param enabled - Whether to enable drag interception.
@@ -838,10 +858,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * drag APIs found on {@link ElementHandle} to drag (or just use the
    * {@link Page.mouse}).
    */
-  async setDragInterception(enabled: boolean): Promise<void>;
-  async setDragInterception(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setDragInterception(enabled: boolean): Promise<void>;
 
   /**
    * Sets the network connection to offline.
@@ -850,10 +867,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param enabled - When `true`, enables offline mode for the page.
    */
-  setOfflineMode(enabled: boolean): Promise<void>;
-  setOfflineMode(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setOfflineMode(enabled: boolean): Promise<void>;
 
   /**
    * This does not affect WebSockets and WebRTC PeerConnections (see
@@ -882,12 +896,9 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * @param networkConditions - Passing `null` disables network condition
    * emulation.
    */
-  emulateNetworkConditions(
+  abstract emulateNetworkConditions(
     networkConditions: NetworkConditions | null
   ): Promise<void>;
-  emulateNetworkConditions(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * This setting will change the default maximum navigation time for the
@@ -1259,17 +1270,11 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * If no URLs are specified, this method returns cookies for the current page
    * URL. If URLs are specified, only cookies for those URLs are returned.
    */
-  async cookies(...urls: string[]): Promise<Protocol.Network.Cookie[]>;
-  async cookies(): Promise<Protocol.Network.Cookie[]> {
-    throw new Error('Not implemented');
-  }
+  abstract cookies(...urls: string[]): Promise<Protocol.Network.Cookie[]>;
 
-  async deleteCookie(
+  abstract deleteCookie(
     ...cookies: Protocol.Network.DeleteCookiesRequest[]
   ): Promise<void>;
-  async deleteCookie(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * @example
@@ -1278,10 +1283,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * await page.setCookie(cookieObject1, cookieObject2);
    * ```
    */
-  async setCookie(...cookies: Protocol.Network.CookieParam[]): Promise<void>;
-  async setCookie(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setCookie(...cookies: Protocol.Network.CookieParam[]): Promise<void>;
 
   /**
    * Adds a `<script>` tag into the page with the desired URL or content.
@@ -1401,10 +1403,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * The method removes a previously added function via ${@link Page.exposeFunction}
    * called `name` from the page's `window` object.
    */
-  async removeExposedFunction(name: string): Promise<void>;
-  async removeExposedFunction(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract removeExposedFunction(name: string): Promise<void>;
 
   /**
    * Provide credentials for `HTTP authentication`.
@@ -1412,10 +1411,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * @remarks
    * To disable authentication, pass `null`.
    */
-  async authenticate(credentials: Credentials): Promise<void>;
-  async authenticate(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract authenticate(credentials: Credentials): Promise<void>;
 
   /**
    * The extra HTTP headers will be sent with every request the page initiates.
@@ -1437,10 +1433,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * @param headers - An object containing additional HTTP headers to be sent
    * with every request. All header values must be strings.
    */
-  async setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
-  async setExtraHTTPHeaders(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
 
   /**
    * @param userAgent - Specific user agent to use in this page
@@ -1489,9 +1482,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * All timestamps are in monotonic time: monotonically increasing time
    * in seconds since an arbitrary point in the past.
    */
-  async metrics(): Promise<Metrics> {
-    throw new Error('Not implemented');
-  }
+  abstract metrics(): Promise<Metrics>;
 
   /**
    * The page's URL.
@@ -1696,36 +1687,32 @@ export abstract class Page extends EventEmitter<PageEvents> {
   /**
    * @internal
    */
-  protected async _waitForNetworkIdle(
+  _waitForNetworkIdle(
     networkManager: BidiNetworkManager | CdpNetworkManager,
     idleTime: number,
-    ms: number,
-    closedDeferred: Deferred<TargetCloseError>
-  ): Promise<void> {
-    await firstValueFrom(
-      merge(
-        fromEvent(
-          networkManager,
-          NetworkManagerEvent.Request as unknown as string
-        ),
-        fromEvent(
-          networkManager,
-          NetworkManagerEvent.Response as unknown as string
-        ),
-        fromEvent(
-          networkManager,
-          NetworkManagerEvent.RequestFailed as unknown as string
-        )
-      ).pipe(
-        startWith(null),
-        filter(() => {
-          return networkManager.inFlightRequestsCount() === 0;
-        }),
-        switchMap(v => {
-          return of(v).pipe(delay(idleTime));
-        }),
-        raceWith(timeout(ms), from(closedDeferred.valueOrThrow()))
-      )
+    requestsInFlight = 0
+  ): Observable<void> {
+    return merge(
+      fromEvent(
+        networkManager,
+        NetworkManagerEvent.Request as unknown as string
+      ) as Observable<void>,
+      fromEvent(
+        networkManager,
+        NetworkManagerEvent.Response as unknown as string
+      ) as Observable<void>,
+      fromEvent(
+        networkManager,
+        NetworkManagerEvent.RequestFailed as unknown as string
+      ) as Observable<void>
+    ).pipe(
+      startWith(undefined),
+      filter(() => {
+        return networkManager.inFlightRequestsCount() <= requestsInFlight;
+      }),
+      switchMap(v => {
+        return of(v).pipe(delay(idleTime));
+      })
     );
   }
 
@@ -1798,10 +1785,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * - `networkidle2` : consider navigation to be finished when there are no
    *   more than 2 network connections for at least `500` ms.
    */
-  async goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
-  async goBack(): Promise<HTTPResponse | null> {
-    throw new Error('Not implemented');
-  }
+  abstract goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
 
   /**
    * This method navigate to the next page in history.
@@ -1829,10 +1813,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * - `networkidle2` : consider navigation to be finished when there are no
    *   more than 2 network connections for at least `500` ms.
    */
-  async goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
-  async goForward(): Promise<HTTPResponse | null> {
-    throw new Error('Not implemented');
-  }
+  abstract goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
 
   /**
    * Brings page to front (activates tab).
@@ -1882,10 +1863,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * NOTE: changing this value won't affect scripts that have already been run.
    * It will take full effect on the next navigation.
    */
-  async setJavaScriptEnabled(enabled: boolean): Promise<void>;
-  async setJavaScriptEnabled(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setJavaScriptEnabled(enabled: boolean): Promise<void>;
 
   /**
    * Toggles bypassing page's Content-Security-Policy.
@@ -1922,19 +1900,13 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * // → false
    * ```
    */
-  async emulateMediaType(type?: string): Promise<void>;
-  async emulateMediaType(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateMediaType(type?: string): Promise<void>;
 
   /**
    * Enables CPU throttling to emulate slow CPUs.
    * @param factor - slowdown factor (1 is no throttle, 2 is 2x slowdown, etc).
    */
-  async emulateCPUThrottling(factor: number | null): Promise<void>;
-  async emulateCPUThrottling(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateCPUThrottling(factor: number | null): Promise<void>;
 
   /**
    * @param features - `<?Array<Object>>` Given an array of media feature
@@ -1997,10 +1969,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * // → false
    * ```
    */
-  async emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
-  async emulateMediaFeatures(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
 
   /**
    * @param timezoneId - Changes the timezone of the page. See
@@ -2008,10 +1977,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * for a list of supported timezone IDs. Passing
    * `null` disables timezone emulation.
    */
-  async emulateTimezone(timezoneId?: string): Promise<void>;
-  async emulateTimezone(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateTimezone(timezoneId?: string): Promise<void>;
 
   /**
    * Emulates the idle state.
@@ -2032,13 +1998,10 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param overrides - Mock idle state. If not set, clears idle overrides
    */
-  async emulateIdleState(overrides?: {
+  abstract emulateIdleState(overrides?: {
     isUserActive: boolean;
     isScreenUnlocked: boolean;
   }): Promise<void>;
-  async emulateIdleState(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * Simulates the given vision deficiency on the page.
@@ -2068,12 +2031,9 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param type - the type of deficiency to simulate, or `'none'` to reset.
    */
-  async emulateVisionDeficiency(
+  abstract emulateVisionDeficiency(
     type?: Protocol.Emulation.SetEmulatedVisionDeficiencyRequest['type']
   ): Promise<void>;
-  async emulateVisionDeficiency(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * `page.setViewport` will resize the page. A lot of websites don't expect
@@ -2275,6 +2235,182 @@ export abstract class Page extends EventEmitter<PageEvents> {
   }
 
   /**
+   * Captures a screencast of this {@link Page | page}.
+   *
+   * @remarks
+   *
+   * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
+   * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+   *
+   * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
+   *
+   * @example
+   * Recording a {@link Page | page}:
+   *
+   * ```
+   * import puppeteer from 'puppeteer';
+   *
+   * // Launch a browser
+   * const browser = await puppeteer.launch();
+   *
+   * // Create a new page
+   * const page = await browser.newPage();
+   *
+   * // Go to your site.
+   * await page.goto("https://www.example.com");
+   *
+   * // Start recording.
+   * const recorder = await page.screencast({path: 'recording.webm'});
+   *
+   * // Do something.
+   *
+   * // Stop recording.
+   * await recorder.stop();
+   *
+   * browser.close();
+   * ```
+   *
+   * @param options - Configures screencast behavior.
+   *
+   * @experimental
+   */
+  async screencast(
+    options: Readonly<ScreencastOptions> = {}
+  ): Promise<ScreenRecorder> {
+    const [{ScreenRecorder}, [width, height, devicePixelRatio]] =
+      await Promise.all([
+        import('../node/ScreenRecorder.js'),
+        this.#getNativePixelDimensions(),
+      ]);
+
+    let crop: BoundingBox | undefined;
+    if (options.crop) {
+      const {
+        x,
+        y,
+        width: cropWidth,
+        height: cropHeight,
+      } = roundRectangle(normalizeRectangle(options.crop));
+      if (x < 0 || y < 0) {
+        throw new Error(
+          `\`crop.x\` and \`crop.y\` must be greater than or equal to 0.`
+        );
+      }
+      if (cropWidth <= 0 || cropHeight <= 0) {
+        throw new Error(
+          `\`crop.height\` and \`crop.width\` must be greater than or equal to 0.`
+        );
+      }
+
+      const viewportWidth = width / devicePixelRatio;
+      const viewportHeight = width / devicePixelRatio;
+      if (x + cropWidth > viewportWidth) {
+        throw new Error(
+          `\`crop.width\` cannot be larger than the viewport width (${viewportWidth}).`
+        );
+      }
+      if (y + cropHeight > viewportHeight) {
+        throw new Error(
+          `\`crop.height\` cannot be larger than the viewport height (${viewportHeight}).`
+        );
+      }
+
+      crop = {
+        x: x * devicePixelRatio,
+        y: y * devicePixelRatio,
+        width: cropWidth * devicePixelRatio,
+        height: cropHeight * devicePixelRatio,
+      };
+    }
+    if (options.speed !== undefined && options.speed <= 0) {
+      throw new Error(`\`speed\` must be greater than 0.`);
+    }
+    if (options.scale !== undefined && options.scale <= 0) {
+      throw new Error(`\`scale\` must be greater than 0.`);
+    }
+
+    const recorder = new ScreenRecorder(this, width, height, {
+      ...options,
+      path: options.ffmpegPath,
+      crop,
+    });
+    try {
+      await this._startScreencast();
+    } catch (error) {
+      void recorder.stop();
+      throw error;
+    }
+    if (options.path) {
+      const {createWriteStream} = await import('fs');
+      const stream = createWriteStream(options.path, 'binary');
+      recorder.pipe(stream);
+    }
+    return recorder;
+  }
+
+  #screencastSessionCount = 0;
+  #startScreencastPromise: Promise<void> | undefined;
+
+  /**
+   * @internal
+   */
+  async _startScreencast(): Promise<void> {
+    ++this.#screencastSessionCount;
+    if (!this.#startScreencastPromise) {
+      this.#startScreencastPromise = this.mainFrame()
+        .client.send('Page.startScreencast', {format: 'png'})
+        .then(() => {
+          // Wait for the first frame.
+          return new Promise(resolve => {
+            return this.mainFrame().client.once('Page.screencastFrame', () => {
+              return resolve();
+            });
+          });
+        });
+    }
+    await this.#startScreencastPromise;
+  }
+
+  /**
+   * @internal
+   */
+  async _stopScreencast(): Promise<void> {
+    --this.#screencastSessionCount;
+    if (!this.#startScreencastPromise) {
+      return;
+    }
+    this.#startScreencastPromise = undefined;
+    if (this.#screencastSessionCount === 0) {
+      await this.mainFrame().client.send('Page.stopScreencast');
+    }
+  }
+
+  /**
+   * Gets the native, non-emulated dimensions of the viewport.
+   */
+  async #getNativePixelDimensions(): Promise<
+    readonly [width: number, height: number, devicePixelRatio: number]
+  > {
+    const viewport = this.viewport();
+    using stack = new DisposableStack();
+    if (viewport && viewport.deviceScaleFactor !== 0) {
+      await this.setViewport({...viewport, deviceScaleFactor: 0});
+      stack.defer(() => {
+        void this.setViewport(viewport).catch(debugError);
+      });
+    }
+    return await this.mainFrame()
+      .isolatedRealm()
+      .evaluate(() => {
+        return [
+          window.visualViewport!.width * window.devicePixelRatio,
+          window.visualViewport!.height * window.devicePixelRatio,
+          window.devicePixelRatio,
+        ] as const;
+      });
+  }
+
+  /**
    * Captures a screenshot of this {@link Page | page}.
    *
    * @param options - Configures screenshot behavior.
@@ -2319,62 +2455,38 @@ export abstract class Page extends EventEmitter<PageEvents> {
           break;
       }
     }
-    if (options.quality) {
-      assert(
-        options.type === 'jpeg' || options.type === 'webp',
-        `options.quality is unsupported for the ${options.type} screenshots`
-      );
-      assert(
-        typeof options.quality === 'number',
-        `Expected options.quality to be a number but found ${typeof options.quality}`
-      );
-      assert(
-        Number.isInteger(options.quality),
-        'Expected options.quality to be an integer'
-      );
-      assert(
-        options.quality >= 0 && options.quality <= 100,
-        `Expected options.quality to be between 0 and 100 (inclusive), got ${options.quality}`
-      );
+    if (options.quality !== undefined) {
+      if (options.quality < 0 && options.quality > 100) {
+        throw new Error(
+          `Expected 'quality' (${options.quality}) to be between 0 and 100, inclusive.`
+        );
+      }
+      if (
+        options.type === undefined ||
+        !['jpeg', 'webp'].includes(options.type)
+      ) {
+        throw new Error(
+          `${options.type ?? 'png'} screenshots do not support 'quality'.`
+        );
+      }
     }
     assert(
       !options.clip || !options.fullPage,
-      'options.clip and options.fullPage are exclusive'
+      "'clip' and 'fullPage' are exclusive"
     );
     if (options.clip) {
-      assert(
-        typeof options.clip.x === 'number',
-        `Expected options.clip.x to be a number but found ${typeof options.clip
-          .x}`
-      );
-      assert(
-        typeof options.clip.y === 'number',
-        `Expected options.clip.y to be a number but found ${typeof options.clip
-          .y}`
-      );
-      assert(
-        typeof options.clip.width === 'number',
-        `Expected options.clip.width to be a number but found ${typeof options
-          .clip.width}`
-      );
-      assert(
-        typeof options.clip.height === 'number',
-        `Expected options.clip.height to be a number but found ${typeof options
-          .clip.height}`
-      );
-      assert(
-        options.clip.width !== 0,
-        'Expected options.clip.width not to be 0.'
-      );
-      assert(
-        options.clip.height !== 0,
-        'Expected options.clip.height not to be 0.'
-      );
+      if (options.clip.width <= 0) {
+        throw new Error("'width' in 'clip' must be positive.");
+      }
+      if (options.clip.height <= 0) {
+        throw new Error("'height' in 'clip' must be positive.");
+      }
     }
 
     setDefaultScreenshotOptions(options);
 
-    options.clip = options.clip && roundClip(normalizeClip(options.clip));
+    options.clip =
+      options.clip && roundRectangle(normalizeRectangle(options.clip));
 
     await using stack = new AsyncDisposableStack();
     if (options.allowViewportExpansion || options.captureBeyondViewport) {
@@ -2480,7 +2592,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
     options: PDFOptions = {},
     lengthUnit: 'in' | 'cm' = 'in'
   ): ParsedPDFOptions {
-    const defaults = {
+    const defaults: Omit<ParsedPDFOptions, 'width' | 'height' | 'margin'> = {
       scale: 1,
       displayHeaderFooter: false,
       headerTemplate: '',
@@ -2491,6 +2603,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
       preferCSSPageSize: false,
       omitBackground: false,
       timeout: 30000,
+      tagged: false,
     };
 
     let width = 8.5;
@@ -2517,15 +2630,13 @@ export abstract class Page extends EventEmitter<PageEvents> {
         convertPrintParameterToInches(options.margin?.right, lengthUnit) || 0,
     };
 
-    const output = {
+    return {
       ...defaults,
       ...options,
       width,
       height,
       margin,
     };
-
-    return output;
   }
 
   /**
@@ -2543,10 +2654,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * @param options - options for generating the PDF.
    */
-  async createPDFStream(options?: PDFOptions): Promise<Readable>;
-  async createPDFStream(): Promise<Readable> {
-    throw new Error('Not implemented');
-  }
+  abstract createPDFStream(options?: PDFOptions): Promise<Readable>;
 
   /**
    * {@inheritDoc Page.createPDFStream}
@@ -2948,12 +3056,9 @@ export abstract class Page extends EventEmitter<PageEvents> {
    * );
    * ```
    */
-  waitForDevicePrompt(
+  abstract waitForDevicePrompt(
     options?: WaitTimeoutOptions
   ): Promise<DeviceRequestPrompt>;
-  waitForDevicePrompt(): Promise<DeviceRequestPrompt> {
-    throw new Error('Not implemented');
-  }
 
   /** @internal */
   [disposeSymbol](): void {
@@ -3030,8 +3135,11 @@ function convertPrintParameterToInches(
 }
 
 /** @see https://w3c.github.io/webdriver-bidi/#normalize-rect */
-function normalizeClip(clip: Readonly<ScreenshotClip>): ScreenshotClip {
+function normalizeRectangle<BoundingBoxType extends BoundingBox>(
+  clip: Readonly<BoundingBoxType>
+): BoundingBoxType {
   return {
+    ...clip,
     ...(clip.width < 0
       ? {
           x: clip.x + clip.width,
@@ -3050,14 +3158,15 @@ function normalizeClip(clip: Readonly<ScreenshotClip>): ScreenshotClip {
           y: clip.y,
           height: clip.height,
         }),
-    scale: clip.scale,
   };
 }
 
-function roundClip(clip: Readonly<ScreenshotClip>): ScreenshotClip {
+function roundRectangle<BoundingBoxType extends BoundingBox>(
+  clip: Readonly<BoundingBoxType>
+): BoundingBoxType {
   const x = Math.round(clip.x);
   const y = Math.round(clip.y);
   const width = Math.round(clip.width + clip.x - x);
   const height = Math.round(clip.height + clip.y - y);
-  return {x, y, width, height, scale: clip.scale};
+  return {...clip, x, y, width, height};
 }

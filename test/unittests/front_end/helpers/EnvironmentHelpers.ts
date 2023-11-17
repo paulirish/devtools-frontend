@@ -111,7 +111,6 @@ const REGISTERED_EXPERIMENTS = [
   'captureNodeCreationStacks',
   'preciseChanges',
   'protocolMonitor',
-  'sourcesPrettyPrint',
   'wasmDWARFDebugging',
   'timelineShowAllEvents',
   'timelineV8RuntimeCallStats',
@@ -132,6 +131,7 @@ const REGISTERED_EXPERIMENTS = [
   'networkPanelFilterBarRedesign',
   'breadcrumbsPerformancePanel',
   'trackContextMenu',
+  'sourcesFrameIndentationMarkersTemporarilyDisable',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -151,7 +151,8 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'automaticallyIgnoreListKnownThirdPartyScripts', true),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'enableIgnoreListing', true),
     createSettingValue(
-        Common.Settings.SettingCategory.DEBUGGER, 'skipStackFramesPattern', '', Common.Settings.SettingType.REGEX),
+        Common.Settings.SettingCategory.DEBUGGER, 'skipStackFramesPattern', '/node_modules/|/bower_components/',
+        Common.Settings.SettingType.REGEX),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'navigatorGroupByFolder', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'showDetailedInspectTooltip', true),
     createSettingValue(Common.Settings.SettingCategory.NETWORK, 'cacheDisabled', false),

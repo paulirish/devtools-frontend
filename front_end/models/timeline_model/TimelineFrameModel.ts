@@ -132,7 +132,7 @@ export class TimelineFrameModel {
 
   handleBeginFrame(startTime: number, seqId: number): void {
     if (!this.lastFrame) {
-      this.startFrame(startTime);
+      this.startFrame(startTime, seqId);
     }
     this.lastBeginFrame = startTime;
 
@@ -141,7 +141,7 @@ export class TimelineFrameModel {
 
   handleDroppedFrame(startTime: number, seqId: number, isPartial: boolean): void {
     if (!this.lastFrame) {
-      this.startFrame(startTime);
+      this.startFrame(startTime, seqId);
     }
 
     // This line handles the case where no BeginFrame event is issued for
@@ -154,7 +154,7 @@ export class TimelineFrameModel {
 
   handleDrawFrame(startTime: number, seqId: number): void {
     if (!this.lastFrame) {
-      this.startFrame(startTime);
+      this.startFrame(startTime, seqId);
       return;
     }
 
@@ -179,7 +179,7 @@ export class TimelineFrameModel {
 
         // If |frame| is the first frame after an idle period, the CPU time
         // will be logged ("committed") under |frame| if applicable.
-        this.startFrame(frame.startTime);
+        this.startFrame(frame.startTime, seqId);
         if (isLastFrameIdle && this.framePendingActivation) {
           this.commitPendingFrame();
         }
@@ -230,11 +230,11 @@ export class TimelineFrameModel {
     }
   }
 
-  private startFrame(startTime: number): void {
+  private startFrame(startTime: number, seqId: number): void {
     if (this.lastFrame) {
       this.flushFrame(this.lastFrame, startTime);
     }
-    this.lastFrame = new TimelineFrame(startTime, startTime - this.minimumRecordTime);
+    this.lastFrame = new TimelineFrame(seqId, startTime, startTime - this.minimumRecordTime);
   }
 
   private flushFrame(frame: TimelineFrame, endTime: number): void {
@@ -304,7 +304,6 @@ export class TimelineFrameModel {
     if (event.args['layerTreeId'] !== this.layerTreeId) {
       return;
     }
-
     const timestamp = event.startTime;
     if (event.name === RecordType.BeginFrame) {
       this.handleBeginFrame(timestamp, event.args['frameSeqId']);
@@ -428,8 +427,10 @@ export class TimelineFrame {
   layerTree: TracingFrameLayerTree|null;
   paints: LayerPaintEvent[];
   mainFrameId: number|undefined;
+  seqId: number;
 
-  constructor(startTime: number, startTimeOffset: number) {
+  constructor(seqId: number, startTime: number, startTimeOffset: number) {
+    this.seqId = seqId;
     this.startTime = startTime;
     this.startTimeOffset = startTimeOffset;
     this.endTime = this.startTime;

@@ -27,13 +27,13 @@ import {
   type IsPageTargetCallback,
   type Permission,
   type TargetFilterCallback,
+  type WaitForTargetOptions,
 } from '../api/Browser.js';
 import {BrowserContext, BrowserContextEvent} from '../api/BrowserContext.js';
 import {CDPSessionEvent, type CDPSession} from '../api/CDPSession.js';
 import type {Page} from '../api/Page.js';
 import type {Target} from '../api/Target.js';
 import type {Viewport} from '../common/Viewport.js';
-import {USE_TAB_TARGET} from '../environment.js';
 import {assert} from '../util/assert.js';
 
 import {ChromeTargetManager} from './ChromeTargetManager.js';
@@ -53,6 +53,8 @@ import {TargetManagerEvent, type TargetManager} from './TargetManager.js';
  * @internal
  */
 export class CdpBrowser extends BrowserBase {
+  readonly protocol = 'cdp';
+
   static async _create(
     product: 'firefox' | 'chrome' | undefined,
     connection: Connection,
@@ -63,8 +65,7 @@ export class CdpBrowser extends BrowserBase {
     closeCallback?: BrowserCloseCallback,
     targetFilterCallback?: TargetFilterCallback,
     isPageTargetCallback?: IsPageTargetCallback,
-    waitForInitiallyDiscoveredTargets = true,
-    useTabTarget = USE_TAB_TARGET
+    waitForInitiallyDiscoveredTargets = true
   ): Promise<CdpBrowser> {
     const browser = new CdpBrowser(
       product,
@@ -76,8 +77,7 @@ export class CdpBrowser extends BrowserBase {
       closeCallback,
       targetFilterCallback,
       isPageTargetCallback,
-      waitForInitiallyDiscoveredTargets,
-      useTabTarget
+      waitForInitiallyDiscoveredTargets
     );
     await browser._attach();
     return browser;
@@ -93,10 +93,6 @@ export class CdpBrowser extends BrowserBase {
   #contexts = new Map<string, CdpBrowserContext>();
   #targetManager: TargetManager;
 
-  override get _targets(): Map<string, CdpTarget> {
-    return this.#targetManager.getAvailableTargets();
-  }
-
   constructor(
     product: 'chrome' | 'firefox' | undefined,
     connection: Connection,
@@ -107,8 +103,7 @@ export class CdpBrowser extends BrowserBase {
     closeCallback?: BrowserCloseCallback,
     targetFilterCallback?: TargetFilterCallback,
     isPageTargetCallback?: IsPageTargetCallback,
-    waitForInitiallyDiscoveredTargets = true,
-    useTabTarget = USE_TAB_TARGET
+    waitForInitiallyDiscoveredTargets = true
   ) {
     super();
     product = product || 'chrome';
@@ -134,8 +129,7 @@ export class CdpBrowser extends BrowserBase {
         connection,
         this.#createTarget,
         this.#targetFilterCallback,
-        waitForInitiallyDiscoveredTargets,
-        useTabTarget
+        waitForInitiallyDiscoveredTargets
       );
     }
     this.#defaultContext = new CdpBrowserContext(this.#connection, this);
@@ -151,7 +145,7 @@ export class CdpBrowser extends BrowserBase {
     this.emit(BrowserEvent.Disconnected, undefined);
   };
 
-  override async _attach(): Promise<void> {
+  async _attach(): Promise<void> {
     this.#connection.on(CDPSessionEvent.Disconnected, this.#emitDisconnected);
     this.#targetManager.on(
       TargetManagerEvent.TargetAvailable,
@@ -172,7 +166,7 @@ export class CdpBrowser extends BrowserBase {
     await this.#targetManager.initialize();
   }
 
-  override _detach(): void {
+  _detach(): void {
     this.#connection.off(CDPSessionEvent.Disconnected, this.#emitDisconnected);
     this.#targetManager.off(
       TargetManagerEvent.TargetAvailable,
@@ -212,7 +206,7 @@ export class CdpBrowser extends BrowserBase {
       });
   }
 
-  override _getIsPageTargetCallback(): IsPageTargetCallback | undefined {
+  _getIsPageTargetCallback(): IsPageTargetCallback | undefined {
     return this.#isPageTargetCallback;
   }
 
@@ -245,7 +239,7 @@ export class CdpBrowser extends BrowserBase {
     return this.#defaultContext;
   }
 
-  override async _disposeContext(contextId?: string): Promise<void> {
+  async _disposeContext(contextId?: string): Promise<void> {
     if (!contextId) {
       return;
     }
@@ -318,8 +312,9 @@ export class CdpBrowser extends BrowserBase {
 
   #onAttachedToTarget = async (target: CdpTarget) => {
     if (
+      target._isTargetExposed() &&
       (await target._initializedDeferred.valueOrThrow()) ===
-      InitializationStatus.SUCCESS
+        InitializationStatus.SUCCESS
     ) {
       this.emit(BrowserEvent.TargetCreated, target);
       target.browserContext().emit(BrowserContextEvent.TargetCreated, target);
@@ -330,8 +325,9 @@ export class CdpBrowser extends BrowserBase {
     target._initializedDeferred.resolve(InitializationStatus.ABORTED);
     target._isClosedDeferred.resolve();
     if (
+      target._isTargetExposed() &&
       (await target._initializedDeferred.valueOrThrow()) ===
-      InitializationStatus.SUCCESS
+        InitializationStatus.SUCCESS
     ) {
       this.emit(BrowserEvent.TargetDestroyed, target);
       target.browserContext().emit(BrowserContextEvent.TargetDestroyed, target);
@@ -355,7 +351,7 @@ export class CdpBrowser extends BrowserBase {
     return await this.#defaultContext.newPage();
   }
 
-  override async _createPageInContext(contextId?: string): Promise<Page> {
+  async _createPageInContext(contextId?: string): Promise<Page> {
     const {targetId} = await this.#connection.send('Target.createTarget', {
       url: 'about:blank',
       browserContextId: contextId || undefined,
@@ -386,6 +382,7 @@ export class CdpBrowser extends BrowserBase {
       this.#targetManager.getAvailableTargets().values()
     ).filter(target => {
       return (
+        target._isTargetExposed() &&
         target._initializedDeferred.value() === InitializationStatus.SUCCESS
       );
     });
@@ -458,7 +455,7 @@ export class CdpBrowserContext extends BrowserContext {
 
   override waitForTarget(
     predicate: (x: Target) => boolean | Promise<boolean>,
-    options: {timeout?: number} = {}
+    options: WaitForTargetOptions = {}
   ): Promise<Target> {
     return this.#browser.waitForTarget(target => {
       return target.browserContext() === this && predicate(target);

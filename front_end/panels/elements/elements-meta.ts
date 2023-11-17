@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type * as Elements from './elements.js';
 import type * as ElementsComponents from './components/components.js';
+import type * as Elements from './elements.js';
 
-import * as i18n from '../../core/i18n/i18n.js';
 const UIStrings = {
   /**
    * @description Command for showing the 'Elements' panel. Elements refers to HTML elements.
@@ -88,6 +88,14 @@ const UIStrings = {
    * @description Title/tooltip of an action in the elements panel to toggle element search on/off.
    */
   selectAnElementInThePageTo: 'Select an element in the page to inspect it',
+  /**
+   *@description Title/tooltip of an action in the elements panel to add a new style rule.
+   */
+  newStyleRule: 'New Style Rule',
+  /**
+   * @description Title/tooltip of an action in the elements panel to refresh the event listeners.
+   */
+  refreshEventListeners: 'Refresh event listeners',
   /**
    * @description Title of a setting under the Elements category in Settings. Whether words should be
    * wrapped around at the end of lines or not.
@@ -435,6 +443,34 @@ UI.ActionRegistration.registerActionExtension({
       platform: UI.ActionRegistration.Platforms.Mac,
     },
   ],
+});
+
+UI.ActionRegistration.registerActionExtension({
+  category: UI.ActionRegistration.ActionCategory.ELEMENTS,
+  actionId: 'elements.new-style-rule',
+  title: i18nLazyString(UIStrings.newStyleRule),
+  iconClass: UI.ActionRegistration.IconClass.PLUS,
+  async loadActionDelegate() {
+    const Elements = await loadElementsModule();
+    return Elements.StylesSidebarPane.ActionDelegate.instance();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Elements => [Elements.StylesSidebarPane.StylesSidebarPane]);
+  },
+});
+
+UI.ActionRegistration.registerActionExtension({
+  category: UI.ActionRegistration.ActionCategory.ELEMENTS,
+  actionId: 'elements.refresh-event-listeners',
+  title: i18nLazyString(UIStrings.refreshEventListeners),
+  iconClass: UI.ActionRegistration.IconClass.REFRESH,
+  async loadActionDelegate() {
+    const Elements = await loadElementsModule();
+    return Elements.EventListenersWidget.ActionDelegate.instance();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Elements => [Elements.EventListenersWidget.EventListenersWidget]);
+  },
 });
 
 Common.Settings.registerSettingExtension({

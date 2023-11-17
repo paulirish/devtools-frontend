@@ -25,7 +25,12 @@ export class CustomError extends Error {
     constructor(message) {
         super(message);
         this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
+    }
+    /**
+     * @internal
+     */
+    get [Symbol.toStringTag]() {
+        return this.constructor.name;
     }
 }
 /**
@@ -68,6 +73,14 @@ export class ProtocolError extends CustomError {
     get originalMessage() {
         return this.#originalMessage;
     }
+}
+/**
+ * Puppeteer will throw this error if a method is not
+ * supported by the currently used protocol
+ *
+ * @public
+ */
+export class UnsupportedOperation extends CustomError {
 }
 /**
  * @internal

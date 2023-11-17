@@ -18,7 +18,7 @@ import {EventEmitter, type EventType} from '../common/EventEmitter.js';
 import {debugError} from '../common/util.js';
 import {asyncDisposeSymbol, disposeSymbol} from '../util/disposable.js';
 
-import type {Browser, Permission} from './Browser.js';
+import type {Browser, Permission, WaitForTargetOptions} from './Browser.js';
 import type {Page} from './Page.js';
 import type {Target} from './Target.js';
 
@@ -107,9 +107,7 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
    * Gets all active {@link Target | targets} inside this
    * {@link BrowserContext | browser context}.
    */
-  targets(): Target[] {
-    throw new Error('Not implemented');
-  }
+  abstract targets(): Target[];
 
   /**
    * Waits until a {@link Target | target} matching the given `predicate`
@@ -128,7 +126,7 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
    */
   abstract waitForTarget(
     predicate: (x: Target) => boolean | Promise<boolean>,
-    options?: {timeout?: number}
+    options?: WaitForTargetOptions
   ): Promise<Target>;
 
   /**
@@ -167,10 +165,10 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
    * @param permissions - An array of permissions to grant. All permissions that
    * are not listed here will be automatically denied.
    */
-  overridePermissions(origin: string, permissions: Permission[]): Promise<void>;
-  overridePermissions(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract overridePermissions(
+    origin: string,
+    permissions: Permission[]
+  ): Promise<void>;
 
   /**
    * Clears all permission overrides for this
@@ -186,9 +184,7 @@ export abstract class BrowserContext extends EventEmitter<BrowserContextEvents> 
    * context.clearPermissionOverrides();
    * ```
    */
-  clearPermissionOverrides(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract clearPermissionOverrides(): Promise<void>;
 
   /**
    * Creates a new {@link Page | page} in this

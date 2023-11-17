@@ -177,7 +177,7 @@ export class StylePropertiesSection {
     this.element.classList.add('styles-section');
     this.element.classList.add('matched-styles');
     this.element.classList.add('monospace');
-    this.element.setAttribute('jslog', `${VisualLogging.stylePropertiesSection()}`);
+    this.element.setAttribute('jslog', `${VisualLogging.section().context('style-properties')}`);
     UI.ARIAUtils.setLabel(this.element, `${this.headerText()}, css selector`);
     this.element.tabIndex = -1;
     UI.ARIAUtils.markAsListitem(this.element);
@@ -216,10 +216,10 @@ export class StylePropertiesSection {
     closeBrace.textContent = '}';
 
     if (this.styleInternal.parentRule) {
-      const newRuleButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.insertStyleRuleBelow), 'plus');
+      const newRuleButton = new UI.Toolbar.ToolbarButton(
+          i18nString(UIStrings.insertStyleRuleBelow), 'plus', undefined, 'elements.new-style-rule');
       newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onNewRuleClick, this);
       newRuleButton.element.tabIndex = -1;
-      newRuleButton.element.setAttribute('jslog', `${VisualLogging.addStylesRule().track({click: true})}`);
       if (!this.newStyleRuleToolbar) {
         this.newStyleRuleToolbar =
             new UI.Toolbar.Toolbar('sidebar-pane-section-toolbar new-rule-toolbar', this.innerElement);
@@ -365,7 +365,9 @@ export class StylePropertiesSection {
       if (!rule) {
         return null;
       }
-      if (ruleLocation && rule.styleSheetId && header && !header.isAnonymousInlineStyleSheet()) {
+      if (ruleLocation && rule.styleSheetId && header &&
+          (!header.isAnonymousInlineStyleSheet() ||
+           matchedStyles.cssModel().sourceMapManager().sourceMapForClient(header))) {
         return StylePropertiesSection.linkifyRuleLocation(
             matchedStyles.cssModel(), linkifier, rule.styleSheetId, ruleLocation);
       }
@@ -385,7 +387,7 @@ export class StylePropertiesSection {
     }
 
     if (header?.isMutable && !header.isViaInspector()) {
-      const location = header.isConstructedByNew() ? null : linkifyRuleLocation();
+      const location = header.isConstructedByNew() && !header.sourceMapURL ? null : linkifyRuleLocation();
       if (location) {
         return location;
       }
@@ -1660,6 +1662,15 @@ export class RegisteredPropertiesSection extends StylePropertiesSection {
       return super.createRuleOriginNode(matchedStyles, linkifier, rule);
     }
     return document.createTextNode('CSS.registerProperty');
+  }
+}
+
+export class FontPaletteValuesRuleSection extends StylePropertiesSection {
+  constructor(
+      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number) {
+    super(stylesPane, matchedStyles, style, sectionIdx, null, null);
+    this.selectorElement.className = 'font-palette-values-key';
   }
 }
 

@@ -458,6 +458,52 @@ export class UserMetrics {
     InspectorFrontendHostInstance.recordPerformanceHistogram(
         'DevTools.VisualLogging.ProcessingTime', timeInMilliseconds);
   }
+
+  legacyResourceTypeFilterNumberOfSelectedChanged(itemCount: number): void {
+    const boundItemCount = Math.max(Math.min(itemCount, ResourceType.MaxValue - 1), 1);
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.LegacyResourceTypeFilterNumberOfSelectedChanged, boundItemCount, ResourceType.MaxValue);
+  }
+
+  legacyResourceTypeFilterItemSelected(resourceTypeName: string): void {
+    const resourceType = ResourceType[resourceTypeName as keyof typeof ResourceType];
+    if (resourceType === undefined) {
+      return;
+    }
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.LegacyResourceTypeFilterItemSelected, resourceType, ResourceType.MaxValue);
+  }
+
+  resourceTypeFilterNumberOfSelectedChanged(itemCount: number): void {
+    const boundItemCount = Math.max(Math.min(itemCount, ResourceType.MaxValue - 1), 1);
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ResourceTypeFilterNumberOfSelectedChanged, boundItemCount, ResourceType.MaxValue);
+  }
+
+  resourceTypeFilterItemSelected(resourceTypeName: string): void {
+    const resourceType = ResourceType[resourceTypeName as keyof typeof ResourceType];
+    if (resourceType === undefined) {
+      return;
+    }
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.ResourceTypeFilterItemSelected, resourceType, ResourceType.MaxValue);
+  }
+
+  networkPanelMoreFiltersNumberOfSelectedChanged(itemCount: number): void {
+    const boundItemCount = Math.max(Math.min(itemCount, NetworkPanelMoreFilters.MaxValue), 0);
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.NetworkPanelMoreFiltersNumberOfSelectedChanged, boundItemCount,
+        NetworkPanelMoreFilters.MaxValue);
+  }
+
+  networkPanelMoreFiltersItemSelected(filterName: string): void {
+    const filter = NetworkPanelMoreFilters[filterName as keyof typeof NetworkPanelMoreFilters];
+    if (filter === undefined) {
+      return;
+    }
+    InspectorFrontendHostInstance.recordEnumeratedHistogram(
+        EnumeratedHistogram.NetworkPanelMoreFiltersItemSelected, filter, NetworkPanelMoreFilters.MaxValue);
+  }
 }
 
 /**
@@ -582,14 +628,22 @@ export enum Action {
   AnimationGroupScrubbed = 103,
   AnimationGroupReplayed = 104,
   OverrideTabDeleteFolderContextMenu = 105,
-  OverrideTabDeleteOverridesContextMenu = 106,
   WorkspaceDropFolder = 107,
   WorkspaceSelectFolder = 108,
   OverrideContentContextMenuSourceMappedWarning = 109,
   OverrideContentContextMenuRedirectToDeployed = 110,
   NewStyleRuleAdded = 111,
   TraceExpanded = 112,
-  MaxValue = 113,
+  InsightConsoleMessageShown = 113,
+  InsightRequestedViaContextMenu = 114,
+  InsightRequestedViaHoverButton = 115,
+  InsightRefined = 116,
+  InsightRatedPositive = 117,
+  InsightRatedNegative = 118,
+  InsightClosed = 119,
+  InsightErrored = 120,
+  InsightHoverButtonShown = 121,
+  MaxValue = 122,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -660,8 +714,9 @@ export enum PanelCodes {
   'performance_insights' = 63,
   'preloading' = 64,
   'bounce_tracking_mitigations' = 65,
-  'resource-loading-pane' = 66,
-  MaxValue = 67,
+  'developer-resources' = 66,
+  'autofill-view' = 67,
+  MaxValue = 68,
 }
 
 /* eslint-enable @typescript-eslint/naming-convention */
@@ -757,7 +812,7 @@ export enum KeyboardShortcutAction {
   OtherShortcut = 0,
   'commandMenu.show' = 1,
   'console.clear' = 2,
-  'console.show' = 3,
+  'console.toggle' = 3,
   'debugger.step' = 4,
   'debugger.step-into' = 5,
   'debugger.step-out' = 6,
@@ -866,7 +921,13 @@ export enum KeyboardShortcutAction {
   'chrome_recorder.replay-recording' = 109,
   'chrome_recorder.toggle-code-view' = 110,
   'chrome_recorder.copy-recording-or-step' = 111,
-  MaxValue = 112,
+  'changes.revert' = 112,
+  'changes.copy' = 113,
+  'elements.new-style-rule' = 114,
+  'elements.refresh-event-listeners' = 115,
+  'coverage.clear' = 116,
+  'coverage.export' = 117,
+  MaxValue = 118,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -892,7 +953,6 @@ export enum IssueOpener {
 export enum DevtoolsExperiments {
   'applyCustomStylesheet' = 0,
   'captureNodeCreationStacks' = 1,
-  'sourcesPrettyPrint' = 2,
   'liveHeapProfile' = 11,
   'protocolMonitor' = 13,
   'developerResourcesView' = 15,
@@ -932,13 +992,14 @@ export enum DevtoolsExperiments {
   'selfXssWarning' = 75,
   'useSourceMapScopes' = 76,
   'storageBucketsTree' = 77,
-  'deleteOverridesTemporarilyEnable' = 78,
   'networkPanelFilterBarRedesign' = 79,
   'breadcrumbsPerformancePanel' = 80,
   'trackContextMenu' = 81,
+  'autofillView' = 82,
+  'sourcesFrameIndentationMarkersTemporarilyDisable' = 83,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 82,
+  'MaxValue' = 84,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -1108,7 +1169,11 @@ export enum IssueCreated {
   'CorsIssue::PreflightMissingPrivateNetworkAccessName' = 79,
   'CorsIssue::PrivateNetworkAccessPermissionUnavailable' = 80,
   'CorsIssue::PrivateNetworkAccessPermissionDenied' = 81,
-  MaxValue = 82,
+  'CookieIssue::WarnThirdPartyPhaseout::ReadCookie' = 82,
+  'CookieIssue::WarnThirdPartyPhaseout::SetCookie' = 83,
+  'CookieIssue::ExcludeThirdPartyPhaseout::ReadCookie' = 84,
+  'CookieIssue::ExcludeThirdPartyPhaseout::SetCookie' = 85,
+  MaxValue = 86,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again
@@ -1139,6 +1204,39 @@ export enum DeveloperResourceScheme {
   SchemeBlob = 8,
   MaxValue = 9,
 }
+
+// TODO(crbug.com/1167717): Make this a const enum again
+// eslint-disable-next-line rulesdir/const_enum
+export enum ResourceType {
+  /* eslint-disable @typescript-eslint/naming-convention */
+  all = 0,
+  /* eslint-enable @typescript-eslint/naming-convention */
+  Documents = 1,
+  Scripts = 2,
+  'XHR and Fetch' = 3,
+  Stylesheets = 4,
+  Fonts = 5,
+  Images = 6,
+  Media = 7,
+  Manifest = 8,
+  WebSockets = 9,
+  WebAssembly = 10,
+  Other = 11,
+  MaxValue = 12,
+}
+
+// TODO(crbug.com/1167717): Make this a const enum again
+/* eslint-disable @typescript-eslint/naming-convention */
+// eslint-disable-next-line rulesdir/const_enum
+export enum NetworkPanelMoreFilters {
+  'Hide data URLs' = 0,
+  'Hide extension URLs' = 1,
+  'Blocked response cookies' = 2,
+  'Blocked requests' = 3,
+  '3rd-party requests' = 4,
+  MaxValue = 5,
+}
+/* eslint-enable @typescript-eslint/naming-convention */
 
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum

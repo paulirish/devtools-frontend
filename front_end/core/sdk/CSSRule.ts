@@ -172,6 +172,12 @@ export class CSSStyleRule extends CSSRule {
   }
 
   selectorRange(): TextUtils.TextRange.TextRange|null {
+    // Nested group rules might not contain a selector.
+    // https://www.w3.org/TR/css-nesting-1/#conditionals
+    if (this.selectors.length === 0) {
+      return null;
+    }
+
     const firstRange = this.selectors[0].range;
     const lastRange = this.selectors[this.selectors.length - 1].range;
     if (!firstRange || !lastRange) {
@@ -251,6 +257,18 @@ export class CSSPropertyRule extends CSSRule {
       throw new Error('Property name is not editable');
     }
     return this.cssModelInternal.setPropertyRulePropertyName(styleSheetId, range, newPropertyName);
+  }
+}
+
+export class CSSFontPaletteValuesRule extends CSSRule {
+  readonly #paletteName: CSSValue;
+  constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSFontPaletteValuesRule) {
+    super(cssModel, {origin: payload.origin, style: payload.style, styleSheetId: payload.styleSheetId});
+    this.#paletteName = new CSSValue(payload.fontPaletteName);
+  }
+
+  name(): CSSValue {
+    return this.#paletteName;
   }
 }
 

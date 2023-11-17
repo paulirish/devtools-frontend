@@ -14,6 +14,7 @@ const events =
     new Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventComplete[]>>();
 
 const profilesInProcess = new Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, ProfileData>>();
+const entryToNode = new Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode>();
 
 // The profile head, containing its metadata like its start
 // time, comes in a "Profile" event. The sample data comes in
@@ -28,7 +29,7 @@ const preprocessedData = new Map<Types.TraceEvents.ProcessID, Map<Types.TraceEve
 
 let handlerState = HandlerState.UNINITIALIZED;
 
-export function buildProfileCalls(): void {
+function buildProfileCalls(): void {
   for (const [processId, profiles] of preprocessedData) {
     for (const [profileId, preProcessedData] of profiles) {
       const threadId = preProcessedData.threadId;
@@ -44,7 +45,6 @@ export function buildProfileCalls(): void {
       const finalizedData: ProfileData =
           {rawProfile: preProcessedData.rawProfile, parsedProfile: profileModel, profileCalls: [], profileTree};
 
-      const entryToNode = new Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode>();
       const dataByThread = Platform.MapUtilities.getWithDefault(profilesInProcess, processId, () => new Map());
       profileModel.forEachFrame(openFrameCallback, closeFrameCallback);
       dataByThread.set(threadId, finalizedData);
@@ -61,7 +61,6 @@ export function buildProfileCalls(): void {
         finalizedData.profileCalls.push(profileCall);
         indexStack.push(finalizedData.profileCalls.length - 1);
         const traceEntryNode = Helpers.TreeHelpers.makeEmptyTraceEntryNode(profileCall, nodeId);
-        finalizedData.profileTree?.nodes.set(nodeId, traceEntryNode);
         entryToNode.set(profileCall, traceEntryNode);
         traceEntryNode.depth = depth;
         if (indexStack.length === 1) {
@@ -95,7 +94,7 @@ export function buildProfileCalls(): void {
           return;
         }
         traceEntryNode.parentId = parentNode.id;
-        parentNode.children.add(traceEntryNode);
+        parentNode.children.push(traceEntryNode);
       }
     }
   }
@@ -105,6 +104,7 @@ export function reset(): void {
   events.clear();
   preprocessedData.clear();
   profilesInProcess.clear();
+  entryToNode.clear();
   handlerState = HandlerState.UNINITIALIZED;
 }
 
@@ -212,6 +212,7 @@ export function data(): SamplesHandlerData {
 
   return {
     profilesInProcess: new Map(profilesInProcess),
+    entryToNode: new Map(entryToNode),
   };
 }
 
@@ -234,6 +235,7 @@ function getOrCreatePreProcessedData(
 
 export interface SamplesHandlerData {
   profilesInProcess: typeof profilesInProcess;
+  entryToNode: typeof entryToNode;
 }
 
 export type ProfileData = {

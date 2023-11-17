@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { firstValueFrom, from, merge, raceWith, filterAsync, fromEvent, } from '../../third_party/rxjs/rxjs.js';
 import { EventEmitter } from '../common/EventEmitter.js';
-import { debugError, waitWithTimeout } from '../common/util.js';
-import { Deferred } from '../util/Deferred.js';
+import { debugError } from '../common/util.js';
+import { timeout } from '../common/util.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
 /**
  * @internal
@@ -90,46 +91,6 @@ export class Browser extends EventEmitter {
         super();
     }
     /**
-     * @internal
-     */
-    _attach() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * @internal
-     */
-    _detach() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * @internal
-     */
-    get _targets() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * Gets the associated
-     * {@link https://nodejs.org/api/child_process.html#class-childprocess | ChildProcess}.
-     *
-     * @returns `null` if this instance was connected to via
-     * {@link Puppeteer.connect}.
-     */
-    process() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * @internal
-     */
-    _getIsPageTargetCallback() {
-        throw new Error('Not implemented');
-    }
-    _disposeContext() {
-        throw new Error('Not implemented');
-    }
-    _createPageInContext() {
-        throw new Error('Not implemented');
-    }
-    /**
      * Waits until a {@link Target | target} matching the given `predicate`
      * appears and returns it.
      *
@@ -145,26 +106,8 @@ export class Browser extends EventEmitter {
      * ```
      */
     async waitForTarget(predicate, options = {}) {
-        const { timeout = 30000 } = options;
-        const targetDeferred = Deferred.create();
-        this.on("targetcreated" /* BrowserEvent.TargetCreated */, check);
-        this.on("targetchanged" /* BrowserEvent.TargetChanged */, check);
-        try {
-            this.targets().forEach(check);
-            if (!timeout) {
-                return await targetDeferred.valueOrThrow();
-            }
-            return await waitWithTimeout(targetDeferred.valueOrThrow(), 'target', timeout);
-        }
-        finally {
-            this.off("targetcreated" /* BrowserEvent.TargetCreated */, check);
-            this.off("targetchanged" /* BrowserEvent.TargetChanged */, check);
-        }
-        async function check(target) {
-            if ((await predicate(target)) && !targetDeferred.resolved()) {
-                targetDeferred.resolve(target);
-            }
-        }
+        const { timeout: ms = 30000 } = options;
+        return await firstValueFrom(merge(fromEvent(this, "targetcreated" /* BrowserEvent.TargetCreated */), fromEvent(this, "targetchanged" /* BrowserEvent.TargetChanged */), from(this.targets())).pipe(filterAsync(predicate), raceWith(timeout(ms))));
     }
     /**
      * Gets a list of all open {@link Page | pages} inside this {@link Browser}.
@@ -184,22 +127,6 @@ export class Browser extends EventEmitter {
         return contextPages.reduce((acc, x) => {
             return acc.concat(x);
         }, []);
-    }
-    /**
-     * Gets this {@link Browser | browser's} original user agent.
-     *
-     * {@link Page | Pages} can override the user agent with
-     * {@link Page.setUserAgent}.
-     */
-    userAgent() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * Disconnects Puppeteer from this {@link Browser | browser}, but leaves the
-     * process running.
-     */
-    disconnect() {
-        throw new Error('Not implemented');
     }
     /**
      * Whether Puppeteer is connected to this {@link Browser | browser}.

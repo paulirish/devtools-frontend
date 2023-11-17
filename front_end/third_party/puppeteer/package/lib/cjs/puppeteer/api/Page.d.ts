@@ -17,30 +17,31 @@
 /// <reference types="node" />
 import type { Readable } from 'stream';
 import type { Protocol } from 'devtools-protocol';
+import { type Observable } from '../../third_party/rxjs/rxjs.js';
 import type { HTTPRequest } from '../api/HTTPRequest.js';
 import type { HTTPResponse } from '../api/HTTPResponse.js';
 import type { BidiNetworkManager } from '../bidi/NetworkManager.js';
 import type { Accessibility } from '../cdp/Accessibility.js';
 import type { Coverage } from '../cdp/Coverage.js';
 import type { DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
-import { type NetworkManager as CdpNetworkManager, type Credentials, type NetworkConditions } from '../cdp/NetworkManager.js';
+import type { NetworkManager as CdpNetworkManager, Credentials, NetworkConditions } from '../cdp/NetworkManager.js';
 import type { Tracing } from '../cdp/Tracing.js';
 import type { WebWorker } from '../cdp/WebWorker.js';
 import type { ConsoleMessage } from '../common/ConsoleMessage.js';
 import type { Device } from '../common/Device.js';
-import { TargetCloseError } from '../common/Errors.js';
 import { EventEmitter, type EventsWithWildcard, type EventType } from '../common/EventEmitter.js';
 import type { FileChooser } from '../common/FileChooser.js';
 import { type ParsedPDFOptions, type PDFOptions } from '../common/PDFOptions.js';
+import { TimeoutSettings } from '../common/TimeoutSettings.js';
 import type { Awaitable, EvaluateFunc, EvaluateFuncWith, HandleFor, NodeFor } from '../common/types.js';
 import type { Viewport } from '../common/Viewport.js';
-import type { Deferred } from '../util/Deferred.js';
+import type { ScreenRecorder } from '../node/ScreenRecorder.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
 import type { Browser } from './Browser.js';
 import type { BrowserContext } from './BrowserContext.js';
 import type { CDPSession } from './CDPSession.js';
 import type { Dialog } from './Dialog.js';
-import type { ClickOptions, ElementHandle } from './ElementHandle.js';
+import type { BoundingBox, ClickOptions, ElementHandle } from './ElementHandle.js';
 import type { Frame, FrameAddScriptTagOptions, FrameAddStyleTagOptions, FrameWaitForFunctionOptions, GoToOptions, WaitForOptions } from './Frame.js';
 import type { Keyboard, KeyboardTypeOptions, Mouse, Touchscreen } from './Input.js';
 import type { JSHandle } from './JSHandle.js';
@@ -136,11 +137,7 @@ export interface MediaFeature {
 /**
  * @public
  */
-export interface ScreenshotClip {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+export interface ScreenshotClip extends BoundingBox {
     /**
      * @defaultValue `1`
      */
@@ -211,6 +208,43 @@ export interface ScreenshotOptions {
      * @internal
      */
     allowViewportExpansion?: boolean;
+}
+/**
+ * @experimental
+ */
+export interface ScreencastOptions {
+    /**
+     * File path to save the screencast to.
+     */
+    path?: `${string}.webm`;
+    /**
+     * Specifies the region of the viewport to crop.
+     */
+    crop?: BoundingBox;
+    /**
+     * Scales the output video.
+     *
+     * For example, `0.5` will shrink the width and height of the output video by
+     * half. `2` will double the width and height of the output video.
+     *
+     * @defaultValue `1`
+     */
+    scale?: number;
+    /**
+     * Specifies the speed to record at.
+     *
+     * For example, `0.5` will slowdown the output video by 50%. `2` will double the
+     * speed of the output video.
+     *
+     * @defaultValue `1`
+     */
+    speed?: number;
+    /**
+     * Path to the [ffmpeg](https://ffmpeg.org/).
+     *
+     * Required if `ffmpeg` is not in your PATH.
+     */
+    ffmpegPath?: string;
 }
 /**
  * All the events that a page instance may emit.
@@ -475,11 +509,15 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     /**
      * @internal
      */
+    _timeoutSettings: TimeoutSettings;
+    /**
+     * @internal
+     */
     constructor();
     /**
      * `true` if the service worker are being bypassed, `false` otherwise.
      */
-    isServiceWorkerBypassed(): boolean;
+    abstract isServiceWorkerBypassed(): boolean;
     /**
      * `true` if drag events are being intercepted, `false` otherwise.
      *
@@ -487,11 +525,11 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * drag APIs found on {@link ElementHandle} to drag (or just use the
      * {@link Page.mouse}).
      */
-    isDragInterceptionEnabled(): boolean;
+    abstract isDragInterceptionEnabled(): boolean;
     /**
      * `true` if the page has JavaScript enabled, `false` otherwise.
      */
-    isJavaScriptEnabled(): boolean;
+    abstract isJavaScriptEnabled(): boolean;
     /**
      * Listen to page events.
      *
@@ -535,7 +573,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * await fileChooser.accept(['/tmp/myfile.pdf']);
      * ```
      */
-    waitForFileChooser(options?: WaitTimeoutOptions): Promise<FileChooser>;
+    abstract waitForFileChooser(options?: WaitTimeoutOptions): Promise<FileChooser>;
     /**
      * Sets the page's geolocation.
      *
@@ -549,11 +587,11 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * await page.setGeolocation({latitude: 59.95, longitude: 30.31667});
      * ```
      */
-    setGeolocation(options: GeolocationOptions): Promise<void>;
+    abstract setGeolocation(options: GeolocationOptions): Promise<void>;
     /**
      * A target this page was created from.
      */
-    target(): Target;
+    abstract target(): Target;
     /**
      * Get the browser the page belongs to.
      */
@@ -572,7 +610,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     /**
      * Creates a Chrome Devtools Protocol session attached to the page.
      */
-    createCDPSession(): Promise<CDPSession>;
+    abstract createCDPSession(): Promise<CDPSession>;
     /**
      * {@inheritDoc Keyboard}
      */
@@ -580,7 +618,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     /**
      * {@inheritDoc Touchscreen}
      */
-    get touchscreen(): Touchscreen;
+    abstract get touchscreen(): Touchscreen;
     /**
      * {@inheritDoc Coverage}
      */
@@ -605,7 +643,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @remarks
      * This does not contain ServiceWorkers
      */
-    workers(): WebWorker[];
+    abstract workers(): WebWorker[];
     /**
      * Activating request interception enables {@link HTTPRequest.abort},
      * {@link HTTPRequest.continue} and {@link HTTPRequest.respond} methods. This
@@ -642,13 +680,13 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @param value - Whether to enable request interception.
      */
-    setRequestInterception(value: boolean): Promise<void>;
+    abstract setRequestInterception(value: boolean): Promise<void>;
     /**
      * Toggles ignoring of service worker for each request.
      *
      * @param bypass - Whether to bypass service worker and load from network.
      */
-    setBypassServiceWorker(bypass: boolean): Promise<void>;
+    abstract setBypassServiceWorker(bypass: boolean): Promise<void>;
     /**
      * @param enabled - Whether to enable drag interception.
      *
@@ -656,7 +694,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * drag APIs found on {@link ElementHandle} to drag (or just use the
      * {@link Page.mouse}).
      */
-    setDragInterception(enabled: boolean): Promise<void>;
+    abstract setDragInterception(enabled: boolean): Promise<void>;
     /**
      * Sets the network connection to offline.
      *
@@ -664,7 +702,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @param enabled - When `true`, enables offline mode for the page.
      */
-    setOfflineMode(enabled: boolean): Promise<void>;
+    abstract setOfflineMode(enabled: boolean): Promise<void>;
     /**
      * This does not affect WebSockets and WebRTC PeerConnections (see
      * https://crbug.com/563644). To set the page offline, you can use
@@ -692,7 +730,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @param networkConditions - Passing `null` disables network condition
      * emulation.
      */
-    emulateNetworkConditions(networkConditions: NetworkConditions | null): Promise<void>;
+    abstract emulateNetworkConditions(networkConditions: NetworkConditions | null): Promise<void>;
     /**
      * This setting will change the default maximum navigation time for the
      * following methods and related shortcuts:
@@ -983,8 +1021,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * If no URLs are specified, this method returns cookies for the current page
      * URL. If URLs are specified, only cookies for those URLs are returned.
      */
-    cookies(...urls: string[]): Promise<Protocol.Network.Cookie[]>;
-    deleteCookie(...cookies: Protocol.Network.DeleteCookiesRequest[]): Promise<void>;
+    abstract cookies(...urls: string[]): Promise<Protocol.Network.Cookie[]>;
+    abstract deleteCookie(...cookies: Protocol.Network.DeleteCookiesRequest[]): Promise<void>;
     /**
      * @example
      *
@@ -992,7 +1030,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * await page.setCookie(cookieObject1, cookieObject2);
      * ```
      */
-    setCookie(...cookies: Protocol.Network.CookieParam[]): Promise<void>;
+    abstract setCookie(...cookies: Protocol.Network.CookieParam[]): Promise<void>;
     /**
      * Adds a `<script>` tag into the page with the desired URL or content.
      *
@@ -1094,14 +1132,14 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * The method removes a previously added function via ${@link Page.exposeFunction}
      * called `name` from the page's `window` object.
      */
-    removeExposedFunction(name: string): Promise<void>;
+    abstract removeExposedFunction(name: string): Promise<void>;
     /**
      * Provide credentials for `HTTP authentication`.
      *
      * @remarks
      * To disable authentication, pass `null`.
      */
-    authenticate(credentials: Credentials): Promise<void>;
+    abstract authenticate(credentials: Credentials): Promise<void>;
     /**
      * The extra HTTP headers will be sent with every request the page initiates.
      *
@@ -1122,7 +1160,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @param headers - An object containing additional HTTP headers to be sent
      * with every request. All header values must be strings.
      */
-    setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
+    abstract setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
     /**
      * @param userAgent - Specific user agent to use in this page
      * @param userAgentData - Specific user agent client hint data to use in this
@@ -1166,7 +1204,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * All timestamps are in monotonic time: monotonically increasing time
      * in seconds since an arbitrary point in the past.
      */
-    metrics(): Promise<Metrics>;
+    abstract metrics(): Promise<Metrics>;
     /**
      * The page's URL.
      * @remarks Shortcut for
@@ -1345,7 +1383,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     /**
      * @internal
      */
-    protected _waitForNetworkIdle(networkManager: BidiNetworkManager | CdpNetworkManager, idleTime: number, ms: number, closedDeferred: Deferred<TargetCloseError>): Promise<void>;
+    _waitForNetworkIdle(networkManager: BidiNetworkManager | CdpNetworkManager, idleTime: number, requestsInFlight?: number): Observable<void>;
     /**
      * Waits for a frame matching the given conditions to appear.
      *
@@ -1384,7 +1422,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * - `networkidle2` : consider navigation to be finished when there are no
      *   more than 2 network connections for at least `500` ms.
      */
-    goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
+    abstract goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
     /**
      * This method navigate to the next page in history.
      * @param options - Navigation Parameter
@@ -1411,7 +1449,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * - `networkidle2` : consider navigation to be finished when there are no
      *   more than 2 network connections for at least `500` ms.
      */
-    goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
+    abstract goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
     /**
      * Brings page to front (activates tab).
      */
@@ -1453,7 +1491,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * NOTE: changing this value won't affect scripts that have already been run.
      * It will take full effect on the next navigation.
      */
-    setJavaScriptEnabled(enabled: boolean): Promise<void>;
+    abstract setJavaScriptEnabled(enabled: boolean): Promise<void>;
     /**
      * Toggles bypassing page's Content-Security-Policy.
      * @param enabled - sets bypassing of page's Content-Security-Policy.
@@ -1488,12 +1526,12 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * // → false
      * ```
      */
-    emulateMediaType(type?: string): Promise<void>;
+    abstract emulateMediaType(type?: string): Promise<void>;
     /**
      * Enables CPU throttling to emulate slow CPUs.
      * @param factor - slowdown factor (1 is no throttle, 2 is 2x slowdown, etc).
      */
-    emulateCPUThrottling(factor: number | null): Promise<void>;
+    abstract emulateCPUThrottling(factor: number | null): Promise<void>;
     /**
      * @param features - `<?Array<Object>>` Given an array of media feature
      * objects, emulates CSS media features on the page. Each media feature object
@@ -1555,14 +1593,14 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * // → false
      * ```
      */
-    emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
+    abstract emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
     /**
      * @param timezoneId - Changes the timezone of the page. See
      * {@link https://source.chromium.org/chromium/chromium/deps/icu.git/+/faee8bc70570192d82d2978a71e2a615788597d1:source/data/misc/metaZones.txt | ICU’s metaZones.txt}
      * for a list of supported timezone IDs. Passing
      * `null` disables timezone emulation.
      */
-    emulateTimezone(timezoneId?: string): Promise<void>;
+    abstract emulateTimezone(timezoneId?: string): Promise<void>;
     /**
      * Emulates the idle state.
      * If no arguments set, clears idle state emulation.
@@ -1582,7 +1620,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @param overrides - Mock idle state. If not set, clears idle overrides
      */
-    emulateIdleState(overrides?: {
+    abstract emulateIdleState(overrides?: {
         isUserActive: boolean;
         isScreenUnlocked: boolean;
     }): Promise<void>;
@@ -1614,7 +1652,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @param type - the type of deficiency to simulate, or `'none'` to reset.
      */
-    emulateVisionDeficiency(type?: Protocol.Emulation.SetEmulatedVisionDeficiencyRequest['type']): Promise<void>;
+    abstract emulateVisionDeficiency(type?: Protocol.Emulation.SetEmulatedVisionDeficiencyRequest['type']): Promise<void>;
     /**
      * `page.setViewport` will resize the page. A lot of websites don't expect
      * phones to change size, so you should set the viewport before navigating to
@@ -1777,6 +1815,55 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      */
     _maybeWriteBufferToFile(path: string | undefined, buffer: Buffer): Promise<void>;
     /**
+     * Captures a screencast of this {@link Page | page}.
+     *
+     * @remarks
+     *
+     * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
+     * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+     *
+     * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
+     *
+     * @example
+     * Recording a {@link Page | page}:
+     *
+     * ```
+     * import puppeteer from 'puppeteer';
+     *
+     * // Launch a browser
+     * const browser = await puppeteer.launch();
+     *
+     * // Create a new page
+     * const page = await browser.newPage();
+     *
+     * // Go to your site.
+     * await page.goto("https://www.example.com");
+     *
+     * // Start recording.
+     * const recorder = await page.screencast({path: 'recording.webm'});
+     *
+     * // Do something.
+     *
+     * // Stop recording.
+     * await recorder.stop();
+     *
+     * browser.close();
+     * ```
+     *
+     * @param options - Configures screencast behavior.
+     *
+     * @experimental
+     */
+    screencast(options?: Readonly<ScreencastOptions>): Promise<ScreenRecorder>;
+    /**
+     * @internal
+     */
+    _startScreencast(): Promise<void>;
+    /**
+     * @internal
+     */
+    _stopScreencast(): Promise<void>;
+    /**
      * Captures a screenshot of this {@link Page | page}.
      *
      * @param options - Configures screenshot behavior.
@@ -1812,7 +1899,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @param options - options for generating the PDF.
      */
-    createPDFStream(options?: PDFOptions): Promise<Readable>;
+    abstract createPDFStream(options?: PDFOptions): Promise<Readable>;
     /**
      * {@inheritDoc Page.createPDFStream}
      */
@@ -2161,7 +2248,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * );
      * ```
      */
-    waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
+    abstract waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
     /** @internal */
     [disposeSymbol](): void;
     /** @internal */

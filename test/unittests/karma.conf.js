@@ -240,6 +240,9 @@ module.exports = function(config) {
           '--disable-features=DialMediaRouteProvider',
           '--password-store=basic',
           ...(DEBUG_ENABLED ? [] : ['--headless=new']),
+          // Extensions mess with module loading sowe disable them. If a test requires
+          // a specific extensions to be enabled, allow-list it via --disable-extensions-except.
+          '--disable-extensions',
         ],
       }
     },

@@ -32,6 +32,7 @@ import {assert} from '../util/assert.js';
 import {AsyncIterableUtil} from '../util/AsyncIterableUtil.js';
 import {throwIfDisposed} from '../util/decorators.js';
 
+import {_isElementHandle} from './ElementHandleSymbol.js';
 import type {
   KeyboardTypeOptions,
   KeyPressOptions,
@@ -150,6 +151,11 @@ export abstract class ElementHandle<
   ElementType extends Node = Element,
 > extends JSHandle<ElementType> {
   /**
+   * @internal
+   */
+  declare [_isElementHandle]: boolean;
+
+  /**
    * A given method will have it's `this` replaced with an isolated version of
    * `this` when decorated with this decorator.
    *
@@ -212,6 +218,7 @@ export abstract class ElementHandle<
   constructor(handle: JSHandle<ElementType>) {
     super();
     this.handle = handle;
+    this[_isElementHandle] = true;
   }
 
   /**
@@ -436,7 +443,7 @@ export abstract class ElementHandle<
    *
    * JavaScript:
    *
-   * ```js
+   * ```ts
    * const feedHandle = await page.$('.feed');
    * expect(
    *   await feedHandle.$$eval('.tweet', nodes => nodes.map(n => n.innerText))
@@ -955,14 +962,12 @@ export abstract class ElementHandle<
    * {@link https://nodejs.org/api/process.html#process_process_cwd | current working directory}.
    * For locals script connecting to remote chrome environments, paths must be
    * absolute.
+   *
    */
-  async uploadFile(
+  abstract uploadFile(
     this: ElementHandle<HTMLInputElement>,
     ...paths: string[]
   ): Promise<void>;
-  async uploadFile(this: ElementHandle<HTMLInputElement>): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * This method scrolls element into view if needed, and then uses
@@ -1151,7 +1156,8 @@ export abstract class ElementHandle<
 
   /**
    * This method returns the bounding box of the element (relative to the main frame),
-   * or `null` if the element is not visible.
+   * or `null` if the element is {@link https://drafts.csswg.org/css-display-4/#box-generation | not part of the layout}
+   * (example: `display: none`).
    */
   @throwIfDisposed()
   @ElementHandle.bindIsolatedHandle
@@ -1183,7 +1189,9 @@ export abstract class ElementHandle<
   }
 
   /**
-   * This method returns boxes of the element, or `null` if the element is not visible.
+   * This method returns boxes of the element,
+   * or `null` if the element is {@link https://drafts.csswg.org/css-display-4/#box-generation | not part of the layout}
+   * (example: `display: none`).
    *
    * @remarks
    *
@@ -1328,6 +1336,10 @@ export abstract class ElementHandle<
    * {@link Page.(screenshot:2) } to take a screenshot of the element.
    * If the element is detached from DOM, the method throws an error.
    */
+  async screenshot(
+    options: Readonly<ScreenshotOptions> & {encoding: 'base64'}
+  ): Promise<string>;
+  async screenshot(options?: Readonly<ScreenshotOptions>): Promise<Buffer>;
   @throwIfDisposed()
   @ElementHandle.bindIsolatedHandle
   async screenshot(

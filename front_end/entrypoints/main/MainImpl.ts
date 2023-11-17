@@ -155,7 +155,9 @@ export class MainImpl {
     await this.requestAndRegisterLocaleData();
 
     Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync_preferences').get());
-    void VisualLogging.startLogging();
+    if (Root.Runtime.Runtime.queryParam('veLogging')) {
+      void VisualLogging.startLogging();
+    }
 
     void this.#createAppUI();
   }
@@ -262,7 +264,6 @@ export class MainImpl {
   #initializeExperiments(): void {
     Root.Runtime.experiments.register('applyCustomStylesheet', 'Allow extensions to load custom stylesheets');
     Root.Runtime.experiments.register('captureNodeCreationStacks', 'Capture node creation stacks');
-    Root.Runtime.experiments.register('sourcesPrettyPrint', 'Automatically pretty print minified sources');
     Root.Runtime.experiments.register(
         'ignoreListJSFramesOnTimeline', 'Ignore List for JavaScript frames on Timeline', true);
     Root.Runtime.experiments.register('liveHeapProfile', 'Live heap profile', true);
@@ -300,6 +301,12 @@ export class MainImpl {
         'jsProfilerTemporarilyEnable', 'Enable JavaScript Profiler temporarily', /* unstable= */ false,
         'https://developer.chrome.com/blog/js-profiler-deprecation/',
         'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548');
+
+    // Sources
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE, 'Disable Indentation Markers temporarily',
+        /* unstable= */ false, 'https://developer.chrome.com/blog/new-in-devtools-121/#indentation',
+        'https://crbug.com/1479986');
 
     // Debugging
     Root.Runtime.experiments.register(
@@ -358,9 +365,6 @@ export class MainImpl {
     // Local overrides
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.HEADER_OVERRIDES, 'Local overrides for response headers');
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.DELETE_OVERRIDES_TEMP_ENABLE, 'Enable "Delete all overrides" temporarily',
-        undefined, 'https://goo.gle/devtools-overrides', 'https://crbug.com/1473681');
 
     // Enable color picking outside the browser window (using Eyedropper API)
     Root.Runtime.experiments.register(
@@ -381,7 +385,7 @@ export class MainImpl {
         'Highlight important DOM properties in the Object Properties viewer');
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, 'Enable Preloading Status Panel in Application panel',
+        Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, 'Enable Speculative Loads Panel in Application panel',
         true);
 
     Root.Runtime.experiments.register(
@@ -397,6 +401,9 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
         'Redesign of the filter bar in the Network Panel',
+        false,
+        'https://goo.gle/devtools-network-filter-redesign',
+        'https://crbug.com/1500573',
     );
 
     Root.Runtime.experiments.register(
@@ -407,12 +414,16 @@ export class MainImpl {
         Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
         'Enable context menu that allows to modify trees in the Flame Chart', true);
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.AUTOFILL_VIEW,
+        'Enable Autofill view',
+    );
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',
       'cssTypeComponentLength',
       Root.Runtime.ExperimentName.PRECISE_CHANGES,
       ...('EyeDropper' in window ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
-      'sourcesPrettyPrint',
       'setAllBreakpointsEagerly',
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
       Root.Runtime.ExperimentName.WASM_DWARF_DEBUGGING,
@@ -420,6 +431,7 @@ export class MainImpl {
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
+      ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocolMonitor'] : []),
     ]);
 
     Root.Runtime.experiments.setNonConfigurableExperiments([
@@ -587,9 +599,10 @@ export class MainImpl {
     UI.DockController.DockController.instance().initialize();
     app.presentUI(document);
 
-    const toggleSearchNodeAction = UI.ActionRegistry.ActionRegistry.instance().action('elements.toggle-element-search');
-    // TODO: we should not access actions from other modules.
-    if (toggleSearchNodeAction) {
+    if (UI.ActionRegistry.ActionRegistry.instance().hasAction('elements.toggle-element-search')) {
+      const toggleSearchNodeAction =
+          UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
+      // TODO: we should not access actions from other modules.
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
           Host.InspectorFrontendHostAPI.Events.EnterInspectElementMode, () => {
             void toggleSearchNodeAction.execute();
@@ -910,7 +923,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         buttons[index].element.focus();
         event.consume(true);
       });
-      contextMenu.headerSection().appendCustomItem(dockItemElement);
+      contextMenu.headerSection().appendCustomItem(dockItemElement, 'dockSide');
     }
 
     const button = (this.#itemInternal.element as HTMLButtonElement);
@@ -935,7 +948,8 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         UI.InspectorView.InspectorView.instance().drawerVisible() ? i18nString(UIStrings.hideConsoleDrawer) :
                                                                     i18nString(UIStrings.showConsoleDrawer));
     contextMenu.appendItemsAtLocation('mainMenu');
-    const moreTools = contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools));
+    const moreTools =
+        contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools), false, 'moreTools');
     const viewExtensions = UI.ViewManager.getRegisteredViewExtensions();
     viewExtensions.sort((extension1, extension2) => {
       const title1 = extension1.title();
@@ -953,7 +967,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         moreTools.defaultSection().appendItem(title, () => {
           Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
           void UI.ViewManager.ViewManager.instance().showView('issues-pane', /* userGesture */ true);
-        });
+        }, {jslogContext: id});
         continue;
       }
 
@@ -969,16 +983,16 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         previewIcon.data = {iconName: 'experiment', color: 'var(--icon-default)', width: '16px', height: '16px'};
         moreTools.defaultSection().appendItem(title, () => {
           void UI.ViewManager.ViewManager.instance().showView(id, true, false);
-        }, /* disabled=*/ false, previewIcon);
+        }, {disabled: false, additionalElement: previewIcon, jslogContext: id});
         continue;
       }
 
       moreTools.defaultSection().appendItem(title, () => {
         void UI.ViewManager.ViewManager.instance().showView(id, true, false);
-      });
+      }, {jslogContext: id});
     }
 
-    const helpSubMenu = contextMenu.footerSection().appendSubMenuItem(i18nString(UIStrings.help));
+    const helpSubMenu = contextMenu.footerSection().appendSubMenuItem(i18nString(UIStrings.help), false, 'help');
     helpSubMenu.appendItemsAtLocation('mainMenuHelp');
   }
 }

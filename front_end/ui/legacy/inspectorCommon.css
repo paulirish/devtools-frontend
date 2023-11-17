@@ -45,6 +45,12 @@
   --monospace-font-family: monospace;
   --source-code-font-size: 11px;
   --source-code-font-family: monospace;
+  --sys-motion-duration-short4: 200ms;
+  --sys-motion-duration-medium2: 300ms;
+  --sys-motion-duration-long2: 500ms;
+  --sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --sys-motion-easing-emphasized-accelerate: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .-theme-with-dark-background {
@@ -76,13 +82,15 @@
 }
 
 body {
+  --default-font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
+
   height: 100%;
   width: 100%;
   position: relative;
   overflow: hidden;
   margin: 0;
   cursor: default;
-  font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
+  font-family: var(--default-font-family);
   font-size: 12px;
   tab-size: 4;
   user-select: none;
@@ -92,22 +100,15 @@ body {
 
 /* Default fonts */
 .platform-linux {
-  font-family: Roboto, Ubuntu, Arial, sans-serif;
+  --default-font-family: roboto, ubuntu, arial, sans-serif;
 }
 
 .platform-mac {
-  font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
-}
-
-.platform-mac,
-.platform-linux {
-  --override-text-color: rgb(48 57 66);
-
-  color: var(--override-text-color);
+  --default-font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
 }
 
 .platform-windows {
-  font-family: "Segoe UI", Tahoma, sans-serif;
+  --default-font-family: "Segoe UI", tahoma, sans-serif;
 }
 
 :focus {
@@ -137,13 +138,6 @@ body {
   --monospace-font-family: dejavu sans mono, monospace;
   --source-code-font-size: 11px;
   --source-code-font-family: dejavu sans mono, monospace;
-}
-
-.-theme-with-dark-background .platform-linux,
-.-theme-with-dark-background .platform-mac,
-:host-context(.-theme-with-dark-background) .platform-linux,
-:host-context(.-theme-with-dark-background) .platform-mac {
-  --override-text-color: rgb(189 198 207);
 }
 
 .monospace {

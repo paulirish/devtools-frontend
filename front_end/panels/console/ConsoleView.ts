@@ -50,12 +50,11 @@ import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {ConsoleContextSelector} from './ConsoleContextSelector.js';
-import consoleViewStyles from './consoleView.css.js';
-
 import {ConsoleFilter, FilterType, type LevelsMask} from './ConsoleFilter.js';
 import {ConsolePinPane} from './ConsolePinPane.js';
 import {ConsolePrompt, Events as ConsolePromptEvents} from './ConsolePrompt.js';
 import {ConsoleSidebar, Events} from './ConsoleSidebar.js';
+import consoleViewStyles from './consoleView.css.js';
 import {
   ConsoleCommand,
   ConsoleCommandResult,
@@ -65,7 +64,6 @@ import {
   getMessageForElement,
   MaxLengthForLinks,
 } from './ConsoleViewMessage.js';
-
 import {ConsoleViewport, type ConsoleViewportElement, type ConsoleViewportProvider} from './ConsoleViewport.js';
 
 const UIStrings = {
@@ -410,13 +408,11 @@ export class ConsoleView extends UI.Widget.VBox implements
     toolbar.appendToolbarItem(this.splitWidget.createShowHideSidebarButton(
         i18nString(UIStrings.showConsoleSidebar), i18nString(UIStrings.hideConsoleSidebar),
         i18nString(UIStrings.consoleSidebarShown), i18nString(UIStrings.consoleSidebarHidden)));
-    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(
-        (UI.ActionRegistry.ActionRegistry.instance().action('console.clear') as UI.ActionRegistration.Action)));
+    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('console.clear'));
     toolbar.appendSeparator();
     toolbar.appendToolbarItem(this.consoleContextSelector.toolbarItem());
     toolbar.appendSeparator();
-    const liveExpressionButton = UI.Toolbar.Toolbar.createActionButton(
-        (UI.ActionRegistry.ActionRegistry.instance().action('console.create-pin') as UI.ActionRegistration.Action));
+    const liveExpressionButton = UI.Toolbar.Toolbar.createActionButtonForId('console.create-pin');
     toolbar.appendToolbarItem(liveExpressionButton);
     toolbar.appendSeparator();
     toolbar.appendToolbarItem(this.filter.textFilterUI);
@@ -531,8 +527,8 @@ export class ConsoleView extends UI.Widget.VBox implements
     // the linkifiers live location change event.
     const throttler = new Common.Throttler.Throttler(100);
     const refilterMessages = (): Promise<void> => throttler.schedule(async () => this.onFilterChanged());
-    this.linkifier =
-        new Components.Linkifier.Linkifier(MaxLengthForLinks, /* useLinkDecorator */ undefined, refilterMessages);
+    this.linkifier = new Components.Linkifier.Linkifier(MaxLengthForLinks);
+    this.linkifier.addEventListener(Components.Linkifier.Events.LiveLocationUpdated, refilterMessages);
 
     this.consoleMessages = [];
     this.consoleGroupStarts = [];
@@ -862,8 +858,13 @@ export class ConsoleView extends UI.Widget.VBox implements
     const insertedInMiddle = insertAt < this.consoleMessages.length;
     this.consoleMessages.splice(insertAt, 0, viewMessage);
 
-    if (message.type !== SDK.ConsoleModel.FrontendMessageType.Command &&
-        message.type !== SDK.ConsoleModel.FrontendMessageType.Result) {
+    if (message.type === SDK.ConsoleModel.FrontendMessageType.Command) {
+      this.prompt.history().pushHistoryItem(message.messageText);
+      if (this.prompt.history().length() >= MIN_HISTORY_LENGTH_FOR_DISABLING_SELF_XSS_WARNING &&
+          !this.selfXssWarningDisabledSetting.get()) {
+        this.selfXssWarningDisabledSetting.set(true);
+      }
+    } else if (message.type !== SDK.ConsoleModel.FrontendMessageType.Result) {
       // Maintain group tree.
       // Find parent group.
       const consoleGroupStartIndex =
@@ -1104,6 +1105,16 @@ export class ConsoleView extends UI.Widget.VBox implements
     const consoleViewMessage = sourceElement && getMessageForElement(sourceElement);
     const consoleMessage = consoleViewMessage ? consoleViewMessage.consoleMessage() : null;
 
+    if (consoleViewMessage) {
+      UI.Context.Context.instance().setFlavor(ConsoleViewMessage, consoleViewMessage);
+    }
+
+    if (consoleMessage && document.documentElement.matches('.aida-available') &&
+        !consoleViewMessage?.element()?.matches('.has-insight') && consoleViewMessage?.shouldShowInsights()) {
+      contextMenu.headerSection().appendAction(
+          consoleViewMessage?.getExplainActionId(), undefined, /* optional=*/ true);
+    }
+
     if (consoleMessage && consoleMessage.url) {
       const menuTitle = i18nString(
           UIStrings.hideMessagesFromS, {PH1: new Common.ParsedURL.ParsedURL(consoleMessage.url).displayName});
@@ -1125,11 +1136,6 @@ export class ConsoleView extends UI.Widget.VBox implements
         contextMenu.debugSection().appendItem(
             i18nString(UIStrings.replayXhr), SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request));
       }
-    }
-
-    if (consoleViewMessage) {
-      UI.Context.Context.instance().setFlavor(ConsoleViewMessage, consoleViewMessage);
-      contextMenu.appendApplicableItems(consoleViewMessage);
     }
 
     void contextMenu.show();
@@ -1391,11 +1397,6 @@ export class ConsoleView extends UI.Widget.VBox implements
 
   private commandEvaluated(event: Common.EventTarget.EventTargetEvent<SDK.ConsoleModel.CommandEvaluatedEvent>): void {
     const {data} = event;
-    this.prompt.history().pushHistoryItem(data.commandMessage.messageText);
-    if (this.prompt.history().length() >= MIN_HISTORY_LENGTH_FOR_DISABLING_SELF_XSS_WARNING &&
-        !this.selfXssWarningDisabledSetting.get()) {
-      this.selfXssWarningDisabledSetting.set(true);
-    }
     this.printResult(data.result, data.commandMessage, data.exceptionDetails);
   }
 
@@ -1795,7 +1796,11 @@ let actionDelegateInstance: ActionDelegate;
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
-      case 'console.show':
+      case 'console.toggle':
+        if (ConsoleView.instance().isShowing() && UI.InspectorView.InspectorView.instance().drawerVisible()) {
+          UI.InspectorView.InspectorView.instance().closeDrawer();
+          return true;
+        }
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.bringToFront();
         Common.Console.Console.instance().show();
         ConsoleView.instance().focusPrompt();

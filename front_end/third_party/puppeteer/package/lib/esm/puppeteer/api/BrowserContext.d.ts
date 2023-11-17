@@ -15,7 +15,7 @@
  */
 import { EventEmitter, type EventType } from '../common/EventEmitter.js';
 import { asyncDisposeSymbol, disposeSymbol } from '../util/disposable.js';
-import type { Browser, Permission } from './Browser.js';
+import type { Browser, Permission, WaitForTargetOptions } from './Browser.js';
 import type { Page } from './Page.js';
 import type { Target } from './Target.js';
 /**
@@ -94,7 +94,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * Gets all active {@link Target | targets} inside this
      * {@link BrowserContext | browser context}.
      */
-    targets(): Target[];
+    abstract targets(): Target[];
     /**
      * Waits until a {@link Target | target} matching the given `predicate`
      * appears and returns it.
@@ -110,9 +110,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * );
      * ```
      */
-    abstract waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: {
-        timeout?: number;
-    }): Promise<Target>;
+    abstract waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: WaitForTargetOptions): Promise<Target>;
     /**
      * Gets a list of all open {@link Page | pages} inside this
      * {@link BrowserContext | browser context}.
@@ -147,7 +145,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * @param permissions - An array of permissions to grant. All permissions that
      * are not listed here will be automatically denied.
      */
-    overridePermissions(origin: string, permissions: Permission[]): Promise<void>;
+    abstract overridePermissions(origin: string, permissions: Permission[]): Promise<void>;
     /**
      * Clears all permission overrides for this
      * {@link BrowserContext | browser context}.
@@ -162,7 +160,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * context.clearPermissionOverrides();
      * ```
      */
-    clearPermissionOverrides(): Promise<void>;
+    abstract clearPermissionOverrides(): Promise<void>;
     /**
      * Creates a new {@link Page | page} in this
      * {@link BrowserContext | browser context}.

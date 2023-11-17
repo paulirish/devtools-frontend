@@ -78,8 +78,8 @@ export class ShortcutRegistry {
     if (keyNode) {
       for (const actionId of Object.keys(handlers)) {
         if (keyNode.actions().indexOf(actionId) >= 0) {
-          const action = this.actionRegistry.action(actionId);
-          if (action) {
+          if (this.actionRegistry.hasAction(actionId)) {
+            const action = this.actionRegistry.getAction(actionId);
             applicableActions.push(action);
           }
         }
@@ -494,7 +494,7 @@ export const ForwardedActions = new Set<string>([
   'debugger.toggle-breakpoints-active',
   'debugger.toggle-pause',
   'commandMenu.show',
-  'console.show',
+  'console.toggle',
 ]);
 export const KeyTimeout = 1000;
 export const DefaultShortcutSetting = 'devToolsDefault';

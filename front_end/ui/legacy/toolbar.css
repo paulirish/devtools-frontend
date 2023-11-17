@@ -53,7 +53,7 @@
 
 .toolbar-item,
 .toolbar-item .devtools-link {
-  color: var(--icon-default-hover);
+  color: var(--icon-default);
 }
 
 .toolbar-shadow.vertical .toolbar-item {
@@ -64,10 +64,13 @@
 
 devtools-issue-counter.toolbar-item {
   margin-top: -4px;
+  padding-left: 1px;
 }
 
 devtools-issue-counter.main-toolbar {
   margin-top: 1px;
+  margin-left: 1px;
+  margin-right: 1px;
 }
 
 .toolbar-dropdown-arrow {
@@ -451,6 +454,11 @@ select.toolbar-item:focus-visible > * {
   justify-content: left;
 }
 
+.toolbar-shadow:not(.floating) .toolbar-button.toolbar-item:last-child:not(:first-child, .toolbar-select-container) {
+  justify-content: center;
+  margin-right: 2px;
+}
+
 input[is="history-input"] {
   margin: 0 1px;
   border: 1px solid var(--sys-color-neutral-outline);
@@ -487,10 +495,6 @@ input[is="history-input"]:hover:not(:focus) {
   & > .title {
     color: var(--sys-color-on-tonal-container);
   }
-}
-
-.toolbar-item.highlight:hover:not(:active) > .title {
-  color: var(--color-button-primary-text-hover);
 }
 
 devtools-icon.leading-issue-icon {

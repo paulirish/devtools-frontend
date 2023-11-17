@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as UI from '../../ui/legacy/legacy.js';
+import * as Host from '../../core/host/host.js';
+import type * as UI from '../../ui/legacy/legacy.js';
 import * as Console from '../console/console.js';
-import * as Sources from '../sources/sources.js';
 
-import {ExplainPopover} from './ExplainPopover.js';
-import {CodeFrameSource} from './sources/CodeFrameSource.js';
-import {ConsoleMessageSource} from './sources/ConsoleMessageSource.js';
+import {ConsoleInsight} from './components/ConsoleInsight.js';
+import {InsightProvider} from './InsightProvider.js';
+import {PromptBuilder} from './PromptBuilder.js';
 
 let actionDelegateInstance: ActionDelegate;
 
@@ -24,22 +24,23 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
     return actionDelegateInstance;
   }
 
-  handleAction(_context: UI.Context.Context, actionId: string): boolean {
+  handleAction(context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
-      case 'explain.code': {
-        const frame = UI.Context.Context.instance().flavor(Sources.UISourceCodeFrame.UISourceCodeFrame);
-        if (frame) {
-          const popover = new ExplainPopover(new CodeFrameSource(frame));
-          void popover.show();
-          return true;
-        }
-        return false;
-      }
-      case 'explain.consoleMessage': {
-        const consoleViewMessage = UI.Context.Context.instance().flavor(Console.ConsoleViewMessage.ConsoleViewMessage);
+      case 'explain.consoleMessage:context':
+      case 'explain.consoleMessage:context:error':
+      case 'explain.consoleMessage:context:warning':
+      case 'explain.consoleMessage:context:other':
+      case 'explain.consoleMessage:hover': {
+        const consoleViewMessage = context.flavor(Console.ConsoleViewMessage.ConsoleViewMessage);
         if (consoleViewMessage) {
-          const popover = new ExplainPopover(new ConsoleMessageSource(consoleViewMessage));
-          void popover.show();
+          if (actionId.startsWith('explain.consoleMessage:context')) {
+            Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRequestedViaContextMenu);
+          } else if (actionId === 'explain.consoleMessage:hover') {
+            Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRequestedViaHoverButton);
+          }
+          const insight = new ConsoleInsight(new PromptBuilder(consoleViewMessage), new InsightProvider());
+          consoleViewMessage.setInsight(insight);
+          void insight.update();
           return true;
         }
         return false;

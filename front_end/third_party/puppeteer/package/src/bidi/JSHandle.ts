@@ -18,10 +18,11 @@ import type * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 
 import type {ElementHandle} from '../api/ElementHandle.js';
 import {JSHandle} from '../api/JSHandle.js';
+import {UnsupportedOperation} from '../common/Errors.js';
 
+import {BidiDeserializer} from './Deserializer.js';
 import type {BidiRealm} from './Realm.js';
 import type {Sandbox} from './Sandbox.js';
-import {BidiSerializer} from './Serializer.js';
 import {releaseReference} from './util.js';
 
 /**
@@ -90,7 +91,7 @@ export class BidiJSHandle<T = unknown> extends JSHandle<T> {
 
   override toString(): string {
     if (this.isPrimitiveValue) {
-      return 'JSHandle:' + BidiSerializer.deserialize(this.#remoteValue);
+      return 'JSHandle:' + BidiDeserializer.deserialize(this.#remoteValue);
     }
 
     return 'JSHandle@' + this.#remoteValue.type;
@@ -105,6 +106,6 @@ export class BidiJSHandle<T = unknown> extends JSHandle<T> {
   }
 
   override remoteObject(): never {
-    throw new Error('Not available in WebDriver BiDi');
+    throw new UnsupportedOperation('Not available in WebDriver BiDi');
   }
 }

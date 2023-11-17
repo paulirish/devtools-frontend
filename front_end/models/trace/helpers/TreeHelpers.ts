@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 import * as Types from '../types/types.js';
+
 let nodeIdCount = 0;
 export const makeTraceEntryNodeId = (): TraceEntryNodeId => (++nodeIdCount) as TraceEntryNodeId;
 
 export const makeEmptyTraceEntryTree = (): TraceEntryTree => ({
-  nodes: new Map(),
   roots: new Set(),
   maxDepth: 0,
 });
@@ -16,22 +16,22 @@ export const makeEmptyTraceEntryNode = (entry: Types.TraceEvents.TraceEntry, id:
   entry,
   id,
   parentId: null,
-  children: new Set(),
+  children: [],
   depth: 0,
 });
 
 export interface TraceEntryTree {
-  nodes: Map<TraceEntryNodeId, TraceEntryNode>;
   roots: Set<TraceEntryNode>;
   maxDepth: number;
 }
 
 export interface TraceEntryNode {
   entry: Types.TraceEvents.TraceEntry;
+  initiator?: Types.TraceEvents.TraceEntry;
   depth: number;
   id: TraceEntryNodeId;
   parentId?: TraceEntryNodeId|null;
-  children: Set<TraceEntryNode>;
+  children: TraceEntryNode[];
 }
 
 class TraceEntryNodeIdTag {
@@ -68,12 +68,26 @@ export function treify(entries: Types.TraceEvents.TraceEntry[], options?: {
   // Reset the node id counter for every new renderer.
   nodeIdCount = -1;
   const tree = makeEmptyTraceEntryTree();
+
+  let lastScheduleStyleRecalcEvent: Types.TraceEvents.TraceEntry|null = null;
+  let lastInvalidateLayout: Types.TraceEvents.TraceEntry|null = null;
+  let lastForcedStyleRecalc: Types.TraceEvents.TraceEntry|null = null;
   for (let i = 0; i < entries.length; i++) {
     const event = entries[i];
     // If the current event should not be part of the tree, then simply proceed
     // with the next event.
     if (options && !options.filter.has(event.name as Types.TraceEvents.KnownEventName)) {
       continue;
+    }
+
+    if (event.name === Types.TraceEvents.KnownEventName.ScheduleStyleRecalculation) {
+      lastScheduleStyleRecalcEvent = event;
+    }
+    if (event.name === Types.TraceEvents.KnownEventName.InvalidateLayout) {
+      lastInvalidateLayout = event;
+    }
+    if (event.name === Types.TraceEvents.KnownEventName.RecalculateStyles) {
+      lastForcedStyleRecalc = event;
     }
 
     const duration = event.dur || 0;
@@ -83,7 +97,6 @@ export function treify(entries: Types.TraceEvents.TraceEntry[], options?: {
     // If the parent stack is empty, then the current event is a root. Create a
     // node for it, mark it as a root, then proceed with the next event.
     if (stack.length === 0) {
-      tree.nodes.set(nodeId, node);
       tree.roots.add(node);
       event.selfTime = Types.Timing.MicroSeconds(duration);
       stack.push(node);
@@ -142,10 +155,9 @@ export function treify(entries: Types.TraceEvents.TraceEntry[], options?: {
     //    contained within the parent event. Create a node for the current
     //    event, establish the parent/child relationship, then proceed with the
     //    next event.
-    tree.nodes.set(nodeId, node);
     node.depth = stack.length;
     node.parentId = parentNode.id;
-    parentNode.children.add(node);
+    parentNode.children.push(node);
     event.selfTime = Types.Timing.MicroSeconds(duration);
     if (parentEvent.selfTime !== undefined) {
       parentEvent.selfTime = Types.Timing.MicroSeconds(parentEvent.selfTime - (event.dur || 0));
@@ -153,8 +165,50 @@ export function treify(entries: Types.TraceEvents.TraceEntry[], options?: {
     stack.push(node);
     tree.maxDepth = Math.max(tree.maxDepth, stack.length);
     entryToNode.set(event, node);
+
+    node.initiator =
+        determineLayoutInitiator(event, lastScheduleStyleRecalcEvent, lastInvalidateLayout, lastForcedStyleRecalc);
   }
   return {tree, entryToNode};
+}
+
+const FORCED_LAYOUT_EVENT_NAMES = new Set([
+  Types.TraceEvents.KnownEventName.Layout,
+]);
+
+const FORCED_RECALC_STYLE_EVENTS = new Set([
+  Types.TraceEvents.KnownEventName.RecalculateStyles,
+  Types.TraceEvents.KnownEventName.UpdateLayoutTree,
+]);
+
+function determineLayoutInitiator(
+    event: Types.TraceEvents.TraceEntry, lastScheduleStyleRecalcEvent: Types.TraceEvents.TraceEntry|null,
+    lastInvalidateLayout: Types.TraceEvents.TraceEntry|null,
+    lastForcedStyleRecalc: Types.TraceEvents.TraceEntry|null): Types.TraceEvents.TraceEntry|undefined {
+  let initiator: Types.TraceEvents.TraceEntry|undefined;
+
+  if (FORCED_LAYOUT_EVENT_NAMES.has(event.name as Types.TraceEvents.KnownEventName)) {
+    if (lastInvalidateLayout) {
+      // By default, the initiator of a forced re layout is the last InvalidateLayout event.
+      initiator = lastInvalidateLayout;
+    }
+
+    // However if the last InvalidateLayout ended before the last forced styles recalc,
+    // set the initiator to be the last ScheduleStylesRecalc.
+    const lastForcedStyleEndTime = lastForcedStyleRecalc && lastForcedStyleRecalc.ts + (lastForcedStyleRecalc.dur || 0);
+    const hasInitiator = lastScheduleStyleRecalcEvent && lastInvalidateLayout && lastForcedStyleEndTime;
+    if (hasInitiator && lastForcedStyleEndTime > lastInvalidateLayout.ts) {
+      initiator = lastScheduleStyleRecalcEvent;
+    }
+  } else if (FORCED_RECALC_STYLE_EVENTS.has(event.name as Types.TraceEvents.KnownEventName)) {
+    lastForcedStyleRecalc = event;
+    if (lastScheduleStyleRecalcEvent) {
+      // By default, the initiator of a forced styles recalc is the last ScheduleStylesRecalc event.
+      initiator = lastScheduleStyleRecalcEvent;
+    }
+  }
+
+  return initiator;
 }
 
 /**
@@ -214,14 +268,17 @@ export function walkTreeFromEntry(
  * 11. End E
  *
  */
+
 export function walkEntireTree(
     entryToNode: Map<Types.TraceEvents.TraceEntry, TraceEntryNode>,
     tree: TraceEntryTree,
     onEntryStart: (entry: Types.TraceEvents.TraceEntry) => void,
     onEntryEnd: (entry: Types.TraceEvents.TraceEntry) => void,
+    traceWindowToInclude?: Types.Timing.TraceWindow,
+    minDuration?: Types.Timing.MicroSeconds,
     ): void {
   for (const rootNode of tree.roots) {
-    walkTreeByNode(entryToNode, rootNode, onEntryStart, onEntryEnd);
+    walkTreeByNode(entryToNode, rootNode, onEntryStart, onEntryEnd, traceWindowToInclude, minDuration);
   }
 }
 
@@ -230,10 +287,55 @@ function walkTreeByNode(
     rootNode: TraceEntryNode,
     onEntryStart: (entry: Types.TraceEvents.TraceEntry) => void,
     onEntryEnd: (entry: Types.TraceEvents.TraceEntry) => void,
+    traceWindowToInclude?: Types.Timing.TraceWindow,
+    minDuration?: Types.Timing.MicroSeconds,
     ): void {
+  if (traceWindowToInclude && !treeNodeIsInWindow(rootNode, traceWindowToInclude)) {
+    // If this node is not within the provided window, we can skip it. We also
+    // can skip all its children too, as we know they won't be in the window if
+    // their parent is not.
+    return;
+  }
+
+  if (typeof minDuration !== 'undefined') {
+    const duration = Types.Timing.MicroSeconds(
+        rootNode.entry.ts + Types.Timing.MicroSeconds(rootNode.entry.dur || 0),
+    );
+    if (duration < minDuration) {
+      return;
+    }
+  }
+
   onEntryStart(rootNode.entry);
   for (const child of rootNode.children) {
-    walkTreeByNode(entryToNode, child, onEntryStart, onEntryEnd);
+    walkTreeByNode(entryToNode, child, onEntryStart, onEntryEnd, traceWindowToInclude, minDuration);
   }
   onEntryEnd(rootNode.entry);
+}
+
+/**
+ * Returns true if the provided node is partially or fully within the trace
+ * window. The entire node does not have to fit inside the window, but it does
+ * have to partially intersect it.
+ */
+function treeNodeIsInWindow(node: TraceEntryNode, traceWindow: Types.Timing.TraceWindow): boolean {
+  const startTime = node.entry.ts;
+  const endTime = node.entry.ts + (node.entry.dur || 0);
+
+  // Min ======= startTime ========= Max => node is within window
+  if (startTime >= traceWindow.min && startTime < traceWindow.max) {
+    return true;
+  }
+
+  // Min ======= endTime ========= Max => node is within window
+  if (endTime > traceWindow.min && endTime <= traceWindow.max) {
+    return true;
+  }
+
+  // startTime ==== Min ======== Max === endTime => node spans greater than the window so is in it.
+  if (startTime <= traceWindow.min && endTime >= traceWindow.max) {
+    return true;
+  }
+
+  return false;
 }

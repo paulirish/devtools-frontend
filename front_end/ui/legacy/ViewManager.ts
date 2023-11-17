@@ -9,28 +9,25 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import {type ContextMenu} from './ContextMenu.js';
 import {Icon} from './Icon.js';
-
-import {Events as TabbedPaneEvents, TabbedPane, type EventData} from './TabbedPane.js';
-
-import {Toolbar, ToolbarMenuButton, type ToolbarItem, type ItemsProvider} from './Toolbar.js';
+import {type EventData, Events as TabbedPaneEvents, TabbedPane} from './TabbedPane.js';
+import {type ItemsProvider, Toolbar, type ToolbarItem, ToolbarMenuButton} from './Toolbar.js';
 import {createTextChild} from './UIUtils.js';
 import {type TabbedViewLocation, type View, type ViewLocation, type ViewLocationResolver} from './View.js';
+import viewContainersStyles from './viewContainers.css.legacy.js';
 import {
+  getLocalizedViewLocationCategory,
   getRegisteredLocationResolvers,
   getRegisteredViewExtensions,
-  getLocalizedViewLocationCategory,
   maybeRemoveViewExtension,
   registerLocationResolver,
   registerViewExtension,
+  resetViewRegistration,
   ViewLocationCategory,
   ViewLocationValues,
   ViewPersistence,
   type ViewRegistration,
-  resetViewRegistration,
 } from './ViewRegistration.js';
-
 import {VBox, type Widget, type WidgetElement} from './Widget.js';
-import viewContainersStyles from './viewContainers.css.legacy.js';
 
 const UIStrings = {
   /**

@@ -45,24 +45,25 @@ export const generatedProperties = [
  },
  {
   "longhands": [
+   "mask-image",
+   "-webkit-mask-position-x",
+   "-webkit-mask-position-y",
+   "mask-size",
+   "mask-repeat",
+   "mask-origin",
+   "mask-clip",
+   "mask-composite",
+   "mask-mode"
+  ],
+  "name": "-alternative-mask"
+ },
+ {
+  "longhands": [
    "view-timeline-name",
    "view-timeline-axis",
    "view-timeline-inset"
   ],
   "name": "-alternative-view-timeline-with-inset"
- },
- {
-  "longhands": [
-   "mask-image",
-   "-webkit-mask-position-x",
-   "-webkit-mask-position-y",
-   "mask-size",
-   "-webkit-mask-repeat-x",
-   "-webkit-mask-repeat-y",
-   "mask-origin",
-   "mask-clip"
-  ],
-  "name": "-webkit-alternative-mask"
  },
  {
   "inherited": true,
@@ -93,19 +94,11 @@ export const generatedProperties = [
   "name": "-webkit-box-decoration-break"
  },
  {
-  "inherited": true,
   "keywords": [
    "normal",
    "reverse"
   ],
   "name": "-webkit-box-direction"
- },
- {
-  "keywords": [
-   "normal",
-   "reverse"
-  ],
-  "name": "-webkit-box-direction-alternative"
  },
  {
   "name": "-webkit-box-flex"
@@ -179,8 +172,7 @@ export const generatedProperties = [
    "-webkit-mask-position-x",
    "-webkit-mask-position-y",
    "-webkit-mask-size",
-   "-webkit-mask-repeat-x",
-   "-webkit-mask-repeat-y",
+   "-webkit-mask-repeat",
    "-webkit-mask-origin",
    "-webkit-mask-clip"
   ],
@@ -237,17 +229,7 @@ export const generatedProperties = [
   "name": "-webkit-mask-position-y"
  },
  {
-  "longhands": [
-   "-webkit-mask-repeat-x",
-   "-webkit-mask-repeat-y"
-  ],
   "name": "-webkit-mask-repeat"
- },
- {
-  "name": "-webkit-mask-repeat-x"
- },
- {
-  "name": "-webkit-mask-repeat-y"
  },
  {
   "name": "-webkit-mask-size"
@@ -555,8 +537,7 @@ export const generatedProperties = [
    "background-position-x",
    "background-position-y",
    "background-size",
-   "background-repeat-x",
-   "background-repeat-y",
+   "background-repeat",
    "background-attachment",
    "background-origin",
    "background-clip",
@@ -637,17 +618,7 @@ export const generatedProperties = [
   "name": "background-position-y"
  },
  {
-  "longhands": [
-   "background-repeat-x",
-   "background-repeat-y"
-  ],
   "name": "background-repeat"
- },
- {
-  "name": "background-repeat-x"
- },
- {
-  "name": "background-repeat-y"
  },
  {
   "keywords": [
@@ -1516,7 +1487,9 @@ export const generatedProperties = [
    "flow-root",
    "none",
    "flow",
-   "math"
+   "math",
+   "ruby",
+   "ruby-text"
   ],
   "name": "display"
  },
@@ -2351,10 +2324,26 @@ export const generatedProperties = [
   "name": "mask-clip"
  },
  {
+  "name": "mask-composite"
+ },
+ {
   "name": "mask-image"
  },
  {
+  "name": "mask-mode"
+ },
+ {
   "name": "mask-origin"
+ },
+ {
+  "longhands": [
+   "-webkit-mask-position-x",
+   "-webkit-mask-position-y"
+  ],
+  "name": "mask-position"
+ },
+ {
+  "name": "mask-repeat"
  },
  {
   "name": "mask-size"
@@ -3523,37 +3512,6 @@ export const generatedProperties = [
   "name": "timeline-scope"
  },
  {
-  "longhands": [
-   "toggle-root",
-   "toggle-trigger"
-  ],
-  "name": "toggle"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "toggle-group"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "toggle-root"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "toggle-trigger"
- },
- {
-  "keywords": [
-   "normal"
-  ],
-  "name": "toggle-visibility"
- },
- {
   "keywords": [
    "auto"
   ],
@@ -3815,12 +3773,6 @@ export const generatedPropertyValues = {
   ]
  },
  "-webkit-box-direction": {
-  "values": [
-   "normal",
-   "reverse"
-  ]
- },
- "-webkit-box-direction-alternative": {
   "values": [
    "normal",
    "reverse"
@@ -4536,7 +4488,9 @@ export const generatedPropertyValues = {
    "flow-root",
    "none",
    "flow",
-   "math"
+   "math",
+   "ruby",
+   "ruby-text"
   ]
  },
  "dominant-baseline": {
@@ -5638,26 +5592,6 @@ export const generatedPropertyValues = {
    "pretty"
   ]
  },
- "toggle-group": {
-  "values": [
-   "none"
-  ]
- },
- "toggle-root": {
-  "values": [
-   "none"
-  ]
- },
- "toggle-trigger": {
-  "values": [
-   "none"
-  ]
- },
- "toggle-visibility": {
-  "values": [
-   "normal"
-  ]
- },
  "top": {
   "values": [
    "auto"
@@ -5874,8 +5808,16 @@ export const generatedAliasesFor = new Map([
   "-alternative-animation-with-timeline"
  ],
  [
+  "-webkit-alternative-mask",
+  "-alternative-mask"
+ ],
+ [
   "-webkit-alternative-mask-clip",
   "mask-clip"
+ ],
+ [
+  "-webkit-alternative-mask-composite",
+  "mask-composite"
  ],
  [
   "-webkit-alternative-mask-image",
@@ -5884,6 +5826,14 @@ export const generatedAliasesFor = new Map([
  [
   "-webkit-alternative-mask-origin",
   "mask-origin"
+ ],
+ [
+  "-webkit-alternative-mask-position",
+  "mask-position"
+ ],
+ [
+  "-webkit-alternative-mask-repeat",
+  "mask-repeat"
  ],
  [
   "-webkit-alternative-mask-size",

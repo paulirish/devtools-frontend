@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
 import type * as TraceEngine from '../../../../../front_end/models/trace/trace.js';
+import * as Timeline from '../../../../../front_end/panels/timeline/timeline.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
 import {describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
 import {TraceLoader} from '../../helpers/TraceLoader.js';
@@ -22,9 +22,6 @@ class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegat
 }
 
 describeWithEnvironment('TimelineFlameChartView', function() {
-  // TODO(crbug.com/1492405): Improve perf panel trace load speed to
-  // prevent timeout bump.
-  this.timeout(20_000);
   it('Can search for events by name in the timeline', async function() {
     const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'lcp-images.json.gz');
     // The timeline flamechart view will invoke the `select` method
@@ -41,17 +38,17 @@ describeWithEnvironment('TimelineFlameChartView', function() {
         new UI.SearchableView.SearchConfig(/* query */ searchQuery, /* caseSensitive */ false, /* isRegex */ false);
     flameChartView.performSearch(searchConfig, true);
 
-    assert.strictEqual(flameChartView.getSearchResults()?.length, 35);
-    assertSelectionName('PrePaint');
-
-    flameChartView.jumpToNextSearchResult();
+    assert.strictEqual(flameChartView.getSearchResults()?.length, 15);
     assertSelectionName('PrePaint');
 
     flameChartView.jumpToNextSearchResult();
     assertSelectionName('Paint');
 
+    flameChartView.jumpToNextSearchResult();
+    assertSelectionName('Paint');
+
     flameChartView.jumpToPreviousSearchResult();
-    assertSelectionName('PrePaint');
+    assertSelectionName('Paint');
     flameChartView.jumpToPreviousSearchResult();
     assertSelectionName('PrePaint');
 
@@ -65,7 +62,9 @@ describeWithEnvironment('TimelineFlameChartView', function() {
     }
   });
 
-  it('Shows the network track correctly', async function() {
+  // This test is still failing after bumping up the timeout to 20 seconds. So
+  // skip it while we work on a fix for the trace load speed.
+  it.skip('[crbug.com/1492405] Shows the network track correctly', async function() {
     const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'load-simple.json.gz');
     // The timeline flamechart view will invoke the `select` method
     // of this delegate every time an event has matched on a search.

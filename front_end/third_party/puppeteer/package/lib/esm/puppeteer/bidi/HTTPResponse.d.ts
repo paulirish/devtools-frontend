@@ -34,5 +34,7 @@ export declare class BidiHTTPResponse extends HTTPResponse {
     timing(): Protocol.Network.ResourceTiming | null;
     frame(): Frame | null;
     fromServiceWorker(): boolean;
+    securityDetails(): never;
+    buffer(): never;
 }
 //# sourceMappingURL=HTTPResponse.d.ts.map

@@ -23,6 +23,10 @@ export declare class CustomError extends Error {
      * @internal
      */
     constructor(message?: string);
+    /**
+     * @internal
+     */
+    get [Symbol.toStringTag](): string;
 }
 /**
  * TimeoutError is emitted whenever certain operations are terminated due to
@@ -55,6 +59,14 @@ export declare class ProtocolError extends CustomError {
      * @public
      */
     get originalMessage(): string;
+}
+/**
+ * Puppeteer will throw this error if a method is not
+ * supported by the currently used protocol
+ *
+ * @public
+ */
+export declare class UnsupportedOperation extends CustomError {
 }
 /**
  * @internal

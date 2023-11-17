@@ -39,19 +39,17 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Extensions from '../../models/extensions/extensions.js';
-
-import elementsPanelStyles from './elementsPanel.css.js';
-
 import type * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as UI from '../../ui/legacy/legacy.js';
 import * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
+import * as UI from '../../ui/legacy/legacy.js';
 
-import {AccessibilityTreeView} from './AccessibilityTreeView.js';
 import {type AXTreeNodeData} from './AccessibilityTreeUtils.js';
+import {AccessibilityTreeView} from './AccessibilityTreeView.js';
+import {ColorSwatchPopoverIcon} from './ColorSwatchPopoverIcon.js';
 import * as ElementsComponents from './components/components.js';
 import {ComputedStyleWidget} from './ComputedStyleWidget.js';
-
+import elementsPanelStyles from './elementsPanel.css.js';
 import {type ElementsTreeElement} from './ElementsTreeElement.js';
 import {ElementsTreeElementHighlighter} from './ElementsTreeElementHighlighter.js';
 import {ElementsTreeOutline} from './ElementsTreeOutline.js';
@@ -62,7 +60,6 @@ import {
   StylesSidebarPane,
   type StylesUpdateCompletedEvent,
 } from './StylesSidebarPane.js';
-import {ColorSwatchPopoverIcon} from './ColorSwatchPopoverIcon.js';
 
 const UIStrings = {
   /**
@@ -226,6 +223,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     this.splitWidget.show(this.element);
 
     this.searchableViewInternal = new UI.SearchableView.SearchableView(this, null);
+    this.searchableViewInternal.setMinimalSearchQuerySize(0);
     this.searchableViewInternal.setMinimumSize(25, 28);
     this.searchableViewInternal.setPlaceholder(i18nString(UIStrings.findByStringSelectorOrXpath));
     const stackElement = this.searchableViewInternal.element;

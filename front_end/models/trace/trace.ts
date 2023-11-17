@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Extras from './extras/extras.js';
+import * as Frames from './frames/frames.js';
 import * as Handlers from './handlers/handlers.js';
 import * as Helpers from './helpers/helpers.js';
 // Purposefully use a shorter name here so references to this are
@@ -10,16 +11,19 @@ import * as Helpers from './helpers/helpers.js';
 import * as Legacy from './LegacyTracingModel.js';
 import * as TraceModel from './ModelImpl.js';
 import * as Processor from './Processor.js';
+import * as RootCauses from './root-causes/root-causes.js';
 import * as TracingManager from './TracingManager.js';
 import * as TreeManipulator from './TreeManipulator.js';
 import * as Types from './types/types.js';
 
 export {
   Extras,
+  Frames,
   Handlers,
   Helpers,
   Legacy,
   Processor,
+  RootCauses,
   TraceModel,
   TracingManager,
   TreeManipulator,

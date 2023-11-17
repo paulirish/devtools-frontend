@@ -84,35 +84,35 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 });
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BidiPage = void 0;
+const rxjs_js_1 = require("../../third_party/rxjs/rxjs.js");
 const Page_js_1 = require("../api/Page.js");
 const Accessibility_js_1 = require("../cdp/Accessibility.js");
 const Coverage_js_1 = require("../cdp/Coverage.js");
 const EmulationManager_js_1 = require("../cdp/EmulationManager.js");
 const FrameTree_js_1 = require("../cdp/FrameTree.js");
-const NetworkManager_js_1 = require("../cdp/NetworkManager.js");
 const Tracing_js_1 = require("../cdp/Tracing.js");
 const ConsoleMessage_js_1 = require("../common/ConsoleMessage.js");
 const Errors_js_1 = require("../common/Errors.js");
-const TimeoutSettings_js_1 = require("../common/TimeoutSettings.js");
+const NetworkManagerEvents_js_1 = require("../common/NetworkManagerEvents.js");
 const util_js_1 = require("../common/util.js");
 const assert_js_1 = require("../util/assert.js");
 const Deferred_js_1 = require("../util/Deferred.js");
 const disposable_js_1 = require("../util/disposable.js");
 const BrowsingContext_js_1 = require("./BrowsingContext.js");
+const Deserializer_js_1 = require("./Deserializer.js");
 const Dialog_js_1 = require("./Dialog.js");
 const ElementHandle_js_1 = require("./ElementHandle.js");
 const EmulationManager_js_2 = require("./EmulationManager.js");
 const Frame_js_1 = require("./Frame.js");
 const Input_js_1 = require("./Input.js");
-const NetworkManager_js_2 = require("./NetworkManager.js");
+const lifecycle_js_1 = require("./lifecycle.js");
+const NetworkManager_js_1 = require("./NetworkManager.js");
 const Realm_js_1 = require("./Realm.js");
-const Serializer_js_1 = require("./Serializer.js");
 /**
  * @internal
  */
 class BidiPage extends Page_js_1.Page {
     #accessibility;
-    #timeoutSettings = new TimeoutSettings_js_1.TimeoutSettings();
     #connection;
     #frameTree = new FrameTree_js_1.FrameTree();
     #networkManager;
@@ -133,31 +133,31 @@ class BidiPage extends Page_js_1.Page {
     ]);
     #networkManagerEvents = [
         [
-            NetworkManager_js_1.NetworkManagerEvent.Request,
+            NetworkManagerEvents_js_1.NetworkManagerEvent.Request,
             (request) => {
                 this.emit("request" /* PageEvent.Request */, request);
             },
         ],
         [
-            NetworkManager_js_1.NetworkManagerEvent.RequestServedFromCache,
+            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestServedFromCache,
             (request) => {
                 this.emit("requestservedfromcache" /* PageEvent.RequestServedFromCache */, request);
             },
         ],
         [
-            NetworkManager_js_1.NetworkManagerEvent.RequestFailed,
+            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFailed,
             (request) => {
                 this.emit("requestfailed" /* PageEvent.RequestFailed */, request);
             },
         ],
         [
-            NetworkManager_js_1.NetworkManagerEvent.RequestFinished,
+            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFinished,
             (request) => {
                 this.emit("requestfinished" /* PageEvent.RequestFinished */, request);
             },
         ],
         [
-            NetworkManager_js_1.NetworkManagerEvent.Response,
+            NetworkManagerEvents_js_1.NetworkManagerEvent.Response,
             (response) => {
                 this.emit("response" /* PageEvent.Response */, response);
             },
@@ -187,7 +187,7 @@ class BidiPage extends Page_js_1.Page {
         for (const [event, subscriber] of this.#browsingContextEvents) {
             this.#browsingContext.on(event, subscriber);
         }
-        this.#networkManager = new NetworkManager_js_2.BidiNetworkManager(this.#connection, this);
+        this.#networkManager = new NetworkManager_js_1.BidiNetworkManager(this.#connection, this);
         for (const [event, subscriber] of this.#subscribedEvents) {
             this.#connection.on(event, subscriber);
         }
@@ -195,7 +195,7 @@ class BidiPage extends Page_js_1.Page {
             // TODO: remove any
             this.#networkManager.on(event, subscriber);
         }
-        const frame = new Frame_js_1.BidiFrame(this, this.#browsingContext, this.#timeoutSettings, this.#browsingContext.parent);
+        const frame = new Frame_js_1.BidiFrame(this, this.#browsingContext, this._timeoutSettings, this.#browsingContext.parent);
         this.#frameTree.addFrame(frame);
         this.emit("frameattached" /* PageEvent.FrameAttached */, frame);
         // TODO: https://github.com/w3c/webdriver-bidi/issues/443
@@ -332,7 +332,7 @@ class BidiPage extends Page_js_1.Page {
     #onContextCreated(context) {
         if (!this.frame(context.id) &&
             (this.frame(context.parent ?? '') || !this.#frameTree.getMainFrame())) {
-            const frame = new Frame_js_1.BidiFrame(this, context, this.#timeoutSettings, context.parent);
+            const frame = new Frame_js_1.BidiFrame(this, context, this._timeoutSettings, context.parent);
             this.#frameTree.addFrame(frame);
             if (frame !== this.mainFrame()) {
                 this.emit("frameattached" /* PageEvent.FrameAttached */, frame);
@@ -369,7 +369,7 @@ class BidiPage extends Page_js_1.Page {
             const text = args
                 .reduce((value, arg) => {
                 const parsedValue = arg.isPrimitiveValue
-                    ? Serializer_js_1.BidiSerializer.deserialize(arg.remoteValue())
+                    ? Deserializer_js_1.BidiDeserializer.deserialize(arg.remoteValue())
                     : arg.toString();
                 return `${value} ${parsedValue}`;
             }, '')
@@ -416,7 +416,7 @@ class BidiPage extends Page_js_1.Page {
         if (this.#closedDeferred.finished()) {
             return;
         }
-        this.#closedDeferred.resolve(new Errors_js_1.TargetCloseError('Page closed!'));
+        this.#closedDeferred.reject(new Errors_js_1.TargetCloseError('Page closed!'));
         this.#networkManager.dispose();
         await this.#connection.send('browsingContext.close', {
             context: this.mainFrame()._id,
@@ -425,33 +425,24 @@ class BidiPage extends Page_js_1.Page {
         this.removeAllListeners();
     }
     async reload(options = {}) {
-        const { waitUntil = 'load', timeout = this.#timeoutSettings.navigationTimeout(), } = options;
-        const readinessState = Frame_js_1.lifeCycleToReadinessState.get((0, BrowsingContext_js_1.getWaitUntilSingle)(waitUntil));
-        try {
-            const { result } = await (0, util_js_1.waitWithTimeout)(this.#connection.send('browsingContext.reload', {
-                context: this.mainFrame()._id,
-                wait: readinessState,
-            }), 'Navigation', timeout);
-            return this.getNavigationResponse(result.navigation);
-        }
-        catch (error) {
-            if (error instanceof Errors_js_1.ProtocolError) {
-                error.message += ` at ${this.url}`;
-            }
-            else if (error instanceof Errors_js_1.TimeoutError) {
-                error.message = 'Navigation timeout of ' + timeout + ' ms exceeded';
-            }
-            throw error;
-        }
+        const { waitUntil = 'load', timeout: ms = this._timeoutSettings.navigationTimeout(), } = options;
+        const [readiness, networkIdle] = (0, lifecycle_js_1.getBiDiReadinessState)(waitUntil);
+        const response = await (0, rxjs_js_1.firstValueFrom)(this._waitWithNetworkIdle(this.#connection.send('browsingContext.reload', {
+            context: this.mainFrame()._id,
+            wait: readiness,
+        }), networkIdle)
+            .pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, rxjs_js_1.from)(this.#closedDeferred.valueOrThrow())))
+            .pipe((0, lifecycle_js_1.rewriteNavigationError)(this.url(), ms)));
+        return this.getNavigationResponse(response?.result.navigation);
     }
     setDefaultNavigationTimeout(timeout) {
-        this.#timeoutSettings.setDefaultNavigationTimeout(timeout);
+        this._timeoutSettings.setDefaultNavigationTimeout(timeout);
     }
     setDefaultTimeout(timeout) {
-        this.#timeoutSettings.setDefaultTimeout(timeout);
+        this._timeoutSettings.setDefaultTimeout(timeout);
     }
     getDefaultTimeout() {
-        return this.#timeoutSettings.timeout();
+        return this._timeoutSettings.timeout();
     }
     isJavaScriptEnabled() {
         return this.#cdpEmulationManager.javascriptEnabled;
@@ -497,9 +488,9 @@ class BidiPage extends Page_js_1.Page {
     }
     async pdf(options = {}) {
         const { path = undefined } = options;
-        const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize, timeout, } = this._getPDFOptions(options, 'cm');
+        const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize, timeout: ms, } = this._getPDFOptions(options, 'cm');
         const pageRanges = ranges ? ranges.split(', ') : [];
-        const { result } = await (0, util_js_1.waitWithTimeout)(this.#connection.send('browsingContext.print', {
+        const { result } = await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.from)(this.#connection.send('browsingContext.print', {
             context: this.mainFrame()._id,
             background,
             margin,
@@ -511,7 +502,7 @@ class BidiPage extends Page_js_1.Page {
             pageRanges,
             scale,
             shrinkToFit: !preferCSSPageSize,
-        }), 'browsingContext.print', timeout);
+        })).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms))));
         const buffer = Buffer.from(result.data, 'base64');
         await this._maybeWriteBufferToFile(path, buffer);
         return buffer;
@@ -530,64 +521,58 @@ class BidiPage extends Page_js_1.Page {
         }
     }
     async _screenshot(options) {
-        const { clip, type, captureBeyondViewport, allowViewportExpansion } = options;
+        const { clip, type, captureBeyondViewport, allowViewportExpansion, quality } = options;
         if (captureBeyondViewport && !allowViewportExpansion) {
-            throw new Error(`BiDi does not support 'captureBeyondViewport'. Use 'allowViewportExpansion'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'captureBeyondViewport'. Use 'allowViewportExpansion'.`);
         }
         if (options.omitBackground !== undefined && options.omitBackground) {
-            throw new Error(`BiDi does not support 'omitBackground'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'omitBackground'.`);
         }
         if (options.optimizeForSpeed !== undefined && options.optimizeForSpeed) {
-            throw new Error(`BiDi does not support 'optimizeForSpeed'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'optimizeForSpeed'.`);
         }
         if (options.fromSurface !== undefined && !options.fromSurface) {
-            throw new Error(`BiDi does not support 'fromSurface'.`);
-        }
-        if (options.quality !== undefined) {
-            throw new Error(`BiDi does not support 'quality'.`);
-        }
-        if (type === 'webp' || type === 'jpeg') {
-            throw new Error(`BiDi only supports 'png' type.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'fromSurface'.`);
         }
         if (clip !== undefined && clip.scale !== undefined && clip.scale !== 1) {
-            throw new Error(`BiDi does not support 'scale' in 'clip'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'scale' in 'clip'.`);
         }
         const { result: { data }, } = await this.#connection.send('browsingContext.captureScreenshot', {
             context: this.mainFrame()._id,
+            format: {
+                type: `image/${type}`,
+                quality: quality ? quality / 100 : undefined,
+            },
             clip: clip && {
-                type: 'viewport',
+                type: 'box',
                 ...clip,
             },
         });
         return data;
     }
     async waitForRequest(urlOrPredicate, options = {}) {
-        const { timeout = this.#timeoutSettings.timeout() } = options;
-        return await (0, util_js_1.waitForEvent)(this.#networkManager, NetworkManager_js_1.NetworkManagerEvent.Request, async (request) => {
-            if ((0, util_js_1.isString)(urlOrPredicate)) {
-                return urlOrPredicate === request.url();
-            }
-            if (typeof urlOrPredicate === 'function') {
-                return !!(await urlOrPredicate(request));
-            }
-            return false;
-        }, timeout, this.#closedDeferred.valueOrThrow());
+        const { timeout = this._timeoutSettings.timeout() } = options;
+        return await (0, util_js_1.waitForHTTP)(this.#networkManager, NetworkManagerEvents_js_1.NetworkManagerEvent.Request, urlOrPredicate, timeout, this.#closedDeferred);
     }
     async waitForResponse(urlOrPredicate, options = {}) {
-        const { timeout = this.#timeoutSettings.timeout() } = options;
-        return await (0, util_js_1.waitForEvent)(this.#networkManager, NetworkManager_js_1.NetworkManagerEvent.Response, async (response) => {
-            if ((0, util_js_1.isString)(urlOrPredicate)) {
-                return urlOrPredicate === response.url();
-            }
-            if (typeof urlOrPredicate === 'function') {
-                return !!(await urlOrPredicate(response));
-            }
-            return false;
-        }, timeout, this.#closedDeferred.valueOrThrow());
+        const { timeout = this._timeoutSettings.timeout() } = options;
+        return await (0, util_js_1.waitForHTTP)(this.#networkManager, NetworkManagerEvents_js_1.NetworkManagerEvent.Response, urlOrPredicate, timeout, this.#closedDeferred);
     }
     async waitForNetworkIdle(options = {}) {
-        const { idleTime = 500, timeout = this.#timeoutSettings.timeout() } = options;
-        await this._waitForNetworkIdle(this.#networkManager, idleTime, timeout, this.#closedDeferred);
+        const { idleTime = util_js_1.NETWORK_IDLE_TIME, timeout: ms = this._timeoutSettings.timeout(), } = options;
+        await (0, rxjs_js_1.firstValueFrom)(this._waitForNetworkIdle(this.#networkManager, idleTime).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, rxjs_js_1.from)(this.#closedDeferred.valueOrThrow()))));
+    }
+    /** @internal */
+    _waitWithNetworkIdle(observableInput, networkIdle) {
+        const delay = networkIdle
+            ? this._waitForNetworkIdle(this.#networkManager, util_js_1.NETWORK_IDLE_TIME, networkIdle === 'networkidle0' ? 0 : 2)
+            : (0, rxjs_js_1.from)(Promise.resolve());
+        return (0, rxjs_js_1.forkJoin)([
+            (0, rxjs_js_1.from)(observableInput).pipe((0, rxjs_js_1.first)()),
+            delay.pipe((0, rxjs_js_1.first)()),
+        ]).pipe((0, rxjs_js_1.map)(([response]) => {
+            return response;
+        }));
     }
     async createCDPSession() {
         const { sessionId } = await this.mainFrame()
@@ -607,7 +592,7 @@ class BidiPage extends Page_js_1.Page {
         const expression = evaluationExpression(pageFunction, ...args);
         const { result } = await this.#connection.send('script.addPreloadScript', {
             functionDeclaration: expression,
-            // TODO: should change spec to accept browsingContext
+            contexts: [this.mainFrame()._id],
         });
         return { identifier: result.script };
     }
@@ -627,6 +612,64 @@ class BidiPage extends Page_js_1.Page {
         await this._client().send('Network.setCacheDisabled', {
             cacheDisabled: !enabled,
         });
+    }
+    isServiceWorkerBypassed() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    target() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    waitForFileChooser() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    workers() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setRequestInterception() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setDragInterception() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setBypassServiceWorker() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setOfflineMode() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    emulateNetworkConditions() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    cookies() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setCookie() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    deleteCookie() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    removeExposedFunction() {
+        // TODO: Quick win?
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    authenticate() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setExtraHTTPHeaders() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    metrics() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    goBack() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    goForward() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    waitForDevicePrompt() {
+        throw new Errors_js_1.UnsupportedOperation();
     }
 }
 exports.BidiPage = BidiPage;

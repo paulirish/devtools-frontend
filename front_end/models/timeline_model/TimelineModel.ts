@@ -64,50 +64,6 @@ const UIStrings = {
    */
   workerSS: '`Worker`: {PH1} {PH2}',
 
-  /**
-   *@description Title of a bidder auction worklet with known URL in the timeline flame chart of the Performance panel
-   *@example {https://google.com} PH1
-   */
-  bidderWorkletS: 'Bidder Worklet — {PH1}',
-
-  /**
-   *@description Title of a seller auction worklet with known URL in the timeline flame chart of the Performance panel
-   *@example {https://google.com} PH1
-   */
-  sellerWorkletS: 'Seller Worklet — {PH1}',
-
-  /**
-   *@description Title of an auction worklet with known URL in the timeline flame chart of the Performance panel
-   *@example {https://google.com} PH1
-   */
-  unknownWorkletS: 'Auction Worklet — {PH1}',
-
-  /**
-   *@description Title of a bidder auction worklet in the timeline flame chart of the Performance panel
-   */
-  bidderWorklet: 'Bidder Worklet',
-
-  /**
-   *@description Title of a seller auction worklet in the timeline flame chart of the Performance panel
-   */
-  sellerWorklet: 'Seller Worklet',
-
-  /**
-   *@description Title of an auction worklet in the timeline flame chart of the Performance panel
-   */
-  unknownWorklet: 'Auction Worklet',
-
-  /**
-   *@description Title of control thread of a service process for an auction worklet in the timeline flame chart of the Performance panel
-   */
-  workletService: 'Auction Worklet Service',
-
-  /**
-   *@description Title of control thread of a service process for an auction worklet with known URL in the timeline flame chart of the Performance panel
-   * @example {https://google.com} PH1
-   */
-  workletServiceS: 'Auction Worklet Service — {PH1}',
-
 };
 const str_ = i18n.i18n.registerUIStrings('models/timeline_model/TimelineModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -119,7 +75,6 @@ export class TimelineModelImpl {
   private sessionId!: string|null;
   private mainFrameNodeId!: number|null;
   private pageFrames!: Map<Protocol.Page.FrameId, PageFrame>;
-  private auctionWorklets!: Map<string, AuctionWorklet>;
   private cpuProfilesInternal!:
       {cpuProfileData: CPUProfile.CPUProfileDataModel.CPUProfileDataModel, target: SDK.Target.Target|null}[];
   private workerIdByThread!: WeakMap<TraceEngine.Legacy.Thread, string>;
@@ -130,10 +85,10 @@ export class TimelineModelImpl {
   private asyncEventTracker!: TimelineAsyncEventTracker;
   private invalidationTracker!: InvalidationTracker;
   private layoutInvalidate!: {
-    [x: string]: TraceEngine.Legacy.Event|null,
+    [x: string]: TraceEngine.Types.TraceEvents.TraceEventData|null,
   };
   private lastScheduleStyleRecalculation!: {
-    [x: string]: TraceEngine.Legacy.Event,
+    [x: string]: TraceEngine.Types.TraceEvents.TraceEventData,
   };
   private paintImageEventByPixelRefId!: {
     [x: string]: TraceEngine.Legacy.Event,
@@ -149,6 +104,7 @@ export class TimelineModelImpl {
   private legacyCurrentPage!: any;
   private currentTaskLayoutAndRecalcEvents: TraceEngine.Legacy.Event[];
   private tracingModelInternal: TraceEngine.Legacy.TracingModel|null;
+  private renderLegacySyncTracks = true;
   private mainFrameLayerTreeId?: any;
   #isFreshRecording = false;
   #isCpuProfile = false;
@@ -338,13 +294,14 @@ export class TimelineModelImpl {
   }
 
   setEvents(
-      tracingModel: TraceEngine.Legacy.TracingModel, isFreshRecording: boolean = false,
-      isCpuProfile: boolean = false): void {
+      tracingModel: TraceEngine.Legacy.TracingModel, isFreshRecording: boolean = false, isCpuProfile: boolean = false,
+      renderLegacySyncTracks = true): void {
     this.#isFreshRecording = isFreshRecording;
     this.#isCpuProfile = isCpuProfile;
     this.reset();
     this.resetProcessingState();
     this.tracingModelInternal = tracingModel;
+    this.renderLegacySyncTracks = renderLegacySyncTracks;
 
     this.minimumRecordTimeInternal = tracingModel.minimumRecordTime();
     this.maximumRecordTimeInternal = tracingModel.maximumRecordTime();
@@ -389,8 +346,7 @@ export class TimelineModelImpl {
     }
     for (const process of tracingModel.sortedProcesses()) {
       for (const thread of process.sortedThreads()) {
-        this.processThreadEvents(
-            tracingModel, thread, thread === browserMainThread, false, true, WorkletType.NotWorklet, null);
+        this.processThreadEvents(tracingModel, thread, thread === browserMainThread, false, true, null);
       }
     }
   }
@@ -431,8 +387,7 @@ export class TimelineModelImpl {
           workerUrl = workerMetaEvent.args['data']['url'] || Platform.DevToolsPath.EmptyUrlString;
         }
         this.processThreadEvents(
-            tracingModel, thread, thread === metaEvent.thread, Boolean(workerUrl), true, WorkletType.NotWorklet,
-            workerUrl);
+            tracingModel, thread, thread === metaEvent.thread, Boolean(workerUrl), true, workerUrl);
       }
       startTime = endTime;
     }
@@ -443,7 +398,6 @@ export class TimelineModelImpl {
       from: number,
       to: number,
       main: boolean,
-      workletType: WorkletType,
       url: Platform.DevToolsPath.UrlString,
     }[]>();
     for (const frame of this.pageFrames.values()) {
@@ -460,26 +414,8 @@ export class TimelineModelImpl {
           to: to,
           main: !frame.parent,
           url: frame.processes[i].url,
-          workletType: WorkletType.NotWorklet,
         });
       }
-    }
-    for (const auctionWorklet of this.auctionWorklets.values()) {
-      const pid = auctionWorklet.processId;
-      let data = processDataByPid.get(pid);
-      if (!data) {
-        data = [];
-        processDataByPid.set(pid, data);
-      }
-      data.push({
-        from: auctionWorklet.startTime,
-        to: auctionWorklet.endTime,
-        main: false,
-        workletType: auctionWorklet.workletType,
-        url:
-            (auctionWorklet.host ? 'https://' + auctionWorklet.host as Platform.DevToolsPath.UrlString :
-                                   Platform.DevToolsPath.EmptyUrlString),
-      });
     }
     const allMetadataEvents = tracingModel.devToolsMetadataEvents();
     for (const process of tracingModel.sortedProcesses()) {
@@ -494,12 +430,6 @@ export class TimelineModelImpl {
       let lastMainUrl: Platform.DevToolsPath.UrlString|null = null;
       let hasMain = false;
 
-      let allWorklet = true;
-      // false: not set, true: inconsistent.
-      let workletUrl: Platform.DevToolsPath.UrlString|boolean = false;
-      // NotWorklet used for not set.
-      let workletType: WorkletType = WorkletType.NotWorklet;
-
       for (const item of processData) {
         if (item.main) {
           hasMain = true;
@@ -510,30 +440,12 @@ export class TimelineModelImpl {
           }
           lastUrl = item.url;
         }
-
-        // Worklet identification
-        if (item.workletType === WorkletType.NotWorklet) {
-          allWorklet = false;
-        } else {
-          // Update combined workletUrl, checking for inconsistencies.
-          if (workletUrl === false) {
-            workletUrl = item.url;
-          } else if (workletUrl !== item.url) {
-            workletUrl = true;  // Process used for different things.
-          }
-
-          if (workletType === WorkletType.NotWorklet) {
-            workletType = item.workletType;
-          } else if (workletType !== item.workletType) {
-            workletType = WorkletType.UnknownWorklet;
-          }
-        }
       }
 
       for (const thread of process.sortedThreads()) {
         if (thread.name() === TimelineModelImpl.RendererMainThreadName) {
           this.processThreadEvents(
-              tracingModel, thread, true /* isMainThread */, false /* isWorker */, hasMain, WorkletType.NotWorklet,
+              tracingModel, thread, true /* isMainThread */, false /* isWorker */, hasMain,
               hasMain ? lastMainUrl : lastUrl);
         } else if (
             thread.name() === TimelineModelImpl.WorkerThreadName ||
@@ -557,25 +469,10 @@ export class TimelineModelImpl {
           this.workerIdByThread.set(thread, workerMetaEvent.args['data']['workerId'] || '');
           this.processThreadEvents(
               tracingModel, thread, false /* isMainThread */, true /* isWorker */, false /* forMainFrame */,
-              WorkletType.NotWorklet, workerMetaEvent.args['data']['url'] || Platform.DevToolsPath.EmptyUrlString);
+              workerMetaEvent.args['data']['url'] || Platform.DevToolsPath.EmptyUrlString);
         } else {
-          let urlForOther: Platform.DevToolsPath.UrlString|null = null;
-          let workletTypeForOther: WorkletType = WorkletType.NotWorklet;
-          if (thread.name() === TimelineModelImpl.AuctionWorkletThreadName ||
-              thread.name().endsWith(TimelineModelImpl.UtilityMainThreadNameSuffix)) {
-            if (typeof workletUrl !== 'boolean') {
-              urlForOther = workletUrl;
-            }
-            workletTypeForOther = workletType;
-          } else {
-            // For processes that only do auction worklet things, skip other threads.
-            if (allWorklet) {
-              continue;
-            }
-          }
           this.processThreadEvents(
-              tracingModel, thread, false /* isMainThread */, false /* isWorker */, false /* forMainFrame */,
-              workletTypeForOther, urlForOther);
+              tracingModel, thread, false /* isMainThread */, false /* isWorker */, false /* forMainFrame */, null);
         }
       }
     }
@@ -759,9 +656,12 @@ export class TimelineModelImpl {
 
     try {
       const profile = (cpuProfile as Protocol.Profiler.Profile);
-      const jsProfileModel = new CPUProfile.CPUProfileDataModel.CPUProfileDataModel(profile);
-      this.cpuProfilesInternal.push({cpuProfileData: jsProfileModel, target});
-      return jsProfileModel;
+      // Sometimes we see cpuProfiles without any nodes. As these are entirely empty, we early exit
+      if (profile.nodes.length) {
+        const jsProfileModel = new CPUProfile.CPUProfileDataModel.CPUProfileDataModel(profile);
+        this.cpuProfilesInternal.push({cpuProfileData: jsProfileModel, target});
+        return jsProfileModel;
+      }
     } catch (e) {
       Common.Console.Console.instance().error('Failed to parse CPU profile.');
     }
@@ -796,23 +696,9 @@ export class TimelineModelImpl {
     return events;
   }
 
-  private static nameAuctionWorklet(workletType: WorkletType, url: Platform.DevToolsPath.UrlString|null): string {
-    switch (workletType) {
-      case WorkletType.BidderWorklet:
-        return url ? i18nString(UIStrings.bidderWorkletS, {PH1: url}) : i18nString(UIStrings.bidderWorklet);
-
-      case WorkletType.SellerWorklet:
-        return url ? i18nString(UIStrings.sellerWorkletS, {PH1: url}) : i18nString(UIStrings.sellerWorklet);
-
-      default:
-        return url ? i18nString(UIStrings.unknownWorkletS, {PH1: url}) : i18nString(UIStrings.unknownWorklet);
-    }
-  }
-
   private processThreadEvents(
       tracingModel: TraceEngine.Legacy.TracingModel, thread: TraceEngine.Legacy.Thread, isMainThread: boolean,
-      isWorker: boolean, forMainFrame: boolean, workletType: WorkletType,
-      url: Platform.DevToolsPath.UrlString|null): void {
+      isWorker: boolean, forMainFrame: boolean, url: Platform.DevToolsPath.UrlString|null): void {
     const track = new Track();
     track.name = thread.name() || i18nString(UIStrings.threadS, {PH1: thread.id()});
     track.type = TrackType.Other;
@@ -839,8 +725,10 @@ export class TimelineModelImpl {
       track.name = url ? i18nString(UIStrings.workletServiceS, {PH1: url}) : i18nString(UIStrings.workletService);
     }
     this.tracksInternal.push(track);
-
-    const events = this.injectJSFrameEvents(tracingModel, thread);
+    let events = thread.events();
+    if (this.renderLegacySyncTracks) {
+      events = this.injectJSFrameEvents(tracingModel, thread);
+    }
     this.eventStack = [];
     const eventStack = this.eventStack;
 
@@ -994,13 +882,20 @@ export class TimelineModelImpl {
     switch (event.name) {
       case RecordType.ResourceSendRequest:
       case RecordType.WebSocketCreate: {
-        timelineData.setInitiator(eventStack[eventStack.length - 1] || null);
+        const lastEvent = eventStack[eventStack.length - 1];
+        if (!(lastEvent instanceof TraceEngine.Legacy.PayloadEvent)) {
+          break;
+        }
+        timelineData.setInitiator(lastEvent.rawPayload() || null);
         timelineData.url = eventData['url'];
         break;
       }
 
       case RecordType.ScheduleStyleRecalculation: {
-        this.lastScheduleStyleRecalculation[eventData['frame']] = event;
+        if (!(event instanceof TraceEngine.Legacy.PayloadEvent)) {
+          break;
+        }
+        this.lastScheduleStyleRecalculation[eventData['frame']] = event.rawPayload();
         break;
       }
 
@@ -1028,7 +923,10 @@ export class TimelineModelImpl {
       case RecordType.InvalidateLayout: {
         // Consider style recalculation as a reason for layout invalidation,
         // but only if we had no earlier layout invalidation records.
-        let layoutInitator: (TraceEngine.Legacy.Event|null)|TraceEngine.Legacy.Event = event;
+        if (!(event instanceof TraceEngine.Legacy.PayloadEvent)) {
+          break;
+        }
+        let layoutInitator: TraceEngine.Types.TraceEvents.TraceEventData|null = event.rawPayload();
         const frameId = eventData['frame'];
         if (!this.layoutInvalidate[frameId] && this.lastRecalculateStylesEvent &&
             this.lastRecalculateStylesEvent.endTime !== undefined &&
@@ -1041,7 +939,10 @@ export class TimelineModelImpl {
 
       case RecordType.Layout: {
         this.invalidationTracker.didLayout(event);
-        const frameId = event.args['beginData']['frame'];
+        const frameId = event.args?.beginData?.frame;
+        if (!frameId) {
+          break;
+        }
         timelineData.setInitiator(this.layoutInvalidate[frameId]);
         // In case we have no closing Layout event, endData is not available.
         if (event.args['endData']) {
@@ -1332,18 +1233,6 @@ export class TimelineModelImpl {
         }
         return;
       }
-      if (event.name === TimelineModelImpl.DevToolsMetadataEvent.AuctionWorkletRunningInProcess &&
-          this.browserFrameTracking) {
-        const worklet = new AuctionWorklet(event, data);
-        this.auctionWorklets.set(data['target'], worklet);
-      }
-      if (event.name === TimelineModelImpl.DevToolsMetadataEvent.AuctionWorkletDoneWithProcess &&
-          this.browserFrameTracking) {
-        const worklet = this.auctionWorklets.get(data['target']);
-        if (worklet) {
-          worklet.endTime = event.startTime;
-        }
-      }
     }
   }
 
@@ -1394,7 +1283,6 @@ export class TimelineModelImpl {
     this.cpuProfilesInternal = [];
     this.workerIdByThread = new WeakMap();
     this.pageFrames = new Map();
-    this.auctionWorklets = new Map();
     this.requestsFromBrowser = new Map();
 
     this.minimumRecordTimeInternal = 0;
@@ -1635,7 +1523,6 @@ export namespace TimelineModelImpl {
     LongHandler = 'LongHandler',
     LongRecurringHandler = 'LongRecurringHandler',
     V8Deopt = 'V8Deopt',
-    LongInteraction = 'LongInteraction',
   }
 
   export const WorkerThreadName = 'DedicatedWorker thread';
@@ -1645,7 +1532,6 @@ export namespace TimelineModelImpl {
   // The names of threads before M111 were exactly this, but afterwards have
   // it a suffix after the exact role.
   export const UtilityMainThreadNameSuffix = 'CrUtilityMain';
-  export const AuctionWorkletThreadName = 'AuctionV8HelperThread';
 
   export const DevToolsMetadataEvent = {
     TracingStartedInBrowser: 'TracingStartedInBrowser',
@@ -1654,8 +1540,6 @@ export namespace TimelineModelImpl {
     FrameCommittedInBrowser: 'FrameCommittedInBrowser',
     ProcessReadyInBrowser: 'ProcessReadyInBrowser',
     FrameDeletedInBrowser: 'FrameDeletedInBrowser',
-    AuctionWorkletRunningInProcess: 'AuctionWorkletRunningInProcess',
-    AuctionWorkletDoneWithProcess: 'AuctionWorkletDoneWithProcess',
   };
 
   export const Thresholds = {
@@ -1789,13 +1673,6 @@ export enum TrackType {
   Other = 'Other',
 }
 
-const enum WorkletType {
-  NotWorklet = 0,
-  BidderWorklet = 1,
-  SellerWorklet = 2,
-  UnknownWorklet = 3,  // new type, or thread used for multiple ones.
-}
-
 export class PageFrame {
   frameId: any;
   url: any;
@@ -1847,29 +1724,6 @@ export class PageFrame {
   addChild(child: PageFrame): void {
     this.children.push(child);
     child.parent = this;
-  }
-}
-
-export class AuctionWorklet {
-  targetId: string;
-  processId: number;
-  host?: string;
-  startTime: number;
-  endTime: number;
-  workletType: WorkletType;
-  constructor(event: TraceEngine.Legacy.Event, data: any) {
-    this.targetId = (typeof data['target'] === 'string') ? data['target'] : '';
-    this.processId = (typeof data['pid'] === 'number') ? data['pid'] : 0;
-    this.host = (typeof data['host'] === 'string') ? data['host'] : undefined;
-    this.startTime = event.startTime;
-    this.endTime = Infinity;
-    if (data['type'] === 'bidder') {
-      this.workletType = WorkletType.BidderWorklet;
-    } else if (data['type'] === 'seller') {
-      this.workletType = WorkletType.SellerWorklet;
-    } else {
-      this.workletType = WorkletType.UnknownWorklet;
-    }
   }
 }
 
@@ -2078,7 +1932,10 @@ export class InvalidationTracker {
   }
 
   didLayout(layoutEvent: TraceEngine.Legacy.Event): void {
-    const layoutFrameId = layoutEvent.args['beginData']['frame'];
+    const layoutFrameId = layoutEvent.args?.beginData?.frame;
+    if (!layoutFrameId) {
+      return;
+    }
     for (const invalidation of this.invalidationsOfTypes([RecordType.LayoutInvalidationTracking])) {
       if (invalidation.linkedLayoutEvent) {
         continue;
@@ -2285,7 +2142,7 @@ export class EventOnTimelineData {
   backendNodeIds: Protocol.DOM.BackendNodeId[];
   stackTrace: Protocol.Runtime.CallFrame[]|null;
   picture: TraceEngine.Legacy.ObjectSnapshot|null;
-  private initiatorInternal: TraceEngine.Legacy.Event|null;
+  private initiatorInternal: TraceEngine.Types.TraceEvents.TraceEventData|null;
   frameId: Protocol.Page.FrameId|null;
 
   constructor() {
@@ -2298,7 +2155,7 @@ export class EventOnTimelineData {
     this.frameId = null;
   }
 
-  setInitiator(initiator: TraceEngine.Legacy.Event|null): void {
+  setInitiator(initiator: TraceEngine.Types.TraceEvents.TraceEventData|null): void {
     this.initiatorInternal = initiator;
     if (!initiator || this.url) {
       return;
@@ -2309,7 +2166,7 @@ export class EventOnTimelineData {
     }
   }
 
-  initiator(): TraceEngine.Legacy.Event|null {
+  initiator(): TraceEngine.Types.TraceEvents.TraceEventData|null {
     return this.initiatorInternal;
   }
 

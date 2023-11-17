@@ -101,6 +101,7 @@ const util_js_1 = require("../common/util.js");
 const assert_js_1 = require("../util/assert.js");
 const AsyncIterableUtil_js_1 = require("../util/AsyncIterableUtil.js");
 const decorators_js_1 = require("../util/decorators.js");
+const ElementHandleSymbol_js_1 = require("./ElementHandleSymbol.js");
 const JSHandle_js_1 = require("./JSHandle.js");
 /**
  * ElementHandle represents an in-page DOM element.
@@ -304,6 +305,7 @@ let ElementHandle = (() => {
         constructor(handle) {
             super();
             this.handle = handle;
+            this[ElementHandleSymbol_js_1._isElementHandle] = true;
         }
         /**
          * @internal
@@ -458,7 +460,7 @@ let ElementHandle = (() => {
          *
          * JavaScript:
          *
-         * ```js
+         * ```ts
          * const feedHandle = await page.$('.feed');
          * expect(
          *   await feedHandle.$$eval('.tweet', nodes => nodes.map(n => n.innerText))
@@ -849,9 +851,6 @@ let ElementHandle = (() => {
                 return [...selectedValues.values()];
             }, values);
         }
-        async uploadFile() {
-            throw new Error('Not implemented');
-        }
         /**
          * This method scrolls element into view if needed, and then uses
          * {@link Touchscreen.tap} to tap in the center of the element.
@@ -1018,7 +1017,8 @@ let ElementHandle = (() => {
         }
         /**
          * This method returns the bounding box of the element (relative to the main frame),
-         * or `null` if the element is not visible.
+         * or `null` if the element is {@link https://drafts.csswg.org/css-display-4/#box-generation | not part of the layout}
+         * (example: `display: none`).
          */
         async boundingBox() {
             const box = await this.evaluate(element => {
@@ -1047,7 +1047,9 @@ let ElementHandle = (() => {
             };
         }
         /**
-         * This method returns boxes of the element, or `null` if the element is not visible.
+         * This method returns boxes of the element,
+         * or `null` if the element is {@link https://drafts.csswg.org/css-display-4/#box-generation | not part of the layout}
+         * (example: `display: none`).
          *
          * @remarks
          *
@@ -1187,11 +1189,6 @@ let ElementHandle = (() => {
             }
             return point;
         }
-        /**
-         * This method scrolls element into view if needed, and then uses
-         * {@link Page.(screenshot:2) } to take a screenshot of the element.
-         * If the element is detached from DOM, the method throws an error.
-         */
         async screenshot(options = {}) {
             const env_6 = { stack: [], error: void 0, hasError: false };
             try {

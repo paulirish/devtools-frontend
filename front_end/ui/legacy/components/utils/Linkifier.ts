@@ -33,11 +33,11 @@ import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../../generated/protocol.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as Breakpoints from '../../../../models/breakpoints/breakpoints.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
-import type * as Protocol from '../../../../generated/protocol.js';
 import type * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as UI from '../../legacy.js';
 
@@ -87,20 +87,17 @@ const linkHandlers = new Map<string, LinkHandler>();
 
 let linkHandlerSettingInstance: Common.Settings.Setting<string>;
 
-export class Linkifier implements SDK.TargetManager.Observer {
+export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements SDK.TargetManager.Observer {
   private readonly maxLength: number;
   private readonly anchorsByTarget: Map<SDK.Target.Target, Element[]>;
   private readonly locationPoolByTarget: Map<SDK.Target.Target, Bindings.LiveLocation.LiveLocationPool>;
-  private onLiveLocationUpdate: (() => void);
   private useLinkDecorator: boolean;
 
-  constructor(
-      maxLengthForDisplayedURLs?: number, useLinkDecorator?: boolean,
-      onLiveLocationUpdate: (() => void) = (): void => {}) {
+  constructor(maxLengthForDisplayedURLs?: number, useLinkDecorator?: boolean) {
+    super();
     this.maxLength = maxLengthForDisplayedURLs || UI.UIUtils.MaxLengthForDisplayedURLs;
     this.anchorsByTarget = new Map();
     this.locationPoolByTarget = new Map();
-    this.onLiveLocationUpdate = onLiveLocationUpdate;
     this.useLinkDecorator = Boolean(useLinkDecorator);
     instances.add(this);
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
@@ -261,6 +258,7 @@ export class Linkifier implements SDK.TargetManager.Observer {
 
     const createLinkOptions: _CreateLinkOptions = {
       tabStop: options?.tabStop,
+      preventClick: true,
     };
     const {link, linkInfo} = Linkifier.createLink(
         fallbackAnchor && fallbackAnchor.textContent ? fallbackAnchor.textContent : '', className, createLinkOptions);
@@ -278,13 +276,15 @@ export class Linkifier implements SDK.TargetManager.Observer {
       revealBreakpoint: options?.revealBreakpoint,
     };
 
-    const currentOnLiveLocationUpdate = this.onLiveLocationUpdate;
+    const updateDelegate = async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
+      await this.updateAnchor(link, linkDisplayOptions, liveLocation);
+      this.dispatchEventToListeners(Events.LiveLocationUpdated, liveLocation);
+    };
     void Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
-        .createLiveLocation(rawLocation, this.updateAnchor.bind(this, link, linkDisplayOptions), pool)
+        .createLiveLocation(rawLocation, updateDelegate.bind(this), pool)
         .then(liveLocation => {
           if (liveLocation) {
             linkInfo.liveLocation = liveLocation;
-            currentOnLiveLocationUpdate();
           }
         });
 
@@ -372,14 +372,15 @@ export class Linkifier implements SDK.TargetManager.Observer {
 
     const linkDisplayOptions = {showColumnNumber: false};
 
-    const currentOnLiveLocationUpdate = this.onLiveLocationUpdate;
+    const updateDelegate = async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
+      await this.updateAnchor(link, linkDisplayOptions, liveLocation);
+      this.dispatchEventToListeners(Events.LiveLocationUpdated, liveLocation);
+    };
     void Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
         .createStackTraceTopFrameLiveLocation(
-            debuggerModel.createRawLocationsByStackTrace(stackTrace),
-            this.updateAnchor.bind(this, link, linkDisplayOptions), pool)
+            debuggerModel.createRawLocationsByStackTrace(stackTrace), updateDelegate.bind(this), pool)
         .then(liveLocation => {
           linkInfo.liveLocation = liveLocation;
-          currentOnLiveLocationUpdate();
         });
 
     const anchors = (this.anchorsByTarget.get(target) as Element[]);
@@ -401,12 +402,14 @@ export class Linkifier implements SDK.TargetManager.Observer {
 
     const linkDisplayOptions = {showColumnNumber: false};
 
-    const currentOnLiveLocationUpdate = this.onLiveLocationUpdate;
+    const updateDelegate = async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
+      await this.updateAnchor(link, linkDisplayOptions, liveLocation);
+      this.dispatchEventToListeners(Events.LiveLocationUpdated, liveLocation);
+    };
     void Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance()
-        .createLiveLocation(rawLocation, this.updateAnchor.bind(this, link, linkDisplayOptions), pool)
+        .createLiveLocation(rawLocation, updateDelegate.bind(this), pool)
         .then(liveLocation => {
           linkInfo.liveLocation = liveLocation;
-          currentOnLiveLocationUpdate();
         });
 
     const anchors = (this.anchorsByTarget.get(rawLocation.cssModel().target()) as Element[]);
@@ -479,12 +482,22 @@ export class Linkifier implements SDK.TargetManager.Observer {
       }
     }
     UI.Tooltip.Tooltip.install(anchor, titleText);
+    if (anchor.classList.contains('devtools-link-prevent-click')) {
+      anchor.classList.remove('devtools-link-prevent-click');
+      anchor.addEventListener('click', event => {
+        if (Linkifier.handleClick(event)) {
+          event.consume(true);
+        }
+      }, false);
+      anchor.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && Linkifier.handleClick(event)) {
+          event.consume(true);
+        }
+      }, false);
+      UI.ARIAUtils.markAsLink(anchor);
+    }
     anchor.classList.toggle('ignore-list-link', await liveLocation.isIgnoreListed());
     Linkifier.updateLinkDecorations(anchor);
-  }
-
-  setLiveLocationUpdateCallback(callback: () => void): void {
-    this.onLiveLocationUpdate = callback;
   }
 
   private static updateLinkDecorations(anchor: Element): void {
@@ -520,7 +533,7 @@ export class Linkifier implements SDK.TargetManager.Observer {
     const preventClick = options.preventClick;
     const maxLength = options.maxLength || UI.UIUtils.MaxLengthForDisplayedURLs;
     const bypassURLTrimming = options.bypassURLTrimming;
-    if (!url || url.trim().toLowerCase().startsWith('javascript:')) {
+    if (!url || Common.ParsedURL.schemeIs(url, 'javascript:')) {
       const element = document.createElement('span');
       if (className) {
         element.className = className;
@@ -614,10 +627,10 @@ export class Linkifier implements SDK.TargetManager.Observer {
           event.consume(true);
         }
       }, false);
+      UI.ARIAUtils.markAsLink(link);
     } else {
       link.classList.add('devtools-link-prevent-click');
     }
-    UI.ARIAUtils.markAsLink(link);
     link.tabIndex = tabStop ? 0 : -1;
     return {link, linkInfo};
   }
@@ -956,7 +969,7 @@ export class ContentProviderContextMenuProvider implements UI.ContextMenu.Provid
       return;
     }
 
-    if (!contentUrl.startsWith('file://')) {
+    if (!Common.ParsedURL.schemeIs(contentUrl, 'file:')) {
       contextMenu.revealSection().appendItem(
           UI.UIUtils.openLinkExternallyLabel(),
           () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
@@ -1054,3 +1067,11 @@ interface LinkDisplayOptions {
 }
 
 export type LinkHandler = (arg0: TextUtils.ContentProvider.ContentProvider, arg1: number) => void;
+
+export const enum Events {
+  LiveLocationUpdated = 'liveLocationUpdated',
+}
+
+export type EventTypes = {
+  [Events.LiveLocationUpdated]: Bindings.LiveLocation.LiveLocation,
+};

@@ -1100,6 +1100,8 @@ export namespace Audits {
     IdTokenHttpNotFound = 'IdTokenHttpNotFound',
     IdTokenNoResponse = 'IdTokenNoResponse',
     IdTokenInvalidResponse = 'IdTokenInvalidResponse',
+    IdTokenIdpErrorResponse = 'IdTokenIdpErrorResponse',
+    IdTokenCrossSiteIdpErrorResponse = 'IdTokenCrossSiteIdpErrorResponse',
     IdTokenInvalidRequest = 'IdTokenInvalidRequest',
     IdTokenInvalidContentType = 'IdTokenInvalidContentType',
     ErrorIdToken = 'ErrorIdToken',
@@ -1650,7 +1652,7 @@ export namespace Browser {
 
   /**
    * Definition of PermissionDescriptor defined in the Permissions API:
-   * https://w3c.github.io/permissions/#dictdef-permissiondescriptor.
+   * https://w3c.github.io/permissions/#dom-permissiondescriptor.
    */
   export interface PermissionDescriptor {
     /**
@@ -2612,6 +2614,10 @@ export namespace CSS {
      */
     familyName: string;
     /**
+     * Font's PostScript name reported by platform.
+     */
+    postScriptName: string;
+    /**
      * Indicates if the font was downloaded or resolved locally.
      */
     isCustomFont: boolean;
@@ -2746,6 +2752,29 @@ export namespace CSS {
     initialValue?: Value;
     inherits: boolean;
     syntax: string;
+  }
+
+  /**
+   * CSS font-palette-values rule representation.
+   */
+  export interface CSSFontPaletteValuesRule {
+    /**
+     * The css style sheet identifier (absent for user agent stylesheet and user-specified
+     * stylesheet rules) this rule came from.
+     */
+    styleSheetId?: StyleSheetId;
+    /**
+     * Parent stylesheet's origin.
+     */
+    origin: StyleSheetOrigin;
+    /**
+     * Associated font palette name.
+     */
+    fontPaletteName: Value;
+    /**
+     * Associated style declaration.
+     */
+    style: CSSStyle;
   }
 
   /**
@@ -2968,6 +2997,10 @@ export namespace CSS {
      * A list of CSS property registrations matching this node.
      */
     cssPropertyRegistrations?: CSSPropertyRegistration[];
+    /**
+     * A font-palette-values rule matching this node.
+     */
+    cssFontPaletteValuesRule?: CSSFontPaletteValuesRule;
     /**
      * Id of the first parent element that does not have display: contents.
      */
@@ -6019,7 +6052,7 @@ export namespace Emulation {
      */
     userAgent: string;
     /**
-     * Browser langugage to emulate.
+     * Browser language to emulate.
      */
     acceptLanguage?: string;
     /**
@@ -9317,7 +9350,7 @@ export namespace Network {
      */
     userAgent: string;
     /**
-     * Browser langugage to emulate.
+     * Browser language to emulate.
      */
     acceptLanguage?: string;
     /**
@@ -10964,6 +10997,7 @@ export namespace Page {
     Unload = 'unload',
     Usb = 'usb',
     VerticalScroll = 'vertical-scroll',
+    WebPrinting = 'web-printing',
     WebShare = 'web-share',
     WindowManagement = 'window-management',
     WindowPlacement = 'window-placement',
@@ -13361,6 +13395,7 @@ export namespace ServiceWorker {
     scriptResponseTime?: number;
     controlledClients?: Target.TargetID[];
     targetId?: Target.TargetID;
+    routerRules?: string;
   }
 
   /**
@@ -13695,13 +13730,27 @@ export namespace Storage {
     ends: integer[];
   }
 
+  export interface AttributionReportingTriggerSpec {
+    /**
+     * number instead of integer because not all uint32 can be represented by
+     * int
+     */
+    triggerData: number[];
+    eventReportWindows: AttributionReportingEventReportWindows;
+  }
+
+  export const enum AttributionReportingTriggerDataMatching {
+    Exact = 'exact',
+    Modulus = 'modulus',
+  }
+
   export interface AttributionReportingSourceRegistration {
     time: Network.TimeSinceEpoch;
     /**
      * duration in seconds
      */
     expiry: integer;
-    eventReportWindows: AttributionReportingEventReportWindows;
+    triggerSpecs: AttributionReportingTriggerSpec[];
     /**
      * duration in seconds
      */
@@ -13715,6 +13764,7 @@ export namespace Storage {
     filterData: AttributionReportingFilterDataEntry[];
     aggregationKeys: AttributionReportingAggregationKeysEntry[];
     debugKey?: UnsignedInt64AsBase10;
+    triggerDataMatching: AttributionReportingTriggerDataMatching;
   }
 
   export const enum AttributionReportingSourceRegistrationResult {
@@ -16212,6 +16262,15 @@ export namespace Preload {
   }
 
   /**
+   * Information of headers to be displayed when the header mismatch occurred.
+   */
+  export interface PrerenderMismatchedHeaders {
+    headerName: string;
+    initialValue?: string;
+    activationValue?: string;
+  }
+
+  /**
    * Upsert. Currently, it is only emitted when a rule set added.
    */
   export interface RuleSetUpdatedEvent {
@@ -16260,6 +16319,7 @@ export namespace Preload {
      * that is incompatible with prerender and has caused the cancellation of the attempt.
      */
     disallowedMojoInterface?: string;
+    mismatchedHeaders?: PrerenderMismatchedHeaders[];
   }
 
   /**
@@ -16286,12 +16346,19 @@ export namespace FedCm {
   }
 
   /**
-   * Whether the dialog shown is an account chooser or an auto re-authentication dialog.
+   * The types of FedCM dialogs.
    */
   export const enum DialogType {
     AccountChooser = 'AccountChooser',
     AutoReauthn = 'AutoReauthn',
     ConfirmIdpLogin = 'ConfirmIdpLogin',
+  }
+
+  /**
+   * The buttons on the FedCM dialog.
+   */
+  export const enum DialogButton {
+    ConfirmIdpLoginContinue = 'ConfirmIdpLoginContinue',
   }
 
   /**
@@ -16327,8 +16394,9 @@ export namespace FedCm {
     accountIndex: integer;
   }
 
-  export interface ConfirmIdpLoginRequest {
+  export interface ClickDialogButtonRequest {
     dialogId: string;
+    dialogButton: DialogButton;
   }
 
   export interface DismissDialogRequest {

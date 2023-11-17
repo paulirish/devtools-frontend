@@ -20,10 +20,48 @@ describe('LoggingConfig', () => {
     assert.isTrue(VisualLogging.LoggingConfig.needsLogging(element));
   });
 
-  it('reads simple logging config', () => {
-    element.setAttribute('jslog', 'TreeItem');
-    const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
-    assert.strictEqual(config.ve, 1);
+  describe('reads simple logging config', () => {
+    it('for TreeItem', () => {
+      element.setAttribute('jslog', 'TreeItem');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 1);
+    });
+
+    it('for TextField', () => {
+      element.setAttribute('jslog', 'TextField');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 8);
+    });
+
+    it('for Action', () => {
+      element.setAttribute('jslog', 'Action');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 29);
+    });
+
+    it('for Preview', () => {
+      element.setAttribute('jslog', 'Preview');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 35);
+    });
+
+    it('for Panel', () => {
+      element.setAttribute('jslog', 'Panel');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 48);
+    });
+
+    it('for TableHeader', () => {
+      element.setAttribute('jslog', 'TableHeader');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 69);
+    });
+
+    it('for TableCell', () => {
+      element.setAttribute('jslog', 'TableCell');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.ve, 70);
+    });
   });
 
   it('throws on unknown visual element', () => {
@@ -38,9 +76,23 @@ describe('LoggingConfig', () => {
   });
 
   it('can parse simple context attribute', () => {
-    element.setAttribute('jslog', 'TreeItem;context:42');
-    const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
-    assert.strictEqual(config.context, '42');
+    it('for TreeItem', () => {
+      element.setAttribute('jslog', 'TreeItem;context:42');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.context, '42');
+    });
+
+    it('for Action', () => {
+      element.setAttribute('jslog', 'Action;context:console.clear');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.context, 'console.clear');
+    });
+
+    it('for Panel', () => {
+      element.setAttribute('jslog', 'Panel;context:developer-resources');
+      const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
+      assert.strictEqual(config.context, 'developer-resources');
+    });
   });
 
   it('can parse parent attribute', () => {
@@ -49,7 +101,7 @@ describe('LoggingConfig', () => {
     assert.strictEqual(config.parent, 'customProvider');
   });
 
-  it('ignores whitespaces while parsnng', () => {
+  it('ignores whitespaces while parsing', () => {
     element.setAttribute('jslog', 'TreeItem;     context:   42');
     const config = VisualLogging.LoggingConfig.getLoggingConfig(element);
     assert.strictEqual(config.context, '42');

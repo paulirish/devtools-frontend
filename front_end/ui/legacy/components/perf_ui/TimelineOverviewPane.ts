@@ -145,6 +145,10 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.update();
   }
 
+  set showingScreenshots(isShowing: boolean) {
+    this.overviewGrid.showingScreenshots = isShowing;
+  }
+
   setBounds(
       minimumBoundary: TraceEngine.Types.Timing.MilliSeconds,
       maximumBoundary: TraceEngine.Types.Timing.MilliSeconds): void {
@@ -178,6 +182,10 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 
   setMarkers(markers: Map<number, Element>): void {
     this.markers = markers;
+  }
+
+  getMarkers(): Map<number, Element> {
+    return this.markers;
   }
 
   private updateMarkers(): void {
@@ -334,7 +342,7 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
   }
 
   update(): void {
-    this.resetCanvas();
+    throw new Error('Not implemented');
   }
 
   dispose(): void {
