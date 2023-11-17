@@ -715,14 +715,6 @@ export class TimelineModelImpl {
       track.type = TrackType.Raster;
     } else if (thread.name().startsWith('ThreadPoolForegroundWorker')) {
       track.type = TrackType.ThreadPool;
-    } else if (thread.name() === TimelineModelImpl.AuctionWorkletThreadName) {
-      track.url = url || Platform.DevToolsPath.EmptyUrlString;
-      track.name = TimelineModelImpl.nameAuctionWorklet(workletType, url);
-    } else if (
-        workletType !== WorkletType.NotWorklet &&
-        thread.name().endsWith(TimelineModelImpl.UtilityMainThreadNameSuffix)) {
-      track.url = url || Platform.DevToolsPath.EmptyUrlString;
-      track.name = url ? i18nString(UIStrings.workletServiceS, {PH1: url}) : i18nString(UIStrings.workletService);
     }
     this.tracksInternal.push(track);
     let events = thread.events();
@@ -2125,7 +2117,10 @@ export class TimelineAsyncEventTracker {
       }
       const initiatorEvent = initiatorMapFromIdToEvent.get(id);
       const timelineData = EventOnTimelineData.forEvent(event);
-      timelineData.setInitiator(initiatorEvent ? initiatorEvent : null);
+      if (!(initiatorEvent instanceof TraceEngine.Legacy.PayloadEvent)) {
+        return;
+      }
+      timelineData.setInitiator(initiatorEvent.rawPayload());
       if (!timelineData.frameId && initiatorEvent) {
         timelineData.frameId = TimelineModelImpl.eventFrameId(initiatorEvent);
       }
