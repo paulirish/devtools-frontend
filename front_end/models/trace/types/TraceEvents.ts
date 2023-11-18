@@ -1623,6 +1623,10 @@ export const enum KnownEventName {
   MLGraphCompute = 'XnnRuntimeWrapper::Invoke', //'Compute MLGraph',
   MLGraphBuild = 'XnnRuntimeWrapper::Create', // 'Build MLGraph',
 
+  // https://chromium-review.googlesource.com/c/chromium/src/+/4930091
+  'DecompressionStream Inflate'
+  'CompressionStream Deflate'
+
 
   /* Other */
   Animation = 'Animation',
