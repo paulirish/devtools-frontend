@@ -293,6 +293,13 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private onEntryHighlighted(commonEvent: Common.EventTarget.EventTargetEvent<number>): void {
     SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
     const entryIndex = commonEvent.data;
+
+    if (Root.Runtime.experiments.isEnabled('timelineEventInitiators')) {
+      if (this.mainDataProvider.buildFlowForInitiator(entryIndex)) {
+        this.mainFlameChart.scheduleUpdate();
+      }
+    }
+
     // TODO(crbug.com/1431166): explore how we can make highlighting agnostic
     // and take either legacy events, or new trace engine events. Currently if
     // this highlight comes from a TrackAppender, we create a new legacy event
@@ -305,6 +312,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     if (!target) {
       return;
     }
+
     let backendNodeIds;
 
     // Events for tracks that are migrated to the new engine won't use
