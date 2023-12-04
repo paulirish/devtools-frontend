@@ -268,6 +268,7 @@ export class PreloadingModel extends SDKModel<EventTypes> {
       status: convertPreloadingStatus(event.status),
       prerenderStatus: event.prerenderStatus || null,
       disallowedMojoInterface: event.disallowedMojoInterface || null,
+      mismatchedHeaders: event.mismatchedHeaders || null,
     };
     this.documents.get(loaderId)?.preloadingAttempts.upsert(attempt);
     this.dispatchEventToListeners(Events.ModelUpdated);
@@ -436,6 +437,7 @@ export interface PrerenderAttempt {
   status: PreloadingStatus;
   prerenderStatus: Protocol.Preload.PrerenderFinalStatus|null;
   disallowedMojoInterface: string|null;
+  mismatchedHeaders: Protocol.Preload.PrerenderMismatchedHeaders[]|null;
   ruleSetIds: Protocol.Preload.RuleSetId[];
   nodeIds: Protocol.DOM.BackendNodeId[];
 }
@@ -456,6 +458,7 @@ export interface PrerenderAttemptInternal {
   status: PreloadingStatus;
   prerenderStatus: Protocol.Preload.PrerenderFinalStatus|null;
   disallowedMojoInterface: string|null;
+  mismatchedHeaders: Protocol.Preload.PrerenderMismatchedHeaders[]|null;
 }
 
 function makePreloadingAttemptId(key: Protocol.Preload.PreloadingAttemptKey): PreloadingAttemptId {
@@ -534,6 +537,12 @@ class PreloadingAttemptRegistry {
     this.map.set(id, attempt);
   }
 
+  // Speculation rules emits a CDP event Preload.preloadingAttemptSourcesUpdated
+  // and an IPC SpeculationHost::UpdateSpeculationCandidates. The latter emits
+  // Preload.prefetch/prerenderAttemptUpdated for each preload attempt triggered.
+  // In general, "Not triggered to triggered" period is short (resp. long) for
+  // eager (resp. non-eager) preloads. For not yet emitted ones, we fill
+  // "Not triggered" preload attempts and show them.
   maybeRegisterNotTriggered(sources: SourceRegistry): void {
     for (const [id, {key}] of sources.entries()) {
       if (this.map.get(id) !== undefined) {
@@ -559,6 +568,7 @@ class PreloadingAttemptRegistry {
             status: PreloadingStatus.NotTriggered,
             prerenderStatus: null,
             disallowedMojoInterface: null,
+            mismatchedHeaders: null,
           };
           break;
       }

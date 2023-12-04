@@ -959,7 +959,6 @@ declare class TreeCursor implements SyntaxNodeRef {
     private bufferNode;
     private yieldNode;
     private yieldBuf;
-    private yield;
     /**
     Move the cursor to this node's first child. When this returns
     false, the node has no child, and the cursor has not been moved.
@@ -1903,7 +1902,7 @@ declare class Facet<Input, Output = readonly Input[]> implements FacetReader<Out
     tag: Output;
 }
 /**
-A facet reader can be used to fetch the value of a facet, though
+A facet reader can be used to fetch the value of a facet, through
 [`EditorState.facet`](https://codemirror.net/6/docs/ref/#state.EditorState.facet) or as a dependency
 in [`Facet.compute`](https://codemirror.net/6/docs/ref/#state.Facet.compute), but not to define new
 values for the facet.
@@ -3334,6 +3333,17 @@ apply to the editor, and if it can, perform it as a side effect
 transaction) and return `true`.
 */
 type Command = (target: EditorView) => boolean;
+declare class ScrollTarget {
+    readonly range: SelectionRange;
+    readonly y: ScrollStrategy;
+    readonly x: ScrollStrategy;
+    readonly yMargin: number;
+    readonly xMargin: number;
+    readonly isSnapshot: boolean;
+    constructor(range: SelectionRange, y?: ScrollStrategy, x?: ScrollStrategy, yMargin?: number, xMargin?: number, isSnapshot?: boolean);
+    map(changes: ChangeDesc): ScrollTarget;
+    clip(state: EditorState): ScrollTarget;
+}
 /**
 This is the interface plugin objects conform to.
 */
@@ -3592,6 +3602,13 @@ interface EditorViewConfig extends EditorStateConfig {
     from the parent.
     */
     root?: Document | ShadowRoot;
+    /**
+    Pass an effect created with
+    [`EditorView.scrollIntoView`](https://codemirror.net/6/docs/ref/#view.EditorView^scrollIntoView) or
+    [`EditorView.scrollSnapshot`](https://codemirror.net/6/docs/ref/#view.EditorView.scrollSnapshot)
+    here to set an initial scroll position.
+    */
+    scrollTo?: StateEffect<any>;
     /**
     Override the way transactions are
     [dispatched](https://codemirror.net/6/docs/ref/#view.EditorView.dispatch) for this editor view.
@@ -3992,14 +4009,29 @@ declare class EditorView {
         /**
         Extra vertical distance to add when moving something into
         view. Not used with the `"center"` strategy. Defaults to 5.
+        Must be less than the height of the editor.
         */
         yMargin?: number;
         /**
         Extra horizontal distance to add. Not used with the `"center"`
-        strategy. Defaults to 5.
+        strategy. Defaults to 5. Must be less than the width of the
+        editor.
         */
         xMargin?: number;
     }): StateEffect<unknown>;
+    /**
+    Return an effect that resets the editor to its current (at the
+    time this method was called) scroll position. Note that this
+    only affects the editor's own scrollable element, not parents.
+    See also
+    [`EditorViewConfig.scrollTo`](https://codemirror.net/6/docs/ref/#view.EditorViewConfig.scrollTo).
+
+    The effect should be used with a document identical to the one
+    it was created for. Failing to do so is not an error, but may
+    not scroll to the expected position. You can
+    [map](https://codemirror.net/6/docs/ref/#state.StateEffect.map) the effect to account for changes.
+    */
+    scrollSnapshot(): StateEffect<ScrollTarget>;
     /**
     Facet to add a [style
     module](https://github.com/marijnh/style-mod#documentation) to
@@ -6937,94 +6969,6 @@ declare namespace _codemirror_lang_less {
   };
 }
 
-type Severity = "hint" | "info" | "warning" | "error";
-/**
-Describes a problem or hint for a piece of code.
-*/
-interface Diagnostic {
-    /**
-    The start position of the relevant text.
-    */
-    from: number;
-    /**
-    The end position. May be equal to `from`, though actually
-    covering text is preferable.
-    */
-    to: number;
-    /**
-    The severity of the problem. This will influence how it is
-    displayed.
-    */
-    severity: Severity;
-    /**
-    When given, add an extra CSS class to parts of the code that
-    this diagnostic applies to.
-    */
-    markClass?: string;
-    /**
-    An optional source string indicating where the diagnostic is
-    coming from. You can put the name of your linter here, if
-    applicable.
-    */
-    source?: string;
-    /**
-    The message associated with this diagnostic.
-    */
-    message: string;
-    /**
-    An optional custom rendering function that displays the message
-    as a DOM node.
-    */
-    renderMessage?: () => Node;
-    /**
-    An optional array of actions that can be taken on this
-    diagnostic.
-    */
-    actions?: readonly Action[];
-}
-/**
-An action associated with a diagnostic.
-*/
-interface Action {
-    /**
-    The label to show to the user. Should be relatively short.
-    */
-    name: string;
-    /**
-    The function to call when the user activates this action. Is
-    given the diagnostic's _current_ position, which may have
-    changed since the creation of the diagnostic, due to editing.
-    */
-    apply: (view: EditorView, from: number, to: number) => void;
-}
-
-/**
-Calls
-[`JSON.parse`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse)
-on the document and, if that throws an error, reports it as a
-single diagnostic.
-*/
-declare const jsonParseLinter: () => (view: EditorView) => Diagnostic[];
-
-/**
-A language provider that provides JSON parsing.
-*/
-declare const jsonLanguage: LRLanguage;
-/**
-JSON language support.
-*/
-declare function json$1(): LanguageSupport;
-
-declare const _codemirror_lang_json_jsonLanguage: typeof jsonLanguage;
-declare const _codemirror_lang_json_jsonParseLinter: typeof jsonParseLinter;
-declare namespace _codemirror_lang_json {
-  export {
-    json$1 as json,
-    _codemirror_lang_json_jsonLanguage as jsonLanguage,
-    _codemirror_lang_json_jsonParseLinter as jsonParseLinter,
-  };
-}
-
 /**
 A language provider based on the [Lezer Java
 parser](https://github.com/lezer-parser/java), extended with
@@ -7367,6 +7311,67 @@ declare namespace index_d$1 {
   };
 }
 
+type Severity = "hint" | "info" | "warning" | "error";
+/**
+Describes a problem or hint for a piece of code.
+*/
+interface Diagnostic {
+    /**
+    The start position of the relevant text.
+    */
+    from: number;
+    /**
+    The end position. May be equal to `from`, though actually
+    covering text is preferable.
+    */
+    to: number;
+    /**
+    The severity of the problem. This will influence how it is
+    displayed.
+    */
+    severity: Severity;
+    /**
+    When given, add an extra CSS class to parts of the code that
+    this diagnostic applies to.
+    */
+    markClass?: string;
+    /**
+    An optional source string indicating where the diagnostic is
+    coming from. You can put the name of your linter here, if
+    applicable.
+    */
+    source?: string;
+    /**
+    The message associated with this diagnostic.
+    */
+    message: string;
+    /**
+    An optional custom rendering function that displays the message
+    as a DOM node.
+    */
+    renderMessage?: () => Node;
+    /**
+    An optional array of actions that can be taken on this
+    diagnostic.
+    */
+    actions?: readonly Action[];
+}
+/**
+An action associated with a diagnostic.
+*/
+interface Action {
+    /**
+    The label to show to the user. Should be relatively short.
+    */
+    name: string;
+    /**
+    The function to call when the user activates this action. Is
+    given the diagnostic's _current_ position, which may have
+    changed since the creation of the diagnostic, due to editing.
+    */
+    apply: (view: EditorView, from: number, to: number) => void;
+}
+
 /**
 A language provider based on the [Lezer JavaScript
 parser](https://github.com/lezer-parser/javascript), extended with
@@ -7516,6 +7521,48 @@ to the surrounding word when the selection is empty.
 */
 declare const selectNextOccurrence: StateCommand;
 
+interface IndentationMarkerConfiguration {
+    /**
+     * Determines whether active block marker is styled differently.
+     */
+    highlightActiveBlock?: boolean;
+    /**
+     * Determines whether markers in the first column are omitted.
+     */
+    hideFirstIndent?: boolean;
+    /**
+     * Determines the type of indentation marker.
+     */
+    markerType?: "fullScope" | "codeOnly";
+    /**
+     * Determines the thickness of marker (in pixels).
+     */
+    thickness?: number;
+    /**
+     * Determines the color of marker.
+     */
+    colors?: {
+        /**
+         * Color of inactive indent markers when using a light theme.
+         */
+        light?: string;
+        /**
+         * Color of inactive indent markers when using a dark theme.
+         */
+        dark?: string;
+        /**
+         * Color of active indent markers when using a light theme.
+         */
+        activeLight?: string;
+        /**
+         * Color of active indent markers when using a dark theme.
+         */
+        activeDark?: string;
+    };
+}
+
+declare function indentationMarkers(config?: IndentationMarkerConfiguration): Extension[];
+
 declare function angular(): Promise<typeof _codemirror_lang_angular>;
 declare function clojure(): Promise<StreamLanguage<unknown>>;
 declare function coffeescript(): Promise<StreamLanguage<unknown>>;
@@ -7529,7 +7576,6 @@ declare function dart(): Promise<StreamLanguage<unknown>>;
 declare function gss(): Promise<StreamLanguage<unknown>>;
 declare function go(): Promise<StreamLanguage<unknown>>;
 declare function java(): Promise<typeof _codemirror_lang_java>;
-declare function json(): Promise<typeof _codemirror_lang_json>;
 declare function kotlin(): Promise<StreamLanguage<unknown>>;
 declare function less(): Promise<typeof _codemirror_lang_less>;
 declare function markdown(): Promise<typeof _codemirror_lang_markdown>;
@@ -7544,4 +7590,4 @@ declare function vue(): Promise<typeof _codemirror_lang_vue>;
 declare function wast(): Promise<typeof _codemirror_lang_wast>;
 declare function xml(): Promise<typeof _codemirror_lang_xml>;
 
-export { Annotation, AnnotationType, ChangeDesc, ChangeSet, ChangeSpec, Command, Compartment, Completion, CompletionContext, CompletionResult, CompletionSource, Decoration, DecorationSet, EditorSelection, EditorState, EditorStateConfig, EditorView, Extension, Facet, GutterMarker, HighlightStyle, KeyBinding, LRParser, Language, LanguageSupport, Line$1 as Line, MapMode, MatchDecorator, NodeProp, NodeSet, NodeType, Panel, Parser, Prec, Range, RangeSet, RangeSetBuilder, SelectionRange, StateEffect, StateEffectType, StateField, StreamLanguage, StreamParser, StringStream, StyleModule, SyntaxNode, Tag, TagStyle, Text, TextIterator, Tooltip, TooltipView, Transaction, TransactionSpec, Tree, TreeCursor, ViewPlugin, ViewUpdate, WidgetType, acceptCompletion, angular, autocompletion, bracketMatching, clojure, closeBrackets, closeBracketsKeymap, closeCompletion, codeFolding, coffeescript, completeAnyWord, completionStatus, cpp, css, cssStreamParser, currentCompletions, cursorGroupLeft, cursorGroupRight, cursorMatchingBracket, cursorSyntaxLeft, cursorSyntaxRight, dart, drawSelection, ensureSyntaxTree, foldGutter, foldKeymap, go, gss, gutter, gutters, highlightSelectionMatches, highlightSpecialChars, highlightTree, history, historyKeymap, index_d$1 as html, ifNotIn, indentLess, indentMore, indentOnInput, indentUnit, insertNewlineAndIndent, java, index_d as javascript, json, keymap, kotlin, less, lineNumberMarkers, lineNumbers, markdown, moveCompletionSelection, php, placeholder, python, redo, redoSelection, repositionTooltips, sass, scala, scrollPastEnd, selectGroupLeft, selectGroupRight, selectMatchingBracket, selectNextOccurrence, selectSyntaxLeft, selectSyntaxRight, selectedCompletion, selectedCompletionIndex, shell, showPanel, showTooltip, standardKeymap, startCompletion, svelte, syntaxHighlighting, syntaxTree, tags, toggleComment, tooltips, undo, undoSelection, vue, wast, xml };
+export { Annotation, AnnotationType, ChangeDesc, ChangeSet, ChangeSpec, Command, Compartment, Completion, CompletionContext, CompletionResult, CompletionSource, Decoration, DecorationSet, EditorSelection, EditorState, EditorStateConfig, EditorView, Extension, Facet, GutterMarker, HighlightStyle, KeyBinding, LRParser, Language, LanguageSupport, Line$1 as Line, MapMode, MatchDecorator, NodeProp, NodeSet, NodeType, Panel, Parser, Prec, Range, RangeSet, RangeSetBuilder, SelectionRange, StateEffect, StateEffectType, StateField, StreamLanguage, StreamParser, StringStream, StyleModule, SyntaxNode, Tag, TagStyle, Text, TextIterator, Tooltip, TooltipView, Transaction, TransactionSpec, Tree, TreeCursor, ViewPlugin, ViewUpdate, WidgetType, acceptCompletion, angular, autocompletion, bracketMatching, clojure, closeBrackets, closeBracketsKeymap, closeCompletion, codeFolding, coffeescript, completeAnyWord, completionStatus, cpp, css, cssStreamParser, currentCompletions, cursorGroupLeft, cursorGroupRight, cursorMatchingBracket, cursorSyntaxLeft, cursorSyntaxRight, dart, drawSelection, ensureSyntaxTree, foldGutter, foldKeymap, go, gss, gutter, gutters, highlightSelectionMatches, highlightSpecialChars, highlightTree, history, historyKeymap, index_d$1 as html, ifNotIn, indentLess, indentMore, indentOnInput, indentUnit, indentationMarkers, insertNewlineAndIndent, java, index_d as javascript, keymap, kotlin, less, lineNumberMarkers, lineNumbers, markdown, moveCompletionSelection, php, placeholder, python, redo, redoSelection, repositionTooltips, sass, scala, scrollPastEnd, selectGroupLeft, selectGroupRight, selectMatchingBracket, selectNextOccurrence, selectSyntaxLeft, selectSyntaxRight, selectedCompletion, selectedCompletionIndex, shell, showPanel, showTooltip, standardKeymap, startCompletion, svelte, syntaxHighlighting, syntaxTree, tags, toggleComment, tooltips, undo, undoSelection, vue, wast, xml };

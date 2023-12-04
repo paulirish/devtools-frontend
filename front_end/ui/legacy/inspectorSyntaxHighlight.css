@@ -111,7 +111,12 @@
     outline-width: unset;
   }
 
-  &:not(.devtools-link-prevent-click) {
+  &.invalid-link {
+    color: var(--text-disabled);
+    text-decoration: none;
+  }
+
+  &:not(.devtools-link-prevent-click, .invalid-link) {
     cursor: pointer;
   }
 

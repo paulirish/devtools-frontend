@@ -6,7 +6,7 @@ const LOGGING_ATTRIBUTE = 'jslog';
 
 export interface LoggingConfig {
   ve: number;
-  track?: Map<string, string>;
+  track?: Map<string, string|undefined>;
   context?: string;
   parent?: string;
 }
@@ -27,10 +27,10 @@ enum VisualElements {
   AccessibilityPane = 4,
   AccessibilitySourceOrder = 5,
   Toggle = 6,
-  AddStylesRule = 7,
-  FilterTextField = 8,
+  Tree = 7,
+  TextField = 8,
   ShowAllStyleProperties = 9,
-  StylePropertiesSection = 10,
+  Section = 10,
   StylePropertiesSectionSeparator = 11,
   StylesPane = 12,
   StylesSelector = 13,
@@ -45,17 +45,17 @@ enum VisualElements {
   JumpToSource = 22,
   MetricsBox = 23,
   MetricsBoxPart = 24,
-  DOMBreakpointsPane = 25,
+  /* 25 used to be DOMBreakpointsPane, but free to grab now */
   DOMBreakpoint = 26,
   ElementPropertiesPane = 27,
   EventListenersPane = 28,
-  Refresh = 29,
+  Action = 29,
   FilterDropdown = 30,
-  AddColor = 31,
+  /* 31 used to be AddColor, but free to grab now */
   BezierCurveEditor = 32,
   BezierEditor = 33,
   BezierPresetCategory = 34,
-  BezierPreview = 35,
+  Preview = 35,
   ColorCanvas = 36,
   ColorEyeDropper = 37,
   ColorPicker = 38,
@@ -68,7 +68,7 @@ enum VisualElements {
   Next = 45,
   Item = 46,
   PaletteColorShades = 47,
-  PalettePanel = 48,
+  Panel = 48,
   Previous = 49,
   ShowStyleEditor = 50,
   Slider = 51,
@@ -79,21 +79,32 @@ enum VisualElements {
   FlexboxOverlays = 56,
   GridOverlays = 57,
   JumpToElement = 58,
-  ElementsPanel = 59,
-  ElementsTreeOutline = 60,
-  Toolbar = 61,
+  /* 59 used to be ElementsPanel, but free to grab now */
+  /* 60 used to be ElementsTreeOutline, but free to grab now */
+  /* 61 used to be RenderingPanel, but free to grab now */
   ElementsBreadcrumbs = 62,
-  FullAccessibilityTree = 63,
-  ToggleDeviceMode = 64,
-  ToggleElementSearch = 65,
+  /* 63 used to be FullAccessibilityTree, but free to grab now */
+  /* 64 used to be ToggleDeviceMode, but free to grab now */
+  /* 65 used to be ToggleElementSearch, but free to grab now */
   PanelTabHeader = 66,
+  Menu = 67,
+  /* 68 used to be DeveloperResourcesPanel, but free to grab now */
+  TableHeader = 69,
+  TableCell = 70,
+  StylesComputedPane = 71,
+  Pane = 72,
+  ResponsivePresets = 73,
+  DeviceModeRuler = 74,
+  MediaInspectorView = 75,
 }
+
+export type VisualElementName = keyof typeof VisualElements;
 
 function resolveVe(ve: string): number {
-  return VisualElements[ve as keyof typeof VisualElements] || 0;
+  return VisualElements[ve as VisualElementName] ?? 0;
 }
 
-function parseJsLog(jslog: string): LoggingConfig {
+export function parseJsLog(jslog: string): LoggingConfig {
   const components = jslog.replace(/ /g, '').split(';');
   const getComponent = (name: string): string|undefined =>
       components.find(c => c.startsWith(name))?.substr(name.length);
@@ -120,9 +131,45 @@ function parseJsLog(jslog: string): LoggingConfig {
   return config;
 }
 
+export function debugString(config: LoggingConfig): string {
+  const components = [VisualElements[config.ve]];
+  if (config.context) {
+    components.push(`context: ${config.context}`);
+  }
+  if (config.parent) {
+    components.push(`parent: ${config.parent}`);
+  }
+  if (config.track?.size) {
+    components.push(`track: ${
+            [...config.track?.entries()].map(([key, value]) => `${key}${value ? `: ${value}` : ''}`).join(', ')}`);
+  }
+  return components.join('; ');
+}
+
 export interface ConfigStringBuilder {
-  context: (value: string|number) => ConfigStringBuilder;
+  /**
+   * Specifies an optional context for the visual element. For string contexts
+   * the convention is to use kebap case (e.g. `foo-bar`).
+   *
+   * @param value Optional context, which can be either a string or a number.
+   * @returns The builder itself.
+   */
+  context: (value: string|number|undefined) => ConfigStringBuilder;
+
+  /**
+   * Speficies the name of a `ParentProvider` used to lookup the parent visual element.
+   *
+   * @param value The name of a previously registered `ParentProvider`.
+   * @returns The builder itself.
+   */
   parent: (value: string) => ConfigStringBuilder;
+
+  /**
+   * Specifies which DOM events to track for this visual element.
+   *
+   * @param options The set of DOM events to track.
+   * @returns The builder itself.
+   */
   track: (options: {
     click?: boolean,
     dblclick?: boolean,
@@ -131,14 +178,22 @@ export interface ConfigStringBuilder {
     change?: boolean,
     keydown?: boolean|string,
   }) => ConfigStringBuilder;
+
+  /**
+   * Serializes the configuration into a `jslog` string.
+   *
+   * @returns The serialized string value to put on a DOM element via the `jslog` attribute.
+   */
   toString: () => string;
 }
 
-export function makeConfigStringBuilder(veName: string): ConfigStringBuilder {
-  const components = [veName];
+export function makeConfigStringBuilder(veName: VisualElementName): ConfigStringBuilder {
+  const components: string[] = [veName];
   return {
-    context: function(value: string|number): ConfigStringBuilder {
-      components.push(`context: ${value}`);
+    context: function(value: string|number|undefined): ConfigStringBuilder {
+      if (typeof value !== 'undefined') {
+        components.push(`context: ${value}`);
+      }
       return this;
     },
     parent: function(value: string): ConfigStringBuilder {

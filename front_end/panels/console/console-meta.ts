@@ -170,12 +170,12 @@ UI.ViewManager.registerViewExtension({
 });
 
 UI.ActionRegistration.registerActionExtension({
-  actionId: 'console.show',
+  actionId: 'console.toggle',
   category: UI.ActionRegistration.ActionCategory.CONSOLE,
   title: i18nLazyString(UIStrings.showConsole),
   async loadActionDelegate() {
     const Console = await loadConsoleModule();
-    return Console.ConsoleView.ActionDelegate.instance();
+    return new Console.ConsoleView.ActionDelegate();
   },
   bindings: [
     {
@@ -195,7 +195,7 @@ UI.ActionRegistration.registerActionExtension({
   iconClass: UI.ActionRegistration.IconClass.CLEAR,
   async loadActionDelegate() {
     const Console = await loadConsoleModule();
-    return Console.ConsoleView.ActionDelegate.instance();
+    return new Console.ConsoleView.ActionDelegate();
   },
   contextTypes() {
     return maybeRetrieveContextTypes(Console => [Console.ConsoleView.ConsoleView]);
@@ -217,7 +217,7 @@ UI.ActionRegistration.registerActionExtension({
   title: i18nLazyString(UIStrings.clearConsoleHistory),
   async loadActionDelegate() {
     const Console = await loadConsoleModule();
-    return Console.ConsoleView.ActionDelegate.instance();
+    return new Console.ConsoleView.ActionDelegate();
   },
 });
 
@@ -228,7 +228,7 @@ UI.ActionRegistration.registerActionExtension({
   iconClass: UI.ActionRegistration.IconClass.EYE,
   async loadActionDelegate() {
     const Console = await loadConsoleModule();
-    return Console.ConsoleView.ActionDelegate.instance();
+    return new Console.ConsoleView.ActionDelegate();
   },
 });
 
@@ -435,9 +435,9 @@ Common.Revealer.registerRevealer({
       Common.Console.Console,
     ];
   },
+  destination: undefined,
   async loadRevealer() {
     const Console = await loadConsoleModule();
-    return Console.ConsolePanel.ConsoleRevealer.instance();
+    return new Console.ConsolePanel.ConsoleRevealer();
   },
-  destination: undefined,
 });

@@ -22,6 +22,7 @@ devtools_module("text_utils") {
     "../../core/platform:bundle",
     "../../core/root:bundle",
     "../../third_party/codemirror",
+    "../../third_party/codemirror.next:bundle",
   ]
 
   visibility =
@@ -49,6 +50,7 @@ devtools_entrypoint("bundle") {
     "../../core/sdk/*",
     "../../ui/components/data_grid/*",
     "../../ui/components/docs/data_grid_controller/*",
+    "../../ui/components/highlighting/*",
     "../../ui/components/markdown_view/*",
     "../../ui/legacy/*",
   ]

@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '3760e3d4287e6c12b154bca26288b6c2aaf97b68',
+  'build_revision': '7c518729ecf1d0248328ec7456753019aeae9c9d',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'a2902fd5eb2223efb71fb8bf4d5f195f0b36e18f',
+  'buildtools_revision': 'd11c27b4cb742354f5e49e5905f486e891a0faa8',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '5388959fd7ad4fe7e3b33ae91015ec5d1a41d35d',
+  'depot_tools_revision': '081bca8cb31b7e96e663806b2493bce10dbb42f0',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '916f43c554c65ebf4ccd896b0f4e2ac99a67c434',
@@ -29,7 +29,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:e4702d7409069c4f12d45ea7b7f0890717ca3f4b',
+  'gn_version': 'git_revision:7367b0df0a0aa25440303998d54045bda73935a5',
 
   'cmake_version': 'version:3.16.1',
 
@@ -46,7 +46,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '120.0.6087.0',
+  'chrome': '121.0.6154.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.

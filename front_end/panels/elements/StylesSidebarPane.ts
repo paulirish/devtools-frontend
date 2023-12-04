@@ -61,6 +61,7 @@ import * as LayersWidget from './LayersWidget.js';
 import {StyleEditorWidget} from './StyleEditorWidget.js';
 import {
   BlankStylePropertiesSection,
+  FontPaletteValuesRuleSection,
   HighlightPseudoStylePropertiesSection,
   KeyframePropertiesSection,
   RegisteredPropertiesSection,
@@ -131,10 +132,6 @@ const UIStrings = {
    *@example {invalidValue} PH3
    */
   invalidString: '{PH1}, property name: {PH2}, property value: {PH3}',
-  /**
-   *@description Tooltip text that appears when hovering over the largeicon add button in the Styles Sidebar Pane of the Elements panel
-   */
-  newStyleRule: 'New Style Rule',
   /**
    *@description Text that is announced by the screen reader when the user focuses on an input field for entering the name of a CSS property in the Styles panel
    *@example {margin} PH1
@@ -256,7 +253,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     return stylesSidebarPaneInstance;
   }
 
-  private constructor() {
+  constructor() {
     super(true /* delegatesFocus */);
     this.setMinimumSize(96, 26);
     this.registerCSSFiles([stylesSidebarPaneStyles]);
@@ -504,33 +501,6 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     return false;
   }
 
-  static createPropertyFilterElement(
-      placeholder: string, container: Element, filterCallback: (arg0: RegExp|null) => void): Element {
-    const input = document.createElement('input');
-    input.type = 'search';
-    input.classList.add('custom-search-input');
-    input.placeholder = placeholder;
-    input.setAttribute('jslog', `${VisualLogging.filterTextField().track({keydown: true})}`);
-
-    function searchHandler(): void {
-      const regex = input.value ? new RegExp(Platform.StringUtilities.escapeForRegExp(input.value), 'i') : null;
-      filterCallback(regex);
-    }
-    input.addEventListener('input', searchHandler, false);
-
-    function keydownHandler(event: Event): void {
-      const keyboardEvent = (event as KeyboardEvent);
-      if (keyboardEvent.key !== Platform.KeyboardUtilities.ESCAPE_KEY || !input.value) {
-        return;
-      }
-      keyboardEvent.consume(true);
-      input.value = '';
-      searchHandler();
-    }
-    input.addEventListener('keydown', keydownHandler, false);
-    return input;
-  }
-
   static formatLeadingProperties(section: StylePropertiesSection): {
     allDeclarationText: string,
     ruleText: string,
@@ -695,7 +665,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
   }
 
-  private onFilterChanged(regex: RegExp|null): void {
+  private onFilterChanged(event: Common.EventTarget.EventTargetEvent<string>): void {
+    const regex = event.data ? new RegExp(Platform.StringUtilities.escapeForRegExp(event.data), 'i') : null;
     this.lastFilterChange = Date.now();
     this.filterRegexInternal = regex;
     this.updateFilter();
@@ -1219,6 +1190,17 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       blocks.push(block);
     }
 
+    const fontPaletteValuesRule = matchedStyles.fontPaletteValuesRule();
+    if (fontPaletteValuesRule) {
+      const block = SectionBlock.createFontPaletteValuesRuleBlock(fontPaletteValuesRule.name().text);
+      this.idleCallbackManager.schedule(() => {
+        block.sections.push(
+            new FontPaletteValuesRuleSection(this, matchedStyles, fontPaletteValuesRule.style, sectionIdx));
+        sectionIdx++;
+      });
+      blocks.push(block);
+    }
+
     for (const positionFallbackRule of matchedStyles.positionFallbackRules()) {
       const block = SectionBlock.createPositionFallbackBlock(positionFallbackRule.name().text);
       for (const tryRule of positionFallbackRule.tryRules()) {
@@ -1341,9 +1323,15 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.visibleSections = visibleSections;
   }
 
+  override wasShown(): void {
+    UI.Context.Context.instance().setFlavor(StylesSidebarPane, this);
+    super.wasShown();
+  }
+
   override willHide(): void {
     this.hideAllPopovers();
     super.willHide();
+    UI.Context.Context.instance().setFlavor(StylesSidebarPane, null);
   }
 
   hideAllPopovers(): void {
@@ -1479,12 +1467,11 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   private createStylesSidebarToolbar(): HTMLElement {
     const container = this.contentElement.createChild('div', 'styles-sidebar-pane-toolbar-container');
     const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
-    const filterContainerElement = hbox.createChild('div', 'styles-sidebar-pane-filter-box');
-    const filterInput = StylesSidebarPane.createPropertyFilterElement(
-        i18nString(UIStrings.filter), hbox, this.onFilterChanged.bind(this));
-    UI.ARIAUtils.setLabel(filterInput, i18nString(UIStrings.filterStyles));
-    filterContainerElement.appendChild(filterInput);
     const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
+    const filterInput = new UI.Toolbar.ToolbarInput(
+        i18nString(UIStrings.filter), i18nString(UIStrings.filterStyles), 1, 1, undefined, undefined, false);
+    filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
+    toolbar.appendToolbarItem(filterInput);
     toolbar.makeToggledGray();
     void toolbar.appendItemsAtLocation('styles-sidebarpane-toolbar');
     this.toolbar = toolbar;
@@ -1736,6 +1723,13 @@ export class SectionBlock {
     separatorElement.className = 'sidebar-separator';
     separatorElement.setAttribute('jslog', `${VisualLogging.stylePropertiesSectionSeparator().context('keyframes')}`);
     separatorElement.textContent = `@keyframes ${keyframesName}`;
+    return new SectionBlock(separatorElement);
+  }
+
+  static createFontPaletteValuesRuleBlock(name: string): SectionBlock {
+    const separatorElement = document.createElement('div');
+    separatorElement.className = 'sidebar-separator';
+    separatorElement.textContent = `@font-palette-values ${name}`;
     return new SectionBlock(separatorElement);
   }
 
@@ -2232,6 +2226,7 @@ export class StylesSidebarPropertyRenderer {
   private animationNameHandler: ((data: string) => Node)|null;
   private animationHandler: ((data: string) => Node)|null;
   private positionFallbackHandler: ((data: string) => Node)|null;
+  private fontPaletteHandler: ((data: string) => Node)|null;
 
   constructor(rule: SDK.CSSRule.CSSRule|null, node: SDK.DOMModel.DOMNode|null, name: string, value: string) {
     this.rule = rule;
@@ -2250,6 +2245,7 @@ export class StylesSidebarPropertyRenderer {
     this.lengthHandler = null;
     this.animationHandler = null;
     this.positionFallbackHandler = null;
+    this.fontPaletteHandler = null;
   }
 
   setColorHandler(handler: (arg0: string) => Node): void {
@@ -2298,6 +2294,10 @@ export class StylesSidebarPropertyRenderer {
 
   setPositionFallbackHandler(handler: (arg0: string) => Node): void {
     this.positionFallbackHandler = handler;
+  }
+
+  setFontPaletteHandler(handler: (arg0: string) => Node): void {
+    this.fontPaletteHandler = handler;
   }
 
   renderName(): Element {
@@ -2396,6 +2396,10 @@ export class StylesSidebarPropertyRenderer {
       regexes.push(/^.*$/g);
       processors.push(this.animationNameHandler);
     }
+    if (this.propertyName === 'font-palette') {
+      regexes.push(/^.*$/g);
+      processors.push(this.fontPaletteHandler);
+    }
 
     if (this.positionFallbackHandler && this.propertyName === 'position-fallback') {
       regexes.push(/^.*$/g);
@@ -2449,16 +2453,27 @@ export class StylesSidebarPropertyRenderer {
   }
 }
 
+export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
+    switch (actionId) {
+      case 'elements.new-style-rule': {
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.NewStyleRuleAdded);
+        void StylesSidebarPane.instance().createNewRuleInViaInspectorStyleSheet();
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 let buttonProviderInstance: ButtonProvider;
 
 export class ButtonProvider implements UI.Toolbar.Provider {
   private readonly button: UI.Toolbar.ToolbarButton;
   private constructor() {
-    this.button = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.newStyleRule), 'plus');
-    this.button.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.clicked, this);
+    this.button = UI.Toolbar.Toolbar.createActionButtonForId('elements.new-style-rule');
     const longclickTriangle = UI.Icon.Icon.create('triangle-bottom-right', 'long-click-glyph');
     this.button.element.appendChild(longclickTriangle);
-    this.button.element.setAttribute('jslog', `${VisualLogging.addStylesRule().track({click: true})}`);
 
     new UI.UIUtils.LongClickController(this.button.element, this.longClicked.bind(this));
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, onNodeChanged.bind(this));
@@ -2480,11 +2495,6 @@ export class ButtonProvider implements UI.Toolbar.Provider {
     }
 
     return buttonProviderInstance;
-  }
-
-  private clicked(): void {
-    Host.userMetrics.actionTaken(Host.UserMetrics.Action.NewStyleRuleAdded);
-    void StylesSidebarPane.instance().createNewRuleInViaInspectorStyleSheet();
   }
 
   private longClicked(event: Event): void {

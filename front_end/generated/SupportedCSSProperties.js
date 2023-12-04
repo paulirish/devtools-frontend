@@ -45,23 +45,25 @@ export const generatedProperties = [
  },
  {
   "longhands": [
-   "view-timeline-name",
-   "view-timeline-axis",
-   "view-timeline-inset"
-  ],
-  "name": "-alternative-view-timeline-with-inset"
- },
- {
-  "longhands": [
    "mask-image",
    "-webkit-mask-position-x",
    "-webkit-mask-position-y",
    "mask-size",
    "mask-repeat",
    "mask-origin",
-   "mask-clip"
+   "mask-clip",
+   "mask-composite",
+   "mask-mode"
   ],
-  "name": "-webkit-alternative-mask"
+  "name": "-alternative-mask"
+ },
+ {
+  "longhands": [
+   "view-timeline-name",
+   "view-timeline-axis",
+   "view-timeline-inset"
+  ],
+  "name": "-alternative-view-timeline-with-inset"
  },
  {
   "inherited": true,
@@ -92,19 +94,11 @@ export const generatedProperties = [
   "name": "-webkit-box-decoration-break"
  },
  {
-  "inherited": true,
   "keywords": [
    "normal",
    "reverse"
   ],
   "name": "-webkit-box-direction"
- },
- {
-  "keywords": [
-   "normal",
-   "reverse"
-  ],
-  "name": "-webkit-box-direction-alternative"
  },
  {
   "name": "-webkit-box-flex"
@@ -1493,7 +1487,9 @@ export const generatedProperties = [
    "flow-root",
    "none",
    "flow",
-   "math"
+   "math",
+   "ruby",
+   "ruby-text"
   ],
   "name": "display"
  },
@@ -2332,6 +2328,9 @@ export const generatedProperties = [
  },
  {
   "name": "mask-image"
+ },
+ {
+  "name": "mask-mode"
  },
  {
   "name": "mask-origin"
@@ -3513,37 +3512,6 @@ export const generatedProperties = [
   "name": "timeline-scope"
  },
  {
-  "longhands": [
-   "toggle-root",
-   "toggle-trigger"
-  ],
-  "name": "toggle"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "toggle-group"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "toggle-root"
- },
- {
-  "keywords": [
-   "none"
-  ],
-  "name": "toggle-trigger"
- },
- {
-  "keywords": [
-   "normal"
-  ],
-  "name": "toggle-visibility"
- },
- {
   "keywords": [
    "auto"
   ],
@@ -3805,12 +3773,6 @@ export const generatedPropertyValues = {
   ]
  },
  "-webkit-box-direction": {
-  "values": [
-   "normal",
-   "reverse"
-  ]
- },
- "-webkit-box-direction-alternative": {
   "values": [
    "normal",
    "reverse"
@@ -4526,7 +4488,9 @@ export const generatedPropertyValues = {
    "flow-root",
    "none",
    "flow",
-   "math"
+   "math",
+   "ruby",
+   "ruby-text"
   ]
  },
  "dominant-baseline": {
@@ -5628,26 +5592,6 @@ export const generatedPropertyValues = {
    "pretty"
   ]
  },
- "toggle-group": {
-  "values": [
-   "none"
-  ]
- },
- "toggle-root": {
-  "values": [
-   "none"
-  ]
- },
- "toggle-trigger": {
-  "values": [
-   "none"
-  ]
- },
- "toggle-visibility": {
-  "values": [
-   "normal"
-  ]
- },
  "top": {
   "values": [
    "auto"
@@ -5862,6 +5806,10 @@ export const generatedAliasesFor = new Map([
  [
   "-webkit-alternative-animation-with-timeline",
   "-alternative-animation-with-timeline"
+ ],
+ [
+  "-webkit-alternative-mask",
+  "-alternative-mask"
  ],
  [
   "-webkit-alternative-mask-clip",

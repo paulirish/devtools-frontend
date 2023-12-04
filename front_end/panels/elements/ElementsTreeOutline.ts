@@ -160,7 +160,7 @@ export class ElementsTreeOutline extends
 
     outlineDisclosureElement.appendChild(this.elementInternal);
     this.element = shadowContainer;
-    this.element.setAttribute('jslog', `${VisualLogging.elementsTreeOutline()}`);
+    this.element.setAttribute('jslog', `${VisualLogging.tree().context('elements-tree-outline')}`);
 
     this.includeRootDOMNode = !omitRootDOMNode;
     this.selectEnabled = selectEnabled;
@@ -878,13 +878,14 @@ export class ElementsTreeOutline extends
     if (treeElement.isClosingTag()) {
       // Drop onto closing tag -> insert as last child.
       parentNode = treeElement.node();
+      anchorNode = null;
     } else {
       const dragTargetNode = treeElement.node();
       parentNode = dragTargetNode.parentNode;
       anchorNode = dragTargetNode;
     }
 
-    if (!parentNode || !anchorNode) {
+    if (!parentNode) {
       return;
     }
     const wasExpanded = this.treeElementBeingDragged.expanded;
@@ -932,7 +933,8 @@ export class ElementsTreeOutline extends
     }
     const commentNode = node.enclosingNodeOrSelfWithClass('webkit-html-comment');
     contextMenu.saveSection().appendItem(
-        i18nString(UIStrings.storeAsGlobalVariable), this.saveNodeToTempVariable.bind(this, treeElement.node()));
+        i18nString(UIStrings.storeAsGlobalVariable), this.saveNodeToTempVariable.bind(this, treeElement.node()),
+        {jslogContext: 'storeAsGlobalVariable'});
     if (textNode) {
       treeElement.populateTextContextMenu(contextMenu, textNode);
     } else if (isTag) {
@@ -945,7 +947,7 @@ export class ElementsTreeOutline extends
 
     contextMenu.viewSection().appendItem(i18nString(UIStrings.adornerSettings), () => {
       ElementsPanel.instance().showAdornerSettingsPane();
-    });
+    }, {jslogContext: 'showAdornerSettings'});
 
     contextMenu.appendApplicableItems(treeElement.node());
     void contextMenu.show();

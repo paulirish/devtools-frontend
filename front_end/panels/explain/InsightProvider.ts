@@ -14,7 +14,7 @@ export class InsightProvider {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.doAidaConversation(
           JSON.stringify({
             input,
-            client: 'GENERAL',
+            client: 'CHROME_DEVTOOLS',
           }),
           result => {
             console.timeEnd('request');
@@ -29,12 +29,15 @@ export class InsightProvider {
                                        return result.textChunk.text;
                                      }
                                      if ('codeChunk' in result) {
-                                       return result.codeChunk.code;
+                                       return '\n`````\n' + result.codeChunk.code + '\n`````\n';
+                                     }
+                                     if ('error' in result) {
+                                       throw new Error(`${result['error']}: ${result['detail']}`);
                                      }
                                      throw new Error('Unknown chunk result');
                                    },
                                    )
-                               .join(' ');
+                               .join('');
               resolve(text);
             } catch (err) {
               reject(err);

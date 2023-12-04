@@ -5,7 +5,6 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {type ContextMenu} from './ContextMenu.js';
@@ -289,28 +288,19 @@ export class ViewManager {
     return widgetForView.get(view) || null;
   }
 
-  showView(viewId: string, userGesture?: boolean, omitFocus?: boolean): Promise<void> {
+  async showView(viewId: string, userGesture?: boolean, omitFocus?: boolean): Promise<void> {
     const view = this.views.get(viewId);
     if (!view) {
       console.error('Could not find view for id: \'' + viewId + '\' ' + new Error().stack);
-      return Promise.resolve();
+      return;
     }
 
-    const locationName = this.locationNameByViewId.get(viewId);
-
-    const location = locationForView.get(view);
-    if (location) {
-      location.reveal();
-      return location.showView(view, undefined, userGesture, omitFocus);
+    const location = locationForView.get(view) ?? await this.resolveLocation(this.locationNameByViewId.get(viewId));
+    if (!location) {
+      throw new Error('Could not resolve location for view: ' + viewId);
     }
-
-    return this.resolveLocation(locationName).then(location => {
-      if (!location) {
-        throw new Error('Could not resolve location for view: ' + viewId);
-      }
-      location.reveal();
-      return location.showView(view, undefined, userGesture, omitFocus);
-    });
+    location.reveal();
+    await location.showView(view, undefined, userGesture, omitFocus);
   }
 
   async resolveLocation(location?: string): Promise<Location|null> {
@@ -708,8 +698,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
   private appendTab(view: View, index?: number): void {
     this.tabbedPaneInternal.appendTab(
         view.viewId(), view.title(), new ContainerWidget(view), undefined, false,
-        view.isCloseable() || view.isTransient(), view.isPreviewFeature(), index,
-        `${VisualLogging.panelTabHeader().track({click: true, drag: true}).context(view.viewId())}`);
+        view.isCloseable() || view.isTransient(), view.isPreviewFeature(), index);
   }
 
   appendView(view: View, insertBefore?: View|null): void {

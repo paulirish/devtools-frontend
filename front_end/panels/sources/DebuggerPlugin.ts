@@ -494,30 +494,34 @@ export class DebuggerPlugin extends Plugin {
         contextMenu.debugSection().appendItem(
             i18nString(UIStrings.addBreakpoint),
             this.createNewBreakpoint.bind(
-                this, line, EMPTY_BREAKPOINT_CONDITION, /* enabled */ true, /* isLogpoint */ false));
+                this, line, EMPTY_BREAKPOINT_CONDITION, /* enabled */ true, /* isLogpoint */ false),
+            {jslogContext: 'add-breakpoint'});
         if (supportsConditionalBreakpoints) {
           contextMenu.debugSection().appendItem(i18nString(UIStrings.addConditionalBreakpoint), () => {
             Host.userMetrics.breakpointEditDialogRevealedFrom(
                 Host.UserMetrics.BreakpointEditDialogRevealedFrom.LineGutterContextMenu);
             this.editBreakpointCondition({line, breakpoint: null, location: null, isLogpoint: false});
-          });
+          }, {jslogContext: 'add-cnd-breakpoint'});
           contextMenu.debugSection().appendItem(i18nString(UIStrings.addLogpoint), () => {
             Host.userMetrics.breakpointEditDialogRevealedFrom(
                 Host.UserMetrics.BreakpointEditDialogRevealedFrom.LineGutterContextMenu);
             this.editBreakpointCondition({line, breakpoint: null, location: null, isLogpoint: true});
-          });
+          }, {jslogContext: 'add-logpoint'});
           contextMenu.debugSection().appendItem(
               i18nString(UIStrings.neverPauseHere),
               this.createNewBreakpoint.bind(
-                  this, line, NEVER_PAUSE_HERE_CONDITION, /* enabled */ true, /* isLogpoint */ false));
+                  this, line, NEVER_PAUSE_HERE_CONDITION, /* enabled */ true, /* isLogpoint */ false),
+              {jslogContext: 'never-pause-here'});
         }
       }
     } else {
       const removeTitle = i18nString(UIStrings.removeBreakpoint, {n: breakpoints.length});
-      contextMenu.debugSection().appendItem(removeTitle, () => breakpoints.forEach(breakpoint => {
-        Host.userMetrics.actionTaken(Host.UserMetrics.Action.BreakpointRemovedFromGutterContextMenu);
-        void breakpoint.remove(false);
-      }));
+      contextMenu.debugSection().appendItem(
+          removeTitle, () => breakpoints.forEach(breakpoint => {
+            Host.userMetrics.actionTaken(Host.UserMetrics.Action.BreakpointRemovedFromGutterContextMenu);
+            void breakpoint.remove(false);
+          }),
+          {jslogContext: 'remove-breakpoint'});
       if (breakpoints.length === 1 && supportsConditionalBreakpoints) {
         // Editing breakpoints only make sense for conditional breakpoints
         // and logpoints and both are currently only available for JavaScript
@@ -526,19 +530,21 @@ export class DebuggerPlugin extends Plugin {
           Host.userMetrics.breakpointEditDialogRevealedFrom(
               Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
           this.editBreakpointCondition({line, breakpoint: breakpoints[0], location: null});
-        });
+        }, {jslogContext: 'edit-breakpoint'});
       }
       const hasEnabled = breakpoints.some(breakpoint => breakpoint.enabled());
       if (hasEnabled) {
         const title = i18nString(UIStrings.disableBreakpoint, {n: breakpoints.length});
         contextMenu.debugSection().appendItem(
-            title, () => breakpoints.forEach(breakpoint => breakpoint.setEnabled(false)));
+            title, () => breakpoints.forEach(breakpoint => breakpoint.setEnabled(false)),
+            {jslogContext: 'enable-breakpoint'});
       }
       const hasDisabled = breakpoints.some(breakpoint => !breakpoint.enabled());
       if (hasDisabled) {
         const title = i18nString(UIStrings.enableBreakpoint, {n: breakpoints.length});
         contextMenu.debugSection().appendItem(
-            title, () => breakpoints.forEach(breakpoint => breakpoint.setEnabled(true)));
+            title, () => breakpoints.forEach(breakpoint => breakpoint.setEnabled(true)),
+            {jslogContext: 'disable-breakpoint'});
       }
     }
   }
@@ -579,12 +585,14 @@ export class DebuggerPlugin extends Plugin {
         const scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile =
             this.scriptFileForDebuggerModel.values().next().value;
         const addSourceMapURLLabel = i18nString(UIStrings.addSourceMap);
-        contextMenu.debugSection().appendItem(addSourceMapURLLabel, addSourceMapURL.bind(null, scriptFile));
+        contextMenu.debugSection().appendItem(
+            addSourceMapURLLabel, addSourceMapURL.bind(null, scriptFile), {jslogContext: 'add-source-map'});
         if (scriptFile.script?.isWasm() &&
             !Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().pluginManager?.hasPluginForScript(
                 scriptFile.script)) {
           contextMenu.debugSection().appendItem(
-              i18nString(UIStrings.addWasmDebugInfo), addDebugInfoURL.bind(null, scriptFile));
+              i18nString(UIStrings.addWasmDebugInfo), addDebugInfoURL.bind(null, scriptFile),
+              {jslogContext: 'add-wasm-debug-info'});
         }
       }
     }
@@ -972,28 +980,6 @@ export class DebuggerPlugin extends Plugin {
       }
       return editA.isLogpoint === editB.isLogpoint;
     }
-  }
-
-  // Create decorations to indicate the current debugging position
-  private computeExecutionDecorations(editorState: CodeMirror.EditorState, lineNumber: number, columnNumber: number):
-      CodeMirror.DecorationSet {
-    const {doc} = editorState;
-    if (lineNumber >= doc.lines) {
-      return CodeMirror.Decoration.none;
-    }
-    const line = doc.line(lineNumber + 1);
-    const decorations: CodeMirror.Range<CodeMirror.Decoration>[] = [executionLineDeco.range(line.from)];
-    const position = Math.min(line.to, line.from + columnNumber);
-    let syntaxNode = CodeMirror.syntaxTree(editorState).resolveInner(position, 1);
-    if (syntaxNode.to === syntaxNode.from - 1 && /[(.]/.test(doc.sliceString(syntaxNode.from, syntaxNode.to))) {
-      syntaxNode = syntaxNode.resolve(syntaxNode.to, 1);
-    }
-    const tokenEnd = Math.min(line.to, syntaxNode.to);
-    if (tokenEnd > position) {
-      decorations.push(executionTokenDeco.range(position, tokenEnd));
-    }
-
-    return CodeMirror.Decoration.set(decorations);
   }
 
   // Show widgets with variable's values after lines that mention the
@@ -1400,31 +1386,32 @@ export class DebuggerPlugin extends Plugin {
             this.uiSourceCode)) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-inline-breakpoint'});
     if (breakpoint) {
       contextMenu.debugSection().appendItem(i18nString(UIStrings.editBreakpoint), () => {
         Host.userMetrics.breakpointEditDialogRevealedFrom(
             Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
         this.editBreakpointCondition({line, breakpoint, location: null});
-      });
+      }, {jslogContext: 'edit-breakpoint'});
     } else {
       const uiLocation = this.transformer.editorLocationToUILocation(line.number - 1, position - line.from);
       contextMenu.debugSection().appendItem(i18nString(UIStrings.addConditionalBreakpoint), () => {
         Host.userMetrics.breakpointEditDialogRevealedFrom(
             Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
         this.editBreakpointCondition({line, breakpoint: null, location: uiLocation, isLogpoint: false});
-      });
+      }, {jslogContext: 'add-cnd-breakpoint'});
       contextMenu.debugSection().appendItem(i18nString(UIStrings.addLogpoint), () => {
         Host.userMetrics.breakpointEditDialogRevealedFrom(
             Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
         this.editBreakpointCondition({line, breakpoint: null, location: uiLocation, isLogpoint: true});
-      });
+      }, {jslogContext: 'add-logpoint'});
 
       contextMenu.debugSection().appendItem(
           i18nString(UIStrings.neverPauseHere),
           () => this.setBreakpoint(
               uiLocation.lineNumber, uiLocation.columnNumber, NEVER_PAUSE_HERE_CONDITION, /* enabled */ true,
-              /* isLogpoint */ false));
+              /* isLogpoint */ false),
+          {jslogContext: 'never-pause-here'});
     }
     void contextMenu.show();
   }
@@ -1702,7 +1689,7 @@ export class DebuggerPlugin extends Plugin {
       const editorLocation =
           this.transformer.uiLocationToEditorLocation(executionLocation.lineNumber, executionLocation.columnNumber);
       const decorations =
-          this.computeExecutionDecorations(this.editor.state, editorLocation.lineNumber, editorLocation.columnNumber);
+          computeExecutionDecorations(this.editor.state, editorLocation.lineNumber, editorLocation.columnNumber);
       this.editor.dispatch({effects: executionLine.update.of(decorations)});
       void this.updateValueDecorations();
       if (this.controlDown) {
@@ -1777,21 +1764,10 @@ export class DebuggerPlugin extends Plugin {
   }
 }
 
-let breakpointLocationRevealerInstance: BreakpointLocationRevealer;
-
-export class BreakpointLocationRevealer implements Common.Revealer.Revealer {
-  static instance({forceNew}: {forceNew: boolean} = {forceNew: false}): BreakpointLocationRevealer {
-    if (!breakpointLocationRevealerInstance || forceNew) {
-      breakpointLocationRevealerInstance = new BreakpointLocationRevealer();
-    }
-
-    return breakpointLocationRevealerInstance;
-  }
-
-  async reveal(breakpointLocation: Object, omitFocus?: boolean|undefined): Promise<void> {
-    if (!(breakpointLocation instanceof Breakpoints.BreakpointManager.BreakpointLocation)) {
-      throw new Error('Internal error: not a breakpoint location');
-    }
+export class BreakpointLocationRevealer implements
+    Common.Revealer.Revealer<Breakpoints.BreakpointManager.BreakpointLocation> {
+  async reveal(breakpointLocation: Breakpoints.BreakpointManager.BreakpointLocation, omitFocus?: boolean|undefined):
+      Promise<void> {
     const {uiLocation} = breakpointLocation;
     SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
     const debuggerPlugin = debuggerPluginForUISourceCode.get(uiLocation.uiSourceCode);
@@ -1990,6 +1966,31 @@ function defineStatefulDecoration(): {
 const executionLineDeco = CodeMirror.Decoration.line({attributes: {class: 'cm-executionLine'}});
 const executionTokenDeco = CodeMirror.Decoration.mark({attributes: {class: 'cm-executionToken'}});
 const executionLine = defineStatefulDecoration();
+
+// Create decorations to indicate the current debugging position
+export function computeExecutionDecorations(
+    state: CodeMirror.EditorState, lineNumber: number, columnNumber: number): CodeMirror.DecorationSet {
+  const {doc} = state;
+  if (lineNumber >= doc.lines) {
+    return CodeMirror.Decoration.none;
+  }
+  const line = doc.line(lineNumber + 1);
+  const decorations: CodeMirror.Range<CodeMirror.Decoration>[] = [executionLineDeco.range(line.from)];
+  const position = Math.min(line.to, line.from + columnNumber);
+  let syntaxTree = null;
+  while (syntaxTree === null) {
+    syntaxTree = CodeMirror.ensureSyntaxTree(state, line.to, /* timeout= */ 500);
+  }
+  let syntaxNode = syntaxTree.resolveInner(position, 1);
+  if (syntaxNode.to === syntaxNode.from - 1 && /[(.]/.test(doc.sliceString(syntaxNode.from, syntaxNode.to))) {
+    syntaxNode = syntaxNode.resolve(syntaxNode.to, 1);
+  }
+  const tokenEnd = Math.min(line.to, syntaxNode.to);
+  if (tokenEnd > position) {
+    decorations.push(executionTokenDeco.range(position, tokenEnd));
+  }
+  return CodeMirror.Decoration.set(decorations);
+}
 
 // Continue-to markers
 

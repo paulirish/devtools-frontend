@@ -1,4 +1,5 @@
 import { HTTPRequest } from '../api/HTTPRequest.js';
+import { UnsupportedOperation } from '../common/Errors.js';
 /**
  * @internal
  */
@@ -31,6 +32,9 @@ export class BidiHTTPRequest extends HTTPRequest {
                 this.#headers[header.name.toLowerCase()] = header.value.value;
             }
         }
+    }
+    get client() {
+        throw new UnsupportedOperation();
     }
     url() {
         return this.#url;
@@ -65,6 +69,36 @@ export class BidiHTTPRequest extends HTTPRequest {
     }
     frame() {
         return this.#frame;
+    }
+    continueRequestOverrides() {
+        throw new UnsupportedOperation();
+    }
+    continue(_overrides = {}) {
+        throw new UnsupportedOperation();
+    }
+    responseForRequest() {
+        throw new UnsupportedOperation();
+    }
+    abortErrorReason() {
+        throw new UnsupportedOperation();
+    }
+    interceptResolutionState() {
+        throw new UnsupportedOperation();
+    }
+    isInterceptResolutionHandled() {
+        throw new UnsupportedOperation();
+    }
+    finalizeInterceptions() {
+        throw new UnsupportedOperation();
+    }
+    abort() {
+        throw new UnsupportedOperation();
+    }
+    respond(_response, _priority) {
+        throw new UnsupportedOperation();
+    }
+    failure() {
+        throw new UnsupportedOperation();
     }
 }
 //# sourceMappingURL=HTTPRequest.js.map

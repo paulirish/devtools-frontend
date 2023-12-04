@@ -16,7 +16,9 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import type { Readable } from 'stream';
+import type * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import type Protocol from 'devtools-protocol';
+import type { Observable, ObservableInput } from '../../third_party/rxjs/rxjs.js';
 import type { CDPSession } from '../api/CDPSession.js';
 import type { WaitForOptions } from '../api/Frame.js';
 import { Page, type GeolocationOptions, type MediaFeature, type NewDocumentScriptEvaluation, type ScreenshotOptions } from '../api/Page.js';
@@ -35,6 +37,7 @@ import type { BidiHTTPRequest } from './HTTPRequest.js';
 import type { BidiHTTPResponse } from './HTTPResponse.js';
 import { BidiKeyboard, BidiMouse, BidiTouchscreen } from './Input.js';
 import type { BidiJSHandle } from './JSHandle.js';
+import type { BiDiNetworkIdle } from './lifecycle.js';
 /**
  * @internal
  */
@@ -66,7 +69,7 @@ export declare class BidiPage extends Page {
     frames(): BidiFrame[];
     frame(frameId?: string): BidiFrame | null;
     childFrames(frameId: string): BidiFrame[];
-    getNavigationResponse(id: string | null): BidiHTTPResponse | null;
+    getNavigationResponse(id?: string | null): BidiHTTPResponse | null;
     isClosed(): boolean;
     close(): Promise<void>;
     reload(options?: WaitForOptions): Promise<BidiHTTPResponse | null>;
@@ -100,6 +103,12 @@ export declare class BidiPage extends Page {
         idleTime?: number;
         timeout?: number;
     }): Promise<void>;
+    /** @internal */
+    _waitWithNetworkIdle(observableInput: ObservableInput<{
+        result: Bidi.BrowsingContext.NavigateResult;
+    } | null>, networkIdle: BiDiNetworkIdle): Observable<{
+        result: Bidi.BrowsingContext.NavigateResult;
+    } | null>;
     createCDPSession(): Promise<CDPSession>;
     bringToFront(): Promise<void>;
     evaluateOnNewDocument<Params extends unknown[], Func extends (...args: Params) => unknown = (...args: Params) => unknown>(pageFunction: Func | string, ...args: Params): Promise<NewDocumentScriptEvaluation>;
@@ -109,5 +118,24 @@ export declare class BidiPage extends Page {
     }): Promise<void>;
     isDragInterceptionEnabled(): boolean;
     setCacheEnabled(enabled?: boolean): Promise<void>;
+    isServiceWorkerBypassed(): never;
+    target(): never;
+    waitForFileChooser(): never;
+    workers(): never;
+    setRequestInterception(): never;
+    setDragInterception(): never;
+    setBypassServiceWorker(): never;
+    setOfflineMode(): never;
+    emulateNetworkConditions(): never;
+    cookies(): never;
+    setCookie(): never;
+    deleteCookie(): never;
+    removeExposedFunction(): never;
+    authenticate(): never;
+    setExtraHTTPHeaders(): never;
+    metrics(): never;
+    goBack(): never;
+    goForward(): never;
+    waitForDevicePrompt(): never;
 }
 //# sourceMappingURL=Page.d.ts.map

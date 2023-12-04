@@ -266,6 +266,14 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       const {data} = event;
       swatch.firstElementChild && swatch.firstElementChild.remove();
       swatch.createChild('span').textContent = data.text;
+      // This is a terrible hack to make sure that color swatch works for CSS variable usages with
+      // variable fallbacks. The issue is `StylesSidebarPropertyRenderer` renders CSS variables with var() fallbacks
+      // with two additions to the value element: CSS var swatch that renders `var(--red, var(--blue)` part -- without the last parens
+      // and a text node with a closing parenthesis. If the color is changed through color swatch, the value becomes invalid with an
+      // additional parenthesis like `#000)`; so in here, we explicitly remove the last parenthesis.
+      if (swatch.nextSibling?.textContent === ')') {
+        swatch.nextSibling.textContent = '';
+      }
       void this.applyStyleText(this.renderedPropertyText(), false);
     };
 
@@ -375,6 +383,24 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         this.parentPaneInternal.jumpToSectionBlock(`@position-fallback ${propertyText}`);
       },
       jslogContext: 'cssPositionFallback',
+    };
+    contentChild.appendChild(swatch);
+
+    return contentChild;
+  }
+
+  private processFontPalette(propertyText: string): Node {
+    const contentChild = document.createElement('span');
+    const swatch = new InlineEditor.LinkSwatch.LinkSwatch();
+    UI.UIUtils.createTextChild(swatch, propertyText);
+    const isDefined = this.matchedStylesInternal.fontPaletteValuesRule()?.name().text === propertyText;
+    swatch.data = {
+      text: propertyText,
+      isDefined,
+      onLinkActivate: (): void => {
+        this.parentPaneInternal.jumpToSectionBlock(`@font-palette-values ${propertyText}`);
+      },
+      jslogContext: 'cssFontPalette',
     };
     contentChild.appendChild(swatch);
 
@@ -502,30 +528,51 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     return swatch;
   }
 
-  private processVar(text: string): Node {
-    const computedSingleValue = this.matchedStylesInternal.computeSingleVariableValue(this.style, text);
-    if (!computedSingleValue) {
-      return document.createTextNode(text);
+  private processVar(text: string, {shouldShowColorSwatch = true}: {shouldShowColorSwatch?: boolean} = {}): Node {
+    // The regex that matches to variables in `StylesSidebarPropertyRenderer`
+    // uses a lazy match. Because of this, when there are multiple right parantheses inside the
+    // var() function, it stops the match. So, for a match like `var(--a, var(--b))`, the text
+    // corresponds to `var(--a, var(--b)`; before processing it, we make sure that parantheses
+    // are matched.
+    const parenthesesBalancedText = text + ')'.repeat(Platform.StringUtilities.countUnmatchedLeftParentheses(text));
+    const computedSingleValue =
+        this.matchedStylesInternal.computeSingleVariableValue(this.style, parenthesesBalancedText);
+    const {variableName, fallback} = SDK.CSSMatchedStyles.parseCSSVariableNameAndFallback(parenthesesBalancedText);
+    if (!computedSingleValue || !variableName) {
+      return document.createTextNode(parenthesesBalancedText);
     }
 
     const {computedValue, fromFallback} = computedSingleValue;
+    let fallbackHtml: Node|null = null;
+    if (fromFallback && fallback?.startsWith('var(')) {
+      fallbackHtml = this.processVar(fallback, {shouldShowColorSwatch: false});
+    } else if (fallback) {
+      fallbackHtml = document.createTextNode(fallback);
+    }
 
     const varSwatch = new InlineEditor.LinkSwatch.CSSVarSwatch();
     UI.UIUtils.createTextChild(varSwatch, text);
     varSwatch.data = {
-      text,
       computedValue,
+      variableName,
       fromFallback,
+      fallbackHtml,
       onLinkActivate: this.handleVarDefinitionActivate.bind(this),
     };
 
     if (varSwatch.link?.linkElement) {
       const {textContent} = varSwatch.link.linkElement;
-      this.parentPaneInternal.addPopover(
-          varSwatch.link, () => textContent ? this.#getVariablePopoverContents(textContent, computedValue) : undefined);
+      if (textContent) {
+        const computedValueOfLink = textContent ?
+            this.matchedStylesInternal.computeSingleVariableValue(this.style, `var(${textContent})`) :
+            null;
+        this.parentPaneInternal.addPopover(
+            varSwatch.link,
+            () => this.#getVariablePopoverContents(textContent, computedValueOfLink?.computedValue ?? null));
+      }
     }
 
-    if (!computedValue || !Common.Color.parse(computedValue)) {
+    if (!computedValue || !Common.Color.parse(computedValue) || !shouldShowColorSwatch) {
       return varSwatch;
     }
 
@@ -917,11 +964,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   #getVariablePopoverContents(variableName: string, computedValue: string|null): HTMLElement|undefined {
-    const registrationDetails = this.#getRegisteredPropertyDetails(variableName);
-    if (!registrationDetails && !computedValue) {
-      return undefined;
-    }
-    return new ElementsComponents.CSSVariableValueView.CSSVariableValueView(computedValue ?? '', registrationDetails);
+    return new ElementsComponents.CSSVariableValueView.CSSVariableValueView({
+      variableName,
+      value: computedValue ?? undefined,
+      details: this.#getRegisteredPropertyDetails(variableName),
+    });
   }
 
   updateTitleIfComputedValueChanged(): void {
@@ -960,6 +1007,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       propertyRenderer.setAngleHandler(this.processAngle.bind(this));
       propertyRenderer.setLengthHandler(this.processLength.bind(this));
       propertyRenderer.setPositionFallbackHandler(this.processPositionFallback.bind(this));
+      propertyRenderer.setFontPaletteHandler(this.processFontPalette.bind(this));
     }
 
     this.listItemElement.removeChildren();
@@ -1248,9 +1296,8 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     const regex = new RegExp(propertyNamePattern, 'i');
     await computedStyleWidget.filterComputedStyles(regex);
 
-    const filterInput = (computedStyleWidget.input as HTMLInputElement);
-    filterInput.value = this.property.name;
-    filterInput.focus();
+    computedStyleWidget.input.setValue(this.property.name);
+    computedStyleWidget.input.element.focus();
   }
 
   private copyCssDeclarationAsJs(): void {

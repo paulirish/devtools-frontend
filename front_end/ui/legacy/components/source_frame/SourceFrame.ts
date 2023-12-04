@@ -109,7 +109,7 @@ const UIStrings = {
    *@description Input box placeholder which instructs the user to type 'allow pasing' into the input box.
    *@example {allow pasting} PH1
    */
-  typeAllowPasting: 'Type  \'\'{PH1}\'\'',
+  typeAllowPasting: 'Type \'\'{PH1}\'\'',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/SourceFrame.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -292,6 +292,16 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
       this.wasmDisassemblyInternal ? markNonBreakableLines(this.wasmDisassemblyInternal) : nonBreakableLines,
       this.options.lineWrapping ? CodeMirror.EditorView.lineWrapping : [],
       this.options.lineNumbers !== false ? CodeMirror.lineNumbers() : [],
+      Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE) ?
+          [] :
+          CodeMirror.indentationMarkers({
+            colors: {
+              light: 'var(--sys-color-divider)',
+              activeLight: 'var(--sys-color-divider-prominent)',
+              dark: 'var(--sys-color-divider)',
+              activeDark: 'var(--sys-color-divider-prominent)',
+            },
+          }),
     ];
   }
 
@@ -1005,7 +1015,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   onContextMenu(event: MouseEvent): boolean {
     event.consume(true);  // Consume event now to prevent document from handling the async menu
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-text-area'});
     const {state} = this.textEditor;
     const pos = state.selection.main.from, line = state.doc.lineAt(pos);
     this.populateTextAreaContextMenu(contextMenu, line.number - 1, pos - line.from);
@@ -1020,7 +1030,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   onLineGutterContextMenu(position: number, event: MouseEvent): boolean {
     event.consume(true);  // Consume event now to prevent document from handling the async menu
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-line-gutter'});
     const lineNumber = this.textEditor.state.doc.lineAt(position).number - 1;
     this.populateLineGutterContextMenu(contextMenu, lineNumber);
     contextMenu.appendApplicableItems(this);

@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {MobileThrottlingSelector} from './MobileThrottlingSelector.js';
 import {NetworkThrottlingSelector} from './NetworkThrottlingSelector.js';
@@ -137,6 +138,12 @@ export class ThrottlingManager {
   decorateSelectWithNetworkThrottling(selectElement: HTMLSelectElement): NetworkThrottlingSelector {
     let options: (SDK.NetworkManager.Conditions|null)[] = [];
     const selector = new NetworkThrottlingSelector(populate, select, this.customNetworkConditionsSetting);
+    selectElement.setAttribute(
+        'jslog',
+        `${
+            VisualLogging.dropDown()
+                .track({change: true})
+                .context(this.currentNetworkThrottlingConditionsSetting.name)}`);
     selectElement.addEventListener('change', optionSelected, false);
     return selector;
 
@@ -211,7 +218,7 @@ export class ThrottlingManager {
   }
 
   createMobileThrottlingButton(): UI.Toolbar.ToolbarMenuButton {
-    const button = new UI.Toolbar.ToolbarMenuButton(appendItems);
+    const button = new UI.Toolbar.ToolbarMenuButton(appendItems, undefined, 'mobileThrottling');
     button.setTitle(i18nString(UIStrings.throttling));
     button.setGlyph('');
     button.turnIntoSelect();
@@ -233,8 +240,8 @@ export class ThrottlingManager {
           continue;
         }
         contextMenu.defaultSection().appendCheckboxItem(
-            conditions.title, selector.optionSelected.bind(selector, conditions as Conditions),
-            selectedIndex === index);
+            conditions.title, selector.optionSelected.bind(selector, conditions as Conditions), selectedIndex === index,
+            undefined, undefined, undefined, conditions.jslogContext);
       }
     }
 
@@ -388,17 +395,8 @@ export class ThrottlingManager {
   }
 }
 
-let actionDelegateInstance: ActionDelegate;
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): ActionDelegate {
-    const {forceNew} = opts;
-    if (!actionDelegateInstance || forceNew) {
-      actionDelegateInstance = new ActionDelegate();
-    }
-    return actionDelegateInstance;
-  }
-
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     if (actionId === 'network-conditions.network-online') {
       SDK.NetworkManager.MultitargetNetworkManager.instance().setNetworkConditions(
           SDK.NetworkManager.NoThrottlingConditions);

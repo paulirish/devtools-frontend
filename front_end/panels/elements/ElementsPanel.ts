@@ -43,7 +43,6 @@ import type * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type AXTreeNodeData} from './AccessibilityTreeUtils.js';
 import {AccessibilityTreeView} from './AccessibilityTreeView.js';
@@ -218,13 +217,13 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
   constructor() {
     super('elements');
 
-    this.element.setAttribute('jslog', `${VisualLogging.elementsPanel()}`);
     this.splitWidget = new UI.SplitWidget.SplitWidget(true, true, 'elementsPanelSplitViewState', 325, 325);
     this.splitWidget.addEventListener(
         UI.SplitWidget.Events.SidebarSizeChanged, this.updateTreeOutlineVisibleWidth.bind(this));
     this.splitWidget.show(this.element);
 
     this.searchableViewInternal = new UI.SearchableView.SearchableView(this, null);
+    this.searchableViewInternal.setMinimalSearchQuerySize(0);
     this.searchableViewInternal.setMinimumSize(25, 28);
     this.searchableViewInternal.setPlaceholder(i18nString(UIStrings.findByStringSelectorOrXpath));
     const stackElement = this.searchableViewInternal.element;
@@ -1250,42 +1249,26 @@ const TrackedCSSProperties = [
   },
 ];
 
-let contextMenuProviderInstance: ContextMenuProvider;
-
-export class ContextMenuProvider implements UI.ContextMenu.Provider {
-  appendApplicableItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, object: Object): void {
-    if (!(object instanceof SDK.RemoteObject.RemoteObject && (object as SDK.RemoteObject.RemoteObject).isNode()) &&
-        !(object instanceof SDK.DOMModel.DOMNode) && !(object instanceof SDK.DOMModel.DeferredDOMNode)) {
+export class ContextMenuProvider implements
+    UI.ContextMenu.Provider<SDK.RemoteObject.RemoteObject|SDK.DOMModel.DOMNode|SDK.DOMModel.DeferredDOMNode> {
+  appendApplicableItems(
+      event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+      object: SDK.RemoteObject.RemoteObject|SDK.DOMModel.DOMNode|SDK.DOMModel.DeferredDOMNode): void {
+    if (object instanceof SDK.RemoteObject.RemoteObject && !object.isNode()) {
       return;
     }
-    if (ElementsPanel.instance().element.isAncestor((event.target as Node))) {
+    if (ElementsPanel.instance().element.isAncestor(event.target as (Node | null))) {
       return;
     }
     contextMenu.revealSection().appendItem(
         i18nString(UIStrings.revealInElementsPanel), () => Common.Revealer.reveal(object));
   }
-
-  static instance(): ContextMenuProvider {
-    if (!contextMenuProviderInstance) {
-      contextMenuProviderInstance = new ContextMenuProvider();
-    }
-    return contextMenuProviderInstance;
-  }
 }
-let dOMNodeRevealerInstance: DOMNodeRevealer;
-export class DOMNodeRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): DOMNodeRevealer {
-    const {forceNew} = opts;
-    if (!dOMNodeRevealerInstance || forceNew) {
-      dOMNodeRevealerInstance = new DOMNodeRevealer();
-    }
 
-    return dOMNodeRevealerInstance;
-  }
-
-  reveal(node: Object, omitFocus?: boolean): Promise<void> {
+export class DOMNodeRevealer implements
+    Common.Revealer.Revealer<SDK.DOMModel.DOMNode|SDK.DOMModel.DeferredDOMNode|SDK.RemoteObject.RemoteObject> {
+  reveal(node: SDK.DOMModel.DOMNode|SDK.DOMModel.DeferredDOMNode|SDK.RemoteObject.RemoteObject, omitFocus?: boolean):
+      Promise<void> {
     const panel = ElementsPanel.instance();
     panel.pendingNodeReveal = true;
 
@@ -1309,7 +1292,7 @@ export class DOMNodeRevealer implements Common.Revealer.Revealer {
         onNodeResolved((node as SDK.DOMModel.DOMNode));
       } else if (node instanceof SDK.DOMModel.DeferredDOMNode) {
         (node as SDK.DOMModel.DeferredDOMNode).resolve(checkDeferredDOMNodeThenReveal);
-      } else if (node instanceof SDK.RemoteObject.RemoteObject) {
+      } else {
         const domModel = node.runtimeModel().target().model(SDK.DOMModel.DOMModel);
         if (domModel) {
           void domModel.pushObjectAsNodeToFrontend(node).then(checkRemoteObjectThenReveal);
@@ -1317,10 +1300,6 @@ export class DOMNodeRevealer implements Common.Revealer.Revealer {
           const msg = i18nString(UIStrings.nodeCannotBeFoundInTheCurrent);
           reject(new Platform.UserVisibleError.UserVisibleError(msg));
         }
-      } else {
-        const msg = i18nString(UIStrings.theRemoteObjectCouldNotBe);
-        reject(new Platform.UserVisibleError.UserVisibleError(msg));
-        panel.pendingNodeReveal = false;
       }
 
       function onNodeResolved(resolvedNode: SDK.DOMModel.DOMNode): void {
@@ -1372,31 +1351,16 @@ export class DOMNodeRevealer implements Common.Revealer.Revealer {
   }
 }
 
-let cSSPropertyRevealerInstance: CSSPropertyRevealer;
-
-export class CSSPropertyRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): CSSPropertyRevealer {
-    const {forceNew} = opts;
-    if (!cSSPropertyRevealerInstance || forceNew) {
-      cSSPropertyRevealerInstance = new CSSPropertyRevealer();
-    }
-
-    return cSSPropertyRevealerInstance;
-  }
-
-  reveal(property: Object): Promise<void> {
+export class CSSPropertyRevealer implements Common.Revealer.Revealer<SDK.CSSProperty.CSSProperty> {
+  reveal(property: SDK.CSSProperty.CSSProperty): Promise<void> {
     const panel = ElementsPanel.instance();
-    return panel.revealProperty((property as SDK.CSSProperty.CSSProperty));
+    return panel.revealProperty(property);
   }
 }
 
-let elementsActionDelegateInstance: ElementsActionDelegate;
-
 export class ElementsActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(context: UI.Context.Context, actionId: string): boolean {
-    const node = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
+    const node = context.flavor(SDK.DOMModel.DOMNode);
     if (!node) {
       return true;
     }
@@ -1442,17 +1406,6 @@ export class ElementsActionDelegate implements UI.ActionRegistration.ActionDeleg
       }
     }
     return false;
-  }
-
-  static instance(opts: {
-    forceNew: boolean|null,
-  }|undefined = {forceNew: null}): ElementsActionDelegate {
-    const {forceNew} = opts;
-    if (!elementsActionDelegateInstance || forceNew) {
-      elementsActionDelegateInstance = new ElementsActionDelegate();
-    }
-
-    return elementsActionDelegateInstance;
   }
 }
 

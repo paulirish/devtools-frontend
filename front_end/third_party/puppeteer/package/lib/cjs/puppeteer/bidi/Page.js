@@ -105,6 +105,7 @@ const ElementHandle_js_1 = require("./ElementHandle.js");
 const EmulationManager_js_2 = require("./EmulationManager.js");
 const Frame_js_1 = require("./Frame.js");
 const Input_js_1 = require("./Input.js");
+const lifecycle_js_1 = require("./lifecycle.js");
 const NetworkManager_js_1 = require("./NetworkManager.js");
 const Realm_js_1 = require("./Realm.js");
 /**
@@ -424,24 +425,15 @@ class BidiPage extends Page_js_1.Page {
         this.removeAllListeners();
     }
     async reload(options = {}) {
-        const { waitUntil = 'load', timeout = this._timeoutSettings.navigationTimeout(), } = options;
-        const readinessState = Frame_js_1.lifeCycleToReadinessState.get((0, BrowsingContext_js_1.getWaitUntilSingle)(waitUntil));
-        try {
-            const { result } = await (0, util_js_1.waitWithTimeout)(this.#connection.send('browsingContext.reload', {
-                context: this.mainFrame()._id,
-                wait: readinessState,
-            }), 'Navigation', timeout);
-            return this.getNavigationResponse(result.navigation);
-        }
-        catch (error) {
-            if (error instanceof Errors_js_1.ProtocolError) {
-                error.message += ` at ${this.url}`;
-            }
-            else if (error instanceof Errors_js_1.TimeoutError) {
-                error.message = 'Navigation timeout of ' + timeout + ' ms exceeded';
-            }
-            throw error;
-        }
+        const { waitUntil = 'load', timeout: ms = this._timeoutSettings.navigationTimeout(), } = options;
+        const [readiness, networkIdle] = (0, lifecycle_js_1.getBiDiReadinessState)(waitUntil);
+        const response = await (0, rxjs_js_1.firstValueFrom)(this._waitWithNetworkIdle(this.#connection.send('browsingContext.reload', {
+            context: this.mainFrame()._id,
+            wait: readiness,
+        }), networkIdle)
+            .pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, rxjs_js_1.from)(this.#closedDeferred.valueOrThrow())))
+            .pipe((0, lifecycle_js_1.rewriteNavigationError)(this.url(), ms)));
+        return this.getNavigationResponse(response?.result.navigation);
     }
     setDefaultNavigationTimeout(timeout) {
         this._timeoutSettings.setDefaultNavigationTimeout(timeout);
@@ -531,25 +523,25 @@ class BidiPage extends Page_js_1.Page {
     async _screenshot(options) {
         const { clip, type, captureBeyondViewport, allowViewportExpansion, quality } = options;
         if (captureBeyondViewport && !allowViewportExpansion) {
-            throw new Error(`BiDi does not support 'captureBeyondViewport'. Use 'allowViewportExpansion'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'captureBeyondViewport'. Use 'allowViewportExpansion'.`);
         }
         if (options.omitBackground !== undefined && options.omitBackground) {
-            throw new Error(`BiDi does not support 'omitBackground'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'omitBackground'.`);
         }
         if (options.optimizeForSpeed !== undefined && options.optimizeForSpeed) {
-            throw new Error(`BiDi does not support 'optimizeForSpeed'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'optimizeForSpeed'.`);
         }
         if (options.fromSurface !== undefined && !options.fromSurface) {
-            throw new Error(`BiDi does not support 'fromSurface'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'fromSurface'.`);
         }
         if (clip !== undefined && clip.scale !== undefined && clip.scale !== 1) {
-            throw new Error(`BiDi does not support 'scale' in 'clip'.`);
+            throw new Errors_js_1.UnsupportedOperation(`BiDi does not support 'scale' in 'clip'.`);
         }
         const { result: { data }, } = await this.#connection.send('browsingContext.captureScreenshot', {
             context: this.mainFrame()._id,
             format: {
                 type: `image/${type}`,
-                ...(quality === undefined ? {} : { quality: quality / 100 }),
+                quality: quality ? quality / 100 : undefined,
             },
             clip: clip && {
                 type: 'box',
@@ -567,8 +559,20 @@ class BidiPage extends Page_js_1.Page {
         return await (0, util_js_1.waitForHTTP)(this.#networkManager, NetworkManagerEvents_js_1.NetworkManagerEvent.Response, urlOrPredicate, timeout, this.#closedDeferred);
     }
     async waitForNetworkIdle(options = {}) {
-        const { idleTime = 500, timeout = this._timeoutSettings.timeout() } = options;
-        await this._waitForNetworkIdle(this.#networkManager, idleTime, timeout, this.#closedDeferred);
+        const { idleTime = util_js_1.NETWORK_IDLE_TIME, timeout: ms = this._timeoutSettings.timeout(), } = options;
+        await (0, rxjs_js_1.firstValueFrom)(this._waitForNetworkIdle(this.#networkManager, idleTime).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, rxjs_js_1.from)(this.#closedDeferred.valueOrThrow()))));
+    }
+    /** @internal */
+    _waitWithNetworkIdle(observableInput, networkIdle) {
+        const delay = networkIdle
+            ? this._waitForNetworkIdle(this.#networkManager, util_js_1.NETWORK_IDLE_TIME, networkIdle === 'networkidle0' ? 0 : 2)
+            : (0, rxjs_js_1.from)(Promise.resolve());
+        return (0, rxjs_js_1.forkJoin)([
+            (0, rxjs_js_1.from)(observableInput).pipe((0, rxjs_js_1.first)()),
+            delay.pipe((0, rxjs_js_1.first)()),
+        ]).pipe((0, rxjs_js_1.map)(([response]) => {
+            return response;
+        }));
     }
     async createCDPSession() {
         const { sessionId } = await this.mainFrame()
@@ -588,7 +592,7 @@ class BidiPage extends Page_js_1.Page {
         const expression = evaluationExpression(pageFunction, ...args);
         const { result } = await this.#connection.send('script.addPreloadScript', {
             functionDeclaration: expression,
-            // TODO: should change spec to accept browsingContext
+            contexts: [this.mainFrame()._id],
         });
         return { identifier: result.script };
     }
@@ -608,6 +612,64 @@ class BidiPage extends Page_js_1.Page {
         await this._client().send('Network.setCacheDisabled', {
             cacheDisabled: !enabled,
         });
+    }
+    isServiceWorkerBypassed() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    target() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    waitForFileChooser() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    workers() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setRequestInterception() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setDragInterception() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setBypassServiceWorker() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setOfflineMode() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    emulateNetworkConditions() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    cookies() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setCookie() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    deleteCookie() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    removeExposedFunction() {
+        // TODO: Quick win?
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    authenticate() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    setExtraHTTPHeaders() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    metrics() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    goBack() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    goForward() {
+        throw new Errors_js_1.UnsupportedOperation();
+    }
+    waitForDevicePrompt() {
+        throw new Errors_js_1.UnsupportedOperation();
     }
 }
 exports.BidiPage = BidiPage;

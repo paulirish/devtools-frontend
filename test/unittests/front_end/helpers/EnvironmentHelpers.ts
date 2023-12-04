@@ -111,7 +111,6 @@ const REGISTERED_EXPERIMENTS = [
   'captureNodeCreationStacks',
   'preciseChanges',
   'protocolMonitor',
-  'sourcesPrettyPrint',
   'wasmDWARFDebugging',
   'timelineShowAllEvents',
   'timelineV8RuntimeCallStats',
@@ -132,6 +131,7 @@ const REGISTERED_EXPERIMENTS = [
   'networkPanelFilterBarRedesign',
   'breadcrumbsPerformancePanel',
   'trackContextMenu',
+  'sourcesFrameIndentationMarkersTemporarilyDisable',
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {

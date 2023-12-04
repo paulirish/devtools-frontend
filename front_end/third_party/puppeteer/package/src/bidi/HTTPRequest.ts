@@ -16,7 +16,12 @@
 import type * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 
 import type {Frame} from '../api/Frame.js';
+import type {
+  ContinueRequestOverrides,
+  ResponseForRequest,
+} from '../api/HTTPRequest.js';
 import {HTTPRequest, type ResourceType} from '../api/HTTPRequest.js';
+import {UnsupportedOperation} from '../common/Errors.js';
 
 import type {BidiHTTPResponse} from './HTTPResponse.js';
 
@@ -64,6 +69,10 @@ export class BidiHTTPRequest extends HTTPRequest {
     }
   }
 
+  override get client(): never {
+    throw new UnsupportedOperation();
+  }
+
   override url(): string {
     return this.#url;
   }
@@ -109,5 +118,48 @@ export class BidiHTTPRequest extends HTTPRequest {
 
   override frame(): Frame | null {
     return this.#frame;
+  }
+
+  override continueRequestOverrides(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override continue(_overrides: ContinueRequestOverrides = {}): never {
+    throw new UnsupportedOperation();
+  }
+
+  override responseForRequest(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override abortErrorReason(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override interceptResolutionState(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override isInterceptResolutionHandled(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override finalizeInterceptions(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override abort(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override respond(
+    _response: Partial<ResponseForRequest>,
+    _priority?: number
+  ): never {
+    throw new UnsupportedOperation();
+  }
+
+  override failure(): never {
+    throw new UnsupportedOperation();
   }
 }

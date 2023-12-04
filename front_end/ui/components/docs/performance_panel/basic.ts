@@ -4,6 +4,7 @@
 
 import * as FrontendHelpers from '../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
 import * as Common from '../../../../core/common/common.js';
+import * as Root from '../../../../core/root/root.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
@@ -61,6 +62,9 @@ UI.ActionRegistration.registerActionExtension({
   contextTypes() {
     return [Timeline.TimelinePanel.TimelinePanel];
   },
+  async loadActionDelegate() {
+    return new Timeline.TimelinePanel.ActionDelegate();
+  },
 });
 UI.ActionRegistration.registerActionExtension({
   actionId: 'components.collect-garbage',
@@ -95,17 +99,14 @@ const traceFileName = params.get('trace');
 const cpuprofileName = params.get('cpuprofile');
 const nodeMode = params.get('isNode');
 const isNodeMode = nodeMode === 'true' ? true : false;
-// By default we run both engines in the dev server, but this can be overridden by passing the parameter.
-let threadTracksSource = Timeline.TimelinePanel.ThreadTracksSource.BOTH_ENGINES;
-const threadTracksSourceParam = params.get('threadTracksSource');
-if (threadTracksSourceParam === 'new') {
-  threadTracksSource = Timeline.TimelinePanel.ThreadTracksSource.NEW_ENGINE;
-} else if (threadTracksSourceParam === 'old') {
-  threadTracksSource = Timeline.TimelinePanel.ThreadTracksSource.OLD_ENGINE;
+if (params.has('initiators')) {
+  Root.Runtime.experiments.setEnabled('timelineEventInitiators', true);
 }
 
-const timeline =
-    Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode, threadTracksSource});
+Root.Runtime.experiments.setEnabled(
+    Root.Runtime.ExperimentName.BREADCRUMBS_PERFORMANCE_PANEL, params.has('breadcrumbs'));
+
+const timeline = Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode});
 const container = document.getElementById('container');
 if (!container) {
   throw new Error('could not find container');

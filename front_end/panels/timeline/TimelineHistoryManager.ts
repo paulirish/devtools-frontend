@@ -16,7 +16,7 @@ import {
   TimelineEventOverviewResponsiveness,
 } from './TimelineEventOverview.js';
 import timelineHistoryManagerStyles from './timelineHistoryManager.css.js';
-import {ThreadTracksSource} from './TimelinePanel.js';
+import {type TimelineMiniMap} from './TimelineMiniMap.js';
 
 const UIStrings = {
   /**
@@ -75,7 +75,7 @@ export interface NewHistoryRecordingData {
   // We do not store this, but need it to build the thumbnail preview.
   filmStripForPreview: TraceEngine.Extras.FilmStrip.Data|null;
   // Also not stored, but used to create the preview overview for a new trace.
-  traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+  traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
 }
 
 export class TimelineHistoryManager {
@@ -84,50 +84,57 @@ export class TimelineHistoryManager {
   private readonly nextNumberByDomain: Map<string, number>;
   private readonly buttonInternal: ToolbarButton;
   private readonly allOverviews: {
-    constructor:
-        (traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData, performanceModel: PerformanceModel) =>
-            TimelineEventOverview,
+    constructor: (traceParsedData: TraceEngine.Handlers.Types.TraceParseData, performanceModel: PerformanceModel) =>
+        TimelineEventOverview,
     height: number,
   }[];
   private totalHeight: number;
   private enabled: boolean;
   private lastActiveModel: PerformanceModel|null;
-  #threadTracksSource: ThreadTracksSource = ThreadTracksSource.OLD_ENGINE;
-  constructor(threadTracksSource?: ThreadTracksSource) {
-    if (threadTracksSource) {
-      this.#threadTracksSource = threadTracksSource;
-    }
-
+  #minimapComponent?: TimelineMiniMap;
+  constructor(minimapComponent?: TimelineMiniMap) {
     this.recordings = [];
-    this.action =
-        (UI.ActionRegistry.ActionRegistry.instance().action('timeline.show-history') as UI.ActionRegistration.Action);
+    this.#minimapComponent = minimapComponent;
+    this.action = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.show-history');
     this.nextNumberByDomain = new Map();
     this.buttonInternal = new ToolbarButton(this.action);
 
     UI.ARIAUtils.markAsMenuButton(this.buttonInternal.element);
     this.clear();
 
+    // Attempt to reuse the overviews coming from the panel's minimap
+    // before creating new instances.
     this.allOverviews = [
       {
+
         constructor: (traceParsedData): TimelineEventOverviewResponsiveness => {
-          return new TimelineEventOverviewResponsiveness(traceParsedData);
+          const responsivenessOverviewFromMinimap =
+              this.#minimapComponent?.getControls().find(
+                  control => control instanceof TimelineEventOverviewResponsiveness) as
+              TimelineEventOverviewResponsiveness;
+          return responsivenessOverviewFromMinimap || new TimelineEventOverviewResponsiveness(traceParsedData);
         },
         height: 3,
       },
       {
-        constructor: (_traceParsedData, performanceModel): TimelineEventOverviewCPUActivity => {
-          // TODO(crbug.com/1464206): remove this conditional once ThreadTracksSource has been fully shipped and the flag removed.
-          if (this.#threadTracksSource === ThreadTracksSource.NEW_ENGINE) {
-            return new TimelineEventOverviewCPUActivity(null, _traceParsedData);
+        constructor: (traceParsedData): TimelineEventOverviewCPUActivity => {
+          const cpuOverviewFromMinimap =
+              this.#minimapComponent?.getControls().find(
+                  control => control instanceof TimelineEventOverviewCPUActivity) as TimelineEventOverviewCPUActivity;
+          if (cpuOverviewFromMinimap) {
+            return cpuOverviewFromMinimap;
           }
-
-          return new TimelineEventOverviewCPUActivity(performanceModel, null);
+          return new TimelineEventOverviewCPUActivity(traceParsedData);
         },
         height: 20,
       },
       {
-        constructor: (traceParsedData): TimelineEventOverviewNetwork =>
-            new TimelineEventOverviewNetwork(traceParsedData),
+        constructor: (traceParsedData): TimelineEventOverviewNetwork => {
+          const networkOverviewFromMinimap =
+              this.#minimapComponent?.getControls().find(control => control instanceof TimelineEventOverviewNetwork) as
+              TimelineEventOverviewNetwork;
+          return networkOverviewFromMinimap || new TimelineEventOverviewNetwork(traceParsedData);
+        },
         height: 8,
       },
     ];
@@ -272,7 +279,7 @@ export class TimelineHistoryManager {
   }
 
   private buildPreview(
-      performanceModel: PerformanceModel, traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData,
+      performanceModel: PerformanceModel, traceParsedData: TraceEngine.Handlers.Types.TraceParseData,
       filmStrip: TraceEngine.Extras.FilmStrip.Data|null): HTMLDivElement {
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(performanceModel.timelineModel().pageURL());
     const domain = parsedURL ? parsedURL.host : '';
@@ -333,29 +340,27 @@ export class TimelineHistoryManager {
     return container;
   }
 
-  private buildOverview(
-      performanceModel: PerformanceModel, traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData): Element {
+  private buildOverview(performanceModel: PerformanceModel, traceParsedData: TraceEngine.Handlers.Types.TraceParseData):
+      Element {
     const container = document.createElement('div');
-
+    const dPR = window.devicePixelRatio;
     container.style.width = previewWidth + 'px';
     container.style.height = this.totalHeight + 'px';
     const canvas = (container.createChild('canvas') as HTMLCanvasElement);
-    canvas.width = window.devicePixelRatio * previewWidth;
-    canvas.height = window.devicePixelRatio * this.totalHeight;
+    canvas.width = dPR * previewWidth;
+    canvas.height = dPR * this.totalHeight;
 
     const ctx = canvas.getContext('2d');
     let yOffset = 0;
 
     for (const overview of this.allOverviews) {
       const timelineOverviewComponent = overview.constructor(traceParsedData, performanceModel);
-      timelineOverviewComponent.setCanvasSize(previewWidth, overview.height);
       timelineOverviewComponent.update();
-      const sourceContext = timelineOverviewComponent.context();
-      const imageData = sourceContext.getImageData(0, 0, sourceContext.canvas.width, sourceContext.canvas.height);
       if (ctx) {
-        ctx.putImageData(imageData, 0, yOffset);
+        ctx.drawImage(
+            timelineOverviewComponent.context().canvas, 0, yOffset, dPR * previewWidth, overview.height * dPR);
       }
-      yOffset += overview.height * window.devicePixelRatio;
+      yOffset += overview.height * dPR;
     }
     return container;
   }

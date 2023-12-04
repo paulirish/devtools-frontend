@@ -134,7 +134,7 @@ const UIStrings = {
    *             cookie (https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies). Such response cookies can
    *             be malformed or otherwise invalid and the browser may choose to ignore or not accept invalid cookies.
    */
-  onlyShowRequestsWithBlockedCookies: 'Show only the requests with blocked response cookies',
+  onlyShowRequestsWithBlockedCookies: 'Show only requests with blocked response cookies',
   /**
    *@description Label for a filter in the Network panel
    */
@@ -400,6 +400,11 @@ const UIStrings = {
    * @description Text for the Show only/Hide requests dropdown button of the filterbar
    */
   moreFilters: 'More filters',
+  /**
+   * @description Text for the Request types dropdown button tooltip
+   * @example {Media, Images} PH1
+   */
+  showOnly: 'Show only {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkLogView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -1011,6 +1016,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.filterRequests();
     this.textFilterSetting.set(this.textFilterUI.value());
     this.moreFiltersDropDownUI?.updateActiveFiltersCount();
+    this.moreFiltersDropDownUI?.updateTooltip();
   }
 
   async resetFilter(): Promise<void> {
@@ -1697,17 +1703,20 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       const disableIfBlob = request.isBlobRequest();
       if (Host.Platform.isWin()) {
         footerSection.appendItem(
-            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request), disableIfBlob);
+            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request),
+            {disabled: disableIfBlob});
         footerSection.appendItem(
             i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
-            disableIfBlob);
+            {disabled: disableIfBlob});
         footerSection.appendItem(
             i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NodeJs),
-            disableIfBlob);
+            {disabled: disableIfBlob});
         footerSection.appendItem(
-            i18nString(UIStrings.copyAsCurlCmd), this.copyCurlCommand.bind(this, request, 'win'), disableIfBlob);
+            i18nString(UIStrings.copyAsCurlCmd), this.copyCurlCommand.bind(this, request, 'win'),
+            {disabled: disableIfBlob});
         footerSection.appendItem(
-            i18nString(UIStrings.copyAsCurlBash), this.copyCurlCommand.bind(this, request, 'unix'), disableIfBlob);
+            i18nString(UIStrings.copyAsCurlBash), this.copyCurlCommand.bind(this, request, 'unix'),
+            {disabled: disableIfBlob});
         footerSection.appendItem(i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
         footerSection.appendItem(
             i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
@@ -1717,15 +1726,17 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         footerSection.appendItem(i18nString(UIStrings.copyAllAsCurlBash), this.copyAllCurlCommand.bind(this, 'unix'));
       } else {
         footerSection.appendItem(
-            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request), disableIfBlob);
+            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request),
+            {disabled: disableIfBlob});
         footerSection.appendItem(
             i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
-            disableIfBlob);
+            {disabled: disableIfBlob});
         footerSection.appendItem(
             i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NodeJs),
-            disableIfBlob);
+            {disabled: disableIfBlob});
         footerSection.appendItem(
-            i18nString(UIStrings.copyAsCurl), this.copyCurlCommand.bind(this, request, 'unix'), disableIfBlob);
+            i18nString(UIStrings.copyAsCurl), this.copyCurlCommand.bind(this, request, 'unix'),
+            {disabled: disableIfBlob});
         footerSection.appendItem(i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
         footerSection.appendItem(
             i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
@@ -2545,6 +2556,7 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
   private contextMenu?: UI.ContextMenu.ContextMenu;
   private selectedTypesCount: HTMLElement;
   private typesCountAdorner: Adorners.Adorner.Adorner;
+  private hasChanged = false;
 
   constructor(
       items: UI.FilterBar.Item[], filterChangedCallback: () => void,
@@ -2563,8 +2575,9 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
     };
     this.typesCountAdorner.classList.add('active-filters-count');
 
-    this.dropDownButton = new UI.Toolbar.ToolbarButton(UIStrings.requestTypesTooltip, this.typesCountAdorner);
-    this.dropDownButton.setText(UIStrings.requestTypes);
+    this.dropDownButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.requestTypesTooltip), this.typesCountAdorner);
+    this.dropDownButton.setText(i18nString(UIStrings.requestTypes));
     this.filterElement.appendChild(this.dropDownButton.element);
     this.dropDownButton.turnIntoSelect();
     this.dropDownButton.element.classList.add('dropdown-filterbar');
@@ -2584,14 +2597,25 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
     this.contextMenu?.discard();
   }
 
+  emitUMA(): void {
+    if (this.hasChanged) {
+      Host.userMetrics.resourceTypeFilterNumberOfSelectedChanged(this.displayedTypes.size);
+      for (const displayedType of this.displayedTypes) {
+        Host.userMetrics.resourceTypeFilterItemSelected(displayedType);
+      }
+    }
+  }
+
   showContextMenu(event: Common.EventTarget.EventTargetEvent<Event>): void {
     const mouseEvent = event.data;
+    this.hasChanged = false;
     this.contextMenu = new UI.ContextMenu.ContextMenu(mouseEvent, {
       useSoftMenu: true,
       keepOpen: true,
       x: this.dropDownButton.element.getBoundingClientRect().left,
       y: this.dropDownButton.element.getBoundingClientRect().top +
           (this.dropDownButton.element as HTMLElement).offsetHeight,
+      onSoftMenuClosed: this.emitUMA.bind(this),
     });
 
     this.addRequestType(this.contextMenu, DropDownTypesUI.ALL_TYPES, i18nString(UIStrings.allStrings));
@@ -2649,6 +2673,7 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
   }
 
   private settingChanged(): void {
+    this.hasChanged = true;
     this.displayedTypes = new Set();
 
     for (const s in this.setting.get()) {
@@ -2664,6 +2689,7 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
     }
     this.updateSelectedTypesCount();
     this.updateLabel();
+    this.updateTooltip();
   }
 
   updateSelectedTypesCount(): void {
@@ -2687,7 +2713,7 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
       newLabel = Common.ResourceType.ResourceCategory.categoryByTitle(type)?.shortTitle() || '';
     } else {
       // show up to two last selected types
-      const twoLastSelected = Array.from(this.displayedTypes).slice(-2).reverse();
+      const twoLastSelected = [...this.displayedTypes].slice(-2).reverse();
       const shortNames =
           twoLastSelected.map(type => Common.ResourceType.ResourceCategory.categoryByTitle(type)?.shortTitle() || '');
       const valuesToDisplay = {PH1: shortNames[0], PH2: shortNames[1]};
@@ -2695,6 +2721,19 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
                                                   i18nString(UIStrings.overTwoTypesSelected, valuesToDisplay);
     }
     this.dropDownButton.setText(newLabel);
+  }
+
+  updateTooltip(): void {
+    let tooltipText = i18nString(UIStrings.requestTypesTooltip);
+    if (!this.displayedTypes.has(DropDownTypesUI.ALL_TYPES)) {
+      // reverse the order to match the button label
+      const selectedTypes = [...this.displayedTypes].reverse();
+      const localized =
+          selectedTypes.map(type => Common.ResourceType.ResourceCategory.categoryByTitle(type)?.title() || '')
+              .join(', ');
+      tooltipText = i18nString(UIStrings.showOnly, {PH1: localized});
+    }
+    this.dropDownButton.setTitle(tooltipText);
   }
 
   isActive(): boolean {
@@ -2729,6 +2768,7 @@ export class MoreFiltersDropDownUI extends
   private contextMenu?: UI.ContextMenu.ContextMenu;
   private activeFiltersCount: HTMLElement;
   private activeFiltersCountAdorner: Adorners.Adorner.Adorner;
+  private hasChanged = false;
 
   constructor(filterChangedCallback: () => void) {
     super();
@@ -2764,22 +2804,40 @@ export class MoreFiltersDropDownUI extends
     this.dropDownButton.addEventListener(
         UI.Toolbar.ToolbarButton.Events.Click, this.showMoreFiltersContextMenu.bind(this));
     UI.ARIAUtils.markAsMenuButton(this.dropDownButton.element);
+    this.updateTooltip();
+  }
+
+  emitUMA(): void {
+    if (this.hasChanged) {
+      const selectedFilters = this.selectedFilters();
+      Host.userMetrics.networkPanelMoreFiltersNumberOfSelectedChanged(selectedFilters.length);
+      for (const selectedFilter of selectedFilters) {
+        Host.userMetrics.networkPanelMoreFiltersItemSelected(selectedFilter);
+      }
+    }
+  }
+
+  #onSettingChanged(): void {
+    this.hasChanged = true;
+    this.filterChangedCallback();
   }
 
   showMoreFiltersContextMenu(event: Common.EventTarget.EventTargetEvent<Event>): void {
     const mouseEvent = event.data;
+    this.hasChanged = false;
 
-    this.networkHideDataURLSetting.addChangeListener(this.filterChangedCallback.bind(this));
-    this.networkHideChromeExtensionsSetting.addChangeListener(this.filterChangedCallback.bind(this));
-    this.networkShowBlockedCookiesOnlySetting.addChangeListener(this.filterChangedCallback.bind(this));
-    this.networkOnlyBlockedRequestsSetting.addChangeListener(this.filterChangedCallback.bind(this));
-    this.networkOnlyThirdPartySetting.addChangeListener(this.filterChangedCallback.bind(this));
+    this.networkHideDataURLSetting.addChangeListener(this.#onSettingChanged.bind(this));
+    this.networkHideChromeExtensionsSetting.addChangeListener(this.#onSettingChanged.bind(this));
+    this.networkShowBlockedCookiesOnlySetting.addChangeListener(this.#onSettingChanged.bind(this));
+    this.networkOnlyBlockedRequestsSetting.addChangeListener(this.#onSettingChanged.bind(this));
+    this.networkOnlyThirdPartySetting.addChangeListener(this.#onSettingChanged.bind(this));
     this.contextMenu = new UI.ContextMenu.ContextMenu(mouseEvent, {
       useSoftMenu: true,
       keepOpen: true,
       x: this.dropDownButton.element.getBoundingClientRect().left,
       y: this.dropDownButton.element.getBoundingClientRect().top +
           (this.dropDownButton.element as HTMLElement).offsetHeight,
+      onSoftMenuClosed: this.emitUMA.bind(this),
     });
 
     this.contextMenu.defaultSection().appendCheckboxItem(
@@ -2811,18 +2869,30 @@ export class MoreFiltersDropDownUI extends
     void this.contextMenu.show();
   }
 
-  updateActiveFiltersCount(): void {
-    const settings = [
-      this.networkHideDataURLSetting.get(),
-      this.networkHideChromeExtensionsSetting.get(),
-      this.networkShowBlockedCookiesOnlySetting.get(),
-      this.networkOnlyBlockedRequestsSetting.get(),
-      this.networkOnlyThirdPartySetting.get(),
+  selectedFilters(): string[] {
+    const filters = [
+      ...this.networkHideDataURLSetting.get() ? [i18nString(UIStrings.hideDataUrls)] : [],
+      ...this.networkHideChromeExtensionsSetting.get() ? [i18nString(UIStrings.chromeExtensions)] : [],
+      ...this.networkShowBlockedCookiesOnlySetting.get() ? [i18nString(UIStrings.hasBlockedCookies)] : [],
+      ...this.networkOnlyBlockedRequestsSetting.get() ? [i18nString(UIStrings.blockedRequests)] : [],
+      ...this.networkOnlyThirdPartySetting.get() ? [i18nString(UIStrings.thirdParty)] : [],
     ];
-    const count = settings.filter(Boolean).length;
+    return filters;
+  }
+
+  updateActiveFiltersCount(): void {
+    const count = this.selectedFilters().length;
     this.activeFiltersCount.textContent = count.toString();
     count ? this.activeFiltersCountAdorner.classList.remove('hidden') :
             this.activeFiltersCountAdorner.classList.add('hidden');
+  }
+
+  updateTooltip(): void {
+    if (this.selectedFilters().length) {
+      this.dropDownButton.setTitle(this.selectedFilters().join(', '));
+    } else {
+      this.dropDownButton.setTitle(UIStrings.showOnlyHideRequests);
+    }
   }
 
   discard(): void {

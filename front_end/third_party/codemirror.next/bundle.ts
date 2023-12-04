@@ -48,6 +48,7 @@ export {
 export {highlightTree, Tag, tags} from '@lezer/highlight';
 export {LRParser} from '@lezer/lr';
 export {StyleModule} from 'style-mod';
+export {indentationMarkers} from '@replit/codemirror-indentation-markers';
 
 export function angular() {
   return import('@codemirror/lang-angular');
@@ -91,9 +92,6 @@ export async function go() {
 }
 export function java() {
   return import('@codemirror/lang-java');
-}
-export function json() {
-  return import('@codemirror/lang-json');
 }
 export async function kotlin() {
   return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/clike')).kotlin);

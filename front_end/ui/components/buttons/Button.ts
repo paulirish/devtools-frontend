@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as LitHtml from '../../lit-html/lit-html.js';
+import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as ComponentHelpers from '../helpers/helpers.js';
 import * as IconButton from '../icon_button/icon_button.js';
 
@@ -16,6 +17,7 @@ declare global {
 
 export const enum Variant {
   PRIMARY = 'primary',
+  TONAL = 'tonal',
   SECONDARY = 'secondary',
   TOOLBAR = 'toolbar',
   // Just like toolbar but has a style similar to a primary button.
@@ -46,6 +48,7 @@ interface ButtonState {
   iconWidth?: string;
   iconHeight?: string;
   iconName?: string;
+  jslogContext?: string;
 }
 
 interface CommonButtonData {
@@ -61,6 +64,7 @@ interface CommonButtonData {
   title?: string;
   iconWidth?: string;
   iconHeight?: string;
+  jslogContext?: string;
 }
 
 export type ButtonData = CommonButtonData&(|{
@@ -70,7 +74,7 @@ export type ButtonData = CommonButtonData&(|{
   variant: Variant.PRIMARY_TOOLBAR | Variant.TOOLBAR | Variant.ROUND,
   iconName: string,
 }|{
-  variant: Variant.PRIMARY | Variant.SECONDARY,
+  variant: Variant.PRIMARY | Variant.SECONDARY | Variant.TONAL,
 });
 
 export class Button extends HTMLElement {
@@ -124,6 +128,7 @@ export class Button extends HTMLElement {
     }
     this.#setDisabledProperty(data.disabled || false);
     this.#props.title = data.title;
+    this.#props.jslogContext = data.jslogContext;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -183,6 +188,15 @@ export class Button extends HTMLElement {
 
   set spinner(spinner: boolean) {
     this.#props.spinner = spinner;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  get jslogContext(): string|undefined {
+    return this.#props.jslogContext;
+  }
+
+  set jslogContext(jslogContext: string|undefined) {
+    this.#props.jslogContext = jslogContext;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -255,6 +269,7 @@ export class Button extends HTMLElement {
     const hasIcon = Boolean(this.#props.iconUrl) || Boolean(this.#props.iconName);
     const classes = {
       primary: this.#props.variant === Variant.PRIMARY,
+      tonal: this.#props.variant === Variant.TONAL,
       secondary: this.#props.variant === Variant.SECONDARY,
       toolbar: this.#isToolbarVariant(),
       'primary-toolbar': this.#props.variant === Variant.PRIMARY_TOOLBAR,
@@ -272,10 +287,12 @@ export class Button extends HTMLElement {
       disabled: Boolean(this.#props.disabled),
       'spinner-component': true,
     };
+    const jslog =
+        this.#props.jslogContext && VisualLogging.action().track({click: true}).context(this.#props.jslogContext);
     // clang-format off
     LitHtml.render(
       LitHtml.html`
-        <button title=${LitHtml.Directives.ifDefined(this.#props.title)} .disabled=${this.#props.disabled} class=${LitHtml.Directives.classMap(classes)}>
+        <button title=${LitHtml.Directives.ifDefined(this.#props.title)} .disabled=${this.#props.disabled} class=${LitHtml.Directives.classMap(classes)} jslog=${LitHtml.Directives.ifDefined(jslog)}>
           ${hasIcon ? LitHtml.html`<${IconButton.Icon.Icon.litTagName}
             .data=${{
               iconPath: this.#props.iconUrl,

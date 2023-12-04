@@ -41,7 +41,7 @@ import * as Bindings from '../../models/bindings/bindings.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import * as NetworkForward from '../../panels/network/forward/forward.js';
+import type * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -159,7 +159,10 @@ const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkPanel.ts', UIStr
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let networkPanelInstance: NetworkPanel;
 
-export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provider, UI.View.ViewLocationResolver {
+export class NetworkPanel extends UI.Panel.Panel implements
+    UI.ContextMenu
+        .Provider<SDK.NetworkRequest.NetworkRequest|SDK.Resource.Resource|Workspace.UISourceCode.UISourceCode>,
+    UI.View.ViewLocationResolver {
   private readonly networkLogShowOverviewSetting: Common.Settings.Setting<boolean>;
   private readonly networkLogLargeRowsSetting: Common.Settings.Setting<boolean>;
   private readonly networkRecordFilmStripSetting: Common.Settings.Setting<boolean>;
@@ -200,9 +203,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.networkLogLargeRowsSetting = Common.Settings.Settings.instance().createSetting('networkLogLargeRows', false);
     this.networkRecordFilmStripSetting =
         Common.Settings.Settings.instance().createSetting('networkRecordFilmStripSetting', false);
-    this.toggleRecordAction =
-        (UI.ActionRegistry.ActionRegistry.instance().action('network.toggle-recording') as
-         UI.ActionRegistration.Action);
+    this.toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('network.toggle-recording');
     this.networkItemView = null;
     this.filmStripView = null;
     this.filmStripRecorder = null;
@@ -289,10 +290,8 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 
     this.closeButtonElement = document.createElement('div', {is: 'dt-close-button'});
     this.closeButtonElement.addEventListener('click', async () => {
-      const action = UI.ActionRegistry.ActionRegistry.instance().action('network.hide-request-details');
-      if (action) {
-        await action.execute();
-      }
+      const action = UI.ActionRegistry.ActionRegistry.instance().getAction('network.hide-request-details');
+      await action.execute();
     }, false);
     this.closeButtonElement.style.margin = '0 5px';
 
@@ -382,10 +381,8 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 
   private async searchToggleClick(): Promise<void> {
-    const action = UI.ActionRegistry.ActionRegistry.instance().action('network.search');
-    if (action) {
-      await action.execute();
-    }
+    const action = UI.ActionRegistry.ActionRegistry.instance().getAction('network.search');
+    await action.execute();
   }
 
   private setupToolbarButtons(splitWidget: UI.SplitWidget.SplitWidget): void {
@@ -398,8 +395,7 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
       }
     }
     this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));
-    this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(
-        (UI.ActionRegistry.ActionRegistry.instance().action('network.clear') as UI.ActionRegistration.Action)));
+    this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('network.clear'));
     this.panelToolbar.appendSeparator();
 
     this.panelToolbar.appendToolbarItem(this.filterBar.filterButton());
@@ -715,47 +711,41 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     }
   }
 
-  appendApplicableItems(this: NetworkPanel, event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object):
-      void {
-    function reveal(this: NetworkPanel, request: SDK.NetworkRequest.NetworkRequest): void {
-      void UI.ViewManager.ViewManager.instance()
-          .showView('network')
-          .then(this.networkLogView.resetFilter.bind(this.networkLogView))
-          .then(this.revealAndHighlightRequest.bind(this, request));
-    }
+  appendApplicableItems(
+      this: NetworkPanel, event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+      target: SDK.NetworkRequest.NetworkRequest|SDK.Resource.Resource|Workspace.UISourceCode.UISourceCode): void {
+    const appendRevealItem = (request: SDK.NetworkRequest.NetworkRequest): void => {
+      contextMenu.revealSection().appendItem(
+          i18nString(UIStrings.revealInNetworkPanel),
+          () => UI.ViewManager.ViewManager.instance()
+                    .showView('network')
+                    .then(this.networkLogView.resetFilter.bind(this.networkLogView))
+                    .then(this.revealAndHighlightRequest.bind(this, request)));
+    };
 
-    function appendRevealItem(this: NetworkPanel, request: SDK.NetworkRequest.NetworkRequest): void {
-      contextMenu.revealSection().appendItem(i18nString(UIStrings.revealInNetworkPanel), reveal.bind(this, request));
-    }
     if ((event.target as Node).isSelfOrDescendant(this.element)) {
       return;
     }
 
     if (target instanceof SDK.Resource.Resource) {
-      const resource = (target as SDK.Resource.Resource);
-      if (resource.request) {
-        appendRevealItem.call(this, resource.request);
+      if (target.request) {
+        appendRevealItem(target.request);
       }
       return;
     }
     if (target instanceof Workspace.UISourceCode.UISourceCode) {
-      const uiSourceCode = (target as Workspace.UISourceCode.UISourceCode);
-      const resource = Bindings.ResourceUtils.resourceForURL(uiSourceCode.url());
+      const resource = Bindings.ResourceUtils.resourceForURL(target.url());
       if (resource && resource.request) {
-        appendRevealItem.call(this, resource.request);
+        appendRevealItem(resource.request);
       }
       return;
     }
 
-    if (!(target instanceof SDK.NetworkRequest.NetworkRequest)) {
-      return;
-    }
-    const request = (target as SDK.NetworkRequest.NetworkRequest);
-    if (this.networkItemView && this.networkItemView.isShowing() && this.networkItemView.request() === request) {
+    if (this.networkItemView && this.networkItemView.isShowing() && this.networkItemView.request() === target) {
       return;
     }
 
-    appendRevealItem.call(this, request);
+    appendRevealItem(target);
   }
 
   private onFilmFrameSelected(event: Common.EventTarget.EventTargetEvent<number>): void {
@@ -793,86 +783,24 @@ export class NetworkPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
   }
 }
 
-let contextMenuProviderInstance: ContextMenuProvider;
-
-export class ContextMenuProvider implements UI.ContextMenu.Provider {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ContextMenuProvider {
-    const {forceNew} = opts;
-    if (!contextMenuProviderInstance || forceNew) {
-      contextMenuProviderInstance = new ContextMenuProvider();
-    }
-
-    return contextMenuProviderInstance;
-  }
-  appendApplicableItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    NetworkPanel.instance().appendApplicableItems(event, contextMenu, target);
-  }
-}
-let requestRevealerInstance: RequestRevealer;
-export class RequestRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): RequestRevealer {
-    const {forceNew} = opts;
-    if (!requestRevealerInstance || forceNew) {
-      requestRevealerInstance = new RequestRevealer();
-    }
-
-    return requestRevealerInstance;
-  }
-
-  reveal(request: Object): Promise<void> {
-    if (!(request instanceof SDK.NetworkRequest.NetworkRequest)) {
-      return Promise.reject(new Error('Internal error: not a network request'));
-    }
+export class RequestRevealer implements Common.Revealer.Revealer<SDK.NetworkRequest.NetworkRequest> {
+  reveal(request: SDK.NetworkRequest.NetworkRequest): Promise<void> {
     const panel = NetworkPanel.instance();
     return UI.ViewManager.ViewManager.instance().showView('network').then(
         panel.revealAndHighlightRequest.bind(panel, request));
   }
 }
 
-let requestIdRevealerInstance: RequestIdRevealer;
-export class RequestIdRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): RequestIdRevealer {
-    const {forceNew} = opts;
-    if (!requestIdRevealerInstance || forceNew) {
-      requestIdRevealerInstance = new RequestIdRevealer();
-    }
-
-    return requestIdRevealerInstance;
-  }
-
-  reveal(requestId: Object): Promise<void> {
-    if (!(requestId instanceof NetworkForward.NetworkRequestId.NetworkRequestId)) {
-      return Promise.reject(new Error('Internal error: not a network request ID'));
-    }
+export class RequestIdRevealer implements Common.Revealer.Revealer<NetworkForward.NetworkRequestId.NetworkRequestId> {
+  reveal(requestId: NetworkForward.NetworkRequestId.NetworkRequestId): Promise<void> {
     const panel = NetworkPanel.instance();
     return UI.ViewManager.ViewManager.instance().showView('network').then(
         panel.revealAndHighlightRequestWithId.bind(panel, requestId));
   }
 }
 
-let networkLogWithFilterRevealerInstance: NetworkLogWithFilterRevealer;
-export class NetworkLogWithFilterRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): NetworkLogWithFilterRevealer {
-    const {forceNew} = opts;
-    if (!networkLogWithFilterRevealerInstance || forceNew) {
-      networkLogWithFilterRevealerInstance = new NetworkLogWithFilterRevealer();
-    }
-
-    return networkLogWithFilterRevealerInstance;
-  }
-
-  reveal(request: Object): Promise<void> {
-    if (!(request instanceof NetworkForward.UIFilter.UIRequestFilter)) {
-      return Promise.reject(new Error('Internal error: not a UIRequestFilter'));
-    }
+export class NetworkLogWithFilterRevealer implements Common.Revealer.Revealer<NetworkForward.UIFilter.UIRequestFilter> {
+  reveal(request: NetworkForward.UIFilter.UIRequestFilter): Promise<void> {
     return NetworkPanel.revealAndFilter(request.filters);
   }
 }
@@ -982,23 +910,10 @@ export class FilmStripRecorder implements TraceEngine.TracingManager.TracingMana
   }
 }
 
-let networkActionDelegateInstance: ActionDelegate;
-
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {
-    forceNew: boolean|null,
-  }|undefined = {forceNew: null}): ActionDelegate {
-    const {forceNew} = opts;
-    if (!networkActionDelegateInstance || forceNew) {
-      networkActionDelegateInstance = new ActionDelegate();
-    }
-    return networkActionDelegateInstance;
-  }
-
   handleAction(context: UI.Context.Context, actionId: string): boolean {
-    const panel = UI.Context.Context.instance().flavor(NetworkPanel);
-    console.assert(Boolean(panel && panel instanceof NetworkPanel));
-    if (!panel) {
+    const panel = context.flavor(NetworkPanel);
+    if (panel === null) {
       return false;
     }
     switch (actionId) {
@@ -1035,21 +950,9 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   }
 }
 
-let requestLocationRevealerInstance: RequestLocationRevealer;
-
-export class RequestLocationRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  }|undefined = {forceNew: null}): RequestLocationRevealer {
-    const {forceNew} = opts;
-    if (!requestLocationRevealerInstance || forceNew) {
-      requestLocationRevealerInstance = new RequestLocationRevealer();
-    }
-    return requestLocationRevealerInstance;
-  }
-
-  async reveal(match: Object): Promise<void> {
-    const location = match as NetworkForward.UIRequestLocation.UIRequestLocation;
+export class RequestLocationRevealer implements
+    Common.Revealer.Revealer<NetworkForward.UIRequestLocation.UIRequestLocation> {
+  async reveal(location: NetworkForward.UIRequestLocation.UIRequestLocation): Promise<void> {
     const view =
         await NetworkPanel.instance().selectAndActivateRequest(location.request, location.tab, location.filterOptions);
     if (!view) {
@@ -1090,7 +993,7 @@ export class SearchNetworkView extends Search.SearchView.SearchView {
   static async openSearch(query: string, searchImmediately?: boolean): Promise<Search.SearchView.SearchView> {
     await UI.ViewManager.ViewManager.instance().showView('network.search-network-tab');
     const searchView = SearchNetworkView.instance();
-    void searchView.toggle(query, Boolean(searchImmediately));
+    searchView.toggle(query, Boolean(searchImmediately));
     return searchView;
   }
 

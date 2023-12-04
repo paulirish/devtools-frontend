@@ -38,6 +38,7 @@ import * as LinearMemoryInspector from '../../ui/components/linear_memory_inspec
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import scopeChainSidebarPaneStyles from './scopeChainSidebarPane.css.js';
 
@@ -90,6 +91,7 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
   private constructor() {
     super(true);
 
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane().context('debugger-scope')}`);
     this.treeOutline = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionsTreeOutline();
 
     this.treeOutline.setShowSelectionOnKeyboardFocus(/* show */ true);
@@ -299,35 +301,23 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
   }
 }
 
-let openLinearMemoryInspectorInstance: OpenLinearMemoryInspector;
-
-export class OpenLinearMemoryInspector extends UI.Widget.VBox implements UI.ContextMenu.Provider {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): OpenLinearMemoryInspector {
-    const {forceNew} = opts;
-    if (!openLinearMemoryInspectorInstance || forceNew) {
-      openLinearMemoryInspectorInstance = new OpenLinearMemoryInspector();
-    }
-
-    return openLinearMemoryInspectorInstance;
-  }
-
-  appendApplicableItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    if (target instanceof ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement) {
-      if (target.property && target.property.value &&
-          LinearMemoryInspector.LinearMemoryInspectorController.isMemoryObjectProperty(target.property.value)) {
-        const expression = target.path();
-        contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.revealInMemoryInspectorPanel),
-            this.openMemoryInspector.bind(this, expression, target.property.value));
-      }
+export class OpenLinearMemoryInspector extends UI.Widget.VBox implements
+    UI.ContextMenu.Provider<ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement> {
+  appendApplicableItems(
+      event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+      target: ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement): void {
+    if (target.property && target.property.value &&
+        LinearMemoryInspector.LinearMemoryInspectorController.isMemoryObjectProperty(target.property.value)) {
+      const expression = target.path();
+      contextMenu.debugSection().appendItem(
+          i18nString(UIStrings.revealInMemoryInspectorPanel),
+          this.openMemoryInspector.bind(this, expression, target.property.value));
     }
   }
 
   private async openMemoryInspector(expression: string, obj: SDK.RemoteObject.RemoteObject): Promise<void> {
     const controller = LinearMemoryInspector.LinearMemoryInspectorController.LinearMemoryInspectorController.instance();
     Host.userMetrics.linearMemoryInspectorRevealedFrom(Host.UserMetrics.LinearMemoryInspectorRevealedFrom.ContextMenu);
-    void controller.openInspectorView(obj, /* address */ undefined, expression);
+    void controller.openInspectorView(obj, expression);
   }
 }

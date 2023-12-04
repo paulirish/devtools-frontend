@@ -19,7 +19,15 @@ import type {Readable} from 'stream';
 import type * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import type Protocol from 'devtools-protocol';
 
-import {firstValueFrom, from, raceWith} from '../../third_party/rxjs/rxjs.js';
+import type {Observable, ObservableInput} from '../../third_party/rxjs/rxjs.js';
+import {
+  first,
+  firstValueFrom,
+  forkJoin,
+  from,
+  map,
+  raceWith,
+} from '../../third_party/rxjs/rxjs.js';
 import type {CDPSession} from '../api/CDPSession.js';
 import type {WaitForOptions} from '../api/Frame.js';
 import {
@@ -39,11 +47,7 @@ import {
   ConsoleMessage,
   type ConsoleMessageLocation,
 } from '../common/ConsoleMessage.js';
-import {
-  ProtocolError,
-  TargetCloseError,
-  TimeoutError,
-} from '../common/Errors.js';
+import {TargetCloseError, UnsupportedOperation} from '../common/Errors.js';
 import type {Handler} from '../common/EventEmitter.js';
 import {NetworkManagerEvent} from '../common/NetworkManagerEvents.js';
 import type {PDFOptions} from '../common/PDFOptions.js';
@@ -51,10 +55,10 @@ import type {Awaitable} from '../common/types.js';
 import {
   debugError,
   evaluationString,
+  NETWORK_IDLE_TIME,
   timeout,
   validateDialogType,
   waitForHTTP,
-  waitWithTimeout,
 } from '../common/util.js';
 import type {Viewport} from '../common/Viewport.js';
 import {assert} from '../util/assert.js';
@@ -66,7 +70,6 @@ import type {BidiBrowserContext} from './BrowserContext.js';
 import {
   BrowsingContextEvent,
   CdpSessionWrapper,
-  getWaitUntilSingle,
   type BrowsingContext,
 } from './BrowsingContext.js';
 import type {BidiConnection} from './Connection.js';
@@ -74,11 +77,13 @@ import {BidiDeserializer} from './Deserializer.js';
 import {BidiDialog} from './Dialog.js';
 import {BidiElementHandle} from './ElementHandle.js';
 import {EmulationManager} from './EmulationManager.js';
-import {BidiFrame, lifeCycleToReadinessState} from './Frame.js';
+import {BidiFrame} from './Frame.js';
 import type {BidiHTTPRequest} from './HTTPRequest.js';
 import type {BidiHTTPResponse} from './HTTPResponse.js';
 import {BidiKeyboard, BidiMouse, BidiTouchscreen} from './Input.js';
 import type {BidiJSHandle} from './JSHandle.js';
+import type {BiDiNetworkIdle} from './lifecycle.js';
+import {getBiDiReadinessState, rewriteNavigationError} from './lifecycle.js';
 import {BidiNetworkManager} from './NetworkManager.js';
 import {createBidiHandle} from './Realm.js';
 
@@ -460,7 +465,7 @@ export class BidiPage extends Page {
     this.emit(PageEvent.Dialog, dialog);
   }
 
-  getNavigationResponse(id: string | null): BidiHTTPResponse | null {
+  getNavigationResponse(id?: string | null): BidiHTTPResponse | null {
     return this.#networkManager.getNavigationResponse(id);
   }
 
@@ -489,32 +494,24 @@ export class BidiPage extends Page {
   ): Promise<BidiHTTPResponse | null> {
     const {
       waitUntil = 'load',
-      timeout = this._timeoutSettings.navigationTimeout(),
+      timeout: ms = this._timeoutSettings.navigationTimeout(),
     } = options;
 
-    const readinessState = lifeCycleToReadinessState.get(
-      getWaitUntilSingle(waitUntil)
-    ) as Bidi.BrowsingContext.ReadinessState;
+    const [readiness, networkIdle] = getBiDiReadinessState(waitUntil);
 
-    try {
-      const {result} = await waitWithTimeout(
+    const response = await firstValueFrom(
+      this._waitWithNetworkIdle(
         this.#connection.send('browsingContext.reload', {
           context: this.mainFrame()._id,
-          wait: readinessState,
+          wait: readiness,
         }),
-        'Navigation',
-        timeout
-      );
+        networkIdle
+      )
+        .pipe(raceWith(timeout(ms), from(this.#closedDeferred.valueOrThrow())))
+        .pipe(rewriteNavigationError(this.url(), ms))
+    );
 
-      return this.getNavigationResponse(result.navigation);
-    } catch (error) {
-      if (error instanceof ProtocolError) {
-        error.message += ` at ${this.url}`;
-      } else if (error instanceof TimeoutError) {
-        error.message = 'Navigation timeout of ' + timeout + ' ms exceeded';
-      }
-      throw error;
-    }
+    return this.getNavigationResponse(response?.result.navigation);
   }
 
   override setDefaultNavigationTimeout(timeout: number): void {
@@ -652,29 +649,34 @@ export class BidiPage extends Page {
     const {clip, type, captureBeyondViewport, allowViewportExpansion, quality} =
       options;
     if (captureBeyondViewport && !allowViewportExpansion) {
-      throw new Error(
+      throw new UnsupportedOperation(
         `BiDi does not support 'captureBeyondViewport'. Use 'allowViewportExpansion'.`
       );
     }
     if (options.omitBackground !== undefined && options.omitBackground) {
-      throw new Error(`BiDi does not support 'omitBackground'.`);
+      throw new UnsupportedOperation(`BiDi does not support 'omitBackground'.`);
     }
     if (options.optimizeForSpeed !== undefined && options.optimizeForSpeed) {
-      throw new Error(`BiDi does not support 'optimizeForSpeed'.`);
+      throw new UnsupportedOperation(
+        `BiDi does not support 'optimizeForSpeed'.`
+      );
     }
     if (options.fromSurface !== undefined && !options.fromSurface) {
-      throw new Error(`BiDi does not support 'fromSurface'.`);
+      throw new UnsupportedOperation(`BiDi does not support 'fromSurface'.`);
     }
     if (clip !== undefined && clip.scale !== undefined && clip.scale !== 1) {
-      throw new Error(`BiDi does not support 'scale' in 'clip'.`);
+      throw new UnsupportedOperation(
+        `BiDi does not support 'scale' in 'clip'.`
+      );
     }
+
     const {
       result: {data},
     } = await this.#connection.send('browsingContext.captureScreenshot', {
       context: this.mainFrame()._id,
       format: {
         type: `image/${type}`,
-        ...(quality === undefined ? {} : {quality: quality / 100}),
+        quality: quality ? quality / 100 : undefined,
       },
       clip: clip && {
         type: 'box',
@@ -719,13 +721,42 @@ export class BidiPage extends Page {
   override async waitForNetworkIdle(
     options: {idleTime?: number; timeout?: number} = {}
   ): Promise<void> {
-    const {idleTime = 500, timeout = this._timeoutSettings.timeout()} = options;
+    const {
+      idleTime = NETWORK_IDLE_TIME,
+      timeout: ms = this._timeoutSettings.timeout(),
+    } = options;
 
-    await this._waitForNetworkIdle(
-      this.#networkManager,
-      idleTime,
-      timeout,
-      this.#closedDeferred
+    await firstValueFrom(
+      this._waitForNetworkIdle(this.#networkManager, idleTime).pipe(
+        raceWith(timeout(ms), from(this.#closedDeferred.valueOrThrow()))
+      )
+    );
+  }
+
+  /** @internal */
+  _waitWithNetworkIdle(
+    observableInput: ObservableInput<{
+      result: Bidi.BrowsingContext.NavigateResult;
+    } | null>,
+    networkIdle: BiDiNetworkIdle
+  ): Observable<{
+    result: Bidi.BrowsingContext.NavigateResult;
+  } | null> {
+    const delay = networkIdle
+      ? this._waitForNetworkIdle(
+          this.#networkManager,
+          NETWORK_IDLE_TIME,
+          networkIdle === 'networkidle0' ? 0 : 2
+        )
+      : from(Promise.resolve());
+
+    return forkJoin([
+      from(observableInput).pipe(first()),
+      delay.pipe(first()),
+    ]).pipe(
+      map(([response]) => {
+        return response;
+      })
     );
   }
 
@@ -755,7 +786,7 @@ export class BidiPage extends Page {
     const expression = evaluationExpression(pageFunction, ...args);
     const {result} = await this.#connection.send('script.addPreloadScript', {
       functionDeclaration: expression,
-      // TODO: should change spec to accept browsingContext
+      contexts: [this.mainFrame()._id],
     });
 
     return {identifier: result.script};
@@ -790,6 +821,83 @@ export class BidiPage extends Page {
     await this._client().send('Network.setCacheDisabled', {
       cacheDisabled: !enabled,
     });
+  }
+
+  override isServiceWorkerBypassed(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override target(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override waitForFileChooser(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override workers(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override setRequestInterception(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override setDragInterception(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override setBypassServiceWorker(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override setOfflineMode(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override emulateNetworkConditions(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override cookies(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override setCookie(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override deleteCookie(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override removeExposedFunction(): never {
+    // TODO: Quick win?
+    throw new UnsupportedOperation();
+  }
+
+  override authenticate(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override setExtraHTTPHeaders(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override metrics(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override goBack(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override goForward(): never {
+    throw new UnsupportedOperation();
+  }
+
+  override waitForDevicePrompt(): never {
+    throw new UnsupportedOperation();
   }
 }
 

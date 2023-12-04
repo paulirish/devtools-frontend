@@ -51,21 +51,13 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/persistence/PersistenceActions.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let contextMenuProviderInstance: ContextMenuProvider;
-
-export class ContextMenuProvider implements UI.ContextMenu.Provider {
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): ContextMenuProvider {
-    const {forceNew} = opts;
-    if (!contextMenuProviderInstance || forceNew) {
-      contextMenuProviderInstance = new ContextMenuProvider();
-    }
-
-    return contextMenuProviderInstance;
-  }
-
-  appendApplicableItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    const contentProvider = target as TextUtils.ContentProvider.ContentProvider;
-
+export class ContextMenuProvider implements
+    UI.ContextMenu
+        .Provider<Workspace.UISourceCode.UISourceCode|SDK.Resource.Resource|SDK.NetworkRequest.NetworkRequest> {
+  appendApplicableItems(
+      _event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+      contentProvider: Workspace.UISourceCode.UISourceCode|SDK.Resource.Resource|
+      SDK.NetworkRequest.NetworkRequest): void {
     async function saveAs(): Promise<void> {
       if (contentProvider instanceof Workspace.UISourceCode.UISourceCode) {
         (contentProvider as Workspace.UISourceCode.UISourceCode).commitWorkingCopy();
@@ -102,7 +94,7 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
     const binding = uiSourceCode && PersistenceImpl.instance().binding(uiSourceCode);
     const fileURL = binding ? binding.fileSystem.contentURL() : contentProvider.contentURL();
 
-    if (fileURL.startsWith('file://')) {
+    if (Common.ParsedURL.schemeIs(fileURL, 'file:')) {
       const path = Common.ParsedURL.ParsedURL.urlToRawPathString(fileURL, Host.Platform.isWin());
       contextMenu.revealSection().appendItem(
           i18nString(UIStrings.openInContainingFolder),
@@ -130,7 +122,7 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
         }
       }
     } else {
-      contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), () => {}, true);
+      contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), () => {}, {disabled: true});
     }
 
     if (contentProvider instanceof SDK.NetworkRequest.NetworkRequest) {

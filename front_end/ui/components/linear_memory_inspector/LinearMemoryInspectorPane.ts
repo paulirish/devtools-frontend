@@ -5,18 +5,18 @@
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as UI from '../../legacy/legacy.js';
+import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
+import {DeleteMemoryHighlightEvent} from './LinearMemoryHighlightChipList.js';
 import {
   AddressChangedEvent,
   LinearMemoryInspector,
   MemoryRequestEvent,
-  SettingsChangedEvent,
   type Settings,
+  SettingsChangedEvent,
 } from './LinearMemoryInspector.js';
-
-import {LinearMemoryInspectorController, type LazyUint8Array} from './LinearMemoryInspectorController.js';
+import {type LazyUint8Array, LinearMemoryInspectorController} from './LinearMemoryInspectorController.js';
 import {type HighlightInfo} from './LinearMemoryViewerUtils.js';
-import {DeleteMemoryHighlightEvent} from './LinearMemoryHighlightChipList.js';
 
 const UIStrings = {
   /**
@@ -28,39 +28,15 @@ const UIStrings = {
 const str_ =
     i18n.i18n.registerUIStrings('ui/components/linear_memory_inspector/LinearMemoryInspectorPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-let inspectorInstance: LinearMemoryInspectorPaneImpl;
+let inspectorInstance: LinearMemoryInspectorPane;
 
-let wrapperInstance: Wrapper;
-
-export class Wrapper extends UI.Widget.VBox {
-  view: LinearMemoryInspectorPaneImpl;
-  private constructor() {
-    super();
-    this.view = LinearMemoryInspectorPaneImpl.instance();
-  }
-
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): Wrapper {
-    const {forceNew} = opts;
-    if (!wrapperInstance || forceNew) {
-      wrapperInstance = new Wrapper();
-    }
-
-    return wrapperInstance;
-  }
-
-  override wasShown(): void {
-    this.view.show(this.contentElement);
-  }
-}
-
-export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
+export class LinearMemoryInspectorPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
     UI.Widget.VBox) {
   readonly #tabbedPane: UI.TabbedPane.TabbedPane;
-  readonly #tabIdToInspectorView: Map<string, LinearMemoryInspectorView>;
+
   constructor() {
     super(false);
+    this.element.setAttribute('jslog', `${VisualLogging.panel().context('linear-memory-inspector')}`);
     const placeholder = document.createElement('div');
     placeholder.textContent = i18nString(UIStrings.noOpenInspections);
     placeholder.style.display = 'flex';
@@ -70,29 +46,25 @@ export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMix
     this.#tabbedPane.setAllowTabReorder(true, true);
     this.#tabbedPane.addEventListener(UI.TabbedPane.Events.TabClosed, this.#tabClosed, this);
     this.#tabbedPane.show(this.contentElement);
-
-    this.#tabIdToInspectorView = new Map();
   }
 
-  static instance(): LinearMemoryInspectorPaneImpl {
+  static instance(): LinearMemoryInspectorPane {
     if (!inspectorInstance) {
-      inspectorInstance = new LinearMemoryInspectorPaneImpl();
+      inspectorInstance = new LinearMemoryInspectorPane();
     }
     return inspectorInstance;
   }
 
-  // Introduced to access Views for testings.
-  getViewForTabId(tabId: string): LinearMemoryInspectorView {
-    const view = this.#tabIdToInspectorView.get(tabId);
-    if (!view) {
+  #tabView(tabId: string): LinearMemoryInspectorView {
+    const view = this.#tabbedPane.tabView(tabId);
+    if (view === null) {
       throw new Error(`No linear memory inspector view for the given tab id: ${tabId}`);
     }
-    return view;
+    return view as LinearMemoryInspectorView;
   }
 
   create(tabId: string, title: string, arrayWrapper: LazyUint8Array, address?: number): void {
     const inspectorView = new LinearMemoryInspectorView(arrayWrapper, address, tabId);
-    this.#tabIdToInspectorView.set(tabId, inspectorView);
     this.#tabbedPane.appendTab(tabId, title, inspectorView, undefined, false, true);
     this.#tabbedPane.selectTab(tabId);
   }
@@ -102,7 +74,7 @@ export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMix
   }
 
   reveal(tabId: string, address?: number): void {
-    const view = this.getViewForTabId(tabId);
+    const view = this.#tabView(tabId);
 
     if (address !== undefined) {
       view.updateAddress(address);
@@ -112,13 +84,12 @@ export class LinearMemoryInspectorPaneImpl extends Common.ObjectWrapper.eventMix
   }
 
   refreshView(tabId: string): void {
-    const view = this.getViewForTabId(tabId);
+    const view = this.#tabView(tabId);
     view.refreshData();
   }
 
   #tabClosed(event: Common.EventTarget.EventTargetEvent<UI.TabbedPane.EventData>): void {
     const {tabId} = event.data;
-    this.#tabIdToInspectorView.delete(tabId);
     this.dispatchEventToListeners(Events.ViewClosed, tabId);
   }
 }

@@ -184,6 +184,10 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.markers = markers;
   }
 
+  getMarkers(): Map<number, Element> {
+    return this.markers;
+  }
+
   private updateMarkers(): void {
     const filteredMarkers = new Map<number, Element>();
     for (const time of this.markers.keys()) {
@@ -282,7 +286,7 @@ export enum Events {
 export interface WindowChangedEvent {
   startTime: number;
   endTime: number;
-  breadcrumb?: TraceEngine.Types.Timing.TraceWindow;
+  breadcrumb?: TraceEngine.Types.Timing.TraceWindowMicroSeconds;
 }
 
 export interface BreadcrumbAddedEvent {
@@ -338,7 +342,7 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
   }
 
   update(): void {
-    this.resetCanvas();
+    throw new Error('Not implemented');
   }
 
   dispose(): void {
