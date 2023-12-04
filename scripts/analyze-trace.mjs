@@ -5,19 +5,25 @@
 // Run this first:
 //    front_end/models/trace/build-trace-engine-lib.sh
 
+/* eslint-disable rulesdir/es_modules_import */
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-// eslint-disable-next-line rulesdir/es_modules_import
-import * as TraceModel from '../out/Default/gen/trace_engine/trace.mjs';
+
+/** @typedef {import('../front_end/models/trace/trace.ts')} TraceEngine */
+
+/** @type {TraceEngine} */
+import * as TraceEngine from '../out/Default/gen/trace_engine/trace.mjs';
 
 polyfillDOMRect();
 
-
+/**
+ * @param {string} filename
+ * @returns {Promise<TraceEngine.TraceModel>}
+ */
 export async function analyzeTrace(filename) {
   const traceEvents = loadTraceEventsFromFile(filename);
 
-  // Primary usage:
-  const processor = TraceModel.Processor.TraceProcessor.createWithAllHandlers(); // aka `fullTraceEngine`
+  const processor = TraceEngine.Processor.TraceProcessor.createWithAllHandlers(TraceEngine.Types.Configuration.DEFAULT); // aka `fullTraceEngine`
   await processor.parse(traceEvents);
   return processor.data;
 }
@@ -29,8 +35,8 @@ if (import.meta.url.endsWith(process?.argv[1])) {
 
 async function cli() {
   const filename = process.argv.at(2);
-  const traceModel = await analyzeTrace(filename);
-  console.log(traceModel);
+  const TraceEngine = await analyzeTrace(filename);
+  console.log(TraceEngine);
 }
 
 

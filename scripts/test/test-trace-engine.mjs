@@ -11,7 +11,7 @@ const filename = './test/unittests/fixtures/traces/invalid-animation-events.json
 const data = await analyzeTrace(filename);
 
 test('key values are populated', t => {
-  assert.equal(data.Renderer.allRendererEvents.length > 90_000, true);
+  assert.equal(data.Renderer.allTraceEntries.length > 90_000, true);
   assert.equal(data.Screenshots.length > 2, true);
   assert.equal(data.Meta.threadsInProcess.size > 2, true);
   assert.equal(data.Meta.mainFrameNavigations.length > 0, true);
