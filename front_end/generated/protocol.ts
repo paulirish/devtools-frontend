@@ -5648,6 +5648,18 @@ export namespace Emulation {
     maskLength: integer;
   }
 
+  export const enum DevicePostureType {
+    Continuous = 'continuous',
+    Folded = 'folded',
+  }
+
+  export interface DevicePosture {
+    /**
+     * Current posture of the device
+     */
+    type: DevicePostureType;
+  }
+
   export interface MediaFeature {
     name: string;
     value: string;
@@ -5842,6 +5854,11 @@ export namespace Emulation {
      * is turned-off.
      */
     displayFeature?: DisplayFeature;
+    /**
+     * If set, the posture of a foldable device. If not set the posture is set
+     * to continuous.
+     */
+    devicePosture?: DevicePosture;
   }
 
   export interface SetScrollbarsHiddenRequest {
@@ -8147,6 +8164,10 @@ export namespace Network {
     UnspecifiedReason = 'unspecifiedReason',
   }
 
+  export interface ServiceWorkerRouterInfo {
+    ruleIdMatched: integer;
+  }
+
   /**
    * HTTP response data.
    */
@@ -8211,6 +8232,10 @@ export namespace Network {
      * Specifies that the request was served from the prefetch cache.
      */
     fromPrefetchCache?: boolean;
+    /**
+     * Infomation about how Service Worker Static Router was used.
+     */
+    serviceWorkerRouterInfo?: ServiceWorkerRouterInfo;
     /**
      * Total number of bytes received for this request so far.
      */
@@ -10996,6 +11021,7 @@ export namespace Page {
     SyncXhr = 'sync-xhr',
     Unload = 'unload',
     Usb = 'usb',
+    UsbUnrestricted = 'usb-unrestricted',
     VerticalScroll = 'vertical-scroll',
     WebPrinting = 'web-printing',
     WebShare = 'web-share',
@@ -11951,13 +11977,6 @@ export namespace Page {
     adScriptId?: AdScriptId;
   }
 
-  export interface GetCookiesResponse extends ProtocolResponseWithError {
-    /**
-     * Array of cookie objects.
-     */
-    cookies: Network.Cookie[];
-  }
-
   export interface GetFrameTreeResponse extends ProtocolResponseWithError {
     /**
      * Present frame tree structure.
@@ -12176,6 +12195,10 @@ export namespace Page {
      * Whether or not to generate tagged (accessible) PDF. Defaults to embedder choice.
      */
     generateTaggedPDF?: boolean;
+    /**
+     * Whether or not to embed the document outline into the PDF.
+     */
+    generateDocumentOutline?: boolean;
   }
 
   export interface PrintToPDFResponse extends ProtocolResponseWithError {
@@ -15729,6 +15752,18 @@ export namespace WebAuthn {
      * Defaults to false.
      */
     isUserVerified?: boolean;
+    /**
+     * Credentials created by this authenticator will have the backup
+     * eligibility (BE) flag set to this value. Defaults to false.
+     * https://w3c.github.io/webauthn/#sctn-credential-backup
+     */
+    defaultBackupEligibility?: boolean;
+    /**
+     * Credentials created by this authenticator will have the backup state
+     * (BS) flag set to this value. Defaults to false.
+     * https://w3c.github.io/webauthn/#sctn-credential-backup
+     */
+    defaultBackupState?: boolean;
   }
 
   export interface Credential {
@@ -16352,6 +16387,7 @@ export namespace FedCm {
     AccountChooser = 'AccountChooser',
     AutoReauthn = 'AutoReauthn',
     ConfirmIdpLogin = 'ConfirmIdpLogin',
+    Error = 'Error',
   }
 
   /**
@@ -16359,6 +16395,8 @@ export namespace FedCm {
    */
   export const enum DialogButton {
     ConfirmIdpLoginContinue = 'ConfirmIdpLoginContinue',
+    ErrorGotIt = 'ErrorGotIt',
+    ErrorMoreDetails = 'ErrorMoreDetails',
   }
 
   /**
@@ -16414,6 +16452,14 @@ export namespace FedCm {
      */
     title: string;
     subtitle?: string;
+  }
+
+  /**
+   * Triggered when a dialog is closed, either by user action, JS abort,
+   * or a command below.
+   */
+  export interface DialogClosedEvent {
+    dialogId: string;
   }
 }
 

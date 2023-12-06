@@ -664,6 +664,11 @@ export namespace ProtocolMapping {
     'Preload.preloadingAttemptSourcesUpdated': [Protocol.Preload.PreloadingAttemptSourcesUpdatedEvent];
     'FedCm.dialogShown': [Protocol.FedCm.DialogShownEvent];
     /**
+     * Triggered when a dialog is closed, either by user action, JS abort,
+     * or a command below.
+     */
+    'FedCm.dialogClosed': [Protocol.FedCm.DialogClosedEvent];
+    /**
      * Fired when breakpoint is resolved to an actual script and location.
      */
     'Debugger.breakpointResolved': [Protocol.Debugger.BreakpointResolvedEvent];
@@ -3118,15 +3123,6 @@ export namespace ProtocolMapping {
     'Page.getAdScriptId': {
       paramsType: [Protocol.Page.GetAdScriptIdRequest];
       returnType: Protocol.Page.GetAdScriptIdResponse;
-    };
-    /**
-     * Returns all browser cookies for the page and all of its subframes. Depending
-     * on the backend support, will return detailed cookie information in the
-     * `cookies` field.
-     */
-    'Page.getCookies': {
-      paramsType: [];
-      returnType: Protocol.Page.GetCookiesResponse;
     };
     /**
      * Returns present frame tree structure.

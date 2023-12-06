@@ -20,8 +20,7 @@ const fileName = (params.get('trace') || 'web-dev') + '.json.gz';
 const customStartWindowTime = params.get('windowStart');
 const customEndWindowTime = params.get('windowEnd');
 
-async function renderMiniMap(
-    containerSelector: string, options: {showMemory: boolean, source: Timeline.TimelinePanel.ThreadTracksSource}) {
+async function renderMiniMap(containerSelector: string, options: {showMemory: boolean}) {
   const container = document.querySelector<HTMLElement>(containerSelector);
   if (!container) {
     throw new Error('could not find container');
@@ -30,19 +29,19 @@ async function renderMiniMap(
   const {left, right} = models.performanceModel.calculateWindowForMainThreadActivity();
   models.performanceModel.setWindow({left, right});
 
-  const minimap = new Timeline.TimelineMiniMap.TimelineMiniMap(options.source);
+  const minimap = new Timeline.TimelineMiniMap.TimelineMiniMap();
   minimap.activateBreadcrumbs();
   minimap.markAsRoot();
   minimap.show(container);
 
+  const bounds = TraceEngine.Helpers.Timing.traceWindowMilliSeconds(models.traceParsedData.Meta.traceBounds);
   minimap.setBounds(
-      TraceEngine.Types.Timing.MilliSeconds(models.timelineModel.minimumRecordTime()),
-      TraceEngine.Types.Timing.MilliSeconds(models.timelineModel.maximumRecordTime()),
+      TraceEngine.Types.Timing.MilliSeconds(bounds.min),
+      TraceEngine.Types.Timing.MilliSeconds(bounds.max),
   );
 
   minimap.setData({
     traceParsedData: models.traceParsedData,
-    performanceModel: models.performanceModel,
     settings: {
       showMemory: options.showMemory,
       showScreenshots: true,
@@ -55,8 +54,5 @@ async function renderMiniMap(
   }
 }
 
-await renderMiniMap('.container', {showMemory: false, source: Timeline.TimelinePanel.ThreadTracksSource.OLD_ENGINE});
-await renderMiniMap(
-    '.container-with-memory', {showMemory: true, source: Timeline.TimelinePanel.ThreadTracksSource.OLD_ENGINE});
-await renderMiniMap(
-    '.container-new-engine', {showMemory: false, source: Timeline.TimelinePanel.ThreadTracksSource.NEW_ENGINE});
+await renderMiniMap('.container', {showMemory: false});
+await renderMiniMap('.container-with-memory', {showMemory: true});

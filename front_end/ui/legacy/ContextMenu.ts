@@ -189,7 +189,10 @@ export class Section {
     if (!label) {
       label = action.title();
     }
-    const result = this.appendItem(label, action.execute.bind(action), {jslogContext: actionId});
+    const result = this.appendItem(label, action.execute.bind(action), {
+      disabled: !action.enabled(),
+      jslogContext: actionId,
+    });
     const shortcut = ShortcutRegistry.instance().shortcutTitleForAction(actionId);
     if (shortcut) {
       result.setShortcut(shortcut);
@@ -363,19 +366,20 @@ export interface ContextMenuOptions {
   onSoftMenuClosed?: () => void;
   x?: number;
   y?: number;
+  jsLogContext?: string;
 }
 
 export class ContextMenu extends SubMenu {
   protected override contextMenu: this;
-  private readonly defaultSectionInternal: Section;
-  private pendingPromises: Promise<Provider[]>[];
-  private pendingTargets: Object[];
+  private pendingPromises: Promise<Provider<unknown>[]>[];
+  private pendingTargets: unknown[];
   private readonly event: MouseEvent;
   private readonly useSoftMenu: boolean;
   private readonly keepOpen: boolean;
   private x: number;
   private y: number;
   private onSoftMenuClosed?: () => void;
+  private jsLogContext?: string;
   private readonly handlers: Map<number, () => void>;
   override idInternal: number;
   private softMenu?: SoftContextMenu;
@@ -388,7 +392,6 @@ export class ContextMenu extends SubMenu {
     const mouseEvent = (event as MouseEvent);
     this.contextMenu = this;
     super.init();
-    this.defaultSectionInternal = this.defaultSection();
     this.pendingPromises = [];
     this.pendingTargets = [];
     this.event = mouseEvent;
@@ -398,6 +401,7 @@ export class ContextMenu extends SubMenu {
     this.x = options.x === undefined ? mouseEvent.x : options.x;
     this.y = options.y === undefined ? mouseEvent.y : options.y;
     this.onSoftMenuClosed = options.onSoftMenuClosed;
+    this.jsLogContext = options.jsLogContext;
     this.handlers = new Map();
     this.idInternal = 0;
     this.openHostedMenu = null;
@@ -444,7 +448,7 @@ export class ContextMenu extends SubMenu {
   async show(): Promise<void> {
     ContextMenu.pendingMenu = this;
     this.event.consume(true);
-    const loadedProviders: Provider[][] = await Promise.all(this.pendingPromises);
+    const loadedProviders = await Promise.all(this.pendingPromises);
 
     // After loading all providers, the contextmenu might be hidden again, so bail out.
     if (ContextMenu.pendingMenu !== this) {
@@ -475,9 +479,7 @@ export class ContextMenu extends SubMenu {
 
   private registerLoggablesWithin(
       descriptors: Host.InspectorFrontendHostAPI.ContextMenuDescriptor[],
-      parent?: Host.InspectorFrontendHostAPI.ContextMenuDescriptor):
-      Host.InspectorFrontendHostAPI.ContextMenuDescriptor[] {
-    const loggables = [];
+      parent?: Host.InspectorFrontendHostAPI.ContextMenuDescriptor): void {
     for (const descriptor of descriptors) {
       if (descriptor.jslogContext) {
         if (descriptor.type === 'checkbox') {
@@ -488,17 +490,15 @@ export class ContextMenu extends SubMenu {
           VisualLogging.registerLoggable(
               descriptor, `${VisualLogging.action().track({click: true}).context(descriptor.jslogContext)}`,
               parent || descriptors);
-        } else if (descriptor.type !== 'subMenu') {
+        } else if (descriptor.type === 'subMenu') {
           VisualLogging.registerLoggable(
               descriptor, `${VisualLogging.item().context(descriptor.jslogContext)}`, parent || descriptors);
         }
-        loggables.push(descriptor);
         if (descriptor.subItems) {
-          loggables.push(...this.registerLoggablesWithin(descriptor.subItems, descriptor));
+          this.registerLoggablesWithin(descriptor.subItems, descriptor);
         }
       }
     }
-    return loggables;
   }
 
   private innerShow(): void {
@@ -532,11 +532,13 @@ export class ContextMenu extends SubMenu {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
             Host.InspectorFrontendHostAPI.Events.ContextMenuItemSelected, this.onItemSelected, this);
       }
-      VisualLogging.registerLoggable(menuObject, `${VisualLogging.menu()}`, null);
-      const loggables = this.registerLoggablesWithin(menuObject);
-      if (loggables.length) {
-        void VisualLogging.logImpressions(loggables);
+      const visualElement = VisualLogging.menu();
+      if (this.jsLogContext) {
+        visualElement.context(this.jsLogContext);
       }
+      VisualLogging.registerLoggable(menuObject, `${visualElement}`, null);
+      this.registerLoggablesWithin(menuObject);
+      void VisualLogging.logImpressions([menuObject]);
       this.openHostedMenu = menuObject;
       // showContextMenuAtPoint call above synchronously issues a clear event for previous context menu (if any),
       // so we skip it before subscribing to the clear event.
@@ -614,7 +616,7 @@ export class ContextMenu extends SubMenu {
     return this.pendingTargets.indexOf(target) >= 0;
   }
 
-  appendApplicableItems(target: Object): void {
+  appendApplicableItems(target: unknown): void {
     this.pendingPromises.push(loadApplicableRegisteredProviders(target));
     this.pendingTargets.push(target);
   }
@@ -633,37 +635,32 @@ export class ContextMenu extends SubMenu {
       ['header', 'new', 'reveal', 'edit', 'clipboard', 'debug', 'view', 'default', 'override', 'save', 'footer'];
 }
 
-export interface Provider {
-  appendApplicableItems(event: Event, contextMenu: ContextMenu, target: Object): void;
+export interface Provider<T> {
+  appendApplicableItems(event: Event, contextMenu: ContextMenu, target: T): void;
 }
 
-const registeredProviders: ProviderRegistration[] = [];
+const registeredProviders: ProviderRegistration<unknown>[] = [];
 
-export function registerProvider(registration: ProviderRegistration): void {
+export function registerProvider<T>(registration: ProviderRegistration<T>): void {
   registeredProviders.push(registration);
 }
 
-async function loadApplicableRegisteredProviders(target: Object): Promise<Provider[]> {
-  return Promise.all(
-      registeredProviders.filter(isProviderApplicableToContextTypes).map(registration => registration.loadProvider()));
-
-  function isProviderApplicableToContextTypes(providerRegistration: ProviderRegistration): boolean {
+async function loadApplicableRegisteredProviders(target: unknown): Promise<Array<Provider<unknown>>> {
+  const providers: Array<Provider<unknown>> = [];
+  for (const providerRegistration of registeredProviders) {
     if (!Root.Runtime.Runtime.isDescriptorEnabled(
             {experiment: providerRegistration.experiment, condition: undefined})) {
-      return false;
+      continue;
     }
-    if (!providerRegistration.contextTypes) {
-      return true;
-    }
-    for (const contextType of providerRegistration.contextTypes()) {
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // @ts-expect-error
-      if (target instanceof contextType) {
-        return true;
+    if (providerRegistration.contextTypes) {
+      for (const contextType of providerRegistration.contextTypes()) {
+        if (target instanceof contextType) {
+          providers.push(await providerRegistration.loadProvider());
+        }
       }
     }
-    return false;
   }
+  return providers;
 }
 
 const registeredItemsProviders: ContextMenuItemRegistration[] = [];
@@ -695,12 +692,14 @@ export enum ItemLocation {
   MAIN_MENU_FOOTER = 'mainMenu/footer',
   MAIN_MENU_HELP_DEFAULT = 'mainMenuHelp/default',
   NAVIGATOR_MENU_DEFAULT = 'navigatorMenu/default',
+  PROFILER_MENU_DEFAULT = 'profilerMenu/default',
   TIMELINE_MENU_OPEN = 'timelineMenu/open',
 }
 
-export interface ProviderRegistration {
-  contextTypes: () => unknown[];
-  loadProvider: () => Promise<Provider>;
+export interface ProviderRegistration<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contextTypes: () => Array<abstract new(...any: any) => T>;
+  loadProvider: () => Promise<Provider<T>>;
   experiment?: Root.Runtime.ExperimentName;
 }
 

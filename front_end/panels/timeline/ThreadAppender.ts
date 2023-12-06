@@ -22,7 +22,6 @@ import {
   type TrackAppender,
   type TrackAppenderName,
 } from './CompatibilityTracksAppender.js';
-import * as TimelineComponents from './components/components.js';
 import {getCategoryStyles, getEventStyle} from './EventUICategory.js';
 
 const UIStrings = {
@@ -173,7 +172,7 @@ export class ThreadAppender implements TrackAppender {
   readonly isOnMainFrame: boolean;
   #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignoreListJSFramesOnTimeline');
   #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
-  #treeManipulator?: TraceEngine.TreeManipulator.TreeManipulator;
+  #entriesFilter?: TraceEngine.EntriesFilter.EntriesFilter;
   constructor(
       compatibilityBuilder: CompatibilityTracksAppender, traceParsedData: TraceEngine.Handlers.Types.TraceParseData,
       processId: TraceEngine.Types.TraceEvents.ProcessID, threadId: TraceEngine.Types.TraceEvents.ThreadID,
@@ -216,20 +215,18 @@ export class ThreadAppender implements TrackAppender {
       this.appenderName = 'Thread_AuctionWorklet';
     }
 
-    this.#treeManipulator = new TraceEngine.TreeManipulator.TreeManipulator(
+    this.#entriesFilter = new TraceEngine.EntriesFilter.EntriesFilter(
         this.threadType === ThreadType.CPU_PROFILE ? traceParsedData.Samples.entryToNode :
                                                      traceParsedData.Renderer.entryToNode);
   }
 
   modifyTree(
-      traceEvent: TraceEngine.Types.TraceEvents.TraceEntry, action: TraceEngine.TreeManipulator.TreeAction,
+      traceEvent: TraceEngine.Types.TraceEvents.TraceEntry, action: TraceEngine.EntriesFilter.FilterAction,
       flameChartView: PerfUI.FlameChart.FlameChart): void {
-    if (!this.#treeManipulator) {
+    if (!this.#entriesFilter) {
       return;
     }
-    // TODO(crbug.com/1469887): Change MERGE_FUNCTION to the user selected operation
-    this.#treeManipulator.applyAction({type: action, entry: traceEvent});
-    this.#entries = this.#treeManipulator.invisibleEntries();
+    this.#entriesFilter.applyAction({type: action, entry: traceEvent});
     flameChartView.dispatchEventToListeners(PerfUI.FlameChart.Events.EntriesModified);
   }
 
@@ -456,7 +453,7 @@ export class ThreadAppender implements TrackAppender {
   #appendNodesAtLevel(
       nodes: Iterable<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
-    const invisibleEntries = this.#treeManipulator?.invisibleEntries() ?? [];
+    const invisibleEntries = this.#entriesFilter?.invisibleEntries() ?? [];
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
@@ -546,6 +543,11 @@ export class ThreadAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
+    if (this.#entriesFilter?.isEntryModified(event)) {
+      // TODO(crbug.com/1469887): Change the UI of modifies entries to the final designs when they're completed.
+      return this.#colorGenerator.colorForID('temporary');
+    }
+
     if (TraceEngine.Types.TraceEvents.isProfileCall(event)) {
       if (event.callFrame.functionName === '(idle)') {
         return getCategoryStyles().Idle.getComputedColorValue();
@@ -615,8 +617,6 @@ export class ThreadAppender implements TrackAppender {
       const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
       title += ` - ${url} [${range}]`;
     }
-    const warningElements: HTMLSpanElement[] =
-        TimelineComponents.DetailsView.buildWarningElementsForEvent(event, this.#traceParsedData);
-    return {title, formattedTime: getFormattedTime(event.dur, event.selfTime), warningElements};
+    return {title, formattedTime: getFormattedTime(event.dur, event.selfTime)};
   }
 }

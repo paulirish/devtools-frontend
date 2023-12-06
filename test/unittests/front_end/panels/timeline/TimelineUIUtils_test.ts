@@ -186,34 +186,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
       assert.strictEqual(node.textContent, 'original-script.ts:1:1');
     });
-    it('maps to the authored script when a trace event from the old engine with a stack trace is provided',
-       async function() {
-         const functionCallEvent = new TraceEngine.Legacy.ConstructedEvent(
-             'devtools.timeline', TimelineModel.TimelineModel.RecordType.FunctionCall,
-             TraceEngine.Types.TraceEvents.Phase.COMPLETE, 10, thread);
-         functionCallEvent.addArgs({
-           data: {
-             stackTrace: [{
-               functionName: 'test',
-               url: 'https://google.com/test.js',
-               scriptId: SCRIPT_ID_STRING,
-               lineNumber: 0,
-               columnNumber: 0,
-             }],
-           },
-         });
-         const data = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(functionCallEvent);
-         data.stackTrace = functionCallEvent.args.data.stackTrace;
-         const linkifier = new Components.Linkifier.Linkifier();
-         const node =
-             Timeline.TimelineUIUtils.TimelineUIUtils.linkifyTopCallFrame(functionCallEvent, target, linkifier, true);
-         if (!node) {
-           throw new Error('Node was unexpectedly null');
-         }
-         await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
-             .pendingLiveLocationChangesPromise();
-         assert.strictEqual(node.textContent, 'original-script.ts:1:1');
-       });
+
     it('maps to the authored script when a trace event from the new engine with a stack trace is provided',
        async function() {
          const functionCallEvent = makeCompleteEvent('FunctionCall', 10, 100);
@@ -434,44 +407,24 @@ describeWithMockConnection('TimelineUIUtils', function() {
   });
 
   describe('testContentMatching', () => {
-    it('[for legacy sync tracks] matches call frame events based on a regular expression and the contents of the event',
-       async function() {
-         const data = await TraceLoader.allModels(this, 'react-hello-world.json.gz');
-         const mainThread =
-             data.timelineModel.tracks().find(t => t.type === TimelineModel.TimelineModel.TrackType.MainThread);
-         // Find an event from the trace that represents some work that React did. This
-         // event is not chosen for any particular reason other than it was the example
-         // used in the bug report: crbug.com/1484504
-         const performConcurrentWorkEvent =
-             mainThread?.events.find(e => e.args?.data?.functionName === 'performConcurrentWorkOnRoot');
-         if (!performConcurrentWorkEvent) {
-           throw new Error('Could not find expected event');
-         }
-         assert.isTrue(
-             Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(performConcurrentWorkEvent, /perfo/));
-         assert.isFalse(Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(
-             performConcurrentWorkEvent, /does not match/));
-       });
-
-    it('[for new sync tracks] matches call frame events based on a regular expression and the contents of the event',
-       async function() {
-         const data = await TraceLoader.allModels(this, 'react-hello-world.json.gz');
-         // Find an event from the trace that represents some work that React did. This
-         // event is not chosen for any particular reason other than it was the example
-         // used in the bug report: crbug.com/1484504
-         const mainThread = getMainThread(data.traceParsedData.Renderer);
-         const performConcurrentWorkEvent = mainThread.entries.find(entry => {
-           if (TraceEngine.Types.TraceEvents.isProfileCall(entry)) {
-             return entry.callFrame.functionName === 'performConcurrentWorkOnRoot';
-           }
-           return false;
-         });
-         if (!performConcurrentWorkEvent) {
-           throw new Error('Could not find expected event');
-         }
-         assert.isTrue(Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(
-             performConcurrentWorkEvent, /perfo/, data.traceParsedData));
-       });
+    it('matches call frame events based on a regular expression and the contents of the event', async function() {
+      const data = await TraceLoader.allModels(this, 'react-hello-world.json.gz');
+      // Find an event from the trace that represents some work that React did. This
+      // event is not chosen for any particular reason other than it was the example
+      // used in the bug report: crbug.com/1484504
+      const mainThread = getMainThread(data.traceParsedData.Renderer);
+      const performConcurrentWorkEvent = mainThread.entries.find(entry => {
+        if (TraceEngine.Types.TraceEvents.isProfileCall(entry)) {
+          return entry.callFrame.functionName === 'performConcurrentWorkOnRoot';
+        }
+        return false;
+      });
+      if (!performConcurrentWorkEvent) {
+        throw new Error('Could not find expected event');
+      }
+      assert.isTrue(Timeline.TimelineUIUtils.TimelineUIUtils.testContentMatching(
+          performConcurrentWorkEvent, /perfo/, data.traceParsedData));
+    });
   });
 
   describe('traceEventDetails', function() {
@@ -630,12 +583,50 @@ describeWithMockConnection('TimelineUIUtils', function() {
           ],
       );
     });
+
+    it('shows information for the WebSocketCreate initiator when viewing a WebSocketSendHandshakeRequest event',
+       async function() {
+         const data = await TraceLoader.allModels(this, 'web-sockets.json.gz');
+         const events = data.traceParsedData.Renderer?.allTraceEntries;
+         if (!events) {
+           throw new Error('Could not find renderer events');
+         }
+
+         const sendHandshake = events.find(TraceEngine.Types.TraceEvents.isTraceEventWebSocketSendHandshakeRequest);
+         if (!sendHandshake) {
+           throw new Error('Could not find handshake event.');
+         }
+
+         const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+             sendHandshake,
+             data.timelineModel,
+             new Components.Linkifier.Linkifier(),
+             false,
+             data.traceParsedData,
+         );
+         const rowData = getRowDataForDetailsElement(details);
+         const expectedRowData = [
+           {title: 'URL', value: 'wss://socketsbay.com/wss/v2/1/demo/'},
+           {title: 'Pending for', value: '72.0 ms'},
+           {title: 'Initiator', 'value': 'Reveal'},
+           // This value looks odd, but it is because the stack trace UI cannot be
+           // easily represented as a string, so this is OK.
+           {title: 'First Invalidated', value: ''},
+         ];
+         assert.deepEqual(
+             rowData,
+             expectedRowData,
+         );
+       });
   });
 
   it('can generate details for a frame', async function() {
-    const data = await TraceLoader.allModels(this, 'web-dev.json.gz');
-    const frame = data.performanceModel.frames()[0];
-    const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(data.traceParsedData);
+    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    const frame = traceParsedData.Frames.frames.at(0);
+    if (!frame) {
+      throw new Error('Could not find expected frame');
+    }
+    const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(traceParsedData);
     const details =
         Timeline.TimelineUIUtils.TimelineUIUtils.generateDetailsContentForFrame(frame, filmStrip, filmStrip.frames[0]);
     const container = document.createElement('div');
@@ -651,9 +642,10 @@ describeWithMockConnection('TimelineUIUtils', function() {
     if (!durationValue) {
       throw new Error('Could not find duration');
     }
-    // Strip the unicode spaces out and replace with simple spaces for easy assertions.
+    // Strip the unicode spaces out and replace with simple spaces for easy
+    // assertions.
     const value = (durationValue.innerText.replaceAll(/\s/g, ' '));
-    assert.strictEqual(value, '2.77 ms (at 136.45 ms)');
+    assert.strictEqual(value, '37.85 ms (at 109.82 ms)');
   });
 
   describe('buildNetworkRequestDetails', function() {

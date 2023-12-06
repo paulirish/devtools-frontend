@@ -27,11 +27,12 @@ if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
   const Console = await import('../console/console.js');
 
   UI.ActionRegistration.registerActionExtension({
+    experiment: Root.Runtime.ExperimentName.CONSOLE_INSIGHTS,
     actionId: 'explain.consoleMessage:hover',
     category: UI.ActionRegistration.ActionCategory.CONSOLE,
     async loadActionDelegate() {
       const Explain = await import('./explain.js');
-      return Explain.ActionDelegate.instance();
+      return new Explain.ActionDelegate();
     },
     title: i18nLazyString(UIStrings.explainThisMessage),
     contextTypes() {
@@ -40,11 +41,12 @@ if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
   });
 
   UI.ActionRegistration.registerActionExtension({
+    experiment: Root.Runtime.ExperimentName.CONSOLE_INSIGHTS,
     actionId: 'explain.consoleMessage:context:error',
     category: UI.ActionRegistration.ActionCategory.CONSOLE,
     async loadActionDelegate() {
       const Explain = await import('./explain.js');
-      return Explain.ActionDelegate.instance();
+      return new Explain.ActionDelegate();
     },
     title: i18nLazyString(UIStrings.explainThisError),
     contextTypes() {
@@ -53,11 +55,12 @@ if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
   });
 
   UI.ActionRegistration.registerActionExtension({
+    experiment: Root.Runtime.ExperimentName.CONSOLE_INSIGHTS,
     actionId: 'explain.consoleMessage:context:warning',
     category: UI.ActionRegistration.ActionCategory.CONSOLE,
     async loadActionDelegate() {
       const Explain = await import('./explain.js');
-      return Explain.ActionDelegate.instance();
+      return new Explain.ActionDelegate();
     },
     title: i18nLazyString(UIStrings.explainThisWarning),
     contextTypes() {
@@ -66,36 +69,16 @@ if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
   });
 
   UI.ActionRegistration.registerActionExtension({
+    experiment: Root.Runtime.ExperimentName.CONSOLE_INSIGHTS,
     actionId: 'explain.consoleMessage:context:other',
     category: UI.ActionRegistration.ActionCategory.CONSOLE,
     async loadActionDelegate() {
       const Explain = await import('./explain.js');
-      return Explain.ActionDelegate.instance();
+      return new Explain.ActionDelegate();
     },
     title: i18nLazyString(UIStrings.explainThisMessage),
     contextTypes() {
       return [];
     },
   });
-
-  void isAidaAvailable().then(async result => {
-    if (result) {
-      document.documentElement.classList.add('aida-available');
-    }
-  });
-}
-
-async function isAidaAvailable(): Promise<boolean> {
-  const Explain = await import('./explain.js');
-  const provider = new Explain.InsightProvider();
-  /* eslint-disable no-console */
-  try {
-    const result = await provider.getInsights('Hello world in JavaScript');
-    console.info('AIDA is available', result);
-    return true;
-  } catch (err) {
-    console.warn('AIDA is not available', err);
-    return false;
-  }
-  /* eslint-enable no-console */
 }

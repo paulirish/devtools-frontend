@@ -64,35 +64,35 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Eve
 
   async getHardwareConcurrency(): Promise<number> {
     return 31;
-    const target = TargetManager.instance().primaryPageTarget();
-    const existingCallback = this.#pendingMainTargetPromise;
+    // const target = TargetManager.instance().primaryPageTarget();
+    // const existingCallback = this.#pendingMainTargetPromise;
 
-    // If the main target hasn't attached yet, block callers until it appears.
-    if (!target) {
-      if (existingCallback) {
-        return new Promise(r => {
-          this.#pendingMainTargetPromise = (result: number): void => {
-            r(result);
-            existingCallback(result);
-          };
-        });
-      }
-      return new Promise(r => {
-        this.#pendingMainTargetPromise = r;
-      });
-    }
+    // // If the main target hasn't attached yet, block callers until it appears.
+    // if (!target) {
+    //   if (existingCallback) {
+    //     return new Promise(r => {
+    //       this.#pendingMainTargetPromise = (result: number): void => {
+    //         r(result);
+    //         existingCallback(result);
+    //       };
+    //     });
+    //   }
+    //   return new Promise(r => {
+    //     this.#pendingMainTargetPromise = r;
+    //   });
+    // }
 
-    const evalResult = await target.runtimeAgent().invoke_evaluate(
-        {expression: 'navigator.hardwareConcurrency', returnByValue: true, silent: true, throwOnSideEffect: true});
-    const error = evalResult.getError();
-    if (error) {
-      throw new Error(error);
-    }
-    const {result, exceptionDetails} = evalResult;
-    if (exceptionDetails) {
-      throw new Error(exceptionDetails.text);
-    }
-    return result.value;
+    // const evalResult = await target.runtimeAgent().invoke_evaluate(
+    //     {expression: 'navigator.hardwareConcurrency', returnByValue: true, silent: true, throwOnSideEffect: true});
+    // const error = evalResult.getError();
+    // if (error) {
+    //   throw new Error(error);
+    // }
+    // const {result, exceptionDetails} = evalResult;
+    // if (exceptionDetails) {
+    //   throw new Error(exceptionDetails.text);
+    // }
+    // return result.value;
   }
 
   modelAdded(emulationModel: EmulationModel): void {

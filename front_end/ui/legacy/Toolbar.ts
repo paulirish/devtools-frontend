@@ -838,8 +838,8 @@ export class ToolbarMenuButton extends ToolbarButton {
   private readonly useSoftMenu: boolean;
   private triggerTimeout?: number;
   private lastTriggerTime?: number;
-  constructor(contextMenuHandler: (arg0: ContextMenu) => void, useSoftMenu?: boolean) {
-    super('', 'dots-vertical');
+  constructor(contextMenuHandler: (arg0: ContextMenu) => void, useSoftMenu?: boolean, jslogContext?: string) {
+    super('', 'dots-vertical', undefined, jslogContext);
     this.contextMenuHandler = contextMenuHandler;
     this.useSoftMenu = Boolean(useSoftMenu);
     ARIAUtils.markAsMenuButton(this.element);
@@ -951,7 +951,8 @@ export class ToolbarComboBox extends ToolbarItem<void> {
       this.selectElementInternal.classList.add(className);
     }
     if (jslogContext) {
-      this.selectElementInternal.setAttribute('jslog', `${VisualLogging.dropDown().context(jslogContext)}`);
+      this.selectElementInternal.setAttribute(
+          'jslog', `${VisualLogging.dropDown().track({change: true}).context(jslogContext)}`);
     }
   }
 
@@ -1084,7 +1085,7 @@ export class ToolbarSettingComboBox extends ToolbarComboBox {
 export class ToolbarCheckbox extends ToolbarItem<void> {
   inputElement: HTMLInputElement;
 
-  constructor(text: string, tooltip?: string, listener?: ((arg0: MouseEvent) => void)) {
+  constructor(text: string, tooltip?: string, listener?: ((arg0: MouseEvent) => void), jslogContext?: string) {
     super(CheckboxLabel.create(text));
     this.element.classList.add('checkbox');
     this.inputElement = (this.element as CheckboxLabel).checkboxElement;
@@ -1095,6 +1096,9 @@ export class ToolbarCheckbox extends ToolbarItem<void> {
     }
     if (listener) {
       this.inputElement.addEventListener('click', listener, false);
+    }
+    if (jslogContext) {
+      this.inputElement.setAttribute('jslog', `${VisualLogging.toggle().track({change: true}).context(jslogContext)}`);
     }
   }
 
@@ -1118,8 +1122,7 @@ export class ToolbarCheckbox extends ToolbarItem<void> {
 
 export class ToolbarSettingCheckbox extends ToolbarCheckbox {
   constructor(setting: Common.Settings.Setting<boolean>, tooltip?: string, alternateTitle?: string) {
-    super(alternateTitle || setting.title() || '', tooltip);
-    this.inputElement.setAttribute('jslog', `${VisualLogging.toggle().track({click: true}).context(setting.name)}`);
+    super(alternateTitle || setting.title() || '', tooltip, undefined, setting.name);
     bindCheckbox(this.inputElement, setting);
   }
 }

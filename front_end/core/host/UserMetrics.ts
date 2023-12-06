@@ -966,14 +966,12 @@ export enum DevtoolsExperiments {
   'timelineV8RuntimeCallStats' = 28,
   'wasmDWARFDebugging' = 31,
   'APCA' = 39,
-  'cspViolationsView' = 40,
   'fontEditor' = 41,
   'fullAccessibilityTree' = 42,
   'ignoreListJSFramesOnTimeline' = 43,
   'contrastIssues' = 44,
   'experimentalCookieFeatures' = 45,
   'cssTypeComponentLength' = 52,
-  'preciseChanges' = 53,
   'bfcacheDisplayTree' = 54,
   'stylesPaneCSSChanges' = 55,
   'headerOverrides' = 56,
@@ -1053,17 +1051,20 @@ export const enum BreakpointsRestoredFromStorageCount {
   MaxValue = 10,
 }
 
+// Update DevToolsIssuesPanelIssueExpanded from tools/metrics/histograms/enums.xml if new enum is added.
 // TODO(crbug.com/1167717): Make this a const enum again
 // eslint-disable-next-line rulesdir/const_enum
 export enum IssueExpanded {
   CrossOriginEmbedderPolicy = 0,
   MixedContent = 1,
-  Cookie = 2,
+  SameSiteCookie = 2,
   HeavyAd = 3,
   ContentSecurityPolicy = 4,
   Other = 5,
   Generic = 6,
-  MaxValue = 7,
+  ThirdPartyPhaseoutCookie = 7,
+  GenericCookie = 8,
+  MaxValue = 9,
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

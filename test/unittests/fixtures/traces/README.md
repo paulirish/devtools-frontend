@@ -133,4 +133,10 @@ Generated from https://github.com/ChromeDevTools/performance-stories/tree/main/f
 
 Generated from https://github.com/ChromeDevTools/performance-stories/tree/main/two-workers. Runs two workers that both calculcate fibonnaci numbers.
 
+### timer-initiators
 
+Contains a `setTimeout`, `requestAnimationFrame` and `requestIdleCallback` call.
+
+### nested-initiators
+
+Contains a `setTimeout` triggered by a prior `setTimeout`, so there is a larger initiator chain.

@@ -6,7 +6,6 @@ import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
-import {matchBeginningAndEndEvents, createSortedAnimationsSyntheticEvents} from './AnimationHandler.js';
 import {type TraceEventHandlerName} from './types.js';
 
 // Each thread contains events. Events indicate the thread and process IDs, which are
@@ -33,8 +32,8 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
 export async function finalize(): Promise<void> {
   const {browserProcessId, browserThreadId} = metaHandlerData();
-  const matchedEvents = matchBeginningAndEndEvents(unpairedAsyncEvents);
-  const syntheticEvents = createSortedAnimationsSyntheticEvents(matchedEvents);
+  const syntheticEvents = Helpers.Trace.createMatchedSortedSyntheticEvents(unpairedAsyncEvents);
+
 
   const browserThreads = eventsInProcessThread.get(browserProcessId);
   if (browserThreads) {

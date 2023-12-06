@@ -1318,9 +1318,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     this.consoleRowWrapper.appendChild(this.contentElement());
 
     if (UI.ActionRegistry.ActionRegistry.instance().hasAction(EXPLAIN_HOVER_ACTION_ID) && this.shouldShowInsights()) {
-      if (document.documentElement.matches('.aida-available')) {
-        Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightConsoleMessageShown);
-      }
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightConsoleMessageShown);
       this.consoleRowWrapper.append(this.#createHoverButton());
     }
 
@@ -1374,6 +1372,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     text.innerText = this.getExplainLabel();
     button.append(text);
     button.classList.add('hover-button');
+    button.ariaLabel = this.getExplainLabel();
+    button.tabIndex = 0;
     hoverButtonObserver.observe(button);
     return button;
   }
@@ -1517,6 +1517,16 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       lines.push(messageContent);
     }
     return lines.join('\n');
+  }
+
+  toMessageTextString(): string {
+    const root = this.contentElement();
+    const consoleText = root.querySelector('.console-message-text');
+    if (consoleText) {
+      return consoleText.deepTextContent().trim();
+    }
+    // Fallback to SDK's message text.
+    return this.consoleMessage().messageText;
   }
 
   setSearchRegex(regex: RegExp|null): void {

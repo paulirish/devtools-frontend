@@ -1143,11 +1143,15 @@ export function createLabel(title: string, className?: string, associatedControl
   return element;
 }
 
-export function createRadioLabel(name: string, title: string, checked?: boolean): DevToolsRadioButton {
+export function createRadioLabel(
+    name: string, title: string, checked?: boolean, jslogContext?: string): DevToolsRadioButton {
   const element = (document.createElement('span', {is: 'dt-radio'}) as DevToolsRadioButton);
   element.radioElement.name = name;
   element.radioElement.checked = Boolean(checked);
   createTextChild(element.labelElement, title);
+  if (jslogContext) {
+    element.radioElement.setAttribute('jslog', `${VisualLogging.toggle().track({change: true}).context(jslogContext)}`);
+  }
   return element;
 }
 
@@ -1208,7 +1212,7 @@ export class CheckboxLabel extends HTMLSpanElement {
     element.checkboxElement.checked = Boolean(checked);
     if (jslogContext) {
       element.checkboxElement.setAttribute(
-          'jslog', `${VisualLogging.toggle().track({click: true}).context(jslogContext)}`);
+          'jslog', `${VisualLogging.toggle().track({change: true}).context(jslogContext)}`);
     }
     if (title !== undefined) {
       element.textElement.textContent = title;
@@ -1391,14 +1395,14 @@ export function bindInput(
     }
 
     const value = modifiedFloatNumber(parseFloat(input.value), event, modifierMultiplier);
-    const stringValue = value ? String(value) : '';
-    const {valid} = validate(stringValue);
-    if (!valid || !value) {
+    if (value === null) {
       return;
     }
-
-    input.value = stringValue;
-    apply(input.value);
+    const stringValue = String(value);
+    const {valid} = validate(stringValue);
+    if (valid) {
+      setValue(stringValue);
+    }
     event.preventDefault();
   }
 

@@ -5,11 +5,13 @@
 import {assert} from 'chai';
 
 import {type Chrome} from '../../../extension-api/ExtensionAPI.js';  // eslint-disable-line rulesdir/es_modules_import
+import {expectError} from '../../conductor/events.js';
 import {
   $,
   $$,
   assertNotNullOrUndefined,
   click,
+  disableExperiment,
   enableExperiment,
   getBrowserAndPages,
   getResourcesPath,
@@ -24,33 +26,31 @@ import {
   waitForNone,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {getResourcesPathWithDevToolsHostname, loadExtension} from '../helpers/extension-helpers.js';
 import {
   CONSOLE_TAB_SELECTOR,
   focusConsolePrompt,
   getCurrentConsoleMessages,
   getStructuredConsoleMessages,
 } from '../helpers/console-helpers.js';
-
+import {getResourcesPathWithDevToolsHostname, loadExtension} from '../helpers/extension-helpers.js';
 import {
+  captureAddedSourceFiles,
+  DEBUGGER_PAUSED_EVENT,
   getCallFrameLocations,
   getCallFrameNames,
   getNonBreakableLines,
   getValuesForScope,
+  type LabelMapping,
   openFileInEditor,
   openSourceCodeEditorForFile,
   openSourcesPanel,
+  PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR,
   RESUME_BUTTON,
+  retrieveTopCallFrameWithoutResuming,
+  stepOver,
   switchToCallFrame,
   WasmLocationLabels,
-  type LabelMapping,
-  captureAddedSourceFiles,
-  PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR,
-  stepOver,
-  retrieveTopCallFrameWithoutResuming,
-  DEBUGGER_PAUSED_EVENT,
 } from '../helpers/sources-helpers.js';
-import {expectError} from '../../conductor/events.js';
 
 declare global {
   let chrome: Chrome.DevTools.Chrome;
@@ -792,6 +792,9 @@ describe('The Debugger Language Plugins', async () => {
 
   it('shows sensible error messages.', async () => {
     const {frontend} = getBrowserAndPages();
+    // This test times out on mac-arm64 when watch expressions take some time to calculate.
+    await disableExperiment('evaluateExpressionsWithSourceMaps');
+
     const extension = await loadExtension(
         'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
     await extension.evaluate(() => {
@@ -878,7 +881,10 @@ describe('The Debugger Language Plugins', async () => {
     await waitForNone('.watch-expression-editing');
 
     const watchResults = await waitForMany('.watch-expression', 2);
-    const watchTexts = await Promise.all(watchResults.map(async watch => await watch.evaluate(e => e.textContent)));
+    const watchTexts = await waitForFunction(async () => {
+      const texts = await Promise.all(watchResults.map(async watch => await watch.evaluate(e => e.textContent)));
+      return texts.every(t => t?.length) ? texts : null;
+    });
     assert.deepStrictEqual(watchTexts, ['foo: 23', 'bar: <not available>']);
 
     const tooltipText = await watchResults[1].evaluate(e => {

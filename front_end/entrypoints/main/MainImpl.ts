@@ -39,6 +39,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as AutofillManager from '../../models/autofill_manager/autofill_manager.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Extensions from '../../models/extensions/extensions.js';
@@ -271,9 +272,6 @@ export class MainImpl {
         'protocolMonitor', 'Protocol Monitor', undefined,
         'https://developer.chrome.com/blog/new-in-devtools-92/#protocol-monitor');
     Root.Runtime.experiments.register('developerResourcesView', 'Show developer resources view');
-    Root.Runtime.experiments.register(
-        'cspViolationsView', 'Show CSP Violations view', undefined,
-        'https://developer.chrome.com/blog/new-in-devtools-89/#csp');
     Root.Runtime.experiments.register('samplingHeapProfilerTimeline', 'Sampling heap profiler timeline', true);
     Root.Runtime.experiments.register(
         'showOptionToExposeInternalsInHeapSnapshot', 'Show option to expose internals in heap snapshots');
@@ -313,7 +311,8 @@ export class MainImpl {
         'wasmDWARFDebugging', 'WebAssembly Debugging: Enable DWARF support', undefined,
         'https://developer.chrome.com/blog/wasm-debugging-2020/');
     Root.Runtime.experiments.register(
-        'evaluateExpressionsWithSourceMaps', 'Resolve variable names in expressions using source maps', undefined);
+        'evaluateExpressionsWithSourceMaps', 'Resolve variable names in expressions using source maps', undefined,
+        'https://goo.gle/evaluate-source-var-default', 'https://crbug.com/1504123');
     Root.Runtime.experiments.register('instrumentationBreakpoints', 'Enable instrumentation breakpoints', true);
     Root.Runtime.experiments.register('setAllBreakpointsEagerly', 'Set all breakpoints eagerly at startup');
     Root.Runtime.experiments.register('useSourceMapScopes', 'Use scope information from source maps', true);
@@ -347,10 +346,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'cssTypeComponentLength', 'Enable CSS <length> authoring tool in the Styles pane', undefined,
         'https://developer.chrome.com/blog/new-in-devtools-96/#length', 'https://g.co/devtools/length-feedback');
-
-    // Display precise changes in the Changes tab.
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.PRECISE_CHANGES, 'Display more precise changes in the Changes tab');
 
     // Integrate CSS changes in the Styles pane.
     Root.Runtime.experiments.register(
@@ -419,10 +414,19 @@ export class MainImpl {
         'Enable Autofill view',
     );
 
+    if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
+      Root.Runtime.experiments.register(
+          Root.Runtime.ExperimentName.CONSOLE_INSIGHTS,
+          'Enable Console Insights. This implies consent to collect and process data',
+          false,
+          'http://go/console-insights-experiment',
+          'http://go/console-insights-experiment-general-feedback',
+      );
+    }
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'sourceOrderViewer',
       'cssTypeComponentLength',
-      Root.Runtime.ExperimentName.PRECISE_CHANGES,
       ...('EyeDropper' in window ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
       'setAllBreakpointsEagerly',
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
@@ -431,6 +435,7 @@ export class MainImpl {
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
+      'evaluateExpressionsWithSourceMaps',
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocolMonitor'] : []),
     ]);
 
@@ -575,6 +580,8 @@ export class MainImpl {
       forceNew: true,
       debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(),
     });
+
+    AutofillManager.AutofillManager.AutofillManager.instance();
 
     new PauseListener();
 
@@ -760,21 +767,8 @@ globalThis.Main = globalThis.Main || {};
 // @ts-ignore Exported for Tests.js
 globalThis.Main.Main = MainImpl;
 
-let zoomActionDelegateInstance: ZoomActionDelegate;
-
 export class ZoomActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ZoomActionDelegate {
-    const {forceNew} = opts;
-    if (!zoomActionDelegateInstance || forceNew) {
-      zoomActionDelegateInstance = new ZoomActionDelegate();
-    }
-
-    return zoomActionDelegateInstance;
-  }
-
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     if (Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
       return false;
     }
@@ -794,21 +788,8 @@ export class ZoomActionDelegate implements UI.ActionRegistration.ActionDelegate 
   }
 }
 
-let searchActionDelegateInstance: SearchActionDelegate;
-
 export class SearchActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): SearchActionDelegate {
-    const {forceNew} = opts;
-    if (!searchActionDelegateInstance || forceNew) {
-      searchActionDelegateInstance = new SearchActionDelegate();
-    }
-
-    return searchActionDelegateInstance;
-  }
-
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     let searchableView = UI.SearchableView.SearchableView.fromElement(
         Platform.DOMUtilities.deepActiveElement(document),
     );
@@ -1055,21 +1036,8 @@ export function sendOverProtocol(
   });
 }
 
-let reloadActionDelegateInstance: ReloadActionDelegate;
-
 export class ReloadActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ReloadActionDelegate {
-    const {forceNew} = opts;
-    if (!reloadActionDelegateInstance || forceNew) {
-      reloadActionDelegateInstance = new ReloadActionDelegate();
-    }
-
-    return reloadActionDelegateInstance;
-  }
-
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
       case 'main.debug-reload':
         Components.Reload.reload();

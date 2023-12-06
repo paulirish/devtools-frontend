@@ -173,7 +173,7 @@ export interface TraceEventComplete extends TraceEventData {
 }
 
 export interface TraceEventFireIdleCallback extends TraceEventComplete {
-  name: 'FireIdleCallback';
+  name: KnownEventName.FireIdleCallback;
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
       allottedMilliseconds: MilliSeconds,
@@ -446,6 +446,7 @@ export interface TraceEventAnimation extends TraceEventData {
   id2?: {
     local?: string,
   };
+  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
 }
 
 // Metadata events.
@@ -459,7 +460,7 @@ export interface TraceEventMetadata extends TraceEventData {
 }
 
 export interface TraceEventThreadName extends TraceEventMetadata {
-  name: 'thread_name';
+  name: KnownEventName.ThreadName;
   args: TraceEventArgs&{
     name?: string,
   };
@@ -886,6 +887,18 @@ export interface TraceEventStyleRecalcInvalidation extends TraceEventInstant {
     },
   };
 }
+export interface TraceEventScheduleStyleRecalculation extends TraceEventInstant {
+  name: KnownEventName.ScheduleStyleRecalculation;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+    },
+  };
+}
+export function isTraceEventScheduleStyleRecalculation(event: TraceEventData):
+    event is TraceEventScheduleStyleRecalculation {
+  return event.name === KnownEventName.ScheduleStyleRecalculation;
+}
 
 export interface TraceEventPrePaint extends TraceEventComplete {
   name: 'PrePaint';
@@ -1156,7 +1169,7 @@ export function isTraceEventCommit(event: TraceEventData): event is TraceEventCo
 export interface TraceEventRasterTask extends TraceEventComplete {
   name: KnownEventName.RasterTask;
   args: TraceEventArgs&{
-    tileData: {
+    tileData?: {
       layerId: number,
       sourceFrameNumber: number,
       tileId: {
@@ -1191,6 +1204,53 @@ export interface TraceEventActivateLayerTree extends TraceEventInstant {
 }
 export function isTraceEventActivateLayerTree(event: TraceEventData): event is TraceEventActivateLayerTree {
   return event.name === KnownEventName.ActivateLayerTree;
+}
+
+export interface TraceEventUpdateLayoutTree extends TraceEventComplete {
+  name: KnownEventName.UpdateLayoutTree;
+  args: TraceEventArgs&{
+    elementCount: number,
+    beginData?: {
+      frame: string,
+    },
+  };
+}
+export function isTraceEventUpdateLayoutTree(event: TraceEventData): event is TraceEventUpdateLayoutTree {
+  return event.name === KnownEventName.UpdateLayoutTree;
+}
+
+export interface TraceEventLayout extends TraceEventComplete {
+  name: KnownEventName.Layout;
+  args: TraceEventArgs&{
+    beginData: {
+      frame: string,
+      dirtyObjects: number,
+      partialLayout: boolean,
+      totalObjects: number,
+    },
+    endData: {
+      layoutRoots: Array<{
+        depth: number,
+        nodeId: Protocol.DOM.BackendNodeId,
+        quads: number[][],
+      }>,
+    },
+  };
+}
+export function isTraceEventLayout(event: TraceEventData): event is TraceEventLayout {
+  return event.name === KnownEventName.Layout;
+}
+export interface TraceEventInvalidateLayout extends TraceEventInstant {
+  name: KnownEventName.InvalidateLayout;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      nodeId: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventInvalidateLayout(event: TraceEventData): event is TraceEventInvalidateLayout {
+  return event.name === KnownEventName.InvalidateLayout;
 }
 
 class ProfileIdTag {
@@ -1273,7 +1333,7 @@ export function isTraceEventUpdateCounters(event: TraceEventData): event is Trac
 export function isThreadName(
     traceEventData: TraceEventData,
     ): traceEventData is TraceEventThreadName {
-  return traceEventData.name === 'thread_name';
+  return traceEventData.name === KnownEventName.ThreadName;
 }
 
 export function isProcessName(
@@ -1599,23 +1659,25 @@ export interface TraceEventLayerTreeHostImplSnapshot extends TraceEventData {
   name: KnownEventName.LayerTreeHostImplSnapshot;
   ph: Phase.OBJECT_SNAPSHOT;
   id: string;
-  /* eslint-disable @typescript-eslint/naming-convention */
   args: TraceEventArgs&{
-    active_tiles: Array<{
-      id: string,
-      layer_id: string,
-      gpu_memory_usage: number,
-      content_rect: number[],
-    }>,
-    device_viewport_size: {
-      width: number,
-      height: number,
+    snapshot: {
+      /* eslint-disable @typescript-eslint/naming-convention */
+      active_tiles: Array<{
+        id: string,
+        layer_id: string,
+        gpu_memory_usage: number,
+        content_rect: number[],
+      }>,
+      device_viewport_size: {
+        width: number,
+        height: number,
+      },
+      active_tree: {
+        root_layer: TraceLayer,
+        layers: TraceLayer[],
+      },
+      /* eslint-enable @typescript-eslint/naming-convention */
     },
-    active_tree: {
-      root_layer: TraceLayer,
-      layers: TraceLayer[],
-    },
-    /* eslint-enable @typescript-eslint/naming-convention */
   };
 }
 
@@ -1651,6 +1713,139 @@ export interface TracingLayerTile {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
+export interface TraceEventFireAnimationFrame extends TraceEventComplete {
+  name: KnownEventName.FireAnimationFrame;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      id: number,
+    },
+  };
+}
+export function isTraceEventFireAnimationFrame(event: TraceEventData): event is TraceEventFireAnimationFrame {
+  return event.name === KnownEventName.FireAnimationFrame;
+}
+
+export interface TraceEventRequestAnimationFrame extends TraceEventInstant {
+  name: KnownEventName.RequestAnimationFrame;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      id: number,
+      stackTrace?: TraceEventCallFrame,
+    },
+  };
+}
+export function isTraceEventRequestAnimationFrame(event: TraceEventData): event is TraceEventRequestAnimationFrame {
+  return event.name === KnownEventName.RequestAnimationFrame;
+}
+
+export interface TraceEventTimerInstall extends TraceEventInstant {
+  name: KnownEventName.TimerInstall;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      singleShot: boolean,
+      stackTrace?: TraceEventCallFrame, timeout: number, timerId: number,
+    },
+  };
+}
+export function isTraceEventTimerInstall(event: TraceEventData): event is TraceEventTimerInstall {
+  return event.name === KnownEventName.TimerInstall;
+}
+
+export interface TraceEventTimerFire extends TraceEventComplete {
+  name: KnownEventName.TimerFire;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      timerId: number,
+    },
+  };
+}
+export function isTraceEventTimerFire(event: TraceEventData): event is TraceEventTimerFire {
+  return event.name === KnownEventName.TimerFire;
+}
+
+export interface TraceEventRequestIdleCallback extends TraceEventInstant {
+  name: KnownEventName.RequestIdleCallback;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      id: number,
+      timeout: number,
+      stackTrace?: TraceEventCallFrame,
+    },
+
+  };
+}
+export function isTraceEventRequestIdleCallback(event: TraceEventData): event is TraceEventRequestIdleCallback {
+  return event.name === KnownEventName.RequestIdleCallback;
+}
+
+export interface TraceEventWebSocketCreate extends TraceEventInstant {
+  name: KnownEventName.WebSocketCreate;
+  args: TraceEventArgs&{
+    data: {
+      identifier: number,
+      url: string,
+      frame?: string,
+      websocketProtocol?: string,
+      stackTrace?: TraceEventCallFrame,
+    },
+  };
+}
+export function isTraceEventWebSocketCreate(event: TraceEventData): event is TraceEventWebSocketCreate {
+  return event.name === KnownEventName.WebSocketCreate;
+}
+
+export interface TraceEventWebSocketSendHandshakeRequest extends TraceEventInstant {
+  name: KnownEventName.WebSocketSendHandshakeRequest;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      identifier: number,
+    },
+  };
+}
+export function isTraceEventWebSocketSendHandshakeRequest(event: TraceEventData):
+    event is TraceEventWebSocketSendHandshakeRequest {
+  return event.name === KnownEventName.WebSocketSendHandshakeRequest;
+}
+
+export interface TraceEventWebSocketReceiveHandshakeResponse extends TraceEventInstant {
+  name: KnownEventName.WebSocketReceiveHandshakeResponse;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      identifier: number,
+    },
+  };
+}
+export function isTraceEventWebSocketReceiveHandshakeResponse(event: TraceEventData):
+    event is TraceEventWebSocketReceiveHandshakeResponse {
+  return event.name === KnownEventName.WebSocketReceiveHandshakeResponse;
+}
+
+export interface TraceEventWebSocketDestroy extends TraceEventInstant {
+  name: KnownEventName.WebSocketDestroy;
+  args: TraceEventArgs&{
+    data: {
+      frame: string,
+      identifier: number,
+    },
+  };
+}
+export function isTraceEventWebSocketDestroy(event: TraceEventData): event is TraceEventWebSocketDestroy {
+  return event.name === KnownEventName.WebSocketDestroy;
+}
+
+export function isWebSocketTraceEvent(event: TraceEventData): event is TraceEventWebSocketCreate|
+    TraceEventWebSocketDestroy|TraceEventWebSocketReceiveHandshakeResponse|TraceEventWebSocketSendHandshakeRequest {
+  return isTraceEventWebSocketCreate(event) || isTraceEventWebSocketDestroy(event) ||
+      isTraceEventWebSocketReceiveHandshakeResponse(event) || isTraceEventWebSocketSendHandshakeRequest(event);
+}
+
 /**
  * This is an exhaustive list of events we track in the Performance
  * panel. Note not all of them are necessarliry shown in the flame
@@ -1658,6 +1853,9 @@ export interface TracingLayerTile {
  * TODO(crbug.com/1428024): Complete this enum.
  */
 export const enum KnownEventName {
+  /* Metadata */
+  ThreadName = 'thread_name',
+
   /* Task */
   Program = 'Program',
   RunTask = 'RunTask',

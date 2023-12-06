@@ -5,7 +5,7 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import * as Actions from './recorder-actions.js';
+import * as Actions from './recorder-actions/recorder-actions.js';
 import type * as Recorder from './recorder.js';
 
 const UIStrings = {
@@ -91,7 +91,7 @@ UI.ActionRegistration.registerActionExtension({
   title: i18nLazyString(UIStrings.createRecording),
   async loadActionDelegate() {
     const Recorder = await loadRecorderModule();
-    return Recorder.RecorderPanel.ActionDelegate.instance();
+    return new Recorder.RecorderPanel.ActionDelegate();
   },
 });
 
@@ -107,7 +107,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   async loadActionDelegate() {
     const Recorder = await loadRecorderModule();
-    return Recorder.RecorderPanel.ActionDelegate.instance();
+    return new Recorder.RecorderPanel.ActionDelegate();
   },
   bindings: [
     {
@@ -130,7 +130,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   async loadActionDelegate() {
     const Recorder = await loadRecorderModule();
-    return Recorder.RecorderPanel.ActionDelegate.instance();
+    return new Recorder.RecorderPanel.ActionDelegate();
   },
   bindings: [
     {
@@ -153,7 +153,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   async loadActionDelegate() {
     const Recorder = await loadRecorderModule();
-    return Recorder.RecorderPanel.ActionDelegate.instance();
+    return new Recorder.RecorderPanel.ActionDelegate();
   },
   bindings: [
     {

@@ -264,8 +264,7 @@ export class SensorsView extends UI.Widget.VBox {
 
     const noOverrideOption = {title: i18nString(UIStrings.noOverride), location: NonPresetOptions.NoOverride};
     this.locationSelectElement = (fields.createChild('select', 'chrome-select') as HTMLSelectElement);
-    this.locationSelectElement.setAttribute(
-        'jslog', `${VisualLogging.dropDown().track({click: true, keydown: 'ArrowUp,ArrowDown'})}`);
+    this.locationSelectElement.setAttribute('jslog', `${VisualLogging.dropDown().track({change: true})}`);
     UI.ARIAUtils.bindLabelToControl(geogroupTitle, this.locationSelectElement);
 
     // No override
@@ -471,8 +470,7 @@ export class SensorsView extends UI.Widget.VBox {
       ],
     }];
     this.orientationSelectElement = (this.contentElement.createChild('select', 'chrome-select') as HTMLSelectElement);
-    this.orientationSelectElement.setAttribute(
-        'jslog', `${VisualLogging.dropDown().track({click: true, keydown: 'ArrowUp,ArrowDown'})}`);
+    this.orientationSelectElement.setAttribute('jslog', `${VisualLogging.dropDown().track({change: true})}`);
     UI.ARIAUtils.bindLabelToControl(orientationTitle, this.orientationSelectElement);
     this.orientationSelectElement.appendChild(new Option(orientationOffOption.title, orientationOffOption.orientation));
     this.orientationSelectElement.appendChild(
@@ -531,6 +529,7 @@ export class SensorsView extends UI.Widget.VBox {
     if (value === NonPresetOptions.NoOverride) {
       this.deviceOrientationOverrideEnabled = false;
       this.enableOrientationFields(true);
+      this.applyDeviceOrientation();
     } else if (value === NonPresetOptions.Custom) {
       this.deviceOrientationOverrideEnabled = true;
       this.resetDeviceOrientation();
@@ -806,22 +805,10 @@ export class PresetOrientations {
   }
 }
 
-let showActionDelegateInstance: ShowActionDelegate;
-
 export class ShowActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(_context: UI.Context.Context, _actionId: string): boolean {
     void UI.ViewManager.ViewManager.instance().showView('sensors');
     return true;
-  }
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ShowActionDelegate {
-    const {forceNew} = opts;
-    if (!showActionDelegateInstance || forceNew) {
-      showActionDelegateInstance = new ShowActionDelegate();
-    }
-
-    return showActionDelegateInstance;
   }
 }
 

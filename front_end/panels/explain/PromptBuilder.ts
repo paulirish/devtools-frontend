@@ -28,12 +28,16 @@ export interface Source {
 
 export class PromptBuilder {
   #consoleMessage: Console.ConsoleViewMessage.ConsoleViewMessage;
+  #cachedSearchResults?: string;
 
   constructor(consoleMessage: Console.ConsoleViewMessage.ConsoleViewMessage) {
     this.#consoleMessage = consoleMessage;
   }
 
   async getSearchAnswers(): Promise<string> {
+    if (this.#cachedSearchResults !== undefined) {
+      return this.#cachedSearchResults;
+    }
     const apiKey = Root.Runtime.Runtime.queryParam('aidaApiKey');
     if (!apiKey) {
       return '';
@@ -54,7 +58,8 @@ export class PromptBuilder {
         break;
       }
     }
-    return result.join('\n');
+    this.#cachedSearchResults = result.join('\n');
+    return this.#cachedSearchResults;
   }
 
   async getNetworkRequest(): Promise<SDK.NetworkRequest.NetworkRequest|undefined> {
@@ -88,17 +93,19 @@ export class PromptBuilder {
     return {text, columnNumber: mappedLocation?.columnNumber ?? 0, lineNumber: mappedLocation?.lineNumber ?? 0};
   }
 
-  async buildPrompt(): Promise<{prompt: string, sources: Source[]}> {
+  async buildPrompt(sourcesTypes: SourceType[] = Object.values(SourceType)):
+      Promise<{prompt: string, sources: Source[]}> {
     const [sourceCode, request, searchAnswers] = await Promise.all([
-      this.getMessageSourceCode(),
-      this.getNetworkRequest(),
-      this.getSearchAnswers(),
+      sourcesTypes.includes(SourceType.RELATED_CODE) ? this.getMessageSourceCode() : undefined,
+      sourcesTypes.includes(SourceType.NETWORK_REQUEST) ? this.getNetworkRequest() : undefined,
+      sourcesTypes.includes(SourceType.SEARCH_ANSWERS) ? this.getSearchAnswers() : '',
     ]);
 
-    const relatedCode = sourceCode.text ? formatRelatedCode(sourceCode) : '';
+    const relatedCode = sourceCode?.text ? formatRelatedCode(sourceCode) : '';
     const relatedRequest = request ? formatNetworkRequest(request) : '';
+    const stacktrace = sourcesTypes.includes(SourceType.STACKTRACE) ? formatStackTrace(this.#consoleMessage) : '';
+
     const message = formatConsoleMessage(this.#consoleMessage);
-    const stacktrace = formatStackTrace(this.#consoleMessage);
 
     const prompt = this.formatPrompt({
       message: [message, stacktrace].join('\n').trim(),
@@ -107,7 +114,6 @@ export class PromptBuilder {
       searchAnswers,
     });
 
-    // TODO: separate the stack trace from message.
     const sources = [
       {
         type: SourceType.MESSAGE,
@@ -359,18 +365,21 @@ Response status: ${request.statusCode} ${request.statusText}`;
 }
 
 export function formatConsoleMessage(message: Console.ConsoleViewMessage.ConsoleViewMessage): string {
-  return message.consoleMessage().messageText;
+  return message.toMessageTextString();
 }
 
+/**
+ * This formats the stacktrace from the console message which might or might not
+ * match the content of stacktrace(s) in the console message arguments.
+ */
 export function formatStackTrace(message: Console.ConsoleViewMessage.ConsoleViewMessage): string {
-  let preview = message.contentElement().querySelector('.stack-preview-container');
+  const previewContainer = message.contentElement().querySelector('.stack-preview-container');
 
-  if (!preview) {
-    // If there is no preview, we grab the entire raw message replacing the message text.
-    return message.toExportString().replace(message.consoleMessage().messageText, '').trim();
+  if (!previewContainer) {
+    return '';
   }
 
-  preview = preview.shadowRoot?.querySelector('.stack-preview-container') as HTMLElement;
+  const preview = previewContainer.shadowRoot?.querySelector('.stack-preview-container') as HTMLElement;
 
   const nodes = preview.childTextNodes();
   // Gets application-level source mapped stack trace taking the ignore list

@@ -4,6 +4,7 @@
 
 import * as FrontendHelpers from '../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
 import * as Common from '../../../../core/common/common.js';
+import * as Root from '../../../../core/root/root.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
@@ -62,7 +63,7 @@ UI.ActionRegistration.registerActionExtension({
     return [Timeline.TimelinePanel.TimelinePanel];
   },
   async loadActionDelegate() {
-    return Timeline.TimelinePanel.ActionDelegate.instance();
+    return new Timeline.TimelinePanel.ActionDelegate();
   },
 });
 UI.ActionRegistration.registerActionExtension({
@@ -92,17 +93,19 @@ UI.ActionRegistration.registerActionExtension({
 const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
 UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistry});
 Common.Settings.settingForTest('flamechartMouseWheelAction').set('zoom');
-
 const params = new URLSearchParams(window.location.search);
 const traceFileName = params.get('trace');
 const cpuprofileName = params.get('cpuprofile');
 const nodeMode = params.get('isNode');
 const isNodeMode = nodeMode === 'true' ? true : false;
+if (params.has('initiators')) {
+  Root.Runtime.experiments.setEnabled('timelineEventInitiators', true);
+}
 
-const threadTracksSource = Timeline.TimelinePanel.ThreadTracksSource.NEW_ENGINE;
+Root.Runtime.experiments.setEnabled(
+    Root.Runtime.ExperimentName.BREADCRUMBS_PERFORMANCE_PANEL, params.has('breadcrumbs'));
 
-const timeline =
-    Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode, threadTracksSource});
+const timeline = Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode});
 const container = document.getElementById('container');
 if (!container) {
   throw new Error('could not find container');

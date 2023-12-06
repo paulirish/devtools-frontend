@@ -24,12 +24,14 @@ devtools_module("timeline") {
   sources = [
     "AnimationsTrackAppender.ts",
     "AppenderUtils.ts",
+    "BenchmarkEvents.ts",
     "CLSLinkifier.ts",
     "CompatibilityTracksAppender.ts",
     "CountersGraph.ts",
     "EventUICategory.ts",
     "EventsTimelineTreeView.ts",
     "GPUTrackAppender.ts",
+    "Initiators.ts",
     "InteractionsTrackAppender.ts",
     "LayoutShiftsTrackAppender.ts",
     "NetworkTrackAppender.ts",
@@ -99,6 +101,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/interactions/panels/performance/timeline/*",
+    "../../../test/perf/*",
     "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
     "../../../test/unittests/front_end/helpers",
     "../../../test/unittests/front_end/models/trace/*",

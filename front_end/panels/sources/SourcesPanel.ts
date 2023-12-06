@@ -140,9 +140,8 @@ const UIStrings = {
   continueToHere: 'Continue to here',
   /**
    *@description A context menu item in the Console that stores selection as a temporary global variable
-   *@example {string} PH1
    */
-  storeSAsGlobalVariable: 'Store {PH1} as global variable',
+  storeAsGlobalVariable: 'Store as global variable',
   /**
    *@description A context menu item in the Console, Sources, and Network panel
    *@example {string} PH1
@@ -178,8 +177,10 @@ const primitiveRemoteObjectTypes = new Set(['number', 'boolean', 'bigint', 'unde
 let sourcesPanelInstance: SourcesPanel;
 let wrapperViewInstance: WrapperView;
 
-export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provider, SDK.TargetManager.Observer,
-                                                            UI.View.ViewLocationResolver {
+export class SourcesPanel extends UI.Panel.Panel implements
+    UI.ContextMenu.Provider<Workspace.UISourceCode.UISourceCode|Workspace.UISourceCode.UILocation|
+                            SDK.RemoteObject.RemoteObject|SDK.NetworkRequest.NetworkRequest|UISourceCodeFrame>,
+    SDK.TargetManager.Observer, UI.View.ViewLocationResolver {
   private readonly workspace: Workspace.Workspace.WorkspaceImpl;
   private readonly togglePauseAction: UI.ActionRegistration.Action;
   private readonly stepOverAction: UI.ActionRegistration.Action;
@@ -859,20 +860,35 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     return debugToolbarDrawer;
   }
 
-  appendApplicableItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    this.appendUISourceCodeItems(event, contextMenu, target);
-    this.appendUISourceCodeFrameItems(event, contextMenu, target);
-    this.appendUILocationItems(contextMenu, target);
-    this.appendRemoteObjectItems(contextMenu, target);
+  appendApplicableItems(
+      event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+      target: Workspace.UISourceCode.UISourceCode|Workspace.UISourceCode.UILocation|SDK.RemoteObject.RemoteObject|
+      SDK.NetworkRequest.NetworkRequest|UISourceCodeFrame): void {
+    if (target instanceof Workspace.UISourceCode.UISourceCode) {
+      this.appendUISourceCodeItems(event, contextMenu, target);
+      return;
+    }
+    if (target instanceof UISourceCodeFrame) {
+      this.appendUISourceCodeFrameItems(contextMenu, target);
+      return;
+    }
+    if (target instanceof Workspace.UISourceCode.UILocation) {
+      this.appendUILocationItems(contextMenu, target);
+      return;
+    }
+    if (target instanceof SDK.RemoteObject.RemoteObject) {
+      this.appendRemoteObjectItems(contextMenu, target);
+      return;
+    }
     this.appendNetworkRequestItems(contextMenu, target);
   }
 
-  private appendUISourceCodeItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    if (!(target instanceof Workspace.UISourceCode.UISourceCode) || !event.target) {
+  private appendUISourceCodeItems(
+      event: Event, contextMenu: UI.ContextMenu.ContextMenu, uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
+    if (!event.target) {
       return;
     }
 
-    const uiSourceCode = (target as Workspace.UISourceCode.UISourceCode);
     const eventTarget = (event.target as Node);
     if (!uiSourceCode.project().isServiceProject() &&
         !eventTarget.isSelfOrDescendant(this.navigatorTabbedLocation.widget().element) &&
@@ -891,21 +907,14 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     }
   }
 
-  private appendUISourceCodeFrameItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    if (!(target instanceof UISourceCodeFrame)) {
-      return;
-    }
+  private appendUISourceCodeFrameItems(contextMenu: UI.ContextMenu.ContextMenu, target: UISourceCodeFrame): void {
     if (target.uiSourceCode().contentType().isFromSourceMap() || target.textEditor.state.selection.main.empty) {
       return;
     }
     contextMenu.debugSection().appendAction('debugger.evaluate-selection');
   }
 
-  appendUILocationItems(contextMenu: UI.ContextMenu.ContextMenu, object: Object): void {
-    if (!(object instanceof Workspace.UISourceCode.UILocation)) {
-      return;
-    }
-    const uiLocation = (object as Workspace.UISourceCode.UILocation);
+  appendUILocationItems(contextMenu: UI.ContextMenu.ContextMenu, uiLocation: Workspace.UISourceCode.UILocation): void {
     const uiSourceCode = uiLocation.uiSourceCode;
 
     if (!Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
@@ -932,12 +941,9 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     this.revealInNavigator(uiSourceCode);
   }
 
-  private appendRemoteObjectItems(contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    if (!(target instanceof SDK.RemoteObject.RemoteObject)) {
-      return;
-    }
+  private appendRemoteObjectItems(contextMenu: UI.ContextMenu.ContextMenu, remoteObject: SDK.RemoteObject.RemoteObject):
+      void {
     const indent = Common.Settings.Settings.instance().moduleSetting('textEditorIndent').get();
-    const remoteObject = (target as SDK.RemoteObject.RemoteObject);
     const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
 
     function getObjectTitle(): string|undefined {
@@ -952,7 +958,7 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     const copyContextMenuTitle = getObjectTitle();
 
     contextMenu.debugSection().appendItem(
-        i18nString(UIStrings.storeSAsGlobalVariable, {PH1: String(copyContextMenuTitle)}),
+        i18nString(UIStrings.storeAsGlobalVariable),
         () => executionContext?.target()
                   .model(SDK.ConsoleModel.ConsoleModel)
                   ?.saveToTempVariable(executionContext, remoteObject));
@@ -1034,11 +1040,8 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
     }
   }
 
-  private appendNetworkRequestItems(contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    if (!(target instanceof SDK.NetworkRequest.NetworkRequest)) {
-      return;
-    }
-    const request = (target as SDK.NetworkRequest.NetworkRequest);
+  private appendNetworkRequestItems(
+      contextMenu: UI.ContextMenu.ContextMenu, request: SDK.NetworkRequest.NetworkRequest): void {
     const uiSourceCode = this.workspace.uiSourceCodeForURL(request.url());
     if (!uiSourceCode) {
       return;
@@ -1213,29 +1216,13 @@ export class SourcesPanel extends UI.Panel.Panel implements UI.ContextMenu.Provi
 export let lastModificationTimeout = 200;
 export const minToolbarWidth = 215;
 
-let uILocationRevealerInstance: UILocationRevealer;
-
-export class UILocationRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): UILocationRevealer {
-    const {forceNew} = opts;
-    if (!uILocationRevealerInstance || forceNew) {
-      uILocationRevealerInstance = new UILocationRevealer();
-    }
-
-    return uILocationRevealerInstance;
-  }
-
-  async reveal(uiLocation: Object, omitFocus?: boolean): Promise<void> {
-    if (!(uiLocation instanceof Workspace.UISourceCode.UILocation)) {
-      throw new Error('Internal error: not a ui location');
-    }
+export class UILocationRevealer implements Common.Revealer.Revealer<Workspace.UISourceCode.UILocation> {
+  async reveal(uiLocation: Workspace.UISourceCode.UILocation, omitFocus?: boolean): Promise<void> {
     SourcesPanel.instance().showUILocation(uiLocation, omitFocus);
   }
 }
 
-export class UILocationRangeRevealer implements Common.Revealer.Revealer {
+export class UILocationRangeRevealer implements Common.Revealer.Revealer<Workspace.UISourceCode.UILocationRange> {
   static #instance?: UILocationRangeRevealer;
   static instance(opts: {forceNew: boolean} = {forceNew: false}): UILocationRangeRevealer {
     if (!UILocationRangeRevealer.#instance || opts.forceNew) {
@@ -1244,33 +1231,14 @@ export class UILocationRangeRevealer implements Common.Revealer.Revealer {
     return UILocationRangeRevealer.#instance;
   }
 
-  async reveal(uiLocationRange: Object, omitFocus?: boolean): Promise<void> {
-    if (!(uiLocationRange instanceof Workspace.UISourceCode.UILocationRange)) {
-      throw new Error('Internal error: Not a UILocationRange');
-    }
+  async reveal(uiLocationRange: Workspace.UISourceCode.UILocationRange, omitFocus?: boolean): Promise<void> {
     const {uiSourceCode, range: {start: from, end: to}} = uiLocationRange;
     SourcesPanel.instance().showUISourceCode(uiSourceCode, {from, to}, omitFocus);
   }
 }
 
-let debuggerLocationRevealerInstance: DebuggerLocationRevealer;
-
-export class DebuggerLocationRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): DebuggerLocationRevealer {
-    const {forceNew} = opts;
-    if (!debuggerLocationRevealerInstance || forceNew) {
-      debuggerLocationRevealerInstance = new DebuggerLocationRevealer();
-    }
-
-    return debuggerLocationRevealerInstance;
-  }
-
-  async reveal(rawLocation: Object, omitFocus?: boolean): Promise<void> {
-    if (!(rawLocation instanceof SDK.DebuggerModel.Location)) {
-      throw new Error('Internal error: not a debugger location');
-    }
+export class DebuggerLocationRevealer implements Common.Revealer.Revealer<SDK.DebuggerModel.Location> {
+  async reveal(rawLocation: SDK.DebuggerModel.Location, omitFocus?: boolean): Promise<void> {
     const uiLocation =
         await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().rawLocationToUILocation(
             rawLocation);
@@ -1280,62 +1248,22 @@ export class DebuggerLocationRevealer implements Common.Revealer.Revealer {
   }
 }
 
-let uISourceCodeRevealerInstance: UISourceCodeRevealer;
-
-export class UISourceCodeRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): UISourceCodeRevealer {
-    const {forceNew} = opts;
-    if (!uISourceCodeRevealerInstance || forceNew) {
-      uISourceCodeRevealerInstance = new UISourceCodeRevealer();
-    }
-
-    return uISourceCodeRevealerInstance;
-  }
-
-  async reveal(uiSourceCode: Object, omitFocus?: boolean): Promise<void> {
-    if (!(uiSourceCode instanceof Workspace.UISourceCode.UISourceCode)) {
-      throw new Error('Internal error: not a ui source code');
-    }
+export class UISourceCodeRevealer implements Common.Revealer.Revealer<Workspace.UISourceCode.UISourceCode> {
+  async reveal(uiSourceCode: Workspace.UISourceCode.UISourceCode, omitFocus?: boolean): Promise<void> {
     SourcesPanel.instance().showUISourceCode(uiSourceCode, undefined, omitFocus);
   }
 }
 
-let debuggerPausedDetailsRevealerInstance: DebuggerPausedDetailsRevealer;
-
-export class DebuggerPausedDetailsRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): DebuggerPausedDetailsRevealer {
-    const {forceNew} = opts;
-    if (!debuggerPausedDetailsRevealerInstance || forceNew) {
-      debuggerPausedDetailsRevealerInstance = new DebuggerPausedDetailsRevealer();
-    }
-
-    return debuggerPausedDetailsRevealerInstance;
-  }
-
-  async reveal(_object: Object): Promise<void> {
+export class DebuggerPausedDetailsRevealer implements
+    Common.Revealer.Revealer<SDK.DebuggerModel.DebuggerPausedDetails> {
+  async reveal(_object: SDK.DebuggerModel.DebuggerPausedDetails): Promise<void> {
     if (Common.Settings.Settings.instance().moduleSetting('autoFocusOnDebuggerPausedEnabled').get()) {
       return SourcesPanel.instance().setAsCurrentPanel();
     }
   }
 }
 
-let revealingActionDelegateInstance: RevealingActionDelegate;
-
 export class RevealingActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): RevealingActionDelegate {
-    const {forceNew} = opts;
-    if (!revealingActionDelegateInstance || forceNew) {
-      revealingActionDelegateInstance = new RevealingActionDelegate();
-    }
-
-    return revealingActionDelegateInstance;
-  }
   handleAction(context: UI.Context.Context, actionId: string): boolean {
     const panel = SourcesPanel.instance();
     if (!panel.ensureSourcesViewVisible()) {
@@ -1377,19 +1305,7 @@ export class RevealingActionDelegate implements UI.ActionRegistration.ActionDele
   }
 }
 
-let actionDelegateInstance: ActionDelegate;
-
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ActionDelegate {
-    const {forceNew} = opts;
-    if (!actionDelegateInstance || forceNew) {
-      actionDelegateInstance = new ActionDelegate();
-    }
-
-    return actionDelegateInstance;
-  }
   handleAction(context: UI.Context.Context, actionId: string): boolean {
     const panel = SourcesPanel.instance();
     switch (actionId) {
@@ -1418,11 +1334,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         return true;
       }
       case 'debugger.evaluate-selection': {
-        const frame = UI.Context.Context.instance().flavor(UISourceCodeFrame);
+        const frame = context.flavor(UISourceCodeFrame);
         if (frame) {
           const {state: editorState} = frame.textEditor;
           let text = editorState.sliceDoc(editorState.selection.main.from, editorState.selection.main.to);
-          const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
+          const executionContext = context.flavor(SDK.RuntimeModel.ExecutionContext);
           const consoleModel = executionContext?.target().model(SDK.ConsoleModel.ConsoleModel);
           if (executionContext && consoleModel) {
             const message = consoleModel.addCommandMessage(executionContext, text);

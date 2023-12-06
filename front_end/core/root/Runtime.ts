@@ -288,13 +288,11 @@ export enum ExperimentName {
   CSS_OVERVIEW = 'cssOverview',
   LIVE_HEAP_PROFILE = 'liveHeapProfile',
   DEVELOPER_RESOURCES_VIEW = 'developerResourcesView',
-  CSP_VIOLATIONS_VIEW = 'cspViolationsView',
   WASM_DWARF_DEBUGGING = 'wasmDWARFDebugging',
   ALL = '*',
   PROTOCOL_MONITOR = 'protocolMonitor',
   WEBAUTHN_PANE = 'webauthnPane',
   FULL_ACCESSIBILITY_TREE = 'fullAccessibilityTree',
-  PRECISE_CHANGES = 'preciseChanges',
   STYLES_PANE_CSS_CHANGES = 'stylesPaneCSSChanges',
   HEADER_OVERRIDES = 'headerOverrides',
   EYEDROPPER_COLOR_PICKER = 'eyedropperColorPicker',
@@ -316,6 +314,7 @@ export enum ExperimentName {
   TRACK_CONTEXT_MENU = 'trackContextMenu',
   AUTOFILL_VIEW = 'autofillView',
   INDENTATION_MARKERS_TEMP_DISABLE = 'sourcesFrameIndentationMarkersTemporarilyDisable',
+  CONSOLE_INSIGHTS = 'consoleInsights',
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

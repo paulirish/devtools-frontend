@@ -385,6 +385,7 @@ export const enum IconClass {
   PLUS = 'plus',
   UNDO = 'undo',
   COPY = 'copy',
+  IMPORT = 'import',
 }
 
 export const enum KeybindSet {
@@ -457,7 +458,7 @@ export interface ActionRegistration {
    *   <...>
    *    async loadActionDelegate() {
    *      const Elements = await loadElementsModule();
-   *      return Elements.ElementsPanel.ElementsActionDelegate.instance();
+   *      return new Elements.ElementsPanel.ElementsActionDelegate();
    *    },
    *   <...>
    *  });

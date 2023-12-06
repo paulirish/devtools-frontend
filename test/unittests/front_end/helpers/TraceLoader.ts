@@ -55,6 +55,9 @@ export class TraceLoader {
    * The context might be null when we only render a component example.
    **/
   static setTestTimeout(context: Mocha.Context|Mocha.Suite|null): void {
+    if (!context || context.timeout() >= 10_000) {
+      return;
+    }
     context?.timeout(10_000);
   }
 
@@ -178,10 +181,11 @@ export class TraceLoader {
     await performanceModel.setTracingModel(tracingModel);
     const timelineModel = performanceModel.timelineModel();
 
-    TraceBounds.TraceBounds.BoundsManager.instance({
-      forceNew: true,
-      initialBounds: traceEngineData.traceParsedData.Meta.traceBounds,
-    });
+    TraceBounds.TraceBounds.BoundsManager
+        .instance({
+          forceNew: true,
+        })
+        .resetWithNewBounds(traceEngineData.traceParsedData.Meta.traceBounds);
 
     const result: AllModelsLoaded = {
       tracingModel,
