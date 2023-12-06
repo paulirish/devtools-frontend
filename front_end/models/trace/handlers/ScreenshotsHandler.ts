@@ -34,15 +34,21 @@ export async function finalize(): Promise<void> {
   const {browserProcessId, browserThreadId} = metaHandlerData();
   const syntheticEvents = Helpers.Trace.createMatchedSortedSyntheticEvents(unpairedAsyncEvents);
 
+  const pReporterByFrameSequence = Object.fromEntries(syntheticEvents.map(e => [e.args?.data.beginEvent.args.chrome_frame_reporter.frame_sequence, e]));
 
   const browserThreads = eventsInProcessThread.get(browserProcessId);
   if (browserThreads) {
     snapshots = browserThreads.get(browserThreadId) || [];
     for (const snapshot of snapshots) {
-      const frame_sequence = snapshot.args.frame_sequence;
-      const matchingPipelineReporter = syntheticEvents.find(e => e.args?.data.beginEvent.args.chrome_frame_reporter.frame_sequence === frame_sequence);
-      if (matchingPipelineReporter) {
-        snapshot.ts = Types.Timing.MicroSeconds(matchingPipelineReporter.ts + matchingPipelineReporter.dur);
+      const frameSequence = parseInt(snapshot.id, 16);
+      const matchingPReporter  = pReporterByFrameSequence[frameSequence];
+      if (matchingPReporter) {
+        const presentationTs = Types.Timing.MicroSeconds(matchingPReporter.ts + matchingPReporter.dur);
+        console.log('Adjusted: ', (presentationTs - snapshot.ts) / 1000, 'ms', frameSequence);
+        snapshot.args.origTs = snapshot.ts;
+        snapshot.ts = presentationTs;
+      } else {
+        console.log('DIDNT adjust', frameSequence);
       }
     }
   }

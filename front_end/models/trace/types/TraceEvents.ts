@@ -422,12 +422,13 @@ export function isTraceEventAuctionWorkletDoneWithProcess(event: TraceEventData)
 // Snapshot events.
 
 export interface TraceEventSnapshot extends TraceEventData {
+  id: string; // For screenshots, this is the frame sequence number in hex
   args: TraceEventArgs&{
     snapshot: string,
   };
   name: 'Screenshot';
   cat: 'disabled-by-default-devtools.screenshot';
-  ph: Phase.OBJECT_SNAPSHOT|Phase.INSTANT;  // In Oct 2023, the phase was changed to Instant. crbug.com/798755
+  ph: Phase.OBJECT_SNAPSHOT;
 }
 
 // Animation events.
