@@ -17,6 +17,7 @@ import * as ChildTargetManager from './ChildTargetManager.js';
 import * as CompilerSourceMappingContentProvider from './CompilerSourceMappingContentProvider.js';
 import * as Connections from './Connections.js';
 import * as ConsoleModel from './ConsoleModel.js';
+import * as ContentData from './ContentData.js';
 import * as Cookie from './Cookie.js';
 import * as CookieModel from './CookieModel.js';
 import * as CookieParser from './CookieParser.js';
@@ -51,6 +52,7 @@ import * as IsolateManager from './IsolateManager.js';
 import * as IssuesModel from './IssuesModel.js';
 import * as LayerTreeBase from './LayerTreeBase.js';
 import * as LogModel from './LogModel.js';
+import * as MimeType from './MimeType.js';
 import * as NetworkManager from './NetworkManager.js';
 import * as NetworkRequest from './NetworkRequest.js';
 import * as OverlayColorGenerator from './OverlayColorGenerator.js';
@@ -70,6 +72,7 @@ import * as ScreenCaptureModel from './ScreenCaptureModel.js';
 import * as Script from './Script.js';
 import * as SDKModel from './SDKModel.js';
 import * as SecurityOriginManager from './SecurityOriginManager.js';
+import * as ServerSentEventProtocol from './ServerSentEventsProtocol.js';
 import * as ServerTiming from './ServerTiming.js';
 import * as ServiceWorkerCacheModel from './ServiceWorkerCacheModel.js';
 import * as ServiceWorkerManager from './ServiceWorkerManager.js';
@@ -89,6 +92,7 @@ export {
   CompilerSourceMappingContentProvider,
   Connections,
   ConsoleModel,
+  ContentData,
   Cookie,
   CookieModel,
   CookieParser,
@@ -123,6 +127,7 @@ export {
   IssuesModel,
   LayerTreeBase,
   LogModel,
+  MimeType,
   NetworkManager,
   NetworkRequest,
   OverlayColorGenerator,
@@ -142,6 +147,7 @@ export {
   Script,
   SDKModel,
   SecurityOriginManager,
+  ServerSentEventProtocol,
   ServerTiming,
   ServiceWorkerCacheModel,
   ServiceWorkerManager,

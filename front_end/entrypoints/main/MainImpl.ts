@@ -271,21 +271,11 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'protocolMonitor', 'Protocol Monitor', undefined,
         'https://developer.chrome.com/blog/new-in-devtools-92/#protocol-monitor');
-    Root.Runtime.experiments.register('developerResourcesView', 'Show developer resources view');
     Root.Runtime.experiments.register('samplingHeapProfilerTimeline', 'Sampling heap profiler timeline', true);
     Root.Runtime.experiments.register(
         'showOptionToExposeInternalsInHeapSnapshot', 'Show option to expose internals in heap snapshots');
-    Root.Runtime.experiments.register(
-        'sourceOrderViewer', 'Source order viewer', undefined,
-        'https://developer.chrome.com/blog/new-in-devtools-92/#source-order');
-    Root.Runtime.experiments.register('webauthnPane', 'WebAuthn Pane');
-
-    // Back/forward cache
-    Root.Runtime.experiments.register(
-        'bfcacheDisplayTree', 'Show back/forward cache blocking reasons in the frame tree structure view');
 
     // Timeline
-    Root.Runtime.experiments.register('timelineEventInitiators', 'Timeline: event initiators');
     Root.Runtime.experiments.register('timelineInvalidationTracking', 'Timeline: invalidation tracking', true);
     Root.Runtime.experiments.register('timelineShowAllEvents', 'Timeline: show all events', true);
     Root.Runtime.experiments.register(
@@ -297,8 +287,7 @@ export class MainImpl {
     // JS Profiler
     Root.Runtime.experiments.register(
         'jsProfilerTemporarilyEnable', 'Enable JavaScript Profiler temporarily', /* unstable= */ false,
-        'https://developer.chrome.com/blog/js-profiler-deprecation/',
-        'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548');
+        'https://goo.gle/js-profiler-deprecation', 'https://crbug.com/1354548');
 
     // Sources
     Root.Runtime.experiments.register(
@@ -307,9 +296,6 @@ export class MainImpl {
         'https://crbug.com/1479986');
 
     // Debugging
-    Root.Runtime.experiments.register(
-        'wasmDWARFDebugging', 'WebAssembly Debugging: Enable DWARF support', undefined,
-        'https://developer.chrome.com/blog/wasm-debugging-2020/');
     Root.Runtime.experiments.register(
         'evaluateExpressionsWithSourceMaps', 'Resolve variable names in expressions using source maps', undefined,
         'https://goo.gle/evaluate-source-var-default', 'https://crbug.com/1504123');
@@ -342,15 +328,6 @@ export class MainImpl {
     // New cookie features.
     Root.Runtime.experiments.register('experimentalCookieFeatures', 'Enable experimental cookie features');
 
-    // CSS <length> authoring tool.
-    Root.Runtime.experiments.register(
-        'cssTypeComponentLength', 'Enable CSS <length> authoring tool in the Styles pane', undefined,
-        'https://developer.chrome.com/blog/new-in-devtools-96/#length', 'https://g.co/devtools/length-feedback');
-
-    // Display precise changes in the Changes tab.
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.PRECISE_CHANGES, 'Display more precise changes in the Changes tab');
-
     // Integrate CSS changes in the Styles pane.
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.STYLES_PANE_CSS_CHANGES, 'Sync CSS changes in the Styles pane');
@@ -360,14 +337,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
         'Highlights a violating node or attribute in the Elements panel DOM tree');
-
-    // Local overrides
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.HEADER_OVERRIDES, 'Local overrides for response headers');
-
-    // Enable color picking outside the browser window (using Eyedropper API)
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER, 'Enable color picking outside the browser window');
 
     // Change grouping of sources panel to use Authored/Deployed trees
     Root.Runtime.experiments.register(
@@ -429,14 +398,8 @@ export class MainImpl {
     }
 
     Root.Runtime.experiments.enableExperimentsByDefault([
-      'sourceOrderViewer',
-      'cssTypeComponentLength',
-      Root.Runtime.ExperimentName.PRECISE_CHANGES,
-      ...('EyeDropper' in window ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
       'setAllBreakpointsEagerly',
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
-      Root.Runtime.ExperimentName.WASM_DWARF_DEBUGGING,
-      Root.Runtime.ExperimentName.HEADER_OVERRIDES,
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
@@ -444,20 +407,12 @@ export class MainImpl {
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocolMonitor'] : []),
     ]);
 
-    Root.Runtime.experiments.setNonConfigurableExperiments([
-      ...(!('EyeDropper' in window) ? [Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER] : []),
-    ]);
-
     Root.Runtime.experiments.cleanUpStaleExperiments();
     const enabledExperiments = Root.Runtime.Runtime.queryParam('enabledExperiments');
     if (enabledExperiments) {
       Root.Runtime.experiments.setServerEnabledExperiments(enabledExperiments.split(';'));
     }
-    Root.Runtime.experiments.enableExperimentsTransiently([
-      'bfcacheDisplayTree',
-      'webauthnPane',
-      'developerResourcesView',
-    ]);
+    Root.Runtime.experiments.enableExperimentsTransiently([]);
 
     if (Host.InspectorFrontendHost.isUnderTest()) {
       const testParam = Root.Runtime.Runtime.queryParam('test');

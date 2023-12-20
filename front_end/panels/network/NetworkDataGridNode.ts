@@ -300,6 +300,11 @@ const UIStrings = {
    *@example {Low} PH2
    */
   initialPriorityToolTip: '{PH1}, Initial priority: {PH2}',
+  /**
+   *@description Tooltip to explain why the request has warning icon
+   */
+  thirdPartyPhaseout:
+      'Cookies for this request are blocked due to third-party cookie phaseout. Learn more in the Issues tab.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkDataGridNode.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -1163,16 +1168,26 @@ export class NetworkRequestNode extends NetworkNode {
       return iconElement;
     }
 
-    if (request.wasIntercepted()) {
+    if (request.hasThirdPartyCookiePhaseoutIssue()) {
+      const iconData = {
+        iconName: 'warning-filled',
+        color: 'var(--icon-warning)',
+      };
+      iconElement = this.createIconElement(iconData, i18nString(UIStrings.thirdPartyPhaseout));
+      iconElement.classList.add('icon');
+
+      return iconElement;
+    }
+
+    const isHeaderOverriden = request.hasOverriddenHeaders();
+    const isContentOverriden = request.hasOverriddenContent;
+    if (isHeaderOverriden || isContentOverriden) {
       const iconData = {
         iconName: 'document',
         color: 'var(--icon-default)',
       };
 
       let title: Common.UIString.LocalizedString;
-      const isHeaderOverriden = request.hasOverriddenHeaders();
-      const isContentOverriden = request.hasOverriddenContent;
-
       if (isHeaderOverriden && isContentOverriden) {
         title = i18nString(UIStrings.requestContentHeadersOverridden);
       } else if (isContentOverriden) {
@@ -1320,12 +1335,9 @@ export class NetworkRequestNode extends NetworkNode {
       if (displayShowHeadersLink) {
         this.setTextAndTitleAsLink(
             cell, i18nString(UIStrings.blockeds, {PH1: reason}), i18nString(UIStrings.blockedTooltip), () => {
-              const tab = Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HEADER_OVERRIDES) ?
-                  NetworkForward.UIRequestLocation.UIRequestTabs.HeadersComponent :
-                  NetworkForward.UIRequestLocation.UIRequestTabs.Headers;
               this.parentView().dispatchEventToListeners(Events.RequestActivated, {
                 showPanel: true,
-                tab,
+                tab: NetworkForward.UIRequestLocation.UIRequestTabs.HeadersComponent,
               });
             });
       } else {
@@ -1554,13 +1566,11 @@ export class NetworkRequestNode extends NetworkNode {
     }
   }
 
-  private appendSubtitle(
-      cellElement: Element, subtitleText: string, showInlineWhenSelected: boolean|undefined = false,
-      tooltipText: string|undefined = ''): void {
+  private appendSubtitle(cellElement: Element, subtitleText: string, alwaysVisible = false, tooltipText = ''): void {
     const subtitleElement = document.createElement('div');
     subtitleElement.classList.add('network-cell-subtitle');
-    if (showInlineWhenSelected) {
-      subtitleElement.classList.add('network-cell-subtitle-show-inline-when-selected');
+    if (alwaysVisible) {
+      subtitleElement.classList.add('always-visible');
     }
     subtitleElement.textContent = subtitleText;
     if (tooltipText) {

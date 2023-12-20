@@ -4,13 +4,14 @@
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Utils from './utils/utils.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
+import infobarStyles from './infobar.css.legacy.js';
 import {Keys} from './KeyboardShortcut.js';
 import {createTextButton} from './UIUtils.js';
+import * as Utils from './utils/utils.js';
 import {type Widget} from './Widget.js';
-import infobarStyles from './infobar.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -51,10 +52,16 @@ export class Infobar {
   #firstFocusableElement: HTMLElement|null = null;
   private parentView?: Widget;
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>) {
+  constructor(
+      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>,
+      /* TODO(crbug.com/1354548) Remove with JS Profiler deprecation */ isCloseable: boolean = true,
+      jsLogContext?: string) {
     this.element = document.createElement('div');
+    if (jsLogContext) {
+      this.element.setAttribute('jslog', `${VisualLogging.infoBar().context(jsLogContext)}`);
+    }
     this.element.classList.add('flex-none');
     this.shadowRoot =
         Utils.createShadowRootWithCoreStyles(this.element, {cssFile: infobarStyles, delegatesFocus: undefined});
@@ -89,6 +96,9 @@ export class Infobar {
         }
 
         const button = createTextButton(action.text, actionCallback, buttonClass);
+        if (action.jsLogContext) {
+          button.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context(action.jsLogContext)}`);
+        }
         if (action.highlight && !this.#firstFocusableElement) {
           this.#firstFocusableElement = button;
         }
@@ -109,9 +119,11 @@ export class Infobar {
     this.toggleElement.setAttribute('role', 'link');
     this.closeContainer.appendChild(this.toggleElement);
     this.closeButton = this.closeContainer.createChild('div', 'close-button', 'dt-close-button');
+    this.closeButton.hidden = !isCloseable;
     // @ts-ignore This is a custom element defined in UIUitls.js that has a `setTabbable` that TS doesn't
     //            know about.
     this.closeButton.setTabbable(true);
+    this.closeButton.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context('close')}`);
     ARIAUtils.setDescription(this.closeButton, i18nString(UIStrings.close));
     self.onInvokeElement(this.closeButton, this.dispose.bind(this));
 
@@ -233,6 +245,7 @@ export interface InfobarAction {
   highlight: boolean;
   delegate: (() => void)|null;
   dismiss: boolean;
+  jsLogContext?: string;
 }
 
 // TODO(crbug.com/1167717): Make this a const enum again

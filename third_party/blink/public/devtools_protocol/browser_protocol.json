@@ -1109,6 +1109,7 @@
                         "Script",
                         "ServiceWorker",
                         "SharedWorker",
+                        "SpeculationRules",
                         "Stylesheet",
                         "Track",
                         "Video",
@@ -2182,6 +2183,11 @@
                             "name": "fillingStrategy",
                             "description": "The filling strategy",
                             "$ref": "FillingStrategy"
+                        },
+                        {
+                            "name": "fieldId",
+                            "description": "The form field's DOM node",
+                            "$ref": "DOM.BackendNodeId"
                         }
                     ]
                 }
@@ -8572,6 +8578,21 @@
                     ]
                 },
                 {
+                    "id": "DevicePosture",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "type",
+                            "description": "Current posture of the device",
+                            "type": "string",
+                            "enum": [
+                                "continuous",
+                                "folded"
+                            ]
+                        }
+                    ]
+                },
+                {
                     "id": "MediaFeature",
                     "type": "object",
                     "properties": [
@@ -8958,6 +8979,13 @@
                             "experimental": true,
                             "optional": true,
                             "$ref": "DisplayFeature"
+                        },
+                        {
+                            "name": "devicePosture",
+                            "description": "If set, the posture of a foldable device. If not set the posture is set\nto continuous.",
+                            "experimental": true,
+                            "optional": true,
+                            "$ref": "DevicePosture"
                         }
                     ]
                 },
@@ -14098,6 +14126,25 @@
                     ]
                 },
                 {
+                    "name": "streamResourceContent",
+                    "description": "Enables streaming of the response for the given requestId.\nIf enabled, the dataReceived event contains the data that was received during streaming.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "requestId",
+                            "description": "Identifier of the request to stream.",
+                            "$ref": "RequestId"
+                        }
+                    ],
+                    "returns": [
+                        {
+                            "name": "bufferedData",
+                            "description": "Data that has been buffered until streaming is enabled.",
+                            "type": "binary"
+                        }
+                    ]
+                },
+                {
                     "name": "getSecurityIsolationStatus",
                     "description": "Returns information about the COEP/COOP isolation status.",
                     "experimental": true,
@@ -14182,6 +14229,13 @@
                             "name": "encodedDataLength",
                             "description": "Actual bytes received (might be less than dataLength for compressed encodings).",
                             "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "description": "Data that was received.",
+                            "experimental": true,
+                            "optional": true,
+                            "type": "binary"
                         }
                     ]
                 },
@@ -16322,6 +16376,7 @@
                         "sync-xhr",
                         "unload",
                         "usb",
+                        "usb-unrestricted",
                         "vertical-scroll",
                         "web-printing",
                         "web-share",
@@ -23616,6 +23671,18 @@
                             "description": "Sets whether User Verification succeeds or fails for an authenticator.\nDefaults to false.",
                             "optional": true,
                             "type": "boolean"
+                        },
+                        {
+                            "name": "defaultBackupEligibility",
+                            "description": "Credentials created by this authenticator will have the backup\neligibility (BE) flag set to this value. Defaults to false.\nhttps://w3c.github.io/webauthn/#sctn-credential-backup",
+                            "optional": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "name": "defaultBackupState",
+                            "description": "Credentials created by this authenticator will have the backup state\n(BS) flag set to this value. Defaults to false.\nhttps://w3c.github.io/webauthn/#sctn-credential-backup",
+                            "optional": true,
+                            "type": "boolean"
                         }
                     ]
                 },
@@ -24399,7 +24466,8 @@
                         "PrefetchFailedNetError",
                         "PrefetchFailedNon2XX",
                         "PrefetchFailedPerPageLimitExceeded",
-                        "PrefetchEvicted",
+                        "PrefetchEvictedAfterCandidateRemoved",
+                        "PrefetchEvictedForNewerPrefetch",
                         "PrefetchHeldback",
                         "PrefetchIneligibleRetryAfter",
                         "PrefetchIsPrivacyDecoy",
@@ -24604,7 +24672,8 @@
                     "enum": [
                         "AccountChooser",
                         "AutoReauthn",
-                        "ConfirmIdpLogin"
+                        "ConfirmIdpLogin",
+                        "Error"
                     ]
                 },
                 {
@@ -24612,7 +24681,9 @@
                     "description": "The buttons on the FedCM dialog.",
                     "type": "string",
                     "enum": [
-                        "ConfirmIdpLoginContinue"
+                        "ConfirmIdpLoginContinue",
+                        "ErrorGotIt",
+                        "ErrorMoreDetails"
                     ]
                 },
                 {
@@ -24693,6 +24764,16 @@
                         {
                             "name": "subtitle",
                             "optional": true,
+                            "type": "string"
+                        }
+                    ]
+                },
+                {
+                    "name": "dialogClosed",
+                    "description": "Triggered when a dialog is closed, either by user action, JS abort,\nor a command below.",
+                    "parameters": [
+                        {
+                            "name": "dialogId",
                             "type": "string"
                         }
                     ]

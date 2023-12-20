@@ -33,6 +33,8 @@ import {
   waitForVisible,
 } from '../../shared/helper.js';
 
+import {openSoftContextMenuAndClickOnItem} from './context-menu-helpers.js';
+
 export const ACTIVE_LINE = '.CodeMirror-activeline > pre > span';
 export const PAUSE_BUTTON = '[aria-label="Pause script execution"]';
 export const RESUME_BUTTON = '[aria-label="Resume script execution"]';
@@ -110,12 +112,7 @@ export async function openFileInSourcesPanel(testInput: string) {
 
 export async function openRecorderSubPane() {
   const root = await waitFor('.navigator-tabbed-pane');
-
-  await waitFor('[aria-label="More tabs"]', root);
   await click('[aria-label="More tabs"]', {root});
-
-  await waitFor('[aria-label="Recordings"]');
-
   await click('[aria-label="Recordings"]');
   await waitFor('[aria-label="Add recording"]');
 }
@@ -133,12 +130,7 @@ export async function createNewRecording(recordingName: string) {
 
 export async function openSnippetsSubPane() {
   const root = await waitFor('.navigator-tabbed-pane');
-
-  await waitFor('[aria-label="More tabs"]', root);
   await click('[aria-label="More tabs"]', {root});
-
-  await waitFor('[aria-label="Snippets"]');
-
   await click('[aria-label="Snippets"]');
   await waitFor('[aria-label="New snippet"]');
 }
@@ -170,12 +162,7 @@ export async function createNewSnippet(snippetName: string, content?: string) {
 
 export async function openOverridesSubPane() {
   const root = await waitFor('.navigator-tabbed-pane');
-
-  await waitFor('[aria-label="More tabs"]', root);
   await click('[aria-label="More tabs"]', {root});
-
-  await waitFor('[aria-label="Overrides"]');
-
   await click('[aria-label="Overrides"]');
   await waitFor('[aria-label="Overrides panel"]');
 }
@@ -642,19 +629,9 @@ export async function openNestedWorkerFile(selectors: NestedFileSelector) {
   await click(selectors.fileSelector);
 }
 
-export async function clickOnContextMenu(selector: string, label: string) {
-  // Find the selected node, right click.
-  await click(selector, {clickOptions: {button: 'right'}});
-
-  // Wait for the context menu option, and click it.
-  const labelSelector = `.soft-context-menu > [aria-label="${label}"]`;
-  await waitFor(labelSelector);
-  await click(labelSelector);
-}
-
 export async function inspectMemory(variableName: string) {
-  await clickOnContextMenu(
-      `[data-object-property-name-for-test="${variableName}"]`, 'Reveal in Memory Inspector panel');
+  await openSoftContextMenuAndClickOnItem(
+      `[data-object-property-name-for-test="${variableName}"]`, 'Reveal in Memory inspector panel');
 }
 
 export async function typeIntoSourcesAndSave(text: string) {
@@ -674,9 +651,7 @@ export async function getValuesForScope(scope: string, expandCount: number, wait
   const scopeSelector = `[aria-label="${scope}"]`;
   await waitFor(scopeSelector);
   for (let i = 0; i < expandCount; i++) {
-    const unexpandedSelector = `${scopeSelector} + ol li[aria-expanded=false]`;
-    await waitFor(unexpandedSelector);
-    await click(unexpandedSelector);
+    await click(`${scopeSelector} + ol li[aria-expanded=false]`);
   }
   const valueSelector = `${scopeSelector} + ol .name-and-value`;
   const valueSelectorElements = await waitForFunction(async () => {

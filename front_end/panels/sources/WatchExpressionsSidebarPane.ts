@@ -123,6 +123,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     this.contentElement.setAttribute('jslog', `${VisualLogging.pane().context('debugger-watch')}`);
     this.contentElement.addEventListener('contextmenu', this.contextMenu.bind(this), false);
     this.treeOutline = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionsTreeOutline();
+    this.treeOutline.hideOverflow();
 
     this.treeOutline.setShowSelectionOnKeyboardFocus(/* show */ true);
     this.expandController =
@@ -489,6 +490,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     titleElement.appendChild(deleteButton);
     this.nameElement =
         ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.createNameElement(this.expressionInternal);
+    UI.Tooltip.Tooltip.install(this.nameElement as HTMLElement, this.expressionInternal);
     if (Boolean(exceptionDetails) || !expressionValue) {
       this.valueElement = document.createElement('span');
       this.valueElement.classList.add('watch-expression-error');

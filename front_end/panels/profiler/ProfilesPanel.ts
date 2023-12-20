@@ -31,12 +31,10 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {type ExperimentsSettingsTab} from '../settings/SettingsScreen.js';
 
 import heapProfilerStyles from './heapProfiler.css.js';
 import {
@@ -52,10 +50,6 @@ import profilesSidebarTreeStyles from './profilesSidebarTree.css.js';
 import {instance} from './ProfileTypeRegistry.js';
 
 const UIStrings = {
-  /**
-   *@description Tooltip text that appears when hovering over the largeicon clear button in the Profiles Panel of a profiler tool
-   */
-  clearAllProfiles: 'Clear all profiles',
   /**
    *@description Text in Profiles Panel of a profiler tool
    *@example {'.js', '.json'} PH1
@@ -85,10 +79,6 @@ const UIStrings = {
   deprecationWarnMsg:
       'This panel will be deprecated in the upcoming version. Use the Performance panel to record JavaScript CPU profiles.',
   /**
-   *@description Text of a button in the JS Profiler panel to show more information about deprecation.
-   */
-  learnMore: 'Learn more',
-  /**
    *@description Text of a button in the JS Profiler panel to let user give feedback.
    */
   feedback: 'Feedback',
@@ -96,10 +86,6 @@ const UIStrings = {
    *@description Text of a button in the JS Profiler panel to let user go to Performance panel.
    */
   goToPerformancePanel: 'Go to Performance Panel',
-  /**
-   *@description Text of a button in the JS Profiler panel to let user go to enable the experiment flag to use this panel temporarily.
-   */
-  enableThisPanelTemporarily: 'Enable this panel temporarily',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfilesPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -111,7 +97,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   readonly toolbarElement: HTMLDivElement;
   toggleRecordAction: UI.ActionRegistration.Action;
   readonly toggleRecordButton: UI.Toolbar.ToolbarButton;
-  clearResultsButton: UI.Toolbar.ToolbarButton;
   readonly #saveToFileAction: UI.ActionRegistration.Action;
   readonly profileViewToolbar: UI.Toolbar.Toolbar;
   profileGroups: {};
@@ -158,13 +143,12 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     toolbarContainerLeft.classList.add('profiles-toolbar');
     this.panelSidebarElement().insertBefore(toolbarContainerLeft, this.panelSidebarElement().firstChild);
     const toolbar = new UI.Toolbar.Toolbar('', toolbarContainerLeft);
+    toolbar.makeWrappable(true);
     this.toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction(recordingActionId);
     this.toggleRecordButton = UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction);
     toolbar.appendToolbarItem(this.toggleRecordButton);
 
-    this.clearResultsButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAllProfiles), 'clear');
-    this.clearResultsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.reset, this);
-    toolbar.appendToolbarItem(this.clearResultsButton);
+    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('profiler.clear-all'));
     toolbar.appendSeparator();
     toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('profiler.load-from-file'));
     this.#saveToFileAction = UI.ActionRegistry.ActionRegistry.instance().getAction('profiler.save-to-file');
@@ -701,11 +685,7 @@ export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistrat
     const registry = instance;
     super('js_profiler', [registry.cpuProfileType], 'profiler.js-toggle-recording');
     this.splitWidget().mainWidget()?.setMinimumSize(350, 0);
-    if (Root.Runtime.experiments.isEnabled('jsProfilerTemporarilyEnable')) {
-      this.#showDeprecationInfobar();
-    } else {
-      this.#showDeprecationWarningAndNoPanel();
-    }
+    this.#showDeprecationInfobar();
   }
 
   static instance(opts: {
@@ -719,9 +699,9 @@ export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistrat
   }
 
   #showDeprecationInfobar(): void {
-    function openRFC(): void {
+    function openFeedbackLink(): void {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://github.com/ChromeDevTools/rfcs/discussions/2' as Platform.DevToolsPath.UrlString);
+          'https://crbug.com/1354548' as Platform.DevToolsPath.UrlString);
     }
 
     async function openPerformancePanel(): Promise<void> {
@@ -732,15 +712,9 @@ export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistrat
         UI.Infobar.Type.Warning, /* text */ i18nString(UIStrings.deprecationWarnMsg), /* actions? */
         [
           {
-            text: i18nString(UIStrings.learnMore),
-            highlight: false,
-            delegate: openRFC,
-            dismiss: false,
-          },
-          {
             text: i18nString(UIStrings.feedback),
             highlight: false,
-            delegate: openRFC,
+            delegate: openFeedbackLink,
             dismiss: false,
           },
           {
@@ -750,55 +724,10 @@ export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistrat
             dismiss: false,
           },
         ],
-        /* disableSetting? */ undefined);
+        /* disableSetting? */ undefined,
+        /* isCloseable TODO(crbug.com/1354548) Remove the prop from infobar with JS Profiler deprecation */ false);
     infobar.setParentView(this);
     this.splitWidget().mainWidget()?.element.prepend(infobar.element);
-  }
-
-  #showDeprecationWarningAndNoPanel(): void {
-    const mainWidget = this.splitWidget().mainWidget();
-    mainWidget?.detachChildWidgets();
-    if (mainWidget) {
-      const emptyPage = new UI.Widget.VBox();
-      emptyPage.contentElement.classList.add('empty-landing-page', 'fill');
-
-      const centered = emptyPage.contentElement.createChild('div');
-
-      centered.createChild('p').textContent =
-          'This panel is deprecated and will be removed in the next version. Use the Performance panel to record JavaScript CPU profiles.';
-      centered.createChild('p').textContent =
-          'You can temporarily enable this panel with Settings > Experiments > Enable JavaScript Profiler.';
-
-      centered.appendChild(UI.UIUtils.createTextButton(
-          i18nString(UIStrings.goToPerformancePanel), openPerformancePanel, 'infobar-button primary-button'));
-      centered.appendChild(UI.UIUtils.createTextButton(i18nString(UIStrings.learnMore), openBlogpost));
-      centered.appendChild(UI.UIUtils.createTextButton(i18nString(UIStrings.feedback), openFeedbackLink));
-      centered.appendChild(
-          UI.UIUtils.createTextButton(i18nString(UIStrings.enableThisPanelTemporarily), openExperimentsSettings));
-
-      emptyPage.show(mainWidget.element);
-    }
-
-    async function openPerformancePanel(): Promise<void> {
-      await UI.InspectorView.InspectorView.instance().showPanel('timeline');
-    }
-
-    function openBlogpost(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://developer.chrome.com/blog/js-profiler-deprecation/' as Platform.DevToolsPath.UrlString);
-    }
-
-    function openFeedbackLink(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548' as Platform.DevToolsPath.UrlString);
-    }
-
-    async function openExperimentsSettings(): Promise<void> {
-      await UI.ViewManager.ViewManager.instance().showView('experiments');
-
-      const tab = await UI.ViewManager.ViewManager.instance().view('experiments').widget();
-      (tab as ExperimentsSettingsTab).setFilter('Enable JavaScript Profiler temporarily');
-    }
   }
 
   override wasShown(): void {
@@ -825,6 +754,14 @@ export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistrat
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
+      case 'profiler.clear-all': {
+        const profilesPanel = context.flavor(ProfilesPanel);
+        if (profilesPanel !== null) {
+          profilesPanel.reset();
+          return true;
+        }
+        return false;
+      }
       case 'profiler.load-from-file': {
         const profilesPanel = context.flavor(ProfilesPanel);
         if (profilesPanel !== null) {

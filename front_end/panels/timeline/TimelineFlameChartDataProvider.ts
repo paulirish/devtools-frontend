@@ -39,12 +39,13 @@ import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
+import {ActiveFilters} from './ActiveFilters.js';
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
 import * as Components from './components/components.js';
 import {type TimelineCategory} from './EventUICategory.js';
 import {eventInitiatorPairsToDraw} from './Initiators.js';
 import {type PerformanceModel} from './PerformanceModel.js';
-import {ThreadAppender, ThreadType} from './ThreadAppender.js';
+import {ThreadAppender} from './ThreadAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
 import {TimelineSelection} from './TimelineSelection.js';
@@ -123,7 +124,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 // tracks have been migrated to the new system, all entries will be of the
 // TraceEventData type.
 export type TimelineFlameChartEntry =
-    (TraceEngine.Legacy.Event|TimelineModel.TimelineFrameModel.TimelineFrame|
+    (TraceEngine.Legacy.Event|TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame|
      TraceEngine.Types.TraceEvents.TraceEventData);
 export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
     PerfUI.FlameChart.FlameChartDataProvider {
@@ -155,7 +156,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private readonly staticHeader: PerfUI.FlameChart.GroupStyle;
   private framesHeader: PerfUI.FlameChart.GroupStyle;
   private readonly screenshotsHeader: PerfUI.FlameChart.GroupStyle;
-  private readonly flowEventIndexById: Map<string, number>;
   private entryData!: TimelineFlameChartEntry[];
   private entryTypeByLevel!: EntryType[];
   private screenshotImageCache!: Map<TraceEngine.Types.TraceEvents.TraceEventSnapshot, HTMLImageElement|null>;
@@ -207,8 +207,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
       }
     });
-
-    this.flowEventIndexById = new Map();
   }
 
   modifyTree(
@@ -265,7 +263,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       this.timelineDataInternal = this.#instantiateTimelineData();
       this.compatibilityTracksAppender = new CompatibilityTracksAppender(
           this.timelineDataInternal, this.traceEngineData, this.entryData, this.entryTypeByLevel,
-          this.legacyTimelineModel, this.isCpuProfile);
+          this.legacyTimelineModel);
     }
     return this.compatibilityTracksAppender;
   }
@@ -305,9 +303,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return group.track || null;
   }
 
-  groupTreeEvents(group: PerfUI.FlameChart.Group): TraceEngine.Legacy.CompatibleTraceEvent[]|null {
-    const eventsFromAppenderSystem = this.compatibilityTracksAppender?.groupEventsForTreeView(group);
-    return eventsFromAppenderSystem || group.track?.eventsForTreeView() || null;
+  groupTreeEvents(group: PerfUI.FlameChart.Group): TraceEngine.Types.TraceEvents.TraceEventData[]|null {
+    return this.compatibilityTracksAppender?.groupEventsForTreeView(group) ?? null;
   }
 
   mainFrameNavigationStartEvents(): readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[] {
@@ -406,7 +403,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       this.reset(/* resetCompatibilityTracksAppender= */ false);
     }
 
-    this.flowEventIndexById.clear();
     this.currentLevel = 0;
 
     if (this.traceEngineData) {
@@ -517,7 +513,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       // If it is, we mark the group as selected.
       if (this.timelineDataInternal && !this.timelineDataInternal.selectedGroup) {
         if (appender instanceof ThreadAppender &&
-            (appender.threadType === ThreadType.MAIN_THREAD || appender.threadType === ThreadType.CPU_PROFILE)) {
+            (appender.threadType === TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD ||
+             appender.threadType === TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE)) {
           const group = this.compatibilityTracksAppender?.groupForAppender(appender);
           if (group) {
             this.timelineDataInternal.selectedGroup = group;
@@ -528,8 +525,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (this.timelineDataInternal && this.timelineDataInternal.selectedGroup) {
       this.timelineDataInternal.selectedGroup.expanded = true;
     }
-
-    this.flowEventIndexById.clear();
   }
 
   #addDecorationToEvent(eventIndex: number, decoration: PerfUI.FlameChart.FlameChartDecoration): void {
@@ -705,7 +700,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         if (TraceEngine.Types.TraceEvents.isAsyncPhase(event.phase)) {
           continue;
         }
-        if (!this.legacyPerformanceModel.isVisible(event)) {
+        if (!ActiveFilters.instance().isVisible(event)) {
           continue;
         }
       }
@@ -783,7 +778,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     let group: PerfUI.FlameChart.Group|null = null;
     for (let i = 0; i < events.length; ++i) {
       const asyncEvent = events[i];
-      if (!this.legacyPerformanceModel || !this.legacyPerformanceModel.isVisible(asyncEvent)) {
+      if (!this.legacyPerformanceModel || !ActiveFilters.instance().isVisible(asyncEvent)) {
         continue;
       }
       if (!group && title) {
@@ -831,8 +826,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.appendHeader(i18nString(UIStrings.frames), this.framesHeader, false /* selectable */, expanded);
 
     this.entryTypeByLevel[this.currentLevel] = EntryType.Frame;
-    for (const frame of this.legacyPerformanceModel.frames()) {
-      this.appendFrame(frame);
+    for (const frame of this.traceEngineData.Frames.frames) {
+      this.#appendNewEngineFrame(frame);
     }
     ++this.currentLevel;
 
@@ -915,8 +910,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       title = this.entryTitle(entryIndex);
 
     } else if (entryType === EntryType.Frame) {
-      const frame = (this.entryData[entryIndex] as TimelineModel.TimelineFrameModel.TimelineFrame);
-      time = i18n.TimeUtilities.preciseMillisToString(frame.duration, 1);
+      const frame = (this.entryData[entryIndex] as TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame);
+      time = i18n.TimeUtilities.preciseMillisToString(
+          TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.duration), 1);
 
       if (frame.idle) {
         title = i18nString(UIStrings.idleFrame);
@@ -1046,7 +1042,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       entryIndex: number, context: CanvasRenderingContext2D, text: string|null, barX: number, barY: number,
       barWidth: number, barHeight: number): void {
     const hPadding = 1;
-    const frame = (this.entryData[entryIndex] as TimelineModel.TimelineFrameModel.TimelineFrame);
+    const frame = (this.entryData[entryIndex] as TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame);
     barX += hPadding;
     barWidth -= 2 * hPadding;
     if (frame.idle) {
@@ -1074,7 +1070,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
     context.fillRect(barX, barY, barWidth, barHeight);
 
-    const frameDurationText = i18n.TimeUtilities.preciseMillisToString(frame.duration, 1);
+    const frameDurationText = i18n.TimeUtilities.preciseMillisToString(
+        TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.duration), 1);
     const textWidth = context.measureText(frameDurationText).width;
     if (textWidth <= barWidth) {
       context.fillStyle = this.textColor(entryIndex);
@@ -1304,16 +1301,18 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
   }
 
-  private appendFrame(frame: TimelineModel.TimelineFrameModel.TimelineFrame): void {
+  #appendNewEngineFrame(frame: TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame): void {
     const index = this.entryData.length;
     this.entryData.push(frame);
-    this.entryIndexToTitle[index] = i18n.TimeUtilities.millisToString(frame.duration, true);
+    const durationMilliseconds = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.duration);
+    this.entryIndexToTitle[index] = i18n.TimeUtilities.millisToString(durationMilliseconds, true);
     if (!this.timelineDataInternal) {
       return;
     }
     this.timelineDataInternal.entryLevels[index] = this.currentLevel;
-    this.timelineDataInternal.entryTotalTimes[index] = frame.duration;
-    this.timelineDataInternal.entryStartTimes[index] = frame.startTime;
+    this.timelineDataInternal.entryTotalTimes[index] = durationMilliseconds;
+    this.timelineDataInternal.entryStartTimes[index] =
+        TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.startTime);
   }
 
   createSelection(entryIndex: number): TimelineSelection|null {
@@ -1323,8 +1322,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (entry && TimelineFlameChartDataProvider.isEntryRegularEvent(entry)) {
       timelineSelection = TimelineSelection.fromTraceEvent(entry);
     } else if (entryType === EntryType.Frame) {
-      timelineSelection =
-          TimelineSelection.fromFrame((this.entryData[entryIndex] as TimelineModel.TimelineFrameModel.TimelineFrame));
+      timelineSelection = TimelineSelection.fromFrame(
+          (this.entryData[entryIndex] as TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame));
     }
     if (timelineSelection) {
       this.lastSelection = new Selection(timelineSelection, entryIndex);

@@ -98,7 +98,8 @@ export interface TraceEventArgsData {
 export interface TraceEventCallFrame {
   codeType?: string;
   functionName: string;
-  scriptId: number;
+  // Trace events are inconsistent here sadly :(
+  scriptId: number|string;
   columnNumber: number;
   lineNumber: number;
   url: string;
@@ -589,6 +590,7 @@ export interface TraceEventUpdateCounters extends TraceEventInstant {
       jsEventListeners: number,
       jsHeapSizeUsed: number,
       nodes: number,
+      gpuMemoryLimitKB?: number,
     },
   };
 }
@@ -596,7 +598,7 @@ export interface TraceEventUpdateCounters extends TraceEventInstant {
 export type TraceEventRendererEvent = TraceEventInstant|TraceEventComplete;
 
 export interface TraceEventTracingStartedInBrowser extends TraceEventInstant {
-  name: 'TracingStartedInBrowser';
+  name: KnownEventName.TracingStartedInBrowser;
   args: TraceEventArgs&{
     data?: TraceEventArgsData & {
       frameTreeNodeId: number,
@@ -858,8 +860,8 @@ export const enum LayoutInvalidationReason {
   UNKNOWN = 'Unknown',
 }
 
-export interface TraceEventLayoutInvalidation extends TraceEventInstant {
-  name: 'LayoutInvalidationTracking'|'ScheduleStyleInvalidationTracking';
+export interface TraceEventLayoutInvalidationTracking extends TraceEventInstant {
+  name: KnownEventName.LayoutInvalidationTracking;
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
       frame: string,
@@ -870,12 +872,34 @@ export interface TraceEventLayoutInvalidation extends TraceEventInstant {
   };
 }
 
+export interface TraceEventScheduleStyleInvalidationTracking extends TraceEventInstant {
+  name: KnownEventName.ScheduleStyleInvalidationTracking;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      frame: string,
+      nodeId: Protocol.DOM.BackendNodeId,
+      invalidationSet?: string,
+      invalidatedSelectorId?: string,
+      reason?: LayoutInvalidationReason,
+      changedClass?: string,
+      changedAttribute?: string,
+      changedId?: string,
+      nodeName?: string,
+      stackTrace?: TraceEventCallFrame[],
+    },
+  };
+}
+export function isTraceEventScheduleStyleInvalidationTracking(event: TraceEventData):
+    event is TraceEventScheduleStyleInvalidationTracking {
+  return event.name === KnownEventName.ScheduleStyleInvalidationTracking;
+}
+
 export const enum StyleRecalcInvalidationReason {
   ANIMATION = 'Animation',
 }
 
-export interface TraceEventStyleRecalcInvalidation extends TraceEventInstant {
-  name: 'StyleRecalcInvalidationTracking';
+export interface TraceEventStyleRecalcInvalidationTracking extends TraceEventInstant {
+  name: KnownEventName.StyleRecalcInvalidationTracking;
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
       frame: string,
@@ -887,6 +911,29 @@ export interface TraceEventStyleRecalcInvalidation extends TraceEventInstant {
     },
   };
 }
+export function isTraceEventStyleRecalcInvalidationTracking(event: TraceEventData):
+    event is TraceEventStyleRecalcInvalidationTracking {
+  return event.name === KnownEventName.StyleRecalcInvalidationTracking;
+}
+export interface TraceEventStyleInvalidatorInvalidationTracking extends TraceEventInstant {
+  name: KnownEventName.StyleInvalidatorInvalidationTracking;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      frame: string,
+      nodeId: Protocol.DOM.BackendNodeId,
+      reason: string,
+      invalidationList: Array<{classes?: string[], id: string}>,
+      subtree: boolean,
+      nodeName?: string,
+      extraData?: string,
+    },
+  };
+}
+export function isTraceEventStyleInvalidatorInvalidationTracking(event: TraceEventData):
+    event is TraceEventStyleInvalidatorInvalidationTracking {
+  return event.name === KnownEventName.StyleInvalidatorInvalidationTracking;
+}
+
 export interface TraceEventScheduleStyleRecalculation extends TraceEventInstant {
   name: KnownEventName.ScheduleStyleRecalculation;
   args: TraceEventArgs&{
@@ -1169,7 +1216,7 @@ export function isTraceEventCommit(event: TraceEventData): event is TraceEventCo
 export interface TraceEventRasterTask extends TraceEventComplete {
   name: KnownEventName.RasterTask;
   args: TraceEventArgs&{
-    tileData: {
+    tileData?: {
       layerId: number,
       sourceFrameNumber: number,
       tileId: {
@@ -1206,12 +1253,28 @@ export function isTraceEventActivateLayerTree(event: TraceEventData): event is T
   return event.name === KnownEventName.ActivateLayerTree;
 }
 
+export interface SyntheticInvalidation extends TraceEventInstant {
+  name: 'SyntheticInvalidation';
+  nodeName?: string;
+  rawEvent: TraceEventScheduleStyleInvalidationTracking|TraceEventStyleRecalcInvalidationTracking|
+      TraceEventStyleInvalidatorInvalidationTracking|TraceEventLayoutInvalidationTracking;
+  nodeId: Protocol.DOM.BackendNodeId;
+  frame: string;
+  reason?: string;
+  stackTrace?: TraceEventCallFrame[];
+}
+
+export function isTraceEventSyntheticInvalidation(event: TraceEventData): event is SyntheticInvalidation {
+  return event.name === 'SyntheticInvalidation';
+}
+
 export interface TraceEventUpdateLayoutTree extends TraceEventComplete {
   name: KnownEventName.UpdateLayoutTree;
   args: TraceEventArgs&{
     elementCount: number,
     beginData?: {
       frame: string,
+      stackTrace?: TraceEventCallFrame[],
     },
   };
 }
@@ -1345,7 +1408,7 @@ export function isProcessName(
 export function isTraceEventTracingStartedInBrowser(
     traceEventData: TraceEventData,
     ): traceEventData is TraceEventTracingStartedInBrowser {
-  return traceEventData.name === 'TracingStartedInBrowser';
+  return traceEventData.name === KnownEventName.TracingStartedInBrowser;
 }
 
 export function isTraceEventFrameCommittedInBrowser(
@@ -1378,16 +1441,10 @@ export function isTraceEventLayoutShift(
   return traceEventData.name === 'LayoutShift';
 }
 
-export function isTraceEventLayoutInvalidation(
+export function isTraceEventLayoutInvalidationTracking(
     traceEventData: TraceEventData,
-    ): traceEventData is TraceEventLayoutInvalidation {
-  return traceEventData.name === 'LayoutInvalidationTracking' ||
-      traceEventData.name === 'ScheduleStyleInvalidationTracking';
-}
-
-export function isTraceEventStyleRecalcInvalidation(traceEventData: TraceEventData):
-    traceEventData is TraceEventStyleRecalcInvalidation {
-  return traceEventData.name === 'StyleRecalcInvalidationTracking';
+    ): traceEventData is TraceEventLayoutInvalidationTracking {
+  return traceEventData.name === KnownEventName.LayoutInvalidationTracking;
 }
 
 export function isTraceEventFirstContentfulPaint(traceEventData: TraceEventData):
@@ -1659,23 +1716,25 @@ export interface TraceEventLayerTreeHostImplSnapshot extends TraceEventData {
   name: KnownEventName.LayerTreeHostImplSnapshot;
   ph: Phase.OBJECT_SNAPSHOT;
   id: string;
-  /* eslint-disable @typescript-eslint/naming-convention */
   args: TraceEventArgs&{
-    active_tiles: Array<{
-      id: string,
-      layer_id: string,
-      gpu_memory_usage: number,
-      content_rect: number[],
-    }>,
-    device_viewport_size: {
-      width: number,
-      height: number,
+    snapshot: {
+      /* eslint-disable @typescript-eslint/naming-convention */
+      active_tiles: Array<{
+        id: string,
+        layer_id: string,
+        gpu_memory_usage: number,
+        content_rect: number[],
+      }>,
+      device_viewport_size: {
+        width: number,
+        height: number,
+      },
+      active_tree: {
+        root_layer: TraceLayer,
+        layers: TraceLayer[],
+      },
+      /* eslint-enable @typescript-eslint/naming-convention */
     },
-    active_tree: {
-      root_layer: TraceLayer,
-      layers: TraceLayer[],
-    },
-    /* eslint-enable @typescript-eslint/naming-convention */
   };
 }
 
@@ -1844,6 +1903,24 @@ export function isWebSocketTraceEvent(event: TraceEventData): event is TraceEven
       isTraceEventWebSocketReceiveHandshakeResponse(event) || isTraceEventWebSocketSendHandshakeRequest(event);
 }
 
+export interface TraceEventV8Compile extends TraceEventComplete {
+  name: KnownEventName.Compile;
+  args: TraceEventArgs&{
+    data?: {
+      url?: string,
+      columnNumber?: number,
+      lineNumber?: number,
+      notStreamedReason?: string,
+      streamed?: boolean,
+      eager?: boolean,
+    },
+    fileName?: string,
+  };
+}
+export function isTraceEventV8Compile(event: TraceEventData): event is TraceEventV8Compile {
+  return event.name === KnownEventName.Compile;
+}
+
 /**
  * This is an exhaustive list of events we track in the Performance
  * panel. Note not all of them are necessarliry shown in the flame
@@ -1867,9 +1944,15 @@ export const enum KnownEventName {
   ParseHTML = 'ParseHTML',
   ParseCSS = 'ParseAuthorStyleSheet',
   /* V8 */
-  CompileScript = 'V8.CompileScript',
   CompileCode = 'V8.CompileCode',
   CompileModule = 'V8.CompileModule',
+  // Although V8 emits the V8.CompileScript event, the event that actually
+  // contains the useful information about the script (URL, etc), is contained
+  // in the v8.compile event.
+  // Yes, it is all lowercase compared to all the rest of the V8... events,
+  // that is not a typo :)
+  Compile = 'v8.compile',
+  CompileScript = 'V8.CompileScript',
   Optimize = 'V8.OptimizeCode',
   WasmStreamFromResponseCallback = 'v8.wasm.streamFromResponseCallback',
   WasmCompiledModule = 'v8.wasm.compiledModule',
@@ -2015,6 +2098,7 @@ export const enum KnownEventName {
   EmbedderCallback = 'EmbedderCallback',
   SetLayerTreeId = 'SetLayerTreeId',
   TracingStartedInPage = 'TracingStartedInPage',
+  TracingStartedInBrowser = 'TracingStartedInBrowser',
   TracingSessionIdForWorker = 'TracingSessionIdForWorker',
   LazyPixelRef = 'LazyPixelRef',
   LayerTreeHostImplSnapshot = 'cc::LayerTreeHostImpl',

@@ -15,7 +15,9 @@ import * as Components from '../../../../../front_end/ui/legacy/components/utils
 import {doubleRaf, renderElementIntoDOM} from '../../helpers/DOMHelpers.js';
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {
+  clearMockConnectionResponseHandler,
   describeWithMockConnection,
+  setMockConnectionResponseHandler,
 } from '../../helpers/MockConnection.js';
 import {loadBasicSourceMapExample, setupPageResourceLoaderForSourceMap} from '../../helpers/SourceMapHelpers.js';
 import {
@@ -55,6 +57,10 @@ describeWithMockConnection('TimelineUIUtils', function() {
       targetManager,
     });
     Bindings.IgnoreListManager.IgnoreListManager.instance({forceNew: true, debuggerWorkspaceBinding});
+  });
+
+  afterEach(() => {
+    clearMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend');
   });
 
   it('creates top frame location text for function calls', async function() {
@@ -309,6 +315,18 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
   }
 
+  function getPieChartDataForDetailsElement(details: DocumentFragment) {
+    const pieChartComp = details.querySelector<HTMLDivElement>('devtools-perf-piechart');
+    if (!pieChartComp?.shadowRoot) {
+      return [];
+    }
+    return Array.from(pieChartComp.shadowRoot.querySelectorAll<HTMLElement>('.pie-chart-legend-row')).map(row => {
+      const title = row.querySelector<HTMLDivElement>('.pie-chart-name')?.innerText;
+      const value = row.querySelector<HTMLDivElement>('.pie-chart-size')?.innerText;
+      return {title, value};
+    });
+  }
+
   describe('colors', function() {
     before(() => {
       // Rather than use the real colours here and burden the test with having to
@@ -367,6 +385,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
       assert.strictEqual('rgb(2 2 2)', Timeline.TimelineUIUtils.TimelineUIUtils.eventColor(event));
     });
+
     it('assigns the correct color to the swatch of an event\'s title', async function() {
       const data = await TraceLoader.allModels(this, 'lcp-web-font.json.gz');
       const events = data.traceParsedData.Renderer.allTraceEntries;
@@ -465,6 +484,109 @@ describeWithMockConnection('TimelineUIUtils', function() {
           title: 'Presentation delay',
           value: '1.974ms',
         },
+      ]);
+    });
+
+    it('renders invalidations correctly', async function() {
+      const data = await TraceLoader.allModels(this, 'style-invalidation-change-attribute.json.gz');
+
+      // Set up a fake DOM so that we can request nodes by backend Ids (even
+      // though we return none, we need to mock these calls else the frontend
+      // will not work.)
+      const documentNode = {nodeId: 1 as Protocol.DOM.BackendNodeId};
+      setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode}));
+      setMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend', () => {
+        return {
+          nodeIds: [],
+        };
+      });
+
+      const updateLayoutTreeEvent = data.traceParsedData.Renderer.allTraceEntries.find(event => {
+        return TraceEngine.Types.TraceEvents.isTraceEventUpdateLayoutTree(event) &&
+            event.args.beginData?.stackTrace?.[0].functionName === 'testFuncs.changeAttributeAndDisplay';
+      });
+      if (!updateLayoutTreeEvent) {
+        throw new Error('Could not find update layout tree event');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          updateLayoutTreeEvent,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          false,
+          data.traceParsedData,
+      );
+      const rowData = getRowDataForDetailsElement(details);
+      assert.deepEqual(rowData, [
+        {
+          title: 'Elements Affected',
+          value: '3',
+        },
+        {
+          title: 'Recalculation Forced',
+          // The Stack trace output would be here but the detailRow helper is
+          // unable to parse it, hence why this returns empty.
+          value: '',
+        },
+        {
+          title: 'Pending for',
+          value: '7.1 ms',
+        },
+        {
+          title: 'Initiator',
+          value: 'Reveal',
+        },
+        {
+          title: 'PseudoClass:active',
+          value: 'BUTTON id=\'changeAttributeAndDisplay\'',
+        },
+        {
+          title: 'Attribute (dir)',
+          value:
+              'DIV id=\'testElementFour\' at chromedevtools.github.io/performance-stories/style-invalidations/app.js:46',
+        },
+        {
+          title: 'Attribute (dir)',
+          value:
+              'DIV id=\'testElementFive\' at chromedevtools.github.io/performance-stories/style-invalidations/app.js:47',
+        },
+        {
+          title: 'Element has pending invalidation list',
+          value: 'DIV id=\'testElementFour\'',
+        },
+        {
+          title: 'Element has pending invalidation list',
+          value: 'DIV id=\'testElementFive\'',
+        },
+      ]);
+    });
+
+    it('renders details for a v8.compile ("Compile Script") event', async function() {
+      const data = await TraceLoader.allModels(this, 'user-timings.json.gz');
+      const compileEvent =
+          data.traceParsedData.Renderer.allTraceEntries.find(TraceEngine.Types.TraceEvents.isTraceEventV8Compile);
+      if (!compileEvent) {
+        throw new Error('Could not find expected event');
+      }
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          compileEvent,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          false,
+          data.traceParsedData,
+      );
+      const rowData = getRowDataForDetailsElement(details);
+      assert.deepEqual(rowData, [
+        {
+          title: 'Script',
+          // URL plus line/col number
+          value: 'chrome-extension://blijaeebfebmkmekmdnehcmmcjnblkeo/lib/utils.js:1:1',
+        },
+        {
+          title: 'Streamed',
+          value: 'false: inline script',
+        },
+        {title: 'Compilation cache status', value: 'script not eligible'},
       ]);
     });
 
@@ -618,12 +740,44 @@ describeWithMockConnection('TimelineUIUtils', function() {
              expectedRowData,
          );
        });
+
+    it('shows the aggregated time information for an event', async function() {
+      const data = await TraceLoader.allModels(this, 'web-dev.json.gz');
+      const event =
+          data.traceParsedData.Renderer?.allTraceEntries.find(e => e.ts === 1020034919877 && e.name === 'RunTask');
+      if (!event) {
+        throw new Error('Could not find renderer events');
+      }
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          event,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          true,
+          data.traceParsedData,
+      );
+      const pieChartData = getPieChartDataForDetailsElement(details);
+
+      const expectedPieChartData = [
+        {title: 'System (self)', value: '2\u00A0ms'},
+        {title: 'System (children)', value: '2\u00A0ms'},
+        {title: 'Rendering', value: '28\u00A0ms'},
+        {title: 'Painting', value: '2\u00A0ms'},
+        {title: 'Total', value: '34\u00A0ms'},
+      ];
+      assert.deepEqual(
+          pieChartData,
+          expectedPieChartData,
+      );
+    });
   });
 
   it('can generate details for a frame', async function() {
-    const data = await TraceLoader.allModels(this, 'web-dev.json.gz');
-    const frame = data.performanceModel.frames()[0];
-    const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(data.traceParsedData);
+    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    const frame = traceParsedData.Frames.frames.at(0);
+    if (!frame) {
+      throw new Error('Could not find expected frame');
+    }
+    const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(traceParsedData);
     const details =
         Timeline.TimelineUIUtils.TimelineUIUtils.generateDetailsContentForFrame(frame, filmStrip, filmStrip.frames[0]);
     const container = document.createElement('div');
@@ -639,9 +793,10 @@ describeWithMockConnection('TimelineUIUtils', function() {
     if (!durationValue) {
       throw new Error('Could not find duration');
     }
-    // Strip the unicode spaces out and replace with simple spaces for easy assertions.
+    // Strip the unicode spaces out and replace with simple spaces for easy
+    // assertions.
     const value = (durationValue.innerText.replaceAll(/\s/g, ' '));
-    assert.strictEqual(value, '2.77 ms (at 136.45 ms)');
+    assert.strictEqual(value, '37.85 ms (at 109.82 ms)');
   });
 
   describe('buildNetworkRequestDetails', function() {

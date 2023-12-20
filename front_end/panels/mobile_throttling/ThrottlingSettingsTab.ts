@@ -80,17 +80,16 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/ThrottlingSettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let throttlingSettingsTabInstance: ThrottlingSettingsTab;
-
 export class ThrottlingSettingsTab extends UI.Widget.VBox implements
     UI.ListWidget.Delegate<SDK.NetworkManager.Conditions> {
   private readonly list: UI.ListWidget.ListWidget<SDK.NetworkManager.Conditions>;
   private readonly customSetting: Common.Settings.Setting<SDK.NetworkManager.Conditions[]>;
   private editor?: UI.ListWidget.Editor<SDK.NetworkManager.Conditions>;
+
   constructor() {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.section().context('throttling-conditions')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane().context('throttling-conditions')}`);
 
     const header = this.contentElement.createChild('div', 'header');
     header.textContent = i18nString(UIStrings.networkThrottlingProfiles);
@@ -110,15 +109,6 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
     this.customSetting.addChangeListener(this.conditionsUpdated, this);
 
     this.setDefaultFocusedElement(addButton);
-  }
-
-  static instance(opts = {forceNew: null}): ThrottlingSettingsTab {
-    const {forceNew} = opts;
-    if (!throttlingSettingsTabInstance || forceNew) {
-      throttlingSettingsTabInstance = new ThrottlingSettingsTab();
-    }
-
-    return throttlingSettingsTabInstance;
   }
 
   override wasShown(): void {

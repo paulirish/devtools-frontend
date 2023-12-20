@@ -41,6 +41,7 @@ import * as Host from '../host/host.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 
+import {ContentData as ContentDataClass, type ContentDataOrError} from './ContentData.js';
 import {Cookie} from './Cookie.js';
 import {
   type BlockedCookieWithReason,
@@ -48,7 +49,6 @@ import {
   Events as NetworkRequestEvents,
   type ExtraRequestInfo,
   type ExtraResponseInfo,
-  type MIME_TYPE,
   type NameValue,
   NetworkRequest,
   type WebBundleInfo,
@@ -183,30 +183,35 @@ export class NetworkManager extends SDKModel<EventTypes> {
     return TextUtils.TextUtils.performSearchInSearchMatches(response.result || [], query, caseSensitive, isRegex);
   }
 
-  static async requestContentData(request: NetworkRequest): Promise<ContentData> {
+  static async requestContentData(request: NetworkRequest): Promise<ContentDataOrError> {
     if (request.resourceType() === Common.ResourceType.resourceTypes.WebSocket) {
-      return {error: i18nString(UIStrings.noContentForWebSocket), content: null, encoded: false};
+      return {error: i18nString(UIStrings.noContentForWebSocket)};
     }
     if (!request.finished) {
       await request.once(NetworkRequestEvents.FinishedLoading);
     }
     if (request.isRedirect()) {
-      return {error: i18nString(UIStrings.noContentForRedirect), content: null, encoded: false};
+      return {error: i18nString(UIStrings.noContentForRedirect)};
     }
     if (request.isPreflightRequest()) {
-      return {error: i18nString(UIStrings.noContentForPreflight), content: null, encoded: false};
+      return {error: i18nString(UIStrings.noContentForPreflight)};
     }
     const manager = NetworkManager.forRequest(request);
     if (!manager) {
-      return {error: 'No network manager for request', content: null, encoded: false};
+      return {error: 'No network manager for request'};
     }
     const requestId = request.backendRequestId();
     if (!requestId) {
-      return {error: 'No backend request id for request', content: null, encoded: false};
+      return {error: 'No backend request id for request'};
     }
     const response = await manager.#networkAgent.invoke_getResponseBody({requestId});
-    const error = response.getError() || null;
-    return {error: error, content: error ? null : response.body, encoded: response.base64Encoded};
+    const error = response.getError();
+    if (error) {
+      return {error};
+    }
+    return new ContentDataClass(
+        response.body, response.base64Encoded, request.resourceType(), request.mimeType,
+        request.charset() ?? undefined);
   }
 
   static async requestPostData(request: NetworkRequest): Promise<string|null> {
@@ -468,7 +473,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     if (response.url && networkRequest.url() !== response.url) {
       networkRequest.setUrl(response.url as Platform.DevToolsPath.UrlString);
     }
-    networkRequest.mimeType = (response.mimeType as MIME_TYPE);
+    networkRequest.mimeType = response.mimeType;
     if (!networkRequest.statusCode || networkRequest.wasIntercepted()) {
       networkRequest.statusCode = response.status;
     }

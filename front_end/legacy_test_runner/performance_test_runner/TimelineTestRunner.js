@@ -87,10 +87,6 @@ PerformanceTestRunner.createTracingModel = function(events) {
   return model;
 };
 
-PerformanceTestRunner.tracingModel = function() {
-  return Timeline.TimelinePanel.TimelinePanel.instance().performanceModel.tracingModel();
-};
-
 PerformanceTestRunner.invokeWithTracing = function(functionName, callback, additionalCategories, enableJSSampling) {
   let categories = '-*,disabled-by-default-devtools.timeline*,devtools.timeline,blink.user_timing,' +
       Trace.Legacy.LegacyTopLevelEventCategory;
@@ -120,10 +116,6 @@ PerformanceTestRunner.performanceModel = function() {
 
 PerformanceTestRunner.timelineModel = function() {
   return PerformanceTestRunner.performanceModel().timelineModel();
-};
-
-PerformanceTestRunner.timelineFrameModel = function() {
-  return PerformanceTestRunner.performanceModel().frameModel();
 };
 
 PerformanceTestRunner.createPerformanceModelWithEvents = async function(events) {

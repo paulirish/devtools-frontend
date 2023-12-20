@@ -20,11 +20,6 @@ export function registerLoggable(loggable: Loggable, config: string, parent: Log
   LoggingDriver.scheduleProcessing();
 }
 
-export const accessibilityComputedProperties =
-    LoggingConfig.makeConfigStringBuilder.bind(null, 'AccessibilityComputedProperties');
-export const accessibilityPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'AccessibilityPane');
-export const accessibilitySourceOrder = LoggingConfig.makeConfigStringBuilder.bind(null, 'AccessibilitySourceOrder');
-
 /**
  * Action visual elements are either buttons or menu items that trigger a given action. Use the
  * context to differentiate between different actions, and make sure that buttons and menu items
@@ -34,8 +29,6 @@ export const accessibilitySourceOrder = LoggingConfig.makeConfigStringBuilder.bi
  */
 export const action = LoggingConfig.makeConfigStringBuilder.bind(null, 'Action');
 
-export const addElementClassPrompt = LoggingConfig.makeConfigStringBuilder.bind(null, 'AddElementClassPrompt');
-export const ariaAttributes = LoggingConfig.makeConfigStringBuilder.bind(null, 'AriaAttributes');
 export const bezierCurveEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'BezierCurveEditor');
 export const bezierEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'BezierEditor');
 export const bezierPresetCategory = LoggingConfig.makeConfigStringBuilder.bind(null, 'BezierPresetCategory');
@@ -47,17 +40,13 @@ export const cssAngleEditor = LoggingConfig.makeConfigStringBuilder.bind(null, '
 export const cssColorMix = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssColorMix');
 export const cssFlexboxEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssFlexboxEditor');
 export const cssGridEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssGridEditor');
-export const cssLayersPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssLayersPane');
 export const cssShadowEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssShadowEditor');
 export const deviceModeRuler = LoggingConfig.makeConfigStringBuilder.bind(null, 'DeviceModeRuler');
 export const domBreakpoint = LoggingConfig.makeConfigStringBuilder.bind(null, 'DOMBreakpoint');
 export const dropDown = LoggingConfig.makeConfigStringBuilder.bind(null, 'DropDown');
 export const elementsBreadcrumbs = LoggingConfig.makeConfigStringBuilder.bind(null, 'ElementsBreadcrumbs');
-export const elementClassesPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'ElementClassesPane');
-export const elementPropertiesPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'ElementPropertiesPane');
-export const elementStatesPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'ElementStatesPan');
-export const eventListenersPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'EventListenersPane');
 export const filterDropdown = LoggingConfig.makeConfigStringBuilder.bind(null, 'FilterDropdown');
+export const infoBar = LoggingConfig.makeConfigStringBuilder.bind(null, 'InfoBar');
 export const flexboxOverlays = LoggingConfig.makeConfigStringBuilder.bind(null, 'FlexboxOverlays');
 export const gridOverlays = LoggingConfig.makeConfigStringBuilder.bind(null, 'GridOverlays');
 export const gridSettings = LoggingConfig.makeConfigStringBuilder.bind(null, 'GridSettings');
@@ -87,6 +76,9 @@ export const pane = LoggingConfig.makeConfigStringBuilder.bind(null, 'Pane');
 export const panel = LoggingConfig.makeConfigStringBuilder.bind(null, 'Panel');
 
 export const panelTabHeader = LoggingConfig.makeConfigStringBuilder.bind(null, 'PanelTabHeader');
+export const pieChart = LoggingConfig.makeConfigStringBuilder.bind(null, 'PieChart');
+export const pieChartSlice = LoggingConfig.makeConfigStringBuilder.bind(null, 'PieChartSlice');
+export const pieChartTotal = LoggingConfig.makeConfigStringBuilder.bind(null, 'PieChartTotal');
 export const preview = LoggingConfig.makeConfigStringBuilder.bind(null, 'Preview');
 export const previous = LoggingConfig.makeConfigStringBuilder.bind(null, 'Previous');
 export const responsivePresets = LoggingConfig.makeConfigStringBuilder.bind(null, 'ResponsivePresets');
@@ -97,8 +89,6 @@ export const stylesComputedPane = LoggingConfig.makeConfigStringBuilder.bind(nul
 export const section = LoggingConfig.makeConfigStringBuilder.bind(null, 'Section');
 export const stylePropertiesSectionSeparator =
     LoggingConfig.makeConfigStringBuilder.bind(null, 'StylePropertiesSectionSeparator');
-export const stylesMetricsPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesMetricsPane');
-export const stylesPane = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesPane');
 export const stylesSelector = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesSelector');
 export const tableCell = LoggingConfig.makeConfigStringBuilder.bind(null, 'TableCell');
 export const tableHeader = LoggingConfig.makeConfigStringBuilder.bind(null, 'TableHeader');

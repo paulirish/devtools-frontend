@@ -22,36 +22,36 @@ export function getLoggingConfig(element: Element): LoggingConfig {
 // eslint-disable-next-line rulesdir/const_enum
 enum VisualElements {
   TreeItem = 1,
-  AriaAttributes = 2,
-  AccessibilityComputedProperties = 3,
-  AccessibilityPane = 4,
-  AccessibilitySourceOrder = 5,
+  /* 2 used to be AriaAttributes, but free to grab now */
+  /* 3 used to be AccessibilityComputedProperties, but free to grab now */
+  /* 4 used to be AccessibilityPane, but free to grab now */
+  /* 5 used to be AccessibilitySourceOrder, but free to grab now */
   Toggle = 6,
   Tree = 7,
   TextField = 8,
   ShowAllStyleProperties = 9,
   Section = 10,
   StylePropertiesSectionSeparator = 11,
-  StylesPane = 12,
+  /* 12 used to be StylesPane, but free to grab now */
   StylesSelector = 13,
   TreeItemExpand = 14,
   ToggleSubpane = 15,
-  ElementClassesPane = 16,
-  AddElementClassPrompt = 17,
-  ElementStatesPan = 18,
-  CssLayersPane = 19,
+  /* 16 used to be ElementClassesPane, but free to grab now */
+  /* 17 used to be AddElementClassPrompt, but free to grab now */
+  /* 18 used to be ElementStatesPan, but free to grab now */
+  /* 19 used to be CssLayersPane, but free to grab now */
   DropDown = 20,
-  StylesMetricsPane = 21,
+  /* 21 used to be StylesMetricsPane, but free to grab now */
   JumpToSource = 22,
   MetricsBox = 23,
   MetricsBoxPart = 24,
   /* 25 used to be DOMBreakpointsPane, but free to grab now */
   DOMBreakpoint = 26,
-  ElementPropertiesPane = 27,
-  EventListenersPane = 28,
+  /* 27 used to be ElementPropertiesPane, but free to grab now */
+  /* 28 used to be EventListenersPane, but free to grab now */
   Action = 29,
   FilterDropdown = 30,
-  /* 31 used to be AddColor, but free to grab now */
+  InfoBar = 31,
   BezierCurveEditor = 32,
   BezierEditor = 33,
   BezierPresetCategory = 34,
@@ -79,9 +79,9 @@ enum VisualElements {
   FlexboxOverlays = 56,
   GridOverlays = 57,
   JumpToElement = 58,
-  /* 59 used to be ElementsPanel, but free to grab now */
-  /* 60 used to be ElementsTreeOutline, but free to grab now */
-  /* 61 used to be RenderingPanel, but free to grab now */
+  PieChart = 59,
+  PieChartSlice = 60,
+  PieChartTotal = 61,
   ElementsBreadcrumbs = 62,
   /* 63 used to be FullAccessibilityTree, but free to grab now */
   /* 64 used to be ToggleDeviceMode, but free to grab now */

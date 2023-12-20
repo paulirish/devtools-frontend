@@ -48,7 +48,6 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 import * as Search from '../search/search.js';
 
-import {BlockedURLsPane} from './BlockedURLsPane.js';
 import {Events, type RequestActivatedEvent} from './NetworkDataGridNode.js';
 import {NetworkItemView} from './NetworkItemView.js';
 import {NetworkLogView} from './NetworkLogView.js';
@@ -233,7 +232,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
     // Create top overview component.
     this.overviewPane = new PerfUI.TimelineOverviewPane.TimelineOverviewPane('network');
     this.overviewPane.addEventListener(
-        PerfUI.TimelineOverviewPane.Events.WindowChanged, this.onWindowChanged.bind(this));
+        PerfUI.TimelineOverviewPane.Events.OverviewPaneWindowChanged, this.onWindowChanged.bind(this));
     this.overviewPane.element.id = 'network-overview-panel';
     this.networkOverview = new NetworkOverview();
     this.overviewPane.setOverviewControls([this.networkOverview]);
@@ -365,8 +364,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
     return this.throttlingSelect;
   }
 
-  private onWindowChanged(event: Common.EventTarget.EventTargetEvent<PerfUI.TimelineOverviewPane.WindowChangedEvent>):
-      void {
+  private onWindowChanged(
+      event: Common.EventTarget.EventTargetEvent<PerfUI.TimelineOverviewPane.OverviewPaneWindowChangedEvent>): void {
     const startTime = Math.max(this.calculator.minimumBoundary(), event.data.startTime / 1000);
     const endTime = Math.min(this.calculator.maximumBoundary(), event.data.endTime / 1000);
     if (startTime === this.calculator.minimumBoundary() && endTime === this.calculator.maximumBoundary()) {
@@ -505,7 +504,6 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   private onNetworkLogReset(event: Common.EventTarget.EventTargetEvent<Logs.NetworkLog.ResetEvent>): void {
     const {clearIfPreserved} = event.data;
-    BlockedURLsPane.reset();
     if (!this.preserveLogSetting.get() || clearIfPreserved) {
       this.calculator.reset();
       this.overviewPane.reset();
@@ -772,7 +770,6 @@ export class NetworkPanel extends UI.Panel.Panel implements
         TraceEngine.Types.Timing.MilliSeconds(this.calculator.minimumBoundary() * 1000),
         TraceEngine.Types.Timing.MilliSeconds(this.calculator.maximumBoundary() * 1000));
     this.networkOverview.updateRequest(request);
-    this.overviewPane.scheduleUpdate();
   }
 
   resolveLocation(locationName: string): UI.View.ViewLocation|null {

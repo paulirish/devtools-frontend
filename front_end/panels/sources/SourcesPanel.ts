@@ -46,14 +46,7 @@ import * as Snippets from '../snippets/snippets.js';
 
 import {CallStackSidebarPane} from './CallStackSidebarPane.js';
 import {DebuggerPausedMessage} from './DebuggerPausedMessage.js';
-import {type NavigatorView} from './NavigatorView.js';
-import {
-  ContentScriptsNavigatorView,
-  FilesNavigatorView,
-  NetworkNavigatorView,
-  OverridesNavigatorView,
-  SnippetsNavigatorView,
-} from './SourcesNavigator.js';
+import {NavigatorView} from './NavigatorView.js';
 import sourcesPanelStyles from './sourcesPanel.css.js';
 import {Events, SourcesView} from './SourcesView.js';
 import {ThreadsSidebarPane} from './ThreadsSidebarPane.js';
@@ -131,7 +124,7 @@ const UIStrings = {
   /**
    *@description A context menu item in the Sources Panel of the Sources panel
    */
-  revealInSidebar: 'Reveal in sidebar',
+  revealInSidebar: 'Reveal in navigator sidebar',
   /**
    *@description A context menu item in the Sources Panel of the Sources panel when debugging JS code.
    * When clicked, the execution is resumed until it reaches the line specified by the right-click that
@@ -175,7 +168,6 @@ const str_ = i18n.i18n.registerUIStrings('panels/sources/SourcesPanel.ts', UIStr
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const primitiveRemoteObjectTypes = new Set(['number', 'boolean', 'bigint', 'undefined']);
 let sourcesPanelInstance: SourcesPanel;
-let wrapperViewInstance: WrapperView;
 
 export class SourcesPanel extends UI.Panel.Panel implements
     UI.ContextMenu.Provider<Workspace.UISourceCode.UISourceCode|Workspace.UISourceCode.UILocation|
@@ -335,7 +327,8 @@ export class SourcesPanel extends UI.Panel.Panel implements
     panel.sourcesViewInternal.leftToolbar().removeToolbarItems();
     panel.sourcesViewInternal.rightToolbar().removeToolbarItems();
     panel.sourcesViewInternal.bottomToolbar().removeToolbarItems();
-    const isInWrapper = WrapperView.isShowing() && !UI.InspectorView.InspectorView.instance().isDrawerMinimized();
+    const isInWrapper = UI.Context.Context.instance().flavor(QuickSourceView) &&
+        !UI.InspectorView.InspectorView.instance().isDrawerMinimized();
     if (panel.splitWidget.isVertical() || isInWrapper) {
       panel.splitWidget.uninstallResizer(panel.sourcesViewInternal.toolbarContainerElement());
     } else {
@@ -398,8 +391,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     UI.Context.Context.instance().setFlavor(SourcesPanel, this);
     this.registerCSSFiles([sourcesPanelStyles]);
     super.wasShown();
-    const wrapper = WrapperView.instance();
-    if (wrapper && wrapper.isShowing()) {
+    if (UI.Context.Context.instance().flavor(QuickSourceView)) {
       UI.InspectorView.InspectorView.instance().setDrawerMinimized(true);
       SourcesPanel.updateResizerAndSidebarButtons(this);
     }
@@ -409,8 +401,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
   override willHide(): void {
     super.willHide();
     UI.Context.Context.instance().setFlavor(SourcesPanel, null);
-    if (WrapperView.isShowing()) {
-      WrapperView.instance().showViewInWrapper();
+    const wrapperView = UI.Context.Context.instance().flavor(QuickSourceView);
+    if (wrapperView) {
+      wrapperView.showViewInWrapper();
       UI.InspectorView.InspectorView.instance().setDrawerMinimized(false);
       SourcesPanel.updateResizerAndSidebarButtons(this);
     }
@@ -425,7 +418,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 
   ensureSourcesViewVisible(): boolean {
-    if (WrapperView.isShowing()) {
+    if (UI.Context.Context.instance().flavor(QuickSourceView)) {
       return true;
     }
     if (!UI.InspectorView.InspectorView.instance().canSelectPanel('sources')) {
@@ -518,8 +511,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
       uiSourceCode: Workspace.UISourceCode.UISourceCode, location?: SourceFrame.SourceFrame.RevealPosition,
       omitFocus?: boolean): void {
     if (omitFocus) {
-      const wrapperShowing = WrapperView.isShowing();
-      if (!this.isShowing() && !wrapperShowing) {
+      if (!this.isShowing() && !UI.Context.Context.instance().flavor(QuickSourceView)) {
         return;
       }
     } else {
@@ -529,7 +521,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 
   private showEditor(): void {
-    if (WrapperView.isShowing()) {
+    if (UI.Context.Context.instance().flavor(QuickSourceView)) {
       return;
     }
     void this.setAsCurrentPanel();
@@ -540,17 +532,18 @@ export class SourcesPanel extends UI.Panel.Panel implements
     this.showUISourceCode(uiSourceCode, {lineNumber, columnNumber}, omitFocus);
   }
 
-  revealInNavigator(uiSourceCode: Workspace.UISourceCode.UISourceCode, skipReveal?: boolean): void {
-    for (const navigator of registeredNavigatorViews) {
-      const navigatorView = navigator.navigatorView();
-      const viewId = navigator.viewId;
-      if (viewId && navigatorView.acceptProject(uiSourceCode.project())) {
+  async revealInNavigator(uiSourceCode: Workspace.UISourceCode.UISourceCode, skipReveal?: boolean): Promise<void> {
+    const viewManager = UI.ViewManager.ViewManager.instance();
+    for (const view of viewManager.viewsForLocation(UI.ViewManager.ViewLocationValues.NAVIGATOR_VIEW)) {
+      const navigatorView = await view.widget();
+      if (navigatorView instanceof NavigatorView && navigatorView.acceptProject(uiSourceCode.project())) {
         navigatorView.revealUISourceCode(uiSourceCode, true);
-        if (skipReveal) {
-          this.navigatorTabbedLocation.tabbedPane().selectTab(viewId);
-        } else {
-          void UI.ViewManager.ViewManager.instance().showView(viewId);
+        this.navigatorTabbedLocation.tabbedPane().selectTab(view.viewId(), true);
+        if (!skipReveal) {
+          this.editorView.showBoth(true);
+          navigatorView.focus();
         }
+        break;
       }
     }
   }
@@ -713,7 +706,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const uiSourceCode = event.data;
     if (this.editorView.mainWidget() &&
         Common.Settings.Settings.instance().moduleSetting('autoRevealInNavigator').get()) {
-      this.revealInNavigator(uiSourceCode, true);
+      void this.revealInNavigator(uiSourceCode, true);
     }
   }
 
@@ -896,7 +889,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
           Bindings.IgnoreListManager.IgnoreListManager.instance().isUserOrSourceMapIgnoreListedUISourceCode(
               uiSourceCode))) {
       contextMenu.revealSection().appendItem(
-          i18nString(UIStrings.revealInSidebar), this.handleContextMenuReveal.bind(this, uiSourceCode));
+          i18nString(UIStrings.revealInSidebar), this.revealInNavigator.bind(this, uiSourceCode), {
+            jslogContext: 'sources.reveal-in-navigator-sidebar',
+          });
     }
     // Ignore list only works for JavaScript debugging.
     if (uiSourceCode.contentType().hasScripts() &&
@@ -934,11 +929,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
       this.callstackPane.appendIgnoreListURLContextMenuItems(contextMenu, uiSourceCode);
     }
-  }
-
-  private handleContextMenuReveal(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
-    this.editorView.showBoth();
-    this.revealInNavigator(uiSourceCode);
   }
 
   private appendRemoteObjectItems(contextMenu: UI.ContextMenu.ContextMenu, remoteObject: SDK.RemoteObject.RemoteObject):
@@ -1348,6 +1338,14 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         }
         return true;
       }
+      case 'sources.reveal-in-navigator-sidebar': {
+        const uiSourceCode = panel.sourcesView().currentUISourceCode();
+        if (uiSourceCode === null) {
+          return false;
+        }
+        void panel.revealInNavigator(uiSourceCode);
+        return true;
+      }
       case 'sources.toggle-navigator-sidebar': {
         panel.toggleNavigatorSidebar();
         return true;
@@ -1361,7 +1359,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   }
 }
 
-export class WrapperView extends UI.Widget.VBox {
+export class QuickSourceView extends UI.Widget.VBox {
   private readonly view: SourcesView;
   constructor() {
     super();
@@ -1369,19 +1367,9 @@ export class WrapperView extends UI.Widget.VBox {
     this.view = SourcesPanel.instance().sourcesView();
   }
 
-  static instance(): WrapperView {
-    if (!wrapperViewInstance) {
-      wrapperViewInstance = new WrapperView();
-    }
-
-    return wrapperViewInstance;
-  }
-
-  static isShowing(): boolean {
-    return Boolean(wrapperViewInstance) && wrapperViewInstance.isShowing();
-  }
-
   override wasShown(): void {
+    UI.Context.Context.instance().setFlavor(QuickSourceView, this);
+    super.wasShown();
     if (!SourcesPanel.instance().isShowing()) {
       this.showViewInWrapper();
     } else {
@@ -1395,42 +1383,11 @@ export class WrapperView extends UI.Widget.VBox {
     queueMicrotask(() => {
       SourcesPanel.updateResizerAndSidebarButtons(SourcesPanel.instance());
     });
+    super.willHide();
+    UI.Context.Context.instance().setFlavor(QuickSourceView, null);
   }
 
   showViewInWrapper(): void {
     this.view.show(this.element);
   }
-}
-
-const registeredNavigatorViews: NavigatorViewRegistration[] = [
-  {
-    viewId: 'navigator-network',
-    navigatorView: NetworkNavigatorView.instance,
-    experiment: undefined,
-  },
-  {
-    viewId: 'navigator-files',
-    navigatorView: FilesNavigatorView.instance,
-    experiment: undefined,
-  },
-  {
-    viewId: 'navigator-snippets',
-    navigatorView: SnippetsNavigatorView.instance,
-    experiment: undefined,
-  },
-  {
-    viewId: 'navigator-overrides',
-    navigatorView: OverridesNavigatorView.instance,
-    experiment: undefined,
-  },
-  {
-    viewId: 'navigator-contentScripts',
-    navigatorView: ContentScriptsNavigatorView.instance,
-    experiment: undefined,
-  },
-];
-export interface NavigatorViewRegistration {
-  navigatorView: () => NavigatorView;
-  viewId: string;
-  experiment?: string;
 }

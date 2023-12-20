@@ -7,7 +7,6 @@ import {assert} from 'chai';
 import {
   $$,
   click,
-  enableExperiment,
   goToResource,
   step,
   typeText,
@@ -16,6 +15,7 @@ import {
   waitForNone,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
+import {openSoftContextMenuAndClickOnItem} from '../helpers/context-menu-helpers.js';
 import {
   openNetworkTab,
   selectRequestByName,
@@ -26,7 +26,6 @@ import {
   typeIntoQuickOpen,
 } from '../helpers/quick_open-helpers.js';
 import {
-  clickOnContextMenu,
   ENABLE_OVERRIDES_SELECTOR,
   enableLocalOverrides,
   openSourcesPanel,
@@ -46,11 +45,11 @@ describe('Overrides panel', async function() {
     await goToResource('empty.html');
     await openSourcesPanel();
     await enableLocalOverrides();
-    await clickOnContextMenu(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
+    await openSoftContextMenuAndClickOnItem(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
     await waitFor('[aria-label="NewFile, file"]');
     await typeText('foo\n');
 
-    await clickOnContextMenu(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
+    await openSoftContextMenuAndClickOnItem(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
     await waitFor('[aria-label="NewFile, file"]');
     await typeText('bar\n');
     await waitFor('[aria-label="bar, file"]');
@@ -222,7 +221,7 @@ describe('Overrides panel', async function() {
     await step('shows indicator after enabling override in Overrides tab', async () => {
       await click('aria/Sources');
       await click('aria/Select folder for overrides');
-      await clickOnContextMenu(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
+      await openSoftContextMenuAndClickOnItem(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
       await waitFor('[aria-label="NewFile, file"]');
 
       await openNetworkTab();
@@ -253,7 +252,7 @@ describe('Overrides panel', async function() {
     await step('when overrides setting is enabled', async () => {
       // Set up & enable overrides in the Sources panel
       await click('aria/Select folder for overrides');
-      await clickOnContextMenu(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
+      await openSoftContextMenuAndClickOnItem(OVERRIDES_FILESYSTEM_SELECTOR, 'New file');
 
       await openNetworkTab();
       await selectRequestByName('coffees.json', {button: 'right'});
@@ -343,7 +342,8 @@ describe('Overrides panel', async function() {
     assert.strictEqual(assertDeleteElements.length, 1);
   });
 
-  it('show redirect dialog when override content of source mapped js file', async () => {
+  // Flaky
+  it.skip('[crbug.com/1502463] show redirect dialog when override content of source mapped js file', async () => {
     await goToResource('sources/sourcemap-origin.html');
     await openSourcesPanel();
     await enableLocalOverrides();
@@ -369,7 +369,8 @@ describe('Overrides panel', async function() {
     await waitFor('[aria-label="Close sourcemap-origin.min.js"]');
   });
 
-  it('show redirect dialog when override content of source mapped css file', async () => {
+  // Flaky
+  it.skip('[crbug.com/1502463] show redirect dialog when override content of source mapped css file', async () => {
     await goToResource('sources/sourcemap-origin.html');
     await openSourcesPanel();
     await enableLocalOverrides();
@@ -397,7 +398,8 @@ describe('Overrides panel', async function() {
 });
 
 describe('Overrides panel', () => {
-  it('appends correct overrides context menu for Sources > Page file', async () => {
+  // Context menu is flakily not populated yet with the "Open in Sources panel".
+  it.skip('[crbug.com/1509276] appends correct overrides context menu for Sources > Page file', async () => {
     await goToResource('elements/elements-panel-styles.html');
     await openNetworkTab();
     await waitForSomeRequestsToAppear(2);
@@ -419,7 +421,6 @@ describe('Overrides panel', () => {
 describe('Overrides panel > Delete context menus', () => {
   beforeEach(async () => {
     // set up 3 overriden files - .header, json, custom js
-    await enableExperiment('headerOverrides');
     await goToResource('network/fetch-json.html');
     await openSourcesPanel();
     await enableLocalOverrides();

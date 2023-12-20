@@ -293,7 +293,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.hasMatchedStyles = false;
 
     this.contentElement.classList.add('styles-pane');
-    this.contentElement.setAttribute('jslog', `${VisualLogging.stylesPane()}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane().context('styles')}`);
 
     this.sectionBlocks = [];
     this.idleCallbackManager = null;
@@ -2147,12 +2147,12 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
         const computedValue =
             this.treeElement.matchedStyles().computeCSSVariable(this.treeElement.property.ownerStyle, completion);
         if (computedValue) {
-          const color = Common.Color.parse(computedValue);
+          const color = Common.Color.parse(computedValue.value);
           if (color) {
             result.subtitleRenderer = colorSwatchRenderer.bind(null, color);
             result.isCSSVariableColor = true;
           } else {
-            result.subtitleRenderer = computedValueSubtitleRenderer.bind(null, computedValue);
+            result.subtitleRenderer = computedValueSubtitleRenderer.bind(null, computedValue.value);
           }
         }
       }
@@ -2387,7 +2387,7 @@ export class StylesSidebarPropertyRenderer {
       }
       processors.push(this.fontHandler);
     }
-    if (Root.Runtime.experiments.isEnabled('cssTypeComponentLength') && this.lengthHandler) {
+    if (this.lengthHandler) {
       // TODO(changhaohan): crbug.com/1138628 refactor this to handle unitless 0 cases
       regexes.push(InlineEditor.CSSLengthUtils.CSSLengthRegex);
       processors.push(this.lengthHandler);

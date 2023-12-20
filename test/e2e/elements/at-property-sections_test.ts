@@ -113,12 +113,12 @@ describe('The styles pane', () => {
       assert.isTrue(await rule.evaluate(e => e.classList.contains('hidden')));
     }
 
-    {
+    await waitForFunction(async () => {
       const section = await click('pierceShadowText/@property', {root: stylesPane});
       await waitForFunction(async () => 'true' === await section.evaluate(e => e.ariaExpanded));
       const rule = await getStyleRule('--custom-prop-4');
-      await waitForFunction(() => rule.evaluate(e => !e.classList.contains('hidden')));
-    }
+      return rule.evaluate(e => !e.classList.contains('hidden'));
+    });
   });
 
   it('shows registration information in a variable popover', async () => {

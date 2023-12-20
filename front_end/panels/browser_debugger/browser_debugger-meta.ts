@@ -116,7 +116,7 @@ UI.ViewManager.registerViewExtension({
 UI.ViewManager.registerViewExtension({
   async loadView() {
     const BrowserDebugger = await loadBrowserDebuggerModule();
-    return BrowserDebugger.CSPViolationBreakpointsSidebarPane.CSPViolationBreakpointsSidebarPane.instance();
+    return new BrowserDebugger.CSPViolationBreakpointsSidebarPane.CSPViolationBreakpointsSidebarPane();
   },
   id: 'sources.cspViolationBreakpoints',
   location: UI.ViewManager.ViewLocationValues.SOURCES_SIDEBAR_BOTTOM,
@@ -215,7 +215,7 @@ UI.ViewManager.registerViewExtension({
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesNavigator.ContentScriptsNavigatorView.instance();
+    return new Sources.SourcesNavigator.ContentScriptsNavigatorView();
   },
 });
 

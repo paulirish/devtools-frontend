@@ -39,11 +39,12 @@ import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as Snippets from '../snippets/snippets.js';
 
 import navigatorTreeStyles from './navigatorTree.css.js';
 import navigatorViewStyles from './navigatorView.css.js';
-import {SearchSourcesView} from './SearchSourcesView.js';
+import {SearchSources} from './SearchSourcesView.js';
 
 const UIStrings = {
   /**
@@ -181,21 +182,14 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
   private readonly frameNodes: Map<SDK.ResourceTreeModel.ResourceTreeFrame, NavigatorGroupTreeNode>;
   private authoredNode?: NavigatorGroupTreeNode;
   private deployedNode?: NavigatorGroupTreeNode;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private navigatorGroupByFolderSetting: Common.Settings.Setting<any>;
+  private navigatorGroupByFolderSetting: Common.Settings.Setting<boolean>;
   private navigatorGroupByAuthoredExperiment?: string;
   private workspaceInternal!: Workspace.Workspace.WorkspaceImpl;
-  private lastSelectedUISourceCode?: Workspace.UISourceCode.UISourceCode;
   private groupByFrame?: boolean;
   private groupByAuthored?: boolean;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private groupByDomain?: any;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private groupByFolder?: any;
-  constructor(enableAuthoredGrouping?: boolean) {
+  private groupByDomain?: boolean;
+  private groupByFolder?: boolean;
+  constructor(jslogContext: string, enableAuthoredGrouping?: boolean) {
     super(true);
 
     this.placeholder = null;
@@ -203,6 +197,7 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
 
     this.scriptsTree.setComparator(NavigatorView.treeElementsCompare);
     this.scriptsTree.setFocusable(false);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane().context(jslogContext)}`);
     this.contentElement.appendChild(this.scriptsTree.element);
     this.setDefaultFocusedElement(this.scriptsTree.element);
 
@@ -271,18 +266,10 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
     return order;
   }
 
-  static appendSearchItem(contextMenu: UI.ContextMenu.ContextMenu, path?: Platform.DevToolsPath.EncodedPathString):
-      void {
-    let searchLabel = i18nString(UIStrings.searchInFolder);
-    if (!path || !path.trim()) {
-      path = '*' as Platform.DevToolsPath.EncodedPathString;
-      searchLabel = i18nString(UIStrings.searchInAllFiles);
-    }
-    contextMenu.viewSection().appendItem(searchLabel, () => {
-      if (path) {
-        void SearchSourcesView.openSearch(`file:${path.trim()}`);
-      }
-    });
+  static appendSearchItem(contextMenu: UI.ContextMenu.ContextMenu, path: string): void {
+    const searchLabel = path ? i18nString(UIStrings.searchInFolder) : i18nString(UIStrings.searchInAllFiles);
+    const searchSources = new SearchSources(path && `file:${path}`);
+    contextMenu.viewSection().appendItem(searchLabel, () => Common.Revealer.reveal(searchSources));
   }
 
   private static treeElementsCompare(
@@ -813,14 +800,12 @@ export class NavigatorView extends UI.Widget.VBox implements SDK.TargetManager.O
       }
       this.scriptsTree.selectedTreeElement.deselect();
     }
-    this.lastSelectedUISourceCode = uiSourceCode;
     // TODO(dgozman): figure out revealing multiple.
     node.reveal(select);
     return node;
   }
 
   sourceSelected(uiSourceCode: Workspace.UISourceCode.UISourceCode, focusSource: boolean): void {
-    this.lastSelectedUISourceCode = uiSourceCode;
     void Common.Revealer.reveal(uiSourceCode, !focusSource);
   }
 

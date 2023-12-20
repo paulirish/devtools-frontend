@@ -107,19 +107,14 @@ export function registerNoopActions(actionIds: string[]): void {
 }
 
 const REGISTERED_EXPERIMENTS = [
-  'bfcacheDisplayTree',
   'captureNodeCreationStacks',
-  'preciseChanges',
   'protocolMonitor',
-  'wasmDWARFDebugging',
   'timelineShowAllEvents',
   'timelineV8RuntimeCallStats',
   'timelineInvalidationTracking',
   'ignoreListJSFramesOnTimeline',
   'instrumentationBreakpoints',
-  'cssTypeComponentLength',
   'stylesPaneCSSChanges',
-  'timelineEventInitiators',
   'timelineAsConsoleProfileResultPanel',
   'headerOverrides',
   'highlightErrorsElementsPanel',

@@ -6,14 +6,15 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
+import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as NetworkComponents from '../network/components/components.js';
+import * as Network from '../network/network.js';
 
 import * as ApplicationComponents from './components/components.js';
 import serviceWorkerCacheViewsStyles from './serviceWorkerCacheViews.css.js';
-
-import type * as Protocol from '../../generated/protocol.js';
-import * as Network from '../network/network.js';
 
 const UIStrings = {
   /**
@@ -405,13 +406,19 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     request.endTime = entry.responseTime;
 
     let header = entry.responseHeaders.find(header => header.name.toLowerCase() === 'content-type');
-    const contentType = header ? header.value : SDK.NetworkRequest.MIME_TYPE.PLAIN;
-    request.mimeType = contentType as SDK.NetworkRequest.MIME_TYPE;
+    let mimeType: string = SDK.MimeType.MimeType.PLAIN;
+    if (header) {
+      const result = SDK.MimeType.parseContentType(header.value);
+      if (result.mimeType) {
+        mimeType = result.mimeType;
+      }
+    }
+    request.mimeType = mimeType;
 
     header = entry.responseHeaders.find(header => header.name.toLowerCase() === 'content-length');
     request.resourceSize = (header && Number(header.value)) || 0;
 
-    let resourceType = Common.ResourceType.ResourceType.fromMimeType(contentType);
+    let resourceType = Common.ResourceType.ResourceType.fromMimeType(mimeType);
     if (!resourceType) {
       resourceType =
           Common.ResourceType.ResourceType.fromURL(entry.requestURL) || Common.ResourceType.resourceTypes.Other;
@@ -421,14 +428,14 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     return request;
   }
 
-  private async requestContent(request: SDK.NetworkRequest.NetworkRequest): Promise<SDK.NetworkRequest.ContentData> {
-    const isText = request.resourceType().isTextType();
-    const contentData: SDK.NetworkRequest.ContentData = {error: null, content: null, encoded: !isText};
+  private async requestContent(request: SDK.NetworkRequest.NetworkRequest):
+      Promise<SDK.ContentData.ContentDataOrError> {
     const response = await this.cache.requestCachedResponse(request.url(), request.requestHeaders());
-    if (response) {
-      contentData.content = isText ? window.atob(response.body) : response.body;
+    if (!response) {
+      return {error: 'No cached response found'};
     }
-    return contentData;
+    return new SDK.ContentData.ContentData(
+        response.body, /* isBase64=*/ true, request.resourceType(), request.mimeType, request.charset() ?? undefined);
   }
 
   private updatedForTest(): void {
@@ -515,7 +522,9 @@ export class RequestView extends UI.Widget.VBox {
     this.resourceViewTabSetting = Common.Settings.Settings.instance().createSetting('cacheStorageViewTab', 'preview');
 
     this.tabbedPane.appendTab(
-        'headers', i18nString(UIStrings.headers), new Network.RequestHeadersView.RequestHeadersView(request));
+        'headers', i18nString(UIStrings.headers),
+        LegacyWrapper.LegacyWrapper.legacyWrapper(
+            UI.Widget.VBox, new NetworkComponents.RequestHeadersView.RequestHeadersView(request)));
     this.tabbedPane.appendTab(
         'preview', i18nString(UIStrings.preview), new Network.RequestPreviewView.RequestPreviewView(request));
     this.tabbedPane.show(this.element);

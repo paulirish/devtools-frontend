@@ -688,7 +688,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
   constructor(
       placeholder: string, accessiblePlaceholder?: string, growFactor?: number, shrinkFactor?: number, tooltip?: string,
       completions?: ((arg0: string, arg1: string, arg2?: boolean|undefined) => Promise<Suggestion[]>),
-      dynamicCompletions?: boolean) {
+      dynamicCompletions?: boolean, jslogContext?: string) {
     const element = document.createElement('div');
     element.classList.add('toolbar-input');
     super(element);
@@ -699,15 +699,19 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
     internalPromptElement.addEventListener('blur', () => this.element.classList.remove('focused'));
 
     this.prompt = new TextPrompt();
+    this.prompt.jslogContext = jslogContext;
     this.proxyElement = this.prompt.attach(internalPromptElement);
     this.proxyElement.classList.add('toolbar-prompt-proxy');
     this.proxyElement.addEventListener('keydown', (event: Event) => this.onKeydownCallback(event as KeyboardEvent));
-    this.prompt.initialize(completions || ((): Promise<never[]> => Promise.resolve([])), ' ', dynamicCompletions);
+    this.prompt.initialize(
+        completions || ((): Promise<never[]> => Promise.resolve([])),
+        ' ',
+        dynamicCompletions,
+    );
     if (tooltip) {
       this.prompt.setTitle(tooltip);
     }
     this.prompt.setPlaceholder(placeholder, accessiblePlaceholder);
-    this.prompt.setJsLog(`${VisualLogging.textField().track({keydown: true})}`);
     this.prompt.addEventListener(TextPromptEvents.TextChanged, this.onChangeCallback.bind(this));
 
     if (growFactor) {
@@ -837,7 +841,6 @@ export class ToolbarMenuButton extends ToolbarButton {
   private readonly contextMenuHandler: (arg0: ContextMenu) => void;
   private readonly useSoftMenu: boolean;
   private triggerTimeout?: number;
-  private lastTriggerTime?: number;
   constructor(contextMenuHandler: (arg0: ContextMenu) => void, useSoftMenu?: boolean, jslogContext?: string) {
     super('', 'dots-vertical', undefined, jslogContext);
     this.contextMenuHandler = contextMenuHandler;
@@ -859,11 +862,6 @@ export class ToolbarMenuButton extends ToolbarButton {
   private trigger(event: Event): void {
     delete this.triggerTimeout;
 
-    // Throttling avoids entering a bad state on Macs when rapidly triggering context menus just
-    // after the window gains focus. See crbug.com/655556
-    if (this.lastTriggerTime && Date.now() - this.lastTriggerTime < 300) {
-      return;
-    }
     const contextMenu = new ContextMenu(event, {
       useSoftMenu: this.useSoftMenu,
       x: this.element.getBoundingClientRect().left,
@@ -871,7 +869,6 @@ export class ToolbarMenuButton extends ToolbarButton {
     });
     this.contextMenuHandler(contextMenu);
     void contextMenu.show();
-    this.lastTriggerTime = Date.now();
   }
 
   override clicked(event: Event): void {

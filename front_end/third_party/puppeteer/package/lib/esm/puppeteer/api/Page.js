@@ -114,7 +114,6 @@ export function setDefaultScreenshotOptions(options) {
     options.omitBackground ??= false;
     options.encoding ??= 'binary';
     options.captureBeyondViewport ??= true;
-    options.allowViewportExpansion ??= options.captureBeyondViewport;
 }
 /**
  * Page provides methods to interact with a single tab or
@@ -255,9 +254,12 @@ let Page = (() => {
         /**
          * The method runs `document.querySelectorAll` within the page. If no elements
          * match the selector, the return value resolves to `[]`.
-         * @remarks
-         * Shortcut for {@link Frame.$$ | Page.mainFrame().$$(selector) }.
+         *
          * @param selector - A `selector` to query page for
+         *
+         * @remarks
+         *
+         * Shortcut for {@link Frame.$$ | Page.mainFrame().$$(selector) }.
          */
         async $$(selector) {
             return await this.mainFrame().$$(selector);
@@ -487,8 +489,10 @@ let Page = (() => {
         }
         /**
          * The page's URL.
-         * @remarks Shortcut for
-         * {@link Frame.url | page.mainFrame().url()}.
+         *
+         * @remarks
+         *
+         * Shortcut for {@link Frame.url | page.mainFrame().url()}.
          */
         url() {
             return this.mainFrame().url();
@@ -504,7 +508,9 @@ let Page = (() => {
          *
          * @param html - HTML markup to assign to the page.
          * @param options - Parameters that has some properties.
+         *
          * @remarks
+         *
          * The parameter `options` might have the following options.
          *
          * - `timeout` : Maximum time in milliseconds for resources to load, defaults
@@ -532,6 +538,7 @@ let Page = (() => {
          * Navigates the page to the given `url`.
          *
          * @remarks
+         *
          * Navigation to `about:blank` or navigation to the same URL with a different
          * hash will succeed and return `null`.
          *
@@ -581,6 +588,7 @@ let Page = (() => {
          * ```
          *
          * @remarks
+         *
          * Usage of the
          * {@link https://developer.mozilla.org/en-US/docs/Web/API/History_API | History API}
          * to change the URL is considered a navigation.
@@ -639,7 +647,6 @@ let Page = (() => {
          * This method is a shortcut for calling two methods:
          * {@link Page.setUserAgent} and {@link Page.setViewport}.
          *
-         * @remarks
          * This method will resize the page. A lot of websites don't expect phones to
          * change size, so you should emulate before navigating to the page.
          *
@@ -729,13 +736,6 @@ let Page = (() => {
         /**
          * Captures a screencast of this {@link Page | page}.
          *
-         * @remarks
-         *
-         * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
-         * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
-         *
-         * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
-         *
          * @example
          * Recording a {@link Page | page}:
          *
@@ -765,6 +765,13 @@ let Page = (() => {
          * @param options - Configures screencast behavior.
          *
          * @experimental
+         *
+         * @remarks
+         *
+         * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
+         * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+         *
+         * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
          */
         async screencast(options = {}) {
             const [{ ScreenRecorder }, [width, height, devicePixelRatio]] = await Promise.all([
@@ -890,7 +897,7 @@ let Page = (() => {
             const env_2 = { stack: [], error: void 0, hasError: false };
             try {
                 await this.bringToFront();
-                // TODO: use structuredClone after Node 16 support is dropped.«
+                // TODO: use structuredClone after Node 16 support is dropped.
                 const options = {
                     ...userOptions,
                     clip: userOptions.clip
@@ -927,7 +934,6 @@ let Page = (() => {
                         throw new Error(`${options.type ?? 'png'} screenshots do not support 'quality'.`);
                     }
                 }
-                assert(!options.clip || !options.fullPage, "'clip' and 'fullPage' are exclusive");
                 if (options.clip) {
                     if (options.clip.width <= 0) {
                         throw new Error("'width' in 'clip' must be positive.");
@@ -937,29 +943,47 @@ let Page = (() => {
                     }
                 }
                 setDefaultScreenshotOptions(options);
-                options.clip =
-                    options.clip && roundRectangle(normalizeRectangle(options.clip));
                 const stack = __addDisposableResource(env_2, new AsyncDisposableStack(), true);
-                if (options.allowViewportExpansion || options.captureBeyondViewport) {
+                if (options.clip) {
                     if (options.fullPage) {
-                        const dimensions = await this.mainFrame()
-                            .isolatedRealm()
-                            .evaluate(() => {
-                            const { scrollHeight, scrollWidth } = document.documentElement;
-                            const { height: viewportHeight, width: viewportWidth } = window.visualViewport;
-                            return {
-                                height: Math.max(scrollHeight, viewportHeight),
-                                width: Math.max(scrollWidth, viewportWidth),
-                            };
-                        });
-                        options.clip = { ...dimensions, x: 0, y: 0 };
-                        stack.use(await this._createTemporaryViewportContainingBox(options.clip));
+                        throw new Error("'clip' and 'fullPage' are mutually exclusive");
                     }
-                    else if (options.clip && !options.captureBeyondViewport) {
-                        stack.use(options.clip &&
-                            (await this._createTemporaryViewportContainingBox(options.clip)));
+                    options.clip = roundRectangle(normalizeRectangle(options.clip));
+                }
+                else {
+                    if (options.fullPage) {
+                        // If `captureBeyondViewport` is `false`, then we set the viewport to
+                        // capture the full page. Note this may be affected by on-page CSS and
+                        // JavaScript.
+                        if (!options.captureBeyondViewport) {
+                            const scrollDimensions = await this.mainFrame()
+                                .isolatedRealm()
+                                .evaluate(() => {
+                                const element = document.documentElement;
+                                return {
+                                    width: element.scrollWidth,
+                                    height: element.scrollHeight,
+                                };
+                            });
+                            const viewport = this.viewport();
+                            await this.setViewport({
+                                ...viewport,
+                                ...scrollDimensions,
+                            });
+                            stack.defer(async () => {
+                                if (viewport) {
+                                    await this.setViewport(viewport).catch(debugError);
+                                }
+                                else {
+                                    await this.setViewport({
+                                        width: 0,
+                                        height: 0,
+                                    }).catch(debugError);
+                                }
+                            });
+                        }
                     }
-                    else if (!options.clip) {
+                    else {
                         options.captureBeyondViewport = false;
                     }
                 }
@@ -979,60 +1003,6 @@ let Page = (() => {
                 const result_1 = __disposeResources(env_2);
                 if (result_1)
                     await result_1;
-            }
-        }
-        /**
-         * @internal
-         */
-        async _createTemporaryViewportContainingBox(clip) {
-            const env_3 = { stack: [], error: void 0, hasError: false };
-            try {
-                const viewport = await this.mainFrame()
-                    .isolatedRealm()
-                    .evaluate(() => {
-                    return {
-                        pageLeft: window.visualViewport.pageLeft,
-                        pageTop: window.visualViewport.pageTop,
-                        width: window.visualViewport.width,
-                        height: window.visualViewport.height,
-                    };
-                });
-                const stack = __addDisposableResource(env_3, new AsyncDisposableStack(), true);
-                if (clip.x < viewport.pageLeft || clip.y < viewport.pageTop) {
-                    await this.evaluate((left, top) => {
-                        window.scroll({ left, top, behavior: 'instant' });
-                    }, Math.floor(clip.x), Math.floor(clip.y));
-                    stack.defer(async () => {
-                        await this.evaluate((left, top) => {
-                            window.scroll({ left, top, behavior: 'instant' });
-                        }, viewport.pageLeft, viewport.pageTop).catch(debugError);
-                    });
-                }
-                if (clip.width + clip.x > viewport.width ||
-                    clip.height + clip.y > viewport.height) {
-                    const originalViewport = this.viewport() ?? {
-                        width: 0,
-                        height: 0,
-                    };
-                    // We add 1 for fractional x and y.
-                    await this.setViewport({
-                        width: Math.max(viewport.width, Math.ceil(clip.width + clip.x)),
-                        height: Math.max(viewport.height, Math.ceil(clip.height + clip.y)),
-                    });
-                    stack.defer(async () => {
-                        await this.setViewport(originalViewport).catch(debugError);
-                    });
-                }
-                return stack.move();
-            }
-            catch (e_3) {
-                env_3.error = e_3;
-                env_3.hasError = true;
-            }
-            finally {
-                const result_2 = __disposeResources(env_3);
-                if (result_2)
-                    await result_2;
             }
         }
         /**
@@ -1083,6 +1053,7 @@ let Page = (() => {
          * The page's title
          *
          * @remarks
+         *
          * Shortcut for {@link Frame.title | page.mainFrame().title()}.
          */
         async title() {
@@ -1093,7 +1064,10 @@ let Page = (() => {
          * needed, and then uses {@link Page | Page.mouse} to click in the center of the
          * element. If there's no element matching `selector`, the method throws an
          * error.
-         * @remarks Bear in mind that if `click()` triggers a navigation event and
+         *
+         * @remarks
+         *
+         * Bear in mind that if `click()` triggers a navigation event and
          * there's a separate `page.waitForNavigation()` promise to be resolved, you
          * may end up with a race condition that yields unexpected results. The
          * correct pattern for click and wait for navigation is the following:
@@ -1126,7 +1100,9 @@ let Page = (() => {
          * @returns Promise which resolves when the element matching selector is
          * successfully focused. The promise will be rejected if there is no element
          * matching selector.
+         *
          * @remarks
+         *
          * Shortcut for {@link Frame.focus | page.mainFrame().focus(selector)}.
          */
         focus(selector) {
@@ -1144,7 +1120,9 @@ let Page = (() => {
          * @returns Promise which resolves when the element matching `selector` is
          * successfully hovered. Promise gets rejected if there's no element matching
          * `selector`.
+         *
          * @remarks
+         *
          * Shortcut for {@link Page.hover | page.mainFrame().hover(selector)}.
          */
         hover(selector) {
@@ -1171,6 +1149,7 @@ let Page = (() => {
          * @returns
          *
          * @remarks
+         *
          * Shortcut for {@link Frame.select | page.mainFrame().select()}
          */
         select(selector, ...values) {
@@ -1185,8 +1164,9 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | Selector}
          * to search for element to tap. If there are multiple elements satisfying the
          * selector, the first will be tapped.
-         * @returns
+         *
          * @remarks
+         *
          * Shortcut for {@link Frame.tap | page.mainFrame().tap(selector)}.
          */
         tap(selector) {
@@ -1214,7 +1194,6 @@ let Page = (() => {
          * @param options - have property `delay` which is the Time to wait between
          * key presses in milliseconds. Defaults to `0`.
          * @returns
-         * @remarks
          */
         type(selector, text, options) {
             return this.mainFrame().type(selector, text, options);
@@ -1225,6 +1204,7 @@ let Page = (() => {
          * Causes your script to wait for the given number of milliseconds.
          *
          * @remarks
+         *
          * It's generally recommended to not wait for a number of seconds, but instead
          * use {@link Frame.waitForSelector}, {@link Frame.waitForXPath} or
          * {@link Frame.waitForFunction} to wait for exactly the conditions you want.
@@ -1278,6 +1258,7 @@ let Page = (() => {
          * @returns Promise which resolves when element specified by selector string
          * is added to DOM. Resolves to `null` if waiting for hidden: `true` and
          * selector is not found in DOM.
+         *
          * @remarks
          * The optional Parameter in Arguments `options` are:
          *

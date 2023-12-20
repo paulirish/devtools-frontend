@@ -6,7 +6,6 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Persistence from '../../models/persistence/persistence.js';
@@ -42,7 +41,7 @@ const UIStrings = {
   /**
    *@description Text in Sources View of the Sources panel.
    */
-  selectFolder: 'select folder',
+  selectFolder: 'Select folder',
   /**
    *@description Accessible label for Sources placeholder view actions list
    */
@@ -372,7 +371,6 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   private createSourceView(uiSourceCode: Workspace.UISourceCode.UISourceCode): UI.Widget.Widget {
-    let sourceFrame;
     let sourceView;
     const contentType = uiSourceCode.contentType();
 
@@ -380,23 +378,17 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       sourceView = new SourceFrame.ImageView.ImageView(uiSourceCode.mimeType(), uiSourceCode);
     } else if (contentType === Common.ResourceType.resourceTypes.Font) {
       sourceView = new SourceFrame.FontView.FontView(uiSourceCode.mimeType(), uiSourceCode);
-    } else if (
-        uiSourceCode.name() === HEADER_OVERRIDES_FILENAME &&
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HEADER_OVERRIDES)) {
+    } else if (uiSourceCode.name() === HEADER_OVERRIDES_FILENAME) {
       sourceView = new Components.HeadersView.HeadersView(uiSourceCode);
     } else {
-      sourceFrame = new UISourceCodeFrame(uiSourceCode);
-    }
-
-    if (sourceFrame) {
-      this.historyManager.trackSourceFrameCursorJumps(sourceFrame);
+      sourceView = new UISourceCodeFrame(uiSourceCode);
+      this.historyManager.trackSourceFrameCursorJumps(sourceView);
     }
 
     uiSourceCode.addEventListener(Workspace.UISourceCode.Events.TitleChanged, this.#uiSourceCodeTitleChanged, this);
 
-    const widget = (sourceFrame || sourceView as UI.Widget.Widget);
-    this.sourceViewByUISourceCode.set(uiSourceCode, widget);
-    return widget;
+    this.sourceViewByUISourceCode.set(uiSourceCode, sourceView);
+    return sourceView;
   }
 
   #sourceViewTypeForWidget(widget: UI.Widget.Widget): SourceViewType {
@@ -413,8 +405,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   #sourceViewTypeForUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): SourceViewType {
-    if (uiSourceCode.name() === HEADER_OVERRIDES_FILENAME &&
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HEADER_OVERRIDES)) {
+    if (uiSourceCode.name() === HEADER_OVERRIDES_FILENAME) {
       return SourceViewType.HeadersView;
     }
     const contentType = uiSourceCode.contentType();

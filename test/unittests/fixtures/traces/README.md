@@ -27,6 +27,10 @@ If you have created an example website to generate a trace, consider contributin
 
 ## basic
 
+Contains a navigation to about:blank first and then to another URL. Includes data from about:blank to ensure a track for that URL is rendered.
+
+## basic
+
 A very barebones trace; contains info on browser processes and threads but very little else.
 
 ## slow-interaction-button-click
@@ -140,3 +144,11 @@ Contains a `setTimeout`, `requestAnimationFrame` and `requestIdleCallback` call.
 ### nested-initiators
 
 Contains a `setTimeout` triggered by a prior `setTimeout`, so there is a larger initiator chain.
+
+### multiple-navigations-same-id
+
+Contains a trace with two identical navigation events with matching IDs. See crbug.com/1503982 for the context and comments in MetaHandler.ts for the fix. This trace is included to avoid a regression.
+
+### web-dev-initial-url
+
+This is a trace where we loaded web.dev/inp, but the initial URL reported by the TraceStartedInBrowser event states google.com (the previous page). In this situation the MetaHandler would produce google.com as the mainFrameURL which is incorrect. This trace was used to write a test to ensure in this instance if we can we try to calculate the actual domain by looking at the first navigation.

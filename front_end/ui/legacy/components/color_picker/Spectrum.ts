@@ -34,7 +34,6 @@ import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as Root from '../../../../core/root/root.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as SrgbOverlay from '../../../components/srgb_overlay/srgb_overlay.js';
@@ -144,6 +143,8 @@ const enum SpectrumGamut {
   DISPLAY_P3 = 'display-p3',
 }
 
+const IS_NATIVE_EYE_DROPPER_AVAILABLE = 'EyeDropper' in window;
+
 function doesFormatSupportDisplayP3(format: Common.Color.Format): boolean {
   return !srgbGamutFormats.includes(format);
 }
@@ -197,8 +198,7 @@ function getColorFromHsva(gamut: SpectrumGamut, hsva: Common.ColorUtils.Color4D)
   const color: Common.Color.Legacy = Common.Color.Legacy.fromHSVA(hsva);
   switch (gamut) {
     case SpectrumGamut.DISPLAY_P3: {
-      const rgba: Common.ColorUtils.Color4D = [0, 0, 0, 0];
-      Common.Color.hsva2rgba(hsva, rgba);
+      const rgba = Common.Color.hsva2rgba(hsva);
       return new Common.Color.ColorFunction(
           Common.Color.Format.DISPLAY_P3, rgba[0], rgba[1], rgba[2], rgba[3], undefined);
     }
@@ -256,7 +256,6 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private colorOffset?: DOMRect;
   private closeButton?: UI.Toolbar.ToolbarButton;
   private paletteContainerMutable?: boolean;
-  private eyeDropperExperimentEnabled?: boolean;
   private shadesCloseHandler?: (() => void);
   private dragElement?: HTMLElement;
   private dragHotSpotX?: number;
@@ -425,7 +424,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     overlay.addEventListener('click', this.togglePalettePanel.bind(this, false));
 
     this.addColorToolbar = new UI.Toolbar.Toolbar('add-color-toolbar');
-    const addColorButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addToPalette), 'plus', 'add-color');
+    const addColorButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addToPalette), 'plus', undefined, 'add-color');
     addColorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onAddColorMousedown.bind(this));
     addColorButton.element.addEventListener('keydown', this.onAddColorKeydown.bind(this));
     this.addColorToolbar.appendToolbarItem(addColorButton);
@@ -1339,11 +1339,9 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.dragHeight = this.colorElement.offsetHeight;
     this.colorDragElementHeight = this.colorDragElement.offsetHeight / 2;
     this.innerSetColor(undefined, undefined, undefined /* colorName */, undefined, ChangeSource.Model);
-    this.eyeDropperExperimentEnabled =
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.EYEDROPPER_COLOR_PICKER);
     // When flag is turned on, eye dropper is not turned on by default.
     // This is because the global change of the cursor into a dropper will disturb the user.
-    if (!this.eyeDropperExperimentEnabled) {
+    if (!IS_NATIVE_EYE_DROPPER_AVAILABLE) {
       void this.toggleColorPicker(true);
     } else {
       this.colorPickerButton.setToggled(false);
@@ -1366,8 +1364,6 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   async toggleColorPicker(enabled?: boolean): Promise<void> {
-    const eyeDropperExperimentEnabled = this.eyeDropperExperimentEnabled;
-
     if (enabled === undefined) {
       enabled = !this.colorPickerButton.toggled();
     }
@@ -1380,7 +1376,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     }
 
     // With the old color picker, colors can only be picked up within the page.
-    if (!eyeDropperExperimentEnabled) {
+    if (!IS_NATIVE_EYE_DROPPER_AVAILABLE) {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.setEyeDropperActive(enabled);
       if (enabled) {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
@@ -1389,7 +1385,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.removeEventListener(
             Host.InspectorFrontendHostAPI.Events.EyeDropperPickedColor, this.colorPickedBound);
       }
-    } else if (eyeDropperExperimentEnabled && enabled) {
+    } else if (IS_NATIVE_EYE_DROPPER_AVAILABLE && enabled) {
       // Use EyeDropper API, can pick up colors outside the browser window,
       // Note: The current EyeDropper API is not designed to pick up colors continuously.
       // Wait for TypeScript to support the definition of EyeDropper API:
@@ -1410,7 +1406,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       }
 
       this.colorPickerButton.setToggled(false);
-    } else if (eyeDropperExperimentEnabled && !enabled) {
+    } else if (IS_NATIVE_EYE_DROPPER_AVAILABLE && !enabled) {
       this.eyeDropperAbortController?.abort();
       this.eyeDropperAbortController = null;
     }

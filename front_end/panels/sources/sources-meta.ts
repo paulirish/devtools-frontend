@@ -13,8 +13,8 @@ import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type * as Sources from './sources.js';
 import type * as SourcesComponents from './components/components.js';
+import type * as Sources from './sources.js';
 
 const UIStrings = {
   /**
@@ -398,6 +398,10 @@ const UIStrings = {
    */
   enableAutoFocusOnDebuggerPaused: 'Focus Sources panel when triggering a breakpoint',
   /**
+   *@description Title of an action to reveal the active file in the navigator sidebar of the Sources panel
+   */
+  revealActiveFileInSidebar: 'Reveal active file in navigator sidebar',
+  /**
    * @description Text for command of toggling navigator sidebar in Sources panel
    */
   toggleNavigatorSidebar: 'Toggle navigator sidebar',
@@ -461,7 +465,7 @@ UI.ViewManager.registerViewExtension({
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesNavigator.FilesNavigatorView.instance();
+    return new Sources.SourcesNavigator.FilesNavigatorView();
   },
 });
 
@@ -474,7 +478,7 @@ UI.ViewManager.registerViewExtension({
   persistence: UI.ViewManager.ViewPersistence.PERMANENT,
   async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesNavigator.SnippetsNavigatorView.instance();
+    return new Sources.SourcesNavigator.SnippetsNavigatorView();
   },
 });
 
@@ -487,7 +491,7 @@ UI.ViewManager.registerViewExtension({
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SearchSourcesView.SearchSourcesView.instance();
+    return new Sources.SearchSourcesView.SearchSourcesView();
   },
 });
 
@@ -500,7 +504,7 @@ UI.ViewManager.registerViewExtension({
   order: 1000,
   async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.SourcesPanel.WrapperView.instance();
+    return new Sources.SourcesPanel.QuickSourceView();
   },
 });
 
@@ -512,7 +516,7 @@ UI.ViewManager.registerViewExtension({
   condition: Root.Runtime.ConditionName.NOT_SOURCES_HIDE_ADD_FOLDER,
   async loadView() {
     const Sources = await loadSourcesModule();
-    return Sources.ThreadsSidebarPane.ThreadsSidebarPane.instance();
+    return new Sources.ThreadsSidebarPane.ThreadsSidebarPane();
   },
 });
 
@@ -1352,6 +1356,19 @@ UI.ActionRegistration.registerActionExtension({
 });
 
 UI.ActionRegistration.registerActionExtension({
+  actionId: 'sources.reveal-in-navigator-sidebar',
+  category: UI.ActionRegistration.ActionCategory.SOURCES,
+  title: i18nLazyString(UIStrings.revealActiveFileInSidebar),
+  async loadActionDelegate() {
+    const Sources = await loadSourcesModule();
+    return new Sources.SourcesPanel.ActionDelegate();
+  },
+  contextTypes() {
+    return maybeRetrieveContextTypes(Sources => [Sources.SourcesView.SourcesView]);
+  },
+});
+
+UI.ActionRegistration.registerActionExtension({
   actionId: 'sources.toggle-navigator-sidebar',
   category: UI.ActionRegistration.ActionCategory.SOURCES,
   title: i18nLazyString(UIStrings.toggleNavigatorSidebar),
@@ -1768,19 +1785,6 @@ UI.ContextMenu.registerProvider({
   experiment: undefined,
 });
 
-UI.ContextMenu.registerProvider({
-  async loadProvider() {
-    const Sources = await loadSourcesModule();
-    return new Sources.ScopeChainSidebarPane.OpenLinearMemoryInspector();
-  },
-  experiment: undefined,
-  contextTypes() {
-    return [
-      ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement,
-    ];
-  },
-});
-
 Common.Revealer.registerRevealer({
   contextTypes() {
     return [
@@ -1856,6 +1860,17 @@ Common.Revealer.registerRevealer({
   async loadRevealer() {
     const Sources = await loadSourcesModule();
     return new Sources.DebuggerPlugin.BreakpointLocationRevealer();
+  },
+});
+
+Common.Revealer.registerRevealer({
+  contextTypes() {
+    return maybeRetrieveContextTypes(Sources => [Sources.SearchSourcesView.SearchSources]);
+  },
+  destination: undefined,
+  async loadRevealer() {
+    const Sources = await loadSourcesModule();
+    return new Sources.SearchSourcesView.Revealer();
   },
 });
 

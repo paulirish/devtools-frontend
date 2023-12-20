@@ -554,6 +554,7 @@ experimental domain Audits
       Script
       ServiceWorker
       SharedWorker
+      SpeculationRules
       Stylesheet
       Track
       Video
@@ -1082,6 +1083,8 @@ experimental domain Autofill
       string autofillType
       # The filling strategy
       FillingStrategy fillingStrategy
+      # The form field's DOM node
+      DOM.BackendNodeId fieldId
 
   # Emitted when an address form is filled.
   event addressFormFilled
@@ -3916,6 +3919,13 @@ domain Emulation
       # A display feature that only splits content will have a 0 mask_length.
       integer maskLength
 
+  type DevicePosture extends object
+    properties
+      # Current posture of the device
+      enum type
+        continuous
+        folded
+
   type MediaFeature extends object
     properties
       string name
@@ -4073,6 +4083,9 @@ domain Emulation
       # If set, the display feature of a multi-segment screen. If not set, multi-segment support
       # is turned-off.
       experimental optional DisplayFeature displayFeature
+      # If set, the posture of a foldable device. If not set the posture is set
+      # to continuous.
+      experimental optional DevicePosture devicePosture
 
   experimental command setScrollbarsHidden
     parameters
@@ -6454,6 +6467,18 @@ domain Network
       integer dataLength
       # Actual bytes received (might be less than dataLength for compressed encodings).
       integer encodedDataLength
+      # Data that was received.
+      experimental optional binary data
+
+  # Enables streaming of the response for the given requestId.
+  # If enabled, the dataReceived event contains the data that was received during streaming.
+  experimental command streamResourceContent
+    parameters
+      # Identifier of the request to stream.
+      RequestId requestId
+    returns
+      # Data that has been buffered until streaming is enabled.
+      binary bufferedData
 
   # Fired when EventSource message is received.
   event eventSourceMessageReceived
@@ -7651,6 +7676,7 @@ domain Page
       sync-xhr
       unload
       usb
+      usb-unrestricted
       vertical-scroll
       web-printing
       web-share
@@ -11102,6 +11128,14 @@ experimental domain WebAuthn
       # Sets whether User Verification succeeds or fails for an authenticator.
       # Defaults to false.
       optional boolean isUserVerified
+      # Credentials created by this authenticator will have the backup
+      # eligibility (BE) flag set to this value. Defaults to false.
+      # https://w3c.github.io/webauthn/#sctn-credential-backup
+      optional boolean defaultBackupEligibility
+      # Credentials created by this authenticator will have the backup state
+      # (BS) flag set to this value. Defaults to false.
+      # https://w3c.github.io/webauthn/#sctn-credential-backup
+      optional boolean defaultBackupState
 
   type Credential extends object
     properties
@@ -11557,7 +11591,8 @@ experimental domain Preload
       PrefetchFailedNetError
       PrefetchFailedNon2XX
       PrefetchFailedPerPageLimitExceeded
-      PrefetchEvicted
+      PrefetchEvictedAfterCandidateRemoved
+      PrefetchEvictedForNewerPrefetch
       PrefetchHeldback
       # A previous prefetch to the origin got a HTTP 503 response with an
       # Retry-After header that has no elapsed yet.
@@ -11636,11 +11671,14 @@ experimental domain FedCm
       AccountChooser
       AutoReauthn
       ConfirmIdpLogin
+      Error
 
   # The buttons on the FedCM dialog.
   type DialogButton extends string
     enum
       ConfirmIdpLoginContinue
+      ErrorGotIt
+      ErrorMoreDetails
 
   # Corresponds to IdentityRequestAccount
   type Account extends object
@@ -11666,6 +11704,12 @@ experimental domain FedCm
       # RP context was used appropriately.
       string title
       optional string subtitle
+
+  # Triggered when a dialog is closed, either by user action, JS abort,
+  # or a command below.
+  event dialogClosed
+    parameters
+      string dialogId
 
   command enable
     parameters

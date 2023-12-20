@@ -34,6 +34,7 @@
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {SuggestBox, type SuggestBoxDelegate, type Suggestion} from './SuggestBox.js';
@@ -69,6 +70,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
   private oldTabIndex?: number;
   private completeTimeout?: number;
   private disableDefaultSuggestionForEmptyInputInternal?: boolean;
+  jslogContext: string|undefined = undefined;
 
   constructor() {
     super();
@@ -140,6 +142,11 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
       element.parentElement.insertBefore(this.proxyElement, element);
     }
     this.contentElement.appendChild(element);
+    let jslog = VisualLogging.textField().track({keydown: true});
+    if (this.jslogContext) {
+      jslog = jslog.context(this.jslogContext);
+    }
+    this.elementInternal.setAttribute('jslog', `${jslog}`);
     this.elementInternal.classList.add('text-prompt');
     ARIAUtils.markAsTextBox(this.elementInternal);
     ARIAUtils.setAutocomplete(this.elementInternal, ARIAUtils.AutocompleteInteractionModel.both);
@@ -270,10 +277,6 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
       this.element().removeAttribute('contenteditable');
     }
     this.element().classList.toggle('disabled', !enabled);
-  }
-
-  setJsLog(jslog: string): void {
-    this.element().setAttribute('jslog', jslog);
   }
 
   private removeFromElement(): void {

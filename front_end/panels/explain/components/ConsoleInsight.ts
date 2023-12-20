@@ -302,7 +302,7 @@ export class ConsoleInsight extends HTMLElement {
       return null;
     }
 
-    const popoverInitiatedViaKeyboard = this.#popoverInitiatedViaKeyboard;
+    const trapFocus = this.#popoverInitiatedViaKeyboard || event.type !== 'mousemove';
 
     return {
       box: hoveredNode.boxInWindow(),
@@ -320,7 +320,7 @@ export class ConsoleInsight extends HTMLElement {
         container.tabIndex = -1;
         container.role = 'dialog';
 
-        if (popoverInitiatedViaKeyboard) {
+        if (trapFocus) {
           container.addEventListener('keydown', event => {
             const keyboardEvent = event as KeyboardEvent;
 
@@ -339,6 +339,7 @@ export class ConsoleInsight extends HTMLElement {
                 }
               }
             } else if (keyboardEvent.key === 'Escape') {
+              event.consume(true);
               // Restore focus to the info icon.
               this.#popover.hidePopover();
               (this.#shadow.querySelector('.info') as HTMLElement)?.focus();
@@ -365,7 +366,7 @@ export class ConsoleInsight extends HTMLElement {
         popover.contentElement.append(container);
         popover.setAnchorBehavior(UI.GlassPane.AnchorBehavior.PreferBottom);
 
-        if (popoverInitiatedViaKeyboard) {
+        if (trapFocus) {
           const origShow = popover.show;
           popover.show = (document: Document): void => {
             origShow.call(popover, document);
@@ -509,10 +510,12 @@ export class ConsoleInsight extends HTMLElement {
     if (event instanceof KeyboardEvent) {
       switch (event.key) {
         case 'Escape':
+          event.consume(true);
           this.#popover.hidePopover();
           break;
         case 'Enter':
         case ' ':
+          event.consume(true);
           this.#popoverInitiatedViaKeyboard = true;
           try {
             event.target?.dispatchEvent(new MouseEvent('mousedown', {

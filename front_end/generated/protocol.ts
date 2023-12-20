@@ -782,6 +782,7 @@ export namespace Audits {
     Script = 'Script',
     ServiceWorker = 'ServiceWorker',
     SharedWorker = 'SharedWorker',
+    SpeculationRules = 'SpeculationRules',
     Stylesheet = 'Stylesheet',
     Track = 'Track',
     Video = 'Video',
@@ -1436,6 +1437,10 @@ export namespace Autofill {
      * The filling strategy
      */
     fillingStrategy: FillingStrategy;
+    /**
+     * The form field's DOM node
+     */
+    fieldId: DOM.BackendNodeId;
   }
 
   export interface TriggerRequest {
@@ -5648,6 +5653,18 @@ export namespace Emulation {
     maskLength: integer;
   }
 
+  export const enum DevicePostureType {
+    Continuous = 'continuous',
+    Folded = 'folded',
+  }
+
+  export interface DevicePosture {
+    /**
+     * Current posture of the device
+     */
+    type: DevicePostureType;
+  }
+
   export interface MediaFeature {
     name: string;
     value: string;
@@ -5842,6 +5859,11 @@ export namespace Emulation {
      * is turned-off.
      */
     displayFeature?: DisplayFeature;
+    /**
+     * If set, the posture of a foldable device. If not set the posture is set
+     * to continuous.
+     */
+    devicePosture?: DevicePosture;
   }
 
   export interface SetScrollbarsHiddenRequest {
@@ -9371,6 +9393,20 @@ export namespace Network {
     userAgentMetadata?: Emulation.UserAgentMetadata;
   }
 
+  export interface StreamResourceContentRequest {
+    /**
+     * Identifier of the request to stream.
+     */
+    requestId: RequestId;
+  }
+
+  export interface StreamResourceContentResponse extends ProtocolResponseWithError {
+    /**
+     * Data that has been buffered until streaming is enabled.
+     */
+    bufferedData: binary;
+  }
+
   export interface GetSecurityIsolationStatusRequest {
     /**
      * If no frameId is provided, the status of the target is provided.
@@ -9429,6 +9465,10 @@ export namespace Network {
      * Actual bytes received (might be less than dataLength for compressed encodings).
      */
     encodedDataLength: integer;
+    /**
+     * Data that was received.
+     */
+    data?: binary;
   }
 
   /**
@@ -11004,6 +11044,7 @@ export namespace Page {
     SyncXhr = 'sync-xhr',
     Unload = 'unload',
     Usb = 'usb',
+    UsbUnrestricted = 'usb-unrestricted',
     VerticalScroll = 'vertical-scroll',
     WebPrinting = 'web-printing',
     WebShare = 'web-share',
@@ -15734,6 +15775,18 @@ export namespace WebAuthn {
      * Defaults to false.
      */
     isUserVerified?: boolean;
+    /**
+     * Credentials created by this authenticator will have the backup
+     * eligibility (BE) flag set to this value. Defaults to false.
+     * https://w3c.github.io/webauthn/#sctn-credential-backup
+     */
+    defaultBackupEligibility?: boolean;
+    /**
+     * Credentials created by this authenticator will have the backup state
+     * (BS) flag set to this value. Defaults to false.
+     * https://w3c.github.io/webauthn/#sctn-credential-backup
+     */
+    defaultBackupState?: boolean;
   }
 
   export interface Credential {
@@ -16241,7 +16294,8 @@ export namespace Preload {
     PrefetchFailedNetError = 'PrefetchFailedNetError',
     PrefetchFailedNon2XX = 'PrefetchFailedNon2XX',
     PrefetchFailedPerPageLimitExceeded = 'PrefetchFailedPerPageLimitExceeded',
-    PrefetchEvicted = 'PrefetchEvicted',
+    PrefetchEvictedAfterCandidateRemoved = 'PrefetchEvictedAfterCandidateRemoved',
+    PrefetchEvictedForNewerPrefetch = 'PrefetchEvictedForNewerPrefetch',
     PrefetchHeldback = 'PrefetchHeldback',
     PrefetchIneligibleRetryAfter = 'PrefetchIneligibleRetryAfter',
     PrefetchIsPrivacyDecoy = 'PrefetchIsPrivacyDecoy',
@@ -16357,6 +16411,7 @@ export namespace FedCm {
     AccountChooser = 'AccountChooser',
     AutoReauthn = 'AutoReauthn',
     ConfirmIdpLogin = 'ConfirmIdpLogin',
+    Error = 'Error',
   }
 
   /**
@@ -16364,6 +16419,8 @@ export namespace FedCm {
    */
   export const enum DialogButton {
     ConfirmIdpLoginContinue = 'ConfirmIdpLoginContinue',
+    ErrorGotIt = 'ErrorGotIt',
+    ErrorMoreDetails = 'ErrorMoreDetails',
   }
 
   /**
@@ -16419,6 +16476,14 @@ export namespace FedCm {
      */
     title: string;
     subtitle?: string;
+  }
+
+  /**
+   * Triggered when a dialog is closed, either by user action, JS abort,
+   * or a command below.
+   */
+  export interface DialogClosedEvent {
+    dialogId: string;
   }
 }
 

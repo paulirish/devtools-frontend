@@ -81,7 +81,6 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/settings/FrameworkIgnoreListSettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let frameworkIgnoreListSettingsTabInstance: FrameworkIgnoreListSettingsTab;
 export class FrameworkIgnoreListSettingsTab extends UI.Widget.VBox implements
     UI.ListWidget.Delegate<Common.Settings.RegExpSettingItem> {
   private readonly list: UI.ListWidget.ListWidget<Common.Settings.RegExpSettingItem>;
@@ -91,7 +90,7 @@ export class FrameworkIgnoreListSettingsTab extends UI.Widget.VBox implements
   constructor() {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.section().context('blackbox')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane().context('blackbox')}`);
 
     const header = this.contentElement.createChild('div', 'header');
     header.textContent = i18nString(UIStrings.frameworkIgnoreList);
@@ -164,15 +163,6 @@ export class FrameworkIgnoreListSettingsTab extends UI.Widget.VBox implements
         ignoreListOptions.classList.add('ignore-listing-disabled');
       }
     }
-  }
-
-  static instance(opts = {forceNew: null}): FrameworkIgnoreListSettingsTab {
-    const {forceNew} = opts;
-    if (!frameworkIgnoreListSettingsTabInstance || forceNew) {
-      frameworkIgnoreListSettingsTabInstance = new FrameworkIgnoreListSettingsTab();
-    }
-
-    return frameworkIgnoreListSettingsTabInstance;
   }
 
   override wasShown(): void {

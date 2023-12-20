@@ -5,7 +5,6 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Root from '../../core/root/root.js';
 import type * as Formatter from '../../models/formatter/formatter.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
@@ -56,8 +55,6 @@ function diffStats(diff: Diff.Diff.DiffArray): string {
   const insertionText = i18nString(UIStrings.sInsertions, {n: insertions});
   return `${insertionText}, ${deletionText}`;
 }
-
-let changesViewInstance: ChangesView;
 
 export class ChangesView extends UI.Widget.VBox {
   private emptyWidget: UI.EmptyWidget.EmptyWidget;
@@ -113,15 +110,6 @@ export class ChangesView extends UI.Widget.VBox {
     this.selectedUISourceCodeChanged();
   }
 
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): ChangesView {
-    const {forceNew} = opts;
-    if (!changesViewInstance || forceNew) {
-      changesViewInstance = new ChangesView();
-    }
-
-    return changesViewInstance;
-  }
-
   private selectedUISourceCodeChanged(): void {
     this.revealUISourceCode(this.changesSidebar.selectedUISourceCode());
     UI.ActionRegistry.ActionRegistry.instance()
@@ -170,8 +158,7 @@ export class ChangesView extends UI.Widget.VBox {
         // Unfortunately, caretRangeFromPoint is broken in shadow
         // roots, which makes determining the character offset more
         // work than justified here.
-        if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.PRECISE_CHANGES) &&
-            this.#selectedSourceCodeFormattedMapping) {
+        if (this.#selectedSourceCodeFormattedMapping) {
           lineNumber = this.#selectedSourceCodeFormattedMapping.formattedToOriginal(lineNumber, 0)[0];
         }
         void Common.Revealer.reveal(this.selectedUISourceCode.uiLocation(lineNumber, 0), false);
@@ -225,9 +212,7 @@ export class ChangesView extends UI.Widget.VBox {
       this.hideDiff(i18nString(UIStrings.binaryData));
       return;
     }
-    const diffResponse = await this.workspaceDiff.requestDiff(
-        uiSourceCode,
-        {shouldFormatDiff: Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.PRECISE_CHANGES)});
+    const diffResponse = await this.workspaceDiff.requestDiff(uiSourceCode, {shouldFormatDiff: true});
     if (this.selectedUISourceCode !== uiSourceCode) {
       return;
     }
@@ -258,22 +243,19 @@ export class ChangesView extends UI.Widget.VBox {
 }
 
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  handleAction(_context: UI.Context.Context, actionId: string): boolean {
+  handleAction(context: UI.Context.Context, actionId: string): boolean {
+    const changesView = context.flavor(ChangesView);
+    if (changesView === null) {
+      return false;
+    }
     switch (actionId) {
       case 'changes.revert':
-        ChangesView.instance().revert();
+        changesView.revert();
         return true;
       case 'changes.copy':
-        void ChangesView.instance().copy();
+        void changesView.copy();
         return true;
     }
     return false;
-  }
-}
-
-export class DiffUILocationRevealer implements Common.Revealer.Revealer<WorkspaceDiff.WorkspaceDiff.DiffUILocation> {
-  async reveal(diffUILocation: WorkspaceDiff.WorkspaceDiff.DiffUILocation, omitFocus?: boolean): Promise<void> {
-    await UI.ViewManager.ViewManager.instance().showView('changes.changes');
-    ChangesView.instance().changesSidebar.selectUISourceCode(diffUILocation.uiSourceCode, omitFocus);
   }
 }
