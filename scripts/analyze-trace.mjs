@@ -11,6 +11,10 @@ import zlib from 'node:zlib';
 
 /** @typedef {import('../front_end/models/trace/trace.ts')} TraceEngine */
 
+// For types... see Connor's manual hack here:
+// https://github.com/GoogleChrome/lighthouse/pull/15703/files#diff-ec7e073cf0e6135d4f2af9bc04fe6100ec0df80ad1686bee2da53871be5f1a7b
+// and https://github.com/GoogleChrome/lighthouse/pull/15703/files#diff-6dab4507247217209f5ab0f6c343ca2b00af1300878abba81fb74d51cdfbedf9
+
 /** @type {TraceEngine} */
 import * as TraceEngine from '../out/Default/gen/trace_engine/trace.mjs';
 
@@ -22,10 +26,9 @@ polyfillDOMRect();
  */
 export async function analyzeTrace(filename) {
   const traceEvents = loadTraceEventsFromFile(filename);
-
-  const processor = TraceEngine.Processor.TraceProcessor.createWithAllHandlers(TraceEngine.Types.Configuration.DEFAULT); // aka `fullTraceEngine`
-  await processor.parse(traceEvents);
-  return processor.data;
+  const model = TraceEngine.TraceModel.Model.createWithAllHandlers(TraceEngine.Types.Configuration.DEFAULT); // aka `fullTraceEngine`
+  await model.parse(traceEvents);
+  return model.traceParsedData();
 }
 
 // If run as CLI, parse the argv trace (or a fallback)
