@@ -44,7 +44,10 @@ import * as TypeScriptUtilities from './typescript-utilities.js';
 import * as UIString from './UIString.js';
 import * as UserVisibleError from './UserVisibleError.js';
 
+
+// The dcheck.js file is generated via generate-dcheck.js. Why? No idea. 
 // export {DCHECK} from './dcheck.js';
+// For ease of esbuild compilation we'll just inline the thing here:
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export function DCHECK(condition: () => boolean, message: string = 'DCHECK'): void {

@@ -2,10 +2,8 @@
 
 set -euo pipefail
 
-# TODO: These paths are very paul-machine specific. soz.
-dtfe=$(realpath "$HOME/chromium-devtools/devtools-frontend")
+dtfe="./$(git rev-parse --show-cdup)"
 standalone="$HOME/code/trace_engine"
-
 
 trace_engine_out="$dtfe/out/Default/gen/trace_engine"
 

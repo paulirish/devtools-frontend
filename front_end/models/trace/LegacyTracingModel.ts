@@ -5,7 +5,6 @@
 // This is what was SDK.TracingModel moved into models/trace to avoid circular dependency issues. Our ultimate goal is to remove this model entirely once the migration to the new model is done
 
 
-
 import * as Helpers from './helpers/helpers.js';
 import {type EventPayload} from './TracingManager.js';
 import * as Types from './types/types.js';

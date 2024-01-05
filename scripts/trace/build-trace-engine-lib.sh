@@ -6,9 +6,8 @@ set -euo pipefail
 # TODO: #
 # - create declaration file i guess? https://esbuild.github.io/content-types/#no-type-system
 
-
-# Sorry. Paul-specific path!
-dtfe=$(realpath "$HOME/chromium-devtools/devtools-frontend")
+# use the git repo root
+dtfe="./$(git rev-parse --show-cdup)"
 trace_engine_out="$dtfe/out/Default/gen/trace_engine"
 
 # set a source-root below to avoid lots of ../ in the sourcemapped paths
