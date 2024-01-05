@@ -26,16 +26,16 @@ See also http://go/btlax
 
 ```sh
 # build bundle with esbuild
-front_end/models/trace/build-trace-engine-lib.sh
+scripts/trace/build-trace-engine-lib.sh
 
 # run
-node scripts/analyze-trace.mjs test/unittests/fixtures/traces/web-dev.json.gz
+node scripts/trace/analyze-trace.mjs test/unittests/fixtures/traces/web-dev.json.gz
 
 # test
-node scripts/test/test-trace-engine.mjs
+node scripts/trace/test/test-trace-engine.mjs
 
 # copy built files to $HOME/code/trace_engine
-front_end/models/trace/copy-build-trace-engine-for-publish.sh
+scripts/trace/copy-build-trace-engine-for-publish.sh
 ```
 
 #### Test and publish

@@ -7,14 +7,18 @@ set -euo pipefail
 # - create declaration file i guess? https://esbuild.github.io/content-types/#no-type-system
 
 
+# Sorry. Paul-specific path!
 dtfe=$(realpath "$HOME/chromium-devtools/devtools-frontend")
 trace_engine_out="$dtfe/out/Default/gen/trace_engine"
+
+# set a source-root below to avoid lots of ../ in the sourcemapped paths
 
 $dtfe/third_party/esbuild/esbuild \
       --outdir=$trace_engine_out \
       --out-extension:.js=.mjs \
       --log-level=info \
       --sourcemap  \
+      --source-root="@trace_engine/x/x/x/x/" \
       --bundle --tree-shaking=true \
       --format=esm \
       --metafile=$trace_engine_out/meta.json \

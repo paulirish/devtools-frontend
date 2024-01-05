@@ -18,11 +18,11 @@ mkdir -p "$standalone/test"
 cp -rp "$dtfe/test/unittests/fixtures/traces/invalid-animation-events.json.gz" "$standalone/test"
 
 # tweak paths for the new location
-cp -rp "$dtfe/scripts/analyze-trace.mjs" "$standalone/analyze-trace.mjs.orig"
+cp -rp "$dtfe/scripts/trace/analyze-trace.mjs" "$standalone/analyze-trace.mjs.orig"
 cat "$standalone/analyze-trace.mjs.orig"        | \
-  sed 's|../out/Default/gen/trace_engine/|./|'     | \
+  sed 's|../../out/Default/gen/trace_engine/|./|'     | \
   sed 's|test/unittests/fixtures/traces/|test/|'  > "$standalone/analyze-trace.mjs"
-cp -rp "$dtfe/scripts/test/test-trace-engine.mjs" "$standalone/test/test-trace-engine.mjs.orig"
+cp -rp "$dtfe/scripts/trace/test/test-trace-engine.mjs" "$standalone/test/test-trace-engine.mjs.orig"
 cat "$standalone/test/test-trace-engine.mjs.orig"  | \
   sed 's|test/unittests/fixtures/traces/|test/|'  > "$standalone/test/test-trace-engine.mjs"
 
