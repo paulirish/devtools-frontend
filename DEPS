@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '2ece0c2ef984598cc159c62801183123d89ab954',
+  'build_revision': '25066035862bdc2f88e49658b2ab9c31bcceaabf',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '77e28252460598b6b7991e223326270cb3178abf',
+  'buildtools_revision': '5e016b7d32822a0cbc3c65162aa9fc2bd021f275',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '007dd45a94b8fe400fb69113f7999fed185cb5c1',
+  'depot_tools_revision': '259976c7483c321c122169d193e150310f4ea609',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '916f43c554c65ebf4ccd896b0f4e2ac99a67c434',
@@ -46,7 +46,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '122.0.6202.0',
+  'chrome': '122.0.6225.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.

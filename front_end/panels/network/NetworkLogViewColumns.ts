@@ -5,12 +5,14 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as SDK from '../../core/sdk/sdk.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import {NetworkRequestNode, type NetworkNode} from './NetworkDataGridNode.js';
+import {type NetworkNode, NetworkRequestNode} from './NetworkDataGridNode.js';
 import {type NetworkLogView} from './NetworkLogView.js';
 import {NetworkManageCustomHeadersView} from './NetworkManageCustomHeadersView.js';
 import {
@@ -177,7 +179,7 @@ export class NetworkLogViewColumns {
   private waterfallScroller!: HTMLElement;
   private waterfallScrollerContent!: HTMLDivElement;
   private waterfallHeaderElement!: HTMLElement;
-  private waterfallColumnSortIcon!: UI.Icon.Icon;
+  private waterfallColumnSortIcon!: IconButton.Icon.Icon;
   private activeWaterfallSortId!: string;
   private popoverHelper?: UI.PopoverHelper.PopoverHelper;
   private hasScrollerTouchStarted?: boolean;
@@ -415,13 +417,16 @@ export class NetworkLogViewColumns {
   private createWaterfallHeader(): void {
     this.waterfallHeaderElement =
         (this.waterfallColumn.contentElement.createChild('div', 'network-waterfall-header') as HTMLElement);
+    this.waterfallHeaderElement.setAttribute(
+        'jslog', `${VisualLogging.tableHeader().track({click: true}).context('waterfall')}`);
     this.waterfallHeaderElement.addEventListener('click', waterfallHeaderClicked.bind(this));
     this.waterfallHeaderElement.addEventListener(
         'contextmenu', event => this.innerHeaderContextMenu(new UI.ContextMenu.ContextMenu(event)));
     this.waterfallHeaderElement.createChild('div', 'hover-layer');
     const innerElement = this.waterfallHeaderElement.createChild('div');
     innerElement.textContent = i18nString(UIStrings.waterfall);
-    this.waterfallColumnSortIcon = UI.Icon.Icon.create('', 'sort-order-icon');
+    this.waterfallColumnSortIcon = new IconButton.Icon.Icon();
+    this.waterfallColumnSortIcon.className = 'sort-order-icon';
     this.waterfallHeaderElement.createChild('div', 'sort-order-icon-container')
         .appendChild(this.waterfallColumnSortIcon);
 
@@ -485,10 +490,11 @@ export class NetworkLogViewColumns {
     this.waterfallRequestsAreStale = true;
     if (columnId === 'waterfall') {
       if (this.dataGridInternal.sortOrder() === DataGrid.DataGrid.Order.Ascending) {
-        this.waterfallColumnSortIcon.setIconType('triangle-up');
+        this.waterfallColumnSortIcon.name = 'triangle-up';
       } else {
-        this.waterfallColumnSortIcon.setIconType('triangle-down');
+        this.waterfallColumnSortIcon.name = 'triangle-down';
       }
+      this.waterfallColumnSortIcon.hidden = false;
 
       const sortFunction =
           (NetworkRequestNode.RequestPropertyComparator.bind(null, this.activeWaterfallSortId) as
@@ -498,7 +504,8 @@ export class NetworkLogViewColumns {
       this.dataGridSortedForTest();
       return;
     }
-    this.waterfallColumnSortIcon.setIconType('');
+    this.waterfallColumnSortIcon.hidden = true;
+    this.waterfallColumnSortIcon.name = null;
 
     const columnConfig = this.columns.find(columnConfig => columnConfig.id === columnId);
     if (!columnConfig || !columnConfig.sortingFunction) {

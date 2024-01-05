@@ -52,6 +52,7 @@ import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {
   Events,
@@ -261,6 +262,10 @@ const UIStrings = {
    */
   copy: 'Copy',
   /**
+   *@description A context menu command in the Network panel, for copying the URL of the selected request to the clipboard.
+   */
+  copyURL: 'Copy URL',
+  /**
    *@description Text in Network Log View of the Network panel
    */
   copyRequestHeaders: 'Copy request headers',
@@ -292,7 +297,7 @@ const UIStrings = {
    * request in Node.js, a desktop application/framework. 'Node.js fetch' is a noun phrase for the
    * type of request that will be copied.
    */
-  copyAsNodejsFetch: 'Copy as `Node.js` `fetch`',
+  copyAsNodejsFetch: 'Copy as `fetch` (`Node.js`)',
   /**
    *@description Text in Network Log View of the Network panel. An action that copies a command to
    *the clipboard. It will copy the command in the format compatible with cURL (a program, not
@@ -304,6 +309,10 @@ const UIStrings = {
    *the clipboard. It will copy the command in the format compatible with a Bash script.
    */
   copyAsCurlBash: 'Copy as `cURL` (`bash`)',
+  /**
+   *@description A context menu command in the Network panel, for copying the URLs of all requestes to the clipboard.
+   */
+  copyAllURLs: 'Copy all URLs',
   /**
    *@description Text in Network Log View of the Network panel. An action that copies a command to
    *the clipboard. It will copy the command in the format compatible with a PowerShell script.
@@ -320,7 +329,7 @@ const UIStrings = {
    *the clipboard. It will copy the command in the format compatible with a Node.js 'fetch' command
    *(fetch and Node.js should not be translated).
    */
-  copyAllAsNodejsFetch: 'Copy all as `Node.js` `fetch`',
+  copyAllAsNodejsFetch: 'Copy all as `fetch` (`Node.js`)',
   /**
    *@description Text in Network Log View of the Network panel. An action that copies a command to
    *the clipboard. It will copy the command in the format compatible with cURL (a program, not
@@ -1663,25 +1672,25 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   handleContextMenuForRequest(contextMenu: UI.ContextMenu.ContextMenu, request: SDK.NetworkRequest.NetworkRequest):
       void {
     contextMenu.appendApplicableItems(request);
-    let copyMenu = contextMenu.clipboardSection().appendSubMenuItem(i18nString(UIStrings.copy));
-    const footerSection = copyMenu.footerSection();
+    const copyMenu = contextMenu.clipboardSection().appendSubMenuItem(i18nString(UIStrings.copy));
     if (request) {
       copyMenu.defaultSection().appendItem(
-          UI.UIUtils.copyLinkAddressLabel(),
+          i18nString(UIStrings.copyURL),
           Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
               Host.InspectorFrontendHost.InspectorFrontendHostInstance, request.contentURL()));
+      copyMenu.footerSection().appendItem(i18nString(UIStrings.copyAllURLs), this.copyAllURLs.bind(this));
       if (request.requestHeadersText()) {
-        copyMenu.defaultSection().appendItem(
+        copyMenu.saveSection().appendItem(
             i18nString(UIStrings.copyRequestHeaders), NetworkLogView.copyRequestHeaders.bind(null, request));
       }
 
       if (request.responseHeadersText) {
-        copyMenu.defaultSection().appendItem(
+        copyMenu.saveSection().appendItem(
             i18nString(UIStrings.copyResponseHeaders), NetworkLogView.copyResponseHeaders.bind(null, request));
       }
 
       if (request.finished) {
-        copyMenu.defaultSection().appendItem(
+        copyMenu.saveSection().appendItem(
             i18nString(UIStrings.copyResponse), NetworkLogView.copyResponse.bind(null, request));
       }
 
@@ -1695,7 +1704,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
           // any callFrames, but its parent frames do.
           const stackTraceText = computeStackTraceText(stack);
           if (stackTraceText !== '') {
-            copyMenu.defaultSection().appendItem(i18nString(UIStrings.copyStacktrace), () => {
+            copyMenu.saveSection().appendItem(i18nString(UIStrings.copyStacktrace), () => {
               Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(stackTraceText);
             });
           }
@@ -1704,52 +1713,44 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
       const disableIfBlob = request.isBlobRequest();
       if (Host.Platform.isWin()) {
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request),
-            {disabled: disableIfBlob});
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
-            {disabled: disableIfBlob});
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NodeJs),
-            {disabled: disableIfBlob});
-        footerSection.appendItem(
+        copyMenu.defaultSection().appendItem(
             i18nString(UIStrings.copyAsCurlCmd), this.copyCurlCommand.bind(this, request, 'win'),
             {disabled: disableIfBlob});
-        footerSection.appendItem(
+        copyMenu.defaultSection().appendItem(
             i18nString(UIStrings.copyAsCurlBash), this.copyCurlCommand.bind(this, request, 'unix'),
             {disabled: disableIfBlob});
-        footerSection.appendItem(i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAllAsNodejsFetch), this.copyAllFetchCall.bind(this, FetchStyle.NodeJs));
-        footerSection.appendItem(i18nString(UIStrings.copyAllAsCurlCmd), this.copyAllCurlCommand.bind(this, 'win'));
-        footerSection.appendItem(i18nString(UIStrings.copyAllAsCurlBash), this.copyAllCurlCommand.bind(this, 'unix'));
       } else {
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request),
-            {disabled: disableIfBlob});
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
-            {disabled: disableIfBlob});
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NodeJs),
-            {disabled: disableIfBlob});
-        footerSection.appendItem(
+        copyMenu.defaultSection().appendItem(
             i18nString(UIStrings.copyAsCurl), this.copyCurlCommand.bind(this, request, 'unix'),
             {disabled: disableIfBlob});
-        footerSection.appendItem(i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
-        footerSection.appendItem(
-            i18nString(UIStrings.copyAllAsNodejsFetch), this.copyAllFetchCall.bind(this, FetchStyle.NodeJs));
-        footerSection.appendItem(i18nString(UIStrings.copyAllAsCurl), this.copyAllCurlCommand.bind(this, 'unix'));
       }
-    } else {
-      copyMenu = contextMenu.clipboardSection().appendSubMenuItem(i18nString(UIStrings.copy));
+      copyMenu.defaultSection().appendItem(
+          i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request),
+          {disabled: disableIfBlob});
+      copyMenu.defaultSection().appendItem(
+          i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
+          {disabled: disableIfBlob});
+      copyMenu.defaultSection().appendItem(
+          i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NodeJs),
+          {disabled: disableIfBlob});
+
+      if (Host.Platform.isWin()) {
+        copyMenu.footerSection().appendItem(
+            i18nString(UIStrings.copyAllAsCurlCmd), this.copyAllCurlCommand.bind(this, 'win'));
+        copyMenu.footerSection().appendItem(
+            i18nString(UIStrings.copyAllAsCurlBash), this.copyAllCurlCommand.bind(this, 'unix'));
+      } else {
+        copyMenu.footerSection().appendItem(
+            i18nString(UIStrings.copyAllAsCurl), this.copyAllCurlCommand.bind(this, 'unix'));
+      }
+      copyMenu.footerSection().appendItem(
+          i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
+      copyMenu.footerSection().appendItem(
+          i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
+      copyMenu.footerSection().appendItem(
+          i18nString(UIStrings.copyAllAsNodejsFetch), this.copyAllFetchCall.bind(this, FetchStyle.NodeJs));
     }
-    footerSection.appendItem(i18nString(UIStrings.copyAllAsHar), this.copyAll.bind(this));
+    copyMenu.footerSection().appendItem(i18nString(UIStrings.copyAllAsHar), this.copyAllAsHAR.bind(this));
 
     contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAllAsHarWithContent), this.exportAll.bind(this));
     contextMenu.overrideSection().appendItem(
@@ -1814,9 +1815,15 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         });
   }
 
-  private async copyAll(): Promise<void> {
+  private async copyAllAsHAR(): Promise<void> {
     const harArchive = {log: await HAR.Log.Log.build(this.harRequests())};
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(JSON.stringify(harArchive, null, 2));
+  }
+
+  private copyAllURLs(): void {
+    const nonBlobRequests = this.filterOutBlobRequests(Logs.NetworkLog.NetworkLog.instance().requests());
+    const urls = nonBlobRequests.map(request => request.url());
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(urls.join('\n'));
   }
 
   private async copyCurlCommand(request: SDK.NetworkRequest.NetworkRequest, platform: 'unix'|'win'): Promise<void> {
@@ -2565,6 +2572,8 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
     this.filterChanged = filterChangedCallback;
 
     this.filterElement = document.createElement('div');
+    this.filterElement.setAttribute(
+        'jslog', `${VisualLogging.dropDown().track({click: true}).context('request-types')}`);
 
     this.typesCountAdorner = new Adorners.Adorner.Adorner();
     this.selectedTypesCount = document.createElement('span');
@@ -2786,6 +2795,8 @@ export class MoreFiltersDropDownUI extends
 
     this.filterElement = document.createElement('div');
     this.filterElement.setAttribute('aria-label', 'Show only/hide requests dropdown');
+    this.filterElement.setAttribute(
+        'jslog', `${VisualLogging.dropDown().track({click: true}).context('more-filters')}`);
 
     this.activeFiltersCountAdorner = new Adorners.Adorner.Adorner();
     this.activeFiltersCount = document.createElement('span');

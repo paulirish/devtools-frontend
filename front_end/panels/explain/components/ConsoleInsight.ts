@@ -143,6 +143,12 @@ const UIStrings = {
    * additional info when hovered or pressed.
    */
   refineInfo: 'Learn how personalizing of insights works',
+
+  /**
+   * @description Label for screenreaders that is added to the end of the link
+   * title to indicate that the link will be opened in a new tab.
+   */
+  opensInNewTab: '(opens in a new tab)',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/explain/components/ConsoleInsight.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -297,8 +303,7 @@ export class ConsoleInsight extends HTMLElement {
 
   #onPopoverRequest(event: MouseEvent): UI.PopoverHelper.PopoverRequest|null {
     const hoveredNode = event.composedPath()[0] as Element;
-    if (!hoveredNode ||
-        (!hoveredNode?.matches('.info') && !hoveredNode.parentElementOrShadowHost()?.matches('.info'))) {
+    if (!hoveredNode || !hoveredNode.isSelfOrDescendant(this.#shadow.querySelector('.info'))) {
       return null;
     }
 
@@ -574,21 +579,18 @@ export class ConsoleInsight extends HTMLElement {
               >
               ${this.#state.type === State.REFINING ? i18nString(UIStrings.refining) : i18nString(UIStrings.refine)}
             </${Buttons.Button.Button.litTagName}>
-            <${IconButton.Icon.Icon.litTagName}
+            <${Buttons.Button.Button.litTagName}
               class="info"
-              role="button"
-              title=${i18nString(UIStrings.refineInfo)}
-              tabindex="0"
-              @keydown=${this.#onInfoKeyDown}
               .data=${
                 {
+                  variant: Buttons.Button.Variant.ROUND,
+                  size: Buttons.Button.Size.SMALL,
                   iconName: 'info',
-                  color: 'var(--icon-default)',
-                  width: '16px',
-                  height: '16px',
-                } as IconButton.Icon.IconData
-              }>
-            </${IconButton.Icon.Icon.litTagName}>
+                  title: i18nString(UIStrings.refineInfo),
+                } as Buttons.Button.ButtonData
+              }
+              @keydown=${this.#onInfoKeyDown}
+            ></${Buttons.Button.Button.litTagName}>
           </div>
           ` : ''}
         </main>`;
@@ -804,7 +806,7 @@ class ConsoleInsightSourcesList extends HTMLElement {
         ${Directives.repeat(this.#sources, item => item.value, item => {
           const icon = new IconButton.Icon.Icon();
           icon.data = {iconName: 'open-externally', color: 'var(--sys-color-primary)', width: '14px', height: '14px'};
-          return html`<li><x-link class="link" href=${`data:text/plain,${encodeURIComponent(item.value)}`}>${localizeType(item.type)}${icon}</x-link></li>`;
+          return html`<li><x-link class="link" title="${localizeType(item.type)} ${i18nString(UIStrings.opensInNewTab)}" href=${`data:text/plain,${encodeURIComponent(item.value)}`}>${localizeType(item.type)}${icon}</x-link></li>`;
         })}
       </ul>
     `, this.#shadow, {

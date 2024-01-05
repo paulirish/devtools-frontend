@@ -113,8 +113,6 @@ const elementToLongTextMap = new WeakMap<Element, string>();
 
 const nodeToColumnIdMap = new WeakMap<Node, string>();
 
-const elementToSortIconMap = new WeakMap<Element, UI.Icon.Icon>();
-
 const elementToPreferedWidthMap = new WeakMap<Element, number>();
 
 const elementToPositionMap = new WeakMap<Element, number>();
@@ -433,9 +431,9 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (column.sortable) {
       cell.addEventListener('click', this.clickInHeaderCell.bind(this), false);
       cell.classList.add('sortable');
-      const icon = UI.Icon.Icon.create('', 'sort-order-icon');
+      const icon = document.createElement('span');
+      icon.className = 'sort-order-icon';
       cell.createChild('div', 'sort-order-icon-container').appendChild(icon);
-      elementToSortIconMap.set(cell, icon);
     }
   }
 
@@ -1273,11 +1271,6 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.sortColumnCell = cell;
 
     cell.classList.add(sortOrder);
-    const icon = elementToSortIconMap.get(cell);
-    if (!icon) {
-      return;
-    }
-    icon.setIconType(sortOrder === Order.Ascending ? 'triangle-up' : 'triangle-down');
 
     this.dispatchEventToListeners(Events.SortingChanged);
   }

@@ -130,7 +130,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   private expandedDueToFilter: boolean;
   valueElement: HTMLElement|null;
   nameElement: HTMLElement|null;
-  private expandElement: UI.Icon.Icon|null;
+  private expandElement: IconButton.Icon.Icon|null;
   private originalPropertyText: string;
   private hasBeenEditedIncrementally: boolean;
   private prompt: CSSPropertyPrompt|null;
@@ -958,9 +958,9 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
     if (this.expanded) {
-      this.expandElement.setIconType('triangle-down');
+      this.expandElement.name = 'triangle-down';
     } else {
-      this.expandElement.setIconType('triangle-right');
+      this.expandElement.name = 'triangle-right';
     }
   }
 
@@ -997,7 +997,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   private innerUpdateTitle(): void {
     this.updateState();
     if (this.isExpandable()) {
-      this.expandElement = UI.Icon.Icon.create('triangle-right', 'expand-icon');
+      this.expandElement = IconButton.Icon.create('triangle-right', 'expand-icon');
       this.expandElement.setAttribute('jslog', `${VisualLogging.treeItemExpand().track({click: true})}`);
     }
 
@@ -1125,7 +1125,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
             enabledCheckboxElement, `${this.nameElement.textContent} ${this.valueElement.textContent}`);
       }
 
-      const copyIcon = UI.Icon.Icon.create('copy', 'copy');
+      const copyIcon = IconButton.Icon.create('copy', 'copy');
       UI.Tooltip.Tooltip.install(copyIcon, i18nString(UIStrings.copyDeclaration));
       copyIcon.addEventListener('click', () => {
         const propertyText = `${this.property.name}: ${this.property.value};`;
