@@ -71,6 +71,11 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
 
   for (let i = 0; i < entries.length; i++) {
     const event = entries[i];
+
+
+    if (event.cat === 'flowy') { console.log('in tree', event) }
+
+
     // If the current event should not be part of the tree, then simply proceed
     // with the next event.
     if (options && !options.filter.has(event.name as Types.TraceEvents.KnownEventName)) {

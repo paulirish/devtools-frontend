@@ -524,6 +524,7 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
     }
     this.detailsView.detachChildWidgets();
     this.detailsView.element.removeChildren();
+    console.log({selectedNode})
     if (selectedNode && this.showDetailsForNode(selectedNode)) {
       return;
     }

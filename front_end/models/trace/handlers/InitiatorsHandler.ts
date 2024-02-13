@@ -35,6 +35,7 @@ const initiatorToEventsMap = new Map<Types.TraceEvents.TraceEventData, Types.Tra
 const requestAnimationFrameEventsById: Map<number, Types.TraceEvents.TraceEventRequestAnimationFrame> = new Map();
 const timerInstallEventsById: Map<number, Types.TraceEvents.TraceEventTimerInstall> = new Map();
 const requestIdleCallbackEventsById: Map<number, Types.TraceEvents.TraceEventRequestIdleCallback> = new Map();
+const flowStartById: Map<number, Types.TraceEvents.TraceEventData> = new Map();
 const webSocketCreateEventsById: Map<number, Types.TraceEvents.TraceEventWebSocketCreate> = new Map();
 
 export function reset(): void {
@@ -46,6 +47,7 @@ export function reset(): void {
   initiatorToEventsMap.clear();
   requestAnimationFrameEventsById.clear();
   requestIdleCallbackEventsById.clear();
+  flowStartById.clear();
   webSocketCreateEventsById.clear();
 
   handlerState = HandlerState.UNINITIALIZED;
@@ -90,6 +92,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
       }
     }
   } else if (Types.TraceEvents.isTraceEventInvalidateLayout(event)) {
+    return; // skip this for now.
     // By default, the InvalidateLayout event is what triggered the layout invalidation for this frame.
     let invalidationInitiator: Types.TraceEvents.TraceEventData = event;
 
@@ -175,6 +178,18 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
         initiator: matchingCreateEvent,
       });
     }
+  } else if (event.ph === Types.TraceEvents.Phase.FLOW_START) {
+    // eg {"args":{},"cat":"flowy","id":24418,"name":"DoStuff","ph":"s","pid":1,"tid":1,"ts":3679},
+    flowStartById.set(event.id, event);
+
+  } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) { // perfetto also needs `bp:e` on this. shrug.
+    // eg {"args":{},"bp":"e","cat":"flowy","id":24418,"name":"DoStuff","ph":"f","pid":1,"tid":2,"ts":3681},
+    const matchingStartEvent = flowStartById.get(event.id);
+     storeInitiator({
+        event,
+        initiator: matchingStartEvent,
+      });
+    console.log('got pair', event, matchingStartEvent)
   }
 }
 
