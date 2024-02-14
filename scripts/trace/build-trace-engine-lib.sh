@@ -1,31 +1,34 @@
 #!/usr/bin/env bash
 
-# Note: build devtools first!
-
 set -euo pipefail
 
 DIRNAME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 dtfe="$DIRNAME/../.."
 cd $dtfe
 
-config_dir="./out/Default"
-trace_engine_out="$config_dir/gen/trace_engine"
-rm -rf "$trace_engine_out"
+# Build to its own out folder, so it can have consistent args
+out_dir="./out/TraceEngine"
+dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources layout but that's fine!
 
-mkdir -p "$trace_engine_out/core"
-mkdir -p "$trace_engine_out/models"
-mkdir -p "$trace_engine_out/generated"
+# build devtools first!
+gn --args="is_debug=true" gen -C $out_dir
+autoninja -C $out_dir front_end
 
-cp -r "$config_dir/gen/front_end/models/trace" "$trace_engine_out/models/trace"
-cp -r "$config_dir/gen/front_end/models/cpu_profile" "$trace_engine_out/models/cpu_profile"
-cp -r "$config_dir/gen/front_end/core/platform" "$trace_engine_out/core/platform"
-cp "$config_dir/gen/front_end/generated/protocol.js" "$trace_engine_out/generated/protocol.js"
-cp "$config_dir/gen/front_end/generated/protocol.d.ts" "$trace_engine_out/generated/protocol.d.ts"
-cp ./front_end/models/trace/package-template.json "$trace_engine_out/package.json"
+rm -rf "$dist"
+mkdir -p "$dist/core"
+mkdir -p "$dist/models"
+mkdir -p "$dist/generated"
 
-echo 'export {};' > $trace_engine_out/models/trace/extras/extras.js
-echo 'export {};' > $trace_engine_out/models/trace/extras/extras.d.ts
-echo 'export {};' > $trace_engine_out/models/trace/TracingManager.js
-echo 'export {};' > $trace_engine_out/models/trace/TracingManager.d.ts
-echo 'export {};' > $trace_engine_out/models/trace/LegacyTracingModel.js
-echo 'export {};' > $trace_engine_out/models/trace/LegacyTracingModel.d.ts
+cp -r "$out_dir/gen/front_end/models/trace" "$dist/models/trace"
+cp -r "$out_dir/gen/front_end/models/cpu_profile" "$dist/models/cpu_profile"
+cp -r "$out_dir/gen/front_end/core/platform" "$dist/core/platform"
+cp "$out_dir/gen/front_end/generated/protocol.js" "$dist/generated/protocol.js"
+cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.ts"
+cp ./front_end/models/trace/package-template.json "$dist/package.json"
+
+echo 'export {};' > $dist/models/trace/extras/extras.js
+echo 'export {};' > $dist/models/trace/extras/extras.d.ts
+echo 'export {};' > $dist/models/trace/TracingManager.js
+echo 'export {};' > $dist/models/trace/TracingManager.d.ts
+echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
+echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts

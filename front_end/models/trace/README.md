@@ -25,7 +25,7 @@ See also http://go/btlax
 #### Build, run, extract
 
 ```sh
-# build bundle with esbuild
+# Build devtools and prep a package
 scripts/trace/build-trace-engine-lib.sh
 
 # run

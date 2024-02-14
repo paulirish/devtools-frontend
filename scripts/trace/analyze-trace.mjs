@@ -16,7 +16,7 @@ import zlib from 'node:zlib';
 // and https://github.com/GoogleChrome/lighthouse/pull/15703/files#diff-6dab4507247217209f5ab0f6c343ca2b00af1300878abba81fb74d51cdfbedf9
 
 /** @type {TraceEngine} */
-import * as TraceEngine from '../../out/Default/gen/trace_engine/models/trace/trace.js';
+import * as TraceEngine from '../../out/TraceEngine/dist/models/trace/trace.js';
 
 polyfillDOMRect();
 
