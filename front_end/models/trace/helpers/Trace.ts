@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Types from '../types/types.js';
 import * as Platform from '../../../core/platform/platform.js';
 import type * as CPUProfile from '../../cpu_profile/cpu_profile.js';
+import * as Types from '../types/types.js';
 
 type MatchedPairType<T extends Types.TraceEvents.TraceEventPairableAsync> = Types.TraceEvents.SyntheticEventPair<T>;
 export function stackTraceForEvent(event: Types.TraceEvents.TraceEventData): Types.TraceEvents.TraceEventCallFrame[]|

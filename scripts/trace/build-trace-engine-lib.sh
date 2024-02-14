@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
 
+# Note: build devtools first!
+
 set -euo pipefail
 
-#########
-# TODO: #
-# - create declaration file i guess? https://esbuild.github.io/content-types/#no-type-system
+DIRNAME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+dtfe="$DIRNAME/../.."
+cd $dtfe
 
-# use the git repo root
-dtfe="./$(git rev-parse --show-cdup)"
-trace_engine_out="$dtfe/out/Default/gen/trace_engine"
+config_dir="./out/Default"
+trace_engine_out="$config_dir/gen/trace_engine"
+rm -rf "$trace_engine_out"
 
-# set a source-root below to avoid lots of ../ in the sourcemapped paths
+mkdir -p "$trace_engine_out/core"
+mkdir -p "$trace_engine_out/models"
 
-$dtfe/third_party/esbuild/esbuild \
-      --outdir=$trace_engine_out \
-      --out-extension:.js=.mjs \
-      --log-level=info \
-      --sourcemap  \
-      --source-root="@trace_engine/x/x/x/x/" \
-      --bundle --tree-shaking=true \
-      --format=esm \
-      --metafile=$trace_engine_out/meta.json \
-      --external:"*TracingManager.js" --external:"*extras.js" \
-      $dtfe/front_end/models/trace/trace.ts
+cp -r "$config_dir/gen/front_end/models/trace" "$trace_engine_out/models/trace"
+cp -r "$config_dir/gen/front_end/models/cpu_profile" "$trace_engine_out/models/cpu_profile"
+cp -r "$config_dir/gen/front_end/core/platform" "$trace_engine_out/core/platform"
+cp ./front_end/models/trace/package-template.json "$trace_engine_out/package.json"
 
-# Stub out some dependencies that need to be present but can be empty
-touch $trace_engine_out/TracingManager.js
-
-mkdir -p $trace_engine_out/extras/
-touch $trace_engine_out/extras/extras.js
+python3 - << EOF
+from pathlib import Path
+path = Path('$trace_engine_out/models/trace/trace.js')
+code = path.read_text()
+code = code.replace("import * as Extras from './extras/extras.js'", "const Extras = {}")
+code = code.replace("import * as TracingManager from './TracingManager.js'", "const TracingManager = {}")
+path.write_text(code)
+EOF

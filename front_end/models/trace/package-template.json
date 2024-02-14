@@ -2,7 +2,7 @@
   "name": "@paulirish/trace_engine",
   "version": "0.0.1",
   "description": "",
-  "main": "trace.mjs",
+  "main": "models/trace/trace.js",
   "scripts": {
     "test": "node test/test-trace-engine.mjs",
     "prepublishOnly": "npm test"

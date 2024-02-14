@@ -214,7 +214,6 @@ def runEsbuild(opts):
     cmd += opts.sources
 
     logging.info('runEsbuild: %s', ' '.join(cmd))
-    print('runEsbuild: %s', ' '.join(cmd))
     p = subprocess.run(cmd)
     return p.returncode
 
