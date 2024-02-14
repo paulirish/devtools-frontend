@@ -9,7 +9,9 @@ export interface AidaRequest {
   input: string;
   client: string;
   options?: {
-    temperature: Number,
+    temperature?: Number,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    model_id?: string,
   };
 }
 
@@ -21,7 +23,13 @@ export class InsightProvider {
     };
     const temperature = parseFloat(Root.Runtime.Runtime.queryParam('aidaTemperature') || '');
     if (!isNaN(temperature)) {
-      request.options = {temperature};
+      request.options ??= {};
+      request.options.temperature = temperature;
+    }
+    const modelId = Root.Runtime.Runtime.queryParam('aidaModelId');
+    if (modelId) {
+      request.options ??= {};
+      request.options.model_id = modelId;
     }
     return request;
   }
@@ -38,25 +46,36 @@ export class InsightProvider {
             console.timeEnd('request');
             try {
               const results = JSON.parse(result.response);
-              const text = results
-                               .map(
-                                   (
-                                       result:|{textChunk: {text: string}}|{codeChunk: {code: string}},
-                                       ) => {
-                                     if ('textChunk' in result) {
-                                       return result.textChunk.text;
-                                     }
-                                     if ('codeChunk' in result) {
-                                       return '\n`````\n' + result.codeChunk.code + '\n`````\n';
-                                     }
-                                     if ('error' in result) {
-                                       throw new Error(`${result['error']}: ${result['detail']}`);
-                                     }
-                                     throw new Error('Unknown chunk result');
-                                   },
-                                   )
-                               .join('');
-              resolve(text);
+              const text = [];
+              let inCodeChunk = false;
+              const CODE_CHUNK_SEPARATOR = '\n`````\n';
+              for (const result of results) {
+                if ('textChunk' in result) {
+                  if (inCodeChunk) {
+                    text.push(CODE_CHUNK_SEPARATOR);
+                    inCodeChunk = false;
+                  }
+                  text.push(result.textChunk.text);
+                } else if ('codeChunk' in result) {
+                  if (!inCodeChunk) {
+                    text.push(CODE_CHUNK_SEPARATOR);
+                    inCodeChunk = true;
+                  }
+                  text.push(result.codeChunk.code);
+                } else if ('error' in result) {
+                  if (result['detail']?.[0]?.error?.code === 403) {
+                    throw new Error('Server responded: permission denied');
+                  }
+                  throw new Error(`Server responded: ${JSON.stringify(result)}`);
+                } else {
+                  throw new Error('Unknown chunk result');
+                }
+              }
+              if (inCodeChunk) {
+                text.push(CODE_CHUNK_SEPARATOR);
+                inCodeChunk = false;
+              }
+              resolve(text.join(''));
             } catch (err) {
               reject(err);
             }

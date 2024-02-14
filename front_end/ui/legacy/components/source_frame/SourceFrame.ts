@@ -132,6 +132,16 @@ export type EventTypes = {
   [Events.EditorScroll]: void,
 };
 
+type FormatFn = (lineNo: number, state: CodeMirror.EditorState) => string;
+export const LINE_NUMBER_FORMATTER = CodeMirror.Facet.define<FormatFn, FormatFn>({
+  combine(value): FormatFn {
+    if (value.length === 0) {
+      return (lineNo: number) => lineNo.toString();
+    }
+    return value[0];
+  },
+});
+
 export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.View.SimpleView>(
     UI.View.SimpleView) implements UI.SearchableView.Searchable, UI.SearchableView.Replaceable, Transformer {
   private readonly lazyContent: () => Promise<TextUtils.ContentProvider.DeferredContent>;
@@ -178,7 +188,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.prettyInternal = false;
     this.rawContent = null;
     this.formattedMap = null;
-    this.prettyToggle = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.prettyPrint), 'brackets');
+    this.prettyToggle =
+        new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.prettyPrint), 'brackets', undefined, 'pretty-print');
     this.prettyToggle.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
       void this.setPretty(!this.prettyToggle.toggled());
     });
@@ -190,7 +201,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.textEditorInternal = new TextEditor.TextEditor.TextEditor(this.placeholderEditorState(''));
     this.textEditorInternal.style.flexGrow = '1';
     this.element.appendChild(this.textEditorInternal);
-    this.element.addEventListener('keydown', (event: KeyboardEvent): void => {
+    this.element.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.defaultPrevented) {
         event.stopPropagation();
       }
@@ -222,15 +233,15 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.contentSet = false;
 
     this.selfXssWarningDisabledSetting = Common.Settings.Settings.instance().createSetting(
-        'disableSelfXssWarning', false, Common.Settings.SettingStorageType.Synced);
+        'disable-self-xss-warning', false, Common.Settings.SettingStorageType.Synced);
     Common.Settings.Settings.instance()
-        .moduleSetting('textEditorIndent')
+        .moduleSetting('text-editor-indent')
         .addChangeListener(this.#textEditorIndentChanged, this);
   }
 
   override disposeView(): void {
     Common.Settings.Settings.instance()
-        .moduleSetting('textEditorIndent')
+        .moduleSetting('text-editor-indent')
         .removeChangeListener(this.#textEditorIndentChanged, this);
   }
 
@@ -431,13 +442,13 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
       const disassembly = this.wasmDisassemblyInternal;
       const lastBytecodeOffset = disassembly.lineNumberToBytecodeOffset(disassembly.lineNumbers - 1);
       const bytecodeOffsetDigits = lastBytecodeOffset.toString(16).length + 1;
-      formatNumber = (lineNumber: number): string => {
+      formatNumber = (lineNumber: number) => {
         const bytecodeOffset =
             disassembly.lineNumberToBytecodeOffset(Math.min(disassembly.lineNumbers, lineNumber) - 1);
         return `0x${bytecodeOffset.toString(16).padStart(bytecodeOffsetDigits, '0')}`;
       };
     } else if (this.prettyInternal) {
-      formatNumber = (lineNumber: number, state: CodeMirror.EditorState): string => {
+      formatNumber = (lineNumber: number, state: CodeMirror.EditorState) => {
         // @codemirror/view passes a high number here to estimate the
         // maximum width to allocate for the line number gutter.
         if (lineNumber < 2 || lineNumber > state.doc.lines) {
@@ -451,7 +462,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
         return '-';
       };
     }
-    return formatNumber ? CodeMirror.lineNumbers({formatNumber}) : [];
+    return formatNumber ? [CodeMirror.lineNumbers({formatNumber}), LINE_NUMBER_FORMATTER.of(formatNumber)] : [];
   }
 
   private updateLineNumberFormatter(): void {
@@ -571,7 +582,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
         worker.onmessage =
             // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ({data}: MessageEvent<any>): void => {
+            ({data}: MessageEvent<any>) => {
               if ('event' in data) {
                 switch (data.event) {
                   case 'progress':
@@ -885,7 +896,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   private searchResultIndexForCurrentSelection(): number {
     return Platform.ArrayUtilities.lowerBound(
-        this.searchResults, this.textEditor.state.selection.main, (a, b): number => a.to - b.to);
+        this.searchResults, this.textEditor.state.selection.main, (a, b) => a.to - b.to);
   }
 
   jumpToNextSearchResult(): void {
@@ -1056,7 +1067,7 @@ class SearchMatch {
   }
 
   insertPlaceholders(replacement: string): string {
-    return replacement.replace(/\$(\$|&|\d+|<[^>]+>)/g, (_, selector): string => {
+    return replacement.replace(/\$(\$|&|\d+|<[^>]+>)/g, (_, selector) => {
       if (selector === '$') {
         return '$';
       }
@@ -1100,11 +1111,12 @@ export class SelfXssWarningDialog {
       content.appendChild(input);
 
       const buttonsBar = content.createChild('div', 'button');
-      const cancelButton = UI.UIUtils.createTextButton(i18nString(UIStrings.cancel), () => resolve(false));
+      const cancelButton =
+          UI.UIUtils.createTextButton(i18nString(UIStrings.cancel), () => resolve(false), {jslogContext: 'cancel'});
       buttonsBar.appendChild(cancelButton);
       const allowButton = UI.UIUtils.createTextButton(i18nString(UIStrings.allow), () => {
         resolve(input.value === i18nString(UIStrings.allowPasting));
-      }, '', true);
+      }, {jslogContext: 'confirm', primary: true});
       allowButton.disabled = true;
       buttonsBar.appendChild(allowButton);
 
@@ -1142,9 +1154,7 @@ export interface Transformer {
   };
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum DecoratorType {
+export const enum DecoratorType {
   PERFORMANCE = 'performance',
   MEMORY = 'memory',
   COVERAGE = 'coverage',
@@ -1176,8 +1186,8 @@ class ActiveSearch {
   }
 }
 
-const setActiveSearch = CodeMirror.StateEffect.define<ActiveSearch|null>(
-    {map: (value, mapping): ActiveSearch | null => value && value.map(mapping)});
+const setActiveSearch =
+    CodeMirror.StateEffect.define<ActiveSearch|null>({map: (value, mapping) => value && value.map(mapping)});
 
 const activeSearchState = CodeMirror.StateField.define<ActiveSearch|null>({
   create(): null {
@@ -1194,7 +1204,8 @@ const searchMatchDeco = CodeMirror.Decoration.mark({class: 'cm-searchMatch'});
 const currentSearchMatchDeco = CodeMirror.Decoration.mark({class: 'cm-searchMatch cm-searchMatch-selected'});
 
 const searchHighlighter = CodeMirror.ViewPlugin.fromClass(class {
-  decorations: CodeMirror.DecorationSet;
+decorations:
+  CodeMirror.DecorationSet;
 
   constructor(view: CodeMirror.EditorView) {
     this.decorations = this.computeDecorations(view);
@@ -1241,7 +1252,7 @@ const searchHighlighter = CodeMirror.ViewPlugin.fromClass(class {
     }
     return builder.finish();
   }
-}, {decorations: (value): CodeMirror.DecorationSet => value.decorations});
+}, {decorations: value => value.decorations});
 
 const nonBreakableLineMark = new (class extends CodeMirror.GutterMarker {
   override elementClass = 'cm-nonBreakableLine';

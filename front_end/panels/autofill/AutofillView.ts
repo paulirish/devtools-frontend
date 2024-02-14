@@ -57,10 +57,18 @@ const UIStrings = {
    */
   heur: 'heur',
   /**
-   * @description Label for checkbox in the Autofill tab. If checked, this tab will open
+   * @description Label for checkbox in the Autofill panel. If checked, this panel will open
    * automatically whenever a form is being autofilled.
    */
-  autoShow: 'Automatically open tab on autofill',
+  autoShow: 'Open panel on autofill',
+  /**
+   * @description Aria text for the section of the autofill view containing a preview of the autofilled address.
+   */
+  addressPreview: 'Address preview',
+  /**
+   * @description Aria text for the section of the autofill view containing the info about the autofilled form fields.
+   */
+  formInspector: 'Form inspector',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/autofill/AutofillView.ts', UIStrings);
@@ -95,7 +103,8 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged,
         this.#onPrimaryPageChanged, this);
-    this.#autoOpenViewSetting = Common.Settings.Settings.instance().createSetting('autoOpenAutofillViewOnEvent', true);
+    this.#autoOpenViewSetting =
+        Common.Settings.Settings.instance().createSetting('auto-open-autofill-view-on-event', true);
 
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
@@ -130,15 +139,17 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
       LitHtml.render(LitHtml.html`
-        <div class="top-right-corner">
-          <label class="checkbox-label">
-            <input type="checkbox" tabindex=-1 ?checked=${this.#autoOpenViewSetting?.get()} @change=${this.#onAutoOpenCheckboxChanged.bind(this)} jslog=${VisualLogging.toggle().track({ change: true }).context('auto-open')}>
-            <span>${i18nString(UIStrings.autoShow)}</span>
-          </label>
-        </div>
-        <div class="placeholder-container" jslog=${VisualLogging.pane().context('autofill-empty')}>
-          <div class="placeholder">${i18nString(UIStrings.noDataAvailable)}</h1>
-        </div>
+        <main>
+          <div class="top-right-corner">
+            <label class="checkbox-label">
+              <input type="checkbox" tabindex=-1 ?checked=${this.#autoOpenViewSetting?.get()} @change=${this.#onAutoOpenCheckboxChanged.bind(this)} jslog=${VisualLogging.toggle('auto-open').track({ change: true })}>
+              <span>${i18nString(UIStrings.autoShow)}</span>
+            </label>
+          </div>
+          <div class="placeholder-container" jslog=${VisualLogging.pane('autofill-empty')}>
+            <div class="placeholder">${i18nString(UIStrings.noDataAvailable)}</h1>
+          </div>
+        </main>
       `, this.#shadow, {host: this});
       // clang-format on
       return;
@@ -147,18 +158,20 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     LitHtml.render(LitHtml.html`
-      <div class="content-container" jslog=${VisualLogging.pane().context('autofill')}>
-        <div class="right-to-left">
-          <div class="label-container">
-            <label class="checkbox-label">
-              <input type="checkbox" tabindex=-1 ?checked=${this.#autoOpenViewSetting?.get()} @change=${this.#onAutoOpenCheckboxChanged.bind(this)} jslog=${VisualLogging.toggle().track({ change: true }).context('auto-open')}>
-              <span>${i18nString(UIStrings.autoShow)}</span>
-            </label>
+      <main>
+        <div class="content-container" jslog=${VisualLogging.pane('autofill')}>
+          <div class="right-to-left" role="region" aria-label=${i18nString(UIStrings.addressPreview)}>
+            <div class="label-container">
+              <label class="checkbox-label">
+                <input type="checkbox" tabindex=-1 ?checked=${this.#autoOpenViewSetting?.get()} @change=${this.#onAutoOpenCheckboxChanged.bind(this)} jslog=${VisualLogging.toggle('auto-open').track({ change: true })}>
+                <span>${i18nString(UIStrings.autoShow)}</span>
+              </label>
+            </div>
+            ${this.#renderAddress()}
           </div>
-          ${this.#renderAddress()}
+          ${this.#renderFilledFields()}
         </div>
-        ${this.#renderFilledFields()}
-      </div>
+      </main>
     `, this.#shadow, {host: this});
     // clang-format on
   }
@@ -189,7 +202,7 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
       return LitHtml.html`
         <span
           class=${spanClasses}
-          @mouseenter=${(): void => this.#onSpanMouseEnter(startIndex)}
+          @mouseenter=${() => this.#onSpanMouseEnter(startIndex)}
           @mouseleave=${this.#onSpanMouseLeave}
         >${templateLines}</span>`;
     };
@@ -243,7 +256,7 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
           sortable: true,
         },
         {
-          id: 'autofillType',
+          id: 'autofill-type',
           title: i18nString(UIStrings.predictedAutofillValue),
           widthWeighting: 50,
           hideable: false,
@@ -259,7 +272,7 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
           sortable: true,
         },
         {
-          id: 'filledFieldIndex',
+          id: 'filled-field-index',
           title: 'filledFieldIndex',
           widthWeighting: 50,
           hideable: true,
@@ -273,7 +286,7 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return LitHtml.html`
-      <div class="grid-wrapper">
+      <div class="grid-wrapper" role="region" aria-label=${i18nString(UIStrings.formInspector)}>
         <${DataGrid.DataGridController.DataGridController.litTagName}
           @rowmouseenter=${this.#onGridRowMouseEnter}
           @rowmouseleave=${this.#onGridRowMouseLeave}
@@ -324,12 +337,12 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
             cells: [
               {columnId: 'name', value: `${fieldName} (${field.htmlType})`},
               {
-                columnId: 'autofillType',
+                columnId: 'autofill-type',
                 value: field.autofillType,
                 renderer: () => this.#autofillTypeRenderer(field.autofillType, field.fillingStrategy),
               },
               {columnId: 'value', value: `"${field.value}"`},
-              {columnId: 'filledFieldIndex', value: index},
+              {columnId: 'filled-field-index', value: index},
             ],
             styles: {
               'font-family': 'var(--monospace-font-family)',

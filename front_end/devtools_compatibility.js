@@ -319,6 +319,10 @@ const DevToolsAPIImpl = class {
     this._dispatchOnInspectorFrontendAPI('searchCompleted', [requestId, fileSystemPath, files]);
   }
 
+  colorThemeChanged() {
+    this._dispatchOnInspectorFrontendAPI('colorThemeChanged', []);
+  }
+
   /**
    * @param {string} tabId
    */
@@ -420,11 +424,10 @@ const EnumeratedHistogram = {
   Language: 'DevTools.Language',
   LighthouseModeRun: 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed: 'DevTools.LighthouseCategoryUsed',
-  LinearMemoryInspectorRevealedFrom: 'DevTools.LinearMemoryInspector.RevealedFrom',
-  LinearMemoryInspectorTarget: 'DevTools.LinearMemoryInspector.Target',
   ManifestSectionSelected: 'DevTools.ManifestSectionSelected',
   PanelClosed: 'DevTools.PanelClosed',
   PanelShown: 'DevTools.PanelShown',
+  PanelShownInLocation: 'DevTools.PanelShownInLocation',
   RecordingAssertion: 'DevTools.RecordingAssertion',
   RecordingCodeToggled: 'DevTools.RecordingCodeToggled',
   RecordingCopiedToClipboard: 'DevTools.RecordingCopiedToClipboard',
@@ -451,6 +454,12 @@ const EnumeratedHistogram = {
   BadgeActivated: 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
   AnimationPointDragged: 'DevTools.AnimationPointDragged',
+  LegacyResourceTypeFilterNumberOfSelectedChanged: 'DevTools.LegacyResourceTypeFilterNumberOfSelectedChanged',
+  LegacyResourceTypeFilterItemSelected: 'DevTools.LegacyResourceTypeFilterItemSelected',
+  ResourceTypeFilterNumberOfSelectedChanged: 'DevTools.ResourceTypeFilterNumberOfSelectedChanged',
+  ResourceTypeFilterItemSelected: 'DevTools.ResourceTypeFilterItemSelected',
+  NetworkPanelMoreFiltersNumberOfSelectedChanged: 'DevTools.NetworkPanelMoreFiltersNumberOfSelectedChanged',
+  NetworkPanelMoreFiltersItemSelected: 'DevTools.NetworkPanelMoreFiltersItemSelected',
 };
 
 /**
@@ -988,6 +997,14 @@ const InspectorFrontendHostImpl = class {
    */
   recordImpression(impressionEvent) {
     DevToolsAPI.sendMessageToEmbedder('recordImpression', [impressionEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ResizeEvent} resizeEvent
+   */
+  recordResize(resizeEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordResize', [resizeEvent], null);
   }
 
   /**

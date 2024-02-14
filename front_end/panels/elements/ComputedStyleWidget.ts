@@ -48,6 +48,7 @@ import computedStyleSidebarPaneStyles from './computedStyleSidebarPane.css.js';
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
 import {PlatformFontsWidget} from './PlatformFontsWidget.js';
 import {categorizePropertyName, type Category, DefaultCategoryOrder} from './PropertyNameCategories.js';
+import {ColorMatch, ColorMatcher, type RenderingContext} from './PropertyParser.js';
 import {StylePropertiesSection} from './StylePropertiesSection.js';
 import {StylesSidebarPropertyRenderer} from './StylesSidebarPane.js';
 
@@ -114,8 +115,8 @@ function renderPropertyContents(
   if (valueFromCache) {
     return valueFromCache;
   }
-  const renderer = new StylesSidebarPropertyRenderer(null, node, propertyName, propertyValue);
-  renderer.setColorHandler(processColor);
+  const renderer =
+      new StylesSidebarPropertyRenderer(null, node, propertyName, propertyValue, [ColorRenderer.matcher()]);
   const name = renderer.renderName();
   name.slot = 'name';
   const value = renderer.renderValue();
@@ -155,8 +156,8 @@ const createTraceElement =
      linkifier: Components.Linkifier.Linkifier): ElementsComponents.ComputedStyleTrace.ComputedStyleTrace => {
       const trace = new ElementsComponents.ComputedStyleTrace.ComputedStyleTrace();
 
-      const renderer = new StylesSidebarPropertyRenderer(null, node, property.name, (property.value as string));
-      renderer.setColorHandler(processColor);
+      const renderer = new StylesSidebarPropertyRenderer(
+          null, node, property.name, (property.value as string), [ColorRenderer.matcher()]);
       const valueElement = renderer.renderValue();
       valueElement.slot = 'trace-value';
       trace.appendChild(valueElement);
@@ -176,21 +177,29 @@ const createTraceElement =
       return trace;
     };
 
-const processColor = (text: string): Node => {
-  const swatch = new InlineEditor.ColorSwatch.ColorSwatch();
-  swatch.renderColor(text, true);
-  const valueElement = document.createElement('span');
-  valueElement.textContent = swatch.getText();
-  swatch.append(valueElement);
+class ColorRenderer extends ColorMatch {
+  render(_node: unknown, context: RenderingContext): Node[] {
+    const swatch = new InlineEditor.ColorSwatch.ColorSwatch();
+    swatch.setReadonly(true);
+    swatch.renderColor(this.text, true);
+    const valueElement = document.createElement('span');
+    valueElement.textContent = swatch.getText();
+    swatch.append(valueElement);
 
-  swatch.addEventListener(
-      InlineEditor.ColorSwatch.ColorChangedEvent.eventName, (event: InlineEditor.ColorSwatch.ColorChangedEvent) => {
-        const {data} = event;
-        valueElement.textContent = data.text;
-      });
+    swatch.addEventListener(
+        InlineEditor.ColorSwatch.ColorChangedEvent.eventName, (event: InlineEditor.ColorSwatch.ColorChangedEvent) => {
+          const {data} = event;
+          valueElement.textContent = data.text;
+        });
 
-  return swatch;
-};
+    context.addControl('color', swatch);
+    return [swatch];
+  }
+
+  static matcher(): ColorMatcher {
+    return new ColorMatcher(text => new ColorRenderer(text));
+  }
+}
 
 const navigateToSource = (cssProperty: SDK.CSSProperty.CSSProperty, event?: Event): void => {
   if (!event) {
@@ -248,10 +257,10 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
     this.computedStyleModel.addEventListener(Events.ComputedStyleChanged, this.update, this);
 
     this.showInheritedComputedStylePropertiesSetting =
-        Common.Settings.Settings.instance().createSetting('showInheritedComputedStyleProperties', false);
+        Common.Settings.Settings.instance().createSetting('show-inherited-computed-style-properties', false);
     this.showInheritedComputedStylePropertiesSetting.addChangeListener(this.update.bind(this));
 
-    this.groupComputedStylesSetting = Common.Settings.Settings.instance().createSetting('groupComputedStyles', false);
+    this.groupComputedStylesSetting = Common.Settings.Settings.instance().createSetting('group-computed-styles', false);
     this.groupComputedStylesSetting.addChangeListener(() => {
       this.update();
     });
@@ -270,7 +279,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
     toolbar.appendToolbarItem(
         new UI.Toolbar.ToolbarSettingCheckbox(this.groupComputedStylesSetting, undefined, i18nString(UIStrings.group)));
 
-    this.contentElement.setAttribute('jslog', `${VisualLogging.stylesComputedPane()}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane('computed')}`);
     this.noMatchesElement = this.contentElement.createChild('div', 'gray-info-message');
     this.noMatchesElement.textContent = i18nString(UIStrings.noMatchingProperty);
 

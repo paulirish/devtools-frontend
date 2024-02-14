@@ -46,6 +46,7 @@ import type * as TextEditor from '../../ui/components/text_editor/text_editor.js
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AddDebugInfoURLDialog} from './AddSourceMapURLDialog.js';
 import {BreakpointEditDialog, type BreakpointEditDialogResult} from './BreakpointEditDialog.js';
@@ -292,7 +293,7 @@ export class DebuggerPlugin extends Plugin {
     return [
       CodeMirror.EditorView.updateListener.of(update => this.onEditorUpdate(update)),
       CodeMirror.EditorView.domEventHandlers({
-        keydown: (event): boolean => {
+        keydown: event => {
           if (this.onKeyDown(event)) {
             return true;
           }
@@ -331,21 +332,21 @@ export class DebuggerPlugin extends Plugin {
     };
 
     return UI.ShortcutRegistry.ShortcutRegistry.instance().getShortcutListener({
-      'debugger.toggle-breakpoint': async(): Promise<boolean> => {
+      'debugger.toggle-breakpoint': async () => {
         if (this.muted || !this.editor) {
           return false;
         }
         await this.toggleBreakpoint(selectionLine(this.editor), false);
         return true;
       },
-      'debugger.toggle-breakpoint-enabled': async(): Promise<boolean> => {
+      'debugger.toggle-breakpoint-enabled': async () => {
         if (this.muted || !this.editor) {
           return false;
         }
         await this.toggleBreakpoint(selectionLine(this.editor), true);
         return true;
       },
-      'debugger.breakpoint-input-window': async(): Promise<boolean> => {
+      'debugger.breakpoint-input-window': async () => {
         if (this.muted || !this.editor) {
           return false;
         }
@@ -397,7 +398,8 @@ export class DebuggerPlugin extends Plugin {
     void this.callFrameChanged();
 
     this.popoverHelper?.dispose();
-    this.popoverHelper = new UI.PopoverHelper.PopoverHelper(editor, this.getPopoverRequest.bind(this));
+    this.popoverHelper =
+        new UI.PopoverHelper.PopoverHelper(editor, this.getPopoverRequest.bind(this), 'sources.object-properties');
     this.popoverHelper.setDisableOnClick(true);
     this.popoverHelper.setTimeout(250, 250);
     this.popoverHelper.setHasPadding(true);
@@ -580,7 +582,7 @@ export class DebuggerPlugin extends Plugin {
     }
 
     if (this.uiSourceCode.project().type() === Workspace.Workspace.projectTypes.Network &&
-        Common.Settings.Settings.instance().moduleSetting('jsSourceMapsEnabled').get() &&
+        Common.Settings.Settings.instance().moduleSetting('js-source-maps-enabled').get() &&
         !Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(this.uiSourceCode.url())) {
       if (this.scriptFileForDebuggerModel.size) {
         const scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile =
@@ -706,7 +708,7 @@ export class DebuggerPlugin extends Plugin {
     let objectPopoverHelper: ObjectUI.ObjectPopoverHelper.ObjectPopoverHelper|null = null;
     return {
       box,
-      show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
+      show: async (popover: UI.GlassPane.GlassPane) => {
         let resolvedText: string = '';
         if (Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps')) {
           const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
@@ -762,7 +764,7 @@ export class DebuggerPlugin extends Plugin {
         editor.dispatch({effects: evalExpression.update.of(decoration)});
         return true;
       },
-      hide: (): void => {
+      hide: () => {
         if (objectPopoverHelper) {
           objectPopoverHelper.dispose();
         }
@@ -1015,7 +1017,7 @@ export class DebuggerPlugin extends Plugin {
     if (!this.editor) {
       return null;
     }
-    if (!Common.Settings.Settings.instance().moduleSetting('inlineVariableValues').get()) {
+    if (!Common.Settings.Settings.instance().moduleSetting('inline-variable-values').get()) {
       return null;
     }
     const executionContext = UI.Context.Context.instance().flavor(SDK.RuntimeModel.ExecutionContext);
@@ -1277,7 +1279,7 @@ export class DebuggerPlugin extends Plugin {
       } else if (main.condition()) {
         gutterClass += ' cm-breakpoint-conditional';
       }
-      gutterMarkers.push((new BreakpointGutterMarker(gutterClass)).range(lineStart));
+      gutterMarkers.push((new BreakpointGutterMarker(gutterClass, lineStart)).range(lineStart));
     }
 
     const addPossibleBreakpoints = (line: CodeMirror.Line, locations: Workspace.UISourceCode.UILocation[]): void => {
@@ -1524,7 +1526,7 @@ export class DebuggerPlugin extends Plugin {
     if (this.sourceMapInfobar) {
       return;
     }
-    if (!Common.Settings.Settings.instance().moduleSetting('jsSourceMapsEnabled').get()) {
+    if (!Common.Settings.Settings.instance().moduleSetting('js-source-maps-enabled').get()) {
       return;
     }
     if (!this.scriptHasSourceMap()) {
@@ -1540,7 +1542,7 @@ export class DebuggerPlugin extends Plugin {
     if (!resource) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapSkipped), [],
-          Common.Settings.Settings.instance().createSetting('sourceMapSkippedInfobarDisabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false));
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1549,13 +1551,13 @@ export class DebuggerPlugin extends Plugin {
     } else if (resource.success) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapLoaded), [],
-          Common.Settings.Settings.instance().createSetting('sourceMapInfobarDisabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false));
       if (!this.sourceMapInfobar) {
         return;
       }
       this.sourceMapInfobar.createDetailsRowMessage(i18nString(UIStrings.associatedFilesShouldBeAdded));
       this.sourceMapInfobar.createDetailsRowMessage(i18nString(UIStrings.associatedFilesAreAvailable, {
-        PH1: String(UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutTitleForAction('quickOpen.show')),
+        PH1: String(UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutTitleForAction('quick-open.show')),
       }));
     } else {
       let text: string;
@@ -1643,7 +1645,7 @@ export class DebuggerPlugin extends Plugin {
   private async setBreakpoint(
       lineNumber: number, columnNumber: number|undefined, condition: Breakpoints.BreakpointManager.UserCondition,
       enabled: boolean, isLogpoint: boolean): Promise<Breakpoints.BreakpointManager.Breakpoint|undefined> {
-    Common.Settings.Settings.instance().moduleSetting('breakpointsActive').set(true);
+    Common.Settings.Settings.instance().moduleSetting('breakpoints-active').set(true);
     const bp = await this.breakpointManager.setBreakpoint(
         this.uiSourceCode, lineNumber, columnNumber, condition, enabled, isLogpoint,
         Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION);
@@ -1662,7 +1664,7 @@ export class DebuggerPlugin extends Plugin {
       this.setExecutionLocation(null);
     } else {
       await Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().createCallFrameLiveLocation(
-          callFrame.location(), async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
+          callFrame.location(), async (liveLocation: Bindings.LiveLocation.LiveLocation) => {
             const uiLocation = await liveLocation.uiLocation();
             if (uiLocation && uiLocation.uiSourceCode === this.uiSourceCode) {
               this.setExecutionLocation(uiLocation);
@@ -1841,7 +1843,7 @@ function muteGutterMarkers(markers: CodeMirror.RangeSet<CodeMirror.GutterMarker>
     if (!/cm-breakpoint-disabled/.test(className)) {
       className += ' cm-breakpoint-disabled';
     }
-    newMarkers.push(new BreakpointGutterMarker(className).range(from));
+    newMarkers.push(new BreakpointGutterMarker(className, from).range(from));
   });
   return CodeMirror.RangeSet.of(newMarkers, false);
 }
@@ -1899,6 +1901,7 @@ class BreakpointInlineMarker extends CodeMirror.WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span');
     span.className = this.class;
+    span.setAttribute('jslog', `${VisualLogging.breakpointMarker('inline').track({click: true})}`);
     span.addEventListener('click', (event: MouseEvent) => {
       this.parent.onInlineBreakpointMarkerClick(event, this.breakpoint);
       event.consume();
@@ -1916,12 +1919,24 @@ class BreakpointInlineMarker extends CodeMirror.WidgetType {
 }
 
 class BreakpointGutterMarker extends CodeMirror.GutterMarker {
-  constructor(override readonly elementClass: string) {
+  readonly #position: number;
+
+  constructor(override readonly elementClass: string, position: number) {
     super();
+    this.#position = position;
   }
 
   override eq(other: BreakpointGutterMarker): boolean {
     return other.elementClass === this.elementClass;
+  }
+
+  override toDOM(view: CodeMirror.EditorView): Node {
+    const div = document.createElement('div');  // We want {display: block} so it uses all of the space.
+    div.setAttribute('jslog', `${VisualLogging.breakpointMarker('gutter').track({click: true})}`);
+    const line = view.state.doc.lineAt(this.#position).number;
+    const formatNumber = view.state.facet(SourceFrame.SourceFrame.LINE_NUMBER_FORMATTER);
+    div.textContent = formatNumber(line, view.state);
+    return div;
   }
 }
 
@@ -2004,10 +2019,9 @@ const noMarkers = {}, hasContinueMarkers = {
 // Add a class to the content element when there are active
 // continue-to markers. This hides the background on the current
 // execution line.
-const markIfContinueTo =
-    CodeMirror.EditorView.contentAttributes.compute([continueToMarkers.field], (state): Record<string, string> => {
-      return state.field(continueToMarkers.field).size ? hasContinueMarkers : noMarkers;
-    });
+const markIfContinueTo = CodeMirror.EditorView.contentAttributes.compute([continueToMarkers.field], state => {
+  return state.field(continueToMarkers.field).size ? hasContinueMarkers : noMarkers;
+});
 
 // Variable value decorations
 

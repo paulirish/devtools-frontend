@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as Input from '../../../ui/components/input/input.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
-import adornerSettingsPaneStyles from './adornerSettingsPane.css.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {type AdornerSettingsMap} from './AdornerManager.js';
+import adornerSettingsPaneStyles from './adornerSettingsPane.css.js';
 
 const UIStrings = {
   /**
@@ -92,6 +94,7 @@ export class AdornerSettingsPane extends HTMLElement {
             class="adorner-status"
             type="checkbox" name=${adorner}
             .checked=${isEnabled}
+            jslog=${VisualLogging.toggle(adorner).track({change: true})}
             data-adorner=${adorner}>
           <span class="adorner-name">${adorner}</span>
         </label>
@@ -102,12 +105,18 @@ export class AdornerSettingsPane extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="adorner-settings-pane" tabindex="-1">
+      <div class="adorner-settings-pane" tabindex="-1" jslog=${VisualLogging.pane('adorner-settings')}>
         <div class="settings-title">${i18nString(UIStrings.settingsTitle)}</div>
         <div class="setting-list" @change=${this.#onChange}>
           ${settingTemplates}
         </div>
-        <button class="close" @click=${this.hide} aria-label=${i18nString(UIStrings.closeButton)}></button>
+        <${Buttons.Button.Button.litTagName} aria-label=${i18nString(UIStrings.closeButton)}
+                                             .iconName=${'cross'}
+                                             .size=${Buttons.Button.Size.SMALL}
+                                             .title=${i18nString(UIStrings.closeButton)}
+                                             .variant=${Buttons.Button.Variant.ROUND}
+                                             jslog=${VisualLogging.close().track({click: true})}
+                                             @click=${this.hide}></${Buttons.Button.Button.litTagName}>
       </div>
     `, this.#shadow, {
       host: this,

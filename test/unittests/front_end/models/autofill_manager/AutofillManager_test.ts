@@ -12,6 +12,7 @@ import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
+import * as Root from '../../../../../front_end/core/root/root.js';
 
 describeWithMockConnection('AutofillManager', () => {
   let target: SDK.Target.Target;
@@ -26,6 +27,7 @@ describeWithMockConnection('AutofillManager', () => {
     model = maybeModel;
     showViewStub = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
     autofillManager = AutofillManager.AutofillManager.AutofillManager.instance({forceNew: true});
+    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.AUTOFILL_VIEW);
   });
 
   afterEach(() => {
@@ -152,6 +154,48 @@ describeWithMockConnection('AutofillManager', () => {
         address: 'Outback Road 1\nMelbourne',
         filledFields,
         matches: [{startIndex: 0, endIndex: 24, filledFieldIndex: 0}],
+        autofillModel: model,
+      };
+      await assertAutofillManagerEvent(inEvent, outEvent);
+    });
+
+    it('with an empty string as filled field value', async () => {
+      const filledFields = [
+        {
+          htmlType: 'text',
+          id: 'input1',
+          name: 'name',
+          value: 'Crocodile',
+          autofillType: 'First name',
+          fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
+          fieldId: 1 as Protocol.DOM.BackendNodeId,
+        },
+        {
+          htmlType: 'text',
+          id: 'input2',
+          name: 'city',
+          value: '',
+          autofillType: 'City',
+          fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
+          fieldId: 2 as Protocol.DOM.BackendNodeId,
+        },
+      ];
+      const inEvent = {
+        addressUi: {
+          addressFields: [
+            {
+              fields: [
+                {name: 'NAME_FULL', value: 'Crocodile Dundee'},
+              ],
+            },
+          ],
+        },
+        filledFields,
+      };
+      const outEvent = {
+        address: 'Crocodile Dundee',
+        filledFields,
+        matches: [{startIndex: 0, endIndex: 9, filledFieldIndex: 0}],
         autofillModel: model,
       };
       await assertAutofillManagerEvent(inEvent, outEvent);

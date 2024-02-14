@@ -1005,8 +1005,7 @@ let eventDispatchDesciptors: EventDispatchTypeDescriptor[];
 
 let colorGenerator: Common.Color.Generator;
 
-const requestPreviewElements =
-    new WeakMap<TraceEngine.Types.TraceEvents.TraceEventSyntheticNetworkRequest, HTMLImageElement>();
+const requestPreviewElements = new WeakMap<TraceEngine.Types.TraceEvents.SyntheticNetworkRequest, HTMLImageElement>();
 
 interface EventStylesMap {
   [x: string]: TimelineRecordStyle;
@@ -1175,9 +1174,7 @@ export class TimelineUIUtils {
     return eventStyles;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static setEventStylesMap(eventStyles: any): void {
+  static setEventStylesMap(eventStyles: EventStylesMap): void {
     eventStylesMap = eventStyles;
   }
 
@@ -1186,11 +1183,10 @@ export class TimelineUIUtils {
       return UI.UIUtils.beautifyFunctionName(frame.functionName);
     }
     const nativeGroup = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.nativeGroup(frame.functionName);
-    const groups = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.NativeGroups;
     switch (nativeGroup) {
-      case groups.Compile:
+      case TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.NativeGroups.Compile:
         return i18nString(UIStrings.compile);
-      case groups.Parse:
+      case TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.NativeGroups.Parse:
         return i18nString(UIStrings.parse);
     }
     return frame.functionName;
@@ -1335,18 +1331,17 @@ export class TimelineUIUtils {
     return frame.scriptId !== '0' && !(frame.url && frame.url.startsWith('native '));
   }
 
-  static syntheticNetworkRequestCategory(request: TraceEngine.Types.TraceEvents.TraceEventSyntheticNetworkRequest):
+  static syntheticNetworkRequestCategory(request: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest):
       NetworkCategory {
-    const categories = NetworkCategory;
     switch (request.args.data.mimeType) {
       case 'text/html':
-        return categories.HTML;
+        return NetworkCategory.HTML;
       case 'application/javascript':
       case 'application/x-javascript':
       case 'text/javascript':
-        return categories.Script;
+        return NetworkCategory.Script;
       case 'text/css':
-        return categories.Style;
+        return NetworkCategory.Style;
       case 'audio/ogg':
       case 'image/gif':
       case 'image/jpeg':
@@ -1358,26 +1353,25 @@ export class TimelineUIUtils {
       case 'font/woff2':
       case 'font/ttf':
       case 'application/font-woff':
-        return categories.Media;
+        return NetworkCategory.Media;
       default:
-        return categories.Other;
+        return NetworkCategory.Other;
     }
   }
 
   static networkCategoryColor(category: NetworkCategory): string {
-    const categories = NetworkCategory;
     let cssVarName = '--app-color-system';
     switch (category) {
-      case categories.HTML:
+      case NetworkCategory.HTML:
         cssVarName = '--app-color-loading';
         break;
-      case categories.Script:
+      case NetworkCategory.Script:
         cssVarName = '--app-color-scripting';
         break;
-      case categories.Style:
+      case NetworkCategory.Style:
         cssVarName = '--app-color-rendering';
         break;
-      case categories.Media:
+      case NetworkCategory.Media:
         cssVarName = '--app-color-painting';
         break;
       default:
@@ -2394,7 +2388,7 @@ export class TimelineUIUtils {
   }
 
   static async buildSyntheticNetworkRequestDetails(
-      event: TraceEngine.Types.TraceEvents.TraceEventSyntheticNetworkRequest,
+      event: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest,
       model: TimelineModel.TimelineModel.TimelineModelImpl,
       linkifier: LegacyComponents.Linkifier.Linkifier): Promise<DocumentFragment> {
     const maybeTarget = model.targetByEvent(event);
@@ -2911,7 +2905,7 @@ export class TimelineUIUtils {
     pieChart.data = {
       chartName: i18nString(UIStrings.timeSpentInRendering),
       size: 110,
-      formatter: (value: number): string => i18n.TimeUtilities.preciseMillisToString(value),
+      formatter: (value: number) => i18n.TimeUtilities.preciseMillisToString(value),
       showLegend: true,
       total,
       slices,
@@ -2933,7 +2927,7 @@ export class TimelineUIUtils {
     if (filmStrip && filmStripFrame) {
       const filmStripPreview = document.createElement('div');
       filmStripPreview.classList.add('timeline-filmstrip-preview');
-      void UI.UIUtils.loadImageFromData(filmStripFrame.screenshotAsString)
+      void UI.UIUtils.loadImage(filmStripFrame.screenshotEvent.args.dataUri)
           .then(image => image && filmStripPreview.appendChild(image));
       contentHelper.appendElementRow('', filmStripPreview);
       filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
@@ -3093,9 +3087,7 @@ export class TimelineUIUtils {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum NetworkCategory {
+export const enum NetworkCategory {
   HTML = 'HTML',
   Script = 'Script',
   Style = 'Style',

@@ -109,7 +109,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     // to an e2e test or no longer accesses this variable directly.
     this.watchExpressions = [];
     this.watchExpressionsSetting =
-        Common.Settings.Settings.instance().createLocalSetting<string[]>('watchExpressions', []);
+        Common.Settings.Settings.instance().createLocalSetting<string[]>('watch-expressions', []);
 
     this.addButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.addWatchExpression), 'plus', undefined, 'add-watch-expression');
@@ -121,7 +121,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.update, this);
 
     this.contentElement.classList.add('watch-expressions');
-    this.contentElement.setAttribute('jslog', `${VisualLogging.pane().context('debugger-watch')}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.watch')}`);
     this.contentElement.addEventListener('contextmenu', this.contextMenu.bind(this), false);
     this.treeOutline = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionsTreeOutline();
     this.treeOutline.hideOverflow();

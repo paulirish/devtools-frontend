@@ -92,8 +92,16 @@ describe('Color', () => {
     assert.deepEqual(parseAndAssertNotNull('#FF00FF00').rgba(), [1, 0, 1, 0]);
   });
 
+  it('does not parse hex values with whitespace', () => {
+    assert.isNull(Color.parse('#FF00FF 00'));
+  });
+
   it('parses nickname values', () => {
     assert.deepEqual(parseAndAssertNotNull('red').rgba(), [1, 0, 0, 1]);
+  });
+
+  it('does not parse nickname values with whitespace', () => {
+    assert.isNull(Color.parse('blue red'));
   });
 
   it('parses rgb(a) values', () => {
@@ -737,7 +745,7 @@ describe('Color', () => {
       const result = sinon.stub(Common.ColorConverter.ColorConverter, fn);
       // TODO(crbug.com/1412307): Figure out why tsc 5.0 stopped infering the function signature correctly.
       // @ts-expect-error
-      result.callsFake((a: number, b: number, c: number): [number, number, number] => {
+      result.callsFake((a: number, b: number, c: number) => {
         assert.deepEqual([a, b, c], [input, 0, 0], `Conversion function ${fn} called with the wrong arguments`);
         return [output, 0, 0];
       });

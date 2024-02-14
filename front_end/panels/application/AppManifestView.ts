@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -89,7 +90,7 @@ const UIStrings = {
   /**
    *@description Tooltip text that appears when hovering over a button which copies the previous text to the clipboard.
    */
-  copyToClipboard: 'Copy to clipboard',
+  copyToClipboard: 'Copy suggested ID to clipboard',
   /**
    *@description Screen reader announcement string when the user clicks the copy to clipboard button.
    *@example {/index.html} PH1
@@ -506,7 +507,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     super(true);
 
     this.contentElement.classList.add('manifest-container');
-    this.contentElement.setAttribute('jslog', `${VisualLogging.pane().context('manifest')}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane('manifest')}`);
 
     this.emptyView = emptyView;
     this.emptyView.appendLink('https://web.dev/add-manifest/' as Platform.DevToolsPath.UrlString);
@@ -521,23 +522,21 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.reportView.hideWidget();
 
     this.errorsSection = this.reportView.appendSection(i18nString(UIStrings.errorsAndWarnings));
-    this.errorsSection.element.setAttribute('jslog', `${VisualLogging.section().context('errors-and-warnings')}`);
+    this.errorsSection.element.setAttribute('jslog', `${VisualLogging.section('errors-and-warnings')}`);
     this.installabilitySection = this.reportView.appendSection(i18nString(UIStrings.installability));
-    this.installabilitySection.element.setAttribute('jslog', `${VisualLogging.section().context('installability')}`);
+    this.installabilitySection.element.setAttribute('jslog', `${VisualLogging.section('installability')}`);
     this.identitySection = this.reportView.appendSection(i18nString(UIStrings.identity));
-    this.identitySection.element.setAttribute('jslog', `${VisualLogging.section().context('identity')}`);
+    this.identitySection.element.setAttribute('jslog', `${VisualLogging.section('identity')}`);
     this.presentationSection = this.reportView.appendSection(i18nString(UIStrings.presentation));
-    this.presentationSection.element.setAttribute('jslog', `${VisualLogging.section().context('presentation')}`);
+    this.presentationSection.element.setAttribute('jslog', `${VisualLogging.section('presentation')}`);
     this.protocolHandlersSection = this.reportView.appendSection(i18nString(UIStrings.protocolHandlers));
-    this.protocolHandlersSection.element.setAttribute(
-        'jslog', `${VisualLogging.section().context('protocol-handlers')}`);
+    this.protocolHandlersSection.element.setAttribute('jslog', `${VisualLogging.section('protocol-handlers')}`);
     this.protocolHandlersView = new ApplicationComponents.ProtocolHandlersView.ProtocolHandlersView();
     this.protocolHandlersSection.appendFieldWithCustomView(this.protocolHandlersView);
     this.iconsSection = this.reportView.appendSection(i18nString(UIStrings.icons), 'report-section-icons');
-    this.iconsSection.element.setAttribute('jslog', `${VisualLogging.section().context('icons')}`);
+    this.iconsSection.element.setAttribute('jslog', `${VisualLogging.section('icons')}`);
     this.windowControlsSection = this.reportView.appendSection(UIStrings.windowControlsOverlay);
-    this.windowControlsSection.element.setAttribute(
-        'jslog', `${VisualLogging.section().context('window-controls-overlay')}`);
+    this.windowControlsSection.element.setAttribute('jslog', `${VisualLogging.section('window-controls-overlay')}`);
     this.shortcutSections = [];
     this.screenshotsSections = [];
 
@@ -700,12 +699,9 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
       UI.ARIAUtils.setLabel(appIdField, 'App Id');
       appIdField.textContent = appId;
 
-      const helpIcon = new IconButton.Icon.Icon();
-      helpIcon.data = {iconName: 'help', color: 'var(--icon-default)', width: '16px', height: '16px'};
-      helpIcon.classList.add('inline-icon');
+      const helpIcon = IconButton.Icon.create('help', 'inline-icon');
       helpIcon.title = i18nString(UIStrings.appIdExplainer);
-      helpIcon.tabIndex = 0;
-      helpIcon.setAttribute('jslog', `${VisualLogging.action().track({hover: true}).context('help')}`);
+      helpIcon.setAttribute('jslog', `${VisualLogging.action('help').track({hover: true})}`);
       appIdField.appendChild(helpIcon);
 
       const learnMoreLink = UI.XLink.XLink.create(
@@ -726,25 +722,17 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
         const suggestedIdSpan = document.createElement('code');
         suggestedIdSpan.textContent = recommendedId;
 
-        const copyButton = new IconButton.IconButton.IconButton();
-        copyButton.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context('copy')}`);
+        const copyButton = new Buttons.Button.Button();
+        copyButton.className = 'inline-button';
+        copyButton.variant = Buttons.Button.Variant.ROUND;
+        copyButton.size = Buttons.Button.Size.SMALL;
+        copyButton.iconName = 'copy';
+        copyButton.jslogContext = 'manifest.copy-id';
         copyButton.title = i18nString(UIStrings.copyToClipboard);
-        copyButton.data = {
-          groups: [{
-            iconName: 'copy',
-            iconHeight: '12px',
-            iconWidth: '12px',
-            text: '',
-            iconColor: 'var(--icon-default-hover)',
-          }],
-          clickHandler: (): void => {
-            UI.ARIAUtils.alert(i18nString(UIStrings.copiedToClipboard, {PH1: recommendedId}));
-            Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(recommendedId);
-          },
-          compact: true,
-          accessibleName: i18nString(UIStrings.copyToClipboard),
-        };
-
+        copyButton.addEventListener('click', () => {
+          UI.ARIAUtils.alert(i18nString(UIStrings.copiedToClipboard, {PH1: recommendedId}));
+          Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(recommendedId);
+        });
         suggestedIdNote.appendChild(i18n.i18n.getFormatLocalizedString(
             str_, UIStrings.appIdNote,
             {PH1: noteSpan, PH2: idSpan, PH3: startUrlSpan, PH4: idSpan2, PH5: suggestedIdSpan, PH6: copyButton}));
@@ -760,7 +748,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
         const link = Components.Linkifier.Linkifier.linkifyURL(
             completeURL, ({text: startURL} as Components.Linkifier.LinkifyURLOptions));
         link.tabIndex = 0;
-        link.setAttribute('jslog', `${VisualLogging.link().track({click: true}).context('start-url')}`);
+        link.setAttribute('jslog', `${VisualLogging.link('start-url').track({click: true})}`);
         this.startURLField.appendChild(link);
       }
     }
@@ -837,8 +825,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     const setIconMaskedCheckbox = UI.UIUtils.CheckboxLabel.create(i18nString(UIStrings.showOnlyTheMinimumSafeAreaFor));
     setIconMaskedCheckbox.classList.add('mask-checkbox');
     setIconMaskedCheckbox.setAttribute(
-        'jslog',
-        `${VisualLogging.toggle().track({change: true}).context('show-minimal-safe-area-for-maskable-icons')}`);
+        'jslog', `${VisualLogging.toggle('show-minimal-safe-area-for-maskable-icons').track({change: true})}`);
     setIconMaskedCheckbox.addEventListener('click', () => {
       this.iconsSection.setIconMasked(setIconMaskedCheckbox.checkboxElement.checked);
     });
@@ -866,7 +853,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     let shortcutIndex = 1;
     for (const shortcut of shortcuts) {
       const shortcutSection = this.reportView.appendSection(i18nString(UIStrings.shortcutS, {PH1: shortcutIndex}));
-      shortcutSection.element.setAttribute('jslog', `${VisualLogging.section().context('shortcuts')}`);
+      shortcutSection.element.setAttribute('jslog', `${VisualLogging.section('shortcuts')}`);
       this.shortcutSections.push(shortcutSection);
 
       shortcutSection.appendFlexedField(i18nString(UIStrings.name), shortcut.name);
@@ -880,7 +867,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
       const shortcutUrl = Common.ParsedURL.ParsedURL.completeURL(url, shortcut.url) as Platform.DevToolsPath.UrlString;
       const link = Components.Linkifier.Linkifier.linkifyURL(
           shortcutUrl, ({text: shortcut.url} as Components.Linkifier.LinkifyURLOptions));
-      link.setAttribute('jslog', `${VisualLogging.link().track({click: true}).context('shortcut')}`);
+      link.setAttribute('jslog', `${VisualLogging.link('shortcut').track({click: true})}`);
       link.tabIndex = 0;
       urlField.appendChild(link);
 
@@ -999,11 +986,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     const wcoStatusMessage = this.windowControlsSection.appendRow();
 
     if (hasWco) {
-      const checkmarkIcon = new IconButton.Icon.Icon();
-      checkmarkIcon
-          .data = {iconName: 'check-circle', color: 'var(--icon-checkmark-green)', width: '16px', height: '16px'};
-      checkmarkIcon.classList.add('inline-icon');
-      checkmarkIcon.tabIndex = 0;
+      const checkmarkIcon = IconButton.Icon.create('check-circle', 'inline-icon');
       wcoStatusMessage.appendChild(checkmarkIcon);
 
       const wco = document.createElement('code');
@@ -1016,10 +999,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
         await this.appendWindowControlsToSection(this.overlayModel, url, stringProperty('theme_color'));
       }
     } else {
-      const infoIcon = new IconButton.Icon.Icon();
-      infoIcon.data = {iconName: 'info', color: 'var(--icon-default)', width: '16px', height: '16px'};
-      infoIcon.classList.add('inline-icon');
-      infoIcon.tabIndex = 0;
+      const infoIcon = IconButton.Icon.create('info', 'inline-icon');
 
       wcoStatusMessage.appendChild(infoIcon);
 
@@ -1345,9 +1325,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   ManifestDetected = 'ManifestDetected',
   ManifestRendered = 'ManifestRendered',
 }

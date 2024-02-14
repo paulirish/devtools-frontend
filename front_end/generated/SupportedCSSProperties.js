@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -2836,6 +2836,25 @@ export const generatedProperties = [
   "name": "position-fallback-bounds"
  },
  {
+  "keywords": [
+   "none",
+   "flip-block",
+   "flip-inline",
+   "flip-start"
+  ],
+  "name": "position-try-options"
+ },
+ {
+  "keywords": [
+   "normal",
+   "most-width",
+   "most-height",
+   "most-block-size",
+   "most-inline-size"
+  ],
+  "name": "position-try-order"
+ },
+ {
   "name": "prefix"
  },
  {
@@ -3483,8 +3502,10 @@ export const generatedProperties = [
  {
   "inherited": true,
   "keywords": [
+   "normal",
+   "space-all",
    "space-first",
-   "space-all"
+   "trim-start"
   ],
   "name": "text-spacing-trim"
  },
@@ -3679,6 +3700,12 @@ export const generatedProperties = [
  },
  {
   "name": "view-timeline-name"
+ },
+ {
+  "keywords": [
+   "none"
+  ],
+  "name": "view-transition-class"
  },
  {
   "keywords": [
@@ -5234,6 +5261,23 @@ export const generatedPropertyValues = {
    "normal"
   ]
  },
+ "position-try-options": {
+  "values": [
+   "none",
+   "flip-block",
+   "flip-inline",
+   "flip-start"
+  ]
+ },
+ "position-try-order": {
+  "values": [
+   "normal",
+   "most-width",
+   "most-height",
+   "most-block-size",
+   "most-inline-size"
+  ]
+ },
  "quotes": {
   "values": [
    "auto",
@@ -5594,8 +5638,10 @@ export const generatedPropertyValues = {
  },
  "text-spacing-trim": {
   "values": [
+   "normal",
+   "space-all",
    "space-first",
-   "space-all"
+   "trim-start"
   ]
  },
  "text-transform": {
@@ -5721,6 +5767,11 @@ export const generatedPropertyValues = {
    "text-top",
    "text-bottom",
    "middle"
+  ]
+ },
+ "view-transition-class": {
+  "values": [
+   "none"
   ]
  },
  "view-transition-name": {

@@ -20,10 +20,16 @@ export class AdvancedApp implements Common.App.App {
   private toolboxWindow?: Window|null;
   private toolboxRootView?: UI.RootView.RootView;
   private changingDockSide?: boolean;
+  private toolboxDocument?: Document;
 
   constructor() {
     UI.DockController.DockController.instance().addEventListener(
         UI.DockController.Events.BeforeDockSideChanged, this.openToolboxWindow, this);
+
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
+        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged, async () => {
+          await UI.Utils.DynamicTheming.fetchColors(this.toolboxDocument);
+        }, this);
   }
 
   /**
@@ -39,7 +45,8 @@ export class AdvancedApp implements Common.App.App {
   presentUI(document: Document): void {
     const rootView = new UI.RootView.RootView();
 
-    this.rootSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'InspectorView.splitViewState', 555, 300, true);
+    this.rootSplitWidget =
+        new UI.SplitWidget.SplitWidget(false, true, 'inspector-view.split-view-state', 555, 300, true);
     this.rootSplitWidget.show(rootView.element);
     this.rootSplitWidget.setSidebarWidget(UI.InspectorView.InspectorView.instance());
     this.rootSplitWidget.setDefaultFocusedChild(UI.InspectorView.InspectorView.instance());
@@ -88,6 +95,8 @@ export class AdvancedApp implements Common.App.App {
 
     this.toolboxRootView = new UI.RootView.RootView();
     this.toolboxRootView.attachToDocument(toolboxDocument);
+
+    this.toolboxDocument = toolboxDocument;
 
     this.updateDeviceModeView();
   }

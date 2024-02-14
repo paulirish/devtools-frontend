@@ -7,12 +7,17 @@ import("../../../../../third_party/typescript/typescript.gni")
 ts_library("text_utils") {
   testonly = true
   sources = [
+    "ContentData_test.ts",
     "StaticContentProvider_test.ts",
+    "StreamingContentData_test.ts",
     "TextCursor_test.ts",
     "TextRange_test.ts",
     "TextUtils_test.ts",
     "Text_test.ts",
   ]
 
-  deps = [ "../../../../../front_end/models/text_utils:bundle" ]
+  deps = [
+    "../../../../../front_end/core/platform:bundle",
+    "../../../../../front_end/models/text_utils:bundle",
+  ]
 }

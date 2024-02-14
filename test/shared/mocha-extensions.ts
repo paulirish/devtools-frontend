@@ -11,7 +11,7 @@ import {ScreenshotError} from '../shared/screenshot-error.js';
 
 import {AsyncScope} from './async-scope.js';
 import {getEnvVar} from './config.js';
-import {platform, type Platform} from './helper.js';
+import {platform, type Platform, TIMEOUT_ERROR_MESSAGE} from './helper.js';
 
 export {after, beforeEach} from 'mocha';
 
@@ -59,7 +59,7 @@ export async function takeScreenshots(testName: string): Promise<{target?: strin
 
 function wrapSuiteFunction(fn: (this: Mocha.Suite) => void) {
   return function(this: Mocha.Suite): void {
-    const hookCreationHook = (hook: Mocha.Hook): void => {
+    const hookCreationHook = (hook: Mocha.Hook) => {
       const originalFn = hook.fn;
       if (!originalFn) {
         return;
@@ -133,8 +133,7 @@ describe.skipOnPlatforms = function(platforms: Array<Platform>, name: string, fn
   }
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err?: any) {
+async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err?: unknown) {
   function* joinStacks() {
     const scopes = AsyncScope.scopes;
     if (scopes.size === 0) {
@@ -253,7 +252,8 @@ function wrapMochaCall(
 
     if (callback.length === 0) {
       async function onError(this: unknown, err?: unknown) {
-        if (err && !getEnvVar('DEBUG_TEST') && !(err instanceof ScreenshotError)) {
+        const isTimeoutError = err instanceof Error && err.message?.includes(TIMEOUT_ERROR_MESSAGE);
+        if (err && !getEnvVar('DEBUG_TEST') && !(err instanceof ScreenshotError) && !isTimeoutError) {
           const {target, frontend} = await takeScreenshots(name);
           err = ScreenshotError.fromBase64Images(err, target, frontend);
         }

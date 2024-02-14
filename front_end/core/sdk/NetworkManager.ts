@@ -41,11 +41,9 @@ import * as Host from '../host/host.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 
-import {ContentData as ContentDataClass, type ContentDataOrError} from './ContentData.js';
 import {Cookie} from './Cookie.js';
 import {
   type BlockedCookieWithReason,
-  type ContentData,
   Events as NetworkRequestEvents,
   type ExtraRequestInfo,
   type ExtraResponseInfo,
@@ -135,21 +133,22 @@ export class NetworkManager extends SDKModel<EventTypes> {
     this.#networkAgent = target.networkAgent();
     target.registerNetworkDispatcher(this.dispatcher);
     target.registerFetchDispatcher(this.fetchDispatcher);
-    if (Common.Settings.Settings.instance().moduleSetting('cacheDisabled').get()) {
+    if (Common.Settings.Settings.instance().moduleSetting('cache-disabled').get()) {
       void this.#networkAgent.invoke_setCacheDisabled({cacheDisabled: true});
     }
 
     void this.#networkAgent.invoke_enable({maxPostDataSize: MAX_EAGER_POST_REQUEST_BODY_LENGTH});
     void this.#networkAgent.invoke_setAttachDebugStack({enabled: true});
 
-    this.#bypassServiceWorkerSetting = Common.Settings.Settings.instance().createSetting('bypassServiceWorker', false);
+    this.#bypassServiceWorkerSetting =
+        Common.Settings.Settings.instance().createSetting('bypass-service-worker', false);
     if (this.#bypassServiceWorkerSetting.get()) {
       this.bypassServiceWorkerChanged();
     }
     this.#bypassServiceWorkerSetting.addChangeListener(this.bypassServiceWorkerChanged, this);
 
     Common.Settings.Settings.instance()
-        .moduleSetting('cacheDisabled')
+        .moduleSetting('cache-disabled')
         .addChangeListener(this.cacheDisabledSettingChanged, this);
   }
 
@@ -183,7 +182,7 @@ export class NetworkManager extends SDKModel<EventTypes> {
     return TextUtils.TextUtils.performSearchInSearchMatches(response.result || [], query, caseSensitive, isRegex);
   }
 
-  static async requestContentData(request: NetworkRequest): Promise<ContentDataOrError> {
+  static async requestContentData(request: NetworkRequest): Promise<TextUtils.ContentData.ContentDataOrError> {
     if (request.resourceType() === Common.ResourceType.resourceTypes.WebSocket) {
       return {error: i18nString(UIStrings.noContentForWebSocket)};
     }
@@ -209,9 +208,33 @@ export class NetworkManager extends SDKModel<EventTypes> {
     if (error) {
       return {error};
     }
-    return new ContentDataClass(
-        response.body, response.base64Encoded, request.resourceType(), request.mimeType,
-        request.charset() ?? undefined);
+    return new TextUtils.ContentData.ContentData(
+        response.body, response.base64Encoded, request.mimeType, request.charset() ?? undefined);
+  }
+
+  /**
+   * Returns the already received bytes for an in-flight request. After calling this method
+   * "dataReceived" events will contain additional data.
+   */
+  static async streamResponseBody(request: NetworkRequest): Promise<TextUtils.ContentData.ContentDataOrError> {
+    if (request.finished) {
+      return {error: 'Streaming the response body is only available for in-flight requests.'};
+    }
+    const manager = NetworkManager.forRequest(request);
+    if (!manager) {
+      return {error: 'No network manager for request'};
+    }
+    const requestId = request.backendRequestId();
+    if (!requestId) {
+      return {error: 'No backend request id for request'};
+    }
+    const response = await manager.#networkAgent.invoke_streamResourceContent({requestId});
+    const error = response.getError();
+    if (error) {
+      return {error};
+    }
+    return new TextUtils.ContentData.ContentData(
+        response.bufferedData, /* isBase64=*/ true, request.mimeType, request.charset() ?? undefined);
   }
 
   static async requestPostData(request: NetworkRequest): Promise<string|null> {
@@ -273,7 +296,7 @@ export class NetworkManager extends SDKModel<EventTypes> {
 
   override dispose(): void {
     Common.Settings.Settings.instance()
-        .moduleSetting('cacheDisabled')
+        .moduleSetting('cache-disabled')
         .removeChangeListener(this.cacheDisabledSettingChanged, this);
   }
 
@@ -309,8 +332,6 @@ export class NetworkManager extends SDKModel<EventTypes> {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   RequestStarted = 'RequestStarted',
   RequestUpdated = 'RequestUpdated',
@@ -474,6 +495,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       networkRequest.setUrl(response.url as Platform.DevToolsPath.UrlString);
     }
     networkRequest.mimeType = response.mimeType;
+    networkRequest.setCharset(response.charset);
     if (!networkRequest.statusCode || networkRequest.wasIntercepted()) {
       networkRequest.statusCode = response.status;
     }
@@ -696,21 +718,15 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     this.#manager.dispatchEventToListeners(Events.ResponseReceived, {request: networkRequest, response});
   }
 
-  dataReceived({requestId, timestamp, dataLength, encodedDataLength}: Protocol.Network.DataReceivedEvent): void {
-    let networkRequest: NetworkRequest|null|undefined = this.#requestsById.get(requestId);
+  dataReceived(event: Protocol.Network.DataReceivedEvent): void {
+    let networkRequest: NetworkRequest|null|undefined = this.#requestsById.get(event.requestId);
     if (!networkRequest) {
-      networkRequest = this.maybeAdoptMainResourceRequest(requestId);
+      networkRequest = this.maybeAdoptMainResourceRequest(event.requestId);
     }
     if (!networkRequest) {
       return;
     }
-
-    networkRequest.resourceSize += dataLength;
-    if (encodedDataLength !== -1) {
-      networkRequest.increaseTransferSize(encodedDataLength);
-    }
-    networkRequest.endTime = timestamp;
-
+    networkRequest.addDataReceivedEvent(event);
     this.updateNetworkRequest(networkRequest);
   }
 
@@ -1010,10 +1026,11 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
         networkRequest.setTransferSize(encodedDataLength);
       }
     }
+    networkRequest.addBlockedRequestCookiesToModel();
     this.#manager.dispatchEventToListeners(Events.RequestFinished, networkRequest);
     MultitargetNetworkManager.instance().inflightMainResourceRequests.delete(networkRequest.requestId());
 
-    if (Common.Settings.Settings.instance().moduleSetting('monitoringXHREnabled').get() &&
+    if (Common.Settings.Settings.instance().moduleSetting('monitoring-xhr-enabled').get() &&
         networkRequest.resourceType().category() === Common.ResourceType.resourceCategories.XHR) {
       let message;
       const failedToLoad = networkRequest.failed || networkRequest.hasErrorStatusCode();
@@ -1201,8 +1218,8 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
     this.#updatingInterceptionPatternsPromise = null;
 
     // TODO(allada) Remove these and merge it with request interception.
-    this.#blockingEnabledSetting = Common.Settings.Settings.instance().moduleSetting('requestBlockingEnabled');
-    this.#blockedPatternsSetting = Common.Settings.Settings.instance().createSetting('networkBlockedPatterns', []);
+    this.#blockingEnabledSetting = Common.Settings.Settings.instance().moduleSetting('request-blocking-enabled');
+    this.#blockedPatternsSetting = Common.Settings.Settings.instance().createSetting('network-blocked-patterns', []);
     this.#effectiveBlockedURLs = [];
     this.updateBlockedPatterns();
 
@@ -1491,8 +1508,8 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
   }
 
   private async updateInterceptionPatterns(): Promise<void> {
-    if (!Common.Settings.Settings.instance().moduleSetting('cacheDisabled').get()) {
-      Common.Settings.Settings.instance().moduleSetting('cacheDisabled').set(true);
+    if (!Common.Settings.Settings.instance().moduleSetting('cache-disabled').get()) {
+      Common.Settings.Settings.instance().moduleSetting('cache-disabled').set(true);
     }
     this.#updatingInterceptionPatternsPromise = null;
     const promises = ([] as Promise<unknown>[]);
@@ -1555,7 +1572,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
       headers['User-Agent'] = currentUserAgent;
     }
 
-    if (Common.Settings.Settings.instance().moduleSetting('cacheDisabled').get()) {
+    if (Common.Settings.Settings.instance().moduleSetting('cache-disabled').get()) {
       headers['Cache-Control'] = 'no-cache';
     }
 
@@ -1570,9 +1587,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
 }
 
 export namespace MultitargetNetworkManager {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Events {
+  export const enum Events {
     BlockedPatternsChanged = 'BlockedPatternsChanged',
     ConditionsChanged = 'ConditionsChanged',
     UserAgentChanged = 'UserAgentChanged',
@@ -1738,14 +1753,37 @@ export class InterceptedRequest {
     void this.#fetchAgent.invoke_failRequest({requestId: this.requestId, errorReason});
   }
 
-  async responseBody(): Promise<ContentData> {
+  async responseBody(): Promise<TextUtils.ContentData.ContentDataOrError> {
     const response = await this.#fetchAgent.invoke_getResponseBody({requestId: this.requestId});
-    const error = response.getError() || null;
-    return {error: error, content: error ? null : response.body, encoded: response.base64Encoded};
+    const error = response.getError();
+    if (error) {
+      return {error};
+    }
+
+    const {mimeType, charset} = this.getMimeTypeAndCharset();
+    return new TextUtils.ContentData.ContentData(
+        response.body, response.base64Encoded, mimeType ?? 'application/octet-stream', charset ?? undefined);
   }
 
   isRedirect(): boolean {
     return this.responseStatusCode !== undefined && this.responseStatusCode >= 300 && this.responseStatusCode < 400;
+  }
+
+  /**
+   * Tries to determine the MIME type and charset for this intercepted request.
+   * Looks at the interecepted response headers first (for Content-Type header), then
+   * checks the `NetworkRequest` if we have one.
+   */
+  getMimeTypeAndCharset(): {mimeType: string|null, charset: string|null} {
+    for (const header of this.responseHeaders ?? []) {
+      if (header.name.toLowerCase() === 'content-type') {
+        return Platform.MimeType.parseContentType(header.value);
+      }
+    }
+
+    const mimeType = this.networkRequest?.mimeType ?? null;
+    const charset = this.networkRequest?.charset() ?? null;
+    return {mimeType, charset};
   }
 }
 

@@ -227,7 +227,7 @@ export class ResponseHeaderSection extends HTMLElement {
         throw 'Type mismatch after parsing';
       }
       this.#headersAreOverrideable =
-          Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled').get();
+          Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').get();
       for (const header of this.#headerEditors) {
         header.valueEditable = this.#headersAreOverrideable;
       }
@@ -482,6 +482,7 @@ export class ResponseHeaderSection extends HTMLElement {
             @headerremoved=${this.#onHeaderRemoved}
             @enableheaderediting=${this.#onEnableHeaderEditingClick}
             data-index=${index}
+            jslog=${VisualLogging.value('response-header')}
         ></${HeaderSectionRow.litTagName}>
       `)}
       ${this.#headersAreOverrideable ? html`
@@ -490,7 +491,7 @@ export class ResponseHeaderSection extends HTMLElement {
           .variant=${Buttons.Button.Variant.SECONDARY}
           .iconUrl=${plusIconUrl}
           @click=${this.#onAddHeaderClick}
-          jslog=${VisualLogging.action().track({click: true}).context('add-header')}>
+          jslog=${VisualLogging.action('add-header').track({click: true})}>
           ${i18nString(UIStrings.addHeader)}
         </${Buttons.Button.Button.litTagName}>
       ` : LitHtml.nothing}
@@ -506,10 +507,10 @@ export class ResponseHeaderSection extends HTMLElement {
     const requestUrl = this.#request.url();
     const networkPersistanceManager = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance();
     if (networkPersistanceManager.project()) {
-      Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled').set(true);
+      Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(true);
       await networkPersistanceManager.getOrCreateHeadersUISourceCodeFromUrl(requestUrl);
     } else {  // If folder for local overrides has not been provided yet
-      UI.InspectorView.InspectorView.instance().displaySelectOverrideFolderInfobar(async(): Promise<void> => {
+      UI.InspectorView.InspectorView.instance().displaySelectOverrideFolderInfobar(async () => {
         await Sources.SourcesNavigator.OverridesNavigatorView.instance().setupNewWorkspace();
         await networkPersistanceManager.getOrCreateHeadersUISourceCodeFromUrl(requestUrl);
       });

@@ -198,10 +198,11 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
     this.displayScreenshotDelay = displayScreenshotDelay;
     this.networkLogShowOverviewSetting =
-        Common.Settings.Settings.instance().createSetting('networkLogShowOverview', true);
-    this.networkLogLargeRowsSetting = Common.Settings.Settings.instance().createSetting('networkLogLargeRows', false);
+        Common.Settings.Settings.instance().createSetting('network-log-show-overview', true);
+    this.networkLogLargeRowsSetting =
+        Common.Settings.Settings.instance().createSetting('network-log-large-rows', false);
     this.networkRecordFilmStripSetting =
-        Common.Settings.Settings.instance().createSetting('networkRecordFilmStripSetting', false);
+        Common.Settings.Settings.instance().createSetting('network-record-film-strip-setting', false);
     this.toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('network.toggle-recording');
     this.networkItemView = null;
     this.filmStripView = null;
@@ -213,10 +214,10 @@ export class NetworkPanel extends UI.Panel.Panel implements
     const networkToolbarContainer = panel.contentElement.createChild('div', 'network-toolbar-container');
     this.panelToolbar = new UI.Toolbar.Toolbar('', networkToolbarContainer);
     this.panelToolbar.makeWrappable(true);
-    this.panelToolbar.element.setAttribute('jslog', `${VisualLogging.section().context('network-toolbar')}`);
+    this.panelToolbar.element.setAttribute('jslog', `${VisualLogging.toolbar('network-main')}`);
     this.rightToolbar = new UI.Toolbar.Toolbar('', networkToolbarContainer);
 
-    this.filterBar = new UI.FilterBar.FilterBar('networkPanel', true);
+    this.filterBar = new UI.FilterBar.FilterBar('network-panel', true);
     this.filterBar.show(panel.contentElement);
     this.filterBar.addEventListener(UI.FilterBar.FilterBarEvents.Changed, this.handleFilterChanged.bind(this));
 
@@ -224,7 +225,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.settingsPane.element.classList.add('network-settings-pane');
     this.settingsPane.show(panel.contentElement);
     this.showSettingsPaneSetting =
-        Common.Settings.Settings.instance().createSetting('networkShowSettingsToolbar', false);
+        Common.Settings.Settings.instance().createSetting('network-show-settings-toolbar', false);
     this.showSettingsPaneSetting.addChangeListener(this.updateSettingsPaneVisibility.bind(this));
     this.updateSettingsPaneVisibility();
 
@@ -235,20 +236,22 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.overviewPane.addEventListener(
         PerfUI.TimelineOverviewPane.Events.OverviewPaneWindowChanged, this.onWindowChanged.bind(this));
     this.overviewPane.element.id = 'network-overview-panel';
+    this.overviewPane.element.setAttribute(
+        'jslog', `${VisualLogging.pane('network-overview').track({click: true, drag: true})}`);
     this.networkOverview = new NetworkOverview();
     this.overviewPane.setOverviewControls([this.networkOverview]);
     this.overviewPlaceholderElement = panel.contentElement.createChild('div');
 
     this.calculator = new NetworkTransferTimeCalculator();
 
-    this.splitWidget = new UI.SplitWidget.SplitWidget(true, false, 'networkPanelSplitViewState');
+    this.splitWidget = new UI.SplitWidget.SplitWidget(true, false, 'network-panel-split-view-state');
     this.splitWidget.hideMain();
     this.splitWidget.show(panel.contentElement);
 
     panel.setDefaultFocusedChild(this.filterBar);
 
     const initialSidebarWidth = 225;
-    const splitWidget = new UI.SplitWidget.SplitWidget(true, false, 'networkPanelSidebarState', initialSidebarWidth);
+    const splitWidget = new UI.SplitWidget.SplitWidget(true, false, 'network-panel-sidebar-state', initialSidebarWidth);
     splitWidget.hideSidebar();
     splitWidget.enableShowModeSaving();
     splitWidget.show(this.element);
@@ -268,6 +271,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
     });
     const closeSidebar = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.close), 'cross');
     closeSidebar.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => splitWidget.hideSidebar());
+    closeSidebar.element.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
     tabbedPane.rightToolbar().appendToolbarItem(closeSidebar);
     splitWidget.setSidebarWidget(tabbedPane);
     splitWidget.setMainWidget(panel);
@@ -299,8 +303,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.networkLogLargeRowsSetting.addChangeListener(this.toggleLargerRequests, this);
     this.networkRecordFilmStripSetting.addChangeListener(this.toggleRecordFilmStrip, this);
 
-    this.preserveLogSetting = Common.Settings.Settings.instance().moduleSetting('network_log.preserve-log');
-    this.recordLogSetting = Common.Settings.Settings.instance().moduleSetting('network_log.record-log');
+    this.preserveLogSetting = Common.Settings.Settings.instance().moduleSetting('network-log.preserve-log');
+    this.recordLogSetting = Common.Settings.Settings.instance().moduleSetting('network-log.record-log');
     this.recordLogSetting.addChangeListener(({data}) => this.toggleRecord(data));
 
     this.throttlingSelect = this.createThrottlingConditionsSelect();
@@ -412,7 +416,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
     this.panelToolbar.appendSeparator();
     const disableCacheCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(
-        Common.Settings.Settings.instance().moduleSetting('cacheDisabled'),
+        Common.Settings.Settings.instance().moduleSetting('cache-disabled'),
         i18nString(UIStrings.disableCacheWhileDevtoolsIsOpen), i18nString(UIStrings.disableCache));
     this.panelToolbar.appendToolbarItem(disableCacheCheckbox);
 
@@ -555,6 +559,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
     if (toggled && !this.filmStripRecorder) {
       this.filmStripView = new PerfUI.FilmStripView.FilmStripView();
       this.filmStripView.element.classList.add('network-film-strip');
+      this.filmStripView.element.setAttribute('jslog', `${VisualLogging.pane('network-film-strip')}`);
       this.filmStripRecorder = new FilmStripRecorder(this.networkLogView.timeCalculator(), this.filmStripView);
       this.filmStripView.show(this.filmStripPlaceholderElement);
       this.filmStripView.addEventListener(PerfUI.FilmStripView.Events.FrameSelected, this.onFilmFrameSelected, this);
@@ -574,7 +579,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   private resetFilmStripView(): void {
     const reloadShortcut =
-        UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('inspector_main.reload')[0];
+        UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('inspector-main.reload')[0];
 
     if (this.filmStripView) {
       this.filmStripView.reset();
@@ -759,8 +764,9 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.networkLogView.clearFilmStripFrame();
   }
 
-  private onUpdateRequest(event: Common.EventTarget.EventTargetEvent<SDK.NetworkRequest.NetworkRequest>): void {
-    const request = event.data;
+  private onUpdateRequest(event: Common.EventTarget.EventTargetEvent<{request: SDK.NetworkRequest.NetworkRequest}>):
+      void {
+    const {request} = event.data;
     this.calculator.updateBoundaries(request);
     // FIXME: Unify all time units across the frontend!
     this.overviewPane.setBounds(

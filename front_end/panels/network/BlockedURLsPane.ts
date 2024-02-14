@@ -67,7 +67,7 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
   constructor() {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.panel().context('network.blocked-urls')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('network.blocked-urls').track({resize: true})}`);
 
     this.manager = SDK.NetworkManager.MultitargetNetworkManager.instance();
     this.manager.addEventListener(
@@ -83,6 +83,7 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
         UI.Toolbar.Toolbar.createActionButtonForId('network.add-network-request-blocking-pattern'));
     this.toolbar.appendToolbarItem(
         UI.Toolbar.Toolbar.createActionButtonForId('network.remove-all-network-request-blocking-patterns'));
+    this.toolbar.element.setAttribute('jslog', `${VisualLogging.toolbar()}`);
 
     this.list = new UI.ListWidget.ListWidget(this);
     this.list.element.classList.add('blocked-urls');
@@ -103,11 +104,9 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
 
   private createEmptyPlaceholder(): Element {
     const element = this.contentElement.createChild('div', 'no-blocked-urls');
-    const addButton =
-        UI.UIUtils.createTextButton(i18nString(UIStrings.addPattern), this.addPattern.bind(this), 'add-button', true);
-    addButton.setAttribute(
-        'jslog',
-        `${VisualLogging.action().track({click: true}).context('network.add-network-request-blocking-pattern')}`);
+    const addButton = UI.UIUtils.createTextButton(
+        i18nString(UIStrings.addPattern), this.addPattern.bind(this),
+        {className: 'add-button', jslogContext: 'network.add-network-request-blocking-pattern', primary: true});
     UI.ARIAUtils.setLabel(addButton, i18nString(UIStrings.addNetworkRequestBlockingPattern));
     element.appendChild(
         i18n.i18n.getFormatLocalizedString(str_, UIStrings.networkRequestsAreNotBlockedS, {PH1: addButton}));

@@ -99,7 +99,7 @@ export function registerNoopActions(actionIds: string[]): void {
     UI.ActionRegistration.registerActionExtension({
       actionId,
       category: UI.ActionRegistration.ActionCategory.NONE,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
+      title: () => 'mock' as Platform.UIString.LocalizedString,
     });
   }
   const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
@@ -107,26 +107,27 @@ export function registerNoopActions(actionIds: string[]): void {
 }
 
 const REGISTERED_EXPERIMENTS = [
-  'captureNodeCreationStacks',
-  'protocolMonitor',
+  Root.Runtime.ExperimentName.CAPTURE_NODE_CREATION_STACKS,
+  Root.Runtime.ExperimentName.PROTOCOL_MONITOR,
   'timelineShowAllEvents',
   'timelineV8RuntimeCallStats',
   'timelineInvalidationTracking',
   'ignoreListJSFramesOnTimeline',
-  'instrumentationBreakpoints',
-  'stylesPaneCSSChanges',
-  'timelineAsConsoleProfileResultPanel',
-  'headerOverrides',
-  'highlightErrorsElementsPanel',
-  'setAllBreakpointsEagerly',
-  'selfXssWarning',
+  Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS,
+  'cssTypeComponentLengthDeprecate',
+  Root.Runtime.ExperimentName.STYLES_PANE_CSS_CHANGES,
+  Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
+  Root.Runtime.ExperimentName.HEADER_OVERRIDES,
+  Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
+  Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY,
+  Root.Runtime.ExperimentName.SELF_XSS_WARNING,
   'evaluateExpressionsWithSourceMaps',
-  'useSourceMapScopes',
+  Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
   'fontEditor',
-  'networkPanelFilterBarRedesign',
-  'breadcrumbsPerformancePanel',
-  'trackContextMenu',
-  'sourcesFrameIndentationMarkersTemporarilyDisable',
+  Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
+  Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
+  Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE,
+  Root.Runtime.ExperimentName.AUTOFILL_VIEW,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -260,7 +261,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'consoleTraceExpand', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.PERFORMANCE, 'flamechartMouseWheelAction', false,
+        Common.Settings.SettingCategory.PERFORMANCE, 'flamechart-mouse-wheel-action', false,
         Common.Settings.SettingType.ENUM),
   ];
 
@@ -303,6 +304,7 @@ export async function deinitializeGlobalVars() {
   SDK.TargetManager.TargetManager.removeInstance();
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
+  Common.Revealer.RevealerRegistry.removeInstance();
   Common.Console.Console.removeInstance();
   Workspace.Workspace.WorkspaceImpl.removeInstance();
   Bindings.IgnoreListManager.IgnoreListManager.removeInstance();

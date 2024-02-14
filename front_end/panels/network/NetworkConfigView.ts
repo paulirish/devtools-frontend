@@ -69,7 +69,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
   constructor() {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.panel().context('network-conditions')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('network-conditions').track({resize: true})}`);
 
     this.contentElement.classList.add('network-config');
 
@@ -97,10 +97,10 @@ export class NetworkConfigView extends UI.Widget.VBox {
     input: HTMLInputElement,
     error: HTMLElement,
   } {
-    const userAgentSetting = Common.Settings.Settings.instance().createSetting('customUserAgent', '');
+    const userAgentSetting = Common.Settings.Settings.instance().createSetting('custom-user-agent', '');
     const userAgentMetadataSetting =
         Common.Settings.Settings.instance().createSetting<Protocol.Emulation.UserAgentMetadata|null>(
-            'customUserAgentMetadata', null);
+            'custom-user-agent-metadata', null);
     const userAgentSelectElement = document.createElement('select');
     userAgentSelectElement.setAttribute(
         'jslog', `${VisualLogging.dropDown().track({change: true}).context(userAgentSetting.name)}`);
@@ -204,7 +204,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
   private createCacheSection(): void {
     const section = this.createSection(i18nString(UIStrings.caching), 'network-config-disable-cache');
     section.appendChild(UI.SettingsUI.createSettingCheckbox(
-        i18nString(UIStrings.disableCache), Common.Settings.Settings.instance().moduleSetting('cacheDisabled'), true));
+        i18nString(UIStrings.disableCache), Common.Settings.Settings.instance().moduleSetting('cache-disabled'), true));
   }
 
   private createNetworkThrottlingSection(): void {
@@ -218,8 +218,8 @@ export class NetworkConfigView extends UI.Widget.VBox {
   private createUserAgentSection(): void {
     const userAgentMetadataSetting =
         Common.Settings.Settings.instance().createSetting<Protocol.Emulation.UserAgentMetadata|null>(
-            'customUserAgentMetadata', null);
-    const customUserAgentSetting = Common.Settings.Settings.instance().createSetting('customUserAgent', '');
+            'custom-user-agent-metadata', null);
+    const customUserAgentSetting = Common.Settings.Settings.instance().createSetting('custom-user-agent', '');
 
     const title = i18nString(UIStrings.userAgent);
     const section = this.createSection(title, 'network-config-ua');
@@ -299,9 +299,9 @@ export class NetworkConfigView extends UI.Widget.VBox {
 
   private createAcceptedEncodingSection(): void {
     const useCustomAcceptedEncodingSetting =
-        Common.Settings.Settings.instance().createSetting('useCustomAcceptedEncodings', false);
+        Common.Settings.Settings.instance().createSetting('use-custom-accepted-encodings', false);
     const customAcceptedEncodingSetting = Common.Settings.Settings.instance().createSetting(
-        'customAcceptedEncodings',
+        'custom-accepted-encodings',
         `${Protocol.Network.ContentEncoding.Gzip},${Protocol.Network.ContentEncoding.Br},${
             Protocol.Network.ContentEncoding.Deflate}`);
 

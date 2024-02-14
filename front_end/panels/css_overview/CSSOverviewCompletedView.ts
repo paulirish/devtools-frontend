@@ -760,7 +760,9 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
       <button
         title="${title}" aria-label="${title}"
         data-type="contrast" data-key="${key}" data-section="contrast" class="block" $="color"
-        jslog="${VisualLogging.action().track({click: true}).context('css-overview.contrast')}">
+        jslog="${VisualLogging.action('css-overview.contrast').track({
+      click: true,
+    })}">
         Text
       </button>
       <div class="block-title">
@@ -810,7 +812,9 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
     const blockFragment = UI.Fragment.Fragment.build`<li>
       <button title=${color} data-type="color" data-color="${color}"
         data-section="${section}" class="block" $="color"
-        jslog="${VisualLogging.action().track({click: true}).context('css-overview.color')}"></button>
+        jslog="${VisualLogging.action('css-overview.color').track({
+      click: true,
+    })}"></button>
       <div class="block-title color-text">${color}</div>
     </li>`;
 
@@ -897,7 +901,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
 
     this.#elementGridColumns = [
       {
-        id: 'nodeId',
+        id: 'node-id',
         title: i18nString(UIStrings.element),
         sortable: true,
         weight: 50,
@@ -933,7 +937,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
         defaultWeight: undefined,
       },
       {
-        id: 'sourceURL',
+        id: 'source-url',
         title: i18nString(UIStrings.source),
         sortable: false,
         weight: 100,
@@ -951,7 +955,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
         defaultWeight: undefined,
       },
       {
-        id: 'contrastRatio',
+        id: 'contrast-ratio',
         title: i18nString(UIStrings.contrastRatio),
         sortable: true,
         weight: 25,
@@ -1017,13 +1021,13 @@ export class ElementDetailsView extends UI.Widget.Widget {
 
     const [firstItem] = data;
     const visibility = new Set<string>();
-    'nodeId' in firstItem && firstItem.nodeId && visibility.add('nodeId');
+    'nodeId' in firstItem && firstItem.nodeId && visibility.add('node-id');
     'declaration' in firstItem && firstItem.declaration && visibility.add('declaration');
-    'sourceURL' in firstItem && firstItem.sourceURL && visibility.add('sourceURL');
-    'contrastRatio' in firstItem && firstItem.contrastRatio && visibility.add('contrastRatio');
+    'sourceURL' in firstItem && firstItem.sourceURL && visibility.add('source-url');
+    'contrastRatio' in firstItem && firstItem.contrastRatio && visibility.add('contrast-ratio');
 
     let relatedNodesMap: Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>|null|undefined;
-    if ('nodeId' in firstItem && visibility.has('nodeId')) {
+    if ('nodeId' in firstItem && visibility.has('node-id')) {
       // Grab the nodes from the frontend, but only those that have not been
       // retrieved already.
       const nodeIds = (data as {nodeId: Protocol.DOM.BackendNodeId}[]).reduce((prev, curr) => {
@@ -1039,7 +1043,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
 
     for (const item of data) {
       let frontendNode;
-      if ('nodeId' in item && visibility.has('nodeId')) {
+      if ('nodeId' in item && visibility.has('node-id')) {
         if (!relatedNodesMap) {
           continue;
         }
@@ -1078,7 +1082,7 @@ export class ElementNode extends DataGrid.SortableDataGrid.SortableDataGridNode<
   override createCell(columnId: string): HTMLElement {
     // Nodes.
     const frontendNode = this.#frontendNode;
-    if (columnId === 'nodeId') {
+    if (columnId === 'node-id') {
       const cell = this.createTD(columnId);
       cell.textContent = '...';
 
@@ -1095,14 +1099,14 @@ export class ElementNode extends DataGrid.SortableDataGrid.SortableDataGridNode<
         showNodeIcon.classList.add('show-element');
         UI.Tooltip.Tooltip.install(showNodeIcon, i18nString(UIStrings.showElement));
         showNodeIcon.tabIndex = 0;
-        showNodeIcon.onclick = (): Promise<void> => frontendNode.scrollIntoView();
+        showNodeIcon.onclick = () => frontendNode.scrollIntoView();
         cell.appendChild(showNodeIcon);
       });
       return cell;
     }
 
     // Links to CSS.
-    if (columnId === 'sourceURL') {
+    if (columnId === 'source-url') {
       const cell = this.createTD(columnId);
 
       if (this.data.range) {
@@ -1121,7 +1125,7 @@ export class ElementNode extends DataGrid.SortableDataGrid.SortableDataGridNode<
       return cell;
     }
 
-    if (columnId === 'contrastRatio') {
+    if (columnId === 'contrast-ratio') {
       const cell = this.createTD(columnId);
       const showAPCA = Root.Runtime.experiments.isEnabled('APCA');
       const contrastRatio = Platform.NumberUtilities.floor(this.data.contrastRatio, 2);

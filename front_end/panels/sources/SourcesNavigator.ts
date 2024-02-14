@@ -269,13 +269,13 @@ export class OverridesNavigatorView extends NavigatorView {
     const project = Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance().project();
     if (project) {
       const enableCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(
-          Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled'));
+          Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled'));
       this.toolbar.appendToolbarItem(enableCheckbox);
 
       this.toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator(true));
       const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearConfiguration), 'clear');
       clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
-        Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled').set(false);
+        Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(false);
         project.remove();
       });
       this.toolbar.appendToolbarItem(clearButton);
@@ -295,7 +295,7 @@ export class OverridesNavigatorView extends NavigatorView {
     if (!fileSystem) {
       return;
     }
-    Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled').set(true);
+    Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(true);
   }
 
   override sourceSelected(uiSourceCode: Workspace.UISourceCode.UISourceCode, focusSource: boolean): void {
@@ -310,7 +310,7 @@ export class OverridesNavigatorView extends NavigatorView {
 
 export class ContentScriptsNavigatorView extends NavigatorView {
   constructor() {
-    super('navigator-contentScripts');
+    super('navigator-content-scripts');
     const placeholder = new UI.EmptyWidget.EmptyWidget('');
     this.setPlaceholder(placeholder);
     placeholder.appendParagraph().appendChild(UI.Fragment.html`
@@ -340,8 +340,8 @@ export class SnippetsNavigatorView extends NavigatorView {
   `);
 
     const toolbar = new UI.Toolbar.Toolbar('navigator-toolbar');
-    const newButton =
-        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.newSnippet), 'plus', i18nString(UIStrings.newSnippet));
+    const newButton = new UI.Toolbar.ToolbarButton(
+        i18nString(UIStrings.newSnippet), 'plus', i18nString(UIStrings.newSnippet), 'sources.new-snippet');
     newButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       void this.create(
           Snippets.ScriptSnippetFileSystem.findSnippetsProject(), '' as Platform.DevToolsPath.EncodedPathString);

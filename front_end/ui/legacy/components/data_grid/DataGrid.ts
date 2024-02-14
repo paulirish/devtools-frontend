@@ -928,7 +928,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
   setName(name: string): void {
     this.columnWeightsSetting =
-        Common.Settings.Settings.instance().createSetting('dataGrid-' + name + '-columnWeights', {});
+        Common.Settings.Settings.instance().createSetting('data-grid-' + name + '-column-weights', {});
     this.loadColumnWeights();
   }
 
@@ -1572,9 +1572,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 // Keep in sync with .data-grid col.corner style rule.
 export const CornerWidth = 14;
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   SelectedNode = 'SelectedNode',
   DeselectedNode = 'DeselectedNode',
   OpenedNode = 'OpenedNode',
@@ -1590,33 +1588,25 @@ export type EventTypes<T> = {
   [Events.PaddingChanged]: void,
 };
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Order {
   Ascending = 'sort-ascending',
   Descending = 'sort-descending',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Align {
+export const enum Align {
   Center = 'center',
   Right = 'right',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum DataType {
+export const enum DataType {
   String = 'String',
   Boolean = 'Boolean',
 }
 
-export const ColumnResizePadding = 24;
+export const ColumnResizePadding = 34;
 export const CenterResizerOverBorderAdjustment = 3;
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ResizeMethod {
+export const enum ResizeMethod {
   Nearest = 'nearest',
   First = 'first',
   Last = 'last',
@@ -1937,7 +1927,7 @@ export class DataGridNode<T> {
         'jslog',
         `${
             VisualLogging.tableCell()
-                .track({click: true, keydown: Boolean(this.dataGrid?.columns[columnId].editable)})
+                .track({click: true, keydown: Boolean(this.dataGrid?.columns[columnId].editable), resize: true})
                 .context(columnId)}`);
     nodeToColumnIdMap.set(cell, columnId);
 
@@ -2455,7 +2445,7 @@ export interface Parameters {
   refreshCallback?: (() => void);
 }
 export interface ColumnDescriptor {
-  id: string;
+  id: Lowercase<string>;
   title?: Common.UIString.LocalizedString;
   titleDOMFragment?: DocumentFragment|null;
   sortable: boolean;

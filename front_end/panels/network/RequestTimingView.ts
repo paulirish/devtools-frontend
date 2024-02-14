@@ -363,7 +363,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   static createTimingTable(request: SDK.NetworkRequest.NetworkRequest, calculator: NetworkTimeCalculator): Element {
     const tableElement = document.createElement('table');
     tableElement.classList.add('network-timing-table');
-    tableElement.setAttribute('jslog', `${VisualLogging.pane().context('timing')}`);
+    tableElement.setAttribute('jslog', `${VisualLogging.pane('timing')}`);
     const colgroup = tableElement.createChild('colgroup');
     colgroup.createChild('col', 'labels');
     colgroup.createChild('col', 'bars');
@@ -684,9 +684,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum RequestTimeRangeNames {
+export const enum RequestTimeRangeNames {
   Push = 'push',
   Queueing = 'queueing',
   Blocking = 'blocking',

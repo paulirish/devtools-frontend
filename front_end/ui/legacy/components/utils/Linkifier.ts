@@ -708,7 +708,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   static linkHandlerSetting(): Common.Settings.Setting<string> {
     if (!linkHandlerSettingInstance) {
       linkHandlerSettingInstance =
-          Common.Settings.Settings.instance().createSetting('openLinkHandler', i18nString(UIStrings.auto));
+          Common.Settings.Settings.instance().createSetting('open-link-handler', i18nString(UIStrings.auto));
     }
     return linkHandlerSettingInstance;
   }
@@ -764,7 +764,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       result.push({
         section: 'reveal',
         title: destination ? i18nString(UIStrings.revealInS, {PH1: destination}) : i18nString(UIStrings.reveal),
-        handler: (): Promise<void> => {
+        handler: () => {
           if (revealable instanceof Breakpoints.BreakpointManager.BreakpointLocation) {
             Host.userMetrics.breakpointEditDialogRevealedFrom(
                 Host.UserMetrics.BreakpointEditDialogRevealedFrom.Linkifier);
@@ -796,12 +796,12 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       result.push({
         section: 'reveal',
         title: UI.UIUtils.openLinkExternallyLabel(),
-        handler: (): void => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(url),
+        handler: () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(url),
       });
       result.push({
         section: 'clipboard',
         title: UI.UIUtils.copyLinkAddressLabel(),
-        handler: (): void => Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(url),
+        handler: () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(url),
       });
     }
 
@@ -810,8 +810,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       result.push({
         section: 'clipboard',
         title: UI.UIUtils.copyFileNameLabel(),
-        handler: (): void =>
-            Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(contentProvider.displayName()),
+        handler: () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(contentProvider.displayName()),
       });
     }
 
@@ -824,9 +823,7 @@ export interface LinkDecorator extends Common.EventTarget.EventTarget<LinkDecora
 }
 
 export namespace LinkDecorator {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Events {
+  export const enum Events {
     LinkIconChanged = 'LinkIconChanged',
   }
 

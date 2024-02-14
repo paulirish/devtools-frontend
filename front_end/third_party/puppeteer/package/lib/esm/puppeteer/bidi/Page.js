@@ -1,17 +1,7 @@
 /**
- * Copyright 2022 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2022 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
@@ -58,7 +48,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     var e = new Error(message);
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
-import { first, firstValueFrom, forkJoin, from, map, raceWith, } from '../../third_party/rxjs/rxjs.js';
+import { firstValueFrom, from, map, raceWith, zip, } from '../../third_party/rxjs/rxjs.js';
 import { Page, } from '../api/Page.js';
 import { Accessibility } from '../cdp/Accessibility.js';
 import { Coverage } from '../cdp/Coverage.js';
@@ -68,7 +58,7 @@ import { Tracing } from '../cdp/Tracing.js';
 import { ConsoleMessage, } from '../common/ConsoleMessage.js';
 import { TargetCloseError, UnsupportedOperation } from '../common/Errors.js';
 import { NetworkManagerEvent } from '../common/NetworkManagerEvents.js';
-import { debugError, evaluationString, NETWORK_IDLE_TIME, timeout, validateDialogType, waitForHTTP, } from '../common/util.js';
+import { debugError, evaluationString, NETWORK_IDLE_TIME, parsePDFOptions, timeout, validateDialogType, } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { Deferred } from '../util/Deferred.js';
 import { disposeSymbol } from '../util/disposable.js';
@@ -405,13 +395,22 @@ export class BidiPage extends Page {
     async reload(options = {}) {
         const { waitUntil = 'load', timeout: ms = this._timeoutSettings.navigationTimeout(), } = options;
         const [readiness, networkIdle] = getBiDiReadinessState(waitUntil);
-        const response = await firstValueFrom(this._waitWithNetworkIdle(this.#connection.send('browsingContext.reload', {
+        const result$ = zip(from(this.#connection.send('browsingContext.reload', {
             context: this.mainFrame()._id,
             wait: readiness,
-        }), networkIdle)
-            .pipe(raceWith(timeout(ms), from(this.#closedDeferred.valueOrThrow())))
-            .pipe(rewriteNavigationError(this.url(), ms)));
-        return this.getNavigationResponse(response?.result.navigation);
+        })), ...(networkIdle !== null
+            ? [
+                this.waitForNetworkIdle$({
+                    timeout: ms,
+                    concurrency: networkIdle === 'networkidle2' ? 2 : 0,
+                    idleTime: NETWORK_IDLE_TIME,
+                }),
+            ]
+            : [])).pipe(map(([{ result }]) => {
+            return result;
+        }), raceWith(timeout(ms), from(this.#closedDeferred.valueOrThrow())), rewriteNavigationError(this.url(), ms));
+        const result = await firstValueFrom(result$);
+        return this.getNavigationResponse(result.navigation);
     }
     setDefaultNavigationTimeout(timeout) {
         this._timeoutSettings.setDefaultNavigationTimeout(timeout);
@@ -465,8 +464,8 @@ export class BidiPage extends Page {
         return this.#viewport;
     }
     async pdf(options = {}) {
-        const { path = undefined } = options;
-        const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize, timeout: ms, } = this._getPDFOptions(options, 'cm');
+        const { timeout: ms = this._timeoutSettings.timeout(), path = undefined } = options;
+        const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize, } = parsePDFOptions(options, 'cm');
         const pageRanges = ranges ? ranges.split(', ') : [];
         const { result } = await firstValueFrom(from(this.#connection.send('browsingContext.print', {
             context: this.mainFrame()._id,
@@ -487,16 +486,12 @@ export class BidiPage extends Page {
     }
     async createPDFStream(options) {
         const buffer = await this.pdf(options);
-        try {
-            const { Readable } = await import('stream');
-            return Readable.from(buffer);
-        }
-        catch (error) {
-            if (error instanceof TypeError) {
-                throw new Error('Can only pass a file path in a Node-like environment.');
-            }
-            throw error;
-        }
+        return new ReadableStream({
+            start(controller) {
+                controller.enqueue(buffer);
+                controller.close();
+            },
+        });
     }
     async _screenshot(options) {
         const { clip, type, captureBeyondViewport, quality } = options;
@@ -548,30 +543,6 @@ export class BidiPage extends Page {
         });
         return data;
     }
-    async waitForRequest(urlOrPredicate, options = {}) {
-        const { timeout = this._timeoutSettings.timeout() } = options;
-        return await waitForHTTP(this.#networkManager, NetworkManagerEvent.Request, urlOrPredicate, timeout, this.#closedDeferred);
-    }
-    async waitForResponse(urlOrPredicate, options = {}) {
-        const { timeout = this._timeoutSettings.timeout() } = options;
-        return await waitForHTTP(this.#networkManager, NetworkManagerEvent.Response, urlOrPredicate, timeout, this.#closedDeferred);
-    }
-    async waitForNetworkIdle(options = {}) {
-        const { idleTime = NETWORK_IDLE_TIME, timeout: ms = this._timeoutSettings.timeout(), } = options;
-        await firstValueFrom(this._waitForNetworkIdle(this.#networkManager, idleTime).pipe(raceWith(timeout(ms), from(this.#closedDeferred.valueOrThrow()))));
-    }
-    /** @internal */
-    _waitWithNetworkIdle(observableInput, networkIdle) {
-        const delay = networkIdle
-            ? this._waitForNetworkIdle(this.#networkManager, NETWORK_IDLE_TIME, networkIdle === 'networkidle0' ? 0 : 2)
-            : from(Promise.resolve());
-        return forkJoin([
-            from(observableInput).pipe(first()),
-            delay.pipe(first()),
-        ]).pipe(map(([response]) => {
-            return response;
-        }));
-    }
     async createCDPSession() {
         const { sessionId } = await this.mainFrame()
             .context()
@@ -611,6 +582,26 @@ export class BidiPage extends Page {
             cacheDisabled: !enabled,
         });
     }
+    async cookies(...urls) {
+        const normalizedUrls = (urls.length ? urls : [this.url()]).map(url => {
+            return new URL(url);
+        });
+        const bidiCookies = await this.#connection.send('storage.getCookies', {
+            partition: {
+                type: 'context',
+                context: this.mainFrame()._id,
+            },
+        });
+        return bidiCookies.result.cookies
+            .map(cookie => {
+            return bidiToPuppeteerCookie(cookie);
+        })
+            .filter(cookie => {
+            return normalizedUrls.some(url => {
+                return testUrlMatchCookie(cookie, url);
+            });
+        });
+    }
     isServiceWorkerBypassed() {
         throw new UnsupportedOperation();
     }
@@ -638,11 +629,55 @@ export class BidiPage extends Page {
     emulateNetworkConditions() {
         throw new UnsupportedOperation();
     }
-    cookies() {
-        throw new UnsupportedOperation();
-    }
-    setCookie() {
-        throw new UnsupportedOperation();
+    async setCookie(...cookies) {
+        const pageURL = this.url();
+        const pageUrlStartsWithHTTP = pageURL.startsWith('http');
+        for (const cookie of cookies) {
+            let cookieUrl = cookie.url || '';
+            if (!cookieUrl && pageUrlStartsWithHTTP) {
+                cookieUrl = pageURL;
+            }
+            assert(cookieUrl !== 'about:blank', `Blank page can not have cookie "${cookie.name}"`);
+            assert(!String.prototype.startsWith.call(cookieUrl || '', 'data:'), `Data URL page can not have cookie "${cookie.name}"`);
+            const normalizedUrl = URL.canParse(cookieUrl)
+                ? new URL(cookieUrl)
+                : undefined;
+            const domain = cookie.domain ?? normalizedUrl?.hostname;
+            assert(domain !== undefined, `At least one of the url and domain needs to be specified`);
+            const bidiCookie = {
+                domain: domain,
+                name: cookie.name,
+                value: {
+                    type: 'string',
+                    value: cookie.value,
+                },
+                ...(cookie.path !== undefined ? { path: cookie.path } : {}),
+                ...(cookie.httpOnly !== undefined ? { httpOnly: cookie.httpOnly } : {}),
+                ...(cookie.secure !== undefined ? { secure: cookie.secure } : {}),
+                ...(cookie.sameSite !== undefined
+                    ? { sameSite: convertCookiesSameSiteCdpToBiDi(cookie.sameSite) }
+                    : {}),
+                ...(cookie.expires !== undefined ? { expiry: cookie.expires } : {}),
+                // Chrome-specific properties.
+                ...cdpSpecificCookiePropertiesFromPuppeteerToBidi(cookie, 'sameParty', 'sourceScheme', 'priority', 'url'),
+            };
+            // TODO: delete cookie before setting them.
+            // await this.deleteCookie(bidiCookie);
+            const partition = cookie.partitionKey !== undefined
+                ? {
+                    type: 'storageKey',
+                    sourceOrigin: cookie.partitionKey,
+                    userContext: this.#browserContext.id,
+                }
+                : {
+                    type: 'context',
+                    context: this.mainFrame()._id,
+                };
+            await this.#connection.send('storage.setCookie', {
+                cookie: bidiCookie,
+                partition,
+            });
+        }
     }
     deleteCookie() {
         throw new UnsupportedOperation();
@@ -712,5 +747,106 @@ function getStackTraceLocations(stackTrace) {
 }
 function evaluationExpression(fun, ...args) {
     return `() => {${evaluationString(fun, ...args)}}`;
+}
+/**
+ * Check domains match.
+ * According to cookies spec, this check should match subdomains as well, but CDP
+ * implementation does not do that, so this method matches only the exact domains, not
+ * what is written in the spec:
+ * https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.3
+ */
+function testUrlMatchCookieHostname(cookie, normalizedUrl) {
+    const cookieDomain = cookie.domain.toLowerCase();
+    const urlHostname = normalizedUrl.hostname.toLowerCase();
+    return cookieDomain === urlHostname;
+}
+/**
+ * Check paths match.
+ * Spec: https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.4
+ */
+function testUrlMatchCookiePath(cookie, normalizedUrl) {
+    const uriPath = normalizedUrl.pathname;
+    const cookiePath = cookie.path;
+    if (uriPath === cookiePath) {
+        // The cookie-path and the request-path are identical.
+        return true;
+    }
+    if (uriPath.startsWith(cookiePath)) {
+        // The cookie-path is a prefix of the request-path.
+        if (cookiePath.endsWith('/')) {
+            // The last character of the cookie-path is %x2F ("/").
+            return true;
+        }
+        if (uriPath[cookiePath.length] === '/') {
+            // The first character of the request-path that is not included in the cookie-path
+            // is a %x2F ("/") character.
+            return true;
+        }
+    }
+    return false;
+}
+/**
+ * Checks the cookie matches the URL according to the spec:
+ */
+function testUrlMatchCookie(cookie, url) {
+    const normalizedUrl = new URL(url);
+    assert(cookie !== undefined);
+    if (!testUrlMatchCookieHostname(cookie, normalizedUrl)) {
+        return false;
+    }
+    return testUrlMatchCookiePath(cookie, normalizedUrl);
+}
+function bidiToPuppeteerCookie(bidiCookie) {
+    return {
+        name: bidiCookie.name,
+        // Presents binary value as base64 string.
+        value: bidiCookie.value.value,
+        domain: bidiCookie.domain,
+        path: bidiCookie.path,
+        size: bidiCookie.size,
+        httpOnly: bidiCookie.httpOnly,
+        secure: bidiCookie.secure,
+        sameSite: convertCookiesSameSiteBiDiToCdp(bidiCookie.sameSite),
+        expires: bidiCookie.expiry ?? -1,
+        session: bidiCookie.expiry === undefined || bidiCookie.expiry <= 0,
+        // Extending with CDP-specific properties with `goog:` prefix.
+        ...cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, 'sameParty', 'sourceScheme', 'partitionKey', 'partitionKeyOpaque', 'priority'),
+    };
+}
+const CDP_SPECIFIC_PREFIX = 'goog:';
+/**
+ * Gets CDP-specific properties from the BiDi cookie and returns them as a new object.
+ */
+function cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, ...propertyNames) {
+    const result = {};
+    for (const property of propertyNames) {
+        if (bidiCookie[CDP_SPECIFIC_PREFIX + property] !== undefined) {
+            result[property] = bidiCookie[CDP_SPECIFIC_PREFIX + property];
+        }
+    }
+    return result;
+}
+/**
+ * Gets CDP-specific properties from the cookie, adds CDP-specific prefixes and returns
+ * them as a new object which can be used in BiDi.
+ */
+function cdpSpecificCookiePropertiesFromPuppeteerToBidi(cookieParam, ...propertyNames) {
+    const result = {};
+    for (const property of propertyNames) {
+        if (cookieParam[property] !== undefined) {
+            result[CDP_SPECIFIC_PREFIX + property] = cookieParam[property];
+        }
+    }
+    return result;
+}
+function convertCookiesSameSiteBiDiToCdp(sameSite) {
+    return sameSite === 'strict' ? 'Strict' : sameSite === 'lax' ? 'Lax' : 'None';
+}
+function convertCookiesSameSiteCdpToBiDi(sameSite) {
+    return sameSite === 'Strict'
+        ? "strict" /* Bidi.Network.SameSite.Strict */
+        : sameSite === 'Lax'
+            ? "lax" /* Bidi.Network.SameSite.Lax */
+            : "none" /* Bidi.Network.SameSite.None */;
 }
 //# sourceMappingURL=Page.js.map

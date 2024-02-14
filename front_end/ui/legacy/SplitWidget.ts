@@ -91,6 +91,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     (this.mainElement.createChild('slot') as HTMLSlotElement).name = 'insertion-point-main';
     (this.sidebarElementInternal.createChild('slot') as HTMLSlotElement).name = 'insertion-point-sidebar';
     this.resizerElementInternal = this.contentElement.createChild('div', 'shadow-split-widget-resizer');
+    this.resizerElementInternal.setAttribute('jslog', `${VisualLogging.resizer('split-view').track({drag: true})}`);
     this.resizerElementSize = null;
 
     this.resizerWidget = new SimpleResizerWidget();
@@ -874,17 +875,13 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ShowMode {
+export const enum ShowMode {
   Both = 'Both',
   OnlyMain = 'OnlyMain',
   OnlySidebar = 'OnlySidebar',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   SidebarSizeChanged = 'SidebarSizeChanged',
   ShowModeChanged = 'ShowModeChanged',
 }

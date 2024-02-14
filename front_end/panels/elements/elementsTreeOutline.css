@@ -34,11 +34,13 @@
 .adorner-with-icon {
   display: flex;
   justify-content: center;
+  align-items: center;
   overflow: hidden;
+  height: 100%;
 
   devtools-icon {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
   }
 }
 
@@ -96,7 +98,7 @@
 .elements-disclosure li.parent:not(.always-parent)::before {
   box-sizing: border-box;
   user-select: none;
-  -webkit-mask-image: var(--image-file-triangle-right);
+  mask-image: var(--image-file-triangle-right);
   height: 14px;
   width: 14px;
   content: "\A0\A0";

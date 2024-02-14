@@ -5,8 +5,8 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
+import type * as Profiler from '../../panels/profiler/profiler.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import type * as Profiler from '../profiler/profiler.js';
 
 import type * as Timeline from './timeline.js';
 
@@ -133,7 +133,7 @@ UI.ViewManager.registerViewExtension({
 
 UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.PANEL,
-  id: 'js_profiler',
+  id: 'js-profiler',
   title: i18nLazyString(UIStrings.javascriptProfiler),
   commandPrompt: i18nLazyString(UIStrings.showJavascriptProfiler),
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
@@ -387,7 +387,7 @@ Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.PERFORMANCE,
   storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.hideChromeFrameInLayersView),
-  settingName: 'frameViewerHideChromeWindow',
+  settingName: 'frame-viewer-hide-chrome-window',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: false,
 });

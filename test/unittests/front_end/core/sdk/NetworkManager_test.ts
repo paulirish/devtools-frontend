@@ -9,6 +9,9 @@ import * as Common from '../../../../../front_end/core/common/common.js';
 import * as Persistence from '../../../../../front_end/models/persistence/persistence.js';
 import * as Platform from '../../../../../front_end/core/platform/platform.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
+import * as Bindings from '../../../../../front_end/models/bindings/bindings.js';
+import * as TextUtils from '../../../../../front_end/models/text_utils/text_utils.js';
+import * as Workspace from '../../../../../front_end/models/workspace/workspace.js';
 import {createTarget, describeWithEnvironment} from '../../helpers/EnvironmentHelpers.js';
 import {createWorkspaceProject} from '../../helpers/OverridesHelpers.js';
 import {describeWithMockConnection} from '../../helpers/MockConnection.js';
@@ -134,7 +137,7 @@ describe('NetworkDispatcher', () => {
         statusCode: 200,
       } as Protocol.Network.ResponseReceivedExtraInfoEvent;
       const mockResponseReceivedEventWithHeaders =
-          (headers: Protocol.Network.Headers): Protocol.Network.ResponseReceivedEvent => {
+          (headers: Protocol.Network.Headers) => {
             return {
               requestId: 'mockId',
               loaderId: 'mockLoaderId',
@@ -203,7 +206,11 @@ describe('NetworkDispatcher', () => {
     const resourceUrlsFoo = ['foo'] as Platform.DevToolsPath.UrlString[];
 
     beforeEach(() => {
-      const networkManager = new Common.ObjectWrapper.ObjectWrapper();
+      const networkManager: Common.ObjectWrapper.ObjectWrapper<unknown>&{target?: () => void} =
+          new Common.ObjectWrapper.ObjectWrapper();
+      networkManager.target = () => ({
+        model: () => null,
+      });
       networkDispatcher = new SDK.NetworkManager.NetworkDispatcher(networkManager as SDK.NetworkManager.NetworkManager);
     });
 
@@ -329,7 +336,7 @@ describeWithMockConnection('InterceptedRequest', () => {
         fetchAgent, request, Protocol.Network.ResourceType.Document, requestId, networkRequest, responseStatusCode,
         filteredResponseHeaders);
     interceptedRequest.responseBody = async () => {
-      return {error: null, content: responseBody, encoded: false};
+      return new TextUtils.ContentData.ContentData(responseBody, false, 'text/html');
     };
 
     assert.isTrue(fulfillRequestSpy.notCalled);
@@ -355,7 +362,7 @@ describeWithMockConnection('InterceptedRequest', () => {
         target, networkRequest, requestId, responseCode, headersFromServer, responseBody, {
           requestId,
           responseCode,
-          body: responseBody,
+          body: btoa(responseBody),
           responseHeaders: expectedOverriddenHeaders,
         },
         expectedPersistedSetCookieHeaders);
@@ -466,6 +473,7 @@ describeWithMockConnection('InterceptedRequest', () => {
           ]`,
           },
           {name: 'helloWorld.html', path: 'www.example.com/', content: 'Hello World!'},
+          {name: 'utf16.html', path: 'www.example.com/', content: 'Overwritten with non-UTF16 (TODO: fix this!)'},
           {name: 'something.html', path: 'file:/usr/local/foo/content/', content: 'Override for something'},
           {
             name: '.headers',
@@ -538,7 +546,7 @@ describeWithMockConnection('InterceptedRequest', () => {
         requestId, responseCode, [{name: 'content-type', value: 'text/html; charset=utf-8'}], responseBody, {
           requestId,
           responseCode,
-          body: responseBody,
+          body: btoa(responseBody),
           responseHeaders: [
             {name: 'css-only', value: 'only added to css files'},
             {name: 'age', value: 'overridden'},
@@ -563,7 +571,7 @@ describeWithMockConnection('InterceptedRequest', () => {
     const interceptedRequest = new SDK.NetworkManager.InterceptedRequest(
         fetchAgent, request, Protocol.Network.ResourceType.Document, requestId, networkRequest);
     interceptedRequest.responseBody = async () => {
-      return {error: null, content: 'interceptedRequest content', encoded: false};
+      return new TextUtils.ContentData.ContentData('interceptedRequest content', false, 'text/html');
     };
 
     assert.isTrue(continueRequestSpy.notCalled);
@@ -590,6 +598,50 @@ describeWithMockConnection('InterceptedRequest', () => {
             {name: 'content-type', value: 'text/html; charset=utf-8'},
           ],
         });
+  });
+
+  describe('NetworkPersistenceManager', () => {
+    it('decodes the intercepted response body with the right charset', async () => {
+      const requestId = 'request_id_utf_16' as Protocol.Fetch.RequestId;
+      const request = {
+        method: 'GET',
+        url: 'https://www.example.com/utf16.html',
+      } as Protocol.Network.Request;
+      const fetchAgent = target.fetchAgent();
+      sinon.spy(fetchAgent, 'invoke_continueRequest');
+
+      const networkRequest = SDK.NetworkRequest.NetworkRequest.create(
+          requestId as unknown as Protocol.Network.RequestId, request.url as Platform.DevToolsPath.UrlString,
+          request.url as Platform.DevToolsPath.UrlString, null, null, null);
+      networkRequest.originalResponseHeaders = [{name: 'content-type', value: 'text/html; charset-utf-16'}];
+
+      // Create a quick'n dirty network UISourceCode for the request manually. We need to establish a binding to the
+      // overridden file system UISourceCode.
+      const networkProject = new Bindings.ContentProviderBasedProject.ContentProviderBasedProject(
+          Workspace.Workspace.WorkspaceImpl.instance(), 'testing-network', Workspace.Workspace.projectTypes.Network,
+          'Override network project', false);
+      Workspace.Workspace.WorkspaceImpl.instance().addProject(networkProject);
+      const uiSourceCode = networkProject.createUISourceCode(
+          'https://www.example.com/utf16.html' as Platform.DevToolsPath.UrlString,
+          Common.ResourceType.resourceTypes.Document);
+      networkProject.addUISourceCode(uiSourceCode);
+
+      const interceptedRequest = new SDK.NetworkManager.InterceptedRequest(
+          fetchAgent, request, Protocol.Network.ResourceType.Document, requestId, networkRequest, 200,
+          [{name: 'content-type', value: 'text/html; charset-utf-16'}]);
+      interceptedRequest.responseBody = async () => {
+        // Very simple HTML doc base64 encoded.
+        return new TextUtils.ContentData.ContentData(
+            '//48ACEARABPAEMAVABZAFAARQAgAGgAdABtAGwAPgAKADwAcAA+AEkA8QB0AOsAcgBuAOIAdABpAPQAbgDgAGwAaQB6AOYAdABpAPgAbgADJjTYBt88AC8AcAA+AAoA',
+            true, 'text/html', 'utf-16');
+      };
+
+      await SDK.NetworkManager.MultitargetNetworkManager.instance().requestIntercepted(interceptedRequest);
+      const content = await Persistence.NetworkPersistenceManager.NetworkPersistenceManager.instance()
+                          .originalContentForUISourceCode(uiSourceCode);
+
+      assert.strictEqual(content, '<!DOCTYPE html>\n<p>Iñtërnâtiônàlizætiøn☃𝌆</p>\n');
+    });
   });
 
   it('can override headers-only for a status 300 (redirect) request', async () => {
@@ -645,7 +697,7 @@ describeWithMockConnection('InterceptedRequest', () => {
         requestId, responseCode, [{name: 'content-type', value: 'text/html; charset=utf-8'}], responseBody, {
           requestId,
           responseCode,
-          body: 'interceptedRequest content',
+          body: btoa(responseBody),
           responseHeaders: [
             {name: 'age', value: 'overridden'},
             {name: 'content-type', value: 'text/html; charset=utf-8'},
@@ -716,7 +768,7 @@ describeWithMockConnection('InterceptedRequest', () => {
         responseBody, {
           requestId,
           responseCode,
-          body: responseBody,
+          body: btoa(responseBody),
           responseHeaders: [
             {name: 'age', value: 'overridden'},
             {name: 'content-type', value: 'text/html; charset=utf-8'},
@@ -767,7 +819,7 @@ describeWithMockConnection('InterceptedRequest', () => {
         responseBody, {
           requestId,
           responseCode,
-          body: responseBody,
+          body: btoa(responseBody),
           responseHeaders: [
             {name: 'long-file-url-header', value: 'long file url header value'},
             {name: 'age', value: 'overridden'},
@@ -815,13 +867,13 @@ describeWithMockConnection('InterceptedRequest', () => {
     await checkRequestOverride(target, request, requestId1, responseCode, originalResponseHeaders, body, {
       requestId: requestId1,
       responseCode,
-      body,
+      body: btoa(body),
       responseHeaders,
     });
     await checkRequestOverride(target, request, requestId2, responseCode, originalResponseHeaders, body, {
       requestId: requestId2,
       responseCode,
-      body,
+      body: btoa(body),
       responseHeaders,
     });
     assert.isTrue(networkManager.dispatcher.requestForId(requestId1)?.wasIntercepted());

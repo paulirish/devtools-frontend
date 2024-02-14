@@ -180,7 +180,7 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
       this.#currentlyLoadingPerTarget.set(target.id(), currentCount + 1);
     }
     if (this.#currentlyLoading > this.#maxConcurrentLoads) {
-      const entry: LoadQueueEntry = {resolve: (): void => {}, reject: (): void => {}};
+      const entry: LoadQueueEntry = {resolve: () => {}, reject: (): void => {}};
       const waitForCapacity = new Promise<void>((resolve, reject) => {
         entry.resolve = resolve;
         entry.reject = reject;
@@ -334,7 +334,7 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
   }> {
     const networkManager = (target.model(NetworkManager) as NetworkManager);
     const ioModel = (target.model(IOModel) as IOModel);
-    const disableCache = Common.Settings.Settings.instance().moduleSetting('cacheDisabled').get();
+    const disableCache = Common.Settings.Settings.instance().moduleSetting('cache-disabled').get();
     const resource = await networkManager.loadNetworkResource(frameId, url, {disableCache, includeCredentials: true});
     try {
       const content = resource.stream ? await ioModel.readToString(resource.stream) : '';
@@ -360,12 +360,10 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
 }
 
 export function getLoadThroughTargetSetting(): Common.Settings.Setting<boolean> {
-  return Common.Settings.Settings.instance().createSetting('loadThroughTarget', true);
+  return Common.Settings.Settings.instance().createSetting('load-through-target', true);
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   Update = 'Update',
 }
 

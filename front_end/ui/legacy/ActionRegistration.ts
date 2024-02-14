@@ -4,7 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Platform from '../../core/platform/platform.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 
 import {Context} from './Context.js';
@@ -219,7 +219,11 @@ export class Action extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     return this.actionRegistration.experiment;
   }
 
-  condition(): string|undefined {
+  setting(): string|undefined {
+    return this.actionRegistration.setting;
+  }
+
+  condition(): Root.Runtime.Condition|undefined {
     return this.actionRegistration.condition;
   }
 
@@ -228,29 +232,40 @@ export class Action extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 }
 
-const registeredActionExtensions: Array<Action> = [];
-
-const actionIdSet = new Set<string>();
+const registeredActions = new Map<string, Action>();
 
 export function registerActionExtension(registration: ActionRegistration): void {
   const actionId = registration.actionId;
-  if (actionIdSet.has(actionId)) {
-    throw new Error(`Duplicate Action id '${actionId}': ${new Error().stack}`);
+  if (registeredActions.has(actionId)) {
+    throw new Error(`Duplicate action ID '${actionId}'`);
   }
-  actionIdSet.add(actionId);
-  registeredActionExtensions.push(new Action(registration));
+  if (!Platform.StringUtilities.isExtendedKebabCase(actionId)) {
+    throw new Error(`Invalid action ID '${actionId}'`);
+  }
+  registeredActions.set(actionId, new Action(registration));
 }
 
 export function reset(): void {
-  actionIdSet.clear();
-  registeredActionExtensions.length = 0;
+  registeredActions.clear();
 }
 
 export function getRegisteredActionExtensions(): Array<Action> {
-  return registeredActionExtensions
-      .filter(
-          action => Root.Runtime.Runtime.isDescriptorEnabled(
-              {experiment: action.experiment(), condition: action.condition()}))
+  return Array.from(registeredActions.values())
+      .filter(action => {
+        const settingName = action.setting();
+        try {
+          if (settingName && !Common.Settings.moduleSetting(settingName).get()) {
+            return false;
+          }
+        } catch (err) {
+          if (err.message.startsWith('No setting registered')) {
+            return false;
+          }
+        }
+
+        return Root.Runtime.Runtime.isDescriptorEnabled(
+            {experiment: action.experiment(), condition: action.condition()});
+      })
       .sort((firstAction, secondAction) => {
         const order1 = firstAction.order() || 0;
         const order2 = secondAction.order() || 0;
@@ -259,12 +274,7 @@ export function getRegisteredActionExtensions(): Array<Action> {
 }
 
 export function maybeRemoveActionExtension(actionId: string): boolean {
-  const actionIndex = registeredActionExtensions.findIndex(action => action.id() === actionId);
-  if (actionIndex < 0 || !actionIdSet.delete(actionId)) {
-    return false;
-  }
-  registeredActionExtensions.splice(actionIndex, 1);
-  return true;
+  return registeredActions.delete(actionId);
 }
 
 export const enum Platforms {
@@ -285,8 +295,7 @@ export type EventTypes = {
   [Events.Toggled]: boolean,
 };
 
-// eslint-disable-next-line rulesdir/const_enum
-export enum ActionCategory {
+export const enum ActionCategory {
   NONE = '',  // `NONE` must be a falsy value. Legacy code uses if-checks for the category.
   ELEMENTS = 'ELEMENTS',
   SCREENSHOT = 'SCREENSHOT',
@@ -527,12 +536,19 @@ export interface ActionRegistration {
    */
   experiment?: Root.Runtime.ExperimentName;
   /**
-   * A condition represented as a string the action's availability depends on. Conditions come
-   * from the queryParamsObject defined in Runtime and just as the experiment field, they determine the availability
-   * of the setting. A condition can be negated by prepending a ‘!’ to the value of the condition
-   * property and in that case the behaviour of the action's availability will be inverted.
+   * The name of the setting an action is associated with. Enabling and
+   * disabling the declared setting will enable and disable the action
+   * respectively. Note that changing the setting requires a reload for it to
+   * apply to action registration.
    */
-  condition?: Root.Runtime.ConditionName;
+  setting?: string;
+  /**
+   * A condition is a function that will make the action available if it
+   * returns true, and not available, otherwise. Make sure that objects you
+   * access from inside the condition function are ready at the time when the
+   * setting conditions are checked.
+   */
+  condition?: Root.Runtime.Condition;
   /**
    * Used to sort actions when all registered actions are queried.
    */

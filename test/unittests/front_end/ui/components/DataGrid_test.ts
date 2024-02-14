@@ -715,7 +715,7 @@ describe('DataGrid', () => {
     const makeColumnsWithWeightings = (...weights: number[]): DataGrid.DataGridUtils.Column[] => {
       return weights.map((weight, index) => {
         return {
-          id: `column-${index}`,
+          id: `column-${index}` as Lowercase<string>,
           title: `Column ${index}`,
           sortable: false,
           visible: true,

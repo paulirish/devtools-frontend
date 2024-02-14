@@ -233,7 +233,7 @@ export class Toolbar {
     };
     if (options.userActionCode) {
       const actionCode = options.userActionCode;
-      handler = (): void => {
+      handler = () => {
         Host.userMetrics.actionTaken(actionCode);
         void action.execute();
       };
@@ -657,9 +657,7 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
 }
 
 export namespace ToolbarButton {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Events {
+  export const enum Events {
     Click = 'Click',
     MouseDown = 'MouseDown',
   }
@@ -693,7 +691,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
     this.proxyElement.classList.add('toolbar-prompt-proxy');
     this.proxyElement.addEventListener('keydown', (event: Event) => this.onKeydownCallback(event as KeyboardEvent));
     this.prompt.initialize(
-        completions || ((): Promise<never[]> => Promise.resolve([])),
+        completions || (() => Promise.resolve([])),
         ' ',
         dynamicCompletions,
     );
@@ -765,9 +763,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
 }
 
 export namespace ToolbarInput {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Event {
+  export const enum Event {
     TextChanged = 'TextChanged',
     EnterPressed = 'EnterPressed',
   }
@@ -831,6 +827,9 @@ export class ToolbarMenuButton extends ToolbarButton {
   private triggerTimeout?: number;
   constructor(contextMenuHandler: (arg0: ContextMenu) => void, useSoftMenu?: boolean, jslogContext?: string) {
     super('', 'dots-vertical', undefined, jslogContext);
+    if (jslogContext) {
+      this.element.setAttribute('jslog', `${VisualLogging.dropDown().track({click: true}).context(jslogContext)}`);
+    }
     this.contextMenuHandler = contextMenuHandler;
     this.useSoftMenu = Boolean(useSoftMenu);
     ARIAUtils.markAsMenuButton(this.element);
@@ -1132,15 +1131,13 @@ export interface ToolbarItemRegistration {
   label?: () => Platform.UIString.LocalizedString;
   showLabel?: boolean;
   actionId?: string;
-  condition?: string;
+  condition?: Root.Runtime.Condition;
   loadItem?: (() => Promise<Provider>);
   experiment?: string;
   jslog?: string;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ToolbarItemLocation {
+export const enum ToolbarItemLocation {
   FILES_NAVIGATION_TOOLBAR = 'files-navigator-toolbar',
   MAIN_TOOLBAR_RIGHT = 'main-toolbar-right',
   MAIN_TOOLBAR_LEFT = 'main-toolbar-left',

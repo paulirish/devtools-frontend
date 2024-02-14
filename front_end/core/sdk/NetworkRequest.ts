@@ -38,13 +38,12 @@ import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 
-import {ContentData as ContentDataClass, type ContentDataOrError} from './ContentData.js';
-import {Attributes, type Cookie} from './Cookie.js';
+import {Attribute, type Cookie} from './Cookie.js';
 import {CookieModel} from './CookieModel.js';
 import {CookieParser} from './CookieParser.js';
 import * as HttpReasonPhraseStrings from './HttpReasonPhraseStrings.js';
-import {parseContentType} from './MimeType.js';
 import {Events as NetworkManagerEvents, NetworkManager} from './NetworkManager.js';
+import {ServerSentEvents} from './ServerSentEvents.js';
 import {ServerTiming} from './ServerTiming.js';
 import {Type} from './Target.js';
 
@@ -201,7 +200,7 @@ const str_ = i18n.i18n.registerUIStrings('core/sdk/NetworkRequest.ts', UIStrings
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements
-    TextUtils.ContentProvider.ContentProvider {
+    TextUtils.ContentProvider.StreamingContentProvider {
   #requestIdInternal: string;
   #backendRequestIdInternal?: Protocol.Network.RequestId;
   readonly #documentURLInternal: Platform.DevToolsPath.UrlString;
@@ -232,9 +231,9 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #webBundleInfoInternal: WebBundleInfo|null;
   #webBundleInnerRequestInfoInternal: WebBundleInnerRequestInfo|null;
   #resourceTypeInternal: Common.ResourceType.ResourceType;
-  #contentDataInternal: Promise<ContentDataOrError>|null;
+  #contentDataInternal: Promise<TextUtils.ContentData.ContentDataOrError>|null;
+  #streamingContentData: Promise<TextUtils.StreamingContentData.StreamingContentDataOrError>|null;
   readonly #framesInternal: WebSocketFrame[];
-  readonly #eventSourceMessagesInternal: EventSourceMessage[];
   #responseHeaderValues: {
     [x: string]: string|undefined,
   };
@@ -277,6 +276,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #canceledInternal!: boolean;
   #preservedInternal!: boolean;
   #mimeTypeInternal!: string;
+  #charset!: string;
   #parsedURLInternal!: Common.ParsedURL.ParsedURL;
   #nameInternal!: string|undefined;
   #pathInternal!: string|undefined;
@@ -301,12 +301,13 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #serverTimingsInternal?: ServerTiming[]|null;
   #queryStringInternal?: string|null;
   #parsedQueryParameters?: NameValue[];
-  #contentDataProvider?: (() => Promise<ContentDataOrError>);
+  #contentDataProvider?: (() => Promise<TextUtils.ContentData.ContentDataOrError>);
   #isSameSiteInternal: boolean|null;
   #wasIntercepted: boolean;
   #associatedData = new Map<string, object>();
   #hasOverriddenContent: boolean;
   #hasThirdPartyCookiePhaseoutIssue: boolean;
+  #serverSentEvents?: ServerSentEvents;
 
   constructor(
       requestId: string, backendRequestId: Protocol.Network.RequestId|undefined, url: Platform.DevToolsPath.UrlString,
@@ -350,8 +351,8 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
 
     this.#resourceTypeInternal = Common.ResourceType.resourceTypes.Other;
     this.#contentDataInternal = null;
+    this.#streamingContentData = null;
     this.#framesInternal = [];
-    this.#eventSourceMessagesInternal = [];
 
     this.#responseHeaderValues = {};
     this.#responseHeadersTextInternal = '';
@@ -778,6 +779,10 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
 
   set mimeType(x: string) {
     this.#mimeTypeInternal = x;
+    if (x === Platform.MimeType.MimeType.EVENTSTREAM && !this.#serverSentEvents) {
+      const parseFromStreamedData = this.resourceType() !== Common.ResourceType.resourceTypes.EventSource;
+      this.#serverSentEvents = new ServerSentEvents(this, parseFromStreamedData);
+    }
   }
 
   get displayName(): string {
@@ -1104,10 +1109,14 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
           CookieParser.parseSetCookie(this.responseHeaderValue('Set-Cookie'), this.domain) || [];
       if (this.#responseCookiesPartitionKey) {
         for (const cookie of this.#responseCookiesInternal) {
-          cookie.setPartitionKey(this.#responseCookiesPartitionKey);
+          if (cookie.partitioned()) {
+            cookie.setPartitionKey(this.#responseCookiesPartitionKey);
+          }
         }
       } else if (this.#responseCookiesPartitionKeyOpaque) {
         for (const cookie of this.#responseCookiesInternal) {
+          // Do not check cookie.partitioned() since most opaque partitions
+          // are fenced/credentialless frames partitioned by default.
           cookie.setPartitionKeyOpaque();
         }
       }
@@ -1301,7 +1310,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     return values.join(', ');
   }
 
-  contentData(): Promise<ContentDataOrError> {
+  contentData(): Promise<TextUtils.ContentData.ContentDataOrError> {
     if (this.#contentDataInternal) {
       return this.#contentDataInternal;
     }
@@ -1313,9 +1322,27 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     return this.#contentDataInternal;
   }
 
-  setContentDataProvider(dataProvider: () => Promise<ContentDataOrError>): void {
+  setContentDataProvider(dataProvider: () => Promise<TextUtils.ContentData.ContentDataOrError>): void {
     console.assert(!this.#contentDataInternal, 'contentData can only be set once.');
     this.#contentDataProvider = dataProvider;
+  }
+
+  requestStreamingContent(): Promise<TextUtils.StreamingContentData.StreamingContentDataOrError> {
+    if (this.#streamingContentData) {
+      return this.#streamingContentData;
+    }
+
+    const contentPromise = this.finished ? this.contentData() : NetworkManager.streamResponseBody(this);
+    this.#streamingContentData = contentPromise.then(contentData => {
+      if (TextUtils.ContentData.ContentData.isError(contentData)) {
+        return contentData;
+      }
+      // Note that this is save: "streamResponseBody()" always creates base64-based ContentData and
+      // for "contentData()" we'll never call "addChunk".
+      return TextUtils.StreamingContentData.StreamingContentData.from(contentData);
+    });
+
+    return this.#streamingContentData;
   }
 
   contentURL(): Platform.DevToolsPath.UrlString {
@@ -1327,7 +1354,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   }
 
   async requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
-    return ContentDataClass.asDeferredContent(await this.contentData());
+    return TextUtils.ContentData.ContentData.asDeferredContent(await this.contentData());
   }
 
   async searchInContent(query: string, caseSensitive: boolean, isRegex: boolean):
@@ -1337,7 +1364,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     }
 
     const contentData = await this.contentData();
-    if (ContentDataClass.isError(contentData) || !contentData.resourceType.isTextType()) {
+    if (TextUtils.ContentData.ContentData.isError(contentData) || !contentData.isTextContent) {
       return [];
     }
     return TextUtils.TextUtils.performSearchInContent(contentData.text, query, caseSensitive, isRegex);
@@ -1397,7 +1424,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
 
   async populateImageSource(image: HTMLImageElement): Promise<void> {
     const contentData = await this.contentData();
-    if (ContentDataClass.isError(contentData)) {
+    if (TextUtils.ContentData.ContentData.isError(contentData)) {
       return;
     }
     let imageSrc = contentData.asDataUrl();
@@ -1445,14 +1472,12 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     this.dispatchEventToListeners(Events.WebsocketFrameAdded, frame);
   }
 
-  eventSourceMessages(): EventSourceMessage[] {
-    return this.#eventSourceMessagesInternal;
+  eventSourceMessages(): readonly EventSourceMessage[] {
+    return this.#serverSentEvents?.eventSourceMessages ?? [];
   }
 
   addEventSourceMessage(time: number, eventName: string, eventId: string, data: string): void {
-    const message = {time: this.pseudoWallTime(time), eventName: eventName, eventId: eventId, data: data};
-    this.#eventSourceMessagesInternal.push(message);
-    this.dispatchEventToListeners(Events.EventSourceMessageAdded, message);
+    this.#serverSentEvents?.onProtocolEventSourceMessageReceived(eventName, data, eventId, this.pseudoWallTime(time));
   }
 
   markAsRedirect(redirectCount: number): void {
@@ -1470,12 +1495,11 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   }
 
   charset(): string|null {
-    const contentTypeHeader = this.responseHeaderValue('content-type');
-    if (!contentTypeHeader) {
-      return null;
-    }
+    return this.#charset ?? null;
+  }
 
-    return parseContentType(contentTypeHeader)?.charset;
+  setCharset(charset: string): void {
+    this.#charset = charset;
   }
 
   addExtraRequestInfo(extraRequestInfo: ExtraRequestInfo): void {
@@ -1590,6 +1614,35 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     }
   }
 
+  // This is called by `NetworkManager.finishNetworkRequest()` and not earlier
+  // to ensure that the correct `CookieModel` is used. If we did this in
+  // `addExtraRequestInfo()`, we would be storing blocked cookies in the wrong
+  // `CookieModel` for OOPIFs.
+  addBlockedRequestCookiesToModel(): void {
+    const networkManager = NetworkManager.forRequest(this);
+    if (!networkManager) {
+      return;
+    }
+    const cookieModel = networkManager.target().model(CookieModel);
+    if (!cookieModel) {
+      return;
+    }
+    for (const blockedCookie of this.#blockedRequestCookiesInternal) {
+      const cookie = blockedCookie.cookie;
+      if (!cookie) {
+        continue;
+      }
+      if (blockedCookie.blockedReasons.includes(Protocol.Network.CookieBlockedReason.ThirdPartyPhaseout)) {
+        this.#hasThirdPartyCookiePhaseoutIssue = true;
+      }
+      cookieModel.addBlockedCookie(
+          cookie, blockedCookie.blockedReasons.map(blockedReason => ({
+                                                     attribute: cookieBlockedReasonToAttribute(blockedReason),
+                                                     uiString: cookieBlockedReasonToUiString(blockedReason),
+                                                   })));
+    }
+  }
+
   hasExtraResponseInfo(): boolean {
     return this.#hasExtraResponseInfoInternal;
   }
@@ -1672,10 +1725,23 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   hasThirdPartyCookiePhaseoutIssue(): boolean {
     return this.#hasThirdPartyCookiePhaseoutIssue;
   }
+
+  addDataReceivedEvent({timestamp, dataLength, encodedDataLength, data}: Protocol.Network.DataReceivedEvent): void {
+    this.resourceSize += dataLength;
+    if (encodedDataLength !== -1) {
+      this.increaseTransferSize(encodedDataLength);
+    }
+    this.endTime = timestamp;
+    if (data) {
+      void this.#streamingContentData?.then(contentData => {
+        if (!TextUtils.StreamingContentData.isError(contentData)) {
+          contentData.addChunk(data);
+        }
+      });
+    }
+  }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   FinishedLoading = 'FinishedLoading',
   TimingChanged = 'TimingChanged',
@@ -1698,9 +1764,7 @@ export type EventTypes = {
   [Events.TrustTokenResultAdded]: void,
 };
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum InitiatorType {
+export const enum InitiatorType {
   Other = 'other',
   Parser = 'parser',
   Redirect = 'redirect',
@@ -1710,8 +1774,6 @@ export enum InitiatorType {
   Preflight = 'preflight',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum WebSocketFrameType {
   Send = 'send',
   Receive = 'receive',
@@ -1801,15 +1863,15 @@ export const setCookieBlockedReasonToUiString = function(
   return '';
 };
 
-export const cookieBlockedReasonToAttribute = function(blockedReason: Protocol.Network.CookieBlockedReason): Attributes|
+export const cookieBlockedReasonToAttribute = function(blockedReason: Protocol.Network.CookieBlockedReason): Attribute|
     null {
       switch (blockedReason) {
         case Protocol.Network.CookieBlockedReason.SecureOnly:
-          return Attributes.Secure;
+          return Attribute.Secure;
         case Protocol.Network.CookieBlockedReason.NotOnPath:
-          return Attributes.Path;
+          return Attribute.Path;
         case Protocol.Network.CookieBlockedReason.DomainMismatch:
-          return Attributes.Domain;
+          return Attribute.Domain;
         case Protocol.Network.CookieBlockedReason.SameSiteStrict:
         case Protocol.Network.CookieBlockedReason.SameSiteLax:
         case Protocol.Network.CookieBlockedReason.SameSiteUnspecifiedTreatedAsLax:
@@ -1817,7 +1879,7 @@ export const cookieBlockedReasonToAttribute = function(blockedReason: Protocol.N
         case Protocol.Network.CookieBlockedReason.SchemefulSameSiteStrict:
         case Protocol.Network.CookieBlockedReason.SchemefulSameSiteLax:
         case Protocol.Network.CookieBlockedReason.SchemefulSameSiteUnspecifiedTreatedAsLax:
-          return Attributes.SameSite;
+          return Attribute.SameSite;
         case Protocol.Network.CookieBlockedReason.SamePartyFromCrossPartyContext:
         case Protocol.Network.CookieBlockedReason.NameValuePairExceedsMaxSize:
         case Protocol.Network.CookieBlockedReason.UserPreferences:
@@ -1829,11 +1891,11 @@ export const cookieBlockedReasonToAttribute = function(blockedReason: Protocol.N
     };
 
 export const setCookieBlockedReasonToAttribute = function(blockedReason: Protocol.Network.SetCookieBlockedReason):
-    Attributes|null {
+    Attribute|null {
       switch (blockedReason) {
         case Protocol.Network.SetCookieBlockedReason.SecureOnly:
         case Protocol.Network.SetCookieBlockedReason.OverwriteSecure:
-          return Attributes.Secure;
+          return Attribute.Secure;
         case Protocol.Network.SetCookieBlockedReason.SameSiteStrict:
         case Protocol.Network.SetCookieBlockedReason.SameSiteLax:
         case Protocol.Network.SetCookieBlockedReason.SameSiteUnspecifiedTreatedAsLax:
@@ -1841,11 +1903,11 @@ export const setCookieBlockedReasonToAttribute = function(blockedReason: Protoco
         case Protocol.Network.SetCookieBlockedReason.SchemefulSameSiteStrict:
         case Protocol.Network.SetCookieBlockedReason.SchemefulSameSiteLax:
         case Protocol.Network.SetCookieBlockedReason.SchemefulSameSiteUnspecifiedTreatedAsLax:
-          return Attributes.SameSite;
+          return Attribute.SameSite;
         case Protocol.Network.SetCookieBlockedReason.InvalidDomain:
-          return Attributes.Domain;
+          return Attribute.Domain;
         case Protocol.Network.SetCookieBlockedReason.InvalidPrefix:
-          return Attributes.Name;
+          return Attribute.Name;
         case Protocol.Network.SetCookieBlockedReason.SamePartyConflictsWithOtherAttributes:
         case Protocol.Network.SetCookieBlockedReason.SamePartyFromCrossPartyContext:
         case Protocol.Network.SetCookieBlockedReason.NameValuePairExceedsMaxSize:
@@ -1882,12 +1944,6 @@ export interface BlockedSetCookieWithReason {
 export interface BlockedCookieWithReason {
   blockedReasons: Protocol.Network.CookieBlockedReason[];
   cookie: Cookie;
-}
-
-export interface ContentData {
-  error: string|null;
-  content: string|null;
-  encoded: boolean;
 }
 
 export interface EventSourceMessage {

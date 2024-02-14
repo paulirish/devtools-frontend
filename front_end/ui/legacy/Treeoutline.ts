@@ -49,8 +49,6 @@ import * as Utils from './utils/utils.js';
 
 const nodeToParentTreeElementMap = new WeakMap<Node, TreeElement>();
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   ElementAttached = 'ElementAttached',
   ElementsDetached = 'ElementsDetached',
@@ -846,7 +844,7 @@ export class TreeElement {
       this.collapse();
       ARIAUtils.unsetExpandable(this.listItemNode);
     } else {
-      VisualLogging.registerLoggable(this.expandLoggable, `${VisualLogging.treeItemExpand()}`, this.listItemNode);
+      VisualLogging.registerLoggable(this.expandLoggable, `${VisualLogging.expand()}`, this.listItemNode);
       ARIAUtils.setExpanded(this.listItemNode, false);
     }
   }

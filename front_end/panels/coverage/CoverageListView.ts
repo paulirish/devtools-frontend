@@ -138,7 +138,7 @@ export class CoverageListView extends UI.Widget.VBox {
     this.isVisibleFilter = isVisibleFilter;
     this.highlightRegExp = null;
 
-    const columns: DataGrid.DataGrid.ColumnDescriptor[] = [
+    const columns = [
       {
         id: 'url',
         title: i18nString(UIStrings.url),
@@ -159,7 +159,7 @@ export class CoverageListView extends UI.Widget.VBox {
         weight: 1,
       },
       {
-        id: 'unusedSize',
+        id: 'unused-size',
         title: i18nString(UIStrings.unusedBytes),
         width: '100px',
         fixedWidth: true,
@@ -176,7 +176,7 @@ export class CoverageListView extends UI.Widget.VBox {
         sortable: true,
         weight: 1,
       },
-    ];
+    ] as DataGrid.DataGrid.ColumnDescriptor[];
     this.dataGrid = new DataGrid.SortableDataGrid.SortableDataGrid<GridNode>({
       displayName: i18nString(UIStrings.codeCoverage),
       columns,
@@ -185,6 +185,7 @@ export class CoverageListView extends UI.Widget.VBox {
       deleteCallback: undefined,
     });
     this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.Last);
+    this.dataGrid.setStriped(true);
     this.dataGrid.element.classList.add('flex-auto');
     this.dataGrid.element.addEventListener('keydown', this.onKeyDown.bind(this), false);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.OpenedNode, this.onOpenedNode, this);
@@ -427,7 +428,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
         this.setCellAccessibleName(sizeAccessibleName, cell, columnId);
         break;
       }
-      case 'unusedSize': {
+      case 'unused-size': {
         const unusedSize = this.coverageInfo.unusedSize() || 0;
         const unusedSizeSpan = cell.createChild('span');
         const unusedPercentsSpan = cell.createChild('span', 'percent-value');
@@ -500,16 +501,16 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
       case 'url':
         return compareURL;
       case 'type':
-        return (a: GridNode, b: GridNode): number => {
+        return (a: GridNode, b: GridNode) => {
           const typeA = coverageTypeToString(a.coverageInfo.type());
           const typeB = coverageTypeToString(b.coverageInfo.type());
           return typeA.localeCompare(typeB) || compareURL(a, b);
         };
       case 'size':
-        return (a: GridNode, b: GridNode): number => a.coverageInfo.size() - b.coverageInfo.size() || compareURL(a, b);
+        return (a: GridNode, b: GridNode) => a.coverageInfo.size() - b.coverageInfo.size() || compareURL(a, b);
       case 'bars':
-      case 'unusedSize':
-        return (a: GridNode, b: GridNode): number =>
+      case 'unused-size':
+        return (a: GridNode, b: GridNode) =>
                    a.coverageInfo.unusedSize() - b.coverageInfo.unusedSize() || compareURL(a, b);
       default:
         console.assert(false, 'Unknown sort field: ' + columnId);

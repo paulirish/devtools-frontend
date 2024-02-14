@@ -44,14 +44,17 @@ import type * as TimelineModel from '../../models/timeline_model/timeline_model.
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
+import * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedback.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import {ActiveFilters} from './ActiveFilters.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
+import {IsolateSelector} from './IsolateSelector.js';
 import {PerformanceModel} from './PerformanceModel.js';
 import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
 import {NodeNamesUpdated, SourceMapsResolver} from './SourceMapsResolver.js';
@@ -92,6 +95,10 @@ const UIStrings = {
    *@description Text to clear content
    */
   clear: 'Clear',
+  /**
+   *@description A label for a button that fixes something.
+   */
+  fixMe: 'Fix me',
   /**
    *@description Tooltip text that appears when hovering over the largeicon load button
    */
@@ -250,6 +257,7 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
 let timelinePanelInstance: TimelinePanel;
 let isNode: boolean;
 
@@ -280,6 +288,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private controller!: TimelineController|null;
   private cpuProfiler!: SDK.CPUProfilerModel.CPUProfilerModel|null;
   private clearButton!: UI.Toolbar.ToolbarButton;
+  private fixMeButton: UI.Toolbar.ToolbarButton;
+  private fixMeButtonAdded = false;
   private loadButton!: UI.Toolbar.ToolbarButton;
   private saveButton!: UI.Toolbar.ToolbarButton;
   private statusPane!: StatusPane|null;
@@ -303,10 +313,25 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   #traceEngineActiveTraceIndex = -1;
   #sourceMapsResolver: SourceMapsResolver|null = null;
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
-
+  readonly #onChartPlayableStateChangeBound: (event: Common.EventTarget.EventTargetEvent<boolean>) => void;
   constructor() {
     super('timeline');
-
+    const adornerContent = document.createElement('span');
+    adornerContent.innerHTML = `<div style="
+      font-size: 12px;
+      transform: scale(1.25);
+      color: transparent;
+      background: linear-gradient(90deg, rgb(255 0 0 / 100%) 0%, rgb(255 154 0 / 100%) 10%, rgb(208 222 33 / 100%) 20%, rgb(79 220 74 / 100%) 30%, rgb(63 218 216 / 100%) 40%, rgb(47 201 226 / 100%) 50%, rgb(28 127 238 / 100%) 60%, rgb(95 21 242 / 100%) 70%, rgb(186 12 248 / 100%) 80%, rgb(251 7 217 / 100%) 90%, rgb(255 0 0 / 100%) 100%);
+      -webkit-background-clip: text;
+      ">💫</div>`;
+    const adorner = new Adorners.Adorner.Adorner();
+    adorner.classList.add('fix-perf-icon');
+    adorner.data = {
+      name: i18nString(UIStrings.fixMe),
+      content: adornerContent,
+    };
+    this.fixMeButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.fixMe), adorner);
+    this.fixMeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => this.onFixMe());
     const config = TraceEngine.Types.Configuration.DEFAULT;
     config.experiments.timelineShowAllEvents = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
     config.experiments.timelineV8RuntimeCallStats = Root.Runtime.experiments.isEnabled('timelineV8RuntimeCallStats');
@@ -330,22 +355,23 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.traceLoadStart = null;
 
     this.disableCaptureJSProfileSetting =
-        Common.Settings.Settings.instance().createSetting('timelineDisableJSSampling', false);
+        Common.Settings.Settings.instance().createSetting('timeline-disable-js-sampling', false);
     this.disableCaptureJSProfileSetting.setTitle(i18nString(UIStrings.disableJavascriptSamples));
     this.captureLayersAndPicturesSetting =
-        Common.Settings.Settings.instance().createSetting('timelineCaptureLayersAndPictures', false);
+        Common.Settings.Settings.instance().createSetting('timeline-capture-layers-and-pictures', false);
     this.captureLayersAndPicturesSetting.setTitle(i18nString(UIStrings.enableAdvancedPaint));
 
     this.showScreenshotsSetting =
-        Common.Settings.Settings.instance().createSetting('timelineShowScreenshots', isNode ? false : true);
+        Common.Settings.Settings.instance().createSetting('timeline-show-screenshots', isNode ? false : true);
     this.showScreenshotsSetting.setTitle(i18nString(UIStrings.screenshots));
     this.showScreenshotsSetting.addChangeListener(this.updateOverviewControls, this);
 
-    this.showMemorySetting = Common.Settings.Settings.instance().createSetting('timelineShowMemory', false);
+    this.showMemorySetting = Common.Settings.Settings.instance().createSetting('timeline-show-memory', false);
     this.showMemorySetting.setTitle(i18nString(UIStrings.memory));
     this.showMemorySetting.addChangeListener(this.onModeChanged, this);
 
     const timelineToolbarContainer = this.element.createChild('div', 'timeline-toolbar-container');
+    timelineToolbarContainer.setAttribute('jslog', `${VisualLogging.toolbar()}`);
     this.panelToolbar = new UI.Toolbar.Toolbar('timeline-main-toolbar', timelineToolbarContainer);
     this.panelToolbar.makeWrappable(true);
     this.panelRightToolbar = new UI.Toolbar.Toolbar('', timelineToolbarContainer);
@@ -368,6 +394,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.Load, this.loadEventFired, this);
 
     this.flameChart = new TimelineFlameChartView(this);
+    this.#onChartPlayableStateChangeBound = this.#onChartPlayableStateChange.bind(this);
+
+    this.flameChart.getMainFlameChart().addEventListener(
+        PerfUI.FlameChart.Events.ChartPlayableStateChange, this.#onChartPlayableStateChangeBound, this);
+
     this.searchableViewInternal = new UI.SearchableView.SearchableView(this.flameChart, null);
     this.searchableViewInternal.setMinimumSize(0, 100);
     this.searchableViewInternal.element.classList.add('searchable-view');
@@ -457,6 +488,22 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     return this.flameChart;
   }
 
+  #onChartPlayableStateChange(event: Common.EventTarget.EventTargetEvent<boolean, unknown>): void {
+    if (event.data) {
+      const dateObj = new Date();
+      const month = dateObj.getUTCMonth() + 1;
+      const day = dateObj.getUTCDate();
+      const isAprilFools = (month === 4 && day === 1) || true;  // TODO: show only on April fools
+      if (isAprilFools && !this.fixMeButtonAdded) {
+        this.fixMeButtonAdded = true;
+        this.panelToolbar.appendToolbarItem(this.fixMeButton);
+      }
+    } else {
+      this.fixMeButtonAdded = false;
+      this.panelToolbar.removeToolbarItem(this.fixMeButton);
+    }
+  }
+
   private loadFromCpuProfile(profile: Protocol.Profiler.Profile|null, title?: string): void {
     if (this.state !== State.Idle) {
       return;
@@ -520,6 +567,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // GC
     this.panelToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('components.collect-garbage'));
 
+    // Isolate selector
+    const isolateSelector = new IsolateSelector();
+    if (isNode) {
+      this.panelToolbar.appendSeparator();
+      this.panelToolbar.appendToolbarItem(isolateSelector);
+    }
+
     // Settings
     if (!isNode) {
       this.panelRightToolbar.appendSeparator();
@@ -529,7 +583,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private createSettingsPane(): void {
     this.showSettingsPaneSetting =
-        Common.Settings.Settings.instance().createSetting('timelineShowSettingsToolbar', false);
+        Common.Settings.Settings.instance().createSetting('timeline-show-settings-toolbar', false);
     this.showSettingsPaneButton = new UI.Toolbar.ToolbarSettingToggle(
         this.showSettingsPaneSetting, 'gear', i18nString(UIStrings.captureSettings), 'gear-filled');
     SDK.NetworkManager.MultitargetNetworkManager.instance().addEventListener(
@@ -842,19 +896,23 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   async #startCPUProfilingRecording(): Promise<void> {
     try {
-      // Only profile the first target devtools connects to. If we profile all target, but this will cause some bugs
-      // like time for the function is calculated wrong, because the profiles will be concated and sorted together,
-      // so the total time will be amplified.
-      // Multiple targets problem might happen when you inspect multiple node servers on different port at same time,
-      // or when you let DevTools listen to both locolhost:9229 & 127.0.0.1:9229.
-      const firstNodeTarget =
-          SDK.TargetManager.TargetManager.instance().targets().find(target => target.type() === SDK.Target.Type.Node);
-      if (!firstNodeTarget) {
-        throw new Error('Could not load any Node target.');
+      this.cpuProfiler = UI.Context.Context.instance().flavor(SDK.CPUProfilerModel.CPUProfilerModel);
+      if (!this.cpuProfiler) {
+        // If there is no isolate selected, we will profile the first isolate that devtools connects to.
+        // If we profile all target, but this will cause some bugs like time for the function is calculated wrong,
+        // because the profiles will be concated and sorted together, so the total time will be amplified.
+        // Multiple targets problem might happen when you inspect multiple node servers on different port at same time,
+        // or when you let DevTools listen to both locolhost:9229 & 127.0.0.1:9229.
+        const firstNodeTarget =
+            SDK.TargetManager.TargetManager.instance().targets().find(target => target.type() === SDK.Target.Type.Node);
+        if (!firstNodeTarget) {
+          throw new Error('Could not load any Node target.');
+        }
+        if (firstNodeTarget) {
+          this.cpuProfiler = firstNodeTarget.model(SDK.CPUProfilerModel.CPUProfilerModel);
+        }
       }
-      if (firstNodeTarget) {
-        this.cpuProfiler = firstNodeTarget.model(SDK.CPUProfilerModel.CPUProfilerModel);
-      }
+
       this.setUIControlsEnabled(false);
       this.hideLandingPage();
       if (!this.cpuProfiler) {
@@ -1015,17 +1073,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private updateTimelineControls(): void {
-    const state = State;
-    this.toggleRecordAction.setToggled(this.state === state.Recording);
-    this.toggleRecordAction.setEnabled(this.state === state.Recording || this.state === state.Idle);
-    this.recordReloadAction.setEnabled(isNode ? false : this.state === state.Idle);
-    this.#historyManager.setEnabled(this.state === state.Idle);
-    this.clearButton.setEnabled(this.state === state.Idle);
-    this.panelToolbar.setEnabled(this.state !== state.Loading);
-    this.panelRightToolbar.setEnabled(this.state !== state.Loading);
-    this.dropTarget.setEnabled(this.state === state.Idle);
-    this.loadButton.setEnabled(this.state === state.Idle);
-    this.saveButton.setEnabled(this.state === state.Idle && Boolean(this.performanceModel));
+    this.toggleRecordAction.setToggled(this.state === State.Recording);
+    this.toggleRecordAction.setEnabled(this.state === State.Recording || this.state === State.Idle);
+    this.recordReloadAction.setEnabled(isNode ? false : this.state === State.Idle);
+    this.#historyManager.setEnabled(this.state === State.Idle);
+    this.clearButton.setEnabled(this.state === State.Idle);
+    this.panelToolbar.setEnabled(this.state !== State.Loading);
+    this.panelRightToolbar.setEnabled(this.state !== State.Loading);
+    this.dropTarget.setEnabled(this.state === State.Idle);
+    this.loadButton.setEnabled(this.state === State.Idle);
+    this.saveButton.setEnabled(this.state === State.Idle && Boolean(this.performanceModel));
   }
 
   async toggleRecording(): Promise<void> {
@@ -1050,6 +1107,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private onClearButton(): void {
     this.#historyManager.clear();
     this.clear();
+  }
+
+  private onFixMe(): void {
+    if (!this.performanceModel) {
+      return;
+    }
+    this.flameChart.fixMe();
   }
 
   private clear(): void {
@@ -1123,6 +1187,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.searchableViewInternal.showWidget();
     } else {
       this.searchableViewInternal.hideWidget();
+      this.fixMeButtonAdded = false;
+      this.panelToolbar.removeToolbarItem(this.fixMeButton);
     }
     this.flameChart.setModel(model, traceParsedData, isCpuProfile);
     this.flameChart.setSelection(null);
@@ -1147,13 +1213,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.flameChart.resizeToPreferredHeights();
     }
 
-    // Set the initial zoom: if we are using breadcrumbs we leave the entire
-    // window visible, but if not we zoom into the biggest period of activity
-    // (we might want to consider doing the same for breadcrumbs)
-    if (this.#minimapComponent.breadcrumbsActivated) {
-      this.#minimapComponent.addInitialBreadcrumb();
-    } else if (traceParsedData) {
-      // We expect traceParsedData to always exist, this check is to keep TS happy.
+    // Set the initial zoom and if we are using breadcrumbs, create the initial breadcrum.
+    // We expect traceParsedData to always exist, this check is to keep TS happy.
+    if (traceParsedData) {
+      if (this.#minimapComponent.breadcrumbsActivated) {
+        this.#minimapComponent.addInitialBreadcrumb();
+      }
 
       // To calculate the activity we might want to zoom in, we find the last
       // main thread. Or we find the CPU Profile thread, for e.g. Node traces.
@@ -1624,9 +1689,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum State {
+export const enum State {
   Idle = 'Idle',
   StartPending = 'StartPending',
   Recording = 'Recording',
@@ -1696,15 +1759,18 @@ export class StatusPane extends UI.Widget.VBox {
     }
 
     const buttonContainer = this.contentElement.createChild('div', 'stop-button');
-    this.downloadTraceButton = UI.UIUtils.createTextButton(i18nString(UIStrings.downloadAfterError), async () => {
+    this.downloadTraceButton = UI.UIUtils.createTextButton(i18nString(UIStrings.downloadAfterError), () => {
       void this.#downloadRawTraceAfterError();
-    });
+    }, {jslogContext: 'timeline.download-after-error'});
 
     this.downloadTraceButton.disabled = true;
     this.downloadTraceButton.style.visibility = 'hidden';
 
     const buttonText = options.buttonText || i18nString(UIStrings.stop);
-    this.button = UI.UIUtils.createTextButton(buttonText, buttonCallback, '', true);
+    this.button = UI.UIUtils.createTextButton(buttonText, buttonCallback, {
+      jslogContext: 'timeline.stop-recording',
+      primary: true,
+    });
     // Profiling can't be stopped during initialization.
     this.button.disabled = !options.buttonDisabled === false;
 

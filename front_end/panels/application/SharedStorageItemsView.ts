@@ -72,9 +72,7 @@ interface WrappedEntry {
 }
 
 export namespace SharedStorageItemsDispatcher {
-  // TODO(crbug.com/1167717): Make this a const enum.
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Events {
+  export const enum Events {
     FilteredItemsCleared = 'FilteredItemsCleared',
     ItemDeleted = 'ItemDeleted',
     ItemEdited = 'ItemEdited',
@@ -137,7 +135,7 @@ export class SharedStorageItemsView extends StorageItemsView {
       void this.#previewEntry(null);
     });
     this.dataGrid.setStriped(true);
-    this.dataGrid.setName('SharedStorageItemsView');
+    this.dataGrid.setName('shared-storage-items-view');
 
     const dataGridWidget = this.dataGrid.asWidget();
     dataGridWidget.setMinimumSize(0, 100);
@@ -150,7 +148,7 @@ export class SharedStorageItemsView extends StorageItemsView {
     const innerResizer = this.#metadataView.element.createChild('div', 'metadata-view-resizer');
 
     this.innerSplitWidget = new UI.SplitWidget.SplitWidget(
-        /* isVertical: */ false, /* secondIsSidebar: */ false, 'sharedStorageInnerSplitViewState');
+        /* isVertical: */ false, /* secondIsSidebar: */ false, 'shared-storage-inner-split-view-state');
     this.innerSplitWidget.setSidebarWidget(this.#metadataView);
     this.innerSplitWidget.setMainWidget(dataGridWidget);
     this.innerSplitWidget.installResizer(innerResizer);
@@ -160,7 +158,7 @@ export class SharedStorageItemsView extends StorageItemsView {
     const outerResizer = this.#noDisplayView.element.createChild('div', 'preview-panel-resizer');
 
     this.outerSplitWidget = new UI.SplitWidget.SplitWidget(
-        /* isVertical: */ false, /* secondIsSidebar: */ true, 'sharedStorageOuterSplitViewState');
+        /* isVertical: */ false, /* secondIsSidebar: */ true, 'shared-storage-outer-split-view-state');
     this.outerSplitWidget.show(this.element);
     this.outerSplitWidget.setMainWidget(this.innerSplitWidget);
     this.outerSplitWidget.setSidebarWidget(this.#noDisplayView);

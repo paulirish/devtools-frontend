@@ -67,6 +67,7 @@ devtools_module("inline_editor") {
     "../../../../ui/legacy:bundle",
     "../../../../ui/legacy/components/utils:bundle",
     "../../../../ui/lit-html:bundle",
+    "../../../../ui/visual_logging:bundle",
   ]
 
   visibility = [ "../../../../component_docs/*" ]
@@ -89,8 +90,6 @@ devtools_entrypoint("bundle") {
     "../../../../panels/application/*",
     "../../../../panels/elements/*",
     "../../../../panels/sources/*",
-
-    # TODO(crbug.com/1202788): Remove invalid dependents
     "../../../components/docs/color_swatch/*",
     "../../../components/text_editor/*",
   ]

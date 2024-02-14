@@ -5,7 +5,10 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Platform from '../../core/platform/platform.js';
+import type * as Root from '../../core/root/root.js';
 import * as IconButton from '../components/icon_button/icon_button.js';
+import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
 import {type ContextMenu} from './ContextMenu.js';
@@ -127,7 +130,7 @@ export class PreRegisteredView implements View {
     return this.viewRegistration.experiment;
   }
 
-  condition(): string|undefined {
+  condition(): Root.Runtime.Condition|undefined {
     return this.viewRegistration.condition;
   }
 }
@@ -144,7 +147,7 @@ export class ViewManager {
     this.locationNameByViewId = new Map();
 
     // Read override setting for location
-    this.locationOverrideSetting = Common.Settings.Settings.instance().createSetting('viewsLocationOverride', {});
+    this.locationOverrideSetting = Common.Settings.Settings.instance().createSetting('views-location-override', {});
     const preferredExtensionLocations = this.locationOverrideSetting.get();
 
     // Views may define their initial ordering within a location. When the user has not reordered, we use the
@@ -176,6 +179,9 @@ export class ViewManager {
       const location = view.location();
       if (this.views.has(viewId)) {
         throw new Error(`Duplicate view id '${viewId}'`);
+      }
+      if (!Platform.StringUtilities.isExtendedKebabCase(viewId)) {
+        throw new Error(`Invalid view ID '${viewId}'`);
       }
       this.views.set(viewId, view);
       // Use the preferred user location if available
@@ -418,6 +424,8 @@ class ExpandableContainerWidget extends VBox {
 
     this.titleElement = document.createElement('div');
     this.titleElement.classList.add('expandable-view-title');
+    this.titleElement.setAttribute(
+        'jslog', `${VisualLogging.sectionHeader().context(view.viewId()).track({click: true})}`);
     ARIAUtils.markAsTreeitem(this.titleElement);
     this.titleExpandIcon = IconButton.Icon.create('triangle-right', 'title-expand-icon');
     this.titleElement.appendChild(this.titleExpandIcon);
@@ -590,15 +598,15 @@ class TabbedLocation extends Location implements TabbedViewLocation {
     this.tabbedPaneInternal.addEventListener(TabbedPaneEvents.TabSelected, this.tabSelected, this);
     this.tabbedPaneInternal.addEventListener(TabbedPaneEvents.TabClosed, this.tabClosed, this);
 
-    this.closeableTabSetting = Common.Settings.Settings.instance().createSetting('closeableTabs', {});
+    this.closeableTabSetting = Common.Settings.Settings.instance().createSetting('closeable-tabs', {});
     // As we give tabs the capability to be closed we also need to add them to the setting so they are still open
     // until the user decide to close them
     this.setOrUpdateCloseableTabsSetting();
 
-    this.tabOrderSetting = Common.Settings.Settings.instance().createSetting(location + '-tabOrder', {});
+    this.tabOrderSetting = Common.Settings.Settings.instance().createSetting(location + '-tab-order', {});
     this.tabbedPaneInternal.addEventListener(TabbedPaneEvents.TabOrderChanged, this.persistTabOrder, this);
     if (restoreSelection) {
-      this.lastSelectedTabSetting = Common.Settings.Settings.instance().createSetting(location + '-selectedTab', '');
+      this.lastSelectedTabSetting = Common.Settings.Settings.instance().createSetting(location + '-selected-tab', '');
     }
     this.defaultTab = defaultTab;
 
@@ -628,7 +636,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
   }
 
   enableMoreTabsButton(): ToolbarMenuButton {
-    const moreTabsButton = new ToolbarMenuButton(this.appendTabsToMenu.bind(this));
+    const moreTabsButton = new ToolbarMenuButton(this.appendTabsToMenu.bind(this), undefined, 'more-tabs');
     this.tabbedPaneInternal.leftToolbar().appendToolbarItem(moreTabsButton);
     this.tabbedPaneInternal.disableOverflowMenu();
     return moreTabsButton;
@@ -828,6 +836,7 @@ class StackLocation extends Location implements ViewLocation {
 
   constructor(manager: ViewManager, revealCallback?: (() => void), location?: string) {
     const vbox = new VBox();
+    vbox.element.setAttribute('jslog', `${VisualLogging.pane('sidebar')}`);
     super(manager, vbox, revealCallback);
     this.vbox = vbox;
     ARIAUtils.markAsTree(vbox.element);

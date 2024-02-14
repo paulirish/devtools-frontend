@@ -36,7 +36,7 @@ const STACKTRACE_ROW_SELECTOR = '.stack-trace-row';
 const STACKTRACE_ROW_LINK_SELECTOR = '.stack-trace-row .link';
 const APPLICATION_PANEL_SELECTED_SELECTOR = '.tabbed-pane-header-tab.selected[aria-label="Application"]';
 
-const getTrailingURL = (text: string): string => {
+const getTrailingURL = (text: string) => {
   const match = text.match(/http.*$/);
   return match ? match[0] : '';
 };
@@ -83,7 +83,7 @@ describe('The Application Tab', async () => {
   });
 
   // Update and reactivate when the whole FrameDetailsView is a custom component
-  it('shows details for a frame when clicked on in the frame tree', async () => {
+  it.skip('[crbug.com/1519420]: shows details for a frame when clicked on in the frame tree', async () => {
     const {target} = getBrowserAndPages();
     await navigateToApplicationTab(target, 'frame-tree');
     await click('#tab-resources');
@@ -289,7 +289,7 @@ describe('The Application Tab', async () => {
   });
 
   // Update and reactivate when the whole FrameDetailsView is a custom component
-  it('can handle when JS writes to frame', async () => {
+  it.skip('[crbug.com/1519420]: can handle when JS writes to frame', async () => {
     expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     await goToResource('application/main-frame.html');

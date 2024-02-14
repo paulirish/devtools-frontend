@@ -235,8 +235,9 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     console.assert(!this.tabsById.has(id), `Tabbed pane already contains a tab with id '${id}'`);
     this.tabsById.set(id, tab);
     tab.tabElement.tabIndex = -1;
+    const context = id === 'console-view' ? 'console' : id;
     tab.tabElement.setAttribute(
-        'jslog', `${VisualLogging.panelTabHeader().track({click: true, drag: true}).context(id)}`);
+        'jslog', `${VisualLogging.panelTabHeader().track({click: true, drag: true}).context(context)}`);
     if (index !== undefined) {
       this.tabs.splice(index, 0, tab);
     } else {
@@ -592,7 +593,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private createDropDownButton(): HTMLDivElement {
     const dropDownContainer = document.createElement('div');
     dropDownContainer.classList.add('tabbed-pane-header-tabs-drop-down-container');
-    dropDownContainer.setAttribute('jslog', `${VisualLogging.dropDown().track({click: true}).context('more')}`);
+    dropDownContainer.setAttribute('jslog', `${VisualLogging.dropDown('more-tabs').track({click: true})}`);
     const chevronIcon = IconButton.Icon.create('chevron-double-right', 'chevron-icon');
     const moreTabsString = i18nString(UIStrings.moreTabs);
     dropDownContainer.title = moreTabsString;
@@ -626,7 +627,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
       useSoftMenu: false,
       x: rect.left,
       y: rect.bottom,
-      onSoftMenuClosed: (): void => {
+      onSoftMenuClosed: () => {
         ARIAUtils.setExpanded(this.dropDownButton, false);
       },
     });
@@ -967,8 +968,6 @@ export interface EventData {
   isUserGesture?: boolean;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   TabInvoked = 'TabInvoked',
   TabSelected = 'TabSelected',
@@ -1175,6 +1174,7 @@ export class TabbedPaneTab {
   private createCloseIconButton(): HTMLDivElement {
     const closeIconContainer = document.createElement('div');
     closeIconContainer.classList.add('close-button', 'tabbed-pane-close-button');
+    closeIconContainer.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
     const closeIcon = new IconButton.Icon.Icon();
     closeIcon.data = {
       iconName: 'cross',

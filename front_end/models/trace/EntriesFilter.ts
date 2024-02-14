@@ -2,45 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as Platform from '../../core/platform/platform.js';
-
 import * as Helpers from './helpers/helpers.js';
 import * as Types from './types/types.js';
 
-type EntryToNodeMap = Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode>;
+type EntryToNodeMap = Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode>;
 
-export type FilterAction = FilterApplyAction|FilterUndoAction;
-
-export const enum FilterApplyAction {
+export const enum FilterAction {
   MERGE_FUNCTION = 'MERGE_FUNCTION',
   COLLAPSE_FUNCTION = 'COLLAPSE_FUNCTION',
   COLLAPSE_REPEATING_DESCENDANTS = 'COLLAPSE_REPEATING_DESCENDANTS',
-}
-
-export const enum FilterUndoAction {
   RESET_CHILDREN = 'RESET_CHILDREN',
   UNDO_ALL_ACTIONS = 'UNDO_ALL_ACTIONS',
 }
 
-const filterApplyActionSet: Set<FilterApplyAction> = new Set([
-  FilterApplyAction.MERGE_FUNCTION,
-  FilterApplyAction.COLLAPSE_FUNCTION,
-  FilterApplyAction.COLLAPSE_REPEATING_DESCENDANTS,
-]);
-
-const filterUndoActionSet: Set<FilterUndoAction> = new Set([
-  FilterUndoAction.RESET_CHILDREN,
-  FilterUndoAction.UNDO_ALL_ACTIONS,
-]);
-
-// Object passed from the frontend that can be either Undo or Apply filter action.
 export interface UserFilterAction {
   type: FilterAction;
-  entry: Types.TraceEvents.TraceEntry;
+  entry: Types.TraceEvents.SyntheticTraceEntry;
 }
 
-export interface UserApplyFilterAction {
-  type: FilterApplyAction;
-  entry: Types.TraceEvents.TraceEntry;
+// Object used to indicate to the Context Menu if an action is possible on the selected entry.
+export interface PossibleFilterActions {
+  [FilterAction.MERGE_FUNCTION]: boolean;
+  [FilterAction.COLLAPSE_FUNCTION]: boolean;
+  [FilterAction.COLLAPSE_REPEATING_DESCENDANTS]: boolean;
+  [FilterAction.RESET_CHILDREN]: boolean;
+  [FilterAction.UNDO_ALL_ACTIONS]: boolean;
 }
 
 /**
@@ -64,42 +50,59 @@ export class EntriesFilter {
   // List of entries whose children are modified. This list is used to
   // keep track of entries that should be identified in the UI as modified.
   #modifiedVisibleEntries: Types.TraceEvents.TraceEventData[] = [];
-  // Cache for ancestors of entry that have already been gathered. The ancestors
+  // Cache for descendants of entry that have already been gathered. The descendants
   // will never change so we can avoid running the potentially expensive search again.
-  #entryToAncestorsMap: Map<Helpers.TreeHelpers.TraceEntryNode, Types.TraceEvents.TraceEventData[]> = new Map();
+  #entryToDescendantsMap: Map<Helpers.TreeHelpers.TraceEntryNode, Types.TraceEvents.TraceEventData[]> = new Map();
 
   constructor(entryToNode: EntryToNodeMap) {
     this.#entryToNode = entryToNode;
   }
 
   /**
-   * Applies an action to hide entries or removes entries
-   * from hidden entries array depending on the type of action.
+   * Checks which actions can be applied on an entry. This allows us to only show possible actions in the Context Menu.
+   * For example, if an entry has no children, COLLAPSE_FUNCTION will not change the FlameChart, therefore there is no need to show this action as an option.
    **/
-  applyAction(action: UserFilterAction): void {
-    if (/* FilterApplyActions */ this.#isUserApplyFilterAction(action)) {
-      this.#applyFilterAction(action);
-
-    } else if (/* FilterUndoActions */ this.#isFilterUndoAction(action.type)) {
-      this.#applyUndoAction(action);
+  findPossibleActions(entry: Types.TraceEvents.SyntheticTraceEntry): PossibleFilterActions {
+    const entryNode = this.#entryToNode.get(entry);
+    if (!entryNode) {
+      // Invalid node was given, return no possible actions.
+      return {
+        [FilterAction.MERGE_FUNCTION]: false,
+        [FilterAction.COLLAPSE_FUNCTION]: false,
+        [FilterAction.COLLAPSE_REPEATING_DESCENDANTS]: false,
+        [FilterAction.RESET_CHILDREN]: false,
+        [FilterAction.UNDO_ALL_ACTIONS]: false,
+      };
     }
+    const entryParent = entryNode.parent;
+    const allVisibleDescendants =
+        this.#findAllDescendantsOfNode(entryNode).filter(descendant => !this.#invisibleEntries.includes(descendant));
+    const allVisibleRepeatingDescendants = this.#findAllRepeatingDescendantsOfNext(entryNode).filter(
+        descendant => !this.#invisibleEntries.includes(descendant));
+    const allInVisibleDescendants =
+        this.#findAllDescendantsOfNode(entryNode).filter(descendant => this.#invisibleEntries.includes(descendant));
+
+    // If there are children to hide, indicate action as possible
+    const possibleActions: PossibleFilterActions = {
+      [FilterAction.MERGE_FUNCTION]: entryParent !== null,
+      [FilterAction.COLLAPSE_FUNCTION]: allVisibleDescendants.length > 0,
+      [FilterAction.COLLAPSE_REPEATING_DESCENDANTS]: allVisibleRepeatingDescendants.length > 0,
+      [FilterAction.RESET_CHILDREN]: allInVisibleDescendants.length > 0,
+      [FilterAction.UNDO_ALL_ACTIONS]: this.#invisibleEntries.length > 0,
+    };
+    return possibleActions;
   }
 
   /**
-   * If undo action is UNDO_ALL_ACTIONS, assign invisibleEntries array to an empty one.
+   * Returns the amount of entry descendants that belong to the hidden entries array.
    * **/
-  #applyUndoAction(action: UserFilterAction): void {
-    switch (action.type) {
-      case FilterUndoAction.UNDO_ALL_ACTIONS: {
-        this.#invisibleEntries = [];
-        this.#modifiedVisibleEntries = [];
-        break;
-      }
-      case FilterUndoAction.RESET_CHILDREN: {
-        this.#makeEntryChildrenVisible(action.entry);
-        break;
-      }
+  findHiddenDescendantsAmount(entry: Types.TraceEvents.SyntheticTraceEntry): number {
+    const entryNode = this.#entryToNode.get(entry);
+    if (!entryNode) {
+      return 0;
     }
+    const allDescendants = this.#findAllDescendantsOfNode(entryNode);
+    return allDescendants.filter(descendant => this.invisibleEntries().includes(descendant)).length;
   }
 
   /**
@@ -109,9 +112,11 @@ export class EntriesFilter {
     return this.#invisibleEntries;
   }
 
-  #applyFilterAction(action: UserApplyFilterAction): Types.TraceEvents.TraceEventData[] {
-    // Identify in the UI that children of the entry are modified.
-    this.#modifiedVisibleEntries.push(action.entry);
+  /**
+   * Applies an action to hide entries or removes entries
+   * from hidden entries array depending on the action.
+   **/
+  applyFilterAction(action: UserFilterAction): Types.TraceEvents.TraceEventData[] {
     // We apply new user action to the set of all entries, and mark
     // any that should be hidden by adding them to this set.
     // Another approach would be to use splice() to remove items from the
@@ -120,34 +125,54 @@ export class EntriesFilter {
     const entriesToHide = new Set<Types.TraceEvents.TraceEventData>();
 
     switch (action.type) {
-      case FilterApplyAction.MERGE_FUNCTION: {
+      case FilterAction.MERGE_FUNCTION: {
         // The entry that was clicked on is merged into its parent. All its
         // children remain visible, so we just have to hide the entry that was
         // selected.
         entriesToHide.add(action.entry);
+        // If parent node exists, add it to modifiedVisibleEntries, so it would be possible to uncollapse its' children.
+        const actionNode = this.#entryToNode.get(action.entry) || null;
+        const parentNode = actionNode && this.#findNextVisibleParent(actionNode);
+        if (parentNode) {
+          this.#modifiedVisibleEntries.push(parentNode?.entry);
+        }
         break;
       }
-
-      case FilterApplyAction.COLLAPSE_FUNCTION: {
-        // The entry itself remains visible, but all of its ancestors are hidden.
+      case FilterAction.COLLAPSE_FUNCTION: {
+        // The entry itself remains visible, but all of its descendants are hidden.
         const entryNode = this.#entryToNode.get(action.entry);
         if (!entryNode) {
           // Invalid node was given, just ignore and move on.
           break;
         }
-        const allAncestors = this.#findAllAncestorsOfNode(entryNode);
-        allAncestors.forEach(ancestor => entriesToHide.add(ancestor));
+        const allDescendants = this.#findAllDescendantsOfNode(entryNode);
+        allDescendants.forEach(descendant => entriesToHide.add(descendant));
+        // If there are any children to hide, add selected entry to modifiedVisibleEntries array to identify in the UI that children of the selected entry are modified.
+        if (entriesToHide.size > 0) {
+          this.#modifiedVisibleEntries.push(action.entry);
+        }
         break;
       }
-
-      case FilterApplyAction.COLLAPSE_REPEATING_DESCENDANTS: {
+      case FilterAction.COLLAPSE_REPEATING_DESCENDANTS: {
         const entryNode = this.#entryToNode.get(action.entry);
         if (!entryNode) {
           // Invalid node was given, just ignore and move on.
           break;
         }
         const allRepeatingDescendants = this.#findAllRepeatingDescendantsOfNext(entryNode);
-        allRepeatingDescendants.forEach(ancestor => entriesToHide.add(ancestor));
+        allRepeatingDescendants.forEach(descendant => entriesToHide.add(descendant));
+        if (entriesToHide.size > 0) {
+          this.#modifiedVisibleEntries.push(action.entry);
+        }
+        break;
+      }
+      case FilterAction.UNDO_ALL_ACTIONS: {
+        this.#invisibleEntries = [];
+        this.#modifiedVisibleEntries = [];
+        break;
+      }
+      case FilterAction.RESET_CHILDREN: {
+        this.#makeEntryChildrenVisible(action.entry);
         break;
       }
       default:
@@ -159,47 +184,57 @@ export class EntriesFilter {
     return this.#invisibleEntries;
   }
 
-  #findAllAncestorsOfNode(root: Helpers.TreeHelpers.TraceEntryNode): Types.TraceEvents.TraceEventData[] {
-    const cachedAncestors = this.#entryToAncestorsMap.get(root);
-    if (cachedAncestors) {
-      return cachedAncestors;
+  // The direct parent might be hidden by other actions, therefore we look for the next visible parent.
+  #findNextVisibleParent(node: Helpers.TreeHelpers.TraceEntryNode): Helpers.TreeHelpers.TraceEntryNode|null {
+    let parent = node.parent;
+    while (parent && this.#invisibleEntries.includes(parent.entry)) {
+      parent = parent.parent;
+    }
+    return parent;
+  }
+
+  #findAllDescendantsOfNode(root: Helpers.TreeHelpers.TraceEntryNode): Types.TraceEvents.TraceEventData[] {
+    const cachedDescendants = this.#entryToDescendantsMap.get(root);
+    if (cachedDescendants) {
+      return cachedDescendants;
     }
 
-    const ancestors: Types.TraceEvents.TraceEventData[] = [];
+    const descendants: Types.TraceEvents.TraceEventData[] = [];
 
-    // Walk through all the ancestors, starting at the root node.
+    // Walk through all the descendants, starting at the root node.
     const children: Helpers.TreeHelpers.TraceEntryNode[] = [...root.children];
     while (children.length > 0) {
       const childNode = children.shift();
       if (childNode) {
-        ancestors.push(childNode.entry);
-        const childNodeCachedAncestors = this.#entryToAncestorsMap.get(childNode);
-        // If the ancestors of a child are cached, get them from the cache instead of iterating through them again
-        if (childNodeCachedAncestors) {
-          ancestors.push(...childNodeCachedAncestors);
+        descendants.push(childNode.entry);
+        const childNodeCachedDescendants = this.#entryToDescendantsMap.get(childNode);
+        // If the descendants of a child are cached, get them from the cache instead of iterating through them again
+        if (childNodeCachedDescendants) {
+          descendants.push(...childNodeCachedDescendants);
         } else {
           children.push(...childNode.children);
         }
       }
     }
 
-    this.#entryToAncestorsMap.set(root, ancestors);
-    return ancestors;
+    this.#entryToDescendantsMap.set(root, descendants);
+    return descendants;
   }
 
-  #findAllRepeatingDescendantsOfNext(root: Helpers.TreeHelpers.TraceEntryNode): Types.TraceEvents.TraceEntry[] {
+  #findAllRepeatingDescendantsOfNext(root: Helpers.TreeHelpers.TraceEntryNode):
+      Types.TraceEvents.SyntheticTraceEntry[] {
     // Walk through all the ancestors, starting at the root node.
     const children: Helpers.TreeHelpers.TraceEntryNode[] = [...root.children];
-    const repeatingNodes: Types.TraceEvents.TraceEntry[] = [];
+    const repeatingNodes: Types.TraceEvents.SyntheticTraceEntry[] = [];
     const rootIsProfileCall = Types.TraceEvents.isProfileCall(root.entry);
 
     while (children.length > 0) {
       const childNode = children.shift();
       if (childNode) {
         const childIsProfileCall = Types.TraceEvents.isProfileCall(childNode.entry);
-        if (/* Handle TraceEventSyntheticProfileCalls */ rootIsProfileCall && childIsProfileCall) {
-          const rootNodeEntry = root.entry as Types.TraceEvents.TraceEventSyntheticProfileCall;
-          const childNodeEntry = childNode.entry as Types.TraceEvents.TraceEventSyntheticProfileCall;
+        if (/* Handle SyntheticProfileCalls */ rootIsProfileCall && childIsProfileCall) {
+          const rootNodeEntry = root.entry as Types.TraceEvents.SyntheticProfileCall;
+          const childNodeEntry = childNode.entry as Types.TraceEvents.SyntheticProfileCall;
 
           if (Helpers.SamplesIntegrator.SamplesIntegrator.framesAreEqual(
                   rootNodeEntry.callFrame, childNodeEntry.callFrame)) {
@@ -221,31 +256,31 @@ export class EntriesFilter {
    * Removes all of the entry children from the
    * invisible entries array to make them visible.
    **/
-  #makeEntryChildrenVisible(entry: Types.TraceEvents.TraceEntry): void {
+  #makeEntryChildrenVisible(entry: Types.TraceEvents.SyntheticTraceEntry): void {
     const entryNode = this.#entryToNode.get(entry);
     if (!entryNode) {
       // Invalid node was given, just ignore and move on.
       return;
     }
-    const ancestors = this.#findAllAncestorsOfNode(entryNode);
+    const descendants = this.#findAllDescendantsOfNode(entryNode);
 
     /**
-     * Filter out all ancestors of the node
+     * Filter out all descendant of the node
      * from the invisible entries list.
      **/
     this.#invisibleEntries = this.#invisibleEntries.filter(entry => {
-      if (ancestors.includes(entry)) {
+      if (descendants.includes(entry)) {
         return false;
       }
       return true;
     });
 
     /**
-     * Filter out all ancestors and entry from modified entries
+     * Filter out all descentants and entry from modified entries
      * list to not show that some entries below those are hidden.
      **/
     this.#modifiedVisibleEntries = this.#modifiedVisibleEntries.filter(iterEntry => {
-      if (ancestors.includes(iterEntry) || iterEntry === entry) {
+      if (descendants.includes(iterEntry) || iterEntry === entry) {
         return false;
       }
       return true;
@@ -254,13 +289,5 @@ export class EntriesFilter {
 
   isEntryModified(event: Types.TraceEvents.TraceEventData): boolean {
     return this.#modifiedVisibleEntries.includes(event);
-  }
-
-  #isUserApplyFilterAction(action: UserFilterAction): action is UserApplyFilterAction {
-    return filterApplyActionSet.has(action.type as FilterApplyAction);
-  }
-
-  #isFilterUndoAction(action: FilterAction): action is FilterUndoAction {
-    return filterUndoActionSet.has(action as FilterUndoAction);
   }
 }

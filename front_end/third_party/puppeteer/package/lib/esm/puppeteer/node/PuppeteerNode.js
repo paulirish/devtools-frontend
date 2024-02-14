@@ -1,17 +1,7 @@
 /**
- * Copyright 2020 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2020 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { Browser as SupportedBrowser, resolveBuildId, detectBrowserPlatform, getInstalledBrowsers, uninstall, } from '@puppeteer/browsers';
 import { Puppeteer } from '../common/Puppeteer.js';
@@ -181,7 +171,7 @@ export class PuppeteerNode extends Puppeteer {
      * @internal
      */
     get defaultDownloadPath() {
-        return this.configuration.downloadPath ?? this.configuration.cacheDirectory;
+        return this.configuration.cacheDirectory;
     }
     /**
      * The name of the browser that was last launched.
@@ -235,7 +225,7 @@ export class PuppeteerNode extends Puppeteer {
         if (!platform) {
             throw new Error('The current platform is not supported.');
         }
-        const cacheDir = this.configuration.downloadPath ?? this.configuration.cacheDirectory;
+        const cacheDir = this.configuration.cacheDirectory;
         const installedBrowsers = await getInstalledBrowsers({
             cacheDir,
         });

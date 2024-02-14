@@ -162,7 +162,7 @@ export class ThreadAppender implements TrackAppender {
   readonly isOnMainFrame: boolean;
   #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignoreListJSFramesOnTimeline');
   #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timelineShowAllEvents');
-  #entriesFilter?: TraceEngine.EntriesFilter.EntriesFilter;
+  #entriesFilter: TraceEngine.EntriesFilter.EntriesFilter;
   #url: string = '';
   #headerNestingLevel: number|null = null;
   constructor(
@@ -213,15 +213,8 @@ export class ThreadAppender implements TrackAppender {
 
     this.#url = this.#traceParsedData.Renderer?.processes.get(this.#processId)?.url || '';
   }
-
-  modifyTree(
-      traceEvent: TraceEngine.Types.TraceEvents.TraceEntry, action: TraceEngine.EntriesFilter.FilterAction,
-      flameChartView: PerfUI.FlameChart.FlameChart): void {
-    if (!this.#entriesFilter) {
-      return;
-    }
-    this.#entriesFilter.applyAction({type: action, entry: traceEvent});
-    flameChartView.dispatchEventToListeners(PerfUI.FlameChart.Events.EntriesModified);
+  entriesFilter(): TraceEngine.EntriesFilter.EntriesFilter {
+    return this.#entriesFilter;
   }
 
   processId(): TraceEngine.Types.TraceEvents.ProcessID {
@@ -491,7 +484,7 @@ export class ThreadAppender implements TrackAppender {
       // stack.
       const skipEventDueToIgnoreListing = entryIsIgnoreListed && parentIsIgnoredListed;
       if (entryIsVisible && !skipEventDueToIgnoreListing) {
-        this.#appendEntryAtLevel(entry, startingLevel, this.#entriesFilter?.isEntryModified(entry));
+        this.#appendEntryAtLevel(entry, startingLevel);
         nextLevel++;
       }
 
@@ -501,19 +494,17 @@ export class ThreadAppender implements TrackAppender {
     return maxDepthInTree;
   }
 
-  #appendEntryAtLevel(entry: TraceEngine.Types.TraceEvents.TraceEventData, level: number, childrenCollapsed?: boolean):
-      void {
+  #appendEntryAtLevel(entry: TraceEngine.Types.TraceEvents.TraceEventData, level: number): void {
     this.#ensureTrackHeaderAppended(level);
     const index = this.#compatibilityBuilder.appendEventAtLevel(entry, level, this);
-    this.#addDecorationsToEntry(entry, index, childrenCollapsed);
+    this.#addDecorationsToEntry(entry, index);
   }
 
-  #addDecorationsToEntry(
-      entry: TraceEngine.Types.TraceEvents.TraceEventData, index: number, childrenCollapsed?: boolean): void {
+  #addDecorationsToEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData, index: number): void {
     const flameChartData = this.#compatibilityBuilder.getFlameChartTimelineData();
-    if (childrenCollapsed) {
+    if (this.#entriesFilter?.isEntryModified(entry)) {
       addDecorationToEvent(
-          flameChartData, index, {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_ANCESTORS_ARROW});
+          flameChartData, index, {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW});
     }
     const warnings = this.#traceParsedData.Warnings.perEvent.get(entry);
     if (!warnings) {
@@ -619,7 +610,7 @@ export class ThreadAppender implements TrackAppender {
    * Returns the info shown when an event added by this appender
    * is hovered in the timeline.
    */
-  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticEventWithSelfTime): HighlightedEntryInfo {
+  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): HighlightedEntryInfo {
     let title = this.titleForEvent(event);
     if (TraceEngine.Types.TraceEvents.isTraceEventParseHTML(event)) {
       const startLine = event.args['beginData']['startLine'];

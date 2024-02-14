@@ -89,15 +89,17 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
   constructor() {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.pane().context('throttling-conditions')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('throttling-conditions')}`);
 
     const header = this.contentElement.createChild('div', 'header');
     header.textContent = i18nString(UIStrings.networkThrottlingProfiles);
     UI.ARIAUtils.markAsHeading(header, 1);
 
-    const addButton = UI.UIUtils.createTextButton(
-        i18nString(UIStrings.addCustomProfile), this.addButtonClicked.bind(this), 'add-conditions-button');
-    addButton.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context('add-conditions')}`);
+    const addButton =
+        UI.UIUtils.createTextButton(i18nString(UIStrings.addCustomProfile), this.addButtonClicked.bind(this), {
+          className: 'add-conditions-button',
+          jslogContext: 'network.add-conditions',
+        });
     this.contentElement.appendChild(addButton);
 
     this.list = new UI.ListWidget.ListWidget(this);
@@ -105,7 +107,7 @@ export class ThrottlingSettingsTab extends UI.Widget.VBox implements
 
     this.list.show(this.contentElement);
 
-    this.customSetting = Common.Settings.Settings.instance().moduleSetting('customNetworkConditions');
+    this.customSetting = Common.Settings.Settings.instance().moduleSetting('custom-network-conditions');
     this.customSetting.addChangeListener(this.conditionsUpdated, this);
 
     this.setDefaultFocusedElement(addButton);

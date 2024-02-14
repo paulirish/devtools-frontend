@@ -36,12 +36,12 @@ export class ShortcutRegistry {
     this.consumePrefix = null;
     this.devToolsDefaultShortcutActions = new Set();
     this.disabledDefaultShortcutsForAction = new Platform.MapUtilities.Multimap();
-    this.keybindSetSetting = Common.Settings.Settings.instance().moduleSetting('activeKeybindSet');
+    this.keybindSetSetting = Common.Settings.Settings.instance().moduleSetting('active-keybind-set');
     this.keybindSetSetting.addChangeListener(event => {
       Host.userMetrics.keybindSetSettingChanged(event.data);
       this.registerBindings();
     });
-    this.userShortcutsSetting = Common.Settings.Settings.instance().moduleSetting('userShortcuts');
+    this.userShortcutsSetting = Common.Settings.Settings.instance().moduleSetting('user-shortcuts');
     this.userShortcutsSetting.addChangeListener(this.registerBindings, this);
 
     this.registerBindings();
@@ -151,7 +151,7 @@ export class ShortcutRegistry {
       allowlistKeyMap.addKeyMapping(shortcut.descriptors.map(descriptor => descriptor.key), shortcut.action);
     });
 
-    return (event: KeyboardEvent): void => {
+    return (event: KeyboardEvent) => {
       const key = KeyboardShortcut.makeKeyFromEvent(event);
       const keyMap = this.activePrefixKey ? allowlistKeyMap.getNode(this.activePrefixKey.key()) : allowlistKeyMap;
       if (!keyMap) {
@@ -204,7 +204,7 @@ export class ShortcutRegistry {
     }
     if (keyMapNode && keyMapNode.hasChords()) {
       this.activePrefixKey = keyMapNode;
-      this.consumePrefix = async(): Promise<void> => {
+      this.consumePrefix = async () => {
         this.activePrefixKey = null;
         this.activePrefixTimeout = null;
         await maybeExecuteActionForKey.call(this);
@@ -492,7 +492,7 @@ export const ForwardedActions = new Set<string>([
   'main.toggle-dock',
   'debugger.toggle-breakpoints-active',
   'debugger.toggle-pause',
-  'commandMenu.show',
+  'quick-open.show-command-menu',
   'console.toggle',
 ]);
 export const KeyTimeout = 1000;

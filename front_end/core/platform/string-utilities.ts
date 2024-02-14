@@ -99,7 +99,7 @@ export const formatAsJSLiteral = (content: string): string => {
 export const sprintf = (fmt: string, ...args: unknown[]): string => {
   let argIndex = 0;
   const RE = /%(?:(\d+)\$)?(?:\.(\d*))?([%dfs])/g;
-  return fmt.replaceAll(RE, (_: string, index?: string, precision?: string, specifier?: string): string => {
+  return fmt.replaceAll(RE, (_: string, index?: string, precision?: string, specifier?: string) => {
     if (specifier === '%') {
       return '%';
     }
@@ -244,6 +244,23 @@ export const countWtf8Bytes = (inputString: string): number => {
 
 export const stripLineBreaks = (inputStr: string): string => {
   return inputStr.replace(/(\r)?\n/g, '');
+};
+
+const EXTENDED_KEBAB_CASE_REGEXP = /^([a-z0-9]+(?:-[a-z0-9]+)*\.)*[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Tests if the `inputStr` is following the extended Kebab Case naming convetion,
+ * where words are separated with either a dash (`-`) or a dot (`.`), and all
+ * characters must be lower-case alphanumeric.
+ *
+ * For example, it will yield `true` for `'my.amazing-string.literal'`, but `false`
+ * for `'Another.AmazingLiteral'` or '`another_amazing_literal'`.
+ *
+ * @param inputStr the input string to test.
+ * @return `true` if the `inputStr` follows the extended Kebab Case convention.
+ */
+export const isExtendedKebabCase = (inputStr: string): boolean => {
+  return EXTENDED_KEBAB_CASE_REGEXP.test(inputStr);
 };
 
 export const toTitleCase = (inputStr: string): string => {
@@ -480,6 +497,38 @@ export const toLowerCaseString = function(input: string): LowerCaseString {
   return input.toLowerCase() as LowerCaseString;
 };
 
+const WORD = /[A-Z]{2,}(?=[A-Z0-9][a-z0-9]+|\b)|[A-Za-z][0-9]+[a-z]|[A-Z]?[a-z]+|[0-9][A-Za-z]+|[A-Z]|[0-9]+|[.]/g;
+//            <---1---><-----------2----------> <--------3--------> <-----4----> <------5-----> <-----6----> <7>
+// 1: two or more consecutive uppercase letters. This is useful for identifying acronyms
+// 2: lookahead assertion that matches a word boundary
+// 3: numeronym: single letter followed by number and another letter
+// 4: word starting with an optional uppercase letter
+// 5: single digit followed by word to handle '3D' or '2px' (this might be controverial)
+// 6: single uppercase letter or number
+// 7: a dot character. We extract it into a separate word and remove dashes around it later.
+//    This is makes more sense conceptually and allows accounting for all possible word variants.
+//    Making dot a part of a word prevent us from handling acronyms or numeronyms after the word
+//    correctly without making the RegExp prohibitively complicated.
+// https://regex101.com/r/LtFugp/1
+export const toKebabCase = function(input: string): Lowercase<string> {
+  return (input.match?.(WORD)?.map(w => w.toLowerCase()).join('-').replaceAll('-.-', '.') || input) as
+      Lowercase<string>;
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function toKebabCaseKeys(settingValue: {
+  [x: string]: any,
+}): {[x: string]: any} {
+  const result: {
+    [x: string]: any,
+  } = {};
+  for (const [key, value] of Object.entries(settingValue)) {
+    result[toKebabCase(key)] = value;
+  }
+  return result;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 // Replaces the last ocurrence of parameter `search` with parameter `replacement` in `input`
 export const replaceLast = function(input: string, search: string, replacement: string): string {
   const replacementStartIndex = input.lastIndexOf(search);
@@ -496,4 +545,17 @@ export const stringifyWithPrecision = function stringifyWithPrecision(s: number,
   }
   const string = s.toFixed(precision).replace(/\.?0*$/, '');
   return string === '-0' ? '0' : string;
+};
+
+/**
+ * Somewhat efficiently concatenates 2 base64 encoded strings.
+ */
+export const concatBase64 = function(lhs: string, rhs: string): string {
+  if (lhs.length === 0 || !lhs.endsWith('=')) {
+    // Empty string or no padding, we can straight-up concatenate.
+    return lhs + rhs;
+  }
+  const lhsLeaveAsIs = lhs.substring(0, lhs.length - 4);
+  const lhsToDecode = lhs.substring(lhs.length - 4);
+  return lhsLeaveAsIs + window.btoa(window.atob(lhsToDecode) + window.atob(rhs));
 };

@@ -40,7 +40,7 @@ class BaseLinkSwatch extends HTMLElement {
   }
 
   set data(data: BaseLinkSwatchRenderData) {
-    this.onLinkActivate = (linkText: string, event: MouseEvent|KeyboardEvent): void => {
+    this.onLinkActivate = (linkText: string, event: MouseEvent|KeyboardEvent) => {
       if (event instanceof MouseEvent && event.button !== 0) {
         return;
       }
@@ -86,7 +86,7 @@ interface CSSVarSwatchRenderData {
   variableName: string;
   computedValue: string|null;
   fromFallback: boolean;
-  fallbackHtml: Node|null;
+  fallbackText: string|null;
   onLinkActivate: (linkText: string) => void;
 }
 
@@ -122,9 +122,6 @@ export class CSSVarSwatch extends HTMLElement {
 
     const isDefined = Boolean(computedValue) && !fromFallback;
     const title = isDefined ? computedValue ?? '' : i18nString(UIStrings.sIsNotDefined, {PH1: variableName});
-    // This is a terrible hack to account for `StylesSidebarPropertyRenderer` parsing var() usages
-    // with a variable fallback without the last parens, so it adds a last parenthesis itself.
-    const shouldAddClosingParens = !data.fallbackHtml?.textContent?.startsWith('var(');
 
     this.#link = new BaseLinkSwatch();
     this.#link.data = {
@@ -138,8 +135,8 @@ export class CSSVarSwatch extends HTMLElement {
     // clang-format off
     render(
         html`<span data-title=${data.computedValue || ''}
-          jslog=${VisualLogging.link().track({click: true, hover: true}).context('cssVar')}
-        >var(${this.#link}${data.fallbackHtml ? ', ' : ''}${data.fallbackHtml}${shouldAddClosingParens ? ')' : ''}</span>`,
+          jslog=${VisualLogging.link('css-var').track({click: true, hover: true})}
+        >var(${this.#link}<slot name="fallback">${data.fallbackText ? `, ${data.fallbackText}` : ''}</slot>)</span>`,
         this.shadow, {host: this});
     // clang-format on
   }

@@ -79,27 +79,20 @@ export class Runtime {
 
   static isDescriptorEnabled(descriptor: {
     experiment: ((string | undefined)|null),
-    condition: ((string | undefined)|null),
+    condition?: Condition,
   }): boolean {
-    const activatorExperiment = descriptor['experiment'];
-    if (activatorExperiment === '*') {
+    const {experiment} = descriptor;
+    if (experiment === '*') {
       return true;
     }
-    if (activatorExperiment && activatorExperiment.startsWith('!') &&
-        experiments.isEnabled(activatorExperiment.substring(1))) {
+    if (experiment && experiment.startsWith('!') && experiments.isEnabled(experiment.substring(1))) {
       return false;
     }
-    if (activatorExperiment && !activatorExperiment.startsWith('!') && !experiments.isEnabled(activatorExperiment)) {
+    if (experiment && !experiment.startsWith('!') && !experiments.isEnabled(experiment)) {
       return false;
     }
-    const condition = descriptor['condition'];
-    if (condition && !condition.startsWith('!') && !Runtime.queryParam(condition)) {
-      return false;
-    }
-    if (condition && condition.startsWith('!') && Runtime.queryParam(condition.substring(1))) {
-      return false;
-    }
-    return true;
+    const {condition} = descriptor;
+    return condition ? condition() : true;
   }
 
   loadLegacyModule(modulePath: string): Promise<void> {
@@ -271,9 +264,7 @@ export class Experiment {
 // This must be constructed after the query parameters have been parsed.
 export const experiments = new ExperimentsSupport();
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ExperimentName {
+export const enum ExperimentName {
   CAPTURE_NODE_CREATION_STACKS = 'captureNodeCreationStacks',
   CSS_OVERVIEW = 'cssOverview',
   LIVE_HEAP_PROFILE = 'liveHeapProfile',
@@ -296,16 +287,17 @@ export enum ExperimentName {
   USE_SOURCE_MAP_SCOPES = 'useSourceMapScopes',
   STORAGE_BUCKETS_TREE = 'storageBucketsTree',
   NETWORK_PANEL_FILTER_BAR_REDESIGN = 'networkPanelFilterBarRedesign',
-  BREADCRUMBS_PERFORMANCE_PANEL = 'breadcrumbsPerformancePanel',
   TRACK_CONTEXT_MENU = 'trackContextMenu',
   AUTOFILL_VIEW = 'autofillView',
   INDENTATION_MARKERS_TEMP_DISABLE = 'sourcesFrameIndentationMarkersTemporarilyDisable',
-  CONSOLE_INSIGHTS = 'consoleInsights',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ConditionName {
-  CAN_DOCK = 'can_dock',
-  NOT_SOURCES_HIDE_ADD_FOLDER = '!sources.hide_add_folder',
-}
+/**
+ * When defining conditions make sure that objects used by the function have
+ * been instantiated.
+ */
+export type Condition = () => boolean;
+
+export const conditions = {
+  canDock: () => Boolean(Runtime.queryParam('can_dock')),
+};

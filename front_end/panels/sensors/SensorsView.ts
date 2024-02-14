@@ -206,10 +206,10 @@ export class SensorsView extends UI.Widget.VBox {
 
   constructor() {
     super(true);
-    this.element.setAttribute('jslog', `${VisualLogging.panel().context('sensors')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('sensors').track({resize: true})}`);
     this.contentElement.classList.add('sensors-view');
 
-    this.LocationSetting = Common.Settings.Settings.instance().createSetting('emulation.locationOverride', '');
+    this.LocationSetting = Common.Settings.Settings.instance().createSetting('emulation.location-override', '');
     this.Location = SDK.EmulationModel.Location.parseSetting(this.LocationSetting.get());
     this.LocationOverrideEnabled = false;
 
@@ -218,7 +218,7 @@ export class SensorsView extends UI.Widget.VBox {
     this.createPanelSeparator();
 
     this.deviceOrientationSetting =
-        Common.Settings.Settings.instance().createSetting('emulation.deviceOrientationOverride', '');
+        Common.Settings.Settings.instance().createSetting('emulation.device-orientation-override', '');
     this.deviceOrientation = SDK.EmulationModel.DeviceOrientation.parseSetting(this.deviceOrientationSetting.get());
     this.deviceOrientationOverrideEnabled = false;
 
@@ -246,7 +246,7 @@ export class SensorsView extends UI.Widget.VBox {
 
   private createLocationSection(location: SDK.EmulationModel.Location): void {
     const geogroup = this.contentElement.createChild('section', 'sensors-group');
-    geogroup.setAttribute('jslog', `${VisualLogging.section().context('location')}`);
+    geogroup.setAttribute('jslog', `${VisualLogging.section('location')}`);
     const geogroupTitle = UI.UIUtils.createLabel(i18nString(UIStrings.location), 'sensors-group-title');
     geogroup.appendChild(geogroupTitle);
     const fields = geogroup.createChild('div', 'geo-fields');
@@ -262,10 +262,9 @@ export class SensorsView extends UI.Widget.VBox {
     this.customLocationsGroup = (this.locationSelectElement.createChild('optgroup') as HTMLOptGroupElement);
     this.customLocationsGroup.label = i18nString(UIStrings.overrides);
     const customLocations = Common.Settings.Settings.instance().moduleSetting('emulation.locations');
-    const manageButton =
-        UI.UIUtils.createTextButton(i18nString(UIStrings.manage), () => Common.Revealer.reveal(customLocations));
-    manageButton.setAttribute(
-        'jslog', `${VisualLogging.action().track({click: true}).context('sensors.manage-locations')}`);
+    const manageButton = UI.UIUtils.createTextButton(
+        i18nString(UIStrings.manage), () => Common.Revealer.reveal(customLocations),
+        {jslogContext: 'sensors.manage-locations'});
     UI.ARIAUtils.setLabel(manageButton, i18nString(UIStrings.manageTheListOfLocations));
     fields.appendChild(manageButton);
     const fillCustomSettings = (): void => {
@@ -437,7 +436,7 @@ export class SensorsView extends UI.Widget.VBox {
 
   private createDeviceOrientationSection(): void {
     const orientationGroup = this.contentElement.createChild('section', 'sensors-group');
-    orientationGroup.setAttribute('jslog', `${VisualLogging.section().context('device-orientation')}`);
+    orientationGroup.setAttribute('jslog', `${VisualLogging.section('device-orientation')}`);
     const orientationTitle = UI.UIUtils.createLabel(i18nString(UIStrings.orientation), 'sensors-group-title');
     orientationGroup.appendChild(orientationTitle);
     const orientationContent = orientationGroup.createChild('div', 'orientation-content');
@@ -630,9 +629,8 @@ export class SensorsView extends UI.Widget.VBox {
     this.gammaSetter(String(deviceOrientation.gamma));
 
     const resetButton = UI.UIUtils.createTextButton(
-        i18nString(UIStrings.reset), this.resetDeviceOrientation.bind(this), 'orientation-reset-button');
-    resetButton.setAttribute(
-        'jslog', `${VisualLogging.action().track({click: true}).context('sensors.reset-device-orientiation')}`);
+        i18nString(UIStrings.reset), this.resetDeviceOrientation.bind(this),
+        {className: 'orientation-reset-button', jslogContext: 'sensors.reset-device-orientiation'});
     UI.ARIAUtils.setLabel(resetButton, i18nString(UIStrings.resetDeviceOrientation));
     resetButton.setAttribute('type', 'reset');
     cellElement.appendChild(resetButton);
@@ -754,7 +752,7 @@ export class SensorsView extends UI.Widget.VBox {
   private appendIdleEmulator(): void {
     const container = this.contentElement.createChild('div', 'idle-section');
     const control = UI.SettingsUI.createControlForSetting(
-        Common.Settings.Settings.instance().moduleSetting('emulation.idleDetection'),
+        Common.Settings.Settings.instance().moduleSetting('emulation.idle-detection'),
         i18nString(UIStrings.forcesSelectedIdleStateEmulation));
 
     if (control) {

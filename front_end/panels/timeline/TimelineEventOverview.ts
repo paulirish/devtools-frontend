@@ -230,7 +230,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
             x += quantSizePx;
           }
 
-          const onEntryStart = (entry: TraceEngine.Types.TraceEvents.TraceEntry): void => {
+          const onEntryStart = (entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void => {
             const category = this.#entryCategory(entry);
             if (!category || category === 'idle') {
               // Idle event won't show in CPU activity, so just skip them.
@@ -243,7 +243,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
             categoryIndexStack.push(categoryIndex || otherIndex);
           };
 
-          function onEntryEnd(entry: TraceEngine.Types.TraceEvents.TraceEntry): void {
+          function onEntryEnd(entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void {
             const endTimeMilli = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(entry.ts) +
                 TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
                     TraceEngine.Types.Timing.MicroSeconds(entry.dur || 0));
@@ -345,9 +345,8 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
     // All the warnings that we care about regarding responsiveness and want to represent on the overview.
     const warningsForResponsiveness = new Set<TraceEngine.Handlers.ModelHandlers.Warnings.Warning>([
       'LONG_TASK',
-      'FORCED_STYLE',
+      'FORCED_REFLOW',
       'IDLE_CALLBACK_OVER_TIME',
-      'FORCED_LAYOUT',
     ]);
 
     const allWarningEvents = new Set<TraceEngine.Types.TraceEvents.TraceEventData>();
@@ -460,8 +459,7 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
   private async imageByFrame(frame: TraceEngine.Extras.FilmStrip.Frame): Promise<HTMLImageElement|null> {
     let imagePromise: Promise<HTMLImageElement|null>|undefined = this.frameToImagePromise.get(frame);
     if (!imagePromise) {
-      const data = frame.screenshotAsString;
-      imagePromise = UI.UIUtils.loadImageFromData(data);
+      imagePromise = UI.UIUtils.loadImage(frame.screenshotEvent.args.dataUri);
       this.frameToImagePromise.set(frame, (imagePromise as Promise<HTMLImageElement>));
     }
     return imagePromise;

@@ -68,7 +68,7 @@ export class BezierEditor extends Common.ObjectWrapper.eventMixin<EventTypes, ty
         Common.Debouncer.debounce(this.startPreviewAnimation.bind(this), PREVIEW_ANIMATION_DEBOUNCE_DELAY);
     this.animationTimingUI = new AnimationTimingUI({
       model: this.model,
-      onChange: (model: AnimationTimingModel): void => {
+      onChange: (model: AnimationTimingModel) => {
         this.setModel(model);
         this.onchange();
         this.unselectPresets();
@@ -82,10 +82,10 @@ export class BezierEditor extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.header = this.contentElement.createChild('div', 'bezier-header');
     const minus = this.createPresetModifyIcon(this.header, 'bezier-preset-minus', 'M 12 6 L 8 10 L 12 14');
     minus.addEventListener('click', this.presetModifyClicked.bind(this, false));
-    minus.setAttribute('jslog', `${VisualLogging.previous().track({click: true})}`);
+    minus.setAttribute('jslog', `${VisualLogging.action('bezier.prev-preset').track({click: true})}`);
     const plus = this.createPresetModifyIcon(this.header, 'bezier-preset-plus', 'M 8 6 L 12 10 L 8 14');
     plus.addEventListener('click', this.presetModifyClicked.bind(this, true));
-    plus.setAttribute('jslog', `${VisualLogging.next().track({click: true})}`);
+    plus.setAttribute('jslog', `${VisualLogging.action('bezier.next-preset').track({click: true})}`);
     this.label = this.header.createChild('span', 'source-code bezier-display-value');
   }
 
@@ -226,9 +226,7 @@ export class BezierEditor extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   BezierChanged = 'BezierChanged',
 }
 

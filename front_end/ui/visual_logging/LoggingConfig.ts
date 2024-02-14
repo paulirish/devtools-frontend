@@ -19,30 +19,29 @@ export function getLoggingConfig(element: Element): LoggingConfig {
   return parseJsLog(element.getAttribute(LOGGING_ATTRIBUTE) || '');
 }
 
-// eslint-disable-next-line rulesdir/const_enum
 enum VisualElements {
   TreeItem = 1,
-  /* 2 used to be AriaAttributes, but free to grab now */
-  /* 3 used to be AccessibilityComputedProperties, but free to grab now */
-  /* 4 used to be AccessibilityPane, but free to grab now */
-  /* 5 used to be AccessibilitySourceOrder, but free to grab now */
+  Close = 2,
+  Counter = 3,
+  Drawer = 4,
+  Resizer = 5,
   Toggle = 6,
   Tree = 7,
   TextField = 8,
-  ShowAllStyleProperties = 9,
+  AnimationClip = 9,
   Section = 10,
-  StylePropertiesSectionSeparator = 11,
-  /* 12 used to be StylesPane, but free to grab now */
+  SectionHeader = 11,
+  Timeline = 12,
   StylesSelector = 13,
-  TreeItemExpand = 14,
+  Expand = 14,
   ToggleSubpane = 15,
-  /* 16 used to be ElementClassesPane, but free to grab now */
-  /* 17 used to be AddElementClassPrompt, but free to grab now */
-  /* 18 used to be ElementStatesPan, but free to grab now */
-  /* 19 used to be CssLayersPane, but free to grab now */
+  ControlPoint = 16,
+  Toolbar = 17,
+  Popover = 18,
+  BreakpointMarker = 19,
   DropDown = 20,
   /* 21 used to be StylesMetricsPane, but free to grab now */
-  JumpToSource = 22,
+  /* 22 used to be JumpToSource, but free to grab now */
   MetricsBox = 23,
   MetricsBoxPart = 24,
   /* 25 used to be DOMBreakpointsPane, but free to grab now */
@@ -56,29 +55,29 @@ enum VisualElements {
   BezierEditor = 33,
   BezierPresetCategory = 34,
   Preview = 35,
-  ColorCanvas = 36,
+  Canvas = 36,
   ColorEyeDropper = 37,
   ColorPicker = 38,
-  CopyColor = 39,
+  /* 39 used to be CopyColor, but free to grab now */
   CssAngleEditor = 40,
   CssFlexboxEditor = 41,
   CssGridEditor = 42,
   CssShadowEditor = 43,
   Link = 44,
-  Next = 45,
+  /* 45 used to be Next, but free to grab now */
   Item = 46,
   PaletteColorShades = 47,
   Panel = 48,
-  Previous = 49,
+  /* 49 used to be Previous, but free to grab now */
   ShowStyleEditor = 50,
   Slider = 51,
   CssColorMix = 52,
   Value = 53,
   Key = 54,
-  GridSettings = 55,
-  FlexboxOverlays = 56,
-  GridOverlays = 57,
-  JumpToElement = 58,
+  /* 55 used to be GridSettings, but free to grab now */
+  /* 56 used to be FlexboxOverlays, but free to grab now */
+  /* 57 used to be GridOverlays, but free to grab now */
+  /* 58 used to be JumpToElement, but free to grab now */
   PieChart = 59,
   PieChartSlice = 60,
   PieChartTotal = 61,
@@ -91,7 +90,7 @@ enum VisualElements {
   /* 68 used to be DeveloperResourcesPanel, but free to grab now */
   TableHeader = 69,
   TableCell = 70,
-  StylesComputedPane = 71,
+  /* 71 used to be StylesComputedPane, but free to grab now */
   Pane = 72,
   ResponsivePresets = 73,
   DeviceModeRuler = 74,
@@ -177,6 +176,7 @@ export interface ConfigStringBuilder {
     drag?: boolean,
     change?: boolean,
     keydown?: boolean|string,
+    resize?: boolean,
   }) => ConfigStringBuilder;
 
   /**
@@ -187,8 +187,11 @@ export interface ConfigStringBuilder {
   toString: () => string;
 }
 
-export function makeConfigStringBuilder(veName: VisualElementName): ConfigStringBuilder {
+export function makeConfigStringBuilder(veName: VisualElementName, context?: string): ConfigStringBuilder {
   const components: string[] = [veName];
+  if (typeof context !== 'undefined') {
+    components.push(`context: ${context}`);
+  }
   return {
     context: function(value: string|number|undefined): ConfigStringBuilder {
       if (typeof value !== 'undefined') {
@@ -207,6 +210,7 @@ export function makeConfigStringBuilder(veName: VisualElementName): ConfigString
       drag?: boolean,
       change?: boolean,
       keydown?: boolean|string,
+      resize?: boolean,
     }): ConfigStringBuilder {
       components.push(`track: ${
           Object.entries(options).map(([key, value]) => value !== true ? `${key}: ${value}` : key).join(', ')}`);

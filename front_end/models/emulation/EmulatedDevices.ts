@@ -10,7 +10,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 
-import {MaxDeviceSize, MinDeviceSize, Insets} from './DeviceModeModel.js';
+import {Insets, MaxDeviceSize, MinDeviceSize} from './DeviceModeModel.js';
 
 const UIStrings = {
   /**
@@ -506,12 +506,12 @@ export class EmulatedDevicesList extends Common.ObjectWrapper.ObjectWrapper<Even
   constructor() {
     super();
 
-    this.#standardSetting = Common.Settings.Settings.instance().createSetting('standardEmulatedDeviceList', []);
+    this.#standardSetting = Common.Settings.Settings.instance().createSetting('standard-emulated-device-list', []);
     this.#standardInternal = new Set();
     this.listFromJSONV1(this.#standardSetting.get(), this.#standardInternal);
     this.updateStandardDevices();
 
-    this.#customSetting = Common.Settings.Settings.instance().createSetting('customEmulatedDeviceList', []);
+    this.#customSetting = Common.Settings.Settings.instance().createSetting('custom-emulated-device-list', []);
     this.#customInternal = new Set();
     if (!this.listFromJSONV1(this.#customSetting.get(), this.#customInternal)) {
       this.saveCustomDevices();

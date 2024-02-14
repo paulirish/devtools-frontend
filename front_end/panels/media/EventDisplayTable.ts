@@ -40,7 +40,7 @@ export interface EventDisplayColumnConfig {
 }
 
 export const enum MediaEventColumnKeys {
-  Timestamp = 'displayTimestamp',
+  Timestamp = 'display-timestamp',
   Event = 'event',
   Value = 'value',
 }
@@ -77,7 +77,7 @@ export class PlayerEventsView extends UI.Widget.VBox {
   constructor() {
     super();
 
-    this.element.setAttribute('jslog', `${VisualLogging.pane().context('events')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('events')}`);
 
     // Set up element styles.
 

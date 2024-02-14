@@ -495,14 +495,14 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
         })}
       >
         <span class="arrow-and-key-wrapper"
-          @mouseover=${(): void => {
+          @mouseover=${() => {
             this.dispatchEvent(new ItemMouseOverEvent(node));
           }}
-          @mouseout=${(): void => {
+          @mouseout=${() => {
             this.dispatchEvent(new ItemMouseOutEvent(node));
           }}
         >
-          <span class="arrow-icon" @click=${this.#onArrowClick(node)} jslog=${VisualLogging.treeItemExpand().track({click: true})}>
+          <span class="arrow-icon" @click=${this.#onArrowClick(node)} jslog=${VisualLogging.expand().track({click: true})}>
           </span>
           <span class="tree-node-key" data-node-key=${node.treeNodeData}>${renderedNodeKey}</span>
         </span>

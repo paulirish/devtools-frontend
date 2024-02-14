@@ -158,16 +158,16 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
   private currentSelectedNode?: ResourceWebSocketFrameNode|null;
 
   private messageFilterSetting: Common.Settings.Setting<string> =
-      Common.Settings.Settings.instance().createSetting('networkWebSocketMessageFilter', '');
+      Common.Settings.Settings.instance().createSetting('network-web-socket-message-filter', '');
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
 
     this.element.classList.add('websocket-frame-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane().context('web-socket-messages')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages')}`);
     this.request = request;
 
-    this.splitWidget = new UI.SplitWidget.SplitWidget(false, true, 'resourceWebSocketFrameSplitViewState');
+    this.splitWidget = new UI.SplitWidget.SplitWidget(false, true, 'resource-web-socket-frame-split-view-state');
     this.splitWidget.show(this.element);
 
     const columns = ([
@@ -200,7 +200,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     this.dataGrid.markColumnAsSortedBy('time', DataGrid.DataGrid.Order.Ascending);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SortingChanged, this.sortItems, this);
 
-    this.dataGrid.setName('ResourceWebSocketFrameView');
+    this.dataGrid.setName('resource-web-socket-frame-view');
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SelectedNode, event => {
       void this.onFrameSelected(event);
     }, this);
@@ -263,7 +263,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
   }
 
   static opCodeDescription(opCode: number, mask: boolean): string {
-    const localizedDescription = opCodeDescriptions[opCode] || ((): string => '');
+    const localizedDescription = opCodeDescriptions[opCode] || (() => '');
     if (mask) {
       return i18nString(UIStrings.sOpcodeSMask, {PH1: localizedDescription(), PH2: opCode});
     }
@@ -358,9 +358,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum OpCodes {
+const enum OpCodes {
   ContinuationFrame = 0,
   TextFrame = 1,
   BinaryFrame = 2,
@@ -370,14 +368,13 @@ export enum OpCodes {
 }
 
 export const opCodeDescriptions: (() => string)[] = (function(): (() => Common.UIString.LocalizedString)[] {
-  const opCodes = OpCodes;
   const map = [];
-  map[opCodes.ContinuationFrame] = i18nLazyString(UIStrings.continuationFrame);
-  map[opCodes.TextFrame] = i18nLazyString(UIStrings.textMessage);
-  map[opCodes.BinaryFrame] = i18nLazyString(UIStrings.binaryMessage);
-  map[opCodes.ConnectionCloseFrame] = i18nLazyString(UIStrings.connectionCloseMessage);
-  map[opCodes.PingFrame] = i18nLazyString(UIStrings.pingMessage);
-  map[opCodes.PongFrame] = i18nLazyString(UIStrings.pongMessage);
+  map[OpCodes.ContinuationFrame] = i18nLazyString(UIStrings.continuationFrame);
+  map[OpCodes.TextFrame] = i18nLazyString(UIStrings.textMessage);
+  map[OpCodes.BinaryFrame] = i18nLazyString(UIStrings.binaryMessage);
+  map[OpCodes.ConnectionCloseFrame] = i18nLazyString(UIStrings.connectionCloseMessage);
+  map[OpCodes.PingFrame] = i18nLazyString(UIStrings.pingMessage);
+  map[OpCodes.PongFrame] = i18nLazyString(UIStrings.pongMessage);
   return map;
 })();
 

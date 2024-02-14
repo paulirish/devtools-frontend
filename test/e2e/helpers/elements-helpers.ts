@@ -144,7 +144,7 @@ export const getContentOfSelectedNode = async () => {
   return await selectedNode.evaluate(node => node.textContent as string);
 };
 
-export const waitForSelectedNodeChange = async(initialValue: string, asyncScope = new AsyncScope()): Promise<void> => {
+export const waitForSelectedNodeChange = async (initialValue: string, asyncScope = new AsyncScope()) => {
   await waitForFunction(async () => {
     const currentContent = await getContentOfSelectedNode();
     return currentContent !== initialValue;
@@ -275,18 +275,6 @@ export const getPropertyFromComputedPane = async (name: string) => {
   return undefined;
 };
 
-export const waitForPropertyValueInComputedPane = async (name: string, value: string) => {
-  await waitForFunction(async () => {
-    const properties = await getAllPropertiesFromComputedPane();
-    for (const property of properties) {
-      if (property && property.name === name && property.value === value) {
-        return true;
-      }
-    }
-    return false;
-  });
-};
-
 export const expandSelectedNodeRecursively = async () => {
   const EXPAND_RECURSIVELY = '[aria-label="Expand recursively"]';
 
@@ -298,16 +286,18 @@ export const expandSelectedNodeRecursively = async () => {
 };
 
 export const forcePseudoState = async (pseudoState: string) => {
-  // Open element state pane and wait for it to be loaded asynchronously
-  await click('[aria-label="Toggle Element State"]');
-  await waitFor(`[aria-label="${pseudoState}"]`);
+  // Open element & page state pane and wait for it to be loaded asynchronously
+  await click('[aria-label="Toggle element & page state"]');
+
+  const stateEl = await waitForAria(pseudoState);
   // FIXME(crbug/1112692): Refactor test to remove the timeout.
   await timeout(100);
-  await click(`[aria-label="${pseudoState}"]`);
+  await stateEl.click();
 };
 
 export const removePseudoState = async (pseudoState: string) => {
-  await click(`[aria-label="${pseudoState}"]`);
+  const stateEl = await waitForAria(pseudoState);
+  await stateEl.click();
 };
 
 export const getComputedStylesForDomNode =

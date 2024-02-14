@@ -41,25 +41,22 @@ export class OverlayPersistentHighlighter {
   #isolatedElementHighlights: Map<Protocol.DOM.NodeId, Protocol.Overlay.IsolationModeHighlightConfig>;
   #gridColorGenerator: OverlayColorGenerator;
   #flexColorGenerator: OverlayColorGenerator;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly #showGridLineLabelsSetting: Common.Settings.Setting<any>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly #extendGridLinesSetting: Common.Settings.Setting<any>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly #showGridAreasSetting: Common.Settings.Setting<any>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly #showGridTrackSizesSetting: Common.Settings.Setting<any>;
+
+  /**
+   * @see `front_end/core/sdk/sdk-meta.ts`
+   */
+  readonly #showGridLineLabelsSetting: Common.Settings.Setting<string>;
+  readonly #extendGridLinesSetting: Common.Settings.Setting<boolean>;
+  readonly #showGridAreasSetting: Common.Settings.Setting<boolean>;
+  readonly #showGridTrackSizesSetting: Common.Settings.Setting<boolean>;
+
   readonly #callbacks: PersistentHighlighterCallbacks;
   constructor(model: OverlayModel, callbacks: PersistentHighlighterCallbacks) {
     this.#model = model;
     this.#callbacks = callbacks;
 
     this.#persistentHighlightSetting =
-        Common.Settings.Settings.instance().createLocalSetting('persistentHighlightSetting', []);
+        Common.Settings.Settings.instance().createLocalSetting('persistent-highlight-setting', []);
 
     this.#gridHighlights = new Map();
 
@@ -76,13 +73,13 @@ export class OverlayPersistentHighlighter {
     this.#gridColorGenerator = new OverlayColorGenerator();
     this.#flexColorGenerator = new OverlayColorGenerator();
 
-    this.#showGridLineLabelsSetting = Common.Settings.Settings.instance().moduleSetting('showGridLineLabels');
+    this.#showGridLineLabelsSetting = Common.Settings.Settings.instance().moduleSetting('show-grid-line-labels');
     this.#showGridLineLabelsSetting.addChangeListener(this.onSettingChange, this);
-    this.#extendGridLinesSetting = Common.Settings.Settings.instance().moduleSetting('extendGridLines');
+    this.#extendGridLinesSetting = Common.Settings.Settings.instance().moduleSetting('extend-grid-lines');
     this.#extendGridLinesSetting.addChangeListener(this.onSettingChange, this);
-    this.#showGridAreasSetting = Common.Settings.Settings.instance().moduleSetting('showGridAreas');
+    this.#showGridAreasSetting = Common.Settings.Settings.instance().moduleSetting('show-grid-areas');
     this.#showGridAreasSetting.addChangeListener(this.onSettingChange, this);
-    this.#showGridTrackSizesSetting = Common.Settings.Settings.instance().moduleSetting('showGridTrackSizes');
+    this.#showGridTrackSizesSetting = Common.Settings.Settings.instance().moduleSetting('show-grid-track-sizes');
     this.#showGridTrackSizesSetting.addChangeListener(this.onSettingChange, this);
   }
 
@@ -96,7 +93,7 @@ export class OverlayPersistentHighlighter {
     const gapBackground = mainColor.setAlpha(0.3).asLegacyColor();
     const gapHatch = mainColor.setAlpha(0.8).asLegacyColor();
 
-    const showGridExtensionLines = (this.#extendGridLinesSetting.get() as boolean);
+    const showGridExtensionLines = this.#extendGridLinesSetting.get();
     const showPositiveLineNumbers = this.#showGridLineLabelsSetting.get() === 'lineNumbers';
     const showNegativeLineNumbers = showPositiveLineNumbers;
     const showLineNames = this.#showGridLineLabelsSetting.get() === 'lineNames';
@@ -115,8 +112,8 @@ export class OverlayPersistentHighlighter {
       showPositiveLineNumbers,
       showNegativeLineNumbers,
       showLineNames,
-      showAreaNames: (this.#showGridAreasSetting.get() as boolean),
-      showTrackSizes: (this.#showGridTrackSizesSetting.get() as boolean),
+      showAreaNames: this.#showGridAreasSetting.get(),
+      showTrackSizes: this.#showGridTrackSizesSetting.get(),
       areaBorderColor: mainColor.toProtocolRGBA(),
       gridBackgroundColor: background.toProtocolRGBA(),
     };

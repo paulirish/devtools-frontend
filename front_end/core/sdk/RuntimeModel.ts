@@ -32,26 +32,24 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import * as Common from '../common/common.js';
-import * as Host from '../host/host.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Common from '../common/common.js';
+import * as Host from '../host/host.js';
 import type * as Platform from '../platform/platform.js';
 
 import {DebuggerModel, type FunctionDetails} from './DebuggerModel.js';
 import {HeapProfilerModel} from './HeapProfilerModel.js';
-
 import {
   RemoteFunction,
   RemoteObject,
   RemoteObjectImpl,
   RemoteObjectProperty,
-  ScopeRemoteObject,
   type ScopeRef,
+  ScopeRemoteObject,
 } from './RemoteObject.js';
-
-import {Capability, Type, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
+import {Capability, type Target, Type} from './Target.js';
 
 export class RuntimeModel extends SDKModel<EventTypes> {
   readonly agent: ProtocolProxyApi.RuntimeApi;
@@ -68,12 +66,12 @@ export class RuntimeModel extends SDKModel<EventTypes> {
     this.#executionContextComparatorInternal = ExecutionContext.comparator;
     this.#hasSideEffectSupportInternal = null;
 
-    if (Common.Settings.Settings.instance().moduleSetting('customFormatters').get()) {
+    if (Common.Settings.Settings.instance().moduleSetting('custom-formatters').get()) {
       void this.agent.invoke_setCustomObjectFormatterEnabled({enabled: true});
     }
 
     Common.Settings.Settings.instance()
-        .moduleSetting('customFormatters')
+        .moduleSetting('custom-formatters')
         .addChangeListener(this.customFormattersStateChanged.bind(this));
   }
 
@@ -328,10 +326,8 @@ export class RuntimeModel extends SDKModel<EventTypes> {
       return;
     }
 
-    const indent = Common.Settings.Settings.instance().moduleSetting('textEditorIndent').get();
+    const indent = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get();
     void object
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-        // @ts-expect-error
         .callFunctionJSON(toStringForClipboard, [{
                             value: {
                               subtype: object.subtype,
@@ -445,9 +441,7 @@ export class RuntimeModel extends SDKModel<EventTypes> {
     return this.#hasSideEffectSupportInternal;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  terminateExecution(): Promise<any> {
+  terminateExecution(): Promise<Protocol.ProtocolResponseWithError> {
     return this.agent.invoke_terminateExecution();
   }
 
@@ -473,8 +467,6 @@ export class RuntimeModel extends SDKModel<EventTypes> {
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const _sideEffectTestExpression: string = '(async function(){ await 1; })()';
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   BindingCalled = 'BindingCalled',
   ExecutionContextCreated = 'ExecutionContextCreated',

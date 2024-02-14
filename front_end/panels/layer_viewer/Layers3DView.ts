@@ -34,6 +34,7 @@ import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import layers3DViewStyles from './layers3DView.css.js';
 import {
@@ -136,6 +137,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   constructor(layerViewHost: LayerViewHost) {
     super(true);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('layers-3d-view')}`);
 
     this.contentElement.classList.add('layers-3d-view');
     this.failBanner = new UI.Widget.VBox();
@@ -155,6 +157,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.canvasElement.addEventListener('mouseleave', this.onMouseMove.bind(this), false);
     this.canvasElement.addEventListener('mousemove', this.onMouseMove.bind(this), false);
     this.canvasElement.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
+    this.canvasElement.setAttribute('jslog', `${VisualLogging.canvas('layers').track({click: true, drag: true})}`);
     UI.ARIAUtils.setLabel(this.canvasElement, i18nString(UIStrings.dLayersView));
 
     this.lastSelection = {};
@@ -663,7 +666,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       return;
     }
 
-    const drawChrome = !Common.Settings.Settings.instance().moduleSetting('frameViewerHideChromeWindow').get() &&
+    const drawChrome = !Common.Settings.Settings.instance().moduleSetting('frame-viewer-hide-chrome-window').get() &&
         this.chromeTextures.length >= 3 && this.chromeTextures.indexOf(undefined) < 0;
     const z = (this.maxDepth + 1) * LayerSpacing;
     const borderWidth = Math.ceil(ViewportBorderWidth * this.scale);
@@ -828,25 +831,29 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   private initToolbar(): void {
     this.panelToolbar = this.transformController.toolbar();
     this.contentElement.appendChild(this.panelToolbar.element);
-    this.showPaintsSetting =
-        this.createVisibilitySetting(i18nString(UIStrings.paints), 'frameViewerShowPaints', false, this.panelToolbar);
+    this.showPaintsSetting = this.createVisibilitySetting(
+        i18nString(UIStrings.paints), 'frame-viewer-show-paints', false, this.panelToolbar);
     this.showSlowScrollRectsSetting = this.createVisibilitySetting(
-        i18nString(UIStrings.slowScrollRects), 'frameViewerShowSlowScrollRects', true, this.panelToolbar);
+        i18nString(UIStrings.slowScrollRects), 'frame-viewer-show-slow-scroll-rects', true, this.panelToolbar);
     this.showPaintsSetting.addChangeListener(this.updatePaints, this);
     Common.Settings.Settings.instance()
-        .moduleSetting('frameViewerHideChromeWindow')
+        .moduleSetting('frame-viewer-hide-chrome-window')
         .addChangeListener(this.update, this);
   }
 
   private onContextMenu(event: Event): void {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     contextMenu.defaultSection().appendItem(
-        i18nString(UIStrings.resetView), () => this.transformController.resetAndNotify());
+        i18nString(UIStrings.resetView), () => this.transformController.resetAndNotify(), {
+          jslogContext: 'layers.3d-center',
+        });
     const selection = this.selectionFromEventPoint(event);
     if (selection && selection.type() === Type.Snapshot) {
       contextMenu.defaultSection().appendItem(
           i18nString(UIStrings.showPaintProfiler),
-          () => this.dispatchEventToListeners(Events.PaintProfilerRequested, selection));
+          () => this.dispatchEventToListeners(Events.PaintProfilerRequested, selection), {
+            jslogContext: 'layers.paint-profiler',
+          });
     }
     this.layerViewHost.showContextMenu(contextMenu, selection);
   }
@@ -900,16 +907,12 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum OutlineType {
   Hovered = 'hovered',
   Selected = 'selected',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   PaintProfilerRequested = 'PaintProfilerRequested',
   ScaleChanged = 'ScaleChanged',
 }

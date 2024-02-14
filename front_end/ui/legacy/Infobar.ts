@@ -95,10 +95,10 @@ export class Infobar {
           buttonClass += ' primary-button';
         }
 
-        const button = createTextButton(action.text, actionCallback, buttonClass);
-        if (action.jsLogContext) {
-          button.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context(action.jsLogContext)}`);
-        }
+        const button = createTextButton(action.text, actionCallback, {
+          className: buttonClass,
+          jslogContext: action.jsLogContext,
+        });
         if (action.highlight && !this.#firstFocusableElement) {
           this.#firstFocusableElement = button;
         }
@@ -108,14 +108,15 @@ export class Infobar {
 
     this.disableSetting = disableSetting || null;
     if (disableSetting) {
-      const disableButton =
-          createTextButton(i18nString(UIStrings.dontShowAgain), this.onDisable.bind(this), 'infobar-button');
+      const disableButton = createTextButton(
+          i18nString(UIStrings.dontShowAgain), this.onDisable.bind(this), {className: 'infobar-button'});
       this.actionContainer.appendChild(disableButton);
     }
 
     this.closeContainer = this.mainRow.createChild('div', 'infobar-close-container');
     this.toggleElement = createTextButton(
-        i18nString(UIStrings.showMore), this.onToggleDetails.bind(this), 'link-style devtools-link hidden');
+        i18nString(UIStrings.showMore), this.onToggleDetails.bind(this),
+        {className: 'link-style devtools-link hidden'});
     this.toggleElement.setAttribute('role', 'link');
     this.closeContainer.appendChild(this.toggleElement);
     this.closeButton = this.closeContainer.createChild('div', 'close-button', 'dt-close-button');
@@ -123,7 +124,7 @@ export class Infobar {
     // @ts-ignore This is a custom element defined in UIUitls.js that has a `setTabbable` that TS doesn't
     //            know about.
     this.closeButton.setTabbable(true);
-    this.closeButton.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context('close')}`);
+    this.closeButton.setAttribute('jslog', `${VisualLogging.action('close').track({click: true})}`);
     ARIAUtils.setDescription(this.closeButton, i18nString(UIStrings.close));
     self.onInvokeElement(this.closeButton, this.dispose.bind(this));
 
@@ -248,9 +249,7 @@ export interface InfobarAction {
   jsLogContext?: string;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Type {
+export const enum Type {
   Warning = 'warning',
   Info = 'info',
   Issue = 'issue',

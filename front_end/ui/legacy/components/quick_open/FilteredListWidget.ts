@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
@@ -97,7 +94,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
     this.itemElementsContainer.addEventListener('mousemove', this.onMouseMove.bind(this), false);
     UI.ARIAUtils.markAsListBox(this.itemElementsContainer);
     UI.ARIAUtils.setControls(this.inputBoxElement, this.itemElementsContainer);
-    UI.ARIAUtils.setAutocomplete(this.inputBoxElement, UI.ARIAUtils.AutocompleteInteractionModel.list);
+    UI.ARIAUtils.setAutocomplete(this.inputBoxElement, UI.ARIAUtils.AutocompleteInteractionModel.List);
 
     this.notFoundElement = this.bottomElementsContainer.createChild('div', 'not-found-text');
     this.notFoundElement.classList.add('hidden');

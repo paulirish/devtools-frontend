@@ -155,11 +155,10 @@ export class MainImpl {
     this.createSettings(prefs);
     await this.requestAndRegisterLocaleData();
 
-    Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync_preferences').get());
+    Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync-preferences').get());
     if (Root.Runtime.Runtime.queryParam('veLogging')) {
       void VisualLogging.startLogging();
     }
-
     void this.#createAppUI();
   }
 
@@ -274,6 +273,9 @@ export class MainImpl {
     Root.Runtime.experiments.register('samplingHeapProfilerTimeline', 'Sampling heap profiler timeline', true);
     Root.Runtime.experiments.register(
         'showOptionToExposeInternalsInHeapSnapshot', 'Show option to expose internals in heap snapshots');
+    Root.Runtime.experiments.register(
+        'heapSnapshotTreatBackingStoreAsContainingObject',
+        'In heap snapshots, treat backing store size as part of the containing object');
 
     // Timeline
     Root.Runtime.experiments.register('timelineInvalidationTracking', 'Timeline: invalidation tracking', true);
@@ -317,7 +319,7 @@ export class MainImpl {
 
     // Font Editor
     Root.Runtime.experiments.register(
-        'fontEditor', 'Enable new Font Editor tool within the Styles Pane.', undefined,
+        'fontEditor', 'Enable new Font Editor tool within the Styles tab.', undefined,
         'https://developer.chrome.com/blog/new-in-devtools-89/#font');
 
     // Contrast issues reported via the Issues panel.
@@ -327,6 +329,11 @@ export class MainImpl {
 
     // New cookie features.
     Root.Runtime.experiments.register('experimentalCookieFeatures', 'Enable experimental cookie features');
+
+    // CSS <length> authoring tool.
+    Root.Runtime.experiments.register(
+        'cssTypeComponentLengthDeprecate', 'Deprecate CSS <length> authoring tool in the Styles tab', undefined,
+        'https://goo.gle/devtools-deprecate-length-tools', 'https://crbug.com/1522657');
 
     // Integrate CSS changes in the Styles pane.
     Root.Runtime.experiments.register(
@@ -375,10 +382,6 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.BREADCRUMBS_PERFORMANCE_PANEL, 'Enable breadcrumbs in the Performance Panel',
-        false);
-
-    Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
         'Enable context menu that allows to modify trees in the Flame Chart', true);
 
@@ -387,17 +390,8 @@ export class MainImpl {
         'Enable Autofill view',
     );
 
-    if (Root.Runtime.Runtime.queryParam('enableAida') === 'true') {
-      Root.Runtime.experiments.register(
-          Root.Runtime.ExperimentName.CONSOLE_INSIGHTS,
-          'Enable Console Insights. This implies consent to collect and process data',
-          false,
-          'http://go/console-insights-experiment',
-          'http://go/console-insights-experiment-general-feedback',
-      );
-    }
-
     Root.Runtime.experiments.enableExperimentsByDefault([
+      'cssTypeComponentLengthDeprecate',
       'setAllBreakpointsEagerly',
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
@@ -436,7 +430,7 @@ export class MainImpl {
     Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.instance();
 
     const defaultThemeSetting = 'systemPreferred';
-    const themeSetting = Common.Settings.Settings.instance().createSetting('uiTheme', defaultThemeSetting);
+    const themeSetting = Common.Settings.Settings.instance().createSetting('ui-theme', defaultThemeSetting);
     UI.UIUtils.initializeUIUtils(document);
 
     // Initialize theme support and apply it.
@@ -458,6 +452,11 @@ export class MainImpl {
     darkThemeMediaQuery.addEventListener('change', onThemeChange);
     highContrastMediaQuery.addEventListener('change', onThemeChange);
     themeSetting.addChangeListener(onThemeChange);
+
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
+        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged, async () => {
+          await UI.Utils.DynamicTheming.fetchColors(document);
+        }, this);
 
     UI.UIUtils.installComponentRootStyles((document.body as Element));
 
@@ -564,6 +563,7 @@ export class MainImpl {
     const app = (appProvider as Common.AppProvider.AppProvider).createApp();
     // It is important to kick controller lifetime after apps are instantiated.
     UI.DockController.DockController.instance().initialize();
+    await UI.Utils.DynamicTheming.fetchColors(document);
     app.presentUI(document);
 
     if (UI.ActionRegistry.ActionRegistry.instance().hasAction('elements.toggle-element-search')) {
@@ -621,7 +621,7 @@ export class MainImpl {
           return runnable.run();
         });
     if (Root.Runtime.experiments.isEnabled('liveHeapProfile')) {
-      const setting = 'memoryLiveHeapProfile';
+      const setting = 'memory-live-heap-profile';
       if (Common.Settings.Settings.instance().moduleSetting(setting).get()) {
         promises.push(PerfUI.LiveHeapProfile.LiveHeapProfile.instance().run());
       } else {
@@ -780,7 +780,7 @@ let mainMenuItemInstance: MainMenuItem;
 export class MainMenuItem implements UI.Toolbar.Provider {
   readonly #itemInternal: UI.Toolbar.ToolbarMenuButton;
   constructor() {
-    this.#itemInternal = new UI.Toolbar.ToolbarMenuButton(this.#handleContextMenu.bind(this), true);
+    this.#itemInternal = new UI.Toolbar.ToolbarMenuButton(this.#handleContextMenu.bind(this), true, 'main-menu');
     this.#itemInternal.element.classList.add('main-menu');
     this.#itemInternal.setTitle(i18nString(UIStrings.customizeAndControlDevtools));
   }
@@ -880,7 +880,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
     if (UI.DockController.DockController.instance().dockSide() === UI.DockController.DockState.UNDOCKED) {
       const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
       if (mainTarget && mainTarget.type() === SDK.Target.Type.Frame) {
-        contextMenu.defaultSection().appendAction('inspector_main.focus-debuggee', i18nString(UIStrings.focusDebuggee));
+        contextMenu.defaultSection().appendAction('inspector-main.focus-debuggee', i18nString(UIStrings.focusDebuggee));
       }
     }
 
@@ -890,7 +890,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
                                                                     i18nString(UIStrings.showConsoleDrawer));
     contextMenu.appendItemsAtLocation('mainMenu');
     const moreTools =
-        contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools), false, 'moreTools');
+        contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools), false, 'more-tools');
     const viewExtensions = UI.ViewManager.getRegisteredViewExtensions();
     viewExtensions.sort((extension1, extension2) => {
       const title1 = extension1.title();

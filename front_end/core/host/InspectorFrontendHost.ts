@@ -53,6 +53,7 @@ import {
   type InspectorFrontendHostAPI,
   type KeyDownEvent,
   type LoadNetworkResourceResult,
+  type ResizeEvent,
   type ShowSurveyResult,
   type SyncInformation,
 } from './InspectorFrontendHostAPI.js';
@@ -476,6 +477,8 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 
   recordImpression(event: ImpressionEvent): void {
   }
+  recordResize(event: ResizeEvent): void {
+  }
   recordClick(event: ClickEvent): void {
   }
   recordHover(event: HoverEvent): void {
@@ -543,6 +546,12 @@ function initializeInspectorFrontendHost(): void {
           (globalThis as unknown as {
             doAidaConversationForTesting: typeof InspectorFrontendHostInstance['doAidaConversation'],
           }).doAidaConversationForTesting;
+    }
+    if ('getSyncInformationForTesting' in globalThis) {
+      InspectorFrontendHostInstance['getSyncInformation'] =
+          (globalThis as unknown as {
+            getSyncInformationForTesting: typeof InspectorFrontendHostInstance['getSyncInformation'],
+          }).getSyncInformationForTesting;
     }
   } else {
     // Otherwise add stubs for missing methods that are declared in the interface.

@@ -58,7 +58,7 @@
 
 .filter-bitset-filter span {
   color: var(--sys-color-on-surface);
-  outline: 1px solid var(--sys-color-tonal-outline);
+  outline: 1px solid var(--sys-color-neutral-outline);
   outline-offset: -1px;
   box-sizing: border-box;
   display: inline-block;
@@ -77,14 +77,6 @@
   outline: -webkit-focus-ring-color auto 5px;
 }
 
-.filter-bitset-filter-divider {
-  background-color: var(--sys-color-divider);
-  height: 16px;
-  width: 1px;
-  margin: auto 2px;
-  display: inline-block;
-}
-
 .filter-bitset-filter span:hover {
   outline: none;
   background: var(--sys-color-state-hover-on-subtle);
@@ -95,6 +87,14 @@
   color: var(--sys-color-on-tonal-container);
   outline: none;
   background-color: var(--sys-color-tonal-container);
+}
+
+.filter-bitset-filter-divider {
+  background-color: var(--sys-color-divider);
+  height: 16px;
+  width: 1px;
+  margin: auto 2px;
+  display: inline-block;
 }
 
 .filter-checkbox-filter {

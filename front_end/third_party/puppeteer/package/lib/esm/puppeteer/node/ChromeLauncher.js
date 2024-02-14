@@ -1,17 +1,7 @@
 /**
- * Copyright 2023 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { mkdtemp } from 'fs/promises';
 import os from 'os';
@@ -29,20 +19,6 @@ export class ChromeLauncher extends ProductLauncher {
         super(puppeteer, 'chrome');
     }
     launch(options = {}) {
-        const headless = options.headless ?? true;
-        if (headless === true &&
-            this.puppeteer.configuration.logLevel === 'warn' &&
-            !Boolean(process.env['PUPPETEER_DISABLE_HEADLESS_WARNING'])) {
-            console.warn([
-                '\x1B[1m\x1B[43m\x1B[30m',
-                'Puppeteer old Headless deprecation warning:\x1B[0m\x1B[33m',
-                '  In the near future `headless: true` will default to the new Headless mode',
-                '  for Chrome instead of the old Headless implementation. For more',
-                '  information, please see https://developer.chrome.com/articles/new-headless/.',
-                '  Consider opting in early by passing `headless: "new"` to `puppeteer.launch()`',
-                '  If you encounter any bugs, please report them to https://github.com/puppeteer/puppeteer/issues/new/choose.\x1B[0m\n',
-            ].join('\n  '));
-        }
         if (this.puppeteer.configuration.logLevel === 'warn' &&
             process.platform === 'darwin' &&
             process.arch === 'x64') {
@@ -104,7 +80,7 @@ export class ChromeLauncher extends ProductLauncher {
         let chromeExecutable = executablePath;
         if (!chromeExecutable) {
             assert(channel || !this.puppeteer._isPuppeteerCore, `An \`executablePath\` or \`channel\` must be specified for \`puppeteer-core\``);
-            chromeExecutable = this.executablePath(channel);
+            chromeExecutable = this.executablePath(channel, options.headless ?? true);
         }
         return {
             executablePath: chromeExecutable,
@@ -165,7 +141,7 @@ export class ChromeLauncher extends ProductLauncher {
             '--disable-default-apps',
             '--disable-dev-shm-usage',
             '--disable-extensions',
-            '--disable-field-trial-config',
+            '--disable-field-trial-config', // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
             '--disable-hang-monitor',
             '--disable-infobars',
             '--disable-ipc-flooding-protection',
@@ -176,6 +152,7 @@ export class ChromeLauncher extends ProductLauncher {
             '--disable-sync',
             '--enable-automation',
             '--export-tagged-pdf',
+            '--generate-pdf-document-outline',
             '--force-color-profile=srgb',
             '--metrics-recording-only',
             '--no-first-run',
@@ -192,7 +169,7 @@ export class ChromeLauncher extends ProductLauncher {
             chromeArguments.push('--auto-open-devtools-for-tabs');
         }
         if (headless) {
-            chromeArguments.push(headless === 'new' ? '--headless=new' : '--headless', '--hide-scrollbars', '--mute-audio');
+            chromeArguments.push(headless === true ? '--headless=new' : '--headless', '--hide-scrollbars', '--mute-audio');
         }
         if (args.every(arg => {
             return arg.startsWith('-');
@@ -202,7 +179,7 @@ export class ChromeLauncher extends ProductLauncher {
         chromeArguments.push(...args);
         return chromeArguments;
     }
-    executablePath(channel) {
+    executablePath(channel, headless) {
         if (channel) {
             return computeSystemExecutablePath({
                 browser: SupportedBrowsers.CHROME,
@@ -210,7 +187,7 @@ export class ChromeLauncher extends ProductLauncher {
             });
         }
         else {
-            return this.resolveExecutablePath();
+            return this.resolveExecutablePath(headless);
         }
     }
 }
@@ -244,7 +221,7 @@ export function getFeatures(flag, options = []) {
         return s.startsWith(flag.endsWith('=') ? flag : `${flag}=`);
     })
         .map(s => {
-        return s.split(new RegExp(`${flag}` + '=\\s*'))[1]?.trim();
+        return s.split(new RegExp(`${flag}=\\s*`))[1]?.trim();
     })
         .filter(s => {
         return s;

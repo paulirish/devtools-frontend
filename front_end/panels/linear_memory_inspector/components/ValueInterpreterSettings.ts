@@ -79,7 +79,7 @@ export class ValueInterpreterSettings extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="settings" jslog=${VisualLogging.section().context('settings')}>
+      <div class="settings" jslog=${VisualLogging.pane('settings')}>
        ${[...GROUP_TO_TYPES.keys()].map(group => {
         return html`
           <div class="value-types-selection">
@@ -100,7 +100,7 @@ export class ValueInterpreterSettings extends HTMLElement {
       ${types.map(type => {
         return html`
           <label class="type-label" title=${valueTypeToLocalizedString(type)}>
-            <input data-input="true" type="checkbox" .checked=${this.#valueTypes.has(type)} @change=${(e: Event): void => this.#onTypeToggle(type, e)} jslog=${VisualLogging.toggle().track({change: true}).context(type)}>
+            <input data-input="true" type="checkbox" .checked=${this.#valueTypes.has(type)} @change=${(e: Event) => this.#onTypeToggle(type, e)} jslog=${VisualLogging.toggle().track({change: true}).context(type)}>
             <span data-title="true">${valueTypeToLocalizedString(type)}</span>
           </label>
      `;})}`;

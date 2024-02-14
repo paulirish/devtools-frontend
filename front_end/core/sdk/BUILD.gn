@@ -33,7 +33,6 @@ devtools_module("sdk") {
     "Connections.ts",
     "ConsoleModel.ts",
     "ConsoleModelTypes.ts",
-    "ContentData.ts",
     "Cookie.ts",
     "CookieModel.ts",
     "CookieParser.ts",
@@ -51,7 +50,6 @@ devtools_module("sdk") {
     "IssuesModel.ts",
     "LayerTreeBase.ts",
     "LogModel.ts",
-    "MimeType.ts",
     "NetworkManager.ts",
     "NetworkRequest.ts",
     "OverlayColorGenerator.ts",
@@ -71,12 +69,14 @@ devtools_module("sdk") {
     "ScreenCaptureModel.ts",
     "Script.ts",
     "SecurityOriginManager.ts",
+    "ServerSentEvents.ts",
     "ServerSentEventsProtocol.ts",
     "ServerTiming.ts",
     "ServiceWorkerCacheModel.ts",
     "ServiceWorkerManager.ts",
     "SourceMap.ts",
     "SourceMapManager.ts",
+    "SourceMapScopes.ts",
     "StorageBucketsModel.ts",
     "StorageKeyManager.ts",
     "Target.ts",
@@ -112,7 +112,11 @@ devtools_entrypoint("bundle") {
 devtools_entrypoint("meta") {
   entrypoint = "sdk-meta.ts"
 
-  deps = [ ":bundle" ]
+  deps = [
+    ":bundle",
+    "../../core/common:bundle",
+    "../../core/i18n:bundle",
+  ]
 
   visibility = [ "../../entrypoints/*" ]
 }

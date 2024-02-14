@@ -104,7 +104,7 @@ main {
 
   margin: 20px 0 0;
   color: var(--sys-color-on-surface);
-  font-size: 12px;
+  font-size: 13px;
   font-style: normal;
   font-weight: 400;
   line-height: 20px;
@@ -117,22 +117,22 @@ devtools-markdown-view {
 footer {
   display: flex;
   flex-direction: row;
+  align-items: flex-end;
   color: var(--sys-color-on-surface);
-  font-size: 12px;
   font-style: normal;
   font-weight: 400;
   line-height: normal;
-  margin-top: 8px;
-}
-
-footer > div:nth-child(1) {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
+  margin-top: 16px;
 }
 
 footer > .filler {
   flex: 1;
+}
+
+footer .rating {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
 }
 
 textarea {
@@ -149,15 +149,24 @@ textarea {
   margin-bottom: 16px;
 }
 
-.dogfood-feedback {
+.disclaimer {
   display: flex;
   gap: 2px;
-  align-items: center;
+  color: var(--sys-color-on-surface-subtle);
+  font-size: 12px;
+  align-items: flex-start;
+  flex-direction: column;
 }
 
 .link {
   color: var(--sys-color-primary);
   text-decoration-line: underline;
+
+  devtools-icon {
+    color: var(--sys-color-primary);
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .loader {
@@ -200,14 +209,6 @@ details[open] {
   transition: height var(--sys-motion-duration-short4) var(--sys-motion-easing-emphasized);
 }
 
-.refine-container {
-  display: flex;
-  flex-direction: row;
-  margin-top: 20px;
-  margin-bottom: 12px;
-  gap: 8px;
-}
-
 h2 {
   display: block;
   font-size: inherit;
@@ -218,4 +219,13 @@ h2 {
 .info {
   width: 20px;
   height: 20px;
+}
+
+devtools-icon[name="spark"] {
+  color: var(--sys-color-primary-bright);
+}
+
+devtools-icon[name="dog-paw"] {
+  width: 16px;
+  height: 16px;
 }

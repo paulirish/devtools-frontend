@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -21,7 +22,8 @@ export class AutofillManager extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.AutofillModel.AutofillModel, SDK.AutofillModel.Events.AddressFormFilled, this.#addressFormFilled, this,
         {scoped: true});
-    this.#autoOpenViewSetting = Common.Settings.Settings.instance().createSetting('autoOpenAutofillViewOnEvent', true);
+    this.#autoOpenViewSetting =
+        Common.Settings.Settings.instance().createSetting('auto-open-autofill-view-on-event', true);
   }
 
   static instance(opts: {forceNew: boolean|null} = {forceNew: null}): AutofillManager {
@@ -35,7 +37,8 @@ export class AutofillManager extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   async #addressFormFilled(
       {data}: Common.EventTarget
           .EventTargetEvent<SDK.AutofillModel.EventTypes[SDK.AutofillModel.Events.AddressFormFilled]>): Promise<void> {
-    if (this.#autoOpenViewSetting.get()) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.AUTOFILL_VIEW) &&
+        this.#autoOpenViewSetting.get()) {
       await UI.ViewManager.ViewManager.instance().showView('autofill-view');
     }
     this.#autofillModel = data.autofillModel;
@@ -76,6 +79,9 @@ export class AutofillManager extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     // Populate a list of matches by searching in the address string for
     // occurences of filled field values.
     for (let i = 0; i < this.#filledFields.length; i++) {
+      if (this.#filledFields[i].value === '') {
+        continue;
+      }
       // Regex replaces whitespace or comma/dot followed by whitespace with a single space.
       const needle = this.#filledFields[i].value.replaceAll(/[.,]*\s+/g, ' ');
       const matches = this.#address.replaceAll(/\s/g, ' ').matchAll(new RegExp(needle, 'g'));
@@ -96,9 +102,7 @@ export interface Match {
   filledFieldIndex: number;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   AddressFormFilled = 'AddressFormFilled',
 }
 

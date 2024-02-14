@@ -449,6 +449,9 @@ export namespace Animation {
     playbackRate: number;
     /**
      * `Animation`'s start time.
+     * Milliseconds for time based animations and
+     * percentage [0 - 100] for scroll driven animations
+     * (i.e. when viewOrScrollTimeline exists).
      */
     startTime: number;
     /**
@@ -468,6 +471,40 @@ export namespace Animation {
      * animation/transition.
      */
     cssId?: string;
+    /**
+     * View or scroll timeline
+     */
+    viewOrScrollTimeline?: ViewOrScrollTimeline;
+  }
+
+  /**
+   * Timeline instance
+   */
+  export interface ViewOrScrollTimeline {
+    /**
+     * Scroll container node
+     */
+    sourceNodeId?: DOM.BackendNodeId;
+    /**
+     * Represents the starting scroll position of the timeline
+     * as a length offset in pixels from scroll origin.
+     */
+    startOffset?: number;
+    /**
+     * Represents the ending scroll position of the timeline
+     * as a length offset in pixels from scroll origin.
+     */
+    endOffset?: number;
+    /**
+     * The element whose principal box's visibility in the
+     * scrollport defined the progress of the timeline.
+     * Does not exist for animations with ScrollTimeline
+     */
+    subjectNodeId?: DOM.BackendNodeId;
+    /**
+     * Orientation of the scroll
+     */
+    axis: DOM.ScrollOrientation;
   }
 
   /**
@@ -492,6 +529,9 @@ export namespace Animation {
     iterations: number;
     /**
      * `AnimationEffect`'s iteration duration.
+     * Milliseconds for time based animations and
+     * percentage [0 - 100] for scroll driven animations
+     * (i.e. when viewOrScrollTimeline exists).
      */
     duration: number;
     /**
@@ -773,6 +813,7 @@ export namespace Audits {
     Frame = 'Frame',
     Image = 'Image',
     Import = 'Import',
+    JSON = 'JSON',
     Manifest = 'Manifest',
     Ping = 'Ping',
     PluginData = 'PluginData',
@@ -1624,6 +1665,7 @@ export namespace Browser {
     AudioCapture = 'audioCapture',
     BackgroundSync = 'backgroundSync',
     BackgroundFetch = 'backgroundFetch',
+    CapturedSurfaceControl = 'capturedSurfaceControl',
     ClipboardReadWrite = 'clipboardReadWrite',
     ClipboardSanitizedWrite = 'clipboardSanitizedWrite',
     DisplayCapture = 'displayCapture',
@@ -2859,6 +2901,12 @@ export namespace CSS {
      * Text position of a new rule in the target style sheet.
      */
     location: SourceRange;
+    /**
+     * NodeId for the DOM node in whose context custom property declarations for registered properties should be
+     * validated. If omitted, declarations in the new rule text can only be validated statically, which may produce
+     * incorrect results if the declaration contains a var() for example.
+     */
+    nodeForPropertySyntaxValidation?: DOM.NodeId;
   }
 
   export interface AddRuleResponse extends ProtocolResponseWithError {
@@ -3171,6 +3219,12 @@ export namespace CSS {
 
   export interface SetStyleTextsRequest {
     edits: StyleDeclarationEdit[];
+    /**
+     * NodeId for the DOM node in whose context custom property declarations for registered properties should be
+     * validated. If omitted, declarations in the new rule text can only be validated statically, which may produce
+     * incorrect results if the declaration contains a var() for example.
+     */
+    nodeForPropertySyntaxValidation?: DOM.NodeId;
   }
 
   export interface SetStyleTextsResponse extends ProtocolResponseWithError {
@@ -3586,6 +3640,14 @@ export namespace DOM {
     Inline = 'Inline',
     Block = 'Block',
     Both = 'Both',
+  }
+
+  /**
+   * Physical scroll orientation
+   */
+  export const enum ScrollOrientation {
+    Horizontal = 'horizontal',
+    Vertical = 'vertical',
   }
 
   /**
@@ -8202,6 +8264,10 @@ export namespace Network {
      */
     mimeType: string;
     /**
+     * Resource charset as determined by the browser (if applicable).
+     */
+    charset: string;
+    /**
      * Refined HTTP request headers that were actually transmitted over the network.
      */
     requestHeaders?: Headers;
@@ -8526,6 +8592,21 @@ export namespace Network {
   }
 
   /**
+   * Types of reasons why a cookie should have been blocked by 3PCD but is exempted for the request.
+   */
+  export const enum CookieExemptionReason {
+    None = 'None',
+    UserSetting = 'UserSetting',
+    TPCDMetadata = 'TPCDMetadata',
+    TPCDDeprecationTrial = 'TPCDDeprecationTrial',
+    TPCDHeuristics = 'TPCDHeuristics',
+    EnterprisePolicy = 'EnterprisePolicy',
+    StorageAccess = 'StorageAccess',
+    TopLevelStorageAccess = 'TopLevelStorageAccess',
+    CorsOptIn = 'CorsOptIn',
+  }
+
+  /**
    * A cookie which was not stored from a response with the corresponding reason.
    */
   export interface BlockedSetCookieWithReason {
@@ -8547,17 +8628,38 @@ export namespace Network {
   }
 
   /**
-   * A cookie with was not sent with a request with the corresponding reason.
+   * A cookie should have been blocked by 3PCD but is exempted and stored from a response with the
+   * corresponding reason. A cookie could only have at most one exemption reason.
    */
-  export interface BlockedCookieWithReason {
+  export interface ExemptedSetCookieWithReason {
     /**
-     * The reason(s) the cookie was blocked.
+     * The reason the cookie was exempted.
      */
-    blockedReasons: CookieBlockedReason[];
+    exemptionReason: CookieExemptionReason;
+    /**
+     * The cookie object representing the cookie.
+     */
+    cookie: Cookie;
+  }
+
+  /**
+   * A cookie associated with the request which may or may not be sent with it.
+   * Includes the cookies itself and reasons for blocking or exemption.
+   */
+  export interface AssociatedCookie {
     /**
      * The cookie object representing the cookie which was not sent.
      */
     cookie: Cookie;
+    /**
+     * The reason(s) the cookie was blocked. If empty means the cookie is included.
+     */
+    blockedReasons: CookieBlockedReason[];
+    /**
+     * The reason the cookie should have been blocked by 3PCD but is exempted. A cookie could
+     * only have at most one exemption reason.
+     */
+    exemptionReason?: CookieExemptionReason;
   }
 
   /**
@@ -9088,6 +9190,11 @@ export namespace Network {
      * If specified, deletes only cookies with the exact path.
      */
     path?: string;
+    /**
+     * If specified, deletes only cookies with the the given name and partitionKey where domain
+     * matches provided URL.
+     */
+    partitionKey?: string;
   }
 
   export interface EmulateNetworkConditionsRequest {
@@ -9932,9 +10039,9 @@ export namespace Network {
     requestId: RequestId;
     /**
      * A list of cookies potentially associated to the requested URL. This includes both cookies sent with
-     * the request and the ones not sent; the latter are distinguished by having blockedReason field set.
+     * the request and the ones not sent; the latter are distinguished by having blockedReasons field set.
      */
-    associatedCookies: BlockedCookieWithReason[];
+    associatedCookies: AssociatedCookie[];
     /**
      * Raw request headers as they will be sent over the wire.
      */
@@ -9998,6 +10105,11 @@ export namespace Network {
      * True if partitioned cookies are enabled, but the partition key is not serializeable to string.
      */
     cookiePartitionKeyOpaque?: boolean;
+    /**
+     * A list of cookies which should have been blocked by 3PCD but are exempted and stored from
+     * the response with the corresponding reason.
+     */
+    exemptedCookies?: ExemptedSetCookieWithReason[];
   }
 
   export const enum TrustTokenOperationDoneEventStatus {
@@ -10977,6 +11089,7 @@ export namespace Page {
     Bluetooth = 'bluetooth',
     BrowsingTopics = 'browsing-topics',
     Camera = 'camera',
+    CapturedSurfaceControl = 'captured-surface-control',
     ChDpr = 'ch-dpr',
     ChDeviceMemory = 'ch-device-memory',
     ChDownlink = 'ch-downlink',
@@ -11032,6 +11145,7 @@ export namespace Page {
     PrivateAggregation = 'private-aggregation',
     PrivateStateTokenIssuance = 'private-state-token-issuance',
     PrivateStateTokenRedemption = 'private-state-token-redemption',
+    PublickeyCredentialsCreate = 'publickey-credentials-create',
     PublickeyCredentialsGet = 'publickey-credentials-get',
     RunAdAuction = 'run-ad-auction',
     ScreenWakeLock = 'screen-wake-lock',
@@ -11041,6 +11155,7 @@ export namespace Page {
     SharedStorageSelectUrl = 'shared-storage-select-url',
     SmartCard = 'smart-card',
     StorageAccess = 'storage-access',
+    SubApps = 'sub-apps',
     SyncXhr = 'sync-xhr',
     Unload = 'unload',
     Usb = 'usb',
@@ -11735,6 +11850,9 @@ export namespace Page {
     WebRTCSticky = 'WebRTCSticky',
     WebTransportSticky = 'WebTransportSticky',
     WebSocketSticky = 'WebSocketSticky',
+    SmartCard = 'SmartCard',
+    LiveMediaStreamTrack = 'LiveMediaStreamTrack',
+    UnloadHandler = 'UnloadHandler',
     ContentSecurityHandler = 'ContentSecurityHandler',
     ContentWebAuthenticationAPI = 'ContentWebAuthenticationAPI',
     ContentFileChooser = 'ContentFileChooser',
@@ -13564,6 +13682,11 @@ export namespace Storage {
   }
 
   /**
+   * Protected audience interest group auction identifier.
+   */
+  export type InterestGroupAuctionId = OpaqueIdentifier<string, 'Protocol.Storage.InterestGroupAuctionId'>;
+
+  /**
    * Enum of interest group access types.
    */
   export const enum InterestGroupAccessType {
@@ -13575,7 +13698,28 @@ export namespace Storage {
     Win = 'win',
     AdditionalBid = 'additionalBid',
     AdditionalBidWin = 'additionalBidWin',
+    TopLevelBid = 'topLevelBid',
+    TopLevelAdditionalBid = 'topLevelAdditionalBid',
     Clear = 'clear',
+  }
+
+  /**
+   * Enum of auction events.
+   */
+  export const enum InterestGroupAuctionEventType {
+    Started = 'started',
+    ConfigResolved = 'configResolved',
+  }
+
+  /**
+   * Enum of network fetches auctions can do.
+   */
+  export const enum InterestGroupAuctionFetchType {
+    BidderJs = 'bidderJs',
+    BidderWasm = 'bidderWasm',
+    SellerJs = 'sellerJs',
+    BidderTrustedSignals = 'bidderTrustedSignals',
+    SellerTrustedSignals = 'sellerTrustedSignals',
   }
 
   /**
@@ -13760,6 +13904,19 @@ export namespace Storage {
     values: string[];
   }
 
+  export interface AttributionReportingFilterConfig {
+    filterValues: AttributionReportingFilterDataEntry[];
+    /**
+     * duration in seconds
+     */
+    lookbackWindow?: integer;
+  }
+
+  export interface AttributionReportingFilterPair {
+    filters: AttributionReportingFilterConfig[];
+    notFilters: AttributionReportingFilterConfig[];
+  }
+
   export interface AttributionReportingAggregationKeysEntry {
     key: string;
     value: UnsignedInt128AsBase16;
@@ -13826,6 +13983,90 @@ export namespace Storage {
     DestinationBothLimitsReached = 'destinationBothLimitsReached',
     ReportingOriginsPerSiteLimitReached = 'reportingOriginsPerSiteLimitReached',
     ExceedsMaxChannelCapacity = 'exceedsMaxChannelCapacity',
+  }
+
+  export const enum AttributionReportingSourceRegistrationTimeConfig {
+    Include = 'include',
+    Exclude = 'exclude',
+  }
+
+  export interface AttributionReportingAggregatableValueEntry {
+    key: string;
+    /**
+     * number instead of integer because not all uint32 can be represented by
+     * int
+     */
+    value: number;
+  }
+
+  export interface AttributionReportingEventTriggerData {
+    data: UnsignedInt64AsBase10;
+    priority: SignedInt64AsBase10;
+    dedupKey?: UnsignedInt64AsBase10;
+    filters: AttributionReportingFilterPair;
+  }
+
+  export interface AttributionReportingAggregatableTriggerData {
+    keyPiece: UnsignedInt128AsBase16;
+    sourceKeys: string[];
+    filters: AttributionReportingFilterPair;
+  }
+
+  export interface AttributionReportingAggregatableDedupKey {
+    dedupKey?: UnsignedInt64AsBase10;
+    filters: AttributionReportingFilterPair;
+  }
+
+  export interface AttributionReportingTriggerRegistration {
+    filters: AttributionReportingFilterPair;
+    debugKey?: UnsignedInt64AsBase10;
+    aggregatableDedupKeys: AttributionReportingAggregatableDedupKey[];
+    eventTriggerData: AttributionReportingEventTriggerData[];
+    aggregatableTriggerData: AttributionReportingAggregatableTriggerData[];
+    aggregatableValues: AttributionReportingAggregatableValueEntry[];
+    debugReporting: boolean;
+    aggregationCoordinatorOrigin?: string;
+    sourceRegistrationTimeConfig: AttributionReportingSourceRegistrationTimeConfig;
+    triggerContextId?: string;
+  }
+
+  export const enum AttributionReportingEventLevelResult {
+    Success = 'success',
+    SuccessDroppedLowerPriority = 'successDroppedLowerPriority',
+    InternalError = 'internalError',
+    NoCapacityForAttributionDestination = 'noCapacityForAttributionDestination',
+    NoMatchingSources = 'noMatchingSources',
+    Deduplicated = 'deduplicated',
+    ExcessiveAttributions = 'excessiveAttributions',
+    PriorityTooLow = 'priorityTooLow',
+    NeverAttributedSource = 'neverAttributedSource',
+    ExcessiveReportingOrigins = 'excessiveReportingOrigins',
+    NoMatchingSourceFilterData = 'noMatchingSourceFilterData',
+    ProhibitedByBrowserPolicy = 'prohibitedByBrowserPolicy',
+    NoMatchingConfigurations = 'noMatchingConfigurations',
+    ExcessiveReports = 'excessiveReports',
+    FalselyAttributedSource = 'falselyAttributedSource',
+    ReportWindowPassed = 'reportWindowPassed',
+    NotRegistered = 'notRegistered',
+    ReportWindowNotStarted = 'reportWindowNotStarted',
+    NoMatchingTriggerData = 'noMatchingTriggerData',
+  }
+
+  export const enum AttributionReportingAggregatableResult {
+    Success = 'success',
+    InternalError = 'internalError',
+    NoCapacityForAttributionDestination = 'noCapacityForAttributionDestination',
+    NoMatchingSources = 'noMatchingSources',
+    ExcessiveAttributions = 'excessiveAttributions',
+    ExcessiveReportingOrigins = 'excessiveReportingOrigins',
+    NoHistograms = 'noHistograms',
+    InsufficientBudget = 'insufficientBudget',
+    NoMatchingSourceFilterData = 'noMatchingSourceFilterData',
+    NotRegistered = 'notRegistered',
+    ProhibitedByBrowserPolicy = 'prohibitedByBrowserPolicy',
+    Deduplicated = 'deduplicated',
+    ReportWindowPassed = 'reportWindowPassed',
+    ExcessiveReports = 'excessiveReports',
   }
 
   export interface GetStorageKeyForFrameRequest {
@@ -14017,6 +14258,10 @@ export namespace Storage {
     enable: boolean;
   }
 
+  export interface SetInterestGroupAuctionTrackingRequest {
+    enable: boolean;
+  }
+
   export interface GetSharedStorageMetadataRequest {
     ownerOrigin: string;
   }
@@ -14170,13 +14415,63 @@ export namespace Storage {
   }
 
   /**
-   * One of the interest groups was accessed by the associated page.
+   * One of the interest groups was accessed. Note that these events are global
+   * to all targets sharing an interest group store.
    */
   export interface InterestGroupAccessedEvent {
     accessTime: Network.TimeSinceEpoch;
     type: InterestGroupAccessType;
     ownerOrigin: string;
     name: string;
+    /**
+     * For topLevelBid/topLevelAdditionalBid, and when appropriate,
+     * win and additionalBidWin
+     */
+    componentSellerOrigin?: string;
+    /**
+     * For bid or somethingBid event, if done locally and not on a server.
+     */
+    bid?: number;
+    bidCurrency?: string;
+    /**
+     * For non-global events --- links to interestGroupAuctionEvent
+     */
+    uniqueAuctionId?: InterestGroupAuctionId;
+  }
+
+  /**
+   * An auction involving interest groups is taking place. These events are
+   * target-specific.
+   */
+  export interface InterestGroupAuctionEventOccurredEvent {
+    eventTime: Network.TimeSinceEpoch;
+    type: InterestGroupAuctionEventType;
+    uniqueAuctionId: InterestGroupAuctionId;
+    /**
+     * Set for child auctions.
+     */
+    parentAuctionId?: InterestGroupAuctionId;
+    /**
+     * Set for started and configResolved
+     */
+    auctionConfig?: any;
+  }
+
+  /**
+   * Specifies which auctions a particular network fetch may be related to, and
+   * in what role. Note that it is not ordered with respect to
+   * Network.requestWillBeSent (but will happen before loadingFinished
+   * loadingFailed).
+   */
+  export interface InterestGroupAuctionNetworkRequestCreatedEvent {
+    type: InterestGroupAuctionFetchType;
+    requestId: Network.RequestId;
+    /**
+     * This is the set of the auctions using the worklet that issued this
+     * request.  In the case of trusted signals, it's possible that only some of
+     * them actually care about the keys being queried.
+     */
+    auctions: InterestGroupAuctionId[];
   }
 
   /**
@@ -14215,13 +14510,15 @@ export namespace Storage {
     bucketId: string;
   }
 
-  /**
-   * TODO(crbug.com/1458532): Add other Attribution Reporting events, e.g.
-   * trigger registration.
-   */
   export interface AttributionReportingSourceRegisteredEvent {
     registration: AttributionReportingSourceRegistration;
     result: AttributionReportingSourceRegistrationResult;
+  }
+
+  export interface AttributionReportingTriggerRegisteredEvent {
+    registration: AttributionReportingTriggerRegistration;
+    eventLevel: AttributionReportingEventLevelResult;
+    aggregatable: AttributionReportingAggregatableResult;
   }
 }
 
@@ -16424,6 +16721,14 @@ export namespace FedCm {
   }
 
   /**
+   * The URLs that each account has
+   */
+  export const enum AccountUrlType {
+    TermsOfService = 'TermsOfService',
+    PrivacyPolicy = 'PrivacyPolicy',
+  }
+
+  /**
    * Corresponds to IdentityRequestAccount
    */
   export interface Account {
@@ -16459,6 +16764,12 @@ export namespace FedCm {
   export interface ClickDialogButtonRequest {
     dialogId: string;
     dialogButton: DialogButton;
+  }
+
+  export interface OpenUrlRequest {
+    dialogId: string;
+    accountIndex: integer;
+    accountUrlType: AccountUrlType;
   }
 
   export interface DismissDialogRequest {

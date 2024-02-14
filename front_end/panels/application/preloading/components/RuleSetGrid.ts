@@ -85,7 +85,7 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
     const reportsGridData: DataGrid.DataGridController.DataGridControllerData = {
       columns: [
         {
-          id: 'ruleSet',
+          id: 'rule-set',
           title: i18nString(UIStrings.ruleSet),
           widthWeighting: 20,
           hideable: false,
@@ -109,7 +109,7 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
     // clang-format off
     LitHtml.render(LitHtml.html`
       <div class="ruleset-container"
-      jslog=${VisualLogging.pane().context('preloading-rules')}>
+      jslog=${VisualLogging.pane('preloading-rules')}>
         <${DataGrid.DataGridController.DataGridController.litTagName} .data=${
             reportsGridData as DataGrid.DataGridController.DataGridControllerData}>
         </${DataGrid.DataGridController.DataGridController.litTagName}>
@@ -127,7 +127,7 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
           cells: [
             {columnId: 'id', value: row.ruleSet.id},
             {
-              columnId: 'ruleSet',
+              columnId: 'rule-set',
               value: '',
               renderer: () => ruleSetRenderer(row.ruleSet, pageURL),
             },
@@ -180,7 +180,7 @@ function ruleSetRenderer(
           'padding-inline-start': '0',
           'padding-inline-end': '0',
         })}
-        jslog=${VisualLogging.action().track({click: true}).context('reveal-in-elements-panel')}
+        jslog=${VisualLogging.action('reveal-in-elements-panel').track({click: true})}
       >
         <${IconButton.Icon.Icon.litTagName}
           .data=${{
@@ -288,7 +288,7 @@ function statusRenderer(preloadsStatusSummary: string, ruleSet: Protocol.Preload
           'padding-inline-start': '0',
           'padding-inline-end': '0',
         })}
-        jslog=${VisualLogging.action().track({click: true}).context('reveal-preloads')}>
+        jslog=${VisualLogging.action('reveal-preloads').track({click: true})}>
         ${preloadsStatusSummary}
       </button>
     `;

@@ -79,7 +79,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
   constructor(pollIntervalMs: number = 500) {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.panel().context('performance-monitor')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('performance-monitor').track({resize: true})}`);
 
     this.contentElement.classList.add('perfmon-pane');
     this.metricsBuffer = [];
@@ -449,7 +449,7 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     this.element = parent.createChild('div', 'perfmon-control-pane');
 
     this.enabledChartsSetting = Common.Settings.Settings.instance().createSetting(
-        'perfmonActiveIndicators2', ['TaskDuration', 'JSHeapTotalSize', 'Nodes']);
+        'perfmon-active-indicators2', ['TaskDuration', 'JSHeapTotalSize', 'Nodes']);
     this.enabledCharts = new Set(this.enabledChartsSetting.get());
   }
 
@@ -576,7 +576,11 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       const active = this.enabledCharts.has(chartName);
       const indicator = new MetricIndicator(this.element, chartInfo, active, this.onToggle.bind(this, chartName));
       indicator.element.setAttribute(
-          'jslog', `${VisualLogging.toggle().track({click: true, keydown: 'Enter'}).context(chartName)}`);
+          'jslog',
+          `${
+              VisualLogging.toggle()
+                  .track({click: true, keydown: 'Enter'})
+                  .context(Platform.StringUtilities.toKebabCase(chartName))}`);
       this.indicators.set(chartName, indicator);
     }
   }

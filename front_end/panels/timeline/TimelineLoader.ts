@@ -299,9 +299,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     void this.cancel();
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private looksLikeAppVersion(item: any): boolean {
+  private looksLikeAppVersion(item: unknown): boolean {
     return typeof item === 'string' && item.indexOf('Chrome') !== -1;
   }
 
@@ -357,9 +355,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
 
 export const TransferChunkLengthBytes = 5000000;
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum State {
+export const enum State {
   Initial = 'Initial',
   LookingForEvents = 'LookingForEvents',
   ReadingEvents = 'ReadingEvents',

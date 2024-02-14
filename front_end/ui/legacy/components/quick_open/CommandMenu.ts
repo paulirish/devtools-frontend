@@ -72,7 +72,7 @@ export class CommandMenu {
     let handler = executeHandler;
     if (userActionCode) {
       const actionCode = userActionCode;
-      handler = (): void => {
+      handler = () => {
         Host.userMetrics.actionTaken(actionCode);
         executeHandler();
       };
@@ -88,18 +88,24 @@ export class CommandMenu {
     }
     const tags = setting.tags() || '';
     const reloadRequired = Boolean(setting.reloadRequired());
+
     return CommandMenu.createCommand({
       category: Common.Settings.getLocalizedSettingsCategory(category),
       keys: tags,
       title,
       shortcut: '',
-      executeHandler: (): void => {
+      executeHandler: () => {
         if (setting.deprecation?.disabled &&
             (!setting.deprecation?.experiment || setting.deprecation.experiment.isEnabled())) {
           void Common.Revealer.reveal(setting);
           return;
         }
         setting.set(value);
+
+        if (setting.name === 'emulate-page-focus') {
+          Host.userMetrics.actionTaken(Host.UserMetrics.Action.ToggleEmulateFocusedPageFromCommandMenu);
+        }
+
         if (reloadRequired) {
           UI.InspectorView.InspectorView.instance().displayReloadRequiredWarning(
               i18nString(UIStrings.oneOrMoreSettingsHaveChanged));
@@ -239,8 +245,7 @@ export interface CreateCommandOptions {
   isPanelOrDrawer?: PanelOrDrawer;
 }
 
-// eslint-disable-next-line rulesdir/const_enum
-export enum PanelOrDrawer {
+export const enum PanelOrDrawer {
   PANEL = 'PANEL',
   DRAWER = 'DRAWER',
 }
@@ -419,6 +424,6 @@ registerProvider({
   iconName: 'chevron-right',
   iconWidth: '20px',
   provider: () => Promise.resolve(new CommandMenuProvider()),
-  titlePrefix: (): Common.UIString.LocalizedString => i18nString(UIStrings.run),
-  titleSuggestion: (): Common.UIString.LocalizedString => i18nString(UIStrings.command),
+  titlePrefix: () => i18nString(UIStrings.run),
+  titleSuggestion: () => i18nString(UIStrings.command),
 });

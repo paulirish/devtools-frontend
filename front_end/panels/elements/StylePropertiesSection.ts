@@ -177,7 +177,7 @@ export class StylePropertiesSection {
     this.element.classList.add('styles-section');
     this.element.classList.add('matched-styles');
     this.element.classList.add('monospace');
-    this.element.setAttribute('jslog', `${VisualLogging.section().context('style-properties')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.section('style-properties')}`);
     UI.ARIAUtils.setLabel(this.element, `${this.headerText()}, css selector`);
     this.element.tabIndex = -1;
     UI.ARIAUtils.markAsListitem(this.element);
@@ -195,8 +195,10 @@ export class StylePropertiesSection {
     this.propertiesTreeOutline.section = this;
     this.innerElement.appendChild(this.propertiesTreeOutline.element);
 
-    this.showAllButton = UI.UIUtils.createTextButton('', this.showAllItems.bind(this), 'styles-show-all');
-    this.showAllButton.setAttribute('jslog', `${VisualLogging.showAllStyleProperties().track({click: true})}`);
+    this.showAllButton = UI.UIUtils.createTextButton('', this.showAllItems.bind(this), {
+      className: 'styles-show-all',
+      jslogContext: 'elements.show-all-style-properties',
+    });
     this.innerElement.appendChild(this.showAllButton);
 
     const selectorContainer = document.createElement('div');
@@ -542,7 +544,7 @@ export class StylePropertiesSection {
       default:
         // Filter out non-printable key strokes.
         if (keyboardEvent.key.length === 1) {
-          this.addNewBlankProperty(0).startEditing();
+          this.addNewBlankProperty(0).startEditingName();
         }
         break;
     }
@@ -888,7 +890,7 @@ export class StylePropertiesSection {
     containerElement.data = {
       container: ElementsComponents.Helper.legacyNodeToElementsComponentsNode(container.containerNode),
       queryName: containerQuery.name,
-      onContainerLinkClick: (event): void => {
+      onContainerLinkClick: event => {
         event.preventDefault();
         void ElementsPanel.instance().revealAndSelectNode(container.containerNode, true, true);
         void container.containerNode.scrollIntoView();
@@ -1168,12 +1170,12 @@ export class StylePropertiesSection {
     const deepTarget = UI.UIUtils.deepElementFromEvent(event);
     const treeElement = deepTarget && UI.TreeOutline.TreeElement.getTreeElementBylistItemNode(deepTarget);
     if (treeElement && treeElement instanceof StylePropertyTreeElement) {
-      this.addNewBlankProperty(treeElement.property.index + 1).startEditing();
+      this.addNewBlankProperty(treeElement.property.index + 1).startEditingName();
     } else if (
         target.classList.contains('selector-container') || target.classList.contains('styles-section-subtitle')) {
-      this.addNewBlankProperty(0).startEditing();
+      this.addNewBlankProperty(0).startEditingName();
     } else {
-      this.addNewBlankProperty().startEditing();
+      this.addNewBlankProperty().startEditingName();
     }
     event.consume(true);
   }
@@ -1412,9 +1414,9 @@ export class StylePropertiesSection {
         currentChild = sibling instanceof StylePropertyTreeElement ? sibling : null;
       }
       if (!currentChild) {
-        this.addNewBlankProperty().startEditing();
+        this.addNewBlankProperty().startEditingName();
       } else {
-        currentChild.startEditing(currentChild.nameElement);
+        currentChild.startEditingName();
       }
     } else {
       const previousSection = this.previousEditableSibling();
@@ -1422,7 +1424,7 @@ export class StylePropertiesSection {
         return;
       }
 
-      previousSection.addNewBlankProperty().startEditing();
+      previousSection.addNewBlankProperty().startEditingName();
     }
   }
 

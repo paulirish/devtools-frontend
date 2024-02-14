@@ -4,6 +4,7 @@
 
 const {assert} = chai;
 
+import * as Host from '../../../../../front_end/core/host/host.js';
 import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
@@ -13,6 +14,7 @@ import {createTarget, stubNoopSettings} from '../../helpers/EnvironmentHelpers.j
 import {
   describeWithMockConnection,
 } from '../../helpers/MockConnection.js';
+import {describeWithRealConnection} from '../../helpers/RealConnection.js';
 
 describeWithMockConnection('MainMenuItem', () => {
   const focusDebuggee = (targetFactory: () => SDK.Target.Target) => {
@@ -25,10 +27,10 @@ describeWithMockConnection('MainMenuItem', () => {
       targetFactory();
 
       sinon.stub(UI.ActionRegistry.ActionRegistry.instance(), 'hasAction')
-          .withArgs(sinon.match(/inspector_main.focus-debuggee|main.toggle-drawer/))
+          .withArgs(sinon.match(/inspector-main.focus-debuggee|main.toggle-drawer/))
           .returns(true);
       sinon.stub(UI.ActionRegistry.ActionRegistry.instance(), 'getAction')
-          .withArgs(sinon.match(/inspector_main.focus-debuggee|main.toggle-drawer/))
+          .withArgs(sinon.match(/inspector-main.focus-debuggee|main.toggle-drawer/))
           .returns(sinon.createStubInstance(UI.ActionRegistration.Action));
     });
 
@@ -72,4 +74,15 @@ describeWithMockConnection('MainMenuItem', () => {
                                 createTarget({parentTarget: tabTaget, subtype: 'prerender'});
                                 return createTarget({parentTarget: tabTaget});
                               }));
+});
+
+describeWithRealConnection('MainImpl', () => {
+  it('calls fetchColors on ColorThemeChanged', async () => {
+    const colorFetchSpy = sinon.spy(UI.Utils.DynamicTheming, 'fetchColors');
+
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.dispatchEventToListeners(
+        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged);
+
+    assert.isTrue(colorFetchSpy.called);
+  });
 });

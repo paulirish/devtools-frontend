@@ -4,21 +4,19 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
+import type * as Platform from '../../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../../generated/protocol.js';
 import * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
+import type * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
-import type * as Platform from '../../../../core/platform/platform.js';
-import type * as UI from '../../../../ui/legacy/legacy.js';
-import type * as Protocol from '../../../../generated/protocol.js';
-
-import * as PreloadingString from './PreloadingString.js';
-
 import preloadingGridStyles from './preloadingGrid.css.js';
+import * as PreloadingString from './PreloadingString.js';
 
 const UIStrings = {
   /**
@@ -91,7 +89,7 @@ export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableCompone
           sortable: true,
         },
         {
-          id: 'ruleSet',
+          id: 'rule-set',
           title: i18nString(UIStrings.ruleSet),
           widthWeighting: 20,
           hideable: false,
@@ -170,7 +168,7 @@ export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableCompone
             },
             {columnId: 'action', value: PreloadingString.capitalizedAction(row.attempt.action)},
             {
-              columnId: 'ruleSet',
+              columnId: 'rule-set',
               value: row.ruleSets.length === 0 ? '' : PreloadingString.ruleSetLocationShort(row.ruleSets[0], pageURL),
             },
             {

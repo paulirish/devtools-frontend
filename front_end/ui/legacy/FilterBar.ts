@@ -84,10 +84,10 @@ export class FilterBar extends Common.ObjectWrapper.eventMixin<FilterBarEventTyp
     this.registerRequiredCSS(filterStyles);
     this.enabled = true;
     this.element.classList.add('filter-bar');
-    this.element.setAttribute('jslog', `${VisualLogging.section().context('filter-bar')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.toolbar('filter-bar')}`);
 
     this.stateSetting =
-        Common.Settings.Settings.instance().createSetting('filterBar-' + name + '-toggled', Boolean(visibleByDefault));
+        Common.Settings.Settings.instance().createSetting('filter-bar-' + name + '-toggled', Boolean(visibleByDefault));
     this.filterButtonInternal =
         new ToolbarSettingToggle(this.stateSetting, 'filter', i18nString(UIStrings.filter), 'filter-filled', 'filter');
 
@@ -219,8 +219,7 @@ export class TextFilterUI extends Common.ObjectWrapper.ObjectWrapper<FilterUIEve
     this.filterElement.className = 'filter-text-filter';
 
     const container = this.filterElement.createChild('div', 'filter-input-container');
-    container.setAttribute(
-        'jslog', `${VisualLogging.toggle().track({click: true, keydown: true}).context('text-filter')}`);
+    container.setAttribute('jslog', `${VisualLogging.toggle('text-filter').track({click: true, keydown: true})}`);
     this.filterInputElement = container.createChild('span', 'filter-input-field');
 
     this.prompt = new TextPrompt();

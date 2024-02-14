@@ -27,8 +27,9 @@ function getMainThread(data: TraceEngine.Handlers.ModelHandlers.Renderer.Rendere
 }
 
 function findFirstEntry(
-    allEntries: readonly TraceEngine.Types.TraceEvents.TraceEntry[],
-    predicate: (entry: TraceEngine.Types.TraceEvents.TraceEntry) => boolean): TraceEngine.Types.TraceEvents.TraceEntry {
+    allEntries: readonly TraceEngine.Types.TraceEvents.SyntheticTraceEntry[],
+    predicate: (entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry) =>
+        boolean): TraceEngine.Types.TraceEvents.SyntheticTraceEntry {
   const entry = allEntries.find(entry => predicate(entry));
   if (!entry) {
     throw new Error('Could not find expected entry.');
@@ -75,11 +76,168 @@ describe('EntriesFilter', function() {
           entry.dur === 827;
     });
     const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
-    stack.applyAction({type: TraceEngine.EntriesFilter.FilterApplyAction.MERGE_FUNCTION, entry: entryTwo});
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, entry: entryTwo});
     assert.isTrue(stack.invisibleEntries().includes(entryTwo), 'entryTwo is invisble');
     // Only one entry - the one for the `basicTwo` function - should have been hidden.
     assert.strictEqual(stack.invisibleEntries().length, 1);
   });
+
+  it('adds the parent of the merged entry into the modifiedVisibleEntries array', async function() {
+    const data = await TraceLoader.traceEngine(this, 'basic-stack.json.gz');
+    const mainThread = getMainThread(data.Renderer);
+    /** This stack looks roughly like so (with some events omitted):
+     * ======== basicStackOne ============
+     * =========== basicTwo ==============
+     * =========== basicThree ============
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *
+     * In this test we want to test that the parent of the merged entry is added to the modifiedVisibleEntries array,
+     * so that later an array decoration is added to it and the merged entry could be shown again if the array is clicked.
+     * the user merging basicTwo into its parent, so the resulting trace should look like so:
+     * ======== basicStackOne ============ << As parent of basicTwo, it belongs to the modifiedVisibleEntries array
+     * =========== basicThree ============ << No more basicTwo, it has been merged.
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *
+     **/
+    const entryTwo = findFirstEntry(mainThread.entries, entry => {
+      // Processing this trace ends up with two distinct stacks for basicTwo()
+      // So we find the first one so we can focus this test on just one stack.
+      return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'basicTwo' &&
+          entry.dur === 827;
+    });
+    const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, entry: entryTwo});
+    assert.isTrue(stack.invisibleEntries().includes(entryTwo), 'entryTwo is invisble');
+
+    // Get the parent of basicTwo, which is basicStackOne.
+    const basicStackOne = findFirstEntry(mainThread.entries, entry => {
+      return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'basicStackOne' &&
+          entry.dur === 827;
+    });
+    // Get the parent of basicTwo marked as modified.
+    assert.isTrue(stack.isEntryModified(basicStackOne));
+  });
+
+  it('adds the collapsed entry into the modifiedVisibleEntries array', async function() {
+    const data = await TraceLoader.traceEngine(this, 'basic-stack.json.gz');
+    const mainThread = getMainThread(data.Renderer);
+    /** This stack looks roughly like so (with some events omitted):
+     * ======== basicStackOne ============
+     * =========== basicTwo ==============
+     * =========== basicThree ============
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *              ======== fibonacci ===
+     *
+     * In this test we want to test that the collapsed entry is added to the modifiedVisibleEntries array,
+     * so that later an arrow decoration is added to it and the collapsed entries could be shown again if the arraw is clicked.
+     *
+     * The user collapses basicTwo, so the resulting trace should look like so:
+     * ======== basicStackOne ============
+     * =========== basicTwo ============ << All entries under basicTwo merged collapsed and it belongs to the modifiedVisibleEntries array
+     *
+     **/
+    const entryTwo = findFirstEntry(mainThread.entries, entry => {
+      // Processing this trace ends up with two distinct stacks for basicTwo()
+      // So we find the first one so we can focus this test on just one stack.
+      return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'basicTwo' &&
+          entry.dur === 827;
+    });
+    const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_FUNCTION, entry: entryTwo});
+    // basicTwo is marked as modified.
+    assert.isTrue(stack.isEntryModified(entryTwo));
+  });
+
+  it('adds the next visible parent of the merged entry into the modifiedVisibleEntries array if the direct parent is hidden',
+     async function() {
+       const data = await TraceLoader.traceEngine(this, 'two-functions-recursion.json.gz');
+       const mainThread = getMainThread(data.Renderer);
+       /** This stack looks roughly like so (with some events omitted):
+        * ======== onclick ============
+        * =========== foo =============
+        *               ==== foo2 =====
+        *               ===== foo =====
+        *               ==== foo2 =====
+        *               ===== foo =====
+        *               ==== foo2 =====
+        *               ===== foo =====
+        *
+        * In this test we want to test that the next visible parent of the merged entry is added to the
+        * modifiedVisibleEntries array even if the direct one is hidden by some other action,
+        * so that later an array decoration is added to it and the merged entry could be shown again if the array is clicked.
+        *
+        * collapse all repeating calls of foo after the first one:
+        * ======== onclick ============
+        * =========== foo =============                  << all foo except first removed
+        *               ===== foo2 ====
+        *               ==== foo2 =====                  << direct parent is not visible anymore
+        *               ==== foo2 =====
+        *
+        * merge second foo2 and add the next visible parent to the modifiedVisibleEntries array:
+        * ======== onclick ============
+        * =========== foo =============
+        *               ===== foo2 ====                  << added to modifiedVisibleEntries as the next visible parent of the merged entry
+        *               ==== foo2 =====
+        *
+        **/
+       const firstFooCallEntry = findFirstEntry(mainThread.entries, entry => {
+         return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'foo' &&
+             entry.dur === 233;
+       });
+       const firstFooCallEndTime = TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(firstFooCallEntry).endTime;
+       const fooCalls = mainThread.entries.filter(entry => {
+         const isFooCall = TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'foo';
+         if (!isFooCall) {
+           return false;
+         }
+         const {endTime} = TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(entry);
+         return endTime <= firstFooCallEndTime;
+       });
+       const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
+
+       // Collapse all foo calls after the first one.
+       stack.applyFilterAction({
+         type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS,
+         entry: firstFooCallEntry,
+       });
+
+       // First foo call is marked as modified since its' children are hidden.
+       assert.isTrue(stack.isEntryModified(firstFooCallEntry));
+
+       // Make sure all foo calls after first are hidden.
+       const allFooExceptFirstInStackAreHidden = fooCalls.every((fooCall, i) => {
+         if (i === 0) {
+           // First foo should not be invisible.
+           return !stack.invisibleEntries().includes(fooCall);
+         }
+         return stack.invisibleEntries().includes(fooCall);
+       });
+       assert.isTrue(
+           allFooExceptFirstInStackAreHidden, 'First foo is invisible or some following foo calls are still visible');
+
+       const foo2Calls = mainThread.entries.filter(entry => {
+         const isFoo2Call =
+             TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'foo2';
+         if (!isFoo2Call) {
+           return false;
+         }
+         const {endTime} = TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(entry);
+         return endTime <= firstFooCallEndTime;
+       });
+
+       // Merge second foo2 entry.
+       stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, entry: foo2Calls[1]});
+       // First foo2 entry should be in the modifiedVisibleEntries array.
+       assert.isTrue(stack.isEntryModified(foo2Calls[0]));
+     });
 
   it('supports collapsing an entry', async function() {
     const data = await TraceLoader.traceEngine(this, 'basic-stack.json.gz');
@@ -121,7 +279,7 @@ describe('EntriesFilter', function() {
       return endTime <= basicTwoCallEndTime;
     });
     const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
-    stack.applyAction({type: TraceEngine.EntriesFilter.FilterApplyAction.COLLAPSE_FUNCTION, entry: basicTwoCallEntry});
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_FUNCTION, entry: basicTwoCallEntry});
 
     // We collapsed at the `basicTwo` entry - so it should not be included in the invisible list itself.
     assert.isFalse(stack.invisibleEntries().includes(basicTwoCallEntry), 'entryTwo is not visible');
@@ -181,8 +339,8 @@ describe('EntriesFilter', function() {
     });
 
     const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
-    stack.applyAction(
-        {type: TraceEngine.EntriesFilter.FilterApplyAction.COLLAPSE_REPEATING_DESCENDANTS, entry: firstFooCallEntry});
+    stack.applyFilterAction(
+        {type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS, entry: firstFooCallEntry});
 
     // We collapsed identical descendants after the first `foo` entry - so it should not be included in the invisible list itself,
     // but all foo() calls below it in the stack should now be invisible.
@@ -255,8 +413,8 @@ describe('EntriesFilter', function() {
     });
 
     // Collapse all repeating descendants of the first fibonacci call:
-    stack.applyAction(
-        {type: TraceEngine.EntriesFilter.FilterApplyAction.COLLAPSE_REPEATING_DESCENDANTS, entry: fibonacciCalls[0]});
+    stack.applyFilterAction(
+        {type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS, entry: fibonacciCalls[0]});
     // We collapsed identical descendants after the first `foo` entry - so it should not be included in the invisible list itself,
     // but all foo() calls below it in the stack should now be invisible.
     const allFibExceptFirstInStackAreHidden = fibonacciCalls.every((fibCall, i) => {
@@ -274,11 +432,11 @@ describe('EntriesFilter', function() {
       return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'basicStackOne' &&
           entry.dur === 827;
     });
-    stack.applyAction({type: TraceEngine.EntriesFilter.FilterApplyAction.MERGE_FUNCTION, entry: basicStackOne});
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, entry: basicStackOne});
     assert.isTrue(stack.invisibleEntries().includes(basicStackOne), 'entrybasicStackOneTwo is visble');
 
     // Collapse basicTwo():
-    stack.applyAction({type: TraceEngine.EntriesFilter.FilterApplyAction.COLLAPSE_FUNCTION, entry: basicTwoCallEntry});
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_FUNCTION, entry: basicTwoCallEntry});
     // basicThree and first fibnacci should now be hidden:
     const basicThree = findFirstEntry(mainThread.entries, entry => {
       return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'basicThree' &&
@@ -289,7 +447,7 @@ describe('EntriesFilter', function() {
 
     // Apply UNDO_ALL_ACTIONS to bring back all of the hidden entries:
     // UNDO_ALL_ACTIONS can be called on any visible entry
-    stack.applyAction({type: TraceEngine.EntriesFilter.FilterUndoAction.UNDO_ALL_ACTIONS, entry: basicTwoCallEntry});
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.UNDO_ALL_ACTIONS, entry: basicTwoCallEntry});
     // If the length of invisibleEntries list is 0, all of the entries added earlier were removed and are now visible.
     assert.strictEqual(stack.invisibleEntries().length, 0);
   });
@@ -355,8 +513,8 @@ describe('EntriesFilter', function() {
     });
 
     const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
-    stack.applyAction(
-        {type: TraceEngine.EntriesFilter.FilterApplyAction.COLLAPSE_REPEATING_DESCENDANTS, entry: firstFooCallEntry});
+    stack.applyFilterAction(
+        {type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS, entry: firstFooCallEntry});
 
     // We collapsed identical descendants after the first `foo` entry - so it should not be included in the invisible list itself,
     // but all foo() calls below it in the stack should now be invisible.
@@ -378,7 +536,7 @@ describe('EntriesFilter', function() {
 
     // Reset all children after second foo2 call
     assert.strictEqual(foo2Calls.length, 3);
-    stack.applyAction({type: TraceEngine.EntriesFilter.FilterUndoAction.RESET_CHILDREN, entry: foo2Calls[1]});
+    stack.applyFilterAction({type: TraceEngine.EntriesFilter.FilterAction.RESET_CHILDREN, entry: foo2Calls[1]});
 
     // All foo and foo2 calls except the second foo cll should now be visible
     allFoo2InStackAreVisible = foo2Calls.every(fooCall => {
@@ -396,5 +554,45 @@ describe('EntriesFilter', function() {
     assert.isTrue(
         allFooExceptSecondInStackAreVisible,
         'Some foo calls except the second one are invisible or the second one is visible');
+  });
+
+  it('correctly returns the amount of hidden children of a node', async function() {
+    const data = await TraceLoader.traceEngine(this, 'two-functions-recursion.json.gz');
+    const mainThread = getMainThread(data.Renderer);
+    /** This stack looks roughly like so (with some erlier events omitted):
+     * ======== onclick ============
+     * =========== foo =============
+     *               ==== foo2 =====
+     *               ===== foo =====
+     *               ==== foo2 =====
+     *               ===== foo =====
+     *               ==== foo2 =====
+     *               ===== foo =====
+     *
+     * In this test we want to test if the amount of hidden children returned is correct:
+     * If we collapse repeating children on the first foo call, the 3 child foo calls should be removed.
+     * Therefore, the amount of hidden children should be equal to 3.
+     * ======== onclick ============
+     * =========== foo =============                  << all foo except first hidden
+     *               ===== foo2 ====
+     *               ==== foo2 =====
+     *               ==== foo2 =====
+     **/
+
+    const firstFooCallEntry = findFirstEntry(mainThread.entries, entry => {
+      return TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === 'foo' &&
+          entry.dur === 233;
+    });
+
+    const stack = new TraceEngine.EntriesFilter.EntriesFilter(data.Renderer.entryToNode);
+
+    // Before applying any action on a node, there should be no entries hidden under it
+    assert.strictEqual(stack.findHiddenDescendantsAmount(firstFooCallEntry), 0);
+
+    stack.applyFilterAction(
+        {type: TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS, entry: firstFooCallEntry});
+
+    // There should be 3 foo() entries hidden under the first foo call entry
+    assert.strictEqual(stack.findHiddenDescendantsAmount(firstFooCallEntry), 3);
   });
 });

@@ -226,7 +226,7 @@ const resolveScope = async(script: SDK.Script.Script, scopeChain: Formatter.Form
 
       if (!cachedScopeMap || cachedScopeMap.sourceMap !== sourceMap) {
         const identifiersPromise =
-            (async(): Promise<{variableMapping: Map<string, string>, thisMapping: string | null}> => {
+            (async () => {
               const variableMapping = new Map<string, string>();
               let thisMapping = null;
 
@@ -671,15 +671,14 @@ export class RemoteObject extends SDK.RemoteObject.RemoteObject {
     return this.object.deleteProperty(name);
   }
 
-  override callFunction<T>(
-      functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
+  override callFunction<T, U>(
+      functionDeclaration: (this: U, ...args: any[]) => T,
       args?: Protocol.Runtime.CallArgument[]): Promise<SDK.RemoteObject.CallFunctionResult> {
     return this.object.callFunction(functionDeclaration, args);
   }
 
-  override callFunctionJSON<T>(
-      functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
-      args?: Protocol.Runtime.CallArgument[]): Promise<T> {
+  override callFunctionJSON<T, U>(
+      functionDeclaration: (this: U, ...args: any[]) => T, args?: Protocol.Runtime.CallArgument[]): Promise<T> {
     return this.object.callFunctionJSON(functionDeclaration, args);
   }
 

@@ -7,10 +7,10 @@ import * as Host from '../../core/host/host.js';
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Coordinator from '../components/render_coordinator/render_coordinator.js';
 
-import {getDomState, isVisible} from './DomState.js';
+import {getDomState, visibleOverlap} from './DomState.js';
 import {type Loggable} from './Loggable.js';
 import {debugString, getLoggingConfig} from './LoggingConfig.js';
-import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown} from './LoggingEvents.js';
+import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown, logResize} from './LoggingEvents.js';
 import {getOrCreateLoggingState} from './LoggingState.js';
 import {getNonDomState, unregisterAllLoggables, unregisterLoggable} from './NonDomState.js';
 
@@ -18,11 +18,16 @@ const PROCESS_DOM_INTERVAL = 500;
 const KEYBOARD_LOG_INTERVAL = 3000;
 const HOVER_LOG_INTERVAL = 1000;
 const DRAG_LOG_INTERVAL = 500;
+const CLICK_LOG_INTERVAL = 500;
+const RESIZE_LOG_INTERVAL = 1000;
+const RESIZE_REPORT_THRESHOLD = 50;
 
 let processingThrottler: Common.Throttler.Throttler|null;
 let keyboardLogThrottler: Common.Throttler.Throttler;
 let hoverLogThrottler: Common.Throttler.Throttler;
 let dragLogThrottler: Common.Throttler.Throttler;
+let clickLogThrottler: Common.Throttler.Throttler;
+let resizeLogThrottler: Common.Throttler.Throttler;
 
 const mutationObservers = new WeakMap<Node, MutationObserver>();
 const documents: Document[] = [];
@@ -48,12 +53,16 @@ export async function startLogging(options?: {
   keyboardLogThrottler?: Common.Throttler.Throttler,
   hoverLogThrottler?: Common.Throttler.Throttler,
   dragLogThrottler?: Common.Throttler.Throttler,
+  clickLogThrottler?: Common.Throttler.Throttler,
+  resizeLogThrottler?: Common.Throttler.Throttler,
 }): Promise<void> {
   logging = true;
   processingThrottler = options?.processingThrottler || new Common.Throttler.Throttler(PROCESS_DOM_INTERVAL);
   keyboardLogThrottler = options?.keyboardLogThrottler || new Common.Throttler.Throttler(KEYBOARD_LOG_INTERVAL);
   hoverLogThrottler = options?.hoverLogThrottler || new Common.Throttler.Throttler(HOVER_LOG_INTERVAL);
   dragLogThrottler = options?.dragLogThrottler || new Common.Throttler.Throttler(DRAG_LOG_INTERVAL);
+  clickLogThrottler = options?.clickLogThrottler || new Common.Throttler.Throttler(CLICK_LOG_INTERVAL);
+  resizeLogThrottler = options?.resizeLogThrottler || new Common.Throttler.Throttler(RESIZE_LOG_INTERVAL);
   await addDocument(document);
 }
 
@@ -95,11 +104,13 @@ export function scheduleProcessing(): void {
 
 let veDebuggingEnabled = false;
 let debugPopover: HTMLElement|null = null;
+const nonDomDebugElements = new WeakMap<Loggable, HTMLElement>();
 
 function setVeDebuggingEnabled(enabled: boolean): void {
   veDebuggingEnabled = enabled;
   if (enabled && !debugPopover) {
     debugPopover = document.createElement('div');
+    debugPopover.classList.add('ve-debug');
     debugPopover.style.position = 'absolute';
     debugPopover.style.bottom = '100px';
     debugPopover.style.left = '100px';
@@ -134,18 +145,25 @@ async function process(): Promise<void> {
   for (const {element, parent} of loggables) {
     const loggingState = getOrCreateLoggingState(element, getLoggingConfig(element), parent);
     if (!loggingState.impressionLogged) {
-      if (isVisible(element, viewportRectFor(element))) {
+      const overlap = visibleOverlap(element, viewportRectFor(element));
+      if (overlap) {
+        loggingState.size = overlap;
         visibleLoggables.push(element);
         loggingState.impressionLogged = true;
       }
     }
     if (!loggingState.processed) {
       if (loggingState.config.track?.has('click')) {
-        element.addEventListener('click', e => logClick(e.currentTarget as Element, e), {capture: true});
+        element.addEventListener('click', e => {
+          const loggable = e.currentTarget as Element;
+          void clickLogThrottler.schedule(async () => logClick(loggable, e));
+        }, {capture: true});
       }
       if (loggingState.config.track?.has('dblclick')) {
-        element.addEventListener(
-            'dblclick', e => logClick(e.currentTarget as Element, e, {doubleClick: true}), {capture: true});
+        element.addEventListener('dblclick', e => {
+          const loggable = e.currentTarget as Element;
+          void clickLogThrottler.schedule(async () => logClick(loggable, e, {doubleClick: true}));
+        }, {capture: true});
       }
       const trackHover = loggingState.config.track?.has('hover');
       if (trackHover) {
@@ -166,6 +184,19 @@ async function process(): Promise<void> {
       const codes = loggingState.config.track?.get('keydown')?.split(',') || [];
       if (trackKeyDown) {
         element.addEventListener('keydown', logKeyDown(codes, keyboardLogThrottler), {capture: true});
+      }
+      if (loggingState.config.track?.has('resize')) {
+        new ResizeObserver(_ => {
+          const overlap = visibleOverlap(element, viewportRectFor(element));
+          if (!loggingState.size || !overlap) {
+            return;
+          }
+          if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
+              Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
+            loggingState.size = overlap;
+            void logResize(resizeLogThrottler)(element);
+          }
+        }).observe(element);
       }
       loggingState.processed = true;
     }
@@ -194,6 +225,28 @@ async function process(): Promise<void> {
     const visible = !loggingState.parent || loggingState.parent.impressionLogged;
     if (!visible) {
       continue;
+    }
+    if (veDebuggingEnabled) {
+      let debugElement = nonDomDebugElements.get(loggable);
+      if (!debugElement) {
+        debugElement = document.createElement('div');
+        debugElement.classList.add('ve-debug');
+        debugElement.style.background = 'black';
+        debugElement.style.color = 'white';
+        debugElement.style.zIndex = '100000';
+        debugElement.textContent = debugString(config);
+        nonDomDebugElements.set(loggable, debugElement);
+      }
+      const parentDebugElement =
+          parent instanceof HTMLElement ? parent : nonDomDebugElements.get(parent as Loggable) || debugPopover;
+      assertNotNullOrUndefined(parentDebugElement);
+      if (!parentDebugElement.classList.contains('ve-debug')) {
+        debugElement.style.position = 'absolute';
+        parentDebugElement.insertBefore(debugElement, parentDebugElement.firstChild);
+      } else {
+        debugElement.style.marginLeft = '10px';
+        parentDebugElement.appendChild(debugElement);
+      }
     }
     visibleLoggables.push(loggable);
     loggingState.impressionLogged = true;

@@ -58,6 +58,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private readonly networkPane: UI.Widget.VBox;
   private readonly splitResizer: HTMLElement;
   private readonly chartSplitWidget: UI.SplitWidget.SplitWidget;
+  private brickGame?: PerfUI.BrickBreaker.BrickBreaker;
   private readonly countersView: CountersGraph;
   private readonly detailsSplitWidget: UI.SplitWidget.SplitWidget;
   private readonly detailsView: TimelineDetailsView;
@@ -75,36 +76,36 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   #traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null;
   #selectedGroupName: string|null = null;
   #onTraceBoundsChangeBound = this.#onTraceBoundsChange.bind(this);
+  #gameKeyMatches = 0;
+  #gameTimeout = setTimeout(() => ({}), 0);
   constructor(delegate: TimelineModeViewDelegate) {
     super();
     this.element.classList.add('timeline-flamechart');
+
     this.delegate = delegate;
     this.model = null;
     this.eventListeners = [];
     this.#traceEngineData = null;
 
-    this.showMemoryGraphSetting = Common.Settings.Settings.instance().createSetting('timelineShowMemory', false);
+    this.showMemoryGraphSetting = Common.Settings.Settings.instance().createSetting('timeline-show-memory', false);
 
     // Create main and network flamecharts.
-    this.networkSplitWidget = new UI.SplitWidget.SplitWidget(false, false, 'timelineFlamechartMainView', 150);
+    this.networkSplitWidget = new UI.SplitWidget.SplitWidget(false, false, 'timeline-flamechart-main-view', 150);
 
     // Ensure that the network panel & resizer appears above the main thread.
     this.networkSplitWidget.sidebarElement().style.zIndex = '120';
 
     const mainViewGroupExpansionSetting =
-        Common.Settings.Settings.instance().createSetting('timelineFlamechartMainViewGroupExpansion', {});
+        Common.Settings.Settings.instance().createSetting('timeline-flamechart-main-view-group-expansion', {});
     this.mainDataProvider = new TimelineFlameChartDataProvider();
     this.mainDataProvider.addEventListener(
         TimelineFlameChartDataProviderEvents.DataChanged, () => this.mainFlameChart.scheduleUpdate());
     this.mainFlameChart = new PerfUI.FlameChart.FlameChart(this.mainDataProvider, this, mainViewGroupExpansionSetting);
     this.mainFlameChart.alwaysShowVerticalScroll();
     this.mainFlameChart.enableRuler(false);
-    this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.TreeModified, event => {
-      this.mainDataProvider.modifyTree(event.data.group, event.data.node, event.data.action, this.mainFlameChart);
-    });
 
     this.networkFlameChartGroupExpansionSetting =
-        Common.Settings.Settings.instance().createSetting('timelineFlamechartNetworkViewGroupExpansion', {});
+        Common.Settings.Settings.instance().createSetting('timeline-flamechart-network-view-group-expansion', {});
     this.networkDataProvider = new TimelineFlameChartNetworkDataProvider();
     this.networkFlameChart =
         new PerfUI.FlameChart.FlameChart(this.networkDataProvider, this, this.networkFlameChartGroupExpansionSetting);
@@ -120,7 +121,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.networkSplitWidget.setSidebarWidget(this.networkPane);
 
     // Create counters chart splitter.
-    this.chartSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'timelineCountersSplitViewState');
+    this.chartSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'timeline-counters-split-view-state');
     this.countersView = new CountersGraph(this.delegate);
     this.chartSplitWidget.setMainWidget(this.networkSplitWidget);
     this.chartSplitWidget.setSidebarWidget(this.countersView);
@@ -129,7 +130,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.updateCountersGraphToggle();
 
     // Create top level properties splitter.
-    this.detailsSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'timelinePanelDetailsSplitViewState');
+    this.detailsSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'timeline-panel-details-split-view-state');
     this.detailsSplitWidget.element.classList.add('timeline-details-split');
     this.detailsView = new TimelineDetailsView(delegate);
     this.detailsSplitWidget.installResizer(this.detailsView.headerElement());
@@ -141,21 +142,47 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.onNetworkEntrySelected = this.onEntrySelected.bind(this, this.networkDataProvider);
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.EntrySelected, this.onMainEntrySelected, this);
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.EntryInvoked, this.onMainEntrySelected, this);
-    this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.EntriesModified, this.onEntriesModified, this);
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.EntrySelected, this.onNetworkEntrySelected, this);
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.EntryInvoked, this.onNetworkEntrySelected, this);
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.EntryHighlighted, this.onEntryHighlighted, this);
-
+    this.element.addEventListener('keydown', this.#keydownHandler.bind(this));
     this.boundRefresh = this.#reset.bind(this);
     this.#selectedEvents = null;
 
     this.mainDataProvider.setEventColorMapping(TimelineUIUtils.eventColor);
     this.groupBySetting = Common.Settings.Settings.instance().createSetting(
-        'timelineTreeGroupBy', AggregatedTimelineTreeView.GroupBy.None);
+        'timeline-tree-group-by', AggregatedTimelineTreeView.GroupBy.None);
     this.groupBySetting.addChangeListener(this.updateColorMapper, this);
     this.updateColorMapper();
 
     TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
+  }
+
+  #keydownHandler(event: KeyboardEvent): void {
+    const keyCombo = 'fixme';
+    if (event.key === keyCombo[this.#gameKeyMatches]) {
+      this.#gameKeyMatches++;
+      clearTimeout(this.#gameTimeout);
+      this.#gameTimeout = setTimeout(() => {
+        this.#gameKeyMatches = 0;
+      }, 2000);
+    } else {
+      this.#gameKeyMatches = 0;
+      clearTimeout(this.#gameTimeout);
+    }
+    if (this.#gameKeyMatches !== keyCombo.length) {
+      return;
+    }
+    this.fixMe();
+  }
+
+  fixMe(): void {
+    if ([...this.element.childNodes].find(child => child instanceof PerfUI.BrickBreaker.BrickBreaker)) {
+      return;
+    }
+    this.brickGame = new PerfUI.BrickBreaker.BrickBreaker(this.mainFlameChart);
+    this.brickGame.classList.add('brick-game');
+    this.element.append(this.brickGame);
   }
 
   #onTraceBoundsChange(event: TraceBounds.TraceBounds.StateChangedEvent): void {
@@ -171,19 +198,6 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.networkDataProvider.setWindowTimes(visibleWindow.min, visibleWindow.max);
     this.networkFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max, shouldAnimate);
     this.updateSearchResults(false, false);
-  }
-
-  onEntriesModified(): void {
-    if (!this.model) {
-      return;
-    }
-    this.mainDataProvider.timelineData(true);
-    const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
-    if (traceBoundsState) {
-      const visibleWindow = traceBoundsState.milli.timelineTraceWindow;
-      this.mainFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max);
-    }
-    this.mainFlameChart.update();
   }
 
   isNetworkTrackShownForTests(): boolean {
@@ -427,6 +441,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     if (this.searchResults) {
       this.selectedSearchResult = this.searchResults[index];
       this.delegate.select(this.mainDataProvider.createSelection(this.selectedSearchResult));
+      this.mainFlameChart.showPopoverForSearchResult(this.selectedSearchResult);
     }
   }
 
@@ -542,8 +557,6 @@ export class TimelineFlameChartMarker implements PerfUI.FlameChart.FlameChartMar
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ColorBy {
+export const enum ColorBy {
   URL = 'URL',
 }

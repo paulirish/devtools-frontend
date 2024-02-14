@@ -15,7 +15,7 @@ const {assert} = chai;
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
-const getInternalDataGridShadowRoot = (component: DataGrid.DataGridController.DataGridController): ShadowRoot => {
+const getInternalDataGridShadowRoot = (component: DataGrid.DataGridController.DataGridController) => {
   assertShadowRoot(component.shadowRoot);
   const internalDataGrid = component.shadowRoot.querySelector('devtools-data-grid');
   assertNotNullOrUndefined(internalDataGrid);
@@ -28,7 +28,7 @@ describe('DataGridController', () => {
   describeWithLocale('sorting the columns', () => {
     const columns = [
       {id: 'key', title: 'Key', sortable: true, widthWeighting: 1, visible: true, hideable: false},
-    ];
+    ] as DataGrid.DataGridUtils.Column[];
     const rows = [
       {cells: [{columnId: 'key', value: 'Bravo'}]},
       {cells: [{columnId: 'key', value: 'Alpha'}]},
@@ -206,7 +206,7 @@ describe('DataGridController', () => {
     const columns = [
       {id: 'key', title: 'Letter', sortable: true, widthWeighting: 1, visible: true, hideable: false},
       {id: 'value', title: 'Phonetic', sortable: true, widthWeighting: 1, visible: true, hideable: false},
-    ];
+    ] as DataGrid.DataGridUtils.Column[];
     const rows = [
       {
         cells: [

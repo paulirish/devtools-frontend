@@ -129,7 +129,7 @@ export function buildStackTraceRows(
         revealBreakpoint: previousStackFrameWasBreakpointCondition,
       });
       if (link) {
-        link.setAttribute('jslog', `${VisualLogging.link().track({click: true}).context('stack-trace-link')}`);
+        link.setAttribute('jslog', `${VisualLogging.link('stack-trace').track({click: true})}`);
         link.addEventListener('contextmenu', populateContextMenu.bind(null, link));
         // TODO(crbug.com/1183325): fix race condition with uiLocation still being null here
         // Note: This has always checked whether the call frame location *in the generated
@@ -252,7 +252,7 @@ function renderStackTraceTable(
       row.createChild('td', 'function-name').textContent = item.functionName;
       row.createChild('td').textContent = ' @ ';
       if (item.link) {
-        row.createChild('td').appendChild(item.link);
+        row.createChild('td', 'link').appendChild(item.link);
         links.push(item.link);
       }
       if (item.ignoreListHide) {

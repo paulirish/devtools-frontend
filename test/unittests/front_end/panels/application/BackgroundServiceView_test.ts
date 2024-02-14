@@ -30,7 +30,7 @@ describeWithMockConnection('BackgroundServiceView', () => {
     UI.ActionRegistration.registerActionExtension({
       actionId: 'background-service.toggle-recording',
       category: UI.ActionRegistration.ActionCategory.BACKGROUND_SERVICES,
-      title: (): Platform.UIString.LocalizedString => 'mock' as Platform.UIString.LocalizedString,
+      title: () => 'mock' as Platform.UIString.LocalizedString,
       toggleable: true,
     });
     sinon.stub(UI.ShortcutRegistry.ShortcutRegistry, 'instance').returns({
@@ -68,9 +68,9 @@ describeWithMockConnection('BackgroundServiceView', () => {
     const dataRow = view.getDataGrid().dataTableBody.getElementsByClassName('data-grid-data-grid-node')[0];
     const expectedData = ['Event1', testKey, 'Instance1'];
     const actualData = [
-      dataRow.getElementsByClassName('eventName-column')[0].textContent,
-      dataRow.getElementsByClassName('storageKey-column')[0].textContent,
-      dataRow.getElementsByClassName('instanceId-column')[0].textContent,
+      dataRow.getElementsByClassName('event-name-column')[0].textContent,
+      dataRow.getElementsByClassName('storage-key-column')[0].textContent,
+      dataRow.getElementsByClassName('instance-id-column')[0].textContent,
     ];
     assert.deepEqual(actualData, expectedData);
   });
