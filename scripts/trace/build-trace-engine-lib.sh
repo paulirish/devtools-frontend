@@ -20,11 +20,7 @@ cp -r "$config_dir/gen/front_end/models/cpu_profile" "$trace_engine_out/models/c
 cp -r "$config_dir/gen/front_end/core/platform" "$trace_engine_out/core/platform"
 cp ./front_end/models/trace/package-template.json "$trace_engine_out/package.json"
 
-python3 - << EOF
-from pathlib import Path
-path = Path('$trace_engine_out/models/trace/trace.js')
-code = path.read_text()
-code = code.replace("import * as Extras from './extras/extras.js'", "const Extras = {}")
-code = code.replace("import * as TracingManager from './TracingManager.js'", "const TracingManager = {}")
-path.write_text(code)
-EOF
+echo 'export {};' > $trace_engine_out/models/trace/extras/extras.js
+echo 'export {};' > $trace_engine_out/models/trace/extras/extras.d.ts
+echo 'export {};' > $trace_engine_out/models/trace/TracingManager.js
+echo 'export {};' > $trace_engine_out/models/trace/TracingManager.d.ts
