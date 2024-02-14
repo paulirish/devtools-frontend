@@ -24,7 +24,9 @@ export function eventInitiatorPairsToDraw(
   let currentEvent: TraceEngine.Types.TraceEvents.TraceEventData|null = selectedEvent;
 
   while (currentEvent) {
-    const currentInitiator = traceEngineData.Initiators.eventToInitiator.get(currentEvent);
+    const lol = traceEngineData.Renderer.eventToInitiatorViaFlow.get(currentEvent);
+    const currentInitiator = traceEngineData.Initiators.eventToInitiator.get(currentEvent) ?? lol;
+
 
     if (currentInitiator) {
       // Store the current pair, and then set the initiator to

@@ -189,7 +189,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
         event,
         initiator: matchingStartEvent,
       });
-    console.log('got pair', event, matchingStartEvent)
+    // console.log('got pair', event, matchingStartEvent)
   }
 }
 

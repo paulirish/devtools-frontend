@@ -34,6 +34,9 @@ const compositorTileWorkers = Array<{
 }>();
 const entryToNode: Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode> = new Map();
 let allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[] = [];
+const flowStartById: Map<number, {flowStart: Types.TraceEvents.TraceEventData, flowOpening: Types.TraceEvents.TraceEventData}> = new Map();
+// For a given event, tell me what its initiator was (via flow events). An event can only have one initiator.
+const eventToInitiatorViaFlow = new Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>();
 
 const completeEventStack: (Types.TraceEvents.SyntheticCompleteEvent)[] = [];
 
@@ -68,6 +71,9 @@ export function handleUserConfig(userConfig: Types.Configuration.Configuration):
 export function reset(): void {
   processes.clear();
   entryToNode.clear();
+  flowStartById.clear();
+  eventToInitiatorViaFlow.clear();
+
   allTraceEntries.length = 0;
   completeEventStack.length = 0;
   compositorTileWorkers.length = 0;
@@ -111,6 +117,28 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     const thread = getOrCreateRendererThread(process, event.tid);
     thread.entries.push(event);
     allTraceEntries.push(event);
+    return;
+  }
+
+  if (event.ph === Types.TraceEvents.Phase.FLOW_START) {
+    const process = getOrCreateRendererProcess(processes, event.pid);
+    const thread = getOrCreateRendererThread(process, event.tid);
+    const lastEvent = thread.entries.at(-1); // a bit of an assumption…
+    flowStartById.set(event.id, {flowStart: event, flowOpening: lastEvent});
+
+    // lastEvent.
+  } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) {
+    const process = getOrCreateRendererProcess(processes, event.pid);
+    const thread = getOrCreateRendererThread(process, event.tid);
+    const flowCompletion = thread.entries.at(-1);
+    const {flowStart, flowOpening} = flowStartById.get(event.id);
+    if (flowCompletion) {
+      eventToInitiatorViaFlow.set(flowCompletion, flowOpening);
+      console.log('got pair', flowOpening, flowCompletion);
+    } else {
+      console.log('NOOOOOOOOOOPE');
+    }
+
   }
 }
 
@@ -138,6 +166,7 @@ export function data(): RendererHandlerData {
     compositorTileWorkers: new Map(gatherCompositorThreads()),
     entryToNode: new Map(entryToNode),
     allTraceEntries: [...allTraceEntries],
+    eventToInitiatorViaFlow: new Map(eventToInitiatorViaFlow),
   };
 }
 
@@ -392,6 +421,7 @@ export interface RendererHandlerData {
    * samples.
    */
   allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[];
+  eventToInitiatorViaFlow: Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>;
 }
 
 export interface RendererProcess {
