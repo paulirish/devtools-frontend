@@ -14,13 +14,18 @@ rm -rf "$trace_engine_out"
 
 mkdir -p "$trace_engine_out/core"
 mkdir -p "$trace_engine_out/models"
+mkdir -p "$trace_engine_out/generated"
 
 cp -r "$config_dir/gen/front_end/models/trace" "$trace_engine_out/models/trace"
 cp -r "$config_dir/gen/front_end/models/cpu_profile" "$trace_engine_out/models/cpu_profile"
 cp -r "$config_dir/gen/front_end/core/platform" "$trace_engine_out/core/platform"
+cp "$config_dir/gen/front_end/generated/protocol.js" "$trace_engine_out/generated/protocol.js"
+cp "$config_dir/gen/front_end/generated/protocol.d.ts" "$trace_engine_out/generated/protocol.d.ts"
 cp ./front_end/models/trace/package-template.json "$trace_engine_out/package.json"
 
 echo 'export {};' > $trace_engine_out/models/trace/extras/extras.js
 echo 'export {};' > $trace_engine_out/models/trace/extras/extras.d.ts
 echo 'export {};' > $trace_engine_out/models/trace/TracingManager.js
 echo 'export {};' > $trace_engine_out/models/trace/TracingManager.d.ts
+echo 'export {};' > $trace_engine_out/models/trace/LegacyTracingModel.js
+echo 'export {};' > $trace_engine_out/models/trace/LegacyTracingModel.d.ts
