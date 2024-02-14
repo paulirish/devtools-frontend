@@ -27,7 +27,6 @@ cat "$standalone/test/test-trace-engine.mjs.orig"  | \
 # cleanup
 command rm "$standalone/analyze-trace.mjs.orig"
 command rm "$standalone/test/test-trace-engine.mjs.orig"
-command rm "$standalone/meta.json"
 
 echo "➕ Files copied. Testing…"
 npm -C "$standalone" run test
