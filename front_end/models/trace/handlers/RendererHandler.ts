@@ -34,7 +34,7 @@ const compositorTileWorkers = Array<{
 }>();
 const entryToNode: Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode> = new Map();
 let allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[] = [];
-const flowStartById: Map<number, {flowStart: Types.TraceEvents.TraceEventData, flowOpening: Types.TraceEvents.TraceEventData}> = new Map();
+const flowStartById: Map<number, {flowStart: Types.TraceEvents.TraceEventData, flowEnd: Types.TraceEvents.TraceEventData}> = new Map();
 // For a given event, tell me what its initiator was (via flow events). An event can only have one initiator.
 const eventToInitiatorViaFlow = new Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>();
 
@@ -120,25 +120,29 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     return;
   }
 
-  if (event.ph === Types.TraceEvents.Phase.FLOW_START) {
+  if (event.ph === Types.TraceEvents.Phase.FLOW_START || event.ph === Types.TraceEvents.Phase.FLOW_END) {
     const process = getOrCreateRendererProcess(processes, event.pid);
     const thread = getOrCreateRendererThread(process, event.tid);
-    const lastEvent = thread.entries.at(-1); // a bit of an assumption…
-    flowStartById.set(event.id, {flowStart: event, flowOpening: lastEvent});
+    thread.entries.push(event);
+    allTraceEntries.push(event);
 
-    // lastEvent.
-  } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) {
-    const process = getOrCreateRendererProcess(processes, event.pid);
-    const thread = getOrCreateRendererThread(process, event.tid);
-    const flowCompletion = thread.entries.at(-1);
-    const {flowStart, flowOpening} = flowStartById.get(event.id);
-    if (flowCompletion) {
-      eventToInitiatorViaFlow.set(flowCompletion, flowOpening);
-      console.log('got pair', flowOpening, flowCompletion);
-    } else {
-      console.log('NOOOOOOOOOOPE');
+    if (event.ph === Types.TraceEvents.Phase.FLOW_START) {
+      // const lastEvent = thread.entries.at(-1); // a bit of an assumption…
+      flowStartById.set(event.id, {flowStart: event});
+
+      // lastEvent.
+    } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) {
+      // const flowCompletion = thread.entries.at(-1);
+      const {flowStart} = flowStartById.get(event.id);
+      flowStartById.set(event.id, {flowStart, flowEnd: event});
+      // if (flowCompletion) {
+      //   eventToInitiatorViaFlow.set(flowCompletion, flowOpening);
+      //   // console.log('got pair', flowOpening, flowCompletion);
+      // } else {
+      //   console.log('NOOOOOOOOOOPE');
+      // }
+
     }
-
   }
 }
 
@@ -151,6 +155,7 @@ export async function finalize(): Promise<void> {
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);
   buildHierarchy(processes);
+  mapFlows(processes);
   sanitizeThreads(processes);
   Helpers.Trace.sortTraceEventsInPlace(allTraceEntries);
   handlerState = HandlerState.FINALIZED;
@@ -367,6 +372,23 @@ export function buildHierarchy(
       for (const [entry, node] of treeData.entryToNode) {
         entryToNode.set(entry, node);
       }
+    }
+  }
+}
+
+
+function mapFlows(  processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
+  for (const {flowStart, flowEnd} of flowStartById.values()) {
+
+     if (flowEnd.ts < flowStart.ts) {
+      console.warn('wrong order flows');
+     }
+    const flowStartParent = entryToNode.get(flowStart)?.parent?.entry;
+    const flowEndParent = entryToNode.get(flowEnd)?.parent?.entry;
+    if (flowStartParent && flowEndParent) {
+      eventToInitiatorViaFlow.set(flowStartParent, flowEndParent);
+    } else {
+      // something?
     }
   }
 }
