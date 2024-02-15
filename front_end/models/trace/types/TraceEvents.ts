@@ -2226,6 +2226,8 @@ export const enum KnownEventName {
   ProfileChunk = 'ProfileChunk',
   UpdateCounters = 'UpdateCounters',
 
+  JSsample = 'JSSample',
+
   /* Other */
   Animation = 'Animation',
   ParseAuthorStyleSheet = 'ParseAuthorStyleSheet',

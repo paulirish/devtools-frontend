@@ -576,6 +576,9 @@ export class ThreadAppender implements TrackAppender {
       return i18nString(UIStrings.onIgnoreList);
     }
 
+
+    if (entry.name === 'JSSample') return 'JS Sample';
+
     // If the event is a profile call, we need to look up its name based on its
     // ProfileNode in the CPUProfile for the trace we are working with.
     if (TraceEngine.Types.TraceEvents.isProfileCall(entry)) {

@@ -109,6 +109,14 @@ export class SamplesIntegrator {
     const stack = [];
     for (let i = 0; i < mergedEvents.length; i++) {
       const event = mergedEvents[i];
+      if (event.ts === 78870337793) {
+        debugger;
+      }
+
+      if (event.name === 'JSSample') {
+        this.#constructedProfileCalls.push(event);  // TEMP. lets include the samples so i can see them.
+      }
+
       // Because instant trace events have no duration, they don't provide
       // useful information for possible changes in the duration of calls
       // in the JS stack.
@@ -236,6 +244,19 @@ export class SamplesIntegrator {
         continue;
       }
       const call = makeProfileCall(node, timestamp, this.#processId, this.#threadId);
+      const JSSampleEvent = {
+        name: 'JSSample',
+        cat: 'disabled-by-default-devtools.timeline',
+        args: {
+          data: {stackTrace: this.#getStackTraceFromProfileCall(call).map(e => e.callFrame)},
+        },
+        ph: 'I',
+        ts: timestamp,
+        dur: 0,
+        pid: this.#processId,
+        tid: this.#threadId,
+      };
+      calls.push(JSSampleEvent);
       calls.push(call);
       if (node.id === this.#profileModel.gcNode?.id && prevNode) {
         // GC samples have no stack, so we just put GC node on top of the
