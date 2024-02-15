@@ -135,7 +135,6 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
   }
 
   async #parse(traceEvents: readonly Types.TraceEvents.TraceEventData[], freshRecording: boolean): Promise<void> {
-    const begin = performance.mark('parsestart');
     // This iterator steps through all events, periodically yielding back to the
     // main thread to avoid blocking execution. It uses `dispatchEvent` to
     // provide status update events, and other various bits of config like the
@@ -170,8 +169,6 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
       }
     }
 
-    const duration = performance.measure('parseparse', { start: begin.startTime, end: performance.now()});
-    console.log(duration.duration);
     // Finalize.
     for (const handler of sortedHandlers) {
       await handler.finalize?.();
