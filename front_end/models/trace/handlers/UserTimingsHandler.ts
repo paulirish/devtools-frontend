@@ -59,9 +59,9 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     throw new Error('UserTimings handler is not initialized');
   }
 
-  if (!(event.cat.includes('blink.user_timing') || event.cat.includes('blink.console') ||
-        event.name === Types.TraceEvents.KnownEventName.TimeStamp
-            )) {
+  // Early exit micro-optimization
+  if (!(event.cat === 'blink.user_timing' || event.cat === 'blink.console' ||
+        event.name === Types.TraceEvents.KnownEventName.TimeStamp)) {
     return;
   }
 

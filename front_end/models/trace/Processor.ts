@@ -140,7 +140,6 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     // provide status update events, and other various bits of config like the
     // pause duration and frequency.
     const {pauseDuration, eventsPerChunk} = this.#modelConfiguration.processing;
-    // const traceEventIterator = new TraceEventIterator(traceEvents, pauseDuration, eventsPerChunk);
 
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];

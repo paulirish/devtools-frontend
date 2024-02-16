@@ -1717,8 +1717,8 @@ export function isTraceEventPerformanceMeasure(traceEventData: TraceEventData):
 export function isTraceEventPerformanceMark(traceEventData: TraceEventData):
     traceEventData is TraceEventPerformanceMark {
   // Resource Timing and Nav Timing numbers are dispatched on the blink.user_timing category,
-  // but the user didn't add with User Timing.  We don't want to include them.
-  // Luckily, all of them use Phase.MARK.
+  // but the user didn't add with User Timing.  We don't want to include them. Luckily, they use Phase.MARK.
+  // As of m117 (https://crrev.com/c/3656547), _actual_ user timing marks are emitted as Phase.INSTANT
   return traceEventData.cat === 'blink.user_timing' && traceEventData.ph === Phase.INSTANT;
 }
 

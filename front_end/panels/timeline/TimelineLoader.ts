@@ -189,8 +189,10 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     }
   }
 
-  /** As TimelineLoader implements `Common.StringOutputStream.OutputStream`, `write()` is called when a
-   * Common.StringOutputStream.StringOutputStream instance has decoded a chunk.
+  /**
+   * As TimelineLoader implements `Common.StringOutputStream.OutputStream`, `write()` is called when a
+   * Common.StringOutputStream.StringOutputStream instance has decoded a chunk. This path is only used
+   * by `loadFromURL()`; it's NOT used by `loadFromEvents` or `loadFromFile`.
    */
   async write(chunk: string): Promise<void> {
     if (!this.client) {
