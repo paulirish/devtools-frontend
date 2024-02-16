@@ -12,9 +12,10 @@ import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/
 
 describe('FlameChart', function() {
   preloadForCodeCoverage('performance_panel/basic.html');
-  // TODO(crbug.com/1472155): Improve perf panel trace load speed to
-  // prevent timeout bump.
-  this.timeout(20_000);
+  // TODO(crbug.com/1472155): Improve perf panel trace load speed to prevent timeout bump.
+  if (this.timeout() !== 0) {
+    this.timeout(20_000);
+  }
   async function getCoordinatesForEntryWithTitleAndTs(
       title: string, tsMicroSecs: number): Promise<{x: number, y: number}> {
     const perfPanel = await waitFor('.vbox.panel.timeline');
@@ -103,7 +104,7 @@ describe('FlameChart', function() {
     const timerFireHandle = await waitFor('.timeline-details-chip-title');
     const timerFireTitle = await timerFireHandle.evaluate(element => element.innerHTML);
     assert.isTrue(timerFireTitle.includes('Timer Fired'));
-    const initiatorLink = await waitFor('[data-row-title="Initiator"] .timeline-details-view-row-value');
+    const initiatorLink = await waitFor('[data-row-title="Initiated by"] .timeline-details-view-row-value');
     await initiatorLink.click();
 
     // Make sure the highlighting element is on the initiator, with some

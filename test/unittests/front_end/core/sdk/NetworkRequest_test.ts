@@ -4,14 +4,14 @@
 
 const {assert} = chai;
 
-import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Platform from '../../../../../front_end/core/platform/platform.js';
+import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as TextUtils from '../../../../../front_end/models/text_utils/text_utils.js';
 import {expectCookie} from '../../helpers/Cookies.js';
 import {createTarget} from '../../helpers/EnvironmentHelpers.js';
 import {describeWithMockConnection, setMockConnectionResponseHandler} from '../../helpers/MockConnection.js';
-import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
 
 describe('NetworkRequest', () => {
   it('can parse statusText from the first line of responseReceivedExtraInfo\'s headersText', () => {
@@ -152,6 +152,7 @@ describe('NetworkRequest', () => {
       statusCode: undefined,
       cookiePartitionKey: undefined,
       cookiePartitionKeyOpaque: undefined,
+      exemptedResponseCookies: undefined,
     });
 
     assert.deepEqual(
@@ -164,6 +165,53 @@ describe('NetworkRequest', () => {
                      }]);
     assert.deepEqual(
         request.nonBlockedResponseCookies().map(cookie => cookie.getCookieLine()), ['foo=duplicate; Path=/']);
+  });
+
+  it('can handle the case of exempted cookies', async () => {
+    const request = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId, 'url' as Platform.DevToolsPath.UrlString,
+        'documentURL' as Platform.DevToolsPath.UrlString, null, null, null);
+
+    const cookie = new SDK.Cookie.Cookie('name', 'value');
+    cookie.addAttribute(SDK.Cookie.Attribute.SameSite, 'None');
+    cookie.addAttribute(SDK.Cookie.Attribute.Secure, true);
+    cookie.setCookieLine('name=value; Path=/; SameSite=None; Secure;');
+    request.addExtraResponseInfo({
+      responseHeaders: [{name: 'Set-Cookie', value: cookie.getCookieLine() as string}],
+      blockedResponseCookies: [],
+      resourceIPAddressSpace: Protocol.Network.IPAddressSpace.Public,
+      statusCode: undefined,
+      cookiePartitionKey: undefined,
+      cookiePartitionKeyOpaque: undefined,
+      exemptedResponseCookies:
+          [{cookie: cookie, exemptionReason: Protocol.Network.CookieExemptionReason.TPCDHeuristics}],
+    });
+
+    assert.deepEqual(
+        request.responseCookies.map(cookie => cookie.getCookieLine()), ['name=value; Path=/; SameSite=None; Secure;']);
+    assert.deepEqual(
+        request.nonBlockedResponseCookies().map(cookie => cookie.getCookieLine()),
+        ['name=value; Path=/; SameSite=None; Secure;']);
+    assert.deepEqual(
+        request.exemptedResponseCookies().map(cookie => cookie.cookie.getCookieLine()),
+        ['name=value; Path=/; SameSite=None; Secure;']);
+    assert.deepEqual(
+        request.exemptedResponseCookies().map(cookie => cookie.exemptionReason),
+        [Protocol.Network.CookieExemptionReason.TPCDHeuristics]);
+
+    request.addExtraRequestInfo({
+      blockedRequestCookies: [],
+      requestHeaders: [],
+      includedRequestCookies: [{exemptionReason: Protocol.Network.CookieExemptionReason.EnterprisePolicy, cookie}],
+      connectTiming: {requestTime: 0},
+    });
+
+    assert.deepEqual(
+        request.includedRequestCookies().map(included => included.cookie.getCookieLine()),
+        ['name=value; Path=/; SameSite=None; Secure;']);
+    assert.deepEqual(
+        request.includedRequestCookies().map(included => included.exemptionReason),
+        [Protocol.Network.CookieExemptionReason.EnterprisePolicy]);
   });
 
   it('preserves order of headers in case of duplicates', () => {
@@ -196,12 +244,11 @@ describeWithMockConnection('NetworkRequest', () => {
   beforeEach(() => {
     const target = createTarget();
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
-    networkDispatcher = new SDK.NetworkManager.NetworkDispatcher(networkManager as SDK.NetworkManager.NetworkManager);
+    assertNotNullOrUndefined(networkManager);
+    networkDispatcher = new SDK.NetworkManager.NetworkDispatcher(networkManager);
     networkManagerForRequestStub = sinon.stub(SDK.NetworkManager.NetworkManager, 'forRequest').returns(networkManager);
     cookie = new SDK.Cookie.Cookie('name', 'value');
-    const cookieModel = target.model(SDK.CookieModel.CookieModel);
-    Platform.assertNotNullOrUndefined(cookieModel);
-    addBlockedCookieSpy = sinon.spy(cookieModel, 'addBlockedCookie');
+    addBlockedCookieSpy = sinon.spy(SDK.CookieModel.CookieModel.prototype, 'addBlockedCookie');
   });
 
   afterEach(() => {
@@ -224,6 +271,7 @@ describeWithMockConnection('NetworkRequest', () => {
       statusCode: undefined,
       cookiePartitionKey: undefined,
       cookiePartitionKeyOpaque: undefined,
+      exemptedResponseCookies: undefined,
     });
     assert.isTrue(addBlockedCookieSpy.calledOnceWith(
         cookie, [{
@@ -237,9 +285,7 @@ describeWithMockConnection('NetworkRequest', () => {
         Protocol.Network.RequestWillBeSentEvent;
     networkDispatcher.requestWillBeSent(requestWillBeSentEvent);
 
-    const request = networkDispatcher.requestForId('requestId');
-    Platform.assertNotNullOrUndefined(request);
-    request.addExtraRequestInfo({
+    networkDispatcher.requestForId('requestId')!.addExtraRequestInfo({
       blockedRequestCookies: [{blockedReasons: [Protocol.Network.CookieBlockedReason.SameSiteLax], cookie}],
       requestHeaders: [],
       includedRequestCookies: [],
@@ -282,11 +328,10 @@ describeWithMockConnection('ServerSentEvents', () => {
         mimeType: 'text/event-stream',
       } as Protocol.Network.Response,
     } as Protocol.Network.ResponseReceivedEvent);
-    const request = networkManager.requestForId('1');
-    assertNotNullOrUndefined(request);
 
     const networkEvents: SDK.NetworkRequest.EventSourceMessage[] = [];
-    request.addEventListener(SDK.NetworkRequest.Events.EventSourceMessageAdded, ({data}) => networkEvents.push(data));
+    networkManager.requestForId('1')!.addEventListener(
+        SDK.NetworkRequest.Events.EventSourceMessageAdded, ({data}) => networkEvents.push(data));
 
     networkManager.dispatcher.eventSourceMessageReceived({
       requestId: '1' as Protocol.Network.RequestId,
@@ -329,12 +374,10 @@ describeWithMockConnection('ServerSentEvents', () => {
         mimeType: 'text/event-stream',
       } as Protocol.Network.Response,
     } as Protocol.Network.ResponseReceivedEvent);
-    const request = networkManager.requestForId('1');
-    assertNotNullOrUndefined(request);
 
     const networkEvents: SDK.NetworkRequest.EventSourceMessage[] = [];
     const {promise: twoEventsReceivedPromise, resolve} = Platform.PromiseUtilities.promiseWithResolvers<void>();
-    request.addEventListener(SDK.NetworkRequest.Events.EventSourceMessageAdded, ({data}) => {
+    networkManager.requestForId('1')!.addEventListener(SDK.NetworkRequest.Events.EventSourceMessageAdded, ({data}) => {
       networkEvents.push(data);
       if (networkEvents.length === 2) {
         resolve();
@@ -398,12 +441,10 @@ describeWithMockConnection('requestStreamingContent', () => {
     networkManager.dispatcher.loadingFinished({
       requestId: '1' as Protocol.Network.RequestId,
     } as Protocol.Network.LoadingFinishedEvent);
-    const request = networkManager.requestForId('1');
-    assertNotNullOrUndefined(request);
 
     const responseBodySpy = sinon.spy(target.networkAgent(), 'invoke_getResponseBody');
 
-    void request.requestStreamingContent();
+    void networkManager.requestForId('1')!.requestStreamingContent();
 
     assert.isTrue(responseBodySpy.calledOnce);
   });
@@ -423,12 +464,10 @@ describeWithMockConnection('requestStreamingContent', () => {
         mimeType: 'text/html',
       } as Protocol.Network.Response,
     } as Protocol.Network.ResponseReceivedEvent);
-    const request = networkManager.requestForId('1');
-    assertNotNullOrUndefined(request);
 
     const responseBodySpy = sinon.spy(target.networkAgent(), 'invoke_streamResourceContent');
 
-    void request.requestStreamingContent();
+    void networkManager.requestForId('1')!.requestStreamingContent();
 
     assert.isTrue(responseBodySpy.calledOnce);
   });
@@ -448,13 +487,11 @@ describeWithMockConnection('requestStreamingContent', () => {
         mimeType: 'text/html',
       } as Protocol.Network.Response,
     } as Protocol.Network.ResponseReceivedEvent);
-    const request = networkManager.requestForId('1');
-    assertNotNullOrUndefined(request);
 
     sinon.stub(SDK.NetworkManager.NetworkManager, 'streamResponseBody')
         .returns(Promise.resolve(new TextUtils.ContentData.ContentData('Zm9v', true, 'text/html')));
 
-    const maybeStreamingContent = await request.requestStreamingContent();
+    const maybeStreamingContent = await networkManager.requestForId('1')!.requestStreamingContent();
     assert.isFalse(TextUtils.StreamingContentData.isError(maybeStreamingContent));
     const streamingContent = maybeStreamingContent as TextUtils.StreamingContentData.StreamingContentData;
     const eventPromise = streamingContent.once(TextUtils.StreamingContentData.Events.ChunkAdded);

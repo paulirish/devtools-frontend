@@ -7,12 +7,11 @@ const {assert} = chai;
 import * as SDK from '../../../../../front_end/core/sdk/sdk.js';
 import * as AutofillManager from '../../../../../front_end/models/autofill_manager/autofill_manager.js';
 
-import {createTarget} from '../../helpers/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../helpers/MockConnection.js';
-import {assertNotNullOrUndefined} from '../../../../../front_end/core/platform/platform.js';
+import * as Root from '../../../../../front_end/core/root/root.js';
 import * as Protocol from '../../../../../front_end/generated/protocol.js';
 import * as UI from '../../../../../front_end/ui/legacy/legacy.js';
-import * as Root from '../../../../../front_end/core/root/root.js';
+import {createTarget} from '../../helpers/EnvironmentHelpers.js';
+import {describeWithMockConnection} from '../../helpers/MockConnection.js';
 
 describeWithMockConnection('AutofillManager', () => {
   let target: SDK.Target.Target;
@@ -22,9 +21,7 @@ describeWithMockConnection('AutofillManager', () => {
 
   beforeEach(() => {
     target = createTarget();
-    const maybeModel = target.model(SDK.AutofillModel.AutofillModel);
-    assertNotNullOrUndefined(maybeModel);
-    model = maybeModel;
+    model = target.model(SDK.AutofillModel.AutofillModel)!;
     showViewStub = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
     autofillManager = AutofillManager.AutofillManager.AutofillManager.instance({forceNew: true});
     Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.AUTOFILL_VIEW);
@@ -58,6 +55,7 @@ describeWithMockConnection('AutofillManager', () => {
           autofillType: 'First name',
           fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
           fieldId: 1 as Protocol.DOM.BackendNodeId,
+          frameId: '1' as Protocol.Page.FrameId,
         },
       ];
       const inEvent = {
@@ -91,6 +89,7 @@ describeWithMockConnection('AutofillManager', () => {
           autofillType: 'First name',
           fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
           fieldId: 1 as Protocol.DOM.BackendNodeId,
+          frameId: '1' as Protocol.Page.FrameId,
         },
         {
           htmlType: 'text',
@@ -100,6 +99,7 @@ describeWithMockConnection('AutofillManager', () => {
           autofillType: 'Last name',
           fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
           fieldId: 2 as Protocol.DOM.BackendNodeId,
+          frameId: '1' as Protocol.Page.FrameId,
         },
       ];
       const inEvent = {
@@ -136,6 +136,7 @@ describeWithMockConnection('AutofillManager', () => {
           autofillType: 'Street address',
           fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
           fieldId: 1 as Protocol.DOM.BackendNodeId,
+          frameId: '1' as Protocol.Page.FrameId,
         },
       ];
       const inEvent = {
@@ -169,6 +170,7 @@ describeWithMockConnection('AutofillManager', () => {
           autofillType: 'First name',
           fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
           fieldId: 1 as Protocol.DOM.BackendNodeId,
+          frameId: '1' as Protocol.Page.FrameId,
         },
         {
           htmlType: 'text',
@@ -178,6 +180,7 @@ describeWithMockConnection('AutofillManager', () => {
           autofillType: 'City',
           fillingStrategy: Protocol.Autofill.FillingStrategy.AutofillInferred,
           fieldId: 2 as Protocol.DOM.BackendNodeId,
+          frameId: '1' as Protocol.Page.FrameId,
         },
       ];
       const inEvent = {
