@@ -54,14 +54,56 @@ export function reset(): void {
   handlerState = HandlerState.INITIALIZED;
 }
 
+const resourceTimingNames = [
+  'workerStart',
+  'redirectStart',
+  'redirectEnd',
+  'fetchStart',
+  'domainLookupStart',
+  'domainLookupEnd',
+  'connectStart',
+  'connectEnd',
+  'secureConnectionStart',
+  'requestStart',
+  'responseStart',
+  'responseEnd',
+];
+const navTimingNames = [
+  'navigationStart',
+  'unloadEventStart',
+  'unloadEventEnd',
+  'redirectStart',
+  'redirectEnd',
+  'fetchStart',
+  'commitNavigationEnd',
+  'domainLookupStart',
+  'domainLookupEnd',
+  'connectStart',
+  'connectEnd',
+  'secureConnectionStart',
+  'requestStart',
+  'responseStart',
+  'responseEnd',
+  'domLoading',
+  'domInteractive',
+  'domContentLoadedEventStart',
+  'domContentLoadedEventEnd',
+  'domComplete',
+  'loadEventStart',
+  'loadEventEnd',
+];
+
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('UserTimings handler is not initialized');
   }
 
-  // Early exit micro-optimization
-  if (!(event.cat === 'blink.user_timing' || event.cat === 'blink.console' ||
-        event.name === Types.TraceEvents.KnownEventName.TimeStamp)) {
+  // These are events dispatched under the blink.user_timing category
+  // but that the user didn't add. Filter them out so that they do not
+  // Appear in the timings track (they still appear in the main thread
+  // flame chart).
+  const ignoredNames = [...resourceTimingNames, ...navTimingNames];
+  if (ignoredNames.includes(event.name)) {
     return;
   }
 
