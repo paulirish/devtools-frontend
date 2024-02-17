@@ -9,17 +9,21 @@ import {TraceLoader} from '../../helpers/TraceLoader.js';
 const {assert} = chai;
 
 describeWithEnvironment('TraceModel', async function() {
-  it('dispatches an end event when the trace is done', async function() {
+  it('dispatches an end event when the trace is done', function(done) {
     const model = TraceModel.TraceModel.Model.createWithAllHandlers();
     const events: string[] = [];
 
     model.addEventListener(TraceModel.TraceModel.ModelUpdateEvent.eventName, (evt: Event) => {
       const updateEvent = evt as TraceModel.TraceModel.ModelUpdateEvent;
-      events.push(updateEvent.data.type);
+      if (TraceModel.TraceModel.isModelUpdateDataComplete(updateEvent.data)) {
+        events.push('done');
+      }
+
+      assert.deepEqual(events, ['done']);
+      done();
     });
 
-    await TraceLoader.rawEvents(this, 'basic.json.gz').then(events => model.parse(events));
-    assert.deepStrictEqual(events, ['PROGRESS_UPDATE', 'COMPLETE']);
+    void TraceLoader.rawEvents(this, 'basic.json.gz').then(events => model.parse(events));
   });
 
   it('supports parsing a generic trace that has no browser specific details', async function() {
