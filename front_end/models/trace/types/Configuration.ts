@@ -36,7 +36,7 @@ export const DEFAULT: Configuration = {
   },
   processing: {
     eventsPerChunk: 30_000,
-    pauseDuration: 1,
+    pauseDuration: 0,
   },
 };
 
