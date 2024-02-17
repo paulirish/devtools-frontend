@@ -122,15 +122,16 @@ describeWithEnvironment('TraceProcessor', async function() {
           },
         });
 
-    let updateEventCount = 0;
+    const updateEventCounts: number[] = [];
 
-    processor.addEventListener(TraceModel.Processor.TraceParseProgressEvent.eventName, () => {
-      updateEventCount++;
+    processor.addEventListener(TraceModel.Processor.TraceParseProgressEvent.eventName, (e) => {
+      const event = e as MessageEvent;
+      updateEventCounts.push(event.data.index);
     });
 
     const rawEvents = await TraceLoader.rawEvents(this, 'web-dev.json.gz');
     await processor.parse(rawEvents).then(() => {
-      assert.strictEqual(updateEventCount, 8);
+      assert.deepStrictEqual(updateEventCounts, [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]);
     });
   });
 
