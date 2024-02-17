@@ -156,7 +156,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     // Handle each event.
     for (let i = 0; i < traceEvents.length; ++i) {
       // Every so often we take a break just to render.
-      if (i % eventsPerChunk === 0) {
+      if (i % eventsPerChunk === 0 && i) {
         // Take the opportunity to provide status update events.
         this.dispatchEvent(new TraceParseProgressEvent({index: i, total: traceEvents.length}));
         // Wait for rendering before resuming.
