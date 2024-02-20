@@ -2364,23 +2364,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       context.lineTo(endX - arrowWidth, endY - 3);
       context.lineTo(endX - arrowWidth, endY + 3);
       context.fill();
-
-      // // Draw debug control point circles
-      // context.fillStyle = 'red';
-      // context.beginPath();
-      // context.arc(p[2].x, p[2].y, 3, 0, 2 * Math.PI);
-      // context.fill();
-      // context.beginPath();
-      // context.arc(p[3].x, p[3].y, 3, 0, 2 * Math.PI);
-      // context.fill();
-
-      // context.fillStyle = 'green';
-      // context.beginPath();
-      // context.arc(p[6].x, p[6].y, 3, 0, 2 * Math.PI);
-      // context.fill();
-      // context.beginPath();
-      // context.arc(p[7].x, p[7].y, 3, 0, 2 * Math.PI);
-      // context.fill();
     }
     context.restore();
   }
