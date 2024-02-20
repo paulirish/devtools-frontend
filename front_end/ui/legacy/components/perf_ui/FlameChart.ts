@@ -2314,6 +2314,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
+    /**
+     * CLs landing this impl:
+     * - https://codereview.chromium.org/794073004/diff/100001/Source/devtools/front_end/ui/FlameChart.js loislo, original
+     * - https://codereview.chromium.org/2745653009/diff/20001/third_party/WebKit/Source/devtools/front_end/perf_ui/FlameChart.js pfeldman, rewrite
+     * - https://codereview.chromium.org/2746333002/diff/40001/third_party/WebKit/Source/devtools/front_end/perf_ui/FlameChart.js pfeldman, tweak beziers
+     */
+
     const endIndex = Platform.ArrayUtilities.lowerBound(
         td.flowStartTimes, this.chartViewport.windowRightTime(), Platform.ArrayUtilities.DEFAULT_COMPARATOR);
 
@@ -2331,10 +2338,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
       const segment = Math.min((endX - startX) / 4, 40);
       const distanceTime = td.flowEndTimes[i] - td.flowStartTimes[i];
+      // Negative distanceY == the arrow goes up to the right.
       const distanceY = (endY - startY) / 10;
       const spread = 30;
+      // If it's a very short distance (why tf is this in microsec and not px?), then draw segment at startY,
+      //   if its not very short, then.. something. but i think the * should be a +. yeah doing that means the line segment stays low which is pretty nice
       const lineY = distanceTime < 1 ? startY : spread + Math.max(0, startY + distanceY * (i % spread));
 
+      // questions
+      // 1. why a lineY that's higher than the end
+      // 2. why not bezier from start to end without middle segment?
+      // 3. why does p[1] start get shifted by arrowWidth (6) but we draw an arc of 2px radius. answer: it doesnt make sense
       const p: {x: number, y: number}[] = [];
       p.push({x: startX, y: startY});
       p.push({x: startX + arrowWidth, y: startY});
@@ -2354,15 +2368,31 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       context.bezierCurveTo(p[6].x, p[6].y, p[7].x, p[7].y, p[8].x, p[8].y);
       context.stroke();
 
+      // Draw (left) half-circle on the right edge of the start
       context.beginPath();
       context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
       context.fill();
 
+      // Draw arrow head at the left edge of the end
       context.beginPath();
       context.moveTo(endX, endY);
       context.lineTo(endX - arrowWidth, endY - 3);
       context.lineTo(endX - arrowWidth, endY + 3);
       context.fill();
+
+      // Draw debug control point circles
+      context.fillStyle = "red"; context.beginPath();
+
+      context.arc(p[2].x, p[2].y, 3, 0, 2 * Math.PI);
+          context.fill(); context.beginPath();
+      context.arc(p[3].x, p[3].y, 3, 0, 2 * Math.PI);
+          context.fill();
+
+      context.fillStyle = "green"; context.beginPath();
+      context.arc(p[6].x, p[6].y, 3, 0, 2 * Math.PI);
+          context.fill(); context.beginPath();
+      context.arc(p[7].x, p[7].y, 3, 0, 2 * Math.PI);
+          context.fill();
     }
     context.restore();
   }
