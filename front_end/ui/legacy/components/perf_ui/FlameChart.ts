@@ -2330,47 +2330,45 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         continue;
       }
       const startX = this.chartViewport.timeToPosition(td.flowStartTimes[i]);
-      const endX = this.chartViewport.timeToPosition(td.flowEndTimes[i]);
+      const endX = this.chartViewport.timeToPosition(td.flowEndTimes[i]) + 1;  // push the arrow 1px into the box.
       const startLevel = td.flowStartLevels[i];
       const endLevel = td.flowEndLevels[i];
       const startY = this.levelToOffset(startLevel) + this.levelHeight(startLevel) / 2;
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
 
-      const segment = Math.min((endX - startX) / 4, 40);
-      const distanceTime = td.flowEndTimes[i] - td.flowStartTimes[i];
-      // Negative distanceY == the arrow goes up to the right.
-      const distanceY = (endY - startY) / 10;
-      const spread = 30;
-      // If it's a very short distance (why tf is this in microsec and not px?), then draw segment at startY,
-      //   if its not very short, then.. something. but i think the * should be a +. yeah doing that means the line segment stays low which is pretty nice
-      const lineY = distanceTime < 1 ? startY : spread + Math.max(0, startY + distanceY * (i % spread));
+      const distanceX = endX - startX;
+      const segmentLen = Math.min(distanceX / 4, 40);
+      // Used to avoid the lines drawing on top of eachother
+      const spread = 15;
+      const startSemicircleRadius = 2;
+      const isNarrow = segmentLen <= arrowWidth * 2;
+      const segmentY = isNarrow ? startY : startY - (i % spread);
 
-      // questions
-      // 1. why a lineY that's higher than the end
-      // 2. why not bezier from start to end without middle segment?
-      // 3. why does p[1] start get shifted by arrowWidth (6) but we draw an arc of 2px radius. answer: it doesnt make sense
       const p: {x: number, y: number}[] = [];
       p.push({x: startX, y: startY});
-      p.push({x: startX + arrowWidth, y: startY});
-      p.push({x: startX + segment + 2 * arrowWidth, y: startY});
-      p.push({x: startX + segment, y: lineY});
-      p.push({x: startX + segment * 2, y: lineY});
-      p.push({x: endX - segment * 2, y: lineY});
-      p.push({x: endX - segment, y: lineY});
-      p.push({x: endX - segment - 2 * arrowWidth, y: endY});
+      p.push({x: startX + startSemicircleRadius, y: startY});
+      p.push({x: startX + segmentLen + 2 * arrowWidth, y: startY});  // p[2]: bez1 control point A
+      p.push({x: startX + segmentLen, y: segmentY});                 // p[3]: bez1 control point B
+      p.push({x: startX + segmentLen * 2, y: segmentY});             // p[4]: start of middle segment
+      p.push({x: endX - segmentLen * 2, y: segmentY});               // p[5]: end of middle segment
+      p.push({x: endX - segmentLen, y: segmentY});                   // p[6]: bez2 control point A
+      p.push({x: endX - segmentLen - 2 * arrowWidth, y: endY});      // p[7]: bez2 control point B
       p.push({x: endX - arrowWidth, y: endY});
-
       context.beginPath();
-      context.moveTo(p[0].x, p[0].y);
-      context.lineTo(p[1].x, p[1].y);
-      context.bezierCurveTo(p[2].x, p[2].y, p[3].x, p[3].y, p[4].x, p[4].y);
-      context.lineTo(p[5].x, p[5].y);
-      context.bezierCurveTo(p[6].x, p[6].y, p[7].x, p[7].y, p[8].x, p[8].y);
+      context.moveTo(p[1].x, p[1].y);
+      if (isNarrow) {
+        // Skip the middle segment, and bezier from start to end.
+        context.bezierCurveTo(p[2].x, p[2].y, p[7].x, p[7].y, p[8].x, p[8].y);
+      } else {
+        context.bezierCurveTo(p[2].x, p[2].y, p[3].x, p[3].y, p[4].x, p[4].y);
+        context.lineTo(p[5].x, p[5].y);
+        context.bezierCurveTo(p[6].x, p[6].y, p[7].x, p[7].y, p[8].x, p[8].y);
+      }
       context.stroke();
 
       // Draw (left) half-circle on the right edge of the start
       context.beginPath();
-      context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
+      context.arc(startX, startY, startSemicircleRadius, -Math.PI / 2, Math.PI / 2, false);
       context.fill();
 
       // Draw arrow head at the left edge of the end
@@ -2380,19 +2378,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       context.lineTo(endX - arrowWidth, endY + 3);
       context.fill();
 
-      // Draw debug control point circles
-      context.fillStyle = "red"; context.beginPath();
+      // // Draw debug control point circles
+      // context.fillStyle = 'red';
+      // context.beginPath();
+      // context.arc(p[2].x, p[2].y, 3, 0, 2 * Math.PI);
+      // context.fill();
+      // context.beginPath();
+      // context.arc(p[3].x, p[3].y, 3, 0, 2 * Math.PI);
+      // context.fill();
 
-      context.arc(p[2].x, p[2].y, 3, 0, 2 * Math.PI);
-          context.fill(); context.beginPath();
-      context.arc(p[3].x, p[3].y, 3, 0, 2 * Math.PI);
-          context.fill();
-
-      context.fillStyle = "green"; context.beginPath();
-      context.arc(p[6].x, p[6].y, 3, 0, 2 * Math.PI);
-          context.fill(); context.beginPath();
-      context.arc(p[7].x, p[7].y, 3, 0, 2 * Math.PI);
-          context.fill();
+      // context.fillStyle = 'green';
+      // context.beginPath();
+      // context.arc(p[6].x, p[6].y, 3, 0, 2 * Math.PI);
+      // context.fill();
+      // context.beginPath();
+      // context.arc(p[7].x, p[7].y, 3, 0, 2 * Math.PI);
+      // context.fill();
     }
     context.restore();
   }
