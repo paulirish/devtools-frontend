@@ -1550,7 +1550,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.restore();
 
     this.drawGroupHeaders(canvasWidth, canvasHeight);
-    this.drawFlowEvents(context);
+    this.drawFlowEvents(context, canvasWidth, canvasHeight);
     this.drawMarkerLines();
     const dividersData = TimelineGrid.calculateGridOffsets(this);
     const navStartTimes = this.dataProvider.mainFrameNavigationStartEvents?.() || [];
@@ -2286,25 +2286,26 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
   }
 
-  private drawFlowEvents(context: CanvasRenderingContext2D): void {
-    const td = this.timelineData();
-    if (!td) {
-      return;
-    }
-
+  private drawFlowEvents(context: CanvasRenderingContext2D, _width: number, _height: number): void {
+    context.save();
     const ratio = window.devicePixelRatio;
     const top = this.chartViewport.scrollOffset();
-    const arrowLineWidth = 6;
-    const arrowWidth = 3;
-
-    context.save();
+    const arrowWidth = 6;
     context.scale(ratio, ratio);
     context.translate(0, -top);
 
     context.fillStyle = '#7f5050';
     context.strokeStyle = '#7f5050';
+    const td = this.timelineData();
+    if (!td) {
+      return;
+    }
 
-    for (let i = 0; i < this.selectedEntryIndex; ++i) {
+    const endIndex = Platform.ArrayUtilities.lowerBound(
+        td.flowStartTimes, this.chartViewport.windowRightTime(), Platform.ArrayUtilities.DEFAULT_COMPARATOR);
+
+    context.lineWidth = 0.5;
+    for (let i = 0; i < endIndex; ++i) {
       if (!td.flowEndTimes[i] || td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
         continue;
       }
@@ -2314,27 +2315,41 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const endLevel = td.flowEndLevels[i];
       const startY = this.levelToOffset(startLevel) + this.levelHeight(startLevel) / 2;
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
-      const lineLength = endX - startX;
 
-      // Draw an arrow in an 'elbow connector' shape
+      const segment = Math.min((endX - startX) / 4, 40);
+      const distanceTime = td.flowEndTimes[i] - td.flowStartTimes[i];
+      const distanceY = (endY - startY) / 10;
+      const spread = 30;
+      const lineY = distanceTime < 1 ? startY : spread + Math.max(0, startY + distanceY * (i % spread));
+
+      const p: {x: number, y: number}[] = [];
+      p.push({x: startX, y: startY});
+      p.push({x: startX + arrowWidth, y: startY});
+      p.push({x: startX + segment + 2 * arrowWidth, y: startY});
+      p.push({x: startX + segment, y: lineY});
+      p.push({x: startX + segment * 2, y: lineY});
+      p.push({x: endX - segment * 2, y: lineY});
+      p.push({x: endX - segment, y: lineY});
+      p.push({x: endX - segment - 2 * arrowWidth, y: endY});
+      p.push({x: endX - arrowWidth, y: endY});
+
       context.beginPath();
-      context.moveTo(startX, startY);
-      context.lineTo(startX + lineLength / 2, startY);
-      context.lineTo(startX + lineLength / 2, endY);
-      context.lineTo(endX, endY);
+      context.moveTo(p[0].x, p[0].y);
+      context.lineTo(p[1].x, p[1].y);
+      context.bezierCurveTo(p[2].x, p[2].y, p[3].x, p[3].y, p[4].x, p[4].y);
+      context.lineTo(p[5].x, p[5].y);
+      context.bezierCurveTo(p[6].x, p[6].y, p[7].x, p[7].y, p[8].x, p[8].y);
       context.stroke();
 
-      // Make line an arrow if the line is long enough to fit the arrow head. Othewise, draw a thinner line without the arrow head.
-      if (lineLength > arrowWidth) {
-        context.lineWidth = 0.5;
-        context.beginPath();
-        context.moveTo(endX, endY);
-        context.lineTo(endX - arrowLineWidth, endY - 3);
-        context.lineTo(endX - arrowLineWidth, endY + 3);
-        context.fill();
-      } else {
-        context.lineWidth = 0.2;
-      }
+      context.beginPath();
+      context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
+      context.fill();
+
+      context.beginPath();
+      context.moveTo(endX, endY);
+      context.lineTo(endX - arrowWidth, endY - 3);
+      context.lineTo(endX - arrowWidth, endY + 3);
+      context.fill();
     }
     context.restore();
   }
@@ -3061,18 +3076,17 @@ export class FlameChartTimelineData {
   selectedGroup: Group|null;
   private constructor(
       entryLevels: number[]|Uint16Array, entryTotalTimes: number[]|Float32Array, entryStartTimes: number[]|Float64Array,
-      groups: Group[]|null, entryDecorations: FlameChartDecoration[][] = [], flowStartTimes: number[] = [],
-      flowStartLevels: number[] = [], flowEndTimes: number[] = [], flowEndLevels: number[] = []) {
+      groups: Group[]|null, entryDecorations: FlameChartDecoration[][] = []) {
     this.entryLevels = entryLevels;
     this.entryTotalTimes = entryTotalTimes;
     this.entryStartTimes = entryStartTimes;
     this.entryDecorations = entryDecorations;
     this.groups = groups || [];
     this.markers = [];
-    this.flowStartTimes = flowStartTimes || [];
-    this.flowStartLevels = flowStartLevels || [];
-    this.flowEndTimes = flowEndTimes || [];
-    this.flowEndLevels = flowEndLevels || [];
+    this.flowStartTimes = [];
+    this.flowStartLevels = [];
+    this.flowEndTimes = [];
+    this.flowEndLevels = [];
     this.selectedGroup = null;
   }
 
@@ -3084,14 +3098,9 @@ export class FlameChartTimelineData {
     entryStartTimes: FlameChartTimelineData['entryStartTimes'],
     groups: FlameChartTimelineData['groups']|null,
     entryDecorations?: FlameChartDecoration[][],
-    flowStartTimes?: FlameChartTimelineData['flowStartTimes'],
-    flowStartLevels?: FlameChartTimelineData['flowStartLevels'],
-    flowEndTimes?: FlameChartTimelineData['flowEndTimes'],
-    flowEndLevels?: FlameChartTimelineData['flowEndLevels'],
   }): FlameChartTimelineData {
     return new FlameChartTimelineData(
-        data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || [],
-        data.flowStartTimes || [], data.flowStartLevels || [], data.flowEndTimes || [], data.flowEndLevels || []);
+        data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || []);
   }
 
   // TODO(crbug.com/1501055) Thinking about refactor this class, so we can avoid create a new object when modifying the
