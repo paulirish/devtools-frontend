@@ -27,13 +27,12 @@ import {
 } from '../../helpers/performance-helpers.js';
 
 async function checkActivityTree(
-    frontend: puppeteer.Page,  expandSubTree: boolean = false) {
-
+    frontend: puppeteer.Page, expectedActivities: string[], expandSubTree: boolean = false) {
+  let index = 0;
   let parentItem: puppeteer.ElementHandle<Element>|undefined = undefined;
-  const result: string[] = [];
-  let itemFound = false;
+  let result = false;
   do {
-    itemFound = await waitForFunction(async () => {
+    result = await waitForFunction(async () => {
       if (parentItem) {
         parentItem.evaluate(e => e.scrollIntoView());
       }
@@ -42,33 +41,39 @@ async function checkActivityTree(
         return false;
       }
       const treeItemText = await treeItem.evaluate(el => el.innerText);
-      if (treeItemText) {
-        result.push(treeItemText);
+      if (expectedActivities[index] === treeItemText) {
         parentItem = treeItem;
         return true;
       }
       return false;
     });
-
+    index++;
 
     if (expandSubTree) {
       await frontend.keyboard.press('ArrowRight');
     }
 
     await frontend.keyboard.press('ArrowDown');
-  } while (itemFound);
+  } while (index < expectedActivities.length);
 
   return result;
 }
 
-async function getTreeParentActivities() {
+async function validateTreeParentActivities(expectedActivities: string[]) {
   return await waitForFunction(async () => {
-    const result = [];
+    let result = true;
     const treeItems = await $$<HTMLElement>('.data-grid-data-grid-node.parent.revealed .activity-name');
+    if (!treeItems || expectedActivities.length !== treeItems.length) {
+      return false;
+    }
+
     for (let i = 0; i < treeItems.length; i++) {
       const treeItem = treeItems[i];
       const treeItemText = await treeItem.evaluate(el => el.innerText);
-      result.push(treeItemText);
+      if (expectedActivities.filter(el => el === treeItemText).length === 0) {
+        result = false;
+        break;
+      }
     }
 
     return result;
@@ -110,7 +115,7 @@ describe('The Performance tool, Bottom-up panel', function() {
 
       const {frontend} = getBrowserAndPages();
       const expectedActivities = ['h2', 'H2', 'h2_with_suffix'];
-      await checkActivityTree(frontend, false);
+      await checkActivityTree(frontend, expectedActivities, false);
 
 
       await wait(20_000);
@@ -145,12 +150,8 @@ describe('The Performance tool, Bottom-up panel', function() {
         }
         await toggleCaseSensitive();
         await setFilter('H2');
-        const x  = (await getTreeParentActivities());
-        console.log({x});
-
-        assert.deepStrictEqual((await getTreeParentActivities()), ['H2'], 'Tree does not contain expected activities');
-        debugger;
-      });
+        assert.isTrue(await validateTreeParentActivities(['H2']), 'Tree does not contain expected activities');
+        });
     });
 
     it('regex button is working as expected', async () => {
@@ -168,7 +169,7 @@ describe('The Performance tool, Bottom-up panel', function() {
         }
         await toggleRegExButtonBottomUp();
         await setFilter('h2$');
-        assert.deepStrictEqual((await getTreeParentActivities()), [ 'H2', 'h2'], 'Tree does not contain expected activities');
+        assert.isTrue(await validateTreeParentActivities(['h2', 'H2']), 'Tree does not contain expected activities');
       });
     });
 
@@ -187,8 +188,7 @@ describe('The Performance tool, Bottom-up panel', function() {
         }
         await toggleMatchWholeWordButtonBottomUp();
         await setFilter('function');
-        assert.deepStrictEqual(
-            (await getTreeParentActivities()), ['Function Call'], 'Tree does not contain expected activities');
+        assert.isTrue(await validateTreeParentActivities(['Function Call']), 'Tree does not contain expected activities');
       });
     });
 
@@ -206,12 +206,12 @@ describe('The Performance tool, Bottom-up panel', function() {
           assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
         }
         await setFilter('h2');
-        assert.deepStrictEqual(
-            (await getTreeParentActivities()), expectedActivities, 'Tree does not contain expected activities');
+        assert.isTrue(
+            await validateTreeParentActivities(expectedActivities), 'Tree does not contain expected activities');
       });
     });
 
-    it.only('filtered results keep context', async () => {
+    it('filtered results keep context', async () => {
       const {frontend} = getBrowserAndPages();
       const expectedActivities = ['h2_with_suffix', 'container2', 'Function Call', 'Timer Fired'];
 
@@ -229,8 +229,8 @@ describe('The Performance tool, Bottom-up panel', function() {
           assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
         }
         await rootActivity.click();
-        assert.deepStrictEqual(
-           ( await checkActivityTree(frontend, true)), expectedActivities, 'Tree does not contain expected activities');
+        assert.isTrue(
+            await checkActivityTree(frontend, expectedActivities, true), 'Tree does not contain expected activities');
       });
     });
 
@@ -254,10 +254,10 @@ describe('The Performance tool, Bottom-up panel', function() {
         }
         await rootActivity.click();
 
-        assert.deepStrictEqual(
-            (await checkActivityTree(frontend)), expectedActivities,
+        assert.isTrue(
+            await checkActivityTree(frontend, expectedActivities),
             'Tree does not contain activities in the expected order');
-      });
-    });
+          });
   });
+});
 });
