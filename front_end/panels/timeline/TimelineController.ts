@@ -178,12 +178,17 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
   // To trigger the StartProfiling interrupt and get the warmup cost out of the way, we send a
   // very soft invocation to V8.https://crbug.com/1358602
   async warmupJsProfiler(): Promise<void> {
+    console.log('warmup')
+    debugger;
     // primaryPageTarget has RuntimeModel whereas rootTarget (Tab) does not.
     const runtimeModel = this.primaryPageTarget.model(SDK.RuntimeModel.RuntimeModel);
+
+    console.log('hasSideEffectSupport', runtimeModel?.hasSideEffectSupport());
     if (!runtimeModel) {
       return;
     }
     await runtimeModel.checkSideEffectSupport();
+    console.log('hasSideEffectSupport', runtimeModel?.hasSideEffectSupport());
   }
 
   traceEventsCollected(events: TraceEngine.TracingManager.EventPayload[]): void {
