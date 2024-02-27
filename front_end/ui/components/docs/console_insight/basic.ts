@@ -67,9 +67,11 @@ Response status: 404`,
       },
     },
     {
-      async getInsights() {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return `Some text with \`code\`. Some code:
+      async *
+          fetch() {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            yield {
+              explanation: `Some text with \`code\`. Some code:
 \`\`\`ts
 console.log('test');
 document.querySelector('test').style = 'black';
@@ -84,8 +86,10 @@ Some text with \`code\`. Some code:
 console.log('test');
 document.querySelector('test').style = 'black';
 \`\`\`
-`;
-      },
+`,
+              metadata: {},
+            };
+          },
     },
     'Explain this error', {
       isSyncActive: true,

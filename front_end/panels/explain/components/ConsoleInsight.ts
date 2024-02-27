@@ -8,13 +8,11 @@ import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
-import {type InsightProvider} from '../InsightProvider.js';
 import {type PromptBuilder, type Source, SourceType} from '../PromptBuilder.js';
 
 import styles from './consoleInsight.css.js';
@@ -131,7 +129,7 @@ export class CloseEvent extends Event {
 }
 
 type PublicPromptBuilder = Pick<PromptBuilder, 'buildPrompt'>;
-type PublicInsightProvider = Pick<InsightProvider, 'getInsights'>;
+type PublicAidaClient = Pick<Host.AidaClient.AidaClient, 'fetch'>;
 
 function localizeType(sourceType: SourceType): string {
   switch (sourceType) {
@@ -191,11 +189,10 @@ type StateData = {
   consentGiven: boolean,
 }|{
   type: State.INSIGHT,
-  explanation: string,
   tokens: MarkdownView.MarkdownView.MarkdownViewData['tokens'],
   validMarkdown: boolean,
   sources: Source[],
-}|{
+}&Host.AidaClient.AidaResponse|{
   type: State.ERROR,
   error: string,
 }|{
@@ -210,7 +207,7 @@ type StateData = {
 };
 
 export class ConsoleInsight extends HTMLElement {
-  static async create(promptBuilder: PublicPromptBuilder, insightProvider: PublicInsightProvider, actionTitle?: string):
+  static async create(promptBuilder: PublicPromptBuilder, aidaClient: PublicAidaClient, actionTitle?: string):
       Promise<ConsoleInsight> {
     const syncData = await new Promise<Host.InspectorFrontendHostAPI.SyncInformation>(resolve => {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.getSyncInformation(syncInfo => {
@@ -218,7 +215,7 @@ export class ConsoleInsight extends HTMLElement {
       });
     });
 
-    return new ConsoleInsight(promptBuilder, insightProvider, actionTitle, syncData);
+    return new ConsoleInsight(promptBuilder, aidaClient, actionTitle, syncData);
   }
 
   static readonly litTagName = LitHtml.literal`devtools-console-insight`;
@@ -227,7 +224,7 @@ export class ConsoleInsight extends HTMLElement {
   #actionTitle = '';
 
   #promptBuilder: PublicPromptBuilder;
-  #insightProvider: PublicInsightProvider;
+  #aidaClient: PublicAidaClient;
   #renderer = new MarkdownRenderer();
 
   // Main state.
@@ -237,11 +234,11 @@ export class ConsoleInsight extends HTMLElement {
   #selectedRating?: boolean;
 
   constructor(
-      promptBuilder: PublicPromptBuilder, insightProvider: PublicInsightProvider, actionTitle?: string,
+      promptBuilder: PublicPromptBuilder, aidaClient: PublicAidaClient, actionTitle?: string,
       syncInfo?: Host.InspectorFrontendHostAPI.SyncInformation) {
     super();
     this.#promptBuilder = promptBuilder;
-    this.#insightProvider = insightProvider;
+    this.#aidaClient = aidaClient;
     this.#actionTitle = actionTitle ?? '';
     this.#state = {
       type: State.NOT_LOGGED_IN,
@@ -338,12 +335,25 @@ export class ConsoleInsight extends HTMLElement {
   }
 
   #onRating(event: Event): void {
+    if (this.#state.type !== State.INSIGHT) {
+      throw new Error('Unexpected state');
+    }
     this.#selectedRating = (event.target as HTMLElement).dataset.rating === 'true';
     if (this.#selectedRating) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRatedPositive);
     } else {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRatedNegative);
     }
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.registerAidaClientEvent(JSON.stringify({
+      client: 'CHROME_DEVTOOLS',
+      event_time: new Date().toISOString(),
+      corresponding_aida_rpc_global_id: this.#state.metadata?.rpcGlobalId,
+      do_conversation_client_event: {
+        user_feedback: {
+          sentiment: this.#selectedRating ? 'POSITIVE' : 'NEGATIVE',
+        },
+      },
+    }));
     this.#openFeedbackFrom();
   }
 
@@ -353,16 +363,18 @@ export class ConsoleInsight extends HTMLElement {
       consentGiven: true,
     });
     try {
-      const {sources, explanation} = await this.#getInsight();
-      const tokens = this.#validateMarkdown(explanation);
-      const valid = tokens !== false;
-      this.#transitionTo({
-        type: State.INSIGHT,
-        tokens: valid ? tokens : [],
-        validMarkdown: valid,
-        explanation,
-        sources,
-      });
+      for await (const {sources, explanation, metadata} of this.#getInsight()) {
+        const tokens = this.#validateMarkdown(explanation);
+        const valid = tokens !== false;
+        this.#transitionTo({
+          type: State.INSIGHT,
+          tokens: valid ? tokens : [],
+          validMarkdown: valid,
+          explanation,
+          sources,
+          metadata,
+        });
+      }
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightGenerated);
     } catch (err) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightErrored);
@@ -389,11 +401,12 @@ export class ConsoleInsight extends HTMLElement {
     }
   }
 
-  async #getInsight(): Promise<{sources: Source[], explanation: string}> {
+  async * #getInsight(): AsyncGenerator<{sources: Source[]}&Host.AidaClient.AidaResponse, void, void> {
     try {
       const {prompt, sources} = await this.#promptBuilder.buildPrompt();
-      const explanation = await this.#insightProvider.getInsights(prompt);
-      return {sources, explanation};
+      for await (const response of this.#aidaClient.fetch(prompt)) {
+        yield {sources, ...response};
+      }
     } catch (err) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightErroredApi);
       throw err;
@@ -629,9 +642,8 @@ class ConsoleInsightSourcesList extends HTMLElement {
       <ul>
         ${Directives.repeat(this.#sources, item => item.value, item => {
           return html`<li><x-link class="link" title="${localizeType(item.type)} ${i18nString(UIStrings.opensInNewTab)}" href=${`data:text/plain,${encodeURIComponent(item.value)}`}>
+            <${IconButton.Icon.Icon.litTagName} name="open-externally"></${IconButton.Icon.Icon.litTagName}>
             ${localizeType(item.type)}
-            <${IconButton.Icon.Icon.litTagName} name="open-externally">
-            </${IconButton.Icon.Icon.litTagName}>
           </x-link></li>`;
         })}
       </ul>
@@ -647,8 +659,8 @@ class ConsoleInsightSourcesList extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-console-insight', ConsoleInsight);
-ComponentHelpers.CustomElements.defineComponent('devtools-console-insight-sources-list', ConsoleInsightSourcesList);
+customElements.define('devtools-console-insight', ConsoleInsight);
+customElements.define('devtools-console-insight-sources-list', ConsoleInsightSourcesList);
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

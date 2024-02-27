@@ -45,8 +45,10 @@ Response status: 404`,
       },
     },
     {
-      async getInsights() {
-        return `## Result
+      async *
+          fetch() {
+            yield {
+              explanation: `## Result
 
 Some text with \`code\`. Some code:
 \`\`\`ts
@@ -54,10 +56,20 @@ console.log('test');
 document.querySelector('test').style = 'black';
 \`\`\`
 
+\`\`\`
+<!DOCTYPE html>
+<div>Hello world</div>
+<script>
+  console.log('Hello World');
+</script>
+\`\`\`
+
 Links: [https://example.com](https://example.com)
 Images: ![https://example.com](https://example.com)
-`;
-      },
+`,
+              metadata: {},
+            };
+          },
     },
     'Explain this error', {
       isSyncActive: true,

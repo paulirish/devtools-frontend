@@ -4,7 +4,6 @@
 
 import * as ProtocolClient from '../../../../front_end/core/protocol_client/protocol_client.js';
 import type * as SDK from '../../../../front_end/core/sdk/sdk.js';
-// eslint-disable-next-line rulesdir/es_modules_import
 import {type ProtocolMapping} from '../../../../front_end/generated/protocol-mapping.js';
 import type * as ProtocolProxyApi from '../../../../front_end/generated/protocol-proxy-api.js';
 
@@ -159,7 +158,7 @@ export function describeWithMockConnection(title: string, fn: (this: Mocha.Suite
 describeWithMockConnection.only = function(title: string, fn: (this: Mocha.Suite) => void, opts: {reset: boolean} = {
   reset: true,
 }) {
-  // eslint-disable-next-line rulesdir/no_only
+  // eslint-disable-next-line mocha/no-exclusive-tests
   return describe.only(title, function() {
     beforeEach(async () => await enable(opts));
     fn.call(this);

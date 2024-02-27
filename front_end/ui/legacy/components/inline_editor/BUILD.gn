@@ -42,7 +42,6 @@ devtools_module("inline_editor") {
     "CSSLinearEasingModel.ts",
     "CSSShadowEditor.ts",
     "CSSShadowModel.ts",
-    "ColorMixModel.ts",
     "ColorMixSwatch.ts",
     "ColorSwatch.ts",
     "FontEditor.ts",
@@ -95,4 +94,29 @@ devtools_entrypoint("bundle") {
   ]
 
   visibility += devtools_ui_legacy_visibility
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [
+    "AnimationTimingModel.test.ts",
+    "AnimationTimingUI.test.ts",
+    "BezierUI.test.ts",
+    "CSSAngle.test.ts",
+    "CSSAnimationModel.test.ts",
+    "CSSLength.test.ts",
+    "CSSLinearEasingModel.test.ts",
+    "ColorMixSwatch.test.ts",
+    "ColorSwatch.test.ts",
+    "FontEditorUnitConverter.test.ts",
+    "FontEditorUtils.test.ts",
+    "LinkSwatch.test.ts",
+  ]
+
+  deps = [
+    ":bundle",
+    "../../../../../test/unittests/front_end/helpers",
+    "../../../legacy:bundle",
+  ]
 }

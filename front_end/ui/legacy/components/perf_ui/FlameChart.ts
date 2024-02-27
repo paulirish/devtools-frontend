@@ -184,6 +184,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   #font: string;
   #groupTreeRoot?: GroupTreeNode|null;
   #searchResultEntryIndex: number;
+  #searchResultHighlightElements: HTMLElement[] = [];
 
   constructor(
       dataProvider: FlameChartDataProvider, flameChartDelegate: FlameChartDelegate,
@@ -307,6 +308,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.highlightedEntryIndex = entryIndex;
     this.updateElementPosition(this.highlightElement, this.highlightedEntryIndex);
     this.dispatchEventToListeners(Events.EntryHighlighted, entryIndex);
+  }
+
+  highlightAllEntries(entries: number[]): void {
+    for (const entry of entries) {
+      const searchElement = this.viewportElement.createChild('div', 'flame-chart-search-element');
+      this.#searchResultHighlightElements.push(searchElement);
+      searchElement.id = entry.toString();
+      this.updateElementPosition(searchElement, entry);
+    }
+  }
+
+  removeSearchResultHighlights(): void {
+    for (const element of this.#searchResultHighlightElements) {
+      element.remove();
+    }
+    this.#searchResultHighlightElements = [];
   }
 
   hideHighlight(): void {
@@ -855,34 +872,37 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (possibleActions?.[TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION]) {
       const item = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.hideFunction), () => {
         this.modifyTree(TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, this.selectedEntryIndex);
-      });
+      }, {jslogContext: 'hide-function'});
       item.setShortcut('H');
     }
 
     if (possibleActions?.[TraceEngine.EntriesFilter.FilterAction.COLLAPSE_FUNCTION]) {
       const item = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.hideChildren), () => {
         this.modifyTree(TraceEngine.EntriesFilter.FilterAction.COLLAPSE_FUNCTION, this.selectedEntryIndex);
-      });
+      }, {jslogContext: 'hide-children'});
       item.setShortcut('C');
     }
 
     if (possibleActions?.[TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS]) {
       const item = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.hideRepeatingChildren), () => {
         this.modifyTree(TraceEngine.EntriesFilter.FilterAction.COLLAPSE_REPEATING_DESCENDANTS, this.selectedEntryIndex);
-      });
+      }, {jslogContext: 'hide-repeating-children'});
       item.setShortcut('R');
     }
 
     if (possibleActions?.[TraceEngine.EntriesFilter.FilterAction.RESET_CHILDREN]) {
       const item = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.resetChildren), () => {
         this.modifyTree(TraceEngine.EntriesFilter.FilterAction.RESET_CHILDREN, this.selectedEntryIndex);
-      });
+      }, {jslogContext: 'reset-children'});
       item.setShortcut('U');
     }
 
     this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.resetTrace), () => {
       this.modifyTree(TraceEngine.EntriesFilter.FilterAction.UNDO_ALL_ACTIONS, this.selectedEntryIndex);
-    }, {disabled: !possibleActions?.[TraceEngine.EntriesFilter.FilterAction.UNDO_ALL_ACTIONS]});
+    }, {
+      disabled: !possibleActions?.[TraceEngine.EntriesFilter.FilterAction.UNDO_ALL_ACTIONS],
+      jslogContext: 'reset-trace',
+    });
 
     void this.contextMenu.show();
   }
@@ -1533,7 +1553,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.restore();
 
     this.drawGroupHeaders(canvasWidth, canvasHeight);
-    this.drawFlowEvents(context, canvasWidth, canvasHeight);
+    this.drawFlowEvents(context);
     this.drawMarkerLines();
     const dividersData = TimelineGrid.calculateGridOffsets(this);
     const navStartTimes = this.dataProvider.mainFrameNavigationStartEvents?.() || [];
@@ -1575,6 +1595,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateElementPosition(this.selectedElement, this.selectedEntryIndex);
     if (this.#searchResultEntryIndex !== -1) {
       this.showPopoverForSearchResult(this.#searchResultEntryIndex);
+    }
+    for (const element of this.#searchResultHighlightElements) {
+      this.updateElementPosition(element, Number(element.id));
     }
     this.updateMarkerHighlight();
   }
@@ -2266,27 +2289,26 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
   }
 
-  private drawFlowEvents(context: CanvasRenderingContext2D, _width: number, _height: number): void {
-    context.save();
-    const ratio = window.devicePixelRatio;
-    const top = this.chartViewport.scrollOffset();
-    const arrowWidth = 6;
-    context.scale(ratio, ratio);
-    context.translate(0, -top);
-
-    context.fillStyle = '#7f5050';
-    context.strokeStyle = '#7f5050';
+  private drawFlowEvents(context: CanvasRenderingContext2D): void {
     const td = this.timelineData();
     if (!td) {
       return;
     }
 
-    const endIndex = Platform.ArrayUtilities.lowerBound(
-        td.flowStartTimes, this.chartViewport.windowRightTime(), Platform.ArrayUtilities.DEFAULT_COMPARATOR);
+    const ratio = window.devicePixelRatio;
+    const top = this.chartViewport.scrollOffset();
+    const arrowLineWidth = 6;
+    const arrowWidth = 3;
 
-    context.lineWidth = 0.5;
-    for (let i = 0; i < endIndex; ++i) {
-      if (!td.flowEndTimes[i] || td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
+    context.save();
+    context.scale(ratio, ratio);
+    context.translate(0, -top);
+
+    context.fillStyle = '#7f5050';
+    context.strokeStyle = '#7f5050';
+
+    for (let i = 0; i < td.flowEndTimes.length; ++i) {
+      if (td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
         continue;
       }
       const startX = this.chartViewport.timeToPosition(td.flowStartTimes[i]);
@@ -2295,41 +2317,27 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const endLevel = td.flowEndLevels[i];
       const startY = this.levelToOffset(startLevel) + this.levelHeight(startLevel) / 2;
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
+      const lineLength = endX - startX;
 
-      const segment = Math.min((endX - startX) / 4, 40);
-      const distanceTime = td.flowEndTimes[i] - td.flowStartTimes[i];
-      const distanceY = (endY - startY) / 10;
-      const spread = 30;
-      const lineY = distanceTime < 1 ? startY : spread + Math.max(0, startY + distanceY * (i % spread));
-
-      const p: {x: number, y: number}[] = [];
-      p.push({x: startX, y: startY});
-      p.push({x: startX + arrowWidth, y: startY});
-      p.push({x: startX + segment + 2 * arrowWidth, y: startY});
-      p.push({x: startX + segment, y: lineY});
-      p.push({x: startX + segment * 2, y: lineY});
-      p.push({x: endX - segment * 2, y: lineY});
-      p.push({x: endX - segment, y: lineY});
-      p.push({x: endX - segment - 2 * arrowWidth, y: endY});
-      p.push({x: endX - arrowWidth, y: endY});
-
+      // Draw an arrow in an 'elbow connector' shape
       context.beginPath();
-      context.moveTo(p[0].x, p[0].y);
-      context.lineTo(p[1].x, p[1].y);
-      context.bezierCurveTo(p[2].x, p[2].y, p[3].x, p[3].y, p[4].x, p[4].y);
-      context.lineTo(p[5].x, p[5].y);
-      context.bezierCurveTo(p[6].x, p[6].y, p[7].x, p[7].y, p[8].x, p[8].y);
+      context.moveTo(startX, startY);
+      context.lineTo(startX + lineLength / 2, startY);
+      context.lineTo(startX + lineLength / 2, endY);
+      context.lineTo(endX, endY);
       context.stroke();
 
-      context.beginPath();
-      context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
-      context.fill();
-
-      context.beginPath();
-      context.moveTo(endX, endY);
-      context.lineTo(endX - arrowWidth, endY - 3);
-      context.lineTo(endX - arrowWidth, endY + 3);
-      context.fill();
+      // Make line an arrow if the line is long enough to fit the arrow head. Othewise, draw a thinner line without the arrow head.
+      if (lineLength > arrowWidth) {
+        context.lineWidth = 0.5;
+        context.beginPath();
+        context.moveTo(endX, endY);
+        context.lineTo(endX - arrowLineWidth, endY - 3);
+        context.lineTo(endX - arrowLineWidth, endY + 3);
+        context.fill();
+      } else {
+        context.lineWidth = 0.2;
+      }
     }
     context.restore();
   }
@@ -3056,17 +3064,18 @@ export class FlameChartTimelineData {
   selectedGroup: Group|null;
   private constructor(
       entryLevels: number[]|Uint16Array, entryTotalTimes: number[]|Float32Array, entryStartTimes: number[]|Float64Array,
-      groups: Group[]|null, entryDecorations: FlameChartDecoration[][] = []) {
+      groups: Group[]|null, entryDecorations: FlameChartDecoration[][] = [], flowStartTimes: number[] = [],
+      flowStartLevels: number[] = [], flowEndTimes: number[] = [], flowEndLevels: number[] = []) {
     this.entryLevels = entryLevels;
     this.entryTotalTimes = entryTotalTimes;
     this.entryStartTimes = entryStartTimes;
     this.entryDecorations = entryDecorations;
     this.groups = groups || [];
     this.markers = [];
-    this.flowStartTimes = [];
-    this.flowStartLevels = [];
-    this.flowEndTimes = [];
-    this.flowEndLevels = [];
+    this.flowStartTimes = flowStartTimes || [];
+    this.flowStartLevels = flowStartLevels || [];
+    this.flowEndTimes = flowEndTimes || [];
+    this.flowEndLevels = flowEndLevels || [];
     this.selectedGroup = null;
   }
 
@@ -3078,9 +3087,14 @@ export class FlameChartTimelineData {
     entryStartTimes: FlameChartTimelineData['entryStartTimes'],
     groups: FlameChartTimelineData['groups']|null,
     entryDecorations?: FlameChartDecoration[][],
+    flowStartTimes?: FlameChartTimelineData['flowStartTimes'],
+    flowStartLevels?: FlameChartTimelineData['flowStartLevels'],
+    flowEndTimes?: FlameChartTimelineData['flowEndTimes'],
+    flowEndLevels?: FlameChartTimelineData['flowEndLevels'],
   }): FlameChartTimelineData {
     return new FlameChartTimelineData(
-        data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || []);
+        data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || [],
+        data.flowStartTimes || [], data.flowStartLevels || [], data.flowEndTimes || [], data.flowEndLevels || []);
   }
 
   // TODO(crbug.com/1501055) Thinking about refactor this class, so we can avoid create a new object when modifying the
