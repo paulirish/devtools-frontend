@@ -26,37 +26,37 @@ import {
   toggleRegExButtonBottomUp,
 } from '../../helpers/performance-helpers.js';
 
-async function checkActivityTree(
-    frontend: puppeteer.Page, expectedActivities: string[], expandSubTree: boolean = false) {
-  let index = 0;
+async function checkActivityTree(frontend: puppeteer.Page, expandSubTree: boolean = false) {
   let parentItem: puppeteer.ElementHandle<Element>|undefined = undefined;
-  let result = false;
-  do {
-    result = await waitForFunction(async () => {
-      if (parentItem) {
-        parentItem.evaluate(e => e.scrollIntoView());
-      }
-      const treeItem = await $<HTMLElement>('.data-grid-data-grid-node.selected.revealed .activity-name');
-      if (!treeItem) {
-        return false;
-      }
-      const treeItemText = await treeItem.evaluate(el => el.innerText);
-      if (expectedActivities[index] === treeItemText) {
-        parentItem = treeItem;
-        return true;
-      }
-      return false;
-    });
-    index++;
+  let treeItem: puppeteer.ElementHandle<Element>|null = null;
+  const arr = [];
+  let isStillSelected = false;
 
+  do {
+    if (parentItem) {
+      parentItem.evaluate(e => e.scrollIntoView());
+    }
+    treeItem = await $<HTMLElement>('.data-grid-data-grid-node.selected.revealed .activity-name');
+    if (!treeItem) {
+      break;
+    }
+
+    if (parentItem === treeItem) {
+      break;
+    }
+    const treeItemText = await treeItem.evaluate(el => el.innerText);
+    arr.push(treeItemText);
+    parentItem = treeItem;
+    console.log({arr, parentItem, treeItem});
     if (expandSubTree) {
       await frontend.keyboard.press('ArrowRight');
     }
-
     await frontend.keyboard.press('ArrowDown');
-  } while (index < expectedActivities.length);
 
-  return result;
+    isStillSelected = await treeItem.evaluate(el => el.closest('.data-grid-data-grid-node').matches('.selected'));
+    // Only continue if our keyboard shifted selection
+  } while (!isStillSelected);
+  return arr;
 }
 
 async function validateTreeParentActivities(expectedActivities: string[]) {
@@ -88,14 +88,12 @@ describe('The Performance tool, Bottom-up panel', function() {
     this.timeout(20000);
   }
 
-
   describe('Recording', function() {
-    it('triggers warmup', async () => {
+    it.only('triggers warmup', async () => {
       await navigateToPerformanceTab('empty');
 
       const recordButton = await waitForAria('Record');
       assert.isNotNull(recordButton, 'no record button found');
-
 
       // const {frontend, browser} = getBrowserAndPages();
       // const result = await frontend.evaluate(`(async () => {
@@ -114,17 +112,14 @@ describe('The Performance tool, Bottom-up panel', function() {
       await navigateToBottomUpTab();
 
       const {frontend} = getBrowserAndPages();
-      const expectedActivities = ['h2', 'H2', 'h2_with_suffix'];
-      await checkActivityTree(frontend, expectedActivities, false);
-
-
-      await wait(20_000);
+      const arr = await checkActivityTree(frontend, false);
+      console.log('coooooool', arr);
+      const expectedActivities = ['Profiling Overhead'];
+      assert.deepStrictEqual(arr, expectedActivities);
     });
   });
 
-
-
-  describe.only('Bottom-up panel', function() {
+  describe('Bottom-up panel', function() {
     beforeEach(async () => {
       await step('navigate to the Performance tab and upload performance profile', async () => {
         await navigateToPerformanceTab('empty');
@@ -151,7 +146,7 @@ describe('The Performance tool, Bottom-up panel', function() {
         await toggleCaseSensitive();
         await setFilter('H2');
         assert.isTrue(await validateTreeParentActivities(['H2']), 'Tree does not contain expected activities');
-        });
+      });
     });
 
     it('regex button is working as expected', async () => {
@@ -188,7 +183,8 @@ describe('The Performance tool, Bottom-up panel', function() {
         }
         await toggleMatchWholeWordButtonBottomUp();
         await setFilter('function');
-        assert.isTrue(await validateTreeParentActivities(['Function Call']), 'Tree does not contain expected activities');
+        assert.isTrue(
+            await validateTreeParentActivities(['Function Call']), 'Tree does not contain expected activities');
       });
     });
 
@@ -257,7 +253,7 @@ describe('The Performance tool, Bottom-up panel', function() {
         assert.isTrue(
             await checkActivityTree(frontend, expectedActivities),
             'Tree does not contain activities in the expected order');
-          });
+      });
+    });
   });
-});
 });
