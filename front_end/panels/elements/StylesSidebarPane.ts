@@ -238,8 +238,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
   private readonly imagePreviewPopover: ImagePreviewPopover;
   #webCustomData?: WebCustomData;
   #hintPopoverHelper: UI.PopoverHelper.PopoverHelper;
-  #evaluatedCSSVarPopoverHelper: UI.PopoverHelper.PopoverHelper;
-  #elementPopoverHooks = new WeakMap<Node, () => HTMLElement | undefined>();
+  #genericPopoverHelper: UI.PopoverHelper.PopoverHelper;
+  #elementPopoverHooks = new WeakMap<Node, {contents: () => HTMLElement | undefined, jslogContext?: string}>();
 
   activeCSSAngle: InlineEditor.CSSAngle.CSSAngle|null;
   #urlToChangeTracker: Map<Platform.DevToolsPath.UrlString, ChangeTracker> = new Map();
@@ -294,7 +294,6 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.hasMatchedStyles = false;
 
     this.contentElement.classList.add('styles-pane');
-    this.contentElement.setAttribute('jslog', `${VisualLogging.pane('styles')}`);
 
     this.sectionBlocks = [];
     this.idleCallbackManager = null;
@@ -395,16 +394,18 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     this.#hintPopoverHelper.setTimeout(300);
     this.#hintPopoverHelper.setHasPadding(true);
 
-    // Bind cssVarSwatch Popover.
-    this.#evaluatedCSSVarPopoverHelper = new UI.PopoverHelper.PopoverHelper(this.contentElement, event => {
+    this.#genericPopoverHelper = new UI.PopoverHelper.PopoverHelper(this.contentElement, event => {
       for (let e = event.composedPath().length - 1; e >= 0; --e) {
         const element = event.composedPath()[e] as Element;
         const hook = this.#elementPopoverHooks.get(element);
-        const contents = hook ? hook() : undefined;
+        const contents = hook ? hook.contents() : undefined;
         if (contents) {
           return {
             box: element.boxInWindow(),
             show: async (popover: UI.GlassPane.GlassPane) => {
+              popover.setJsLog(`${
+                  VisualLogging.popover(`${hook?.jslogContext ?? 'elements.generic-sidebar-popover'}`)
+                      .parent('popoverParent')}`);
               popover.contentElement.classList.add('borderless-popover');
               popover.contentElement.appendChild(contents);
               return true;
@@ -413,13 +414,13 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         }
       }
       return null;
-    }, 'elements.css-var');
-    this.#evaluatedCSSVarPopoverHelper.setDisableOnClick(true);
-    this.#evaluatedCSSVarPopoverHelper.setTimeout(500, 200);
+    }, 'elements.generic-sidebar-popover');
+    this.#genericPopoverHelper.setDisableOnClick(true);
+    this.#genericPopoverHelper.setTimeout(500, 200);
   }
 
-  addPopover(element: Node, contents: () => HTMLElement | undefined): void {
-    this.#elementPopoverHooks.set(element, contents);
+  addPopover(element: Node, popover: {contents: () => HTMLElement | undefined, jslogContext?: string}): void {
+    this.#elementPopoverHooks.set(element, popover);
   }
 
   private onScroll(_event: Event): void {
@@ -443,7 +444,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     if (title === null) {
       UI.Tooltip.Tooltip.install(exclamationElement, invalidMessage);
     } else {
-      this.addPopover(exclamationElement, () => title);
+      this.addPopover(exclamationElement, {contents: () => title});
     }
     const invalidString =
         i18nString(UIStrings.invalidString, {PH1: invalidMessage, PH2: property.name, PH3: property.value});
@@ -633,10 +634,12 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     for (let i = 0; i < contextMenuDescriptors.length; ++i) {
       const descriptor = contextMenuDescriptors[i];
-      contextMenu.defaultSection().appendItem(descriptor.text, descriptor.handler);
+      contextMenu.defaultSection().appendItem(
+          descriptor.text, descriptor.handler, {jslogContext: 'style-sheet-header'});
     }
     contextMenu.footerSection().appendItem(
-        'inspector-stylesheet', this.createNewRuleInViaInspectorStyleSheet.bind(this));
+        'inspector-stylesheet', this.createNewRuleInViaInspectorStyleSheet.bind(this),
+        {jslogContext: 'inspector-stylesheet'});
     void contextMenu.show();
 
     function compareDescriptors(
@@ -1334,7 +1337,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     }
 
     this.#hintPopoverHelper?.hidePopover();
-    this.#evaluatedCSSVarPopoverHelper?.hidePopover();
+    this.#genericPopoverHelper?.hidePopover();
   }
 
   getSectionBlockByName(name: string): SectionBlock|undefined {
@@ -1571,16 +1574,16 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         autoDarkModeSetting.set(false);
         prefersColorSchemeSetting.set(isLightColorScheme ? '' : 'light');
         button.setToggled(Boolean(prefersColorSchemeSetting.get()));
-      });
+      }, {jslogContext: 'prefer-light-color-scheme'});
       menu.defaultSection().appendItem(darkColorSchemeOption, () => {
         autoDarkModeSetting.set(false);
         prefersColorSchemeSetting.set(isDarkColorScheme ? '' : 'dark');
         button.setToggled(Boolean(prefersColorSchemeSetting.get()));
-      });
+      }, {jslogContext: 'prefer-dark-color-scheme'});
       menu.defaultSection().appendItem(autoDarkModeOption, () => {
         autoDarkModeSetting.set(!isAutoDarkEnabled);
         button.setToggled(Boolean(prefersColorSchemeSetting.get()));
-      });
+      }, {jslogContext: 'emulate-auto-dark-mode'});
 
       void menu.show();
       event.stopPropagation();
@@ -2202,18 +2205,11 @@ export class StylesSidebarPropertyRenderer {
   private node: SDK.DOMModel.DOMNode|null;
   readonly propertyName: string;
   readonly propertyValue: string;
-  private colorMixHandler: ((arg0: string) => Node)|null;
-  private bezierHandler: ((arg0: string) => Node)|null;
   private fontHandler: ((arg0: string) => Node)|null;
   private shadowHandler: ((arg0: string, arg1: string) => Node)|null;
   private gridHandler: ((arg0: string, arg1: string) => Node)|null;
-  private varHandler: ((arg0: string) => Node)|null;
-  private angleHandler: ((arg0: string, readonly: boolean) => Node)|null;
   private lengthHandler: ((arg0: string) => Node)|null;
-  private animationNameHandler: ((data: string) => Node)|null;
   private animationHandler: ((data: string) => Node)|null;
-  private positionFallbackHandler: ((data: string) => Node)|null;
-  private fontPaletteHandler: ((data: string) => Node)|null;
   matchers: Matcher[];
 
   constructor(
@@ -2223,27 +2219,12 @@ export class StylesSidebarPropertyRenderer {
     this.node = node;
     this.propertyName = name;
     this.propertyValue = value;
-    this.colorMixHandler = null;
-    this.bezierHandler = null;
     this.fontHandler = null;
     this.shadowHandler = null;
     this.gridHandler = null;
-    this.varHandler = document.createTextNode.bind(document);
-    this.animationNameHandler = null;
-    this.angleHandler = null;
     this.lengthHandler = null;
     this.animationHandler = null;
-    this.positionFallbackHandler = null;
-    this.fontPaletteHandler = null;
     this.matchers = matchers;
-  }
-
-  setColorMixHandler(handler: (arg0: string) => Node): void {
-    this.colorMixHandler = handler;
-  }
-
-  setBezierHandler(handler: (arg0: string) => Node): void {
-    this.bezierHandler = handler;
   }
 
   setFontHandler(handler: (arg0: string) => Node): void {
@@ -2258,32 +2239,12 @@ export class StylesSidebarPropertyRenderer {
     this.gridHandler = handler;
   }
 
-  setVarHandler(handler: (arg0: string) => Node): void {
-    this.varHandler = handler;
-  }
-
-  setAnimationNameHandler(handler: (arg0: string) => Node): void {
-    this.animationNameHandler = handler;
-  }
-
   setAnimationHandler(handler: (arg0: string) => Node): void {
     this.animationHandler = handler;
   }
 
-  setAngleHandler(handler: (arg0: string, readonly: boolean) => Node): void {
-    this.angleHandler = handler;
-  }
-
   setLengthHandler(handler: (arg0: string) => Node): void {
     this.lengthHandler = handler;
-  }
-
-  setPositionFallbackHandler(handler: (arg0: string) => Node): void {
-    this.positionFallbackHandler = handler;
-  }
-
-  setFontPaletteHandler(handler: (arg0: string) => Node): void {
-    this.fontPaletteHandler = handler;
   }
 
   renderName(): Element {
@@ -2326,10 +2287,6 @@ export class StylesSidebarPropertyRenderer {
       return valueElement;
     }
 
-    if (metadata.isStringProperty(this.propertyName)) {
-      UI.Tooltip.Tooltip.install(valueElement, unescapeCssString(this.propertyValue));
-    }
-
     const matchers: Matcher[] = [...this.matchers];
 
     // AST matching applies regexes bottom-up to subexpressions. This requires the regexes to be explicit enough to only
@@ -2343,82 +2300,22 @@ export class StylesSidebarPropertyRenderer {
       return new RegExp(`^${source}$`, flags);
     };
 
-    // Push `color-mix` handler before pushing regex handler because
-    // `color-mix` can contain variables inside and we want to handle
-    // it as `color-mix` swatch that displays a variable swatch inside
-    // `color: color-mix(in srgb, var(--a), var(--b))` should be handled
-    // by colorMixHandler not varHandler.
-    if (this.colorMixHandler && metadata.isColorAwareProperty(this.propertyName)) {
-      matchers.push(new LegacyRegexMatcher(Common.Color.ColorMixRegex, this.colorMixHandler));
-    }
-
-    matchers.push(new LegacyRegexMatcher(SDK.CSSMetadata.URLRegex, this.processURL.bind(this)));
-    if (this.bezierHandler && metadata.isBezierAwareProperty(this.propertyName)) {
-      matchers.push(new LegacyRegexMatcher(UI.Geometry.CubicBezier.Regex, this.bezierHandler));
-    }
-    if (this.angleHandler && metadata.isAngleAwareProperty(this.propertyName)) {
-      // TODO(changhaohan): crbug.com/1138628 refactor this to handle unitless 0 cases
-      matchers.push(new LegacyRegexMatcher(asLineMatch(InlineEditor.CSSAngleUtils.CSSAngleRegex), this.angleHandler));
-    }
     if (this.fontHandler && metadata.isFontAwareProperty(this.propertyName)) {
       matchers.push(new LegacyRegexMatcher(
           this.propertyName === 'font-family' ? InlineEditor.FontEditorUtils.FontFamilyRegex :
                                                 InlineEditor.FontEditorUtils.FontPropertiesRegex,
           this.fontHandler));
     }
-    if (!Root.Runtime.experiments.isEnabled('cssTypeComponentLengthDeprecate') && this.lengthHandler) {
+    if (!Root.Runtime.experiments.isEnabled('css-type-component-length-deprecate') && this.lengthHandler) {
       // TODO(changhaohan): crbug.com/1138628 refactor this to handle unitless 0 cases
       matchers.push(
           new LegacyRegexMatcher(asLineMatch(InlineEditor.CSSLengthUtils.CSSLengthRegex), this.lengthHandler));
-    }
-    if (this.propertyName === 'animation-name' && this.animationNameHandler) {
-      matchers.push(new LegacyRegexMatcher(/^[^,]*$/g, this.animationNameHandler));
-    }
-    if (this.propertyName === 'font-palette' && this.fontPaletteHandler) {
-      matchers.push(new LegacyRegexMatcher(/^.*$/g, this.fontPaletteHandler));
-    }
-
-    if (this.positionFallbackHandler && this.propertyName === 'position-fallback') {
-      matchers.push(new LegacyRegexMatcher(/^.*$/g, this.positionFallbackHandler));
     }
 
     renderPropertyValue(this.propertyValue, matchers, this.propertyName)
         .forEach(node => valueElement.appendChild(node));
     valueElement.normalize();
     return valueElement;
-  }
-
-  private processURL(text: string): Node {
-    // Strip "url(" and ")" along with whitespace.
-    let url = text.substring(4, text.length - 1).trim() as Platform.DevToolsPath.UrlString;
-    const isQuoted = /^'.*'$/s.test(url) || /^".*"$/s.test(url);
-    if (isQuoted) {
-      url = Common.ParsedURL.ParsedURL.substring(url, 1, url.length - 1);
-    }
-    const container = document.createDocumentFragment();
-    UI.UIUtils.createTextChild(container, 'url(');
-    let hrefUrl: Platform.DevToolsPath.UrlString|null = null;
-    if (this.rule && this.rule.resourceURL()) {
-      hrefUrl = Common.ParsedURL.ParsedURL.completeURL(this.rule.resourceURL(), url);
-    } else if (this.node) {
-      hrefUrl = this.node.resolveURL(url);
-    }
-    const link = ImagePreviewPopover.setImageUrl(
-        Components.Linkifier.Linkifier.linkifyURL(hrefUrl || url, {
-          text: url,
-          preventClick: false,
-          // crbug.com/1027168
-          // We rely on CSS text-overflow: ellipsis to hide long URLs in the Style panel,
-          // so that we don't have to keep two versions (original vs. trimmed) of URL
-          // at the same time, which complicates both StylesSidebarPane and StylePropertyTreeElement.
-          bypassURLTrimming: true,
-          showColumnNumber: false,
-          inlineFrameIndex: 0,
-        }),
-        hrefUrl || url);
-    container.appendChild(link);
-    UI.UIUtils.createTextChild(container, ')');
-    return container;
   }
 }
 

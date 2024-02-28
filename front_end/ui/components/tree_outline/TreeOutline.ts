@@ -239,13 +239,11 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
   }
 
   #setNodeKeyNoWrapCSSVariable(attributeValue: string|null): void {
-    ComponentHelpers.SetCSSProperty.set(
-        this, '--override-key-whitespace-wrapping', attributeValue !== null ? 'nowrap' : 'initial');
+    this.style.setProperty('--override-key-whitespace-wrapping', attributeValue !== null ? 'nowrap' : 'initial');
   }
 
   #setTopLevelNodeBorderColorCSSVariable(attributeValue: string|null): void {
-    ComponentHelpers.SetCSSProperty.set(
-        this, '--override-top-node-border', attributeValue ? `1px solid ${attributeValue}` : '');
+    this.style.setProperty('--override-top-node-border', attributeValue ? `1px solid ${attributeValue}` : '');
   }
 
   async #recursivelyCollapseTreeNodeChildren(treeNode: TreeNode<TreeNodeDataType>): Promise<void> {
@@ -554,7 +552,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-tree-outline', TreeOutline);
+customElements.define('devtools-tree-outline', TreeOutline);
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

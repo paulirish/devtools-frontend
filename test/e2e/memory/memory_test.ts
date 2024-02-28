@@ -44,7 +44,7 @@ import {
   waitUntilRetainerChainSatisfies,
 } from '../helpers/memory-helpers.js';
 
-describe('The Memory Panel', async function() {
+describe('The Memory Panel', function() {
   // These tests render large chunks of data into DevTools and filter/search
   // through it. On bots with less CPU power, these can fail because the
   // rendering takes a long time, so we allow a much larger timeout.
@@ -57,8 +57,7 @@ describe('The Memory Panel', async function() {
     await navigateToMemoryTab();
   });
 
-  // Flaky test
-  it.skip('[crbug.com/1435436] Can take several heap snapshots ', async () => {
+  it('Can take several heap snapshots ', async () => {
     await goToResource('memory/default.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -276,8 +275,7 @@ describe('The Memory Panel', async function() {
     });
     const rows = await getDataGridRows('.retaining-paths-view table.data');
     const propertyNameElement = await rows[0].$('span.property-name');
-    assertNotNullOrUndefined(propertyNameElement);
-    propertyNameElement.hover();
+    propertyNameElement!.hover();
     const el = await waitFor('div.vbox.flex-auto.no-pointer-events');
     await waitFor('.source-code', el);
   });
@@ -425,7 +423,7 @@ describe('The Memory Panel', async function() {
 
   it('Does not include backing store size in the shallow size of a JS Set', async () => {
     await goToResource('memory/set.html');
-    await disableExperiment('heapSnapshotTreatBackingStoreAsContainingObject');
+    await disableExperiment('heap-snapshot-treat-backing-store-as-containing-object');
     const sizes = await runJSSetTest();
 
     // The Set object is small, regardless of the contained content.
@@ -441,7 +439,7 @@ describe('The Memory Panel', async function() {
 
   it('Includes backing store size in the shallow size of a JS Set', async () => {
     await goToResource('memory/set.html');
-    await enableExperiment('heapSnapshotTreatBackingStoreAsContainingObject');
+    await enableExperiment('heap-snapshot-treat-backing-store-as-containing-object');
     const sizes = await runJSSetTest();
 
     // The Set is reported as containing at least 100 pointers.

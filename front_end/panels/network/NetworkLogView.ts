@@ -1675,26 +1675,31 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   handleContextMenuForRequest(contextMenu: UI.ContextMenu.ContextMenu, request: SDK.NetworkRequest.NetworkRequest):
       void {
     contextMenu.appendApplicableItems(request);
-    const copyMenu = contextMenu.clipboardSection().appendSubMenuItem(i18nString(UIStrings.copy));
+    const copyMenu = contextMenu.clipboardSection().appendSubMenuItem(i18nString(UIStrings.copy), false, 'copy');
     if (request) {
       copyMenu.defaultSection().appendItem(
           i18nString(UIStrings.copyURL),
           Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
-              Host.InspectorFrontendHost.InspectorFrontendHostInstance, request.contentURL()));
-      copyMenu.footerSection().appendItem(i18nString(UIStrings.copyAllURLs), this.copyAllURLs.bind(this));
+              Host.InspectorFrontendHost.InspectorFrontendHostInstance, request.contentURL()),
+          {jslogContext: 'copy-url'});
+      copyMenu.footerSection().appendItem(
+          i18nString(UIStrings.copyAllURLs), this.copyAllURLs.bind(this), {jslogContext: 'copy-all-urls'});
       if (request.requestHeadersText()) {
         copyMenu.saveSection().appendItem(
-            i18nString(UIStrings.copyRequestHeaders), NetworkLogView.copyRequestHeaders.bind(null, request));
+            i18nString(UIStrings.copyRequestHeaders), NetworkLogView.copyRequestHeaders.bind(null, request),
+            {jslogContext: 'copy-request-headers'});
       }
 
       if (request.responseHeadersText) {
         copyMenu.saveSection().appendItem(
-            i18nString(UIStrings.copyResponseHeaders), NetworkLogView.copyResponseHeaders.bind(null, request));
+            i18nString(UIStrings.copyResponseHeaders), NetworkLogView.copyResponseHeaders.bind(null, request),
+            {jslogContext: 'copy-response-headers'});
       }
 
       if (request.finished) {
         copyMenu.saveSection().appendItem(
-            i18nString(UIStrings.copyResponse), NetworkLogView.copyResponse.bind(null, request));
+            i18nString(UIStrings.copyResponse), NetworkLogView.copyResponse.bind(null, request),
+            {jslogContext: 'copy-response'});
       }
 
       const initiator = request.initiator();
@@ -1709,7 +1714,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
           if (stackTraceText !== '') {
             copyMenu.saveSection().appendItem(i18nString(UIStrings.copyStacktrace), () => {
               Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(stackTraceText);
-            });
+            }, {jslogContext: 'copy-stacktrace'});
           }
         }
       }
@@ -1718,50 +1723,63 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       if (Host.Platform.isWin()) {
         copyMenu.defaultSection().appendItem(
             i18nString(UIStrings.copyAsCurlCmd), this.copyCurlCommand.bind(this, request, 'win'),
-            {disabled: disableIfBlob});
+            {disabled: disableIfBlob, jslogContext: 'copy-as-curl-cmd'});
         copyMenu.defaultSection().appendItem(
             i18nString(UIStrings.copyAsCurlBash), this.copyCurlCommand.bind(this, request, 'unix'),
-            {disabled: disableIfBlob});
+            {disabled: disableIfBlob, jslogContext: 'copy-as-curl-bash'});
       } else {
         copyMenu.defaultSection().appendItem(
             i18nString(UIStrings.copyAsCurl), this.copyCurlCommand.bind(this, request, 'unix'),
-            {disabled: disableIfBlob});
+            {disabled: disableIfBlob, jslogContext: 'copy-as-curl'});
       }
       copyMenu.defaultSection().appendItem(
           i18nString(UIStrings.copyAsPowershell), this.copyPowerShellCommand.bind(this, request),
-          {disabled: disableIfBlob});
+          {disabled: disableIfBlob, jslogContext: 'copy-as-powershell'});
       copyMenu.defaultSection().appendItem(
           i18nString(UIStrings.copyAsFetch), this.copyFetchCall.bind(this, request, FetchStyle.Browser),
-          {disabled: disableIfBlob});
+          {disabled: disableIfBlob, jslogContext: 'copy-as-fetch'});
       copyMenu.defaultSection().appendItem(
           i18nString(UIStrings.copyAsNodejsFetch), this.copyFetchCall.bind(this, request, FetchStyle.NodeJs),
-          {disabled: disableIfBlob});
+          {disabled: disableIfBlob, jslogContext: 'copy-as-nodejs-fetch'});
 
       if (Host.Platform.isWin()) {
         copyMenu.footerSection().appendItem(
-            i18nString(UIStrings.copyAllAsCurlCmd), this.copyAllCurlCommand.bind(this, 'win'));
+            i18nString(UIStrings.copyAllAsCurlCmd), this.copyAllCurlCommand.bind(this, 'win'),
+            {jslogContext: 'copy-all-as-curl-cmd'});
         copyMenu.footerSection().appendItem(
-            i18nString(UIStrings.copyAllAsCurlBash), this.copyAllCurlCommand.bind(this, 'unix'));
+            i18nString(UIStrings.copyAllAsCurlBash), this.copyAllCurlCommand.bind(this, 'unix'),
+            {jslogContext: 'copy-all-as-curl-bash'});
       } else {
         copyMenu.footerSection().appendItem(
-            i18nString(UIStrings.copyAllAsCurl), this.copyAllCurlCommand.bind(this, 'unix'));
+            i18nString(UIStrings.copyAllAsCurl), this.copyAllCurlCommand.bind(this, 'unix'),
+            {jslogContext: 'copy-all-as-curl'});
       }
       copyMenu.footerSection().appendItem(
-          i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this));
+          i18nString(UIStrings.copyAllAsPowershell), this.copyAllPowerShellCommand.bind(this),
+          {jslogContext: 'copy-all-as-powershell'});
       copyMenu.footerSection().appendItem(
-          i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser));
+          i18nString(UIStrings.copyAllAsFetch), this.copyAllFetchCall.bind(this, FetchStyle.Browser),
+          {jslogContext: 'copy-all-as-fetch'});
       copyMenu.footerSection().appendItem(
-          i18nString(UIStrings.copyAllAsNodejsFetch), this.copyAllFetchCall.bind(this, FetchStyle.NodeJs));
+          i18nString(UIStrings.copyAllAsNodejsFetch), this.copyAllFetchCall.bind(this, FetchStyle.NodeJs),
+          {jslogContext: 'copy-all-as-nodejs-fetch'});
     }
-    copyMenu.footerSection().appendItem(i18nString(UIStrings.copyAllAsHar), this.copyAllAsHAR.bind(this));
+    copyMenu.footerSection().appendItem(
+        i18nString(UIStrings.copyAllAsHar), this.copyAllAsHAR.bind(this), {jslogContext: 'copy-all-as-har'});
 
-    contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAllAsHarWithContent), this.exportAll.bind(this));
+    contextMenu.saveSection().appendItem(
+        i18nString(UIStrings.saveAllAsHarWithContent), this.exportAll.bind(this),
+        {jslogContext: 'save-all-as-har-with-content'});
     contextMenu.overrideSection().appendItem(
-        i18nString(UIStrings.overrideHeaders), this.#handleCreateResponseHeaderOverrideClick.bind(this, request));
+        i18nString(UIStrings.overrideHeaders), this.#handleCreateResponseHeaderOverrideClick.bind(this, request),
+        {jslogContext: 'override-headers'});
 
-    contextMenu.editSection().appendItem(i18nString(UIStrings.clearBrowserCache), this.clearBrowserCache.bind(this));
     contextMenu.editSection().appendItem(
-        i18nString(UIStrings.clearBrowserCookies), this.clearBrowserCookies.bind(this));
+        i18nString(UIStrings.clearBrowserCache), this.clearBrowserCache.bind(this),
+        {jslogContext: 'clear-browser-cache'});
+    contextMenu.editSection().appendItem(
+        i18nString(UIStrings.clearBrowserCookies), this.clearBrowserCookies.bind(this),
+        {jslogContext: 'clear-browser-cookies'});
 
     if (request) {
       const maxBlockedURLLength = 20;
@@ -1784,26 +1802,31 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       const urlWithoutScheme = request.parsedURL.urlWithoutScheme();
       if (urlWithoutScheme && !patterns.find(pattern => pattern.url === urlWithoutScheme)) {
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.blockRequestUrl), addBlockedURL.bind(null, urlWithoutScheme));
+            i18nString(UIStrings.blockRequestUrl), addBlockedURL.bind(null, urlWithoutScheme),
+            {jslogContext: 'block-request-url'});
       } else if (urlWithoutScheme) {
         const croppedURL = Platform.StringUtilities.trimMiddle(urlWithoutScheme, maxBlockedURLLength);
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.unblockS, {PH1: croppedURL}), removeBlockedURL.bind(null, urlWithoutScheme));
+            i18nString(UIStrings.unblockS, {PH1: croppedURL}), removeBlockedURL.bind(null, urlWithoutScheme),
+            {jslogContext: 'unblock'});
       }
 
       const domain = request.parsedURL.domain();
       if (domain && !patterns.find(pattern => pattern.url === domain)) {
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.blockRequestDomain), addBlockedURL.bind(null, domain));
+            i18nString(UIStrings.blockRequestDomain), addBlockedURL.bind(null, domain),
+            {jslogContext: 'block-request-domain'});
       } else if (domain) {
         const croppedDomain = Platform.StringUtilities.trimMiddle(domain, maxBlockedURLLength);
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.unblockS, {PH1: croppedDomain}), removeBlockedURL.bind(null, domain));
+            i18nString(UIStrings.unblockS, {PH1: croppedDomain}), removeBlockedURL.bind(null, domain),
+            {jslogContext: 'unblock'});
       }
 
       if (SDK.NetworkManager.NetworkManager.canReplayRequest(request)) {
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.replayXhr), SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request));
+            i18nString(UIStrings.replayXhr), SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request),
+            {jslogContext: 'replay-xhr'});
       }
     }
   }
@@ -2438,10 +2461,10 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         props.push(`$session.UserAgent = ${escapeString(userAgentHeader.value)}`);
       }
 
-      for (const cookie of request.includedRequestCookies()) {
-        const name = escapeString(cookie.name());
-        const value = escapeString(cookie.value());
-        const domain = escapeString(cookie.domain());
+      for (const includedCookie of request.includedRequestCookies()) {
+        const name = escapeString(includedCookie.cookie.name());
+        const value = escapeString(includedCookie.cookie.value());
+        const domain = escapeString(includedCookie.cookie.domain());
         props.push(`$session.Cookies.Add((New-Object System.Net.Cookie(${name}, ${value}, "/", ${domain})))`);
       }
 
@@ -2641,7 +2664,7 @@ export class DropDownTypesUI extends Common.ObjectWrapper.ObjectWrapper<UI.Filte
     contextMenu.defaultSection().appendCheckboxItem(label, () => {
       this.setting.get()[name] = !this.setting.get()[name];
       this.toggleTypeFilter(name);
-    }, this.setting.get()[name], undefined, undefined, undefined, jslogContext);
+    }, {checked: this.setting.get()[name], jslogContext});
   }
 
   private toggleTypeFilter(typeName: string): void {
@@ -2853,31 +2876,41 @@ export class MoreFiltersDropDownUI extends
 
     this.contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.hideDataUrls),
-        () => this.networkHideDataURLSetting.set(!this.networkHideDataURLSetting.get()),
-        this.networkHideDataURLSetting.get(), undefined, undefined, i18nString(UIStrings.hidesDataAndBlobUrls),
-        'hide-data-urls');
+        () => this.networkHideDataURLSetting.set(!this.networkHideDataURLSetting.get()), {
+          checked: this.networkHideDataURLSetting.get(),
+          tooltip: i18nString(UIStrings.hidesDataAndBlobUrls),
+          jslogContext: 'hide-data-urls',
+        });
     this.contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.chromeExtensions),
-        () => this.networkHideChromeExtensionsSetting.set(!this.networkHideChromeExtensionsSetting.get()),
-        this.networkHideChromeExtensionsSetting.get(), undefined, undefined, i18nString(UIStrings.hideChromeExtension),
-        'hide-extension-urls');
+        () => this.networkHideChromeExtensionsSetting.set(!this.networkHideChromeExtensionsSetting.get()), {
+          checked: this.networkHideChromeExtensionsSetting.get(),
+          tooltip: i18nString(UIStrings.hideChromeExtension),
+          jslogContext: 'hide-extension-urls',
+        });
     this.contextMenu.defaultSection().appendSeparator();
 
     this.contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.hasBlockedCookies),
-        () => this.networkShowBlockedCookiesOnlySetting.set(!this.networkShowBlockedCookiesOnlySetting.get()),
-        this.networkShowBlockedCookiesOnlySetting.get(), undefined, undefined,
-        i18nString(UIStrings.onlyShowRequestsWithBlockedCookies), 'only-blocked-response-cookies');
+        () => this.networkShowBlockedCookiesOnlySetting.set(!this.networkShowBlockedCookiesOnlySetting.get()), {
+          checked: this.networkShowBlockedCookiesOnlySetting.get(),
+          tooltip: i18nString(UIStrings.onlyShowRequestsWithBlockedCookies),
+          jslogContext: 'only-blocked-response-cookies',
+        });
     this.contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.blockedRequests),
-        () => this.networkOnlyBlockedRequestsSetting.set(!this.networkOnlyBlockedRequestsSetting.get()),
-        this.networkOnlyBlockedRequestsSetting.get(), undefined, undefined,
-        i18nString(UIStrings.onlyShowBlockedRequests), 'only-blocked-requests');
+        () => this.networkOnlyBlockedRequestsSetting.set(!this.networkOnlyBlockedRequestsSetting.get()), {
+          checked: this.networkOnlyBlockedRequestsSetting.get(),
+          tooltip: i18nString(UIStrings.onlyShowBlockedRequests),
+          jslogContext: 'only-blocked-requests',
+        });
     this.contextMenu.defaultSection().appendCheckboxItem(
         i18nString(UIStrings.thirdParty),
-        () => this.networkOnlyThirdPartySetting.set(!this.networkOnlyThirdPartySetting.get()),
-        this.networkOnlyThirdPartySetting.get(), undefined, undefined, i18nString(UIStrings.onlyShowThirdPartyRequests),
-        'only-3rd-party-requests');
+        () => this.networkOnlyThirdPartySetting.set(!this.networkOnlyThirdPartySetting.get()), {
+          checked: this.networkOnlyThirdPartySetting.get(),
+          tooltip: i18nString(UIStrings.onlyShowThirdPartyRequests),
+          jslogContext: 'only-3rd-party-requests',
+        });
 
     void this.contextMenu.show();
   }

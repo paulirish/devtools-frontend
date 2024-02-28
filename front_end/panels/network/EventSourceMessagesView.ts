@@ -57,13 +57,13 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
   private filterRegex: RegExp|null;
 
   private messageFilterSetting: Common.Settings.Setting<string> =
-      Common.Settings.Settings.instance().createSetting('networkEventSourceMessageFilter', '');
+      Common.Settings.Settings.instance().createSetting('network-event-source-message-filter', '');
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
 
     this.element.classList.add('event-source-messages-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane('event-stream')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('event-stream').track({resize: true})}`);
     this.request = request;
 
     this.mainToolbar = new UI.Toolbar.Toolbar('');
@@ -180,7 +180,8 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
     contextMenu.clipboardSection().appendItem(
         i18nString(UIStrings.copyMessage),
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
-            Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data));
+            Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data),
+        {jslogContext: 'copy'});
   }
 
   refresh(): void {

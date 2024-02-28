@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/legacy/legacy.js'; // for x-link
+
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as ComponentHelpers from '../../components/helpers/helpers.js';
+import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
+import * as TextEditor from '../../../ui/components/text_editor/text_editor.js';
 import * as IconButton from '../../components/icon_button/icon_button.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
 
@@ -33,6 +36,13 @@ export class CodeBlock extends HTMLElement {
   #copyTimeout = 1000;
   #timer?: ReturnType<typeof setTimeout>;
   #copied = false;
+  #editorState?: CodeMirror.EditorState;
+  #languageConf = new CodeMirror.Compartment();
+  /**
+   * Whether to display a notice "​​Use code snippets with caution" in code
+   * blocks.
+   */
+  #displayNotice = false;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [styles];
@@ -41,6 +51,15 @@ export class CodeBlock extends HTMLElement {
 
   set code(value: string) {
     this.#code = value;
+    this.#editorState = CodeMirror.EditorState.create({
+      doc: this.#code,
+      extensions: [
+        TextEditor.Config.baseConfiguration(this.#code),
+        CodeMirror.EditorState.readOnly.of(true),
+        CodeMirror.EditorView.lineWrapping,
+        this.#languageConf.of(CodeMirror.javascript.javascript()),
+      ],
+    });
     this.#render();
   }
 
@@ -55,6 +74,11 @@ export class CodeBlock extends HTMLElement {
 
   set timeout(value: number) {
     this.#copyTimeout = value;
+    this.#render();
+  }
+
+  set displayNotice(value: boolean) {
+    this.#displayNotice = value;
     this.#render();
   }
 
@@ -97,15 +121,41 @@ export class CodeBlock extends HTMLElement {
           </button>
         </div>
       </div>
-      <code>${this.#code}</code>
+      <div class="editor-wrapper">
+        <${TextEditor.TextEditor.TextEditor.litTagName} .state=${
+          this.#editorState
+        }></${TextEditor.TextEditor.TextEditor.litTagName}>
+        ${this.#displayNotice ? LitHtml.html`<p class="notice"><x-link class="link" href="https://support.google.com/legal/answer/13505487">Use code snippets with caution.</x-link></p>` : LitHtml.nothing}
+      </div>
     </div>`, this.#shadow, {
       host: this,
     });
-    // clang-format one
+    // clang-format on
+
+    const editor = this.#shadow?.querySelector('devtools-text-editor')?.editor;
+
+    if (!editor) {
+      return;
+    }
+    let language = CodeMirror.html.html();
+    switch (this.#codeLang) {
+      case 'js':
+        language = CodeMirror.javascript.javascript();
+        break;
+      case 'ts':
+        language = CodeMirror.javascript.javascript({typescript: true});
+        break;
+      case 'jsx':
+        language = CodeMirror.javascript.javascript({jsx: true});
+        break;
+    }
+    editor.dispatch({
+      effects: this.#languageConf.reconfigure(language),
+    });
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-code-block', CodeBlock);
+customElements.define('devtools-code-block', CodeBlock);
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

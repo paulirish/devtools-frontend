@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as FrontendHelpers from '../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
 import * as Explain from '../../../../panels/explain/explain.js';
+import * as FrontendHelpers from '../../../../testing/EnvironmentHelpers.js';
 import * as ComponentHelpers from '../../helpers/helpers.js';
 
 await ComponentHelpers.ComponentServerSetup.setup();
@@ -45,8 +45,10 @@ Response status: 404`,
       },
     },
     {
-      async getInsights() {
-        return `## Result
+      async *
+          fetch() {
+            yield {
+              explanation: `## Result
 
 Some text with \`code\`. Some code:
 \`\`\`ts
@@ -54,12 +56,22 @@ console.log('test');
 document.querySelector('test').style = 'black';
 \`\`\`
 
+\`\`\`
+<!DOCTYPE html>
+<div>Hello world</div>
+<script>
+  console.log('Hello World');
+</script>
+\`\`\`
+
 Links: [https://example.com](https://example.com)
 Images: ![https://example.com](https://example.com)
-`;
-      },
+`,
+              metadata: {},
+            };
+          },
     },
-    'Explain this error', {
+    'Understand this error', {
       isSyncActive: true,
       accountEmail: 'some-email',
     });

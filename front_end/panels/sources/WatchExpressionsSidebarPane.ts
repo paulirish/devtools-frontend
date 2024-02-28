@@ -287,7 +287,8 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     if (target instanceof ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement) {
       if (!target.property.synthetic) {
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.addPropertyPathToWatch), () => this.focusAndAddExpressionToWatch(target.path()));
+            i18nString(UIStrings.addPropertyPathToWatch), () => this.focusAndAddExpressionToWatch(target.path()),
+            {jslogContext: 'add-property-path-to-watch'});
       }
       return;
     }
@@ -346,7 +347,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
   async #evaluateExpression(executionContext: SDK.RuntimeModel.ExecutionContext, expression: string):
       Promise<SDK.RuntimeModel.EvaluationResult> {
-    if (Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps')) {
+    if (Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps')) {
       const callFrame = executionContext.debuggerModel.selectedCallFrame();
       if (callFrame) {
         const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(callFrame);
