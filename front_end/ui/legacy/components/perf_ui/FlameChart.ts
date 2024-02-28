@@ -42,9 +42,6 @@ import flameChartStyles from './flameChart.css.legacy.js';
 import {DEFAULT_FONT_SIZE, getFontFamilyForCanvas} from './Font.js';
 import {type Calculator, TimelineGrid} from './TimelineGrid.js';
 
-
-type LineDirection = 'LEFT'|'RIGHT'|'UP'|'DOWN';
-
 const UIStrings = {
   /**
    *@description Aria accessible name in Flame Chart of the Performance panel
@@ -2318,61 +2315,24 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const endLevel = td.flowEndLevels[i];
       const startY = this.levelToOffset(startLevel) + this.levelHeight(startLevel) / 2;
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
-
-      const distanceX = endX - startX;
-      const segmentLen = Math.min(distanceX / 4, 40);
-      // Used to avoid the lines drawing on top of eachother
-      const spread = 15;
-      const startSemicircleRadius = 2;
-      const isNarrow = segmentLen <= arrowWidth * 2;
-      const segmentY = isNarrow ? startY : startY - (i % spread);
-
-      const begin = {x: startX, y: startY, dir: 'LEFT'};
-      const beginCirc = {x: startX + startSemicircleRadius, y: startY};
-      const bez1cpA = {x: startX + segmentLen + 2 * arrowWidth, y: startY};
-      const bez1cpB = {x: startX + segmentLen, y: segmentY};
-      const segmentStart = {x: startX + segmentLen * 2, y: segmentY};
-      const segmentEnd = {x: endX - segmentLen * 2, y: segmentY};
-      const bez2cpA = {x: endX - segmentLen, y: segmentY};
-      const bez2cpB = {x: endX - segmentLen - 2 * arrowWidth, y: endY};
-      const end = {x: endX, y: endY, dir: 'RIGHT'};
-      context.beginPath();
-      // context.moveTo(beginCirc.x, beginCirc.y);
-      // if (isNarrow) {
-      //   // Skip the middle segment, and bezier from start to end.
-      //   context.bezierCurveTo(bez1cpA.x, bez1cpA.y, bez2cpB.x, bez2cpB.y, end.x, end.y);
-      // } else {
-      //   context.bezierCurveTo(bez1cpA.x, bez1cpA.y, bez1cpB.x, bez1cpB.y, segmentStart.x, segmentStart.y);
-      //   context.lineTo(segmentEnd.x, segmentEnd.y);
-      //   context.bezierCurveTo(bez2cpA.x, bez2cpA.y, bez2cpB.x, bez2cpB.y, end.x, end.y);
-      // }
-      // context.stroke();
-
+      const distanceX = Math.abs(endX - startX);
 
       // perfetto-style https://github.com/google/perfetto/blob/74cf5e884e04c87d561c74f73ef89b4e21b1f835/ui/src/frontend/flow_events_renderer.ts#L250-L273
+      const hasArrowHead = distanceX > 3 * arrowWidth;
+      // Defaults to 30, but can shrink as the distance goes down, to avoid arrows that curl backwards
+      const bezierOffset = Math.min(30, distanceX);
+      const endOffset = hasArrowHead ? arrowWidth : 0;
 
-      let beginDir: LineDirection = 'LEFT';
-      let endDir: LineDirection = 'RIGHT';
-
-      const TRIANGLE_SIZE = arrowWidth;
-      const hasArrowHead = Math.abs(begin.x - end.x) > 3 * TRIANGLE_SIZE;
-
-      const BEZIER_OFFSET = Math.min(30, Math.abs(begin.x - end.x));
-      const END_OFFSET = (((end.dir === 'RIGHT' || end.dir === 'LEFT') && hasArrowHead) ? TRIANGLE_SIZE : 0);
-
-
-      context.moveTo(begin.x, begin.y);
+      context.beginPath();
+      context.moveTo(startX, startY);
       context.bezierCurveTo(
-          begin.x - this.getDeltaX(begin.dir, BEZIER_OFFSET), begin.y - this.getDeltaY(begin.dir, BEZIER_OFFSET),
-          end.x - this.getDeltaX(end.dir, BEZIER_OFFSET + END_OFFSET),
-          end.y - this.getDeltaY(end.dir, BEZIER_OFFSET + END_OFFSET), end.x - this.getDeltaX(end.dir, END_OFFSET),
-          end.y - this.getDeltaY(end.dir, END_OFFSET));
+          startX + bezierOffset, startY, endX - (bezierOffset + endOffset), endY, endX - endOffset, endY);
       context.stroke();
 
       if (hasArrowHead) {
         // Draw (left) half-circle on the right edge of the start
         context.beginPath();
-        context.arc(startX, startY, startSemicircleRadius, -Math.PI / 2, Math.PI / 2, false);
+        context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
         context.fill();
 
         // Draw arrow head at the left edge of the end
