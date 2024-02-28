@@ -706,11 +706,23 @@ export const NativeFunctions = [
   },
   {
     name: "map",
-    signatures: [["callbackfn","?thisArg"]]
+    signatures: [["callbackfn","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
+  },
+  {
+    name: "map",
+    signatures: [["mapper"]],
+    receivers: ["Observable"]
   },
   {
     name: "filter",
-    signatures: [["predicate","?thisArg"]]
+    signatures: [["predicate","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
+  },
+  {
+    name: "filter",
+    signatures: [["predicate"]],
+    receivers: ["Observable"]
   },
   {
     name: "reduce",
@@ -3145,7 +3157,7 @@ export const NativeFunctions = [
   },
   {
     name: "initMutationEvent",
-    signatures: [["typeArg","?bubblesArg","?cancelableArg","?relatedNodeArg","?prevValueArg","?newValueArg","?attrNameArg","?attrChangeArg"],["?type","?bubbles","?cancelable","?relatedNode","?prevValue","?newValue","?attrName","?attrChange"]]
+    signatures: [["typeArg","?bubblesArg","?cancelableArg","?relatedNodeArg","?prevValueArg","?newValueArg","?attrNameArg","?attrChangeArg"],["type","?bubbles","?cancelable","?relatedNode","?prevValue","?newValue","?attrName","?attrChange"]]
   },
   {
     name: "getNamedItem",
@@ -6375,6 +6387,14 @@ export const NativeFunctions = [
     signatures: [["notifier"]]
   },
   {
+    name: "take",
+    signatures: [["number_to_take"]]
+  },
+  {
+    name: "drop",
+    signatures: [["number_to_drop"]]
+  },
+  {
     name: "getPartNode",
     signatures: [["index"]]
   },
@@ -6522,7 +6542,7 @@ export const NativeFunctions = [
   },
   {
     name: "initTextEvent",
-    signatures: [["?type","?bubbles","?cancelable","?view","?data"]]
+    signatures: [["type","?bubbles","?cancelable","?view","?data"]]
   },
   {
     name: "ToggleEvent",
@@ -6717,6 +6737,10 @@ export const NativeFunctions = [
   {
     name: "setReportEventDataForAutomaticBeacons",
     signatures: [["event"]]
+  },
+  {
+    name: "notifyEvent",
+    signatures: [["triggering_event"]]
   },
   {
     name: "FencedFrameConfig",
@@ -7222,10 +7246,6 @@ export const NativeFunctions = [
     signatures: [["type","init"]]
   },
   {
-    name: "requestIdentity",
-    signatures: [["options"]]
-  },
-  {
     name: "FederatedCredential",
     signatures: [["data"]]
   },
@@ -7580,19 +7600,11 @@ export const NativeFunctions = [
     receivers: ["MLModel"]
   },
   {
-    name: "computeSync",
-    signatures: [["graph","inputs","outputs"]]
-  },
-  {
     name: "MLModelLoader",
     signatures: [["context"]]
   },
   {
     name: "createContext",
-    signatures: [["?options"]]
-  },
-  {
-    name: "createContextSync",
     signatures: [["?options"]]
   },
   {
@@ -7817,10 +7829,6 @@ export const NativeFunctions = [
   },
   {
     name: "build",
-    signatures: [["outputs"]]
-  },
-  {
-    name: "buildSync",
     signatures: [["outputs"]]
   },
   {

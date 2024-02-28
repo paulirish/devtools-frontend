@@ -63,7 +63,7 @@ async function waitForTextContent(selector: string) {
 const DEVTOOLS_LINK = '.toolbar-item .devtools-link';
 const INFOBAR_TEXT = '.infobar-info-text';
 
-describe('The Sources Tab', async function() {
+describe('The Sources Tab', function() {
   // Some of these tests that use instrumentation breakpoints
   // can be slower on mac and windows. Increase the timeout for them.
   if (this.timeout() !== 0) {
@@ -238,7 +238,7 @@ describe('The Sources Tab', async function() {
     await step('Check that expression evaluation understands unminified name', async () => {
       await frontend.evaluate(`(async () => {
         const Root = await import('./core/root/root.js');
-        Root.Runtime.experiments.setEnabled('evaluateExpressionsWithSourceMaps', true);
+        Root.Runtime.experiments.setEnabled('evaluate-expressions-with-source-maps', true);
       })()`);
 
       await click(CONSOLE_TAB_SELECTOR);
@@ -358,8 +358,7 @@ describe('The Sources Tab', async function() {
     });
   });
 
-  // TODO(crbug.com/1346228) Flaky - timeouts.
-  it.skip('[crbug.com/1346228] automatically ignore-lists third party code from source maps', async function() {
+  it('automatically ignore-lists third party code from source maps', async () => {
     const {target} = getBrowserAndPages();
     await openSourceCodeEditorForFile('webpack-main.js', 'webpack-index.html');
 
@@ -403,7 +402,7 @@ describe('The Sources Tab', async function() {
   });
 
   it('reliably hits breakpoints on worker with source map', async () => {
-    await enableExperiment('instrumentationBreakpoints');
+    await enableExperiment('instrumentation-breakpoints');
     const {target, frontend} = getBrowserAndPages();
     await openSourceCodeEditorForFile('sourcemap-stepping-source.js', 'sourcemap-breakpoint.html');
 
@@ -695,7 +694,7 @@ describe('The Sources Tab', async function() {
   });
 });
 
-describe('The Elements Tab', async () => {
+describe('The Elements Tab', () => {
   async function clickStyleValueWithModifiers(selector: string, name: string, value: string, location: string) {
     const element = await waitForCSSPropertyValue(selector, name, value, location);
     // Click with offset to skip swatches.

@@ -33,28 +33,32 @@ export async function logImpressions(loggables: Loggable[]): Promise<void> {
   }
 }
 
-export const logResize = (resizeLogThrottler: Common.Throttler.Throttler) => async (loggable: Loggable) => {
-  const loggingState = getLoggingState(loggable);
-  if (!loggingState || !loggingState.size) {
-    return;
-  }
-  const resizeEvent: Host.InspectorFrontendHostAPI
-      .ResizeEvent = {veid: loggingState.veid, width: loggingState.size.width, height: loggingState.size.height};
-  await resizeLogThrottler.schedule(async () => {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordResize(resizeEvent);
-  });
-};
-
-export async function logClick(loggable: Loggable, event: Event, options?: {doubleClick?: boolean}): Promise<void> {
-  if (!(event instanceof MouseEvent)) {
-    return;
-  }
+export async function logResize(
+    loggable: Loggable, size: DOMRect, resizeLogThrottler?: Common.Throttler.Throttler): Promise<void> {
   const loggingState = getLoggingState(loggable);
   if (!loggingState) {
     return;
   }
+  loggingState.size = size;
+  const resizeEvent: Host.InspectorFrontendHostAPI
+      .ResizeEvent = {veid: loggingState.veid, width: loggingState.size.width, height: loggingState.size.height};
+  if (resizeLogThrottler) {
+    await resizeLogThrottler.schedule(async () => {
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordResize(resizeEvent);
+    });
+  } else {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordResize(resizeEvent);
+  }
+}
+
+export async function logClick(loggable: Loggable, event: Event, options?: {doubleClick?: boolean}): Promise<void> {
+  const loggingState = getLoggingState(loggable);
+  if (!loggingState) {
+    return;
+  }
+  const button = event instanceof MouseEvent ? event.button : 0;
   const clickEvent: Host.InspectorFrontendHostAPI
-      .ClickEvent = {veid: loggingState.veid, mouseButton: event.button, doubleClick: Boolean(options?.doubleClick)};
+      .ClickEvent = {veid: loggingState.veid, mouseButton: button, doubleClick: Boolean(options?.doubleClick)};
   const context = await loggingState.context(event);
   if (context) {
     clickEvent.context = context;

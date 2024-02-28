@@ -330,16 +330,16 @@ export class SelectMenuButton extends HTMLElement {
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [selectMenuButtonStyles];
-    ComponentHelpers.SetCSSProperty.set(this, '--deploy-menu-arrow', `url(${deployMenuArrow})`);
+    this.style.setProperty('--deploy-menu-arrow', `url(${deployMenuArrow})`);
     void coordinator.write(() => {
       switch (this.arrowDirection) {
         case Dialogs.Dialog.DialogVerticalPosition.AUTO:
         case Dialogs.Dialog.DialogVerticalPosition.TOP: {
-          ComponentHelpers.SetCSSProperty.set(this, '--arrow-angle', '180deg');
+          this.style.setProperty('--arrow-angle', '180deg');
           break;
         }
         case Dialogs.Dialog.DialogVerticalPosition.BOTTOM: {
-          ComponentHelpers.SetCSSProperty.set(this, '--arrow-angle', '0deg');
+          this.style.setProperty('--arrow-angle', '0deg');
           break;
         }
         default:
@@ -449,12 +449,12 @@ export class SelectMenuButton extends HTMLElement {
     LitHtml.render(LitHtml.html`
       <button aria-haspopup="true" aria-expanded="false" class="show" @keydown=${this.#handleButtonKeyDown} @click=${this.#handleClick} ?disabled=${this.disabled} jslog=${VisualLogging.dropDown(this.jslogContext)}>${buttonTitle}</button>
     `, this.#shadow, { host: this });
-      // clang-format on
+    // clang-format on
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-select-menu', SelectMenu);
-ComponentHelpers.CustomElements.defineComponent('devtools-select-menu-button', SelectMenuButton);
+customElements.define('devtools-select-menu', SelectMenu);
+customElements.define('devtools-select-menu-button', SelectMenuButton);
 
 declare global {
   interface HTMLElementTagNameMap {

@@ -429,17 +429,26 @@ export class DebuggerPlugin extends Plugin {
       Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListUISourceCode(uiSourceCode);
     }
 
-    const infobar =
-        new UI.Infobar.Infobar(UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore), [
-          {text: i18nString(UIStrings.removeFromIgnoreList), highlight: false, delegate: unIgnoreList, dismiss: true},
+    const infobar = new UI.Infobar.Infobar(
+        UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
+        [
+          {
+            text: i18nString(UIStrings.removeFromIgnoreList),
+            highlight: false,
+            delegate: unIgnoreList,
+            dismiss: true,
+            jslogContext: 'remove-from-ignore-list',
+          },
           {
             text: i18nString(UIStrings.configure),
             highlight: false,
             delegate:
                 UI.ViewManager.ViewManager.instance().showView.bind(UI.ViewManager.ViewManager.instance(), 'blackbox'),
             dismiss: false,
+            jslogContext: 'configure',
           },
-        ]);
+        ],
+        undefined, undefined, 'script-on-ignore-list');
     this.ignoreListInfobar = infobar;
     infobar.setCloseCallback(() => this.removeInfobar(this.ignoreListInfobar));
 
@@ -710,7 +719,7 @@ export class DebuggerPlugin extends Plugin {
       box,
       show: async (popover: UI.GlassPane.GlassPane) => {
         let resolvedText: string = '';
-        if (Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps')) {
+        if (Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps')) {
           const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
           try {
             resolvedText =
@@ -731,7 +740,7 @@ export class DebuggerPlugin extends Plugin {
         //   * Explicit function calls on the other hand must be side-effect free. The canonical
         //     example is hovering over {Math.random()} which would result in a different value
         //     each time the user hovers over it.
-        const throwOnSideEffect = Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps') &&
+        const throwOnSideEffect = Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps') &&
             highlightRange.containsSideEffects;
         const result = await selectedCallFrame.evaluate({
           expression: resolvedText || evaluationText,
@@ -1389,7 +1398,7 @@ export class DebuggerPlugin extends Plugin {
             this.uiSourceCode)) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-inline-breakpoint'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     if (breakpoint) {
       contextMenu.debugSection().appendItem(i18nString(UIStrings.editBreakpoint), () => {
         Host.userMetrics.breakpointEditDialogRevealedFrom(
@@ -1473,7 +1482,8 @@ export class DebuggerPlugin extends Plugin {
       this.missingDebugInfoBar = null;
       return;
     }
-    this.missingDebugInfoBar = UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, []);
+    this.missingDebugInfoBar =
+        UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, [], undefined, 'missing-debug-info');
     if (!this.missingDebugInfoBar) {
       return;
     }
@@ -1542,7 +1552,8 @@ export class DebuggerPlugin extends Plugin {
     if (!resource) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapSkipped), [],
-          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false),
+          'source-map-skipped');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1551,7 +1562,7 @@ export class DebuggerPlugin extends Plugin {
     } else if (resource.success) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapLoaded), [],
-          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false), 'source-map-loaded');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1570,10 +1581,12 @@ export class DebuggerPlugin extends Plugin {
         text = i18nString(UIStrings.ignoreScript);
         delegate = ignoreListManager.ignoreListUISourceCode.bind(ignoreListManager, this.uiSourceCode);
       }
-      this.sourceMapInfobar =
-          UI.Infobar.Infobar.create(UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed), [
+      this.sourceMapInfobar = UI.Infobar.Infobar.create(
+          UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed),
+          [
             {text, highlight: false, delegate, dismiss: true},
-          ]);
+          ],
+          undefined, 'source-map-failed');
       if (!this.sourceMapInfobar) {
         return;
       }

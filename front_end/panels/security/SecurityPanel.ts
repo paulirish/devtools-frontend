@@ -813,7 +813,6 @@ export class SecurityPanelSidebarTree extends UI.TreeOutline.TreeOutlineInShadow
 
   constructor(mainViewElement: SecurityPanelSidebarTreeElement, showOriginInPanel: (arg0: Origin) => void) {
     super();
-    this.element.setAttribute('jslog', `${VisualLogging.pane('security.sidebar')}`);
 
     this.appendChild(mainViewElement);
 
@@ -1478,7 +1477,7 @@ export class SecurityOriginView extends UI.Widget.VBox {
         {filterType: NetworkForward.UIFilter.FilterType.Domain, filterValue: parsedURL.host},
         {filterType: NetworkForward.UIFilter.FilterType.Scheme, filterValue: parsedURL.scheme},
       ]));
-    }, {jslogContext: 'security.view-requests-in-network-panel'});
+    }, {jslogContext: 'reveal-in-network'});
     originNetworkDiv.appendChild(originNetworkButton);
     UI.ARIAUtils.markAsLink(originNetworkButton);
 

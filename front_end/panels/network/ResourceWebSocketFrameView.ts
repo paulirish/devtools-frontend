@@ -164,7 +164,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     super();
 
     this.element.classList.add('websocket-frame-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages').track({resize: true})}`);
     this.request = request;
 
     this.splitWidget = new UI.SplitWidget.SplitWidget(false, true, 'resource-web-socket-frame-split-view-state');
@@ -256,9 +256,11 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
         contextMenu.clipboardSection().appendItem(
             i18nString(UIStrings.copyMessage),
             Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
-                Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data));
+                Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data),
+            {jslogContext: 'copy'});
       }
-      contextMenu.footerSection().appendItem(i18nString(UIStrings.clearAllL), this.clearFrames.bind(this));
+      contextMenu.footerSection().appendItem(
+          i18nString(UIStrings.clearAllL), this.clearFrames.bind(this), {jslogContext: 'clear-all'});
     }
   }
 

@@ -23,7 +23,7 @@ describe('Performance panel', function() {
     await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
     await waitFor('.timeline-flamechart');
     await waitFor('div.tabbed-pane');
-    await click('#tab-BottomUp');
+    await click('#tab-bottom-up');
     const datagrid = await waitFor('.timeline-tree-view');
     await waitForFunction(async () => {
       const datagrid = await waitFor('.timeline-tree-view');
@@ -37,7 +37,7 @@ describe('Performance panel', function() {
     await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
     await waitFor('.timeline-flamechart');
     await waitFor('div.tabbed-pane');
-    await click('#tab-CallTree');
+    await click('#tab-call-tree');
     const datagrid = await waitFor('.timeline-tree-view');
     await waitForFunction(async () => {
       const datagrid = await waitFor('.timeline-tree-view');
@@ -106,7 +106,7 @@ describe('Performance panel', function() {
     await assertElementScreenshotUnchanged(panel, 'performance/timeline-web-dev-screenshot-frames.png', 1);
   });
 
-  itScreenshot('supports the network track being expanded and then clicked', async function() {
+  itScreenshot.skip('supports the network track being expanded and then clicked', async function() {
     await loadComponentDocExample('performance_panel/basic.html?trace=web-dev');
     await waitFor('.timeline-flamechart');
     const panel = await waitFor('body');

@@ -334,8 +334,8 @@ export class ViewManager {
     return new TabbedLocation(this, revealCallback, location, restoreSelection, allowReorder, defaultTab);
   }
 
-  createStackLocation(revealCallback?: (() => void), location?: string): ViewLocation {
-    return new StackLocation(this, revealCallback, location);
+  createStackLocation(revealCallback?: (() => void), location?: string, jslogContext?: string): ViewLocation {
+    return new StackLocation(this, revealCallback, location, jslogContext);
   }
 
   hasViewsForLocation(location: string): boolean {
@@ -698,11 +698,12 @@ class TabbedLocation extends Location implements TabbedViewLocation {
         contextMenu.defaultSection().appendItem(title, () => {
           Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
           void this.showView(view, undefined, true);
-        });
+        }, {jslogContext: 'issues-pane'});
         continue;
       }
 
-      contextMenu.defaultSection().appendItem(title, this.showView.bind(this, view, undefined, true));
+      contextMenu.defaultSection().appendItem(
+          title, this.showView.bind(this, view, undefined, true), {jslogContext: view.viewId()});
     }
   }
 
@@ -834,9 +835,9 @@ class StackLocation extends Location implements ViewLocation {
   private readonly vbox: VBox;
   private readonly expandableContainers: Map<string, ExpandableContainerWidget>;
 
-  constructor(manager: ViewManager, revealCallback?: (() => void), location?: string) {
+  constructor(manager: ViewManager, revealCallback?: (() => void), location?: string, jslogContext?: string) {
     const vbox = new VBox();
-    vbox.element.setAttribute('jslog', `${VisualLogging.pane('sidebar')}`);
+    vbox.element.setAttribute('jslog', `${VisualLogging.pane(jslogContext || 'sidebar').track({resize: true})}`);
     super(manager, vbox, revealCallback);
     this.vbox = vbox;
     ARIAUtils.markAsTree(vbox.element);
