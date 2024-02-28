@@ -2297,9 +2297,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     const ratio = window.devicePixelRatio;
     const top = this.chartViewport.scrollOffset();
-    const arrowLineWidth = 6;
-    const arrowWidth = 3;
-
+    const arrowWidth = 6;
     context.save();
     context.scale(ratio, ratio);
     context.translate(0, -top);
@@ -2307,36 +2305,44 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.fillStyle = '#7f5050';
     context.strokeStyle = '#7f5050';
 
+    context.lineWidth = 0.5;
     for (let i = 0; i < td.flowEndTimes.length; ++i) {
       if (td.flowEndTimes[i] < this.chartViewport.windowLeftTime()) {
         continue;
       }
       const startX = this.chartViewport.timeToPosition(td.flowStartTimes[i]);
-      const endX = this.chartViewport.timeToPosition(td.flowEndTimes[i]);
+      const endX = this.chartViewport.timeToPosition(td.flowEndTimes[i]) + 1;  // push the arrow 1px into the box.
       const startLevel = td.flowStartLevels[i];
       const endLevel = td.flowEndLevels[i];
       const startY = this.levelToOffset(startLevel) + this.levelHeight(startLevel) / 2;
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
-      const lineLength = endX - startX;
+      const distanceX = Math.abs(endX - startX);
 
-      // Draw an arrow in an 'elbow connector' shape
+      // Draw bezier arrow perfetto-style
+      // https://github.com/google/perfetto/blob/74cf5e884e04c87d561c74f73ef89b4e21b1f835/ui/src/frontend/flow_events_renderer.ts#L250-L273
+      const hasArrowHead = distanceX > 3 * arrowWidth;
+      // Defaults to 30, but can shrink as the distance goes down, to avoid arrows that curl backwards
+      const bezierOffset = Math.min(30, distanceX);
+      const endOffset = hasArrowHead ? arrowWidth : 0;
+
       context.beginPath();
       context.moveTo(startX, startY);
-      context.lineTo(startX + lineLength / 2, startY);
-      context.lineTo(startX + lineLength / 2, endY);
-      context.lineTo(endX, endY);
+      context.bezierCurveTo(
+          startX + bezierOffset, startY, endX - (bezierOffset + endOffset), endY, endX - endOffset, endY);
       context.stroke();
 
-      // Make line an arrow if the line is long enough to fit the arrow head. Othewise, draw a thinner line without the arrow head.
-      if (lineLength > arrowWidth) {
-        context.lineWidth = 0.5;
+      if (hasArrowHead) {
+        // Draw (left) half-circle on the right edge of the start
+        context.beginPath();
+        context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
+        context.fill();
+
+        // Draw arrow head at the left edge of the end
         context.beginPath();
         context.moveTo(endX, endY);
-        context.lineTo(endX - arrowLineWidth, endY - 3);
-        context.lineTo(endX - arrowLineWidth, endY + 3);
+        context.lineTo(endX - arrowWidth, endY - 3);
+        context.lineTo(endX - arrowWidth, endY + 3);
         context.fill();
-      } else {
-        context.lineWidth = 0.2;
       }
     }
     context.restore();
