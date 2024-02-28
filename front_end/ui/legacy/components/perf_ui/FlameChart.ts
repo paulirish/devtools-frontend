@@ -1553,7 +1553,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.restore();
 
     this.drawGroupHeaders(canvasWidth, canvasHeight);
-    this.drawFlowEvents(context, canvasWidth, canvasHeight);
+    this.drawFlowEvents(context);
     this.drawMarkerLines();
     const dividersData = TimelineGrid.calculateGridOffsets(this);
     const navStartTimes = this.dataProvider.mainFrameNavigationStartEvents?.() || [];
@@ -2289,20 +2289,21 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
   }
 
-  private drawFlowEvents(context: CanvasRenderingContext2D, _width: number, _height: number): void {
-    context.save();
+  private drawFlowEvents(context: CanvasRenderingContext2D): void {
+    const td = this.timelineData();
+    if (!td) {
+      return;
+    }
+
     const ratio = window.devicePixelRatio;
     const top = this.chartViewport.scrollOffset();
     const arrowWidth = 6;
+    context.save();
     context.scale(ratio, ratio);
     context.translate(0, -top);
 
     context.fillStyle = '#7f5050';
     context.strokeStyle = '#7f5050';
-    const td = this.timelineData();
-    if (!td) {
-      return;
-    }
 
     context.lineWidth = 0.5;
     for (let i = 0; i < td.flowEndTimes.length; ++i) {
@@ -2317,7 +2318,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
       const distanceX = Math.abs(endX - startX);
 
-      // perfetto-style https://github.com/google/perfetto/blob/74cf5e884e04c87d561c74f73ef89b4e21b1f835/ui/src/frontend/flow_events_renderer.ts#L250-L273
+      // Draw bezier arrow perfetto-style
+      // https://github.com/google/perfetto/blob/74cf5e884e04c87d561c74f73ef89b4e21b1f835/ui/src/frontend/flow_events_renderer.ts#L250-L273
       const hasArrowHead = distanceX > 3 * arrowWidth;
       // Defaults to 30, but can shrink as the distance goes down, to avoid arrows that curl backwards
       const bezierOffset = Math.min(30, distanceX);
@@ -2344,36 +2346,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       }
     }
     context.restore();
-  }
-
-  private getDeltaX(dir: LineDirection, offset: number): number {
-    switch (dir) {
-      case 'LEFT':
-        return -offset;
-      case 'RIGHT':
-        return offset;
-      case 'UP':
-        return 0;
-      case 'DOWN':
-        return 0;
-      default:
-        return 0;
-    }
-  }
-
-  private getDeltaY(dir: LineDirection, offset: number): number {
-    switch (dir) {
-      case 'LEFT':
-        return 0;
-      case 'RIGHT':
-        return 0;
-      case 'UP':
-        return -offset;
-      case 'DOWN':
-        return offset;
-      default:
-        return 0;
-    }
   }
 
   /**
@@ -3098,17 +3070,18 @@ export class FlameChartTimelineData {
   selectedGroup: Group|null;
   private constructor(
       entryLevels: number[]|Uint16Array, entryTotalTimes: number[]|Float32Array, entryStartTimes: number[]|Float64Array,
-      groups: Group[]|null, entryDecorations: FlameChartDecoration[][] = []) {
+      groups: Group[]|null, entryDecorations: FlameChartDecoration[][] = [], flowStartTimes: number[] = [],
+      flowStartLevels: number[] = [], flowEndTimes: number[] = [], flowEndLevels: number[] = []) {
     this.entryLevels = entryLevels;
     this.entryTotalTimes = entryTotalTimes;
     this.entryStartTimes = entryStartTimes;
     this.entryDecorations = entryDecorations;
     this.groups = groups || [];
     this.markers = [];
-    this.flowStartTimes = [];
-    this.flowStartLevels = [];
-    this.flowEndTimes = [];
-    this.flowEndLevels = [];
+    this.flowStartTimes = flowStartTimes || [];
+    this.flowStartLevels = flowStartLevels || [];
+    this.flowEndTimes = flowEndTimes || [];
+    this.flowEndLevels = flowEndLevels || [];
     this.selectedGroup = null;
   }
 
@@ -3120,9 +3093,14 @@ export class FlameChartTimelineData {
     entryStartTimes: FlameChartTimelineData['entryStartTimes'],
     groups: FlameChartTimelineData['groups']|null,
     entryDecorations?: FlameChartDecoration[][],
+    flowStartTimes?: FlameChartTimelineData['flowStartTimes'],
+    flowStartLevels?: FlameChartTimelineData['flowStartLevels'],
+    flowEndTimes?: FlameChartTimelineData['flowEndTimes'],
+    flowEndLevels?: FlameChartTimelineData['flowEndLevels'],
   }): FlameChartTimelineData {
     return new FlameChartTimelineData(
-        data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || []);
+        data.entryLevels, data.entryTotalTimes, data.entryStartTimes, data.groups, data.entryDecorations || [],
+        data.flowStartTimes || [], data.flowStartLevels || [], data.flowEndTimes || [], data.flowEndLevels || []);
   }
 
   // TODO(crbug.com/1501055) Thinking about refactor this class, so we can avoid create a new object when modifying the
