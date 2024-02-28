@@ -2324,25 +2324,24 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const isNarrow = segmentLen <= arrowWidth * 2;
       const segmentY = isNarrow ? startY : startY - (i % spread);
 
-      const p: {x: number, y: number}[] = [];
-      p.push({x: startX, y: startY});
-      p.push({x: startX + startSemicircleRadius, y: startY});
-      p.push({x: startX + segmentLen + 2 * arrowWidth, y: startY});  // p[2]: bez1 control point A
-      p.push({x: startX + segmentLen, y: segmentY});                 // p[3]: bez1 control point B
-      p.push({x: startX + segmentLen * 2, y: segmentY});             // p[4]: start of middle segment
-      p.push({x: endX - segmentLen * 2, y: segmentY});               // p[5]: end of middle segment
-      p.push({x: endX - segmentLen, y: segmentY});                   // p[6]: bez2 control point A
-      p.push({x: endX - segmentLen - 2 * arrowWidth, y: endY});      // p[7]: bez2 control point B
-      p.push({x: endX - arrowWidth, y: endY});
+      const begin = {x: startX, y: startY};
+      const beginCirc = {x: startX + startSemicircleRadius, y: startY};
+      const bez1cpA = {x: startX + segmentLen + 2 * arrowWidth, y: startY};
+      const bez1cpB = {x: startX + segmentLen, y: segmentY};
+      const segmentStart = {x: startX + segmentLen * 2, y: segmentY};
+      const segmentEnd = {x: endX - segmentLen * 2, y: segmentY};
+      const bez2cpA = {x: endX - segmentLen, y: segmentY};
+      const bez2cpB = {x: endX - segmentLen - 2 * arrowWidth, y: endY};
+      const end = {x: endX - arrowWidth, y: endY};
       context.beginPath();
-      context.moveTo(p[1].x, p[1].y);
+      context.moveTo(beginCirc.x, beginCirc.y);
       if (isNarrow) {
         // Skip the middle segment, and bezier from start to end.
-        context.bezierCurveTo(p[2].x, p[2].y, p[7].x, p[7].y, p[8].x, p[8].y);
+        context.bezierCurveTo(bez1cpA.x, bez1cpA.y, bez2cpB.x, bez2cpB.y, end.x, end.y);
       } else {
-        context.bezierCurveTo(p[2].x, p[2].y, p[3].x, p[3].y, p[4].x, p[4].y);
-        context.lineTo(p[5].x, p[5].y);
-        context.bezierCurveTo(p[6].x, p[6].y, p[7].x, p[7].y, p[8].x, p[8].y);
+        context.bezierCurveTo(bez1cpA.x, bez1cpA.y, bez1cpB.x, bez1cpB.y, segmentStart.x, segmentStart.y);
+        context.lineTo(segmentEnd.x, segmentEnd.y);
+        context.bezierCurveTo(bez2cpA.x, bez2cpA.y, bez2cpB.x, bez2cpB.y, end.x, end.y);
       }
       context.stroke();
 
