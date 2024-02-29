@@ -1158,6 +1158,7 @@ export interface TraceEventPipelineReporter extends TraceEventData {
   args: TraceEventArgs&{
     chrome_frame_reporter: ChromeFrameReporter,
   };
+  dur: MicroSeconds;
 }
 
 export function isTraceEventPipelineReporter(event: TraceEventData): event is TraceEventPipelineReporter {

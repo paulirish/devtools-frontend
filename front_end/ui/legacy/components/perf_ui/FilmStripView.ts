@@ -73,6 +73,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
     element.classList.add('frame');
     UI.Tooltip.Tooltip.install(element, i18nString(UIStrings.doubleclickToZoomImageClickTo));
     element.createChild('div', 'time').textContent = frameTime;
+
     element.tabIndex = 0;
     element.setAttribute('jslog', `${VisualLogging.preview('film-strip').track({click: true, dblclick: true})}`);
     element.setAttribute('aria-label', i18nString(UIStrings.screenshotForSSelectToView, {PH1: frameTime}));
@@ -181,6 +182,8 @@ export class Dialog {
         <x-hbox overflow=auto border='1px solid #ddd'>
           <img $='image' data-film-strip-dialog-img style="max-height: 80vh; max-width: 80vw;"></img>
         </x-hbox>
+        <div $='stuff'>
+        </div>
         <x-hbox x-center justify-content=center margin-top=10px>
           ${prevButton}
           <x-hbox $='time' margin=8px></x-hbox>
@@ -189,6 +192,9 @@ export class Dialog {
       </x-widget>
     `;
     this.widget = (this.fragment.element() as UI.XWidget.XWidget);
+
+
+
     (this.widget as HTMLElement).tabIndex = 0;
     this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
     this.dialog = null;
@@ -280,6 +286,10 @@ export class Dialog {
     const image = (this.fragment.$('image') as HTMLImageElement);
     image.setAttribute('data-frame-index', this.index.toString());
     FilmStripView.setImageData(image, frame.screenshotEvent.args.dataUri);
+    const stuff = (this.fragment.$('stuff') as HTMLDivElement);
+    stuff.textContent = JSON.stringify(frame.screenshotEvent.args.pr.args.data.beginEvent.args.chrome_frame_reporter, null, 2);
+    stuff.style.whiteSpace = 'pre-wrap';
+
     this.resize();
   }
 }

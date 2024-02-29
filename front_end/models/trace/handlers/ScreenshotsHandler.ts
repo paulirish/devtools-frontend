@@ -32,15 +32,18 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
 export async function finalize(): Promise<void> {
   const pipelineReporterEvents = Helpers.Trace.createMatchedSortedSyntheticEvents(unpairedAsyncEvents);
-
-  frameSequenceToTs = Object.fromEntries(pipelineReporterEvents.map(evt => {
-    const frameSequenceId = evt.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence;
-    const presentationTs = Types.Timing.MicroSeconds(evt.ts + evt.dur);
-    return [frameSequenceId, presentationTs];
-  }));
+  const presentedFrames = pipelineReporterEvents.filter(evt => { const {state} = evt.args.data.beginEvent.args.chrome_frame_reporter; return state === 'STATE_PRESENTED_ALL' || state === 'STATE_PRESENTED_PARTIAL'; });
+  console.log({presentedFrames});
+  // frameSequenceToTs = Object.fromEntries(presentedFrames.map(evt => {
+  //   const frameSequenceId = evt.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence;
+  //   const presentationTs = Types.Timing.MicroSeconds(evt.ts + evt.dur);
+  //   return [frameSequenceId, presentationTs];
+  // }));
 
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
+    const presentationTimestamp = getPresentationTimestamp(snapshotEvent);
+    console.log('diff', parseInt(snapshotEvent.id, 16), (presentationTimestamp - snapshotEvent.ts) / 1000, 'ms');
     const syntheticEvent: Types.TraceEvents.SyntheticScreenshot = {
       cat,
       name,
@@ -48,37 +51,51 @@ export async function finalize(): Promise<void> {
       pid,
       tid,
       // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot was adjusted to the right/later
-      ts: getPresentationTimestamp(snapshotEvent),
+      ts: presentationTimestamp,
       args: {
         dataUri: `data:image/jpg;base64,${snapshotEvent.args.snapshot}`,
+        pr: snapshotEvent.pr,
       },
     };
     syntheticScreenshotEvents.push(syntheticEvent);
   }
-}
+  syntheticScreenshotEvents.sort((a, b) => a.ts - b.ts);
 
-/**
- * Correct the screenshot timestamps
- * The screenshot 'snapshot object' trace event has the "frame sequence number" attached as an ID.
- * We match that up with the "PipelineReporter" trace events as they terminate at presentation.
- * Presentation == when the pixels hit the screen. AKA Swap on the GPU
- */
-function getPresentationTimestamp(screenshotEvent: Types.TraceEvents.TraceEventScreenshot): Types.Timing.MicroSeconds {
-  const frameSequence = parseInt(screenshotEvent.id, 16);
-  // If it's 1, then it's an old trace (before https://crrev.com/c/4957973) and cannot be corrected.
-  if (frameSequence === 1) {
-    return screenshotEvent.ts;
+
+  // PR: a reference array. reliably incrementing.
+  // S: a mildly shuffled array
+
+  /**
+   * Correct the screenshot timestamps
+   * The screenshot 'snapshot object' trace event has the "frame sequence number" attached as an ID.
+   * We match that up with the "PipelineReporter" trace events as they terminate at presentation.
+   * Presentation == when the pixels hit the screen. AKA Swap on the GPU
+   */
+  function getPresentationTimestamp(screenshotEvent: Types.TraceEvents.TraceEventScreenshot): Types.Timing.MicroSeconds {
+    const frameSequence = parseInt(screenshotEvent.id, 16);
+    // If it's 1, then it's an old trace (before https://crrev.com/c/4957973) and cannot be corrected.
+    if (frameSequence === 1) {
+      return screenshotEvent.ts;
+    }
+    // TODO write stuff O(n²)
+    const index = presentedFrames.findIndex(evt => evt.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence === frameSequence);
+    if (index === -1) {
+      return screenshotEvent.ts;
+    }
+    const evt = presentedFrames.splice(index, 1).at(0) as unknown as Types.TraceEvents.TraceEventPipelineReporter;
+    const presentationTs =  Types.Timing.MicroSeconds(evt.ts + evt.dur);
+    screenshotEvent.pr = evt;
+    // The screenshot trace event's `ts` reflects the "expected display time" which is ESTIMATE.
+    // It is set by the compositor frame sink from the `expected_display_time`, which is based on a previously known
+    // frame start PLUS the vsync interval (eg 16.6ms)
+    const updatedTs = presentationTs;
+    // Do we always find a match? No...
+    // We generally don't match the very first screenshot and, sometimes, the last
+    // The very first screenshot is requested immediately (even if nothing is painting). As a result there's no compositor
+    // instrumentation running alongside.
+    // The last one is sometimes missing as because the trace terminates right before the associated PipelineReporter is emitted.
+    return updatedTs ?? screenshotEvent.ts;
   }
-  // The screenshot trace event's `ts` reflects the "expected display time" which is ESTIMATE.
-  // It is set by the compositor frame sink from the `expected_display_time`, which is based on a previously known
-  // frame start PLUS the vsync interval (eg 16.6ms)
-  const updatedTs = frameSequenceToTs[frameSequence];
-  // Do we always find a match? No...
-  // We generally don't match the very first screenshot and, sometimes, the last
-  // The very first screenshot is requested immediately (even if nothing is painting). As a result there's no compositor
-  // instrumentation running alongside.
-  // The last one is sometimes missing as because the trace terminates right before the associated PipelineReporter is emitted.
-  return updatedTs ?? screenshotEvent.ts;
 }
 
 export function data(): Types.TraceEvents.SyntheticScreenshot[] {
