@@ -18,10 +18,6 @@ export type Configuration = Readonly<{
   },
   processing: {
     /**
-     * How long the processor should pause between event chunks.
-     */
-    pauseDuration: number,
-    /**
      * How many events should be processed before yielding to the main thread for a pause.
      */
     eventsPerChunk: number,
@@ -36,7 +32,6 @@ export const DEFAULT: Configuration = {
   },
   processing: {
     eventsPerChunk: 50_000,
-    pauseDuration: 0,
   },
 };
 

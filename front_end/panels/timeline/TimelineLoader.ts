@@ -171,7 +171,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
       this.#collectEvents(chunk);
       (this.tracingModel as TraceEngine.Legacy.TracingModel).addEvents(chunk);
       await this.client?.loadingProgress((i + chunk.length) / events.length);
-      await new Promise(r => window.setTimeout(r, 0));  // Yield event loop to paint.
+      await scheduler.yield();  // Yield event loop to paint.
     }
     void this.close();
   }

@@ -142,7 +142,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     // main thread to avoid blocking execution. It uses `dispatchEvent` to
     // provide status update events, and other various bits of config like the
     // pause duration and frequency.
-    const {pauseDuration, eventsPerChunk} = this.#modelConfiguration.processing;
+    const {eventsPerChunk} = this.#modelConfiguration.processing;
 
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
@@ -163,7 +163,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
         // Take the opportunity to provide status update events.
         this.dispatchEvent(new TraceParseProgressEvent({index: i, total: traceEvents.length}));
         // Wait for rendering before resuming.
-        await new Promise(resolve => setTimeout(resolve, pauseDuration));
+        await scheduler.yield();
       }
       const event = traceEvents[i];
       for (let j = 0; j < sortedHandlers.length; ++j) {
