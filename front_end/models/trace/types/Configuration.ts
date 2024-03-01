@@ -35,7 +35,7 @@ export const DEFAULT: Configuration = {
     timelineShowAllEvents: false,
   },
   processing: {
-    eventsPerChunk: 30_000,
+    eventsPerChunk: 50_000,
     pauseDuration: 0,
   },
 };
