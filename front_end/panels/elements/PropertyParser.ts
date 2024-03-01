@@ -6,6 +6,8 @@ import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
+import * as InlineEditor from '../../ui/legacy/components/inline_editor/inline_editor.js';
+import * as UI from '../../ui/legacy/legacy.js';
 
 const cssParser = CodeMirror.css.cssLanguage.parser;
 
@@ -29,7 +31,10 @@ export class SyntaxTree {
     this.trailingNodes = trailingNodes;
   }
 
-  text(node?: CodeMirror.SyntaxNode): string {
+  text(node?: CodeMirror.SyntaxNode|null): string {
+    if (node === null) {
+      return '';
+    }
     return nodeText(node ?? this.tree, this.rule);
   }
 
@@ -109,11 +114,16 @@ type Constructor = (abstract new (...args: any[]) => any)|(new (...args: any[]) 
 export type MatchFactory<MatchT extends Constructor> = (...args: ConstructorParameters<MatchT>) => InstanceType<MatchT>;
 
 export interface Matcher {
+  accepts(propertyName: string): boolean;
   matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null;
 }
 
 export abstract class MatcherBase<MatchT extends Constructor> implements Matcher {
   constructor(readonly createMatch: MatchFactory<MatchT>) {
+  }
+
+  accepts(_propertyName: string): boolean {
+    return true;
   }
 
   abstract matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null;
@@ -132,7 +142,7 @@ export class BottomUpTreeMatching extends TreeWalker {
   constructor(ast: SyntaxTree, matchers: Matcher[]) {
     super(ast);
     this.computedText = new ComputedText(ast.propertyValue);
-    this.#matchers.push(...matchers);
+    this.#matchers.push(...matchers.filter(m => !ast.propertyName || m.accepts(ast.propertyName)));
     this.#matchers.push(new TextMatcher());
   }
 
@@ -392,7 +402,7 @@ export class Renderer extends TreeWalker {
   }
 }
 
-function siblings(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
+export function siblings(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
   const result = [];
   while (node) {
     result.push(node);
@@ -401,8 +411,135 @@ function siblings(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
   return result;
 }
 
-export function children(node: CodeMirror.SyntaxNode): CodeMirror.SyntaxNode[] {
-  return siblings(node.firstChild);
+export function children(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
+  return siblings(node?.firstChild ?? null);
+}
+
+function* stripComments(nodes: CodeMirror.SyntaxNode[]): Generator<CodeMirror.SyntaxNode> {
+  for (const node of nodes) {
+    if (node.type.name !== 'Comment') {
+      yield node;
+    }
+  }
+}
+
+function split(nodes: CodeMirror.SyntaxNode[]): CodeMirror.SyntaxNode[][] {
+  const result = [];
+  let current = [];
+  for (const node of nodes) {
+    if (node.name === ',') {
+      result.push(current);
+      current = [];
+    } else {
+      current.push(node);
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function callArgs(node: CodeMirror.SyntaxNode): CodeMirror.SyntaxNode[][] {
+  const args = children(node.getChild('ArgList'));
+  const openParen = args.splice(0, 1)[0];
+  const closingParen = args.pop();
+
+  if (openParen?.name !== '(' || closingParen?.name !== ')') {
+    return [];
+  }
+
+  return split(args);
+}
+
+export abstract class AngleMatch implements Match {
+  readonly type: string = 'angle';
+  constructor(readonly text: string) {
+  }
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class AngleMatcher extends MatcherBase<typeof AngleMatch> {
+  override accepts(propertyName: string): boolean {
+    return SDK.CSSMetadata.cssMetadata().isAngleAwareProperty(propertyName);
+  }
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    if (node.name !== 'NumberLiteral') {
+      return null;
+    }
+    const unit = node.getChild('Unit');
+    // TODO(crbug/1138628) handle unitless 0
+    if (!unit || !['deg', 'grad', 'rad', 'turn'].includes(matching.ast.text(unit))) {
+      return null;
+    }
+
+    return this.createMatch(matching.ast.text(node));
+  }
+}
+
+function literalToNumber(node: CodeMirror.SyntaxNode, ast: SyntaxTree): number|null {
+  if (node.type.name !== 'NumberLiteral') {
+    return null;
+  }
+  const text = ast.text(node);
+
+  return Number(text.substring(0, text.length - ast.text(node.getChild('Unit')).length));
+}
+
+export abstract class ColorMixMatch implements Match {
+  readonly type = 'color-mix';
+  constructor(
+      readonly text: string, readonly space: CodeMirror.SyntaxNode[], readonly color1: CodeMirror.SyntaxNode[],
+      readonly color2: CodeMirror.SyntaxNode[]) {
+  }
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class ColorMixMatcher extends MatcherBase<typeof ColorMixMatch> {
+  override accepts(propertyName: string): boolean {
+    return SDK.CSSMetadata.cssMetadata().isColorAwareProperty(propertyName);
+  }
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    if (node.name !== 'CallExpression' || matching.ast.text(node.getChild('Callee')) !== 'color-mix') {
+      return null;
+    }
+
+    const computedValueTree = tokenizePropertyValue(matching.getComputedText(node));
+    if (!computedValueTree) {
+      return null;
+    }
+
+    const computedValueArgs = callArgs(computedValueTree.tree);
+    if (computedValueArgs.length !== 3) {
+      return null;
+    }
+
+    const [space, color1, color2] = computedValueArgs;
+    // Verify that all arguments are there, and that the space starts with a literal `in`.
+    if (space.length < 2 || computedValueTree.text(stripComments(space).next().value) !== 'in' || color1.length < 1 ||
+        color2.length < 1) {
+      return null;
+    }
+
+    // Verify there's at most one percentage value for each color.
+    const p1 =
+        color1.filter(n => n.type.name === 'NumberLiteral' && computedValueTree.text(n.getChild('Unit')) === '%');
+    const p2 =
+        color2.filter(n => n.type.name === 'NumberLiteral' && computedValueTree.text(n.getChild('Unit')) === '%');
+    if (p1.length > 1 || p2.length > 1) {
+      return null;
+    }
+
+    // Verify that if both colors carry percentages, they aren't both zero (which is an invalid property value).
+    if (p1[0] && p2[0] && (literalToNumber(p1[0], computedValueTree) ?? 0) === 0 &&
+        (literalToNumber(p2[0], computedValueTree) ?? 0) === 0) {
+      return null;
+    }
+
+    const args = callArgs(node);
+    if (args.length !== 3) {
+      return null;
+    }
+    return this.createMatch(matching.ast.text(node), args[0], args[1], args[2]);
+  }
 }
 
 export abstract class VariableMatch implements Match {
@@ -459,6 +596,36 @@ export class VariableMatcher extends MatcherBase<typeof VariableMatch> {
   }
 }
 
+export abstract class URLMatch implements Match {
+  readonly type = 'url';
+  constructor(readonly url: Platform.DevToolsPath.UrlString, readonly text: string) {
+  }
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class URLMatcher extends MatcherBase<typeof URLMatch> {
+  matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    if (node.name !== 'CallLiteral') {
+      return null;
+    }
+    const callee = node.getChild('CallTag');
+    if (!callee || matching.ast.text(callee) !== 'url') {
+      return null;
+    }
+    const [, lparenNode, urlNode, rparenNode] = siblings(callee);
+    if (matching.ast.text(lparenNode) !== '(' ||
+        (urlNode.name !== 'ParenthesizedContent' && urlNode.name !== 'StringLiteral') ||
+        matching.ast.text(rparenNode) !== ')') {
+      return null;
+    }
+
+    const text = matching.ast.text(urlNode);
+    const url = (urlNode.name === 'StringLiteral' ? text.substr(1, text.length - 2) : text.trim()) as
+        Platform.DevToolsPath.UrlString;
+    return this.createMatch(url, matching.ast.text(node));
+  }
+}
+
 export abstract class ColorMatch implements Match {
   readonly type = 'color';
   constructor(readonly text: string) {
@@ -467,10 +634,11 @@ export abstract class ColorMatch implements Match {
 }
 
 export class ColorMatcher extends MatcherBase<typeof ColorMatch> {
-  matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
-    if (matching.ast.propertyName && !SDK.CSSMetadata.cssMetadata().isColorAwareProperty(matching.ast.propertyName)) {
-      return null;
-    }
+  override accepts(propertyName: string): boolean {
+    return SDK.CSSMetadata.cssMetadata().isColorAwareProperty(propertyName);
+  }
+
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
     const text = matching.ast.text(node);
     if (node.name === 'ColorLiteral') {
       return this.createMatch(text);
@@ -485,6 +653,89 @@ export class ColorMatcher extends MatcherBase<typeof ColorMatch> {
       }
     }
     return null;
+  }
+}
+
+export const enum LinkableNameProperties {
+  AnimationName = 'animation-name',
+  FontPalette = 'font-palette',
+  PositionFallback = 'position-fallback',
+}
+
+export abstract class LinkableNameMatch implements Match {
+  readonly type = 'linkable-name';
+  constructor(readonly text: string, readonly properyName: LinkableNameProperties) {
+  }
+
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class LinkableNameMatcher extends MatcherBase<typeof LinkableNameMatch> {
+  private static isLinkableNameProperty(propertyName: string): propertyName is LinkableNameProperties {
+    const names: string[] = [
+      LinkableNameProperties.AnimationName,
+      LinkableNameProperties.FontPalette,
+      LinkableNameProperties.PositionFallback,
+    ];
+    return names.includes(propertyName);
+  }
+
+  override accepts(propertyName: string): boolean {
+    return LinkableNameMatcher.isLinkableNameProperty(propertyName);
+  }
+
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    const {propertyName} = matching.ast;
+    const text = matching.ast.text(node);
+    if (!propertyName || node.name !== 'ValueName' || !LinkableNameMatcher.isLinkableNameProperty(propertyName)) {
+      return null;
+    }
+    // Only animation-name is allowed to specify more than one name. We don't verify this for the other properties since
+    // they would be reported as !parsedOk from the backend.
+    return this.createMatch(text, propertyName);
+  }
+}
+
+export abstract class BezierMatch implements Match {
+  readonly type: string = 'bezier';
+  constructor(readonly text: string) {
+  }
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class BezierMatcher extends MatcherBase<typeof BezierMatch> {
+  override accepts(propertyName: string): boolean {
+    return SDK.CSSMetadata.cssMetadata().isBezierAwareProperty(propertyName);
+  }
+
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    const text = matching.ast.text(node);
+
+    const isCubicBezierKeyword = node.name === 'ValueName' && UI.Geometry.CubicBezier.KeywordValues.has(text);
+    const isCubicBezierOrLinearFunction = node.name === 'CallExpression' &&
+        ['cubic-bezier', 'linear'].includes(matching.ast.text(node.getChild('Callee')));
+
+    if (!isCubicBezierKeyword && !isCubicBezierOrLinearFunction) {
+      return null;
+    }
+
+    if (!InlineEditor.AnimationTimingModel.AnimationTimingModel.parse(text)) {
+      return null;
+    }
+    return this.createMatch(text);
+  }
+}
+
+export abstract class StringMatch implements Match {
+  type: string = 'string';
+  constructor(readonly text: string) {
+  }
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class StringMatcher extends MatcherBase<typeof StringMatch> {
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    return node.name === 'StringLiteral' ? this.createMatch(matching.ast.text(node)) : null;
   }
 }
 
@@ -517,6 +768,9 @@ export class LegacyRegexMatcher implements Matcher {
   constructor(regexp: RegExp, processor: LegacyRegexHandler) {
     this.regexp = new RegExp(regexp);
     this.processor = processor;
+  }
+  accepts(): boolean {
+    return true;
   }
   matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
     const text = matching.ast.text(node);
@@ -553,6 +807,9 @@ export class TextMatch implements Match {
 }
 
 class TextMatcher implements Matcher {
+  accepts(): boolean {
+    return true;
+  }
   matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
     if (!node.firstChild || node.name === 'NumberLiteral' /* may have a Unit child */) {
       // Leaf node, just emit text

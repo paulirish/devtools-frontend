@@ -167,8 +167,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private colorForEvent?: ((arg0: TraceEngine.Legacy.Event) => string);
   #eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
   #font: string;
-
   #eventIndexByEvent: WeakMap<TraceEngine.Types.TraceEvents.TraceEventData, number|null> = new WeakMap();
+  #eventsWithCircleDecorationIndexes: number[] = [];
 
   constructor() {
     super();
@@ -369,6 +369,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.entryIndexToTitle = [];
     this.asyncColorByCategory = new Map();
     this.screenshotImageCache = new Map();
+    this.#eventIndexByEvent = new Map();
     this.#eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
     if (resetCompatibilityTracksAppender) {
       this.compatibilityTracksAppender = null;
@@ -524,6 +525,25 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 
   /**
+   * Removes all circle decorations that indicate
+   * that the initiator or initiated entry are hidden.
+   * Remove them every time a new entry is chosen.
+   */
+  #removeAllCollapsedFlowEventsDecorations(): void {
+    this.#eventsWithCircleDecorationIndexes.forEach(index => {
+      if (!this.timelineDataInternal) {
+        return;
+      }
+      let decorationsForEvent = this.timelineDataInternal.entryDecorations[index] || [];
+      decorationsForEvent = decorationsForEvent.filter(decorationIter => {
+        return decorationIter.type !== PerfUI.FlameChart.FlameChartDecorationType.INITIATOR_HIDDEN_CIRCLE;
+      });
+      this.timelineDataInternal.entryDecorations[index] = decorationsForEvent;
+    });
+    this.#eventsWithCircleDecorationIndexes = [];
+  }
+
+  /**
    * Appends a track in the flame chart using the legacy system.
    * @param track the legacy track to be rendered.
    * @param expanded if the track is expanded.
@@ -658,7 +678,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return null;
     }
     const openEvents = [];
-    const ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignoreListJSFramesOnTimeline');
+    const ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignore-list-js-frames-on-timeline');
     let maxStackDepth = 0;
     let group: PerfUI.FlameChart.Group|null = null;
     if (track && track.type === TimelineModel.TimelineModel.TrackType.MainThread) {
@@ -1377,8 +1397,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 
   /**
-   * Build the |flowStartTimes|, |flowStartLevels|, |flowEndTimes| and
-   * |flowEndLevels| data for the initiator arrows of given entry.
+   * Build the pairs of initiators and initiated entries.
    * @param entryIndex
    * @returns if we should re-render the flame chart (canvas)
    */
@@ -1396,7 +1415,9 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return false;
     }
 
-    const previousInitiatorPairsLength = this.timelineDataInternal.flowStartTimes.length;
+    // Remove all previously assigned decorations indicating that the flow event entries are hidden
+    this.#removeAllCollapsedFlowEventsDecorations();
+    const previousInitiatorPairsLength = this.timelineDataInternal.initiatorPairs.length;
     // |entryIndex| equals -1 means there is no entry selected, just clear the
     // initiator cache if there is any previous arrow and return true to
     // re-render.
@@ -1424,12 +1445,22 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
     // Reset to clear any previous arrows from the last event.
     this.timelineDataInternal.resetFlowData();
-
     this.lastInitiatorEntry = entryIndex;
+
+    let hiddenEvents: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
+    let modifiedEntries: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
+
+    if (this.timelineDataInternal.selectedGroup) {
+      hiddenEvents = this.compatibilityTracksAppender?.getHiddenEvents(this.timelineDataInternal.selectedGroup) ?? [];
+      modifiedEntries =
+          this.compatibilityTracksAppender?.getModifiedEntries(this.timelineDataInternal.selectedGroup) ?? [];
+    }
 
     const initiatorPairs = eventInitiatorPairsToDraw(
         this.traceEngineData,
         event,
+        hiddenEvents,
+        modifiedEntries,
     );
     // This means there is no change for arrows.
     if (previousInitiatorPairsLength === 0 && initiatorPairs.length === 0) {
@@ -1441,15 +1472,22 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       if (eventIndex === null || initiatorIndex === null) {
         continue;
       }
-      const {startTime} = TraceEngine.Legacy.timesForEventInMilliseconds(pair.event);
-      const {endTime: initiatorEndTime, startTime: initiatorStartTime} =
-          TraceEngine.Legacy.timesForEventInMilliseconds(pair.initiator);
+      this.timelineDataInternal.initiatorPairs.push({initiatorIndex, eventIndex});
 
-      const td = this.timelineDataInternal;
-      td.flowStartTimes.push(initiatorEndTime || initiatorStartTime);
-      td.flowStartLevels.push(td.entryLevels[initiatorIndex]);
-      td.flowEndTimes.push(startTime);
-      td.flowEndLevels.push(td.entryLevels[eventIndex]);
+      // Add a decoration of a circle around the 'collapse arrow' to show that the entry is hidden
+      if (pair.isEntryHidden) {
+        this.#addDecorationToEvent(
+            this.entryData.indexOf(pair.event),
+            {type: PerfUI.FlameChart.FlameChartDecorationType.INITIATOR_HIDDEN_CIRCLE});
+        this.#eventsWithCircleDecorationIndexes.push(this.entryData.indexOf(pair.event));
+      }
+
+      if (pair.isInitiatorHidden) {
+        this.#addDecorationToEvent(
+            this.entryData.indexOf(pair.initiator),
+            {type: PerfUI.FlameChart.FlameChartDecorationType.INITIATOR_HIDDEN_CIRCLE});
+        this.#eventsWithCircleDecorationIndexes.push(this.entryData.indexOf(pair.initiator));
+      }
     }
     return true;
   }

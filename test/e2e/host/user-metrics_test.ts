@@ -463,7 +463,7 @@ describe('User Metrics for sidebar panes', () => {
 
 describe('User Metrics for Issue Panel', () => {
   beforeEach(async () => {
-    await enableExperiment('contrastIssues');
+    await enableExperiment('contrast-issues');
     await openPanelViaMoreTools('Issues');
   });
 
@@ -589,8 +589,7 @@ describe('User Metrics for CSS custom properties in the Styles pane', () => {
     await focusElementsTree();
   });
 
-  // Flaky test.
-  it.skip('[crbug.com/1483974]: dispatch events when capture overview button hit', async () => {
+  it('dispatch events when capture overview button hit', async () => {
     const {frontend} = getBrowserAndPages();
     await frontend.keyboard.press('ArrowRight');
     await waitForContentOfSelectedElementsNode('<div id=\u200B"properties-to-inspect">\u200B</div>\u200B');

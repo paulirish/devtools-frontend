@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -84,7 +83,7 @@ export class LinearMemoryViewer extends HTMLElement {
   }
 
   connectedCallback(): void {
-    ComponentHelpers.SetCSSProperty.set(this, '--byte-group-margin', `${BYTE_GROUP_MARGIN}px`);
+    this.style.setProperty('--byte-group-margin', `${BYTE_GROUP_MARGIN}px`);
     this.#shadow.adoptedStyleSheets = [linearMemoryViewerStyles];
   }
 
@@ -315,10 +314,10 @@ export class LinearMemoryViewer extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-linear-memory-inspector-viewer', LinearMemoryViewer);
+customElements.define('devtools-linear-memory-inspector-viewer', LinearMemoryViewer);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 interface HTMLElementTagNameMap {
     'devtools-linear-memory-inspector-viewer': LinearMemoryViewer;
   }

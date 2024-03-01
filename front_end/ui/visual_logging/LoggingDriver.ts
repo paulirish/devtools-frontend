@@ -11,7 +11,7 @@ import {getDomState, visibleOverlap} from './DomState.js';
 import {type Loggable} from './Loggable.js';
 import {debugString, getLoggingConfig} from './LoggingConfig.js';
 import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown, logResize} from './LoggingEvents.js';
-import {getOrCreateLoggingState} from './LoggingState.js';
+import {getLoggingState, getOrCreateLoggingState} from './LoggingState.js';
 import {getNonDomState, unregisterAllLoggables, unregisterLoggable} from './NonDomState.js';
 
 const PROCESS_DOM_INTERVAL = 500;
@@ -146,8 +146,11 @@ async function process(): Promise<void> {
     const loggingState = getOrCreateLoggingState(element, getLoggingConfig(element), parent);
     if (!loggingState.impressionLogged) {
       const overlap = visibleOverlap(element, viewportRectFor(element));
-      if (overlap) {
-        loggingState.size = overlap;
+      const visibleSelectOption = element.tagName === 'OPTION' && loggingState.parent?.selectOpen;
+      if (overlap || visibleSelectOption) {
+        if (overlap) {
+          loggingState.size = overlap;
+        }
         visibleLoggables.push(element);
         loggingState.impressionLogged = true;
       }
@@ -186,38 +189,77 @@ async function process(): Promise<void> {
         element.addEventListener('keydown', logKeyDown(codes, keyboardLogThrottler), {capture: true});
       }
       if (loggingState.config.track?.has('resize')) {
-        new ResizeObserver(_ => {
-          const overlap = visibleOverlap(element, viewportRectFor(element));
-          if (!loggingState.size || !overlap) {
+        const updateSize = (): void => {
+          const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
+          if (!loggingState.size) {
             return;
           }
           if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
               Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
-            loggingState.size = overlap;
-            void logResize(resizeLogThrottler)(element);
+            void logResize(element, overlap, resizeLogThrottler);
           }
-        }).observe(element);
+        };
+        new ResizeObserver(updateSize).observe(element);
+        new IntersectionObserver(updateSize).observe(element);
+      }
+      if (element.tagName === 'SELECT') {
+        const onSelectOpen = (): void => {
+          if (loggingState.selectOpen) {
+            return;
+          }
+          loggingState.selectOpen = true;
+          scheduleProcessing();
+        };
+        element.addEventListener('click', onSelectOpen, {capture: true});
+        // Based on MenuListSelectType::ShouldOpenPopupForKey{Down,Press}Event
+        element.addEventListener('keydown', event => {
+          const e = event as KeyboardEvent;
+          if ((Host.Platform.isMac() || e.altKey) && (e.code === 'ArrowDown' || e.code === 'ArrowUp') ||
+              (!e.altKey && !e.ctrlKey && e.code === 'F4')) {
+            onSelectOpen();
+          }
+        }, {capture: true});
+        element.addEventListener('keypress', event => {
+          const e = event as KeyboardEvent;
+          if (e.key === ' ' || !Host.Platform.isMac() && e.key === '\r') {
+            onSelectOpen();
+          }
+        }, {capture: true});
+        element.addEventListener('change', e => {
+          for (const option of (element as HTMLSelectElement).selectedOptions) {
+            if (getLoggingState(option)?.config.track?.has('click')) {
+              void logClick(option, e);
+            }
+          }
+        }, {capture: true});
       }
       loggingState.processed = true;
     }
     if (veDebuggingEnabled && !loggingState.processedForDebugging) {
-      (element as HTMLElement).style.outline = 'solid 1px red';
-      element.addEventListener('mouseenter', () => {
-        assertNotNullOrUndefined(debugPopover);
-        debugPopover.style.display = 'block';
-        const pathToRoot = [loggingState];
-        let ancestor = loggingState.parent;
-        while (ancestor) {
-          pathToRoot.push(ancestor);
-          ancestor = ancestor.parent;
+      if (element.tagName === 'OPTION') {
+        if (loggingState.parent?.selectOpen && debugPopover) {
+          debugPopover.innerHTML += '<br>' + debugString(loggingState.config);
+          loggingState.processedForDebugging = true;
         }
-        debugPopover.innerHTML = pathToRoot.map(s => debugString(s.config)).join('<br>');
-      }, {capture: true});
-      element.addEventListener('mouseleave', () => {
-        assertNotNullOrUndefined(debugPopover);
-        debugPopover.style.display = 'none';
-      }, {capture: true});
-      loggingState.processedForDebugging = true;
+      } else {
+        (element as HTMLElement).style.outline = 'solid 1px red';
+        element.addEventListener('mouseenter', () => {
+          assertNotNullOrUndefined(debugPopover);
+          debugPopover.style.display = 'block';
+          const pathToRoot = [loggingState];
+          let ancestor = loggingState.parent;
+          while (ancestor) {
+            pathToRoot.push(ancestor);
+            ancestor = ancestor.parent;
+          }
+          debugPopover.innerHTML = pathToRoot.map(s => debugString(s.config)).join('<br>');
+        }, {capture: true});
+        element.addEventListener('mouseleave', () => {
+          assertNotNullOrUndefined(debugPopover);
+          debugPopover.style.display = 'none';
+        }, {capture: true});
+        loggingState.processedForDebugging = true;
+      }
     }
   }
   for (const {loggable, config, parent} of getNonDomState().loggables) {
@@ -236,6 +278,12 @@ async function process(): Promise<void> {
         debugElement.style.zIndex = '100000';
         debugElement.textContent = debugString(config);
         nonDomDebugElements.set(loggable, debugElement);
+        setTimeout(() => {
+          if (!loggingState.size?.width || !loggingState.size?.height) {
+            debugElement?.parentElement?.removeChild(debugElement);
+            nonDomDebugElements.delete(loggable);
+          }
+        }, 10000);
       }
       const parentDebugElement =
           parent instanceof HTMLElement ? parent : nonDomDebugElements.get(parent as Loggable) || debugPopover;

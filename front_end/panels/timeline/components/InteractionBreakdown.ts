@@ -64,10 +64,9 @@ export class InteractionBreakdown extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-interaction-breakdown', InteractionBreakdown);
+customElements.define('devtools-interaction-breakdown', InteractionBreakdown);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-interaction-breakdown': InteractionBreakdown;
   }

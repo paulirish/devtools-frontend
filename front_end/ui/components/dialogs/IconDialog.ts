@@ -26,7 +26,6 @@ const str_ = i18n.i18n.registerUIStrings('ui/components/dialogs/IconDialog.ts', 
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-icon-dialog': IconDialog;
   }
@@ -158,4 +157,4 @@ export class IconDialog extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-icon-dialog', IconDialog);
+customElements.define('devtools-icon-dialog', IconDialog);

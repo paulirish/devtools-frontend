@@ -18,13 +18,13 @@ import {addBenchmarkResult, type Benchmark} from '../../report/report.js';
 async function getPanelWithFixture(fixture: string): Promise<ElementHandle> {
   await navigateToPerformanceTab();
   const uploadProfileHandle = await waitFor<HTMLInputElement>('input[type=file]');
-  await uploadProfileHandle.uploadFile(`test/unittests/fixtures/traces/${fixture}.json.gz`);
+  await uploadProfileHandle.uploadFile(`../../../../front_end/panels/timeline/fixtures/traces/${fixture}.json.gz`);
   return await waitFor('.widget.panel.timeline');
 }
 describe('Performance panel trace load performance', () => {
   const allBenchmarks: Benchmark[] = [];
 
-  describe('Total trace load time', async () => {
+  describe('Total trace load time', () => {
     beforeEach(async () => {
       // Reload devtools to get a fresh version of the panel on each
       // run and prevent a skew due to caching, etc.

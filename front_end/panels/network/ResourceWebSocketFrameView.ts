@@ -164,7 +164,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     super();
 
     this.element.classList.add('websocket-frame-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages').track({resize: true})}`);
     this.request = request;
 
     this.splitWidget = new UI.SplitWidget.SplitWidget(false, true, 'resource-web-socket-frame-split-view-state');
@@ -256,9 +256,11 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
         contextMenu.clipboardSection().appendItem(
             i18nString(UIStrings.copyMessage),
             Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
-                Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data));
+                Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data),
+            {jslogContext: 'copy'});
       }
-      contextMenu.footerSection().appendItem(i18nString(UIStrings.clearAllL), this.clearFrames.bind(this));
+      contextMenu.footerSection().appendItem(
+          i18nString(UIStrings.clearAllL), this.clearFrames.bind(this), {jslogContext: 'clear-all'});
     }
   }
 
@@ -297,7 +299,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
   private clearFrames(): void {
     // TODO(allada): actially remove frames from request.
-    _clearFrameOffsets.set(this.request, this.request.frames().length);
+    clearFrameOffsets.set(this.request, this.request.frames().length);
     this.refresh();
   }
 
@@ -347,7 +349,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
     const url = this.request.url();
     let frames = this.request.frames();
-    const offset = _clearFrameOffsets.get(this.request) || 0;
+    const offset = clearFrameOffsets.get(this.request) || 0;
     frames = frames.slice(offset);
     frames = frames.filter(this.frameFilter.bind(this));
     frames.forEach(frame => this.dataGrid.insertChild(new ResourceWebSocketFrameNode(url, frame)));
@@ -475,6 +477,4 @@ export function ResourceWebSocketFrameNodeTimeComparator(
   return a.frame.time - b.frame.time;
 }
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const _clearFrameOffsets = new WeakMap<SDK.NetworkRequest.NetworkRequest, number>();
+const clearFrameOffsets = new WeakMap<SDK.NetworkRequest.NetworkRequest, number>();

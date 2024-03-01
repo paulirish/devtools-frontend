@@ -57,10 +57,10 @@ export class Infobar {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>,
       /* TODO(crbug.com/1354548) Remove with JS Profiler deprecation */ isCloseable: boolean = true,
-      jsLogContext?: string) {
+      jslogContext?: string) {
     this.element = document.createElement('div');
-    if (jsLogContext) {
-      this.element.setAttribute('jslog', `${VisualLogging.infoBar().context(jsLogContext)}`);
+    if (jslogContext) {
+      this.element.setAttribute('jslog', `${VisualLogging.dialog(jslogContext).track({resize: true})}`);
     }
     this.element.classList.add('flex-none');
     this.shadowRoot =
@@ -97,7 +97,7 @@ export class Infobar {
 
         const button = createTextButton(action.text, actionCallback, {
           className: buttonClass,
-          jslogContext: action.jsLogContext,
+          jslogContext: action.jslogContext,
         });
         if (action.highlight && !this.#firstFocusableElement) {
           this.#firstFocusableElement = button;
@@ -116,7 +116,7 @@ export class Infobar {
     this.closeContainer = this.mainRow.createChild('div', 'infobar-close-container');
     this.toggleElement = createTextButton(
         i18nString(UIStrings.showMore), this.onToggleDetails.bind(this),
-        {className: 'link-style devtools-link hidden'});
+        {className: 'link-style devtools-link hidden', jslogContext: 'show-more'});
     this.toggleElement.setAttribute('role', 'link');
     this.closeContainer.appendChild(this.toggleElement);
     this.closeButton = this.closeContainer.createChild('div', 'close-button', 'dt-close-button');
@@ -124,7 +124,6 @@ export class Infobar {
     // @ts-ignore This is a custom element defined in UIUitls.js that has a `setTabbable` that TS doesn't
     //            know about.
     this.closeButton.setTabbable(true);
-    this.closeButton.setAttribute('jslog', `${VisualLogging.action('close').track({click: true})}`);
     ARIAUtils.setDescription(this.closeButton, i18nString(UIStrings.close));
     self.onInvokeElement(this.closeButton, this.dispose.bind(this));
 
@@ -153,14 +152,15 @@ export class Infobar {
     this.closeCallback = null;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static create(type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>):
-      Infobar|null {
+  static create(
+      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>,
+      jslogContext?: string): Infobar|null {
     if (disableSetting && disableSetting.get()) {
       return null;
     }
-    return new Infobar(type, text, actions, disableSetting);
+    return new Infobar(type, text, actions, disableSetting, undefined, jslogContext);
   }
 
   dispose(): void {
@@ -246,7 +246,7 @@ export interface InfobarAction {
   highlight: boolean;
   delegate: (() => void)|null;
   dismiss: boolean;
-  jsLogContext?: string;
+  jslogContext?: string;
 }
 
 export const enum Type {

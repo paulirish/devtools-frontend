@@ -1031,7 +1031,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   onContextMenu(event: MouseEvent): boolean {
     event.consume(true);  // Consume event now to prevent document from handling the async menu
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-text-area'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     const {state} = this.textEditor;
     const pos = state.selection.main.from, line = state.doc.lineAt(pos);
     this.populateTextAreaContextMenu(contextMenu, line.number - 1, pos - line.from);
@@ -1046,7 +1046,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   onLineGutterContextMenu(position: number, event: MouseEvent): boolean {
     event.consume(true);  // Consume event now to prevent document from handling the async menu
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-line-gutter'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     const lineNumber = this.textEditor.state.doc.lineAt(position).number - 1;
     this.populateLineGutterContextMenu(contextMenu, lineNumber);
     contextMenu.appendApplicableItems(this);
@@ -1084,7 +1084,7 @@ class SearchMatch {
 
 export class SelfXssWarningDialog {
   static async show(): Promise<boolean> {
-    const dialog = new UI.Dialog.Dialog();
+    const dialog = new UI.Dialog.Dialog('self-xss-warning');
     dialog.setMaxContentSize(new UI.Geometry.Size(504, 340));
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SetExactWidthMaxHeight);
     dialog.setDimmed(true);
@@ -1106,7 +1106,7 @@ export class SelfXssWarningDialog {
       content.createChild('div', 'message').textContent =
           i18nString(UIStrings.doNotPaste, {PH1: i18nString(UIStrings.allowPasting)});
 
-      const input = UI.UIUtils.createInput('text-input', 'text');
+      const input = UI.UIUtils.createInput('text-input', 'text', 'allow-pasting');
       input.placeholder = i18nString(UIStrings.typeAllowPasting, {PH1: i18nString(UIStrings.allowPasting)});
       content.appendChild(input);
 

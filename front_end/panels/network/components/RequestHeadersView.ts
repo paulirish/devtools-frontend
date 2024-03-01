@@ -121,7 +121,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
     this.#request = request;
-    this.setAttribute('jslog', `${VisualLogging.pane('headers')}`);
+    this.setAttribute('jslog', `${VisualLogging.pane('headers').track({resize: true})}`);
   }
 
   override wasShown(): void {
@@ -361,7 +361,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
       if (!showFull) {
         const contextMenu = new UI.ContextMenu.ContextMenu(event);
         const section = contextMenu.newSection();
-        section.appendItem(i18nString(UIStrings.showMore), showMore);
+        section.appendItem(i18nString(UIStrings.showMore), showMore, {jslogContext: 'show-more'});
         void contextMenu.show();
       }
     };
@@ -573,11 +573,10 @@ export class Category extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-request-headers', RequestHeadersView);
-ComponentHelpers.CustomElements.defineComponent('devtools-request-headers-category', Category);
+customElements.define('devtools-request-headers', RequestHeadersView);
+customElements.define('devtools-request-headers-category', Category);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-request-headers': RequestHeadersView;
     'devtools-request-headers-category': Category;

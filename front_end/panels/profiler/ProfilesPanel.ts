@@ -240,7 +240,8 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
 
     const error = await profileType.loadFromFile(file);
     if (error && 'message' in error) {
-      void UI.UIUtils.MessageDialog.show(i18nString(UIStrings.profileLoadingFailedS, {PH1: error.message}));
+      void UI.UIUtils.MessageDialog.show(
+          i18nString(UIStrings.profileLoadingFailedS, {PH1: error.message}), undefined, 'profile-loading-failed');
     }
   }
 
@@ -712,23 +713,28 @@ export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistrat
     }
 
     const infobar = new UI.Infobar.Infobar(
-        UI.Infobar.Type.Warning, /* text */ i18nString(UIStrings.deprecationWarnMsg), /* actions? */
+        UI.Infobar.Type.Warning,
+        /* text */ i18nString(UIStrings.deprecationWarnMsg), /* actions? */
         [
           {
             text: i18nString(UIStrings.feedback),
             highlight: false,
             delegate: openFeedbackLink,
             dismiss: false,
+            jslogContext: 'feedback',
           },
           {
             text: i18nString(UIStrings.goToPerformancePanel),
             highlight: true,
             delegate: openPerformancePanel,
             dismiss: false,
+            jslogContext: 'go-to-performance-panel',
           },
         ],
         /* disableSetting? */ undefined,
-        /* isCloseable TODO(crbug.com/1354548) Remove the prop from infobar with JS Profiler deprecation */ false);
+        /* isCloseable TODO(crbug.com/1354548) Remove the prop from infobar with JS Profiler deprecation */ false,
+        'panel-deprecated',
+    );
     infobar.setParentView(this);
     this.splitWidget().mainWidget()?.element.prepend(infobar.element);
   }

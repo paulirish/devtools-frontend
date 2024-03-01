@@ -43,7 +43,7 @@ async function getRequestRowInfo(frontend: BrowserAndPages['frontend'], name: st
   return {status: statusColumn[index], time: timeColumn[index], type: typeColumn[index]};
 }
 
-describe('The Network Tab', async function() {
+describe('The Network Tab', function() {
   if (this.timeout() !== 0.0) {
     // These tests take some time on slow windows machines.
     this.timeout(10000);
@@ -274,7 +274,7 @@ describe('The Network Tab', async function() {
       const expectedValues = JSON.stringify(['Remote Address Space', 'Local', 'Local']);
       await waitForFunction(async () => {
         const remoteAddressSpaceValues = await frontend.$$eval(
-            'pierce/.remoteaddress-space-column',
+            'pierce/.remote-address-space-column',
             cells => cells.map(element => element.textContent),
         );
         return JSON.stringify(remoteAddressSpaceValues) === expectedValues;

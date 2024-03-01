@@ -2836,6 +2836,13 @@ export const generatedProperties = [
   "name": "position-fallback-bounds"
  },
  {
+  "longhands": [
+   "position-try-order",
+   "position-try-options"
+  ],
+  "name": "position-try"
+ },
+ {
   "keywords": [
    "none",
    "flip-block",
@@ -3352,6 +3359,9 @@ export const generatedProperties = [
    "no-autospace"
   ],
   "name": "text-autospace"
+ },
+ {
+  "name": "text-box-edge"
  },
  {
   "keywords": [

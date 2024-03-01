@@ -1123,15 +1123,23 @@ export function createSelect(name: string, options: string[]|Map<string, string[
         optGroup.label = key;
         for (const child of value) {
           if (typeof child === 'string') {
-            optGroup.appendChild(new Option(child, child));
+            optGroup.appendChild(createOption(child, child, Platform.StringUtilities.toKebabCase(child)));
           }
         }
       }
     } else if (typeof option === 'string') {
-      select.add(new Option(option, option));
+      select.add(createOption(option, option, Platform.StringUtilities.toKebabCase(option)));
     }
   }
   return select;
+}
+
+export function createOption(title: string, value?: string, jslogContext?: string): HTMLOptionElement {
+  const result = new Option(title, value || title);
+  if (jslogContext) {
+    result.setAttribute('jslog', `${VisualLogging.item(jslogContext).track({click: true})}`);
+  }
+  return result;
 }
 
 export function createLabel(title: string, className?: string, associatedControl?: Element): Element {
@@ -1545,8 +1553,8 @@ export function createFileSelectorElement(callback: (arg0: File) => void): HTMLI
 export const MaxLengthForDisplayedURLs = 150;
 
 export class MessageDialog {
-  static async show(message: string, where?: Element|Document): Promise<void> {
-    const dialog = new Dialog();
+  static async show(message: string, where?: Element|Document, jslogContext?: string): Promise<void> {
+    const dialog = new Dialog(jslogContext);
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
@@ -1569,7 +1577,7 @@ export class MessageDialog {
 
 export class ConfirmDialog {
   static async show(message: string, where?: Element|Document, options?: ConfirmDialogOptions): Promise<boolean> {
-    const dialog = new Dialog();
+    const dialog = new Dialog(options?.jslogContext);
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
     ARIAUtils.setLabel(dialog.contentElement, message);
@@ -1745,6 +1753,7 @@ export interface RendererRegistration {
 export interface ConfirmDialogOptions {
   okButtonLabel?: string;
   cancelButtonLabel?: string;
+  jslogContext?: string;
 }
 
 VisualLogging.registerContextProvider(

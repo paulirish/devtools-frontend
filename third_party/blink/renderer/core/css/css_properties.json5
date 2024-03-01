@@ -273,6 +273,26 @@
       ],
     },
 
+    // - anchor_mode
+    // Determines whether or not anchor() / anchor-size() queries are allowed
+    // in the relevant property.
+    //
+    // If omitted, no anchor queries are allowed.
+    //
+    // See also Length::AnchorScope::Mode.
+    anchor_mode: {
+      valid_values: [
+        // anchor()
+        "left",
+        "right",
+        "top",
+        "bottom",
+
+        // anchor-size()
+        "size",
+      ]
+    },
+
     // Valid for field_template:derived_flag only. This specifies the function
     // on ComputedStyle used to calculate the flag.
     derived_from: {
@@ -489,12 +509,17 @@
       valid_type: "str",
     },
 
-    // - priority: "High"
+    // - priority: 1
     // The priority level for computing the property. Properties with the same
     // priority level are grouped and computed in alphabetical order.
+    // Anything above zero are designated "high priority" and done before
+    // certain operations, like updating fonts. (Most high-priority properties
+    // are 1; 2 and higher are used only in special circumstances.) This mechanism
+    // is primarily useful for properties that influence other properties,
+    // like line-height influencing lh units. Negative values are not used.
     priority: {
-      default: "Low",
-      valid_values: ["High", "Low"],
+      default: 0,
+      valid_type: "int",
     },
 
     // - layout_dependent
@@ -1083,7 +1108,7 @@
       type_name: "StyleColor",
       computed_style_protected_functions: ["getter"],
       style_builder_custom_functions: ["initial", "inherit", "value"],
-      priority: "High",
+      priority: 1,
       keywords: ["currentcolor"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1109,7 +1134,7 @@
       default_value: "ltr",
       type_name: "TextDirection",
       style_builder_custom_functions: ["value"],
-      priority: "High",
+      priority: 1,
       valid_for_marker: true,
       valid_for_formatted_text: true,
       valid_for_formatted_text_run: true,
@@ -1124,7 +1149,7 @@
       type_name: "FontDescription::FamilyDescription",
       style_builder_custom_functions: ["initial", "inherit"],
       converter: "ConvertFontFamily",
-      priority: "High",
+      priority: 1,
       valid_for_first_letter: true,
       valid_for_first_line: true,
       valid_for_cue: true,
@@ -1142,7 +1167,7 @@
       name_for_methods: "Kerning",
       converter: "ConvertFontKerning",
       type_name: "FontDescription::Kerning",
-      priority: "High",
+      priority: 1,
       keywords: ["auto", "normal", "none"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1161,7 +1186,7 @@
       name_for_methods: "FontOpticalSizing",
       converter: "ConvertFontOpticalSizing",
       type_name: "OpticalSizing",
-      priority: "High",
+      priority: 1,
       keywords: ["auto", "none"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1178,7 +1203,7 @@
       font: true,
       converter: "ConvertFontPalette",
       type_name: "FontPalette",
-      priority: "High",
+      priority: 1,
       keywords: ["normal", "light", "dark"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1196,7 +1221,7 @@
       name_for_methods: "Size",
       getter: "GetSize",
       converter: "ConvertFontSize",
-      priority: "High",
+      priority: 1,
       keywords: ["xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large", "xxx-large", "larger", "smaller", "-webkit-xxx-large"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
@@ -1217,7 +1242,7 @@
       font: true,
       name_for_methods: "SizeAdjust",
       converter: "ConvertFontSizeAdjust",
-      priority: "High",
+      priority: 1,
       keywords: ["none", "ex-height", "cap-height", "ch-width", "ic-width", "from-font"],
       typedom_types: ["Keyword", "Number"],
       valid_for_first_letter: true,
@@ -1235,7 +1260,7 @@
       font: true,
       name_for_methods: "Stretch",
       converter: "ConvertFontStretch",
-      priority: "High",
+      priority: 1,
       keywords: [
         "normal", "ultra-condensed", "extra-condensed", "condensed",
         "semi-condensed", "semi-expanded", "expanded", "extra-expanded", "ultra-expanded"
@@ -1259,7 +1284,7 @@
       font: true,
       name_for_methods: "Style",
       converter: "ConvertFontStyle",
-      priority: "High",
+      priority: 1,
       keywords: ["normal", "italic", "oblique"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1279,7 +1304,7 @@
       name_for_methods: "VariantLigatures",
       type_name: "VariantLigatures",
       converter: "ConvertFontVariantLigatures",
-      priority: "High",
+      priority: 1,
       keywords: [
          "normal", "none", "common-ligatures", "no-common-ligatures",
          "discretionary-ligatures", "no-discretionary-ligatures",
@@ -1302,7 +1327,7 @@
       font: true,
       name_for_methods: "VariantCaps",
       converter: "ConvertFontVariantCaps",
-      priority: "High",
+      priority: 1,
       keywords: [
         "normal", "small-caps", "all-small-caps", "petite-caps",
         "all-petite-caps", "unicase", "titling-caps"
@@ -1323,7 +1348,7 @@
       font: true,
       name_for_methods: "VariantEastAsian",
       converter: "ConvertFontVariantEastAsian",
-      priority: "High",
+      priority: 1,
       keywords: [
          "normal", "jis78", "jis83", "jis90", "jis04", "simplified",
          "traditional", "full-width", "proportional-width", "ruby"
@@ -1344,7 +1369,7 @@
       font: true,
       name_for_methods: "VariantNumeric",
       converter: "ConvertFontVariantNumeric",
-      priority: "High",
+      priority: 1,
       keywords: [
         "normal", "lining-nums", "oldstyle-nums", "proportional-nums",
         "tabular-nums", "diagonal-fractions", "stacked-fractions", "ordinal",
@@ -1367,7 +1392,7 @@
       type_name: "FontVariantAlternates",
       name_for_methods: "FontVariantAlternates",
       converter: "ConvertFontVariantAlternates",
-      priority: "High",
+      priority: 1,
       keywords: [
         "normal",
       ],
@@ -1389,7 +1414,7 @@
       font: true,
       name_for_methods: "Weight",
       converter: "ConvertFontWeight",
-      priority: "High",
+      priority: 1,
       keywords: ["normal", "bold", "bolder", "lighter"],
       typedom_types: ["Keyword", "Number"],
       valid_for_first_letter: true,
@@ -1408,7 +1433,7 @@
       font: true,
       name_for_methods: "FontSynthesisWeight",
       type_name: "FontDescription::FontSynthesisWeight",
-      priority: "High",
+      priority: 1,
       keywords: ["auto", "none"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1424,7 +1449,7 @@
       font: true,
       name_for_methods: "FontSynthesisStyle",
       type_name: "FontDescription::FontSynthesisStyle",
-      priority: "High",
+      priority: 1,
       keywords: ["auto", "none"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1440,7 +1465,7 @@
       font: true,
       name_for_methods: "FontSynthesisSmallCaps",
       type_name: "FontDescription::FontSynthesisSmallCaps",
-      priority: "High",
+      priority: 1,
       keywords: ["auto", "none"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1457,7 +1482,7 @@
       font: true,
       name_for_methods: "FeatureSettings",
       converter: "ConvertFontFeatureSettings",
-      priority: "High",
+      priority: 1,
       keywords: ["normal"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1477,7 +1502,7 @@
       font: true,
       name_for_methods: "VariationSettings",
       converter: "ConvertFontVariationSettings",
-      priority: "High",
+      priority: 1,
       keywords: ["normal"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1498,7 +1523,7 @@
       name_for_methods: "VariantPosition",
       type_name: "FontDescription::FontVariantPosition",
       converter: "ConvertFontVariantPosition",
-      priority: "High",
+      priority: 1,
       keywords: ["normal", "sub", "super"],
       typedom_types: ["Keyword"],
       valid_for_first_letter: true,
@@ -1513,7 +1538,7 @@
       inherited: true,
       font: true,
       type_name: "FontSmoothingMode",
-      priority: "High",
+      priority: 1,
       valid_for_first_letter: true,
       valid_for_first_line: true,
     },
@@ -1524,7 +1549,9 @@
       inherited: true,
       runtime_flag: "ForcedColors",
       field_template: "keyword",
-      priority: "High",
+      // Affects the computed value of color when it is inherited and
+      // forced-color- adjust is set to preserve-parent-color.
+      priority: 2,
       keywords: ["auto", "none", "preserve-parent-color"],
       typedom_types: ["Keyword"],
       default_value: "auto",
@@ -1547,7 +1574,7 @@
       inherited: true,
       font: true,
       style_builder_custom_functions: ["value"],
-      priority: "High",
+      priority: 1,
     },
     {
       name: "math-depth",
@@ -1559,6 +1586,9 @@
       style_builder_custom_functions: ["value"],
       type_name: "short",
       typedom_types: ["Number"],
+      // Affects the computed value of 'font-size', hence needs to happen before
+      // high-priority properties.
+      priority: 2,
     },
     {
       name: "text-orientation",
@@ -1571,7 +1601,7 @@
       default_value: "mixed",
       getter: "GetTextOrientation",
       style_builder_custom_functions: ["initial", "inherit", "value"],
-      priority: "High",
+      priority: 1,
       computable: false,
       valid_for_formatted_text: true,
     },
@@ -1580,7 +1610,7 @@
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
       type_name: "TextOrientation",
-      priority: "High",
+      priority: 1,
       surrogate_for: "text-orientation",
     },
     {
@@ -1594,7 +1624,7 @@
       default_value: "horizontal-tb",
       type_name: "WritingMode",
       style_builder_custom_functions: ["initial", "inherit", "value"],
-      priority: "High",
+      priority: 1,
       valid_for_formatted_text: true,
       // Incremental code does not call DidChangeWritingMode(), which influences
       // the font.
@@ -1605,7 +1635,7 @@
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
       type_name: "WritingMode",
-      priority: "High",
+      priority: 1,
       surrogate_for: "writing-mode",
     },
     {
@@ -1616,7 +1646,7 @@
       type_name: "TextRenderingMode",
       keywords: ["auto", "optimizespeed", "optimizelegibility", "geometricprecision"],
       typedom_types: ["Keyword"],
-      priority: "High",
+      priority: 1,
     },
     {
       name: "zoom",
@@ -1626,7 +1656,7 @@
       default_value: "1.0",
       type_name: "float",
       style_builder_custom_functions: ["initial", "inherit", "value"],
-      priority: "High",
+      priority: 1,
       // Setting zoom affects the _EffectiveZoom_, which in turns affects every px value
       // stored on ComputedStyle; see CSSToLengthConversionData::ZoomedComputedPixels.
       supports_incremental_style: false,
@@ -2367,8 +2397,8 @@
       keywords: ["auto"],
       default_value: "Length()",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthOrAuto",
+      anchor_mode: "bottom",
       logical_property_group: {
         name: "inset",
         resolver: "bottom",
@@ -2572,6 +2602,9 @@
       field_template: "external",
       valid_for_highlight_legacy: true,
       computable: false,
+      // Affects the computed value of 'color', hence needs to happen before
+      // high-priority properties.
+      priority: 2,
     },
     {
       name: "column-fill",
@@ -3088,8 +3121,8 @@
       keywords: ["auto", "fit-content", "min-content", "max-content"],
       default_value: "Length()",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthSizing",
+      anchor_mode: "size",
       logical_property_group: {
         name: "size",
         resolver: "vertical",
@@ -3112,7 +3145,7 @@
     },
     {
       name: "popover-show-delay",
-      runtime_flag: "HTMLPopoverHint",
+      runtime_flag: "HTMLPopoverActionHover",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*",
       field_template: "primitive",
@@ -3125,7 +3158,7 @@
     },
     {
       name: "popover-hide-delay",
-      runtime_flag: "HTMLPopoverHint",
+      runtime_flag: "HTMLPopoverActionHover",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*",
       field_template: "primitive",
@@ -3255,8 +3288,8 @@
       keywords: ["auto"],
       default_value: "Length()",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthOrAuto",
+      anchor_mode: "left",
       logical_property_group: {
         name: "inset",
         resolver: "left",
@@ -3300,7 +3333,7 @@
       inherited: true,
       field_group: "inherited",
       field_template: "<length>",
-      default_value: "Length::Percent(-100.0)",
+      default_value: "Length::Auto()",
       getter: "SpecifiedLineHeight",
       computed_style_custom_functions: ["getter"],
       converter: "ConvertLineHeight",
@@ -3527,8 +3560,8 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::None()",
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthMaxSizing",
+      anchor_mode: "size",
       keywords: ["none"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       logical_property_group: {
@@ -3545,8 +3578,8 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::None()",
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthMaxSizing",
+      anchor_mode: "size",
       keywords: ["none"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       logical_property_group: {
@@ -3563,8 +3596,8 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length()",
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthSizing",
+      anchor_mode: "size",
       typedom_types: ["Length", "Percentage"],
       logical_property_group: {
         name: "min-size",
@@ -3580,8 +3613,8 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length()",
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthSizing",
+      anchor_mode: "size",
       typedom_types: ["Length", "Percentage"],
       logical_property_group: {
         name: "min-size",
@@ -4138,7 +4171,7 @@
       // @try-styling rely on this being high-priority, so that declarations
       // from @try blocks can be applied conditionally based on whether or not
       // we're out-of-flow positioned.
-      priority: "High",
+      priority: 1,
     },
     {
       name: "position-fallback",
@@ -4184,7 +4217,7 @@
     },
     {
       name: "position-try-order",
-      property_methods: ["CSSValueFromComputedStyleInternal"],
+      property_methods: ["CSSValueFromComputedStyleInternal", "InitialValue"],
       field_group: "*",
       field_template: "keyword",
       keywords: ["normal", "most-width", "most-height", "most-block-size", "most-inline-size"],
@@ -4237,8 +4270,8 @@
       keywords: ["auto"],
       default_value: "Length()",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthOrAuto",
+      anchor_mode: "right",
       logical_property_group: {
         name: "inset",
         resolver: "right",
@@ -5016,6 +5049,17 @@
       runtime_flag: "CSSTextBoxTrim",
     },
     {
+      name: "text-box-edge",
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
+      field_group: "box",
+      field_template: "external",
+      include_paths: ["third_party/blink/renderer/core/style/text_box_edge.h"],
+      default_value: "TextBoxEdge(TextBoxEdge::TextBoxEdgeType::kLeading)",
+      type_name: "TextBoxEdge",
+      converter: "ConvertTextBoxEdge",
+      runtime_flag: "CSSTextBoxTrim",
+    },
+    {
       name: "text-combine-upright",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
@@ -5194,7 +5238,7 @@
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
       font: true,
-      priority: "High",
+      priority: 1,
       type_name: "TextSpacingTrim",
       include_paths: ["third_party/blink/renderer/platform/fonts/shaping/text_spacing_trim.h"],
       keywords: ["normal", "space-all", "space-first", "trim-start"],
@@ -5276,8 +5320,8 @@
       keywords: ["auto"],
       default_value: "Length()",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthOrAuto",
+      anchor_mode: "top",
       logical_property_group: {
         name: "inset",
         resolver: "top",
@@ -5369,7 +5413,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/platform/transforms/translate_transform_operation.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "TranslateTransformOperation",
       converter: "ConvertTranslate",
@@ -5383,7 +5427,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/platform/transforms/rotate_transform_operation.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "RotateTransformOperation",
       converter: "ConvertRotate",
@@ -5397,7 +5441,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/platform/transforms/scale_transform_operation.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "ScaleTransformOperation",
       converter: "ConvertScale",
@@ -5920,6 +5964,9 @@
         fill_type_getter: "GetImage"
       },
       runtime_flag: "CSSMaskingInterop",
+      // {-webkit-}mask-image needs to be applied before {-webkit-}mask-composite,
+      // otherwise {-webkit-}mask-composite has no effect.
+      priority: 2,
     },
     {
       name: "-webkit-alternative-mask-image",
@@ -5936,6 +5983,9 @@
         fill_type: "Image",
         fill_type_getter: "GetImage"
       },
+      // {-webkit-}mask-image needs to be applied before {-webkit-}mask-composite,
+      // otherwise {-webkit-}mask-composite has no effect.
+      priority: 2,
     },
     {
       name: "mask-origin",
@@ -6319,8 +6369,8 @@
       keywords: ["auto", "fit-content", "min-content", "max-content"],
       default_value: "Length()",
       typedom_types: ["Keyword", "Length", "Percentage"],
-      computed_style_protected_functions: ["getter"],
       converter: "ConvertLengthSizing",
+      anchor_mode: "size",
       logical_property_group: {
         name: "size",
         resolver: "horizontal",
@@ -7517,6 +7567,12 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
     },
     {
+      name: "position-try",
+      longhands: ["position-try-order", "position-try-options"],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      runtime_flag: "CSSAnchorPositioning",
+    },
+    {
       name: "scroll-margin",
       longhands: ["scroll-margin-top", "scroll-margin-right", "scroll-margin-bottom", "scroll-margin-left"],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
@@ -7723,7 +7779,7 @@
       type_name: "StyleColor",
       computed_style_protected_functions: ["getter"],
       style_builder_custom_functions: ["initial", "inherit", "value"],
-      priority: "High",
+      priority: 1,
       valid_for_first_letter: true,
       valid_for_first_line: true,
       valid_for_cue: true,

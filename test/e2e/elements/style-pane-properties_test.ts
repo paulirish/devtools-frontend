@@ -55,7 +55,7 @@ const deletePropertyByBackspace = async (selector: string, root?: puppeteer.Elem
   await waitFor('.tree-outline .child-editing', root);
 };
 
-describe('The Styles pane', async () => {
+describe('The Styles pane', () => {
   it(
       'can display the CSS properties of the selected element', async () => {
         await goToResourceAndWaitForStyleSection('elements/simple-styled-page.html');
@@ -389,7 +389,7 @@ describe('The Styles pane', async () => {
     const rule1PropertiesSection = await getStyleRule(RULE1_SELECTOR);
     const supportsQuery = await waitFor('.query.editable', rule1PropertiesSection);
     const supportsQueryText = await supportsQuery.evaluate(node => (node as HTMLElement).innerText as string);
-    assert.deepEqual(supportsQueryText, '@supports (width: 10px)', 'incorrectly displayed @supports rule');
+    assert.deepEqual(supportsQueryText, '@supports (width: 10px) {', 'incorrectly displayed @supports rule');
   });
 
   it('can display @layer separators', async () => {
