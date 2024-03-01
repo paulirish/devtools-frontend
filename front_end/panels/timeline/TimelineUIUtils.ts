@@ -44,10 +44,13 @@ import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
+// eslint-disable-next-line rulesdir/es_modules_import
+import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
+// eslint-disable-next-line rulesdir/es_modules_import
 import inspectorCommonStyles from '../../ui/legacy/inspectorCommon.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
@@ -2534,11 +2537,12 @@ export class TimelineUIUtils {
     const indentLength = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get().length;
     // Elide if the data is huge. Then remove the initial new-line for a denser UI
     const eventStr = JSON.stringify(eventWithArgsFirst, null, indentLength).slice(0, 3000).replace(/{\n  /, '{ ');
+
+    // Use CodeHighlighter for syntax highlighting.
     const highlightContainer = document.createElement('div');
-    // Use CodeHighlighter for nice syntax highlighting.
     const shadowRoot = highlightContainer.attachShadow({mode: 'open'});
-    shadowRoot.adoptedStyleSheets = [inspectorCommonStyles, CodeHighlighter.Style.default];
-    const elem = shadowRoot.createChild('div') as HTMLDivElement;
+    shadowRoot.adoptedStyleSheets = [inspectorCommonStyles, codeHighlighterStyles];
+    const elem = shadowRoot.createChild('div');
     elem.classList.add('monospace', 'source-code');
     elem.textContent = eventStr;
     void CodeHighlighter.CodeHighlighter.highlightNode(elem, 'text/javascript');
