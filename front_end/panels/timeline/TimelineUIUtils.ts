@@ -1872,15 +1872,8 @@ export class TimelineUIUtils {
     }
     if (detailed && !Number.isNaN(duration || 0)) {
       contentHelper.appendTextRow(
-          [
-            i18nString(UIStrings.selfTime),
-            i18nString(UIStrings.totalTime),
-          ].join(' / '),
-          [
-            i18n.TimeUtilities.millisToString(selfTime, true),
-            i18n.TimeUtilities.millisToString(duration || 0, true),
-          ].join(' / '),
-      );
+          i18nString(UIStrings.totalTime), i18n.TimeUtilities.millisToString(duration || 0, true));
+      contentHelper.appendTextRow(i18nString(UIStrings.selfTime), i18n.TimeUtilities.millisToString(selfTime, true));
     }
 
     if (traceParseData?.Meta.traceIsGeneric) {
