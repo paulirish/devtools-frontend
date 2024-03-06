@@ -16,16 +16,16 @@ cp -rp "$dtfe/front_end/models/trace/README.md" "$standalone"
 cp -rp "$dtfe/front_end/models/trace/package-template.json" "$standalone/package.json"
 cp -rp "$dtfe/LICENSE" "$standalone"
 mkdir -p "$standalone/test"
-cp -rp "$dtfe/test/unittests/fixtures/traces/invalid-animation-events.json.gz" "$standalone/test"
+cp -rp "$dtfe/front_end/panels/timeline/fixtures/traces/invalid-animation-events.json.gz" "$standalone/test"
 
 # tweak paths for the new location
 cp -rp "$dtfe/scripts/trace/analyze-trace.mjs" "$standalone/analyze-trace.mjs.orig"
 cat "$standalone/analyze-trace.mjs.orig"        | \
   sed 's|../../out/TraceEngine/dist/|./|'     | \
-  sed 's|test/unittests/fixtures/traces/|test/|'  > "$standalone/analyze-trace.mjs"
+  sed 's|front_end/panels/timeline/fixtures/traces/|test/|'  > "$standalone/analyze-trace.mjs"
 cp -rp "$dtfe/scripts/trace/test/test-trace-engine.mjs" "$standalone/test/test-trace-engine.mjs.orig"
 cat "$standalone/test/test-trace-engine.mjs.orig"  | \
-  sed 's|test/unittests/fixtures/traces/|test/|'  > "$standalone/test/test-trace-engine.mjs"
+  sed 's|front_end/panels/timeline/fixtures/traces/|test/|'  > "$standalone/test/test-trace-engine.mjs"
 
 # cleanup
 command rm "$standalone/analyze-trace.mjs.orig"

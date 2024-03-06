@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import test from 'node:test';
 import {strict as assert} from 'assert';
+import test from 'node:test';
 
 import {analyzeTrace} from '../analyze-trace.mjs';
 
-const filename = './test/unittests/fixtures/traces/invalid-animation-events.json.gz';
+const filename = './front_end/panels/timeline/fixtures/traces/invalid-animation-events.json.gz';
 const data = await analyzeTrace(filename);
 
 test('key values are populated', t => {
