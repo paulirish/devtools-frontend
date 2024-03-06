@@ -2511,8 +2511,19 @@ export class TimelineUIUtils {
     return contentHelper.fragment;
   }
 
+  /**
+   * Some stacks have 0-indexed values, some have 1-indexed values.
+   * If the impl uses `stackTrace.topLineNumber` (or topColumnNumber), that's a 1-indexed value.
+   * Meanwhile a `frame.lineNumber` (or columNumber) is 0-indexed. https://source.chromium.org/chromium/chromium/src/+/main:v8/src/inspector/v8-stack-trace-impl.h
+   *
+   * Unfortunately, both values are written into the trace as `lineNumber` with no obvious method of distinction.
+   */
   static stackTraceFromCallFrames(callFrames: Protocol.Runtime.CallFrame[]|
                                   TraceEngine.Types.TraceEvents.TraceEventCallFrame[]): Protocol.Runtime.StackTrace {
+    // const zeroIndexedLineNumberCallFrames = callFrames.map(frame => ({
+    //                                                          ...frame,
+    //                                                          lineNumber: frame.lineNumber - 1,
+    //                                                        }));
     return {callFrames: callFrames} as Protocol.Runtime.StackTrace;
   }
 

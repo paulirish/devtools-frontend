@@ -100,7 +100,9 @@ export interface TraceEventCallFrame {
   functionName: string;
   // Trace events are inconsistent here sadly :(
   scriptId: number|string;
+  // 1-indexed, we think
   columnNumber: number;
+  // 1-indexed, we think
   lineNumber: number;
   url: string;
 }

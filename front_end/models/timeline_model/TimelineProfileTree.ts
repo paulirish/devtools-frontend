@@ -558,7 +558,13 @@ export function eventStackFrame(event: TraceEngine.Types.TraceEvents.TraceEventD
   if (!topFrame) {
     return null;
   }
-  return {...topFrame, scriptId: String(topFrame.scriptId) as Protocol.Runtime.ScriptId};
+  return {
+    ...topFrame,
+    scriptId: String(topFrame.scriptId) as Protocol.Runtime.ScriptId,
+    // We need to change 1-index to 0 index on both line/col for this to match runtime.callframe
+    lineNumber: topFrame.lineNumber - 1,
+    columnNumber: topFrame.columnNumber - 1,
+  };
 }
 
 export function generateEventID(event: TraceEngine.Legacy.CompatibleTraceEvent): string {
