@@ -550,8 +550,13 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     filterBar.addDivider();
 
     const filterItems =
-        Object.values(Common.ResourceType.resourceCategories)
-            .map(category => ({name: category.title(), label: () => category.shortTitle(), title: category.title()}));
+        Object.entries(Common.ResourceType.resourceCategories).map(([key, category]) => ({
+                                                                     name: category.title(),
+                                                                     label: () => category.shortTitle(),
+                                                                     title: category.title(),
+                                                                     jslogContext:
+                                                                         Platform.StringUtilities.toKebabCase(key),
+                                                                   }));
 
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN)) {
       this.resourceCategoryFilterUI = new DropDownTypesUI(filterItems, this.networkResourceTypeFiltersSetting);
@@ -923,7 +928,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   private computeRowHeight(): number {
-    return Math.round(this.rawRowHeight * window.devicePixelRatio) / window.devicePixelRatio;
+    return this.rawRowHeight;
   }
 
   nodeForRequest(request: SDK.NetworkRequest.NetworkRequest): NetworkRequestNode|null {

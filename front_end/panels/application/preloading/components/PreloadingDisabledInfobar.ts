@@ -13,6 +13,7 @@ import * as Coordinator from '../../../../ui/components/render_coordinator/rende
 import * as ReportView from '../../../../ui/components/report_view/report_view.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 
 import preloadingDisabledInfobarStyles from './preloadingDisabledInfobar.css.js';
 
@@ -35,7 +36,7 @@ const UIStrings = {
   headerDisabledByPreference: 'User settings or extensions',
   /**
    *@description Description in dialog
-   *@example {Preload pages settings (linked to chrome://settings/preloading)} PH1
+   *@example {Preload pages settings (linked to chrome://settings/performance)} PH1
    *@example {Extensions settings (linked to chrome://extensions)} PH2
    */
   descriptionDisabledByPreference:
@@ -159,6 +160,7 @@ export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.Wrapp
             closeOnESC: true,
             closeOnScroll: false,
           } as Dialogs.IconDialog.IconDialogData}
+          jslog=${VisualLogging.dialog('preloading-disabled').track({resize: true})}
         >
           ${this.#dialogContents()}
         </${Dialogs.IconDialog.IconDialog.litTagName}>
@@ -261,7 +263,6 @@ export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.Wrapp
 customElements.define('devtools-resources-preloading-disabled-infobar', PreloadingDisabledInfobar);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-resources-preloading-disabled-infobar': PreloadingDisabledInfobar;
   }

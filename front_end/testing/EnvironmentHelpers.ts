@@ -250,6 +250,12 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.CONSOLE, 'console-timestamps-enabled', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
+        Common.Settings.SettingCategory.CONSOLE, 'console-insights-enabled', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.CONSOLE, 'console-insights-onboarding-finished', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'console-history-autocomplete', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
@@ -267,6 +273,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(
         Common.Settings.SettingCategory.PERFORMANCE, 'flamechart-mouse-wheel-action', false,
         Common.Settings.SettingType.ENUM),
+    createSettingValue(
+        Common.Settings.SettingCategory.ELEMENTS, 'show-css-property-documentation-on-hover', false,
+        Common.Settings.SettingType.BOOLEAN),
   ];
 
   Common.Settings.registerSettingsForTest(settings, reset);

@@ -33,11 +33,10 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     EventTarget {
   // We force the Meta handler to be enabled, so the TraceHandlers type here is
   // the model handlers the user passes in and the Meta handler.
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   readonly #traceHandlers: Handlers.Types.HandlersWithMeta<EnabledModelHandlers>;
   #status = Status.IDLE;
   #modelConfiguration = Types.Configuration.DEFAULT;
-  #insights: Insights.Types.TraceInsightData|null = null;
+  #insights: Insights.Types.TraceInsightData<EnabledModelHandlers>|null = null;
 
   static createWithAllHandlers(): TraceProcessor<typeof Handlers.ModelHandlers> {
     return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.DEFAULT);
@@ -201,7 +200,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     return enabledInsights;
   }
 
-  get insights(): Insights.Types.TraceInsightData|null {
+  get insights(): Insights.Types.TraceInsightData<EnabledModelHandlers>|null {
     if (!this.traceParsedData) {
       return null;
     }
@@ -224,9 +223,15 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
         navigationId: nav.args.data.navigationId,
       };
 
-      const navInsightData = {} as Insights.Types.NavigationInsightData;
+      const navInsightData = {} as Insights.Types.NavigationInsightData<EnabledModelHandlers>;
       for (const [name, generateInsight] of Object.entries(enabledInsightRunners)) {
-        Object.assign(navInsightData, {[name]: generateInsight(this.traceParsedData, context)});
+        let insightResult;
+        try {
+          insightResult = generateInsight(this.traceParsedData, context);
+        } catch (err) {
+          insightResult = err;
+        }
+        Object.assign(navInsightData, {[name]: insightResult});
       }
 
       this.#insights.set(context.navigationId, navInsightData);

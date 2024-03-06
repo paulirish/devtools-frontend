@@ -643,7 +643,14 @@ export enum Action {
   InsightGenerated = 130,
   InsightErroredApi = 131,
   InsightErroredMarkdown = 132,
-  MaxValue = 133,
+  ToggleShowWebVitals = 133,
+  InsightErroredPermissionDenied = 134,
+  InsightErroredCannotSend = 135,
+  InsightErroredRequestFailed = 136,
+  InsightErroredCannotParseChunk = 137,
+  InsightErroredUnknownChunk = 138,
+  InsightErroredOther = 139,
+  MaxValue = 140,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */

@@ -1000,6 +1000,11 @@ export namespace Audits {
     WebAndOsHeaders = 'WebAndOsHeaders',
     NoWebOrOsSupport = 'NoWebOrOsSupport',
     NavigationRegistrationWithoutTransientUserActivation = 'NavigationRegistrationWithoutTransientUserActivation',
+    InvalidInfoHeader = 'InvalidInfoHeader',
+    NoRegisterSourceHeader = 'NoRegisterSourceHeader',
+    NoRegisterTriggerHeader = 'NoRegisterTriggerHeader',
+    NoRegisterOsSourceHeader = 'NoRegisterOsSourceHeader',
+    NoRegisterOsTriggerHeader = 'NoRegisterOsTriggerHeader',
   }
 
   /**
@@ -11870,6 +11875,7 @@ export namespace Page {
     SmartCard = 'SmartCard',
     LiveMediaStreamTrack = 'LiveMediaStreamTrack',
     UnloadHandler = 'UnloadHandler',
+    ParserAborted = 'ParserAborted',
     ContentSecurityHandler = 'ContentSecurityHandler',
     ContentWebAuthenticationAPI = 'ContentWebAuthenticationAPI',
     ContentFileChooser = 'ContentFileChooser',

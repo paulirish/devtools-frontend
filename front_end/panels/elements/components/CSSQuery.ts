@@ -55,7 +55,7 @@ export class CSSQuery extends HTMLElement {
 
     render(html`
       <div class=${queryClasses}>
-        ${this.#queryPrefix ? html`<span>${this.#queryPrefix + ' '}</span>` : LitHtml.nothing}${this.#queryName ? html`<span>${this.#queryName + ' '}</span>` : LitHtml.nothing}${queryText}
+        <slot name="indent"></slot>${this.#queryPrefix ? html`<span>${this.#queryPrefix + ' '}</span>` : LitHtml.nothing}${this.#queryName ? html`<span>${this.#queryName + ' '}</span>` : LitHtml.nothing}${queryText} {
       </div>
     `, this.#shadow, {
       host: this,
@@ -67,7 +67,6 @@ export class CSSQuery extends HTMLElement {
 customElements.define('devtools-css-query', CSSQuery);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-css-query': CSSQuery;
   }

@@ -43,7 +43,7 @@ import {ActiveFilters} from './ActiveFilters.js';
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
 import * as Components from './components/components.js';
 import {type TimelineCategory} from './EventUICategory.js';
-import {eventInitiatorPairsToDraw} from './Initiators.js';
+import {initiatorsDataToDraw} from './Initiators.js';
 import {type PerformanceModel} from './PerformanceModel.js';
 import {ThreadAppender} from './ThreadAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
@@ -167,7 +167,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private colorForEvent?: ((arg0: TraceEngine.Legacy.Event) => string);
   #eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
   #font: string;
-
   #eventIndexByEvent: WeakMap<TraceEngine.Types.TraceEvents.TraceEventData, number|null> = new WeakMap();
 
   constructor() {
@@ -369,6 +368,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.entryIndexToTitle = [];
     this.asyncColorByCategory = new Map();
     this.screenshotImageCache = new Map();
+    this.#eventIndexByEvent = new Map();
     this.#eventToDisallowRoot = new WeakMap<TraceEngine.Legacy.Event, boolean>();
     if (resetCompatibilityTracksAppender) {
       this.compatibilityTracksAppender = null;
@@ -1377,8 +1377,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 
   /**
-   * Build the |flowStartTimes|, |flowStartLevels|, |flowEndTimes| and
-   * |flowEndLevels| data for the initiator arrows of given entry.
+   * Build the data for initiators and initiated entries.
    * @param entryIndex
    * @returns if we should re-render the flame chart (canvas)
    */
@@ -1396,13 +1395,14 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return false;
     }
 
-    const previousInitiatorPairsLength = this.timelineDataInternal.flowStartTimes.length;
+    // Remove all previously assigned decorations indicating that the flow event entries are hidden
+    const previousInitiatorsDataLength = this.timelineDataInternal.initiatorsData.length;
     // |entryIndex| equals -1 means there is no entry selected, just clear the
     // initiator cache if there is any previous arrow and return true to
     // re-render.
     if (entryIndex === -1) {
       this.lastInitiatorEntry = entryIndex;
-      if (previousInitiatorPairsLength === 0) {
+      if (previousInitiatorsDataLength === 0) {
         // This means there is no arrow before, so we don't need to re-render.
         return false;
       }
@@ -1424,32 +1424,39 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
     // Reset to clear any previous arrows from the last event.
     this.timelineDataInternal.resetFlowData();
-
     this.lastInitiatorEntry = entryIndex;
 
-    const initiatorPairs = eventInitiatorPairsToDraw(
+    let hiddenEvents: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
+    let modifiedEntries: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
+
+    if (this.timelineDataInternal.selectedGroup) {
+      hiddenEvents = this.compatibilityTracksAppender?.getHiddenEvents(this.timelineDataInternal.selectedGroup) ?? [];
+      modifiedEntries =
+          this.compatibilityTracksAppender?.getModifiedEntries(this.timelineDataInternal.selectedGroup) ?? [];
+    }
+
+    const initiatorsData = initiatorsDataToDraw(
         this.traceEngineData,
         event,
+        hiddenEvents,
+        modifiedEntries,
     );
     // This means there is no change for arrows.
-    if (previousInitiatorPairsLength === 0 && initiatorPairs.length === 0) {
+    if (previousInitiatorsDataLength === 0 && initiatorsData.length === 0) {
       return false;
     }
-    for (const pair of initiatorPairs) {
-      const eventIndex = this.getIndexForEvent(pair.event);
-      const initiatorIndex = this.getIndexForEvent(pair.initiator);
+    for (const intiatorData of initiatorsData) {
+      const eventIndex = this.getIndexForEvent(intiatorData.event);
+      const initiatorIndex = this.getIndexForEvent(intiatorData.initiator);
       if (eventIndex === null || initiatorIndex === null) {
         continue;
       }
-      const {startTime} = TraceEngine.Legacy.timesForEventInMilliseconds(pair.event);
-      const {endTime: initiatorEndTime, startTime: initiatorStartTime} =
-          TraceEngine.Legacy.timesForEventInMilliseconds(pair.initiator);
-
-      const td = this.timelineDataInternal;
-      td.flowStartTimes.push(initiatorEndTime || initiatorStartTime);
-      td.flowStartLevels.push(td.entryLevels[initiatorIndex]);
-      td.flowEndTimes.push(startTime);
-      td.flowEndLevels.push(td.entryLevels[eventIndex]);
+      this.timelineDataInternal.initiatorsData.push({
+        initiatorIndex,
+        eventIndex,
+        isInitiatorHidden: intiatorData.isInitiatorHidden,
+        isEntryHidden: intiatorData.isEntryHidden,
+      });
     }
     return true;
   }
