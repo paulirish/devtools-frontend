@@ -41,8 +41,8 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
+import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
@@ -1913,10 +1913,9 @@ export class TimelineUIUtils {
         break;
       }
       case recordTypes.JSSample: {
-          // contentHelper.appendStackTrace('stack trace', event.args.data.stackTrace);
-          contentHelper.appendStackTrace(i18nString(UIStrings.stackTrace),
-          TimelineUIUtils.stackTraceFromCallFrames(event.args.data.stackTrace));
-        break;
+        // Don't need this as another codepath will print it
+        // contentHelper.createChildStackTraceElement(TimelineUIUtils.stackTraceFromCallFrames(event.args.data.stackTrace));
+        // break;
       }
       case recordTypes.JSRoot:
       case recordTypes.JSFrame:
