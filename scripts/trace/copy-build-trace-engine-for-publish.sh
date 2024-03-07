@@ -7,6 +7,14 @@ standalone="$HOME/code/trace_engine"
 
 trace_engine_dist="$dtfe/out/TraceEngine/dist"
 
+echo "Testing before copy"
+node "$dtfe/scripts/trace/test/test-trace-engine.mjs"
+if [ $? -ne 0 ]; then
+ exit $?
+fi
+
+echo -e "\nCopying to $standalone … \n"
+
 # don't keep around old stuff
 command rm -rf "$standalone/models" "$standalone/core" "$standalone/generated"
 

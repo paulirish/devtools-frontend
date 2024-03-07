@@ -32,33 +32,18 @@ You'll probably use something like…
 
 See also http://go/btlax
 
-#### Build, run, extract
-
 ```sh
 # Build devtools and prep a package
 scripts/trace/build-trace-engine-lib.sh
-
-# run
-node scripts/trace/analyze-trace.mjs test/unittests/fixtures/traces/web-dev.json.gz
-
-# test
-node scripts/trace/test/test-trace-engine.mjs
-
-# copy built files to $HOME/code/trace_engine
+# Test and copy built files to $HOME/code/trace_engine
 scripts/trace/copy-build-trace-engine-for-publish.sh
-```
 
-#### Test and publish
 
-```sh
 # switch to standalone
 cd $HOME/code/trace_engine
 
-# test
-node test/test-trace-engine.mjs
-
 # bump and publish
-npm version v0.0.XXX   # Manually determine next version
+npm version v0.0.XXX   # Manually determine next version. `npm info @paulirish/trace_engine | grep latest` + 1
 npm publish --access public --dry-run
 npm publish --access public
 ```
