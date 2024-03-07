@@ -1,6 +1,9 @@
 # Trace Model (NOT FOR PUBLIC CONSUMPTION)
 
-This folder contains the new trace engine that was first implemented for the Performance Insights panel and is now being repurposed as the primary trace engine that we use within DevTools.
+This package contains the trace engine implementation used by the DevTools Performance Panel.
+
+⚠️ The API is not stable and it's fairly likely that upgrades will break you (at some point).
+But the breakages should be obvious exceptions or type failures.
 
 ## API quickstart
 
@@ -8,15 +11,22 @@ This folder contains the new trace engine that was first implemented for the Per
 import * as TraceModel from '@paulirish/trace_engine';
 
 polyfillDOMRect();
-const processor = TraceModel.Processor.TraceProcessor.createWithAllHandlers();
+const engine = TraceModel.Processor.TraceProcessor.createWithAllHandlers();
 
-await processor.parse(traceEvents);
-console.log(processor.data)
+await engine.parse(traceEvents);
+console.log(engine.data) // TraceParseData
 ```
 
-**Note:** in reality to run in Node, you'll need to polyfill `window.DOMRect`. 😜
+**Note:** To run in Node, you'll need to polyfill `window.DOMRect`. 😜
 
 See the included `analyze-trace.mjs` a runnable invocation.
+
+### Types
+
+You'll probably use something like…
+
+    @type {import('@paulirish/trace_engine').Types.TraceEvents.TraceEventData[]
+    @type {import('@paulirish/trace_engine').Handlers.Types.TraceParseData
 
 ## Maintainer cheatsheet
 
