@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Common from '../../../core/common/common.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import type * as Common from '../../../core/common/common.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+
 import {getMetricsInPage} from './getMetricsInPage.js';
 
 declare global {
@@ -44,6 +45,7 @@ export class CurrentPageMetrics extends HTMLElement {
       console.log('could not get main target');
       return;
     }
+    console.log('we have a main target.');
     const frameTreeResponse = await mainTarget.pageAgent().invoke_getFrameTree();
     const mainFrameID = frameTreeResponse.frameTree.frame.id;
     this.#mainFrameID = mainFrameID;
@@ -108,4 +110,4 @@ export class CurrentPageMetrics extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-timeline-current-page-metrics', CurrentPageMetrics);
+customElements.define('devtools-timeline-current-page-metrics', CurrentPageMetrics);

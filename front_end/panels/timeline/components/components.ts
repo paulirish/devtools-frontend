@@ -7,7 +7,6 @@ import * as BreadcrumbsUI from './BreadcrumbsUI.js';
 import * as CurrentPageMetrics from './CurrentPageMetrics.js';
 import * as DetailsView from './DetailsView.js';
 import * as InteractionBreakdown from './InteractionBreakdown.js';
-import * as WebVitalsTimeline from './WebVitalsTimeline.js';
 
 export {
   Breadcrumbs,
@@ -15,5 +14,4 @@ export {
   CurrentPageMetrics,
   DetailsView,
   InteractionBreakdown,
-  WebVitalsTimeline,
 };
