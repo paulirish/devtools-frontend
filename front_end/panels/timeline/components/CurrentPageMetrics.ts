@@ -5,13 +5,12 @@
 import type * as Common from '../../../core/common/common.js';
 import {RuntimeModel} from '../../../core/sdk/RuntimeModel.js';
 import * as SDK from '../../../core/sdk/sdk.js';
-import * as ProtocolProxyApi from '../../../generated/protocol-proxy-api.js';
+import type * as ProtocolProxyApi from '../../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import {getMetricsInPage} from './getMetricsInPage.js';
-
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -40,19 +39,24 @@ export class CurrentPageMetrics extends HTMLElement {
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
 
-  #currentPageMetrics = [];
+  #currentPageMetrics = [{empty: 0}];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
-  onEventBound: any;
 
-  async init(onEventBound: (item: any) => void): Promise<void> {
+  constructor() {
+    super();
+    void this.setup();
+  }
+  async setup(): Promise<void> {
+    const wait = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(500);  // HACK. need something better for waiting for target reference
+
     const mainTarget = (SDK.TargetManager.TargetManager.instance().primaryPageTarget());
-    this.#mainTarget = mainTarget;
-    this.onEventBound = onEventBound;
     if (!mainTarget) {
       console.log('could not get main target');
       return;
     }
+    this.#mainTarget = mainTarget;
     console.log('we have a main target.');
 
     const runtimeModel = this.#mainTarget.model(RuntimeModel);
@@ -70,10 +74,11 @@ export class CurrentPageMetrics extends HTMLElement {
 
     this.#getPageMetrics();
     // TODO: listen to the page URL changing and run the code again?
-    // void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
-  async reset(): Promise<void> {  // TODO: hook this up to something.
+  // TODO: wire this up
+  async destroyStufff(): Promise<void> {
     SDK.TargetManager.TargetManager.instance().removeModelListener(
         SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
 
@@ -82,13 +87,14 @@ export class CurrentPageMetrics extends HTMLElement {
     resourceTreeModel.removeEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
   }
 
-
   #onBindingCalled(event: ProtocolProxyApi.RuntimeApi.BindingCalledEvent): void {
     const {data} = event;
-    if (data.name !== '__chromium_devtools_metrics_reporter')
+    if (data.name !== '__chromium_devtools_metrics_reporter') {
       return;
+    }
     const obj = JSON.parse(event.data.payload);
-    this.#currentPageMetrics.push(obj) this.onEventBound(obj);
+    this.#currentPageMetrics.push(obj);
+    console.log('binding called', obj);
     this.#render();
   }
 
@@ -110,6 +116,7 @@ export class CurrentPageMetrics extends HTMLElement {
     if (!this.#mainTarget) {
       return;
     }
+    await this.#mainTarget.runtimeAgent().invoke_evaluate({expression: 'console.log({dpr: window.devicePixelRatio})'});
 
     const evaluationResult = await this.#mainTarget.runtimeAgent().invoke_evaluate({
       returnByValue: true,
@@ -125,7 +132,7 @@ export class CurrentPageMetrics extends HTMLElement {
 
 
     // this.#currentPageMetrics = evaluationResult.result.value;
-    // this.#render();
+    this.#render();
   }
 
   #getResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel {
@@ -143,17 +150,17 @@ export class CurrentPageMetrics extends HTMLElement {
     // clang-format off
     LitHtml.render(LitHtml.html`<button @click=${(): void => {
       void this.#getPageMetrics();
-    }}>click me to re-evaluate</button>
+    }}>refresh? (probably unneeded)</button>
       ${this.#renderPageMetrics()}
     `, this.#shadow, {host: this});
     // clang-format on
   }
 
-
   #renderPageMetrics(): LitHtml.TemplateResult {
-    if (!this.#currentPageMetrics.length)
+    if (!this.#currentPageMetrics.length) {
       return LitHtml.html``;
-    return LitHtml.html`<p>${JSON.stringify(this.#currentPageMetrics)}</p>`
+    }
+    return LitHtml.html`<p>${JSON.stringify(this.#currentPageMetrics)}</p>`;
   }
 }
 
