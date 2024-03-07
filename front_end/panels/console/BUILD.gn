@@ -71,7 +71,6 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/e2e/console/*",
-    "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
     "../../entrypoints/*",
     "../../panels/explain/*",
   ]
@@ -106,13 +105,13 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../test/unittests/front_end/helpers",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated:protocol",
     "../../models/bindings:bundle",
     "../../models/issues_manager:bundle",
     "../../models/logs:bundle",
+    "../../testing",
     "../../ui/legacy/components/utils:bundle",
   ]
 }

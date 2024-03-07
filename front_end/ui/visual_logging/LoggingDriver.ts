@@ -4,14 +4,14 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Coordinator from '../components/render_coordinator/render_coordinator.js';
 
+import {processForDebugging} from './Debugging.js';
 import {getDomState, visibleOverlap} from './DomState.js';
 import {type Loggable} from './Loggable.js';
-import {debugString, getLoggingConfig} from './LoggingConfig.js';
+import {getLoggingConfig} from './LoggingConfig.js';
 import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown, logResize} from './LoggingEvents.js';
-import {getOrCreateLoggingState} from './LoggingState.js';
+import {getLoggingState, getOrCreateLoggingState} from './LoggingState.js';
 import {getNonDomState, unregisterAllLoggables, unregisterLoggable} from './NonDomState.js';
 
 const PROCESS_DOM_INTERVAL = 500;
@@ -22,12 +22,16 @@ const CLICK_LOG_INTERVAL = 500;
 const RESIZE_LOG_INTERVAL = 1000;
 const RESIZE_REPORT_THRESHOLD = 50;
 
-let processingThrottler: Common.Throttler.Throttler|null;
-let keyboardLogThrottler: Common.Throttler.Throttler;
-let hoverLogThrottler: Common.Throttler.Throttler;
-let dragLogThrottler: Common.Throttler.Throttler;
-let clickLogThrottler: Common.Throttler.Throttler;
-let resizeLogThrottler: Common.Throttler.Throttler;
+const noOpThrottler = {
+  schedule: async () => {},
+} as unknown as Common.Throttler.Throttler;
+
+let processingThrottler = noOpThrottler;
+export let keyboardLogThrottler = noOpThrottler;
+let hoverLogThrottler = noOpThrottler;
+let dragLogThrottler = noOpThrottler;
+export let clickLogThrottler = noOpThrottler;
+export let resizeLogThrottler = noOpThrottler;
 
 const mutationObservers = new WeakMap<Node, MutationObserver>();
 const documents: Document[] = [];
@@ -91,7 +95,7 @@ export function stopLogging(): void {
     mutationObservers.delete(shadowRoot);
   }
   documents.length = 0;
-  processingThrottler = null;
+  processingThrottler = noOpThrottler;
 }
 
 export function scheduleProcessing(): void {
@@ -101,28 +105,6 @@ export function scheduleProcessing(): void {
   void processingThrottler.schedule(
       () => Coordinator.RenderCoordinator.RenderCoordinator.instance().read('processForLogging', process));
 }
-
-let veDebuggingEnabled = false;
-let debugPopover: HTMLElement|null = null;
-const nonDomDebugElements = new WeakMap<Loggable, HTMLElement>();
-
-function setVeDebuggingEnabled(enabled: boolean): void {
-  veDebuggingEnabled = enabled;
-  if (enabled && !debugPopover) {
-    debugPopover = document.createElement('div');
-    debugPopover.classList.add('ve-debug');
-    debugPopover.style.position = 'absolute';
-    debugPopover.style.bottom = '100px';
-    debugPopover.style.left = '100px';
-    debugPopover.style.background = 'black';
-    debugPopover.style.color = 'white';
-    debugPopover.style.zIndex = '100000';
-    document.body.appendChild(debugPopover);
-  }
-}
-
-// @ts-ignore
-globalThis.setVeDebuggingEnabled = setVeDebuggingEnabled;
 
 async function process(): Promise<void> {
   if (document.hidden) {
@@ -146,8 +128,11 @@ async function process(): Promise<void> {
     const loggingState = getOrCreateLoggingState(element, getLoggingConfig(element), parent);
     if (!loggingState.impressionLogged) {
       const overlap = visibleOverlap(element, viewportRectFor(element));
-      if (overlap) {
-        loggingState.size = overlap;
+      const visibleSelectOption = element.tagName === 'OPTION' && loggingState.parent?.selectOpen;
+      if (overlap || visibleSelectOption) {
+        if (overlap) {
+          loggingState.size = overlap;
+        }
         visibleLoggables.push(element);
         loggingState.impressionLogged = true;
       }
@@ -156,13 +141,13 @@ async function process(): Promise<void> {
       if (loggingState.config.track?.has('click')) {
         element.addEventListener('click', e => {
           const loggable = e.currentTarget as Element;
-          void clickLogThrottler.schedule(async () => logClick(loggable, e));
+          logClick(clickLogThrottler)(loggable, e);
         }, {capture: true});
       }
       if (loggingState.config.track?.has('dblclick')) {
         element.addEventListener('dblclick', e => {
           const loggable = e.currentTarget as Element;
-          void clickLogThrottler.schedule(async () => logClick(loggable, e, {doubleClick: true}));
+          logClick(clickLogThrottler)(loggable, e, {doubleClick: true});
         }, {capture: true});
       }
       const trackHover = loggingState.config.track?.has('hover');
@@ -181,9 +166,9 @@ async function process(): Promise<void> {
         element.addEventListener('change', logChange, {capture: true});
       }
       const trackKeyDown = loggingState.config.track?.has('keydown');
-      const codes = loggingState.config.track?.get('keydown')?.split(',') || [];
+      const codes = loggingState.config.track?.get('keydown')?.split('|') || [];
       if (trackKeyDown) {
-        element.addEventListener('keydown', logKeyDown(codes, keyboardLogThrottler), {capture: true});
+        element.addEventListener('keydown', logKeyDown(keyboardLogThrottler, codes), {capture: true});
       }
       if (loggingState.config.track?.has('resize')) {
         const updateSize = (): void => {
@@ -193,33 +178,46 @@ async function process(): Promise<void> {
           }
           if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
               Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
-            void logResize(element, overlap, resizeLogThrottler);
+            void logResize(resizeLogThrottler)(element, overlap);
           }
         };
         new ResizeObserver(updateSize).observe(element);
         new IntersectionObserver(updateSize).observe(element);
       }
+      if (element.tagName === 'SELECT') {
+        const onSelectOpen = (): void => {
+          if (loggingState.selectOpen) {
+            return;
+          }
+          loggingState.selectOpen = true;
+          scheduleProcessing();
+        };
+        element.addEventListener('click', onSelectOpen, {capture: true});
+        // Based on MenuListSelectType::ShouldOpenPopupForKey{Down,Press}Event
+        element.addEventListener('keydown', event => {
+          const e = event as KeyboardEvent;
+          if ((Host.Platform.isMac() || e.altKey) && (e.code === 'ArrowDown' || e.code === 'ArrowUp') ||
+              (!e.altKey && !e.ctrlKey && e.code === 'F4')) {
+            onSelectOpen();
+          }
+        }, {capture: true});
+        element.addEventListener('keypress', event => {
+          const e = event as KeyboardEvent;
+          if (e.key === ' ' || !Host.Platform.isMac() && e.key === '\r') {
+            onSelectOpen();
+          }
+        }, {capture: true});
+        element.addEventListener('change', e => {
+          for (const option of (element as HTMLSelectElement).selectedOptions) {
+            if (getLoggingState(option)?.config.track?.has('click')) {
+              void logClick(clickLogThrottler)(option, e);
+            }
+          }
+        }, {capture: true});
+      }
       loggingState.processed = true;
     }
-    if (veDebuggingEnabled && !loggingState.processedForDebugging) {
-      (element as HTMLElement).style.outline = 'solid 1px red';
-      element.addEventListener('mouseenter', () => {
-        assertNotNullOrUndefined(debugPopover);
-        debugPopover.style.display = 'block';
-        const pathToRoot = [loggingState];
-        let ancestor = loggingState.parent;
-        while (ancestor) {
-          pathToRoot.push(ancestor);
-          ancestor = ancestor.parent;
-        }
-        debugPopover.innerHTML = pathToRoot.map(s => debugString(s.config)).join('<br>');
-      }, {capture: true});
-      element.addEventListener('mouseleave', () => {
-        assertNotNullOrUndefined(debugPopover);
-        debugPopover.style.display = 'none';
-      }, {capture: true});
-      loggingState.processedForDebugging = true;
-    }
+    processForDebugging(element);
   }
   for (const {loggable, config, parent} of getNonDomState().loggables) {
     const loggingState = getOrCreateLoggingState(loggable, config, parent);
@@ -227,28 +225,7 @@ async function process(): Promise<void> {
     if (!visible) {
       continue;
     }
-    if (veDebuggingEnabled) {
-      let debugElement = nonDomDebugElements.get(loggable);
-      if (!debugElement) {
-        debugElement = document.createElement('div');
-        debugElement.classList.add('ve-debug');
-        debugElement.style.background = 'black';
-        debugElement.style.color = 'white';
-        debugElement.style.zIndex = '100000';
-        debugElement.textContent = debugString(config);
-        nonDomDebugElements.set(loggable, debugElement);
-      }
-      const parentDebugElement =
-          parent instanceof HTMLElement ? parent : nonDomDebugElements.get(parent as Loggable) || debugPopover;
-      assertNotNullOrUndefined(parentDebugElement);
-      if (!parentDebugElement.classList.contains('ve-debug')) {
-        debugElement.style.position = 'absolute';
-        parentDebugElement.insertBefore(debugElement, parentDebugElement.firstChild);
-      } else {
-        debugElement.style.marginLeft = '10px';
-        parentDebugElement.appendChild(debugElement);
-      }
-    }
+    processForDebugging(loggable);
     visibleLoggables.push(loggable);
     loggingState.impressionLogged = true;
     // No need to track loggable as soon as we've logged the impression

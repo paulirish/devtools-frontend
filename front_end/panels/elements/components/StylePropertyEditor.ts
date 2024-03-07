@@ -72,7 +72,6 @@ export class StylePropertyEditor extends HTMLElement {
   #authoredProperties: Map<string, string> = new Map();
   #computedProperties: Map<string, string> = new Map();
   protected readonly editableProperties: EditableProperty[] = [];
-  protected readonly jslog: string = '';
 
   constructor() {
     super();
@@ -96,7 +95,7 @@ export class StylePropertyEditor extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="container" jslog=${this.jslog}>
+      <div class="container">
         ${this.editableProperties.map(prop => this.#renderProperty(prop))}
       </div>
     `, this.#shadow, {
@@ -161,7 +160,7 @@ export class StylePropertyEditor extends HTMLElement {
 }
 
 export class FlexboxEditor extends StylePropertyEditor {
-  protected override readonly jslog = `${VisualLogging.cssFlexboxEditor()}`;
+  readonly jslogContext = 'cssFlexboxEditor';
   protected override readonly editableProperties: EditableProperty[] = FlexboxEditableProperties;
 
   protected override findIcon(query: string, computedProperties: Map<string, string>): IconInfo|null {
@@ -172,14 +171,13 @@ export class FlexboxEditor extends StylePropertyEditor {
 customElements.define('devtools-flexbox-editor', FlexboxEditor);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-flexbox-editor': FlexboxEditor;
   }
 }
 
 export class GridEditor extends StylePropertyEditor {
-  protected override readonly jslog = `${VisualLogging.cssGridEditor()}`;
+  readonly jslogContext = 'cssGridEditor';
   protected override readonly editableProperties: EditableProperty[] = GridEditableProperties;
 
   protected override findIcon(query: string, computedProperties: Map<string, string>): IconInfo|null {
@@ -190,7 +188,6 @@ export class GridEditor extends StylePropertyEditor {
 customElements.define('devtools-grid-editor', GridEditor);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-grid-editor': GridEditor;
   }

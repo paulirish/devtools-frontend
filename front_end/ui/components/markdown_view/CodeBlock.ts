@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/legacy/legacy.js'; // for x-link
+
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
@@ -20,6 +22,10 @@ const UIStrings = {
    * @description The title of the button after it was pressed and the text was copied to clipboard.
    */
   copied: 'Copied to clipboard',
+  /**
+   * @description Disclaimer shown in the code blocks.
+   */
+  disclaimer: 'Use code snippets with caution',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/components/markdown_view/CodeBlock.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -36,6 +42,11 @@ export class CodeBlock extends HTMLElement {
   #copied = false;
   #editorState?: CodeMirror.EditorState;
   #languageConf = new CodeMirror.Compartment();
+  /**
+   * Whether to display a notice "​​Use code snippets with caution" in code
+   * blocks.
+   */
+  #displayNotice = false;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [styles];
@@ -67,6 +78,11 @@ export class CodeBlock extends HTMLElement {
 
   set timeout(value: number) {
     this.#copyTimeout = value;
+    this.#render();
+  }
+
+  set displayNotice(value: boolean) {
+    this.#displayNotice = value;
     this.#render();
   }
 
@@ -113,6 +129,9 @@ export class CodeBlock extends HTMLElement {
         <${TextEditor.TextEditor.TextEditor.litTagName} .state=${
           this.#editorState
         }></${TextEditor.TextEditor.TextEditor.litTagName}>
+        ${this.#displayNotice ? LitHtml.html`<p class="notice">
+          <x-link class="link" href="https://support.google.com/legal/answer/13505487">${i18nString(UIStrings.disclaimer)}</x-link>
+        </p>` : LitHtml.nothing}
       </div>
     </div>`, this.#shadow, {
       host: this,
@@ -145,7 +164,6 @@ export class CodeBlock extends HTMLElement {
 customElements.define('devtools-code-block', CodeBlock);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-code-block': CodeBlock;
   }

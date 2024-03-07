@@ -17,6 +17,7 @@ generate_css("css_files") {
 
 devtools_module("animation") {
   sources = [
+    "AnimationDOMNode.ts",
     "AnimationGroupPreviewUI.ts",
     "AnimationModel.ts",
     "AnimationScreenshotPopover.ts",
@@ -75,6 +76,6 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../test/unittests/front_end/helpers",
+    "../../testing",
   ]
 }

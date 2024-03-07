@@ -429,17 +429,26 @@ export class DebuggerPlugin extends Plugin {
       Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListUISourceCode(uiSourceCode);
     }
 
-    const infobar =
-        new UI.Infobar.Infobar(UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore), [
-          {text: i18nString(UIStrings.removeFromIgnoreList), highlight: false, delegate: unIgnoreList, dismiss: true},
+    const infobar = new UI.Infobar.Infobar(
+        UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
+        [
+          {
+            text: i18nString(UIStrings.removeFromIgnoreList),
+            highlight: false,
+            delegate: unIgnoreList,
+            dismiss: true,
+            jslogContext: 'remove-from-ignore-list',
+          },
           {
             text: i18nString(UIStrings.configure),
             highlight: false,
             delegate:
                 UI.ViewManager.ViewManager.instance().showView.bind(UI.ViewManager.ViewManager.instance(), 'blackbox'),
             dismiss: false,
+            jslogContext: 'configure',
           },
-        ]);
+        ],
+        undefined, undefined, 'script-on-ignore-list');
     this.ignoreListInfobar = infobar;
     infobar.setCloseCallback(() => this.removeInfobar(this.ignoreListInfobar));
 
@@ -1389,7 +1398,7 @@ export class DebuggerPlugin extends Plugin {
             this.uiSourceCode)) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-inline-breakpoint'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     if (breakpoint) {
       contextMenu.debugSection().appendItem(i18nString(UIStrings.editBreakpoint), () => {
         Host.userMetrics.breakpointEditDialogRevealedFrom(
@@ -1473,7 +1482,8 @@ export class DebuggerPlugin extends Plugin {
       this.missingDebugInfoBar = null;
       return;
     }
-    this.missingDebugInfoBar = UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, []);
+    this.missingDebugInfoBar =
+        UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, [], undefined, 'missing-debug-info');
     if (!this.missingDebugInfoBar) {
       return;
     }
@@ -1542,7 +1552,8 @@ export class DebuggerPlugin extends Plugin {
     if (!resource) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapSkipped), [],
-          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false),
+          'source-map-skipped');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1551,7 +1562,7 @@ export class DebuggerPlugin extends Plugin {
     } else if (resource.success) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapLoaded), [],
-          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false), 'source-map-loaded');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1570,10 +1581,12 @@ export class DebuggerPlugin extends Plugin {
         text = i18nString(UIStrings.ignoreScript);
         delegate = ignoreListManager.ignoreListUISourceCode.bind(ignoreListManager, this.uiSourceCode);
       }
-      this.sourceMapInfobar =
-          UI.Infobar.Infobar.create(UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed), [
+      this.sourceMapInfobar = UI.Infobar.Infobar.create(
+          UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed),
+          [
             {text, highlight: false, delegate, dismiss: true},
-          ]);
+          ],
+          undefined, 'source-map-failed');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1990,17 +2003,16 @@ export function computeExecutionDecorations(
   const line = doc.line(lineNumber + 1);
   const decorations: CodeMirror.Range<CodeMirror.Decoration>[] = [executionLineDeco.range(line.from)];
   const position = Math.min(line.to, line.from + columnNumber);
-  let syntaxTree = null;
-  while (syntaxTree === null) {
-    syntaxTree = CodeMirror.ensureSyntaxTree(state, line.to, /* timeout= */ 500);
-  }
-  let syntaxNode = syntaxTree.resolveInner(position, 1);
-  if (syntaxNode.to === syntaxNode.from - 1 && /[(.]/.test(doc.sliceString(syntaxNode.from, syntaxNode.to))) {
-    syntaxNode = syntaxNode.resolve(syntaxNode.to, 1);
-  }
-  const tokenEnd = Math.min(line.to, syntaxNode.to);
-  if (tokenEnd > position) {
-    decorations.push(executionTokenDeco.range(position, tokenEnd));
+  const syntaxTree = CodeMirror.ensureSyntaxTree(state, line.to, /* timeout= */ 500);
+  if (syntaxTree !== null) {
+    let syntaxNode = syntaxTree.resolveInner(position, 1);
+    if (syntaxNode.to === syntaxNode.from - 1 && /[(.]/.test(doc.sliceString(syntaxNode.from, syntaxNode.to))) {
+      syntaxNode = syntaxNode.resolve(syntaxNode.to, 1);
+    }
+    const tokenEnd = Math.min(line.to, syntaxNode.to);
+    if (tokenEnd > position) {
+      decorations.push(executionTokenDeco.range(position, tokenEnd));
+    }
   }
   return CodeMirror.Decoration.set(decorations);
 }

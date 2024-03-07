@@ -59,7 +59,6 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
     "../../entrypoints/*",
   ]
 
@@ -90,6 +89,6 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../test/unittests/front_end/helpers",
+    "../../testing",
   ]
 }

@@ -28,8 +28,6 @@ devtools_module("icon_button") {
     "../../../ui/components/render_coordinator:bundle",
     "../../../ui/lit-html:bundle",
   ]
-
-  visibility = [ "../../../../test/unittests/front_end/ui/components" ]
 }
 
 devtools_entrypoint("bundle") {
@@ -62,7 +60,7 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../../test/unittests/front_end/helpers",
+    "../../../testing",
     "../../lit-html:bundle",
   ]
 }

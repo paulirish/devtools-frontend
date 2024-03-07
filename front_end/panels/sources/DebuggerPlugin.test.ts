@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {createTarget, describeWithEnvironment} from '../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
-import {describeWithMockConnection} from '../../../test/unittests/front_end/helpers/MockConnection.js';
-import {MockProtocolBackend, parseScopeChain} from '../../../test/unittests/front_end/helpers/MockScopeChain.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import {createTarget, describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {MockProtocolBackend, parseScopeChain} from '../../testing/MockScopeChain.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 
@@ -503,6 +503,15 @@ describe('DebuggerPlugin', () => {
       const state = CodeMirror.EditorState.create({doc, extensions});
       const decorations = computeExecutionDecorations(state, 9_998, 0);
       assert.strictEqual(decorations.size, 2, 'Expected to have execution line and token decoration');
+    });
+
+    it('correctly returns line decorations for documents that don\'t have syntax highlighting', () => {
+      const doc = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"></html>`;
+      const state = CodeMirror.EditorState.create({doc});
+      const decorations = computeExecutionDecorations(state, 1, 0);
+      assert.strictEqual(decorations.size, 1, 'Expected to have execution line decoration');
     });
   });
 

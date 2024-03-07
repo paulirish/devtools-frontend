@@ -57,6 +57,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ExecutionContextSelector} from './ExecutionContextSelector.js';
+import {SettingTracker} from './SettingTracker.js';
 
 const UIStrings = {
   /**
@@ -256,6 +257,9 @@ export class MainImpl {
     const globalStorage = new Common.Settings.SettingsStorage(prefs, hostUnsyncedStorage, storagePrefix);
     Common.Settings.Settings.instance({forceNew: true, syncedStorage, globalStorage, localStorage});
 
+    // Needs to be created after Settings are available.
+    new SettingTracker();
+
     if (!Host.InspectorFrontendHost.isUnderTest()) {
       new Common.Settings.VersionController().updateVersion();
     }
@@ -382,10 +386,6 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
-        'Enable context menu that allows to modify trees in the Flame Chart', true);
-
-    Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.AUTOFILL_VIEW,
         'Enable Autofill view',
     );
@@ -398,6 +398,7 @@ export class MainImpl {
       Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
       'evaluate-expressions-with-source-maps',
+      Root.Runtime.ExperimentName.AUTOFILL_VIEW,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 
@@ -817,11 +818,15 @@ export class MainMenuItem implements UI.Toolbar.Provider {
           i18nString(UIStrings.placementOfDevtoolsRelativeToThe, {PH1: toggleDockSideShorcuts[0].title()}));
       dockItemElement.appendChild(titleElement);
       const dockItemToolbar = new UI.Toolbar.Toolbar('', dockItemElement);
+      dockItemElement.setAttribute('jslog', `${VisualLogging.item('dock-side')}`);
       dockItemToolbar.makeBlueOnHover();
-      const undock = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window');
-      const bottom = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToBottom), 'dock-bottom');
-      const right = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToRight), 'dock-right');
-      const left = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToLeft), 'dock-left');
+      const undock = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'undock');
+      const bottom =
+          new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToBottom), 'dock-bottom', undefined, 'dock-bottom');
+      const right =
+          new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToRight), 'dock-right', undefined, 'dock-right');
+      const left = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToLeft), 'dock-left', undefined, 'dock-left');
       undock.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
       bottom.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
       right.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());

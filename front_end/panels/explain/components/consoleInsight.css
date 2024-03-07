@@ -72,6 +72,8 @@
   padding: 16px;
   background-color: var(--sys-color-cdt-base-container);
   border-radius: 16px;
+  /* stylelint-disable-next-line property-no-unknown */
+  container-type: inline-size;
 }
 
 .wrapper.top {
@@ -107,6 +109,42 @@ main {
   font-style: normal;
   font-weight: 400;
   line-height: 20px;
+
+  p {
+    margin-block-start: 1em;
+    margin-block-end: 1em;
+  }
+
+  ul {
+    list-style-type: none;
+    list-style-position: inside;
+    padding-inline-start: 0.2em;
+
+    li {
+      display: list-item;
+      list-style-type: disc;
+    }
+
+    li::marker {
+      font-size: 11px;
+      line-height: 1;
+    }
+  }
+
+  label {
+    display: inline-flex;
+    flex-direction: row;
+    gap: 0.5em;
+
+    input,
+    span {
+      vertical-align: middle;
+    }
+
+    input[type="checkbox"] {
+      margin-top: 0.3em;
+    }
+  }
 }
 
 devtools-markdown-view {
@@ -116,12 +154,20 @@ devtools-markdown-view {
 footer {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  align-items: center;
   color: var(--sys-color-on-surface);
   font-style: normal;
   font-weight: 400;
   line-height: normal;
   margin-top: 14px;
+  gap: 32px;
+}
+
+/* stylelint-disable-next-line at-rule-no-unknown */
+@container (max-width: 600px) {
+  footer {
+    gap: 8px;
+  }
 }
 
 footer > .filler {
@@ -131,7 +177,7 @@ footer > .filler {
 footer .rating {
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: 8px;
 }
 
 textarea {
@@ -145,7 +191,9 @@ textarea {
 }
 
 .buttons {
-  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .disclaimer {
@@ -155,6 +203,7 @@ textarea {
   font-size: 11px;
   align-items: flex-start;
   flex-direction: column;
+  max-width: 360px;
 }
 
 .link {

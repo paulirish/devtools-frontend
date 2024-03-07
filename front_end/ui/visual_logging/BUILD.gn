@@ -8,6 +8,7 @@ import("../../../third_party/typescript/typescript.gni")
 
 devtools_module("visual_logging") {
   sources = [
+    "Debugging.ts",
     "DomState.ts",
     "Loggable.ts",
     "LoggingConfig.ts",
@@ -30,7 +31,6 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../test/unittests/front_end/ui/visual_logging/*",
     "../../entrypoints/device_mode_emulation_frame/*",
     "../../entrypoints/main/*",
     "../../panels/*",
@@ -51,6 +51,7 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "Debugging.test.ts",
     "DomState.test.ts",
     "LoggingConfig.test.ts",
     "LoggingDriver.test.ts",
@@ -62,6 +63,6 @@ ts_library("unittests") {
   deps = [
     ":bundle",
     ":testing",
-    "../../../test/unittests/front_end/helpers",
+    "../../testing",
   ]
 }

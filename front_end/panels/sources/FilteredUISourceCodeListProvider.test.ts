@@ -10,8 +10,8 @@ import type * as Platform from '../../core/platform/platform.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Root from '../../core/root/root.js';
 import * as Sources from './sources.js';
-import {describeWithEnvironment} from '../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
-import {setUpEnvironment} from '../../../test/unittests/front_end/helpers/OverridesHelpers.js';
+import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {setUpEnvironment} from '../../testing/OverridesHelpers.js';
 
 const setUpEnvironmentWithUISourceCode =
     (url: string, resourceType: Common.ResourceType.ResourceType, project?: Workspace.Workspace.Project) => {
@@ -44,7 +44,7 @@ describeWithEnvironment('FilteredUISourceCodeListProvider', () => {
     const {workspace, project} = setUpEnvironmentWithUISourceCode(url, resourceType);
 
     const filteredUISourceCodeListProvider =
-        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider();
+        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider('test');
     filteredUISourceCodeListProvider.attach();
 
     const result = filteredUISourceCodeListProvider.itemCount();
@@ -61,7 +61,7 @@ describeWithEnvironment('FilteredUISourceCodeListProvider', () => {
     const {workspace, project} = setUpEnvironmentWithUISourceCode(url, resourceType);
 
     const filteredUISourceCodeListProvider =
-        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider();
+        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider('test');
     filteredUISourceCodeListProvider.attach();
 
     const result = filteredUISourceCodeListProvider.itemCount();
@@ -78,7 +78,7 @@ describeWithEnvironment('FilteredUISourceCodeListProvider', () => {
     const {workspace, project} = setUpEnvironmentWithUISourceCode(url, resourceType);
 
     const filteredUISourceCodeListProvider =
-        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider();
+        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider('test');
     filteredUISourceCodeListProvider.attach();
 
     const resultUrl = filteredUISourceCodeListProvider.itemKeyAt(0);
@@ -101,7 +101,7 @@ describeWithEnvironment('FilteredUISourceCodeListProvider', () => {
     Bindings.IgnoreListManager.IgnoreListManager.instance().ignoreListUISourceCode(uiSourceCode);
 
     const filteredUISourceCodeListProvider =
-        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider();
+        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider('test');
     filteredUISourceCodeListProvider.attach();
 
     const result = filteredUISourceCodeListProvider.itemCount();
@@ -119,7 +119,7 @@ describeWithEnvironment('FilteredUISourceCodeListProvider', () => {
     const {workspace, project} = setUpEnvironmentWithUISourceCode(url, resourceType);
 
     const filteredUISourceCodeListProvider =
-        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider();
+        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider('test');
     filteredUISourceCodeListProvider.attach();
 
     const resultUrl = filteredUISourceCodeListProvider.itemKeyAt(0);
@@ -138,7 +138,7 @@ describeWithEnvironment('FilteredUISourceCodeListProvider', () => {
     const {workspace, project} = setUpEnvironmentWithUISourceCode(url, resourceType);
 
     const filteredUISourceCodeListProvider =
-        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider();
+        new Sources.FilteredUISourceCodeListProvider.FilteredUISourceCodeListProvider('test');
     filteredUISourceCodeListProvider.attach();
 
     const resultUrl = filteredUISourceCodeListProvider.itemKeyAt(0);

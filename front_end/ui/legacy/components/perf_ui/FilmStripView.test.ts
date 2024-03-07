@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as TraceEngine from '../../../../models/trace/trace.js';
 import {
   dispatchClickEvent,
   dispatchKeyDownEvent,
   querySelectorErrorOnMissing,
   raf,
   renderElementIntoDOM,
-} from '../../../../../test/unittests/front_end/helpers/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
-import {TraceLoader} from '../../../../../test/unittests/front_end/helpers/TraceLoader.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+} from '../../../../testing/DOMHelpers.js';
+import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
+import {TraceLoader} from '../../../../testing/TraceLoader.js';
 
 import * as PerfUI from './perf_ui.js';
 
@@ -34,7 +34,7 @@ describeWithEnvironment('FilmStripView', function() {
   it('generates frames and timestamps', async function() {
     const {traceParsedData} = await TraceLoader.allModels(this, 'web-dev.json.gz');
     const filmStrip = await renderView(TraceEngine.Extras.FilmStrip.fromTraceData(traceParsedData));
-    const renderedFrames = Array.from(filmStrip.contentElement.querySelectorAll<HTMLElement>('div.frame'));
+    const renderedFrames = Array.from(filmStrip.contentElement.querySelectorAll<HTMLElement>('button.frame'));
     assert.lengthOf(renderedFrames, 5);
     const expectedTimeLabelsForFrames = [
       '0ms',

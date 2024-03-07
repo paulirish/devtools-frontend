@@ -20,8 +20,6 @@ devtools_module("expandable_list") {
     "../../visual_logging:bundle",
     "../helpers:bundle",
   ]
-
-  visibility = [ "../../../../test/unittests/front_end/ui/components" ]
 }
 
 devtools_entrypoint("bundle") {
@@ -42,7 +40,7 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../../test/unittests/front_end/helpers",
+    "../../../testing",
     "../../lit-html:bundle",
   ]
 }

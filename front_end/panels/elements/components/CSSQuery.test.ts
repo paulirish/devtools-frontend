@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertShadowRoot, renderElementIntoDOM} from '../../../../test/unittests/front_end/helpers/DOMHelpers.js';
+import {assertShadowRoot, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 
 import * as ElementsComponents from './components.js';
 
@@ -27,7 +27,7 @@ describe('CSSQuery', () => {
 
     assert.strictEqual(
         queryElement.innerText,
-        '@container (min-width: 10px)',
+        '@container (min-width: 10px) {',
         'text content of query element should match query text',
     );
   });
@@ -55,7 +55,7 @@ describe('CSSQuery', () => {
 
     assert.strictEqual(
         queryElement.innerText,
-        '@container container-query-1 (max-width: 10px)',
+        '@container container-query-1 (max-width: 10px) {',
         'text content of query element should match query text',
     );
 

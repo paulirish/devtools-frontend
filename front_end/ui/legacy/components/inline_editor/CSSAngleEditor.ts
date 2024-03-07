@@ -130,7 +130,7 @@ export class CSSAngleEditor extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="editor" jslog=${VisualLogging.cssAngleEditor().track({click: true, drag: true})}>
+      <div class="editor" jslog=${VisualLogging.dialog('cssAngleEditor').track({click: true, drag: true, resize: true})}>
         <span class="pointer"></span>
         <div
           class="clock"
@@ -173,7 +173,6 @@ export class CSSAngleEditor extends HTMLElement {
 customElements.define('devtools-css-angle-editor', CSSAngleEditor);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-css-angle-editor': CSSAngleEditor;
   }

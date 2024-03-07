@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {createTarget} from '../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
-import {describeWithRealConnection} from '../../../test/unittests/front_end/helpers/RealConnection.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {describeWithRealConnection} from '../../testing/RealConnection.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 
 import * as Elements from './elements.js';
@@ -22,8 +22,7 @@ const stubTopLayerDOMNode = (nodeName: string, backendNodeId: number, ownerDocum
 
 const stubElementsTreeElement = () => {
   return {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    adorn: ({name: string}, content?: HTMLElement) => new Adorners.Adorner.Adorner(),
+    adorn: (_unused: {name: string}) => new Adorners.Adorner.Adorner(),
   } as Elements.ElementsTreeElement.ElementsTreeElement;
 };
 

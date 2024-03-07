@@ -99,7 +99,7 @@ body {
 
 /* Default fonts */
 .platform-linux {
-  --default-font-family: roboto, ubuntu, arial, sans-serif;
+  --default-font-family: "Google Sans Text", "Google Sans", system-ui, sans-serif;
 }
 
 .platform-mac {
@@ -480,6 +480,7 @@ span[is="dt-icon-label"] {
 
 .undisplayable-text,
 .expandable-inline-button {
+  border: none;
   padding: 1px 3px;
   margin: 0 2px;
   font-size: 11px;

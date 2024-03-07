@@ -18,6 +18,7 @@ devtools_module("adorners") {
   deps = [
     "../../../core/platform:bundle",
     "../../../ui/lit-html:bundle",
+    "../../../ui/visual_logging:bundle",
     "../helpers:bundle",
   ]
 }
@@ -40,8 +41,8 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../../test/unittests/front_end/helpers",
     "../../../core/common:bundle",
     "../../../core/platform:bundle",
+    "../../../testing",
   ]
 }

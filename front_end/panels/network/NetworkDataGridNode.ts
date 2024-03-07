@@ -33,7 +33,6 @@
  */
 
 // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/naming-convention */
 
 import * as Common from '../../core/common/common.js';
@@ -397,7 +396,7 @@ export class NetworkNode extends DataGrid.SortableDataGrid.SortableDataGridNode<
     return cell;
   }
 
-  renderCell(cell: Element, columnId: string): void {
+  renderCell(_cell: Element, _columnId: string): void {
   }
 
   isFailed(): boolean {
@@ -965,11 +964,11 @@ export class NetworkRequestNode extends NetworkNode {
         this.setTextAndTitle(cell, this.requestInternal.domain);
         break;
       }
-      case 'remoteaddress': {
+      case 'remote-address': {
         this.setTextAndTitle(cell, this.requestInternal.remoteAddress());
         break;
       }
-      case 'remoteaddress-space': {
+      case 'remote-address-space': {
         this.renderAddressSpaceCell(cell, this.requestInternal.remoteAddressSpace());
         break;
       }
@@ -977,7 +976,7 @@ export class NetworkRequestNode extends NetworkNode {
         this.setTextAndTitle(cell, this.arrayLength(this.requestInternal.includedRequestCookies()));
         break;
       }
-      case 'setcookies': {
+      case 'set-cookies': {
         this.setTextAndTitle(cell, this.arrayLength(this.requestInternal.nonBlockedResponseCookies()));
         break;
       }
@@ -1003,7 +1002,7 @@ export class NetworkRequestNode extends NetworkNode {
             cell, initialPriority ? PerfUI.NetworkPriorities.uiLabelForNetworkPriority(initialPriority) : '');
         break;
       }
-      case 'connectionid': {
+      case 'connection-id': {
         this.setTextAndTitle(cell, this.requestInternal.connectionId === '0' ? '' : this.requestInternal.connectionId);
         break;
       }

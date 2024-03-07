@@ -61,10 +61,7 @@ devtools_module("perf_ui") {
     "../../../../ui/lit-html:bundle",
   ]
 
-  visibility = [
-    "../../../../../test/unittests/front_end/perf_ui",
-    "../../../../component_docs/perf_piechart",
-  ]
+  visibility = [ "../../../../component_docs/perf_piechart" ]
 }
 
 devtools_entrypoint("bundle") {
@@ -78,12 +75,12 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../../../test/unittests/*",
     "../../../../panels/layer_viewer/*",
     "../../../../panels/media/*",
     "../../../../panels/network/*",
     "../../../../panels/profiler/*",
     "../../../../panels/timeline/*",
+    "../../../../testing/*",
     "../../../components/docs/perf_piechart/*",
     "../../../components/docs/performance_panel/*",
   ]
@@ -118,8 +115,8 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../../../test/unittests/front_end/helpers",
     "../../../../core/sdk:bundle",
+    "../../../../testing",
     "../../../../ui/legacy:bundle",
   ]
 }

@@ -254,7 +254,8 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
       throw new Error('Should not call #deleteBucket if #storageBucketsModel or #storageBucket is null.');
     }
     const ok = await UI.UIUtils.ConfirmDialog.show(
-        i18nString(UIStrings.confirmBucketDeletion, {PH1: this.#storageBucket.bucket.name || ''}), this);
+        i18nString(UIStrings.confirmBucketDeletion, {PH1: this.#storageBucket.bucket.name || ''}), this,
+        {jslogContext: 'delete-bucket-confirmation'});
     if (ok) {
       this.#storageBucketsModel.deleteBucket(this.#storageBucket.bucket);
     }
@@ -264,7 +265,6 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
 customElements.define('devtools-storage-metadata-view', StorageMetadataView);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-storage-metadata-view': StorageMetadataView;
   }

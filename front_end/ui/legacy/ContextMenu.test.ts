@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertElement, dispatchMouseUpEvent} from '../../../test/unittests/front_end/helpers/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
-import {stabilizeEvent, stabilizeImpressions} from '../../../test/unittests/front_end/helpers/VisualLoggingHelpers.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
+import {assertElement, dispatchMouseUpEvent} from '../../testing/DOMHelpers.js';
+import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {stabilizeEvent, stabilizeImpressions} from '../../testing/VisualLoggingHelpers.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as UI from './legacy.js';
@@ -126,7 +126,7 @@ describeWithEnvironment('ContextMenu', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.isTrue(recordClick.calledOnce);
     assert.deepStrictEqual(
-        stabilizeEvent(recordClick.firstCall.firstArg), {veid: 0, mouseButton: 0, doubleClick: false, context: 44});
+        stabilizeEvent(recordClick.firstCall.firstArg), {veid: 0, mouseButton: 0, doubleClick: false});
     VisualLogging.stopLogging();
   });
 });

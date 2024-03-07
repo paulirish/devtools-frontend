@@ -31,7 +31,6 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../test/unittests/front_end/models/source_map_scopes/*",
     "../../panels/console/*",
     "../../panels/sources/*",
     "../../panels/timeline/*",
@@ -52,9 +51,9 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../test/unittests/front_end/helpers",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
+    "../../testing",
     "../formatter:bundle",
   ]
 }

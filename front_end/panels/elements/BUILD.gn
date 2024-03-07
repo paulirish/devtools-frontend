@@ -22,7 +22,7 @@ generate_css("css_files") {
     "nodeStackTraceWidget.css",
     "platformFontsWidget.css",
     "propertiesWidget.css",
-    "stylesSectionTree.css",
+    "stylePropertiesTreeOutline.css",
     "stylesSidebarPane.css",
   ]
 }
@@ -99,10 +99,7 @@ devtools_module("elements") {
     "./components:bundle",
   ]
 
-  visibility = [
-    "../../../test/unittests/front_end/elements",
-    "../../component_docs/*",
-  ]
+  visibility = [ "../../component_docs/*" ]
 }
 
 devtools_entrypoint("bundle") {
@@ -115,8 +112,6 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
-    "../../../test/unittests/front_end/panels/elements/*",
     "../../entrypoints/*",
     "../../panels/recorder/*",
     "../../ui/components/docs/computed_style_property/*",
@@ -144,9 +139,8 @@ devtools_entrypoint("meta") {
   ]
 
   visibility = [
-    "../../../test/unittests/front_end/helpers/*",
-    "../../../test/unittests/front_end/panels/elements/*",
     "../../entrypoints/*",
+    "../../testing/*",
   ]
 }
 
@@ -175,7 +169,7 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../test/unittests/front_end/helpers",
+    "../../testing",
     "./components:unittests",
   ]
 }

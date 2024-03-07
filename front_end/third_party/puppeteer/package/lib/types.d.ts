@@ -1525,7 +1525,7 @@ export declare interface DeleteCookiesRequest {
     name: string;
     /**
      * If specified, deletes all the cookies with the given name where domain and path match
-     * provided URL.
+     * provided URL. Otherwise, deletes only cookies related to the current page's domain.
      */
     url?: string;
     /**
@@ -2266,6 +2266,8 @@ export declare class FileChooser {
      */
     cancel(): Promise<void>;
 }
+
+/* Excluded from this release type: filterAsync */
 
 /* Excluded from this release type: FilteredLocator */
 

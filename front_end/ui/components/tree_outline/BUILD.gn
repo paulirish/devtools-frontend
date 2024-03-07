@@ -25,8 +25,6 @@ devtools_module("tree_outline") {
     "../../../ui/visual_logging:bundle",
     "../code_highlighter:bundle",
   ]
-
-  visibility = [ "../../../../test/unittests/front_end/ui/components" ]
 }
 
 devtools_entrypoint("bundle") {
@@ -47,7 +45,7 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../../test/unittests/front_end/helpers",
+    "../../../testing",
     "../../lit-html:bundle",
     "../render_coordinator:bundle",
   ]

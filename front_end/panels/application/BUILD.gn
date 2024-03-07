@@ -41,9 +41,6 @@ devtools_module("application") {
     "CookieItemsView.ts",
     "DOMStorageItemsView.ts",
     "DOMStorageModel.ts",
-    "DatabaseModel.ts",
-    "DatabaseQueryView.ts",
-    "DatabaseTableView.ts",
     "IndexedDBModel.ts",
     "IndexedDBViews.ts",
     "InterestGroupStorageModel.ts",
@@ -117,7 +114,6 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../test/unittests/front_end/entrypoints/missing_entrypoints/*",
     "../../entrypoints/*",
   ]
 
@@ -168,8 +164,8 @@ ts_library("unittests") {
 
   deps = [
     ":bundle",
-    "../../../test/unittests/front_end/helpers",
     "../../core/sdk:bundle",
+    "../../testing",
     "../../ui/components/render_coordinator:bundle",
     "./components",
     "./preloading/components",
