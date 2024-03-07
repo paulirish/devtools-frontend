@@ -650,7 +650,9 @@ export enum Action {
   InsightErroredCannotParseChunk = 137,
   InsightErroredUnknownChunk = 138,
   InsightErroredOther = 139,
-  MaxValue = 140,
+  AutofillReceived = 140,
+  AutofillReceivedAndTabAutoOpened = 141,
+  MaxValue = 142,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -1110,7 +1112,6 @@ export enum DevtoolsExperiments {
   'use-source-map-scopes' = 76,
   'storage-buckets-tree' = 77,
   'network-panel-filter-bar-redesign' = 79,
-  'track-context-menu' = 81,
   'autofill-view' = 82,
   'sources-frame-indentation-markers-temporarily-disable' = 83,
   'heap-snapshot-treat-backing-store-as-containing-object' = 84,

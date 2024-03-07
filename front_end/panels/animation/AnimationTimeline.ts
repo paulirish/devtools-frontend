@@ -666,10 +666,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
 
   private handleAnimationGroupKeyDown(group: AnimationGroup, event: KeyboardEvent): void {
     switch (event.key) {
-      case ' ':
-      case 'Enter':
-        void this.selectAnimationGroup(group);
-        break;
       case 'Backspace':
       case 'Delete':
         this.removeAnimationGroup(group, event);
@@ -892,8 +888,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       if (lastDraw === undefined || gridWidth - lastDraw > 50) {
         lastDraw = gridWidth;
         const label = UI.UIUtils.createSVGChild(this.#grid, 'text', 'animation-timeline-grid-label');
-        label.textContent =
-            isScrollDriven ? `${(100 * time / this.duration()).toFixed(0)}%` : i18n.TimeUtilities.millisToString(time);
+        label.textContent = isScrollDriven ? `${time.toFixed(0)}px` : i18n.TimeUtilities.millisToString(time);
         label.setAttribute('x', (gridWidth + 10).toString());
         label.setAttribute('y', '16');
       }
