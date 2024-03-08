@@ -21,17 +21,12 @@ declare global {
 const PAGE_METRICS_CODE_TO_EVALUATE = `
   // Evaluated in an IIFE to avoid polluting the global scope of the page we're evaluating.
   (function() {
-      if (typeof __chromium_devtools_metrics_reporter !== 'function') console.warn('ruhroh');
+    if (typeof __chromium_devtools_metrics_reporter !== 'function') console.warn('ruhroh');
 
-      async function getData() {
-        ${getMetricsInPage.toString()}
-        const result = await getMetricsInPage()
-        return result;
-      };
-
-      return getData();
-    })();
-    `;
+    (${getMetricsInPage.toString()})();
+    return 1;
+  })();
+`;
 
 export class CurrentPageMetrics extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-timeline-current-page-metrics`;
@@ -39,7 +34,7 @@ export class CurrentPageMetrics extends HTMLElement {
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
 
-  #currentPageMetrics = [{empty: 0}];
+  #currentPageMetrics: Array<{payload: PerformanceEventTiming}> = [];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
 
@@ -48,7 +43,7 @@ export class CurrentPageMetrics extends HTMLElement {
     void this.setup();
   }
   async setup(): Promise<void> {
-    const wait = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
+    const wait = (ms = 100): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
     await wait(500);  // HACK. need something better for waiting for target reference
 
     const mainTarget = (SDK.TargetManager.TargetManager.instance().primaryPageTarget());
@@ -57,7 +52,6 @@ export class CurrentPageMetrics extends HTMLElement {
       return;
     }
     this.#mainTarget = mainTarget;
-    console.log('we have a main target.');
 
     const runtimeModel = this.#mainTarget.model(RuntimeModel);
     SDK.TargetManager.TargetManager.instance().addModelListener(
@@ -68,12 +62,11 @@ export class CurrentPageMetrics extends HTMLElement {
     const mainFrameID = frameTreeResponse.frameTree.frame.id;
     this.#mainFrameID = mainFrameID;
 
-    const resourceTreeModel = this.#getResourceTreeModel();
-    resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
-    await resourceTreeModel.setLifecycleEventsEnabled(true);
+    const resourceTreeModel = this.#mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    resourceTreeModel?.addEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
+    await resourceTreeModel?.setLifecycleEventsEnabled(true);
 
-    this.#getPageMetrics();
-    // TODO: listen to the page URL changing and run the code again?
+    void this.#invokePerfObserver();
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
@@ -82,19 +75,19 @@ export class CurrentPageMetrics extends HTMLElement {
     SDK.TargetManager.TargetManager.instance().removeModelListener(
         SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
 
-    const resourceTreeModel = this.#getResourceTreeModel();
-    await resourceTreeModel.setLifecycleEventsEnabled(false);
-    resourceTreeModel.removeEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
+    const resourceTreeModel = this.#mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    await resourceTreeModel?.setLifecycleEventsEnabled(false);
+    resourceTreeModel?.removeEventListener(
+        SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
   }
 
-  #onBindingCalled(event: ProtocolProxyApi.RuntimeApi.BindingCalledEvent): void {
+  #onBindingCalled(event: {data: Protocol.Runtime.BindingCalledEvent}): void {
     const {data} = event;
     if (data.name !== '__chromium_devtools_metrics_reporter') {
       return;
     }
     const obj = JSON.parse(event.data.payload);
     this.#currentPageMetrics.push(obj);
-    console.log('binding called', obj);
     this.#render();
   }
 
@@ -106,21 +99,20 @@ export class CurrentPageMetrics extends HTMLElement {
     if (event.data.frameId !== this.#mainFrameID) {
       return;
     }
+    // Runt the perf observer on new page loads.
     if (event.data.name === 'load') {
-      void this.#getPageMetrics();
+      void this.#invokePerfObserver();
       return;
     }
   }
 
-  async #getPageMetrics(): Promise<void> {
+  async #invokePerfObserver(): Promise<void> {
     if (!this.#mainTarget) {
       return;
     }
-    await this.#mainTarget.runtimeAgent().invoke_evaluate({expression: 'console.log({dpr: window.devicePixelRatio})'});
 
     const evaluationResult = await this.#mainTarget.runtimeAgent().invoke_evaluate({
       returnByValue: true,
-      awaitPromise: true,
       expression: PAGE_METRICS_CODE_TO_EVALUATE,
     });
     const err = evaluationResult.getError();
@@ -128,39 +120,13 @@ export class CurrentPageMetrics extends HTMLElement {
       return console.error(err);
     }
 
-    console.log('eva', evaluationResult, evaluationResult.getError());
-
-
-    // this.#currentPageMetrics = evaluationResult.result.value;
     this.#render();
   }
 
-  #getResourceTreeModel(): SDK.ResourceTreeModel.ResourceTreeModel {
-    if (!this.#mainTarget) {
-      throw new Error('No main target available');
-    }
-    const model = this.#mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    if (!model) {
-      throw new Error('Could not get ResourceTreeModel');
-    }
-    return model;
-  }
-
   #render(): void {
-    // clang-format off
-    LitHtml.render(LitHtml.html`<button @click=${(): void => {
-      void this.#getPageMetrics();
-    }}>refresh? (probably unneeded)</button>
-      ${this.#renderPageMetrics()}
-    `, this.#shadow, {host: this});
-    // clang-format on
-  }
-
-  #renderPageMetrics(): LitHtml.TemplateResult {
-    if (!this.#currentPageMetrics.length) {
-      return LitHtml.html``;
-    }
-    return LitHtml.html`<p>${JSON.stringify(this.#currentPageMetrics)}</p>`;
+    const list = this.#currentPageMetrics.map(
+        m => LitHtml.html`<li><b>${m.payload.entryType}</b>: <small>${JSON.stringify(m.payload)}</small>`);
+    LitHtml.render(LitHtml.html`<ul>${list}</ul>`, this.#shadow, {host: this});
   }
 }
 

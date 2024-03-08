@@ -109,6 +109,7 @@ devtools_module("timeline") {
     "../../services/trace_bounds:bundle",
     "../../ui/components/menus:bundle",
     "../../ui/components/panel_feedback:bundle",
+
     # "../../ui/components/code_highlighter:bundle", # pagemetrics showing
     "../../ui/legacy/components/data_grid:bundle",
     "../../ui/legacy/components/perf_ui:bundle",
