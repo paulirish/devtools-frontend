@@ -12,7 +12,10 @@ import * as UI from '../../ui/legacy/legacy.js';
 const cssParser = CodeMirror.css.cssLanguage.parser;
 
 function nodeText(node: CodeMirror.SyntaxNode, text: string): string {
-  return text.substring(node.from, node.to);
+  return nodeTextRange(node, node, text);
+}
+function nodeTextRange(from: CodeMirror.SyntaxNode, to: CodeMirror.SyntaxNode, text: string): string {
+  return text.substring(from.from, to.to);
 }
 
 export class SyntaxTree {
@@ -38,6 +41,10 @@ export class SyntaxTree {
     return nodeText(node ?? this.tree, this.rule);
   }
 
+  textRange(from: CodeMirror.SyntaxNode, to: CodeMirror.SyntaxNode): string {
+    return nodeTextRange(from, to, this.rule);
+  }
+
   subtree(node: CodeMirror.SyntaxNode): SyntaxTree {
     return new SyntaxTree(this.propertyValue, this.rule, node);
   }
@@ -55,14 +62,32 @@ export abstract class TreeWalker {
   static walkExcludingSuccessors<T extends TreeWalker, ArgTs extends unknown[]>(
       this: {new(ast: SyntaxTree, ...args: ArgTs): T}, propertyValue: SyntaxTree, ...args: ArgTs): T {
     const instance = new this(propertyValue, ...args);
-    instance.iterateExcludingSuccessors(propertyValue.tree);
+    if (propertyValue.tree.name === 'Declaration') {
+      instance.iterateDeclaration(propertyValue.tree);
+    } else {
+      instance.iterateExcludingSuccessors(propertyValue.tree);
+    }
     return instance;
   }
   static walk<T extends TreeWalker, ArgTs extends unknown[]>(
       this: {new(ast: SyntaxTree, ...args: ArgTs): T}, propertyValue: SyntaxTree, ...args: ArgTs): T {
     const instance = new this(propertyValue, ...args);
-    instance.iterate(propertyValue.tree);
+    if (propertyValue.tree.name === 'Declaration') {
+      instance.iterateDeclaration(propertyValue.tree);
+    } else {
+      instance.iterate(propertyValue.tree);
+    }
     return instance;
+  }
+
+  iterateDeclaration(tree: CodeMirror.SyntaxNode): void {
+    if (tree.name !== 'Declaration') {
+      return;
+    }
+    if (this.enter(tree)) {
+      ASTUtils.declValue(tree)?.cursor().iterate(this.enter.bind(this), this.leave.bind(this));
+    }
+    this.leave(tree);
   }
 
   protected iterate(tree: CodeMirror.SyntaxNode): void {
@@ -141,7 +166,7 @@ export class BottomUpTreeMatching extends TreeWalker {
 
   constructor(ast: SyntaxTree, matchers: Matcher[]) {
     super(ast);
-    this.computedText = new ComputedText(ast.propertyValue);
+    this.computedText = new ComputedText(ast.rule.substring(ast.tree.from));
     this.#matchers.push(...matchers.filter(m => !ast.propertyName || m.accepts(ast.propertyName)));
     this.#matchers.push(new TextMatcher());
   }
@@ -169,11 +194,19 @@ export class BottomUpTreeMatching extends TreeWalker {
   }
 
   hasUnresolvedVars(node: CodeMirror.SyntaxNode): boolean {
-    return this.computedText.hasUnresolvedVars(node.from - this.ast.tree.from, node.to - this.ast.tree.from);
+    return this.hasUnresolvedVarsRange(node, node);
+  }
+
+  hasUnresolvedVarsRange(from: CodeMirror.SyntaxNode, to: CodeMirror.SyntaxNode): boolean {
+    return this.computedText.hasUnresolvedVars(from.from - this.ast.tree.from, to.to - this.ast.tree.from);
   }
 
   getComputedText(node: CodeMirror.SyntaxNode): string {
-    return this.computedText.get(node.from - this.ast.tree.from, node.to - this.ast.tree.from);
+    return this.getComputedTextRange(node, node);
+  }
+
+  getComputedTextRange(from: CodeMirror.SyntaxNode, to: CodeMirror.SyntaxNode): string {
+    return this.computedText.get(from.from - this.ast.tree.from, to.to - this.ast.tree.from);
   }
 }
 
@@ -337,6 +370,9 @@ export function requiresSpace(a: Node[]|string|undefined, b: Node[]|string|undef
       !noSpaceBefore.includes(leadingChar);
 }
 
+export const CSSControlMap = Map<string, HTMLElement[]>;
+export type CSSControlMap = Map<string, HTMLElement[]>;
+
 function mergeWithSpacing(nodes: Node[], merge: Node[]): Node[] {
   const result = [...nodes];
   if (requiresSpace(nodes, merge)) {
@@ -345,9 +381,6 @@ function mergeWithSpacing(nodes: Node[], merge: Node[]): Node[] {
   result.push(...merge);
   return result;
 }
-
-export const CSSControlMap = Map<string, HTMLElement[]>;
-export type CSSControlMap = Map<string, HTMLElement[]>;
 
 export class Renderer extends TreeWalker {
   readonly #matchedResult: BottomUpTreeMatching;
@@ -402,52 +435,61 @@ export class Renderer extends TreeWalker {
   }
 }
 
-export function siblings(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
-  const result = [];
-  while (node) {
-    result.push(node);
-    node = node.nextSibling;
+export namespace ASTUtils {
+  export function siblings(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
+    const result = [];
+    while (node) {
+      result.push(node);
+      node = node.nextSibling;
+    }
+    return result;
   }
-  return result;
-}
 
-export function children(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
-  return siblings(node?.firstChild ?? null);
-}
+  export function children(node: CodeMirror.SyntaxNode|null): CodeMirror.SyntaxNode[] {
+    return siblings(node?.firstChild ?? null);
+  }
 
-function* stripComments(nodes: CodeMirror.SyntaxNode[]): Generator<CodeMirror.SyntaxNode> {
-  for (const node of nodes) {
-    if (node.type.name !== 'Comment') {
-      yield node;
+  export function declValue(node: CodeMirror.SyntaxNode): CodeMirror.SyntaxNode|null {
+    if (node.name !== 'Declaration') {
+      return null;
+    }
+    return children(node).find(node => node.name === ':')?.nextSibling ?? null;
+  }
+
+  export function* stripComments(nodes: CodeMirror.SyntaxNode[]): Generator<CodeMirror.SyntaxNode> {
+    for (const node of nodes) {
+      if (node.type.name !== 'Comment') {
+        yield node;
+      }
     }
   }
-}
 
-function split(nodes: CodeMirror.SyntaxNode[]): CodeMirror.SyntaxNode[][] {
-  const result = [];
-  let current = [];
-  for (const node of nodes) {
-    if (node.name === ',') {
-      result.push(current);
-      current = [];
-    } else {
-      current.push(node);
+  export function split(nodes: CodeMirror.SyntaxNode[]): CodeMirror.SyntaxNode[][] {
+    const result = [];
+    let current = [];
+    for (const node of nodes) {
+      if (node.name === ',') {
+        result.push(current);
+        current = [];
+      } else {
+        current.push(node);
+      }
     }
-  }
-  result.push(current);
-  return result;
-}
-
-function callArgs(node: CodeMirror.SyntaxNode): CodeMirror.SyntaxNode[][] {
-  const args = children(node.getChild('ArgList'));
-  const openParen = args.splice(0, 1)[0];
-  const closingParen = args.pop();
-
-  if (openParen?.name !== '(' || closingParen?.name !== ')') {
-    return [];
+    result.push(current);
+    return result;
   }
 
-  return split(args);
+  export function callArgs(node: CodeMirror.SyntaxNode): CodeMirror.SyntaxNode[][] {
+    const args = children(node.getChild('ArgList'));
+    const openParen = args.splice(0, 1)[0];
+    const closingParen = args.pop();
+
+    if (openParen?.name !== '(' || closingParen?.name !== ')') {
+      return [];
+    }
+
+    return split(args);
+  }
 }
 
 export abstract class AngleMatch implements Match {
@@ -502,20 +544,24 @@ export class ColorMixMatcher extends MatcherBase<typeof ColorMixMatch> {
       return null;
     }
 
-    const computedValueTree = tokenizePropertyValue(matching.getComputedText(node));
+    const computedValueTree = tokenizeDeclaration('--property', matching.getComputedText(node));
     if (!computedValueTree) {
       return null;
     }
 
-    const computedValueArgs = callArgs(computedValueTree.tree);
+    const value = ASTUtils.declValue(computedValueTree.tree);
+    if (!value) {
+      return null;
+    }
+    const computedValueArgs = ASTUtils.callArgs(value);
     if (computedValueArgs.length !== 3) {
       return null;
     }
 
     const [space, color1, color2] = computedValueArgs;
     // Verify that all arguments are there, and that the space starts with a literal `in`.
-    if (space.length < 2 || computedValueTree.text(stripComments(space).next().value) !== 'in' || color1.length < 1 ||
-        color2.length < 1) {
+    if (space.length < 2 || computedValueTree.text(ASTUtils.stripComments(space).next().value) !== 'in' ||
+        color1.length < 1 || color2.length < 1) {
       return null;
     }
 
@@ -534,7 +580,7 @@ export class ColorMixMatcher extends MatcherBase<typeof ColorMixMatch> {
       return null;
     }
 
-    const args = callArgs(node);
+    const args = ASTUtils.callArgs(node);
     if (args.length !== 3) {
       return null;
     }
@@ -560,7 +606,7 @@ export class VariableMatcher extends MatcherBase<typeof VariableMatch> {
       return null;
     }
 
-    const [lparenNode, nameNode, ...fallbackOrRParenNodes] = children(args);
+    const [lparenNode, nameNode, ...fallbackOrRParenNodes] = ASTUtils.children(args);
 
     if (lparenNode?.name !== '(' || nameNode?.name !== 'VariableName') {
       return null;
@@ -612,7 +658,7 @@ export class URLMatcher extends MatcherBase<typeof URLMatch> {
     if (!callee || matching.ast.text(callee) !== 'url') {
       return null;
     }
-    const [, lparenNode, urlNode, rparenNode] = siblings(callee);
+    const [, lparenNode, urlNode, rparenNode] = ASTUtils.siblings(callee);
     if (matching.ast.text(lparenNode) !== '(' ||
         (urlNode.name !== 'ParenthesizedContent' && urlNode.name !== 'StringLiteral') ||
         matching.ast.text(rparenNode) !== ')') {
@@ -657,9 +703,18 @@ export class ColorMatcher extends MatcherBase<typeof ColorMatch> {
 }
 
 export const enum LinkableNameProperties {
+  Animation = 'animation',
   AnimationName = 'animation-name',
   FontPalette = 'font-palette',
   PositionFallback = 'position-fallback',
+}
+
+const enum AnimationLonghandPart {
+  Direction = 'direction',
+  FillMode = 'fill-mode',
+  PlayState = 'play-state',
+  IterationCount = 'iteration-count',
+  EasingFunction = 'easing-function',
 }
 
 export abstract class LinkableNameMatch implements Match {
@@ -673,11 +728,79 @@ export abstract class LinkableNameMatch implements Match {
 export class LinkableNameMatcher extends MatcherBase<typeof LinkableNameMatch> {
   private static isLinkableNameProperty(propertyName: string): propertyName is LinkableNameProperties {
     const names: string[] = [
+      LinkableNameProperties.Animation,
       LinkableNameProperties.AnimationName,
       LinkableNameProperties.FontPalette,
       LinkableNameProperties.PositionFallback,
     ];
     return names.includes(propertyName);
+  }
+
+  static readonly identifierAnimationLonghandMap: Map<string, AnimationLonghandPart> = new Map(
+      Object.entries({
+        'normal': AnimationLonghandPart.Direction,
+        'alternate': AnimationLonghandPart.Direction,
+        'reverse': AnimationLonghandPart.Direction,
+        'alternate-reverse': AnimationLonghandPart.Direction,
+        'none': AnimationLonghandPart.FillMode,
+        'forwards': AnimationLonghandPart.FillMode,
+        'backwards': AnimationLonghandPart.FillMode,
+        'both': AnimationLonghandPart.FillMode,
+        'running': AnimationLonghandPart.PlayState,
+        'paused': AnimationLonghandPart.PlayState,
+        'infinite': AnimationLonghandPart.IterationCount,
+        'linear': AnimationLonghandPart.EasingFunction,
+        'ease': AnimationLonghandPart.EasingFunction,
+        'ease-in': AnimationLonghandPart.EasingFunction,
+        'ease-out': AnimationLonghandPart.EasingFunction,
+        'ease-in-out': AnimationLonghandPart.EasingFunction,
+      }),
+  );
+
+  private matchAnimationNameInShorthand(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    // Order is important within each animation definition for distinguishing <keyframes-name> values from other keywords.
+    // When parsing, keywords that are valid for properties other than animation-name
+    // whose values were not found earlier in the shorthand must be accepted for those properties rather than for animation-name.
+    // See the details in: https://w3c.github.io/csswg-drafts/css-animations/#animation.
+    const text = matching.ast.text(node);
+    // This is not a known identifier, so return it as `animation-name`.
+    if (!LinkableNameMatcher.identifierAnimationLonghandMap.has(text)) {
+      return this.createMatch(text, LinkableNameProperties.Animation);
+    }
+    // There can be multiple `animation` declarations splitted by a comma.
+    // So, we find the declaration nodes that are related to the node argument.
+    const declarations = ASTUtils.split(ASTUtils.siblings(ASTUtils.declValue(matching.ast.tree)));
+    const currentDeclarationNodes = declarations.find(
+        declaration => declaration[0].from <= node.from && declaration[declaration.length - 1].to >= node.to);
+    if (!currentDeclarationNodes) {
+      return null;
+    }
+
+    // We reparse here until the node argument since a variable might be
+    // providing a meaningful value such as a timing keyword,
+    // that might change the meaning of the node.
+    const computedText = matching.getComputedTextRange(currentDeclarationNodes[0], node);
+    const tokenized = tokenizeDeclaration('--p', computedText);
+    if (!tokenized) {
+      return null;
+    }
+
+    const identifierCategory =
+        LinkableNameMatcher.identifierAnimationLonghandMap.get(text);  // The category of the node argument
+    for (let itNode: typeof tokenized.tree|null = ASTUtils.declValue(tokenized.tree); itNode?.nextSibling;
+         itNode = itNode.nextSibling) {
+      // Run through all the nodes that come before node argument
+      // and check whether a value in the same category is found.
+      // if so, it means our identifier is an `animation-name` keyword.
+      if (itNode.name === 'ValueName') {
+        const categoryValue = LinkableNameMatcher.identifierAnimationLonghandMap.get(tokenized.text(itNode));
+        if (categoryValue && categoryValue === identifierCategory) {
+          return this.createMatch(text, LinkableNameProperties.Animation);
+        }
+      }
+    }
+
+    return null;
   }
 
   override accepts(propertyName: string): boolean {
@@ -687,12 +810,28 @@ export class LinkableNameMatcher extends MatcherBase<typeof LinkableNameMatch> {
   override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
     const {propertyName} = matching.ast;
     const text = matching.ast.text(node);
-    if (!propertyName || node.name !== 'ValueName' || !LinkableNameMatcher.isLinkableNameProperty(propertyName)) {
+    const parentNode = node.parent;
+    if (!parentNode) {
       return null;
     }
-    // Only animation-name is allowed to specify more than one name. We don't verify this for the other properties since
-    // they would be reported as !parsedOk from the backend.
-    return this.createMatch(text, propertyName);
+
+    const isParentADeclaration = parentNode.name === 'Declaration';
+    const isInsideVarCall = parentNode.name === 'ArgList' && parentNode.prevSibling?.name === 'Callee' &&
+        matching.ast.text(parentNode.prevSibling) === 'var';
+    const isAParentDeclarationOrVarCall = isParentADeclaration || isInsideVarCall;
+    // We only mark top level nodes or nodes that are inside `var()` expressions as linkable names.
+    if (!propertyName || (node.name !== 'ValueName' && node.name !== 'VariableName') ||
+        !isAParentDeclarationOrVarCall) {
+      return null;
+    }
+
+    if (propertyName === 'animation') {
+      return this.matchAnimationNameInShorthand(node, matching);
+    }
+
+    // The assertion here is safe since this matcher only runs for
+    // properties with names inside `LinkableNameProperties` (See the `accepts` function.)
+    return this.createMatch(text, propertyName as LinkableNameProperties);
   }
 }
 
@@ -727,7 +866,7 @@ export class BezierMatcher extends MatcherBase<typeof BezierMatch> {
 }
 
 export abstract class StringMatch implements Match {
-  type: string = 'string';
+  readonly type: string = 'string';
   constructor(readonly text: string) {
   }
   abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
@@ -736,6 +875,31 @@ export abstract class StringMatch implements Match {
 export class StringMatcher extends MatcherBase<typeof StringMatch> {
   override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
     return node.name === 'StringLiteral' ? this.createMatch(matching.ast.text(node)) : null;
+  }
+}
+
+export const enum ShadowType {
+  BoxShadow = 'boxShadow',
+  TextShadow = 'textShadow',
+}
+export abstract class ShadowMatch implements Match {
+  readonly type: string = 'shadow';
+  constructor(readonly text: string, readonly shadowType: ShadowType) {
+  }
+  abstract render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[];
+}
+
+export class ShadowMatcher extends MatcherBase<typeof ShadowMatch> {
+  override accepts(propertyName: string): boolean {
+    return SDK.CSSMetadata.cssMetadata().isShadowProperty(propertyName);
+  }
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    if (node.name !== 'Declaration') {
+      return null;
+    }
+    const text = matching.ast.text(node);
+    return this.createMatch(
+        text, matching.ast.propertyName === 'text-shadow' ? ShadowType.TextShadow : ShadowType.BoxShadow);
   }
 }
 
@@ -826,15 +990,18 @@ function declaration(rule: string): CodeMirror.SyntaxNode|null {
   return cssParser.parse(rule).topNode.getChild('RuleSet')?.getChild('Block')?.getChild('Declaration') ?? null;
 }
 
-export function tokenizePropertyValue(propertyValue: string, propertyName?: string): SyntaxTree|null {
-  const fakePropertyName = '--property';
-  const rule = `*{${fakePropertyName}: ${propertyValue};}`;
+export function tokenizeDeclaration(propertyName: string, propertyValue: string): SyntaxTree|null {
+  const name = tokenizePropertyName(propertyName);
+  if (!name) {
+    return null;
+  }
+  const rule = `*{${name}: ${propertyValue};}`;
   const decl = declaration(rule);
   if (!decl || decl.type.isError) {
     return null;
   }
 
-  const childNodes = children(decl);
+  const childNodes = ASTUtils.children(decl);
   if (childNodes.length < 3) {
     return null;
   }
@@ -846,15 +1013,14 @@ export function tokenizePropertyValue(propertyValue: string, propertyName?: stri
   // It's possible that there are nodes following the declaration when there are comments or syntax errors. We want to
   // render any comments, so pick up any trailing nodes following the declaration excluding the final semicolon and
   // brace.
-  const trailingNodes = siblings(decl).slice(1);
+  const trailingNodes = ASTUtils.siblings(decl).slice(1);
   const [semicolon, brace] = trailingNodes.splice(trailingNodes.length - 2, 2);
   if (semicolon?.name !== ';' && brace?.name !== '}') {
     return null;
   }
 
-  const name = (propertyName && tokenizePropertyName(propertyName)) ?? undefined;
-  const ast = new SyntaxTree(propertyValue, rule, tree, name, trailingNodes);
-  if (ast.text(varName) !== fakePropertyName || colon.name !== ':') {
+  const ast = new SyntaxTree(propertyValue, rule, decl, name, trailingNodes);
+  if (ast.text(varName) !== name || colon.name !== ':') {
     return null;
   }
   return ast;
@@ -867,7 +1033,7 @@ export function tokenizePropertyName(name: string): string|null {
     return null;
   }
 
-  const propertyName = decl.getChild('PropertyName');
+  const propertyName = decl.getChild('PropertyName') ?? decl.getChild('VariableName');
   if (!propertyName) {
     return null;
   }
@@ -883,13 +1049,13 @@ export function tokenizePropertyName(name: string): string|null {
 //
 // More general, longer matches take precedence over shorter, more specific matches. Whitespaces are normalized, for
 // unmatched text and around rendered matching results.
-export function renderPropertyValue(value: string, matchers: Matcher[], propertyName?: string): Node[] {
-  const ast = tokenizePropertyValue(value, propertyName);
+export function renderPropertyValue(propertyName: string, propertyValue: string, matchers: Matcher[]): Node[] {
+  const ast = tokenizeDeclaration(propertyName, propertyValue);
   if (!ast) {
-    return [document.createTextNode(value)];
+    return [document.createTextNode(propertyValue)];
   }
   const matchedResult = BottomUpTreeMatching.walk(ast, matchers);
   ast.trailingNodes.forEach(n => matchedResult.matchText(n));
   const context = new RenderingContext(ast, matchedResult);
-  return Renderer.render([...siblings(ast.tree), ...ast.trailingNodes], context).nodes;
+  return Renderer.render([ast.tree, ...ast.trailingNodes], context).nodes;
 }

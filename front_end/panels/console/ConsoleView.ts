@@ -285,7 +285,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   private searchRegex!: RegExp|null;
   private groupableMessages: Map<string, ConsoleViewMessage[]>;
   private readonly groupableMessageTitle: Map<string, ConsoleViewMessage>;
-  private readonly shortcuts: Map<number, () => void>;
+  private readonly shortcuts: Map<number, (e: KeyboardEvent) => void>;
   private regexMatchRanges: RegexMatchRange[];
   private readonly consoleContextSelector: ConsoleContextSelector;
   private readonly filterStatusText: UI.Toolbar.ToolbarText;
@@ -1346,8 +1346,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   private messagesPasted(event: Event): void {
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SELF_XSS_WARNING) &&
-        !Root.Runtime.Runtime.queryParam('isChromeForTesting') && !this.selfXssWarningDisabledSetting.get()) {
+    if (!Root.Runtime.Runtime.queryParam('isChromeForTesting') && !this.selfXssWarningDisabledSetting.get()) {
       event.preventDefault();
       this.prompt.showSelfXssWarning();
     }
@@ -1363,8 +1362,9 @@ export class ConsoleView extends UI.Widget.VBox implements
         this.clearPromptBackwards.bind(this));
   }
 
-  private clearPromptBackwards(): void {
+  private clearPromptBackwards(e: KeyboardEvent): void {
     this.prompt.clear();
+    void VisualLogging.logKeyDown(e, 'clear-prompt');
   }
 
   private promptKeyDown(event: Event): void {
@@ -1377,7 +1377,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     const shortcut = UI.KeyboardShortcut.KeyboardShortcut.makeKeyFromEvent(keyboardEvent);
     const handler = this.shortcuts.get(shortcut);
     if (handler) {
-      handler();
+      handler(keyboardEvent);
       keyboardEvent.preventDefault();
     }
   }

@@ -304,8 +304,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       button.textContent = playbackRate ? i18nString(UIStrings.playbackRatePlaceholder, {PH1: playbackRate * 100}) :
                                           i18nString(UIStrings.pause);
       button.setAttribute(
-          'jslog',
-          `${VisualLogging.action().context(`animations.playback-rate-${playbackRate * 100}`).track({click: true})}`);
+          'jslog', `${VisualLogging.action().context(`animations.playback-rate-${playbackRate * 100}`).track({
+            click: true,
+            keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight',
+          })}`);
       playbackRates.set(button, playbackRate);
       button.addEventListener('click', this.setPlaybackRate.bind(this, playbackRate));
       UI.ARIAUtils.markAsOption(button);
@@ -666,10 +668,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
 
   private handleAnimationGroupKeyDown(group: AnimationGroup, event: KeyboardEvent): void {
     switch (event.key) {
-      case ' ':
-      case 'Enter':
-        void this.selectAnimationGroup(group);
-        break;
       case 'Backspace':
       case 'Delete':
         this.removeAnimationGroup(group, event);
@@ -892,8 +890,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       if (lastDraw === undefined || gridWidth - lastDraw > 50) {
         lastDraw = gridWidth;
         const label = UI.UIUtils.createSVGChild(this.#grid, 'text', 'animation-timeline-grid-label');
-        label.textContent =
-            isScrollDriven ? `${(100 * time / this.duration()).toFixed(0)}%` : i18n.TimeUtilities.millisToString(time);
+        label.textContent = isScrollDriven ? `${time.toFixed(0)}px` : i18n.TimeUtilities.millisToString(time);
         label.setAttribute('x', (gridWidth + 10).toString());
         label.setAttribute('y', '16');
       }

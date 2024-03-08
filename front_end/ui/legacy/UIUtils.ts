@@ -536,6 +536,7 @@ export function handleElementValueModifications(
   if (!isElementValueModification(event)) {
     return false;
   }
+  void VisualLogging.logKeyDown(event, 'element-value-modification');
 
   const selection = element.getComponentSelection();
   if (!selection || !selection.rangeCount) {
@@ -1107,7 +1108,8 @@ export function createInput(className?: string, type?: string, jslogContext?: st
     element.type = type;
   }
   if (jslogContext) {
-    element.setAttribute('jslog', `${VisualLogging.textField().track({keydown: true}).context(jslogContext)}`);
+    element.setAttribute(
+        'jslog', `${VisualLogging.textField().track({keydown: 'Enter', change: true}).context(jslogContext)}`);
   }
   return element;
 }
@@ -1755,6 +1757,3 @@ export interface ConfirmDialogOptions {
   cancelButtonLabel?: string;
   jslogContext?: string;
 }
-
-VisualLogging.registerContextProvider(
-    'elementValueModification', e => Promise.resolve(isElementValueModification(e as Event) ? 1 : 0));

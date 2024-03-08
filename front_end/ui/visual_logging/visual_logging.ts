@@ -5,12 +5,18 @@
 import type * as LoggableModule from './Loggable.js';
 import * as LoggingConfig from './LoggingConfig.js';
 import * as LoggingDriver from './LoggingDriver.js';
+import * as LoggingEvents from './LoggingEvents.js';
 import * as NonDomState from './NonDomState.js';
 
 export type Loggable = LoggableModule.Loggable;
 export {startLogging, stopLogging, addDocument} from './LoggingDriver.js';
-export {logClick, logImpressions, logResize} from './LoggingEvents.js';
-export {registerContextProvider, registerParentProvider} from './LoggingState.js';
+export {logImpressions, logChange} from './LoggingEvents.js';
+export const logClick = (l: Loggable, e: Event): void => LoggingEvents.logClick(LoggingDriver.clickLogThrottler)(l, e);
+export const logResize = (l: Loggable, s: DOMRect): void =>
+    LoggingEvents.logResize(LoggingDriver.resizeLogThrottler)(l, s);
+export const logKeyDown = async(e: Event, context?: string): Promise<void> =>
+    LoggingEvents.logKeyDown(LoggingDriver.keyboardLogThrottler)(e, context);
+export {registerParentProvider, setMappedParent} from './LoggingState.js';
 
 export function registerLoggable(loggable: Loggable, config: string, parent: Loggable|null): void {
   if (!LoggingDriver.isLogging()) {
@@ -31,24 +37,18 @@ export const action = LoggingConfig.makeConfigStringBuilder.bind(null, 'Action')
 export const adorner = LoggingConfig.makeConfigStringBuilder.bind(null, 'Adorner');
 export const animationClip = LoggingConfig.makeConfigStringBuilder.bind(null, 'AnimationClip');
 export const bezierCurveEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'BezierCurveEditor');
-export const bezierEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'BezierEditor');
 export const bezierPresetCategory = LoggingConfig.makeConfigStringBuilder.bind(null, 'BezierPresetCategory');
 export const breakpointMarker = LoggingConfig.makeConfigStringBuilder.bind(null, 'BreakpointMarker');
 export const canvas = LoggingConfig.makeConfigStringBuilder.bind(null, 'Canvas');
 export const close = LoggingConfig.makeConfigStringBuilder.bind(null, 'Close');
 export const colorEyeDropper = LoggingConfig.makeConfigStringBuilder.bind(null, 'ColorEyeDropper');
-export const colorPicker = LoggingConfig.makeConfigStringBuilder.bind(null, 'ColorPicker');
 export const counter = LoggingConfig.makeConfigStringBuilder.bind(null, 'Counter');
 /**
  * Visual element to denote a moveable control point such as the ones exist in BezierEditor
  * for bezier control points or keyframes in AnimationUI.
  */
 export const controlPoint = LoggingConfig.makeConfigStringBuilder.bind(null, 'ControlPoint');
-export const cssAngleEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssAngleEditor');
 export const cssColorMix = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssColorMix');
-export const cssFlexboxEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssFlexboxEditor');
-export const cssGridEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssGridEditor');
-export const cssShadowEditor = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssShadowEditor');
 export const deviceModeRuler = LoggingConfig.makeConfigStringBuilder.bind(null, 'DeviceModeRuler');
 export const domBreakpoint = LoggingConfig.makeConfigStringBuilder.bind(null, 'DOMBreakpoint');
 export const drawer = LoggingConfig.makeConfigStringBuilder.bind(null, 'Drawer');
