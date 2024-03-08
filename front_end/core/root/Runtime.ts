@@ -29,7 +29,9 @@ export function getRemoteBase(location: string = self.location.toString()): {
 }
 
 export class Runtime {
+  experiments: {[x: string]: boolean};
   private constructor() {
+    this.experiments = Runtime.getAllExperimentsSettings();
   }
 
   static instance(opts: {
@@ -55,19 +57,18 @@ export class Runtime {
     queryParamsObject.set(name, value);
   }
 
-  static experimentsSetting(): {
-    [x: string]: boolean,
-  } {
+  static getAllExperimentsSettings(): {[x: string]: boolean} {
     try {
-      return Platform.StringUtilities.toKebabCaseKeys(
-          JSON.parse(self.localStorage && self.localStorage['experiments'] ? self.localStorage['experiments'] : '{}') as
-          {
-            [x: string]: boolean,
-          });
+      const experiments = JSON.parse(self.localStorage?.experiments ?? '{}');
+      return Platform.StringUtilities.toKebabCaseKeys(experiments);
     } catch (e) {
       console.error('Failed to parse localStorage[\'experiments\']');
       return {};
     }
+  }
+
+  static experimentsSetting(): {[x: string]: boolean} {
+    return Runtime.instance().experiments;
   }
 
   static setPlatform(platform: string): void {
@@ -137,6 +138,7 @@ export class ExperimentsSupport {
       return;
     }
     self.localStorage['experiments'] = JSON.stringify(value);
+    Runtime.instance().experiments = Runtime.getAllExperimentsSettings();
   }
 
   register(
