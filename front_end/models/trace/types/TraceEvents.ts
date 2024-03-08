@@ -2050,6 +2050,22 @@ export function isTraceEventV8Compile(event: TraceEventData): event is TraceEven
   return event.name === KnownEventName.Compile;
 }
 
+export interface TraceEventThreadControllerImplRunTask extends TraceEventComplete {
+  name: KnownEventName.ThreadControllerImplRunTask;
+  args: TraceEventArgs&{
+    /* eslint-disable @typescript-eslint/naming-convention */
+    renderer_main_thread_task_execution: {task_type?: string},
+    sequence_manager_task: {priority?: string, queue_name?: string},
+    src_file?: string,
+    src_func?: string,
+    /* eslint-enable @typescript-eslint/naming-convention */
+  };
+}
+export function isTraceEventThreadControllerImplRunTask(event: TraceEventData):
+    event is TraceEventThreadControllerImplRunTask {
+  return event.name === KnownEventName.ThreadControllerImplRunTask;
+}
+
 /**
  * Generally, before JS is executed, a trace event is dispatched that
  * parents the JS calls. These we call "invocation" events. This
@@ -2087,6 +2103,7 @@ export const enum KnownEventName {
   RunTask = 'RunTask',
   AsyncTask = 'AsyncTask',
   RunMicrotasks = 'RunMicrotasks',
+  ThreadControllerImplRunTask = 'ThreadControllerImpl::RunTask',
 
   /* Load */
   XHRLoad = 'XHRLoad',

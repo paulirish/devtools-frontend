@@ -595,6 +595,10 @@ function maybeInitSylesMap(): EventStylesMap {
       new TimelineRecordStyle(i18nString(UIStrings.task), defaultCategoryStyles.Other),
     ],
     [
+      TraceEngine.Types.TraceEvents.KnownEventName.ThreadControllerImplRunTask,
+      new TimelineRecordStyle('UMMM ThreadControllerImplRunTask', defaultCategoryStyles.Other),
+    ],
+    [
       TraceEngine.Types.TraceEvents.KnownEventName.ProfileCall,
       new TimelineRecordStyle(i18nString(UIStrings.jsFrame), defaultCategoryStyles.Scripting),
     ],

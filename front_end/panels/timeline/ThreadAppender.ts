@@ -453,7 +453,7 @@ export class ThreadAppender implements TrackAppender {
   #appendNodesAtLevel(
       nodes: Iterable<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
-    const invisibleEntries = this.#entriesFilter?.invisibleEntries() ?? [];
+    const invisibleEntries = this.#entriesFilter?.invisibleEntries();
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
@@ -467,9 +467,8 @@ export class ThreadAppender implements TrackAppender {
       // another traversal to the entries array (which could grow
       // large). To avoid the extra cost we  add the check in the
       // traversal we already need to append events.
-      const entryIsVisible =
-          (!invisibleEntries.includes(entry) && this.#compatibilityBuilder.entryIsVisibleInTimeline(entry)) ||
-          this.#showAllEventsEnabled;
+      const entryIsVisible = this.#showAllEventsEnabled ||
+          (!invisibleEntries.includes(entry) && this.#compatibilityBuilder.entryIsVisibleInTimeline(entry));
       // For ignore listing support, these two conditions need to be met
       // to not append a profile call to the flame chart:
       // 1. It is ignore listed
@@ -483,7 +482,8 @@ export class ThreadAppender implements TrackAppender {
       // frame, which is distictively marked to denote an ignored listed
       // stack.
       const skipEventDueToIgnoreListing = entryIsIgnoreListed && parentIsIgnoredListed;
-      if (entryIsVisible && !skipEventDueToIgnoreListing) {
+      const skipEventDueToTreeRelationship = this.#shouldSkipEventDueToTreeRelationship(node);
+      if (entryIsVisible && !skipEventDueToIgnoreListing && !skipEventDueToTreeRelationship) {
         this.#appendEntryAtLevel(entry, startingLevel);
         nextLevel++;
       }
@@ -534,6 +534,33 @@ export class ThreadAppender implements TrackAppender {
 
   private isIgnoreListedURL(url: Platform.DevToolsPath.UrlString): boolean {
     return Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url);
+  }
+
+  #shouldSkipEventDueToTreeRelationship(node: TraceEngine.Helpers.TreeHelpers.TraceEntryNode): boolean {
+    // ThreadControllerImplRunTask should only be included if it has no visible children
+    if (!TraceEngine.Types.TraceEvents.isTraceEventThreadControllerImplRunTask(node.entry)) {
+      return false;
+    }
+    const entryIsVisible = (entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): boolean =>
+        this.#showAllEventsEnabled ||
+        (!this.#entriesFilter?.invisibleEntries().includes(entry) &&
+         this.#compatibilityBuilder.entryIsVisibleInTimeline(entry));
+
+    function hasAVisibleDescendent(node: TraceEngine.Helpers.TreeHelpers.TraceEntryNode): boolean {
+      // Walk through all the descendants, starting at the given node.
+      const children: TraceEngine.Helpers.TreeHelpers.TraceEntryNode[] = [...node.children];
+      while (children.length > 0) {
+        const childNode = children.shift();
+        if (childNode) {
+          if (entryIsVisible(childNode.entry)) {
+            return true;
+          }
+          children.push(...childNode.children);
+        }
+      }
+      return false;
+    }
+    return hasAVisibleDescendent(node);
   }
 
   /*
@@ -600,6 +627,10 @@ export class ThreadAppender implements TrackAppender {
       // rather than show the event title (which is always just "Event"), we
       // add the type ("click") to help the user understand the event.
       return i18nString(UIStrings.eventDispatchS, {PH1: entry.args.data.type});
+    }
+
+    if (TraceEngine.Types.TraceEvents.isTraceEventThreadControllerImplRunTask(entry)) {
+      return entry.args.src_func ?? entry.name;
     }
 
     const defaultName = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName)?.title;
