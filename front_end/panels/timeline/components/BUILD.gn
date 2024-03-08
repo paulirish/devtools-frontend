@@ -47,7 +47,10 @@ devtools_module("components") {
 devtools_entrypoint("bundle") {
   entrypoint = "components.ts"
 
-  deps = [ ":components" ]
+  deps = [
+    ":components",
+    ":css_files",
+  ]
 
   visibility = [
     ":*",

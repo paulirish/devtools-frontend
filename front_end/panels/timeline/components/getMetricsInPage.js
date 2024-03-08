@@ -8,6 +8,10 @@
 // globals __chromium_devtools_metrics_reporter
 
 export async function getMetricsInPage() {
+  if (globalThis.YAHDONE === 1)
+    return;
+
+  globalThis.YAHDONE = 1;
   // Adapated from https://gist.github.com/mmocny/8e7fb5c0fbe03c8bed2e61ea49a95863
   function measureInteractions() {
     let worst_inp = 0;
@@ -52,7 +56,7 @@ export async function getMetricsInPage() {
   measureInteractions();
 
   // LCP, FCP, FP
-  const entryTypes = ['largest-contentful-paint', 'paint'];  // 'layout-shift'
+  const entryTypes = ['largest-contentful-paint', 'paint', 'navigation', 'resource'];  // 'layout-shift'
   const obs = new PerformanceObserver(entryList => {
     for (const entry of entryList.getEntries()) {
       __chromium_devtools_metrics_reporter(JSON.stringify({payload: entry.toJSON()}));

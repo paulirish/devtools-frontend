@@ -56,7 +56,7 @@ import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 import {ActiveFilters} from './ActiveFilters.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
 import * as Components from './components/components.js';
-import {PlayerEventsTimeline} from './components/CurrentPageMetrics.js';
+import {LiveMetricsTimeline} from './components/CurrentPageMetrics.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
 import {IsolateSelector} from './IsolateSelector.js';
@@ -399,7 +399,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     liveTimelineEl.id = 'live-timeline';
     // liveTimelineEl.append()
 
-    this.landingPageTimeline = new PlayerEventsTimeline();
+    this.landingPageTimeline = new LiveMetricsTimeline();
     // this.landingPageTimeline.show(liveTimelineEl);
     // setTimeout(_ => {
     this.landingPageTimeline.show(liveTimelineEl);

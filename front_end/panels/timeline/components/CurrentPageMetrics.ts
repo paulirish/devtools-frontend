@@ -36,7 +36,7 @@ const PAGE_METRICS_CODE_TO_EVALUATE = `
 `;
 
 
-export class PlayerEventsTimeline extends TickingFlameChart {
+export class LiveMetricsTimeline extends TickingFlameChart {
   private normalizedTimestamp: number;
   private playbackStatusLastEvent: Event|null;
   private audioBufferingStateEvent: Event|null;
@@ -49,9 +49,8 @@ export class PlayerEventsTimeline extends TickingFlameChart {
 
     this.currentPageMetrics = new CurrentPageMetrics();
     const onEventBound = this.onEvent.bind(this);
-    setTimeout(() => {
-      this.currentPageMetrics.init(onEventBound);
-    }, 1000);  // lol. so bad.
+    void this.currentPageMetrics.setup(onEventBound);
+
 
     this.addGroup('somegroup', 2);
     this.addGroup('okay', 2);  // video on top, audio on bottom
@@ -84,8 +83,7 @@ export class PlayerEventsTimeline extends TickingFlameChart {
   }
 
   onEvent(item: any): void {
-    console.log('its an item', item);
-    const payload = item.payload;
+    const payload = item;
     if (!payload)
       return;
 
@@ -103,26 +101,26 @@ export class CurrentPageMetrics extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
-  readonly timelineView = new PlayerEventsTimeline();
+  // readonly timelineView = new LiveMetricsTimeline();
 
 
 
   #currentPerfEntries: Array<{payload: PerformanceEventTiming}> = [];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
-  onEventBound: any;
+  onEventToTimeline: (item: any) => void;
 
   constructor() {
     super();
     void this.setup();
   }
-  async setup(): Promise<void> {
+  async setup(onEventBound: (item: any) => void): Promise<void> {
     const wait = (ms = 100): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(500);  // HACK. need something better for waiting for target reference
+    await wait(1);  // HACK. need something better for waiting for target reference
 
     const mainTarget = (SDK.TargetManager.TargetManager.instance().primaryPageTarget());
     this.#mainTarget = mainTarget;
-    this.onEventBound = onEventBound;
+    this.onEventToTimeline = onEventBound;
     if (!mainTarget) {
       // eslint-disable-next-line no-console
       console.log('could not get main target');
@@ -166,7 +164,9 @@ export class CurrentPageMetrics extends HTMLElement {
     if (!this.#currentPerfEntries.find(m => entry.startTime === m.startTime && entry.name === m.name)) {
       this.#currentPerfEntries.push(entry);
     }
-    this.onEventBound(entry);
+    if (!this.onEventToTimeline)
+      console.log('arrived before ready', entry);
+    this.onEventToTimeline(entry);
     this.#render();
   }
 
@@ -183,7 +183,7 @@ export class CurrentPageMetrics extends HTMLElement {
 
     // TODO: actually get this working appropriately. because lifecycle-wise it's all wrong.
     // On new page loads, reset the stats and execute the perf Observer
-    this.#currentPerfEntries.splice(0, this.#currentPerfEntries.length);
+    // this.#currentPerfEntries.splice(0, this.#currentPerfEntries.length);
     void this.#invokePerfObserver();
   }
 
@@ -208,13 +208,11 @@ export class CurrentPageMetrics extends HTMLElement {
     // globalThis.tv = this.timelineView;
     // this.timelineView.element.style.height = '200px';
     // this.timelineView.show();
-    // clang-format off
-    LitHtml.render(LitHtml.html`<button @click=${(): void => {
-      void this.#invokePerfObserver();
-    }}>click me to re-evaluate</button>
+    LitHtml.render(
+        LitHtml.html`
       ${this.#renderPageMetrics()}
-    `, this.#shadow, {host: this});
-    // clang-format on
+    `,
+        this.#shadow, {host: this});
     // this.#shadow.appendChild(this.timelineView.element);
   }
 

@@ -207,14 +207,15 @@ export class TickingFlameChart extends UI.Widget.VBox {
 
     // Delegate doesn't do much for now.
     this.delegate = new TickingFlameChartDelegate();
-    this.delegate.windowChanged = (startTime: number, endTime: number, animate: boolean) => {
-      console.log({startTime, endTime, animate});
-      this.dataProvider.bounds = new Bounds(startTime, endTime)
-    }
+    this.delegate.windowChanged =
+        (startTime: number, endTime: number, animate: boolean) => {
+          // console.log({startTime, endTime, animate});
+          this.dataProvider.bounds = new Bounds(startTime, endTime)
+        }
 
-    // Chart settings.
-    this.chartGroupExpansionSetting =
-        Common.Settings.Settings.instance().createSetting('media-flame-chart-group-expansion', {});
+                                                                  // Chart settings.
+                                                                  this.chartGroupExpansionSetting =
+            Common.Settings.Settings.instance().createSetting('media-flame-chart-group-expansion', {});
 
     // Create the chart.
     this.chart =
@@ -352,7 +353,6 @@ class TickingFlameChartDelegate implements PerfUI.FlameChart.FlameChartDelegate 
   }
 
   windowChanged(_windowStartTime: number, _windowEndTime: number, _animate: boolean): void {
-
   }
 
   updateRangeSelection(_startTime: number, _endTime: number): void {
@@ -441,7 +441,7 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
 
   private updateTimelineData(): void {
     if (!this.timelineDataInternal) {
-      return;
+      this.timelineDataInternal = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
     }
     const lastTimeByLevel = [];
     let maxLevel = 0;
@@ -467,9 +467,7 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
         this.timelineDataInternal.entryLevels[i] = maxLevel;
       }
     }
-    this.timelineDataInternal = new PerfUI.FlameChart.TimelineData(
-        this.timelineDataInternal.entryLevels, this.timelineDataInternal.entryTotalTimes,
-        this.timelineDataInternal.entryStartTimes, this.timelineDataInternal.groups);
+
     this.maxLevel = maxLevel;
   }
 
