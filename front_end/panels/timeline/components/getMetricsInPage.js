@@ -47,19 +47,17 @@ export async function getMetricsInPage() {
     });
 
     observer.observe({type: 'event', durationThreshold: 0, buffered: true});
-
     return observer;
   }
   measureInteractions();
 
-  // LCP
+  // LCP, FCP, FP
+  const entryTypes = ['largest-contentful-paint', 'paint'];  // 'layout-shift'
   const obs = new PerformanceObserver(entryList => {
     for (const entry of entryList.getEntries()) {
       __chromium_devtools_metrics_reporter(JSON.stringify({payload: entry.toJSON()}));
     }
   });
-
-  const entryTypes = ['largest-contentful-paint', 'paint'];  // 'layout-shift'
   for (const type of entryTypes) {
     obs.observe({type, buffered: true, durationThreshold: 0, includeSoftNavigationObservations: true});
   }
