@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Common from '../../../core/common/common.js';
-import {RuntimeModel} from '../../../core/sdk/RuntimeModel.js';
 import * as SDK from '../../../core/sdk/sdk.js';
-import type * as ProtocolProxyApi from '../../../generated/protocol-proxy-api.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
@@ -34,7 +32,7 @@ export class CurrentPageMetrics extends HTMLElement {
   readonly #renderBound = this.#render.bind(this);
   readonly #onPageLifecycleEventBound = this.#onPageLifecycleEvent.bind(this);
 
-  #currentPageMetrics: Array<{payload: PerformanceEventTiming}> = [];
+  #currentPerfEntries: Array<{payload: PerformanceEventTiming}> = [];
   #mainTarget: SDK.Target.Target|null = null;
   #mainFrameID: Protocol.Page.FrameId|null = null;
 
@@ -48,19 +46,20 @@ export class CurrentPageMetrics extends HTMLElement {
 
     const mainTarget = (SDK.TargetManager.TargetManager.instance().primaryPageTarget());
     if (!mainTarget) {
+      // eslint-disable-next-line no-console
       console.log('could not get main target');
       return;
     }
     this.#mainTarget = mainTarget;
 
-    const runtimeModel = this.#mainTarget.model(RuntimeModel);
+    const runtimeModel = this.#mainTarget.model(SDK.RuntimeModel.RuntimeModel);
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.RuntimeModel.RuntimeModel, SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
 
     await runtimeModel?.addBinding({name: '__chromium_devtools_metrics_reporter'});
+
     const frameTreeResponse = await mainTarget.pageAgent().invoke_getFrameTree();
-    const mainFrameID = frameTreeResponse.frameTree.frame.id;
-    this.#mainFrameID = mainFrameID;
+    this.#mainFrameID = frameTreeResponse.frameTree.frame.id;
 
     const resourceTreeModel = this.#mainTarget?.model(SDK.ResourceTreeModel.ResourceTreeModel);
     resourceTreeModel?.addEventListener(SDK.ResourceTreeModel.Events.LifecycleEvent, this.#onPageLifecycleEventBound);
@@ -86,8 +85,10 @@ export class CurrentPageMetrics extends HTMLElement {
     if (data.name !== '__chromium_devtools_metrics_reporter') {
       return;
     }
-    const obj = JSON.parse(event.data.payload);
-    this.#currentPageMetrics.push(obj);
+    const entry = JSON.parse(event.data.payload).payload;
+    if (!this.#currentPerfEntries.find(m => entry.startTime === m.startTime && entry.name === m.name)) {
+      this.#currentPerfEntries.push(entry);
+    }
     this.#render();
   }
 
@@ -99,11 +100,13 @@ export class CurrentPageMetrics extends HTMLElement {
     if (event.data.frameId !== this.#mainFrameID) {
       return;
     }
-    // Runt the perf observer on new page loads.
-    if (event.data.name === 'load') {
-      void this.#invokePerfObserver();
-      return;
-    }
+    // eslint-disable-next-line no-console
+    console.log('lifecycle event', event);
+
+    // TODO: actually get this working appropriately. because lifecycle-wise it's all wrong.
+    // On new page loads, reset the stats and execute the perf Observer
+    this.#currentPerfEntries.splice(0, this.#currentPerfEntries.length);
+    void this.#invokePerfObserver();
   }
 
   async #invokePerfObserver(): Promise<void> {
@@ -124,8 +127,8 @@ export class CurrentPageMetrics extends HTMLElement {
   }
 
   #render(): void {
-    const list = this.#currentPageMetrics.map(
-        m => LitHtml.html`<li><b>${m.payload.entryType}</b>: <small>${JSON.stringify(m.payload)}</small>`);
+    const list =
+        this.#currentPerfEntries.map(m => LitHtml.html`<li><b>${m.entryType}</b>: <small>${JSON.stringify(m)}</small>`);
     LitHtml.render(LitHtml.html`<ul>${list}</ul>`, this.#shadow, {host: this});
   }
 }

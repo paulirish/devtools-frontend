@@ -25,12 +25,9 @@ export async function getMetricsInPage() {
         // Worst INP is typically ~= real INP since most page loads the p98 thing isn't important
         worst_inp = Math.max(entry.duration, worst_inp);
 
-        // Don't need to performance.measure() since DevTools already shows Interactions
-        const score = entry.duration;
-        const label = score <= 200 ? 'GOOD' : score <= 500 ? 'NeedsImprovement' : 'POOR';
-
         const monoStyle = 'color: grey; font-family: Consolas,monospace';
         const resetStyle = '';
+        /** @param {number} score */
         const scoreToStyle = score => {
           if (score <= 200) {
             return 'color: green';
@@ -40,6 +37,7 @@ export async function getMetricsInPage() {
           }
           return 'color: red';
         };
+        // eslint-disable-next-line no-console
         console.log(
             `%c[Interaction: ${entry.name.padEnd(12)}] %cDuration: %c${entry.duration}`, monoStyle, resetStyle,
             scoreToStyle(entry.duration));

@@ -588,5 +588,9 @@ devtools-feedback-button {
 }
 
 devtools-timeline-current-page-metrics {
-  overflow-wrap: break-word;
+  word-break: break-all;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: block;
+  user-select: text;
 }
