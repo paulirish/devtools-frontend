@@ -150,7 +150,9 @@ const buildFiles = async () => {
   const nonJSOrCSSFileName = Array.from(changedFiles).find(f => !f.endsWith('.css') && !f.endsWith('.ts'));
   if (nonJSOrCSSFileName) {
     console.log(`${currentTimeString()} - ${relativeFileName(nonJSOrCSSFileName)} changed, running ninja`);
-    childProcess.spawnSync('autoninja', ['-C', `out/${target}`], {cwd, env, stdio: 'inherit'});
+    childProcess.spawnSync(
+        'autoninja', ['-C', `out/${target}`, 'front_end/ui/components/docs/performance_panel'],
+        {cwd, env, stdio: 'inherit'});
     changedFiles.clear();
     return;
   }
@@ -200,7 +202,9 @@ const fastRebuildFile = async fileName => {
 
 console.log('Running initial build before watching changes');
 assertTargetArgsForWatchBuild();
-childProcess.spawnSync('autoninja', ['-C', `out/${target}`], {cwd, env, stdio: 'inherit'});
+childProcess.spawnSync(
+    'autoninja', ['-C', `out/${target}`, 'front_end/ui/components/docs/performance_panel'],
+    {cwd, env, stdio: 'inherit'});
 
 // Watch the front_end and test folder and build on any change.
 console.log(`Watching for changes in ${frontEndDir} and ${testsDir}`);

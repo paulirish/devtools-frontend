@@ -102,6 +102,8 @@ const nodeMode = params.get('isNode');
 const isNodeMode = nodeMode === 'true' ? true : false;
 Root.Runtime.experiments.setEnabled('timeline-invalidation-tracking', params.has('invalidations'));
 
+Root.Runtime.experiments.setEnabled('timeline-show-all-events', true);
+
 const timeline = Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode});
 const container = document.getElementById('container');
 if (!container) {
@@ -110,6 +112,7 @@ if (!container) {
 container.innerHTML = '';
 timeline.markAsRoot();
 timeline.show(container);
+window.addEventListener('resize', () => timeline.doResize());
 
 let fileName;
 if (traceFileName) {
