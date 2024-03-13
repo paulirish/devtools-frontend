@@ -2300,19 +2300,13 @@ export class StylesSidebarPropertyRenderer {
       return new RegExp(`^${source}$`, flags);
     };
 
-    if (this.fontHandler && metadata.isFontAwareProperty(this.propertyName)) {
-      matchers.push(new LegacyRegexMatcher(
-          this.propertyName === 'font-family' ? InlineEditor.FontEditorUtils.FontFamilyRegex :
-                                                InlineEditor.FontEditorUtils.FontPropertiesRegex,
-          this.fontHandler));
-    }
     if (!Root.Runtime.experiments.isEnabled('css-type-component-length-deprecate') && this.lengthHandler) {
       // TODO(changhaohan): crbug.com/1138628 refactor this to handle unitless 0 cases
       matchers.push(
           new LegacyRegexMatcher(asLineMatch(InlineEditor.CSSLengthUtils.CSSLengthRegex), this.lengthHandler));
     }
 
-    renderPropertyValue(this.propertyValue, matchers, this.propertyName)
+    renderPropertyValue(this.propertyName, this.propertyValue, matchers)
         .forEach(node => valueElement.appendChild(node));
     valueElement.normalize();
     return valueElement;

@@ -9240,6 +9240,18 @@ export namespace Network {
      * Connection type if known.
      */
     connectionType?: ConnectionType;
+    /**
+     * WebRTC packet loss (percent, 0-100). 0 disables packet loss emulation, 100 drops all the packets.
+     */
+    packetLoss?: number;
+    /**
+     * WebRTC packet queue length (packet). 0 removes any queue length limitations.
+     */
+    packetQueueLength?: integer;
+    /**
+     * WebRTC packetReordering feature.
+     */
+    packetReordering?: boolean;
   }
 
   export interface EnableRequest {
@@ -11127,7 +11139,7 @@ export namespace Page {
     ChUaPlatform = 'ch-ua-platform',
     ChUaModel = 'ch-ua-model',
     ChUaMobile = 'ch-ua-mobile',
-    ChUaFormFactor = 'ch-ua-form-factor',
+    ChUaFormFactors = 'ch-ua-form-factors',
     ChUaFullVersion = 'ch-ua-full-version',
     ChUaFullVersionList = 'ch-ua-full-version-list',
     ChUaPlatformVersion = 'ch-ua-platform-version',
@@ -11826,6 +11838,7 @@ export namespace Page {
     CookieDisabled = 'CookieDisabled',
     HTTPAuthRequired = 'HTTPAuthRequired',
     CookieFlushed = 'CookieFlushed',
+    BroadcastChannelOnMessage = 'BroadcastChannelOnMessage',
     WebSocket = 'WebSocket',
     WebTransport = 'WebTransport',
     WebRTC = 'WebRTC',
@@ -13746,32 +13759,6 @@ export namespace Storage {
   }
 
   /**
-   * Ad advertising element inside an interest group.
-   */
-  export interface InterestGroupAd {
-    renderURL: string;
-    metadata?: string;
-  }
-
-  /**
-   * The full details of an interest group.
-   */
-  export interface InterestGroupDetails {
-    ownerOrigin: string;
-    name: string;
-    expirationTime: Network.TimeSinceEpoch;
-    joiningOrigin: string;
-    biddingLogicURL?: string;
-    biddingWasmHelperURL?: string;
-    updateURL?: string;
-    trustedBiddingSignalsURL?: string;
-    trustedBiddingSignalsKeys: string[];
-    userBiddingSignals?: string;
-    ads: InterestGroupAd[];
-    adComponents: InterestGroupAd[];
-  }
-
-  /**
    * Enum of shared storage access types.
    */
   export const enum SharedStorageAccessType {
@@ -13791,6 +13778,10 @@ export namespace Storage {
     WorkletEntries = 'workletEntries',
     WorkletLength = 'workletLength',
     WorkletRemainingBudget = 'workletRemainingBudget',
+    HeaderSet = 'headerSet',
+    HeaderAppend = 'headerAppend',
+    HeaderDelete = 'headerDelete',
+    HeaderClear = 'headerClear',
   }
 
   /**
@@ -13880,22 +13871,28 @@ export namespace Storage {
      * SharedStorageAccessType.documentDelete,
      * SharedStorageAccessType.workletSet,
      * SharedStorageAccessType.workletAppend,
-     * SharedStorageAccessType.workletDelete, and
-     * SharedStorageAccessType.workletGet.
+     * SharedStorageAccessType.workletDelete,
+     * SharedStorageAccessType.workletGet,
+     * SharedStorageAccessType.headerSet,
+     * SharedStorageAccessType.headerAppend, and
+     * SharedStorageAccessType.headerDelete.
      */
     key?: string;
     /**
      * Value for a specific entry in an origin's shared storage.
      * Present only for SharedStorageAccessType.documentSet,
      * SharedStorageAccessType.documentAppend,
-     * SharedStorageAccessType.workletSet, and
-     * SharedStorageAccessType.workletAppend.
+     * SharedStorageAccessType.workletSet,
+     * SharedStorageAccessType.workletAppend,
+     * SharedStorageAccessType.headerSet, and
+     * SharedStorageAccessType.headerAppend.
      */
     value?: string;
     /**
      * Whether or not to set an entry for a key if that key is already present.
-     * Present only for SharedStorageAccessType.documentSet and
-     * SharedStorageAccessType.workletSet.
+     * Present only for SharedStorageAccessType.documentSet,
+     * SharedStorageAccessType.workletSet, and
+     * SharedStorageAccessType.headerSet.
      */
     ignoreIfPresent?: boolean;
   }
@@ -14293,7 +14290,13 @@ export namespace Storage {
   }
 
   export interface GetInterestGroupDetailsResponse extends ProtocolResponseWithError {
-    details: InterestGroupDetails;
+    /**
+     * This largely corresponds to:
+     * https://wicg.github.io/turtledove/#dictdef-generatebidinterestgroup
+     * but has absolute expirationTime instead of relative lifetimeMs and
+     * also adds joiningOrigin.
+     */
+    details: any;
   }
 
   export interface SetInterestGroupTrackingRequest {

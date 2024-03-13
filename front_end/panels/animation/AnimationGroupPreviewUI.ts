@@ -11,7 +11,7 @@ import {AnimationUI} from './AnimationUI.js';
 
 export class AnimationGroupPreviewUI {
   #model: AnimationGroup;
-  element: HTMLDivElement;
+  element: HTMLButtonElement;
   readonly #removeButtonInternal: HTMLElement;
   readonly #replayOverlayElement: HTMLElement;
   readonly #svg: Element;
@@ -19,8 +19,11 @@ export class AnimationGroupPreviewUI {
 
   constructor(model: AnimationGroup) {
     this.#model = model;
-    this.element = document.createElement('div');
-    this.element.setAttribute('jslog', `${VisualLogging.item('animations.buffer-preview').track({click: true})}`);
+    this.element = document.createElement('button');
+    this.element.setAttribute(
+        'jslog', `${VisualLogging.item(`animations.buffer-preview${model.isScrollDriven() ? '-sda' : ''}`).track({
+          click: true,
+        })}`);
     this.element.classList.add('animation-buffer-preview');
     this.element.addEventListener('animationend', () => {
       this.element.classList.add('no-animation');
@@ -29,7 +32,9 @@ export class AnimationGroupPreviewUI {
     this.element.createChild('div', 'animation-paused fill');
 
     if (model.isScrollDriven()) {
-      this.element.appendChild(IconButton.Icon.create('mouse', 'mouse-icon'));
+      this.element.appendChild(IconButton.Icon.create('mouse', 'preview-icon'));
+    } else {
+      this.element.appendChild(IconButton.Icon.create('watch', 'preview-icon'));
     }
 
     this.#removeButtonInternal = this.element.createChild('button', 'animation-remove-button');
