@@ -344,7 +344,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       searchElement.id = entry.toString();
       this.updateElementPosition(searchElement, entry);
     }
-    //
   }
 
   removeSearchResultHighlights(): void {
@@ -3066,12 +3065,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return false;
   }
 
-
   /**
    * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
    * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
    */
-  private getElementPosition(element: Element, entryIndex: number, isDecoration?: boolean): void {
+  private updateElementPosition(element: Element, entryIndex: number, isDecoration?: boolean): void {
     const elementMinWidthPx = 2;
     element.classList.add('hidden');
     if (entryIndex === -1) {
@@ -3108,43 +3106,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const entryLevel = timelineData.entryLevels[entryIndex];
     const barY = this.levelToOffset(entryLevel) - this.chartViewport.scrollOffset();
     const barHeight = this.levelHeight(entryLevel);
-    const position:{top: number, left: number, height: number, width: number} = {};
+    const style = (element as HTMLElement).style;
 
     if (isDecoration) {
-      position.top = barY;
-      position.width = barHeight;
-      position.height = barHeight;
-      position.left = barX + barWidth - barHeight;
+      style.top = barY + 'px';
+      style.width = barHeight + 'px';
+      style.height = barHeight + 'px';
+      style.left = barX + barWidth - barHeight + 'px';
     } else {
-      position.top = barY;
-      position.width = barWidth;
-      position.height = barHeight - 1;
-      position.left = barX;
+      style.top = barY + 'px';
+      style.width = barWidth + 'px';
+      style.height = barHeight - 1 + 'px';
+      style.left = barX + 'px';
     }
-
-    return {
-      position,
-      visible,
-    };
-  }
-
-
-  /**
-   * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
-   * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
-   */
-  private updateElementPosition(element: Element, entryIndex: number, isDecoration?: boolean): void {
-    const elementPosition = this.getElementPosition(element, entryIndex, isDecoration);
-    if (!elementPosition) return;
-
-    for (const key of Object.keys(elementPosition.position)){
-      (element as HTMLElement).style[key] = `${elementPosition.position[key]}px`;
-    }
-
-    element.classList.toggle('hidden', !elementPosition.visible);
+    element.classList.toggle('hidden', !visible);
     this.viewportElement.appendChild(element);
   }
-
 
   // Updates the highlight of an Arrow button that is shown on an entry if it has hidden child entries
   private updateHiddenChildrenArrowHighlighPosition(entryIndex: number): void {
