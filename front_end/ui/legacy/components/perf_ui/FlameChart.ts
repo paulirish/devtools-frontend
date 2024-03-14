@@ -251,6 +251,41 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.highlightElement = this.viewportElement.createChild('div', 'flame-chart-highlight-element');
     this.revealDescendantsArrowHighlightElement =
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
+
+    this.dimDiv =
+        this.viewportElement.createChild('div', 'dimming-mask', 'fill');
+    this.dimDiv.style.cssText = `
+    background: #ffffffb3;
+    mix-blend-mode: color;`;
+
+    this.dimSvgDiv =
+        this.viewportElement.createChild('div', 'dim-svg-mask', 'fill');
+    this.dimSvgDiv.innerHTML = `
+
+
+    <svg viewBox="0 0 756.3  756.3">
+
+  <mask id="myMask">
+  <!--within the mask... -->
+  <!--  grayish pixels => show the the outer rect at % opacity -->
+    <rect x="0" y="0" width="756.3" height="756.3" fill="hsl(0deg 0% 82.36%)"></rect>
+
+  <!--  black pixels =>   punch, fully transparently, through to the next thing. these are the cutouts -->
+    <rect x="37" y="78" width="103.02" height="16" fill="black"></rect>
+
+  <!--  white pixels =>   show the outer rect. (probably dont need. just for debugging.) -->
+    <path d="M10,35 A20,20,0,0,1,50,35 A20,20,0,0,1,90,35 Q90,65,50,95 Q10,65,10,35 Z"
+     style="fill: white;"></path>
+  </mask>
+
+
+  <!-- the fill is what i want to be user visible (grey = some desaturation).
+       the mask punches through it-->
+<rect x="0" y="0" width="756.3" height="756.3" fill="gray" mask="url(#myMask)"></rect></svg>
+
+`;
+    this.dimSvgDiv.style.cssText = `    mix-blend-mode: hue;`;
+
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     this.canvas.addEventListener('focus', () => {
       this.dispatchEventToListeners(Events.CanvasFocused);
@@ -338,12 +373,15 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   highlightAllEntries(entries: number[]): void {
+    const positions = [];
     for (const entry of entries) {
       const searchElement = this.viewportElement.createChild('div', 'flame-chart-search-element');
       this.#searchResultHighlightElements.push(searchElement);
       searchElement.id = entry.toString();
-      this.updateElementPosition(searchElement, entry);
+      const newPosition = this.updateElementPosition(searchElement, entry);
+      positions.push(newPosition);
     }
+    console.log(positions);
   }
 
   removeSearchResultHighlights(): void {
@@ -3069,7 +3107,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
    * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
    */
-  private updateElementPosition(element: Element, entryIndex: number, isDecoration?: boolean): void {
+  private updateElementPosition(element: Element, entryIndex: number, isDecoration?: boolean): void|{position: {top: number;width: number;height: number;left: number;}, visible: boolean} {
     const elementMinWidthPx = 2;
     element.classList.add('hidden');
     if (entryIndex === -1) {
@@ -3106,21 +3144,27 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const entryLevel = timelineData.entryLevels[entryIndex];
     const barY = this.levelToOffset(entryLevel) - this.chartViewport.scrollOffset();
     const barHeight = this.levelHeight(entryLevel);
-    const style = (element as HTMLElement).style;
 
-    if (isDecoration) {
-      style.top = barY + 'px';
-      style.width = barHeight + 'px';
-      style.height = barHeight + 'px';
-      style.left = barX + barWidth - barHeight + 'px';
-    } else {
-      style.top = barY + 'px';
-      style.width = barWidth + 'px';
-      style.height = barHeight - 1 + 'px';
-      style.left = barX + 'px';
+    const position = isDecoration ? {
+      top: barY,
+      width: barHeight,
+      height: barHeight,
+      left: barX + barWidth - barHeight,
+    } : {
+      top: barY,
+      width: barWidth,
+      height: barHeight - 1,
+      left: barX,
+    };
+
+    const elStyle = (element as HTMLElement).style;
+    for (const prop of Object.keys(position)) {
+      elStyle[prop] = `${position[prop]}px`;
     }
     element.classList.toggle('hidden', !visible);
     this.viewportElement.appendChild(element);
+
+    return {position, visible};
   }
 
   // Updates the highlight of an Arrow button that is shown on an entry if it has hidden child entries
