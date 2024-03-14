@@ -15,11 +15,9 @@ import {
 import {mean, percentile} from '../../helpers/perf-helper.js';
 import {addBenchmarkResult, type Benchmark} from '../../report/report.js';
 
-async function getPanelWithFixture(fixture: string): Promise<ElementHandle> {
-  await navigateToPerformanceTab();
+async function getPanelWithFixture(fixture: string): Promise<void> {
   const uploadProfileHandle = await waitFor<HTMLInputElement>('input[type=file]');
   await uploadProfileHandle.uploadFile(`front_end/panels/timeline/fixtures/traces/${fixture}.gz`);
-  return await waitFor('.widget.panel.timeline');
 }
 describe('Performance panel trace load performance', () => {
   const allTestValues: {name: string, values: number[]}[] = [];
@@ -38,7 +36,8 @@ describe('Performance panel trace load performance', () => {
     for (let run = 1; run <= RUNS; run++) {
       it(`run ${run}/${RUNS}`, async function() {
         this.timeout(10_000);
-        const panelElement = await getPanelWithFixture('large-profile.cpuprofile');
+        await navigateToPerformanceTab();
+        const panelElement = await waitFor('.widget.panel.timeline');;
         const eventPromise = panelElement.evaluate(el => {
           return new Promise<number>(resolve => {
             el.addEventListener('traceload', e => {
@@ -47,6 +46,7 @@ describe('Performance panel trace load performance', () => {
             }, {once: true});
           });
         });
+        await getPanelWithFixture('web-dev-with-advanced-instrumentation.json');
         const duration = await eventPromise;
         // Ensure only 2 decimal places.
         const timeTaken = Number(duration.toFixed(2));
