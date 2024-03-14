@@ -281,10 +281,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   <!-- the fill is what i want to be user visible (grey = some desaturation).
        the mask punches through it-->
-<rect x="0" y="0" width="756.3" height="756.3" fill="gray" mask="url(#myMask)"></rect></svg>
+<rect x="0" y="0" width="756.3" height="756.3" fill="#ebebeb" mask="url(#myMask)"></rect></svg>
 
 `;
-    this.dimSvgDiv.style.cssText = `    mix-blend-mode: hue;`;
+    this.dimSvgDiv.style.cssText = `    mix-blend-mode: screen;`;
 
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     this.canvas.addEventListener('focus', () => {
