@@ -82,7 +82,9 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     ]);
   });
 
-  it('populates the frames track with frames and screenshots', async function() {
+  it.only('populates the frames track with frames and screenshots', async function() {
+    // const _data = await TraceLoader.allModels(this, 'web-dev.json.gz');
+
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
     const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'web-dev.json.gz');
     dataProvider.setModel(performanceModel, traceParsedData);

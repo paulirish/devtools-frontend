@@ -164,9 +164,9 @@ export class TraceLoader {
    */
   static async allModels(context: Mocha.Context|Mocha.Suite|null, name: string): Promise<AllModelsLoaded> {
     const fromCache = allModelsCache.get(name);
-    if (fromCache) {
-      return fromCache;
-    }
+    // if (fromCache) {
+    //   return fromCache;
+    // }
     // Load the contents of the file and get the array of all the events.
     let fileContents = await TraceLoader.fixtureContents(context, name);
     if (name.endsWith('.cpuprofile.gz')) {
@@ -203,6 +203,12 @@ export class TraceLoader {
       performanceModel,
       traceParsedData: traceEngineData.traceParsedData,
     };
+    if (fromCache) {
+      console.log('ohboy');
+      // expect(fromCache).toMatch(result);
+       assert.deepStrictEqual(fromCache.timelineModel, result.timelineModel)
+      assert.deepStrictEqual(fromCache.traceParsedData, result.traceParsedData)
+    }
     allModelsCache.set(name, result);
     return result;
   }
