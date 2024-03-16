@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -77,11 +78,6 @@ export interface TrackAppender {
    * Returns the info shown when an event in the timeline is hovered.
    */
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
-  /**
-   * The EntriesFilter instance that used to modify the trees in a track based on user actions,
-   * e.g collapsing functions, etc.
-   */
-  entriesFilter?(): TraceEngine.EntriesFilter.EntriesFilter;
 }
 
 export const TrackNames =
@@ -182,59 +178,6 @@ export class CompatibilityTracksAppender {
 
   getFlameChartTimelineData(): PerfUI.FlameChart.FlameChartTimelineData {
     return this.#flameChartData;
-  }
-
-  getHiddenEvents(group: PerfUI.FlameChart.Group): TraceEngine.Types.TraceEvents.TraceEventData[]|void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      return appender.entriesFilter().invisibleEntries();
-    }
-    console.warn('Could not get hidden events.');
-  }
-
-  getModifiedEntries(group: PerfUI.FlameChart.Group): TraceEngine.Types.TraceEvents.TraceEventData[]|void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      return appender.entriesFilter().modifiedEntries();
-    }
-    console.warn('Could not get modified events.');
-  }
-
-  modifyTree(
-      group: PerfUI.FlameChart.Group, entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry,
-      type: TraceEngine.EntriesFilter.FilterAction): void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      appender.entriesFilter().applyFilterAction({entry, type});
-    } else {
-      console.warn('Could not modify tree on a track.');
-    }
-  }
-
-  findPossibleContextMenuActions(
-      group: PerfUI.FlameChart.Group,
-      node: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): TraceEngine.EntriesFilter.PossibleFilterActions|void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      return appender.entriesFilter().findPossibleActions(node);
-    }
-    console.warn('Could not find possible context menu actions.');
-  }
-
-  revealEntry(group: PerfUI.FlameChart.Group, index: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      appender.entriesFilter().revealEntry(index);
-    }
-  }
-
-  findHiddenDescendantsAmount(group: PerfUI.FlameChart.Group, node: TraceEngine.Types.TraceEvents.SyntheticTraceEntry):
-      number|void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      return appender.entriesFilter().findHiddenDescendantsAmount(node);
-    }
-    console.warn('Could not find hidden entries on a track.');
   }
 
   #addThreadAppenders(): void {
@@ -592,6 +535,12 @@ export class CompatibilityTracksAppender {
       // Therefore we mark them as visible so they are appended onto the Thread
       // track, and hence accessible by the CountersGraph view.
       return true;
+    }
+
+    // Gate the visibility of post message events behind the experiement flag
+    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
     }
 
     // Default styles are globally defined for each event name. Some

@@ -652,7 +652,10 @@ export enum Action {
   InsightErroredOther = 139,
   AutofillReceived = 140,
   AutofillReceivedAndTabAutoOpened = 141,
-  MaxValue = 142,
+  AnimationGroupSelected = 142,
+  ScrollDrivenAnimationGroupSelected = 143,
+  ScrollDrivenAnimationGroupScrubbed = 144,
+  MaxValue = 145,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -1105,7 +1108,6 @@ export enum DevtoolsExperiments {
   'timeline-as-console-profile-result-panel' = 67,
   'preloading-status-panel' = 68,
   'outermost-target-selector' = 71,
-  'js-profiler-temporarily-enable' = 72,
   'highlight-errors-elements-panel' = 73,
   'set-all-breakpoints-eagerly' = 74,
   'use-source-map-scopes' = 76,
@@ -1115,9 +1117,12 @@ export enum DevtoolsExperiments {
   'sources-frame-indentation-markers-temporarily-disable' = 83,
   'heap-snapshot-treat-backing-store-as-containing-object' = 84,
   'css-type-component-length-deprecate' = 85,
+  'timeline-show-postmessage-events' = 86,
+  'save-and-load-trace-with-annotations' = 87,
+  'timeline-track-configuration' = 88,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 86,
+  'MaxValue' = 89,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

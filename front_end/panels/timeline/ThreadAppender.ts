@@ -162,7 +162,6 @@ export class ThreadAppender implements TrackAppender {
   readonly isOnMainFrame: boolean;
   #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignore-list-js-frames-on-timeline');
   #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
-  #entriesFilter: TraceEngine.EntriesFilter.EntriesFilter;
   #url: string = '';
   #headerNestingLevel: number|null = null;
   constructor(
@@ -206,15 +205,7 @@ export class ThreadAppender implements TrackAppender {
     if (this.#traceParsedData.AuctionWorklets.worklets.has(processId)) {
       this.appenderName = 'Thread_AuctionWorklet';
     }
-
-    this.#entriesFilter = new TraceEngine.EntriesFilter.EntriesFilter(
-        this.threadType === TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE ? traceParsedData.Samples.entryToNode :
-                                                                                  traceParsedData.Renderer.entryToNode);
-
     this.#url = this.#traceParsedData.Renderer?.processes.get(this.#processId)?.url || '';
-  }
-  entriesFilter(): TraceEngine.EntriesFilter.EntriesFilter {
-    return this.#entriesFilter;
   }
 
   processId(): TraceEngine.Types.TraceEvents.ProcessID {
@@ -453,7 +444,7 @@ export class ThreadAppender implements TrackAppender {
   #appendNodesAtLevel(
       nodes: Iterable<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
-    const invisibleEntries = this.#entriesFilter?.invisibleEntries() ?? [];
+    const invisibleEntries = TraceEngine.EntriesFilter.EntriesFilter.maybeInstance()?.invisibleEntries() ?? [];
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
@@ -467,9 +458,8 @@ export class ThreadAppender implements TrackAppender {
       // another traversal to the entries array (which could grow
       // large). To avoid the extra cost we  add the check in the
       // traversal we already need to append events.
-      const entryIsVisible =
-          (!invisibleEntries.includes(entry) && this.#compatibilityBuilder.entryIsVisibleInTimeline(entry)) ||
-          this.#showAllEventsEnabled;
+      const entryIsVisible = !invisibleEntries.includes(entry) &&
+          (this.#compatibilityBuilder.entryIsVisibleInTimeline(entry) || this.#showAllEventsEnabled);
       // For ignore listing support, these two conditions need to be met
       // to not append a profile call to the flame chart:
       // 1. It is ignore listed
@@ -502,7 +492,7 @@ export class ThreadAppender implements TrackAppender {
 
   #addDecorationsToEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData, index: number): void {
     const flameChartData = this.#compatibilityBuilder.getFlameChartTimelineData();
-    if (this.#entriesFilter?.isEntryModified(entry)) {
+    if (TraceEngine.EntriesFilter.EntriesFilter.maybeInstance()?.isEntryModified(entry)) {
       addDecorationToEvent(
           flameChartData, index, {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW});
     }
@@ -553,19 +543,19 @@ export class ThreadAppender implements TrackAppender {
 
     if (TraceEngine.Types.TraceEvents.isProfileCall(event)) {
       if (event.callFrame.functionName === '(idle)') {
-        return getCategoryStyles().Idle.getComputedColorValue();
+        return getCategoryStyles().idle.getComputedColorValue();
       }
       if (event.callFrame.scriptId === '0') {
         // If we can not match this frame to a script, return the
         // generic "scripting" color.
-        return getCategoryStyles().Scripting.getComputedColorValue();
+        return getCategoryStyles().scripting.getComputedColorValue();
       }
       // Otherwise, return a color created based on its URL.
       return this.#colorGenerator.colorForID(event.callFrame.url);
     }
     const defaultColor =
         getEventStyle(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category.getComputedColorValue();
-    return defaultColor || getCategoryStyles().Other.getComputedColorValue();
+    return defaultColor || getCategoryStyles().other.getComputedColorValue();
   }
 
   /**

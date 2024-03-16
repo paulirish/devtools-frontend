@@ -4,8 +4,8 @@
 
 import("../../../third_party/typescript/typescript.gni")
 
-node_ts_library("profiler") {
-  sources = [ "profiler_test.ts" ]
+node_ts_library("targets") {
+  sources = [ "worklet_test.ts" ]
 
   deps = [
     "../../shared",
