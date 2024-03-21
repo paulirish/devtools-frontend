@@ -227,18 +227,18 @@ export class TimelineMiniMap extends
     this.#data = data;
     this.#controls = [];
 
-    this.#setMarkers(data.traceParsedData);
+    // this.#setMarkers(data.traceParsedData);
     this.#setNavigationStartEvents(data.traceParsedData);
-    this.#controls.push(new TimelineEventOverviewResponsiveness(data.traceParsedData));
-    this.#controls.push(new TimelineEventOverviewCPUActivity(data.traceParsedData));
-
-    this.#controls.push(new TimelineEventOverviewNetwork(data.traceParsedData));
+    // this.#controls.push(new TimelineEventOverviewResponsiveness(data.traceParsedData));
     if (data.settings.showScreenshots) {
       const filmStrip = TraceEngine.Extras.FilmStrip.fromTraceData(data.traceParsedData);
       if (filmStrip.frames.length) {
         this.#controls.push(new TimelineFilmStripOverview(filmStrip));
       }
     }
+    this.#controls.push(new TimelineEventOverviewCPUActivity(data.traceParsedData));
+
+    this.#controls.push(new TimelineEventOverviewNetwork(data.traceParsedData));
     if (data.settings.showMemory) {
       this.#controls.push(new TimelineEventOverviewMemory(data.traceParsedData));
     }

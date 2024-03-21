@@ -212,7 +212,7 @@
   float: left;
   width: 14px;
   height: 14px;
-  margin-right: 2px;
+ margin-left: -5px;
   content: "";
   position: relative;
   top: 3px;
