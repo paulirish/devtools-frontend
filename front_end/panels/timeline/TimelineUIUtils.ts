@@ -559,7 +559,6 @@ type LinkifyLocationOptions = {
 };
 
 export class TimelineUIUtils {
-
   static frameDisplayName(frame: Protocol.Runtime.CallFrame): string {
     if (!TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.isNativeRuntimeFrame(frame)) {
       return UI.UIUtils.beautifyFunctionName(frame.functionName);
@@ -1633,16 +1632,16 @@ export class TimelineUIUtils {
       }
     }
 
-    const stats: {
-      [x: string]: number,
-    } = {};
-    const showPieChart =
-        detailed && traceParseData && TimelineUIUtils.aggregatedStatsForTraceEvent(stats, traceParseData, event);
-    if (showPieChart) {
-      contentHelper.addSection(i18nString(UIStrings.aggregatedTime));
-      const pieChart = TimelineUIUtils.generatePieChart(stats, TimelineUIUtils.eventStyle(event).category, selfTime);
-      contentHelper.appendElementRow('', pieChart);
-    }
+    // const stats: {
+    //   [x: string]: number,
+    // } = {};
+    // const showPieChart =
+    //     detailed && traceParseData && TimelineUIUtils.aggregatedStatsForTraceEvent(stats, traceParseData, event);
+    // if (showPieChart) {
+    //   contentHelper.addSection(i18nString(UIStrings.aggregatedTime));
+    //   const pieChart = TimelineUIUtils.generatePieChart(stats, TimelineUIUtils.eventStyle(event).category, selfTime);
+    //   contentHelper.appendElementRow('', pieChart);
+    // }
 
     return contentHelper.fragment;
   }

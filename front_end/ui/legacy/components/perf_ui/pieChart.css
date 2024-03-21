@@ -5,10 +5,11 @@
  */
 
 .root {
-  align-items: flex-start; /* keep chart at top so it doesnt change position as the legend changes height */
+  align-items: center; /* keep chart at top so it doesnt change position as the legend changes height */
   display: flex;
   min-width: fit-content;
   white-space: nowrap;
+    flex-direction: column;
 }
 
 .chart-root {

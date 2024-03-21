@@ -255,7 +255,7 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
     const columns = ([] as DataGrid.DataGrid.ColumnDescriptor[]);
     this.populateColumns(columns);
 
-    this.splitWidget = new UI.SplitWidget.SplitWidget(true, true, 'timeline-tree-view-details-split-widget');
+    this.splitWidget = new UI.SplitWidget.SplitWidget(false, true, 'timeline-tree-view-details-split-widget');
     const mainView = new UI.Widget.VBox();
     const toolbar = new UI.Toolbar.Toolbar('', mainView.element);
     toolbar.makeWrappable(true);
@@ -419,10 +419,10 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
 
   populateColumns(columns: DataGrid.DataGrid.ColumnDescriptor[]): void {
     columns.push(
-        ({id: 'self', title: i18nString(UIStrings.selfTime), width: '120px', fixedWidth: true, sortable: true} as
+        ({id: 'self', title: i18nString(UIStrings.selfTime), width: '76px', fixedWidth: true, sortable: true} as
          DataGrid.DataGrid.ColumnDescriptor));
     columns.push(
-        ({id: 'total', title: i18nString(UIStrings.totalTime), width: '120px', fixedWidth: true, sortable: true} as
+        ({id: 'total', title: i18nString(UIStrings.totalTime), width: '82px', fixedWidth: true, sortable: true} as
          DataGrid.DataGrid.ColumnDescriptor));
     columns.push(
         ({id: 'activity', title: i18nString(UIStrings.activity), disclosure: true, sortable: true} as
@@ -726,7 +726,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
     const textDiv = cell.createChild('div');
     textDiv.createChild('span').textContent = i18nString(UIStrings.fms, {PH1: value.toFixed(1)});
 
-    if (showPercents && this.treeView.exposePercentages()) {
+    if (false && showPercents && this.treeView.exposePercentages()) {
       textDiv.createChild('span', 'percent-column').textContent =
           i18nString(UIStrings.percentPlaceholder, {PH1: (value / this.grandTotalTime * 100).toFixed(1)});
     }
