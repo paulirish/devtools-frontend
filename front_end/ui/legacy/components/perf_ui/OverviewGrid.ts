@@ -63,13 +63,13 @@ export class OverviewGrid {
     this.element = document.createElement('div');
     this.element.id = prefix + '-overview-container';
 
-    this.grid = new TimelineGrid();
-    this.grid.element.id = prefix + '-overview-grid';
-    this.grid.setScrollTop(0);
+    // this.grid? = new TimelineGrid();
+    // this.grid?.element.id = prefix + '-overview-grid';
+    // this.grid?.setScrollTop(0);
 
-    this.element.appendChild(this.grid.element);
+    // this.element.appendChild(this.grid?.element);
 
-    this.window = new Window(this.element, this.grid.dividersLabelBarElement, calculator);
+    this.window = new Window(this.element, this.grid?.dividersLabelBarElement, calculator);
   }
 
   enableCreateBreadcrumbsButton(): HTMLElement {
@@ -85,15 +85,15 @@ export class OverviewGrid {
   }
 
   updateDividers(calculator: Calculator): void {
-    this.grid.updateDividers(calculator);
+    this.grid?.updateDividers(calculator);
   }
 
   addEventDividers(dividers: Element[]): void {
-    this.grid.addEventDividers(dividers);
+    this.grid?.addEventDividers(dividers);
   }
 
   removeEventDividers(): void {
-    this.grid.removeEventDividers();
+    this.grid?.removeEventDividers();
   }
 
   reset(): void {
