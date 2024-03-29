@@ -1267,6 +1267,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
                                  .filter(data => mainThreadTypes.includes(data.type))
                                  .at(-1);
       if (lastMainThread) {
+        // TODO: also consider network activity.
         const zoomedInBounds = TraceEngine.Extras.MainThreadActivity.calculateWindow(
             traceParsedData.Meta.traceBounds, lastMainThread.entries);
 

@@ -43,11 +43,11 @@ export function calculateWindow(
     for (let i = startIndex; i !== stopIndex; i += step) {
       const task = entriesWithIdleRemoved[i];
       const taskTimings = Helpers.Timing.eventTimingsMicroSeconds(task);
-      const taskTime = (taskTimings.startTime + taskTimings.endTime) / 2;
-      const interval = Math.abs(cutTime - taskTime);
+      const taskMidpointTime = (taskTimings.startTime + taskTimings.endTime) / 2;
+      const interval = Math.abs(cutTime - taskMidpointTime);
       if (usedTime < threshold * interval) {
         cutIndex = i;
-        cutTime = taskTime;
+        cutTime = taskMidpointTime;
         usedTime = 0;
       }
       usedTime += taskTimings.duration;
