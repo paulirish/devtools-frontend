@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 import type * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
-import type * as Protocol from '../../generated/protocol.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as Host from '../../core/host/host.js';
 
 import {ApplicationPanelTreeElement, ExpandableApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
 import {type ResourcesPanel} from './ResourcesPanel.js';
@@ -36,8 +37,8 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
   private storageBucket?: Protocol.Storage.StorageBucket;
 
   constructor(resourcesPanel: ResourcesPanel, storageBucket?: Protocol.Storage.StorageBucket) {
-    super(resourcesPanel, i18nString(UIStrings.cacheStorage), 'CacheStorage');
-    const icon = UI.Icon.Icon.create('database', 'resource-tree-item');
+    super(resourcesPanel, i18nString(UIStrings.cacheStorage), 'cache-storage');
+    const icon = IconButton.Icon.create('database');
     this.setLink(
         'https://developer.chrome.com/docs/devtools/storage/cache/?utm_source=devtools' as
         Platform.DevToolsPath.UrlString);
@@ -51,9 +52,9 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
     this.swCacheModels.clear();
     this.swCacheTreeElements.clear();
     SDK.TargetManager.TargetManager.instance().observeModels(SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel, {
-      modelAdded: (model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel): void =>
+      modelAdded: (model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel) =>
           this.serviceWorkerCacheModelAdded(model),
-      modelRemoved: (model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel): void =>
+      modelRemoved: (model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel) =>
           this.serviceWorkerCacheModelRemoved(model),
     });
   }
@@ -65,7 +66,8 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
 
   private handleContextMenuEvent(event: MouseEvent): void {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
-    contextMenu.defaultSection().appendItem(i18nString(UIStrings.refreshCaches), this.refreshCaches.bind(this));
+    contextMenu.defaultSection().appendItem(
+        i18nString(UIStrings.refreshCaches), this.refreshCaches.bind(this), {jslogContext: 'refresh-caches'});
     void contextMenu.show();
   }
 
@@ -165,7 +167,7 @@ export class SWCacheTreeElement extends ApplicationPanelTreeElement {
     this.model = model;
     this.cache = cache;
     this.view = null;
-    const icon = UI.Icon.Icon.create('table', 'resource-tree-item');
+    const icon = IconButton.Icon.create('table');
     this.setLeadingIcons([icon]);
   }
 
@@ -181,7 +183,8 @@ export class SWCacheTreeElement extends ApplicationPanelTreeElement {
 
   private handleContextMenuEvent(event: MouseEvent): void {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
-    contextMenu.defaultSection().appendItem(i18nString(UIStrings.delete), this.clearCache.bind(this));
+    contextMenu.defaultSection().appendItem(
+        i18nString(UIStrings.delete), this.clearCache.bind(this), {jslogContext: 'delete'});
     void contextMenu.show();
   }
 
@@ -203,7 +206,7 @@ export class SWCacheTreeElement extends ApplicationPanelTreeElement {
     }
 
     this.showView(this.view);
-    Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.service_worker_cache]);
+    Host.userMetrics.panelShown('service-worker-cache');
     return false;
   }
 

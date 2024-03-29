@@ -36,6 +36,7 @@ input {
 
 details {
   border-top: 1px solid var(--sys-color-divider);
+  padding: 2px 0;
 }
 
 details:not(.active) {
@@ -44,7 +45,7 @@ details:not(.active) {
 }
 
 details > summary {
-  height: 18px;
+  min-height: 20px;
   list-style: none;
   display: flex;
   padding: 0 8px 0 6px;
@@ -58,7 +59,7 @@ details > summary:hover {
 details > summary::before {
   display: block;
   user-select: none;
-  -webkit-mask-image: var(--image-file-triangle-right);
+  mask-image: var(--image-file-triangle-right);
   background-color: var(--icon-default);
   content: "";
   height: 14px;
@@ -90,8 +91,6 @@ details[open] > summary::before {
 
 .group-header-title {
   margin-left: 4px;
-  font-weight: 500;
-  font-size: var(--source-code-font-size);
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -142,8 +141,13 @@ summary:hover button {
   display: flex;
 }
 
-button:hover devtools-icon {
-  --icon-color: var(--icon-default-hover);
+devtools-icon {
+  width: 16px;
+  height: 16px;
+
+  button:hover & {
+    color: var(--icon-default-hover);
+  }
 }
 
 .type-indicator {
@@ -201,8 +205,14 @@ button:hover devtools-icon {
   margin-right: 6px;
 }
 
-summary:hover .file-icon {
-  display: none;
+devtools-icon[name="file-script"] {
+  color: var(--icon-file-script);
+  width: 18px;
+  height: 18px;
+
+  summary:hover & {
+    display: none;
+  }
 }
 
 .group-checkbox {

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -12,7 +11,7 @@ import linearMemoryNavigatorStyles from './linearMemoryNavigator.css.js';
 
 const UIStrings = {
   /**
-   *@description Tooltip text that appears when hovering over a valid memory address (e.g. 0x0) in the address line in the Linear Memory Inspector.
+   *@description Tooltip text that appears when hovering over a valid memory address (e.g. 0x0) in the address line in the Linear memory inspector.
    */
   enterAddress: 'Enter address',
   /**
@@ -168,7 +167,9 @@ export class LinearMemoryNavigator extends HTMLElement {
     };
     return html`
       <input class=${LitHtml.Directives.classMap(classMap)} data-input="true" .value=${this.#address}
-        jslog=${VisualLogging.textField().track({keydown: true}).context('linear-memory-inspector.address')}
+        jslog=${VisualLogging.textField('linear-memory-inspector.address').track({
+      keydown: true,
+    })}
         title=${this.#valid ? i18nString(UIStrings.enterAddress) : this.#error} @change=${
         this.#onAddressChange.bind(this, Mode.Submitted)} @input=${this.#onAddressChange.bind(this, Mode.Edit)}/>`;
   }
@@ -185,18 +186,14 @@ export class LinearMemoryNavigator extends HTMLElement {
         jslog=${VisualLogging.action().track({click: true, keydown: 'Enter'}).context(data.jslogContext)}
         data-button=${data.event.type} title=${data.title}
         @click=${this.dispatchEvent.bind(this, data.event)}>
-        <${IconButton.Icon.Icon.litTagName} .data=${
-        {iconName: data.icon, color: 'var(--icon-default)', width: '20px', height: '20px'} as
-        IconButton.Icon.IconWithName}>
-        </${IconButton.Icon.Icon.litTagName}>
+        <${IconButton.Icon.Icon.litTagName} name=${data.icon}></${IconButton.Icon.Icon.litTagName}>
       </button>`;
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-linear-memory-inspector-navigator', LinearMemoryNavigator);
+customElements.define('devtools-linear-memory-inspector-navigator', LinearMemoryNavigator);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-linear-memory-inspector-navigator': LinearMemoryNavigator;
   }

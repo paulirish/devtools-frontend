@@ -18,7 +18,7 @@
     "message": "`[aria-*]` özellikleri rolleriyle eşleşiyor"
   },
   "core/audits/accessibility/aria-allowed-role.js | description": {
-    "message": "Yardımcı teknolojiler, ARIA `role` sayesinde web sayfasındaki her bir öğenin rolünü öğrenebilir. `role` değerleri yanlış yazılmışsa, mevcut ARIA `role` değerleri değilse veya soyut roller kullanılmışsa öğenin amacı, yardımcı teknolojilerin kullanıcılarına bildirilmez. [ARIA rolleri hakkında daha fazla bilgi edinin](https://dequeuniversity.com/rules/axe/4.8/aria-allowed-roles)."
+    "message": "Yardımcı teknolojiler, ARIA `role` sayesinde web sayfasındaki her bir öğenin rolünü öğrenebilir. `role` değerleri yanlış yazılmışsa, mevcut ARIA `role` değerleri değilse veya soyut roller kullanılmışsa öğenin amacı, yardımcı teknolojilerin kullanıcılarına bildirilmez. [ARIA rolleri hakkında daha fazla bilgi edinin](https://dequeuniversity.com/rules/axe/4.8/aria-allowed-role)."
   },
   "core/audits/accessibility/aria-allowed-role.js | failureTitle": {
     "message": "`role=\"\"` öğesine atanan değerler geçerli ARIA rolleri değil."
@@ -605,6 +605,9 @@
   "core/audits/bf-cache.js | title": {
     "message": "Sayfa, geri-ileri önbelleğin geri yüklenmesini engellemedi"
   },
+  "core/audits/bf-cache.js | warningHeadless": {
+    "message": "Geri-ileri önbellek, eski Gözetimsiz Chrome'da (`--chrome-flags=\"--headless=old\"`) test edilemez. Denetleme sonuçlarını görmek için yeni Gözetimsiz Chrome'u (`--chrome-flags=\"--headless=new\"`) veya standart Chrome'u kullanın."
+  },
   "core/audits/bootup-time.js | chromeExtensionsWarning": {
     "message": "Chrome uzantıları bu sayfanın yükleme performansını olumsuz etkilemiştir. Sayfayı gizli modda veya uzantı içermeyen bir Chrome profilinden denetlemeyi deneyin."
   },
@@ -639,7 +642,7 @@
     "message": "Animasyonlu içerik için video biçimleri kullanın"
   },
   "core/audits/byte-efficiency/legacy-javascript.js | description": {
-    "message": "Çoklu dolgular ve dönüşümler, eski tarayıcıların yeni JavaScript özelliklerini kullanmasını sağlar. Ancak, çoğu modern tarayıcılar için gerekli değildir. Eski tarayıcılara verilen desteği sürdürürken, modern tarayıcılara gönderilen kod miktarını azaltmak üzere modüllü/modülsüz özellik algılamayı kullanarak JavaScript paketiniz için modern bir komut dosyası dağıtım stratejisi kullanın. [Modern JavaScript'i nasıl kullanacağınızı öğrenin](https://web.dev/publish-modern-javascript/)."
+    "message": "Çoklu dolgular ve dönüşümler, eski tarayıcıların yeni JavaScript özelliklerini kullanmasını sağlar. Ancak, çoğu modern tarayıcılar için gerekli değildir. Eski tarayıcılara verilen desteği sürdürürken, modern tarayıcılara gönderilen kod miktarını azaltmak üzere modüllü/modülsüz özellik algılamayı kullanarak JavaScript paketiniz için modern bir komut dosyası dağıtım stratejisi kullanın. [Modern JavaScript'i nasıl kullanacağınızı öğrenin](https://web.dev/articles/publish-modern-javascript)."
   },
   "core/audits/byte-efficiency/legacy-javascript.js | title": {
     "message": "Modern tarayıcılara eski JavaScript sunmaktan kaçının"
@@ -993,7 +996,7 @@
     "message": "Beklenen boyut"
   },
   "core/audits/image-size-responsive.js | description": {
-    "message": "Resmin doğal boyutları, resmin netliğini en üst düzeye çıkarmak için görüntü boyutu ve piksel oranı ile orantılı olmalıdır. [Nasıl uyumlu resimler sağlayabileceğinizi öğrenin](https://web.dev/serve-responsive-images/)."
+    "message": "Resmin doğal boyutları, resmin netliğini en üst düzeye çıkarmak için görüntü boyutu ve piksel oranı ile orantılı olmalıdır. [Nasıl uyumlu resimler sağlayabileceğinizi öğrenin](https://web.dev/articles/serve-responsive-images)."
   },
   "core/audits/image-size-responsive.js | failureTitle": {
     "message": "Düşük çözünürlüklü resimleri sunar"
@@ -1155,16 +1158,40 @@
     "message": "Largest Contentful Paint öğesi"
   },
   "core/audits/layout-shift-elements.js | columnContribution": {
-    "message": "CLS Katkısı"
+    "message": "Düzen kaymasının etkisi"
   },
   "core/audits/layout-shift-elements.js | description": {
-    "message": "Sayfanın CLS'sine en fazla bu DOM öğeleri katkıda bulunur. [CLS'yi nasıl iyileştireceğinizi öğrenin](https://web.dev/optimize-cls/)"
+    "message": "Düzen kaymalarından en çok bu DOM öğeleri etkilendi. [Pencereleme](https://web.dev/articles/cls#what_is_cls) nedeniyle CLS metriği değerine bazı düzen kaymaları dahil edilmeyebilir. [CLS'yi nasıl iyileştireceğinizi öğrenin](https://web.dev/articles/optimize-cls)"
   },
   "core/audits/layout-shift-elements.js | title": {
     "message": "Büyük düzen kaymalarından kaçının"
   },
+  "core/audits/layout-shifts.js | columnScore": {
+    "message": "Düzen kayması puanı"
+  },
+  "core/audits/layout-shifts.js | description": {
+    "message": "Bunlar, sayfada gözlemlenen en büyük düzen kaymalarıdır. Her tablo öğesi, tek bir düzen kaymasını temsil eder ve en çok kayan öğeyi gösterir. Her öğenin altında, düzen kaymasına yol açan olası temel nedenler yer alır. [Pencereleme](https://web.dev/articles/cls#what_is_cls) nedeniyle CLS metriği değerine bu düzen kaymalarından bazıları dahil edilmeyebilir. [CLS'yi nasıl iyileştireceğinizi öğrenin](https://web.dev/articles/optimize-cls)"
+  },
+  "core/audits/layout-shifts.js | displayValueShiftsFound": {
+    "message": "{shiftCount,plural, =1{1 düzen kayması bulundu}other{# düzen kayması bulundu}}"
+  },
+  "core/audits/layout-shifts.js | rootCauseFontChanges": {
+    "message": "Web yazı tipi yüklendi"
+  },
+  "core/audits/layout-shifts.js | rootCauseInjectedIframe": {
+    "message": "Yerleştirilen iFrame"
+  },
+  "core/audits/layout-shifts.js | rootCauseRenderBlockingRequest": {
+    "message": "Geç gelen bir ağ isteği, sayfa düzenini değiştirdi"
+  },
+  "core/audits/layout-shifts.js | rootCauseUnsizedMedia": {
+    "message": "Açık bir boyutu olmayan medya öğesi"
+  },
+  "core/audits/layout-shifts.js | title": {
+    "message": "Büyük düzen kaymalarından kaçının"
+  },
   "core/audits/lcp-lazy-loaded.js | description": {
-    "message": "Ekranın üst kısmında olup geç yüklenen resimler sayfanın yaşam döngüsünde sonradan oluşturulur. Bu durum, Largest Contentful Paint'i geciktirebilir. [İdeal geç yükleme hakkında daha fazla bilgi edinin](https://web.dev/lcp-lazy-loading/)."
+    "message": "Ekranın üst kısmında olup geç yüklenen resimler sayfanın yaşam döngüsünde sonradan oluşturulur. Bu durum, Largest Contentful Paint'i geciktirebilir. [İdeal geç yükleme hakkında daha fazla bilgi edinin](https://web.dev/articles/lcp-lazy-loading)."
   },
   "core/audits/lcp-lazy-loaded.js | failureTitle": {
     "message": "Largest Contentful Paint resmi geç yüklendi"
@@ -1173,7 +1200,7 @@
     "message": "Largest Contentful Paint resmi geç yüklenmedi"
   },
   "core/audits/long-tasks.js | description": {
-    "message": "Ana ileti dizisindeki en uzun görevleri listeler; giriş gecikmesine en çok katkıda bulunanları belirlemekte faydalıdır. [Uzun ana iş parçacığı görevlerinden nasıl kaçınacağınızı öğrenin](https://web.dev/long-tasks-devtools/)."
+    "message": "Ana ileti dizisindeki en uzun görevleri listeler; giriş gecikmesine en çok katkıda bulunanları belirlemekte faydalıdır. [Uzun ana iş parçacığı görevlerinden nasıl kaçınacağınızı öğrenin](https://web.dev/articles/long-tasks-devtools)."
   },
   "core/audits/long-tasks.js | displayValue": {
     "message": "{itemCount,plural, =1{# uzun görev bulundu}other{# uzun görev bulundu}}"
@@ -1221,7 +1248,7 @@
     "message": "Manifest dosyası maskelenebilir simge içeriyor"
   },
   "core/audits/metrics/cumulative-layout-shift.js | description": {
-    "message": "Cumulative Layout Shift, görüntü alanı içindeki görünür öğelerin hareketini ölçer. [Cumulative Layout Shift metriği hakkında daha fazla bilgi edinin](https://web.dev/cls/)."
+    "message": "Cumulative Layout Shift, görüntü alanı içindeki görünür öğelerin hareketini ölçer. [Cumulative Layout Shift metriği hakkında daha fazla bilgi edinin](https://web.dev/articles/cls)."
   },
   "core/audits/metrics/first-contentful-paint.js | description": {
     "message": "İlk Zengin İçerikli Boyama, ilk metnin veya resmin boyandığı zamanı işaret eder. [İlk zengin içerikli boyama metriği hakkında daha fazla bilgi edinin](https://developer.chrome.com/docs/lighthouse/performance/first-contentful-paint/)."
@@ -1230,7 +1257,7 @@
     "message": "İlk Anlamlı Boyama, bir sayfanın ana içeriğinin ne zaman görünür hale geldiğini ölçer. [İlk anlamlı boyama metriği hakkında daha fazla bilgi edinin](https://developer.chrome.com/docs/lighthouse/performance/first-meaningful-paint/)."
   },
   "core/audits/metrics/interaction-to-next-paint.js | description": {
-    "message": "Sonraki Boyamayla Etkileşim, sayfanın tepkisini ve kullanıcı girişine görünür şekilde yanıt vermesinin ne kadar sürdüğünü ölçer. [Sonraki Boyamayla Etkileşim metriği hakkında daha fazla bilgi edinin](https://web.dev/inp/)."
+    "message": "Sonraki Boyamayla Etkileşim, sayfanın tepkisini ve kullanıcı girişine görünür şekilde yanıt vermesinin ne kadar sürdüğünü ölçer. [Sonraki Boyamayla Etkileşim metriği hakkında daha fazla bilgi edinin](https://web.dev/articles/inp)."
   },
   "core/audits/metrics/interactive.js | description": {
     "message": "Etkileşime Hazır Olma Süresi, sayfanın tamamen etkileşime hazır hale gelmesi için geçmesi gereken süreyi ifade eder. [Etkileşime Hazır Olma Süresi metriği hakkında daha fazla bilgi edinin](https://developer.chrome.com/docs/lighthouse/performance/interactive/)."
@@ -1260,7 +1287,7 @@
     "message": "Sunucunun Arka Uç Gecikmeleri"
   },
   "core/audits/no-unload-listeners.js | description": {
-    "message": "`unload` etkinliği güvenilir bir şekilde tetiklenmez ve etkinliğin dinlenmesi, Geri-İleri Önbelleği gibi tarayıcı optimizasyonlarını engelleyebilir. Bunun yerine `pagehide` veya `visibilitychange` etkinliklerini kullanın. [Kaldırma etkinlik işleyiciler hakkında daha fazla bilgi edinin](https://web.dev/bfcache/#never-use-the-unload-event)."
+    "message": "`unload` etkinliği güvenilir bir şekilde tetiklenmez ve etkinliğin dinlenmesi, Geri-İleri Önbelleği gibi tarayıcı optimizasyonlarını engelleyebilir. Bunun yerine `pagehide` veya `visibilitychange` etkinliklerini kullanın. [Kaldırma etkinlik işleyiciler hakkında daha fazla bilgi edinin](https://web.dev/articles/bfcache#never_use_the_unload_event)."
   },
   "core/audits/no-unload-listeners.js | failureTitle": {
     "message": "Bir `unload` işleyicisi bulunuyor"
@@ -1305,7 +1332,7 @@
     "message": "Performans bütçesi"
   },
   "core/audits/preload-fonts.js | description": {
-    "message": "Sitenize ilk kez gelen ziyaretçilerin kullanma olasılığına karşı `optional` özelliği olan yazı tiplerini önceden yükleyin. [Yazı tiplerini önceden yükleme hakkında daha fazla bilgi edinin](https://web.dev/preload-optional-fonts/)."
+    "message": "Sitenize ilk kez gelen ziyaretçilerin kullanma olasılığına karşı `optional` özelliği olan yazı tiplerini önceden yükleyin. [Yazı tiplerini önceden yükleme hakkında daha fazla bilgi edinin](https://web.dev/articles/preload-optional-fonts)."
   },
   "core/audits/preload-fonts.js | failureTitle": {
     "message": "`font-display: optional` özelliği olan yazı tipleri önceden yüklenmedi"
@@ -1314,7 +1341,7 @@
     "message": "`font-display: optional` özelliği olan yazı tipleri önceden yüklendi"
   },
   "core/audits/prioritize-lcp-image.js | description": {
-    "message": "LCP öğesinin sayfaya dinamik olarak eklendiği durumlarda LCP'yi iyileştirmek için resmi önceden yüklemeniz gerekir. [LCP öğelerini önceden yükleme hakkında daha fazla bilgi edinin](https://web.dev/optimize-lcp/#optimize-when-the-resource-is-discovered)."
+    "message": "LCP öğesinin sayfaya dinamik olarak eklendiği durumlarda LCP'yi iyileştirmek için resmi önceden yüklemeniz gerekir. [LCP öğelerini önceden yükleme hakkında daha fazla bilgi edinin](https://web.dev/articles/optimize-lcp#optimize_when_the_resource_is_discovered)."
   },
   "core/audits/prioritize-lcp-image.js | title": {
     "message": "Largest Contentful Paint resmi önceden yükleme"
@@ -1532,6 +1559,18 @@
   "core/audits/themed-omnibox.js | title": {
     "message": "Adres çubuğu için tema rengi ayarlar."
   },
+  "core/audits/third-party-cookies.js | description": {
+    "message": "Chrome'un gelecekteki bir sürümünde üçüncü taraf çerezlerine yönelik destek kaldırılacaktır. [Üçüncü taraf çerezlerinin kullanımdan kaldırılması hakkında daha fazla bilgi edinin](https://developer.chrome.com/en/docs/privacy-sandbox/third-party-cookie-phase-out/)."
+  },
+  "core/audits/third-party-cookies.js | displayValue": {
+    "message": "{itemCount,plural, =1{1 çerez bulundu}other{# çerez bulundu}}"
+  },
+  "core/audits/third-party-cookies.js | failureTitle": {
+    "message": "Üçüncü taraf çerezlerini kullanır"
+  },
+  "core/audits/third-party-cookies.js | title": {
+    "message": "Üçüncü taraf çerezlerinden kaçınır"
+  },
   "core/audits/third-party-facades.js | categoryCustomerSuccess": {
     "message": "{productName} (Müşteri Başarısı)"
   },
@@ -1587,7 +1626,7 @@
     "message": "Zamanlama bütçesi"
   },
   "core/audits/unsized-images.js | description": {
-    "message": "Düzen kaymalarını azaltıp CLS'yi iyileştirmek için görsel öğelerde genişliği ve yüksekliği açıkça belirtilmiş şekilde ayarlayın. [Resim boyutlarını nasıl belirleyeceğinizi öğrenin](https://web.dev/optimize-cls/#images-without-dimensions)."
+    "message": "Düzen kaymalarını azaltıp CLS'yi iyileştirmek için görsel öğelerde genişliği ve yüksekliği açıkça belirtilmiş şekilde ayarlayın. [Resim boyutlarını nasıl belirleyeceğinizi öğrenin](https://web.dev/articles/optimize-cls#images_without_dimensions)."
   },
   "core/audits/unsized-images.js | failureTitle": {
     "message": "Resim öğelerinin açıkça belirtilmiş `width` ve `height` değerleri yok"
@@ -1662,7 +1701,7 @@
     "message": "`width` veya `initial-scale` değerleri olan bir `<meta name=\"viewport\">` etiketi var"
   },
   "core/audits/work-during-interaction.js | description": {
-    "message": "Bu, sonraki boyamayla etkileşim ölçümü sırasında ortaya çıkıp iş parçacıklarını engelleyen işi belirtir. [Sonraki Boyamayla Etkileşim metriği hakkında daha fazla bilgi edinin](https://web.dev/inp/)."
+    "message": "Bu, sonraki boyamayla etkileşim ölçümü sırasında ortaya çıkıp iş parçacıklarını engelleyen işi belirtir. [Sonraki Boyamayla Etkileşim metriği hakkında daha fazla bilgi edinin](https://web.dev/articles/inp)."
   },
   "core/audits/work-during-interaction.js | displayValue": {
     "message": "\"{interactionType}\" etkinliğine {timeInMs, number, milliseconds} ms. harcandı"
@@ -1704,10 +1743,10 @@
     "message": "En iyi uygulamalar"
   },
   "core/config/default-config.js | a11yCategoryDescription": {
-    "message": "Bu kontroller, [web uygulamanızın erişilebilirliğini iyileştirme](https://developer.chrome.com/docs/lighthouse/accessibility/) fırsatlarını öne çıkarır. Otomatik algılama, sorunların yalnızca bir alt kümesini algılayabilir ve web uygulamanızın erişilebilirliğini garanti etmez. Bu nedenle, [manuel test](https://web.dev/how-to-review/) yapmanız da önerilir."
+    "message": "Bu kontroller, [web uygulamanızın erişilebilirliğini iyileştirme](https://developer.chrome.com/docs/lighthouse/accessibility/) fırsatlarını öne çıkarır. Otomatik algılama, sorunların yalnızca bir alt kümesini algılayabilir ve web uygulamanızın erişilebilirliğini garanti etmez. Bu nedenle, [manuel test](https://web.dev/articles/how-to-review) yapmanız da önerilir."
   },
   "core/config/default-config.js | a11yCategoryManualDescription": {
-    "message": "Bu öğeler, otomatik test aracının kapsamında yer almayan alanları ele alır. [Erişilebilirlik incelemesi gerçekleştirme](https://web.dev/how-to-review/) hakkında daha fazla bilgiyi rehberimizde bulabilirsiniz."
+    "message": "Bu öğeler, otomatik test aracının kapsamında yer almayan alanları ele alır. [Erişilebilirlik incelemesi gerçekleştirme](https://web.dev/articles/how-to-review) hakkında daha fazla bilgiyi rehberimizde bulabilirsiniz."
   },
   "core/config/default-config.js | a11yCategoryTitle": {
     "message": "Erişilebilirlik"
@@ -1752,7 +1791,7 @@
     "message": "Genel"
   },
   "core/config/default-config.js | bestPracticesTrustSafetyGroupTitle": {
-    "message": "Güven ve Güvenlik"
+    "message": "Politika Değerlendirme"
   },
   "core/config/default-config.js | bestPracticesUXGroupTitle": {
     "message": "Kullanıcı Deneyimi"
@@ -1794,10 +1833,10 @@
     "message": "Performans"
   },
   "core/config/default-config.js | pwaCategoryDescription": {
-    "message": "Bu denetimler, progresif web uygulamasının (pwa) özelliklerini doğrular. [İyi bir progresif web uygulaması (pwa) için nelere dikkat etmeniz gerektiğini öğrenin](https://web.dev/pwa-checklist/)."
+    "message": "Bu denetimler, progresif web uygulamasının (pwa) özelliklerini doğrular. [İyi bir progresif web uygulaması (pwa) için nelere dikkat etmeniz gerektiğini öğrenin](https://web.dev/articles/pwa-checklist)."
   },
   "core/config/default-config.js | pwaCategoryManualDescription": {
-    "message": "Temel [Progresif Web Uygulaması Yapılacaklar Listesi](https://web.dev/pwa-checklist/) tarafından zorunlu tutulan bu denetimler, Lighthouse tarafından otomatik olarak kontrol edilmez. Bunlar skorunuzu etkilemez ancak manuel olarak doğrulamanız önemlidir."
+    "message": "Temel [Progresif Web Uygulaması Yapılacaklar Listesi](https://web.dev/articles/pwa-checklist) tarafından zorunlu tutulan bu denetimler, Lighthouse tarafından otomatik olarak kontrol edilmez. Bunlar skorunuzu etkilemez ancak manuel olarak doğrulamanız önemlidir."
   },
   "core/config/default-config.js | pwaCategoryTitle": {
     "message": "PWA (Progresif Web Uygulaması)"
@@ -1809,7 +1848,7 @@
     "message": "Optimize Edilmiş PWA (Progresif Web Uygulaması)"
   },
   "core/config/default-config.js | seoCategoryDescription": {
-    "message": "Bu kontroller, sayfanızın temel arama motoru optimizasyonu tavsiyesine uymasını sağlar. Burada Lighthouse'un puan vermediği ve [Önemli Web Verileri](https://web.dev/learn-core-web-vitals/)'ndeki performansınız da dahil arama sıralamanızı etkileyebilecek birçok ek faktör vardır. [Google Arama'nın Temel Özellikleri hakkında daha fazla bilgi edinin](https://support.google.com/webmasters/answer/35769)."
+    "message": "Bu kontroller, sayfanızın temel arama motoru optimizasyonu tavsiyesine uymasını sağlar. Burada Lighthouse'un puan vermediği ve [Önemli Web Verileri](https://web.dev/explore/vitals)'ndeki performansınız da dahil arama sıralamanızı etkileyebilecek birçok ek faktör vardır. [Google Arama'nın Temel Özellikleri hakkında daha fazla bilgi edinin](https://support.google.com/webmasters/answer/35769)."
   },
   "core/config/default-config.js | seoCategoryManualDescription": {
     "message": "SEO ile ilgili diğer en iyi uygulamaları kontrol etmek için sitenizde bu ek doğrulayıcıları çalıştırın."
@@ -2643,7 +2682,7 @@
     "message": "Lighthouse istediğiniz sayfayı güvenli bir şekilde yükleyemedi. Doğru URL'yi test ettiğinizden ve sunucunun tüm isteklere gerektiği gibi yanıt verdiğinden emin olun. (Ayrıntılar: {errorDetails})"
   },
   "core/lib/lh-error.js | pageLoadFailedWithStatusCode": {
-    "message": "Lighthouse istediğiniz sayfayı güvenli bir şekilde yükleyemedi. Doğru URL'yi test ettiğinizden ve sunucunun tüm isteklere gerektiği gibi yanıt verdiğinden emin olun. (Durum kodu: {statusCode})"
+    "message": "Lighthouse, istediğiniz sayfayı güvenli bir şekilde yükleyemedi. Doğru URL'yi test ettiğinizden ve sunucunun tüm isteklere gerektiği gibi yanıt verdiğinden emin olun. (Durum kodu: {statusCode})"
   },
   "core/lib/lh-error.js | pageLoadTookTooLong": {
     "message": "Sayfanın yüklenmesi çok uzun sürdü. Sayfanızın yüklenme süresini azaltmak için lütfen rapordaki fırsatları uygulayın ve sonra Lighthouse'u tekrar çalıştırmayı deneyin. ({errorCode})"
@@ -2656,6 +2695,9 @@
   },
   "core/lib/lh-error.js | urlInvalid": {
     "message": "Sağladığınız URL'nin geçersiz olduğu anlaşılıyor."
+  },
+  "core/lib/navigation-error.js | warningStatusCode": {
+    "message": "Lighthouse, istediğiniz sayfayı güvenli bir şekilde yükleyemedi. Doğru URL'yi test ettiğinizden ve sunucunun tüm isteklere gerektiği gibi yanıt verdiğinden emin olun. (Durum kodu: {errorCode})"
   },
   "core/lib/navigation-error.js | warningXhtml": {
     "message": "Sayfanın MIME türü XHTML: Lighthouse bu doküman türünü açıkça desteklemez"
@@ -3108,22 +3150,22 @@
     "message": "Tarayıcıya gönderilen dosyaların boyutunu küçültmek için NitroPack'te [`Gzip compression`](https://support.nitropack.io/hc/en-us/articles/13229297479313-Enabling-GZIP-compression) özelliğini kullanın."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | modern-image-formats": {
-    "message": "`nuxt/image` bileşenini kullanarak `format=\"webp\"` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxtjs.org/components/nuxt-img#format)."
+    "message": "`nuxt/image` bileşenini kullanarak `format=\"webp\"` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxt.com/usage/nuxt-img#format)."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | offscreen-images": {
-    "message": "Ekran dışı resimler için `nuxt/image` bileşenini kullanarak `loading=\"lazy\"` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxtjs.org/components/nuxt-img#loading)."
+    "message": "Ekran dışı resimler için `nuxt/image` bileşenini kullanarak `loading=\"lazy\"` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxt.com/usage/nuxt-img#loading)."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | prioritize-lcp-image": {
-    "message": "`nuxt/image` bileşenini kullanarak LCP resmi için `preload` değerini belirtin. [Daha fazla bilgi](https://image.nuxtjs.org/components/nuxt-img#preload)."
+    "message": "`nuxt/image` bileşenini kullanarak LCP resmi için `preload` değerini belirtin. [Daha fazla bilgi](https://image.nuxt.com/usage/nuxt-img#preload)."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | unsized-images": {
-    "message": "`nuxt/image` bileşenini kullanarak `width` ve `height` değerlerini açıkça belirtin. [Daha fazla bilgi](https://image.nuxtjs.org/components/nuxt-img#width--height)."
+    "message": "`nuxt/image` bileşenini kullanarak `width` ve `height` değerlerini açıkça belirtin. [Daha fazla bilgi](https://image.nuxt.com/usage/nuxt-img#width-height)."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | uses-optimized-images": {
-    "message": "`nuxt/image` bileşenini kullanın ve uygun `quality` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxtjs.org/components/nuxt-img#quality)."
+    "message": "`nuxt/image` bileşenini kullanın ve uygun `quality` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxt.com/usage/nuxt-img#quality)."
   },
   "node_modules/lighthouse-stack-packs/packs/nuxt.js | uses-responsive-images": {
-    "message": "`nuxt/image` bileşenini kullanın ve uygun `sizes` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxtjs.org/components/nuxt-img#sizes)."
+    "message": "`nuxt/image` bileşenini kullanın ve uygun `sizes` değerini ayarlayın. [Daha fazla bilgi](https://image.nuxt.com/usage/nuxt-img#sizes)."
   },
   "node_modules/lighthouse-stack-packs/packs/octobercms.js | efficient-animated-content": {
     "message": "Web sayfalarının daha hızlı yüklenmesi için [animasyonlu GIF'lerin yerine video koyun](https://web.dev/replace-gifs-with-videos/) ve mevcut son teknoloji video codec'i VP9'da sıkıştırma etkinliğini %30'dan fazla artırmak için [WebM](https://web.dev/replace-gifs-with-videos/#create-webm-videos) veya [AV1](https://developers.google.com/web/updates/2018/09/chrome-70-media-updates#av1-decoder) gibi modern dosya biçimlerini kullanın."
@@ -3356,8 +3398,17 @@
   "report/renderer/report-utils.js | passedAuditsGroupTitle": {
     "message": "Başarılı denetimler"
   },
+  "report/renderer/report-utils.js | pwaRemovalMessage": {
+    "message": "Lighthouse, [Chrome'un güncellenen yüklenebilirlik ölçütleri](https://developer.chrome.com/blog/update-install-criteria) uyarınca gelecekteki sürümlerden birinde PWA (progresif web uygulaması) kategorisi desteğini sonlandıracaktır. Gelecekteki PWA testleri için lütfen [güncellenmiş PWA dokümanlarına](https://developer.chrome.com/docs/devtools/progressive-web-apps/) göz atın."
+  },
   "report/renderer/report-utils.js | runtimeAnalysisWindow": {
     "message": "İlk sayfa yükleme"
+  },
+  "report/renderer/report-utils.js | runtimeAnalysisWindowSnapshot": {
+    "message": "Belirli bir noktada anlık görüntü"
+  },
+  "report/renderer/report-utils.js | runtimeAnalysisWindowTimespan": {
+    "message": "Kullanıcı etkileşimleri zaman aralığı"
   },
   "report/renderer/report-utils.js | runtimeCustom": {
     "message": "Özel kısıtlamalar"
@@ -3393,10 +3444,10 @@
     "message": "Kullanıcı aracısı (ağ)"
   },
   "report/renderer/report-utils.js | runtimeSingleLoad": {
-    "message": "Tek sayfa yükleme"
+    "message": "Tek sayfalık oturum"
   },
   "report/renderer/report-utils.js | runtimeSingleLoadTooltip": {
-    "message": "Bu veriler, birçok oturumu özetleyen alan verilerinin aksine tek bir sayfa yükleme işleminden alınmıştır."
+    "message": "Bu veriler, birçok oturumu özetleyen alan verilerinin aksine tek bir sayfa oturumundan alınmıştır."
   },
   "report/renderer/report-utils.js | runtimeSlow4g": {
     "message": "Yavaş 4G kısıtlaması"

@@ -363,7 +363,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   static createTimingTable(request: SDK.NetworkRequest.NetworkRequest, calculator: NetworkTimeCalculator): Element {
     const tableElement = document.createElement('table');
     tableElement.classList.add('network-timing-table');
-    tableElement.setAttribute('jslog', `${VisualLogging.pane().context('timing')}`);
+    tableElement.setAttribute('jslog', `${VisualLogging.pane('timing').track({resize: true})}`);
     const colgroup = tableElement.createChild('colgroup');
     colgroup.createChild('col', 'labels');
     colgroup.createChild('col', 'bars');
@@ -467,8 +467,7 @@ export class RequestTimingView extends UI.Widget.VBox {
     note.colSpan = 1;
     const explanationLink = UI.XLink.XLink.create(
         'https://developer.chrome.com/docs/devtools/network/reference/#timing-explanation',
-        i18nString(UIStrings.explanation));
-    explanationLink.setAttribute('jslog', `${VisualLogging.link().track({click: true}).context('explanation')}`);
+        i18nString(UIStrings.explanation), undefined, undefined, 'explanation');
     note.appendChild(explanationLink);
     footer.createChild('td');
     UI.UIUtils.createTextChild(footer.createChild('td'), i18n.TimeUtilities.secondsToString(totalDuration, true));
@@ -493,8 +492,8 @@ export class RequestTimingView extends UI.Widget.VBox {
       information.colSpan = 3;
 
       const link = UI.XLink.XLink.create(
-          'https://web.dev/custom-metrics/#server-timing-api', i18nString(UIStrings.theServerTimingApi));
-      link.setAttribute('jslog', `${VisualLogging.link().track({click: true}).context('server-timing-api')}`);
+          'https://web.dev/custom-metrics/#server-timing-api', i18nString(UIStrings.theServerTimingApi), undefined,
+          undefined, 'server-timing-api');
       information.appendChild(
           i18n.i18n.getFormatLocalizedString(str_, UIStrings.duringDevelopmentYouCanUseSToAdd, {PH1: link}));
 
@@ -685,9 +684,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum RequestTimeRangeNames {
+export const enum RequestTimeRangeNames {
   Push = 'push',
   Queueing = 'queueing',
   Blocking = 'blocking',

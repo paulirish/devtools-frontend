@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as ComponentHelpers from '../../../components/helpers/helpers.js';
 import * as LitHtml from '../../../lit-html/lit-html.js';
 
 import cssAngleStyles from './cssAngle.css.js';
@@ -42,6 +41,12 @@ export class UnitChangedEvent extends Event {
     super(UnitChangedEvent.eventName, {});
     this.data = {value};
   }
+}
+
+interface EventTypes {
+  [PopoverToggledEvent.eventName]: PopoverToggledEvent;
+  [UnitChangedEvent.eventName]: UnitChangedEvent;
+  [ValueChangedEvent.eventName]: ValueChangedEvent;
 }
 
 export interface CSSAngleData {
@@ -132,6 +137,18 @@ export class CSSAngle extends HTMLElement {
     this.angleElement.focus();
   }
 
+  override addEventListener<K extends keyof EventTypes>(
+      type: K, listener: (this: CSSAngle, ev: EventTypes[K]) => void,
+      options?: boolean|AddEventListenerOptions|undefined): void;
+  override addEventListener<K extends keyof HTMLElementEventMap>(
+      type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => void,
+      options?: boolean|AddEventListenerOptions|undefined): void;
+  override addEventListener(
+      type: string, listener: EventListenerOrEventListenerObject,
+      options?: boolean|AddEventListenerOptions|undefined): void {
+    super.addEventListener(type, listener, options);
+  }
+
   minify(): void {
     if (this.popoverOpen === false) {
       return;
@@ -149,7 +166,7 @@ export class CSSAngle extends HTMLElement {
     this.render();
   }
 
-  private updateAngle(angle: Angle): void {
+  updateAngle(angle: Angle): void {
     this.displayedAngle = roundAngleByUnit(convertAngleUnit(angle, this.displayedAngle.unit));
     this.angle = this.displayedAngle;
     this.dispatchEvent(new ValueChangedEvent(`${this.angle.value}${this.angle.unit}`));
@@ -216,7 +233,7 @@ export class CSSAngle extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="css-angle" @keydown=${this.onKeydown} tabindex="-1">
+      <div class="css-angle" @focusout=${this.minify} @keydown=${this.onKeydown} tabindex="-1">
         <div class="preview">
           <${CSSAngleSwatch.litTagName}
             @click=${this.onMiniIconClick}
@@ -261,10 +278,9 @@ export class CSSAngle extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-css-angle', CSSAngle);
+customElements.define('devtools-css-angle', CSSAngle);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-css-angle': CSSAngle;
   }

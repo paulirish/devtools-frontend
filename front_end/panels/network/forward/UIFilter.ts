@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum FilterType {
   Domain = 'domain',
   HasResponseHeader = 'has-response-header',
@@ -28,18 +26,14 @@ export enum FilterType {
   Url = 'url',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum IsFilterType {
+export const enum IsFilterType {
   Running = 'running',
   FromCache = 'from-cache',
   ServiceWorkerIntercepted = 'service-worker-intercepted',
   ServiceWorkerInitiated = 'service-worker-initiated',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum MixedContentFilterValues {
+export const enum MixedContentFilterValues {
   All = 'all',
   Displayed = 'displayed',
   Blocked = 'blocked',

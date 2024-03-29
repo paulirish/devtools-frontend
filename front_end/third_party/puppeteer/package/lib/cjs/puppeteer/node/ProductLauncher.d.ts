@@ -56,7 +56,7 @@ export declare abstract class ProductLauncher {
     /**
      * @internal
      */
-    protected closeBrowser(browserProcess: ReturnType<typeof launch>, connection?: Connection): Promise<void>;
+    protected closeBrowser(browserProcess: ReturnType<typeof launch>, cdpConnection?: Connection): Promise<void>;
     /**
      * @internal
      */
@@ -104,6 +104,6 @@ export declare abstract class ProductLauncher {
     /**
      * @internal
      */
-    protected resolveExecutablePath(): string;
+    protected resolveExecutablePath(headless?: boolean | 'shell'): string;
 }
 //# sourceMappingURL=ProductLauncher.d.ts.map

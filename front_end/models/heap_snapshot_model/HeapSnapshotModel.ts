@@ -34,6 +34,7 @@ export const HeapSnapshotProgressEvent = {
 };
 
 export const baseSystemDistance = 100000000;
+export const baseUnreachableDistance = baseSystemDistance * 2;
 
 export class AllocationNodeCallers {
   nodesWithSingleCaller: SerializedAllocationNode[];
@@ -99,6 +100,7 @@ export class Node {
   canBeQueried: boolean;
   detachedDOMTreeNode: boolean;
   isAddedNotRemoved: boolean|null;
+  ignored: boolean;
   constructor(
       id: number, name: string, distance: number, nodeIndex: number, retainedSize: number, selfSize: number,
       type: string) {
@@ -113,6 +115,7 @@ export class Node {
     this.canBeQueried = false;
     this.detachedDOMTreeNode = false;
     this.isAddedNotRemoved = null;
+    this.ignored = false;
   }
 }
 
@@ -305,4 +308,8 @@ export class Location {
     this.lineNumber = lineNumber;
     this.columnNumber = columnNumber;
   }
+}
+
+export interface HeapSnapshotOptions {
+  heapSnapshotTreatBackingStoreAsContainingObject: boolean;
 }

@@ -1,12 +1,15 @@
 # Visual logging
 
 The goal of this project is to improve the logging of user interactions in
-DevTools. The current UMA logging is unreliable and inconsistent. This can lead
+DevTools. The current UMA logging is unreliable and inconsistent. This can lead to
 incorrect conclusions about how users are interacting with the product.
 
 We want to be able to understand how users are interacting with DevTools so that
 we can improve the product. This includes understanding what users are seeing,
 what they are interacting with, and how they are using different features.
+
+To turn on the logging, you need to pass `--enable-features=DevToolsVeLogging`
+as command line flag to Chrome.
 
 ## General approach
 
@@ -52,21 +55,21 @@ These are all bound versions of `LoggingConfig.makeConfigStringBuilder` and are
 used in the legacy UI as:
 
 ```
-this.element.setAttribute('jslog', `${VisualLogging.panel().context(name)}`);
+this.element.setAttribute('jslog', `${VisualLogging.panel(context)}`);
 ```
 
 or
 
 ```
-button.element.setAttribute('jslog', `${VisualLogging.dropDown()
-    .track({click: true}).context('rendering-emulations')}`);
+button.element.setAttribute('jslog', `${VisualLogging.dropDown('rendering-emulations')
+    .track({click: true})}`);
 ```
 
 In LitHTML, the usage is:
 
 ```
-Lit.html`<td jslog=${VisualLogging.tableCell()
-        .track({click: true}).context(col.id)}>
+Lit.html`<td jslog=${VisualLogging.tableCell(/* context */ col.id)
+        .track({click: true})}>
 ```
 
 ### `jslog` Builder API
@@ -83,11 +86,11 @@ this element. Called with tracking options, an object with the following boolean
 If a string is provided, it will be used as the key code to track. Otherwise, all keydown
 events will be tracked.
 
-The `context()` method sets the context for the visual logging element. The context
-can be a string or a number. If a string is given, it is be first considered
-to refer to a context provider (see below). If no context provider is registered
-with this name, SHA-1 hash is computed and the first 32 bits
-(little endian) is logged. Number is be logged as is.
+The builder function accepts a `context` parameter, which sets the context for the visual
+logging element. The context can be a string or a number. If a string is given, it is be
+first considered to refer to a context provider (see below). If no context provider is
+registered with this name, SHA-1 hash is computed and the first 32 bits
+(little endian) is logged. Number will be logged as is.
 
 The `parent()` method sets the custom parent provider for the visual logging element
 (see below). If not invoked, the parent visual element is taken from a DOM tree structure.
@@ -190,3 +193,6 @@ You may find it useful to see which UI elements are annotated and how the tree
 structure look like. To do that, call `setVeDebuggingEnabled(true)` in DevTools
 on DevTools. This will add red outline to each visual element and will show the
 details of logging config for an element and all its ancestors on hover.
+
+**Note:** This will only work if you invoked Chrome with the command line flag
+`--enable-features=DevToolsVeLogging`. Otherwise you won't see any red lines.

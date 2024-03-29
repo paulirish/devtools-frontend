@@ -76,8 +76,6 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/elements/PropertiesWidget.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let propertiesWidgetInstance: PropertiesWidget;
-
 export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
   private node: SDK.DOMModel.DOMNode|null;
   private readonly showAllPropertiesSetting: Common.Settings.Setting<boolean>;
@@ -89,7 +87,7 @@ export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
   constructor(throttlingTimeout?: number) {
     super(true /* isWebComponent */, throttlingTimeout);
 
-    this.showAllPropertiesSetting = Common.Settings.Settings.instance().createSetting('showAllProperties', false);
+    this.showAllPropertiesSetting = Common.Settings.Settings.instance().createSetting('show-all-properties', false);
     this.showAllPropertiesSetting.addChangeListener(this.filterList.bind(this));
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
@@ -112,7 +110,7 @@ export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(
         this.showAllPropertiesSetting, i18nString(UIStrings.showAllTooltip), i18nString(UIStrings.showAll)));
 
-    this.contentElement.setAttribute('jslog', `${VisualLogging.elementPropertiesPane()}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane('element-properties').track({resize: true})}`);
     this.noMatchesElement = this.contentElement.createChild('div', 'gray-info-message hidden');
     this.noMatchesElement.textContent = i18nString(UIStrings.noMatchingProperty);
 
@@ -127,17 +125,6 @@ export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
     });
 
     this.update();
-  }
-
-  static instance(opts?: {
-    forceNew: boolean,
-    throttlingTimeout: number,
-  }): PropertiesWidget {
-    if (!propertiesWidgetInstance || opts?.forceNew) {
-      propertiesWidgetInstance = new PropertiesWidget(opts?.throttlingTimeout);
-    }
-
-    return propertiesWidgetInstance;
   }
 
   private onFilterChanged(event: Common.EventTarget.EventTargetEvent<string>): void {

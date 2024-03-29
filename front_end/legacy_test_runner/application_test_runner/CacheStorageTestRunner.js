@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as SDK from '../../core/sdk/sdk.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Application from '../../panels/application/application.js';
 
 /**
@@ -22,7 +23,7 @@ export const dumpCacheTreeNoRefresh = async function(pathFilter) {
   function _dumpDataGrid(dataGrid) {
     for (const node of dataGrid.rootNode().children) {
       const children = Array.from(node.element().children).filter(function(element) {
-        return !element.classList.contains('responseTime-column');
+        return !element.classList.contains('response-time-column');
       });
 
       const entries = Array.from(children, td => td.textContent).filter(text => text);
@@ -121,7 +122,10 @@ export const dumpCachedEntryContentNoRefresh = async function(cacheName, request
             }
           }
           const contentObject = await view.requestContent(request);
-          const content = contentObject.content;
+          let content = null;
+          if (!TextUtils.ContentData.ContentData.isError(contentObject)) {
+            content = contentObject.isTextContent ? contentObject.text : contentObject.base64;
+          }
           TestRunner.addResult(' '.repeat(8) + (content ? content : '(nothing to preview)'));
         }
         resolve();

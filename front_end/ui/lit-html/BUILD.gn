@@ -4,6 +4,7 @@
 
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
+import("../../../third_party/typescript/typescript.gni")
 import("./visibility.gni")
 
 devtools_module("lit-html") {
@@ -21,16 +22,22 @@ devtools_entrypoint("bundle") {
   deps = [ ":lit-html" ]
 
   visibility = [
-    "../../../test/unittests/front_end/*",
-    "../../../test/unittests/front_end/ui/components/*",
+    ":*",
     "../../panels/*",
+    "../../testing/*",
     "../../ui/components/*",
-
-    # TODO(crbug.com/1202788): Remove invalid dependents
     "../../ui/legacy/*",
     "../../ui/legacy/components/inline_editor/*",
     "../../ui/legacy/components/perf_ui/*",
   ]
 
   visibility += devtools_lit_visibility
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [ "static.test.ts" ]
+
+  deps = [ ":bundle" ]
 }

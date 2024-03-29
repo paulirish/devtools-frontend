@@ -93,7 +93,11 @@
   border-bottom: 1px solid var(--sys-color-divider);
   overflow: visible;
   width: 100%;
-  background-color: var(--sys-color-cdt-base);
+  background-color: var(--app-color-toolbar-background);
+
+  & > * {
+    cursor: initial;
+  }
 }
 
 .tabbed-pane-header-contents {
@@ -198,15 +202,9 @@
   height: 100%;
 }
 
-.tabbed-pane-header-tabs-drop-down-container > .chevron-icon {
-  background-color: var(--icon-default);
-  display: block;
-}
-
 .tabbed-pane-header-tabs-drop-down-container > .chevron-icon:hover,
 .tabbed-pane-header-tabs-drop-down-container > .chevron-icon:focus-visible {
-  background-color: var(--icon-default-hover);
-  display: block;
+  color: var(--icon-default-hover);
 }
 
 .tabbed-pane-header-tabs-drop-down-container:hover,
@@ -336,10 +334,13 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  background-color: transparent;
+  border: none;
 }
 
 .close-button:hover,
-.close-button:active {
+.close-button:active,
+.close-button:focus {
   background-color: var(--sys-color-state-hover-on-subtle);
 }
 
@@ -382,7 +383,7 @@
 
   .tabbed-pane-header-tab:hover .tabbed-pane-close-button,
   .tabbed-pane-shadow .tabbed-pane-header-tab:focus-visible .tabbed-pane-close-button {
-    --icon-color: HighlightText;
+    color: HighlightText;
   }
 
   .tabbed-pane-header-tabs-drop-down-container {
@@ -395,12 +396,12 @@
   }
 
   .tabbed-pane-header-tabs-drop-down-container > .chevron-icon {
-    background-color: ButtonText;
+    color: ButtonText;
   }
 
   .tabbed-pane-header-tabs-drop-down-container:hover > .chevron-icon,
   .tabbed-pane-header-tabs-drop-down-container:focus-visible > .chevron-icon {
-    background-color: HighlightText;
+    color: HighlightText;
   }
 
   .tabbed-pane-header-tabs .tabbed-pane-header-tab .preview-icon {

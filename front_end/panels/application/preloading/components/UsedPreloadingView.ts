@@ -8,13 +8,13 @@ import type * as Platform from '../../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
-import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as Coordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 import * as ReportView from '../../../../ui/components/report_view/report_view.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as PreloadingHelper from '../helper/helper.js';
 
 import * as MismatchedPreloadingGrid from './MismatchedPreloadingGrid.js';
@@ -126,9 +126,7 @@ export interface UsedPreloadingViewData {
   currentAttempts: SDK.PreloadingModel.PreloadingAttempt[];
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum UsedKind {
+export const enum UsedKind {
   DowngradedPrerenderToPrefetchAndUsed = 'DowngradedPrerenderToPrefetchAndUsed',
   PrefetchUsed = 'PrefetchUsed',
   PrerenderUsed = 'PrerenderUsed',
@@ -180,7 +178,7 @@ export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableCom
           ReportView.ReportView.ReportSectionDivider.litTagName}>
 
         <${ReportView.ReportView.ReportSection.litTagName}>
-          ${UI.XLink.XLink.create('https://developer.chrome.com/blog/prerender-pages/', i18nString(UIStrings.learnMore), 'link')}
+          ${UI.XLink.XLink.create('https://developer.chrome.com/blog/prerender-pages/', i18nString(UIStrings.learnMore), 'link', undefined, 'learn-more')}
         </${ReportView.ReportView.ReportSection.litTagName}>
       </${ReportView.ReportView.Report.litTagName}>
     `;
@@ -315,12 +313,13 @@ export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableCom
       <${ReportView.ReportView.ReportSectionHeader.litTagName}>${i18nString(UIStrings.currentURL)}</${
         ReportView.ReportView.ReportSectionHeader.litTagName}>
       <${ReportView.ReportView.ReportSection.litTagName}>
-        ${UI.XLink.XLink.create(this.#data.pageURL, undefined, 'link')}
+        ${UI.XLink.XLink.create(this.#data.pageURL, undefined, 'link', undefined, 'current-url')}
       </${ReportView.ReportView.ReportSection.litTagName}>
 
       <${ReportView.ReportView.ReportSectionHeader.litTagName}>${i18nString(UIStrings.preloadedURLs)}</${
         ReportView.ReportView.ReportSectionHeader.litTagName}>
-      <${ReportView.ReportView.ReportSection.litTagName}>
+      <${ReportView.ReportView.ReportSection.litTagName}
+      jslog=${VisualLogging.section('preloaded-urls')}>
         <${MismatchedPreloadingGrid.MismatchedPreloadingGrid.litTagName}
           .data=${data as MismatchedPreloadingGrid.MismatchedPreloadingGridData}></${
           MismatchedPreloadingGrid.MismatchedPreloadingGrid.litTagName}>
@@ -404,11 +403,13 @@ export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableCom
           </div>
 
           <div class="reveal-links">
-            <button class="link devtools-link" @click=${revealRuleSetView}>
+            <button class="link devtools-link" @click=${revealRuleSetView}
+            jslog=${VisualLogging.action('view-all-rules').track({click: true})}>
               ${i18nString(UIStrings.viewAllRules)}
             </button>
            ・
-            <button class="link devtools-link" @click=${revealAttemptViewWithFilter}>
+            <button class="link devtools-link" @click=${revealAttemptViewWithFilter}
+            jslog=${VisualLogging.action('view-all-speculations').track({click: true})}>
              ${i18nString(UIStrings.viewAllSpeculations)}
             </button>
           </div>
@@ -447,14 +448,7 @@ export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableCom
     // clang-format off
     return LitHtml.html`
       <span class=${klass}>
-        <${IconButton.Icon.Icon.litTagName}
-          .data=${{
-            iconName,
-            color: 'var(--icon-default)',
-            width: '16px',
-          } as IconButton.Icon.IconWithName}
-        >
-        </${IconButton.Icon.Icon.litTagName}>
+        <${IconButton.Icon.Icon.litTagName} name=${iconName}></${IconButton.Icon.Icon.litTagName}>
         <span>
           ${message}
         </span>
@@ -464,10 +458,9 @@ export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableCom
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-resources-used-preloading-view', UsedPreloadingView);
+customElements.define('devtools-resources-used-preloading-view', UsedPreloadingView);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-resources-used-preloading-view': UsedPreloadingView;
   }

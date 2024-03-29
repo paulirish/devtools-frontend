@@ -256,7 +256,7 @@
 }
 
 .is-recording .header-title::before {
-  background: var(--sys-color-error);
+  background: var(--sys-color-error-bright);
 }
 
 .footer {
@@ -280,6 +280,7 @@
   width: 14px;
   height: 14px;
   transform: rotate(-90deg);
+  color: var(--sys-color-on-surface);
 }
 
 .expanded .chevron {

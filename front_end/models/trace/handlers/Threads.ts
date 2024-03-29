@@ -12,12 +12,12 @@ import {type TraceParseData} from './types.js';
 export interface ThreadData {
   pid: Types.TraceEvents.ProcessID;
   tid: Types.TraceEvents.ThreadID;
-  entries: readonly Types.TraceEvents.TraceEntry[];
+  entries: readonly Types.TraceEvents.SyntheticTraceEntry[];
   processIsOnMainFrame: boolean;
   tree: Helpers.TreeHelpers.TraceEntryTree;
   type: ThreadType;
   name: string|null;
-  entryToNode: Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode>;
+  entryToNode: Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode>;
 }
 
 export const enum ThreadType {
@@ -27,6 +27,7 @@ export const enum ThreadType {
   AUCTION_WORKLET = 'AUCTION_WORKLET',
   OTHER = 'OTHER',
   CPU_PROFILE = 'CPU_PROFILE',
+  THREAD_POOL = 'THREAD_POOL',
 }
 
 function getThreadTypeForRendererThread(
@@ -41,6 +42,9 @@ function getThreadTypeForRendererThread(
     threadType = ThreadType.RASTERIZER;
   } else if (auctionWorkletsData.worklets.has(pid)) {
     threadType = ThreadType.AUCTION_WORKLET;
+  } else if (thread.name?.startsWith('ThreadPool')) {
+    // TODO(paulirish): perhaps exclude ThreadPoolServiceThread entirely
+    threadType = ThreadType.THREAD_POOL;
   }
   return threadType;
 }
@@ -55,13 +59,13 @@ export function threadsInRenderer(
   if (rendererData.processes.size) {
     for (const [pid, process] of rendererData.processes) {
       for (const [tid, thread] of process.threads) {
-        const threadType = getThreadTypeForRendererThread(auctionWorkletsData, pid, thread);
         if (!thread.tree) {
           // Drop threads where we could not create the tree; this indicates
           // unexpected data and we won't be able to support all the UI
           // filtering we need.
           continue;
         }
+        const threadType = getThreadTypeForRendererThread(auctionWorkletsData, pid, thread);
         foundThreads.push({
           name: thread.name,
           pid,

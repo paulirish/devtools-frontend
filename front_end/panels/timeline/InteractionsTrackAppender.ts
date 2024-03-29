@@ -4,6 +4,7 @@
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as TraceEngine from '../../models/trace/trace.js';
+import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 import {
@@ -91,7 +92,7 @@ export class InteractionsTrackAppender implements TrackAppender {
     const {interactionEventsWithNoNesting, interactionsOverThreshold} = this.#traceParsedData.UserInteractions;
 
     const addCandyStripeToLongInteraction =
-        (event: TraceEngine.Types.TraceEvents.SyntheticInteractionEvent, index: number): void => {
+        (event: TraceEngine.Types.TraceEvents.SyntheticInteractionPair, index: number): void => {
           // Each interaction that we drew that is over the INP threshold needs to be
           // candy-striped.
           const overThreshold = interactionsOverThreshold.has(event);
@@ -110,20 +111,20 @@ export class InteractionsTrackAppender implements TrackAppender {
   }
 
   #addCandyStripeAndWarningForLongInteraction(
-      entry: TraceEngine.Types.TraceEvents.SyntheticInteractionEvent, eventIndex: number): void {
+      entry: TraceEngine.Types.TraceEvents.SyntheticInteractionPair, eventIndex: number): void {
     const decorationsForEvent =
         this.#compatibilityBuilder.getFlameChartTimelineData().entryDecorations[eventIndex] || [];
     decorationsForEvent.push(
         {
-          type: 'CANDY',
+          type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
           startAtTime: TraceEngine.Handlers.ModelHandlers.UserInteractions.LONG_INTERACTION_THRESHOLD,
           // Interaction events have whiskers, so we do not want to candy stripe
-          // the entire duration. The box represents processing time, so we only
+          // the entire duration. The box represents processing duration, so we only
           // candystripe up to the end of processing.
           endAtTime: entry.processingEnd,
         },
         {
-          type: 'WARNING_TRIANGLE',
+          type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE,
           customEndTime: entry.processingEnd,
         });
     this.#compatibilityBuilder.getFlameChartTimelineData().entryDecorations[eventIndex] = decorationsForEvent;
@@ -176,7 +177,7 @@ export class InteractionsTrackAppender implements TrackAppender {
  * Return the title to use for a given interaction event.
  * Exported so the title in the DetailsView can re-use the same logic
  **/
-export function titleForInteractionEvent(event: TraceEngine.Types.TraceEvents.SyntheticInteractionEvent): string {
+export function titleForInteractionEvent(event: TraceEngine.Types.TraceEvents.SyntheticInteractionPair): string {
   const category = TraceEngine.Handlers.ModelHandlers.UserInteractions.categoryOfInteraction(event);
   // Because we hide nested interactions, we do not want to show the
   // specific type of the interaction that was not hidden, so instead we

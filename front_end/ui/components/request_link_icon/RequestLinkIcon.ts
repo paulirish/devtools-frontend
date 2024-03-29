@@ -5,12 +5,10 @@
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
-import * as Root from '../../../core/root/root.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import type * as Logs from '../../../models/logs/logs.js';
 import * as NetworkForward from '../../../panels/network/forward/forward.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
@@ -36,6 +34,8 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('ui/components/request_link_icon/RequestLinkIcon.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
+
 export interface RequestLinkIconData {
   linkToPreflight?: boolean;
   request?: SDK.NetworkRequest.NetworkRequest|null;
@@ -57,8 +57,6 @@ export const extractShortPath = (path: Platform.DevToolsPath.UrlString): string 
   return (/[^/]+$/.exec(path) || /[^/]+\/$/.exec(path) || [''])[0];
 };
 
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
-
 export class RequestLinkIcon extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-request-link-icon`;
   readonly #shadow = this.attachShadow({mode: 'open'});
@@ -74,7 +72,6 @@ export class RequestLinkIcon extends HTMLElement {
   #affectedRequest?: {requestId: Protocol.Network.RequestId, url?: string};
   #additionalOnClickAction?: () => void;
   #reveal = Common.Revealer.reveal;
-  #requestResolvedPromise = Promise.resolve<void>(undefined);
 
   set data(data: RequestLinkIconData) {
     this.#linkToPreflight = data.linkToPreflight;
@@ -92,26 +89,23 @@ export class RequestLinkIcon extends HTMLElement {
       this.#reveal = data.revealOverride;
     }
     if (!this.#request && data.affectedRequest) {
-      this.#requestResolvedPromise = this.#resolveRequest(data.affectedRequest.requestId);
+      if (!this.#requestResolver) {
+        throw new Error('A `RequestResolver` must be provided if an `affectedRequest` is provided.');
+      }
+      this.#requestResolver.waitFor(data.affectedRequest.requestId)
+          .then(request => {
+            this.#request = request;
+            return this.#render();
+          })
+          .catch(() => {
+            this.#request = null;
+          });
     }
     void this.#render();
   }
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [requestLinkIconStyles];
-  }
-
-  #resolveRequest(requestId: Protocol.Network.RequestId): Promise<void> {
-    if (!this.#requestResolver) {
-      throw new Error('A `RequestResolver` must be provided if an `affectedRequest` is provided.');
-    }
-    return this.#requestResolver.waitFor(requestId)
-        .then(request => {
-          this.#request = request;
-        })
-        .catch(() => {
-          this.#request = null;
-        });
   }
 
   get data(): RequestLinkIconData {
@@ -129,22 +123,6 @@ export class RequestLinkIcon extends HTMLElement {
     };
   }
 
-  #iconColor(): string {
-    if (!this.#request) {
-      return '--icon-no-request';
-    }
-    return '--icon-link';
-  }
-
-  iconData(): IconButton.Icon.IconData {
-    return {
-      iconName: 'arrow-up-down-circle',
-      color: `var(${this.#iconColor()})`,
-      width: '16px',
-      height: '16px',
-    };
-  }
-
   handleClick(event: MouseEvent): void {
     if (event.button !== 0) {
       return;  // Only handle left-click for now.
@@ -158,14 +136,12 @@ export class RequestLinkIcon extends HTMLElement {
           linkedRequest, this.#highlightHeader.section, this.#highlightHeader.name);
       void this.#reveal(requestLocation);
     } else {
-      const headersTab = Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HEADER_OVERRIDES) ?
-          NetworkForward.UIRequestLocation.UIRequestTabs.HeadersComponent :
-          NetworkForward.UIRequestLocation.UIRequestTabs.Headers;
-      const requestLocation =
-          NetworkForward.UIRequestLocation.UIRequestLocation.tab(linkedRequest, this.#networkTab ?? headersTab);
+      const requestLocation = NetworkForward.UIRequestLocation.UIRequestLocation.tab(
+          linkedRequest, this.#networkTab ?? NetworkForward.UIRequestLocation.UIRequestTabs.HeadersComponent);
       void this.#reveal(requestLocation);
     }
     this.#additionalOnClickAction?.();
+    event.consume();
   }
 
   #getTooltip(): Platform.UIString.LocalizedString {
@@ -200,36 +176,26 @@ export class RequestLinkIcon extends HTMLElement {
     return LitHtml.html`<span aria-label=${i18nString(UIStrings.shortenedURL)} title=${url}>${filename}</span>`;
   }
 
-  #render(): Promise<void> {
+  async #render(): Promise<void> {
     return coordinator.write(() => {
       // clang-format off
       LitHtml.render(LitHtml.html`
-        ${LitHtml.Directives.until(this.#requestResolvedPromise.then(() => this.#renderComponent()), this.#renderComponent())}
-      `,
+      <button class=${LitHtml.Directives.classMap({'link': Boolean(this.#request)})}
+              title=${this.#getTooltip()}
+              jslog=${VisualLogging.link('request').track({click: true})}
+              @click=${this.handleClick}>
+        <${IconButton.Icon.Icon.litTagName} name="arrow-up-down-circle"></${IconButton.Icon.Icon.litTagName}>
+        ${this.#maybeRenderURL()}
+      </button>`,
       this.#shadow, {host: this});
       // clang-format on
     });
   }
-
-  #renderComponent(): LitHtml.TemplateResult {
-    // clang-format off
-    return LitHtml.html`
-      <span class=${LitHtml.Directives.classMap({'link': Boolean(this.#request)})}
-            tabindex="0"
-            jslog=${VisualLogging.link().track({click: true}).context('network-request')}
-            @click=${this.handleClick}>
-        <${IconButton.Icon.Icon.litTagName} .data=${this.iconData() as IconButton.Icon.IconData}
-          title=${this.#getTooltip()}></${IconButton.Icon.Icon.litTagName}>
-        ${this.#maybeRenderURL()}
-      </span>`;
-    // clang-format on
-  }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-request-link-icon', RequestLinkIcon);
+customElements.define('devtools-request-link-icon', RequestLinkIcon);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-request-link-icon': RequestLinkIcon;
   }

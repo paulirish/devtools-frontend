@@ -1,17 +1,7 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import type {Protocol} from 'devtools-protocol';
@@ -21,7 +11,6 @@ import {Frame, FrameEvent, throwIfDetached} from '../api/Frame.js';
 import type {HTTPResponse} from '../api/HTTPResponse.js';
 import type {WaitTimeoutOptions} from '../api/Page.js';
 import {UnsupportedOperation} from '../common/Errors.js';
-import {setPageContent} from '../common/util.js';
 import {Deferred} from '../util/Deferred.js';
 import {disposeSymbol} from '../util/disposable.js';
 import {isErrorLike} from '../util/ErrorLike.js';
@@ -31,6 +20,7 @@ import type {
   DeviceRequestPromptManager,
 } from './DeviceRequestPrompt.js';
 import type {FrameManager} from './FrameManager.js';
+import type {IsolatedWorldChart} from './IsolatedWorld.js';
 import {IsolatedWorld} from './IsolatedWorld.js';
 import {MAIN_WORLD, PUPPETEER_WORLD} from './IsolatedWorlds.js';
 import {
@@ -46,6 +36,7 @@ export class CdpFrame extends Frame {
   #url = '';
   #detached = false;
   #client!: CDPSession;
+  worlds!: IsolatedWorldChart;
 
   _frameManager: FrameManager;
   override _id: string;
@@ -97,6 +88,11 @@ export class CdpFrame extends Frame {
   updateClient(client: CDPSession, keepWorlds = false): void {
     this.#client = client;
     if (!keepWorlds) {
+      // Clear the current contexts on previous world instances.
+      if (this.worlds) {
+        this.worlds[MAIN_WORLD].clearContext();
+        this.worlds[PUPPETEER_WORLD].clearContext();
+      }
       this.worlds = {
         [MAIN_WORLD]: new IsolatedWorld(
           this,
@@ -210,6 +206,7 @@ export class CdpFrame extends Frame {
     options: {
       timeout?: number;
       waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
+      ignoreSameDocumentNavigation?: boolean;
     } = {}
   ): Promise<HTTPResponse | null> {
     const {
@@ -224,14 +221,22 @@ export class CdpFrame extends Frame {
     );
     const error = await Deferred.race([
       watcher.terminationPromise(),
-      watcher.sameDocumentNavigationPromise(),
+      ...(options.ignoreSameDocumentNavigation
+        ? []
+        : [watcher.sameDocumentNavigationPromise()]),
       watcher.newDocumentNavigationPromise(),
     ]);
     try {
       if (error) {
         throw error;
       }
-      return await watcher.navigationResponse();
+      const result = await Deferred.race<
+        Error | HTTPResponse | null | undefined
+      >([watcher.terminationPromise(), watcher.navigationResponse()]);
+      if (result instanceof Error) {
+        throw error;
+      }
+      return result || null;
     } finally {
       watcher.dispose();
     }
@@ -262,7 +267,9 @@ export class CdpFrame extends Frame {
       timeout = this._frameManager.timeoutSettings.navigationTimeout(),
     } = options;
 
-    await setPageContent(this.isolatedRealm(), html);
+    // We rely upon the fact that document.open() will reset frame lifecycle with "init"
+    // lifecycle event. @see https://crrev.com/608658
+    await this.setFrameContent(html);
 
     const watcher = new LifecycleWatcher(
       this._frameManager.networkManager,

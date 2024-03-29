@@ -10,8 +10,6 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as EmulationComponents from './components/components.js';
 import devicesSettingsTabStyles from './devicesSettingsTab.css.js';
 
-let devicesSettingsTabInstance: DevicesSettingsTab;
-
 const UIStrings = {
   /**
    *@description Title for a section of the UI that shows all of the devices the user can emulate, in the Device Toolbar.
@@ -78,10 +76,10 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
   private emulatedDevicesList: EmulationModel.EmulatedDevices.EmulatedDevicesList;
   private editor?: UI.ListWidget.Editor<EmulationModel.EmulatedDevices.EmulatedDevice>;
 
-  private constructor() {
+  constructor() {
     super();
 
-    this.element.setAttribute('jslog', `${VisualLogging.section().context('devices')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('devices')}`);
 
     this.element.classList.add('settings-tab-container');
     this.element.classList.add('devices-settings-tab');
@@ -92,10 +90,8 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
                                 .createChild('div', 'settings-tab settings-content settings-container');
 
     const buttonsRow = this.containerElement.createChild('div', 'devices-button-row');
-    this.addCustomButton =
-        UI.UIUtils.createTextButton(i18nString(UIStrings.addCustomDevice), this.addCustomDevice.bind(this));
-    this.addCustomButton.setAttribute(
-        'jslog', `${VisualLogging.action().track({click: true}).context('custom-device-add-button')}`);
+    this.addCustomButton = UI.UIUtils.createTextButton(
+        i18nString(UIStrings.addCustomDevice), this.addCustomDevice.bind(this), {jslogContext: 'add-custom-device'});
     this.addCustomButton.id = 'custom-device-add-button';
     buttonsRow.appendChild(this.addCustomButton);
     this.ariaSuccessMessageElement = this.containerElement.createChild('div', 'device-success-message');
@@ -113,13 +109,6 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
         EmulationModel.EmulatedDevices.Events.StandardDevicesUpdated, this.devicesUpdated, this);
 
     this.setDefaultFocusedElement(this.addCustomButton);
-  }
-
-  static instance(): DevicesSettingsTab {
-    if (!devicesSettingsTabInstance) {
-      devicesSettingsTabInstance = new DevicesSettingsTab();
-    }
-    return devicesSettingsTabInstance;
   }
 
   override wasShown(): void {

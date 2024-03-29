@@ -10,13 +10,13 @@ import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
 import * as Logs from '../../../../models/logs/logs.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
-import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as Coordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 import * as ReportView from '../../../../ui/components/report_view/report_view.js';
 import * as RequestLinkIcon from '../../../../ui/components/request_link_icon/request_link_icon.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as PreloadingHelper from '../helper/helper.js';
 
 import preloadingDetailsReportViewStyles from './preloadingDetailsReportView.css.js';
@@ -163,7 +163,8 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
       LitHtml.render(LitHtml.html`
-        <${ReportView.ReportView.Report.litTagName} .data=${{reportTitle: 'Speculative Loading Attempt'} as ReportView.ReportView.ReportData}>
+        <${ReportView.ReportView.Report.litTagName} .data=${{reportTitle: 'Speculative Loading Attempt'} as ReportView.ReportView.ReportData}
+        jslog=${VisualLogging.section('preloading-details')}>
           <${ReportView.ReportView.ReportSectionHeader.litTagName}>${i18nString(UIStrings.detailsDetailedInformation)}</${
             ReportView.ReportView.ReportSectionHeader.litTagName}>
 
@@ -238,7 +239,7 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
     const action = PreloadingString.capitalizedAction(this.#data.preloadingAttempt.action);
 
     let maybeInspectButton: LitHtml.LitTemplate = LitHtml.nothing;
-    ((): void => {
+    (() => {
       if (attempt.action !== Protocol.Preload.SpeculationAction.Prerender) {
         return;
       }
@@ -267,6 +268,7 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
             .size=${Buttons.Button.Size.SMALL}
             .variant=${Buttons.Button.Variant.SECONDARY}
             .disabled=${disabled}
+            jslog=${VisualLogging.action('inspect-prerendered-page').track({click: true})}
           >
             ${i18nString(UIStrings.buttonInspect)}
           </${Buttons.Button.Button.litTagName}>
@@ -353,6 +355,7 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
               color: 'var(--sys-color-primary)',
               'text-decoration': 'underline',
             })}
+            jslog=${VisualLogging.action('reveal-rule-set').track({click: true})}
           >
             ${location}
           </button>
@@ -363,11 +366,9 @@ export class PreloadingDetailsReportView extends LegacyWrapper.LegacyWrapper.Wra
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent(
-    'devtools-resources-preloading-details-report-view', PreloadingDetailsReportView);
+customElements.define('devtools-resources-preloading-details-report-view', PreloadingDetailsReportView);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-resources-preloading-details-report-view': PreloadingDetailsReportView;
   }

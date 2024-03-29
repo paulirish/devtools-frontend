@@ -47,7 +47,6 @@ import confirmDialogStyles from './confirmDialog.css.legacy.js';
 import {Dialog} from './Dialog.js';
 import {Size} from './Geometry.js';
 import {GlassPane, PointerEventsBehavior, SizeBehavior} from './GlassPane.js';
-import {Icon} from './Icon.js';
 import inlineButtonStyles from './inlineButton.css.legacy.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
 import radioButtonStyles from './radioButton.css.legacy.js';
@@ -537,6 +536,7 @@ export function handleElementValueModifications(
   if (!isElementValueModification(event)) {
     return false;
   }
+  void VisualLogging.logKeyDown(event.currentTarget, event, 'element-value-modification');
 
   const selection = element.getComponentSelection();
   if (!selection || !selection.rangeCount) {
@@ -952,7 +952,7 @@ export function animateFunction(
     }
   }
 
-  return (): void => window.cancelAnimationFrame(raf);
+  return () => window.cancelAnimationFrame(raf);
 }
 
 export class LongClickController {
@@ -1073,20 +1073,25 @@ export const createTextChildren = (element: Element|DocumentFragment, ...childre
   }
 };
 
-export function createTextButton(
-    text: string, eventHandler?: ((arg0: Event) => void), className?: string, primary?: boolean,
-    alternativeEvent?: string): HTMLButtonElement {
+export function createTextButton(text: string, clickHandler?: ((arg0: Event) => void), opts?: {
+  className?: string,
+  jslogContext?: string,
+  primary?: boolean,
+}): HTMLButtonElement {
   const element = document.createElement('button');
-  if (className) {
-    element.className = className;
+  if (opts?.className) {
+    element.className = opts.className;
   }
   element.textContent = text;
   element.classList.add('text-button');
-  if (primary) {
+  if (opts?.primary) {
     element.classList.add('primary-button');
   }
-  if (eventHandler) {
-    element.addEventListener(alternativeEvent || 'click', eventHandler);
+  if (clickHandler) {
+    element.addEventListener('click', clickHandler);
+  }
+  if (opts?.jslogContext) {
+    element.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context(opts.jslogContext)}`);
   }
   element.type = 'button';
   return element;
@@ -1103,7 +1108,8 @@ export function createInput(className?: string, type?: string, jslogContext?: st
     element.type = type;
   }
   if (jslogContext) {
-    element.setAttribute('jslog', `${VisualLogging.textField().track({keydown: true}).context(jslogContext)}`);
+    element.setAttribute(
+        'jslog', `${VisualLogging.textField().track({keydown: 'Enter', change: true}).context(jslogContext)}`);
   }
   return element;
 }
@@ -1119,15 +1125,23 @@ export function createSelect(name: string, options: string[]|Map<string, string[
         optGroup.label = key;
         for (const child of value) {
           if (typeof child === 'string') {
-            optGroup.appendChild(new Option(child, child));
+            optGroup.appendChild(createOption(child, child, Platform.StringUtilities.toKebabCase(child)));
           }
         }
       }
     } else if (typeof option === 'string') {
-      select.add(new Option(option, option));
+      select.add(createOption(option, option, Platform.StringUtilities.toKebabCase(option)));
     }
   }
   return select;
+}
+
+export function createOption(title: string, value?: string, jslogContext?: string): HTMLOptionElement {
+  const result = new Option(title, value || title);
+  if (jslogContext) {
+    result.setAttribute('jslog', `${VisualLogging.item(jslogContext).track({click: true})}`);
+  }
+  return result;
 }
 
 export function createLabel(title: string, className?: string, associatedControl?: Element): Element {
@@ -1239,6 +1253,7 @@ export class DevToolsIconLabel extends HTMLSpanElement {
     });
     this.#icon = new IconButton.Icon.Icon();
     this.#icon.style.setProperty('margin-right', '4px');
+    this.#icon.style.setProperty('vertical-align', 'baseline');
     root.appendChild(this.#icon);
     root.createChild('slot');
   }
@@ -1335,10 +1350,11 @@ export class DevToolsCloseButton extends HTMLDivElement {
     super();
     const root = Utils.createShadowRootWithCoreStyles(this, {cssFile: closeButtonStyles, delegatesFocus: undefined});
     this.buttonElement = (root.createChild('div', 'close-button') as HTMLElement);
+    this.buttonElement.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
     Tooltip.install(this.buttonElement, i18nString(UIStrings.close));
     ARIAUtils.setLabel(this.buttonElement, i18nString(UIStrings.close));
     ARIAUtils.markAsButton(this.buttonElement);
-    const regularIcon = Icon.create('cross', 'default-icon');
+    const regularIcon = IconButton.Icon.create('cross');
     this.buttonElement.appendChild(regularIcon);
   }
 
@@ -1522,16 +1538,12 @@ export function loadImage(url: string): Promise<HTMLImageElement|null> {
   });
 }
 
-export function loadImageFromData(data: string|null): Promise<HTMLImageElement|null> {
-  return data ? loadImage('data:image/jpg;base64,' + data) : Promise.resolve(null);
-}
-
 export function createFileSelectorElement(callback: (arg0: File) => void): HTMLInputElement {
   const fileSelectorElement = document.createElement('input');
   fileSelectorElement.type = 'file';
   fileSelectorElement.style.display = 'none';
   fileSelectorElement.tabIndex = -1;
-  fileSelectorElement.onchange = (): void => {
+  fileSelectorElement.onchange = () => {
     if (fileSelectorElement.files) {
       callback(fileSelectorElement.files[0]);
     }
@@ -1543,15 +1555,15 @@ export function createFileSelectorElement(callback: (arg0: File) => void): HTMLI
 export const MaxLengthForDisplayedURLs = 150;
 
 export class MessageDialog {
-  static async show(message: string, where?: Element|Document): Promise<void> {
-    const dialog = new Dialog();
+  static async show(message: string, where?: Element|Document, jslogContext?: string): Promise<void> {
+    const dialog = new Dialog(jslogContext);
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
     const shadowRoot = Utils.createShadowRootWithCoreStyles(
         dialog.contentElement, {cssFile: confirmDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');
     await new Promise(resolve => {
-      const okButton = createTextButton(i18nString(UIStrings.ok), resolve, '', true);
+      const okButton = createTextButton(i18nString(UIStrings.ok), resolve, {jslogContext: 'confirm', primary: true});
       content.createChild('div', 'message').createChild('span').textContent = message;
       content.createChild('div', 'button').appendChild(okButton);
       dialog.setOutsideClickCallback(event => {
@@ -1567,7 +1579,7 @@ export class MessageDialog {
 
 export class ConfirmDialog {
   static async show(message: string, where?: Element|Document, options?: ConfirmDialogOptions): Promise<boolean> {
-    const dialog = new Dialog();
+    const dialog = new Dialog(options?.jslogContext);
     dialog.setSizeBehavior(SizeBehavior.MeasureContent);
     dialog.setDimmed(true);
     ARIAUtils.setLabel(dialog.contentElement, message);
@@ -1579,11 +1591,10 @@ export class ConfirmDialog {
     const result = await new Promise<boolean>(resolve => {
       const okButton = createTextButton(
           /* text= */ options?.okButtonLabel || i18nString(UIStrings.ok), /* clickHandler= */ () => resolve(true),
-          /* className= */ '',
-          /* primary= */ true);
+          {jslogContext: 'confirm', primary: true});
       buttonsBar.appendChild(okButton);
-      buttonsBar.appendChild(
-          createTextButton(options?.cancelButtonLabel || i18nString(UIStrings.cancel), () => resolve(false)));
+      buttonsBar.appendChild(createTextButton(
+          options?.cancelButtonLabel || i18nString(UIStrings.cancel), () => resolve(false), {jslogContext: 'cancel'}));
       dialog.setOutsideClickCallback(event => {
         event.consume();
         resolve(false);
@@ -1744,7 +1755,5 @@ export interface RendererRegistration {
 export interface ConfirmDialogOptions {
   okButtonLabel?: string;
   cancelButtonLabel?: string;
+  jslogContext?: string;
 }
-
-VisualLogging.registerContextProvider(
-    'elementValueModification', e => Promise.resolve(isElementValueModification(e as Event) ? 1 : 0));

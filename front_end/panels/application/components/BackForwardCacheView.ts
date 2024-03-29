@@ -5,13 +5,11 @@
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
-import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Protocol from '../../../generated/protocol.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ChromeLink from '../../../ui/components/chrome_link/chrome_link.js';
 import * as ExpandableList from '../../../ui/components/expandable_list/expandable_list.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
@@ -19,6 +17,7 @@ import * as ReportView from '../../../ui/components/report_view/report_view.js';
 import * as TreeOutline from '../../../ui/components/tree_outline/tree_outline.js';
 import * as Components from '../../../ui/legacy/components/utils/utils.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {NotRestoredReasonDescription} from './BackForwardCacheStrings.js';
 import backForwardCacheViewStyles from './backForwardCacheView.css.js';
@@ -186,7 +185,8 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
       LitHtml.render(LitHtml.html`
         <${ReportView.ReportView.Report.litTagName} .data=${
             {reportTitle: i18nString(UIStrings.backForwardCacheTitle)} as ReportView.ReportView.ReportData
-        }>
+        } jslog=${VisualLogging.pane('back-forward-cache')}>
+
           ${this.#renderMainFrameInformation()}
         </${ReportView.ReportView.Report.litTagName}>
       `, this.#shadow, {host: this});
@@ -290,7 +290,8 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
           .disabled=${isTestRunning || isTestingForbidden}
           .spinner=${isTestRunning}
           .variant=${Buttons.Button.Variant.PRIMARY}
-          @click=${this.#navigateAwayAndBack}>
+          @click=${this.#navigateAwayAndBack}
+          jslog=${VisualLogging.action('back-forward-cache.run-test').track({click: true})}>
           ${isTestRunning ? LitHtml.html`
             ${i18nString(UIStrings.runningTest)}`:`
             ${i18nString(UIStrings.runTest)}
@@ -302,7 +303,8 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
       ${this.#maybeRenderExplanations(frame.backForwardCacheDetails.explanations,
           frame.backForwardCacheDetails.explanationsTree)}
       <${ReportView.ReportView.ReportSection.litTagName}>
-        <x-link href="https://web.dev/bfcache/" class="link">
+        <x-link href="https://web.dev/bfcache/" class="link"
+        jslog=${VisualLogging.action('learn-more.eligibility').track({click: true})}>
           ${i18nString(UIStrings.learnMore)}
         </x-link>
       </${ReportView.ReportView.ReportSection.litTagName}>
@@ -312,8 +314,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
 
   #maybeRenderFrameTree(explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|
                         undefined): LitHtml.LitTemplate {
-    if (!explanationTree || (explanationTree.explanations.length === 0 && explanationTree.children.length === 0) ||
-        !Root.Runtime.experiments.isEnabled('bfcacheDisplayTree')) {
+    if (!explanationTree || (explanationTree.explanations.length === 0 && explanationTree.children.length === 0)) {
       return LitHtml.nothing;
     }
 
@@ -357,7 +358,8 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
 
     // clang-format off
     return LitHtml.html`
-      <div class="report-line">
+      <div class="report-line"
+      jslog=${VisualLogging.section('frames')}>
         <div class="report-key">
           ${i18nString(UIStrings.framesTitle)}
         </div>
@@ -563,16 +565,20 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
   }
 
   #renderFramesPerReason(frames: string[]|undefined): LitHtml.LitTemplate {
-    if (frames === undefined || frames.length === 0 || !Root.Runtime.experiments.isEnabled('bfcacheDisplayTree')) {
+    if (frames === undefined || frames.length === 0) {
       return LitHtml.nothing;
     }
     const rows = [LitHtml.html`<div>${i18nString(UIStrings.framesPerIssue, {n: frames.length})}</div>`];
-    rows.push(...frames.map(url => LitHtml.html`<div class="text-ellipsis" title=${url}>${url}</div>`));
+    rows.push(...frames.map(url => LitHtml.html`<div class="text-ellipsis" title=${url}
+    jslog=${VisualLogging.treeItem()}>${url}</div>`));
     return LitHtml.html`
-      <div class="details-list">
-        <${ExpandableList.ExpandableList.ExpandableList.litTagName} .data=${
-        {rows} as
-        ExpandableList.ExpandableList.ExpandableListData}></${ExpandableList.ExpandableList.ExpandableList.litTagName}>
+      <div class="details-list"
+      jslog=${VisualLogging.tree('frames-per-issue')}>
+        <${ExpandableList.ExpandableList.ExpandableList.litTagName} .data=${{
+      rows,
+      title: i18nString(UIStrings.framesPerIssue, {n: frames.length}),
+    } as ExpandableList.ExpandableList.ExpandableListData}
+        jslog=${VisualLogging.treeItem()}></${ExpandableList.ExpandableList.ExpandableList.litTagName}>
       </div>
     `;
   }
@@ -581,7 +587,10 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     if (explanation.reason === Protocol.Page.BackForwardCacheNotRestoredReason.UnloadHandlerExistsInMainFrame ||
         explanation.reason === Protocol.Page.BackForwardCacheNotRestoredReason.UnloadHandlerExistsInSubFrame) {
       return LitHtml.html`
-        <x-link href="https://web.dev/bfcache/#never-use-the-unload-event" class="link">
+        <x-link href="https://web.dev/bfcache/#never-use-the-unload-event" class="link"
+        jslog=${VisualLogging.action('learn-more.never-use-unload').track({
+        click: true,
+      })}>
           ${i18nString(UIStrings.neverUseUnload)}
         </x-link>`;
     }
@@ -651,10 +660,9 @@ interface FrameTreeNodeData {
   iconName?: string;
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-resources-back-forward-cache-view', BackForwardCacheView);
+customElements.define('devtools-resources-back-forward-cache-view', BackForwardCacheView);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-resources-back-forward-cache-view': BackForwardCacheView;
   }

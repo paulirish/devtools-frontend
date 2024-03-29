@@ -41,7 +41,7 @@ import {
 
 /* eslint-disable no-console */
 
-describe('The Console Tab', async () => {
+describe('The Console Tab', () => {
   const tests = [
     {
       description: 'produces console messages when a page logs using console.log',
@@ -439,7 +439,7 @@ describe('The Console Tab', async () => {
   });
 
   describe('for memory objects', () => {
-    const MEMORY_ICON_SELECTOR = '[aria-label="Reveal in Memory Inspector panel"]';
+    const MEMORY_ICON_SELECTOR = '[aria-label="Reveal in Memory inspector panel"]';
 
     it('shows one memory icon to open memory inspector for ArrayBuffers (description)', async () => {
       const {frontend} = getBrowserAndPages();

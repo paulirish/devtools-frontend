@@ -12,7 +12,7 @@ import {type LazyUint8Array, LinearMemoryInspectorController} from './LinearMemo
 
 const UIStrings = {
   /**
-   *@description Label in the Linear Memory Inspector tool that serves as a placeholder if no inspections are open (i.e. nothing to see here).
+   *@description Label in the Linear Memory inspector tool that serves as a placeholder if no inspections are open (i.e. nothing to see here).
    *             Inspection hereby refers to viewing, navigating and understanding the memory through this tool.
    */
   noOpenInspections: 'No open inspections',
@@ -27,7 +27,7 @@ export class LinearMemoryInspectorPane extends Common.ObjectWrapper.eventMixin<E
 
   constructor() {
     super(false);
-    this.element.setAttribute('jslog', `${VisualLogging.panel().context('linear-memory-inspector')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('linear-memory-inspector').track({resize: true})}`);
     const placeholder = document.createElement('div');
     placeholder.textContent = i18nString(UIStrings.noOpenInspections);
     placeholder.style.display = 'flex';
@@ -37,6 +37,8 @@ export class LinearMemoryInspectorPane extends Common.ObjectWrapper.eventMixin<E
     this.#tabbedPane.setAllowTabReorder(true, true);
     this.#tabbedPane.addEventListener(UI.TabbedPane.Events.TabClosed, this.#tabClosed, this);
     this.#tabbedPane.show(this.contentElement);
+    this.#tabbedPane.headerElement().setAttribute(
+        'jslog', `${VisualLogging.toolbar().track({keydown: 'ArrowUp|ArrowLeft|ArrowDown|ArrowRight|Enter|Space'})}`);
   }
 
   static instance(): LinearMemoryInspectorPane {

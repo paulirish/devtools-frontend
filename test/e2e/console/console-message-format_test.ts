@@ -12,7 +12,7 @@ import {
   waitForConsoleMessagesToBeNonEmpty,
 } from '../helpers/console-helpers.js';
 
-describe('The Console Tab', async () => {
+describe('The Console Tab', () => {
   it('shows BigInts formatted', async () => {
     const messages = await getConsoleMessages('big-int', false, () => waitForConsoleMessagesToBeNonEmpty(5));
 
@@ -46,7 +46,7 @@ describe('The Console Tab', async () => {
     assert.deepEqual(messages, [
       '{}',
       'ƒ Object() { [native code] }',
-      '{constructor: ƒ, __defineGetter__: ƒ, __defineSetter__: ƒ, hasOwnProperty: ƒ, __lookupGetter__: ƒ,\xA0…}',
+      '{__defineGetter__: ƒ, __defineSetter__: ƒ, hasOwnProperty: ƒ, __lookupGetter__: ƒ, __lookupSetter__: ƒ,\xA0…}',
       '{foo: \'foo\'}',
       '{bar: \'bar\'}',
       '[\'test\']',
@@ -243,7 +243,7 @@ describe('The Console Tab', async () => {
     ]);
   });
 
-  describe('shows messages from before', async () => {
+  describe('shows messages from before', () => {
     it('iframe removal', async () => {
       const messages =
           await getConsoleMessages('navigation/after-removal', false, () => waitForConsoleMessagesToBeNonEmpty(3));

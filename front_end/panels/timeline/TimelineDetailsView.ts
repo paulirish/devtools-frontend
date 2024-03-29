@@ -7,11 +7,12 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {EventsTimelineTreeView} from './EventsTimelineTreeView.js';
-import {Events, type PerformanceModel} from './PerformanceModel.js';
+import {type PerformanceModel} from './PerformanceModel.js';
 import {TimelineLayersView} from './TimelineLayersView.js';
 import {TimelinePaintProfilerView} from './TimelinePaintProfilerView.js';
 import {type TimelineModeViewDelegate} from './TimelinePanel.js';
@@ -60,7 +61,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   private readonly defaultDetailsContentElement: HTMLElement;
   private rangeDetailViews: Map<string, TimelineTreeView>;
   private model!: PerformanceModel;
-  #selectedEvents?: TraceEngine.Legacy.CompatibleTraceEvent[]|null;
+  #selectedEvents?: TraceEngine.Types.TraceEvents.TraceEventData[]|null;
   private lazyPaintProfilerView?: TimelinePaintProfilerView|null;
   private lazyLayersView?: TimelineLayersView|null;
   private preferredTabId?: string;
@@ -68,6 +69,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   private updateContentsScheduled: boolean;
   #traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null = null;
   #filmStrip: TraceEngine.Extras.FilmStrip.Data|null = null;
+  #onTraceBoundsChangeBound = this.#onTraceBoundsChange.bind(this);
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -101,23 +103,37 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     this.rangeDetailViews.set(Tab.EventLog, eventsView);
 
     this.tabbedPane.addEventListener(UI.TabbedPane.Events.TabSelected, this.tabSelected, this);
+
+    TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
   }
 
   getDetailsContentElementForTest(): HTMLElement {
     return this.defaultDetailsContentElement;
   }
 
+  async #onTraceBoundsChange(event: TraceBounds.TraceBounds.StateChangedEvent): Promise<void> {
+    if (event.updateType === 'MINIMAP_BOUNDS') {
+      // If new minimap bounds are set, we might need to update the selected entry summary because
+      // the links to other entries (ex. initiator) might be outside of the new breadcrumb.
+      if (this.selection) {
+        await this.setSelection(this.selection);
+      }
+    }
+
+    if (event.updateType === 'RESET' || event.updateType === 'VISIBLE_WINDOW') {
+      // If the update type was a changing of the minimap bounds, we do not
+      // need to redraw.
+      if (!this.selection) {
+        this.scheduleUpdateContentsFromWindow();
+      }
+    }
+  }
+
   async setModel(
       model: PerformanceModel|null, traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null,
-      selectedEvents: TraceEngine.Legacy.CompatibleTraceEvent[]|null): Promise<void> {
+      selectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[]|null): Promise<void> {
     if (this.model !== model) {
-      if (this.model) {
-        this.model.removeEventListener(Events.WindowChanged, this.onWindowChanged, this);
-      }
       this.model = (model as PerformanceModel);
-      if (this.model) {
-        this.model.addEventListener(Events.WindowChanged, this.onWindowChanged, this);
-      }
     }
     this.#traceEngineData = traceEngineData;
     if (traceEngineData) {
@@ -147,8 +163,12 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   private updateContents(): void {
     const view = this.rangeDetailViews.get(this.tabbedPane.selectedTabId || '');
     if (view) {
-      const window = this.model.window();
-      view.updateContents(this.selection || TimelineSelection.fromRange(window.left, window.right));
+      const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
+      if (!traceBoundsState) {
+        return;
+      }
+      const visibleWindow = traceBoundsState.milli.timelineTraceWindow;
+      view.updateContents(this.selection || TimelineSelection.fromRange(visibleWindow.min, visibleWindow.max));
     }
   }
 
@@ -165,12 +185,6 @@ export class TimelineDetailsView extends UI.Widget.VBox {
 
   setPreferredTab(tabId: string): void {
     this.preferredTabId = tabId;
-  }
-
-  private onWindowChanged(): void {
-    if (!this.selection) {
-      this.scheduleUpdateContentsFromWindow();
-    }
   }
 
   /**
@@ -203,8 +217,12 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   }
 
   private updateContentsFromWindow(): void {
-    const window = this.model.window();
-    this.updateSelectedRangeStats(window.left, window.right);
+    const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
+    if (!traceBoundsState) {
+      return;
+    }
+    const visibleWindow = traceBoundsState.milli.timelineTraceWindow;
+    this.updateSelectedRangeStats(visibleWindow.min, visibleWindow.max);
     this.updateContents();
   }
 
@@ -372,13 +390,11 @@ export class TimelineDetailsView extends UI.Widget.VBox {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Tab {
-  Details = 'Details',
-  EventLog = 'EventLog',
-  CallTree = 'CallTree',
-  BottomUp = 'BottomUp',
-  PaintProfiler = 'PaintProfiler',
-  LayerViewer = 'LayerViewer',
+  Details = 'details',
+  EventLog = 'event-log',
+  CallTree = 'call-tree',
+  BottomUp = 'bottom-up',
+  PaintProfiler = 'paint-profiler',
+  LayerViewer = 'layer-viewer',
 }

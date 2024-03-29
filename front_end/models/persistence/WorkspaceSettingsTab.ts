@@ -40,17 +40,16 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/persistence/WorkspaceSettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let workspaceSettingsTabInstance: WorkspaceSettingsTab;
-
 export class WorkspaceSettingsTab extends UI.Widget.VBox {
   containerElement: HTMLElement;
   private readonly fileSystemsListContainer: HTMLElement;
   private readonly elementByPath: Map<Platform.DevToolsPath.UrlString, Element>;
   private readonly mappingViewByPath: Map<Platform.DevToolsPath.UrlString, EditFileSystemView>;
-  private constructor() {
+
+  constructor() {
     super();
 
-    this.element.setAttribute('jslog', `${VisualLogging.section().context('workspace')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('workspace')}`);
 
     this.element.classList.add('workspace-settings-tab');
     const header = this.element.createChild('header');
@@ -73,10 +72,9 @@ export class WorkspaceSettingsTab extends UI.Widget.VBox {
 
     this.fileSystemsListContainer = this.containerElement.createChild('div', '');
 
-    const addButton =
-        UI.UIUtils.createTextButton(i18nString(UIStrings.addFolder), this.addFileSystemClicked.bind(this));
-    addButton.setAttribute(
-        'jslog', `${VisualLogging.action().track({click: true}).context('sources.add-folder-to-workspace')}`);
+    const addButton = UI.UIUtils.createTextButton(
+        i18nString(UIStrings.addFolder), this.addFileSystemClicked.bind(this),
+        {jslogContext: 'sources.add-folder-to-workspace'});
     this.containerElement.appendChild(addButton);
     this.setDefaultFocusedElement(addButton);
 
@@ -88,15 +86,6 @@ export class WorkspaceSettingsTab extends UI.Widget.VBox {
     for (let i = 0; i < fileSystems.length; ++i) {
       this.addItem(fileSystems[i]);
     }
-  }
-
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): WorkspaceSettingsTab {
-    const {forceNew} = opts;
-    if (!workspaceSettingsTabInstance || forceNew) {
-      workspaceSettingsTabInstance = new WorkspaceSettingsTab();
-    }
-
-    return workspaceSettingsTabInstance;
   }
 
   override wasShown(): void {

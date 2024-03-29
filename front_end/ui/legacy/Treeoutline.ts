@@ -39,7 +39,6 @@ import type * as IconButton from '../components/icon_button/icon_button.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
-import {type Icon} from './Icon.js';
 import {type Config, InplaceEditor} from './InplaceEditor.js';
 import {Keys} from './KeyboardShortcut.js';
 import * as ThemeSupport from './theme_support/theme_support.js';
@@ -48,12 +47,8 @@ import treeoutlineStyles from './treeoutline.css.legacy.js';
 import {deepElementFromPoint, enclosingNodeOrSelfWithNodeNameInArray, isEditing} from './UIUtils.js';
 import * as Utils from './utils/utils.js';
 
-type AnyIcon = Icon|IconButton.Icon.Icon;
-
 const nodeToParentTreeElementMap = new WeakMap<Node, TreeElement>();
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   ElementAttached = 'ElementAttached',
   ElementsDetached = 'ElementsDetached',
@@ -475,7 +470,9 @@ export class TreeElement {
     this.listItemNode.addEventListener('click', (this.treeElementToggled.bind(this) as EventListener), false);
     this.listItemNode.addEventListener('dblclick', this.handleDoubleClick.bind(this), false);
     this.listItemNode.setAttribute(
-        'jslog', `${VisualLogging.treeItem().parent('parentTreeItem').context(jslogContext)}`);
+        'jslog', `${VisualLogging.treeItem().parent('parentTreeItem').context(jslogContext).track({
+          keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Backspace|Delete|Enter|Space|Home|End',
+        })}`);
     ARIAUtils.markAsTreeitem(this.listItemNode);
 
     this.childrenInternal = null;
@@ -787,7 +784,7 @@ export class TreeElement {
     }
   }
 
-  setLeadingIcons(icons: AnyIcon[]): void {
+  setLeadingIcons(icons: IconButton.Icon.Icon[]): void {
     if (!this.leadingIconsElement && !icons.length) {
       return;
     }
@@ -804,7 +801,7 @@ export class TreeElement {
     }
   }
 
-  setTrailingIcons(icons: AnyIcon[]): void {
+  setTrailingIcons(icons: IconButton.Icon.Icon[]): void {
     if (!this.trailingIconsElement && !icons.length) {
       return;
     }
@@ -849,7 +846,7 @@ export class TreeElement {
       this.collapse();
       ARIAUtils.unsetExpandable(this.listItemNode);
     } else {
-      VisualLogging.registerLoggable(this.expandLoggable, `${VisualLogging.treeItemExpand()}`, this.listItemNode);
+      VisualLogging.registerLoggable(this.expandLoggable, `${VisualLogging.expand()}`, this.listItemNode);
       ARIAUtils.setExpanded(this.listItemNode, false);
     }
   }
@@ -1407,7 +1404,8 @@ export class TreeElement {
 
 function loggingParentProvider(e: Element): Element|undefined {
   const treeElement = TreeElement.getTreeElementBylistItemNode(e);
-  return treeElement?.parent?.listItemElement || treeElement?.treeOutline?.element;
+  const parentElement = treeElement?.parent?.listItemElement;
+  return parentElement?.isConnected && parentElement || treeElement?.treeOutline?.contentElement;
 }
 
 VisualLogging.registerParentProvider('parentTreeItem', loggingParentProvider);

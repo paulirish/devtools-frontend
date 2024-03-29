@@ -70,6 +70,9 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
         this.#capabilitiesMask = Capability.JS | Capability.Log | Capability.Network | Capability.Target |
             Capability.IO | Capability.Media | Capability.Emulation | Capability.EventBreakpoints;
         break;
+      case Type.Worklet:
+        this.#capabilitiesMask = Capability.JS | Capability.Log | Capability.EventBreakpoints;
+        break;
       case Type.Node:
         this.#capabilitiesMask = Capability.JS;
         break;
@@ -243,8 +246,6 @@ export class Target extends ProtocolClient.InspectorBackend.TargetBase {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Type {
   Frame = 'frame',
   ServiceWorker = 'service-worker',
@@ -254,12 +255,11 @@ export enum Type {
   Node = 'node',
   Browser = 'browser',
   AuctionWorklet = 'auction-worklet',
+  Worklet = 'worklet',
   Tab = 'tab',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Capability {
+export const enum Capability {
   Browser = 1 << 0,
   DOM = 1 << 1,
   JS = 1 << 2,

@@ -1,18 +1,8 @@
 "use strict";
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
@@ -52,7 +42,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CdpFrame = void 0;
 const Frame_js_1 = require("../api/Frame.js");
 const Errors_js_1 = require("../common/Errors.js");
-const util_js_1 = require("../common/util.js");
 const Deferred_js_1 = require("../util/Deferred.js");
 const disposable_js_1 = require("../util/disposable.js");
 const ErrorLike_js_1 = require("../util/ErrorLike.js");
@@ -81,6 +70,7 @@ let CdpFrame = (() => {
         #url = (__runInitializers(this, _instanceExtraInitializers), '');
         #detached = false;
         #client;
+        worlds;
         _frameManager;
         _id;
         _loaderId = '';
@@ -119,6 +109,11 @@ let CdpFrame = (() => {
         updateClient(client, keepWorlds = false) {
             this.#client = client;
             if (!keepWorlds) {
+                // Clear the current contexts on previous world instances.
+                if (this.worlds) {
+                    this.worlds[IsolatedWorlds_js_1.MAIN_WORLD].clearContext();
+                    this.worlds[IsolatedWorlds_js_1.PUPPETEER_WORLD].clearContext();
+                }
                 this.worlds = {
                     [IsolatedWorlds_js_1.MAIN_WORLD]: new IsolatedWorld_js_1.IsolatedWorld(this, this._frameManager.timeoutSettings),
                     [IsolatedWorlds_js_1.PUPPETEER_WORLD]: new IsolatedWorld_js_1.IsolatedWorld(this, this._frameManager.timeoutSettings),
@@ -189,14 +184,20 @@ let CdpFrame = (() => {
             const watcher = new LifecycleWatcher_js_1.LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout);
             const error = await Deferred_js_1.Deferred.race([
                 watcher.terminationPromise(),
-                watcher.sameDocumentNavigationPromise(),
+                ...(options.ignoreSameDocumentNavigation
+                    ? []
+                    : [watcher.sameDocumentNavigationPromise()]),
                 watcher.newDocumentNavigationPromise(),
             ]);
             try {
                 if (error) {
                     throw error;
                 }
-                return await watcher.navigationResponse();
+                const result = await Deferred_js_1.Deferred.race([watcher.terminationPromise(), watcher.navigationResponse()]);
+                if (result instanceof Error) {
+                    throw error;
+                }
+                return result || null;
             }
             finally {
                 watcher.dispose();
@@ -213,7 +214,9 @@ let CdpFrame = (() => {
         }
         async setContent(html, options = {}) {
             const { waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), } = options;
-            await (0, util_js_1.setPageContent)(this.isolatedRealm(), html);
+            // We rely upon the fact that document.open() will reset frame lifecycle with "init"
+            // lifecycle event. @see https://crrev.com/608658
+            await this.setFrameContent(html);
             const watcher = new LifecycleWatcher_js_1.LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout);
             const error = await Deferred_js_1.Deferred.race([
                 watcher.terminationPromise(),

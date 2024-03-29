@@ -27,6 +27,7 @@
   align-items: flex-start;
   white-space: nowrap;
   flex: 0 0 var(--timeline-controls-width);
+  z-index: 1;
 }
 
 .animation-node-description > * {
@@ -143,7 +144,7 @@ circle.animation-keyframe-point:active {
   z-index: 2;
 }
 
-.animation-grid-header.has-selected-group {
+.animation-grid-header.scrubber-enabled {
   cursor: pointer;
 }
 
@@ -259,6 +260,13 @@ rect.animation-timeline-grid-line {
   cursor: not-allowed;
 }
 
+.animation-node-removed-overlay {
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  cursor: not-allowed;
+}
+
 svg.animation-ui g:first-child {
   opacity: 100%;
 }
@@ -297,6 +305,10 @@ text.animation-timeline-grid-label {
   position: relative;
 
   & .screenshot-arrow {
+    background-image: var(--image-file-popoverArrows);
+    background-position: 0 76px;
+    width: 19px;
+    height: 19px;
     position: absolute;
     left: 6px;
     top: -19px;
@@ -314,6 +326,8 @@ text.animation-timeline-grid-label {
     border: 1px solid transparent;
     box-shadow: var(--drop-shadow);
     border-radius: 2px;
+    max-width: 220px;
+    max-height: 220px;
   }
 
   & .screenshots-container.to-the-left {
@@ -335,6 +349,10 @@ text.animation-timeline-grid-label {
   }
 
   &:hover .screenshots-container:not(.no-screenshots):hover {
+    display: none;
+  }
+
+  &:has(.selected):hover .screenshots-container:not(.no-screenshots) {
     display: none;
   }
 }
@@ -389,6 +407,19 @@ text.animation-timeline-grid-label {
   position: relative;
 }
 
+.animation-buffer-preview.no-animation {
+  animation: none;
+}
+
+.animation-buffer-preview .preview-icon {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  right: 1px;
+  bottom: 2px;
+  opacity: 60%;
+}
+
 .animation-buffer-preview-animation {
   width: 100%;
   height: 100%;
@@ -405,9 +436,17 @@ text.animation-timeline-grid-label {
   outline: -webkit-focus-ring-color auto 5px;
 }
 
+.animation-buffer-preview.selected .preview-icon {
+  opacity: 100%;
+}
+
 .animation-buffer-preview:not(.selected):focus-visible,
 .animation-buffer-preview:not(.selected):hover {
   background-color: var(--sys-color-surface-variant);
+
+  & .preview-icon {
+    opacity: 80%;
+  }
 }
 
 .animation-buffer-preview.selected {
@@ -445,7 +484,7 @@ text.animation-timeline-grid-label {
 
 @keyframes newGroupAnim {
   from {
-    clip-path: polygon(0% 0%, 0% 100%, 0% 100%, 0% 0%);
+    clip-path: polygon(0% 0%, 0% 100%, 50% 100%, 50% 0%);
   }
 
   to {
@@ -460,7 +499,10 @@ text.animation-timeline-grid-label {
 }
 
 .animation-playback-rate-button {
-  border: 1px solid var(--sys-color-tonal-outline);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--sys-color-tonal-outline);
+  border-right-width: 0;
   color: var(--sys-color-on-surface);
   display: inline-block;
   margin-right: -1px;
@@ -476,6 +518,7 @@ text.animation-timeline-grid-label {
 
 .animation-playback-rate-button:last-child {
   border-radius: 0 4px 4px 0;
+  border-right-width: 1px;
 }
 
 .animation-playback-rate-button.selected {
@@ -494,8 +537,14 @@ text.animation-timeline-grid-label {
   outline-offset: 2px;
 }
 
-.animation-playback-rate-button:not(.selected):hover {
+.animation-playback-rate-button:not(.selected):not([disabled]):hover {
   background: var(--sys-color-state-hover-on-subtle);
+}
+
+.animation-playback-rate-button[disabled] {
+  background: unset;
+  border-color: var(--sys-color-state-disabled);
+  color: var(--sys-color-state-disabled);
 }
 
 .animation-remove-button {
@@ -504,19 +553,22 @@ text.animation-timeline-grid-label {
   right: -3px;
   background: var(--sys-color-token-subtle);
   border-radius: 12px;
+  border: 0;
   height: 16px;
   width: 16px;
-  align-items: center;
-  font-size: 10px;
-  justify-content: center;
   z-index: 100;
   display: none;
-  font-weight: 700;
-  color: var(--sys-color-cdt-base-container);
-}
+  padding: 0;
 
-.animation-remove-button:hover {
-  background: var(--sys-color-on-surface);
+  & > devtools-icon {
+    height: 16px;
+    width: 16px;
+    color: var(--sys-color-cdt-base-container);
+  }
+
+  &:hover {
+    background-color: var(--sys-color-on-surface);
+  }
 }
 
 .animation-buffer-preview:hover .animation-remove-button {

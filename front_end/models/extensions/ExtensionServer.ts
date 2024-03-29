@@ -31,7 +31,7 @@
 // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';  // eslint-disable-line rulesdir/es_modules_import
+import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -209,6 +209,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.registerHandler(PrivateAPI.Commands.GetWasmOp, this.onGetWasmOp.bind(this));
     this.registerHandler(
         PrivateAPI.Commands.RegisterRecorderExtensionPlugin, this.registerRecorderExtensionEndpoint.bind(this));
+    this.registerHandler(PrivateAPI.Commands.ReportResourceLoad, this.onReportResourceLoad.bind(this));
     this.registerHandler(PrivateAPI.Commands.CreateRecorderView, this.onCreateRecorderView.bind(this));
     this.registerHandler(PrivateAPI.Commands.ShowRecorderView, this.onShowRecorderView.bind(this));
     window.addEventListener('message', this.onWindowMessage, false);  // Only for main window.
@@ -293,24 +294,18 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.RegisterLanguageExtensionPlugin}`);
     }
     const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-    if (!pluginManager) {
-      return this.status.E_FAILED('WebAssembly DWARF support needs to be enabled to use this extension');
-    }
-
     const {pluginName, port, supportedScriptTypes: {language, symbol_types}} = message;
     const symbol_types_array =
         (Array.isArray(symbol_types) && symbol_types.every(e => typeof e === 'string') ? symbol_types : []);
-    const endpoint = new LanguageExtensionEndpoint(pluginName, {language, symbol_types: symbol_types_array}, port);
+    const extensionOrigin = this.getExtensionOrigin(_shared_port);
+    const endpoint =
+        new LanguageExtensionEndpoint(extensionOrigin, pluginName, {language, symbol_types: symbol_types_array}, port);
     pluginManager.addPlugin(endpoint);
     return this.status.OK();
   }
 
   private async loadWasmValue<T>(expression: string, stopId: unknown): Promise<Record|T> {
     const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-    if (!pluginManager) {
-      return this.status.E_FAILED('WebAssembly DWARF support needs to be enabled to use this extension');
-    }
-
     const callFrame = pluginManager.callFrameForStopId(stopId as Bindings.DebuggerLanguagePlugins.StopId);
     if (!callFrame) {
       return this.status.E_BADARG('stopId', 'Unknown stop id');
@@ -344,7 +339,9 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (message.command !== PrivateAPI.Commands.GetWasmGlobal) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmGlobal}`);
     }
-    return this.loadWasmValue(`globals[${Number(message.global)}]`, message.stopId);
+    const global = Number(message.global);
+    const result = await this.loadWasmValue<Chrome.DevTools.WasmValue>(`globals[${global}]`, message.stopId);
+    return result ?? this.status.E_BADARG('global', `No global with index ${global}`);
   }
 
   private async onGetWasmLocal(message: PrivateAPI.ExtensionServerRequestMessage):
@@ -352,14 +349,19 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (message.command !== PrivateAPI.Commands.GetWasmLocal) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmLocal}`);
     }
-    return this.loadWasmValue(`locals[${Number(message.local)}]`, message.stopId);
+    const local = Number(message.local);
+    const result = await this.loadWasmValue<Chrome.DevTools.WasmValue>(`locals[${local}]`, message.stopId);
+    return result ?? this.status.E_BADARG('local', `No local with index ${local}`);
   }
+
   private async onGetWasmOp(message: PrivateAPI.ExtensionServerRequestMessage):
       Promise<Record|Chrome.DevTools.WasmValue> {
     if (message.command !== PrivateAPI.Commands.GetWasmOp) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmOp}`);
     }
-    return this.loadWasmValue(`stack[${Number(message.op)}]`, message.stopId);
+    const op = Number(message.op);
+    const result = await this.loadWasmValue<Chrome.DevTools.WasmValue>(`stack[${op}]`, message.stopId);
+    return result ?? this.status.E_BADARG('op', `No operand with index ${op}`);
   }
 
   private registerRecorderExtensionEndpoint(
@@ -370,6 +372,26 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     const {pluginName, mediaType, port, capabilities} = message;
     RecorderPluginManager.instance().addPlugin(
         new RecorderExtensionEndpoint(pluginName, port, capabilities, mediaType));
+    return this.status.OK();
+  }
+
+  private onReportResourceLoad(message: PrivateAPI.ExtensionServerRequestMessage): Record {
+    if (message.command !== PrivateAPI.Commands.ReportResourceLoad) {
+      return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ReportResourceLoad}`);
+    }
+    const {resourceUrl, extensionId, status} = message;
+    const url = resourceUrl as Platform.DevToolsPath.UrlString;
+    const initiator: SDK.PageResourceLoader.ExtensionInitiator =
+        {target: null, frameId: null, initiatorUrl: extensionId as Platform.DevToolsPath.UrlString, extensionId};
+
+    const pageResource: SDK.PageResourceLoader.PageResource = {
+      url,
+      initiator,
+      errorMessage: status.errorMessage,
+      success: status.success ?? null,
+      size: status.size ?? null,
+    };
+    SDK.PageResourceLoader.PageResourceLoader.instance().resourceLoadedThroughExtension(pageResource);
     return this.status.OK();
   }
 
@@ -525,7 +547,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (message.command !== PrivateAPI.Commands.ApplyStyleSheet) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ApplyStyleSheet}`);
     }
-    if (!Root.Runtime.experiments.isEnabled('applyCustomStylesheet')) {
+    if (!Root.Runtime.experiments.isEnabled('apply-custom-stylesheet')) {
       return;
     }
 
@@ -1359,11 +1381,8 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   SidebarPaneAdded = 'SidebarPaneAdded',
-  TraceProviderAdded = 'TraceProviderAdded',
 }
 
 export type EventTypes = {

@@ -257,7 +257,7 @@ export class PlayerMessagesView extends UI.Widget.VBox {
   constructor() {
     super();
 
-    this.element.setAttribute('jslog', `${VisualLogging.pane().context('messages')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('messages')}`);
 
     this.headerPanel = this.contentElement.createChild('div', 'media-messages-header');
     this.bodyPanel = this.contentElement.createChild('div', 'media-messages-body');
@@ -276,14 +276,13 @@ export class PlayerMessagesView extends UI.Widget.VBox {
   private createDropdown(): UI.Toolbar.ToolbarItem {
     const items = new UI.ListModel.ListModel<SelectableLevel>();
     this.messageLevelSelector = new MessageLevelSelector(items, this);
-    const dropDown = new UI.SoftDropDown.SoftDropDown<SelectableLevel>(items, this.messageLevelSelector);
+    const dropDown = new UI.SoftDropDown.SoftDropDown<SelectableLevel>(items, this.messageLevelSelector, 'log-level');
     dropDown.setRowHeight(18);
 
     this.messageLevelSelector.populate();
     this.messageLevelSelector.setDefault(dropDown);
 
     const dropDownItem = new UI.Toolbar.ToolbarItem(dropDown.element);
-    dropDownItem.element.setAttribute('jslog', `${VisualLogging.dropDown().track({click: true}).context('log-level')}`);
     dropDownItem.element.classList.add('toolbar-has-dropdown');
     dropDownItem.setEnabled(true);
     dropDownItem.setTitle(this.messageLevelSelector.defaultTitle());

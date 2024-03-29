@@ -68,7 +68,7 @@ export class ContextMenuProvider implements
         decodedContent = window.atob(decodedContent);
       }
       const url = contentProvider.contentURL();
-      void Workspace.FileManager.FileManager.instance().save(url, decodedContent, true);
+      await Workspace.FileManager.FileManager.instance().save(url, decodedContent, true);
       Workspace.FileManager.FileManager.instance().close(url);
     }
 
@@ -82,9 +82,9 @@ export class ContextMenuProvider implements
     }
 
     if (contentProvider.contentType().isDocumentOrScriptOrStyleSheet()) {
-      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), saveAs);
+      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), saveAs, {jslogContext: 'save-as'});
     } else if (contentProvider instanceof SDK.Resource.Resource && contentProvider.contentType().isImage()) {
-      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveImage), saveImage);
+      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveImage), saveImage, {jslogContext: 'save-image'});
     }
 
     // Retrieve uiSourceCode by URL to pick network resources everywhere.
@@ -98,7 +98,8 @@ export class ContextMenuProvider implements
       const path = Common.ParsedURL.ParsedURL.urlToRawPathString(fileURL, Host.Platform.isWin());
       contextMenu.revealSection().appendItem(
           i18nString(UIStrings.openInContainingFolder),
-          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.showItemInFolder(path));
+          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.showItemInFolder(path),
+          {jslogContext: 'open-in-containing-folder'});
     }
 
     if (contentProvider instanceof Workspace.UISourceCode.UISourceCode &&
@@ -107,29 +108,29 @@ export class ContextMenuProvider implements
       return;
     }
 
+    let disabled = true;
+    let handler = (): void => {};
     if (uiSourceCode && networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode)) {
       if (!uiSourceCode.contentType().isFromSourceMap()) {
-        contextMenu.overrideSection().appendItem(
-            i18nString(UIStrings.overrideContent),
-            async () => await this.handleOverrideContent(uiSourceCode, contentProvider));
+        disabled = false;
+        handler = this.handleOverrideContent.bind(this, uiSourceCode, contentProvider);
       } else {
         // show redirect dialog for source mapped file
         const deployedUiSourceCode = this.getDeployedUiSourceCode(uiSourceCode);
         if (deployedUiSourceCode) {
-          contextMenu.overrideSection().appendItem(
-              i18nString(UIStrings.overrideContent),
-              async () => await this.redirectOverrideToDeployedUiSourceCode(deployedUiSourceCode, uiSourceCode));
+          disabled = false;
+          handler = this.redirectOverrideToDeployedUiSourceCode.bind(this, deployedUiSourceCode, uiSourceCode);
         }
       }
-    } else {
-      contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), () => {}, {disabled: true});
     }
+    contextMenu.overrideSection().appendItem(
+        i18nString(UIStrings.overrideContent), handler, {disabled, jslogContext: 'override-content'});
 
     if (contentProvider instanceof SDK.NetworkRequest.NetworkRequest) {
       contextMenu.overrideSection().appendItem(i18nString(UIStrings.showOverrides), async () => {
         await UI.ViewManager.ViewManager.instance().showView('navigator-overrides');
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.ShowAllOverridesFromNetworkContextMenu);
-      });
+      }, {jslogContext: 'show-overrides'});
     }
   }
 
@@ -177,7 +178,8 @@ export class ContextMenuProvider implements
     const warningMessage = i18nString(UIStrings.overrideSourceMappedFileWarning, {PH1: deployedName}) + '\n' +
         i18nString(UIStrings.overrideSourceMappedFileExplanation, {PH1: originalName});
 
-    const shouldJumpToDeployedFile = await UI.UIUtils.ConfirmDialog.show(warningMessage);
+    const shouldJumpToDeployedFile = await UI.UIUtils.ConfirmDialog.show(
+        warningMessage, undefined, {jslogContext: 'override-source-mapped-file-warning'});
 
     if (shouldJumpToDeployedFile) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuRedirectToDeployed);

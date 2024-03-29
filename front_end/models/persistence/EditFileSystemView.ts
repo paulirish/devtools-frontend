@@ -32,7 +32,6 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import editFileSystemViewStyles from './editFileSystemView.css.js';
 import {Events, IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
@@ -96,10 +95,9 @@ export class EditFileSystemView extends UI.Widget.VBox implements UI.ListWidget.
     excludedFoldersHeader.createChild('div', 'file-system-header-text').textContent =
         i18nString(UIStrings.excludedFolders);
     const addButton = UI.UIUtils.createTextButton(
-        i18nString(UIStrings.add), this.addExcludedFolderButtonClicked.bind(this), 'add-button');
+        i18nString(UIStrings.add), this.addExcludedFolderButtonClicked.bind(this),
+        {className: 'add-button', jslogContext: 'settings.add-excluded-folder'});
     excludedFoldersHeader.appendChild(addButton);
-    addButton.setAttribute(
-        'jslog', `${VisualLogging.action().track({click: true}).context('settings.add-excluded-folder')}`);
     this.excludedFoldersList = new UI.ListWidget.ListWidget(this);
     this.excludedFoldersList.element.classList.add('file-system-list');
 
@@ -158,14 +156,14 @@ export class EditFileSystemView extends UI.Widget.VBox implements UI.ListWidget.
       this.getFileSystem().removeExcludedFolder(item);
     }
     this.getFileSystem().addExcludedFolder(
-        this.normalizePrefix(editor.control('pathPrefix').value) as Platform.DevToolsPath.EncodedPathString);
+        this.normalizePrefix(editor.control('path-prefix').value) as Platform.DevToolsPath.EncodedPathString);
     this.muteUpdate = false;
     this.update();
   }
 
   beginEdit(item: string): UI.ListWidget.Editor<string> {
     const editor = this.createExcludedFolderEditor();
-    editor.control('pathPrefix').value = item;
+    editor.control('path-prefix').value = item;
     return editor;
   }
 
@@ -183,7 +181,7 @@ export class EditFileSystemView extends UI.Widget.VBox implements UI.ListWidget.
 
     const fields = content.createChild('div', 'file-system-edit-row');
     fields.createChild('div', 'file-system-value')
-        .appendChild(editor.createInput('pathPrefix', 'text', '/path/to/folder/', pathPrefixValidator.bind(this)));
+        .appendChild(editor.createInput('path-prefix', 'text', '/path/to/folder/', pathPrefixValidator.bind(this)));
 
     return editor;
 

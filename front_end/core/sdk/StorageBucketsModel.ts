@@ -167,7 +167,17 @@ export class StorageBucketsModel extends SDKModel<EventTypes> implements Protoco
     }
   }
 
+  attributionReportingTriggerRegistered(_event: Protocol.Storage.AttributionReportingTriggerRegisteredEvent): void {
+  }
+
   interestGroupAccessed(_event: Protocol.Storage.InterestGroupAccessedEvent): void {
+  }
+
+  interestGroupAuctionEventOccurred(_event: Protocol.Storage.InterestGroupAuctionEventOccurredEvent): void {
+  }
+
+  interestGroupAuctionNetworkRequestCreated(_event: Protocol.Storage.InterestGroupAuctionNetworkRequestCreatedEvent):
+      void {
   }
 
   indexedDBListUpdated(_event: Protocol.Storage.IndexedDBListUpdatedEvent): void {

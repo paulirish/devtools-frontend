@@ -92,7 +92,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
         this.element.createChild('div', 'profile-launcher-view-content vbox') as HTMLDivElement;
 
     const profileTypeSelectorElement = this.contentElementInternal.createChild('div', 'vbox');
-    this.selectedProfileTypeSetting = Common.Settings.Settings.instance().createSetting('selectedProfileType', 'CPU');
+    this.selectedProfileTypeSetting = Common.Settings.Settings.instance().createSetting('selected-profile-type', 'CPU');
     this.profileTypeHeaderElement = profileTypeSelectorElement.createChild('h1');
     this.profileTypeSelectorForm = profileTypeSelectorElement.createChild('form');
     UI.ARIAUtils.markAsRadioGroup(this.profileTypeSelectorForm);
@@ -107,8 +107,13 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
     isolateSelectorElement.appendChild(isolateSelector.totalMemoryElement());
 
     const buttonsDiv = this.contentElementInternal.createChild('div', 'hbox profile-launcher-buttons');
-    this.controlButton = UI.UIUtils.createTextButton('', this.controlButtonClicked.bind(this), '', /* primary */ true);
-    this.loadButton = UI.UIUtils.createTextButton(i18nString(UIStrings.load), this.loadButtonClicked.bind(this), '');
+    this.controlButton = UI.UIUtils.createTextButton('', this.controlButtonClicked.bind(this), {
+      jslogContext: 'profiler.heap-toggle-recording',
+      primary: true,
+    });
+    this.loadButton = UI.UIUtils.createTextButton(i18nString(UIStrings.load), this.loadButtonClicked.bind(this), {
+      jslogContext: 'profiler.load-from-file',
+    });
     buttonsDiv.appendChild(this.controlButton);
     buttonsDiv.appendChild(this.loadButton);
     this.recordButtonEnabled = true;
@@ -165,7 +170,8 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
   }
 
   addProfileType(profileType: ProfileType): void {
-    const labelElement = UI.UIUtils.createRadioLabel('profile-type', profileType.name);
+    const labelElement =
+        UI.UIUtils.createRadioLabel('profile-type', profileType.name, undefined, 'profiler.profile-type');
     this.profileTypeSelectorForm.appendChild(labelElement);
     const optionElement = labelElement.radioElement;
     this.typeIdToOptionElementAndProfileType.set(profileType.id, {optionElement, profileType});
@@ -230,9 +236,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   ProfileTypeSelected = 'ProfileTypeSelected',
 }
 

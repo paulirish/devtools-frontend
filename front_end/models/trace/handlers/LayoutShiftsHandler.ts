@@ -9,7 +9,6 @@ import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
 import {ScoreClassification} from './PageLoadMetricsHandler.js';
-import {data as screenshotsHandlerData} from './ScreenshotsHandler.js';
 import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 // We start with a score of zero and step through all Layout Shift records from
@@ -38,15 +37,18 @@ import {HandlerState, type TraceEventHandlerName} from './types.js';
 // navigation-to-unload CLS score.
 
 interface LayoutShifts {
-  clusters: LayoutShiftCluster[];
+  clusters: readonly LayoutShiftCluster[];
   sessionMaxScore: number;
   // The session window which contains the SessionMaxScore
   clsWindowID: number;
   // We use these to calculate root causes for a given LayoutShift
+  // TODO(crbug/41484172): should be readonly
   prePaintEvents: Types.TraceEvents.TraceEventPrePaint[];
-  layoutInvalidationEvents: Types.TraceEvents.TraceEventLayoutInvalidation[];
-  styleRecalcInvalidationEvents: Types.TraceEvents.TraceEventStyleRecalcInvalidation[];
-  scoreRecords: ScoreRecord[];
+  layoutInvalidationEvents: readonly Types.TraceEvents.TraceEventLayoutInvalidationTracking[];
+  scheduleStyleInvalidationEvents: readonly Types.TraceEvents.TraceEventScheduleStyleInvalidationTracking[];
+  styleRecalcInvalidationEvents: readonly Types.TraceEvents.TraceEventStyleRecalcInvalidationTracking[];
+  scoreRecords: readonly ScoreRecord[];
+  // TODO(crbug/41484172): should be readonly
   backendNodeIds: Protocol.DOM.BackendNodeId[];
 }
 
@@ -69,8 +71,9 @@ const layoutShiftEvents: Types.TraceEvents.TraceEventLayoutShift[] = [];
 
 // These events denote potential node resizings. We store them to link captured
 // layout shifts to the resizing of unsized elements.
-const layoutInvalidationEvents: Types.TraceEvents.TraceEventLayoutInvalidation[] = [];
-const styleRecalcInvalidationEvents: Types.TraceEvents.TraceEventStyleRecalcInvalidation[] = [];
+const layoutInvalidationEvents: Types.TraceEvents.TraceEventLayoutInvalidationTracking[] = [];
+const scheduleStyleInvalidationEvents: Types.TraceEvents.TraceEventScheduleStyleInvalidationTracking[] = [];
+const styleRecalcInvalidationEvents: Types.TraceEvents.TraceEventStyleRecalcInvalidationTracking[] = [];
 
 const backendNodeIds = new Set<Protocol.DOM.BackendNodeId>();
 
@@ -110,6 +113,8 @@ export function reset(): void {
   handlerState = HandlerState.UNINITIALIZED;
   layoutShiftEvents.length = 0;
   layoutInvalidationEvents.length = 0;
+  scheduleStyleInvalidationEvents.length = 0;
+  styleRecalcInvalidationEvents.length = 0;
   prePaintEvents.length = 0;
   backendNodeIds.clear();
   clusters.length = 0;
@@ -127,11 +132,14 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     layoutShiftEvents.push(event);
     return;
   }
-  if (Types.TraceEvents.isTraceEventLayoutInvalidation(event)) {
+  if (Types.TraceEvents.isTraceEventLayoutInvalidationTracking(event)) {
     layoutInvalidationEvents.push(event);
     return;
   }
-  if (Types.TraceEvents.isTraceEventStyleRecalcInvalidation(event)) {
+  if (Types.TraceEvents.isTraceEventScheduleStyleInvalidationTracking(event)) {
+    scheduleStyleInvalidationEvents.push(event);
+  }
+  if (Types.TraceEvents.isTraceEventStyleRecalcInvalidationTracking(event)) {
     styleRecalcInvalidationEvents.push(event);
   }
   if (Types.TraceEvents.isTraceEventPrePaint(event)) {
@@ -152,20 +160,6 @@ function updateTraceWindowMax(
     traceWindow: Types.Timing.TraceWindowMicroSeconds, newMax: Types.Timing.MicroSeconds): void {
   traceWindow.max = newMax;
   traceWindow.range = Types.Timing.MicroSeconds(traceWindow.max - traceWindow.min);
-}
-
-function findNextScreenshotSource(timestamp: Types.Timing.MicroSeconds): string|undefined {
-  const screenshots = screenshotsHandlerData();
-  const screenshotIndex = findNextScreenshotEventIndex(screenshots, timestamp);
-  if (!screenshotIndex) {
-    return undefined;
-  }
-  return `data:img/png;base64,${screenshots[screenshotIndex].args.snapshot}`;
-}
-
-export function findNextScreenshotEventIndex(
-    screenshots: Types.TraceEvents.TraceEventSnapshot[], timestamp: Types.Timing.MicroSeconds): number|null {
-  return Platform.ArrayUtilities.nearestIndexFromBeginning(screenshots, frame => frame.ts > timestamp);
 }
 
 function buildScoreRecords(): void {
@@ -206,12 +200,18 @@ function collectNodes(): void {
     }
   }
 
-  // Collect the node ids present in LayoutInvalidation events.
+  // Collect the node ids present in LayoutInvalidation & scheduleStyleInvalidation events.
   for (const layoutInvalidation of layoutInvalidationEvents) {
     if (!layoutInvalidation.args.data?.nodeId) {
       continue;
     }
     backendNodeIds.add(layoutInvalidation.args.data.nodeId);
+  }
+  for (const scheduleStyleInvalidation of scheduleStyleInvalidationEvents) {
+    if (!scheduleStyleInvalidation.args.data?.nodeId) {
+      continue;
+    }
+    backendNodeIds.add(scheduleStyleInvalidation.args.data.nodeId);
   }
 }
 
@@ -228,6 +228,7 @@ export async function finalize(): Promise<void> {
   collectNodes();
   handlerState = HandlerState.FINALIZED;
 }
+
 async function buildLayoutShiftsClusters(): Promise<void> {
   const {navigationsByFrameId, mainFrameId, traceBounds} = metaHandlerData();
   const navigations = navigationsByFrameId.get(mainFrameId) || [];
@@ -317,7 +318,6 @@ async function buildLayoutShiftsClusters(): Promise<void> {
         },
       },
       parsedData: {
-        screenshotSource: findNextScreenshotSource(event.ts),
         timeFromNavigation,
         cumulativeWeightedScoreInWindow: currentCluster.clusterCumulativeScore,
         // The score of the session window is temporarily set to 0 just
@@ -415,13 +415,15 @@ export function data(): LayoutShifts {
   }
 
   return {
-    clusters: [...clusters],
+    clusters,
     sessionMaxScore: sessionMaxScore,
     clsWindowID,
-    prePaintEvents: [...prePaintEvents],
-    layoutInvalidationEvents: [...layoutInvalidationEvents],
+    prePaintEvents,
+    layoutInvalidationEvents,
+    scheduleStyleInvalidationEvents,
     styleRecalcInvalidationEvents: [],
-    scoreRecords: [...scoreRecords],
+    scoreRecords,
+    // TODO(crbug/41484172): change the type so no need to clone
     backendNodeIds: [...backendNodeIds],
   };
 }

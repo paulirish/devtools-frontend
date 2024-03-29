@@ -1,18 +1,8 @@
 /// <reference types="node" />
 /**
- * Copyright 2020 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2020 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import type { Protocol } from 'devtools-protocol';
 import type { CDPSession } from './CDPSession.js';
@@ -98,7 +88,7 @@ export declare abstract class HTTPRequest {
     /**
      * @internal
      */
-    _requestId: string;
+    abstract get id(): string;
     /**
      * @internal
      */
@@ -191,6 +181,17 @@ export declare abstract class HTTPRequest {
      */
     abstract postData(): string | undefined;
     /**
+     * True when the request has POST data. Note that {@link HTTPRequest.postData}
+     * might still be undefined when this flag is true when the data is too long
+     * or not readily available in the decoded form. In that case, use
+     * {@link HTTPRequest.fetchPostData}.
+     */
+    abstract hasPostData(): boolean;
+    /**
+     * Fetches the POST data for the request from the browser.
+     */
+    abstract fetchPostData(): Promise<string | undefined>;
+    /**
      * An object with HTTP headers associated with the request. All
      * header names are lower-case.
      */
@@ -267,13 +268,6 @@ export declare abstract class HTTPRequest {
     /**
      * Continues request with optional request overrides.
      *
-     * @remarks
-     *
-     * To use this, request
-     * interception should be enabled with {@link Page.setRequestInterception}.
-     *
-     * Exception is immediately thrown if the request interception is not enabled.
-     *
      * @example
      *
      * ```ts
@@ -289,20 +283,19 @@ export declare abstract class HTTPRequest {
      * ```
      *
      * @param overrides - optional overrides to apply to the request.
-     * @param priority - If provided, intercept is resolved using
-     * cooperative handling rules. Otherwise, intercept is resolved
-     * immediately.
+     * @param priority - If provided, intercept is resolved using cooperative
+     * handling rules. Otherwise, intercept is resolved immediately.
+     *
+     * @remarks
+     *
+     * To use this, request interception should be enabled with
+     * {@link Page.setRequestInterception}.
+     *
+     * Exception is immediately thrown if the request interception is not enabled.
      */
     abstract continue(overrides?: ContinueRequestOverrides, priority?: number): Promise<void>;
     /**
      * Fulfills a request with the given response.
-     *
-     * @remarks
-     *
-     * To use this, request
-     * interception should be enabled with {@link Page.setRequestInterception}.
-     *
-     * Exception is immediately thrown if the request interception is not enabled.
      *
      * @example
      * An example of fulfilling all requests with 404 responses:
@@ -325,20 +318,28 @@ export declare abstract class HTTPRequest {
      * @param priority - If provided, intercept is resolved using
      * cooperative handling rules. Otherwise, intercept is resolved
      * immediately.
+     *
+     * @remarks
+     *
+     * To use this, request
+     * interception should be enabled with {@link Page.setRequestInterception}.
+     *
+     * Exception is immediately thrown if the request interception is not enabled.
      */
     abstract respond(response: Partial<ResponseForRequest>, priority?: number): Promise<void>;
     /**
      * Aborts a request.
      *
-     * @remarks
-     * To use this, request interception should be enabled with
-     * {@link Page.setRequestInterception}. If it is not enabled, this method will
-     * throw an exception immediately.
-     *
      * @param errorCode - optional error code to provide.
      * @param priority - If provided, intercept is resolved using
      * cooperative handling rules. Otherwise, intercept is resolved
      * immediately.
+     *
+     * @remarks
+     *
+     * To use this, request interception should be enabled with
+     * {@link Page.setRequestInterception}. If it is not enabled, this method will
+     * throw an exception immediately.
      */
     abstract abort(errorCode?: ErrorCode, priority?: number): Promise<void>;
 }
@@ -353,12 +354,6 @@ export declare enum InterceptResolutionAction {
     None = "none",
     AlreadyHandled = "already-handled"
 }
-/**
- * @public
- *
- * @deprecated please use {@link InterceptResolutionAction} instead.
- */
-export type InterceptResolutionStrategy = InterceptResolutionAction;
 /**
  * @public
  */

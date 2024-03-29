@@ -31,11 +31,17 @@
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as TraceEngine from '../../models/trace/trace.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import {getCategoryStyles, getEventStyle, type TimelineCategory} from './EventUICategory.js';
-import {TimelineUIUtils} from './TimelineUIUtils.js';
+import {
+  EventCategory,
+  getCategoryStyles,
+  getEventStyle,
+  getTimelineMainEventCategories,
+  type TimelineCategory,
+} from './EventUICategory.js';
 
 const UIStrings = {
   /**
@@ -152,8 +158,8 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
   private backgroundCanvas: HTMLCanvasElement;
   #traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
   #drawn = false;
-  #start?: TraceEngine.Types.Timing.MilliSeconds;
-  #end?: TraceEngine.Types.Timing.MilliSeconds;
+  #start: TraceEngine.Types.Timing.MilliSeconds;
+  #end: TraceEngine.Types.Timing.MilliSeconds;
 
   constructor(traceParsedData: TraceEngine.Handlers.Types.TraceParseData) {
     // During the sync tracks migration this component can use either legacy
@@ -163,18 +169,20 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     super('cpu-activity', i18nString(UIStrings.cpu));
     this.#traceParsedData = traceParsedData;
     this.backgroundCanvas = (this.element.createChild('canvas', 'fill background') as HTMLCanvasElement);
+    this.#start = TraceEngine.Helpers.Timing.traceWindowMilliSeconds(traceParsedData.Meta.traceBounds).min;
+    this.#end = TraceEngine.Helpers.Timing.traceWindowMilliSeconds(traceParsedData.Meta.traceBounds).max;
   }
 
-  #entryCategory(entry: TraceEngine.Types.TraceEvents.TraceEventData): string|undefined {
+  #entryCategory(entry: TraceEngine.Types.TraceEvents.TraceEventData): EventCategory|undefined {
     // Special case: in CPU Profiles we get a lot of ProfileCalls that
     // represent Idle time. We typically represent ProfileCalls in the
     // Scripting Category, but if they represent idle time, we do not want
     // that.
     if (TraceEngine.Types.TraceEvents.isProfileCall(entry) && entry.callFrame.functionName === '(idle)') {
-      return 'idle';
+      return EventCategory.IDLE;
     }
     const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category ||
-        getCategoryStyles().Other;
+        getCategoryStyles().other;
     const categoryName = eventStyle.name;
     return categoryName;
   }
@@ -186,34 +194,26 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     this.backgroundCanvas.height = this.element.clientHeight * window.devicePixelRatio;
   }
 
-  #draw(
-      traceParsedData: TraceEngine.Handlers.Types.TraceParseData, customStart?: TraceEngine.Types.Timing.MilliSeconds,
-      customEnd?: TraceEngine.Types.Timing.MilliSeconds): void {
-    const traceBoundsMilli = TraceEngine.Helpers.Timing.traceWindowMilliSeconds(traceParsedData.Meta.traceBounds);
-    if (!traceParsedData.Renderer || !traceParsedData.Samples) {
-      return;
-    }
-
+  #draw(traceParsedData: TraceEngine.Handlers.Types.TraceParseData): void {
     const quantSizePx = 4 * window.devicePixelRatio;
     const width = this.width();
     const height = this.height();
     const baseLine = height;
-    const timeStart = customStart ?? traceBoundsMilli.min;
-    const timeRange = (customStart && customEnd) ? customEnd - customStart : traceBoundsMilli.max - timeStart;
+    const timeRange = this.#end - this.#start;
     const scale = width / timeRange;
     const quantTime = quantSizePx / scale;
-    const categories = TimelineUIUtils.categories();
-    const categoryOrder = TimelineUIUtils.getTimelineMainEventCategories();
-    const otherIndex = categoryOrder.indexOf('other');
+    const categories = getCategoryStyles();
+    const categoryOrder = getTimelineMainEventCategories();
+    const otherIndex = categoryOrder.indexOf(EventCategory.OTHER);
     const idleIndex = 0;
-    console.assert(idleIndex === categoryOrder.indexOf('idle'));
+    console.assert(idleIndex === categoryOrder.indexOf(EventCategory.IDLE));
     for (let i = 0; i < categoryOrder.length; ++i) {
       categoryToIndex.set(categories[categoryOrder[i]], i);
     }
 
     const drawThreadEntries =
         (context: CanvasRenderingContext2D, threadData: TraceEngine.Handlers.Threads.ThreadData): void => {
-          const quantizer = new Quantizer(timeStart, quantTime, drawSample);
+          const quantizer = new Quantizer(this.#start, quantTime, drawSample);
           let x = 0;
           const categoryIndexStack: number[] = [];
           const paths: Path2D[] = [];
@@ -235,7 +235,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
             x += quantSizePx;
           }
 
-          const onEntryStart = (entry: TraceEngine.Types.TraceEvents.TraceEntry): void => {
+          const onEntryStart = (entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void => {
             const category = this.#entryCategory(entry);
             if (!category || category === 'idle') {
               // Idle event won't show in CPU activity, so just skip them.
@@ -248,7 +248,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
             categoryIndexStack.push(categoryIndex || otherIndex);
           };
 
-          function onEntryEnd(entry: TraceEngine.Types.TraceEvents.TraceEntry): void {
+          function onEntryEnd(entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void {
             const endTimeMilli = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(entry.ts) +
                 TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
                     TraceEngine.Types.Timing.MicroSeconds(entry.dur || 0));
@@ -257,15 +257,13 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
               quantizer.appendInterval(endTimeMilli, lastCategoryIndex);
             }
           }
-
-          const bounds = {...traceParsedData.Meta.traceBounds};
-          if (customStart) {
-            bounds.min = TraceEngine.Helpers.Timing.millisecondsToMicroseconds(customStart);
-          }
-          if (customEnd) {
-            bounds.max = TraceEngine.Helpers.Timing.millisecondsToMicroseconds(customEnd);
-          }
-          bounds.range = TraceEngine.Types.Timing.MicroSeconds(bounds.max - bounds.min);
+          const startMicro = TraceEngine.Helpers.Timing.millisecondsToMicroseconds(this.#start);
+          const endMicro = TraceEngine.Helpers.Timing.millisecondsToMicroseconds(this.#end);
+          const bounds = {
+            min: startMicro,
+            max: endMicro,
+            range: TraceEngine.Types.Timing.MicroSeconds(endMicro - startMicro),
+          };
 
           // Filter out tiny events - they don't make a visual impact to the
           // canvas as they are so small, but they do impact the time it takes
@@ -276,8 +274,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
           );
           TraceEngine.Helpers.TreeHelpers.walkEntireTree(
               threadData.entryToNode, threadData.tree, onEntryStart, onEntryEnd, bounds, minDuration);
-
-          quantizer.appendInterval(timeStart + timeRange + quantTime, idleIndex);  // Kick drawing the last bucket.
+          quantizer.appendInterval(this.#start + timeRange + quantTime, idleIndex);  // Kick drawing the last bucket.
           for (let i = categoryOrder.length - 1; i > 0; --i) {
             paths[i].lineTo(width, height);
             const computedColorValue = categories[categoryOrder[i]].getComputedColorValue();
@@ -322,14 +319,21 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     applyPattern(backgroundContext);
   }
 
-  override update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
-    if (this.#start === start && this.#end === end && this.#drawn) {
+  override update(): void {
+    const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
+    const bounds = traceBoundsState?.milli.minimapTraceBounds;
+    if (!bounds) {
       return;
     }
+    if (bounds.min === this.#start && bounds.max === this.#end && this.#drawn) {
+      return;
+    }
+    this.#start = bounds.min;
+    this.#end = bounds.max;
     // Order matters here, resetCanvas will set this.#drawn to false.
     this.resetCanvas();
     this.#drawn = true;
-    this.#draw(this.#traceParsedData, start, end);
+    this.#draw(this.#traceParsedData);
   }
 }
 
@@ -346,9 +350,8 @@ export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
     // All the warnings that we care about regarding responsiveness and want to represent on the overview.
     const warningsForResponsiveness = new Set<TraceEngine.Handlers.ModelHandlers.Warnings.Warning>([
       'LONG_TASK',
-      'FORCED_STYLE',
+      'FORCED_REFLOW',
       'IDLE_CALLBACK_OVER_TIME',
-      'FORCED_LAYOUT',
     ]);
 
     const allWarningEvents = new Set<TraceEngine.Types.TraceEvents.TraceEventData>();
@@ -461,8 +464,7 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
   private async imageByFrame(frame: TraceEngine.Extras.FilmStrip.Frame): Promise<HTMLImageElement|null> {
     let imagePromise: Promise<HTMLImageElement|null>|undefined = this.frameToImagePromise.get(frame);
     if (!imagePromise) {
-      const data = frame.screenshotAsString;
-      imagePromise = UI.UIUtils.loadImageFromData(data);
+      imagePromise = UI.UIUtils.loadImage(frame.screenshotEvent.args.dataUri);
       this.frameToImagePromise.set(frame, (imagePromise as Promise<HTMLImageElement>));
     }
     return imagePromise;

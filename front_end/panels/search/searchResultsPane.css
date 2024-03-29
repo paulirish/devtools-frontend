@@ -32,7 +32,7 @@ li.search-result {
 }
 
 li.search-result:hover {
-  background-color: var(--item-hover-color);
+  background-color: var(--sys-color-state-hover-on-subtle);
 }
 
 li.search-result .search-result-file-name {
@@ -68,6 +68,10 @@ li.search-match {
   white-space: pre;
 }
 
+li.search-match.selected:focus-visible {
+  background: var(--sys-color-tonal-container);
+}
+
 li.search-match::before {
   display: none;
 }
@@ -79,10 +83,6 @@ li.search-match .search-match-line-number {
   word-break: normal;
   padding: 2px 4px 2px 6px;
   margin-right: 5px;
-}
-
-li.search-match:hover {
-  background-color: var(--item-hover-color);
 }
 
 .tree-outline .devtools-link {
@@ -99,10 +99,11 @@ ol.children.expanded {
   padding-bottom: 4px;
 }
 
-.search-match-link {
+li.search-match .link-style.search-match-link {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-left: 9px;
+  text-align: left;
 }
 
 .search-result-qualifier {

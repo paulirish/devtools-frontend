@@ -510,7 +510,7 @@ async function printStyleSection(section, omitLonghands, includeSelectorGroupMar
 
   TestRunner.addResult(
       '[expanded] ' + ((section.propertiesTreeOutline.element.classList.contains('no-affect') ? '[no-affect] ' : '')));
-  const queries = section.titleElement.querySelectorAll('devtools-css-query');
+  const queries = section.element.querySelectorAll('devtools-css-query');
 
   for (const query of queries) {
     const queryElement = query.shadowRoot.querySelector('.query');
@@ -590,19 +590,19 @@ ElementsTestRunner.toggleMatchedStyleProperty = function(propertyName, checked) 
 };
 
 ElementsTestRunner.eventListenersWidget = function() {
-  UI.ViewManager.ViewManager.instance().showView('elements.eventListeners');
+  UI.ViewManager.ViewManager.instance().showView('elements.event-listeners');
   return Elements.EventListenersWidget.EventListenersWidget.instance();
 };
 
 ElementsTestRunner.showEventListenersWidget = function() {
-  return UI.ViewManager.ViewManager.instance().showView('elements.eventListeners');
+  return UI.ViewManager.ViewManager.instance().showView('elements.event-listeners');
 };
 
 /**
  * @return {Promise}
  */
 ElementsTestRunner.showComputedStyles = function() {
-  Elements.ElementsPanel.ElementsPanel.instance().sidebarPaneView.tabbedPane().selectTab('Computed', true);
+  Elements.ElementsPanel.ElementsPanel.instance().sidebarPaneView.tabbedPane().selectTab('computed', true);
   return ElementsTestRunner.computedStyleWidget().doUpdate();
 };
 
@@ -1209,7 +1209,7 @@ ElementsTestRunner.addNewRuleInStyleSheet = function(styleSheetHeader, selector,
 ElementsTestRunner.addNewRule = function(selector, callback) {
   Elements.ElementsPanel.ElementsPanel.instance()
       .stylesWidget.contentElement.querySelector('.styles-pane-toolbar')
-      .shadowRoot.querySelector('.plus')
+      .shadowRoot.querySelector('[aria-label="New Style Rule"]')
       .click();
   TestRunner.addSniffer(
       Elements.StylesSidebarPane.StylesSidebarPane.prototype, 'addBlankSection',

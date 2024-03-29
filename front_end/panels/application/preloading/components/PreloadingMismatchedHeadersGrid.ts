@@ -6,7 +6,6 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import type * as SDK from '../../../../core/sdk/sdk.js';
 import * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
-import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import type * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -63,7 +62,7 @@ export class PreloadingMismatchedHeadersGrid extends LegacyWrapper.LegacyWrapper
     const reportsGridData: DataGrid.DataGridController.DataGridControllerData = {
       columns: [
         {
-          id: 'headerName',
+          id: 'header-name',
           title: i18nString(UIStrings.headerName),
           widthWeighting: 30,
           hideable: false,
@@ -71,7 +70,7 @@ export class PreloadingMismatchedHeadersGrid extends LegacyWrapper.LegacyWrapper
           sortable: true,
         },
         {
-          id: 'initialValue',
+          id: 'initial-value',
           title: i18nString(UIStrings.initialNavigationValue),
           widthWeighting: 30,
           hideable: false,
@@ -79,7 +78,7 @@ export class PreloadingMismatchedHeadersGrid extends LegacyWrapper.LegacyWrapper
           sortable: true,
         },
         {
-          id: 'activationValue',
+          id: 'activation-value',
           title: i18nString(UIStrings.activationNavigationValue),
           widthWeighting: 30,
           hideable: false,
@@ -111,15 +110,15 @@ export class PreloadingMismatchedHeadersGrid extends LegacyWrapper.LegacyWrapper
         mismatchedHeaders => ({
           cells: [
             {
-              columnId: 'headerName',
+              columnId: 'header-name',
               value: mismatchedHeaders.headerName,
             },
             {
-              columnId: 'initialValue',
+              columnId: 'initial-value',
               value: mismatchedHeaders.initialValue ?? i18nString(UIStrings.missing),
             },
             {
-              columnId: 'activationValue',
+              columnId: 'activation-value',
               value: mismatchedHeaders.activationValue ?? i18nString(UIStrings.missing),
             },
           ],
@@ -127,8 +126,7 @@ export class PreloadingMismatchedHeadersGrid extends LegacyWrapper.LegacyWrapper
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent(
-    'devtools-resources-preloading-mismatched-headers-grid', PreloadingMismatchedHeadersGrid);
+customElements.define('devtools-resources-preloading-mismatched-headers-grid', PreloadingMismatchedHeadersGrid);
 
 declare global {
   interface HTMLElementTagNameMap {

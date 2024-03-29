@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -12,19 +13,19 @@ import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getEventLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import {getEventStyle} from './EventUICategory.js';
+import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
-import {UberFramesTrackAppender} from './UberFramesTrackAppender.js';
-import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {NewFramesTrackAppender} from './NewFramesTrackAppender.js';
-import {ThreadAppender, ThreadType} from './ThreadAppender.js';
+import {ThreadAppender} from './ThreadAppender.js';
 import {
   EntryType,
   InstantEventVisibleDurationMs,
   type TimelineFlameChartEntry,
 } from './TimelineFlameChartDataProvider.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
+import {UberFramesTrackAppender} from './UberFramesTrackAppender.js';
 
 export type HighlightedEntryInfo = {
   title: string,
@@ -82,8 +83,10 @@ export interface TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
 }
 
-export const TrackNames =
-    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet', 'UberFrames', 'FramesWaterfall', 'NewFrames'] as const;
+export const TrackNames = [
+  'Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet', 'UberFrames',
+  'FramesWaterfall', 'NewFrames'
+] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -99,7 +102,6 @@ export class CompatibilityTracksAppender {
   #colorGenerator: Common.Color.Generator;
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
-  #isCpuProfile = false;
 
   // TODO(crbug.com/1416533)
   // These are used only for compatibility with the legacy flame chart
@@ -134,8 +136,7 @@ export class CompatibilityTracksAppender {
   constructor(
       flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
       traceParsedData: TraceEngine.Handlers.Types.TraceParseData, entryData: TimelineFlameChartEntry[],
-      legacyEntryTypeByLevel: EntryType[], legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl,
-      isCpuProfile = false) {
+      legacyEntryTypeByLevel: EntryType[], legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl) {
     this.#flameChartData = flameChartData;
     this.#traceParsedData = traceParsedData;
     this.#entryData = entryData;
@@ -146,11 +147,10 @@ export class CompatibilityTracksAppender {
         /* alphaSpace= */ 0.7);
     this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
     this.#legacyTimelineModel = legacyTimelineModel;
-    this.#isCpuProfile = isCpuProfile;
     this.#timingsTrackAppender = new TimingsTrackAppender(this, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
 
-      const uberFramesColorGenerator = new Common.Color.Generator(
+    const uberFramesColorGenerator = new Common.Color.Generator(
         /* hueSpace= */ {min: 0, max: 359, count: undefined},
         /* satSpace= */ {min: 70, max: 100, count: undefined},
         /* lightnessSpace= */ 70,
@@ -205,81 +205,78 @@ export class CompatibilityTracksAppender {
     return this.#flameChartData;
   }
 
-  modifyTree(
-      group: PerfUI.FlameChart.Group, node: TraceEngine.Types.TraceEvents.TraceEntry,
-      action: TraceEngine.EntriesFilter.FilterAction, flameChartView: PerfUI.FlameChart.FlameChart): void {
-    const threadTrackAppender = this.#trackForGroup.get(group);
-    if (threadTrackAppender instanceof ThreadAppender) {
-      threadTrackAppender.modifyTree(node, action, flameChartView);
-    } else {
-      console.warn('Could not modify tree in not thread track');
-    }
-  }
-
   #addThreadAppenders(): void {
     const weight = (appender: ThreadAppender): number => {
       switch (appender.threadType) {
-        case ThreadType.MAIN_THREAD:
-          return appender.isOnMainFrame ? 0 : 1;
-        case ThreadType.WORKER:
-          return 2;
-        case ThreadType.RASTERIZER:
+        case TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD: {
+          // Within tracks of the main thread, those with data
+          // from about:blank are treated with the lowest priority,
+          // since there's a chance they have only noise from the
+          // navigation to about:blank done on record and reload.
+          if (!appender.getUrl()) {
+            // We expect each appender to have a URL as we filter out empty URL
+            // processes, but in the event that we do not have a URL (can
+            // happen for a generic trace), return 2, to ensure these are put
+            // below any that do have value URLs.
+            return 2;
+          }
+          const asUrl = new URL(appender.getUrl());
+          if (asUrl.protocol === 'about:') {
+            return 2;
+          }
+          return (appender.isOnMainFrame && appender.getUrl() !== '') ? 0 : 1;
+        }
+        case TraceEngine.Handlers.Threads.ThreadType.WORKER:
           return 3;
-        case ThreadType.THREAD_POOL:
+        case TraceEngine.Handlers.Threads.ThreadType.RASTERIZER:
           return 4;
-        case ThreadType.AUCTION_WORKLET:
-          return 4;
-        case ThreadType.OTHER:
+        case TraceEngine.Handlers.Threads.ThreadType.THREAD_POOL:
           return 5;
-        default:
+        case TraceEngine.Handlers.Threads.ThreadType.AUCTION_WORKLET:
           return 6;
+        case TraceEngine.Handlers.Threads.ThreadType.OTHER:
+          return 7;
+        default:
+          return 8;
       }
     };
-    if (this.#isCpuProfile && this.#traceParsedData.Samples) {
-      for (const [pid, process] of this.#traceParsedData.Samples.profilesInProcess) {
-        for (const tid of process.keys()) {
-          this.#threadAppenders.push(
-              new ThreadAppender(this, this.#traceParsedData, pid, tid, null, ThreadType.CPU_PROFILE));
-        }
-      }
-    } else if (this.#traceParsedData.Renderer) {
-      for (const [pid, process] of this.#traceParsedData.Renderer.processes) {
-        if (this.#traceParsedData.AuctionWorklets.worklets.has(pid)) {
-          const workletEvent = this.#traceParsedData.AuctionWorklets.worklets.get(pid);
-          if (!workletEvent) {
-            continue;
-          }
+    const threads = TraceEngine.Handlers.Threads.threadsInTrace(this.#traceParsedData);
+    const processedAuctionWorkletsIds = new Set<TraceEngine.Types.TraceEvents.ProcessID>();
 
-          // Each AuctionWorklet event represents two threads:
-          // 1. the Utility Thread
-          // 2. the V8 Helper Thread
-          // Note that the names passed here are not used visually. TODO: remove this name?
-          this.#threadAppenders.push(new ThreadAppender(
-              this, this.#traceParsedData, pid, workletEvent.args.data.utilityThread.tid, 'auction-worket-utility',
-              ThreadType.AUCTION_WORKLET));
-          this.#threadAppenders.push(new ThreadAppender(
-              this, this.#traceParsedData, pid, workletEvent.args.data.v8HelperThread.tid, 'auction-worklet-v8helper',
-              ThreadType.AUCTION_WORKLET));
-          continue;
-        }
-
-        for (const [tid, thread] of process.threads) {
-          let threadType = ThreadType.OTHER;
-          if (thread.name === 'CrRendererMain') {
-            threadType = ThreadType.MAIN_THREAD;
-          } else if (thread.name === 'DedicatedWorker thread') {
-            threadType = ThreadType.WORKER;
-          } else if (thread.name?.startsWith('CompositorTileWorker')) {
-            threadType = ThreadType.RASTERIZER;
-          } else if (thread.name?.startsWith('ThreadPool')) {
-            // TODO(paulirish): perhaps exclude ThreadPoolServiceThread entirely
-            threadType = ThreadType.THREAD_POOL;
-          }
-          this.#threadAppenders.push(
-              new ThreadAppender(this, this.#traceParsedData, pid, tid, thread.name, threadType));
-        }
+    for (const {pid, tid, name, type} of threads) {
+      if (this.#traceParsedData.Meta.traceIsGeneric) {
+        // If the trace is generic, we just push all of the threads with no
+        // effort to differentiate them, hence overriding the thread type to be
+        // OTHER for all threads.
+        this.#threadAppenders.push(new ThreadAppender(
+            this, this.#traceParsedData, pid, tid, name, TraceEngine.Handlers.Threads.ThreadType.OTHER));
+        continue;
       }
+
+      const maybeWorklet = this.#traceParsedData.AuctionWorklets.worklets.get(pid);
+      if (processedAuctionWorkletsIds.has(pid)) {
+        // Keep track of this process to ensure we only add the following
+        // tracks once per process and not once per thread.
+        continue;
+      }
+      if (maybeWorklet) {
+        processedAuctionWorkletsIds.add(pid);
+        // Each AuctionWorklet event represents two threads:
+        // 1. the Utility Thread
+        // 2. the V8 Helper Thread
+        // Note that the names passed here are not used visually. TODO: remove this name?
+        this.#threadAppenders.push(new ThreadAppender(
+            this, this.#traceParsedData, pid, maybeWorklet.args.data.utilityThread.tid, 'auction-worket-utility',
+            TraceEngine.Handlers.Threads.ThreadType.AUCTION_WORKLET));
+        this.#threadAppenders.push(new ThreadAppender(
+            this, this.#traceParsedData, pid, maybeWorklet.args.data.v8HelperThread.tid, 'auction-worklet-v8helper',
+            TraceEngine.Handlers.Threads.ThreadType.AUCTION_WORKLET));
+        continue;
+      }
+
+      this.#threadAppenders.push(new ThreadAppender(this, this.#traceParsedData, pid, tid, name, type));
     }
+
     this.#threadAppenders.sort((a, b) => weight(a) - weight(b));
     this.#allTrackAppenders.push(...this.#threadAppenders);
   }
@@ -457,7 +454,8 @@ export class CompatibilityTracksAppender {
    * Returns number of tracks of given type already appended.
    * Used to name the "Raster Thread 6" tracks, etc
    */
-  getCurrentTrackCountForThreadType(threadType: ThreadType.RASTERIZER|ThreadType.THREAD_POOL): number {
+  getCurrentTrackCountForThreadType(threadType: TraceEngine.Handlers.Threads.ThreadType.RASTERIZER|
+                                    TraceEngine.Handlers.Threads.ThreadType.THREAD_POOL): number {
     return this.#threadAppenders.filter(appender => appender.threadType === threadType && appender.headerAppended())
         .length;
   }
@@ -562,12 +560,34 @@ export class CompatibilityTracksAppender {
   }
 
   entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+    if (this.#traceParsedData.Meta.traceIsGeneric) {
+      return true;
+    }
+
+    if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
+      // These events are not "visible" on the timeline because they are instant events with 0 duration.
+      // However, the Memory view (CountersGraph in the codebase) relies on
+      // finding the UpdateCounters events within the user's active trace
+      // selection in order to show the memory usage for the selected time
+      // period.
+      // Therefore we mark them as visible so they are appended onto the Thread
+      // track, and hence accessible by the CountersGraph view.
+      return true;
+    }
+
+    // Gate the visibility of post message events behind the experiement flag
+    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+    }
+
     // Default styles are globally defined for each event name. Some
     // events are hidden by default.
     const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
     const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
         TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
         TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
+
     return (eventStyle && !eventStyle.hidden) || eventIsTiming;
   }
 
@@ -576,6 +596,20 @@ export class CompatibilityTracksAppender {
    */
   allVisibleTrackAppenders(): TrackAppender[] {
     return this.#allTrackAppenders.filter(track => this.#visibleTrackNames.has(track.appenderName));
+  }
+
+  allThreadAppendersByProcess(): Map<TraceEngine.Types.TraceEvents.ProcessID, ThreadAppender[]> {
+    const appenders = this.allVisibleTrackAppenders();
+    const result = new Map<TraceEngine.Types.TraceEvents.ProcessID, ThreadAppender[]>();
+    for (const appender of appenders) {
+      if (!(appender instanceof ThreadAppender)) {
+        continue;
+      }
+      const existing = result.get(appender.processId()) ?? [];
+      existing.push(appender);
+      result.set(appender.processId(), existing);
+    }
+    return result;
   }
 
   /**

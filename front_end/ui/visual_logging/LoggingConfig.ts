@@ -4,9 +4,19 @@
 
 const LOGGING_ATTRIBUTE = 'jslog';
 
+interface TrackConfig {
+  click?: boolean;
+  dblclick?: boolean;
+  hover?: boolean;
+  drag?: boolean;
+  change?: boolean;
+  keydown?: boolean|string;
+  resize?: boolean;
+}
+
 export interface LoggingConfig {
   ve: number;
-  track?: Map<string, string|undefined>;
+  track?: TrackConfig;
   context?: string;
   parent?: string;
 }
@@ -19,79 +29,78 @@ export function getLoggingConfig(element: Element): LoggingConfig {
   return parseJsLog(element.getAttribute(LOGGING_ATTRIBUTE) || '');
 }
 
-// eslint-disable-next-line rulesdir/const_enum
-enum VisualElements {
+export enum VisualElements {
   TreeItem = 1,
-  AriaAttributes = 2,
-  AccessibilityComputedProperties = 3,
-  AccessibilityPane = 4,
-  AccessibilitySourceOrder = 5,
+  Close = 2,
+  Counter = 3,
+  Drawer = 4,
+  Resizer = 5,
   Toggle = 6,
   Tree = 7,
   TextField = 8,
-  ShowAllStyleProperties = 9,
+  AnimationClip = 9,
   Section = 10,
-  StylePropertiesSectionSeparator = 11,
-  StylesPane = 12,
+  SectionHeader = 11,
+  Timeline = 12,
   StylesSelector = 13,
-  TreeItemExpand = 14,
+  Expand = 14,
   ToggleSubpane = 15,
-  ElementClassesPane = 16,
-  AddElementClassPrompt = 17,
-  ElementStatesPan = 18,
-  CssLayersPane = 19,
+  ControlPoint = 16,
+  Toolbar = 17,
+  Popover = 18,
+  BreakpointMarker = 19,
   DropDown = 20,
-  StylesMetricsPane = 21,
-  JumpToSource = 22,
+  Adorner = 21,
+  Gutter = 22,
   MetricsBox = 23,
   MetricsBoxPart = 24,
   /* 25 used to be DOMBreakpointsPane, but free to grab now */
   DOMBreakpoint = 26,
-  ElementPropertiesPane = 27,
-  EventListenersPane = 28,
+  /* 27 used to be ElementPropertiesPane, but free to grab now */
+  /* 28 used to be EventListenersPane, but free to grab now */
   Action = 29,
   FilterDropdown = 30,
-  /* 31 used to be AddColor, but free to grab now */
+  Dialog = 31,
   BezierCurveEditor = 32,
-  BezierEditor = 33,
+  /* 33 used to be BezierEditor, but free to grab now */
   BezierPresetCategory = 34,
   Preview = 35,
-  ColorCanvas = 36,
+  Canvas = 36,
   ColorEyeDropper = 37,
-  ColorPicker = 38,
-  CopyColor = 39,
-  CssAngleEditor = 40,
-  CssFlexboxEditor = 41,
-  CssGridEditor = 42,
-  CssShadowEditor = 43,
+  /* 38 used to be ColorPicker, but free to grab now */
+  /* 39 used to be CopyColor, but free to grab now */
+  /* 40 used to be CssAngleEditor, but free to grab now */
+  /* 41 used to be CssFlexboxEditor, but free to grab now */
+  /* 42 used to be CssGridEditor, but free to grab now */
+  /* 43 used to be CssShadowEditor, but free to grab now */
   Link = 44,
-  Next = 45,
+  /* 45 used to be Next, but free to grab now */
   Item = 46,
   PaletteColorShades = 47,
   Panel = 48,
-  Previous = 49,
+  /* 49 used to be Previous, but free to grab now */
   ShowStyleEditor = 50,
   Slider = 51,
   CssColorMix = 52,
   Value = 53,
   Key = 54,
-  GridSettings = 55,
-  FlexboxOverlays = 56,
-  GridOverlays = 57,
-  JumpToElement = 58,
-  /* 59 used to be ElementsPanel, but free to grab now */
-  /* 60 used to be ElementsTreeOutline, but free to grab now */
-  /* 61 used to be RenderingPanel, but free to grab now */
+  /* 55 used to be GridSettings, but free to grab now */
+  /* 56 used to be FlexboxOverlays, but free to grab now */
+  /* 57 used to be GridOverlays, but free to grab now */
+  /* 58 used to be JumpToElement, but free to grab now */
+  PieChart = 59,
+  PieChartSlice = 60,
+  PieChartTotal = 61,
   ElementsBreadcrumbs = 62,
   /* 63 used to be FullAccessibilityTree, but free to grab now */
   /* 64 used to be ToggleDeviceMode, but free to grab now */
   /* 65 used to be ToggleElementSearch, but free to grab now */
   PanelTabHeader = 66,
   Menu = 67,
-  /* 68 used to be DeveloperResourcesPanel, but free to grab now */
+  TableRow = 68,
   TableHeader = 69,
   TableCell = 70,
-  StylesComputedPane = 71,
+  /* 71 used to be StylesComputedPane, but free to grab now */
   Pane = 72,
   ResponsivePresets = 73,
   DeviceModeRuler = 74,
@@ -125,25 +134,17 @@ export function parseJsLog(jslog: string): LoggingConfig {
 
   const trackString = getComponent('track:');
   if (trackString) {
-    config.track = new Map<string, string>(trackString.split(',').map(t => t.split(':') as [string, string]));
+    config.track = {};
+    for (const [key, value] of trackString.split(',').map(t => t.split(':') as [string, string])) {
+      if (key === 'keydown' && value?.length) {
+        config.track.keydown = value;
+      } else {
+        config.track[key as keyof TrackConfig] = true;
+      }
+    }
   }
 
   return config;
-}
-
-export function debugString(config: LoggingConfig): string {
-  const components = [VisualElements[config.ve]];
-  if (config.context) {
-    components.push(`context: ${config.context}`);
-  }
-  if (config.parent) {
-    components.push(`parent: ${config.parent}`);
-  }
-  if (config.track?.size) {
-    components.push(`track: ${
-            [...config.track?.entries()].map(([key, value]) => `${key}${value ? `: ${value}` : ''}`).join(', ')}`);
-  }
-  return components.join('; ');
 }
 
 export interface ConfigStringBuilder {
@@ -170,14 +171,7 @@ export interface ConfigStringBuilder {
    * @param options The set of DOM events to track.
    * @returns The builder itself.
    */
-  track: (options: {
-    click?: boolean,
-    dblclick?: boolean,
-    hover?: boolean,
-    drag?: boolean,
-    change?: boolean,
-    keydown?: boolean|string,
-  }) => ConfigStringBuilder;
+  track: (options: TrackConfig) => ConfigStringBuilder;
 
   /**
    * Serializes the configuration into a `jslog` string.
@@ -187,8 +181,11 @@ export interface ConfigStringBuilder {
   toString: () => string;
 }
 
-export function makeConfigStringBuilder(veName: VisualElementName): ConfigStringBuilder {
+export function makeConfigStringBuilder(veName: VisualElementName, context?: string): ConfigStringBuilder {
   const components: string[] = [veName];
+  if (typeof context !== 'undefined') {
+    components.push(`context: ${context}`);
+  }
   return {
     context: function(value: string|number|undefined): ConfigStringBuilder {
       if (typeof value !== 'undefined') {
@@ -200,14 +197,7 @@ export function makeConfigStringBuilder(veName: VisualElementName): ConfigString
       components.push(`parent: ${value}`);
       return this;
     },
-    track: function(options: {
-      click?: boolean,
-      dblclick?: boolean,
-      hover?: boolean,
-      drag?: boolean,
-      change?: boolean,
-      keydown?: boolean|string,
-    }): ConfigStringBuilder {
+    track: function(options: TrackConfig): ConfigStringBuilder {
       components.push(`track: ${
           Object.entries(options).map(([key, value]) => value !== true ? `${key}: ${value}` : key).join(', ')}`);
       return this;

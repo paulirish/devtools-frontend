@@ -85,7 +85,9 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 
   enableCreateBreadcrumbsButton(): void {
-    this.overviewGrid.enableCreateBreadcrumbsButton();
+    const breacrumbsElement = this.overviewGrid.enableCreateBreadcrumbsButton();
+    breacrumbsElement.addEventListener('mousemove', this.onMouseMove.bind(this), true);
+    breacrumbsElement.addEventListener('mouseleave', this.hideCursor.bind(this), true);
   }
 
   private onMouseMove(event: Event): void {
@@ -94,7 +96,9 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     }
     const mouseEvent = (event as MouseEvent);
     const target = (event.target as HTMLElement);
-    this.cursorPosition = mouseEvent.offsetX + target.offsetLeft;
+    const offsetLeftRelativeToCursorArea =
+        target.getBoundingClientRect().left - this.cursorArea.getBoundingClientRect().left;
+    this.cursorPosition = mouseEvent.offsetX + offsetLeftRelativeToCursorArea;
     this.cursorElement.style.left = this.cursorPosition + 'px';
     this.cursorElement.style.visibility = 'visible';
     void this.overviewInfo.setContent(this.buildOverviewInfo());
@@ -152,9 +156,14 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   setBounds(
       minimumBoundary: TraceEngine.Types.Timing.MilliSeconds,
       maximumBoundary: TraceEngine.Types.Timing.MilliSeconds): void {
+    if (minimumBoundary === this.overviewCalculator.minimumBoundary() &&
+        maximumBoundary === this.overviewCalculator.maximumBoundary()) {
+      return;
+    }
     this.overviewCalculator.setBounds(minimumBoundary, maximumBoundary);
     this.overviewGrid.setResizeEnabled(true);
     this.cursorEnabled = true;
+    this.scheduleUpdate(minimumBoundary, maximumBoundary);
   }
 
   setNavStartTimes(navStartTimes: readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[]): void {
@@ -225,7 +234,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 
   private onBreadcrumbAdded(): void {
-    this.dispatchEventToListeners(Events.BreadcrumbAdded, {
+    this.dispatchEventToListeners(Events.OverviewPaneBreadcrumbAdded, {
       startTime: TraceEngine.Types.Timing.MilliSeconds(this.windowStartTime),
       endTime: TraceEngine.Types.Timing.MilliSeconds(this.windowEndTime),
     });
@@ -245,9 +254,12 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.windowEndTime =
         event.data.rawEndValue === this.overviewCalculator.maximumBoundary() ? Infinity : event.data.rawEndValue;
 
-    const windowTimes = {startTime: this.windowStartTime, endTime: this.windowEndTime};
+    const windowTimes = {
+      startTime: TraceEngine.Types.Timing.MilliSeconds(this.windowStartTime),
+      endTime: TraceEngine.Types.Timing.MilliSeconds(this.windowEndTime),
+    };
 
-    this.dispatchEventToListeners(Events.WindowChanged, windowTimes);
+    this.dispatchEventToListeners(Events.OverviewPaneWindowChanged, windowTimes);
   }
 
   setWindowTimes(startTime: number, endTime: number): void {
@@ -257,7 +269,10 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.windowStartTime = startTime;
     this.windowEndTime = endTime;
     this.updateWindow();
-    this.dispatchEventToListeners(Events.WindowChanged, {startTime: startTime, endTime: endTime});
+    this.dispatchEventToListeners(Events.OverviewPaneWindowChanged, {
+      startTime: TraceEngine.Types.Timing.MilliSeconds(startTime),
+      endTime: TraceEngine.Types.Timing.MilliSeconds(endTime),
+    });
   }
 
   private updateWindow(): void {
@@ -275,28 +290,24 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
-  WindowChanged = 'WindowChanged',
-  BreadcrumbAdded = 'BreadcrumbAdded',
+export const enum Events {
+  OverviewPaneWindowChanged = 'OverviewPaneWindowChanged',
+  OverviewPaneBreadcrumbAdded = 'OverviewPaneBreadcrumbAdded',
 }
 
-// TODO(alinavarkki): Replace this event with PerformanceModel WindowChanged event
-export interface WindowChangedEvent {
-  startTime: number;
-  endTime: number;
-  breadcrumb?: TraceEngine.Types.Timing.TraceWindowMicroSeconds;
+export interface OverviewPaneWindowChangedEvent {
+  startTime: TraceEngine.Types.Timing.MilliSeconds;
+  endTime: TraceEngine.Types.Timing.MilliSeconds;
 }
 
-export interface BreadcrumbAddedEvent {
+export interface OverviewPaneBreadcrumbAddedEvent {
   startTime: TraceEngine.Types.Timing.MilliSeconds;
   endTime: TraceEngine.Types.Timing.MilliSeconds;
 }
 
 export type EventTypes = {
-  [Events.WindowChanged]: WindowChangedEvent,
-  [Events.BreadcrumbAdded]: BreadcrumbAddedEvent,
+  [Events.OverviewPaneWindowChanged]: OverviewPaneWindowChangedEvent,
+  [Events.OverviewPaneBreadcrumbAdded]: OverviewPaneBreadcrumbAddedEvent,
 };
 
 export interface TimelineOverview {
