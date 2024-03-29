@@ -14,6 +14,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "\nCopying to $standalone … \n"
+mkdir -p "$standalone"
 
 # don't keep around old stuff
 command rm -rf "$standalone/models" "$standalone/core" "$standalone/generated"
