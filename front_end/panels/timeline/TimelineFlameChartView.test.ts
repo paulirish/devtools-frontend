@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 import * as TraceEngine from '../../models/trace/trace.js';
+import * as AnnotationsManager from '../../services/annotations_manager/annotations_manager.js';
+import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -23,6 +25,14 @@ class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegat
   }
 }
 
+const baseTraceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds = {
+  min: TraceEngine.Types.Timing.MicroSeconds(0),
+  max: TraceEngine.Types.Timing.MicroSeconds(10_000),
+  range: TraceEngine.Types.Timing.MicroSeconds(10_000),
+};
+const boundsManager =
+    TraceBounds.TraceBounds.BoundsManager.instance({forceNew: true}).resetWithNewBounds(baseTraceWindow);
+
 describeWithEnvironment('TimelineFlameChartView', function() {
   it('Can search for events by name in the timeline', async function() {
     const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'lcp-images.json.gz');
@@ -40,7 +50,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
         new UI.SearchableView.SearchConfig(/* query */ searchQuery, /* caseSensitive */ false, /* isRegex */ false);
     flameChartView.performSearch(searchConfig, true);
 
-    assert.strictEqual(flameChartView.getSearchResults()?.length, 15);
+    assert.strictEqual(flameChartView.getSearchResults()?.length, 17);
     assertSelectionName('PrePaint');
 
     flameChartView.jumpToNextSearchResult();
@@ -96,6 +106,10 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
     const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
     flameChartView.setModel(performanceModel, traceParsedData);
+    AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance({
+      entryToNodeMap: traceParsedData.Renderer.entryToNode,
+      wholeTraceBounds: boundsManager.state()?.micro.entireTraceBounds,
+    });
 
     // Find the main track to later collapse entries of
     const mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -140,6 +154,10 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
        const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
        flameChartView.setModel(performanceModel, traceParsedData);
+       AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance({
+         entryToNodeMap: traceParsedData.Renderer.entryToNode,
+         wholeTraceBounds: boundsManager.state()?.micro.entireTraceBounds,
+       });
 
        // Find the main track to later collapse entries of
        const mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -187,6 +205,10 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
        const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
        flameChartView.setModel(performanceModel, traceParsedData);
+       AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance({
+         entryToNodeMap: traceParsedData.Renderer.entryToNode,
+         wholeTraceBounds: boundsManager.state()?.micro.entireTraceBounds,
+       });
 
        // Find the main track to later collapse entries of
        let mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -248,6 +270,10 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
       flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
       flameChartView.setModel(performanceModel, traceParsedData);
+      AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance({
+        entryToNodeMap: traceParsedData.Renderer.entryToNode,
+        wholeTraceBounds: boundsManager.state()?.micro.entireTraceBounds,
+      });
 
       // Find the Main track to later collapse entries of
       const mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -258,42 +284,79 @@ describeWithEnvironment('TimelineFlameChartView', function() {
       }
     });
 
-    it('When an entry has no children, correctly show only Hide as a possible Context Menu action', async function() {
-      /** Part of this stack looks roughly like so (with some events omitted):
-       * =============== foo ===============
-       * =============== foo ===============
-       * =============== foo ===============
-       * =============== foo ===============
-       * =============== foo ===============
-       * =============== foo ===============
-       * =============== foo ===============
-       * == now ==      == updateCounters ==  <-- ID=245
-       *
-       * In this test we want to test that the Context Menu option available
-       * for an entry with no children and a parent is to hide given entry only.
-       * Since there are no children to hide, we don't want to show 'hide children' option.
-       *
-       * To chieve that, we will dispatch the context menu on the 'updateCounters' function that does not have children.
-       * The ID of 'updateCounters' is 245.
-       **/
+    it('When an entry has no children, correctly make only Hide Entry enabled in the Context Menu action',
+       async function() {
+         /** Part of this stack looks roughly like so (with some events omitted):
+          * =============== foo ===============
+          * =============== foo ===============
+          * =============== foo ===============
+          * =============== foo ===============
+          * =============== foo ===============
+          * =============== foo ===============
+          * =============== foo ===============
+          * == now ==      == updateCounters ==  <-- ID=245
+          *
+          * In this test we want to test that the Context Menu option available
+          * for an entry with no children and a parent is to hide given entry only.
+          * Since there are no children to hide, we don't want to show 'hide children' option.
+          *
+          * To chieve that, we will dispatch the context menu on the 'updateCounters' function that does not have children.
+          * The ID of 'updateCounters' is 245.
+          **/
 
-      const iDOfNodeWithNoChildren = 245;
-      // Highlight the node to make the Context Menu dispatch on this node
-      flameChartView.getMainFlameChart().highlightEntry(iDOfNodeWithNoChildren);
+         const iDOfNodeWithNoChildren = 245;
+         // Highlight the node to make the Context Menu dispatch on this node
+         flameChartView.getMainFlameChart().highlightEntry(iDOfNodeWithNoChildren);
 
-      // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
-      flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+         // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
+         flameChartView.getMainFlameChart().onContextMenu(new Event(''));
 
-      assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 2);
-      assert.strictEqual(
-          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(0)?.buildDescriptor().label,
-          'Hide function');
-      assert.strictEqual(
-          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().label,
-          'Reset trace');
-    });
+         assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
+         // Hide function enabled
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(0)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Rest of the actions disabled
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(1)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(2)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(3)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(4)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+       });
 
-    it('When an entry has children, correctly show only Hide and Hide Children as possible Context Menu actions',
+    it('When an entry has children, correctly make only Hide Entry and Hide Children enabled in the Context Menu action',
        async function() {
          /** Part of this stack looks roughly like so (with some events omitted):
           * =============== foo ===============
@@ -321,19 +384,53 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
          flameChartView.getMainFlameChart().onContextMenu(new Event(''));
 
-         assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 3);
+         assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
+         // Hide function enabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(0)?.buildDescriptor().label,
-             'Hide function');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(0)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Hide children enabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().label,
-             'Hide children');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(1)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Rest of the actions disabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(2)?.buildDescriptor().label,
-             'Reset trace');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(2)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(3)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(4)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
        });
 
-    it('When an entry has repeating children, correctly show only Hide, Hide Children and Hide repeating children as possible Context Menu actions',
+    it('When an entry has repeating children, correctly make only Hide Entry, Hide Children and Hide repeating children enabled in the Context Menu action',
        async function() {
          /** Part of this stack looks roughly like so (with some events omitted):
           * =============== foo ===============
@@ -360,22 +457,54 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
          flameChartView.getMainFlameChart().onContextMenu(new Event(''));
 
-         assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 4);
+         assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
+         // Hide function enabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(0)?.buildDescriptor().label,
-             'Hide function');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(0)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Hide children enabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().label,
-             'Hide children');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(1)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Hide repeating children enabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(2)?.buildDescriptor().label,
-             'Hide repeating children');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(2)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Rest of the actions disabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(3)?.buildDescriptor().label,
-             'Reset trace');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(3)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(4)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
        });
 
-    it('When an entry does not have a parent and has children, correctly show only Hide Children as a possible Context Menu action',
+    it('When an entry has no parent and has children, correctly make only Hide Children enabled in the Context Menu action',
        async function() {
          /** Part of this stack looks roughly like so (with some events omitted):
           * =============== Task ============== <-- ID=62
@@ -403,13 +532,49 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
          flameChartView.getMainFlameChart().onContextMenu(new Event(''));
 
-         assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 2);
+         // Hide function disabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(0)?.buildDescriptor().label,
-             'Hide children');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(0)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         // Hide children enabled
          assert.strictEqual(
-             flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().label,
-             'Reset trace');
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(1)
+                 ?.buildDescriptor()
+                 .enabled,
+             true);
+         // Rest of the actions disabled
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(2)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(3)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
+         assert.strictEqual(
+             flameChartView.getMainFlameChart()
+                 .getContextMenu()
+                 ?.defaultSection()
+                 .items.at(4)
+                 ?.buildDescriptor()
+                 .enabled,
+             false);
        });
 
     it('Reset Trace Context Menu action is disabled before some action has been applied', async function() {
@@ -437,13 +602,13 @@ describeWithEnvironment('TimelineFlameChartView', function() {
       // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
       flameChartView.getMainFlameChart().onContextMenu(new Event(''));
 
-      assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 2);
+      assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
       assert.strictEqual(
-          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().label,
+          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(4)?.buildDescriptor().label,
           'Reset trace');
       // Check that Reset Trace is disabled
       assert.strictEqual(
-          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().enabled,
+          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(4)?.buildDescriptor().enabled,
           false);
 
       flameChartView.getMainFlameChart().modifyTree(TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, iDOfNode);
@@ -452,7 +617,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
       // Check that Reset Trace is enabled
       assert.strictEqual(
-          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(1)?.buildDescriptor().enabled,
+          flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.at(4)?.buildDescriptor().enabled,
           true);
     });
   });

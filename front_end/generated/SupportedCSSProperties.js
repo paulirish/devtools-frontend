@@ -384,12 +384,6 @@ export const generatedProperties = [
   "keywords": [
    "none"
   ],
-  "name": "anchor-default"
- },
- {
-  "keywords": [
-   "none"
-  ],
   "name": "anchor-name"
  },
  {
@@ -2825,9 +2819,9 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "none"
+   "implicit"
   ],
-  "name": "position-fallback"
+  "name": "position-anchor"
  },
  {
   "keywords": [
@@ -2860,6 +2854,15 @@ export const generatedProperties = [
    "most-inline-size"
   ],
   "name": "position-try-order"
+ },
+ {
+  "keywords": [
+   "always",
+   "anchors-valid",
+   "anchors-visible",
+   "no-overflow"
+  ],
+  "name": "position-visibility"
  },
  {
   "name": "prefix"
@@ -3929,11 +3932,6 @@ export const generatedPropertyValues = {
    "after-edge",
    "text-after-edge",
    "hanging"
-  ]
- },
- "anchor-default": {
-  "values": [
-   "none"
   ]
  },
  "anchor-name": {
@@ -5272,9 +5270,9 @@ export const generatedPropertyValues = {
    "sticky"
   ]
  },
- "position-fallback": {
+ "position-anchor": {
   "values": [
-   "none"
+   "implicit"
   ]
  },
  "position-fallback-bounds": {
@@ -5297,6 +5295,14 @@ export const generatedPropertyValues = {
    "most-height",
    "most-block-size",
    "most-inline-size"
+  ]
+ },
+ "position-visibility": {
+  "values": [
+   "always",
+   "anchors-valid",
+   "anchors-visible",
+   "no-overflow"
   ]
  },
  "quotes": {

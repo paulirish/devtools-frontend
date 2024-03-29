@@ -114,9 +114,7 @@ class FormattingError extends Error {
 }
 
 class NamespaceObject extends SDK.RemoteObject.LocalJSONObject {
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(value: any) {
+  constructor(value: typeof SDK.RemoteObject.LocalJSONObject.prototype.value) {
     super(value);
   }
 
@@ -394,7 +392,8 @@ export class DebuggerLanguagePluginManager implements
     rawModuleId: string,
     plugin: DebuggerLanguagePlugin,
     scripts: Array<SDK.Script.Script>,
-    addRawModulePromise: Promise<Array<Platform.DevToolsPath.UrlString>|{missingSymbolFiles: string[]}>,
+    addRawModulePromise:
+        Promise<Array<Platform.DevToolsPath.UrlString>|{missingSymbolFiles: SDK.DebuggerModel.MissingDebugFiles[]}>,
   }>;
   private readonly callFrameByStopId: Map<StopId, SDK.DebuggerModel.CallFrame> = new Map();
   private readonly stopIdByCallFrame: Map<SDK.DebuggerModel.CallFrame, StopId> = new Map();
@@ -794,7 +793,12 @@ export class DebuggerLanguagePluginManager implements
               return [];
             }
             if ('missingSymbolFiles' in addModuleResult) {
-              return {missingSymbolFiles: addModuleResult.missingSymbolFiles};
+              const initiator = plugin.createPageResourceLoadInitiator();
+              const missingSymbolFiles = addModuleResult.missingSymbolFiles.map(resource => {
+                const resourceUrl = resource as Platform.DevToolsPath.UrlString;
+                return {resourceUrl, initiator};
+              });
+              return {missingSymbolFiles: missingSymbolFiles};
             }
             const sourceFileURLs = addModuleResult as Platform.DevToolsPath.UrlString[];
             if (sourceFileURLs.length === 0) {
@@ -849,7 +853,8 @@ export class DebuggerLanguagePluginManager implements
   }
 
   getSourcesForScript(script: SDK.Script.Script):
-      Promise<Array<Platform.DevToolsPath.UrlString>|{missingSymbolFiles: string[]}|undefined> {
+      Promise<Array<Platform.DevToolsPath.UrlString>|{missingSymbolFiles: SDK.DebuggerModel.MissingDebugFiles[]}|
+              undefined> {
     const rawModuleId = rawModuleIdForScript(script);
     const rawModuleHandle = this.#rawModuleHandles.get(rawModuleId);
     if (rawModuleHandle) {
@@ -898,7 +903,8 @@ export class DebuggerLanguagePluginManager implements
   }
 
   async getFunctionInfo(script: SDK.Script.Script, location: SDK.DebuggerModel.Location):
-      Promise<{frames: Array<Chrome.DevTools.FunctionInfo>}|{missingSymbolFiles: string[]}|null> {
+      Promise<{frames: Array<Chrome.DevTools.FunctionInfo>}|{missingSymbolFiles: SDK.DebuggerModel.MissingDebugFiles[]}|
+              null> {
     const {rawModuleId, plugin} = await this.rawModuleIdAndPluginForScript(script);
     if (!plugin) {
       return null;
@@ -912,6 +918,14 @@ export class DebuggerLanguagePluginManager implements
 
     try {
       const functionInfo = await plugin.getFunctionInfo(rawLocation);
+      if ('missingSymbolFiles' in functionInfo) {
+        const initiator = plugin.createPageResourceLoadInitiator();
+        const missingSymbolFiles = functionInfo.missingSymbolFiles.map(resource => {
+          const resourceUrl = resource as Platform.DevToolsPath.UrlString;
+          return {resourceUrl, initiator};
+        });
+        return {missingSymbolFiles};
+      }
       return functionInfo;
     } catch (error) {
       Common.Console.Console.instance().warn(i18nString(UIStrings.errorInDebuggerLanguagePlugin, {PH1: error.message}));
@@ -1085,4 +1099,5 @@ class ModelData {
 export interface DebuggerLanguagePlugin extends Chrome.DevTools.LanguageExtensionPlugin {
   name: string;
   handleScript(script: SDK.Script.Script): boolean;
+  createPageResourceLoadInitiator(): SDK.PageResourceLoader.PageResourceLoadInitiator;
 }

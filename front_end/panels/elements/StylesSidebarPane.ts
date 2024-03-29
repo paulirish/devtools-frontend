@@ -58,13 +58,13 @@ import {ElementsPanel} from './ElementsPanel.js';
 import {ElementsSidebarPane} from './ElementsSidebarPane.js';
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
 import * as LayersWidget from './LayersWidget.js';
-import {LegacyRegexMatcher, type Matcher, renderPropertyValue} from './PropertyParser.js';
 import {StyleEditorWidget} from './StyleEditorWidget.js';
 import {
   BlankStylePropertiesSection,
   FontPaletteValuesRuleSection,
   HighlightPseudoStylePropertiesSection,
   KeyframePropertiesSection,
+  PositionTryRuleSection,
   RegisteredPropertiesSection,
   StylePropertiesSection,
   TryRuleSection,
@@ -133,16 +133,6 @@ const UIStrings = {
    *@example {invalidValue} PH3
    */
   invalidString: '{PH1}, property name: {PH2}, property value: {PH3}',
-  /**
-   *@description Text that is announced by the screen reader when the user focuses on an input field for entering the name of a CSS property in the Styles panel
-   *@example {margin} PH1
-   */
-  cssPropertyName: '`CSS` property name: {PH1}',
-  /**
-   *@description Text that is announced by the screen reader when the user focuses on an input field for entering the value of a CSS property in the Styles panel
-   *@example {10px} PH1
-   */
-  cssPropertyValue: '`CSS` property value: {PH1}',
   /**
    *@description Tooltip text that appears when hovering over the rendering button in the Styles Sidebar Pane of the Elements panel
    */
@@ -1207,6 +1197,15 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       blocks.push(block);
     }
 
+    for (const positionTryRule of matchedStyles.positionTryRules()) {
+      const block = SectionBlock.createPositionTryBlock(positionTryRule.name().text);
+      this.idleCallbackManager.schedule(() => {
+        block.sections.push(new PositionTryRuleSection(this, matchedStyles, positionTryRule.style, sectionIdx));
+        sectionIdx++;
+      });
+      blocks.push(block);
+    }
+
     if (matchedStyles.registeredProperties().length > 0) {
       const expandedByDefault = matchedStyles.registeredProperties().length <= MIN_FOLDED_SECTIONS_COUNT;
       const block = SectionBlock.createRegisteredPropertiesBlock(expandedByDefault);
@@ -1463,7 +1462,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
     const filterInput = new UI.Toolbar.ToolbarInput(
-        i18nString(UIStrings.filter), i18nString(UIStrings.filterStyles), 1, 1, undefined, undefined, false);
+        i18nString(UIStrings.filter), i18nString(UIStrings.filterStyles), 1, 1, undefined, undefined, false,
+        'styles-filter');
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     toolbar.makeToggledGray();
@@ -1730,6 +1730,14 @@ export class SectionBlock {
     separatorElement.className = 'sidebar-separator';
     separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('position-fallback')}`);
     separatorElement.textContent = `@position-fallback ${positionFallbackName}`;
+    return new SectionBlock(separatorElement);
+  }
+
+  static createPositionTryBlock(positionTryName: string): SectionBlock {
+    const separatorElement = document.createElement('div');
+    separatorElement.className = 'sidebar-separator';
+    separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('position-try')}`);
+    separatorElement.textContent = `@position-try ${positionTryName}`;
     return new SectionBlock(separatorElement);
   }
 
@@ -2198,125 +2206,6 @@ export function escapeUrlAsCssComment(urlText: string): string {
     return `${url.origin}${url.pathname}${url.search.replaceAll('*/', '*%2F')}${url.hash}`;
   }
   return url.toString();
-}
-
-export class StylesSidebarPropertyRenderer {
-  private rule: SDK.CSSRule.CSSRule|null;
-  private node: SDK.DOMModel.DOMNode|null;
-  readonly propertyName: string;
-  readonly propertyValue: string;
-  private fontHandler: ((arg0: string) => Node)|null;
-  private shadowHandler: ((arg0: string, arg1: string) => Node)|null;
-  private gridHandler: ((arg0: string, arg1: string) => Node)|null;
-  private lengthHandler: ((arg0: string) => Node)|null;
-  private animationHandler: ((data: string) => Node)|null;
-  matchers: Matcher[];
-
-  constructor(
-      rule: SDK.CSSRule.CSSRule|null, node: SDK.DOMModel.DOMNode|null, name: string, value: string,
-      matchers: Matcher[] = []) {
-    this.rule = rule;
-    this.node = node;
-    this.propertyName = name;
-    this.propertyValue = value;
-    this.fontHandler = null;
-    this.shadowHandler = null;
-    this.gridHandler = null;
-    this.lengthHandler = null;
-    this.animationHandler = null;
-    this.matchers = matchers;
-  }
-
-  setFontHandler(handler: (arg0: string) => Node): void {
-    this.fontHandler = handler;
-  }
-
-  setShadowHandler(handler: (arg0: string, arg1: string) => Node): void {
-    this.shadowHandler = handler;
-  }
-
-  setGridHandler(handler: (arg0: string, arg1: string) => Node): void {
-    this.gridHandler = handler;
-  }
-
-  setAnimationHandler(handler: (arg0: string) => Node): void {
-    this.animationHandler = handler;
-  }
-
-  setLengthHandler(handler: (arg0: string) => Node): void {
-    this.lengthHandler = handler;
-  }
-
-  renderName(): Element {
-    const nameElement = document.createElement('span');
-    nameElement.setAttribute('jslog', `${VisualLogging.key().track({keydown: true, click: true})}`);
-    UI.ARIAUtils.setLabel(nameElement, i18nString(UIStrings.cssPropertyName, {PH1: this.propertyName}));
-    nameElement.className = 'webkit-css-property';
-    nameElement.textContent = this.propertyName;
-    nameElement.normalize();
-    return nameElement;
-  }
-
-  renderValue(): Element {
-    const valueElement = document.createElement('span');
-    valueElement.setAttribute('jslog', `${VisualLogging.value().track({keydown: true, click: true})}`);
-    UI.ARIAUtils.setLabel(valueElement, i18nString(UIStrings.cssPropertyValue, {PH1: this.propertyValue}));
-    valueElement.className = 'value';
-    if (!this.propertyValue) {
-      return valueElement;
-    }
-
-    const metadata = SDK.CSSMetadata.cssMetadata();
-
-    if (this.shadowHandler && metadata.isShadowProperty(this.propertyName) &&
-        !SDK.CSSMetadata.VariableRegex.test(this.propertyValue)) {
-      valueElement.appendChild(this.shadowHandler(this.propertyValue, this.propertyName));
-      valueElement.normalize();
-      return valueElement;
-    }
-
-    if (this.gridHandler && metadata.isGridAreaDefiningProperty(this.propertyName)) {
-      valueElement.appendChild(this.gridHandler(this.propertyValue, this.propertyName));
-      valueElement.normalize();
-      return valueElement;
-    }
-
-    if (this.animationHandler && (this.propertyName === 'animation' || this.propertyName === '-webkit-animation')) {
-      valueElement.appendChild(this.animationHandler(this.propertyValue));
-      valueElement.normalize();
-      return valueElement;
-    }
-
-    const matchers: Matcher[] = [...this.matchers];
-
-    // AST matching applies regexes bottom-up to subexpressions. This requires the regexes to be explicit enough to only
-    // capture a full subexpression and not partials or prefixes. This helper converts a regex to a full-line regex if
-    // it does not already take line endings into account in some way.
-    const asLineMatch = (r: RegExp): RegExp => {
-      const {source, flags, multiline} = r;
-      if (source.startsWith('^') || source.endsWith('$') || multiline) {
-        return r;
-      }
-      return new RegExp(`^${source}$`, flags);
-    };
-
-    if (this.fontHandler && metadata.isFontAwareProperty(this.propertyName)) {
-      matchers.push(new LegacyRegexMatcher(
-          this.propertyName === 'font-family' ? InlineEditor.FontEditorUtils.FontFamilyRegex :
-                                                InlineEditor.FontEditorUtils.FontPropertiesRegex,
-          this.fontHandler));
-    }
-    if (!Root.Runtime.experiments.isEnabled('css-type-component-length-deprecate') && this.lengthHandler) {
-      // TODO(changhaohan): crbug.com/1138628 refactor this to handle unitless 0 cases
-      matchers.push(
-          new LegacyRegexMatcher(asLineMatch(InlineEditor.CSSLengthUtils.CSSLengthRegex), this.lengthHandler));
-    }
-
-    renderPropertyValue(this.propertyValue, matchers, this.propertyName)
-        .forEach(node => valueElement.appendChild(node));
-    valueElement.normalize();
-    return valueElement;
-  }
 }
 
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {

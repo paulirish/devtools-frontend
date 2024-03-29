@@ -153,7 +153,9 @@ export class SearchableView extends VBox {
     this.searchInputElement.classList.add('search-replace', 'custom-search-input');
     this.searchInputElement.id = 'search-input-field';
     this.searchInputElement.placeholder = i18nString(UIStrings.findString);
-    this.searchInputElement.setAttribute('jslog', `${VisualLogging.textField('search').track({change: true})}`);
+    this.searchInputElement.setAttribute(
+        'jslog',
+        `${VisualLogging.textField('search').track({change: true, keydown: 'ArrowUp|ArrowDown|Enter|Escape'})}`);
     searchControlElement.appendChild(this.searchInputElement);
 
     this.matchesElement = searchControlElement.createChild('label', 'search-results-matches');
@@ -183,7 +185,8 @@ export class SearchableView extends VBox {
         (searchInputElements.createChild('input', 'search-replace toolbar-replace-control hidden') as HTMLInputElement);
     this.replaceInputElement.addEventListener('keydown', this.onReplaceKeyDown.bind(this), true);
     this.replaceInputElement.placeholder = i18nString(UIStrings.replace);
-    this.replaceInputElement.setAttribute('jslog', `${VisualLogging.textField('replace').track({change: true})}`);
+    this.replaceInputElement.setAttribute(
+        'jslog', `${VisualLogging.textField('replace').track({change: true, keydown: 'Enter'})}`);
 
     this.buttonsContainer = this.footerElement.createChild('div', 'toolbar-search-buttons');
     const firstRowButtons = this.buttonsContainer.createChild('div', 'first-row-buttons');
@@ -580,10 +583,6 @@ export class SearchableView extends VBox {
     this.performSearch(false, true);
   }
 }
-
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export const _symbol = Symbol('searchableView');
 
 const searchableViewsByElement = new WeakMap<Element, SearchableView>();
 

@@ -41,15 +41,6 @@ export class UserMetrics {
     this.#launchPanelName = '';
   }
 
-  breakpointWithConditionAdded(breakpointWithConditionAdded: BreakpointWithConditionAdded): void {
-    if (breakpointWithConditionAdded >= BreakpointWithConditionAdded.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BreakpointWithConditionAdded, breakpointWithConditionAdded,
-        BreakpointWithConditionAdded.MaxValue);
-  }
-
   breakpointEditDialogRevealedFrom(breakpointEditDialogRevealedFrom: BreakpointEditDialogRevealedFrom): void {
     if (breakpointEditDialogRevealedFrom >= BreakpointEditDialogRevealedFrom.MaxValue) {
       return;
@@ -254,22 +245,6 @@ export class UserMetrics {
     }
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.DeveloperResourceScheme, developerResourceScheme, DeveloperResourceScheme.MaxValue);
-  }
-
-  inlineScriptParsed(inlineScriptType: VMInlineScriptType): void {
-    if (inlineScriptType >= VMInlineScriptType.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.InlineScriptParsed, inlineScriptType, VMInlineScriptType.MaxValue);
-  }
-
-  vmInlineScriptContentShown(inlineScriptType: VMInlineScriptType): void {
-    if (inlineScriptType >= VMInlineScriptType.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.VMInlineScriptTypeShown, inlineScriptType, VMInlineScriptType.MaxValue);
   }
 
   language(language: Intl.UnicodeBCP47LocaleIdentifier): void {
@@ -652,7 +627,10 @@ export enum Action {
   InsightErroredOther = 139,
   AutofillReceived = 140,
   AutofillReceivedAndTabAutoOpened = 141,
-  MaxValue = 142,
+  AnimationGroupSelected = 142,
+  ScrollDrivenAnimationGroupSelected = 143,
+  ScrollDrivenAnimationGroupScrubbed = 144,
+  MaxValue = 145,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -1105,10 +1083,8 @@ export enum DevtoolsExperiments {
   'timeline-as-console-profile-result-panel' = 67,
   'preloading-status-panel' = 68,
   'outermost-target-selector' = 71,
-  'js-profiler-temporarily-enable' = 72,
   'highlight-errors-elements-panel' = 73,
   'set-all-breakpoints-eagerly' = 74,
-  'self-xss-warning' = 75,
   'use-source-map-scopes' = 76,
   'storage-buckets-tree' = 77,
   'network-panel-filter-bar-redesign' = 79,
@@ -1116,17 +1092,14 @@ export enum DevtoolsExperiments {
   'sources-frame-indentation-markers-temporarily-disable' = 83,
   'heap-snapshot-treat-backing-store-as-containing-object' = 84,
   'css-type-component-length-deprecate' = 85,
+  'timeline-show-postmessage-events' = 86,
+  'save-and-load-trace-with-annotations' = 87,
+  'timeline-track-configuration' = 88,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 86,
+  'MaxValue' = 89,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
-
-export const enum BreakpointWithConditionAdded {
-  Logpoint = 0,
-  ConditionalBreakpoint = 1,
-  MaxValue = 2,
-}
 
 export const enum BreakpointEditDialogRevealedFrom {
   BreakpointSidebarContextMenu = 0,
@@ -1340,12 +1313,6 @@ export enum NetworkPanelMoreFilters {
   MaxValue = 5,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
-
-export const enum VMInlineScriptType {
-  MODULE_SCRIPT = 0,
-  CLASSIC_SCRIPT = 1,
-  MaxValue = 2,
-}
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export enum Language {
@@ -1594,7 +1561,8 @@ export const enum SwatchType {
   Angle = 7,
   Length = 8,
   PositionFallbackLink = 9,
-  MaxValue = 10,
+  PositionTryLink = 10,
+  MaxValue = 11,
 }
 
 export const enum BadgeType {

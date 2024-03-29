@@ -14,7 +14,7 @@ describe('ConsoleInsight', function() {
   const CLICK_TARGET_SELECTOR = '.console-message-text';
   const EXPLAIN_LABEL = 'Understand this error';
 
-  async function setupMocks(aidaResponse: unknown) {
+  async function setupMocks(aidaResponse: unknown, queryParams = '') {
     const {frontend} = getBrowserAndPages();
     await frontend.bringToFront();
     await frontend.evaluateOnNewDocument(`
@@ -25,7 +25,7 @@ describe('ConsoleInsight', function() {
         cb({"isSyncActive": true, "accountEmail": "some-email"});
       }
     `);
-    await frontend.goto(frontend.url() + '&enableAida=true', {
+    await frontend.goto(frontend.url() + '&enableAida=true' + queryParams, {
       waitUntil: 'networkidle0',
     });
   }
@@ -80,6 +80,62 @@ describe('ConsoleInsight', function() {
     await setupMocks([
       {'textChunk': {'text': 'test'}},
     ]);
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if age check is not passing', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks(
+        [
+          {'textChunk': {'text': 'test'}},
+        ],
+        '?ci_blockedByAge=true');
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if policy does not allow it', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks(
+        [
+          {'textChunk': {'text': 'test'}},
+        ],
+        '?ci_blockedByEnterprisePolicy=true');
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if it is restriced by geography', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks(
+        [
+          {'textChunk': {'text': 'test'}},
+        ],
+        '?ci_blockedByGeo=true');
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if disabled by default', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks(
+        [
+          {'textChunk': {'text': 'test'}},
+        ],
+        '?ci_disabledByDefault=true');
     await click(CONSOLE_TAB_SELECTOR);
     await target.evaluate(() => {
       console.error(new Error('Unexpected error'));

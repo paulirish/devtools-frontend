@@ -304,8 +304,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       button.textContent = playbackRate ? i18nString(UIStrings.playbackRatePlaceholder, {PH1: playbackRate * 100}) :
                                           i18nString(UIStrings.pause);
       button.setAttribute(
-          'jslog',
-          `${VisualLogging.action().context(`animations.playback-rate-${playbackRate * 100}`).track({click: true})}`);
+          'jslog', `${VisualLogging.action().context(`animations.playback-rate-${playbackRate * 100}`).track({
+            click: true,
+            keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight',
+          })}`);
       playbackRates.set(button, playbackRate);
       button.addEventListener('click', this.setPlaybackRate.bind(this, playbackRate));
       UI.ARIAUtils.markAsOption(button);
@@ -807,6 +809,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       this.#gridHeader.classList.add('scrubber-enabled');
     }
 
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.AnimationGroupSelected);
+    if (this.#selectedGroup.isScrollDriven()) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.ScrollDrivenAnimationGroupSelected);
+    }
     this.animationGroupSelectedForTest();
   }
 
@@ -1059,6 +1065,9 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
       this.#scrubberPlayer.currentTime = currentTime;
     }
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.AnimationGroupScrubbed);
+    if (this.#selectedGroup?.isScrollDriven()) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.ScrollDrivenAnimationGroupScrubbed);
+    }
     this.#currentTime.window().requestAnimationFrame(this.updateScrubber.bind(this));
 
     if (!this.#animationGroupPausedBeforeScrub) {

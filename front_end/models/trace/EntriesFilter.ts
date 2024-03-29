@@ -54,8 +54,8 @@ export class EntriesFilter {
   // will never change so we can avoid running the potentially expensive search again.
   #entryToDescendantsMap: Map<Helpers.TreeHelpers.TraceEntryNode, Types.TraceEvents.TraceEventData[]> = new Map();
 
-  constructor(entryToNode: EntryToNodeMap) {
-    this.#entryToNode = entryToNode;
+  constructor(entryToNodeMap: EntryToNodeMap) {
+    this.#entryToNode = entryToNodeMap;
   }
 
   /**
@@ -110,6 +110,17 @@ export class EntriesFilter {
    **/
   invisibleEntries(): Types.TraceEvents.TraceEventData[] {
     return this.#invisibleEntries;
+  }
+
+  /**
+   * Sets invisible entries. Called when a trace with annotations is loaded and some entries are set as hidden.
+   **/
+  setInvisibleEntries(entries: Types.TraceEvents.TraceEventData[]): void {
+    this.#invisibleEntries.push(...entries);
+  }
+
+  inEntryInvisible(entry: Types.TraceEvents.TraceEventData): boolean {
+    return this.#invisibleEntries.includes(entry);
   }
 
   /**

@@ -43,6 +43,7 @@ import type * as Protocol from '../../generated/protocol.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import * as AnnotationsManager from '../../services/annotations_manager/annotations_manager.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedback.js';
@@ -671,7 +672,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private contextMenu(event: Event): void {
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    // Do not show this Context menu on FlameChart entries because we have a different context menu for FlameChart entries
+    const mouseEvent = (event as MouseEvent);
+    if (this.flameChart.getMainFlameChart().coordinatesToEntryIndex(mouseEvent.offsetX, mouseEvent.offsetY) !== -1) {
+      return;
+    }
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
     contextMenu.appendItemsAtLocation('timelineMenu');
     void contextMenu.show();
   }
@@ -687,6 +693,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     const traceEvents = this.#traceEngineModel.traceEvents(this.#traceEngineActiveTraceIndex);
     const metadata = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex);
+    // Save annotations into the metadata if annotations the experiment is on
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS) &&
+        metadata) {
+      metadata.annotations = AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.getAnnotations();
+    }
     if (!traceEvents) {
       return;
     }
@@ -1048,7 +1059,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
               /* tracingModel= */ null,
               /* exclusiveFilter= */ null,
               /* isCpuProfile= */ false,
-              /* recordingStartTime= */ null);
+              /* recordingStartTime= */ null,
+              /* metadata= */ null);
         });
     this.statusPane.showPane(this.statusPaneContainer);
     this.statusPane.updateStatus(i18nString(UIStrings.recordingFailed));
@@ -1173,7 +1185,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   setModel(
       model: PerformanceModel|null, exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null,
-      traceEngineIndex: number = -1): void {
+      traceEngineIndex: number = -1, metadata: TraceEngine.Types.File.MetaData|null = null): void {
     this.performanceModel = model;
     this.#traceEngineActiveTraceIndex = traceEngineIndex;
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
@@ -1187,6 +1199,24 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       TraceBounds.TraceBounds.BoundsManager.instance().resetWithNewBounds(
           traceParsedData.Meta.traceBounds,
       );
+
+      // Since we have a single instance to AnnotationsManager, combine both SyntheticEvent to Node maps
+      const samplesAndRendererEventsEntryToNodeMap =
+          new Map([...traceParsedData.Samples.entryToNode, ...traceParsedData.Renderer.entryToNode]);
+      // If the annotations experiment is on and there are some annotations saved, apply the annotations from the file.
+      // We create AnnotationsManager regardless of the experiment because the EntriesFilterer initiated in the AnnotationsManager
+      // needs to work even if the experiment is off.
+      const traceBounds = TraceBounds.TraceBounds.BoundsManager.instance().state();
+      AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance({
+        entryToNodeMap: samplesAndRendererEventsEntryToNodeMap,
+        wholeTraceBounds: traceBounds?.micro.entireTraceBounds,
+      });
+      if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS) &&
+          metadata?.annotations) {
+        AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.applyAnnotations(
+            metadata?.annotations);
+      }
+
       this.#applyActiveFilters(traceParsedData.Meta.traceIsGeneric, exclusiveFilter);
     }
     if (model) {
@@ -1202,7 +1232,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // Set up line level profiling with CPU profiles, if we found any.
     PerfUI.LineLevelProfile.Performance.instance().reset();
     if (traceParsedData && traceParsedData.Samples.profilesInProcess.size) {
-      const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
+      const primaryPageTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
       // Gather up all CPU Profiles we found when parsing this trace.
       const cpuProfiles =
           Array.from(traceParsedData.Samples.profilesInProcess).flatMap(([_processId, threadsInProcess]) => {
@@ -1210,7 +1240,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
             return profiles;
           });
       for (const profile of cpuProfiles) {
-        PerfUI.LineLevelProfile.Performance.instance().appendCPUProfile(profile, rootTarget);
+        PerfUI.LineLevelProfile.Performance.instance().appendCPUProfile(profile, primaryPageTarget);
       }
     }
 
@@ -1391,7 +1421,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[],
       tracingModel: TraceEngine.Legacy.TracingModel|null,
       exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null, isCpuProfile: boolean,
-      recordingStartTime: number|null): Promise<void> {
+      recordingStartTime: number|null, metadata: TraceEngine.Types.File.MetaData|null): Promise<void> {
     this.#traceEngineModel.resetProcessor();
     SourceMapsResolver.clearResolvedNodeNames();
 
@@ -1414,13 +1444,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.performanceModel = new PerformanceModel();
     }
 
+    metadata = metadata ?
+        metadata :
+        await TraceEngine.Extras.Metadata.forNewRecording(isCpuProfile, recordingStartTime ?? undefined);
     try {
       // Run the new engine in parallel with the parsing done in the performanceModel
       await Promise.all([
         // Calling setTracingModel now and setModel so much later, leads to several problems due to addEventListener order being unexpected
         // TODO(paulirish): Resolve this, or just wait for the death of tracingModel. :)
         this.performanceModel.setTracingModel(tracingModel, recordingIsFresh),
-        this.#executeNewTraceEngine(collectedEvents, recordingIsFresh, isCpuProfile, recordingStartTime),
+        this.#executeNewTraceEngine(collectedEvents, recordingIsFresh, metadata),
       ]);
 
       // This code path is only executed when a new trace is recorded/imported,
@@ -1428,7 +1461,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // the newest trace will be automatically set to active.
       this.#traceEngineActiveTraceIndex = this.#traceEngineModel.size() - 1;
 
-      this.setModel(this.performanceModel, exclusiveFilter, this.#traceEngineActiveTraceIndex);
+      this.setModel(this.performanceModel, exclusiveFilter, this.#traceEngineActiveTraceIndex, metadata);
 
       if (this.statusPane) {
         this.statusPane.remove();
@@ -1497,14 +1530,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   async #executeNewTraceEngine(
-      collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[], isFreshRecording: boolean, isCpuProfile: boolean,
-      recordStartTime: number|null): Promise<void> {
-    const shouldGatherMetadata = isFreshRecording && !isCpuProfile;
-    const metadata =
-        shouldGatherMetadata ? await TraceEngine.Extras.Metadata.forNewRecording(recordStartTime ?? undefined) : {};
-    metadata.dataOrigin =
-        isCpuProfile ? TraceEngine.Types.File.DataOrigin.CPUProfile : TraceEngine.Types.File.DataOrigin.TraceEvents;
-
+      collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[], isFreshRecording: boolean,
+      metadata: TraceEngine.Types.File.MetaData): Promise<void> {
     return this.#traceEngineModel.parse(
         collectedEvents,
         {
