@@ -6,7 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as Coordinator from '../components/render_coordinator/render_coordinator.js';
 
-import {processForDebugging} from './Debugging.js';
+import {processForDebugging, processStartLoggingForDebugging} from './Debugging.js';
 import {getDomState, visibleOverlap} from './DomState.js';
 import {type Loggable} from './Loggable.js';
 import {getLoggingConfig} from './LoggingConfig.js';
@@ -17,7 +17,7 @@ import {getNonDomState, unregisterAllLoggables, unregisterLoggable} from './NonD
 const PROCESS_DOM_INTERVAL = 500;
 const KEYBOARD_LOG_INTERVAL = 3000;
 const HOVER_LOG_INTERVAL = 1000;
-const DRAG_LOG_INTERVAL = 500;
+const DRAG_LOG_INTERVAL = 1250;
 const CLICK_LOG_INTERVAL = 500;
 const RESIZE_LOG_INTERVAL = 1000;
 const RESIZE_REPORT_THRESHOLD = 50;
@@ -67,6 +67,7 @@ export async function startLogging(options?: {
   dragLogThrottler = options?.dragLogThrottler || new Common.Throttler.Throttler(DRAG_LOG_INTERVAL);
   clickLogThrottler = options?.clickLogThrottler || new Common.Throttler.Throttler(CLICK_LOG_INTERVAL);
   resizeLogThrottler = options?.resizeLogThrottler || new Common.Throttler.Throttler(RESIZE_LOG_INTERVAL);
+  processStartLoggingForDebugging();
   await addDocument(document);
 }
 
@@ -138,39 +139,36 @@ async function process(): Promise<void> {
       }
     }
     if (!loggingState.processed) {
-      if (loggingState.config.track?.has('click')) {
-        element.addEventListener('click', e => {
-          const loggable = e.currentTarget as Element;
-          logClick(clickLogThrottler)(loggable, e);
-        }, {capture: true});
+      const clickLikeHandler = (doubleClick: boolean) => (e: Event) => {
+        const loggable = e.currentTarget as Element;
+        logClick(clickLogThrottler)(loggable, e, {doubleClick});
+      };
+      if (loggingState.config.track?.click) {
+        element.addEventListener('click', clickLikeHandler(false), {capture: true});
+        element.addEventListener('contextmenu', clickLikeHandler(false), {capture: true});
       }
-      if (loggingState.config.track?.has('dblclick')) {
-        element.addEventListener('dblclick', e => {
-          const loggable = e.currentTarget as Element;
-          logClick(clickLogThrottler)(loggable, e, {doubleClick: true});
-        }, {capture: true});
+      if (loggingState.config.track?.dblclick) {
+        element.addEventListener('dblclick', clickLikeHandler(true), {capture: true});
       }
-      const trackHover = loggingState.config.track?.has('hover');
+      const trackHover = loggingState.config.track?.hover;
       if (trackHover) {
         element.addEventListener('mouseover', logHover(hoverLogThrottler), {capture: true});
-        const cancelLogging = (): Promise<void> => Promise.resolve();
         element.addEventListener('mouseout', () => hoverLogThrottler.schedule(cancelLogging), {capture: true});
       }
-      const trackDrag = loggingState.config.track?.has('drag');
+      const trackDrag = loggingState.config.track?.drag;
       if (trackDrag) {
         element.addEventListener('pointerdown', logDrag(dragLogThrottler), {capture: true});
-        const cancelLogging = (): Promise<void> => Promise.resolve();
-        element.addEventListener('pointerup', () => dragLogThrottler.schedule(cancelLogging), {capture: true});
+        document.addEventListener('pointerup', cancelDrag, {capture: true});
+        document.addEventListener('dragend', cancelDrag, {capture: true});
       }
-      if (loggingState.config.track?.has('change')) {
+      if (loggingState.config.track?.change) {
         element.addEventListener('change', logChange, {capture: true});
       }
-      const trackKeyDown = loggingState.config.track?.has('keydown');
-      const codes = loggingState.config.track?.get('keydown')?.split('|') || [];
+      const trackKeyDown = loggingState.config.track?.keydown;
       if (trackKeyDown) {
-        element.addEventListener('keydown', logKeyDown(keyboardLogThrottler, codes), {capture: true});
+        element.addEventListener('keydown', e => logKeyDown(keyboardLogThrottler)(e.currentTarget, e), {capture: true});
       }
-      if (loggingState.config.track?.has('resize')) {
+      if (loggingState.config.track?.resize) {
         const updateSize = (): void => {
           const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
           if (!loggingState.size) {
@@ -209,7 +207,7 @@ async function process(): Promise<void> {
         }, {capture: true});
         element.addEventListener('change', e => {
           for (const option of (element as HTMLSelectElement).selectedOptions) {
-            if (getLoggingState(option)?.config.track?.has('click')) {
+            if (getLoggingState(option)?.config.track?.click) {
               void logClick(clickLogThrottler)(option, e);
             }
           }
@@ -221,7 +219,7 @@ async function process(): Promise<void> {
   }
   for (const {loggable, config, parent} of getNonDomState().loggables) {
     const loggingState = getOrCreateLoggingState(loggable, config, parent);
-    const visible = !loggingState.parent || loggingState.parent.impressionLogged;
+    const visible = !parent || loggingState.parent?.impressionLogged;
     if (!visible) {
       continue;
     }
@@ -234,4 +232,11 @@ async function process(): Promise<void> {
   }
   await logImpressions(visibleLoggables);
   Host.userMetrics.visualLoggingProcessingDone(performance.now() - startTime);
+}
+
+async function cancelLogging(): Promise<void> {
+}
+
+function cancelDrag(): void {
+  void dragLogThrottler.schedule(cancelLogging);
 }

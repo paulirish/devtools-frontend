@@ -13,6 +13,9 @@ const ConsoleInsight = Explain.ConsoleInsight;
 
 const component = new ConsoleInsight(
     {
+      getSearchQuery() {
+        return '';
+      },
       async buildPrompt() {
         return {prompt: '', sources: []};
       },
@@ -24,7 +27,7 @@ const component = new ConsoleInsight(
             throw new Error('Could not connect to the server');
           },
     },
-    'Understand this error', {
+    {
       isSyncActive: true,
       accountEmail: 'some-email',
     });

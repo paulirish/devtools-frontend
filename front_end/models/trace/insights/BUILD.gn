@@ -9,6 +9,8 @@ import("../../visibility.gni")
 devtools_module("insights") {
   sources = [
     "InsightRunners.ts",
+    "InteractionToNextPaint.ts",
+    "LargestContentfulPaint.ts",
     "RenderBlocking.ts",
     "types.ts",
   ]
@@ -30,7 +32,11 @@ devtools_entrypoint("bundle") {
 ts_library("unittests") {
   testonly = true
 
-  sources = [ "RenderBlocking.test.ts" ]
+  sources = [
+    "InteractionToNextPaint.test.ts",
+    "LargestContentfulPaint.test.ts",
+    "RenderBlocking.test.ts",
+  ]
 
   deps = [
     "../../../models/trace:bundle",

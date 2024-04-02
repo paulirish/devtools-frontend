@@ -641,6 +641,12 @@ declare namespace ProtocolProxyApi {
     invoke_getLayersForNode(params: Protocol.CSS.GetLayersForNodeRequest): Promise<Protocol.CSS.GetLayersForNodeResponse>;
 
     /**
+     * Given a CSS selector text and a style sheet ID, getLocationForSelector
+     * returns an array of locations of the CSS selector in the style sheet.
+     */
+    invoke_getLocationForSelector(params: Protocol.CSS.GetLocationForSelectorRequest): Promise<Protocol.CSS.GetLocationForSelectorResponse>;
+
+    /**
      * Starts tracking the given computed styles for updates. The specified array of properties
      * replaces the one previously specified. Pass empty array to disable tracking.
      * Use takeComputedStyleUpdates to retrieve the list of nodes that had properties modified.
@@ -1413,6 +1419,20 @@ declare namespace ProtocolProxyApi {
      * query results).
      */
     invoke_setDeviceMetricsOverride(params: Protocol.Emulation.SetDeviceMetricsOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Start reporting the given posture value to the Device Posture API.
+     * This override can also be set in setDeviceMetricsOverride().
+     */
+    invoke_setDevicePostureOverride(params: Protocol.Emulation.SetDevicePostureOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Clears a device posture override set with either setDeviceMetricsOverride()
+     * or setDevicePostureOverride() and starts using posture information from the
+     * platform again.
+     * Does nothing if no override is set.
+     */
+    invoke_clearDevicePostureOverride(): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_setScrollbarsHidden(params: Protocol.Emulation.SetScrollbarsHiddenRequest): Promise<Protocol.ProtocolResponseWithError>;
 
@@ -3144,6 +3164,18 @@ declare namespace ProtocolProxyApi {
      * Enables/disables issuing of Attribution Reporting events.
      */
     invoke_setAttributionReportingTracking(params: Protocol.Storage.SetAttributionReportingTrackingRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Sends all pending Attribution Reports immediately, regardless of their
+     * scheduled report time.
+     */
+    invoke_sendPendingAttributionReports(): Promise<Protocol.Storage.SendPendingAttributionReportsResponse>;
+
+    /**
+     * Returns the effective Related Website Sets in use by this profile for the browser
+     * session. The effective Related Website Sets will not change during a browser session.
+     */
+    invoke_getRelatedWebsiteSets(): Promise<Protocol.Storage.GetRelatedWebsiteSetsResponse>;
 
   }
   export interface StorageDispatcher {

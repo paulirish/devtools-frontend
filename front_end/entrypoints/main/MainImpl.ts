@@ -289,11 +289,9 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timeline-as-console-profile-result-panel',
         'View console.profile() results in the Performance panel for Node.js', true);
-
-    // JS Profiler
     Root.Runtime.experiments.register(
-        'js-profiler-temporarily-enable', 'Enable JavaScript Profiler temporarily', /* unstable= */ false,
-        'https://goo.gle/js-profiler-deprecation', 'https://crbug.com/1354548');
+        'timeline-track-configuration',
+        'Timeline: Enable track configuration feature that can reorder or hide a track in the flame chart', true);
 
     // Sources
     Root.Runtime.experiments.register(
@@ -372,9 +370,6 @@ export class MainImpl {
         'Enable background page selector (e.g. for prerendering debugging)', false);
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.SELF_XSS_WARNING, 'Show warning about Self-XSS when pasting code');
-
-    Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.STORAGE_BUCKETS_TREE, 'Enable Storage Buckets Tree in Application panel', true);
 
     Root.Runtime.experiments.register(
@@ -387,7 +382,20 @@ export class MainImpl {
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-        'Enable Autofill view',
+        'Autofill panel',
+        false,
+        'https://goo.gle/devtools-autofill-panel',
+        'https://crbug.com/329106326',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
+        'Timeline: Show postMessage dispatch and handling flows',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
+        'Enable save and load trace with annotations in Performance Panel',
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
@@ -395,7 +403,6 @@ export class MainImpl {
       'set-all-breakpoints-eagerly',
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
-      Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
       'evaluate-expressions-with-source-maps',
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,
@@ -455,9 +462,7 @@ export class MainImpl {
     themeSetting.addChangeListener(onThemeChange);
 
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged, async () => {
-          await ThemeSupport.ThemeSupport.fetchColors(document);
-        }, this);
+        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged, () => ThemeSupport.ThemeSupport.fetchColors(document));
 
     UI.UIUtils.installComponentRootStyles((document.body as Element));
 
@@ -564,7 +569,7 @@ export class MainImpl {
     const app = (appProvider as Common.AppProvider.AppProvider).createApp();
     // It is important to kick controller lifetime after apps are instantiated.
     UI.DockController.DockController.instance().initialize();
-    await ThemeSupport.ThemeSupport.fetchColors(document);
+    ThemeSupport.ThemeSupport.fetchColors(document);
     app.presentUI(document);
 
     if (UI.ActionRegistry.ActionRegistry.instance().hasAction('elements.toggle-element-search')) {
@@ -818,7 +823,8 @@ export class MainMenuItem implements UI.Toolbar.Provider {
           i18nString(UIStrings.placementOfDevtoolsRelativeToThe, {PH1: toggleDockSideShorcuts[0].title()}));
       dockItemElement.appendChild(titleElement);
       const dockItemToolbar = new UI.Toolbar.Toolbar('', dockItemElement);
-      dockItemElement.setAttribute('jslog', `${VisualLogging.item('dock-side')}`);
+      dockItemElement.setAttribute(
+          'jslog', `${VisualLogging.item('dock-side').track({keydown: 'ArrowDown|ArrowLeft|ArrowRight'})}`);
       dockItemToolbar.makeBlueOnHover();
       const undock = new UI.Toolbar.ToolbarToggle(
           i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'undock');

@@ -43,7 +43,7 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         return this.#request.url;
     }
     resourceType() {
-        return this.initiator().type.toLowerCase();
+        throw new Errors_js_1.UnsupportedOperation();
     }
     method() {
         return this.#request.method;
@@ -101,8 +101,8 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     continueRequestOverrides() {
         throw new Errors_js_1.UnsupportedOperation();
     }
-    continue(_overrides = {}) {
-        throw new Errors_js_1.UnsupportedOperation();
+    async continue(_overrides = {}) {
+        return await this.#request.continueRequest();
     }
     responseForRequest() {
         throw new Errors_js_1.UnsupportedOperation();
@@ -119,10 +119,10 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     finalizeInterceptions() {
         throw new Errors_js_1.UnsupportedOperation();
     }
-    abort() {
-        throw new Errors_js_1.UnsupportedOperation();
+    async abort() {
+        return await this.#request.failRequest();
     }
-    respond(_response, _priority) {
+    async respond(_response, _priority) {
         throw new Errors_js_1.UnsupportedOperation();
     }
 }

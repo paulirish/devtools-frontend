@@ -121,13 +121,14 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.HEADER_OVERRIDES,
   Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
   Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY,
-  Root.Runtime.ExperimentName.SELF_XSS_WARNING,
   'evaluate-expressions-with-source-maps',
   Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
   'font-editor',
   Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
   Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE,
   Root.Runtime.ExperimentName.AUTOFILL_VIEW,
+  Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
+  Root.Runtime.ExperimentName.TIMELINE_TRACK_CONFIGURATION,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -193,6 +194,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'allow-scroll-past-eof', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'css-source-maps-enabled', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'inline-variable-values', true),
+    createSettingValue(Common.Settings.SettingCategory.SOURCES, 'auto-pretty-print-minified', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'js-source-maps-enabled', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'show-whitespaces-in-editor', 'none'),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-autocompletion', true),

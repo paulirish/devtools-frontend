@@ -49,7 +49,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AddDebugInfoURLDialog} from './AddSourceMapURLDialog.js';
-import {BreakpointEditDialog, type BreakpointEditDialogResult} from './BreakpointEditDialog.js';
+import {BreakpointEditDialog} from './BreakpointEditDialog.js';
 import * as SourceComponents from './components/components.js';
 import {Plugin} from './Plugin.js';
 import {SourcesPanel} from './SourcesPanel.js';
@@ -171,6 +171,14 @@ const UIStrings = {
    *@example {app.wasm} PH1
    */
   debugInfoNotFound: 'Failed to load any debug info for {PH1}.',
+  /**
+   *@description Text of a button to open up details on a request when no debug info could be loaded
+   */
+  showRequest: 'Show request',
+  /**
+   *@description Tooltip text that shows on hovering over a button to see more details on a request
+   */
+  openDeveloperResources: 'Opens the request in the Developer resource panel',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/DebuggerPlugin.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -911,7 +919,6 @@ export class DebuggerPlugin extends Plugin {
       }
       SourceComponents.BreakpointsView.BreakpointsSidebarController.instance().breakpointEditFinished(
           breakpoint, oldCondition !== result.condition);
-      recordBreakpointWithConditionAdded(result);
       if (breakpoint) {
         breakpoint.setCondition(result.condition, result.isLogpoint);
       } else if (location) {
@@ -958,21 +965,6 @@ export class DebuggerPlugin extends Plugin {
     dialog.focusEditor();
     this.activeBreakpointDialog = dialog;
     this.#activeBreakpointEditRequest = breakpointEditRequest;
-
-    // This counts new conditional breakpoints or logpoints that are added.
-    function recordBreakpointWithConditionAdded(result: BreakpointEditDialogResult): void {
-      const {condition: newCondition, isLogpoint} = result;
-      const isConditionalBreakpoint = newCondition.length !== 0 && !isLogpoint;
-
-      const wasLogpoint = breakpoint?.isLogpoint();
-      const wasConditionalBreakpoint = oldCondition && oldCondition.length !== 0 && !wasLogpoint;
-      if (isLogpoint && !wasLogpoint) {
-        Host.userMetrics.breakpointWithConditionAdded(Host.UserMetrics.BreakpointWithConditionAdded.Logpoint);
-      } else if (isConditionalBreakpoint && !wasConditionalBreakpoint) {
-        Host.userMetrics.breakpointWithConditionAdded(
-            Host.UserMetrics.BreakpointWithConditionAdded.ConditionalBreakpoint);
-      }
-    }
 
     function isSameEditRequest(editA: BreakpointEditRequest, editB: BreakpointEditRequest): boolean {
       if (editA.line.number !== editB.line.number) {
@@ -1488,9 +1480,19 @@ export class DebuggerPlugin extends Plugin {
       return;
     }
     for (const resource of warning.resources) {
-      const detailsRow =
-          this.missingDebugInfoBar?.createDetailsRowMessage(i18nString(UIStrings.debugFileNotFound, {PH1: resource}));
+      const detailsRow = this.missingDebugInfoBar?.createDetailsRowMessage(
+          i18nString(UIStrings.debugFileNotFound, {PH1: Common.ParsedURL.ParsedURL.extractName(resource.resourceUrl)}));
       if (detailsRow) {
+        const pageResourceKey =
+            SDK.PageResourceLoader.PageResourceLoader.makeExtensionKey(resource.resourceUrl, resource.initiator);
+        if (SDK.PageResourceLoader.PageResourceLoader.instance().getResourcesLoaded().get(pageResourceKey)) {
+          const showRequest = UI.UIUtils.createTextButton(i18nString(UIStrings.showRequest), () => {
+            void Common.Revealer.reveal(new SDK.PageResourceLoader.ResourceKey(pageResourceKey));
+          }, {className: 'link-style devtools-link', jslogContext: 'show-request'});
+          showRequest.style.setProperty('margin-left', '10px');
+          showRequest.title = i18nString(UIStrings.openDeveloperResources);
+          detailsRow.appendChild(showRequest);
+        }
         detailsRow.classList.add('infobar-selectable');
       }
     }
@@ -1914,7 +1916,7 @@ class BreakpointInlineMarker extends CodeMirror.WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span');
     span.className = this.class;
-    span.setAttribute('jslog', `${VisualLogging.breakpointMarker('inline').track({click: true})}`);
+    span.setAttribute('jslog', `${VisualLogging.breakpointMarker().track({click: true})}`);
     span.addEventListener('click', (event: MouseEvent) => {
       this.parent.onInlineBreakpointMarkerClick(event, this.breakpoint);
       event.consume();
@@ -1945,7 +1947,7 @@ class BreakpointGutterMarker extends CodeMirror.GutterMarker {
 
   override toDOM(view: CodeMirror.EditorView): Node {
     const div = document.createElement('div');  // We want {display: block} so it uses all of the space.
-    div.setAttribute('jslog', `${VisualLogging.breakpointMarker('gutter').track({click: true})}`);
+    div.setAttribute('jslog', `${VisualLogging.breakpointMarker().track({click: true})}`);
     const line = view.state.doc.lineAt(this.#position).number;
     const formatNumber = view.state.facet(SourceFrame.SourceFrame.LINE_NUMBER_FORMATTER);
     div.textContent = formatNumber(line, view.state);
@@ -2337,7 +2339,7 @@ function containsSideEffects(doc: CodeMirror.Text, root: CodeMirror.SyntaxNode):
           return false;
         }
         case 'ArithOp': {
-          const op = doc.sliceString(node.from, node.to);
+          const op = doc.sliceString(root.from + node.from, root.from + node.to);
           if (op === '++' || op === '--') {
             containsSideEffects = true;
             return false;

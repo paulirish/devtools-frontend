@@ -956,7 +956,7 @@ export declare interface Configuration {
     /**
      * Tells Puppeteer to not chrome-headless-shell download during installation.
      *
-     * Can be overridden by `PUPPETEER_SKIP_CHROME_HEADLESSS_HELL_DOWNLOAD`.
+     * Can be overridden by `PUPPETEER_SKIP_CHROME_HEADLESS_SHELL_DOWNLOAD`.
      */
     skipChromeHeadlessShellDownload?: boolean;
     /**
@@ -2418,7 +2418,10 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
     /* Excluded from this release type: mainRealm */
     /* Excluded from this release type: isolatedRealm */
     /* Excluded from this release type: clearDocumentHandle */
-    /* Excluded from this release type: frameElement */
+    /**
+     * @returns The frame element associated with this frame (if any).
+     */
+    frameElement(): Promise<HandleFor<HTMLIFrameElement> | null>;
     /**
      * Behaves identically to {@link Page.evaluateHandle} except it's run within
      * the context of this frame.
@@ -2427,7 +2430,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      */
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
     /**
-     * Behaves identically to {@link Page.evaluate} except it's run within the
+     * Behaves identically to {@link Page.evaluate} except it's run within
      * the context of this frame.
      *
      * @see {@link Page.evaluate} for details.
@@ -2601,6 +2604,13 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * @remarks
      * This value is calculated once when the frame is created, and will not
      * update if the attribute is changed later.
+     *
+     * @deprecated Use
+     *
+     * ```ts
+     * const element = await frame.frameElement();
+     * const nameOrId = await element.evaluate(frame => frame.name ?? frame.id);
+     * ```
      */
     name(): string;
     /**
@@ -3232,10 +3242,17 @@ export declare abstract class HTTPResponse {
     abstract timing(): Protocol.Network.ResourceTiming | null;
     /**
      * Promise which resolves to a buffer with response body.
+     *
+     * @remarks
+     *
+     * The buffer might be re-encoded by the browser
+     * based on HTTP-headers or other heuristics. If the browser
+     * failed to detect the correct encoding, the buffer might
+     * be encoded incorrectly. See https://github.com/puppeteer/puppeteer/issues/6478.
      */
     abstract buffer(): Promise<Buffer>;
     /**
-     * Promise which resolves to a text representation of response body.
+     * Promise which resolves to a text (utf8) representation of response body.
      */
     text(): Promise<string>;
     /**
@@ -4875,7 +4892,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * Functions installed via `page.exposeFunction` survive navigations.
      *
-     * :::note
+     * :::
      *
      * @example
      * An example of adding an `md5` function into the page:
@@ -6877,7 +6894,7 @@ export declare interface ScreenshotOptions {
      */
     path?: string;
     /**
-     * Specifies the region of the page to clip.
+     * Specifies the region of the page/element to clip.
      */
     clip?: ScreenshotClip;
     /**
@@ -7351,6 +7368,7 @@ export declare interface WaitForOptions {
      * @defaultValue `'load'`
      */
     waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
+    /* Excluded from this release type: ignoreSameDocumentNavigation */
 }
 
 /**

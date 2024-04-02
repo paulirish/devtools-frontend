@@ -77,7 +77,9 @@ export class SoftDropDown<T> implements ListDelegate<T> {
         .appendChild(this.list.element);
     ARIAUtils.markAsMenu(this.list.element);
     VisualLogging.setMappedParent(this.list.element, this.element);
-    this.list.element.setAttribute('jslog', `${VisualLogging.menu().parent('mapped').track({resize: true})}`);
+    this.list.element.setAttribute(
+        'jslog',
+        `${VisualLogging.menu().parent('mapped').track({resize: true, keydown: 'ArrowUp|ArrowDown|PageUp|PageDown'})}`);
 
     this.listWasShowing200msAgo = false;
     this.element.addEventListener('mousedown', event => {
@@ -100,6 +102,10 @@ export class SoftDropDown<T> implements ListDelegate<T> {
         return;
       }
       this.selectHighlightedItem();
+      if (event.target instanceof Element && event.target?.parentElement) {
+        // hide() will consume the mouseup event and click won't be triggered
+        void VisualLogging.logClick(event.target.parentElement, event);
+      }
       this.hide(event);
     }, false);
     model.addEventListener(ListModelEvents.ItemsReplaced, this.itemsReplaced, this);

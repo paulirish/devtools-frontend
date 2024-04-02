@@ -26,9 +26,8 @@ export class AdvancedApp implements Common.App.App {
         UI.DockController.Events.BeforeDockSideChanged, this.openToolboxWindow, this);
 
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged, async () => {
-          await ThemeSupport.ThemeSupport.fetchColors(this.toolboxDocument);
-        }, this);
+        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged,
+        () => ThemeSupport.ThemeSupport.fetchColors(this.toolboxDocument));
   }
 
   /**
@@ -85,6 +84,7 @@ export class AdvancedApp implements Common.App.App {
 
   deviceModeEmulationFrameLoaded(toolboxDocument: Document): void {
     ThemeSupport.ThemeSupport.instance().applyTheme(toolboxDocument);
+    ThemeSupport.ThemeSupport.fetchColors(toolboxDocument);
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       ThemeSupport.ThemeSupport.instance().applyTheme(toolboxDocument);
     });

@@ -13,6 +13,9 @@ const ConsoleInsight = Explain.ConsoleInsight;
 
 const component = new ConsoleInsight(
     {
+      getSearchQuery() {
+        return '';
+      },
       async buildPrompt() {
         return {prompt: '', sources: []};
       },
@@ -36,7 +39,7 @@ Images: ![https://example.com](https://example.com)
             };
           },
     },
-    'Understand this error', {
+    {
       isSyncActive: true,
       accountEmail: 'some-email',
     });

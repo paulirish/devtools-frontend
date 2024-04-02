@@ -274,7 +274,7 @@ export interface ScreenshotOptions {
    */
   path?: string;
   /**
-   * Specifies the region of the page to clip.
+   * Specifies the region of the page/element to clip.
    */
   clip?: ScreenshotClip;
   /**
@@ -1342,7 +1342,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * Functions installed via `page.exposeFunction` survive navigations.
    *
-   * :::note
+   * :::
    *
    * @example
    * An example of adding an `md5` function into the page:
@@ -2458,7 +2458,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
     };
     if (options.type === undefined && options.path !== undefined) {
       const filePath = options.path;
-      // Note we cannot use Node.js here due to browser compatability.
+      // Note we cannot use Node.js here due to browser compatibility.
       const extension = filePath
         .slice(filePath.lastIndexOf('.') + 1)
         .toLowerCase();
