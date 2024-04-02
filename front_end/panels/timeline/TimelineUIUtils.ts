@@ -1289,11 +1289,11 @@ export class TimelineUIUtils {
         contentHelper.appendTextRow(i18nString(UIStrings.collected), Platform.NumberUtilities.bytesToString(delta));
         break;
       }
-      case recordTypes.JSSample: {
-        // Don't need this as another codepath will print it
-        // contentHelper.createChildStackTraceElement(TimelineUIUtils.stackTraceFromCallFrames(event.args.data.stackTrace));
-        // break;
-      }
+      // case recordTypes.JSSample: {
+      //   // Don't need this as another codepath will print it
+      //   // contentHelper.createChildStackTraceElement(TimelineUIUtils.stackTraceFromCallFrames(event.args.data.stackTrace));
+      //   // break;
+      // }
       case recordTypes.JSRoot:
       case recordTypes.JSFrame:
       case TraceEngine.Types.TraceEvents.KnownEventName.ProfileCall:

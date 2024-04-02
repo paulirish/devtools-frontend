@@ -109,9 +109,6 @@ export class SamplesIntegrator {
     const stack = [];
     for (let i = 0; i < mergedEvents.length; i++) {
       const event = mergedEvents[i];
-      if (event.ts === 78870337793) {
-        debugger;
-      }
 
       if (event.name === 'JSSample') {
         this.#constructedProfileCalls.push(event);  // TEMP. lets include the samples so i can see them.

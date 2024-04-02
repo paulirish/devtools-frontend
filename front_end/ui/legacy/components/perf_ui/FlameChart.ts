@@ -1916,6 +1916,19 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // like one solid block and is not very easy to distinguish when events
     // start and end.
     context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
+
+    // Draw lil diamonds on instant events.
+    if (0.2 < barWidth && barWidth <= 1) {
+      const miniRectSize = 2;
+      const half = miniRectSize / 2;
+      const adjX = barX + 0.25;  // position middle of the 0.5px line.
+      const adjY = barY + (barHeight - 1) / 2 - half;
+      context.moveTo(adjX, adjY);
+      context.lineTo(adjX + half, adjY + half);
+      context.lineTo(adjX, adjY + miniRectSize);
+      context.lineTo(adjX - half, adjY + half);
+      context.lineTo(adjX, adjY);
+    }
   }
 
   #eventBarHeight(timelineData: FlameChartTimelineData, entryIndex: number): number {
@@ -1939,6 +1952,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const entryStartTime = entryStartTimes[entryIndex];
     const barXStart = this.timeToPositionClipped(entryStartTime);
     const barXEnd = this.timeToPositionClipped(entryStartTime + duration);
+    return barXEnd - barXStart;
     // Ensure that the width of the bar is at least one pixel.
     const barWidth = Math.max(barXEnd - barXStart, 1);
     return barWidth;
