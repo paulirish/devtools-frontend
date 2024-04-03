@@ -34,18 +34,17 @@
 import * as Platform from '../platform/platform.js';
 
 import {ColorConverter} from './ColorConverter.js';
-
 import {
   blendColors,
+  type Color3D,
+  type Color4D,
+  type Color4DOr3D,
   contrastRatioAPCA,
   desiredLuminanceAPCA,
   luminance,
   luminanceAPCA,
   rgbToHsl,
   rgbToHwb,
-  type Color3D,
-  type Color4D,
-  type Color4DOr3D,
 } from './ColorUtils.js';
 
 // <hue> is defined as a <number> or <angle>
@@ -2438,7 +2437,97 @@ export class Generator {
     const s = this.indexToValueInSpace(hash >> 8, this.#satSpace);
     const l = this.indexToValueInSpace(hash >> 16, this.#lightnessSpace);
     const a = this.indexToValueInSpace(hash >> 24, this.#alphaSpace);
-    const start = `oklch(${l/100} ${s/6/100} ${h}`; // LCH WHAT UP
+    const start = `hsl(${h}deg ${s}% ${l}%`;
+    if (a !== 1) {
+      return `${start} / ${Math.floor(a * 100)}%)`;
+    }
+    return `${start})`;
+  }
+
+  private indexToValueInSpace(index: number, space: number|{
+    min: number,
+    max: number,
+    count: (number|undefined),
+  }): number {
+    if (typeof space === 'number') {
+      return space;
+    }
+    const count = space.count || space.max - space.min;
+    index %= count;
+    return space.min + Math.floor(index / (count - 1) * (space.max - space.min));
+  }
+}
+
+export class GeneratorOKLCH {
+  readonly lightnessSpace: number|{
+    min: number,
+    max: number,
+    count: (number|undefined),
+  };
+  readonly chromaSpace: number|{
+    min: number,
+    max: number,
+    count: (number|undefined),
+  };
+  readonly hueSpace: number|{
+    min: number,
+    max: number,
+    count: (number|undefined),
+  };
+  readonly #alphaSpace: number|{
+    min: number,
+    max: number,
+    count: (number|undefined),
+  };
+  readonly #colors: Map<string, string>;
+  constructor(
+      lightnessSpace?: number|{
+        min: number,
+        max: number,
+        count: (number|undefined),
+      },
+      chromaSpace?: number|{
+        min: number,
+        max: number,
+        count: (number|undefined),
+      },
+      hueSpace?: number|{
+        min: number,
+        max: number,
+        count: (number|undefined),
+      },
+      alphaSpace?: number|{
+        min: number,
+        max: number,
+        count: (number|undefined),
+      }) {
+    this.lightnessSpace = lightnessSpace || {min: 0, max: 100, count: undefined};
+    this.chromaSpace = chromaSpace || {min: 0, max: 0.37, count: undefined};
+    this.hueSpace = hueSpace || {min: 0, max: 360, count: undefined};
+    this.#alphaSpace = alphaSpace || 1;
+    this.#colors = new Map();
+  }
+
+  setColorForID(id: string, color: string): void {
+    this.#colors.set(id, color);
+  }
+
+  colorForID(id: string): string {
+    let color = this.#colors.get(id);
+    if (!color) {
+      color = this.generateColorForID(id);
+      this.#colors.set(id, color);
+    }
+    return color;
+  }
+
+  private generateColorForID(id: string): string {
+    const hash = Platform.StringUtilities.hashCode(id);
+    const l = this.indexToValueInSpace(hash, this.lightnessSpace);
+    const c = this.indexToValueInSpace(hash >> 8, this.chromaSpace);
+    const h = this.indexToValueInSpace(hash >> 16, this.hueSpace);
+    const a = this.indexToValueInSpace(hash >> 24, this.#alphaSpace);
+    const start = `oklch(${l}% ${c} ${h}`;  // LCH WHAT UP
     if (a !== 1) {
       return `${start} / ${Math.floor(a * 100)}%)`;
     }

@@ -148,7 +148,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ThreadAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'Thread';
 
-  #colorGenerator: Common.Color.Generator;
+  #colorGenerator: Common.Color.GeneratorOKLCH;
   #compatibilityBuilder: CompatibilityTracksAppender;
   #traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
 
@@ -176,8 +176,7 @@ export class ThreadAppender implements TrackAppender {
     // generator is used here to create colors for js frames (profile
     // calls) in the flamechart by hashing the script's url. We might
     // need to reconsider this generator when migrating to GM3 colors.
-    this.#colorGenerator =
-        new Common.Color.Generator({min: 30, max: 330, count: undefined}, {min: 50, max: 80, count: 3}, 85);
+    this.#colorGenerator = new Common.Color.GeneratorOKLCH(92, 0.07, {min: 70, max: 325, count: undefined});
     // Add a default color for call frames with no url.
     this.#colorGenerator.setColorForID('', '#f2ecdc');
     this.#traceParsedData = traceParsedData;
