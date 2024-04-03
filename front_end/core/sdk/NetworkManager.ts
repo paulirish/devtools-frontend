@@ -882,6 +882,10 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
   requestIntercepted({}: Protocol.Network.RequestInterceptedEvent): void {
   }
 
+  responseReceivedEarlyHints({}: Protocol.Network.ResponseReceivedEarlyHintsEvent): void {
+    // Not implemented.
+  }
+
   requestWillBeSentExtraInfo(
       {requestId, associatedCookies, headers, clientSecurityState, connectTiming, siteHasCookieInOtherPartition}:
           Protocol.Network.RequestWillBeSentExtraInfoEvent): void {
@@ -931,6 +935,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       cookiePartitionKeyOpaque,
       exemptedResponseCookies: exemptedCookies?.map(exemptedCookie => ({
                                                       cookie: Cookie.fromProtocolCookie(exemptedCookie.cookie),
+                                                      cookieLine: exemptedCookie.cookieLine,
                                                       exemptionReason: exemptedCookie.exemptionReason,
                                                     })),
     };
