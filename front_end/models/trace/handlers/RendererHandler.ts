@@ -34,9 +34,10 @@ const compositorTileWorkers = Array<{
 }>();
 const entryToNode: Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode> = new Map();
 let allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[] = [];
-const flowStartById: Map<number, {flowStart: Types.TraceEvents.TraceEventData, flowEnd: Types.TraceEvents.TraceEventData}> = new Map();
+const flowStartById:
+    Map<number, {flowStart: Types.TraceEvents.TraceEventData, flowEnd: Types.TraceEvents.TraceEventData}> = new Map();
 // For a given event, tell me what its initiator was (via flow events). An event can only have one initiator.
-const eventToInitiatorViaFlow = new Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>();
+const endToBeginViaFlow = new Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>();
 
 const completeEventStack: (Types.TraceEvents.SyntheticCompleteEvent)[] = [];
 
@@ -72,7 +73,7 @@ export function reset(): void {
   processes.clear();
   entryToNode.clear();
   flowStartById.clear();
-  eventToInitiatorViaFlow.clear();
+  endToBeginViaFlow.clear();
 
   allTraceEntries.length = 0;
   completeEventStack.length = 0;
@@ -136,12 +137,11 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
       const {flowStart} = flowStartById.get(event.id);
       flowStartById.set(event.id, {flowStart, flowEnd: event});
       // if (flowCompletion) {
-      //   eventToInitiatorViaFlow.set(flowCompletion, flowOpening);
+      //   endToBeginViaFlow.set(flowCompletion, flowOpening);
       //   // console.log('got pair', flowOpening, flowCompletion);
       // } else {
       //   console.log('NOOOOOOOOOOPE');
       // }
-
     }
   }
 }
@@ -171,7 +171,7 @@ export function data(): RendererHandlerData {
     compositorTileWorkers: new Map(gatherCompositorThreads()),
     entryToNode: new Map(entryToNode),
     allTraceEntries: [...allTraceEntries],
-    eventToInitiatorViaFlow: new Map(eventToInitiatorViaFlow),
+    endToBeginViaFlow: new Map(endToBeginViaFlow),
   };
 }
 
@@ -378,16 +378,15 @@ export function buildHierarchy(
 }
 
 
-function mapFlows(  processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
+function mapFlows(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
   for (const {flowStart, flowEnd} of flowStartById.values()) {
-
-     if (flowEnd.ts < flowStart.ts) {
+    if (flowEnd.ts < flowStart.ts) {
       console.warn('wrong order flows');
-     }
+    }
     const flowStartParent = entryToNode.get(flowStart)?.parent?.entry;
     const flowEndParent = entryToNode.get(flowEnd)?.parent?.entry;
     if (flowStartParent && flowEndParent) {
-      eventToInitiatorViaFlow.set(flowStartParent, flowEndParent);
+      endToBeginViaFlow.set(flowEndParent, flowStartParent);
     } else {
       // something?
     }
@@ -444,7 +443,7 @@ export interface RendererHandlerData {
    * samples.
    */
   allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[];
-  eventToInitiatorViaFlow: Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>;
+  endToBeginViaFlow: Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>;
 }
 
 export interface RendererProcess {

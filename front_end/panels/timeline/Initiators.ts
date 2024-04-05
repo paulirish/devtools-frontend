@@ -48,11 +48,13 @@ function findInitiatorDataPredecessors(
   while (currentEvent) {
     let currentInitiator = traceEngineData.Initiators.eventToInitiator.get(currentEvent);
 
-    const currentInitiatorByFlow = traceEngineData.Renderer.eventToInitiatorViaFlow.get(currentEvent);
+    const currentInitiatorByFlow = traceEngineData.Renderer.endToBeginViaFlow.get(currentEvent);
     if (currentInitiatorByFlow) {
-      if (currentEvent.ts < currentInitiatorByFlow.ts) { console.warn('these are in the wrong order...')}
-      else {
-        console.log('correct order');
+      if (currentEvent.ts < currentInitiatorByFlow.ts) {
+        console.warn('these are in the wrong order...')
+      } else {
+        console.log('initiator match', `${currentInitiatorByFlow.name}  ➵ ➛ ➲ ➤ ${currentEvent.name}`);
+        currentInitiator = currentInitiatorByFlow;
       }
     }
 
