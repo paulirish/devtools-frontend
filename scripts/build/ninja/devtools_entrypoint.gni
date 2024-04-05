@@ -196,12 +196,15 @@ template("devtools_entrypoint") {
       target_gen_dir + "/" + invoker.target_name + "-tsconfig.json"
   _target_outputs = [ _entrypoint_gen_file_location ]
 
+  devtools_skip_typecheck_str = "$devtools_skip_typecheck"
+
   node_action(target_name) {
     script = "scripts/build/ninja/generate-tsconfig.js"
 
     args = [
              rebase_path(_generated_tsconfig_location, root_build_dir),
              rebase_path(invoker.entrypoint, root_build_dir),
+             devtools_skip_typecheck_str,
            ] + invoker.deps
 
     public_deps = _devtools_entrypoint_deps

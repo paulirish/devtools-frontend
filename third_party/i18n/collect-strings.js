@@ -9,7 +9,7 @@
 'use strict';
 
 const fs = require('fs');
-const glob = require('glob');
+const glob = require('fast-glob');
 const path = require('path');
 const tsc = require('typescript');
 const {collectAndBakeCtcStrings} = require('./bake-ctc-to-lhl.js');
