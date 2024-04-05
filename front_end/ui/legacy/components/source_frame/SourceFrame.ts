@@ -38,6 +38,7 @@ import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as CodeMirror from '../../../../third_party/codemirror.next/codemirror.next.js';
 import * as CodeHighlighter from '../../../components/code_highlighter/code_highlighter.js';
 import * as TextEditor from '../../../components/text_editor/text_editor.js';
+import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
 import selfXssDialogStyles from './selfXssDialog.css.legacy.js';
@@ -200,6 +201,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
     this.textEditorInternal = new TextEditor.TextEditor.TextEditor(this.placeholderEditorState(''));
     this.textEditorInternal.style.flexGrow = '1';
+
     this.element.appendChild(this.textEditorInternal);
     this.element.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.defaultPrevented) {
@@ -325,12 +327,11 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 
   protected onPaste(): boolean {
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SELF_XSS_WARNING) &&
-        !Root.Runtime.Runtime.queryParam('isChromeForTesting') && !this.selfXssWarningDisabledSetting.get()) {
-      void this.showSelfXssWarning();
-      return true;
+    if (Root.Runtime.Runtime.queryParam('isChromeForTesting') || this.selfXssWarningDisabledSetting.get()) {
+      return false;
     }
-    return false;
+    void this.showSelfXssWarning();
+    return true;
   }
 
   async showSelfXssWarning(): Promise<void> {
@@ -384,7 +385,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 
   setCanPrettyPrint(canPrettyPrint: boolean, autoPrettyPrint?: boolean): void {
-    this.shouldAutoPrettyPrint = canPrettyPrint && Boolean(autoPrettyPrint);
+    this.shouldAutoPrettyPrint = autoPrettyPrint === true &&
+        Common.Settings.Settings.instance().moduleSetting('auto-pretty-print-minified').get();
     this.prettyToggle.setVisible(canPrettyPrint);
   }
 
@@ -467,6 +469,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   private updateLineNumberFormatter(): void {
     this.textEditor.dispatch({effects: config.lineNumbers.reconfigure(this.getLineNumberFormatter())});
+    this.textEditor.shadowRoot?.querySelector('.cm-lineNumbers')
+        ?.setAttribute('jslog', `${VisualLogging.gutter('line-numbers').track({click: true})}`);
   }
 
   private updatePrettyPrintState(): void {
@@ -718,6 +722,11 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.innerRevealPositionIfNeeded();
     this.innerSetSelectionIfNeeded();
     this.innerScrollToLineIfNeeded();
+    this.textEditor.shadowRoot?.querySelector('.cm-lineNumbers')
+        ?.setAttribute('jslog', `${VisualLogging.gutter('line-numbers').track({click: true})}`);
+    this.textEditor.shadowRoot?.querySelector('.cm-foldGutter')
+        ?.setAttribute('jslog', `${VisualLogging.gutter('fold')}`);
+    this.textEditor.shadowRoot?.querySelector('.cm-content')?.setAttribute('jslog', `${VisualLogging.textField()}`);
   }
 
   onTextChanged(): void {
@@ -1031,7 +1040,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   onContextMenu(event: MouseEvent): boolean {
     event.consume(true);  // Consume event now to prevent document from handling the async menu
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-text-area'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     const {state} = this.textEditor;
     const pos = state.selection.main.from, line = state.doc.lineAt(pos);
     this.populateTextAreaContextMenu(contextMenu, line.number - 1, pos - line.from);
@@ -1046,7 +1055,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   onLineGutterContextMenu(position: number, event: MouseEvent): boolean {
     event.consume(true);  // Consume event now to prevent document from handling the async menu
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-line-gutter'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     const lineNumber = this.textEditor.state.doc.lineAt(position).number - 1;
     this.populateLineGutterContextMenu(contextMenu, lineNumber);
     contextMenu.appendApplicableItems(this);
@@ -1084,11 +1093,11 @@ class SearchMatch {
 
 export class SelfXssWarningDialog {
   static async show(): Promise<boolean> {
-    const dialog = new UI.Dialog.Dialog();
+    const dialog = new UI.Dialog.Dialog('self-xss-warning');
     dialog.setMaxContentSize(new UI.Geometry.Size(504, 340));
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SetExactWidthMaxHeight);
     dialog.setDimmed(true);
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         dialog.contentElement, {cssFile: selfXssDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');
 
@@ -1106,7 +1115,7 @@ export class SelfXssWarningDialog {
       content.createChild('div', 'message').textContent =
           i18nString(UIStrings.doNotPaste, {PH1: i18nString(UIStrings.allowPasting)});
 
-      const input = UI.UIUtils.createInput('text-input', 'text');
+      const input = UI.UIUtils.createInput('text-input', 'text', 'allow-pasting');
       input.placeholder = i18nString(UIStrings.typeAllowPasting, {PH1: i18nString(UIStrings.allowPasting)});
       content.appendChild(input);
 

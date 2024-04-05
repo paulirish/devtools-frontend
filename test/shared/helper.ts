@@ -247,6 +247,12 @@ export const getTextContent =
   return text ?? undefined;
 };
 
+export const getAllTextContents =
+    async(selector: string, root?: puppeteer.JSHandle, handler = 'pierce'): Promise<Array<string|null>> => {
+  const allElements = await $$(selector, root, handler);
+  return Promise.all(allElements.map(e => e.evaluate(e => e.textContent)));
+};
+
 /**
  * Match multiple elements based on a selector and return their textContents, but only for those
  * elements that are visible.
@@ -436,6 +442,10 @@ export const setDevToolsSettings = async (settings: Record<string, string>) => {
   await reloadDevTools();
 };
 
+export function goToHtml(html: string): Promise<void> {
+  return goTo(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
 export const goTo = async (url: string, options: puppeteer.WaitForOptions = {}) => {
   const {target} = getBrowserAndPages();
   await target.goto(url, options);
@@ -579,6 +589,10 @@ export const selectTextFromNodeToNode = async (
 
     return navigator.clipboard.readText();
   }, await from, await to, direction);
+};
+
+export const clickMoreTabsButton = async (root?: puppeteer.ElementHandle<Element>) => {
+  await click('aria/More tabs', {root});
 };
 
 export const closePanelTab = async (panelTabSelector: string) => {

@@ -30,7 +30,7 @@ import {
   ViewPersistence,
   type ViewRegistration,
 } from './ViewRegistration.js';
-import {VBox, type Widget, type WidgetElement} from './Widget.js';
+import {VBox, type Widget} from './Widget.js';
 
 const UIStrings = {
   /**
@@ -41,10 +41,6 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/ViewManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-export const defaultOptionsForTabs = {
-  security: true,
-};
 
 export class PreRegisteredView implements View {
   private readonly viewRegistration: ViewRegistration;
@@ -334,8 +330,8 @@ export class ViewManager {
     return new TabbedLocation(this, revealCallback, location, restoreSelection, allowReorder, defaultTab);
   }
 
-  createStackLocation(revealCallback?: (() => void), location?: string): ViewLocation {
-    return new StackLocation(this, revealCallback, location);
+  createStackLocation(revealCallback?: (() => void), location?: string, jslogContext?: string): ViewLocation {
+    return new StackLocation(this, revealCallback, location, jslogContext);
   }
 
   hasViewsForLocation(location: string): boolean {
@@ -424,8 +420,10 @@ class ExpandableContainerWidget extends VBox {
 
     this.titleElement = document.createElement('div');
     this.titleElement.classList.add('expandable-view-title');
-    this.titleElement.setAttribute(
-        'jslog', `${VisualLogging.sectionHeader().context(view.viewId()).track({click: true})}`);
+    this.titleElement.setAttribute('jslog', `${VisualLogging.sectionHeader().context(view.viewId()).track({
+                                     click: true,
+                                     keydown: 'Enter|Space|ArrowLeft|ArrowRight',
+                                   })}`);
     ARIAUtils.markAsTreeitem(this.titleElement);
     this.titleExpandIcon = IconButton.Icon.create('triangle-right', 'title-expand-icon');
     this.titleElement.appendChild(this.titleExpandIcon);
@@ -620,6 +618,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
   private setOrUpdateCloseableTabsSetting(): void {
     // Update the setting value, we respect the closed state decided by the user
     // and append the new tabs with value of true so they are shown open
+    const defaultOptionsForTabs = {'security': true, 'chrome-recorder': true};
     const newClosable = {
       ...defaultOptionsForTabs,
       ...this.closeableTabSetting.get(),
@@ -698,11 +697,12 @@ class TabbedLocation extends Location implements TabbedViewLocation {
         contextMenu.defaultSection().appendItem(title, () => {
           Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
           void this.showView(view, undefined, true);
-        });
+        }, {jslogContext: 'issues-pane'});
         continue;
       }
 
-      contextMenu.defaultSection().appendItem(title, this.showView.bind(this, view, undefined, true));
+      contextMenu.defaultSection().appendItem(
+          title, this.showView.bind(this, view, undefined, true), {jslogContext: view.viewId()});
     }
   }
 
@@ -834,9 +834,9 @@ class StackLocation extends Location implements ViewLocation {
   private readonly vbox: VBox;
   private readonly expandableContainers: Map<string, ExpandableContainerWidget>;
 
-  constructor(manager: ViewManager, revealCallback?: (() => void), location?: string) {
+  constructor(manager: ViewManager, revealCallback?: (() => void), location?: string, jslogContext?: string) {
     const vbox = new VBox();
-    vbox.element.setAttribute('jslog', `${VisualLogging.pane('sidebar')}`);
+    vbox.element.setAttribute('jslog', `${VisualLogging.pane(jslogContext || 'sidebar').track({resize: true})}`);
     super(manager, vbox, revealCallback);
     this.vbox = vbox;
     ARIAUtils.markAsTree(vbox.element);
@@ -859,7 +859,7 @@ class StackLocation extends Location implements ViewLocation {
       locationForView.set(view, this);
       this.manager.views.set(view.viewId(), view);
       container = new ExpandableContainerWidget(view);
-      let beforeElement: (WidgetElement|null)|null = null;
+      let beforeElement: Node|null = null;
       if (insertBefore) {
         const beforeContainer = expandableContainerForView.get(insertBefore);
         beforeElement = beforeContainer ? beforeContainer.element : null;

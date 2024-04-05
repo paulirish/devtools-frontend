@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as FrontendHelpers from '../../../../../test/unittests/front_end/helpers/EnvironmentHelpers.js';
-import * as ComponentHelpers from '../../helpers/helpers.js';
 import * as Explain from '../../../../panels/explain/explain.js';
+import * as FrontendHelpers from '../../../../testing/EnvironmentHelpers.js';
+import * as ComponentHelpers from '../../helpers/helpers.js';
 
 await ComponentHelpers.ComponentServerSetup.setup();
 await FrontendHelpers.initializeGlobalVars();
@@ -13,6 +13,9 @@ const ConsoleInsight = Explain.ConsoleInsight;
 
 const component = new ConsoleInsight(
     {
+      getSearchQuery() {
+        return '';
+      },
       async buildPrompt() {
         return {
           prompt: '',
@@ -67,9 +70,11 @@ Response status: 404`,
       },
     },
     {
-      async getInsights() {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return `Some text with \`code\`. Some code:
+      async *
+          fetch() {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            yield {
+              explanation: `Some text with \`code\`. Some code:
 \`\`\`ts
 console.log('test');
 document.querySelector('test').style = 'black';
@@ -84,10 +89,12 @@ Some text with \`code\`. Some code:
 console.log('test');
 document.querySelector('test').style = 'black';
 \`\`\`
-`;
-      },
+`,
+              metadata: {},
+            };
+          },
     },
-    'Explain this error', {
+    {
       isSyncActive: true,
       accountEmail: 'some-email',
     });

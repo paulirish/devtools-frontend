@@ -130,7 +130,7 @@ export class ElementsTreeOutline extends
 
     this.treeElementByNode = new WeakMap();
     const shadowContainer = document.createElement('div');
-    this.shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    this.shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         shadowContainer,
         {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.Style.default], delegatesFocus: undefined});
     const outlineDisclosureElement = this.shadowRoot.createChild('div', 'elements-disclosure');
@@ -159,7 +159,7 @@ export class ElementsTreeOutline extends
 
     outlineDisclosureElement.appendChild(this.elementInternal);
     this.element = shadowContainer;
-    this.element.setAttribute('jslog', `${VisualLogging.tree('elements')}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.tree('elements')}`);
 
     this.includeRootDOMNode = !omitRootDOMNode;
     this.selectEnabled = selectEnabled;
@@ -1791,6 +1791,7 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
     adorner.data = {
       name,
       content: adornerContent,
+      jslogContext: 'reveal',
     };
     this.listItemElement.appendChild(adorner);
     const onClick = ((() => {

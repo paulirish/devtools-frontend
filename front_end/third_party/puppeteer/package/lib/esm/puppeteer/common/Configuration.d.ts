@@ -54,7 +54,7 @@ export interface Configuration {
      * @remarks
      * This must include the protocol and may even need a path prefix.
      *
-     * @defaultValue Either https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing or
+     * @defaultValue Either https://storage.googleapis.com/chrome-for-testing-public or
      * https://archive.mozilla.org/pub/firefox/nightly/latest-mozilla-central,
      * depending on the product.
      */
@@ -99,7 +99,7 @@ export interface Configuration {
     /**
      * Tells Puppeteer to not chrome-headless-shell download during installation.
      *
-     * Can be overridden by `PUPPETEER_SKIP_CHROME_HEADLESSS_HELL_DOWNLOAD`.
+     * Can be overridden by `PUPPETEER_SKIP_CHROME_HEADLESS_SHELL_DOWNLOAD`.
      */
     skipChromeHeadlessShellDownload?: boolean;
     /**

@@ -405,7 +405,6 @@ window.DevToolsAPI = DevToolsAPI;
  */
 const EnumeratedHistogram = {
   ActionTaken: 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded: 'DevTools.BreakpointWithConditionAdded',
   BreakpointEditDialogRevealedFrom: 'DevTools.BreakpointEditDialogRevealedFrom',
   CSSHintShown: 'DevTools.CSSHintShown',
   DeveloperResourceLoaded: 'DevTools.DeveloperResourceLoaded',
@@ -447,9 +446,6 @@ const EnumeratedHistogram = {
   ColorConvertedFrom: 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom: 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation: 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed: 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown: 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount: 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated: 'DevTools.SwatchActivated',
   BadgeActivated: 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
@@ -674,6 +670,14 @@ const InspectorFrontendHostImpl = class {
    */
   openInNewTab(url) {
     DevToolsAPI.sendMessageToEmbedder('openInNewTab', [url], null);
+  }
+
+  /**
+   * @override
+   * @param {string} query
+   */
+  openSearchResultsInNewTab(query) {
+    DevToolsAPI.sendMessageToEmbedder('openSearchResultsInNewTab', [query], null);
   }
 
   /**
@@ -1126,10 +1130,19 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @param {string} request
+   * @param {number} streamId
    * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
    */
-  doAidaConversation(request, cb) {
-    DevToolsAPI.sendMessageToEmbedder('doAidaConversation', [request], cb);
+  doAidaConversation(request, streamId, cb) {
+    DevToolsAPI.sendMessageToEmbedder('doAidaConversation', [request, streamId], cb);
+  }
+
+  /**
+   * @param {string} request
+   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   */
+  registerAidaClientEvent(request) {
+    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request]);
   }
 };
 

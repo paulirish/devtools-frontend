@@ -410,7 +410,12 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
 
     const cell = document.createElement('th');
-    cell.setAttribute('jslog', `${VisualLogging.tableHeader().track({click: column.sortable}).context(columnId)}`);
+    cell.setAttribute(
+        'jslog',
+        `${
+            VisualLogging.tableHeader()
+                .track({click: column.sortable})
+                .context(Platform.StringUtilities.toKebabCase(columnId))}`);
     cell.className = columnId + '-column';
     nodeToColumnIdMap.set(cell, columnId);
     this.dataTableHeaders[columnId] = cell;
@@ -1023,7 +1028,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.positionResizers();
   }
 
-  setColumnsVisiblity(columnsVisibility: Set<string>): void {
+  setColumnsVisibility(columnsVisibility: Set<string>): void {
     this.visibleColumnsArray = [];
     for (const column of this.columnsArray) {
       if (columnsVisibility.has(column.id)) {
@@ -1104,6 +1109,12 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (!(event instanceof KeyboardEvent)) {
       return;
     }
+    if (this.selectedNode) {
+      if ((this.selectedNode.element() as HTMLElement).tabIndex < 0) {
+        void VisualLogging.logKeyDown(this.selectedNode.element(), event);
+      }
+    }
+
     if (event.shiftKey || event.metaKey || event.ctrlKey || this.editing || UI.UIUtils.isEditing()) {
       return;
     }
@@ -1335,12 +1346,13 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     const sortableColumns = [...sortableVisibleColumns, ...sortableHiddenColumns];
     if (sortableColumns.length > 0) {
-      const sortMenu = contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.sortByString));
+      const sortMenu =
+          contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.sortByString), false, 'sort-by');
       for (const column of sortableColumns) {
         const headerCell = this.dataTableHeaders[column.id];
         sortMenu.defaultSection().appendItem(
             (column.title as string), this.sortByColumnHeaderCell.bind(this, headerCell), {
-              jslogContext: column.id,
+              jslogContext: Platform.StringUtilities.toKebabCase(column.id),
             });
       }
     }
@@ -1349,17 +1361,20 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       if (this.headerContextMenuCallback) {
         this.headerContextMenuCallback(contextMenu);
       }
-      contextMenu.defaultSection().appendItem(i18nString(UIStrings.resetColumns), this.resetColumnWeights.bind(this));
+      contextMenu.defaultSection().appendItem(
+          i18nString(UIStrings.resetColumns), this.resetColumnWeights.bind(this), {jslogContext: 'reset-columns'});
       void contextMenu.show();
       return;
     }
 
     // Add header context menu to a subsection available from the body
-    const headerSubMenu = contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.headerOptions));
+    const headerSubMenu =
+        contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.headerOptions), false, 'header-options');
     if (this.headerContextMenuCallback) {
       this.headerContextMenuCallback(headerSubMenu);
     }
-    headerSubMenu.defaultSection().appendItem(i18nString(UIStrings.resetColumns), this.resetColumnWeights.bind(this));
+    headerSubMenu.defaultSection().appendItem(
+        i18nString(UIStrings.resetColumns), this.resetColumnWeights.bind(this), {jslogContext: 'reset-columns'});
 
     const isContextMenuKey = (event.button === 0);
     const gridNode = isContextMenuKey ? this.selectedNode : this.dataGridNodeFromNode(target);
@@ -1374,7 +1389,8 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       }
     }
     if (this.refreshCallback && (!gridNode || gridNode !== this.creationNode)) {
-      contextMenu.defaultSection().appendItem(i18nString(UIStrings.refresh), this.refreshCallback.bind(this));
+      contextMenu.defaultSection().appendItem(
+          i18nString(UIStrings.refresh), this.refreshCallback.bind(this), {jslogContext: 'refresh'});
     }
 
     if (gridNode && gridNode.selectable && !gridNode.isEventWithinDisclosureTriangle(event)) {
@@ -1383,7 +1399,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
           const firstEditColumnIndex = this.nextEditableColumn(-1);
           const tableCellElement = gridNode.element().children[firstEditColumnIndex];
           contextMenu.defaultSection().appendItem(
-              i18nString(UIStrings.addNew), this.startEditing.bind(this, tableCellElement));
+              i18nString(UIStrings.addNew), this.startEditing.bind(this, tableCellElement), {jslogContext: 'add-new'});
         } else if (isContextMenuKey) {
           const firstEditColumnIndex = this.nextEditableColumn(-1);
           if (firstEditColumnIndex > -1) {
@@ -1391,7 +1407,8 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
             if (firstColumn && firstColumn.editable) {
               contextMenu.defaultSection().appendItem(
                   i18nString(UIStrings.editS, {PH1: String(firstColumn.title)}),
-                  this.startEditingColumnOfDataGridNode.bind(this, gridNode, firstEditColumnIndex));
+                  this.startEditingColumnOfDataGridNode.bind(this, gridNode, firstEditColumnIndex),
+                  {jslogContext: 'edit'});
             }
           }
         } else {
@@ -1399,12 +1416,13 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
           if (columnId && this.columns[columnId].editable) {
             contextMenu.defaultSection().appendItem(
                 i18nString(UIStrings.editS, {PH1: String(this.columns[columnId].title)}),
-                this.startEditing.bind(this, target));
+                this.startEditing.bind(this, target), {jslogContext: 'edit'});
           }
         }
       }
       if (this.deleteCallback && gridNode !== this.creationNode) {
-        contextMenu.defaultSection().appendItem(i18nString(UIStrings.delete), this.deleteCallback.bind(this, gridNode));
+        contextMenu.defaultSection().appendItem(
+            i18nString(UIStrings.delete), this.deleteCallback.bind(this, gridNode), {jslogContext: 'delete'});
       }
       if (this.rowContextMenuCallback) {
         this.rowContextMenuCallback(contextMenu, gridNode);
@@ -1617,7 +1635,7 @@ export type DataGridData = {
 };
 
 export class DataGridNode<T> {
-  elementInternal: Element|null;
+  elementInternal: HTMLElement|null;
   expandedInternal: boolean;
   private selectedInternal: boolean;
   private dirty: boolean;
@@ -1681,6 +1699,8 @@ export class DataGridNode<T> {
 
   protected createElement(): Element {
     this.elementInternal = document.createElement('tr');
+    this.elementInternal.setAttribute(
+        'jslog', `${VisualLogging.tableRow().track({keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space'})}`);
     this.elementInternal.classList.add('data-grid-data-grid-node');
     if (this.dataGrid) {
       this.dataGrid.elementToDataGridNode.set(this.elementInternal, this);
@@ -1923,15 +1943,23 @@ export class DataGridNode<T> {
 
   createTD(columnId: string): HTMLElement {
     const cell = this.createTDWithClass(columnId + '-column');
-    cell.setAttribute(
-        'jslog',
-        `${
-            VisualLogging.tableCell()
-                .track({click: true, keydown: Boolean(this.dataGrid?.columns[columnId].editable), resize: true})
-                .context(columnId)}`);
     nodeToColumnIdMap.set(cell, columnId);
 
     if (this.dataGrid) {
+      const editableCell = this.dataGrid.columns[columnId].editable;
+
+      cell.setAttribute(
+          'jslog',
+          `${
+              VisualLogging.tableCell()
+                  .track({
+                    click: true,
+                    keydown: editableCell ? 'Enter|Space|Escape' : false,
+                    dblclick: editableCell,
+                    change: editableCell,
+                    resize: true,
+                  })
+                  .context(Platform.StringUtilities.toKebabCase(columnId))}`);
       const alignment = this.dataGrid.columns[columnId].align;
       if (alignment) {
         cell.classList.add(alignment);
@@ -1945,7 +1973,6 @@ export class DataGridNode<T> {
       }
 
       // Allow accessibility tool to identify the editable cell and display context menu
-      const editableCell = this.dataGrid.columns[columnId].editable;
       if (editableCell) {
         cell.tabIndex = 0;
         cell.ariaHasPopup = 'true';
@@ -2220,6 +2247,7 @@ export class DataGridNode<T> {
 
     if (this.elementInternal) {
       this.elementInternal.classList.add('selected');
+      this.elementInternal.focus();
       this.dataGrid.setHasSelection(true);
       this.dataGrid.announceSelectedGridNode();
     }

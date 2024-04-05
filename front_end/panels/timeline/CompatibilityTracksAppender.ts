@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -12,6 +13,8 @@ import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getEventLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import {getEventStyle} from './EventUICategory.js';
+import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
+import {ExtensionTrackAppender} from './ExtensionTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
@@ -77,15 +80,11 @@ export interface TrackAppender {
    * Returns the info shown when an event in the timeline is hovered.
    */
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo;
-  /**
-   * The EntriesFilter instance that used to modify the trees in a track based on user actions,
-   * e.g collapsing functions, etc.
-   */
-  entriesFilter?(): TraceEngine.EntriesFilter.EntriesFilter;
 }
 
 export const TrackNames =
-    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet'] as const;
+    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet', 'Extension'] as
+    const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -161,6 +160,9 @@ export class CompatibilityTracksAppender {
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
     this.#addThreadAppenders();
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS)) {
+      this.#addExtensionAppenders();
+    }
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       for (const group of this.#flameChartData.groups) {
         // We only need to update the color here, because FlameChart will call `scheduleUpdate()` when theme is changed.
@@ -184,34 +186,11 @@ export class CompatibilityTracksAppender {
     return this.#flameChartData;
   }
 
-  modifyTree(
-      group: PerfUI.FlameChart.Group, entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry,
-      type: TraceEngine.EntriesFilter.FilterAction): void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      appender.entriesFilter().applyFilterAction({entry, type});
-    } else {
-      console.warn('Could not modify tree on a track.');
+  #addExtensionAppenders(): void {
+    const tracks = ExtensionDataGatherer.instance().getExtensionData();
+    for (const trackData of tracks) {
+      this.#allTrackAppenders.push(new ExtensionTrackAppender(this, trackData));
     }
-  }
-
-  findPossibleContextMenuActions(
-      group: PerfUI.FlameChart.Group,
-      node: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): TraceEngine.EntriesFilter.PossibleFilterActions|void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      return appender.entriesFilter().findPossibleActions(node);
-    }
-    console.warn('Could not modify tree on a track.');
-  }
-
-  findHiddenDescendantsAmount(group: PerfUI.FlameChart.Group, node: TraceEngine.Types.TraceEvents.SyntheticTraceEntry):
-      number|void {
-    const appender = this.#trackForGroup.get(group);
-    if (appender && appender.entriesFilter) {
-      return appender.entriesFilter().findHiddenDescendantsAmount(node);
-    }
-    console.warn('Could not find hidden entries on a track.');
   }
 
   #addThreadAppenders(): void {
@@ -568,6 +547,16 @@ export class CompatibilityTracksAppender {
       // period.
       // Therefore we mark them as visible so they are appended onto the Thread
       // track, and hence accessible by the CountersGraph view.
+      return true;
+    }
+
+    // Gate the visibility of post message events behind the experiement flag
+    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+    }
+
+    if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry)) {
       return true;
     }
 

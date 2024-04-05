@@ -49,7 +49,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AddDebugInfoURLDialog} from './AddSourceMapURLDialog.js';
-import {BreakpointEditDialog, type BreakpointEditDialogResult} from './BreakpointEditDialog.js';
+import {BreakpointEditDialog} from './BreakpointEditDialog.js';
 import * as SourceComponents from './components/components.js';
 import {Plugin} from './Plugin.js';
 import {SourcesPanel} from './SourcesPanel.js';
@@ -171,6 +171,14 @@ const UIStrings = {
    *@example {app.wasm} PH1
    */
   debugInfoNotFound: 'Failed to load any debug info for {PH1}.',
+  /**
+   *@description Text of a button to open up details on a request when no debug info could be loaded
+   */
+  showRequest: 'Show request',
+  /**
+   *@description Tooltip text that shows on hovering over a button to see more details on a request
+   */
+  openDeveloperResources: 'Opens the request in the Developer resource panel',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/DebuggerPlugin.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -429,17 +437,26 @@ export class DebuggerPlugin extends Plugin {
       Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListUISourceCode(uiSourceCode);
     }
 
-    const infobar =
-        new UI.Infobar.Infobar(UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore), [
-          {text: i18nString(UIStrings.removeFromIgnoreList), highlight: false, delegate: unIgnoreList, dismiss: true},
+    const infobar = new UI.Infobar.Infobar(
+        UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
+        [
+          {
+            text: i18nString(UIStrings.removeFromIgnoreList),
+            highlight: false,
+            delegate: unIgnoreList,
+            dismiss: true,
+            jslogContext: 'remove-from-ignore-list',
+          },
           {
             text: i18nString(UIStrings.configure),
             highlight: false,
             delegate:
                 UI.ViewManager.ViewManager.instance().showView.bind(UI.ViewManager.ViewManager.instance(), 'blackbox'),
             dismiss: false,
+            jslogContext: 'configure',
           },
-        ]);
+        ],
+        undefined, undefined, 'script-on-ignore-list');
     this.ignoreListInfobar = infobar;
     infobar.setCloseCallback(() => this.removeInfobar(this.ignoreListInfobar));
 
@@ -710,7 +727,7 @@ export class DebuggerPlugin extends Plugin {
       box,
       show: async (popover: UI.GlassPane.GlassPane) => {
         let resolvedText: string = '';
-        if (Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps')) {
+        if (Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps')) {
           const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
           try {
             resolvedText =
@@ -731,7 +748,7 @@ export class DebuggerPlugin extends Plugin {
         //   * Explicit function calls on the other hand must be side-effect free. The canonical
         //     example is hovering over {Math.random()} which would result in a different value
         //     each time the user hovers over it.
-        const throwOnSideEffect = Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps') &&
+        const throwOnSideEffect = Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps') &&
             highlightRange.containsSideEffects;
         const result = await selectedCallFrame.evaluate({
           expression: resolvedText || evaluationText,
@@ -902,7 +919,6 @@ export class DebuggerPlugin extends Plugin {
       }
       SourceComponents.BreakpointsView.BreakpointsSidebarController.instance().breakpointEditFinished(
           breakpoint, oldCondition !== result.condition);
-      recordBreakpointWithConditionAdded(result);
       if (breakpoint) {
         breakpoint.setCondition(result.condition, result.isLogpoint);
       } else if (location) {
@@ -949,21 +965,6 @@ export class DebuggerPlugin extends Plugin {
     dialog.focusEditor();
     this.activeBreakpointDialog = dialog;
     this.#activeBreakpointEditRequest = breakpointEditRequest;
-
-    // This counts new conditional breakpoints or logpoints that are added.
-    function recordBreakpointWithConditionAdded(result: BreakpointEditDialogResult): void {
-      const {condition: newCondition, isLogpoint} = result;
-      const isConditionalBreakpoint = newCondition.length !== 0 && !isLogpoint;
-
-      const wasLogpoint = breakpoint?.isLogpoint();
-      const wasConditionalBreakpoint = oldCondition && oldCondition.length !== 0 && !wasLogpoint;
-      if (isLogpoint && !wasLogpoint) {
-        Host.userMetrics.breakpointWithConditionAdded(Host.UserMetrics.BreakpointWithConditionAdded.Logpoint);
-      } else if (isConditionalBreakpoint && !wasConditionalBreakpoint) {
-        Host.userMetrics.breakpointWithConditionAdded(
-            Host.UserMetrics.BreakpointWithConditionAdded.ConditionalBreakpoint);
-      }
-    }
 
     function isSameEditRequest(editA: BreakpointEditRequest, editB: BreakpointEditRequest): boolean {
       if (editA.line.number !== editB.line.number) {
@@ -1389,7 +1390,7 @@ export class DebuggerPlugin extends Plugin {
             this.uiSourceCode)) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'sources-inline-breakpoint'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     if (breakpoint) {
       contextMenu.debugSection().appendItem(i18nString(UIStrings.editBreakpoint), () => {
         Host.userMetrics.breakpointEditDialogRevealedFrom(
@@ -1473,14 +1474,25 @@ export class DebuggerPlugin extends Plugin {
       this.missingDebugInfoBar = null;
       return;
     }
-    this.missingDebugInfoBar = UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, []);
+    this.missingDebugInfoBar =
+        UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, [], undefined, 'missing-debug-info');
     if (!this.missingDebugInfoBar) {
       return;
     }
     for (const resource of warning.resources) {
-      const detailsRow =
-          this.missingDebugInfoBar?.createDetailsRowMessage(i18nString(UIStrings.debugFileNotFound, {PH1: resource}));
+      const detailsRow = this.missingDebugInfoBar?.createDetailsRowMessage(
+          i18nString(UIStrings.debugFileNotFound, {PH1: Common.ParsedURL.ParsedURL.extractName(resource.resourceUrl)}));
       if (detailsRow) {
+        const pageResourceKey =
+            SDK.PageResourceLoader.PageResourceLoader.makeExtensionKey(resource.resourceUrl, resource.initiator);
+        if (SDK.PageResourceLoader.PageResourceLoader.instance().getResourcesLoaded().get(pageResourceKey)) {
+          const showRequest = UI.UIUtils.createTextButton(i18nString(UIStrings.showRequest), () => {
+            void Common.Revealer.reveal(new SDK.PageResourceLoader.ResourceKey(pageResourceKey));
+          }, {className: 'link-style devtools-link', jslogContext: 'show-request'});
+          showRequest.style.setProperty('margin-left', '10px');
+          showRequest.title = i18nString(UIStrings.openDeveloperResources);
+          detailsRow.appendChild(showRequest);
+        }
         detailsRow.classList.add('infobar-selectable');
       }
     }
@@ -1542,7 +1554,8 @@ export class DebuggerPlugin extends Plugin {
     if (!resource) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapSkipped), [],
-          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false),
+          'source-map-skipped');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1551,7 +1564,7 @@ export class DebuggerPlugin extends Plugin {
     } else if (resource.success) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
           UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapLoaded), [],
-          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false));
+          Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false), 'source-map-loaded');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1570,10 +1583,12 @@ export class DebuggerPlugin extends Plugin {
         text = i18nString(UIStrings.ignoreScript);
         delegate = ignoreListManager.ignoreListUISourceCode.bind(ignoreListManager, this.uiSourceCode);
       }
-      this.sourceMapInfobar =
-          UI.Infobar.Infobar.create(UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed), [
+      this.sourceMapInfobar = UI.Infobar.Infobar.create(
+          UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed),
+          [
             {text, highlight: false, delegate, dismiss: true},
-          ]);
+          ],
+          undefined, 'source-map-failed');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1901,7 +1916,7 @@ class BreakpointInlineMarker extends CodeMirror.WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span');
     span.className = this.class;
-    span.setAttribute('jslog', `${VisualLogging.breakpointMarker('inline').track({click: true})}`);
+    span.setAttribute('jslog', `${VisualLogging.breakpointMarker().track({click: true})}`);
     span.addEventListener('click', (event: MouseEvent) => {
       this.parent.onInlineBreakpointMarkerClick(event, this.breakpoint);
       event.consume();
@@ -1932,7 +1947,7 @@ class BreakpointGutterMarker extends CodeMirror.GutterMarker {
 
   override toDOM(view: CodeMirror.EditorView): Node {
     const div = document.createElement('div');  // We want {display: block} so it uses all of the space.
-    div.setAttribute('jslog', `${VisualLogging.breakpointMarker('gutter').track({click: true})}`);
+    div.setAttribute('jslog', `${VisualLogging.breakpointMarker().track({click: true})}`);
     const line = view.state.doc.lineAt(this.#position).number;
     const formatNumber = view.state.facet(SourceFrame.SourceFrame.LINE_NUMBER_FORMATTER);
     div.textContent = formatNumber(line, view.state);
@@ -1990,17 +2005,16 @@ export function computeExecutionDecorations(
   const line = doc.line(lineNumber + 1);
   const decorations: CodeMirror.Range<CodeMirror.Decoration>[] = [executionLineDeco.range(line.from)];
   const position = Math.min(line.to, line.from + columnNumber);
-  let syntaxTree = null;
-  while (syntaxTree === null) {
-    syntaxTree = CodeMirror.ensureSyntaxTree(state, line.to, /* timeout= */ 500);
-  }
-  let syntaxNode = syntaxTree.resolveInner(position, 1);
-  if (syntaxNode.to === syntaxNode.from - 1 && /[(.]/.test(doc.sliceString(syntaxNode.from, syntaxNode.to))) {
-    syntaxNode = syntaxNode.resolve(syntaxNode.to, 1);
-  }
-  const tokenEnd = Math.min(line.to, syntaxNode.to);
-  if (tokenEnd > position) {
-    decorations.push(executionTokenDeco.range(position, tokenEnd));
+  const syntaxTree = CodeMirror.ensureSyntaxTree(state, line.to, /* timeout= */ 500);
+  if (syntaxTree !== null) {
+    let syntaxNode = syntaxTree.resolveInner(position, 1);
+    if (syntaxNode.to === syntaxNode.from - 1 && /[(.]/.test(doc.sliceString(syntaxNode.from, syntaxNode.to))) {
+      syntaxNode = syntaxNode.resolve(syntaxNode.to, 1);
+    }
+    const tokenEnd = Math.min(line.to, syntaxNode.to);
+    if (tokenEnd > position) {
+      decorations.push(executionTokenDeco.range(position, tokenEnd));
+    }
   }
   return CodeMirror.Decoration.set(decorations);
 }
@@ -2325,7 +2339,7 @@ function containsSideEffects(doc: CodeMirror.Text, root: CodeMirror.SyntaxNode):
           return false;
         }
         case 'ArithOp': {
-          const op = doc.sliceString(node.from, node.to);
+          const op = doc.sliceString(root.from + node.from, root.from + node.to);
           if (op === '++' || op === '--') {
             containsSideEffects = true;
             return false;

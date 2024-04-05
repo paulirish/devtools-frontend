@@ -17,8 +17,8 @@ import {
   type ResourceType,
   type ResponseForRequest,
   STATUS_TEXTS,
+  handleError,
 } from '../api/HTTPRequest.js';
-import type {ProtocolError} from '../common/Errors.js';
 import {debugError, isString} from '../common/util.js';
 import {assert} from '../util/assert.js';
 
@@ -28,6 +28,7 @@ import type {CdpHTTPResponse} from './HTTPResponse.js';
  * @internal
  */
 export class CdpHTTPRequest extends HTTPRequest {
+  override id: string;
   declare _redirectChain: CdpHTTPRequest[];
   declare _response: CdpHTTPResponse | null;
 
@@ -91,7 +92,7 @@ export class CdpHTTPRequest extends HTTPRequest {
   ) {
     super();
     this.#client = client;
-    this._requestId = data.requestId;
+    this.id = data.requestId;
     this.#isNavigationRequest =
       data.requestId === data.loaderId && data.type === 'Document';
     this._interceptionId = interceptionId;
@@ -188,7 +189,7 @@ export class CdpHTTPRequest extends HTTPRequest {
   override async fetchPostData(): Promise<string | undefined> {
     try {
       const result = await this.#client.send('Network.getRequestPostData', {
-        requestId: this._requestId,
+        requestId: this.id,
       });
       return result.postData;
     } catch (err) {
@@ -437,13 +438,3 @@ const errorReasons: Record<ErrorCode, Protocol.Network.ErrorReason> = {
   timedout: 'TimedOut',
   failed: 'Failed',
 } as const;
-
-async function handleError(error: ProtocolError) {
-  if (['Invalid header'].includes(error.originalMessage)) {
-    throw error;
-  }
-  // In certain cases, protocol will return error if the request was
-  // already canceled or the page was closed. We should tolerate these
-  // errors.
-  debugError(error);
-}

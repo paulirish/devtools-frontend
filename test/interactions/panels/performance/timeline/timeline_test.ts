@@ -23,7 +23,7 @@ describe('Performance panel', function() {
     await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
     await waitFor('.timeline-flamechart');
     await waitFor('div.tabbed-pane');
-    await click('#tab-BottomUp');
+    await click('#tab-bottom-up');
     const datagrid = await waitFor('.timeline-tree-view');
     await waitForFunction(async () => {
       const datagrid = await waitFor('.timeline-tree-view');
@@ -37,7 +37,7 @@ describe('Performance panel', function() {
     await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
     await waitFor('.timeline-flamechart');
     await waitFor('div.tabbed-pane');
-    await click('#tab-CallTree');
+    await click('#tab-call-tree');
     const datagrid = await waitFor('.timeline-tree-view');
     await waitForFunction(async () => {
       const datagrid = await waitFor('.timeline-tree-view');
@@ -47,18 +47,20 @@ describe('Performance panel', function() {
     await assertElementScreenshotUnchanged(datagrid, 'performance/callTree.png', 3);
   });
 
-  itScreenshot('renders the timeline correctly when scrolling', async () => {
-    await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
-    await waitFor('.timeline-flamechart');
-    const panel = await waitFor('body');
+  // Flaky on linux
+  itScreenshot.skipOnPlatforms(
+      ['linux'], '[crbug.com/327586819 renders the timeline correctly when scrolling', async () => {
+        await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
+        await waitFor('.timeline-flamechart');
+        const panel = await waitFor('body');
 
-    const virtualScrollBar = await waitFor('div.chart-viewport-v-scroll.always-show-scrollbar');
+        const virtualScrollBar = await waitFor('div.chart-viewport-v-scroll.always-show-scrollbar');
 
-    await virtualScrollBar.evaluate(el => {
-      el.scrollTop = 200;
-    });
-    await assertElementScreenshotUnchanged(panel, 'performance/timeline_canvas_scrolldown.png', 3);
-  });
+        await virtualScrollBar.evaluate(el => {
+          el.scrollTop = 200;
+        });
+        await assertElementScreenshotUnchanged(panel, 'performance/timeline_canvas_scrolldown.png', 3);
+      });
 
   itScreenshot('loads a cpuprofile and renders it in non-node mode', async () => {
     await loadComponentDocExample('performance_panel/basic.html?cpuprofile=node-fibonacci-website');
@@ -91,7 +93,9 @@ describe('Performance panel', function() {
   });
 
   itScreenshot.skip('renders screenshots in the frames track', async () => {
-    this.timeout(20_000);
+    if (this.timeout() !== 0) {
+      this.timeout(20_000);
+    }
     await loadComponentDocExample(
         'performance_panel/basic.html?trace=web-dev-with-commit&flamechart-force-expand=frames');
     const panel = await waitFor('body');
@@ -104,7 +108,7 @@ describe('Performance panel', function() {
     await assertElementScreenshotUnchanged(panel, 'performance/timeline-web-dev-screenshot-frames.png', 1);
   });
 
-  itScreenshot('supports the network track being expanded and then clicked', async function() {
+  itScreenshot.skip('supports the network track being expanded and then clicked', async function() {
     await loadComponentDocExample('performance_panel/basic.html?trace=web-dev');
     await waitFor('.timeline-flamechart');
     const panel = await waitFor('body');

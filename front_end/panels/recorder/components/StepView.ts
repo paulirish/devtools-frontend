@@ -270,6 +270,7 @@ type Action = {
   label: string,
   group: string,
   groupTitle: string,
+  jslogContext?: string,
 };
 
 export class StepView extends HTMLElement {
@@ -606,6 +607,7 @@ export class StepView extends HTMLElement {
           label: converter.getFormatName(),
           group: 'copy',
           groupTitle: i18nString(UIStrings.copyAs),
+          jslogContext: COPY_ACTION_PREFIX + 'extension',
         });
       }
     }
@@ -676,7 +678,7 @@ export class StepView extends HTMLElement {
                 item => {
                   return LitHtml.html`<${Menus.Menu.MenuItem.litTagName}
                       .value=${item.id}
-                      jslog=${VisualLogging.action().track({click: true}).context(`${item.id}`)}
+                      jslog=${VisualLogging.action().track({click: true}).context(`${item.jslogContext || item.id}`)}
                     >
                       ${item.label}
                     </${Menus.Menu.MenuItem.litTagName}>
@@ -714,7 +716,7 @@ export class StepView extends HTMLElement {
         this.#handleStepAction(
             new Menus.Menu.MenuItemSelectedEvent(item.id),
         );
-      });
+      }, {jslogContext: item.id});
     }
 
     const preferredCopyAction = copyActions.find(
@@ -726,11 +728,11 @@ export class StepView extends HTMLElement {
         this.#handleStepAction(
             new Menus.Menu.MenuItemSelectedEvent(preferredCopyAction.id),
         );
-      });
+      }, {jslogContext: preferredCopyAction.id});
     }
 
     if (copyActions.length) {
-      const copyAs = menu.section('copy').appendSubMenuItem(i18nString(UIStrings.copyAs));
+      const copyAs = menu.section('copy').appendSubMenuItem(i18nString(UIStrings.copyAs), false, 'copy');
       for (const item of copyActions) {
         if (item === preferredCopyAction) {
           continue;
@@ -739,7 +741,7 @@ export class StepView extends HTMLElement {
           this.#handleStepAction(
               new Menus.Menu.MenuItemSelectedEvent(item.id),
           );
-        });
+        }, {jslogContext: item.id});
       }
     }
 
@@ -858,4 +860,4 @@ export class StepView extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-step-view', StepView);
+customElements.define('devtools-step-view', StepView);

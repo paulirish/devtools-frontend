@@ -41,15 +41,6 @@ export class UserMetrics {
     this.#launchPanelName = '';
   }
 
-  breakpointWithConditionAdded(breakpointWithConditionAdded: BreakpointWithConditionAdded): void {
-    if (breakpointWithConditionAdded >= BreakpointWithConditionAdded.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BreakpointWithConditionAdded, breakpointWithConditionAdded,
-        BreakpointWithConditionAdded.MaxValue);
-  }
-
   breakpointEditDialogRevealedFrom(breakpointEditDialogRevealedFrom: BreakpointEditDialogRevealedFrom): void {
     if (breakpointEditDialogRevealedFrom >= BreakpointEditDialogRevealedFrom.MaxValue) {
       return;
@@ -256,22 +247,6 @@ export class UserMetrics {
         EnumeratedHistogram.DeveloperResourceScheme, developerResourceScheme, DeveloperResourceScheme.MaxValue);
   }
 
-  inlineScriptParsed(inlineScriptType: VMInlineScriptType): void {
-    if (inlineScriptType >= VMInlineScriptType.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.InlineScriptParsed, inlineScriptType, VMInlineScriptType.MaxValue);
-  }
-
-  vmInlineScriptContentShown(inlineScriptType: VMInlineScriptType): void {
-    if (inlineScriptType >= VMInlineScriptType.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.VMInlineScriptTypeShown, inlineScriptType, VMInlineScriptType.MaxValue);
-  }
-
   language(language: Intl.UnicodeBCP47LocaleIdentifier): void {
     const languageCode = Language[language as keyof typeof Language];
     if (languageCode === undefined) {
@@ -393,13 +368,6 @@ export class UserMetrics {
         EnumeratedHistogram.BadgeActivated, badge, BadgeType.MaxValue);
   }
 
-  breakpointsRestoredFromStorage(count: number): void {
-    const countBucket = this.#breakpointCountToBucket(count);
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BreakpointsRestoredFromStorageCount, countBucket,
-        BreakpointsRestoredFromStorageCount.MaxValue);
-  }
-
   animationPlaybackRateChanged(playbackRate: AnimationsPlaybackRate): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.AnimationPlaybackRateChanged, playbackRate, AnimationsPlaybackRate.MaxValue);
@@ -408,37 +376,6 @@ export class UserMetrics {
   animationPointDragged(dragType: AnimationPointDragType): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.AnimationPointDragged, dragType, AnimationPointDragType.MaxValue);
-  }
-
-  #breakpointCountToBucket(count: number): BreakpointsRestoredFromStorageCount {
-    if (count < 100) {
-      return BreakpointsRestoredFromStorageCount.LessThan100;
-    }
-    if (count < 300) {
-      return BreakpointsRestoredFromStorageCount.LessThan300;
-    }
-    if (count < 1000) {
-      return BreakpointsRestoredFromStorageCount.LessThan1000;
-    }
-    if (count < 3000) {
-      return BreakpointsRestoredFromStorageCount.LessThan3000;
-    }
-    if (count < 10000) {
-      return BreakpointsRestoredFromStorageCount.LessThan10000;
-    }
-    if (count < 30000) {
-      return BreakpointsRestoredFromStorageCount.LessThan30000;
-    }
-    if (count < 100000) {
-      return BreakpointsRestoredFromStorageCount.LessThan100000;
-    }
-    if (count < 300000) {
-      return BreakpointsRestoredFromStorageCount.LessThan300000;
-    }
-    if (count < 1000000) {
-      return BreakpointsRestoredFromStorageCount.LessThan1000000;
-    }
-    return BreakpointsRestoredFromStorageCount.Above1000000;
   }
 
   workspacesPopulated(wallClockTimeInMilliseconds: number): void {
@@ -643,7 +580,19 @@ export enum Action {
   InsightGenerated = 130,
   InsightErroredApi = 131,
   InsightErroredMarkdown = 132,
-  MaxValue = 133,
+  ToggleShowWebVitals = 133,
+  InsightErroredPermissionDenied = 134,
+  InsightErroredCannotSend = 135,
+  InsightErroredRequestFailed = 136,
+  InsightErroredCannotParseChunk = 137,
+  InsightErroredUnknownChunk = 138,
+  InsightErroredOther = 139,
+  AutofillReceived = 140,
+  AutofillReceivedAndTabAutoOpened = 141,
+  AnimationGroupSelected = 142,
+  ScrollDrivenAnimationGroupSelected = 143,
+  ScrollDrivenAnimationGroupScrubbed = 144,
+  MaxValue = 145,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -1072,53 +1021,47 @@ export const enum IssueOpener {
  */
 /* eslint-disable @typescript-eslint/naming-convention */
 export enum DevtoolsExperiments {
-  'applyCustomStylesheet' = 0,
-  'captureNodeCreationStacks' = 1,
-  'liveHeapProfile' = 11,
-  'protocolMonitor' = 13,
-  'samplingHeapProfilerTimeline' = 17,
-  'showOptionToExposeInternalsInHeapSnapshot' = 18,
-  'timelineInvalidationTracking' = 26,
-  'timelineShowAllEvents' = 27,
-  'timelineV8RuntimeCallStats' = 28,
-  'APCA' = 39,
-  'fontEditor' = 41,
-  'fullAccessibilityTree' = 42,
-  'ignoreListJSFramesOnTimeline' = 43,
-  'contrastIssues' = 44,
-  'experimentalCookieFeatures' = 45,
-  'stylesPaneCSSChanges' = 55,
-  'evaluateExpressionsWithSourceMaps' = 58,
-  'instrumentationBreakpoints' = 61,
-  'authoredDeployedGrouping' = 63,
-  'importantDOMProperties' = 64,
-  'justMyCode' = 65,
-  'timelineAsConsoleProfileResultPanel' = 67,
-  'preloadingStatusPanel' = 68,
-  'outermostTargetSelector' = 71,
-  'jsProfilerTemporarilyEnable' = 72,
-  'highlightErrorsElementsPanel' = 73,
-  'setAllBreakpointsEagerly' = 74,
-  'selfXssWarning' = 75,
-  'useSourceMapScopes' = 76,
-  'storageBucketsTree' = 77,
-  'networkPanelFilterBarRedesign' = 79,
-  'trackContextMenu' = 81,
-  'autofillView' = 82,
-  'sourcesFrameIndentationMarkersTemporarilyDisable' = 83,
-  'heapSnapshotTreatBackingStoreAsContainingObject' = 84,
-  'cssTypeComponentLengthDeprecate' = 85,
+  'apply-custom-stylesheet' = 0,
+  'capture-node-creation-stacks' = 1,
+  'live-heap-profile' = 11,
+  'protocol-monitor' = 13,
+  'sampling-heap-profiler-timeline' = 17,
+  'show-option-tp-expose-internals-in-heap-snapshot' = 18,
+  'timeline-invalidation-tracking' = 26,
+  'timeline-show-all-events' = 27,
+  'timeline-v8-runtime-call-stats' = 28,
+  'apca' = 39,
+  'font-editor' = 41,
+  'full-accessibility-tree' = 42,
+  'ignore-list-js-frames-on-timeline' = 43,
+  'contrast-issues' = 44,
+  'experimental-cookie-features' = 45,
+  'styles-pane-css-changes' = 55,
+  'evaluate-expressions-with-source-maps' = 58,
+  'instrumentation-breakpoints' = 61,
+  'authored-deployed-grouping' = 63,
+  'important-dom-properties' = 64,
+  'just-my-code' = 65,
+  'preloading-status-panel' = 68,
+  'outermost-target-selector' = 71,
+  'highlight-errors-elements-panel' = 73,
+  'set-all-breakpoints-eagerly' = 74,
+  'use-source-map-scopes' = 76,
+  'storage-buckets-tree' = 77,
+  'network-panel-filter-bar-redesign' = 79,
+  'autofill-view' = 82,
+  'sources-frame-indentation-markers-temporarily-disable' = 83,
+  'heap-snapshot-treat-backing-store-as-containing-object' = 84,
+  'css-type-component-length-deprecate' = 85,
+  'timeline-show-postmessage-events' = 86,
+  'save-and-load-trace-with-annotations' = 87,
+  'timeline-track-configuration' = 88,
+  'timeline-extensions' = 89,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 86,
+  'MaxValue' = 90,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
-
-export const enum BreakpointWithConditionAdded {
-  Logpoint = 0,
-  ConditionalBreakpoint = 1,
-  MaxValue = 2,
-}
 
 export const enum BreakpointEditDialogRevealedFrom {
   BreakpointSidebarContextMenu = 0,
@@ -1148,20 +1091,6 @@ export const enum CSSPropertyDocumentation {
   ToggledOn = 1,
   ToggledOff = 2,
   MaxValue = 3,
-}
-
-export const enum BreakpointsRestoredFromStorageCount {
-  LessThan100 = 0,
-  LessThan300 = 1,
-  LessThan1000 = 2,
-  LessThan3000 = 3,
-  LessThan10000 = 4,
-  LessThan30000 = 5,
-  LessThan100000 = 6,
-  LessThan300000 = 7,
-  LessThan1000000 = 8,
-  Above1000000 = 9,
-  MaxValue = 10,
 }
 
 // Update DevToolsIssuesPanelIssueExpanded from tools/metrics/histograms/enums.xml if new enum is added.
@@ -1332,12 +1261,6 @@ export enum NetworkPanelMoreFilters {
   MaxValue = 5,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
-
-export const enum VMInlineScriptType {
-  MODULE_SCRIPT = 0,
-  CLASSIC_SCRIPT = 1,
-  MaxValue = 2,
-}
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export enum Language {
@@ -1586,7 +1509,8 @@ export const enum SwatchType {
   Angle = 7,
   Length = 8,
   PositionFallbackLink = 9,
-  MaxValue = 10,
+  PositionTryLink = 10,
+  MaxValue = 11,
 }
 
 export const enum BadgeType {

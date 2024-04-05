@@ -269,7 +269,7 @@ export class HeapSnapshotLoaderProxy extends HeapSnapshotProxyObject implements 
     await this.callMethodPromise('close');
     const snapshotProxy = await this.callFactoryMethodPromise('buildSnapshot', HeapSnapshotProxy, {
       heapSnapshotTreatBackingStoreAsContainingObject:
-          Root.Runtime.experiments.isEnabled('heapSnapshotTreatBackingStoreAsContainingObject'),
+          Root.Runtime.experiments.isEnabled('heap-snapshot-treat-backing-store-as-containing-object'),
     });
     this.dispose();
     // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
@@ -388,6 +388,22 @@ export class HeapSnapshotProxy extends HeapSnapshotProxyObject {
 
   getSamples(): Promise<HeapSnapshotModel.HeapSnapshotModel.Samples|null> {
     return this.callMethodPromise('getSamples');
+  }
+
+  ignoreNodeInRetainersView(nodeIndex: number): Promise<void> {
+    return this.callMethodPromise('ignoreNodeInRetainersView', nodeIndex);
+  }
+
+  unignoreNodeInRetainersView(nodeIndex: number): Promise<void> {
+    return this.callMethodPromise('unignoreNodeInRetainersView', nodeIndex);
+  }
+
+  unignoreAllNodesInRetainersView(): Promise<void> {
+    return this.callMethodPromise('unignoreAllNodesInRetainersView');
+  }
+
+  areNodesIgnoredInRetainersView(): Promise<boolean> {
+    return this.callMethodPromise('areNodesIgnoredInRetainersView');
   }
 
   get totalSize(): number {

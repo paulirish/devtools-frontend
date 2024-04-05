@@ -53,16 +53,21 @@ const Browser_js_1 = require("./Browser.js");
 let Session = (() => {
     let _classSuper = EventEmitter_js_1.EventEmitter;
     let _instanceExtraInitializers = [];
+    let _connection_decorators;
+    let _connection_initializers = [];
     let _dispose_decorators;
     let _send_decorators;
     let _subscribe_decorators;
+    let _addIntercepts_decorators;
     let _end_decorators;
     return class Session extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(this, null, _connection_decorators, { kind: "accessor", name: "connection", static: false, private: false, access: { has: obj => "connection" in obj, get: obj => obj.connection, set: (obj, value) => { obj.connection = value; } }, metadata: _metadata }, _connection_initializers, _instanceExtraInitializers);
             __esDecorate(this, null, _dispose_decorators, { kind: "method", name: "dispose", static: false, private: false, access: { has: obj => "dispose" in obj, get: obj => obj.dispose }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _send_decorators, { kind: "method", name: "send", static: false, private: false, access: { has: obj => "send" in obj, get: obj => obj.send }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _subscribe_decorators, { kind: "method", name: "subscribe", static: false, private: false, access: { has: obj => "subscribe" in obj, get: obj => obj.subscribe }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _addIntercepts_decorators, { kind: "method", name: "addIntercepts", static: false, private: false, access: { has: obj => "addIntercepts" in obj, get: obj => obj.addIntercepts }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _end_decorators, { kind: "method", name: "end", static: false, private: false, access: { has: obj => "end" in obj, get: obj => obj.end }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
@@ -103,6 +108,7 @@ let Session = (() => {
                         platformName: '',
                         setWindowRect: false,
                         webSocketUrl: '',
+                        userAgent: '',
                     },
                 };
             }
@@ -115,7 +121,9 @@ let Session = (() => {
         #disposables = new disposable_js_1.DisposableStack();
         #info;
         browser;
-        connection;
+        #connection_accessor_storage = __runInitializers(this, _connection_initializers, void 0);
+        get connection() { return this.#connection_accessor_storage; }
+        set connection(value) { this.#connection_accessor_storage = value; }
         // keep-sorted end
         constructor(connection, info) {
             super();
@@ -125,12 +133,23 @@ let Session = (() => {
             // keep-sorted end
         }
         async #initialize() {
-            this.connection.pipeTo(this);
             // SAFETY: We use `any` to allow assignment of the readonly property.
             this.browser = await Browser_js_1.Browser.from(this);
             const browserEmitter = this.#disposables.use(this.browser);
             browserEmitter.once('closed', ({ reason }) => {
                 this.dispose(reason);
+            });
+            // TODO: Currently, some implementations do not emit navigationStarted event
+            // for fragment navigations (as per spec) and some do. This could emits a
+            // synthetic navigationStarted to work around this inconsistency.
+            const seen = new WeakSet();
+            this.on('browsingContext.fragmentNavigated', info => {
+                if (seen.has(info)) {
+                    return;
+                }
+                seen.add(info);
+                this.emit('browsingContext.navigationStarted', info);
+                this.emit('browsingContext.fragmentNavigated', info);
             });
         }
         // keep-sorted start block=yes
@@ -151,9 +170,6 @@ let Session = (() => {
             this.#reason = reason;
             this[disposable_js_1.disposeSymbol]();
         }
-        pipeTo(emitter) {
-            this.connection.pipeTo(emitter);
-        }
         /**
          * Currently, there is a 1:1 relationship between the session and the
          * session. In the future, we might support multiple sessions and in that
@@ -164,9 +180,16 @@ let Session = (() => {
         async send(method, params) {
             return await this.connection.send(method, params);
         }
-        async subscribe(events) {
+        async subscribe(events, contexts) {
             await this.send('session.subscribe', {
                 events,
+                contexts,
+            });
+        }
+        async addIntercepts(events, contexts) {
+            await this.send('session.subscribe', {
+                events,
+                contexts,
             });
         }
         async end() {
@@ -177,10 +200,13 @@ let Session = (() => {
                 this.dispose(`Session already ended.`);
             }
         }
-        [(_dispose_decorators = [decorators_js_1.inertIfDisposed], _send_decorators = [(0, decorators_js_1.throwIfDisposed)(session => {
+        [(_connection_decorators = [(0, decorators_js_1.bubble)()], _dispose_decorators = [decorators_js_1.inertIfDisposed], _send_decorators = [(0, decorators_js_1.throwIfDisposed)(session => {
                 // SAFETY: By definition of `disposed`, `#reason` is defined.
                 return session.#reason;
             })], _subscribe_decorators = [(0, decorators_js_1.throwIfDisposed)(session => {
+                // SAFETY: By definition of `disposed`, `#reason` is defined.
+                return session.#reason;
+            })], _addIntercepts_decorators = [(0, decorators_js_1.throwIfDisposed)(session => {
                 // SAFETY: By definition of `disposed`, `#reason` is defined.
                 return session.#reason;
             })], _end_decorators = [(0, decorators_js_1.throwIfDisposed)(session => {

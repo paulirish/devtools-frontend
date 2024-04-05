@@ -4,7 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Platform from '../../core/platform/platform.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
@@ -187,7 +187,6 @@ export class CoverageListView extends UI.Widget.VBox {
     this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.Last);
     this.dataGrid.setStriped(true);
     this.dataGrid.element.classList.add('flex-auto');
-    this.dataGrid.element.addEventListener('keydown', this.onKeyDown.bind(this), false);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.OpenedNode, this.onOpenedNode, this);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SortingChanged, this.sortingChanged, this);
 
@@ -305,14 +304,6 @@ export class CoverageListView extends UI.Widget.VBox {
     void this.revealSourceForSelectedNode();
   }
 
-  private onKeyDown(event: KeyboardEvent): void {
-    if (!(event.key === 'Enter')) {
-      return;
-    }
-    event.consume(true);
-    void this.revealSourceForSelectedNode();
-  }
-
   private async revealSourceForSelectedNode(): Promise<void> {
     const node = this.dataGrid.selectedNode;
     if (!node) {
@@ -360,6 +351,15 @@ function getPercentageFormatter(): Intl.NumberFormat {
     });
   }
   return percentageFormatter;
+}
+
+let bytesFormatter: Intl.NumberFormat|null = null;
+
+function getBytesFormatter(): Intl.NumberFormat {
+  if (!bytesFormatter) {
+    bytesFormatter = new Intl.NumberFormat(i18n.DevToolsLocale.DevToolsLocale.instance().locale);
+  }
+  return bytesFormatter;
 }
 
 export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<GridNode> {
@@ -422,9 +422,11 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
         break;
       }
       case 'size': {
+        const size = this.coverageInfo.size() || 0;
         const sizeSpan = cell.createChild('span');
-        sizeSpan.textContent = Platform.NumberUtilities.withThousandsSeparator(this.coverageInfo.size() || 0);
-        const sizeAccessibleName = i18nString(UIStrings.sBytes, {n: this.coverageInfo.size() || 0});
+        const sizeFormatted = getBytesFormatter().format(size);
+        sizeSpan.textContent = sizeFormatted;
+        const sizeAccessibleName = i18nString(UIStrings.sBytes, {n: size});
         this.setCellAccessibleName(sizeAccessibleName, cell, columnId);
         break;
       }
@@ -432,7 +434,8 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
         const unusedSize = this.coverageInfo.unusedSize() || 0;
         const unusedSizeSpan = cell.createChild('span');
         const unusedPercentsSpan = cell.createChild('span', 'percent-value');
-        unusedSizeSpan.textContent = Platform.NumberUtilities.withThousandsSeparator(unusedSize);
+        const unusedSizeFormatted = getBytesFormatter().format(unusedSize);
+        unusedSizeSpan.textContent = unusedSizeFormatted;
         const unusedPercentFormatted = getPercentageFormatter().format(this.coverageInfo.unusedPercentage());
         unusedPercentsSpan.textContent = unusedPercentFormatted;
         const unusedAccessibleName = i18nString(UIStrings.sBytesS, {n: unusedSize, percentage: unusedPercentFormatted});

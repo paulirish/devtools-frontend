@@ -40,6 +40,7 @@ import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
+import {type PageResourceLoadInitiator} from './PageResourceLoader.js';
 import {type GetPropertiesResult, type RemoteObject, ScopeRef} from './RemoteObject.js';
 import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
 import {type EvaluationOptions, type EvaluationResult, type ExecutionContext, RuntimeModel} from './RuntimeModel.js';
@@ -300,7 +301,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       return;
     }
     const {debuggerId} = response;
-    _debuggerIdToModel.set(debuggerId, this);
+    debuggerIdToModel.set(debuggerId, this);
     this.#debuggerId = debuggerId;
     this.dispatchEventToListeners(Events.DebuggerIsReadyToPause, this);
   }
@@ -314,11 +315,11 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       await DebuggerModel.resyncDebuggerIdForModels();
       DebuggerModel.shouldResyncDebuggerId = false;
     }
-    return _debuggerIdToModel.get(debuggerId) || null;
+    return debuggerIdToModel.get(debuggerId) || null;
   }
 
   static async resyncDebuggerIdForModels(): Promise<void> {
-    const dbgModels = _debuggerIdToModel.values();
+    const dbgModels = debuggerIdToModel.values();
     for (const dbgModel of dbgModels) {
       if (dbgModel.debuggerEnabled()) {
         await dbgModel.syncDebuggerId();
@@ -338,7 +339,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     this.globalObjectCleared();
     this.dispatchEventToListeners(Events.DebuggerWasDisabled, this);
     if (typeof this.#debuggerId === 'string') {
-      _debuggerIdToModel.delete(this.#debuggerId);
+      debuggerIdToModel.delete(this.#debuggerId);
     }
     this.#debuggerId = null;
   }
@@ -692,14 +693,6 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     this.registerScript(script);
     this.dispatchEventToListeners(Events.ParsedScriptSource, script);
 
-    if (script.isInlineScript() && !script.hasSourceURL) {
-      if (script.isModule) {
-        Host.userMetrics.inlineScriptParsed(Host.UserMetrics.VMInlineScriptType.MODULE_SCRIPT);
-      } else {
-        Host.userMetrics.inlineScriptParsed(Host.UserMetrics.VMInlineScriptType.CLASSIC_SCRIPT);
-      }
-    }
-
     if (script.sourceMapURL && !hasSyntaxError) {
       this.#sourceMapManagerInternal.attachSourceMap(script, script.sourceURL, script.sourceMapURL);
     }
@@ -894,7 +887,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   override dispose(): void {
     this.#sourceMapManagerInternal.dispose();
     if (this.#debuggerId) {
-      _debuggerIdToModel.delete(this.#debuggerId);
+      debuggerIdToModel.delete(this.#debuggerId);
     }
     Common.Settings.Settings.instance()
         .moduleSetting('pause-on-exception-enabled')
@@ -927,9 +920,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 }
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export const _debuggerIdToModel = new Map<string, DebuggerModel>();
+const debuggerIdToModel = new Map<string, DebuggerModel>();
 
 /**
  * Keep these in sync with WebCore::V8Debugger
@@ -1139,9 +1130,14 @@ export class BreakLocation extends Location {
   }
 }
 
+export interface MissingDebugFiles {
+  resourceUrl: Platform.DevToolsPath.UrlString;
+  initiator: PageResourceLoadInitiator;
+}
+
 export interface MissingDebugInfoDetails {
   details: string;
-  resources: string[];
+  resources: MissingDebugFiles[];
 }
 
 export class CallFrame {

@@ -606,9 +606,7 @@ export class RemoteObject extends SDK.RemoteObject.RemoteObject {
     return this.object.subtype;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override get value(): any {
+  override get value(): typeof this.object.value {
     return this.object.value;
   }
 
@@ -777,14 +775,12 @@ export async function resolveProfileFrameFunctionName(
   return await getFunctionNameFromScopeStart(script, lineNumber, columnNumber);
 }
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-// eslint-disable-next-line @typescript-eslint/naming-convention
-let _scopeResolvedForTest: (...arg0: unknown[]) => void = function(): void {};
+let scopeResolvedForTest: (...arg0: unknown[]) => void = function(): void {};
 
 export const getScopeResolvedForTest = (): (...arg0: unknown[]) => void => {
-  return _scopeResolvedForTest;
+  return scopeResolvedForTest;
 };
 
 export const setScopeResolvedForTest = (scope: (...arg0: unknown[]) => void): void => {
-  _scopeResolvedForTest = scope;
+  scopeResolvedForTest = scope;
 };

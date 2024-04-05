@@ -26,10 +26,6 @@ const UIStrings = {
    */
   categories: 'Categories',
   /**
-   * @description Title in the Lighthouse Start View for list of available start plugins
-   */
-  plugins: 'Plugins',
-  /**
    * @description Label for a button to start analyzing a page navigation with Lighthouse
    */
   analyzeNavigation: 'Analyze page load',
@@ -147,14 +143,12 @@ export class StartView extends UI.Widget.Widget {
 
     // Populate the categories
     const categoryFormElements = fragment.$('categories-form-elements') as HTMLElement;
-    const pluginFormElements = fragment.$('plugins-form-elements') as HTMLElement;
 
     this.checkboxes = [];
     for (const preset of Presets) {
-      const formElements = preset.plugin ? pluginFormElements : categoryFormElements;
       preset.setting.setTitle(preset.title());
       const checkbox = new UI.Toolbar.ToolbarSettingCheckbox(preset.setting, preset.description());
-      const row = formElements.createChild('div', 'vbox lighthouse-launcher-row');
+      const row = categoryFormElements.createChild('div', 'vbox lighthouse-launcher-row');
       row.appendChild(checkbox.element);
       checkbox.element.setAttribute('data-lh-category', preset.configID);
       this.checkboxes.push({preset, checkbox});
@@ -165,12 +159,11 @@ export class StartView extends UI.Widget.Widget {
     }
     UI.ARIAUtils.markAsGroup(categoryFormElements);
     UI.ARIAUtils.setLabel(categoryFormElements, i18nString(UIStrings.categories));
-    UI.ARIAUtils.markAsGroup(pluginFormElements);
-    UI.ARIAUtils.setLabel(pluginFormElements, i18nString(UIStrings.plugins));
   }
 
   private render(): void {
     this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.clear-storage', this.settingsToolbarInternal);
+    this.populateRuntimeSettingAsToolbarCheckbox('lighthouse.enable-sampling', this.settingsToolbarInternal);
     this.populateRuntimeSettingAsToolbarDropdown('lighthouse.throttling', this.settingsToolbarInternal);
 
     const {mode} = this.controller.getFlags();
@@ -195,12 +188,6 @@ export class StartView extends UI.Widget.Widget {
       <div class="lighthouse-form-section">
         <div class="lighthouse-form-section-label">${i18nString(UIStrings.categories)}</div>
         <div class="lighthouse-form-elements" $="categories-form-elements"></div>
-      </div>
-      <div class="lighthouse-form-section">
-        <div class="lighthouse-form-section-label">
-          <div class="lighthouse-icon-label">${i18nString(UIStrings.plugins)}</div>
-        </div>
-        <div class="lighthouse-form-elements" $="plugins-form-elements"></div>
       </div>
     </div>
   </div>

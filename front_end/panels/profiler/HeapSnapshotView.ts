@@ -257,6 +257,11 @@ const UIStrings = {
    */
   stackWasNotRecordedForThisObject:
       'Stack was not recorded for this object because it had been allocated before this profile recording started.',
+  /**
+   *@description Text in Heap Snapshot View of a profiler tool.
+   * This text is on a button to undo all previous "Ignore this retainer" actions.
+   */
+  restoreIgnoredRetainers: 'Restore ignored retainers',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/HeapSnapshotView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -296,6 +301,7 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
   readonly filterSelect: UI.Toolbar.ToolbarComboBox;
   readonly classNameFilter: UI.Toolbar.ToolbarInput;
   readonly selectedSizeText: UI.Toolbar.ToolbarText;
+  readonly resetRetainersButton: UI.Toolbar.ToolbarButton;
   readonly popoverHelper: UI.PopoverHelper.PopoverHelper;
   currentPerspectiveIndex: number;
   currentPerspective: SummaryPerspective|ComparisonPerspective|ContainmentPerspective|AllocationPerspective|
@@ -348,7 +354,7 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     this.constructorsWidget = this.constructorsDataGrid.asWidget();
     this.constructorsWidget.setMinimumSize(50, 25);
     this.constructorsWidget.element.setAttribute(
-        'jslog', `${VisualLogging.section('heap-snapshot.constructors-view')}`);
+        'jslog', `${VisualLogging.pane('heap-snapshot.constructors-view').track({resize: true})}`);
 
     this.diffDataGrid = new HeapSnapshotDiffDataGrid(heapProfilerModel, this);
     this.diffDataGrid.addEventListener(DataGrid.DataGrid.Events.SelectedNode, this.selectionChanged, this);
@@ -375,7 +381,7 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     this.retainmentWidget.setMinimumSize(50, 21);
     this.retainmentWidget.element.classList.add('retaining-paths-view');
     this.retainmentWidget.element.setAttribute(
-        'jslog', `${VisualLogging.section('heap-snapshot.retaining-paths-view')}`);
+        'jslog', `${VisualLogging.pane('heap-snapshot.retaining-paths-view').track({resize: true})}`);
 
     let splitWidgetResizer;
     if (this.allocationStackView) {
@@ -438,6 +444,17 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     this.diffDataGrid.setNameFilter(this.classNameFilter);
 
     this.selectedSizeText = new UI.Toolbar.ToolbarText();
+
+    const restoreIgnoredRetainers = i18nString(UIStrings.restoreIgnoredRetainers);
+    this.resetRetainersButton =
+        new UI.Toolbar.ToolbarButton(restoreIgnoredRetainers, 'clear-list', restoreIgnoredRetainers);
+    this.resetRetainersButton.setVisible(false);
+    this.resetRetainersButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, async () => {
+      // The reset retainers button acts upon whichever snapshot is currently shown in the Retainers pane.
+      await this.retainmentDataGrid.snapshot?.unignoreAllNodesInRetainersView();
+      await this.retainmentDataGrid.dataSourceChanged();
+    });
+    this.retainmentDataGrid.resetRetainersButton = this.resetRetainersButton;
 
     this.popoverHelper = new UI.PopoverHelper.PopoverHelper(
         this.element, this.getPopoverRequest.bind(this), 'profiler.heap-snapshot-object');
@@ -586,6 +603,7 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
       result.push(this.baseSelect, this.filterSelect);
     }
     result.push(this.selectedSizeText);
+    result.push(this.resetRetainersButton);
     return result;
   }
 
@@ -907,11 +925,13 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
           return false;
         }
         const remoteObject = await (node as HeapSnapshotGridNode).queryObjectContent(heapProfilerModel, 'popover');
-        if (!remoteObject) {
-          return false;
+        if (remoteObject instanceof SDK.RemoteObject.RemoteObject) {
+          objectPopoverHelper =
+              await ObjectUI.ObjectPopoverHelper.ObjectPopoverHelper.buildObjectPopover(remoteObject, popover);
+        } else {
+          objectPopoverHelper = ObjectUI.ObjectPopoverHelper.ObjectPopoverHelper.buildDescriptionPopover(
+              remoteObject.description, remoteObject.link, popover);
         }
-        objectPopoverHelper =
-            await ObjectUI.ObjectPopoverHelper.ObjectPopoverHelper.buildObjectPopover(remoteObject, popover);
         if (!objectPopoverHelper) {
           heapProfilerModel.runtimeModel().releaseObjectGroup('popover');
           return false;
@@ -1251,7 +1271,7 @@ export class HeapSnapshotProfileType extends
   override customContent(): Element|null {
     const optionsContainer = document.createElement('div');
     const showOptionToExposeInternalsInHeapSnapshot =
-        Root.Runtime.experiments.isEnabled('showOptionToExposeInternalsInHeapSnapshot');
+        Root.Runtime.experiments.isEnabled('show-option-tp-expose-internals-in-heap-snapshot');
     const omitParagraphElement = !showOptionToExposeInternalsInHeapSnapshot;
     if (showOptionToExposeInternalsInHeapSnapshot) {
       const exposeInternalsInHeapSnapshotCheckbox = UI.SettingsUI.createSettingCheckbox(
@@ -1799,7 +1819,8 @@ export class HeapSnapshotStatisticsView extends UI.Widget.VBox {
   constructor() {
     super();
     this.element.classList.add('heap-snapshot-statistics-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane('profiler.heap-snapshot-statistics-view')}`);
+    this.element.setAttribute(
+        'jslog', `${VisualLogging.pane('profiler.heap-snapshot-statistics-view').track({resize: true})}`);
     this.pieChart = new PerfUI.PieChart.PieChart();
     this.setTotalAndRecords(0, []);
     this.pieChart.classList.add('heap-snapshot-stats-pie-chart');

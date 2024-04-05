@@ -23,7 +23,6 @@ module.exports = {
     'rulesdir/custom_element_definitions_location': ['error', {
       rootFrontendDirectory: __dirname,
     }],
-    'rulesdir/custom_element_component_definition': 'error',
   },
   'overrides': [
     {
@@ -150,6 +149,14 @@ module.exports = {
           }
         ]
       }
+    },
+    {
+      'files': ['*.test.ts', '**/testing/*.ts'],
+      'rules': {
+        'rulesdir/check_component_naming': 'off',
+        'rulesdir/custom_element_definitions_location': 'off',
+        '@typescript-eslint/explicit-function-return-type': 'off',
+      },
     },
     {
       'files': ['panels/**/components/*.ts', 'ui/components/**/*.ts', 'entrypoints/**/*.ts'],

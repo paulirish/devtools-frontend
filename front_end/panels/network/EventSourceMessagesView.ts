@@ -57,13 +57,13 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
   private filterRegex: RegExp|null;
 
   private messageFilterSetting: Common.Settings.Setting<string> =
-      Common.Settings.Settings.instance().createSetting('networkEventSourceMessageFilter', '');
+      Common.Settings.Settings.instance().createSetting('network-event-source-message-filter', '');
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
 
     this.element.classList.add('event-source-messages-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane('event-stream')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('event-stream').track({resize: true})}`);
     this.request = request;
 
     this.mainToolbar = new UI.Toolbar.Toolbar('');
@@ -180,7 +180,8 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
     contextMenu.clipboardSection().appendItem(
         i18nString(UIStrings.copyMessage),
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
-            Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data));
+            Host.InspectorFrontendHost.InspectorFrontendHostInstance, node.data.data),
+        {jslogContext: 'copy'});
   }
 
   refresh(): void {
@@ -209,9 +210,7 @@ export class EventSourceMessageNode extends DataGrid.SortableDataGrid.SortableDa
   }
 }
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export function EventSourceMessageNodeComparator(
+function eventSourceMessageNodeComparator(
     fieldGetter: (arg0: SDK.NetworkRequest.EventSourceMessage) => (number | string), a: EventSourceMessageNode,
     b: EventSourceMessageNode): number {
   const aValue = fieldGetter(a.message);
@@ -222,9 +221,9 @@ export function EventSourceMessageNodeComparator(
 export const Comparators: {
   [x: string]: (arg0: EventSourceMessageNode, arg1: EventSourceMessageNode) => number,
 } = {
-  'id': EventSourceMessageNodeComparator.bind(null, message => message.eventId),
-  'type': EventSourceMessageNodeComparator.bind(null, message => message.eventName),
-  'time': EventSourceMessageNodeComparator.bind(null, message => message.time),
+  'id': eventSourceMessageNodeComparator.bind(null, message => message.eventId),
+  'type': eventSourceMessageNodeComparator.bind(null, message => message.eventName),
+  'time': eventSourceMessageNodeComparator.bind(null, message => message.time),
 };
 
 const clearMessageOffsets = new WeakMap<SDK.NetworkRequest.NetworkRequest, number>();

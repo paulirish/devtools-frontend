@@ -366,8 +366,8 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
         height: '14px',
       };
       icon.classList.add('call-frame-warning-icon');
-      const messages =
-          callframe.missingDebugInfoDetails.resources.map(r => i18nString(UIStrings.debugFileNotFound, {PH1: r}));
+      const messages = callframe.missingDebugInfoDetails.resources.map(
+          r => i18nString(UIStrings.debugFileNotFound, {PH1: Common.ParsedURL.ParsedURL.extractName(r.resourceUrl)}));
       UI.Tooltip.Tooltip.install(icon, [callframe.missingDebugInfoDetails.details, ...messages].join('\n'));
       element.appendChild(icon);
     }
@@ -439,7 +439,7 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
     if (!item) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {jsLogContext: 'call-stack-frame'});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     const debuggerCallFrame = itemToCallFrame.get(item);
     if (debuggerCallFrame) {
       contextMenu.defaultSection().appendItem(i18nString(UIStrings.restartFrame), () => {

@@ -12,25 +12,43 @@ const UIStrings = {
   /**
    *@description Message to offer insights for a console error message
    */
-  explainThisError: 'Explain this error',
+  explainThisError: 'Understand this error',
   /**
    *@description Message to offer insights for a console warning message
    */
-  explainThisWarning: 'Explain this warning',
+  explainThisWarning: 'Understand this warning',
   /**
    *@description Message to offer insights for a console message
    */
-  explainThisMessage: 'Explain this message',
+  explainThisMessage: 'Understand this message',
   /**
    * @description The setting title to enable the console insights feature via
    * the settings tab.
    */
-  enableConsoleInsights: 'Enable Console Insights',
+  enableConsoleInsights: 'Understand console messages with AI',
   /**
    * @description Message shown to the user if the DevTools locale is not
    * supported.
    */
-  wrongLocale: 'Only English locales are currently supported.',
+  wrongLocale: 'To use this feature, update your Language preference in DevTools Settings to English.',
+  /**
+   * @description Message shown to the user if the age check is not successful.
+   */
+  ageRestricted: 'This feature is only available to users who are 18 years of age or older.',
+  /**
+   * @description Message shown to the user if the user's region is not
+   * supported.
+   */
+  geoRestricted: 'This feature is unavailable in your region.',
+  /**
+   * @description Message shown to the user if the enterprise policy does
+   * not allow this feature.
+   */
+  policyRestricted: 'Your organization turned off this feature. Contact your administrators for more information.',
+  /**
+   * @description  Message shown to the user if the feature roll out is currently happening.
+   */
+  rolloutRestricted: 'This feature is currently being rolled out. Please try again later.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/explain/explain-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -69,26 +87,38 @@ const actions = [
   },
 ];
 
-function isActionAvailable(): boolean {
-  return isLocaleAllowed() === true && isSettingAvailable();
-}
-
 function isSettingAvailable(): boolean {
   return isFeatureEnabled();
 }
 
-/**
- * Additional checks for the availability of the feature event if enabled via
- * the server. Returns true if locale is supported, or a string containing the
- * reason why not.
- */
-function isLocaleAllowed(): true|string {
-  const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance();
-  if (!devtoolsLocale.locale.startsWith('en-')) {
-    return i18nString(UIStrings.wrongLocale);
-  }
+function isActionAvailable(): boolean {
+  return isSettingAvailable() && !isAgeRestricted() && !isLocaleRestricted() && !isGeoRestricted() &&
+      !isPolicyRestricted() && !isRolloutRestricted();
+}
 
-  return true;
+function isLocaleRestricted(): boolean {
+  const devtoolsLocale = i18n.DevToolsLocale.DevToolsLocale.instance();
+  return !devtoolsLocale.locale.startsWith('en-');
+}
+
+function isAgeRestricted(): boolean {
+  return Root.Runtime.Runtime.queryParam('ci_blockedByAge') === 'true';
+}
+
+function isRolloutRestricted(): boolean {
+  return Root.Runtime.Runtime.queryParam('ci_blockedByRollout') === 'true';
+}
+
+function isGeoRestricted(): boolean {
+  return Root.Runtime.Runtime.queryParam('ci_blockedByGeo') === 'true';
+}
+
+function isPolicyRestricted(): boolean {
+  return Root.Runtime.Runtime.queryParam('ci_blockedByEnterprisePolicy') === 'true';
+}
+
+function isDisabledByDefault(): boolean {
+  return Root.Runtime.Runtime.queryParam('ci_disabledByDefault') === 'true';
 }
 
 function isFeatureEnabled(): boolean {
@@ -100,13 +130,24 @@ Common.Settings.registerSettingExtension({
   settingName: setting,
   settingType: Common.Settings.SettingType.BOOLEAN,
   title: i18nLazyString(UIStrings.enableConsoleInsights),
-  defaultValue: true,
+  defaultValue: isDisabledByDefault() ? false : true,
   reloadRequired: true,
   condition: isSettingAvailable,
   disabledCondition: () => {
-    const localeCheck = isLocaleAllowed();
-    if (localeCheck !== true) {
-      return {disabled: true, reason: localeCheck};
+    if (isLocaleRestricted()) {
+      return {disabled: true, reason: i18nString(UIStrings.wrongLocale)};
+    }
+    if (isAgeRestricted()) {
+      return {disabled: true, reason: i18nString(UIStrings.ageRestricted)};
+    }
+    if (isGeoRestricted()) {
+      return {disabled: true, reason: i18nString(UIStrings.geoRestricted)};
+    }
+    if (isPolicyRestricted()) {
+      return {disabled: true, reason: i18nString(UIStrings.policyRestricted)};
+    }
+    if (isRolloutRestricted()) {
+      return {disabled: true, reason: i18nString(UIStrings.rolloutRestricted)};
     }
     return {disabled: false};
   },

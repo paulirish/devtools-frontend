@@ -47,8 +47,7 @@ import {type Suggestion} from './SuggestBox.js';
 import {Events as TextPromptEvents, TextPrompt} from './TextPrompt.js';
 import toolbarStyles from './toolbar.css.legacy.js';
 import {Tooltip} from './Tooltip.js';
-import {CheckboxLabel, LongClickController} from './UIUtils.js';
-import * as Utils from './utils/utils.js';
+import {CheckboxLabel, createShadowRootWithCoreStyles, LongClickController} from './UIUtils.js';
 
 const UIStrings = {
   /**
@@ -81,8 +80,7 @@ export class Toolbar {
     this.element.className = className;
     this.element.classList.add('toolbar');
     this.enabled = true;
-    this.shadowRoot =
-        Utils.createShadowRootWithCoreStyles(this.element, {cssFile: toolbarStyles, delegatesFocus: undefined});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: toolbarStyles, delegatesFocus: undefined});
     this.contentElement = this.shadowRoot.createChild('div', 'toolbar-shadow');
   }
 
@@ -224,11 +222,7 @@ export class Toolbar {
       button.setText(options.label?.() || action.title());
     }
 
-    let handler = (_event: {
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: any,
-    }): void => {
+    let handler = (): void => {
       void action.execute();
     };
     if (options.userActionCode) {
@@ -964,6 +958,8 @@ export class ToolbarComboBox extends ToolbarItem<void> {
     if (typeof value !== 'undefined') {
       option.value = value;
     }
+    const jslogContext = value ? Platform.StringUtilities.toKebabCase(value) : undefined;
+    option.setAttribute('jslog', `${VisualLogging.item(jslogContext).track({click: true})}`);
     return option;
   }
 
@@ -988,10 +984,7 @@ export class ToolbarComboBox extends ToolbarItem<void> {
   }
 
   select(option: Element): void {
-    this.selectElementInternal.selectedIndex =
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Array.prototype.indexOf.call((this.selectElementInternal as any), option);
+    this.selectElementInternal.selectedIndex = Array.prototype.indexOf.call(this.selectElementInternal, option);
   }
 
   setSelectedIndex(index: number): void {

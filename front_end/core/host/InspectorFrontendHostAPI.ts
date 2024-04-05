@@ -135,7 +135,14 @@ export interface SearchCompletedEvent {
 }
 
 export interface DoAidaConversationResult {
-  response: string;
+  statusCode?: number;
+  headers?: {
+    [x: string]: string,
+  };
+  netError?: number;
+  netErrorName?: string;
+  error?: string;
+  detail?: string;
 }
 
 export interface VisualElementImpression {
@@ -159,7 +166,7 @@ export interface ResizeEvent {
 
 export interface ClickEvent {
   veid: number;
-  mouseButton: number;
+  mouseButton?: number;
   context?: number;
   doubleClick: boolean;
 }
@@ -181,7 +188,7 @@ export interface ChangeEvent {
 }
 
 export interface KeyDownEvent {
-  veid: number;
+  veid?: number;
   context?: number;
 }
 
@@ -248,6 +255,8 @@ export interface InspectorFrontendHostAPI {
   inspectElementCompleted(): void;
 
   openInNewTab(url: Platform.DevToolsPath.UrlString): void;
+
+  openSearchResultsInNewTab(query: string): void;
 
   showItemInFolder(fileSystemPath: Platform.DevToolsPath.RawPathString): void;
 
@@ -351,7 +360,8 @@ export interface InspectorFrontendHostAPI {
 
   initialTargetId(): Promise<string|null>;
 
-  doAidaConversation: (request: string, cb: (result: DoAidaConversationResult) => void) => void;
+  doAidaConversation: (request: string, streamId: number, cb: (result: DoAidaConversationResult) => void) => void;
+  registerAidaClientEvent: (request: string) => void;
 
   recordImpression(event: ImpressionEvent): void;
   recordClick(event: ClickEvent): void;
@@ -417,7 +427,6 @@ export interface SyncInformation {
  */
 export const enum EnumeratedHistogram {
   ActionTaken = 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded = 'DevTools.BreakpointWithConditionAdded',
   BreakpointEditDialogRevealedFrom = 'DevTools.BreakpointEditDialogRevealedFrom',
   PanelClosed = 'DevTools.PanelClosed',
   PanelShown = 'DevTools.PanelShown',
@@ -459,9 +468,6 @@ export const enum EnumeratedHistogram {
   ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed = 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown = 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount = 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated = 'DevTools.SwatchActivated',
   BadgeActivated = 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged = 'DevTools.AnimationPlaybackRateChanged',

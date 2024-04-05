@@ -275,6 +275,18 @@ const UIStrings = {
    */
   doNotDetectIndentation: 'Do not detect indentation',
   /**
+   *@description Title of a setting under Sources category that can be invoked through the Command Menu.
+   *This setting turns on the automatic formatting of source files in the Sources panel that are detected
+   *to be minified.
+   */
+  automaticallyPrettyPrintMinifiedSources: 'Automatically pretty print minified sources',
+  /**
+   *@description Title of a setting under Sources category that can be invoked through the Command Menu.
+   *This setting turns off the automatic formatting of source files in the Sources panel that are detected
+   *to be minified.
+   */
+  doNotAutomaticallyPrettyPrintMinifiedSources: 'Do not automatically pretty print minified sources',
+  /**
    *@description Text for autocompletion
    */
   autocompletion: 'Autocompletion',
@@ -370,15 +382,15 @@ const UIStrings = {
   /**
    *@description Title of a setting under the Sources category in Settings
    */
-  wasmAutoStepping: 'When debugging wasm with debug information, do not pause on wasm bytecode if possible',
+  wasmAutoStepping: 'When debugging Wasm with debug information, do not pause on wasm bytecode if possible',
   /**
    *@description Title of a setting under the Sources category in Settings
    */
-  enableWasmAutoStepping: 'Enable wasm auto-stepping',
+  enableWasmAutoStepping: 'Enable Wasm auto-stepping',
   /**
    *@description Title of a setting under the Sources category in Settings
    */
-  disableWasmAutoStepping: 'Disable wasm auto-stepping',
+  disableWasmAutoStepping: 'Disable Wasm auto-stepping',
 
   /**
    *@description Text for command prefix of go to a given line or symbol
@@ -1677,6 +1689,25 @@ Common.Settings.registerSettingExtension({
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.SOURCES,
   storageType: Common.Settings.SettingStorageType.Synced,
+  title: i18nLazyString(UIStrings.automaticallyPrettyPrintMinifiedSources),
+  settingName: 'auto-pretty-print-minified',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
+  options: [
+    {
+      value: true,
+      title: i18nLazyString(UIStrings.automaticallyPrettyPrintMinifiedSources),
+    },
+    {
+      value: false,
+      title: i18nLazyString(UIStrings.doNotAutomaticallyPrettyPrintMinifiedSources),
+    },
+  ],
+});
+
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.SOURCES,
+  storageType: Common.Settings.SettingStorageType.Synced,
   title: i18nLazyString(UIStrings.cssSourceMaps),
   settingName: 'css-source-maps-enabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
@@ -1942,7 +1973,7 @@ UI.ContextMenu.registerItem({
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '@',
   iconName: 'symbol',
-  iconWidth: '16px',
+  iconWidth: '20px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.OutlineQuickOpen.OutlineQuickOpen();
@@ -1966,7 +1997,7 @@ QuickOpen.FilteredListWidget.registerProvider({
 QuickOpen.FilteredListWidget.registerProvider({
   prefix: '',
   iconName: 'document',
-  iconWidth: '16px',
+  iconWidth: '20px',
   async provider() {
     const Sources = await loadSourcesModule();
     return new Sources.OpenFileQuickOpen.OpenFileQuickOpen();

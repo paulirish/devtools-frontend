@@ -276,19 +276,19 @@ export class RuntimeModel extends SDKModel<EventTypes> {
     return result.getError() ? null : result;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  inspectRequested(payload: Protocol.Runtime.RemoteObject, hints?: any, executionContextId?: number): void {
+  inspectRequested(payload: Protocol.Runtime.RemoteObject, hints: unknown, executionContextId?: number): void {
     const object = this.createRemoteObject(payload);
 
-    if (hints && 'copyToClipboard' in hints && Boolean(hints.copyToClipboard)) {
-      this.copyRequested(object);
-      return;
-    }
+    if (hints !== null && typeof hints === 'object') {
+      if ('copyToClipboard' in hints && Boolean(hints.copyToClipboard)) {
+        this.copyRequested(object);
+        return;
+      }
 
-    if (hints && 'queryObjects' in hints && hints.queryObjects) {
-      void this.queryObjectsRequested(object, executionContextId);
-      return;
+      if ('queryObjects' in hints && hints.queryObjects) {
+        void this.queryObjectsRequested(object, executionContextId);
+        return;
+      }
     }
 
     if (object.isNode()) {
@@ -313,6 +313,10 @@ export class RuntimeModel extends SDKModel<EventTypes> {
 
   async addBinding(event: Protocol.Runtime.AddBindingRequest): Promise<Protocol.ProtocolResponseWithError> {
     return await this.agent.invoke_addBinding(event);
+  }
+
+  async removeBinding(request: Protocol.Runtime.RemoveBindingRequest): Promise<Protocol.ProtocolResponseWithError> {
+    return await this.agent.invoke_removeBinding(request);
   }
 
   bindingCalled(event: Protocol.Runtime.BindingCalledEvent): void {
@@ -431,7 +435,7 @@ export class RuntimeModel extends SDKModel<EventTypes> {
     }
     // Check for a positive throwOnSideEffect response without triggering side effects.
     const response = await this.agent.invoke_evaluate({
-      expression: _sideEffectTestExpression,
+      expression: sideEffectTestExpression,
       contextId: testContext.id,
       throwOnSideEffect: true,
     });
@@ -461,11 +465,8 @@ export class RuntimeModel extends SDKModel<EventTypes> {
  * - IMPORTANT: must not actually cause user-visible or JS-visible side-effects.
  * - Must throw when evaluated with `throwOnSideEffect: true`.
  * - Must be valid when run from any ExecutionContext that supports `throwOnSideEffect`.
- * @const
  */
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const _sideEffectTestExpression: string = '(async function(){ await 1; })()';
+const sideEffectTestExpression = '(async function(){ await 1; })()';
 
 export enum Events {
   BindingCalled = 'BindingCalled',

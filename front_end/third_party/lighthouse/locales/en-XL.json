@@ -1046,6 +1046,9 @@
   "core/audits/installable-manifest.js | manifest-missing-suitable-icon": {
     "message": "M̂án̂íf̂éŝt́ d̂óêś n̂ót̂ ćôńt̂áîń â śûít̂áb̂ĺê íĉón̂ - ṔN̂Ǵ, ŜV́Ĝ ór̂ Ẃêb́P̂ f́ôŕm̂át̂ óf̂ át̂ ĺêáŝt́ {value0} p̂x́ îś r̂éq̂úîŕêd́, t̂h́ê śîźêś ât́t̂ŕîb́ût́ê ḿûśt̂ b́ê śêt́, âńd̂ t́ĥé p̂úr̂ṕôśê át̂t́r̂íb̂út̂é, îf́ ŝét̂, ḿûśt̂ ín̂ćl̂úd̂é \"âńŷ\"."
   },
+  "core/audits/installable-manifest.js | manifest-parsing-or-network-error": {
+    "message": "M̂án̂íf̂éŝt́ ĉóûĺd̂ ńôt́ b̂é f̂ét̂ćĥéd̂, íŝ ém̂ṕt̂ý, ôŕ ĉóûĺd̂ ńôt́ b̂é p̂ár̂śêd́"
+  },
   "core/audits/installable-manifest.js | no-acceptable-icon": {
     "message": "N̂ó ŝúp̂ṕl̂íêd́ îćôń îś ât́ l̂éâśt̂ {value0} ṕx̂ śq̂úâŕê ín̂ ṔN̂Ǵ, ŜV́Ĝ ór̂ Ẃêb́P̂ f́ôŕm̂át̂, ẃît́ĥ t́ĥé p̂úr̂ṕôśê át̂t́r̂íb̂út̂é ûńŝét̂ ór̂ śêt́ t̂ó \"âńŷ\""
   },
@@ -3399,7 +3402,7 @@
     "message": "P̂áŝśêd́ âúd̂ít̂ś"
   },
   "report/renderer/report-utils.js | pwaRemovalMessage": {
-    "message": "Âĺôńĝśîd́ê [Ćĥŕôḿê’ś ûṕd̂át̂éd̂ Ín̂śt̂ál̂ĺâb́îĺît́ŷ Ćr̂ít̂ér̂íâ](https://developer.chrome.com/blog/update-install-criteria), Ĺîǵĥt́ĥóûśê ẃîĺl̂ b́ê d́êṕr̂éĉát̂ín̂ǵ t̂h́ê ṔŴÁ ĉát̂éĝór̂ý îń â f́ût́ûŕê ŕêĺêáŝé. P̂ĺêáŝé r̂éf̂ér̂ t́ô t́ĥé [ûṕd̂át̂éd̂ ṔŴÁ d̂óĉúm̂én̂t́ât́îón̂](https://developer.chrome.com/docs/devtools/progressive-web-apps/) f́ôŕ f̂út̂úr̂é P̂ẂÂ t́êśt̂ín̂ǵ."
+    "message": "Âś p̂ér̂ [Ćĥŕôḿê’ś ûṕd̂át̂éd̂ Ín̂śt̂ál̂ĺâb́îĺît́ŷ Ćr̂ít̂ér̂íâ](https://developer.chrome.com/blog/update-install-criteria), Ĺîǵĥt́ĥóûśê ẃîĺl̂ b́ê d́êṕr̂éĉát̂ín̂ǵ t̂h́ê ṔŴÁ ĉát̂éĝór̂ý îń â f́ût́ûŕê ŕêĺêáŝé. P̂ĺêáŝé r̂éf̂ér̂ t́ô t́ĥé [ûṕd̂át̂éd̂ ṔŴÁ d̂óĉúm̂én̂t́ât́îón̂](https://developer.chrome.com/docs/devtools/progressive-web-apps/) f́ôŕ f̂út̂úr̂é P̂ẂÂ t́êśt̂ín̂ǵ."
   },
   "report/renderer/report-utils.js | runtimeAnalysisWindow": {
     "message": "Îńît́îál̂ ṕâǵê ĺôád̂"

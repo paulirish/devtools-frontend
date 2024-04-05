@@ -462,7 +462,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * );
      * ```
      */
-    abstract waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: WaitForTargetOptions): Promise<Target>;
+    waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: WaitForTargetOptions): Promise<Target>;
     /**
      * Gets a list of all open {@link Page | pages} inside this
      * {@link BrowserContext | browser context}.
@@ -477,6 +477,17 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      * In Chrome, the
      * {@link Browser.defaultBrowserContext | default browser context} is the only
      * non-incognito browser context.
+     *
+     * @deprecated In Chrome, the
+     * {@link Browser.defaultBrowserContext | default browser context} can also be
+     * "icognito" if configured via the arguments and in such cases this getter
+     * returns wrong results (see
+     * https://github.com/puppeteer/puppeteer/issues/8836). Also, the term
+     * "incognito" is not applicable to other browsers. To migrate, check the
+     * {@link Browser.defaultBrowserContext | default browser context} instead: in
+     * Chrome all non-default contexts are incognito, and the default context
+     * might be incognito if you provide the `--incognito` argument when launching
+     * the browser.
      */
     abstract isIncognito(): boolean;
     /**
@@ -744,7 +755,7 @@ export declare type CDPEvents = {
  * @example
  *
  * ```ts
- * const client = await page.target().createCDPSession();
+ * const client = await page.createCDPSession();
  * await client.send('Animation.enable');
  * client.on('Animation.animationCreated', () =>
  *   console.log('Animation created!')
@@ -900,7 +911,7 @@ export declare interface Configuration {
      * @remarks
      * This must include the protocol and may even need a path prefix.
      *
-     * @defaultValue Either https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing or
+     * @defaultValue Either https://storage.googleapis.com/chrome-for-testing-public or
      * https://archive.mozilla.org/pub/firefox/nightly/latest-mozilla-central,
      * depending on the product.
      */
@@ -945,7 +956,7 @@ export declare interface Configuration {
     /**
      * Tells Puppeteer to not chrome-headless-shell download during installation.
      *
-     * Can be overridden by `PUPPETEER_SKIP_CHROME_HEADLESSS_HELL_DOWNLOAD`.
+     * Can be overridden by `PUPPETEER_SKIP_CHROME_HEADLESS_SHELL_DOWNLOAD`.
      */
     skipChromeHeadlessShellDownload?: boolean;
     /**
@@ -1514,7 +1525,7 @@ export declare interface DeleteCookiesRequest {
     name: string;
     /**
      * If specified, deletes all the cookies with the given name where domain and path match
-     * provided URL.
+     * provided URL. Otherwise, deletes only cookies related to the current page's domain.
      */
     url?: string;
     /**
@@ -2256,6 +2267,8 @@ export declare class FileChooser {
     cancel(): Promise<void>;
 }
 
+/* Excluded from this release type: filterAsync */
+
 /* Excluded from this release type: FilteredLocator */
 
 /* Excluded from this release type: FirefoxLauncher */
@@ -2331,7 +2344,6 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
     #private;
     /* Excluded from this release type: _id */
     /* Excluded from this release type: _parentId */
-    /* Excluded from this release type: worlds */
     /* Excluded from this release type: _name */
     /* Excluded from this release type: _hasStartedLoading */
     /* Excluded from this release type: __constructor */
@@ -2378,12 +2390,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * Server Error". The status code for such responses can be retrieved by
      * calling {@link HTTPResponse.status}.
      */
-    abstract goto(url: string, options?: {
-        referer?: string;
-        referrerPolicy?: string;
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<HTTPResponse | null>;
+    abstract goto(url: string, options?: GoToOptions): Promise<HTTPResponse | null>;
     /**
      * Waits for the frame to navigate. It is useful for when you run code which
      * will indirectly cause the frame to navigate.
@@ -2411,7 +2418,10 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
     /* Excluded from this release type: mainRealm */
     /* Excluded from this release type: isolatedRealm */
     /* Excluded from this release type: clearDocumentHandle */
-    /* Excluded from this release type: frameElement */
+    /**
+     * @returns The frame element associated with this frame (if any).
+     */
+    frameElement(): Promise<HandleFor<HTMLIFrameElement> | null>;
     /**
      * Behaves identically to {@link Page.evaluateHandle} except it's run within
      * the context of this frame.
@@ -2420,7 +2430,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      */
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
     /**
-     * Behaves identically to {@link Page.evaluate} except it's run within the
+     * Behaves identically to {@link Page.evaluate} except it's run within
      * the context of this frame.
      *
      * @see {@link Page.evaluate} for details.
@@ -2583,10 +2593,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * @param options - Options to configure how long before timing out and at
      * what point to consider the content setting successful.
      */
-    abstract setContent(html: string, options?: {
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<void>;
+    abstract setContent(html: string, options?: WaitForOptions): Promise<void>;
     /* Excluded from this release type: setFrameContent */
     /**
      * The frame's `name` attribute as specified in the tag.
@@ -2597,6 +2604,13 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * @remarks
      * This value is calculated once when the frame is created, and will not
      * update if the attribute is changed later.
+     *
+     * @deprecated Use
+     *
+     * ```ts
+     * const element = await frame.frameElement();
+     * const nameOrId = await element.evaluate(frame => frame.name ?? frame.id);
+     * ```
      */
     name(): string;
     /**
@@ -2891,6 +2905,8 @@ export declare interface GoToOptions extends WaitForOptions {
     referrerPolicy?: string;
 }
 
+/* Excluded from this release type: handleError */
+
 /**
  * @public
  */
@@ -2944,7 +2960,7 @@ export declare type Handler<T = unknown> = (event: T) => void;
  * @public
  */
 export declare abstract class HTTPRequest {
-    /* Excluded from this release type: _requestId */
+    /* Excluded from this release type: id */
     /* Excluded from this release type: _interceptionId */
     /* Excluded from this release type: _failureText */
     /* Excluded from this release type: _response */
@@ -3228,10 +3244,17 @@ export declare abstract class HTTPResponse {
     abstract timing(): Protocol.Network.ResourceTiming | null;
     /**
      * Promise which resolves to a buffer with response body.
+     *
+     * @remarks
+     *
+     * The buffer might be re-encoded by the browser
+     * based on HTTP-headers or other heuristics. If the browser
+     * failed to detect the correct encoding, the buffer might
+     * be encoded incorrectly. See https://github.com/puppeteer/puppeteer/issues/6478.
      */
     abstract buffer(): Promise<Buffer>;
     /**
-     * Promise which resolves to a text representation of response body.
+     * Promise which resolves to a text (utf8) representation of response body.
      */
     text(): Promise<string>;
     /**
@@ -4232,8 +4255,17 @@ export declare interface Moveable {
  * @public
  */
 export declare interface NetworkConditions {
+    /**
+     * Download speed (bytes/s)
+     */
     download: number;
+    /**
+     * Upload speed (bytes/s)
+     */
     upload: number;
+    /**
+     * Latency (ms)
+     */
     latency: number;
 }
 
@@ -4396,6 +4428,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     abstract setGeolocation(options: GeolocationOptions): Promise<void>;
     /**
      * A target this page was created from.
+     *
+     * @deprecated Use {@link Page.createCDPSession} directly.
      */
     abstract target(): Target;
     /**
@@ -4860,7 +4894,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * Functions installed via `page.exposeFunction` survive navigations.
      *
-     * :::note
+     * :::
      *
      * @example
      * An example of adding an `md5` function into the page:
@@ -6862,7 +6896,7 @@ export declare interface ScreenshotOptions {
      */
     path?: string;
     /**
-     * Specifies the region of the page to clip.
+     * Specifies the region of the page/element to clip.
      */
     clip?: ScreenshotClip;
     /**
@@ -7336,6 +7370,7 @@ export declare interface WaitForOptions {
      * @defaultValue `'load'`
      */
     waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
+    /* Excluded from this release type: ignoreSameDocumentNavigation */
 }
 
 /**
@@ -7483,6 +7518,7 @@ export declare abstract class WebWorker extends EventEmitter<Record<EventType, u
      * @returns A {@link JSHandle | handle} to the return value of `func`.
      */
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(func: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
+    close(): Promise<void>;
 }
 
 /* Excluded from this release type: withSourcePuppeteerURLIfNone */

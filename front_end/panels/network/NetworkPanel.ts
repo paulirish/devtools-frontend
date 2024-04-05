@@ -38,6 +38,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
+import type * as Extensions from '../../models/extensions/extensions.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
@@ -268,6 +269,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
       }
       splitWidget.hideSidebar();
       event.consume();
+      void VisualLogging.logKeyDown(event.currentTarget, event, 'hide-sidebar');
     });
     const closeSidebar = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.close), 'cross');
     closeSidebar.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => splitWidget.hideSidebar());
@@ -720,7 +722,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
           () => UI.ViewManager.ViewManager.instance()
                     .showView('network')
                     .then(this.networkLogView.resetFilter.bind(this.networkLogView))
-                    .then(this.revealAndHighlightRequest.bind(this, request)));
+                    .then(this.revealAndHighlightRequest.bind(this, request)),
+          {jslogContext: 'reveal-in-network'});
     };
 
     if ((event.target as Node).isSelfOrDescendant(this.element)) {
@@ -799,9 +802,15 @@ export class RequestIdRevealer implements Common.Revealer.Revealer<NetworkForwar
   }
 }
 
-export class NetworkLogWithFilterRevealer implements Common.Revealer.Revealer<NetworkForward.UIFilter.UIRequestFilter> {
-  reveal(request: NetworkForward.UIFilter.UIRequestFilter): Promise<void> {
-    return NetworkPanel.revealAndFilter(request.filters);
+export class NetworkLogWithFilterRevealer implements
+    Common.Revealer
+        .Revealer<Extensions.ExtensionServer.RevealableNetworkRequestFilter|NetworkForward.UIFilter.UIRequestFilter> {
+  reveal(request: Extensions.ExtensionServer.RevealableNetworkRequestFilter|
+         NetworkForward.UIFilter.UIRequestFilter): Promise<void> {
+    if ('filters' in request) {
+      return NetworkPanel.revealAndFilter(request.filters);
+    }
+    return NetworkPanel.revealAndFilter(request.filter ? [{filterType: null, filterValue: request.filter}] : []);
   }
 }
 

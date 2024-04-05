@@ -12,7 +12,7 @@ import type { Target } from '../api/Target.js';
 import type { Viewport } from '../common/Viewport.js';
 import { BidiBrowserContext } from './BrowserContext.js';
 import type { BidiConnection } from './Connection.js';
-import { type BidiTarget } from './Target.js';
+import { BidiBrowserTarget } from './Target.js';
 /**
  * @internal
  */
@@ -29,11 +29,12 @@ export interface BidiBrowserOptions {
 export declare class BidiBrowser extends Browser {
     #private;
     readonly protocol = "webDriverBiDi";
-    static readonly subscribeModules: string[];
+    static readonly subscribeModules: [string, ...string[]];
     static readonly subscribeCdpEvents: Bidi.Cdp.EventNames[];
     static create(opts: BidiBrowserOptions): Promise<BidiBrowser>;
     private constructor();
-    userAgent(): never;
+    get cdpSupported(): boolean;
+    userAgent(): Promise<string>;
     get connection(): BidiConnection;
     wsEndpoint(): string;
     close(): Promise<void>;
@@ -45,8 +46,7 @@ export declare class BidiBrowser extends Browser {
     defaultBrowserContext(): BidiBrowserContext;
     newPage(): Promise<Page>;
     targets(): Target[];
-    _getTargetById(id: string): BidiTarget;
-    target(): Target;
+    target(): BidiBrowserTarget;
     disconnect(): Promise<void>;
     get debugInfo(): DebugInfo;
 }

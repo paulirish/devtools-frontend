@@ -43,10 +43,10 @@ const configureAndCheckHeaderOverrides = async () => {
   });
 
   let networkView = await waitFor('.network-item-view');
-  await click('#tab-headersComponent', {
+  await click('#tab-headers-component', {
     root: networkView,
   });
-  await waitFor('#tab-headersComponent[role=tab][aria-selected=true]', networkView);
+  await waitFor('#tab-headers-component[role=tab][aria-selected=true]', networkView);
   let responseHeaderSection = await waitFor('[aria-label="Response Headers"]', networkView);
 
   let row = await waitFor('.row', responseHeaderSection);
@@ -68,7 +68,7 @@ const configureAndCheckHeaderOverrides = async () => {
   await navigateToNetworkTab('hello.html');
   await selectRequestByName('hello.html');
   networkView = await waitFor('.network-item-view');
-  await click('#tab-headersComponent', {
+  await click('#tab-headers-component', {
     root: networkView,
   });
 
@@ -77,7 +77,7 @@ const configureAndCheckHeaderOverrides = async () => {
   assert.deepStrictEqual(await getTextFromHeadersRow(row), ['cache-control:', 'Foo']);
 };
 
-describe('The Network Request view', async () => {
+describe('The Network Request view', () => {
   it('re-opens the same tab after switching to another panel and navigating back to the "Network" tab (https://crbug.com/1184578)',
      async () => {
        await navigateToNetworkTab(SIMPLE_PAGE_URL);
@@ -628,7 +628,7 @@ describe('The Network Request view', async () => {
     await selectRequestByName('hello.html');
 
     const networkView = await waitFor('.network-item-view');
-    await click('#tab-headersComponent', {
+    await click('#tab-headers-component', {
       root: networkView,
     });
 

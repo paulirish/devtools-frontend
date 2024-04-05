@@ -1,10 +1,11 @@
-import { headersArray, HTTPRequest, InterceptResolutionAction, STATUS_TEXTS, } from '../api/HTTPRequest.js';
+import { headersArray, HTTPRequest, InterceptResolutionAction, STATUS_TEXTS, handleError, } from '../api/HTTPRequest.js';
 import { debugError, isString } from '../common/util.js';
 import { assert } from '../util/assert.js';
 /**
  * @internal
  */
 export class CdpHTTPRequest extends HTTPRequest {
+    id;
     #client;
     #isNavigationRequest;
     #allowInterception;
@@ -30,7 +31,7 @@ export class CdpHTTPRequest extends HTTPRequest {
     constructor(client, frame, interceptionId, allowInterception, data, redirectChain) {
         super();
         this.#client = client;
-        this._requestId = data.requestId;
+        this.id = data.requestId;
         this.#isNavigationRequest =
             data.requestId === data.loaderId && data.type === 'Document';
         this._interceptionId = interceptionId;
@@ -111,7 +112,7 @@ export class CdpHTTPRequest extends HTTPRequest {
     async fetchPostData() {
         try {
             const result = await this.#client.send('Network.getRequestPostData', {
-                requestId: this._requestId,
+                requestId: this.id,
             });
             return result.postData;
         }
@@ -313,13 +314,4 @@ const errorReasons = {
     timedout: 'TimedOut',
     failed: 'Failed',
 };
-async function handleError(error) {
-    if (['Invalid header'].includes(error.originalMessage)) {
-        throw error;
-    }
-    // In certain cases, protocol will return error if the request was
-    // already canceled or the page was closed. We should tolerate these
-    // errors.
-    debugError(error);
-}
 //# sourceMappingURL=HTTPRequest.js.map

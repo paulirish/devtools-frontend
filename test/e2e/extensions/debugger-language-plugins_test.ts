@@ -4,7 +4,7 @@
 
 import {assert} from 'chai';
 
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';  // eslint-disable-line rulesdir/es_modules_import
+import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
 import {expectError} from '../../conductor/events.js';
 import {
   $,
@@ -12,8 +12,11 @@ import {
   assertNotNullOrUndefined,
   click,
   disableExperiment,
+  getAllTextContents,
   getBrowserAndPages,
+  getDevToolsFrontendHostname,
   getResourcesPath,
+  getTestServerPort,
   goToResource,
   installEventListener,
   pasteText,
@@ -31,6 +34,7 @@ import {
   getCurrentConsoleMessages,
   getStructuredConsoleMessages,
 } from '../helpers/console-helpers.js';
+import {checkIfTabExistsInDrawer} from '../helpers/cross-tool-helper.js';
 import {getResourcesPathWithDevToolsHostname, loadExtension} from '../helpers/extension-helpers.js';
 import {
   captureAddedSourceFiles,
@@ -51,6 +55,7 @@ import {
   WasmLocationLabels,
 } from '../helpers/sources-helpers.js';
 
+const DEVELOPER_RESOURCES_TAB_SELECTOR = '#tab-developer-resources';
 declare global {
   let chrome: Chrome.DevTools.Chrome;
   interface Window {
@@ -79,7 +84,7 @@ function goToWasmResource(
 
 // This testcase reaches into DevTools internals to install the extension plugin. At this point, there is no sensible
 // alternative, because loading a real extension is not supported in our test setup.
-describe('The Debugger Language Plugins', async () => {
+describe('The Debugger Language Plugins', () => {
   // Load a simple wasm file and verify that the source file shows up in the file tree.
   it('can show C filenames after loading the module', async () => {
     const {target} = getBrowserAndPages();
@@ -581,6 +586,62 @@ describe('The Debugger Language Plugins', async () => {
     assert.deepEqual(title, `${incompleteMessage}\n${text}`);
   });
 
+  it('connects warnings to the developer resource panel', async () => {
+    const extension = await loadExtension(
+        'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
+    await extension.evaluate(() => {
+      class MissingInfoPlugin {
+        async addRawModule() {
+          await chrome.devtools.languageServices.reportResourceLoad(
+              'http://test.com/test.dwo', {success: false, errorMessage: '404'});
+          return [];
+        }
+
+        async getFunctionInfo() {
+          return {missingSymbolFiles: ['http://test.com/test.dwo']};
+        }
+      }
+
+      RegisterExtension(new MissingInfoPlugin(), 'MissingInfo', {language: 'WebAssembly', symbol_types: ['None']});
+    });
+
+    await openSourcesPanel();
+    await click(PAUSE_ON_UNCAUGHT_EXCEPTION_SELECTOR);
+    await goToResource('sources/wasm/unreachable.html');
+    await waitFor(RESUME_BUTTON);
+
+    const incompleteMessage = 'The debug information for function $Main is incomplete';
+    const infoBar = await waitFor(`.infobar-error[aria-label="${incompleteMessage}"`);
+
+    const showMoreButton = await waitFor('button', infoBar);
+    const showMoreText = await showMoreButton.evaluate(e => e.textContent);
+    assert.deepEqual(showMoreText, 'Show more');
+    await click('button', {root: infoBar});
+
+    const detailsRowMessage = await waitFor('.infobar-row-message');
+    const showRequestButton = await waitFor('button', detailsRowMessage);
+    const expectedShowRequestText = 'Show request';
+    assert.deepEqual(await showRequestButton.evaluate(e => e.textContent), expectedShowRequestText);
+    await click('button', {root: detailsRowMessage});
+
+    await checkIfTabExistsInDrawer(DEVELOPER_RESOURCES_TAB_SELECTOR);
+
+    const resourcesGrid = await waitFor('.developer-resource-view-results');
+    const selectedReportedResource = await waitFor('.data-grid-data-grid-node.selected', resourcesGrid);
+    const selectedDetails = await getAllTextContents('td', selectedReportedResource);
+
+    const initiatorUrl = `https://${getDevToolsFrontendHostname()}:${getTestServerPort()}`;
+    const dwoUrl = 'http://test.com/test.dwo';
+    assert.deepEqual(selectedDetails, [
+      'failure',
+      dwoUrl,
+      initiatorUrl,
+      '',
+      '404',
+      '',
+    ]);
+  });
+
   it('shows variable values with the evaluate API', async () => {
     const extension = await loadExtension(
         'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
@@ -788,7 +849,7 @@ describe('The Debugger Language Plugins', async () => {
   it('shows sensible error messages.', async () => {
     const {frontend} = getBrowserAndPages();
     // This test times out on mac-arm64 when watch expressions take some time to calculate.
-    await disableExperiment('evaluateExpressionsWithSourceMaps');
+    await disableExperiment('evaluate-expressions-with-source-maps');
 
     const extension = await loadExtension(
         'TestExtension', `${getResourcesPathWithDevToolsHostname()}/extensions/language_extensions.html`);
@@ -1033,8 +1094,7 @@ describe('The Debugger Language Plugins', async () => {
     await locationLabels.setBreakpointInWasmAndRun('FIRST_PAUSE', 'window.Module.instance.exports.Main(16)');
     await waitFor('.paused-status');
     await locationLabels.checkLocationForLabel('FIRST_PAUSE');
-    const beforeStepCallFrame = (await retrieveTopCallFrameWithoutResuming())?.split(':');
-    assertNotNullOrUndefined(beforeStepCallFrame);
+    const beforeStepCallFrame = (await retrieveTopCallFrameWithoutResuming())!.split(':');
     const beforeStepFunctionNames = await getCallFrameNames();
 
     await stepOver();

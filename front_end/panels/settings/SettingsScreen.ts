@@ -112,14 +112,12 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
   private constructor() {
     super(true);
 
-    this.element.setAttribute('jslog', `${VisualLogging.panel('settings').track({resize: true})}`);
-
     this.contentElement.classList.add('settings-window-main');
     this.contentElement.classList.add('vbox');
 
     const settingsLabelElement = document.createElement('div');
     const settingsTitleElement =
-        UI.Utils
+        UI.UIUtils
             .createShadowRootWithCoreStyles(
                 settingsLabelElement, {cssFile: [settingsScreenStyles], delegatesFocus: undefined})
             .createChild('div', 'settings-window-title');
@@ -162,7 +160,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     }
 
     settingsScreen.reportTabOnReveal = true;
-    const dialog = new UI.Dialog.Dialog();
+    const dialog = new UI.Dialog.Dialog('settings');
     dialog.contentElement.tabIndex = -1;
     dialog.addCloseButton();
     dialog.setOutsideClickCallback(() => {});
@@ -491,7 +489,7 @@ export class ExperimentsSettingsTab extends SettingsTab {
 
     if (experiment.docLink) {
       const link = UI.XLink.XLink.create(
-          experiment.docLink, undefined, undefined, undefined, `${experiment.name}:documentation`);
+          experiment.docLink, undefined, undefined, undefined, `${experiment.name}-documentation`);
       link.textContent = '';
       link.setAttribute('aria-label', i18nString(UIStrings.learnMore));
 
@@ -505,7 +503,7 @@ export class ExperimentsSettingsTab extends SettingsTab {
 
     if (experiment.feedbackLink) {
       const link = UI.XLink.XLink.create(
-          experiment.feedbackLink, undefined, undefined, undefined, `${experiment.name}:feedback`);
+          experiment.feedbackLink, undefined, undefined, undefined, `${experiment.name}-feedback`);
       link.textContent = i18nString(UIStrings.sendFeedback);
       link.classList.add('feedback-link');
 

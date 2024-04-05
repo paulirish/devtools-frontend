@@ -160,13 +160,11 @@ export class Menu extends HTMLElement {
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [menuStyles];
     void coordinator.write(() => {
-      ComponentHelpers.SetCSSProperty.set(this, '--selected-item-check', `url(${selectedItemCheckmark})`);
-      ComponentHelpers.SetCSSProperty.set(
-          this, '--menu-checkmark-width', this.#props.showSelectedItem ? '26px' : '0px');
-      ComponentHelpers.SetCSSProperty.set(
-          this, '--menu-checkmark-height', this.#props.showSelectedItem ? '12px' : '0px');
+      this.style.setProperty('--selected-item-check', `url(${selectedItemCheckmark})`);
+      this.style.setProperty('--menu-checkmark-width', this.#props.showSelectedItem ? '26px' : '0px');
+      this.style.setProperty('--menu-checkmark-height', this.#props.showSelectedItem ? '12px' : '0px');
       const dividerLine = this.showDivider ? '1px var(--divider-line) solid' : 'none';
-      ComponentHelpers.SetCSSProperty.set(this, '--override-divider-line', dividerLine);
+      this.style.setProperty('--override-divider-line', dividerLine);
     });
   }
 
@@ -401,7 +399,7 @@ export class Menu extends HTMLElement {
           this.#dialog = domNode as Dialogs.Dialog.Dialog;
         })}
         >
-        <span id="container" role="menu" tabIndex="0" @keydown=${this.#handleDialogKeyDown} jslog=${VisualLogging.menu()}>
+        <span id="container" role="menu" tabIndex="0" @keydown=${this.#handleDialogKeyDown} jslog=${VisualLogging.menu().track({resize: true, keydown: 'Escape'})}>
           <slot @click=${this.#handleItemClick}>
           </slot>
         </span>
@@ -531,9 +529,9 @@ export class MenuGroup extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-menu', Menu);
-ComponentHelpers.CustomElements.defineComponent('devtools-menu-item', MenuItem);
-ComponentHelpers.CustomElements.defineComponent('devtools-menu-group', MenuGroup);
+customElements.define('devtools-menu', Menu);
+customElements.define('devtools-menu-item', MenuItem);
+customElements.define('devtools-menu-group', MenuGroup);
 
 declare global {
   interface HTMLElementTagNameMap {

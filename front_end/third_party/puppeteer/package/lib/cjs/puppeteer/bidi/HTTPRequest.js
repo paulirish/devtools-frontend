@@ -1,89 +1,130 @@
 "use strict";
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BidiHTTPRequest = void 0;
+exports.BidiHTTPRequest = exports.requests = void 0;
 const HTTPRequest_js_1 = require("../api/HTTPRequest.js");
 const Errors_js_1 = require("../common/Errors.js");
+const HTTPResponse_js_1 = require("./HTTPResponse.js");
+exports.requests = new WeakMap();
 /**
  * @internal
  */
 class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
-    _response = null;
-    _redirectChain;
-    _navigationId;
-    #url;
-    #resourceType;
-    #method;
-    #postData;
-    #headers = {};
-    #initiator;
+    static from(bidiRequest, frame) {
+        const request = new _a(bidiRequest, frame);
+        request.#initialize();
+        return request;
+    }
+    #redirect;
+    #response = null;
+    id;
     #frame;
-    constructor(event, frame, redirectChain = []) {
+    #request;
+    constructor(request, frame) {
         super();
-        this.#url = event.request.url;
-        this.#resourceType = event.initiator.type.toLowerCase();
-        this.#method = event.request.method;
-        this.#postData = undefined;
-        this.#initiator = event.initiator;
+        exports.requests.set(request, this);
+        this.#request = request;
         this.#frame = frame;
-        this._requestId = event.request.request;
-        this._redirectChain = redirectChain;
-        this._navigationId = event.navigation;
-        for (const header of event.request.headers) {
-            // TODO: How to handle Binary Headers
-            // https://w3c.github.io/webdriver-bidi/#type-network-Header
-            if (header.value.type === 'string') {
-                this.#headers[header.name.toLowerCase()] = header.value.value;
-            }
-        }
+        this.id = request.id;
     }
     get client() {
         throw new Errors_js_1.UnsupportedOperation();
     }
+    #initialize() {
+        this.#request.on('redirect', request => {
+            this.#redirect = _a.from(request, this.#frame);
+        });
+        this.#request.once('success', data => {
+            this.#response = HTTPResponse_js_1.BidiHTTPResponse.from(data, this);
+        });
+        this.#frame?.page().trustedEmitter.emit("request" /* PageEvent.Request */, this);
+    }
     url() {
-        return this.#url;
+        return this.#request.url;
     }
     resourceType() {
-        return this.#resourceType;
+        throw new Errors_js_1.UnsupportedOperation();
     }
     method() {
-        return this.#method;
+        return this.#request.method;
     }
     postData() {
-        return this.#postData;
+        throw new Errors_js_1.UnsupportedOperation();
     }
     hasPostData() {
-        return this.#postData !== undefined;
+        throw new Errors_js_1.UnsupportedOperation();
     }
     async fetchPostData() {
-        return this.#postData;
+        throw new Errors_js_1.UnsupportedOperation();
     }
     headers() {
-        return this.#headers;
+        const headers = {};
+        for (const header of this.#request.headers) {
+            headers[header.name.toLowerCase()] = header.value.value;
+        }
+        return headers;
     }
     response() {
-        return this._response;
+        return this.#response;
+    }
+    failure() {
+        if (this.#request.error === undefined) {
+            return null;
+        }
+        return { errorText: this.#request.error };
     }
     isNavigationRequest() {
-        return Boolean(this._navigationId);
+        return this.#request.navigation !== undefined;
     }
     initiator() {
-        return this.#initiator;
+        return this.#request.initiator;
     }
     redirectChain() {
-        return this._redirectChain.slice();
+        if (this.#redirect === undefined) {
+            return [];
+        }
+        const redirects = [this.#redirect];
+        for (const redirect of redirects) {
+            if (redirect.#redirect !== undefined) {
+                redirects.push(redirect.#redirect);
+            }
+        }
+        return redirects;
     }
     enqueueInterceptAction(pendingHandler) {
         // Execute the handler when interception is not supported
         void pendingHandler();
     }
     frame() {
-        return this.#frame;
+        return this.#frame ?? null;
     }
     continueRequestOverrides() {
         throw new Errors_js_1.UnsupportedOperation();
     }
-    continue(_overrides = {}) {
-        throw new Errors_js_1.UnsupportedOperation();
+    async continue(overrides = {}) {
+        if (!this.#request.isBlocked) {
+            throw new Error('Request Interception is not enabled!');
+        }
+        // Request interception is not supported for data: urls.
+        if (this.url().startsWith('data:')) {
+            return;
+        }
+        const headers = getBidiHeaders(overrides.headers);
+        return await this.#request
+            .continueRequest({
+            url: overrides.url,
+            method: overrides.method,
+            body: overrides.postData
+                ? {
+                    type: 'base64',
+                    value: btoa(overrides.postData),
+                }
+                : undefined,
+            headers: headers.length > 0 ? headers : undefined,
+        })
+            .catch(error => {
+            return (0, HTTPRequest_js_1.handleError)(error);
+        });
     }
     responseForRequest() {
         throw new Errors_js_1.UnsupportedOperation();
@@ -100,15 +141,84 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     finalizeInterceptions() {
         throw new Errors_js_1.UnsupportedOperation();
     }
-    abort() {
-        throw new Errors_js_1.UnsupportedOperation();
+    async abort() {
+        if (!this.#request.isBlocked) {
+            throw new Error('Request Interception is not enabled!');
+        }
+        // Request interception is not supported for data: urls.
+        if (this.url().startsWith('data:')) {
+            return;
+        }
+        return await this.#request.failRequest();
     }
-    respond(_response, _priority) {
-        throw new Errors_js_1.UnsupportedOperation();
-    }
-    failure() {
-        throw new Errors_js_1.UnsupportedOperation();
+    async respond(response, _priority) {
+        if (!this.#request.isBlocked) {
+            throw new Error('Request Interception is not enabled!');
+        }
+        // Request interception is not supported for data: urls.
+        if (this.url().startsWith('data:')) {
+            return;
+        }
+        const responseBody = response.body && response.body instanceof Uint8Array
+            ? response.body.toString('base64')
+            : response.body
+                ? btoa(response.body)
+                : undefined;
+        const headers = getBidiHeaders(response.headers);
+        const hasContentLength = headers.some(header => {
+            return header.name === 'content-length';
+        });
+        if (response.contentType) {
+            headers.push({
+                name: 'content-type',
+                value: {
+                    type: 'string',
+                    value: response.contentType,
+                },
+            });
+        }
+        if (responseBody && !hasContentLength) {
+            const encoder = new TextEncoder();
+            headers.push({
+                name: 'content-length',
+                value: {
+                    type: 'string',
+                    value: String(encoder.encode(responseBody).byteLength),
+                },
+            });
+        }
+        const status = response.status || 200;
+        return await this.#request.provideResponse({
+            statusCode: status,
+            headers: headers.length > 0 ? headers : undefined,
+            reasonPhrase: HTTPRequest_js_1.STATUS_TEXTS[status],
+            body: responseBody
+                ? {
+                    type: 'base64',
+                    value: responseBody,
+                }
+                : undefined,
+        });
     }
 }
 exports.BidiHTTPRequest = BidiHTTPRequest;
+_a = BidiHTTPRequest;
+function getBidiHeaders(rawHeaders) {
+    const headers = [];
+    for (const [name, value] of Object.entries(rawHeaders ?? [])) {
+        if (!Object.is(value, undefined)) {
+            const values = Array.isArray(value) ? value : [value];
+            for (const value of values) {
+                headers.push({
+                    name: name.toLowerCase(),
+                    value: {
+                        type: 'string',
+                        value: String(value),
+                    },
+                });
+            }
+        }
+    }
+    return headers;
+}
 //# sourceMappingURL=HTTPRequest.js.map

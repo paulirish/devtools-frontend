@@ -124,6 +124,7 @@ export class CookiesTable extends UI.Widget.VBox {
   private data: {folderName: string|null, cookies: Array<SDK.Cookie.Cookie>|null}[];
   private cookieDomain: string;
   private cookieToBlockedReasons: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.BlockedReason[]>|null;
+  private cookieToExemptionReason: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.ExemptionReason>|null;
   constructor(
       renderInline?: boolean,
       saveCallback?: ((arg0: SDK.Cookie.Cookie, arg1: SDK.Cookie.Cookie|null) => Promise<boolean>),
@@ -227,7 +228,7 @@ export class CookiesTable extends UI.Widget.VBox {
       },
     ] as DataGrid.DataGrid.ColumnDescriptor[];
 
-    if (Root.Runtime.experiments.isEnabled('experimentalCookieFeatures')) {
+    if (Root.Runtime.experiments.isEnabled('experimental-cookie-features')) {
       const additionalColumns = [
         {
           id: SDK.Cookie.Attribute.SourceScheme,
@@ -287,6 +288,8 @@ export class CookiesTable extends UI.Widget.VBox {
     this.cookieDomain = '';
 
     this.cookieToBlockedReasons = null;
+
+    this.cookieToExemptionReason = null;
   }
 
   override wasShown(): void {
@@ -295,15 +298,18 @@ export class CookiesTable extends UI.Widget.VBox {
 
   setCookies(
       cookies: SDK.Cookie.Cookie[],
-      cookieToBlockedReasons?: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.BlockedReason[]>): void {
-    this.setCookieFolders([{cookies: cookies, folderName: null}], cookieToBlockedReasons);
+      cookieToBlockedReasons?: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.BlockedReason[]>,
+      cookieToExemptionReason?: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.ExemptionReason>): void {
+    this.setCookieFolders([{cookies: cookies, folderName: null}], cookieToBlockedReasons, cookieToExemptionReason);
   }
 
   setCookieFolders(
       cookieFolders: {folderName: string|null, cookies: Array<SDK.Cookie.Cookie>|null}[],
-      cookieToBlockedReasons?: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.BlockedReason[]>): void {
+      cookieToBlockedReasons?: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.BlockedReason[]>,
+      cookieToExemptionReason?: ReadonlyMap<SDK.Cookie.Cookie, SDK.CookieModel.ExemptionReason>): void {
     this.data = cookieFolders;
     this.cookieToBlockedReasons = cookieToBlockedReasons || null;
+    this.cookieToExemptionReason = cookieToExemptionReason || null;
     this.rebuildTable();
   }
 
@@ -359,6 +365,7 @@ export class CookiesTable extends UI.Widget.VBox {
   }
 
   private rebuildTable(): void {
+    const restoreFocus = this.dataGrid.element?.contains(document.activeElement);
     const selectionCookies = this.getSelectionCookies();
     const lastEditedColumnId = this.lastEditedColumnId;
     this.lastEditedColumnId = null;
@@ -398,6 +405,9 @@ export class CookiesTable extends UI.Widget.VBox {
     }
     if (this.saveCallback) {
       this.dataGrid.addCreationNode(false);
+    }
+    if (restoreFocus) {
+      this.dataGrid.element.focus();
     }
   }
 
@@ -573,7 +583,8 @@ export class CookiesTable extends UI.Widget.VBox {
     data[SDK.Cookie.Attribute.PartitionKey] = cookie.partitionKey() || '';
 
     const blockedReasons = this.cookieToBlockedReasons?.get(cookie);
-    const node = new DataGridNode(data, cookie, blockedReasons || null);
+    const exemptionReason = this.cookieToExemptionReason?.get(cookie);
+    const node = new DataGridNode(data, cookie, blockedReasons || null, exemptionReason || null);
     if (expiresTooltip) {
       node.setExpiresTooltip(expiresTooltip);
     }
@@ -724,12 +735,12 @@ export class CookiesTable extends UI.Widget.VBox {
         },
       ]);
       void Common.Revealer.reveal(requestFilter);
-    });
+    }, {jslogContext: 'show-requests-with-this-cookie'});
     if (IssuesManager.RelatedIssue.hasIssues(cookie)) {
       contextMenu.revealSection().appendItem(i18nString(UIStrings.showIssueAssociatedWithThis), () => {
         // TODO(chromium:1077719): Just filter for the cookie instead of revealing one of the associated issues.
         void IssuesManager.RelatedIssue.reveal(cookie);
-      });
+      }, {jslogContext: 'show-issue-associated-with-this'});
     }
   }
 }
@@ -737,14 +748,16 @@ export class CookiesTable extends UI.Widget.VBox {
 export class DataGridNode extends DataGrid.DataGrid.DataGridNode<DataGridNode> {
   cookie: SDK.Cookie.Cookie;
   private readonly blockedReasons: SDK.CookieModel.BlockedReason[]|null;
+  private readonly exemptionReason: SDK.CookieModel.ExemptionReason|null;
   private expiresTooltip?: Platform.UIString.LocalizedString;
 
   constructor(
       data: {[x: string]: string|number|boolean}, cookie: SDK.Cookie.Cookie,
-      blockedReasons: SDK.CookieModel.BlockedReason[]|null) {
+      blockedReasons: SDK.CookieModel.BlockedReason[]|null, exemptionReason: SDK.CookieModel.ExemptionReason|null) {
     super(data);
     this.cookie = cookie;
     this.blockedReasons = blockedReasons;
+    this.exemptionReason = exemptionReason;
   }
 
   override createCells(element: Element): void {
@@ -798,6 +811,15 @@ export class DataGridNode extends DataGrid.DataGrid.DataGridNode<DataGridNode> {
       infoElement.title = blockedReasonString;
       cell.insertBefore(infoElement, cell.firstChild);
     }
+
+    if (this.exemptionReason?.uiString && columnId === SDK.Cookie.Attribute.Name) {
+      const infoElement = new IconButton.Icon.Icon();
+      infoElement.data = {iconName: 'info', color: 'var(--icon-info)', width: '14px', height: '14px'};
+      cell.classList.add('flagged-cookie-attribute-cell');
+      infoElement.title = this.exemptionReason.uiString;
+      cell.insertBefore(infoElement, cell.firstChild);
+    }
+
     return cell;
   }
 }

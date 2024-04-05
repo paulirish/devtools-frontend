@@ -239,13 +239,11 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
   }
 
   #setNodeKeyNoWrapCSSVariable(attributeValue: string|null): void {
-    ComponentHelpers.SetCSSProperty.set(
-        this, '--override-key-whitespace-wrapping', attributeValue !== null ? 'nowrap' : 'initial');
+    this.style.setProperty('--override-key-whitespace-wrapping', attributeValue !== null ? 'nowrap' : 'initial');
   }
 
   #setTopLevelNodeBorderColorCSSVariable(attributeValue: string|null): void {
-    ComponentHelpers.SetCSSProperty.set(
-        this, '--override-top-node-border', attributeValue ? `1px solid ${attributeValue}` : '');
+    this.style.setProperty('--override-top-node-border', attributeValue ? `1px solid ${attributeValue}` : '');
   }
 
   async #recursivelyCollapseTreeNodeChildren(treeNode: TreeNode<TreeNodeDataType>): Promise<void> {
@@ -474,7 +472,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
         aria-level=${depth + 1}
         aria-posinset=${positionInSet + 1}
         class=${listItemClasses}
-        jslog=${VisualLogging.treeItem()}
+        jslog=${VisualLogging.treeItem(node.jslogContext).track({click: true, keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space|Home|End'})}
         @click=${this.#onNodeClick}
         track-dom-node-to-tree-node=${trackDOMNodeToTreeNode(this.#domNodeToTreeNodeMap, node)}
         on-render=${ComponentHelpers.Directives.nodeRenderedCallback(domNode => {
@@ -554,10 +552,9 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-tree-outline', TreeOutline);
+customElements.define('devtools-tree-outline', TreeOutline);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-tree-outline': TreeOutline<unknown>;
   }

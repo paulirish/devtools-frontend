@@ -10,7 +10,6 @@ import {
   concat,
   EMPTY,
   filter,
-  filterAsync,
   first,
   firstValueFrom,
   from,
@@ -63,6 +62,7 @@ import type {
 import {
   debugError,
   fromEmitterEvent,
+  filterAsync,
   importFSPromises,
   isString,
   NETWORK_IDLE_TIME,
@@ -274,7 +274,7 @@ export interface ScreenshotOptions {
    */
   path?: string;
   /**
-   * Specifies the region of the page to clip.
+   * Specifies the region of the page/element to clip.
    */
   clip?: ScreenshotClip;
   /**
@@ -616,7 +616,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
               )
             ).pipe(
               filter(request => {
-                return request._requestId === originalRequest._requestId;
+                return request.id === originalRequest.id;
               }),
               take(1),
               map(() => {
@@ -757,6 +757,8 @@ export abstract class Page extends EventEmitter<PageEvents> {
 
   /**
    * A target this page was created from.
+   *
+   * @deprecated Use {@link Page.createCDPSession} directly.
    */
   abstract target(): Target;
 
@@ -1340,7 +1342,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
    *
    * Functions installed via `page.exposeFunction` survive navigations.
    *
-   * :::note
+   * :::
    *
    * @example
    * An example of adding an `md5` function into the page:
@@ -2456,7 +2458,7 @@ export abstract class Page extends EventEmitter<PageEvents> {
     };
     if (options.type === undefined && options.path !== undefined) {
       const filePath = options.path;
-      // Note we cannot use Node.js here due to browser compatability.
+      // Note we cannot use Node.js here due to browser compatibility.
       const extension = filePath
         .slice(filePath.lastIndexOf('.') + 1)
         .toLowerCase();

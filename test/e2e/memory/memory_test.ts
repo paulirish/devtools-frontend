@@ -25,6 +25,7 @@ import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   changeAllocationSampleViewViaDropdown,
   changeViewViaDropdown,
+  clickOnContextMenuForRetainer,
   expandFocusedRow,
   findSearchResult,
   focusTableRow,
@@ -33,6 +34,7 @@ import {
   getSizesFromCategoryRow,
   getSizesFromSelectedRow,
   navigateToMemoryTab,
+  restoreIgnoredRetainers,
   setClassFilter,
   setSearchFilter,
   takeAllocationProfile,
@@ -44,7 +46,7 @@ import {
   waitUntilRetainerChainSatisfies,
 } from '../helpers/memory-helpers.js';
 
-describe('The Memory Panel', async function() {
+describe('The Memory Panel', function() {
   // These tests render large chunks of data into DevTools and filter/search
   // through it. On bots with less CPU power, these can fail because the
   // rendering takes a long time, so we allow a much larger timeout.
@@ -57,8 +59,7 @@ describe('The Memory Panel', async function() {
     await navigateToMemoryTab();
   });
 
-  // Flaky test
-  it.skip('[crbug.com/1435436] Can take several heap snapshots ', async () => {
+  it('Can take several heap snapshots ', async () => {
     await goToResource('memory/default.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -276,10 +277,15 @@ describe('The Memory Panel', async function() {
     });
     const rows = await getDataGridRows('.retaining-paths-view table.data');
     const propertyNameElement = await rows[0].$('span.property-name');
-    assertNotNullOrUndefined(propertyNameElement);
-    propertyNameElement.hover();
+    propertyNameElement!.hover();
     const el = await waitFor('div.vbox.flex-auto.no-pointer-events');
     await waitFor('.source-code', el);
+
+    await setSearchFilter('system / descriptorarray');
+    await findSearchResult('system / DescriptorArray');
+    const searchResultElement = await waitFor('.selected.data-grid-data-grid-node span.object-value-null');
+    searchResultElement!.hover();
+    await waitFor('.widget .object-popover-footer');
   });
 
   it('shows the flamechart for an allocation sample', async () => {
@@ -425,7 +431,7 @@ describe('The Memory Panel', async function() {
 
   it('Does not include backing store size in the shallow size of a JS Set', async () => {
     await goToResource('memory/set.html');
-    await disableExperiment('heapSnapshotTreatBackingStoreAsContainingObject');
+    await disableExperiment('heap-snapshot-treat-backing-store-as-containing-object');
     const sizes = await runJSSetTest();
 
     // The Set object is small, regardless of the contained content.
@@ -441,7 +447,7 @@ describe('The Memory Panel', async function() {
 
   it('Includes backing store size in the shallow size of a JS Set', async () => {
     await goToResource('memory/set.html');
-    await enableExperiment('heapSnapshotTreatBackingStoreAsContainingObject');
+    await enableExperiment('heap-snapshot-treat-backing-store-as-containing-object');
     const sizes = await runJSSetTest();
 
     // The Set is reported as containing at least 100 pointers.
@@ -470,5 +476,26 @@ describe('The Memory Panel', async function() {
     assert.isTrue((await getSizesFromCategoryRow('CustomClass3Key')).retainedSize < 2 ** 15);
     assert.isTrue((await getSizesFromCategoryRow('CustomClass4Key')).retainedSize < 2 ** 15);
     assert.isTrue((await getSizesFromCategoryRow('CustomClass4Retainer')).retainedSize >= 2 ** 15);
+  });
+
+  it('Allows ignoring retainers', async () => {
+    await goToResource('memory/ignoring-retainers.html');
+    await navigateToMemoryTab();
+    await takeHeapSnapshot();
+    await waitForNonEmptyHeapSnapshotData();
+    await setSearchFilter('searchable_string');
+    await waitForSearchResultNumber(2);
+    await findSearchResult('"searchable_string"');
+    await waitForRetainerChain(['Object', 'KeyType', 'Window']);
+    await clickOnContextMenuForRetainer('KeyType', 'Ignore this retainer');
+    await waitForRetainerChain(['Object', 'Object', 'Window']);
+    await clickOnContextMenuForRetainer('x', 'Ignore this retainer');
+    await waitForRetainerChain(['Object', '(internal array)[]', 'WeakMap', 'Window']);
+    await clickOnContextMenuForRetainer('(internal array)[]', 'Ignore this retainer');
+    await waitForRetainerChain(['Object', 'Object', 'Object', 'Object', 'Object', 'Window']);
+    await clickOnContextMenuForRetainer('b', 'Ignore this retainer');
+    await waitForRetainerChain(['(Internalized strings)', '(GC roots)']);
+    await restoreIgnoredRetainers();
+    await waitForRetainerChain(['Object', 'KeyType', 'Window']);
   });
 });

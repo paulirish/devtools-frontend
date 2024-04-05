@@ -115,6 +115,20 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
     this.setDefaultFocusedChild(dataGridWidget);
   }
 
+  select(item: SDK.PageResourceLoader.PageResource): void {
+    const node = this.nodeForItem.get(item);
+    if (node) {
+      node.select();
+    }
+  }
+
+  selectedItem(): SDK.PageResourceLoader.PageResource|null {
+    if (!this.dataGrid.selectedNode) {
+      return null;
+    }
+    return (this.dataGrid.selectedNode as GridNode).item;
+  }
+
   private populateContextMenu(
       contextMenu: UI.ContextMenu.ContextMenu,
       gridNode: DataGrid.DataGrid.DataGridNode<
@@ -123,11 +137,11 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
     const item = (gridNode as GridNode).item;
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyUrl), () => {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(item.url);
-    }, {jslogContext: 'copyURL'});
+    }, {jslogContext: 'copy-url'});
     if (item.initiator.initiatorUrl) {
       contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyInitiatorUrl), () => {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(item.initiator.initiatorUrl);
-      }, {jslogContext: 'copyInitiatorURL'});
+      }, {jslogContext: 'copy-initiator-url'});
     }
   }
 

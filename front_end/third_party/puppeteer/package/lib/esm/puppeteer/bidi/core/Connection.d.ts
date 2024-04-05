@@ -99,6 +99,14 @@ export interface Commands {
         params: Bidi.Input.ReleaseActionsParameters;
         returnType: Bidi.EmptyResult;
     };
+    'input.setFiles': {
+        params: Bidi.Input.SetFilesParameters;
+        returnType: Bidi.EmptyResult;
+    };
+    'permissions.setPermission': {
+        params: Bidi.Permissions.SetPermissionParameters;
+        returnType: Bidi.EmptyResult;
+    };
     'session.end': {
         params: Bidi.EmptyParams;
         returnType: Bidi.EmptyResult;
@@ -119,6 +127,10 @@ export interface Commands {
         params: Bidi.Session.SubscriptionRequest;
         returnType: Bidi.EmptyResult;
     };
+    'storage.deleteCookies': {
+        params: Bidi.Storage.DeleteCookiesParameters;
+        returnType: Bidi.Storage.DeleteCookiesResult;
+    };
     'storage.getCookies': {
         params: Bidi.Storage.GetCookiesParameters;
         returnType: Bidi.Storage.GetCookiesResult;
@@ -126,6 +138,26 @@ export interface Commands {
     'storage.setCookie': {
         params: Bidi.Storage.SetCookieParameters;
         returnType: Bidi.Storage.SetCookieParameters;
+    };
+    'network.addIntercept': {
+        params: Bidi.Network.AddInterceptParameters;
+        returnType: Bidi.Network.AddInterceptResult;
+    };
+    'network.removeIntercept': {
+        params: Bidi.Network.RemoveInterceptParameters;
+        returnType: Bidi.EmptyResult;
+    };
+    'network.continueRequest': {
+        params: Bidi.Network.ContinueRequestParameters;
+        returnType: Bidi.EmptyResult;
+    };
+    'network.failRequest': {
+        params: Bidi.Network.FailRequestParameters;
+        returnType: Bidi.EmptyResult;
+    };
+    'network.provideResponse': {
+        params: Bidi.Network.ProvideResponseParameters;
+        returnType: Bidi.EmptyResult;
     };
 }
 /**
@@ -143,6 +175,5 @@ export interface Connection<Events extends BidiEvents = BidiEvents> extends Even
     send<T extends keyof Commands>(method: T, params: Commands[T]['params']): Promise<{
         result: Commands[T]['returnType'];
     }>;
-    pipeTo<Events extends BidiEvents>(emitter: EventEmitter<Events>): void;
 }
 //# sourceMappingURL=Connection.d.ts.map

@@ -8,7 +8,6 @@ import type { ClickOptions, ElementHandle } from '../api/ElementHandle.js';
 import type { HTTPResponse } from '../api/HTTPResponse.js';
 import type { Page, WaitForSelectorOptions, WaitTimeoutOptions } from '../api/Page.js';
 import type { DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
-import type { IsolatedWorldChart } from '../cdp/IsolatedWorld.js';
 import type { PuppeteerLifeCycleEvent } from '../cdp/LifecycleWatcher.js';
 import { EventEmitter, type EventType } from '../common/EventEmitter.js';
 import type { Awaitable, EvaluateFunc, EvaluateFuncWith, HandleFor, NodeFor } from '../common/types.js';
@@ -37,6 +36,10 @@ export interface WaitForOptions {
      * @defaultValue `'load'`
      */
     waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
+    /**
+     * @internal
+     */
+    ignoreSameDocumentNavigation?: boolean;
 }
 /**
  * @public
@@ -231,10 +234,6 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
     /**
      * @internal
      */
-    worlds: IsolatedWorldChart;
-    /**
-     * @internal
-     */
     _name?: string;
     /**
      * @internal
@@ -287,12 +286,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * Server Error". The status code for such responses can be retrieved by
      * calling {@link HTTPResponse.status}.
      */
-    abstract goto(url: string, options?: {
-        referer?: string;
-        referrerPolicy?: string;
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<HTTPResponse | null>;
+    abstract goto(url: string, options?: GoToOptions): Promise<HTTPResponse | null>;
     /**
      * Waits for the frame to navigate. It is useful for when you run code which
      * will indirectly cause the frame to navigate.
@@ -335,7 +329,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      */
     clearDocumentHandle(): void;
     /**
-     * @internal
+     * @returns The frame element associated with this frame (if any).
      */
     frameElement(): Promise<HandleFor<HTMLIFrameElement> | null>;
     /**
@@ -346,7 +340,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      */
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
     /**
-     * Behaves identically to {@link Page.evaluate} except it's run within the
+     * Behaves identically to {@link Page.evaluate} except it's run within
      * the context of this frame.
      *
      * @see {@link Page.evaluate} for details.
@@ -509,10 +503,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * @param options - Options to configure how long before timing out and at
      * what point to consider the content setting successful.
      */
-    abstract setContent(html: string, options?: {
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<void>;
+    abstract setContent(html: string, options?: WaitForOptions): Promise<void>;
     /**
      * @internal
      */
@@ -526,6 +517,13 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * @remarks
      * This value is calculated once when the frame is created, and will not
      * update if the attribute is changed later.
+     *
+     * @deprecated Use
+     *
+     * ```ts
+     * const element = await frame.frameElement();
+     * const nameOrId = await element.evaluate(frame => frame.name ?? frame.id);
+     * ```
      */
     name(): string;
     /**

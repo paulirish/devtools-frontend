@@ -416,7 +416,7 @@ export class AXBreadcrumbsPane extends AccessibilitySubPane {
         }
         void domNode.scrollIntoView();
       });
-    });
+    }, {jslogContext: 'scroll-into-view'});
 
     const deferredNode = axNode.deferredDOMNode();
     if (deferredNode) {
@@ -450,7 +450,9 @@ export class AXBreadcrumb {
 
     this.elementInternal = document.createElement('div');
     this.elementInternal.classList.add('ax-breadcrumb');
-    this.elementInternal.setAttribute('jslog', `${VisualLogging.treeItem().track({click: true})}`);
+    this.elementInternal.setAttribute(
+        'jslog',
+        `${VisualLogging.treeItem().track({click: true, keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter'})}`);
     elementsToAXBreadcrumb.set(this.elementInternal, this);
 
     this.nodeElementInternal = document.createElement('div');

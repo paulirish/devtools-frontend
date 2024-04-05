@@ -358,6 +358,8 @@ export class CdpPage extends Page {
       const worker = new CdpWebWorker(
         session,
         session._target().url(),
+        session._target()._targetId,
+        session._target().type(),
         this.#addConsoleMessage.bind(this),
         this.#handleException.bind(this)
       );
@@ -914,7 +916,10 @@ export class CdpPage extends Page {
     options?: WaitForOptions
   ): Promise<HTTPResponse | null> {
     const [result] = await Promise.all([
-      this.waitForNavigation(options),
+      this.waitForNavigation({
+        ...options,
+        ignoreSameDocumentNavigation: true,
+      }),
       this.#primaryTargetClient.send('Page.reload'),
     ]);
 

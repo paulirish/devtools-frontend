@@ -85,6 +85,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 import { EventEmitter } from '../../common/EventEmitter.js';
 import { inertIfDisposed, throwIfDisposed } from '../../util/decorators.js';
 import { DisposableStack, disposeSymbol } from '../../util/disposable.js';
+import { SharedWorkerRealm } from './Realm.js';
 import { UserContext } from './UserContext.js';
 /**
  * @internal
@@ -95,6 +96,7 @@ let Browser = (() => {
     let _dispose_decorators;
     let _close_decorators;
     let _addPreloadScript_decorators;
+    let _removeIntercept_decorators;
     let _removePreloadScript_decorators;
     let _createUserContext_decorators;
     return class Browser extends _classSuper {
@@ -103,6 +105,7 @@ let Browser = (() => {
             __esDecorate(this, null, _dispose_decorators, { kind: "method", name: "dispose", static: false, private: false, access: { has: obj => "dispose" in obj, get: obj => obj.dispose }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _close_decorators, { kind: "method", name: "close", static: false, private: false, access: { has: obj => "close" in obj, get: obj => obj.close }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _addPreloadScript_decorators, { kind: "method", name: "addPreloadScript", static: false, private: false, access: { has: obj => "addPreloadScript" in obj, get: obj => obj.addPreloadScript }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _removeIntercept_decorators, { kind: "method", name: "removeIntercept", static: false, private: false, access: { has: obj => "removeIntercept" in obj, get: obj => obj.removeIntercept }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _removePreloadScript_decorators, { kind: "method", name: "removePreloadScript", static: false, private: false, access: { has: obj => "removePreloadScript" in obj, get: obj => obj.removePreloadScript }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _createUserContext_decorators, { kind: "method", name: "createUserContext", static: false, private: false, access: { has: obj => "createUserContext" in obj, get: obj => obj.createUserContext }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
@@ -118,13 +121,13 @@ let Browser = (() => {
         #disposables = new DisposableStack();
         #userContexts = new Map();
         session;
+        #sharedWorkers = new Map();
         // keep-sorted end
         constructor(session) {
             super();
             // keep-sorted start
             this.session = session;
             // keep-sorted end
-            this.#userContexts.set(UserContext.DEFAULT, UserContext.create(this, UserContext.DEFAULT));
         }
         async #initialize() {
             const sessionEmitter = this.#disposables.use(new EventEmitter(this.session));
@@ -132,9 +135,10 @@ let Browser = (() => {
                 this.dispose(reason);
             });
             sessionEmitter.on('script.realmCreated', info => {
-                if (info.type === 'shared-worker') {
-                    // TODO: Create a SharedWorkerRealm.
+                if (info.type !== 'shared-worker') {
+                    return;
                 }
+                this.#sharedWorkers.set(info.realm, SharedWorkerRealm.from(this, info.realm, info.origin));
             });
             await this.#syncUserContexts();
             await this.#syncBrowsingContexts();
@@ -142,10 +146,7 @@ let Browser = (() => {
         async #syncUserContexts() {
             const { result: { userContexts }, } = await this.session.send('browser.getUserContexts', {});
             for (const context of userContexts) {
-                if (context.userContext === UserContext.DEFAULT) {
-                    continue;
-                }
-                this.#userContexts.set(context.userContext, UserContext.create(this, context.userContext));
+                this.#createUserContext(context.userContext);
             }
         }
         async #syncBrowsingContexts() {
@@ -160,9 +161,6 @@ let Browser = (() => {
                     sessionEmitter.on('browsingContext.contextCreated', info => {
                         contextIds.add(info.context);
                     });
-                    sessionEmitter.on('browsingContext.contextDestroyed', info => {
-                        contextIds.delete(info.context);
-                    });
                     const { result } = await this.session.send('browsingContext.getTree', {});
                     contexts = result.contexts;
                 }
@@ -176,13 +174,23 @@ let Browser = (() => {
             }
             // Simulating events so contexts are created naturally.
             for (const info of contexts) {
-                if (contextIds.has(info.context)) {
+                if (!contextIds.has(info.context)) {
                     this.session.emit('browsingContext.contextCreated', info);
                 }
                 if (info.children) {
                     contexts.push(...info.children);
                 }
             }
+        }
+        #createUserContext(id) {
+            const userContext = UserContext.create(this, id);
+            this.#userContexts.set(userContext.id, userContext);
+            const userContextEmitter = this.#disposables.use(new EventEmitter(userContext));
+            userContextEmitter.once('closed', () => {
+                userContextEmitter.removeAllListeners();
+                this.#userContexts.delete(userContext.id);
+            });
+            return userContext;
         }
         // keep-sorted start block=yes
         get closed() {
@@ -225,6 +233,11 @@ let Browser = (() => {
             });
             return script;
         }
+        async removeIntercept(intercept) {
+            await this.session.send('network.removeIntercept', {
+                intercept,
+            });
+        }
         async removePreloadScript(script) {
             await this.session.send('script.removePreloadScript', {
                 script,
@@ -232,19 +245,15 @@ let Browser = (() => {
         }
         async createUserContext() {
             const { result: { userContext: context }, } = await this.session.send('browser.createUserContext', {});
-            const userContext = UserContext.create(this, context);
-            this.#userContexts.set(userContext.id, userContext);
-            const userContextEmitter = this.#disposables.use(new EventEmitter(userContext));
-            userContextEmitter.once('closed', () => {
-                userContextEmitter.removeAllListeners();
-                this.#userContexts.delete(context);
-            });
-            return userContext;
+            return this.#createUserContext(context);
         }
         [(_dispose_decorators = [inertIfDisposed], _close_decorators = [throwIfDisposed(browser => {
                 // SAFETY: By definition of `disposed`, `#reason` is defined.
                 return browser.#reason;
             })], _addPreloadScript_decorators = [throwIfDisposed(browser => {
+                // SAFETY: By definition of `disposed`, `#reason` is defined.
+                return browser.#reason;
+            })], _removeIntercept_decorators = [throwIfDisposed(browser => {
                 // SAFETY: By definition of `disposed`, `#reason` is defined.
                 return browser.#reason;
             })], _removePreloadScript_decorators = [throwIfDisposed(browser => {

@@ -43,6 +43,7 @@ import type * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type AXTreeNodeData} from './AccessibilityTreeUtils.js';
 import {AccessibilityTreeView} from './AccessibilityTreeView.js';
@@ -185,7 +186,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
   private readonly searchableViewInternal: UI.SearchableView.SearchableView;
   private mainContainer: HTMLDivElement;
   private domTreeContainer: HTMLDivElement;
-  private splitMode: _splitMode|null;
+  private splitMode: SplitMode|null;
   private readonly accessibilityTreeView: AccessibilityTreeView|undefined;
   private breadcrumbs: ElementsComponents.ElementsBreadcrumbs.ElementsBreadcrumbs;
   stylesWidget: StylesSidebarPane;
@@ -238,7 +239,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     this.mainContainer = document.createElement('div');
     this.domTreeContainer = document.createElement('div');
     const crumbsContainer = document.createElement('div');
-    if (Root.Runtime.experiments.isEnabled('fullAccessibilityTree')) {
+    if (Root.Runtime.experiments.isEnabled('full-accessibility-tree')) {
       this.initializeFullAccessibilityTreeView();
     }
     this.mainContainer.appendChild(this.domTreeContainer);
@@ -998,17 +999,19 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     }
   }
 
-  private initializeSidebarPanes(splitMode: _splitMode): void {
-    this.splitWidget.setVertical(splitMode === _splitMode.Vertical);
+  private initializeSidebarPanes(splitMode: SplitMode): void {
+    this.splitWidget.setVertical(splitMode === SplitMode.Vertical);
     this.showToolbarPane(null /* widget */, null /* toggle */);
 
     const matchedStylePanesWrapper = new UI.Widget.VBox();
     matchedStylePanesWrapper.element.classList.add('style-panes-wrapper');
+    matchedStylePanesWrapper.element.setAttribute('jslog', `${VisualLogging.pane('styles').track({resize: true})}`);
     this.stylesWidget.show(matchedStylePanesWrapper.element);
     this.setupTextSelectionHack(matchedStylePanesWrapper.element);
 
     const computedStylePanesWrapper = new UI.Widget.VBox();
     computedStylePanesWrapper.element.classList.add('style-panes-wrapper');
+    computedStylePanesWrapper.element.setAttribute('jslog', `${VisualLogging.pane('computed').track({resize: true})}`);
     this.computedStyleWidget.show(computedStylePanesWrapper.element);
 
     const stylesSplitWidget = new UI.SplitWidget.SplitWidget(
@@ -1072,7 +1075,10 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     this.sidebarPaneView = UI.ViewManager.ViewManager.instance().createTabbedLocation(
         () => UI.ViewManager.ViewManager.instance().showView('elements'), 'styles-pane-sidebar', true, true);
     const tabbedPane = this.sidebarPaneView.tabbedPane();
-    if (this.splitMode !== _splitMode.Vertical) {
+    tabbedPane.headerElement().setAttribute(
+        'jslog',
+        `${VisualLogging.toolbar('sidebar').track({keydown: 'ArrowUp|ArrowLeft|ArrowDown|ArrowRight|Enter|Space'})}`);
+    if (this.splitMode !== SplitMode.Vertical) {
       this.splitWidget.installResizer(tabbedPane.headerElement());
     }
 
@@ -1113,10 +1119,10 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     }  // We can't reparent extension iframes.
 
     const position = Common.Settings.Settings.instance().moduleSetting('sidebar-position').get();
-    let splitMode = _splitMode.Horizontal;
+    let splitMode = SplitMode.Horizontal;
     if (position === 'right' ||
         (position === 'auto' && UI.InspectorView.InspectorView.instance().element.offsetWidth > 680)) {
-      splitMode = _splitMode.Vertical;
+      splitMode = SplitMode.Vertical;
     }
     if (!this.sidebarPaneView) {
       this.initializeSidebarPanes(splitMode);
@@ -1130,10 +1136,10 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
     const tabbedPane = this.sidebarPaneView.tabbedPane();
     this.splitWidget.uninstallResizer(tabbedPane.headerElement());
 
-    this.splitWidget.setVertical(this.splitMode === _splitMode.Vertical);
+    this.splitWidget.setVertical(this.splitMode === SplitMode.Vertical);
     this.showToolbarPane(null /* widget */, null /* toggle */);
 
-    if (this.splitMode !== _splitMode.Vertical) {
+    if (this.splitMode !== SplitMode.Vertical) {
       this.splitWidget.installResizer(tabbedPane.headerElement());
     }
   }
@@ -1247,9 +1253,7 @@ globalThis.Elements = globalThis.Elements || {};
 // @ts-ignore exported for Tests.js
 globalThis.Elements.ElementsPanel = ElementsPanel;
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export const enum _splitMode {
+const enum SplitMode {
   Vertical = 'Vertical',
   Horizontal = 'Horizontal',
 }

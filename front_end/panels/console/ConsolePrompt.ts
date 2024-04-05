@@ -164,7 +164,8 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     // Record the console tool load time after the console prompt constructor is complete.
     Host.userMetrics.panelLoaded('console', 'DevTools.Launch.Console');
 
-    this.element.setAttribute('jslog', `${VisualLogging.textField('console-prompt').track({keydown: 'Enter'})}`);
+    this.element.setAttribute(
+        'jslog', `${VisualLogging.textField('console-prompt').track({keydown: 'Enter|ArrowUp|ArrowDown|PageUp'})}`);
   }
 
   private eagerSettingChanged(): void {
@@ -369,7 +370,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
   private async evaluateCommandInConsole(
       executionContext: SDK.RuntimeModel.ExecutionContext, message: SDK.ConsoleModel.ConsoleMessage, expression: string,
       useCommandLineAPI: boolean): Promise<void> {
-    if (Root.Runtime.experiments.isEnabled('evaluateExpressionsWithSourceMaps')) {
+    if (Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps')) {
       const callFrame = executionContext.debuggerModel.selectedCallFrame();
       if (callFrame) {
         const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(callFrame);

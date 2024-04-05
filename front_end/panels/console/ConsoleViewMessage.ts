@@ -32,7 +32,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';  // eslint-disable-line rulesdir/es_modules_import
+import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -54,6 +54,7 @@ import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {format, updateStyle} from './ConsoleFormat.js';
 import consoleViewStyles from './consoleView.css.js';
@@ -190,15 +191,15 @@ const UIStrings = {
   /**
    *@description Message to offer insights for a console error message
    */
-  explainThisError: 'Explain this error',
+  explainThisError: 'Understand this error',
   /**
    *@description Message to offer insights for a console warning message
    */
-  explainThisWarning: 'Explain this warning',
+  explainThisWarning: 'Understand this warning',
   /**
    *@description Message to offer insights for a console message
    */
-  explainThisMessage: 'Explain this message',
+  explainThisMessage: 'Understand this message',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsoleViewMessage.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -456,7 +457,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     const messageElement = document.createElement('span');
     if (this.message.level === Protocol.Log.LogEntryLevel.Error) {
       UI.UIUtils.createTextChild(messageElement, request.requestMethod + ' ');
-      const linkElement = Components.Linkifier.Linkifier.linkifyRevealable(request, request.url(), request.url());
+      const linkElement = Components.Linkifier.Linkifier.linkifyRevealable(
+          request, request.url(), request.url(), undefined, undefined, 'network-request');
       // Focus is handled by the viewport.
       linkElement.tabIndex = -1;
       this.selectableChildren.push({element: linkElement, forceSelect: () => linkElement.focus()});
@@ -476,7 +478,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       const fragment = this.linkifyWithCustomLinkifier(messageText, (text, url, lineNumber, columnNumber) => {
         const linkElement = url === request.url() ?
             Components.Linkifier.Linkifier.linkifyRevealable(
-                (request as SDK.NetworkRequest.NetworkRequest), url, request.url()) :
+                (request as SDK.NetworkRequest.NetworkRequest), url, request.url(), undefined, undefined,
+                'network-request') :
             Components.Linkifier.Linkifier.linkifyURL(
                 url, ({text, lineNumber, columnNumber} as Components.Linkifier.LinkifyURLOptions));
         linkElement.tabIndex = -1;
@@ -588,7 +591,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     clickableElement.appendChild(messageElement);
     const stackTraceElement = contentElement.createChild('div');
     const stackTracePreview = Components.JSPresentationUtils.buildStackTracePreviewContents(
-        runtimeModel.target(), this.linkifier, {stackTrace: this.message.stackTrace, tabStops: undefined});
+        runtimeModel.target(), this.linkifier,
+        {stackTrace: this.message.stackTrace, tabStops: undefined, widthConstrained: true});
     stackTraceElement.appendChild(stackTracePreview.element);
     for (const linkElement of stackTracePreview.links) {
       this.selectableChildren.push({element: linkElement, forceSelect: () => linkElement.focus()});
@@ -894,26 +898,31 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
 
   private formatParameterAsError(output: SDK.RemoteObject.RemoteObject): HTMLElement {
     const result = document.createElement('span');
-    const errorStack = output.description || '';
 
     // Combine the ExceptionDetails for this error object with the parsed Error#stack.
     // The Exceptiondetails include script IDs for stack frames, which allows more accurate
     // linking.
-    this.#formatErrorStackPromiseForTest = this.retrieveExceptionDetails(output).then(exceptionDetails => {
-      const errorSpan = this.tryFormatAsError(errorStack, exceptionDetails);
-      result.appendChild(errorSpan ?? this.linkifyStringAsFragment(errorStack));
-    });
+    const formatErrorStack =
+        async(errorObj: SDK.RemoteObject.RemoteObject, includeCausedByPrefix: boolean): Promise<void> => {
+      const error = SDK.RemoteObject.RemoteError.objectAsError(errorObj);
+      const [details, cause] = await Promise.all([error.exceptionDetails(), error.cause()]);
+      const errorElement =
+          this.tryFormatAsError(error.errorStack, details) ?? this.linkifyStringAsFragment(error.errorStack);
+      if (includeCausedByPrefix) {
+        errorElement.prepend('Caused by: ');
+      }
+      result.appendChild(errorElement);
+
+      if (cause && cause.subtype === 'error') {
+        await formatErrorStack(cause, /* includeCausedByPrefix */ true);
+      } else if (cause && cause.type === 'string') {
+        result.append(`Caused by: ${cause.value}`);
+      }
+    };
+
+    this.#formatErrorStackPromiseForTest = formatErrorStack(output, /* includeCausedByPrefix */ false);
 
     return result;
-  }
-
-  private async retrieveExceptionDetails(errorObject: SDK.RemoteObject.RemoteObject):
-      Promise<Protocol.Runtime.ExceptionDetails|undefined> {
-    const runtimeModel = this.message.runtimeModel();
-    if (runtimeModel && errorObject.objectId) {
-      return runtimeModel.getExceptionDetails(errorObject.objectId);
-    }
-    return undefined;
   }
 
   private formatAsArrayEntry(output: SDK.RemoteObject.RemoteObject): HTMLElement {
@@ -1257,6 +1266,10 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     }
 
     this.elementInternal.className = 'console-message-wrapper';
+    this.elementInternal.setAttribute('jslog', `${VisualLogging.item('console-message').track({
+                                        click: true,
+                                        keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space|Home|End',
+                                      })}`);
     this.elementInternal.removeChildren();
     this.consoleRowWrapper = this.elementInternal.createChild('div');
     this.consoleRowWrapper.classList.add('console-row-wrapper');
@@ -1315,6 +1328,11 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
   }
 
   shouldShowInsights(): boolean {
+    if (this.message.source === SDK.ConsoleModel.FrontendMessageSource.ConsoleAPI &&
+        this.message.stackTrace?.callFrames[0]?.url === '') {
+      // Do not show insights for direct calls to Console APIs from within DevTools Console.
+      return false;
+    }
     return this.message.level === Protocol.Log.LogEntryLevel.Error ||
         this.message.level === Protocol.Log.LogEntryLevel.Warning;
   }
@@ -1638,7 +1656,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     }
 
     const debuggerModel = runtimeModel.debuggerModel();
-    const formattedResult = document.createElement('span');
+    const formattedResult = document.createElement('div');
+
     for (let i = 0; i < linkInfos.length; ++i) {
       const newline = i < linkInfos.length - 1 ? '\n' : '';
       const {line, link} = linkInfos[i];

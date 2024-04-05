@@ -102,8 +102,10 @@ const styleSheetPaths = [
   'front_end/ui/legacy/themeColors.css',
   'front_end/ui/legacy/tokens.css',
   'front_end/ui/legacy/applicationColorTokens.css',
+  'front_end/ui/legacy/designTokens.css',
   'front_end/ui/legacy/inspectorCommon.css',
   'front_end/ui/legacy/inspectorSyntaxHighlight.css',
+  'front_end/ui/legacy/textButton.css',
   'front_end/ui/components/docs/component_docs_styles.css',
 ];
 
@@ -529,7 +531,7 @@ function createTracesIndexFile(traceFilenames) {
  * @param {string|null} filePath
  */
 async function handleTracesModeRequest(request, response, filePath) {
-  const traceFolder = path.resolve(path.join(process.cwd(), 'test/unittests/fixtures/traces/'));
+  const traceFolder = path.resolve(path.join(process.cwd(), 'front_end/panels/timeline/fixtures/traces/'));
   if (filePath === '/') {
     const traceFilenames = fs.readdirSync(traceFolder).filter(f => f.includes('json'));
     const html = createTracesIndexFile(traceFilenames);

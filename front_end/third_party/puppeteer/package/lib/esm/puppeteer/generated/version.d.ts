@@ -1,5 +1,5 @@
 /**
  * @internal
  */
-export declare const packageVersion = "22.0.0";
+export declare const packageVersion = "22.6.2";
 //# sourceMappingURL=version.d.ts.map

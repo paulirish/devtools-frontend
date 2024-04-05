@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Host from '../../../../core/host/host.js';
-import * as ComponentHelpers from '../../../components/helpers/helpers.js';
 import * as LitHtml from '../../../lit-html/lit-html.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 
@@ -173,10 +172,9 @@ export class CSSLength extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-css-length', CSSLength);
+customElements.define('devtools-css-length', CSSLength);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-css-length': CSSLength;
   }

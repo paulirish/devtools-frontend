@@ -84,10 +84,11 @@ export class SoftContextMenu {
   private onMenuClosed?: () => void;
   private focusOnTheFirstItem = true;
   private keepOpen: boolean;
+  private loggableParent: Element|null;
 
   constructor(
       items: SoftContextMenuDescriptor[], itemSelectedCallback: (arg0: number) => void, keepOpen: boolean,
-      parentMenu?: SoftContextMenu, onMenuClosed?: () => void) {
+      parentMenu?: SoftContextMenu, onMenuClosed?: () => void, loggableParent?: Element|null) {
     this.items = items;
     this.itemSelectedCallback = itemSelectedCallback;
     this.parentMenu = parentMenu;
@@ -96,6 +97,7 @@ export class SoftContextMenu {
     this.detailsForElementMap = new WeakMap();
     this.onMenuClosed = onMenuClosed;
     this.keepOpen = keepOpen;
+    this.loggableParent = loggableParent || null;
   }
 
   getItems(): SoftContextMenuDescriptor[] {
@@ -119,6 +121,12 @@ export class SoftContextMenu {
     this.glassPane.setAnchorBehavior(this.parentMenu ? AnchorBehavior.PreferRight : AnchorBehavior.PreferBottom);
 
     this.contextMenuElement = this.glassPane.contentElement.createChild('div', 'soft-context-menu');
+    this.contextMenuElement.setAttribute('jslog', `${VisualLogging.menu().track({resize: true}).parent('mapped').track({
+                                           keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space|Escape',
+                                         })}`);
+    if (this.loggableParent) {
+      VisualLogging.setMappedParent(this.contextMenuElement, this.loggableParent);
+    }
     this.contextMenuElement.tabIndex = -1;
     ARIAUtils.markAsMenu(this.contextMenuElement);
     this.contextMenuElement.addEventListener('mouseup', e => e.consume(), false);
@@ -246,7 +254,7 @@ export class SoftContextMenu {
       subMenuTimer: undefined,
     };
 
-    if (item.jslogContext) {
+    if (item.jslogContext && !item.element?.hasAttribute('jslog')) {
       if (item.type === 'checkbox') {
         menuItemElement.setAttribute(
             'jslog', `${VisualLogging.toggle().track({click: true}).context(item.jslogContext)}`);

@@ -6,11 +6,10 @@
 /// <reference types="node" />
 import type { ChildProcess } from 'child_process';
 import type { DebugInfo } from '../api/Browser.js';
-import { Browser as BrowserBase, type BrowserCloseCallback, type BrowserContextOptions, type IsPageTargetCallback, type Permission, type TargetFilterCallback, type WaitForTargetOptions } from '../api/Browser.js';
-import { BrowserContext } from '../api/BrowserContext.js';
+import { Browser as BrowserBase, type BrowserCloseCallback, type BrowserContextOptions, type IsPageTargetCallback, type TargetFilterCallback } from '../api/Browser.js';
 import type { Page } from '../api/Page.js';
-import type { Target } from '../api/Target.js';
 import type { Viewport } from '../common/Viewport.js';
+import { CdpBrowserContext } from './BrowserContext.js';
 import type { Connection } from './Connection.js';
 import { type CdpTarget } from './Target.js';
 import { type TargetManager } from './TargetManager.js';
@@ -42,22 +41,5 @@ export declare class CdpBrowser extends BrowserBase {
     disconnect(): Promise<void>;
     get connected(): boolean;
     get debugInfo(): DebugInfo;
-}
-/**
- * @internal
- */
-export declare class CdpBrowserContext extends BrowserContext {
-    #private;
-    constructor(connection: Connection, browser: CdpBrowser, contextId?: string);
-    get id(): string | undefined;
-    targets(): CdpTarget[];
-    waitForTarget(predicate: (x: Target) => boolean | Promise<boolean>, options?: WaitForTargetOptions): Promise<Target>;
-    pages(): Promise<Page[]>;
-    isIncognito(): boolean;
-    overridePermissions(origin: string, permissions: Permission[]): Promise<void>;
-    clearPermissionOverrides(): Promise<void>;
-    newPage(): Promise<Page>;
-    browser(): CdpBrowser;
-    close(): Promise<void>;
 }
 //# sourceMappingURL=Browser.d.ts.map

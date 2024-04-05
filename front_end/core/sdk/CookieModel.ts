@@ -39,6 +39,10 @@ export class CookieModel extends SDKModel<void> {
     }
   }
 
+  removeBlockedCookie(cookie: Cookie): void {
+    this.#blockedCookies.delete(cookie.key());
+  }
+
   #onPrimaryPageChanged(): void {
     this.#blockedCookies.clear();
     this.#cookieToBlockedReasons.clear();
@@ -86,7 +90,7 @@ export class CookieModel extends SDKModel<void> {
     if (cookie.expires()) {
       expires = Math.floor(Date.parse(`${cookie.expires()}`) / 1000);
     }
-    const enabled = Root.Runtime.experiments.isEnabled('experimentalCookieFeatures');
+    const enabled = Root.Runtime.experiments.isEnabled('experimental-cookie-features');
     const preserveUnset = (scheme: Protocol.Network.CookieSourceScheme): Protocol.Network.CookieSourceScheme.Unset|
                           undefined => scheme === Protocol.Network.CookieSourceScheme.Unset ? scheme : undefined;
     const protocolCookie = {
@@ -155,4 +159,7 @@ SDKModel.register(CookieModel, {capabilities: Capability.Network, autostart: fal
 export interface BlockedReason {
   uiString: string;
   attribute: Attribute|null;
+}
+export interface ExemptionReason {
+  uiString: string;
 }

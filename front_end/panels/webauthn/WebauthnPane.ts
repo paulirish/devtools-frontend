@@ -271,7 +271,7 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
 
     this.#availableAuthenticatorSetting =
         Common.Settings.Settings.instance().createSetting<AvailableAuthenticatorOptions[]>(
-            'webauthnAuthenticators', []);
+            'webauthn-authenticators', []);
 
     this.#createToolbar();
     this.#authenticatorsView = this.contentElement.createChild('div', 'authenticators-view');
@@ -471,7 +471,7 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
     this.#transportSelect.removeChildren();
 
     for (const option of enabledOptions) {
-      this.#transportSelect.appendChild(new Option(option, option));
+      this.#transportSelect.appendChild(UI.UIUtils.createOption(option, option, option));
     }
 
     // Make sure the currently selected value stays the same.
@@ -552,7 +552,7 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
     UI.ARIAUtils.bindLabelToControl(protocolSelectTitle, (this.#protocolSelect as Element));
     Object.values(PROTOCOL_AUTHENTICATOR_VALUES).sort().forEach((option: Protocol.WebAuthn.AuthenticatorProtocol) => {
       if (this.#protocolSelect) {
-        this.#protocolSelect.appendChild(new Option(option, option));
+        this.#protocolSelect.appendChild(UI.UIUtils.createOption(option, option, option));
       }
     });
 
@@ -662,7 +662,7 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
     const nameField = (titleElement.createChild('input', 'authenticator-name-field') as HTMLInputElement);
     nameField.placeholder = i18nString(UIStrings.enterNewName);
     nameField.disabled = true;
-    nameField.setAttribute('jslog', `${VisualLogging.textField('name').track({keydown: true})}`);
+    nameField.setAttribute('jslog', `${VisualLogging.textField('name').track({keydown: 'Enter', change: true})}`);
     const userFriendlyName = authenticatorId.slice(-5);  // User friendly name defaults to last 5 chars of UUID.
     nameField.value = i18nString(UIStrings.authenticatorS, {PH1: userFriendlyName});
     this.#updateActiveLabelTitle(activeLabel, nameField.value);

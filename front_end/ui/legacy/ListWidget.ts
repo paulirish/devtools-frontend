@@ -113,8 +113,11 @@ export class ListWidget<T> extends VBox {
     if (this.isTable) {
       element.role = 'rowgroup';
     }
-    element.setAttribute('jslog', `${VisualLogging.item()}`);
-    element.appendChild(this.delegate.renderItem(item, editable));
+    const content = this.delegate.renderItem(item, editable);
+    if (!content.hasAttribute('jslog')) {
+      content.setAttribute('jslog', `${VisualLogging.item()}`);
+    }
+    element.appendChild(content);
     if (editable) {
       element.classList.add('editable');
       element.tabIndex = 0;
@@ -367,7 +370,7 @@ export class Editor<T> {
     const input = (createInput('', type) as HTMLInputElement);
     input.placeholder = title;
     input.addEventListener('input', this.validateControls.bind(this, false), false);
-    input.setAttribute('jslog', `${VisualLogging.textField().track({keydown: true}).context(name)}`);
+    input.setAttribute('jslog', `${VisualLogging.textField().track({change: true, keydown: 'Enter'}).context(name)}`);
     ARIAUtils.setLabel(input, title);
     this.controlByName.set(name, input);
     this.controls.push(input);
@@ -385,6 +388,8 @@ export class Editor<T> {
       const option = (select.createChild('option') as HTMLOptionElement);
       option.value = options[index];
       option.textContent = options[index];
+      option.setAttribute(
+          'jslog', `${VisualLogging.item(Platform.StringUtilities.toKebabCase(options[index])).track({click: true})}`);
     }
     if (title) {
       Tooltip.install(select, title);

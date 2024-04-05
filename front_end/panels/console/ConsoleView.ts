@@ -276,7 +276,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   private filter: ConsoleViewFilter;
   private readonly consoleToolbarContainer: HTMLElement;
   private readonly splitWidget: UI.SplitWidget.SplitWidget;
-  private readonly contentsElement: UI.Widget.WidgetElement;
+  private readonly contentsElement: typeof UI.Widget.Widget.prototype.element;
   private visibleViewMessages: ConsoleViewMessage[];
   private hiddenByFilterCount: number;
   private shouldBeHiddenCache: Set<ConsoleViewMessage>;
@@ -285,7 +285,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   private searchRegex!: RegExp|null;
   private groupableMessages: Map<string, ConsoleViewMessage[]>;
   private readonly groupableMessageTitle: Map<string, ConsoleViewMessage>;
-  private readonly shortcuts: Map<number, () => void>;
+  private readonly shortcuts: Map<number, (e: KeyboardEvent) => void>;
   private regexMatchRanges: RegexMatchRange[];
   private readonly consoleContextSelector: ConsoleContextSelector;
   private readonly filterStatusText: UI.Toolbar.ToolbarText;
@@ -1123,22 +1123,26 @@ export class ConsoleView extends UI.Widget.VBox implements
       const menuTitle = i18nString(
           UIStrings.hideMessagesFromS, {PH1: new Common.ParsedURL.ParsedURL(consoleMessage.url).displayName});
       contextMenu.headerSection().appendItem(
-          menuTitle, this.filter.addMessageURLFilter.bind(this.filter, consoleMessage.url));
+          menuTitle, this.filter.addMessageURLFilter.bind(this.filter, consoleMessage.url),
+          {jslogContext: 'hide-messages-from'});
     }
 
     contextMenu.defaultSection().appendAction('console.clear');
     contextMenu.defaultSection().appendAction('console.clear.history');
-    contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), this.saveConsole.bind(this));
+    contextMenu.saveSection().appendItem(
+        i18nString(UIStrings.saveAs), this.saveConsole.bind(this), {jslogContext: 'save-as'});
     if (this.element.hasSelection()) {
       contextMenu.clipboardSection().appendItem(
-          i18nString(UIStrings.copyVisibleStyledSelection), this.viewport.copyWithStyles.bind(this.viewport));
+          i18nString(UIStrings.copyVisibleStyledSelection), this.viewport.copyWithStyles.bind(this.viewport),
+          {jslogContext: 'copy-visible-styled-selection'});
     }
 
     if (consoleMessage) {
       const request = Logs.NetworkLog.NetworkLog.requestForConsoleMessage(consoleMessage);
       if (request && SDK.NetworkManager.NetworkManager.canReplayRequest(request)) {
         contextMenu.debugSection().appendItem(
-            i18nString(UIStrings.replayXhr), SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request));
+            i18nString(UIStrings.replayXhr), SDK.NetworkManager.NetworkManager.replayRequest.bind(null, request),
+            {jslogContext: 'replay-xhr'});
       }
     }
 
@@ -1283,9 +1287,9 @@ export class ConsoleView extends UI.Widget.VBox implements
 
       if (!viewMessagesInGroup.find(x => this.shouldMessageBeVisible(x))) {
         // Optimize for speed.
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-        // @ts-expect-error
-        Platform.SetUtilities.addAll(alreadyAdded, viewMessagesInGroup);
+        for (const viewMessageInGroup of viewMessagesInGroup) {
+          alreadyAdded.add(viewMessageInGroup.consoleMessage());
+        }
         processedGroupKeys.add(key);
         continue;
       }
@@ -1342,8 +1346,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   private messagesPasted(event: Event): void {
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SELF_XSS_WARNING) &&
-        !Root.Runtime.Runtime.queryParam('isChromeForTesting') && !this.selfXssWarningDisabledSetting.get()) {
+    if (!Root.Runtime.Runtime.queryParam('isChromeForTesting') && !this.selfXssWarningDisabledSetting.get()) {
       event.preventDefault();
       this.prompt.showSelfXssWarning();
     }
@@ -1359,8 +1362,9 @@ export class ConsoleView extends UI.Widget.VBox implements
         this.clearPromptBackwards.bind(this));
   }
 
-  private clearPromptBackwards(): void {
+  private clearPromptBackwards(e: KeyboardEvent): void {
     this.prompt.clear();
+    void VisualLogging.logKeyDown(e.currentTarget, e, 'clear-prompt');
   }
 
   private promptKeyDown(event: Event): void {
@@ -1373,7 +1377,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     const shortcut = UI.KeyboardShortcut.KeyboardShortcut.makeKeyFromEvent(keyboardEvent);
     const handler = this.shortcuts.get(shortcut);
     if (handler) {
-      handler();
+      handler(keyboardEvent);
       keyboardEvent.preventDefault();
     }
   }
@@ -1757,9 +1761,11 @@ export class ConsoleViewFilter {
           (this.levelMenuButton.element as HTMLElement).offsetHeight,
     });
     contextMenu.headerSection().appendItem(
-        i18nString(UIStrings.default), () => setting.set(ConsoleFilter.defaultLevelsFilterValue()));
+        i18nString(UIStrings.default), () => setting.set(ConsoleFilter.defaultLevelsFilterValue()),
+        {jslogContext: 'default'});
     for (const [level, levelText] of this.levelLabels.entries()) {
-      contextMenu.defaultSection().appendCheckboxItem(levelText, toggleShowLevel.bind(null, level), levels[level]);
+      contextMenu.defaultSection().appendCheckboxItem(
+          levelText, toggleShowLevel.bind(null, level), {checked: levels[level], jslogContext: level});
     }
     void contextMenu.show();
 

@@ -296,7 +296,7 @@ export class CdpPage extends Page {
         assert(session instanceof CdpCDPSession);
         this.#frameManager.onAttachedToTarget(session._target());
         if (session._target()._getTargetInfo().type === 'worker') {
-            const worker = new CdpWebWorker(session, session._target().url(), this.#addConsoleMessage.bind(this), this.#handleException.bind(this));
+            const worker = new CdpWebWorker(session, session._target().url(), session._target()._targetId, session._target().type(), this.#addConsoleMessage.bind(this), this.#handleException.bind(this));
             this.#workers.set(session.id(), worker);
             this.emit("workercreated" /* PageEvent.WorkerCreated */, worker);
         }
@@ -683,7 +683,10 @@ export class CdpPage extends Page {
     }
     async reload(options) {
         const [result] = await Promise.all([
-            this.waitForNavigation(options),
+            this.waitForNavigation({
+                ...options,
+                ignoreSameDocumentNavigation: true,
+            }),
             this.#primaryTargetClient.send('Page.reload'),
         ]);
         return result;

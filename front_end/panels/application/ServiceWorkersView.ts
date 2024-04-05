@@ -231,7 +231,7 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
         UI.Fragment
             .html`<a class="devtools-link" role="link" tabindex="0" href="chrome://serviceworker-internals" target="_blank" style="display: inline; cursor: pointer;">${
                 i18nString(UIStrings.seeAllRegistrations)}</a>`;
-    seeOthers.setAttribute('jslog', `${VisualLogging.link('see-all-registrations').track({click: true})}`);
+    seeOthers.setAttribute('jslog', `${VisualLogging.link('view-all').track({click: true})}`);
     self.onInvokeElement(seeOthers, event => {
       const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
       rootTarget &&
@@ -880,7 +880,7 @@ export class Section {
   }
 
   private wrapWidget(container: Element): Element {
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(container, {
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(container, {
       cssFile: [
         serviceWorkersViewStyles,
         /* These styles are for the timing table in serviceWorkerUpdateCycleView but this is the widget that it is rendered
