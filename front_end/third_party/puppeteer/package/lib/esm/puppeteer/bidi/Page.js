@@ -233,11 +233,6 @@ let BidiPage = (() => {
         }
         async close(options) {
             try {
-                if (this.#interception) {
-                    // Workaround for Firefox
-                    // TODO: Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=1882260 is fixed
-                    await this.setRequestInterception(false);
-                }
                 await this.#frame.browsingContext.close(options?.runBeforeUnload);
             }
             catch {
@@ -316,6 +311,11 @@ let BidiPage = (() => {
             const { timeout: ms = this._timeoutSettings.timeout(), path = undefined } = options;
             const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize, } = parsePDFOptions(options, 'cm');
             const pageRanges = ranges ? ranges.split(', ') : [];
+            await firstValueFrom(from(this.mainFrame()
+                .isolatedRealm()
+                .evaluate(() => {
+                return document.fonts.ready;
+            })).pipe(raceWith(timeout(ms))));
             const data = await firstValueFrom(from(this.#frame.browsingContext.print({
                 background,
                 margin,

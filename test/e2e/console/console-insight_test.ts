@@ -115,6 +115,20 @@ describe('ConsoleInsight', function() {
     await waitForNone('.hover-button', undefined, undefined, 'pierce');
   });
 
+  it('does not show the hover button if the feature is not rolled out', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks(
+        [
+          {'textChunk': {'text': 'test'}},
+        ],
+        '?ci_blockedByRollout=true');
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
   it('does not show the hover button if it is restriced by geography', async () => {
     const {target} = getBrowserAndPages();
     await setupMocks(
@@ -244,7 +258,8 @@ describe('ConsoleInsight', function() {
       const message = consoleViewMessage?.toMessageTextString() || '';
       // Replace dynamic line and column numbers in stacktraces with ':1:1'.
       // Ignore stacktrace added by Puppeteer.
-      return message.replace(/:\d+:\d+/gi, ':1:1').replaceAll(/\n    at pptr:;CdpFrame\.%3Can….js%3A\d+%3A\d+\):1:1/gi, '');
+      return message.replace(/:\d+:\d+/gi, ':1:1')
+          .replaceAll(/\n    at pptr:;CdpFrame\.%3Can….js%3A\d+%3A\d+\):1:1/gi, '');
     };
     const consoleModule = (await frontend.evaluateHandle('import(\'./panels/console/console.js\')')) as
         puppeteer.JSHandle<typeof Console>;

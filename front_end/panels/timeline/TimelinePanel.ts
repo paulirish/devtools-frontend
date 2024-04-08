@@ -86,6 +86,10 @@ const UIStrings = {
    */
   enableAdvancedPaint: 'Enable advanced paint instrumentation (slow)',
   /**
+   *@description Title of CSS selector stats setting in timeline panel of the performance panel
+   */
+  enableSelectorStats: 'Enable CSS selector stats',
+  /**
    *@description Title of show screenshots setting in timeline panel of the performance panel
    */
   screenshots: 'Screenshots',
@@ -132,6 +136,10 @@ const UIStrings = {
   /**
    *@description Text in Timeline Panel of the Performance panel
    */
+  capturesSelectorStats: 'Captures CSS selector statistics',
+  /**
+   *@description Text in Timeline Panel of the Performance panel
+   */
   network: 'Network:',
   /**
    *@description Text in Timeline Panel of the Performance panel
@@ -163,6 +171,10 @@ const UIStrings = {
    *@description Text in Timeline Panel of the Performance panel
    */
   SignificantOverheadDueToPaint: '- Significant overhead due to paint instrumentation',
+  /**
+   *@description Text in Timeline Panel of the Performance panel
+   */
+  SelectorStatsEnabled: '- Selector stats is enabled',
   /**
    *@description Text in Timeline Panel of the Performance panel
    */
@@ -275,6 +287,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private performanceModel: PerformanceModel|null;
   private disableCaptureJSProfileSetting: Common.Settings.Setting<boolean>;
   private readonly captureLayersAndPicturesSetting: Common.Settings.Setting<boolean>;
+  private readonly captureSelectorStatsSetting: Common.Settings.Setting<boolean>;
   private showScreenshotsSetting: Common.Settings.Setting<boolean>;
   private showMemorySetting: Common.Settings.Setting<boolean>;
   private readonly panelToolbar: UI.Toolbar.Toolbar;
@@ -363,6 +376,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.captureLayersAndPicturesSetting =
         Common.Settings.Settings.instance().createSetting('timeline-capture-layers-and-pictures', false);
     this.captureLayersAndPicturesSetting.setTitle(i18nString(UIStrings.enableAdvancedPaint));
+    this.captureSelectorStatsSetting =
+        Common.Settings.Settings.instance().createSetting('timeline-capture-selector-stats', false);
+    this.captureSelectorStatsSetting.setTitle(i18nString(UIStrings.enableSelectorStats));
 
     this.showScreenshotsSetting =
         Common.Settings.Settings.instance().createSetting('timeline-show-screenshots', isNode ? false : true);
@@ -417,26 +433,24 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.SuspendStateChanged, this.onSuspendStateChanged, this);
-    if (Root.Runtime.experiments.isEnabled('timeline-as-console-profile-result-panel')) {
-      const profilerModels = SDK.TargetManager.TargetManager.instance().models(SDK.CPUProfilerModel.CPUProfilerModel);
-      for (const model of profilerModels) {
-        for (const message of model.registeredConsoleProfileMessages) {
-          this.consoleProfileFinished(message);
-        }
+    const profilerModels = SDK.TargetManager.TargetManager.instance().models(SDK.CPUProfilerModel.CPUProfilerModel);
+    for (const model of profilerModels) {
+      for (const message of model.registeredConsoleProfileMessages) {
+        this.consoleProfileFinished(message);
       }
-      SDK.TargetManager.TargetManager.instance().observeModels(
-          SDK.CPUProfilerModel.CPUProfilerModel,
-          {
-            modelAdded: (model: SDK.CPUProfilerModel.CPUProfilerModel) => {
-              model.addEventListener(
-                  SDK.CPUProfilerModel.Events.ConsoleProfileFinished, event => this.consoleProfileFinished(event.data));
-            },
-            modelRemoved: (_model: SDK.CPUProfilerModel.CPUProfilerModel) => {
-
-            },
-          },
-      );
     }
+    SDK.TargetManager.TargetManager.instance().observeModels(
+        SDK.CPUProfilerModel.CPUProfilerModel,
+        {
+          modelAdded: (model: SDK.CPUProfilerModel.CPUProfilerModel) => {
+            model.addEventListener(
+                SDK.CPUProfilerModel.Events.ConsoleProfileFinished, event => this.consoleProfileFinished(event.data));
+          },
+          modelRemoved: (_model: SDK.CPUProfilerModel.CPUProfilerModel) => {
+
+          },
+        },
+    );
     SDK.TargetManager.TargetManager.instance().observeTargets({
       targetAdded: (target: SDK.Target.Target) => {
         if (target !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
@@ -602,6 +616,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         SDK.CPUThrottlingManager.Events.HardwareConcurrencyChanged, this.updateShowSettingsToolbarButton, this);
     this.disableCaptureJSProfileSetting.addChangeListener(this.updateShowSettingsToolbarButton, this);
     this.captureLayersAndPicturesSetting.addChangeListener(this.updateShowSettingsToolbarButton, this);
+    this.captureSelectorStatsSetting.addChangeListener(this.updateShowSettingsToolbarButton, this);
 
     this.settingsPane = new UI.Widget.HBox();
     this.settingsPane.element.classList.add('timeline-settings-pane');
@@ -614,6 +629,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.disableCaptureJSProfileSetting, i18nString(UIStrings.disablesJavascriptSampling)));
     captureToolbar.appendToolbarItem(
         this.createSettingCheckbox(this.captureLayersAndPicturesSetting, i18nString(UIStrings.capturesAdvancedPaint)));
+    captureToolbar.appendToolbarItem(
+        this.createSettingCheckbox(this.captureSelectorStatsSetting, i18nString(UIStrings.capturesSelectorStats)));
 
     const throttlingPane = new UI.Widget.VBox();
     throttlingPane.element.classList.add('flex-auto');
@@ -836,6 +853,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.captureLayersAndPicturesSetting.get()) {
       messages.push(i18nString(UIStrings.SignificantOverheadDueToPaint));
     }
+    if (this.captureSelectorStatsSetting.get()) {
+      messages.push(i18nString(UIStrings.SelectorStatsEnabled));
+    }
     if (this.disableCaptureJSProfileSetting.get()) {
       messages.push(i18nString(UIStrings.JavascriptSamplingIsDisabled));
     }
@@ -983,6 +1003,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         enableJSSampling: !this.disableCaptureJSProfileSetting.get(),
         capturePictures: this.captureLayersAndPicturesSetting.get(),
         captureFilmStrip: this.showScreenshotsSetting.get(),
+        captureSelectorStats: this.captureSelectorStatsSetting.get(),
       };
       // Order is important here: we tell the controller to start recording, which enables tracing.
       const response = await this.controller.startRecording(recordingOptions);
@@ -1179,7 +1200,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // http/tests/devtools/tracing/timeline-js/timeline-open-function-call.js
     // http/tests/devtools/tracing/timeline-misc/timeline-filtering-self-time.js
     // http/tests/devtools/tracing/timeline-misc/timeline-filtering.js
-    // http/tests/devtools/tracing/timeline-misc/timeline-range-stats.js
     this.#applyActiveFilters(false, exclusiveFilter);
   }
 

@@ -13,6 +13,8 @@ import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getEventLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import {getEventStyle} from './EventUICategory.js';
+import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
+import {ExtensionTrackAppender} from './ExtensionTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
@@ -81,7 +83,8 @@ export interface TrackAppender {
 }
 
 export const TrackNames =
-    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet'] as const;
+    ['Animations', 'Timings', 'Interactions', 'GPU', 'LayoutShifts', 'Thread', 'Thread_AuctionWorklet', 'Extension'] as
+    const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
@@ -157,6 +160,9 @@ export class CompatibilityTracksAppender {
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
     this.#addThreadAppenders();
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS)) {
+      this.#addExtensionAppenders();
+    }
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       for (const group of this.#flameChartData.groups) {
         // We only need to update the color here, because FlameChart will call `scheduleUpdate()` when theme is changed.
@@ -178,6 +184,13 @@ export class CompatibilityTracksAppender {
 
   getFlameChartTimelineData(): PerfUI.FlameChart.FlameChartTimelineData {
     return this.#flameChartData;
+  }
+
+  #addExtensionAppenders(): void {
+    const tracks = ExtensionDataGatherer.instance().getExtensionData();
+    for (const trackData of tracks) {
+      this.#allTrackAppenders.push(new ExtensionTrackAppender(this, trackData));
+    }
   }
 
   #addThreadAppenders(): void {
@@ -541,6 +554,10 @@ export class CompatibilityTracksAppender {
     if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
         TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
       return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+    }
+
+    if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry)) {
+      return true;
     }
 
     // Default styles are globally defined for each event name. Some

@@ -202,11 +202,6 @@ export class BidiPage extends Page {
 
   override async close(options?: {runBeforeUnload?: boolean}): Promise<void> {
     try {
-      if (this.#interception) {
-        // Workaround for Firefox
-        // TODO: Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=1882260 is fixed
-        await this.setRequestInterception(false);
-      }
       await this.#frame.browsingContext.close(options?.runBeforeUnload);
     } catch {
       return;
@@ -326,6 +321,17 @@ export class BidiPage extends Page {
       preferCSSPageSize,
     } = parsePDFOptions(options, 'cm');
     const pageRanges = ranges ? ranges.split(', ') : [];
+
+    await firstValueFrom(
+      from(
+        this.mainFrame()
+          .isolatedRealm()
+          .evaluate(() => {
+            return document.fonts.ready;
+          })
+      ).pipe(raceWith(timeout(ms)))
+    );
+
     const data = await firstValueFrom(
       from(
         this.#frame.browsingContext.print({

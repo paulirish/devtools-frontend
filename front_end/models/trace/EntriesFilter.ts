@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as Platform from '../../core/platform/platform.js';
+
 import * as Helpers from './helpers/helpers.js';
 import * as Types from './types/types.js';
 
@@ -113,10 +114,13 @@ export class EntriesFilter {
   }
 
   /**
-   * Sets invisible entries. Called when a trace with annotations is loaded and some entries are set as hidden.
+   * Sets invisible and modified entries. Called when a trace with annotations is loaded and some entries are set as hidden and modified.
+   * Both arrays are set together because if there is one, the other must be present too.
    **/
-  setInvisibleEntries(entries: Types.TraceEvents.TraceEventData[]): void {
-    this.#invisibleEntries.push(...entries);
+  setInvisibleAndModifiedEntries(
+      invisibleEntries: Types.TraceEvents.TraceEventData[], modifiedEntries: Types.TraceEvents.TraceEventData[]): void {
+    this.#invisibleEntries.push(...invisibleEntries);
+    this.#modifiedVisibleEntries.push(...modifiedEntries);
   }
 
   inEntryInvisible(entry: Types.TraceEvents.TraceEventData): boolean {

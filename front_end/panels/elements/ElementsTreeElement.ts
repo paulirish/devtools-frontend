@@ -262,6 +262,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         'jslog', `${VisualLogging.treeItem().parent('elementsTreeOutline').track({
           keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Backspace|Delete|Enter|Space|Home|End',
           drag: true,
+          click: true,
         })}`);
     this.contentElement = this.listItemElement.createChild('div');
     this.gutterContainer = this.contentElement.createChild('div', 'gutter-container');
@@ -1123,9 +1124,9 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           },
         ]),
         TextEditor.Config.baseConfiguration(initialValue),
-        TextEditor.Config.closeBrackets,
+        TextEditor.Config.closeBrackets.instance(),
         TextEditor.Config.autocompletion.instance(),
-        CodeMirror.html.html(),
+        CodeMirror.html.html({autoCloseTags: false, selfClosingTags: true}),
         TextEditor.Config.domWordWrap.instance(),
         CodeMirror.EditorView.theme({
           '&.cm-editor': {maxHeight: '300px'},

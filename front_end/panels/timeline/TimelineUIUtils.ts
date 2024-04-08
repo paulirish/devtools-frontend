@@ -61,6 +61,7 @@ import {
   TimelineRecordStyle,
   visibleTypes,
 } from './EventUICategory.js';
+import * as Extensions from './extensions/extensions.js';
 import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
 import {SourceMapsResolver} from './SourceMapsResolver.js';
 import {TimelinePanel} from './TimelinePanel.js';
@@ -541,6 +542,15 @@ const UIStrings = {
    *@description Text indicating that something is hidden from the Performace Panel Timeline
    */
   entryIsHidden: '(entry is hidden)',
+  /**
+   * @description Title of a row in the details view for a `Recalculate Styles` event that contains more info about selector stats tracing.
+   */
+  selectorStatsTitle: 'Selector Stats',
+  /**
+   * @description Info text that explains to the user how to enable selector stats tracing.
+   * @example {Setting Name} PH1
+   */
+  sSelectorStatsInfo: 'Select "{PH1}" to collect detailed CSS selector matching statistics.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineUIUtils.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -656,6 +666,10 @@ export class TimelineUIUtils {
       if (TimelineUIUtils.isUserFrame(frame)) {
         return TimelineUIUtils.colorForId(frame.url);
       }
+    }
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event) &&
+        TraceEngine.Types.Extensions.isSyntheticExtensionEntry(event)) {
+      return Extensions.ExtensionUI.extensionEntryColor(event);
     }
     let parsedColor = TimelineUIUtils.eventStyle(event).category.getComputedColorValue();
     // This event is considered idle time but still rendered as a scripting event here
@@ -1213,9 +1227,7 @@ export class TimelineUIUtils {
 
     const contentHelper = new TimelineDetailsContentHelper(model.targetByEvent(event), linkifier);
 
-    const defaultColorForEvent = TraceEngine.Legacy.eventIsFromNewEngine(event) ?
-        getEventStyle(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category.getComputedColorValue() :
-        TimelineUIUtils.eventStyle(event).category.getComputedColorValue();
+    const defaultColorForEvent = this.eventColor(event);
     const color = model.isMarkerEvent(event) ? TimelineUIUtils.markerStyleForEvent(event).color : defaultColorForEvent;
 
     contentHelper.addSection(TimelineUIUtils.eventTitle(event), color);
@@ -1271,6 +1283,13 @@ export class TimelineUIUtils {
           i18nString(UIStrings.streamed),
           isStreamed + (isStreamed ? '' : `: ${event.args.data?.notStreamedReason || ''}`));
       TimelineUIUtils.buildConsumeCacheDetails(eventData, contentHelper);
+    }
+
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event) &&
+        TraceEngine.Types.Extensions.isSyntheticExtensionEntry(event)) {
+      for (const [key, value] of event.args.detailsPairs || []) {
+        contentHelper.appendTextRow(key, value);
+      }
     }
 
     switch (event.name) {
@@ -1427,6 +1446,15 @@ export class TimelineUIUtils {
       case recordTypes.UpdateLayoutTree:  // We don't want to see default details.
       case recordTypes.RecalculateStyles: {
         contentHelper.appendTextRow(i18nString(UIStrings.elementsAffected), event.args['elementCount']);
+
+        const selectorStatsSetting =
+            Common.Settings.Settings.instance().createSetting('timeline-capture-selector-stats', false);
+        if (!selectorStatsSetting.get()) {
+          const note = document.createElement('span');
+          note.textContent = i18nString(UIStrings.sSelectorStatsInfo, {PH1: selectorStatsSetting.title()});
+          contentHelper.appendElementRow(i18nString(UIStrings.selectorStatsTitle), note);
+        }
+
         break;
       }
 
@@ -1647,7 +1675,9 @@ export class TimelineUIUtils {
     return contentHelper.fragment;
   }
 
-  static statsForTimeRange(events: TraceEngine.Legacy.CompatibleTraceEvent[], startTime: number, endTime: number): {
+  static statsForTimeRange(
+      events: TraceEngine.Legacy.CompatibleTraceEvent[], startTime: TraceEngine.Types.Timing.MilliSeconds,
+      endTime: TraceEngine.Types.Timing.MilliSeconds): {
     [x: string]: number,
   } {
     if (!events.length) {

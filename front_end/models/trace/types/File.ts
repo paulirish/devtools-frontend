@@ -2,20 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {type TraceWindowMicroSeconds} from './Timing.js';
 import {type TraceEventData} from './TraceEvents.js';
+
 export type TraceFile = {
   traceEvents: readonly TraceEventData[],
   metadata: MetaData,
 };
+
+export interface Breadcrumb {
+  window: TraceWindowMicroSeconds;
+  child: Breadcrumb|null;
+}
 
 export const enum DataOrigin {
   CPUProfile = 'CPUProfile',
   TraceEvents = 'TraceEvents',
 }
 export interface Annotations {
-  hiddenRendererEventsHashes: string[];
-  hiddenProfileCallsSampleIndexes: number[];
-  hiddenProfileCallsDepths: number[];
+  entriesFilterAnnotations: {
+    hiddenEntriesIndexes: number[],
+    modifiedEntriesIndexes: number[],
+  };
+  initialBreadcrumb: Breadcrumb;
 }
 
 /**

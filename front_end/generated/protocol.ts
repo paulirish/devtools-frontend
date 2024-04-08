@@ -5970,8 +5970,13 @@ export namespace Emulation {
     /**
      * If set, the posture of a foldable device. If not set the posture is set
      * to continuous.
+     * Deprecated, use Emulation.setDevicePostureOverride.
      */
     devicePosture?: DevicePosture;
+  }
+
+  export interface SetDevicePostureOverrideRequest {
+    posture: DevicePosture;
   }
 
   export interface SetScrollbarsHiddenRequest {
@@ -8363,6 +8368,10 @@ export namespace Network {
      */
     fromPrefetchCache?: boolean;
     /**
+     * Specifies that the request was served from the prefetch cache.
+     */
+    fromEarlyHints?: boolean;
+    /**
      * Information about how Service Worker Static Router was used.
      */
     serviceWorkerRouterInfo?: ServiceWorkerRouterInfo;
@@ -8695,6 +8704,10 @@ export namespace Network {
      * The reason the cookie was exempted.
      */
     exemptionReason: CookieExemptionReason;
+    /**
+     * The string representing this individual cookie as it would appear in the header.
+     */
+    cookieLine: string;
     /**
      * The cookie object representing the cookie.
      */
@@ -10181,6 +10194,22 @@ export namespace Network {
      * the response with the corresponding reason.
      */
     exemptedCookies?: ExemptedSetCookieWithReason[];
+  }
+
+  /**
+   * Fired when 103 Early Hints headers is received in addition to the common response.
+   * Not every responseReceived event will have an responseReceivedEarlyHints fired.
+   * Only one responseReceivedEarlyHints may be fired for eached responseReceived event.
+   */
+  export interface ResponseReceivedEarlyHintsEvent {
+    /**
+     * Request identifier. Used to match this information to another responseReceived event.
+     */
+    requestId: RequestId;
+    /**
+     * Raw response headers as they were received over the wire.
+     */
+    headers: Headers;
   }
 
   export const enum TrustTokenOperationDoneEventStatus {
@@ -14055,6 +14084,7 @@ export namespace Storage {
     DestinationBothLimitsReached = 'destinationBothLimitsReached',
     ReportingOriginsPerSiteLimitReached = 'reportingOriginsPerSiteLimitReached',
     ExceedsMaxChannelCapacity = 'exceedsMaxChannelCapacity',
+    ExceedsMaxTriggerStateCardinality = 'exceedsMaxTriggerStateCardinality',
   }
 
   export const enum AttributionReportingSourceRegistrationTimeConfig {
@@ -16929,6 +16959,45 @@ export namespace FedCm {
    */
   export interface DialogClosedEvent {
     dialogId: string;
+  }
+}
+
+/**
+ * This domain allows interacting with the browser to control PWAs.
+ */
+export namespace PWA {
+
+  /**
+   * The following types are the replica of
+   * https://crsrc.org/c/chrome/browser/web_applications/proto/web_app_os_integration_state.proto;drc=9910d3be894c8f142c977ba1023f30a656bc13fc;l=67
+   */
+  export interface FileHandlerAccept {
+    /**
+     * New name of the mimetype according to
+     * https://www.iana.org/assignments/media-types/media-types.xhtml
+     */
+    mediaType: string;
+    fileExtensions: string[];
+  }
+
+  export interface FileHandler {
+    action: string;
+    accepts: FileHandlerAccept[];
+    displayName: string;
+  }
+
+  export interface GetOsAppStateRequest {
+    /**
+     * The id from the webapp's manifest file, commonly it's the url of the
+     * site installing the webapp. See
+     * https://web.dev/learn/pwa/web-app-manifest.
+     */
+    manifestId: string;
+  }
+
+  export interface GetOsAppStateResponse extends ProtocolResponseWithError {
+    badgeCount: integer;
+    fileHandlers: FileHandler[];
   }
 }
 

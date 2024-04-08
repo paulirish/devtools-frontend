@@ -464,8 +464,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             return 4;
           case 'Thread_AuctionWorklet':
             return 10;
+          case 'Extension':
+            return 11;
           default:
-            return -1;
+            return 12;
         }
       }
 
@@ -479,7 +481,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         case TimelineModel.TimelineModel.TrackType.Other:
           return 11;
         default:
-          return -1;
+          return 12;
       }
     };
 
@@ -922,7 +924,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
 
     const element = document.createElement('div');
-    const root = UI.Utils.createShadowRootWithCoreStyles(element, {
+    const root = UI.UIUtils.createShadowRootWithCoreStyles(element, {
       cssFile: [timelineFlamechartPopoverStyles],
       delegatesFocus: undefined,
     });
@@ -943,7 +945,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
 
   prepareHighlightedHiddenEntriesArrowInfo(entryIndex: number): Element|null {
     const element = document.createElement('div');
-    const root = UI.Utils.createShadowRootWithCoreStyles(element, {
+    const root = UI.UIUtils.createShadowRootWithCoreStyles(element, {
       cssFile: [timelineFlamechartPopoverStyles],
       delegatesFocus: undefined,
     });
@@ -984,7 +986,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const entryType = this.entryType(entryIndex);
     if (entryType === EntryType.Event) {
       const event = (this.entryData[entryIndex] as TraceEngine.Legacy.Event);
-      if (this.legacyTimelineModel.isGenericTrace()) {
+
+      if (this.traceEngineData && this.traceEngineData.Meta.traceIsGeneric) {
         return this.genericTraceEventColor(event);
       }
       if (this.legacyPerformanceModel.timelineModel().isMarkerEvent(event)) {

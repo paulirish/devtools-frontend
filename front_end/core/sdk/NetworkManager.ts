@@ -537,6 +537,10 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       networkRequest.setFromPrefetchCache();
     }
 
+    if (response.fromEarlyHints) {
+      networkRequest.setFromEarlyHints();
+    }
+
     if (response.cacheStorageCacheName) {
       networkRequest.setResponseCacheStorageCacheName(response.cacheStorageCacheName);
     }
@@ -901,6 +905,13 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     this.getExtraInfoBuilder(requestId).addRequestExtraInfo(extraRequestInfo);
   }
 
+  responseReceivedEarlyHints({
+    requestId,
+    headers,
+  }: Protocol.Network.ResponseReceivedEarlyHintsEvent): void {
+    this.getExtraInfoBuilder(requestId).setEarlyHintsHeaders(this.headersMapToHeadersArray(headers));
+  }
+
   responseReceivedExtraInfo({
     requestId,
     blockedCookies,
@@ -927,6 +938,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       cookiePartitionKeyOpaque,
       exemptedResponseCookies: exemptedCookies?.map(exemptedCookie => ({
                                                       cookie: Cookie.fromProtocolCookie(exemptedCookie.cookie),
+                                                      cookieLine: exemptedCookie.cookieLine,
                                                       exemptionReason: exemptedCookie.exemptionReason,
                                                     })),
     };
@@ -1808,6 +1820,7 @@ class ExtraInfoBuilder {
   readonly #requests: NetworkRequest[];
   #requestExtraInfos: (ExtraRequestInfo|null)[];
   #responseExtraInfos: (ExtraResponseInfo|null)[];
+  #responseEarlyHintsHeaders: NameValue[];
   #finishedInternal: boolean;
   #webBundleInfo: WebBundleInfo|null;
   #webBundleInnerRequestInfo: WebBundleInnerRequestInfo|null;
@@ -1815,6 +1828,7 @@ class ExtraInfoBuilder {
   constructor() {
     this.#requests = [];
     this.#requestExtraInfos = [];
+    this.#responseEarlyHintsHeaders = [];
     this.#responseExtraInfos = [];
     this.#finishedInternal = false;
     this.#webBundleInfo = null;
@@ -1834,6 +1848,11 @@ class ExtraInfoBuilder {
   addResponseExtraInfo(info: ExtraResponseInfo): void {
     this.#responseExtraInfos.push(info);
     this.sync(this.#responseExtraInfos.length - 1);
+  }
+
+  setEarlyHintsHeaders(earlyHintsHeaders: NameValue[]): void {
+    this.#responseEarlyHintsHeaders = earlyHintsHeaders;
+    this.updateFinalRequest();
   }
 
   setWebBundleInfo(info: WebBundleInfo): void {
@@ -1888,6 +1907,7 @@ class ExtraInfoBuilder {
     const finalRequest = this.finalRequest();
     finalRequest?.setWebBundleInfo(this.#webBundleInfo);
     finalRequest?.setWebBundleInnerRequestInfo(this.#webBundleInnerRequestInfo);
+    finalRequest?.setEarlyHintsHeaders(this.#responseEarlyHintsHeaders);
   }
 }
 

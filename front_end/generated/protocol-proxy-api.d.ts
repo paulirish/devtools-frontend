@@ -106,6 +106,8 @@ declare namespace ProtocolProxyApi {
 
     FedCm: FedCmApi;
 
+    PWA: PWAApi;
+
     Debugger: DebuggerApi;
 
     HeapProfiler: HeapProfilerApi;
@@ -206,6 +208,8 @@ declare namespace ProtocolProxyApi {
     Preload: PreloadDispatcher;
 
     FedCm: FedCmDispatcher;
+
+    PWA: PWADispatcher;
 
     Debugger: DebuggerDispatcher;
 
@@ -1420,6 +1424,20 @@ declare namespace ProtocolProxyApi {
      */
     invoke_setDeviceMetricsOverride(params: Protocol.Emulation.SetDeviceMetricsOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Start reporting the given posture value to the Device Posture API.
+     * This override can also be set in setDeviceMetricsOverride().
+     */
+    invoke_setDevicePostureOverride(params: Protocol.Emulation.SetDevicePostureOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Clears a device posture override set with either setDeviceMetricsOverride()
+     * or setDevicePostureOverride() and starts using posture information from the
+     * platform again.
+     * Does nothing if no override is set.
+     */
+    invoke_clearDevicePostureOverride(): Promise<Protocol.ProtocolResponseWithError>;
+
     invoke_setScrollbarsHidden(params: Protocol.Emulation.SetScrollbarsHiddenRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_setDocumentCookieDisabled(params: Protocol.Emulation.SetDocumentCookieDisabledRequest): Promise<Protocol.ProtocolResponseWithError>;
@@ -2190,6 +2208,13 @@ declare namespace ProtocolProxyApi {
      * it, and responseReceivedExtraInfo may be fired before or after responseReceived.
      */
     responseReceivedExtraInfo(params: Protocol.Network.ResponseReceivedExtraInfoEvent): void;
+
+    /**
+     * Fired when 103 Early Hints headers is received in addition to the common response.
+     * Not every responseReceived event will have an responseReceivedEarlyHints fired.
+     * Only one responseReceivedEarlyHints may be fired for eached responseReceived event.
+     */
+    responseReceivedEarlyHints(params: Protocol.Network.ResponseReceivedEarlyHintsEvent): void;
 
     /**
      * Fired exactly once for each Trust Token operation. Depending on
@@ -3856,6 +3881,16 @@ declare namespace ProtocolProxyApi {
      */
     dialogClosed(params: Protocol.FedCm.DialogClosedEvent): void;
 
+  }
+
+  export interface PWAApi {
+    /**
+     * Returns the following OS state for the given manifest id.
+     */
+    invoke_getOsAppState(params: Protocol.PWA.GetOsAppStateRequest): Promise<Protocol.PWA.GetOsAppStateResponse>;
+
+  }
+  export interface PWADispatcher {
   }
 
   export interface DebuggerApi {

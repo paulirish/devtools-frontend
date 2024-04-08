@@ -91,9 +91,58 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/perf_ui/FlameChart.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+/**
+ * The expansion arrow is drawn from the center, so the indent is in fact the center of the arrow.
+ * See `drawExpansionArrow` function to understand how we draw the arrow.
+ * |headerLeftPadding|Arrow|
+ * |expansionArrowIndent|
+ *
+ * Normal mode:
+ * - Nesting Level 0
+ * |ICON_WIDTH|expansionArrowIndent|
+ * |headerLeftPadding|EDIT  ICON|Arrow|LabelXPadding|Title|LabelXPadding|
+ *                   |ICON WIDTH|<--            labelWidth           -->|
+ *
+ * - Nesting Level 1
+ * |ICON_WIDTH|expansionArrowIndent|expansionArrowIndent|
+ * |headerLeftPadding|EDIT  ICON|                    |Arrow|LabelXPadding|Title|LabelXPadding|
+ *                   |ICON WIDTH|<--                      labelWidth                      -->|
+ *
+ * - Nesting Level 2
+ * |ICON_WIDTH|expansionArrowIndent|expansionArrowIndent|expansionArrowIndent|
+ * |headerLeftPadding|EDIT  ICON|                                         |Arrow|LabelXPadding|Title|LabelXPadding|
+ *                   |ICON WIDTH|<--                                labelWidth                                 -->|
+ *
+ * Edit mode:
+ * - Nesting Level 0
+ * |       EDITION_MODE_INDENT      |expansionArrowIndent|
+ * |headerLeftPadding| UP   ICON|DOWN  ICON|HIDE  ICON|Arrow|LabelXPadding|Title|LabelXPadding|SAVE  ICON|
+ *                   |<-    EDITION_MODE_INDENT     ->|<--            labelWidth           -->|
+ *
+ * - Nesting Level 1
+ * |       EDITION_MODE_INDENT      |expansionArrowIndent|expansionArrowIndent|
+ * |headerLeftPadding| UP   ICON|DOWN  ICON|HIDE  ICON|                    |Arrow|LabelXPadding|Title|LabelXPadding|SAVE  ICON|
+ *                   |<-    EDITION_MODE_INDENT     ->|<--                      labelWidth                      -->|
+ *
+ * - Nesting Level 2
+ * |       EDITION_MODE_INDENT      |expansionArrowIndent|expansionArrowIndent|expansionArrowIndent|
+ * |headerLeftPadding| UP   ICON|DOWN  ICON|HIDE  ICON|                                         |Arrow|LabelXPadding|Title|LabelXPadding|SAVE  ICON|
+ *                   |<-    EDITION_MODE_INDENT     ->|<--                                labelWidth                                 -->|
+ */
+const HEADER_LEFT_PADDING = 6;
+const ARROW_SIDE = 8;
+const EXPANSION_ARROW_INDENT = HEADER_LEFT_PADDING + ARROW_SIDE / 2;
+const HEADER_LABEL_X_PADDING = 3;
+const HEADER_LABEL_Y_PADDING = 2;
+
+const ICON_LEFT_PADDING = HEADER_LEFT_PADDING;
 // This number is get from front_end/ui/components/buttons/button.css
 const EDIT_BUTTON_SIZE = 16;
 const EDITION_MODE_INDENT = EDIT_BUTTON_SIZE * 3;
+const UP_ICON_LEFT = ICON_LEFT_PADDING;
+const DOWN_ICON_LEFT = UP_ICON_LEFT + EDIT_BUTTON_SIZE;
+const HIDE_ICON_LEFT = DOWN_ICON_LEFT + EDIT_BUTTON_SIZE;
+const EDIT_ICON_LEFT = ICON_LEFT_PADDING;
 
 // These are copied from front_end/images/*.svg, because we need to draw them with canvas.
 // edit.svg
@@ -105,9 +154,12 @@ const saveIconPath = 'm8.229 14.062-3.521-3.541L5.75 9.479l2.479 2.459 6.021-6L1
 const moveUpIconPath = 'M9.25 17V5.875L7.062 8.062L6 7L10 3L14 7L12.938 8.062L10.75 5.875V17H9.25Z';
 // arrow-down.svg
 const moveDownIconPath = 'M9.25 3V14.125L7.062 11.938L6 13L10 17L14 13L12.938 11.938L10.75 14.125V3H9.25Z';
-// bin.svg
+// eye-crossed.svg
 const hideIconPath =
-    'M6.5 17c-.417 0-.77-.146-1.062-.438A1.444 1.444 0 0 1 5 15.5v-10H4V4h4V3h4v1h4v1.5h-1v10c0 .417-.146.77-.438 1.062A1.444 1.444 0 0 1 13.5 17h-7Zm7-11.5h-7v10h7v-10ZM8 14h1.5V7H8v7Zm2.5 0H12V7h-1.5v7Z';
+    'M13.2708 11.1459L11.9792 9.85419C12.0347 9.32641 11.875 8.87155 11.5 8.4896C11.125 8.10766 10.6736 7.94446 10.1458 8.00002L8.85417 6.70835C9.03472 6.63891 9.22222 6.58683 9.41667 6.5521C9.61111 6.51738 9.80556 6.50002 10 6.50002C10.9722 6.50002 11.7986 6.8403 12.4792 7.52085C13.1597 8.20141 13.5 9.0278 13.5 10C13.5 10.1945 13.4826 10.3889 13.4479 10.5834C13.4132 10.7778 13.3542 10.9653 13.2708 11.1459ZM16.0417 13.9167L14.9583 12.8334C15.4583 12.4445 15.9132 12.0174 16.3229 11.5521C16.7326 11.0868 17.0764 10.5695 17.3542 10C16.6736 8.59724 15.6701 7.49655 14.3438 6.69794C13.0174 5.89933 11.5694 5.50002 10 5.50002C9.63889 5.50002 9.28472 5.52085 8.9375 5.56252C8.59028 5.60419 8.25 5.67363 7.91667 5.77085L6.70833 4.56252C7.23611 4.35419 7.77431 4.20835 8.32292 4.12502C8.87153 4.04169 9.43056 4.00002 10 4.00002C11.9861 4.00002 13.8021 4.53821 15.4479 5.6146C17.0938 6.69099 18.2778 8.1528 19 10C18.6944 10.7917 18.2882 11.5104 17.7813 12.1563C17.2743 12.8021 16.6944 13.3889 16.0417 13.9167ZM16 18.125L13.2917 15.4167C12.7639 15.6111 12.2257 15.757 11.6771 15.8542C11.1285 15.9514 10.5694 16 10 16C8.01389 16 6.19792 15.4618 4.55208 14.3854C2.90625 13.309 1.72222 11.8472 1 10C1.30556 9.20835 1.70833 8.48613 2.20833 7.83335C2.70833 7.18058 3.29167 6.5903 3.95833 6.06252L1.875 3.97919L2.9375 2.91669L17.0625 17.0625L16 18.125ZM5.02083 7.14585C4.53472 7.53474 4.08333 7.96183 3.66667 8.4271C3.25 8.89238 2.90972 9.41669 2.64583 10C3.32639 11.4028 4.32986 12.5035 5.65625 13.3021C6.98264 14.1007 8.43056 14.5 10 14.5C10.3611 14.5 10.7153 14.4757 11.0625 14.4271C11.4097 14.3785 11.7569 14.3125 12.1042 14.2292L11.1667 13.2917C10.9722 13.3611 10.7778 13.4132 10.5833 13.4479C10.3889 13.4827 10.1944 13.5 10 13.5C9.02778 13.5 8.20139 13.1597 7.52083 12.4792C6.84028 11.7986 6.5 10.9722 6.5 10C6.5 9.80558 6.52431 9.61113 6.57292 9.41669C6.62153 9.22224 6.66667 9.0278 6.70833 8.83335L5.02083 7.14585Z';
+// eye.svg
+const showIconPath =
+    'M10 13.5C10.972 13.5 11.7983 13.1597 12.479 12.479C13.1597 11.7983 13.5 10.972 13.5 10C13.5 9.028 13.1597 8.20167 12.479 7.521C11.7983 6.84033 10.972 6.5 10 6.5C9.028 6.5 8.20167 6.84033 7.521 7.521C6.84033 8.20167 6.5 9.028 6.5 10C6.5 10.972 6.84033 11.7983 7.521 12.479C8.20167 13.1597 9.028 13.5 10 13.5ZM10 12C9.44467 12 8.97233 11.8057 8.583 11.417C8.19433 11.0277 8 10.5553 8 10C8 9.44467 8.19433 8.97233 8.583 8.583C8.97233 8.19433 9.44467 8 10 8C10.5553 8 11.0277 8.19433 11.417 8.583C11.8057 8.97233 12 9.44467 12 10C12 10.5553 11.8057 11.0277 11.417 11.417C11.0277 11.8057 10.5553 12 10 12ZM10 16C8.014 16 6.20833 15.455 4.583 14.365C2.95833 13.2743 1.764 11.8193 1 10C1.764 8.18067 2.95833 6.72567 4.583 5.635C6.20833 4.545 8.014 4 10 4C11.986 4 13.7917 4.545 15.417 5.635C17.0417 6.72567 18.236 8.18067 19 10C18.236 11.8193 17.0417 13.2743 15.417 14.365C13.7917 15.455 11.986 16 10 16ZM10 14.5C11.5553 14.5 12.9927 14.0973 14.312 13.292C15.632 12.486 16.646 11.3887 17.354 10C16.646 8.61133 15.632 7.514 14.312 6.708C12.9927 5.90267 11.5553 5.5 10 5.5C8.44467 5.5 7.00733 5.90267 5.688 6.708C4.368 7.514 3.354 8.61133 2.646 10C3.354 11.3887 4.368 12.486 5.688 13.292C7.00733 14.0973 8.44467 14.5 10 14.5Z';
 
 // export for test.
 export const enum EditButtonType {
@@ -171,11 +223,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private hitMarginPx: number;
   private textBaseline: number;
   private textPadding: number;
-  private readonly headerLeftPadding: number;
-  private readonly arrowSide: number;
-  private readonly expansionArrowIndent: number;
-  private readonly headerLabelXPadding: number;
-  private readonly headerLabelYPadding: number;
   private highlightedMarkerIndex: number;
   /**
    * Represents the index of the entry that the user's mouse cursor is over.
@@ -272,12 +319,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.textPadding = 5;
     this.chartViewport.setWindowTimes(
         dataProvider.minimumBoundary(), dataProvider.minimumBoundary() + dataProvider.totalTime());
-
-    this.headerLeftPadding = 6;
-    this.arrowSide = 8;
-    this.expansionArrowIndent = this.headerLeftPadding + this.arrowSide / 2;
-    this.headerLabelXPadding = 3;
-    this.headerLabelYPadding = 2;
 
     this.highlightedMarkerIndex = -1;
     this.highlightedEntryIndex = -1;
@@ -496,21 +537,28 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
     // Check if the mouse is hovering any group's header area
-    const {groupIndex} =
+    const {groupIndex: groupIndexHeaderArea} =
         this.coordinatesToGroupIndexAndButton(mouseEvent.offsetX, mouseEvent.offsetY, true /* headerOnly */);
-    if (groupIndex >= 0) {
+    if (groupIndexHeaderArea >= 0) {
       this.hideHighlight();
       this.viewportElement.style.cursor = 'pointer';
       // Show edit icon for the hovered group
       this.resetCanvas();
-      this.draw(/* hoveredGroupIndex= */ groupIndex);
+      this.draw(/* hoveredGroupIndex= */ groupIndexHeaderArea);
       return;
     }
-    // No group is hovered.
-
-    // Redraw the flame chart to clear the potentially previously draw edit icon.
-    this.resetCanvas();
-    this.draw();
+    // Check if the mouse is hovering any group's non-header area
+    const {groupIndex} = this.coordinatesToGroupIndexAndButton(mouseEvent.offsetX, mouseEvent.offsetY);
+    if (groupIndex >= 0) {
+      // Show edit icon for the hovered group
+      this.resetCanvas();
+      this.draw(/* hoveredGroupIndex= */ groupIndex);
+    } else {
+      // No group is hovered.
+      // Redraw the flame chart to clear the potentially previously draw edit icon.
+      this.resetCanvas();
+      this.draw();
+    }
 
     this.updateHighlight();
   }
@@ -644,11 +692,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
             this.moveGroupDown(groupIndex);
             return;
           case EditButtonType.HIDE:
-            this.hideGroup(groupIndex);
+            this.#toggleGroupHiddenState(groupIndex, !this.rawTimelineData?.groups[groupIndex].hidden);
             return;
           case EditButtonType.SAVE:
           case EditButtonType.EDIT:
             this.#editMode = !this.#editMode;
+            this.updateLevelPositions();
             this.resetCanvas();
             this.draw();
             return;
@@ -1578,27 +1627,26 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.save();
     context.font = this.#font;
     const saveIconLeft =
-        EDITION_MODE_INDENT + this.headerLeftPadding + this.labelWidthForGroup(context, groups[groupIndex]);
-    const editIconLeft = this.headerLeftPadding + this.labelWidthForGroup(context, groups[groupIndex]);
-    const headerLeft = (this.#editMode ? EDITION_MODE_INDENT : 0) + this.headerLeftPadding;
-    const headerRight = headerLeft + this.labelWidthForGroup(context, groups[groupIndex]) + EDIT_BUTTON_SIZE;
+        HEADER_LEFT_PADDING + EDITION_MODE_INDENT + this.labelWidthForGroup(context, groups[groupIndex]);
+    const headerRight = HEADER_LEFT_PADDING + (this.#editMode ? EDITION_MODE_INDENT : EDIT_BUTTON_SIZE) +
+        this.labelWidthForGroup(context, groups[groupIndex]);
     context.restore();
 
     if (this.#editMode) {
-      if (0 <= x && x < EDIT_BUTTON_SIZE) {
+      if (UP_ICON_LEFT <= x && x < UP_ICON_LEFT + EDIT_BUTTON_SIZE) {
         return {groupIndex, editButtonType: EditButtonType.UP};
       }
-      if (EDIT_BUTTON_SIZE <= x && x < EDIT_BUTTON_SIZE * 2) {
+      if (DOWN_ICON_LEFT <= x && x < DOWN_ICON_LEFT + EDIT_BUTTON_SIZE) {
         return {groupIndex, editButtonType: EditButtonType.DOWN};
       }
-      if (EDIT_BUTTON_SIZE * 2 <= x && x < EDIT_BUTTON_SIZE * 3) {
+      if (HIDE_ICON_LEFT <= x && x < HIDE_ICON_LEFT + EDIT_BUTTON_SIZE) {
         return {groupIndex, editButtonType: EditButtonType.HIDE};
       }
       if (saveIconLeft <= x && x < saveIconLeft + EDIT_BUTTON_SIZE) {
         return {groupIndex, editButtonType: EditButtonType.SAVE};
       }
     } else {
-      if (editIconLeft <= x && x < editIconLeft + EDIT_BUTTON_SIZE) {
+      if (EDIT_ICON_LEFT <= x && x < EDIT_ICON_LEFT + EDIT_BUTTON_SIZE) {
         return {groupIndex, editButtonType: EditButtonType.EDIT};
       }
     }
@@ -1952,7 +2000,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     const height = this.offsetHeight;
     const top = this.chartViewport.scrollOffset();
-    const visibleLevelOffsets = this.visibleLevelOffsets ?? new Uint32Array();
 
     const textPadding = this.textPadding;
     // How wide in pixels / long in duration an event needs to be to make it
@@ -1960,25 +2007,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const minTextWidth = 2 * textPadding + UI.UIUtils.measureTextWidth(context, '…');
     const minTextWidthDuration = this.chartViewport.pixelToTimeOffset(minTextWidth);
 
-    const minVisibleBarLevel = Math.max(
-        Platform.ArrayUtilities.upperBound(visibleLevelOffsets, top, Platform.ArrayUtilities.DEFAULT_COMPARATOR) - 1,
-        0);
-
     // As we parse each event, we bucket them into groups based on the color we
     // will render them with. The key of this map will be a color, and all
     // events stored in the `indexes` array for that color will be painted as
     // such. This way, when rendering events, we can render them based on
     // color, and ensure the minimum amount of changes to context.fillStyle.
     const colorBuckets = new Map<string, {indexes: number[]}>();
-    for (let level = minVisibleBarLevel; level < this.dataProvider.maxStackDepth(); ++level) {
-      if (this.levelToOffset(level) > top + height) {
-        break;
+    for (let level = 0; level < this.dataProvider.maxStackDepth(); ++level) {
+      // Since tracks can be reordered the |visibleLevelOffsets| is not necessarily sorted, so we need to check all levels.
+      if (this.levelToOffset(level) < top || this.levelToOffset(level) > top + height) {
+        continue;
       }
       if (!this.visibleLevels || !this.visibleLevels[level]) {
         continue;
       }
       if (!this.timelineLevels) {
-        continue;
+        break;
       }
 
       // Entries are ordered by start time within a level, so find the last visible entry.
@@ -2044,8 +2088,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private drawGroupHeaders(width: number, height: number, hoveredGroupIndex?: number): void {
     const context = (this.canvas.getContext('2d') as CanvasRenderingContext2D);
     const top = this.chartViewport.scrollOffset();
-    // Add an indent to the group headers. This area will show the buttons to customize the groups.
-    const left = this.#editMode ? EDITION_MODE_INDENT : 0;
     const ratio = window.devicePixelRatio;
     if (!this.rawTimelineData) {
       return;
@@ -2064,10 +2106,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     context.save();
     context.scale(ratio, ratio);
-    context.translate(left, -top);
+    context.translate(0, -top);
     context.font = this.#font;
 
     context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
+    // Fill the gap between groups.
     this.forEachGroupInViewport((offset, index, group) => {
       const paddingHeight = group.style.padding;
       if (paddingHeight < 5) {
@@ -2075,10 +2118,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       }
       context.fillRect(0, offset - paddingHeight + 2, width, paddingHeight - 4);
     });
+    // Fill the gap between last group and the bottom of canvas view.
     if (groups.length && lastGroupOffset < top + height) {
       context.fillRect(0, lastGroupOffset + 2, width, top + height - lastGroupOffset);
     }
 
+    // The separating line between top level groups.
     context.strokeStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-neutral-container');
     context.beginPath();
     this.forEachGroupInViewport((offset, index, group, isFirst) => {
@@ -2112,11 +2157,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.save();
     const trackConfigurationEnabled =
         Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_TRACK_CONFIGURATION);
+    // If there is only one track, we won't allow the track reordering or hiding.
+    const trackConfigurationAllowed = groups.length > 1;
+
+    // When it is normal mode, there is only an edit icon in the group headers.
+    // When it is in edit mode, there are three icons to customize the groups.
+    const iconsWidth = this.#editMode ? EDITION_MODE_INDENT : EDIT_BUTTON_SIZE;
     this.forEachGroupInViewport((offset, index, group) => {
       context.font = this.#font;
       if (this.isGroupCollapsible(index) && !group.expanded || group.style.shareHeaderLine) {
-        const width = this.labelWidthForGroup(context, group) +
-            ((trackConfigurationEnabled && hoveredGroupIndex === index) ? EDIT_BUTTON_SIZE : 0);
+        // In edit mode, we draw an extra rectangle for the save icon.
+        const labelBackgroundWidth = this.labelWidthForGroup(context, group) + (this.#editMode ? EDIT_BUTTON_SIZE : 0);
         if (this.isGroupFocused(index)) {
           context.fillStyle =
               ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
@@ -2126,27 +2177,49 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
             context.fillStyle = (parsedColor.setAlpha(0.8).asString() as string);
           }
         }
-
         context.fillRect(
-            this.headerLeftPadding - this.headerLabelXPadding, offset + this.headerLabelYPadding, width,
-            group.style.height - 2 * this.headerLabelYPadding);
+            iconsWidth + HEADER_LEFT_PADDING, offset + HEADER_LABEL_Y_PADDING, labelBackgroundWidth,
+            group.style.height - 2 * HEADER_LABEL_Y_PADDING);
       }
-      context.fillStyle = group.style.color;
-      const titleStart = Math.floor(this.expansionArrowIndent * (group.style.nestingLevel + 1) + this.arrowSide);
-      context.fillText(group.name, titleStart, offset + group.style.height - this.textBaseline);
+      context.fillStyle = (this.#editMode && group.hidden) ?
+          ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-token-subtle', this.contentElement) :
+          group.style.color;
 
-      if (trackConfigurationEnabled) {
+      // The arrow is drawn from the center, so the indent is in fact the center of the arrow. See `drawExpansionArrow`
+      // function to understand how we draw the arrow.
+      // So the header looks like this:
+      // |ICON_WIDTH|expansionArrowIndent * (nesting level + 1)|
+      // |headerLeftPadding|EDIT  ICON|                     |Arrow|LabelXPadding|Title|LabelXPadding|
+      //                                                                        ^ titleStart
+      const titleStart = iconsWidth + EXPANSION_ARROW_INDENT * (group.style.nestingLevel + 1) + ARROW_SIDE / 2 +
+          HEADER_LABEL_X_PADDING;
+      context.fillText(group.name, titleStart, offset + group.style.height - this.textBaseline);
+      if (this.#editMode && group.hidden) {
+        // Draw a strikethrough line for the hidden tracks.
+        context.fillRect(
+            titleStart, offset + group.style.height / 2, UI.UIUtils.measureTextWidth(context, group.name), 1);
+      }
+
+      // The icon and track title will look like this
+      // Normal mode:
+      // [Edit]Track title
+      // Edit mode:
+      // [ Up ][Down][Hide]Track title[Save]
+      if (trackConfigurationEnabled && trackConfigurationAllowed) {
         if (this.#editMode) {
+          const iconColor = group.hidden ? '--sys-color-token-subtle' : '--sys-color-on-surface';
           // We only allow to reorder the top level groups.
           if (group.style.nestingLevel === 0) {
-            drawIcon(-EDITION_MODE_INDENT, offset, moveUpIconPath);
-            drawIcon(-EDITION_MODE_INDENT + EDIT_BUTTON_SIZE, offset, moveDownIconPath);
+            drawIcon(UP_ICON_LEFT, offset, moveUpIconPath, iconColor);
+            drawIcon(DOWN_ICON_LEFT, offset, moveDownIconPath, iconColor);
           }
-          drawIcon(-EDITION_MODE_INDENT + EDIT_BUTTON_SIZE * 2, offset, hideIconPath);
+          drawIcon(HIDE_ICON_LEFT, offset, group.hidden ? showIconPath : hideIconPath, iconColor);
 
-          drawIcon(this.labelWidthForGroup(context, group), offset, saveIconPath);
+          drawIcon(
+              HEADER_LEFT_PADDING + EDITION_MODE_INDENT + this.labelWidthForGroup(context, group), offset, saveIconPath,
+              iconColor);
         } else if (hoveredGroupIndex === index) {
-          drawIcon(this.labelWidthForGroup(context, group), offset, editIconPath);
+          drawIcon(EDIT_ICON_LEFT, offset, editIconPath);
         }
       }
     });
@@ -2156,8 +2229,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.forEachGroupInViewport((offset, index, group) => {
       if (this.isGroupCollapsible(index)) {
         drawExpansionArrow.call(
-            this, this.expansionArrowIndent * (group.style.nestingLevel + 1),
-            offset + group.style.height - this.textBaseline - this.arrowSide / 2, Boolean(group.expanded));
+            this, iconsWidth + EXPANSION_ARROW_INDENT * (group.style.nestingLevel + 1),
+            offset + group.style.height - this.textBaseline - ARROW_SIDE / 2,
+            this.#editMode ? false : Boolean(group.expanded));
       }
     });
 
@@ -2181,11 +2255,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         // +-+---+
 
         // The vertical stroke
-        context.fillRect(0, offset - lineWidth, lineWidth, groupHeight - group.style.padding + 2 * lineWidth);
+        context.fillRect(iconsWidth, offset - lineWidth, lineWidth, groupHeight - group.style.padding + 2 * lineWidth);
         // The top horizontal stroke
-        context.fillRect(0, offset - lineWidth, bracketLength, lineWidth);
+        context.fillRect(iconsWidth, offset - lineWidth, bracketLength, lineWidth);
         // The top horizontal stroke
-        context.fillRect(0, offset + groupHeight - group.style.padding, bracketLength, lineWidth);
+        context.fillRect(iconsWidth, offset + groupHeight - group.style.padding, bracketLength, lineWidth);
       }
     });
 
@@ -2197,25 +2271,39 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
 
     function drawExpansionArrow(this: FlameChart, x: number, y: number, expanded: boolean): void {
-      const arrowHeight = this.arrowSide * Math.sqrt(3) / 2;
+      // We will draw a equilateral triangle, so first calculate the height of the triangle.
+      const arrowHeight = ARROW_SIDE * Math.sqrt(3) / 2;
       const arrowCenterOffset = Math.round(arrowHeight / 2);
       context.save();
       context.beginPath();
       context.translate(x, y);
       context.rotate(expanded ? Math.PI / 2 : 0);
-      context.moveTo(-arrowCenterOffset, -this.arrowSide / 2);
-      context.lineTo(-arrowCenterOffset, this.arrowSide / 2);
+      // The final triangle will be this shape: (the rotation will be handled by `context.rotate`)
+      // |\
+      // | \
+      // | /
+      // |/
+
+      // Move to the top vertex
+      context.moveTo(-arrowCenterOffset, -ARROW_SIDE / 2);
+      // Line to the bottom vertex
+      context.lineTo(-arrowCenterOffset, ARROW_SIDE / 2);
+      // Line to the right vertex
       context.lineTo(arrowHeight - arrowCenterOffset, 0);
       context.fill();
       context.restore();
     }
 
-    function drawIcon(x: number, y: number, pathData: string, iconColor: string = '--sys-color-token-subtle'): void {
+    function drawIcon(x: number, y: number, pathData: string, iconColor: string = '--sys-color-on-surface'): void {
       const p = new Path2D(pathData);
 
       context.save();
-      context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue(iconColor);
       context.translate(x, y);
+      // This color is same as the background of the whole flame chart.
+      context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
+      context.fillRect(0, 0, EDIT_BUTTON_SIZE, EDIT_BUTTON_SIZE);
+
+      context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue(iconColor);
       // The pathData from front_end/images folder is for a 20 pixel icon.
       // So we add a scale to draw the icon in a correct size.
       const scale = EDIT_BUTTON_SIZE / 20;
@@ -2407,7 +2495,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
       const currentIndex = sortedGroupIndexes.indexOf(i);
       const nextOffset = groupOffsets[sortedGroupIndexes[currentIndex + 1]];
-      if (!parentGroupVisible || group.hidden) {
+      // In edit mode all the groups are visible.
+      if (!this.#editMode && (!parentGroupVisible || group.hidden)) {
         continue;
       }
       callback(groupTop, i, group, firstGroup, nextOffset - groupTop);
@@ -2431,13 +2520,16 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   /**
    * Returns the width of the title label of the group, which include the left padding, arrow and the group header text.
    * This function is public for test reason.
+   * |ICON_WIDTH|expansionArrowIndent * (nestingLevel + 1)|
+   * |headerLeftPadding|EDIT  ICON|                    |Arrow|LabelXPadding|Title|LabelXPadding|
+   *                              |<--                      labelWidth                      -->|
    * @param context canvas context
    * @param group
    * @returns the width of the label of the group.
    */
   labelWidthForGroup(context: CanvasRenderingContext2D, group: Group): number {
-    return UI.UIUtils.measureTextWidth(context, group.name) +
-        this.expansionArrowIndent * (group.style.nestingLevel + 1) + this.arrowSide + this.headerLabelXPadding;
+    return EXPANSION_ARROW_INDENT * (group.style.nestingLevel + 1) + ARROW_SIDE / 2 + HEADER_LABEL_X_PADDING +
+        UI.UIUtils.measureTextWidth(context, group.name) + HEADER_LABEL_X_PADDING - HEADER_LEFT_PADDING;
   }
 
   private drawCollapsedOverviewForGroup(group: Group, y: number, endLevel: number): void {
@@ -2932,7 +3024,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       // If |shareHeaderLine| is false, we add the height of one more level to
       // the current offset, which will be used for the start level of current
       // group.
-      if (!groups[groupNode.index].hidden && parentGroupIsVisible && !groups[groupNode.index].style.shareHeaderLine) {
+      // If it's in edit mode, all the groups are shown.
+      if (this.#editMode ||
+          (!groups[groupNode.index].hidden && parentGroupIsVisible && !groups[groupNode.index].style.shareHeaderLine)) {
         currentOffset += groups[groupNode.index].style.height;
       }
     }
@@ -2988,16 +3082,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         height = this.barHeight;
       }
 
-      this.visibleLevels[level] = thisLevelIsVisible ?? false;
+      // If it's in edit mode, all the levels are hidden.
+      this.visibleLevels[level] = this.#editMode ? false : Boolean(thisLevelIsVisible);
       this.visibleLevelOffsets[level] = currentOffset;
-      this.visibleLevelHeights[level] = height;
+      this.visibleLevelHeights[level] = this.#editMode ? 0 : height;
 
       // If this level not belong to any group, it is always shown, otherwise we need to check if it is visible.
       if (groupNode.index < 0 ||
           (!groups[groupNode.index].hidden) &&
               (thisLevelIsVisible ||
                (parentGroupIsVisible && groups[groupNode.index].style.shareHeaderLine && isFirstOnLevel))) {
-        currentOffset += height;
+        currentOffset += this.visibleLevelHeights[level];
       }
     }
 
@@ -3007,8 +3102,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     for (const child of groupNode.children) {
       // If the child is not the first child, we will add a padding top.
-      if (thisGroupLevelsAreVisible && !groups[child.index]?.hidden && child !== groupNode.children[0]) {
-        currentOffset += groups[child.index].style.padding ?? 0;
+      if (this.#editMode ||
+          (thisGroupLevelsAreVisible && !groups[child.index]?.hidden && child !== groupNode.children[0])) {
+        currentOffset += (groups[child.index].style.padding ?? 0);
       }
       currentOffset =
           this.#traverseGroupTreeAndUpdateLevelPositionsForTheGroup(child, currentOffset, thisGroupLevelsAreVisible);

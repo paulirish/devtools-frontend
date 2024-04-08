@@ -46,6 +46,8 @@ import {
   GridTemplateMatch,
   GridTemplateMatcher,
   LegacyRegexMatcher,
+  LightDarkColorMatch,
+  LightDarkColorMatcher,
   LinkableNameMatch,
   LinkableNameMatcher,
   LinkableNameProperties,
@@ -377,6 +379,85 @@ export class ColorRenderer extends ColorMatch {
     }
     const contrastInfo = new ColorPicker.ContrastInfo.ContrastInfo(await cssModel.getBackgroundColors(node.id));
     swatchIcon.setContrastInfo(contrastInfo);
+  }
+}
+
+export class LightDarkColorRenderer extends LightDarkColorMatch {
+  readonly #treeElement: StylePropertyTreeElement;
+  constructor(
+      treeElement: StylePropertyTreeElement, text: string, light: CodeMirror.SyntaxNode[],
+      dark: CodeMirror.SyntaxNode[]) {
+    super(text, light, dark);
+    this.#treeElement = treeElement;
+  }
+
+  static matcher(treeElement: StylePropertyTreeElement): LightDarkColorMatcher {
+    return new LightDarkColorMatcher((text, light, dark) => new LightDarkColorRenderer(treeElement, text, light, dark));
+  }
+
+  override render(node: CodeMirror.SyntaxNode, context: RenderingContext): Node[] {
+    const content = document.createElement('span');
+    content.appendChild(document.createTextNode('light-dark('));
+    const light = content.appendChild(document.createElement('span'));
+    content.appendChild(document.createTextNode(', '));
+    const dark = content.appendChild(document.createElement('span'));
+    content.appendChild(document.createTextNode(')'));
+    Renderer.renderInto(this.light, context, light);
+    Renderer.renderInto(this.dark, context, dark);
+
+    if (context.matchedResult.hasUnresolvedVars(node)) {
+      return [content];
+    }
+
+    const colorSwatch = new ColorRenderer(this.#treeElement, context.ast.text(node)).renderColorSwatch(content);
+    context.addControl('color', colorSwatch);
+    void this.applyColorScheme(context, colorSwatch, light, dark);
+
+    return [colorSwatch];
+  }
+
+  async applyColorScheme(
+      context: RenderingContext, colorSwatch: InlineEditor.ColorSwatch.ColorSwatch, light: HTMLSpanElement,
+      dark: HTMLSpanElement): Promise<void> {
+    const activeColor = await this.#activeColor();
+    if (!activeColor) {
+      return;
+    }
+    const inactiveColor = (activeColor === this.light) ? dark : light;
+    const colorText = context.matchedResult.getComputedTextRange(activeColor[0], activeColor[activeColor.length - 1]);
+    const color = colorText && Common.Color.parse(colorText);
+    inactiveColor.style.textDecoration = 'line-through';
+    if (color) {
+      colorSwatch.renderColor(color);
+    }
+  }
+
+  // Returns the syntax node group corresponding the active color scheme:
+  // If the element has color-scheme set to light or dark, return the respective group.
+  // If the element has color-scheme set to both light and dark, we check the prefers-color-scheme media query.
+  async #activeColor(): Promise<CodeMirror.SyntaxNode[]|undefined> {
+    const activeColorSchemes = this.#treeElement.getComputedStyle('color-scheme')?.split(' ') ?? [];
+    const hasLight = activeColorSchemes.includes(SDK.CSSModel.ColorScheme.Light);
+    const hasDark = activeColorSchemes.includes(SDK.CSSModel.ColorScheme.Dark);
+
+    if (!hasDark && !hasLight) {
+      return this.light;
+    }
+    if (!hasLight) {
+      return this.dark;
+    }
+    if (!hasDark) {
+      return this.light;
+    }
+
+    switch (await this.#treeElement.parentPane().cssModel()?.colorScheme()) {
+      case SDK.CSSModel.ColorScheme.Dark:
+        return this.dark;
+      case SDK.CSSModel.ColorScheme.Light:
+        return this.light;
+      default:
+        return undefined;
+    }
   }
 }
 
@@ -1049,7 +1130,8 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
           StylePropertyTreeElementParams,
   ) {
     // Pass an empty title, the title gets made later in onattach.
-    super('', isShorthand, property.name);
+    const jslogContext = property.name.startsWith('--') ? 'custom-property' : property.name;
+    super('', isShorthand, jslogContext);
     this.style = property.ownerStyle;
     this.matchedStylesInternal = matchedStyles;
     this.property = property;
@@ -1079,7 +1161,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
   static renderNameElement(name: string): HTMLElement {
     const nameElement = document.createElement('span');
-    nameElement.setAttribute('jslog', `${VisualLogging.key().track({keydown: true, click: true})}`);
+    nameElement.setAttribute(
+        'jslog', `${VisualLogging.key().track({
+          change: true,
+          keydown: 'ArrowLeft|ArrowUp|PageUp|Home|PageDown|ArrowRight|ArrowDown|End|Space|Tab|Enter|Escape',
+        })}`);
     UI.ARIAUtils.setLabel(nameElement, i18nString(UIStrings.cssPropertyName, {PH1: name}));
     nameElement.className = 'webkit-css-property';
     nameElement.textContent = name;
@@ -1089,7 +1175,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
   static renderValueElement(propertyName: string, propertyValue: string, renderers: Matcher[]): HTMLElement {
     const valueElement = document.createElement('span');
-    valueElement.setAttribute('jslog', `${VisualLogging.value().track({keydown: true, click: true})}`);
+    valueElement.setAttribute(
+        'jslog', `${VisualLogging.value().track({
+          change: true,
+          keydown: 'ArrowLeft|ArrowUp|PageUp|Home|PageDown|ArrowRight|ArrowDown|End|Space|Tab|Enter|Escape',
+        })}`);
     UI.ARIAUtils.setLabel(valueElement, i18nString(UIStrings.cssPropertyValue, {PH1: propertyValue}));
     valueElement.className = 'value';
 
@@ -1126,6 +1216,10 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
   setComputedStyles(computedStyles: Map<string, string>|null): void {
     this.computedStyles = computedStyles;
+  }
+
+  getComputedStyle(property: string): string|null {
+    return this.computedStyles?.get(property) ?? null;
   }
 
   setParentsComputedStyles(parentsComputedStyles: Map<string, string>|null): void {
@@ -1420,6 +1514,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
           StringRenderer.matcher(),
           ShadowRenderer.matcher(this),
           FontRenderer.matcher(this),
+          LightDarkColorRenderer.matcher(this),
           GridTemplateRenderer.matcher(),
         ] :
         [];
@@ -1603,6 +1698,9 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     if (UI.UIUtils.isBeingEdited((event.target as Node))) {
       return;
     }
+    if (event.composedPath()[0] instanceof HTMLButtonElement) {
+      return;
+    }
 
     event.consume(true);
 
@@ -1628,8 +1726,10 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         selectedElement.enclosingNodeOrSelfWithClass('value') ||
         selectedElement.enclosingNodeOrSelfWithClass('styles-semicolon');
     if (!selectedElement || selectedElement === this.nameElement) {
+      VisualLogging.logClick(this.nameElement as Element, event);
       this.startEditingName();
     } else {
+      VisualLogging.logClick(this.valueElement as Element, event);
       this.startEditingValue();
     }
   }

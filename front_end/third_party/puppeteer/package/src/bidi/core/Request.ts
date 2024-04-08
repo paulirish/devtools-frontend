@@ -135,37 +135,62 @@ export class Request extends EventEmitter<{
   get redirect(): Request | undefined {
     return this.#redirect;
   }
+  get lastRedirect(): Request | undefined {
+    let redirect = this.#redirect;
+    while (redirect) {
+      if (redirect && !redirect.#redirect) {
+        return redirect;
+      }
+      redirect = redirect.#redirect;
+    }
+    return redirect;
+  }
   get response(): Bidi.Network.ResponseData | undefined {
     return this.#response;
   }
   get url(): string {
     return this.#event.request.url;
   }
+  get isBlocked(): boolean {
+    return this.#event.isBlocked;
+  }
   // keep-sorted end
 
-  async continueRequest(): Promise<void> {
-    if (!this.#event.isBlocked) {
-      throw new Error('Request Interception is not enabled!');
-    }
-    // Request interception is not supported for data: urls.
-    if (this.url.startsWith('data:')) {
-      return;
-    }
+  async continueRequest({
+    url,
+    method,
+    headers,
+    cookies,
+    body,
+  }: Omit<Bidi.Network.ContinueRequestParameters, 'request'>): Promise<void> {
     await this.#session.send('network.continueRequest', {
       request: this.id,
+      url,
+      method,
+      headers,
+      body,
+      cookies,
     });
   }
 
   async failRequest(): Promise<void> {
-    if (!this.#event.isBlocked) {
-      throw new Error('Request Interception is not enabled!');
-    }
-    // Request interception is not supported for data: urls.
-    if (this.url.startsWith('data:')) {
-      return;
-    }
     await this.#session.send('network.failRequest', {
       request: this.id,
+    });
+  }
+
+  async provideResponse({
+    statusCode,
+    reasonPhrase,
+    headers,
+    body,
+  }: Omit<Bidi.Network.ProvideResponseParameters, 'request'>): Promise<void> {
+    await this.#session.send('network.provideResponse', {
+      request: this.id,
+      statusCode,
+      reasonPhrase,
+      headers,
+      body,
     });
   }
 
