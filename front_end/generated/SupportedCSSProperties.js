@@ -1896,23 +1896,10 @@ export const generatedProperties = [
   "name": "grid-column-end"
  },
  {
-  "longhands": [
-   "column-gap"
-  ],
-  "name": "grid-column-gap"
- },
- {
   "keywords": [
    "auto"
   ],
   "name": "grid-column-start"
- },
- {
-  "longhands": [
-   "row-gap",
-   "column-gap"
-  ],
-  "name": "grid-gap"
  },
  {
   "longhands": [
@@ -1926,12 +1913,6 @@ export const generatedProperties = [
    "auto"
   ],
   "name": "grid-row-end"
- },
- {
-  "longhands": [
-   "row-gap"
-  ],
-  "name": "grid-row-gap"
  },
  {
   "keywords": [
@@ -2132,6 +2113,12 @@ export const generatedProperties = [
   "name": "line-break"
  },
  {
+  "keywords": [
+   "none"
+  ],
+  "name": "line-clamp"
+ },
+ {
   "name": "line-gap-override"
  },
  {
@@ -2208,8 +2195,7 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-bottom"
  },
@@ -2234,22 +2220,19 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-left"
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-right"
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-top"
  },
@@ -2822,7 +2805,6 @@ export const generatedProperties = [
  {
   "keywords": [
    "always",
-   "anchors-valid",
    "anchors-visible",
    "no-overflow"
   ],
@@ -4925,6 +4907,11 @@ export const generatedPropertyValues = {
    "anywhere"
   ]
  },
+ "line-clamp": {
+  "values": [
+   "none"
+  ]
+ },
  "line-height": {
   "values": [
    "normal"
@@ -5267,7 +5254,6 @@ export const generatedPropertyValues = {
  "position-visibility": {
   "values": [
    "always",
-   "anchors-valid",
    "anchors-visible",
    "no-overflow"
   ]
@@ -6306,6 +6292,18 @@ export const generatedAliasesFor = new Map([
  [
   "-webkit-user-select",
   "user-select"
+ ],
+ [
+  "grid-column-gap",
+  "column-gap"
+ ],
+ [
+  "grid-gap",
+  "gap"
+ ],
+ [
+  "grid-row-gap",
+  "row-gap"
  ],
  [
   "word-wrap",

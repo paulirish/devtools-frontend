@@ -329,6 +329,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #timingInternal?: Protocol.Network.ResourceTiming;
   #requestHeadersTextInternal?: string;
   #responseHeadersInternal?: NameValue[];
+  #earlyHintsHeadersInternal?: NameValue[];
   #sortedResponseHeadersInternal?: NameValue[];
   #responseCookiesInternal?: Cookie[];
   #serverTimingsInternal?: ServerTiming[]|null;
@@ -1026,6 +1027,14 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     this.dispatchEventToListeners(Events.ResponseHeadersChanged);
   }
 
+  get earlyHintsHeaders(): NameValue[] {
+    return this.#earlyHintsHeadersInternal || [];
+  }
+
+  set earlyHintsHeaders(x: NameValue[]) {
+    this.#earlyHintsHeadersInternal = x;
+  }
+
   get originalResponseHeaders(): Protocol.Fetch.HeaderEntry[] {
     return this.#originalResponseHeaders;
   }
@@ -1143,6 +1152,10 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
 
   setWasIntercepted(wasIntercepted: boolean): void {
     this.#wasIntercepted = wasIntercepted;
+  }
+
+  setEarlyHintsHeaders(headers: NameValue[]): void {
+    this.earlyHintsHeaders = headers;
   }
 
   get responseCookies(): Cookie[] {
@@ -1662,35 +1675,6 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     }
   }
 
-  // This is called by `NetworkManager.finishNetworkRequest()` and not earlier
-  // to ensure that the correct `CookieModel` is used. If we did this in
-  // `addExtraRequestInfo()`, we would be storing blocked cookies in the wrong
-  // `CookieModel` for OOPIFs.
-  addBlockedRequestCookiesToModel(): void {
-    const networkManager = NetworkManager.forRequest(this);
-    if (!networkManager) {
-      return;
-    }
-    const cookieModel = networkManager.target().model(CookieModel);
-    if (!cookieModel) {
-      return;
-    }
-    for (const blockedCookie of this.#blockedRequestCookiesInternal) {
-      const cookie = blockedCookie.cookie;
-      if (!cookie) {
-        continue;
-      }
-      if (blockedCookie.blockedReasons.includes(Protocol.Network.CookieBlockedReason.ThirdPartyPhaseout)) {
-        this.#hasThirdPartyCookiePhaseoutIssue = true;
-      }
-      cookieModel.addBlockedCookie(
-          cookie, blockedCookie.blockedReasons.map(blockedReason => ({
-                                                     attribute: cookieBlockedReasonToAttribute(blockedReason),
-                                                     uiString: cookieBlockedReasonToUiString(blockedReason),
-                                                   })));
-    }
-  }
-
   hasExtraResponseInfo(): boolean {
     return this.#hasExtraResponseInfoInternal;
   }
@@ -2068,6 +2052,10 @@ export interface ExtraResponseInfo {
     cookieLine: string,
     exemptionReason: Protocol.Network.CookieExemptionReason,
   }[]|undefined;
+}
+
+export interface EarlyHintsInfo {
+  responseHeaders: NameValue[];
 }
 
 export interface WebBundleInfo {

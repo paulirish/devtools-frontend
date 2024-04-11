@@ -569,6 +569,35 @@ export type PageLoadEvent = TraceEventFirstContentfulPaint|TraceEventMarkDOMCont
     TraceEventLargestContentfulPaintCandidate|TraceEventLayoutShift|TraceEventFirstPaint|TraceEventMarkLoad|
     TraceEventNavigationStart;
 
+const markerTypeGuards = [
+  isTraceEventMarkDOMContent,
+  isTraceEventMarkLoad,
+  isTraceEventFirstPaint,
+  isTraceEventFirstContentfulPaint,
+  isTraceEventLargestContentfulPaintCandidate,
+  isTraceEventNavigationStart,
+];
+
+export const MarkerName =
+    ['MarkDOMContent', 'MarkLoad', 'firstPaint', 'firstContentfulPaint', 'largestContentfulPaint::Candidate'] as const;
+
+interface MakerEvent extends TraceEventData {
+  name: typeof MarkerName[number];
+}
+
+export function isTraceEventMarkerEvent(event: TraceEventData): event is MakerEvent {
+  return markerTypeGuards.some(fn => fn(event));
+}
+
+const pageLoadEventTypeGuards = [
+  ...markerTypeGuards,
+  isTraceEventInteractiveTime,
+];
+
+export function eventIsPageLoadEvent(event: TraceEventData): event is PageLoadEvent {
+  return pageLoadEventTypeGuards.some(fn => fn(event));
+}
+
 export interface TraceEventLargestContentfulPaintCandidate extends TraceEventMark {
   name: 'largestContentfulPaint::Candidate';
   args: TraceEventArgs&{
@@ -971,6 +1000,7 @@ export interface TraceEventStyleRecalcInvalidationTracking extends TraceEventIns
     },
   };
 }
+
 export function isTraceEventStyleRecalcInvalidationTracking(event: TraceEventData):
     event is TraceEventStyleRecalcInvalidationTracking {
   return event.name === KnownEventName.StyleRecalcInvalidationTracking;
@@ -1412,10 +1442,39 @@ export function isSyntheticInvalidation(event: TraceEventData): event is Synthet
   return event.name === 'SyntheticInvalidation';
 }
 
+export interface SelectorTiming {
+  'elapsed (us)': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'fast_reject_count': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'match_attempts': number;
+  'selector': string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'style_sheet_id': string;
+}
+
+export interface SelectorStats {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  selector_timings: SelectorTiming[];
+}
+
+export interface TraceEventStyleRecalcSelectorStats extends TraceEventComplete {
+  name: KnownEventName.SelectorStats;
+  args: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    selector_stats?: SelectorStats,
+  };
+}
+
+export function isStyleRecalcSelectorStats(event: TraceEventData): event is TraceEventStyleRecalcSelectorStats {
+  return event.name === KnownEventName.SelectorStats;
+}
+
 export interface TraceEventUpdateLayoutTree extends TraceEventComplete {
   name: KnownEventName.UpdateLayoutTree;
   args: TraceEventArgs&{
-    elementCount: number,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    selector_stats?: SelectorStats, elementCount: number,
     beginData?: {
       frame: string,
       stackTrace?: TraceEventCallFrame[],
@@ -1756,8 +1815,7 @@ export function isTraceEventPerformanceMeasure(traceEventData: TraceEventData):
 export function isTraceEventPerformanceMark(traceEventData: TraceEventData):
     traceEventData is TraceEventPerformanceMark {
   return traceEventData.cat === 'blink.user_timing' &&
-      (traceEventData.ph === Phase.MARK || traceEventData.ph === Phase.INSTANT ||
-       traceEventData.ph === Phase.ASYNC_NESTABLE_INSTANT);
+      (traceEventData.ph === Phase.MARK || traceEventData.ph === Phase.INSTANT);
 }
 
 export function isTraceEventConsoleTime(traceEventData: TraceEventData): traceEventData is TraceEventConsoleTime {
@@ -2187,6 +2245,7 @@ export const enum KnownEventName {
   ScheduleStyleInvalidationTracking = 'ScheduleStyleInvalidationTracking',
   StyleRecalcInvalidationTracking = 'StyleRecalcInvalidationTracking',
   StyleInvalidatorInvalidationTracking = 'StyleInvalidatorInvalidationTracking',
+  SelectorStats = 'SelectorStats',
 
   /* Paint */
   ScrollLayer = 'ScrollLayer',

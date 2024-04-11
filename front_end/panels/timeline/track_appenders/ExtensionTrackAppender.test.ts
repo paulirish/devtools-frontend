@@ -12,15 +12,13 @@ import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 import * as Timeline from '../timeline.js';
 
-const {assert} = chai;
-
 function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData, traceParsedData: TraceModel.Handlers.Types.TraceParseData,
     entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     timelineModel: TimelineModel.TimelineModel.TimelineModelImpl):
     Timeline.ExtensionTrackAppender.ExtensionTrackAppender[] {
-  Timeline.ExtensionDataGatherer.ExtensionDataGatherer.instace().modelChanged(traceParsedData);
+  Timeline.ExtensionDataGatherer.ExtensionDataGatherer.instance().modelChanged(traceParsedData);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
       flameChartData, traceParsedData, entryData, entryTypeByLevel, timelineModel);
 
@@ -76,7 +74,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
           traceParsedData.ExtensionTraceData.extensionTrackData.flatMap(track => track.flameChartEntries);
       for (let i = 0; i < allExtensionTrackEntries.length; i++) {
         const event = allExtensionTrackEntries[i];
-        if (TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.isTraceEventMarkerEvent(event)) {
+        if (TraceEngine.Types.TraceEvents.isTraceEventMarkerEvent(event)) {
           assert.isNaN(flameChartData.entryTotalTimes[i]);
           continue;
         }

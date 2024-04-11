@@ -2506,7 +2506,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/core/style/shadow_list.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "ShadowList",
       converter: "ConvertShadowList",
@@ -3516,9 +3516,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginBottom",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3539,9 +3539,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginLeft",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3562,9 +3562,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginRight",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3585,9 +3585,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginTop",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -4319,13 +4319,15 @@
       supports_incremental_style: false,
       // @position-try-styling rely on this being high-priority, so that
       // declarations from @position-try blocks can be applied conditionally
-      // based on whether or not we're out-of-flow positioned.
-      priority: 1,
+      // based on whether or not we're out-of-flow positioned. Also, it needs to
+      // have a priority higher than inset-area which is already at priority:1.
+      priority: 2,
       valid_for_permission_element: true,
     },
     {
       name: "position-anchor",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal" ],
+      style_builder_custom_functions: ["initial", "inherit", "value"],
       include_paths: ["third_party/blink/renderer/core/style/scoped_css_name.h"],
       type_name: "ScopedCSSName",
       wrapper_pointer_name: "Member",
@@ -4338,7 +4340,9 @@
       runtime_flag: "CSSAnchorPositioning",
       valid_for_permission_element: true,
       valid_for_position_try: true,
-      priority: 1,
+      // Needs to be applied before inset-area which in turn needs to be applied
+      // before inset properties.
+      priority: 2,
     },
     {
       name: "position-fallback-bounds",
@@ -4388,7 +4392,8 @@
       getter: "GetPositionVisibility",
       type_name: "PositionVisibility",
       converter: "ConvertPositionVisibility",
-      keywords: ["always", "anchors-valid", "anchors-visible", "no-overflow"],
+      // TODO(crbug.com/332933527): Support anchors-valid.
+      keywords: ["always", "anchors-visible", "no-overflow"],
       typedom_types: ["Keyword"],
       runtime_flag: "CSSPositionVisibility",
     },
@@ -4500,12 +4505,13 @@
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       inherited: true,
       name_for_methods: "ScrollbarColor",
-      type_name: "std::optional<StyleScrollbarColor>",
+      type_name: "StyleScrollbarColor",
       converter: "ConvertScrollbarColor",
       keywords: ["auto"],
       field_group: "*",
-      field_template: "external",
-      default_value: "std::optional<StyleScrollbarColor>()",
+      field_template: "pointer",
+      default_value: "nullptr",
+      wrapper_pointer_name: "Member",
       include_paths: ["third_party/blink/renderer/core/style/style_scrollbar_color.h"],
       runtime_flag: "ScrollbarColor",
     },
@@ -5406,7 +5412,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/core/style/shadow_list.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "ShadowList",
       converter: "ConvertShadowList",
@@ -5805,6 +5811,9 @@
       computed_style_protected_functions: ["getter"],
       default_value: "kNoControlPart",
       type_name: "ControlPart",
+      // appearance needs to be computed before
+      // -internal-appearance-auto-base-select() can be resolved.
+      priority: 1,
     },
     {
       name: "-webkit-appearance",
@@ -6072,14 +6081,26 @@
       valid_for_formatted_text: true,
       surrogate_for: "-webkit-line-break",
     },
-    // An Apple extension.
+    {
+      name: "line-clamp",
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
+      field_group: "*",
+      field_template: "primitive",
+      default_value: "0",
+      converter: "ConvertIntegerOrNone<0>",
+      keywords: ["none"],
+      type_name: "int",
+      name_for_methods: "StandardLineClamp",
+      runtime_flag: "CSSLineClamp",
+    },
     {
       name: "-webkit-line-clamp",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*",
-      field_template: "external",
+      field_template: "primitive",
       default_value: "0",
       type_name: "int",
+      name_for_methods: "WebkitLineClamp",
     },
     {
       name: "-webkit-mask-box-image-outset",
@@ -7254,11 +7275,12 @@
       name: "types",
       is_descriptor: true,
       is_property: false,
-      runtime_flag: "ViewTransitionTypes",
+      runtime_flag: "ViewTransitionOnNavigation",
     },
     {
       name: "inset-area",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
+      style_builder_custom_functions: ["value", "inherit"],
       field_group: "*",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/style/inset_area.h"],
@@ -7273,6 +7295,10 @@
       valid_for_position_try: true,
       runtime_flag: "CSSAnchorPositioning",
       valid_for_permission_element: true,
+      // inset-area needs to be applied before inset properties since
+      // anchor() functions compute relative to the containing block that is
+      // modified by inset-area in AnchorEvaluatorImpl.
+      priority: 1,
     },
 
     // Shorthands
@@ -7688,22 +7714,7 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
     },
     {
-      name: "grid-column-gap",
-      longhands: ["column-gap"],
-      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-    },
-    {
-      name: "grid-row-gap",
-      longhands: ["row-gap"],
-      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-    },
-    {
       name: "gap",
-      longhands: ["row-gap", "column-gap"],
-      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-    },
-    {
-      name: "grid-gap",
       longhands: ["row-gap", "column-gap"],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
     },
@@ -8765,6 +8776,18 @@
     {
       name: "word-wrap",
       alias_for: "overflow-wrap",
+    },
+    {
+      name: "grid-column-gap",
+      alias_for: "column-gap",
+    },
+    {
+      name: "grid-row-gap",
+      alias_for: "row-gap",
+    },
+    {
+      name: "grid-gap",
+      alias_for: "gap",
     },
   ],
 }

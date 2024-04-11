@@ -6427,6 +6427,14 @@ export const NativeFunctions = [
     signatures: [["mapper"]]
   },
   {
+    name: "first",
+    signatures: [["?options"]]
+  },
+  {
+    name: "last",
+    signatures: [["?options"]]
+  },
+  {
     name: "getPartNode",
     signatures: [["index"]]
   },
@@ -6526,6 +6534,10 @@ export const NativeFunctions = [
   },
   {
     name: "InputEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "InterestEvent",
     signatures: [["type","?eventInitDict"]]
   },
   {

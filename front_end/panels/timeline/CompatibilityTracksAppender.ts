@@ -187,11 +187,12 @@ export class CompatibilityTracksAppender {
   }
 
   #addExtensionAppenders(): void {
-    const tracks = ExtensionDataGatherer.instace().getExtensionData();
+    const tracks = ExtensionDataGatherer.instance().getExtensionData();
     for (const trackData of tracks) {
       this.#allTrackAppenders.push(new ExtensionTrackAppender(this, trackData));
     }
   }
+
   #addThreadAppenders(): void {
     const weight = (appender: ThreadAppender): number => {
       switch (appender.threadType) {

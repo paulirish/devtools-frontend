@@ -33,6 +33,10 @@ export namespace ProtocolMapping {
      * Event for animation that has been started.
      */
     'Animation.animationStarted': [Protocol.Animation.AnimationStartedEvent];
+    /**
+     * Event for animation that has been updated.
+     */
+    'Animation.animationUpdated': [Protocol.Animation.AnimationUpdatedEvent];
     'Audits.issueAdded': [Protocol.Audits.IssueAddedEvent];
     /**
      * Emitted when an address form is filled.
@@ -4365,6 +4369,13 @@ export namespace ProtocolMapping {
     'FedCm.resetCooldown': {
       paramsType: [];
       returnType: void;
+    };
+    /**
+     * Returns the following OS state for the given manifest id.
+     */
+    'PWA.getOsAppState': {
+      paramsType: [Protocol.PWA.GetOsAppStateRequest];
+      returnType: Protocol.PWA.GetOsAppStateResponse;
     };
     /**
      * Continues execution until specific location is reached.

@@ -35,8 +35,6 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import * as Timeline from './timeline.js';
 
-const {assert} = chai;
-
 describeWithMockConnection('TimelineUIUtils', function() {
   let tracingModel: TraceEngine.Legacy.TracingModel;
   let process: TraceEngine.Legacy.Process;
@@ -564,6 +562,10 @@ describeWithMockConnection('TimelineUIUtils', function() {
           value: '3',
         },
         {
+          title: 'Selector Stats',
+          value: 'Select "" to collect detailed CSS selector matching statistics.',
+        },
+        {
           // The "Recalculation forced" Stack trace output would be here but the detailRow helper is
           // unable to parse it, hence why this returns undefined.
           title: undefined,
@@ -731,6 +733,32 @@ describeWithMockConnection('TimelineUIUtils', function() {
               value: 'This is a top level rendering task',
             },
             {title: 'Tip', value: 'A tip to improve this'},
+          ],
+      );
+    });
+    it('renders the details for an extension marker properly', async function() {
+      const data = await TraceLoader.allModels(this, 'extension-tracks-and-marks.json.gz');
+      const extensionMark = data.traceParsedData.ExtensionTraceData.extensionMarkers[0];
+
+      if (!extensionMark) {
+        throw new Error('Could not find extension mark.');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          extensionMark,
+          data.timelineModel,
+          new Components.Linkifier.Linkifier(),
+          false,
+          data.traceParsedData,
+      );
+      const rowData = getRowDataForDetailsElement(details);
+      assert.deepEqual(
+          rowData,
+          [
+            {
+              title: 'Description',
+              value: 'This marks the start of a task',
+            },
           ],
       );
     });
@@ -1017,6 +1045,153 @@ describeWithMockConnection('TimelineUIUtils', function() {
       const style = Timeline.TimelineUIUtils.TimelineUIUtils.eventStyle(profileCalls[0]);
       assert.strictEqual(style.category.name, 'scripting');
       assert.strictEqual(style.category.color, 'rgb(250 204 21 / 100%)');
+    });
+  });
+
+  describe('statsForTimeRange', () => {
+    it('correctly aggregates up stats', async () => {
+      const mainThread = TraceEngine.Types.TraceEvents.ThreadID(1);
+      const pid = TraceEngine.Types.TraceEvents.ProcessID(100);
+      function microsec(x: number): TraceEngine.Types.Timing.MicroSeconds {
+        return TraceEngine.Types.Timing.MicroSeconds(x);
+      }
+
+      const events: TraceEngine.Types.TraceEvents.TraceEventData[] = [
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'TracingStartedInBrowser',
+          ph: TraceEngine.Types.TraceEvents.Phase.INSTANT,
+          pid: pid,
+          tid: mainThread,
+          ts: microsec(100),
+          args: {
+            data: {
+              frames: [
+                {frame: 'frame1', url: 'frameurl', name: 'frame-name'},
+              ],
+            },
+          },
+        } as TraceEngine.Types.TraceEvents.TraceEventTracingStartedInBrowser,
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'SetLayerTreeId',
+          ph: TraceEngine.Types.TraceEvents.Phase.INSTANT,
+          pid: pid,
+          tid: mainThread,
+          ts: microsec(101),
+          args: {data: {frame: 'frame1', layerTreeId: 17}},
+        } as TraceEngine.Types.TraceEvents.TraceEventSetLayerTreeId,
+        {
+          cat: 'toplevel',
+          name: 'Program',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(100000),
+          dur: microsec(3000),
+          tid: mainThread,
+          pid: pid,
+          args: {},
+        },
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'FunctionCall',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(100500),
+          dur: microsec(1500),
+          tid: mainThread,
+          pid: pid,
+          args: {},
+        },
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'Layout',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(101000),
+          dur: microsec(1000),
+          tid: mainThread,
+          pid: pid,
+          args: {
+            beginData: {
+              frame: 'FAKE_FRAME_ID',
+              dirtyObjects: 0,
+              partialLayout: false,
+              totalObjects: 1,
+            },
+            endData: {layoutRoots: []},
+          },
+        } as TraceEngine.Types.TraceEvents.TraceEventLayout,
+
+        {
+          cat: 'toplevel',
+          name: 'Program',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(104000),
+          dur: microsec(4000),
+          tid: mainThread,
+          pid: pid,
+          args: {},
+        },
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'FunctionCall',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(104000),
+          dur: microsec(1000),
+          tid: mainThread,
+          pid: pid,
+          args: {},
+        },
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'CommitLoad',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(105000),
+          dur: microsec(1000),
+          tid: mainThread,
+          pid: pid,
+          args: {},
+        },
+        {
+          cat: 'disabled-by-default-devtools.timeline',
+          name: 'Layout',
+          ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+          ts: microsec(107000),
+          dur: microsec(1000),
+          tid: mainThread,
+          pid: pid,
+          args: {
+            beginData: {
+              frame: 'FAKE_FRAME_ID',
+              dirtyObjects: 0,
+              partialLayout: false,
+              totalObjects: 1,
+            },
+            endData: {layoutRoots: []},
+          },
+        } as TraceEngine.Types.TraceEvents.TraceEventLayout,
+      ];
+
+      const rangeStats101To103 = Timeline.TimelineUIUtils.TimelineUIUtils.statsForTimeRange(
+          events,
+          TraceEngine.Types.Timing.MilliSeconds(101),
+          TraceEngine.Types.Timing.MilliSeconds(103),
+      );
+      assert.deepEqual(rangeStats101To103, {
+        other: 1,
+        rendering: 1,
+        scripting: 0,
+        idle: 0,
+      });
+      const rangeStats104To109 = Timeline.TimelineUIUtils.TimelineUIUtils.statsForTimeRange(
+          events,
+          TraceEngine.Types.Timing.MilliSeconds(104),
+          TraceEngine.Types.Timing.MilliSeconds(109),
+      );
+      assert.deepEqual(rangeStats104To109, {
+        other: 2,
+        rendering: 1,
+        scripting: 1,
+        idle: 1,
+      });
     });
   });
 });

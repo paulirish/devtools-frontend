@@ -699,6 +699,16 @@ export namespace Animation {
      */
     animation: Animation;
   }
+
+  /**
+   * Event for animation that has been updated.
+   */
+  export interface AnimationUpdatedEvent {
+    /**
+     * Animation that was updated.
+     */
+    animation: Animation;
+  }
 }
 
 /**
@@ -3637,6 +3647,8 @@ export namespace DOM {
     GrammarError = 'grammar-error',
     Highlight = 'highlight',
     FirstLineInherited = 'first-line-inherited',
+    ScrollMarker = 'scroll-marker',
+    ScrollMarkers = 'scroll-markers',
     Scrollbar = 'scrollbar',
     ScrollbarThumb = 'scrollbar-thumb',
     ScrollbarButton = 'scrollbar-button',
@@ -16959,6 +16971,45 @@ export namespace FedCm {
    */
   export interface DialogClosedEvent {
     dialogId: string;
+  }
+}
+
+/**
+ * This domain allows interacting with the browser to control PWAs.
+ */
+export namespace PWA {
+
+  /**
+   * The following types are the replica of
+   * https://crsrc.org/c/chrome/browser/web_applications/proto/web_app_os_integration_state.proto;drc=9910d3be894c8f142c977ba1023f30a656bc13fc;l=67
+   */
+  export interface FileHandlerAccept {
+    /**
+     * New name of the mimetype according to
+     * https://www.iana.org/assignments/media-types/media-types.xhtml
+     */
+    mediaType: string;
+    fileExtensions: string[];
+  }
+
+  export interface FileHandler {
+    action: string;
+    accepts: FileHandlerAccept[];
+    displayName: string;
+  }
+
+  export interface GetOsAppStateRequest {
+    /**
+     * The id from the webapp's manifest file, commonly it's the url of the
+     * site installing the webapp. See
+     * https://web.dev/learn/pwa/web-app-manifest.
+     */
+    manifestId: string;
+  }
+
+  export interface GetOsAppStateResponse extends ProtocolResponseWithError {
+    badgeCount: integer;
+    fileHandlers: FileHandler[];
   }
 }
 

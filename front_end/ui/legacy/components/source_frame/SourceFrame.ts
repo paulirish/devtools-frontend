@@ -272,7 +272,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     return [
       CodeMirror.EditorView.updateListener.of(update => this.dispatchEventToListeners(Events.EditorUpdate, update)),
       TextEditor.Config.baseConfiguration(doc),
-      TextEditor.Config.closeBrackets,
+      TextEditor.Config.closeBrackets.instance(),
       TextEditor.Config.autocompletion.instance(),
       TextEditor.Config.showWhitespace.instance(),
       TextEditor.Config.allowScrollPastEof.instance(),
@@ -1097,7 +1097,7 @@ export class SelfXssWarningDialog {
     dialog.setMaxContentSize(new UI.Geometry.Size(504, 340));
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SetExactWidthMaxHeight);
     dialog.setDimmed(true);
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         dialog.contentElement, {cssFile: selfXssDialogStyles, delegatesFocus: undefined});
     const content = shadowRoot.createChild('div', 'widget');
 
