@@ -125,6 +125,8 @@ export class TimingsTrackAppender implements TrackAppender {
       return new TimelineFlameChartMarker(startTimeMs, startTimeMs - minTimeMs, style);
     });
     this.#compatibilityBuilder.getFlameChartTimelineData().markers.push(...flameChartMarkers);
+    // TODO: we would like to have markers share the level with the rest but...
+    //  due to how CompatTrackAppender.appendEventsAtLevel tweaks the legacyEntryTypeByLevel array, it would take some work
     return ++currentLevel;
   }
 
