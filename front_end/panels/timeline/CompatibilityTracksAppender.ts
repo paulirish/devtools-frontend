@@ -231,6 +231,8 @@ export class CompatibilityTracksAppender {
     const threads = TraceEngine.Handlers.Threads.threadsInTrace(this.#traceParsedData);
     const processedAuctionWorkletsIds = new Set<TraceEngine.Types.TraceEvents.ProcessID>();
 
+    const showAllEvents = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
+
     for (const {pid, tid, name, type} of threads) {
       if (this.#traceParsedData.Meta.traceIsGeneric) {
         // If the trace is generic, we just push all of the threads with no
@@ -238,6 +240,11 @@ export class CompatibilityTracksAppender {
         // OTHER for all threads.
         this.#threadAppenders.push(new ThreadAppender(
             this, this.#traceParsedData, pid, tid, name, TraceEngine.Handlers.Threads.ThreadType.OTHER));
+        continue;
+      }
+
+      // These threads have no useful information. Omit them
+      if ((name === 'Chrome_ChildIOThread' || name === 'Compositor') && !showAllEvents) {
         continue;
       }
 
