@@ -107,9 +107,6 @@ export class TimingsTrackAppender implements TrackAppender {
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS)) {
       markers = markers.concat(this.#traceParsedData.ExtensionTraceData.extensionMarkers);
     }
-    if (markers.length === 0) {
-      return currentLevel;
-    }
 
     markers.forEach(marker => {
       const index = this.#compatibilityBuilder.appendEventAtLevel(marker, currentLevel, this);
@@ -125,7 +122,8 @@ export class TimingsTrackAppender implements TrackAppender {
       return new TimelineFlameChartMarker(startTimeMs, startTimeMs - minTimeMs, style);
     });
     this.#compatibilityBuilder.getFlameChartTimelineData().markers.push(...flameChartMarkers);
-    return ++currentLevel;
+    // Don't incremement because we may place marks on the same line.
+    return currentLevel;
   }
 
   /*
