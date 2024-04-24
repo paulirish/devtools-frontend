@@ -192,11 +192,13 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
    * @param barHeight The height of the visible part request
    * @param unclippedBarX The start pixel of the request compare to the visible area. It is calculated with request.beginTime() in FlameChart.
    * @param timeToPixelRatio
+   * @param backgroundColor - the background color of the group. applying light/dark mode and selected/focused state
    * @returns if the entry needs to be decorate, which is alway true if the request has "timing" field
    */
   decorateEntry(
       index: number, context: CanvasRenderingContext2D, _text: string|null, barX: number, barY: number,
-      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number): boolean {
+      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number,
+      backgroundColor: string): boolean {
     const event = this.#events[index];
 
     const {sendStart, headersEnd, finish, start, end} =
@@ -206,7 +208,9 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     context.fillStyle = 'hsla(0, 100%, 100%, 0.8)';
     context.fillRect(sendStart + 0.5, barY + 0.5, headersEnd - sendStart - 0.5, barHeight - 2);
     // Clear portions of initial rect to prepare for the ticks.
-    context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
+
+    context.fillStyle =
+        ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', context.canvas);
     context.fillRect(barX, barY - 0.5, sendStart - barX, barHeight);
     context.fillRect(finish, barY - 0.5, barX + barWidth - finish, barHeight);
 

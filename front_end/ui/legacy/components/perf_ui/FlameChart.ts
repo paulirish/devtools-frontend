@@ -2223,7 +2223,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         nextGroup++;
       }
       const endLevel = nextGroup < groups.length ? groups[nextGroup].startLevel : this.dataProvider.maxStackDepth();
-      this.drawCollapsedOverviewForGroup(group, offset, endLevel);
+      this.drawCollapsedOverviewForGroup(group, offset, endLevel, index);
     });
 
     context.save();
@@ -2444,6 +2444,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.save();
     context.beginPath();
     const {entryStartTimes, entryLevels} = timelineData;
+    const backgroundColor =
+        ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
     for (let i = 0; i < titleIndices.length; ++i) {
       const entryIndex = titleIndices[i];
       const entryStartTime = entryStartTimes[entryIndex];
@@ -2473,7 +2475,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       }
       const unclippedBarX = this.chartViewport.timeToPosition(entryStartTime);
       if (this.dataProvider.decorateEntry(
-              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel)) {
+              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel,
+              backgroundColor)) {
         continue;
       }
       if (!text || !text.length) {
@@ -2604,7 +2607,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         UI.UIUtils.measureTextWidth(context, group.name) + HEADER_LABEL_X_PADDING - HEADER_LEFT_PADDING;
   }
 
-  private drawCollapsedOverviewForGroup(group: Group, y: number, endLevel: number): void {
+  private drawCollapsedOverviewForGroup(group: Group, y: number, endLevel: number, index: number): void {
     const range = new Common.SegmentedRange.SegmentedRange<string>(mergeCallback);
     const timeWindowLeft = this.chartViewport.windowLeftTime();
     const timeWindowRight = this.chartViewport.windowRightTime();
@@ -2616,6 +2619,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const entryStartTimes = this.rawTimelineData.entryStartTimes;
     const entryTotalTimes = this.rawTimelineData.entryTotalTimes;
     const timeToPixel = this.chartViewport.timeToPixel();
+
+    const backgroundColor = this.isGroupFocused(index) ?
+        ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement) :
+        ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
 
     for (let level = group.startLevel; level < endLevel; ++level) {
       const levelIndexes: number[] = this.timelineLevels ? this.timelineLevels[level] : [];
@@ -2647,7 +2654,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
           context.fillStyle = color;
           context.fillRect(barX, y, barWidth, groupBarHeight - 1);
           this.dataProvider.decorateEntry(
-              entryIndex, context, '', barX, y, barWidth, groupBarHeight, unclippedBarX, timeToPixel);
+              entryIndex, context, '', barX, y, barWidth, groupBarHeight, unclippedBarX, timeToPixel, backgroundColor);
           continue;
         }
         range.append(new Common.SegmentedRange.Segment(barX, endBarX, color));
@@ -3626,7 +3633,8 @@ export interface FlameChartDataProvider {
 
   decorateEntry(
       entryIndex: number, context: CanvasRenderingContext2D, text: string|null, barX: number, barY: number,
-      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number): boolean;
+      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number,
+      backgroundColor: string): boolean;
 
   forceDecoration(entryIndex: number): boolean;
 

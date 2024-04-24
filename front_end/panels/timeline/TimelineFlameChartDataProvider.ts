@@ -795,7 +795,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
 
   decorateEntry(
       entryIndex: number, context: CanvasRenderingContext2D, text: string|null, barX: number, barY: number,
-      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number): boolean {
+      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number,
+      backgroundColor: string): boolean {
     const entryType = this.entryType(entryIndex);
 
     if (entryType === EntryType.Frame) {
@@ -812,7 +813,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       const entry = this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData;
       if (TraceEngine.Types.TraceEvents.isSyntheticInteractionEvent(entry)) {
         this.#drawInteractionEventWithWhiskers(
-            context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio);
+            context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio,
+            backgroundColor);
         return true;
       }
     }
@@ -832,11 +834,13 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
    * @param barWidth - the width of the full bar in pixels
    * @param barHeight - the height of the full bar in pixels
    * @param timeToPixelRatio - the ratio required to convert a millisecond time to a pixel value.
+   * @param backgroundColor - the background color of the group. applying light/dark mode and selected/focused state
    **/
   #drawInteractionEventWithWhiskers(
       context: CanvasRenderingContext2D, entryIndex: number, entryTitle: string|null,
       entry: TraceEngine.Types.TraceEvents.SyntheticInteractionPair, barX: number, barY: number,
-      unclippedBarXStartPixel: number, barWidth: number, barHeight: number, timeToPixelRatio: number): void {
+      unclippedBarXStartPixel: number, barWidth: number, barHeight: number, timeToPixelRatio: number,
+      backgroundColor: string): void {
     /**
      * An interaction is drawn with whiskers as so:
      * |----------[=======]-------------|
@@ -863,7 +867,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     context.save();
 
     // Clear portions of initial rect to prepare for the ticks.
-    context.fillStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-cdt-base-container');
+    context.fillStyle = backgroundColor;
     let desiredBoxStartX = timeToPixel(entry.processingStart);
     const desiredBoxEndX = timeToPixel(entry.processingEnd);
 

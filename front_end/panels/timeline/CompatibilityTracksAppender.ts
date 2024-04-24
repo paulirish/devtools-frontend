@@ -244,7 +244,7 @@ export class CompatibilityTracksAppender {
       }
 
       // These threads have no useful information. Omit them
-      if ((name === 'Chrome_ChildIOThread' || name === 'Compositor') && !showAllEvents) {
+      if ((name === 'Chrome_ChildIOThread' || name === 'Compositor' || name === 'GpuMemoryThread') && !showAllEvents) {
         continue;
       }
 
