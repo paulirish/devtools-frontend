@@ -681,10 +681,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     const group = data.groups.at(this.selectedGroupIndex);
     // If the mouse is hovering over the hidden descendants arrow, get an element that shows how many children are hidden, otherwise an element with the event name and length
+    const timeToPixel = this.chartViewport.timeToPixel();
     const entryInfo = (isMouseOverRevealChildrenArrow && group) ?
         this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo &&
             this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo(entryIndex) :
-        this.dataProvider.prepareHighlightedEntryInfo(entryIndex);
+        this.dataProvider.prepareHighlightedEntryInfo(entryIndex, timeToPixel);
     if (entryInfo) {
       this.popoverElement.appendChild(entryInfo);
       this.updatePopoverOffset();
@@ -2012,19 +2013,20 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const barHeight = this.#eventBarHeight(timelineData, entryIndex);
     const barY = this.levelToOffset(barLevel);
     const barWidth = overrides?.width ?? this.#eventBarWidth(timelineData, entryIndex);
-    if (barWidth === 0) {
+    if (barWidth <= 0.1) {  // magic number
       return;
     }
+    const clampedBarWidth = Math.max(barWidth, 1);
     // We purposefully leave a 1px gap off the height so there is a small gap
     // visually between events vertically in the panel.
     // Similarly, we leave 0.5 pixels off the width so that there is a small
     // gap between events. Otherwise if a trace has a lot of events it looks
     // like one solid block and is not very easy to distinguish when events
     // start and end.
-    context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
+    context.rect(barX, barY, clampedBarWidth - 0.5, barHeight - 1);
 
-    // Draw lil diamonds on instant events.
-    if (0.2 < barWidth && barWidth <= 1) {
+    // For instant events (not just zoomed out ones), draw lil diamonds.
+    if (duration === 0.001 && barWidth <= 1) {
       const miniRectSize = 2;
       const half = miniRectSize / 2;
       const adjX = barX + 0.25;  // position middle of the 0.5px line.
@@ -3626,7 +3628,7 @@ export interface FlameChartDataProvider {
 
   timelineData(rebuild?: boolean): FlameChartTimelineData|null;
 
-  prepareHighlightedEntryInfo(entryIndex: number): Element|null;
+  prepareHighlightedEntryInfo(entryIndex: number, timeToPixel, number): Element|null;
 
   prepareHighlightedHiddenEntriesArrowInfo?(entryIndex: number): Element|null;
 

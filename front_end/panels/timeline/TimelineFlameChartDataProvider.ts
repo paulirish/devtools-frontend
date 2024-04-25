@@ -583,7 +583,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
                                      .entryLevels[entryIndex]];
   }
 
-  prepareHighlightedEntryInfo(entryIndex: number): Element|null {
+  prepareHighlightedEntryInfo(entryIndex: number, timeToPixel: number): Element|null {
     let time = '';
     let title;
     let warningElements: Element[] = [];
@@ -599,6 +599,14 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       const event = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventData);
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
       const eventLevel = timelineData.entryLevels[entryIndex];
+
+      const duration = timelineData.entryTotalTimes[entryIndex];
+      const widthPx = timeToPixel * duration;
+      // Don't do hover stuff on instant/short events that are visually filtered.
+      if (widthPx < 0.1) {
+        return null;
+      }
+
       const highlightedEntryInfo = this.compatibilityTracksAppender.highlightedEntryInfo(event, eventLevel);
       title = highlightedEntryInfo.title;
       time = highlightedEntryInfo.formattedTime;
@@ -1137,7 +1145,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   }
 }
 
-export const InstantEventVisibleDurationMs = 0.001;
+export const InstantEventVisibleDur =
+    TraceEngine.Helpers.Timing.millisecondsToMicroseconds(0.001 as TraceEngine.Types.Timing.MilliSeconds);
 
 export const enum Events {
   DataChanged = 'DataChanged',
