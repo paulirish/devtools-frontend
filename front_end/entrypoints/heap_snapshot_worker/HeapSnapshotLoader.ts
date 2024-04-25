@@ -28,31 +28,28 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import * as Platform from '../../core/platform/platform.js';
+import type * as HeapSnapshotModel from '../../models/heap_snapshot_model/heap_snapshot_model.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-import {HeapSnapshotProgress, JSHeapSnapshot, type HeapSnapshotHeader, type Profile} from './HeapSnapshot.js';
 
+import {type HeapSnapshotHeader, HeapSnapshotProgress, JSHeapSnapshot, type Profile} from './HeapSnapshot.js';
 import {type HeapSnapshotWorkerDispatcher} from './HeapSnapshotWorkerDispatcher.js';
 
 export class HeapSnapshotLoader {
   readonly #progress: HeapSnapshotProgress;
-  #buffer: string;
+  #buffer: string[];
   #dataCallback: ((value: string|PromiseLike<string>) => void)|null;
   #done: boolean;
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   #snapshot?: {[x: string]: any};
-  #array!: number[]|Uint32Array|null;
+  #array!: Platform.TypedArrayUtilities.BigUint32Array|null;
   #arrayIndex!: number;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  #json?: any;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  #jsonTokenizer?: any;
+  #json: string = '';
   constructor(dispatcher: HeapSnapshotWorkerDispatcher) {
     this.#reset();
     this.#progress = new HeapSnapshotProgress(dispatcher);
-    this.#buffer = '';
+    this.#buffer = [];
     this.#dataCallback = null;
     this.#done = false;
     void this.#parseInput();
@@ -74,11 +71,11 @@ export class HeapSnapshotLoader {
     }
   }
 
-  buildSnapshot(): JSHeapSnapshot {
+  buildSnapshot(options: HeapSnapshotModel.HeapSnapshotModel.HeapSnapshotOptions): JSHeapSnapshot {
     this.#snapshot = this.#snapshot || {};
 
     this.#progress.updateStatus('Processing snapshot…');
-    const result = new JSHeapSnapshot((this.#snapshot as Profile), this.#progress);
+    const result = new JSHeapSnapshot((this.#snapshot as Profile), this.#progress, options);
     this.#reset();
     return result;
   }
@@ -122,7 +119,7 @@ export class HeapSnapshotLoader {
       if (!this.#array) {
         throw new Error('Array not instantiated');
       }
-      this.#array[this.#arrayIndex++] = nextNumber;
+      this.#array.setValue(this.#arrayIndex++, nextNumber);
     }
   }
 
@@ -141,19 +138,25 @@ export class HeapSnapshotLoader {
   }
 
   write(chunk: string): void {
-    this.#buffer += chunk;
+    this.#buffer.push(chunk);
     if (!this.#dataCallback) {
       return;
     }
-    this.#dataCallback(this.#buffer);
+    this.#dataCallback(this.#buffer.shift() as string);
     this.#dataCallback = null;
-    this.#buffer = '';
   }
 
   #fetchChunk(): Promise<string> {
-    return this.#done ? Promise.resolve(this.#buffer) : new Promise(r => {
-      this.#dataCallback = r;
-    });
+    // This method shoudln't be entered more than once since parsing happens
+    // sequentially. This means it's fine to stash away a single #dataCallback
+    // instead of an array of them.
+    if (this.#buffer.length > 0) {
+      return Promise.resolve(this.#buffer.shift() as string);
+    }
+
+    const {promise, resolve} = Platform.PromiseUtilities.promiseWithResolvers<string>();
+    this.#dataCallback = resolve;
+    return promise;
   }
 
   async #findToken(token: string, startIndex?: number): Promise<number> {
@@ -167,11 +170,13 @@ export class HeapSnapshotLoader {
     }
   }
 
-  async #parseArray(name: string, title: string, length?: number): Promise<number[]|Uint32Array> {
+  async #parseArray(name: string, title: string, length?: number):
+      Promise<Platform.TypedArrayUtilities.BigUint32Array> {
     const nameIndex = await this.#findToken(name);
     const bracketIndex = await this.#findToken('[', nameIndex);
     this.#json = this.#json.slice(bracketIndex + 1);
-    this.#array = length ? new Uint32Array(length) : [];
+    this.#array = length === undefined ? Platform.TypedArrayUtilities.createExpandableBigUint32Array() :
+                                         Platform.TypedArrayUtilities.createFixedBigUint32Array(length);
     this.#arrayIndex = 0;
     while (this.#parseUintArray()) {
       if (length) {
@@ -195,35 +200,36 @@ export class HeapSnapshotLoader {
 
     this.#progress.updateStatus('Loading snapshot info…');
     const json = this.#json.slice(snapshotTokenIndex + snapshotToken.length + 1);
-    this.#jsonTokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(metaJSON => {
-      this.#json = this.#jsonTokenizer.remainder();
-      this.#jsonTokenizer = null;
+    let jsonTokenizerDone = false;
+    const jsonTokenizer = new TextUtils.TextUtils.BalancedJSONTokenizer(metaJSON => {
+      this.#json = jsonTokenizer.remainder();
+      jsonTokenizerDone = true;
 
       this.#snapshot = this.#snapshot || {};
       this.#snapshot.snapshot = (JSON.parse(metaJSON) as HeapSnapshotHeader);
     });
-    this.#jsonTokenizer.write(json);
-    while (this.#jsonTokenizer) {
-      this.#jsonTokenizer.write(await this.#fetchChunk());
+    jsonTokenizer.write(json);
+    while (!jsonTokenizerDone) {
+      jsonTokenizer.write(await this.#fetchChunk());
     }
 
     this.#snapshot = this.#snapshot || {};
     const nodes = await this.#parseArray(
         '"nodes"', 'Loading nodes… {PH1}%',
         this.#snapshot.snapshot.meta.node_fields.length * this.#snapshot.snapshot.node_count);
-    this.#snapshot.nodes = (nodes as Uint32Array);
+    this.#snapshot.nodes = nodes;
 
     const edges = await this.#parseArray(
         '"edges"', 'Loading edges… {PH1}%',
         this.#snapshot.snapshot.meta.edge_fields.length * this.#snapshot.snapshot.edge_count);
-    this.#snapshot.edges = (edges as Uint32Array);
+    this.#snapshot.edges = edges;
 
     if (this.#snapshot.snapshot.trace_function_count) {
       const traceFunctionInfos = await this.#parseArray(
           '"trace_function_infos"', 'Loading allocation traces… {PH1}%',
           this.#snapshot.snapshot.meta.trace_function_info_fields.length *
               this.#snapshot.snapshot.trace_function_count);
-      this.#snapshot.trace_function_infos = (traceFunctionInfos as Uint32Array);
+      this.#snapshot.trace_function_infos = traceFunctionInfos.asUint32ArrayOrFail();
 
       const thisTokenEndIndex = await this.#findToken(':');
       const nextTokenIndex = await this.#findToken('"', thisTokenEndIndex);
@@ -235,12 +241,12 @@ export class HeapSnapshotLoader {
 
     if (this.#snapshot.snapshot.meta.sample_fields) {
       const samples = await this.#parseArray('"samples"', 'Loading samples…');
-      this.#snapshot.samples = (samples as number[]);
+      this.#snapshot.samples = samples.asArrayOrFail();
     }
 
     if (this.#snapshot.snapshot.meta['location_fields']) {
       const locations = await this.#parseArray('"locations"', 'Loading locations…');
-      this.#snapshot.locations = (locations as number[]);
+      this.#snapshot.locations = locations.asArrayOrFail();
     } else {
       this.#snapshot.locations = [];
     }

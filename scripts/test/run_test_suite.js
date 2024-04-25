@@ -57,10 +57,15 @@ const yargsObject =
           desc:
               'Mocha\'s fgrep option [https://mochajs.org/#-fgrep-string-f-string] which only runs tests whose titles contain the provided string',
         })
+        .option('mocha-grep', {
+          type: 'string',
+          desc:
+              'Mocha\'s grep option [https://mochajs.org/#-grep-regexp-g-regexp] which only runs tests whose titles matches the provided regular expression',
+        })
         .option('invert', {
           type: 'boolean',
           desc:
-              'Mocha\'s invert option [https://mochajs.org/#-invert] which inverts the match specified by mocha-fgrep',
+              'Mocha\'s invert option [https://mochajs.org/#-invert] which inverts the match specified by mocha-fgrep and mocha-grep',
           default: false,
         })
         .option('mocha-reporter', {
@@ -335,6 +340,7 @@ function main() {
       cwd: configurationFlags['cwd'],
       mochaOptions: {
         fgrep: configurationFlags['mocha-fgrep'],
+        grep: configurationFlags['mocha-grep'],
         invert: configurationFlags['invert'],
         reporter: configurationFlags['mocha-reporter'],
         'reporter-option': configurationFlags['mocha-reporter-option'],
@@ -351,6 +357,9 @@ function main() {
     if (yargsObject['coverage']) {
       fs.cpSync(
           'interactions-coverage', `${yargsObject['swarming-output-file']}/interactions-coverage`, {recursive: true});
+    }
+    if (fs.existsSync('perf-data')) {
+      fs.cpSync('perf-data', `${yargsObject['swarming-output-file']}/perf-data`, {recursive: true});
     }
     fs.cpSync('test/interactions/goldens', `${yargsObject['swarming-output-file']}/goldens`, {recursive: true});
   }

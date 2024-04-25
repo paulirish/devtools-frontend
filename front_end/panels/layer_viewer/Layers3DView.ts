@@ -29,24 +29,23 @@
  */
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import type * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
+import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import layers3DViewStyles from './layers3DView.css.js';
-
-import type * as Protocol from '../../generated/protocol.js';
-
-import type * as SDK from '../../core/sdk/sdk.js';
-import * as UI from '../../ui/legacy/legacy.js';
-
 import {
   LayerSelection,
+  type LayerView,
+  type LayerViewHost,
+  ScrollRectSelection,
   Selection,
   SnapshotSelection,
   Type,
-  ScrollRectSelection,
-  type LayerView,
-  type LayerViewHost,
 } from './LayerViewHost.js';
 import {Events as TransformControllerEvents, TransformController} from './TransformController.js';
 
@@ -90,6 +89,14 @@ const UIStrings = {
    *@description A context menu item in the DView of the Layers panel
    */
   showPaintProfiler: 'Show Paint Profiler',
+  /**
+   *@description Text for a button in the DView of the Layers panel
+   */
+  sendFeedback: 'Send feedback',
+  /**
+   *@description Text for a warning message in the DView of the Layers panel
+   */
+  deprecationWarning: 'Layers panel might be deprecated soon. Share your thoughts and concerns before we decide.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/layer_viewer/Layers3DView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -109,6 +116,7 @@ const imageForTexture = new Map<WebGLTexture, HTMLImageElement>();
 export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements LayerView {
   private readonly failBanner: UI.Widget.VBox;
+  private readonly deprecationBanner: UI.Infobar.Infobar;
   private readonly layerViewHost: LayerViewHost;
   private transformController: TransformController;
   private canvasElement: HTMLCanvasElement;
@@ -130,6 +138,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   private gl?: WebGLRenderingContext|null;
   private dimensionsForAutoscale?: {width: number, height: number};
   private needsUpdate?: boolean;
+  private updateScheduled?: boolean;
   private panelToolbar?: UI.Toolbar.Toolbar;
   private showSlowScrollRectsSetting?: Common.Settings.Setting<boolean>;
   private showPaintsSetting?: Common.Settings.Setting<boolean>;
@@ -138,6 +147,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   constructor(layerViewHost: LayerViewHost) {
     super(true);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('layers-3d-view')}`);
 
     this.contentElement.classList.add('layers-3d-view');
     this.failBanner = new UI.Widget.VBox();
@@ -148,6 +158,11 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.layerViewHost.registerView(this);
     this.transformController = new TransformController(this.contentElement as HTMLElement);
     this.transformController.addEventListener(TransformControllerEvents.TransformChanged, this.update, this);
+
+    this.deprecationBanner = this.#createDeprecationBanner();
+    this.deprecationBanner.setParentView(this);
+    this.contentElement.appendChild(this.deprecationBanner.element);
+
     this.initToolbar();
     this.canvasElement = this.contentElement.createChild('canvas') as HTMLCanvasElement;
     this.canvasElement.tabIndex = 0;
@@ -157,10 +172,12 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.canvasElement.addEventListener('mouseleave', this.onMouseMove.bind(this), false);
     this.canvasElement.addEventListener('mousemove', this.onMouseMove.bind(this), false);
     this.canvasElement.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
+    this.canvasElement.setAttribute('jslog', `${VisualLogging.canvas('layers').track({click: true, drag: true})}`);
     UI.ARIAUtils.setLabel(this.canvasElement, i18nString(UIStrings.dLayersView));
 
     this.lastSelection = {};
     this.layerTree = null;
+    this.updateScheduled = false;
 
     this.textureManager = new LayerTextureManager(this.update.bind(this));
 
@@ -172,6 +189,30 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.layerViewHost.setLayerSnapshotMap(this.snapshotLayers);
 
     this.layerViewHost.showInternalLayersSetting().addChangeListener(this.update, this);
+  }
+
+  #createDeprecationBanner(): UI.Infobar.Infobar {
+    function openLink(): void {
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
+          'https://crbug.com/328948996' as Platform.DevToolsPath.UrlString);
+    }
+
+    return new UI.Infobar.Infobar(
+        UI.Infobar.Type.Warning,
+        i18nString(UIStrings.deprecationWarning),
+        [
+          {
+            text: i18nString(UIStrings.sendFeedback),
+            highlight: false,
+            delegate: openLink,
+            dismiss: false,
+            jslogContext: 'Send feedback',
+          },
+        ],
+        /* disableSetting? */ undefined,
+        /* isCloseable */ true,
+        'panel-deprecated',
+    );
   }
 
   setLayerTree(layerTree: SDK.LayerTreeBase.LayerTreeBase|null): void {
@@ -602,6 +643,10 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     gl.vertexAttribPointer(attribute, length, gl.FLOAT, false, 0, 0);
   }
 
+  // This view currently draws every rect, every frame
+  // It'd be far more effectient to retain the buffers created in setVertexAttribute,
+  // and manipulate them as needed.
+  // TODO(crbug.com/1473451): consider those optimizations or porting to 3D css transforms
   private drawRectangle(vertices: number[], mode: number, color?: number[], texture?: Object): void {
     const gl = this.gl;
     const white = [255, 255, 255, 1];
@@ -660,7 +705,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       return;
     }
 
-    const drawChrome = !Common.Settings.Settings.instance().moduleSetting('frameViewerHideChromeWindow').get() &&
+    const drawChrome = !Common.Settings.Settings.instance().moduleSetting('frame-viewer-hide-chrome-window').get() &&
         this.chromeTextures.length >= 3 && this.chromeTextures.indexOf(undefined) < 0;
     const z = (this.maxDepth + 1) * LayerSpacing;
     const borderWidth = Math.ceil(ViewportBorderWidth * this.scale);
@@ -736,6 +781,20 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
       this.needsUpdate = true;
       return;
     }
+    // Debounce into the next frame (double rAF).
+    // Without this the GPU work can pile up without any backpressure.
+    // A single rAF might be fine, but the GPU work here is so heavy, we prefer
+    // the extra breathing room over lower latency
+    if (!this.updateScheduled) {
+      this.updateScheduled = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+                              this.updateScheduled = false;
+                              this.innerUpdate();
+                            }));
+    }
+  }
+
+  private innerUpdate(): void {
     if (!this.layerTree || !this.layerTree.root()) {
       this.failBanner.show(this.contentElement);
       return;
@@ -767,7 +826,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     fragment.createChild('div').textContent = i18nString(UIStrings.cantDisplayLayers);
     fragment.createChild('div').textContent = i18nString(UIStrings.webglSupportIsDisabledInYour);
     fragment.appendChild(i18n.i18n.getFormatLocalizedString(
-        str_, UIStrings.checkSForPossibleReasons, {PH1: UI.XLink.XLink.create('about:gpu')}));
+        str_, UIStrings.checkSForPossibleReasons,
+        {PH1: UI.XLink.XLink.create('about:gpu', undefined, undefined, undefined, 'about-gpu')}));
     return fragment;
   }
 
@@ -810,25 +870,29 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   private initToolbar(): void {
     this.panelToolbar = this.transformController.toolbar();
     this.contentElement.appendChild(this.panelToolbar.element);
+    this.showPaintsSetting = this.createVisibilitySetting(
+        i18nString(UIStrings.paints), 'frame-viewer-show-paints', false, this.panelToolbar);
     this.showSlowScrollRectsSetting = this.createVisibilitySetting(
-        i18nString(UIStrings.slowScrollRects), 'frameViewerShowSlowScrollRects', true, this.panelToolbar);
-    this.showPaintsSetting =
-        this.createVisibilitySetting(i18nString(UIStrings.paints), 'frameViewerShowPaints', true, this.panelToolbar);
+        i18nString(UIStrings.slowScrollRects), 'frame-viewer-show-slow-scroll-rects', true, this.panelToolbar);
     this.showPaintsSetting.addChangeListener(this.updatePaints, this);
     Common.Settings.Settings.instance()
-        .moduleSetting('frameViewerHideChromeWindow')
+        .moduleSetting('frame-viewer-hide-chrome-window')
         .addChangeListener(this.update, this);
   }
 
   private onContextMenu(event: Event): void {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     contextMenu.defaultSection().appendItem(
-        i18nString(UIStrings.resetView), () => this.transformController.resetAndNotify(), false);
+        i18nString(UIStrings.resetView), () => this.transformController.resetAndNotify(), {
+          jslogContext: 'layers.3d-center',
+        });
     const selection = this.selectionFromEventPoint(event);
     if (selection && selection.type() === Type.Snapshot) {
       contextMenu.defaultSection().appendItem(
           i18nString(UIStrings.showPaintProfiler),
-          () => this.dispatchEventToListeners(Events.PaintProfilerRequested, selection), false);
+          () => this.dispatchEventToListeners(Events.PaintProfilerRequested, selection), {
+            jslogContext: 'layers.paint-profiler',
+          });
     }
     this.layerViewHost.showContextMenu(contextMenu, selection);
   }
@@ -882,16 +946,12 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum OutlineType {
   Hovered = 'hovered',
   Selected = 'selected',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   PaintProfilerRequested = 'PaintProfilerRequested',
   ScaleChanged = 'ScaleChanged',
 }

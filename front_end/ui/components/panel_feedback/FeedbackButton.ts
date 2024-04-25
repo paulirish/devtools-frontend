@@ -52,14 +52,15 @@ export class FeedbackButton extends HTMLElement {
       <${Buttons.Button.Button.litTagName}
           @click=${this.#onFeedbackClick}
           .iconUrl=${feedbackIconUrl}
-          .variant=${Buttons.Button.Variant.SECONDARY}
+          .variant=${Buttons.Button.Variant.OUTLINED}
+          .jslogContext=${'feedback'}
       >${i18nString(UIStrings.feedback)}</${Buttons.Button.Button.litTagName}>
       `, this.#shadow, {host: this});
     // clang-format on
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-feedback-button', FeedbackButton);
+customElements.define('devtools-feedback-button', FeedbackButton);
 
 declare global {
   interface HTMLElementTagNameMap {

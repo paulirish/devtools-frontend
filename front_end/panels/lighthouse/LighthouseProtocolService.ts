@@ -8,7 +8,6 @@ import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 
 import type * as ReportRenderer from './LighthouseReporterTypes.js';
-import type * as Protocol from '../../generated/protocol.js';
 
 /* eslint-disable jsdoc/check-alignment */
 /**
@@ -59,8 +58,7 @@ export interface LighthouseRun {
  */
 export class ProtocolService {
   private mainSessionId?: string;
-  private mainFrameId?: string;
-  private targetInfos?: Protocol.Target.TargetInfo[];
+  private rootTargetId?: string;
   private parallelConnection?: ProtocolClient.InspectorBackend.Connection;
   private lighthouseWorkerPromise?: Promise<Worker>;
   private lighthouseMessageUpdateCallback?: ((arg0: string) => void);
@@ -73,6 +71,10 @@ export class ProtocolService {
     if (!mainTarget) {
       throw new Error('Unable to find main target required for Lighthouse');
     }
+    const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
+    if (!rootTarget) {
+      throw new Error('Could not find the root target');
+    }
     const childTargetManager = mainTarget.model(SDK.ChildTargetManager.ChildTargetManager);
     if (!childTargetManager) {
       throw new Error('Unable to find child target manager required for Lighthouse');
@@ -81,12 +83,13 @@ export class ProtocolService {
     if (!resourceTreeModel) {
       throw new Error('Unable to find resource tree model required for Lighthouse');
     }
-    const mainFrame = resourceTreeModel.mainFrame;
-    if (!mainFrame) {
-      throw new Error('Unable to find main frame required for Lighthouse');
+
+    const rootChildTargetManager = rootTarget.model(SDK.ChildTargetManager.ChildTargetManager);
+    if (!rootChildTargetManager) {
+      throw new Error('Could not find the child target manager class for the root target');
     }
 
-    const {connection, sessionId} = await childTargetManager.createParallelConnection(message => {
+    const {connection, sessionId} = await rootChildTargetManager.createParallelConnection(message => {
       if (typeof message === 'string') {
         message = JSON.parse(message);
       }
@@ -107,12 +110,11 @@ export class ProtocolService {
     };
 
     resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.JavaScriptDialogOpening, dialogHandler);
-    this.removeDialogHandler = (): void =>
+    this.removeDialogHandler = () =>
         resourceTreeModel.removeEventListener(SDK.ResourceTreeModel.Events.JavaScriptDialogOpening, dialogHandler);
 
     this.parallelConnection = connection;
-    this.targetInfos = childTargetManager.targetInfos();
-    this.mainFrameId = mainFrame.id;
+    this.rootTargetId = await rootChildTargetManager.getParentTargetId();
     this.mainSessionId = sessionId;
   }
 
@@ -123,7 +125,7 @@ export class ProtocolService {
   async startTimespan(currentLighthouseRun: LighthouseRun): Promise<void> {
     const {inspectedURL, categoryIDs, flags} = currentLighthouseRun;
 
-    if (!this.mainFrameId || !this.mainSessionId || !this.targetInfos) {
+    if (!this.mainSessionId || !this.rootTargetId) {
       throw new Error('Unable to get target info required for Lighthouse');
     }
 
@@ -134,15 +136,14 @@ export class ProtocolService {
       config: this.configForTesting,
       locales: this.getLocales(),
       mainSessionId: this.mainSessionId,
-      mainFrameId: this.mainFrameId,
-      targetInfos: this.targetInfos,
+      rootTargetId: this.rootTargetId,
     });
   }
 
   async collectLighthouseResults(currentLighthouseRun: LighthouseRun): Promise<ReportRenderer.RunnerResult> {
     const {inspectedURL, categoryIDs, flags} = currentLighthouseRun;
 
-    if (!this.mainFrameId || !this.mainSessionId || !this.targetInfos) {
+    if (!this.mainSessionId || !this.rootTargetId) {
       throw new Error('Unable to get target info required for Lighthouse');
     }
 
@@ -158,8 +159,7 @@ export class ProtocolService {
       config: this.configForTesting,
       locales: this.getLocales(),
       mainSessionId: this.mainSessionId,
-      mainFrameId: this.mainFrameId,
-      targetInfos: this.targetInfos,
+      rootTargetId: this.rootTargetId,
     });
   }
 

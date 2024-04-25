@@ -92,6 +92,27 @@ function devtoolsPlugin(source, importer) {
     };
   }
 
+  if (importedFileDirectory.includes(path.join('front_end', 'third_party', 'puppeteer', 'package'))) {
+    // Ignore possible dynamic imports from the Node folder.
+    if (importedFileDirectory.includes(path.join('front_end', 'third_party', 'puppeteer', 'package', 'lib', 'esm', 'puppeteer', 'node'))) {
+      return {
+        id: importedFilelocation,
+        external: true,
+      };
+    }
+    return {
+      id: importedFilelocation,
+      external: false,
+    };
+  }
+
+  if (importedFileDirectory.includes(path.join('front_end', 'third_party', 'puppeteer-replay', 'package'))) {
+    return {
+      id: importedFilelocation,
+      external: false,
+    };
+  }
+
   const importedFileName = path.basename(importedFilelocation, '.js');
   const importedFileParentDirectory = path.basename(path.dirname(importedFilelocation));
   const isExternal = importedFileName === importedFileParentDirectory;

@@ -1,8 +1,9 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import type * as Types from './types/types.js';
 import * as Handlers from './handlers/handlers.js';
+import * as Insights from './insights/insights.js';
+import * as Types from './types/types.js';
 
 const enum Status {
   IDLE = 'IDLE',
@@ -32,17 +33,17 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     EventTarget {
   // We force the Meta handler to be enabled, so the TraceHandlers type here is
   // the model handlers the user passes in and the Meta handler.
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   readonly #traceHandlers: Handlers.Types.HandlersWithMeta<EnabledModelHandlers>;
-  #pauseDuration: number;
-  #eventsPerChunk: number;
   #status = Status.IDLE;
+  #modelConfiguration = Types.Configuration.DEFAULT;
+  #data: Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>|null = null;
+  #insights: Insights.Types.TraceInsightData<EnabledModelHandlers>|null = null;
 
   static createWithAllHandlers(): TraceProcessor<typeof Handlers.ModelHandlers> {
-    return new TraceProcessor(Handlers.ModelHandlers);
+    return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.DEFAULT);
   }
 
-  constructor(traceHandlers: EnabledModelHandlers, {pauseDuration = 1, eventsPerChunk = 15_000} = {}) {
+  constructor(traceHandlers: EnabledModelHandlers, modelConfiguration?: Types.Configuration.Configuration) {
     super();
 
     this.#verifyHandlers(traceHandlers);
@@ -50,8 +51,25 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
       Meta: Handlers.ModelHandlers.Meta,
       ...traceHandlers,
     };
-    this.#pauseDuration = pauseDuration;
-    this.#eventsPerChunk = eventsPerChunk;
+    if (modelConfiguration) {
+      this.#modelConfiguration = modelConfiguration;
+    }
+    this.#passConfigToHandlers();
+  }
+
+  updateConfiguration(config: Types.Configuration.Configuration): void {
+    this.#modelConfiguration = config;
+    this.#passConfigToHandlers();
+  }
+
+  #passConfigToHandlers(): void {
+    for (const handler of Object.values(this.#traceHandlers)) {
+      // Bit of an odd double check, but without this TypeScript refuses to let
+      // you call the function as it thinks it might be undefined.
+      if ('handleUserConfig' in handler && handler.handleUserConfig) {
+        handler.handleUserConfig(this.#modelConfiguration);
+      }
+    }
   }
 
   /**
@@ -101,6 +119,8 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
       handler.reset();
     }
 
+    this.#data = null;
+    this.#insights = null;
     this.#status = Status.IDLE;
   }
 
@@ -123,7 +143,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     // main thread to avoid blocking execution. It uses `dispatchEvent` to
     // provide status update events, and other various bits of config like the
     // pause duration and frequency.
-    const traceEventIterator = new TraceEventIterator(traceEvents, this.#pauseDuration, this.#eventsPerChunk);
+    const {pauseDuration, eventsPerChunk} = this.#modelConfiguration.processing;
 
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
@@ -138,13 +158,18 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     }
 
     // Handle each event.
-    for await (const item of traceEventIterator) {
-      if (item.kind === IteratorItemType.STATUS_UPDATE) {
-        this.dispatchEvent(new TraceParseProgressEvent(item.data));
-        continue;
+    for (let i = 0; i < traceEvents.length; ++i) {
+      // Every so often we take a break just to render.
+      if (i % eventsPerChunk === 0 && i) {
+        // Take the opportunity to provide status update events.
+        this.dispatchEvent(new TraceParseProgressEvent({index: i, total: traceEvents.length}));
+        // Wait for rendering before resuming.
+        // TODO(paulirish): consider using `scheduler.await()` or `scheduler.postTask(() => {}, {priority: 'user-blocking'})`
+        await new Promise(resolve => setTimeout(resolve, pauseDuration));
       }
-      for (const handler of sortedHandlers) {
-        handler.handleEvent(item.data);
+      const event = traceEvents[i];
+      for (let j = 0; j < sortedHandlers.length; ++j) {
+        sortedHandlers[j].handleEvent(event);
       }
     }
 
@@ -154,17 +179,102 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
     }
   }
 
-  get data(): Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>|null {
+  get traceParsedData(): Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>|null {
     if (this.#status !== Status.FINISHED_PARSING) {
       return null;
     }
 
-    const data = {};
-    for (const [name, handler] of Object.entries(this.#traceHandlers)) {
-      Object.assign(data, {[name]: handler.data()});
+    if (this.#data) {
+      return this.#data;
     }
 
-    return data as Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>;
+    // Handlers that depend on other handlers do so via .data(), which used to always
+    // return a shallow clone of its internal data structures. However, that pattern
+    // easily results in egregious amounts of allocation. Now .data() does not do any
+    // cloning, and it happens here instead so that users of the trace processor may
+    // still assume that the parsed data is theirs.
+    // See: crbug/41484172
+    const shallowClone = (value: unknown, recurse = true): unknown => {
+      if (value instanceof Map) {
+        return new Map(value);
+      }
+      if (value instanceof Set) {
+        return new Set(value);
+      }
+      if (Array.isArray(value)) {
+        return [...value];
+      }
+      if (typeof value === 'object' && value && recurse) {
+        const obj: Record<string, unknown> = {};
+        for (const [key, v] of Object.entries(value)) {
+          obj[key] = shallowClone(v, false);
+        }
+        return obj;
+      }
+      return value;
+    };
+
+    const traceParsedData = {};
+    for (const [name, handler] of Object.entries(this.#traceHandlers)) {
+      const data = shallowClone(handler.data());
+      Object.assign(traceParsedData, {[name]: data});
+    }
+
+    this.#data = traceParsedData as Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>;
+    return this.#data;
+  }
+
+  #getEnabledInsightRunners(traceParsedData: Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>):
+      Insights.Types.EnabledInsightRunners<EnabledModelHandlers> {
+    const enabledInsights = {} as Insights.Types.EnabledInsightRunners<EnabledModelHandlers>;
+    for (const [name, insight] of Object.entries(Insights.InsightRunners)) {
+      const deps = insight.deps();
+      if (deps.some(dep => !traceParsedData[dep])) {
+        continue;
+      }
+      Object.assign(enabledInsights, {[name]: insight.generateInsight});
+    }
+    return enabledInsights;
+  }
+
+  get insights(): Insights.Types.TraceInsightData<EnabledModelHandlers>|null {
+    if (!this.traceParsedData) {
+      return null;
+    }
+
+    if (this.#insights) {
+      return this.#insights;
+    }
+
+    this.#insights = new Map();
+
+    const enabledInsightRunners = this.#getEnabledInsightRunners(this.traceParsedData);
+
+    for (const nav of this.traceParsedData.Meta.mainFrameNavigations) {
+      if (!nav.args.frame || !nav.args.data?.navigationId) {
+        continue;
+      }
+
+      const context = {
+        frameId: nav.args.frame,
+        navigationId: nav.args.data.navigationId,
+      };
+
+      const navInsightData = {} as Insights.Types.NavigationInsightData<EnabledModelHandlers>;
+      for (const [name, generateInsight] of Object.entries(enabledInsightRunners)) {
+        let insightResult;
+        try {
+          insightResult = generateInsight(this.traceParsedData, context);
+        } catch (err) {
+          insightResult = err;
+        }
+        Object.assign(navInsightData, {[name]: insightResult});
+      }
+
+      this.#insights.set(context.navigationId, navInsightData);
+    }
+
+    return this.#insights;
   }
 }
 
@@ -209,45 +319,4 @@ export function sortHandlers(
     visitHandler(handlerName as Handlers.Types.TraceEventHandlerName);
   }
   return sortedMap;
-}
-
-const enum IteratorItemType {
-  TRACE_EVENT = 1,
-  STATUS_UPDATE = 2,
-}
-
-type IteratorItem = IteratorTraceEventItem|IteratorStatusUpdateItem;
-
-type IteratorTraceEventItem = {
-  kind: IteratorItemType.TRACE_EVENT,
-  data: Types.TraceEvents.TraceEventData,
-};
-
-type IteratorStatusUpdateItem = {
-  kind: IteratorItemType.STATUS_UPDATE,
-  data: TraceParseEventProgressData,
-};
-
-class TraceEventIterator {
-  #eventCount: number;
-
-  constructor(
-      private traceEvents: readonly Types.TraceEvents.TraceEventData[], private pauseDuration: number,
-      private eventsPerChunk: number) {
-    this.#eventCount = 0;
-  }
-
-  async * [Symbol.asyncIterator](): AsyncGenerator<IteratorItem, void, void> {
-    for (let i = 0, length = this.traceEvents.length; i < length; i++) {
-      // Every so often we take a break just to render.
-      if (++this.#eventCount % this.eventsPerChunk === 0) {
-        // Take the opportunity to provide status update events.
-        yield {kind: IteratorItemType.STATUS_UPDATE, data: {index: i, total: length}};
-        // Wait for rendering before resuming.
-        await new Promise(resolve => setTimeout(resolve, this.pauseDuration));
-      }
-
-      yield {kind: IteratorItemType.TRACE_EVENT, data: this.traceEvents[i]};
-    }
-  }
 }

@@ -1,23 +1,14 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import {assert} from 'chai';
 
+import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
-import {$, $$, $textContent, platform, waitFor, waitForFunction} from '../../shared/helper.js';
+import {$, $$, $textContent, click, waitFor, waitForFunction} from '../../shared/helper.js';
 
-export function platformSpecificTextForSubMenuEntryItem(text: string): string {
-  /**
-   * On Mac the context menu adds the ▶ icon to the sub menu entry points in the
-   * context menu, but on Linux/Windows it uses an image. So if we're running on
-   * Mac, we append the search text with the icon, else we do not.
-   */
-  return platform === 'mac' ? `${text}▶` : text;
-}
-
-export function waitForSoftContextMenu(): Promise<puppeteer.ElementHandle<Element>> {
-  return waitFor('.soft-context-menu');
+export async function waitForSoftContextMenu(): Promise<puppeteer.ElementHandle<Element>> {
+  return await waitFor('.soft-context-menu');
 }
 
 export async function assertTopLevelContextMenuItemsText(expectedOptions: string[]): Promise<void> {
@@ -31,21 +22,20 @@ export async function assertTopLevelContextMenuItemsText(expectedOptions: string
 
   assert.deepEqual(allItemsText, expectedOptions);
 }
-export async function findSubMenuEntryItem(
-    text: string, hasSubmenu: boolean): Promise<puppeteer.ElementHandle<Element>> {
-  const textToSearchFor = hasSubmenu ? platformSpecificTextForSubMenuEntryItem(text) : text;
-  const matchingElement = await $textContent(textToSearchFor);
+
+export async function findSubMenuEntryItem(text: string): Promise<puppeteer.ElementHandle<Element>> {
+  const matchingElement = await $textContent(text);
 
   if (!matchingElement) {
     const allItems = await $$('.soft-context-menu > .soft-context-menu-item');
     const allItemsText = await Promise.all(allItems.map(item => item.evaluate(div => div.textContent)));
-    assert.fail(`Could not find "${textToSearchFor}" option on context menu. Found items: ${allItemsText.join(' | ')}`);
+    assert.fail(`Could not find "${text}" option on context menu. Found items: ${allItemsText.join(' | ')}`);
   }
   return matchingElement;
 }
 
 export async function assertSubMenuItemsText(subMenuText: string, expectedOptions: string[]): Promise<void> {
-  const subMenuEntryItem = await findSubMenuEntryItem(subMenuText, true);
+  const subMenuEntryItem = await findSubMenuEntryItem(subMenuText);
   if (!subMenuEntryItem) {
     const allItems = await $$('.soft-context-menu > .soft-context-menu-item');
     const allItemsText = await Promise.all(allItems.map(item => item.evaluate(div => div.textContent)));
@@ -68,4 +58,13 @@ export async function assertSubMenuItemsText(subMenuText: string, expectedOption
   const subMenuItems = await $$('.soft-context-menu-item', subMenuElement);
   const subMenuItemsText = await Promise.all(subMenuItems.map(item => item.evaluate(div => div.textContent)));
   assert.deepEqual(subMenuItemsText, expectedOptions);
+}
+
+export async function openSoftContextMenuAndClickOnItem(selector: string, label: string) {
+  // Find the selected node, right click.
+  await click(selector, {clickOptions: {button: 'right'}});
+
+  // Wait for the context menu option, and click it.
+  const root = await waitForSoftContextMenu();
+  await click(`[aria-label="${label}"]`, {root});
 }

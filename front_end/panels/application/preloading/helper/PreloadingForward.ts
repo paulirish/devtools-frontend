@@ -4,10 +4,18 @@
 
 import type * as Protocol from '../../../../generated/protocol.js';
 
-export class AttemptViewWithFilter {
-  readonly ruleSetId: Protocol.Preload.RuleSetId;
+export class RuleSetView {
+  readonly ruleSetId: Protocol.Preload.RuleSetId|null;
 
-  constructor(ruleSetId: Protocol.Preload.RuleSetId) {
+  constructor(ruleSetId: Protocol.Preload.RuleSetId|null) {
+    this.ruleSetId = ruleSetId;
+  }
+}
+
+export class AttemptViewWithFilter {
+  readonly ruleSetId: Protocol.Preload.RuleSetId|null;
+
+  constructor(ruleSetId: Protocol.Preload.RuleSetId|null) {
     this.ruleSetId = ruleSetId;
   }
 }

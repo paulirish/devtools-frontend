@@ -87,7 +87,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
     this.embedderPathInternal = embedderPath;
     this.domFileSystem = domFileSystem;
     this.excludedFoldersSetting =
-        Common.Settings.Settings.instance().createLocalSetting('workspaceExcludedFolders', {});
+        Common.Settings.Settings.instance().createLocalSetting('workspace-excluded-folders', {});
     this.excludedFoldersInternal = new Set(this.excludedFoldersSetting.get()[path] || []);
     this.excludedEmbedderFolders = [];
 
@@ -159,7 +159,6 @@ export class IsolatedFileSystem extends PlatformFileSystem {
   private initializeFilePaths(): Promise<void> {
     return new Promise(fulfill => {
       let pendingRequests = 1;
-      let numberOfFilesLoaded = 0, numberOfDirectoriesTraversed = 1;
       const boundInnerCallback = innerCallback.bind(this);
       this.requestEntries(Platform.DevToolsPath.EmptyRawPathString, boundInnerCallback);
 
@@ -171,7 +170,6 @@ export class IsolatedFileSystem extends PlatformFileSystem {
                     entry.fullPath as Platform.DevToolsPath.RawPathString))) {
               continue;
             }
-            ++numberOfFilesLoaded;
             this.initialFilePathsInternal.add(Common.ParsedURL.ParsedURL.rawPathToEncodedPathString(
                 Common.ParsedURL.ParsedURL.substr(entry.fullPath as Platform.DevToolsPath.RawPathString, 1)));
           } else {
@@ -193,16 +191,12 @@ export class IsolatedFileSystem extends PlatformFileSystem {
                   Common.ParsedURL.ParsedURL.urlToRawPathString(url, Host.Platform.isWin()));
               continue;
             }
-            ++numberOfDirectoriesTraversed;
             ++pendingRequests;
             this.requestEntries(entry.fullPath as Platform.DevToolsPath.RawPathString, boundInnerCallback);
           }
         }
         if ((--pendingRequests === 0)) {
           fulfill();
-          if (this.type() === '') {
-            Host.userMetrics.workspacesNumberOfFiles(numberOfFilesLoaded, numberOfDirectoriesTraversed);
-          }
         }
       }
     });
@@ -302,6 +296,34 @@ export class IsolatedFileSystem extends PlatformFileSystem {
     }
   }
 
+  override deleteDirectoryRecursively(path: Platform.DevToolsPath.EncodedPathString): Promise<boolean> {
+    let resolveCallback: (arg0: boolean) => void;
+    const promise = new Promise<boolean>(resolve => {
+      resolveCallback = resolve;
+    });
+    this.domFileSystem.root.getDirectory(
+        Common.ParsedURL.ParsedURL.encodedPathToRawPathString(path), undefined, dirEntryLoaded.bind(this),
+        errorHandler.bind(this));
+    return promise;
+
+    function dirEntryLoaded(this: IsolatedFileSystem, dirEntry: DirectoryEntry): void {
+      dirEntry.removeRecursively(dirEntryRemoved, errorHandler.bind(this));
+    }
+
+    function dirEntryRemoved(): void {
+      resolveCallback(true);
+    }
+
+    /**
+     * TODO(jsbell): Update externs replacing DOMError with DOMException. https://crbug.com/496901
+     */
+    function errorHandler(this: IsolatedFileSystem, error: DOMError): void {
+      const errorMessage = IsolatedFileSystem.errorMessage(error);
+      console.error(errorMessage + ' when deleting directory \'' + (this.path() + '/' + path) + '\'');
+      resolveCallback(false);
+    }
+  }
+
   override requestFileBlob(path: Platform.DevToolsPath.EncodedPathString): Promise<Blob|null> {
     return new Promise(resolve => {
       this.domFileSystem.root.getFile(Common.ParsedURL.ParsedURL.encodedPathToRawPathString(path), undefined, entry => {
@@ -369,11 +391,10 @@ export class IsolatedFileSystem extends PlatformFileSystem {
   override async setFileContent(path: Platform.DevToolsPath.EncodedPathString, content: string, isBase64: boolean):
       Promise<void> {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.FileSavedInWorkspace);
-    let callback: (event?: ProgressEvent<EventTarget>) => void;
-    const innerSetFileContent = (): Promise<ProgressEvent<EventTarget>> => {
-      const promise = new Promise<ProgressEvent<EventTarget>>(x => {
-        // @ts-ignore TODO(crbug.com/1172300) Properly type this after jsdoc to ts migration
-        callback = x;
+    let resolve: (result: ProgressEvent<EventTarget>|undefined) => void;
+    const innerSetFileContent = (): Promise<ProgressEvent<EventTarget>|undefined> => {
+      const promise = new Promise<ProgressEvent<EventTarget>|undefined>(x => {
+        resolve = x;
       });
       this.domFileSystem.root.getFile(
           Common.ParsedURL.ParsedURL.encodedPathToRawPathString(path), {create: true}, fileEntryLoaded.bind(this),
@@ -399,7 +420,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       fileWriter.write(blob);
 
       function fileWritten(): void {
-        fileWriter.onwriteend = callback;
+        fileWriter.onwriteend = resolve;
         fileWriter.truncate(blob.size);
       }
     }
@@ -408,7 +429,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
       // @ts-ignore TODO(crbug.com/1172300) Properly type this after jsdoc to ts migration
       const errorMessage = IsolatedFileSystem.errorMessage(error);
       console.error(errorMessage + ' when setting content for file \'' + (this.path() + '/' + path) + '\'');
-      callback(undefined);
+      resolve(undefined);
     }
   }
 

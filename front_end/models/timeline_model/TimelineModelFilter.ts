@@ -7,7 +7,9 @@ import * as TraceEngine from '../../models/trace/trace.js';
 import {RecordType, TimelineModelImpl} from './TimelineModel.js';
 
 export abstract class TimelineModelFilter {
-  abstract accept(_event: TraceEngine.Legacy.CompatibleTraceEvent): boolean;
+  abstract accept(
+      _event: TraceEngine.Legacy.CompatibleTraceEvent,
+      traceParsedData?: TraceEngine.Handlers.Types.TraceParseData): boolean;
 }
 
 export class TimelineVisibleEventsFilter extends TimelineModelFilter {
@@ -18,6 +20,12 @@ export class TimelineVisibleEventsFilter extends TimelineModelFilter {
   }
 
   accept(event: TraceEngine.Legacy.CompatibleTraceEvent): boolean {
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event)) {
+      if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(event) ||
+          TraceEngine.Types.TraceEvents.isSyntheticTraceEntry(event)) {
+        return true;
+      }
+    }
     return this.visibleTypes.has(TimelineVisibleEventsFilter.eventType(event));
   }
 

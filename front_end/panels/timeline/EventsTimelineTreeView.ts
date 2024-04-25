@@ -5,23 +5,18 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import * as TraceEngine from '../../models/trace/trace.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as TraceEngine from '../../models/trace/trace.js';
 
+import {type EventCategory, getCategoryStyles} from './EventUICategory.js';
 import {Category, IsLong} from './TimelineFilters.js';
-
 import {type TimelineModeViewDelegate} from './TimelinePanel.js';
-
 import {TimelineSelection} from './TimelineSelection.js';
 import {TimelineTreeView} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
-  /**
-   *@description Aria-label for filter bar in Event Log view
-   */
-  filterEventLog: 'Filter event log',
   /**
    *@description Text for the start time of an activity
    */
@@ -52,7 +47,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     this.filtersControl.addEventListener(Events.FilterChanged, this.onFilterChanged, this);
     this.init();
     this.delegate = delegate;
-    this.dataGrid.markColumnAsSortedBy('startTime', DataGrid.DataGrid.Order.Ascending);
+    this.dataGrid.markColumnAsSortedBy('start-time', DataGrid.DataGrid.Order.Ascending);
     this.splitWidget.showBoth();
   }
 
@@ -65,10 +60,6 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     if (TimelineSelection.isTraceEventSelection(selection.object)) {
       this.selectEvent(selection.object, true);
     }
-  }
-
-  override getToolbarInputAccessiblePlaceHolder(): string {
-    return i18nString(UIStrings.filterEventLog);
   }
 
   override buildTree(): TimelineModel.TimelineProfileTree.Node {
@@ -123,7 +114,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
 
   override populateColumns(columns: DataGrid.DataGrid.ColumnDescriptor[]): void {
     columns.push(({
-      id: 'startTime',
+      id: 'start-time',
       title: i18nString(UIStrings.startTime),
       width: '80px',
       fixedWidth: true,
@@ -145,12 +136,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     if (!traceEvent) {
       return false;
     }
-    const model = this.model();
-    if (!model) {
-      return false;
-    }
-    void TimelineUIUtils
-        .buildTraceEventDetails(traceEvent, model.timelineModel(), this.linkifier, false, this.traceParseData())
+    void TimelineUIUtils.buildTraceEventDetails(traceEvent, this.linkifier, false, this.traceParseData())
         .then(fragment => this.detailsView.element.appendChild(fragment));
     return true;
   }
@@ -186,14 +172,14 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     toolbar.appendToolbarItem(durationFilterUI);
 
     const categoryFiltersUI = new Map<string, UI.Toolbar.ToolbarCheckbox>();
-    const categories = TimelineUIUtils.categories();
+    const categories = getCategoryStyles();
     for (const categoryName in categories) {
-      const category = categories[categoryName];
+      const category = categories[categoryName as EventCategory];
       if (!category.visible) {
         continue;
       }
-      const checkbox =
-          new UI.Toolbar.ToolbarCheckbox(category.title, undefined, categoriesFilterChanged.bind(this, categoryName));
+      const checkbox = new UI.Toolbar.ToolbarCheckbox(
+          category.title, undefined, categoriesFilterChanged.bind(this, categoryName as EventCategory));
       checkbox.setChecked(true);
       checkbox.inputElement.style.backgroundColor = category.color;
       categoryFiltersUI.set(category.name, checkbox);
@@ -207,8 +193,8 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
       this.notifyFiltersChanged();
     }
 
-    function categoriesFilterChanged(this: Filters, name: string): void {
-      const categories = TimelineUIUtils.categories();
+    function categoriesFilterChanged(this: Filters, name: EventCategory): void {
+      const categories = getCategoryStyles();
       const checkBox = categoryFiltersUI.get(name);
       categories[name].hidden = !checkBox || !checkBox.checked();
       this.notifyFiltersChanged();
@@ -219,8 +205,6 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     this.dispatchEventToListeners(Events.FilterChanged);
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   private static readonly durationFilterPresetsMs = [0, 1, 15];
 }
 

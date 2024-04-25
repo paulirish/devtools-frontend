@@ -11,14 +11,14 @@ import {
 } from '../helpers/elements-helpers.js';
 import {openSourcesPanel} from '../helpers/sources-helpers.js';
 
-describe('The Elements tab', async function() {
+describe('The Elements tab', function() {
   it('does not break when switching panels while editing as HTML', async () => {
     await goToResource('elements/switch-panels-while-editing-as-html.html');
     await expandSelectedNodeRecursively();
     const elementsContentPanel = await waitFor('#elements-content');
     const selectedNode = await waitForElementWithTextContent('Inspected Node', elementsContentPanel);
     await selectedNode.click({button: 'right'});
-    const editAsHTMLOption = await findSubMenuEntryItem('Edit as HTML', false);
+    const editAsHTMLOption = await findSubMenuEntryItem('Edit as HTML');
     await editAsHTMLOption.click();
     await waitFor('.elements-disclosure devtools-text-editor');
     await openSourcesPanel();

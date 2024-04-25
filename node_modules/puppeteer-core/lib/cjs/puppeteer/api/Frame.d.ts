@@ -1,52 +1,60 @@
 /**
- * Copyright 2023 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
-import { ClickOptions, ElementHandle } from '../api/ElementHandle.js';
-import { HTTPResponse } from '../api/HTTPResponse.js';
-import { Page, WaitTimeoutOptions } from '../api/Page.js';
-import { CDPSession } from '../common/Connection.js';
-import { DeviceRequestPrompt } from '../common/DeviceRequestPrompt.js';
-import { ExecutionContext } from '../common/ExecutionContext.js';
-import { IsolatedWorldChart, WaitForSelectorOptions } from '../common/IsolatedWorld.js';
-import { PuppeteerLifeCycleEvent } from '../common/LifecycleWatcher.js';
-import { EvaluateFunc, EvaluateFuncWith, HandleFor, InnerLazyParams, NodeFor } from '../common/types.js';
-import { TaskManager } from '../common/WaitTask.js';
-import { KeyboardTypeOptions } from './Input.js';
-import { JSHandle } from './JSHandle.js';
-import { Locator } from './Locator.js';
+import type Protocol from 'devtools-protocol';
+import type { ClickOptions, ElementHandle } from '../api/ElementHandle.js';
+import type { HTTPResponse } from '../api/HTTPResponse.js';
+import type { Page, WaitForSelectorOptions, WaitTimeoutOptions } from '../api/Page.js';
+import type { DeviceRequestPrompt } from '../cdp/DeviceRequestPrompt.js';
+import type { PuppeteerLifeCycleEvent } from '../cdp/LifecycleWatcher.js';
+import { EventEmitter, type EventType } from '../common/EventEmitter.js';
+import type { Awaitable, EvaluateFunc, EvaluateFuncWith, HandleFor, NodeFor } from '../common/types.js';
+import type { CDPSession } from './CDPSession.js';
+import type { KeyboardTypeOptions } from './Input.js';
+import { type Locator } from './locators/locators.js';
+import type { Realm } from './Realm.js';
 /**
- * @internal
+ * @public
  */
-export interface Realm {
-    taskManager: TaskManager;
-    waitForFunction<Params extends unknown[], Func extends EvaluateFunc<InnerLazyParams<Params>> = EvaluateFunc<InnerLazyParams<Params>>>(pageFunction: Func | string, options: {
-        polling?: 'raf' | 'mutation' | number;
-        timeout?: number;
-        root?: ElementHandle<Node>;
-        signal?: AbortSignal;
-    }, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
-    adoptHandle<T extends JSHandle<Node>>(handle: T): Promise<T>;
-    transferHandle<T extends JSHandle<Node>>(handle: T): Promise<T>;
-    evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
-    evaluate<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
-    click(selector: string, options: Readonly<ClickOptions>): Promise<void>;
-    focus(selector: string): Promise<void>;
-    hover(selector: string): Promise<void>;
-    select(selector: string, ...values: string[]): Promise<string[]>;
-    tap(selector: string): Promise<void>;
-    type(selector: string, text: string, options?: Readonly<KeyboardTypeOptions>): Promise<void>;
+export interface WaitForOptions {
+    /**
+     * Maximum wait time in milliseconds. Pass 0 to disable the timeout.
+     *
+     * The default value can be changed by using the
+     * {@link Page.setDefaultTimeout} or {@link Page.setDefaultNavigationTimeout}
+     * methods.
+     *
+     * @defaultValue `30000`
+     */
+    timeout?: number;
+    /**
+     * When to consider waiting succeeds. Given an array of event strings, waiting
+     * is considered to be successful after all events have been fired.
+     *
+     * @defaultValue `'load'`
+     */
+    waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
+    /**
+     * @internal
+     */
+    ignoreSameDocumentNavigation?: boolean;
+}
+/**
+ * @public
+ */
+export interface GoToOptions extends WaitForOptions {
+    /**
+     * If provided, it will take preference over the referer header value set by
+     * {@link Page.setExtraHTTPHeaders | page.setExtraHTTPHeaders()}.
+     */
+    referer?: string;
+    /**
+     * If provided, it will take preference over the referer-policy header value
+     * set by {@link Page.setExtraHTTPHeaders | page.setExtraHTTPHeaders()}.
+     */
+    referrerPolicy?: string;
 }
 /**
  * @public
@@ -126,6 +134,41 @@ export interface FrameAddStyleTagOptions {
     content?: string;
 }
 /**
+ * @public
+ */
+export interface FrameEvents extends Record<EventType, unknown> {
+    /** @internal */
+    [FrameEvent.FrameNavigated]: Protocol.Page.NavigationType;
+    /** @internal */
+    [FrameEvent.FrameSwapped]: undefined;
+    /** @internal */
+    [FrameEvent.LifecycleEvent]: undefined;
+    /** @internal */
+    [FrameEvent.FrameNavigatedWithinDocument]: undefined;
+    /** @internal */
+    [FrameEvent.FrameDetached]: Frame;
+    /** @internal */
+    [FrameEvent.FrameSwappedByActivation]: undefined;
+}
+/**
+ * We use symbols to prevent external parties listening to these events.
+ * They are internal to Puppeteer.
+ *
+ * @internal
+ */
+export declare namespace FrameEvent {
+    const FrameNavigated: unique symbol;
+    const FrameSwapped: unique symbol;
+    const LifecycleEvent: unique symbol;
+    const FrameNavigatedWithinDocument: unique symbol;
+    const FrameDetached: unique symbol;
+    const FrameSwappedByActivation: unique symbol;
+}
+/**
+ * @internal
+ */
+export declare const throwIfDetached: (target: (this: Frame, ...args: any[]) => any, _: unknown) => (this: Frame, ...args: any[]) => any;
+/**
  * Represents a DOM frame.
  *
  * To understand frames, you can think of frames as `<iframe>` elements. Just
@@ -172,13 +215,14 @@ export interface FrameAddStyleTagOptions {
  * Frame lifecycles are controlled by three events that are all dispatched on
  * the parent {@link Frame.page | page}:
  *
- * - {@link PageEmittedEvents.FrameAttached}
- * - {@link PageEmittedEvents.FrameNavigated}
- * - {@link PageEmittedEvents.FrameDetached}
+ * - {@link PageEvent.FrameAttached}
+ * - {@link PageEvent.FrameNavigated}
+ * - {@link PageEvent.FrameDetached}
  *
  * @public
  */
-export declare class Frame {
+export declare abstract class Frame extends EventEmitter<FrameEvents> {
+    #private;
     /**
      * @internal
      */
@@ -187,10 +231,6 @@ export declare class Frame {
      * @internal
      */
     _parentId?: string;
-    /**
-     * @internal
-     */
-    worlds: IsolatedWorldChart;
     /**
      * @internal
      */
@@ -206,14 +246,14 @@ export declare class Frame {
     /**
      * The page associated with the frame.
      */
-    page(): Page;
+    abstract page(): Page;
     /**
      * Is `true` if the frame is an out-of-process (OOP) frame. Otherwise,
      * `false`.
      */
-    isOOPFrame(): boolean;
+    abstract isOOPFrame(): boolean;
     /**
-     * Navigates a frame to the given url.
+     * Navigates the frame to the given `url`.
      *
      * @remarks
      * Navigation to `about:blank` or navigation to the same URL with a different
@@ -227,20 +267,17 @@ export declare class Frame {
      *
      * :::
      *
-     * @param url - the URL to navigate the frame to. This should include the
-     * scheme, e.g. `https://`.
-     * @param options - navigation options. `waitUntil` is useful to define when
-     * the navigation should be considered successful - see the docs for
-     * {@link PuppeteerLifeCycleEvent} for more details.
-     *
+     * @param url - URL to navigate the frame to. The URL should include scheme,
+     * e.g. `https://`
+     * @param options - Options to configure waiting behavior.
      * @returns A promise which resolves to the main resource response. In case of
      * multiple redirects, the navigation will resolve with the response of the
      * last redirect.
-     * @throws This method will throw an error if:
+     * @throws If:
      *
      * - there's an SSL error (e.g. in case of self-signed certificates).
      * - target URL is invalid.
-     * - the `timeout` is exceeded during navigation.
+     * - the timeout is exceeded during navigation.
      * - the remote server does not respond or is unreachable.
      * - the main resource failed to load.
      *
@@ -249,12 +286,7 @@ export declare class Frame {
      * Server Error". The status code for such responses can be retrieved by
      * calling {@link HTTPResponse.status}.
      */
-    goto(url: string, options?: {
-        referer?: string;
-        referrerPolicy?: string;
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<HTTPResponse | null>;
+    abstract goto(url: string, options?: GoToOptions): Promise<HTTPResponse | null>;
     /**
      * Waits for the frame to navigate. It is useful for when you run code which
      * will indirectly cause the frame to navigate.
@@ -274,30 +306,32 @@ export declare class Frame {
      * ]);
      * ```
      *
-     * @param options - options to configure when the navigation is consided
-     * finished.
-     * @returns a promise that resolves when the frame navigates to a new URL.
+     * @param options - Options to configure waiting behavior.
+     * @returns A promise which resolves to the main resource response.
      */
-    waitForNavigation(options?: {
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<HTTPResponse | null>;
+    abstract waitForNavigation(options?: WaitForOptions): Promise<HTTPResponse | null>;
     /**
      * @internal
      */
-    _client(): CDPSession;
+    abstract get client(): CDPSession;
     /**
      * @internal
      */
-    executionContext(): Promise<ExecutionContext>;
+    abstract mainRealm(): Realm;
     /**
      * @internal
      */
-    mainRealm(): Realm;
+    abstract isolatedRealm(): Realm;
     /**
+     * Used to clear the document handle that has been destroyed.
+     *
      * @internal
      */
-    isolatedRealm(): Realm;
+    clearDocumentHandle(): void;
+    /**
+     * @returns The frame element associated with this frame (if any).
+     */
+    frameElement(): Promise<HandleFor<HTMLIFrameElement> | null>;
     /**
      * Behaves identically to {@link Page.evaluateHandle} except it's run within
      * the context of this frame.
@@ -306,21 +340,30 @@ export declare class Frame {
      */
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
     /**
-     * Behaves identically to {@link Page.evaluate} except it's run within the
+     * Behaves identically to {@link Page.evaluate} except it's run within
      * the context of this frame.
      *
      * @see {@link Page.evaluate} for details.
      */
     evaluate<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
     /**
-     * Creates a locator for the provided `selector`. See {@link Locator} for
+     * Creates a locator for the provided selector. See {@link Locator} for
      * details and supported actions.
      *
      * @remarks
      * Locators API is experimental and we will not follow semver for breaking
      * change in the Locators API.
      */
-    locator(selector: string): Locator;
+    locator<Selector extends string>(selector: Selector): Locator<NodeFor<Selector>>;
+    /**
+     * Creates a locator for the provided function. See {@link Locator} for
+     * details and supported actions.
+     *
+     * @remarks
+     * Locators API is experimental and we will not follow semver for breaking
+     * change in the Locators API.
+     */
+    locator<Ret>(func: () => Awaitable<Ret>): Locator<Ret>;
     /**
      * Queries the frame for an element matching the given selector.
      *
@@ -357,7 +400,7 @@ export declare class Frame {
      * @param args - Additional arguments to pass to `pageFunction`.
      * @returns A promise to the result of the function.
      */
-    $eval<Selector extends string, Params extends unknown[], Func extends EvaluateFuncWith<NodeFor<Selector>, Params> = EvaluateFuncWith<NodeFor<Selector>, Params>>(selector: Selector, pageFunction: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
+    $eval<Selector extends string, Params extends unknown[], Func extends EvaluateFuncWith<NodeFor<Selector>, Params> = EvaluateFuncWith<NodeFor<Selector>, Params>>(selector: Selector, pageFunction: string | Func, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
     /**
      * Runs the given function on an array of elements matching the given selector
      * in the frame.
@@ -367,7 +410,7 @@ export declare class Frame {
      *
      * @example
      *
-     * ```js
+     * ```ts
      * const divsCounts = await frame.$$eval('div', divs => divs.length);
      * ```
      *
@@ -378,18 +421,7 @@ export declare class Frame {
      * @param args - Additional arguments to pass to `pageFunction`.
      * @returns A promise to the result of the function.
      */
-    $$eval<Selector extends string, Params extends unknown[], Func extends EvaluateFuncWith<Array<NodeFor<Selector>>, Params> = EvaluateFuncWith<Array<NodeFor<Selector>>, Params>>(selector: Selector, pageFunction: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
-    /**
-     * @deprecated Use {@link Frame.$$} with the `xpath` prefix.
-     *
-     * Example: `await frame.$$('xpath/' + xpathExpression)`
-     *
-     * This method evaluates the given XPath expression and returns the results.
-     * If `xpath` starts with `//` instead of `.//`, the dot will be appended
-     * automatically.
-     * @param expression - the XPath expression to evaluate.
-     */
-    $x(expression: string): Promise<Array<ElementHandle<Node>>>;
+    $$eval<Selector extends string, Params extends unknown[], Func extends EvaluateFuncWith<Array<NodeFor<Selector>>, Params> = EvaluateFuncWith<Array<NodeFor<Selector>>, Params>>(selector: Selector, pageFunction: string | Func, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
     /**
      * Waits for an element matching the given selector to appear in the frame.
      *
@@ -426,29 +458,6 @@ export declare class Frame {
      * @throws Throws if an element matching the given selector doesn't appear.
      */
     waitForSelector<Selector extends string>(selector: Selector, options?: WaitForSelectorOptions): Promise<ElementHandle<NodeFor<Selector>> | null>;
-    /**
-     * @deprecated Use {@link Frame.waitForSelector} with the `xpath` prefix.
-     *
-     * Example: `await frame.waitForSelector('xpath/' + xpathExpression)`
-     *
-     * The method evaluates the XPath expression relative to the Frame.
-     * If `xpath` starts with `//` instead of `.//`, the dot will be appended
-     * automatically.
-     *
-     * Wait for the `xpath` to appear in page. If at the moment of calling the
-     * method the `xpath` already exists, the method will return immediately. If
-     * the xpath doesn't appear after the `timeout` milliseconds of waiting, the
-     * function will throw.
-     *
-     * For a code example, see the example for {@link Frame.waitForSelector}. That
-     * function behaves identically other than taking a CSS selector rather than
-     * an XPath.
-     *
-     * @param xpath - the XPath expression to wait for.
-     * @param options - options to configure the visibility of the element and how
-     * long to wait before timing out.
-     */
-    waitForXPath(xpath: string, options?: WaitForSelectorOptions): Promise<ElementHandle<Node> | null>;
     /**
      * @example
      * The `waitForFunction` can be used to observe viewport size change:
@@ -494,10 +503,11 @@ export declare class Frame {
      * @param options - Options to configure how long before timing out and at
      * what point to consider the content setting successful.
      */
-    setContent(html: string, options?: {
-        timeout?: number;
-        waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
-    }): Promise<void>;
+    abstract setContent(html: string, options?: WaitForOptions): Promise<void>;
+    /**
+     * @internal
+     */
+    setFrameContent(content: string): Promise<void>;
     /**
      * The frame's `name` attribute as specified in the tag.
      *
@@ -507,24 +517,41 @@ export declare class Frame {
      * @remarks
      * This value is calculated once when the frame is created, and will not
      * update if the attribute is changed later.
+     *
+     * @deprecated Use
+     *
+     * ```ts
+     * const element = await frame.frameElement();
+     * const nameOrId = await element.evaluate(frame => frame.name ?? frame.id);
+     * ```
      */
     name(): string;
     /**
      * The frame's URL.
      */
-    url(): string;
+    abstract url(): string;
     /**
      * The parent frame, if any. Detached and main frames return `null`.
      */
-    parentFrame(): Frame | null;
+    abstract parentFrame(): Frame | null;
     /**
      * An array of child frames.
      */
-    childFrames(): Frame[];
+    abstract childFrames(): Frame[];
+    /**
+     * @returns `true` if the frame has detached. `false` otherwise.
+     */
+    abstract get detached(): boolean;
     /**
      * Is`true` if the frame has been detached. Otherwise, `false`.
+     *
+     * @deprecated Use the `detached` getter.
      */
     isDetached(): boolean;
+    /**
+     * @internal
+     */
+    get disposed(): boolean;
     /**
      * Adds a `<script>` tag into the page with the desired url or content.
      *
@@ -534,13 +561,18 @@ export declare class Frame {
      */
     addScriptTag(options: FrameAddScriptTagOptions): Promise<ElementHandle<HTMLScriptElement>>;
     /**
-     * Adds a `<link rel="stylesheet">` tag into the page with the desired URL or
-     * a `<style type="text/css">` tag with the content.
+     * Adds a `HTMLStyleElement` into the frame with the desired URL
      *
-     * @returns An {@link ElementHandle | element handle} to the loaded `<link>`
-     * or `<style>` element.
+     * @returns An {@link ElementHandle | element handle} to the loaded `<style>`
+     * element.
      */
     addStyleTag(options: Omit<FrameAddStyleTagOptions, 'url'>): Promise<ElementHandle<HTMLStyleElement>>;
+    /**
+     * Adds a `HTMLLinkElement` into the frame with the desired URL
+     *
+     * @returns An {@link ElementHandle | element handle} to the loaded `<link>`
+     * element.
+     */
     addStyleTag(options: FrameAddStyleTagOptions): Promise<ElementHandle<HTMLLinkElement>>;
     /**
      * Clicks the first element found that matches `selector`.
@@ -625,27 +657,6 @@ export declare class Frame {
      */
     type(selector: string, text: string, options?: Readonly<KeyboardTypeOptions>): Promise<void>;
     /**
-     * @deprecated Replace with `new Promise(r => setTimeout(r, milliseconds));`.
-     *
-     * Causes your script to wait for the given number of milliseconds.
-     *
-     * @remarks
-     * It's generally recommended to not wait for a number of seconds, but instead
-     * use {@link Frame.waitForSelector}, {@link Frame.waitForXPath} or
-     * {@link Frame.waitForFunction} to wait for exactly the conditions you want.
-     *
-     * @example
-     *
-     * Wait for 1 second:
-     *
-     * ```ts
-     * await frame.waitForTimeout(1000);
-     * ```
-     *
-     * @param milliseconds - the number of milliseconds to wait.
-     */
-    waitForTimeout(milliseconds: number): Promise<void>;
-    /**
      * The frame's title.
      */
     title(): Promise<string>;
@@ -671,7 +682,9 @@ export declare class Frame {
      *   await devicePrompt.waitForDevice(({name}) => name.includes('My Device'))
      * );
      * ```
+     *
+     * @internal
      */
-    waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
+    abstract waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
 }
 //# sourceMappingURL=Frame.d.ts.map

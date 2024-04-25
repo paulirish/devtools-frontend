@@ -23,7 +23,7 @@ export namespace Chrome {
 
       eval(
           expression: string,
-          options?: {contextSecurityOrigin?: string, frameURL?: string, useContentScriptContext?: boolean},
+          options?: {scriptExecutionContext?: string, frameURL?: string, useContentScriptContext?: boolean},
           callback?: (result: unknown, exceptioninfo: {
             code: string,
             description: string,
@@ -70,6 +70,7 @@ export namespace Chrome {
     export interface Panels {
       elements: PanelWithSidebar;
       sources: PanelWithSidebar;
+      network: NetworkPanel;
       themeName: string;
 
       create(title: string, iconPath: string, pagePath: string, callback?: (panel: ExtensionPanel) => unknown): void;
@@ -94,12 +95,17 @@ export namespace Chrome {
       getHAR(callback: (harLog: object) => unknown): void;
     }
 
+    export interface NetworkPanel {
+      show(options?: {filter: string}): Promise<void>;
+    }
+
     export interface DevToolsAPI {
       network: Network;
       panels: Panels;
       inspectedWindow: InspectedWindow;
       languageServices: LanguageExtensions;
       recorder: RecorderExtensions;
+      performance: Performance;
     }
 
     export interface ExperimentalDevToolsAPI {
@@ -271,6 +277,9 @@ export namespace Chrome {
       getWasmLocal(local: number, stopId: unknown): Promise<WasmValue>;
       getWasmGlobal(global: number, stopId: unknown): Promise<WasmValue>;
       getWasmOp(op: number, stopId: unknown): Promise<WasmValue>;
+
+      reportResourceLoad(resourceUrl: string, status: {success: boolean, errorMessage?: string, size?: number}):
+          Promise<void>;
     }
 
 
@@ -279,6 +288,11 @@ export namespace Chrome {
           Promise<void>;
       unregisterRecorderExtensionPlugin(plugin: RecorderExtensionPlugin): Promise<void>;
       createView(title: string, pagePath: string): Promise<RecorderView>;
+    }
+
+    export interface Performance {
+      onProfilingStarted: EventSink<() => unknown>;
+      onProfilingStopped: EventSink<() => unknown>;
     }
 
     export interface Chrome {

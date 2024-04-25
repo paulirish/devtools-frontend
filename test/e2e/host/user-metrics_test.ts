@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-
 import type * as puppeteer from 'puppeteer-core';
 
 import {
@@ -22,8 +21,8 @@ import {
   waitForFunction,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
-import {navigateToCssOverviewTab, startCaptureCSSOverview} from '../helpers/css-overview-helpers.js';
 import {CONSOLE_MESSAGES_SELECTOR, navigateToConsoleTab} from '../helpers/console-helpers.js';
+import {navigateToCssOverviewTab, startCaptureCSSOverview} from '../helpers/css-overview-helpers.js';
 import {
   editCSSProperty,
   focusElementsTree,
@@ -31,11 +30,11 @@ import {
   waitForContentOfSelectedElementsNode,
   waitForElementsStyleSection,
 } from '../helpers/elements-helpers.js';
+import {navigateToNetworkTab, openNetworkTab} from '../helpers/network-helpers.js';
 import {openCommandMenu} from '../helpers/quick_open-helpers.js';
 import {closeSecurityTab, navigateToSecurityTab} from '../helpers/security-helpers.js';
 import {openPanelViaMoreTools, openSettingsTab} from '../helpers/settings-helpers.js';
 import {waitForSourcesPanel} from '../helpers/sources-helpers.js';
-import {navigateToNetworkTab, openNetworkTab} from '../helpers/network-helpers.js';
 
 interface UserMetrics {
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -185,10 +184,6 @@ describe('User Metrics', () => {
     await assertHistogramEventsInclude([
       {
         actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // 'console-view'.
-      },
-      {
-        actionName: 'DevTools.PanelShown',
         actionCode: 11,  // 'animations'.
       },
     ]);
@@ -201,10 +196,6 @@ describe('User Metrics', () => {
       {
         actionName: 'DevTools.IssuesPanelOpenedFrom',
         actionCode: 3,  // 'HamburgerMenu'.
-      },
-      {
-        actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // 'console-view'.
       },
       {
         actionName: 'DevTools.PanelShown',
@@ -374,7 +365,7 @@ describe('User Metrics', () => {
     await assertHistogramEventsInclude([
       {
         actionName: 'DevTools.ExperimentEnabledAtLaunch',
-        actionCode: 52,  // Enabled by default: cssTypeComponentLength
+        actionCode: 74,  // Enabled by default: setAllBreakpointsEagerly
       },
       {
         actionName: 'DevTools.ExperimentDisabledAtLaunch',
@@ -396,8 +387,7 @@ describe('User Metrics', () => {
 
     const events = await retrieveRecordedPerformanceHistogramEvents(frontend);
 
-    assert.strictEqual(events.length, 1);
-    assert.strictEqual(events[0].histogramName, 'DevTools.Launch.Timeline');
+    assert.include(events.map(e => e.histogramName), 'DevTools.Launch.Timeline');
   });
 
   it('records the selected language', async () => {
@@ -417,7 +407,7 @@ describe('User Metrics', () => {
   });
 });
 
-describe('User Metrics for CSS Overview', () => {
+describe('User metrics for CSS overview', () => {
   it('dispatch events when capture overview button hit', async () => {
     await goToResource('css_overview/default.html');
     await navigateToCssOverviewTab();
@@ -438,29 +428,9 @@ describe('User Metrics for CSS Overview', () => {
 });
 
 describe('User Metrics for sidebar panes', () => {
-  it('dispatches sidebar panes events for navigating Elements Panel sidebar panes', async () => {
-    await navigateToSidePane('Computed');
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.Elements.SidebarTabShown',
-        actionCode: 2,  // Computed
-      },
-    ]);
-  });
-
-  it('should not dispatch sidebar panes events for navigating to the same pane', async () => {
-    await navigateToSidePane('Styles');
-
-    const {frontend} = getBrowserAndPages();
-    const events = await retrieveRecordedHistogramEvents(frontend);
-    const eventNames = events.map(event => event.actionName);
-
-    assert.notInclude(eventNames, 'DevTools.Elements.SidebarTabShown');
-  });
-
-  it('dispatches sidebar panes events for switching to \'Filesystem\' tab in the \'Sources\' panel', async () => {
+  it('dispatches sidebar panes events for switching to \'Workspace\' tab in the \'Sources\' panel', async () => {
     await click('#tab-sources');
-    await navigateToSidePane('Filesystem');
+    await navigateToSidePane('Workspace');
 
     await assertHistogramEventsInclude([
       {
@@ -473,7 +443,7 @@ describe('User Metrics for sidebar panes', () => {
 
 describe('User Metrics for Issue Panel', () => {
   beforeEach(async () => {
-    await enableExperiment('contrastIssues');
+    await enableExperiment('contrast-issues');
     await openPanelViaMoreTools('Issues');
   });
 
@@ -523,7 +493,6 @@ describe('User Metrics for Issue Panel', () => {
 
   it('dispatch events when a link to an element is clicked', async () => {
     await goToResource('elements/element-reveal-inline-issue.html');
-    await waitFor('.issue');
     await click('.issue');
 
     await waitFor('.element-reveal-icon');
@@ -546,35 +515,6 @@ describe('User Metrics for Issue Panel', () => {
       {
         actionName: 'DevTools.IssuesPanelResourceOpened',
         actionCode: 7,  // ContentSecurityPolicyElement
-      },
-    ]);
-  });
-
-  it('dispatch events when a "Learn More" link is clicked', async () => {
-    await goToResource('elements/element-reveal-inline-issue.html');
-    await waitFor('.issue');
-    await click('.issue');
-
-    await waitFor('.link-list x-link');
-    await scrollElementIntoView('.link-list x-link');
-    await click('.link-list x-link');
-
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.IssueCreated',
-        actionCode: 1,  // ContentSecurityPolicyIssue
-      },
-      {
-        actionName: 'DevTools.IssueCreated',
-        actionCode: 1,  // ContentSecurityPolicyIssue
-      },
-      {
-        actionName: 'DevTools.IssuesPanelIssueExpanded',
-        actionCode: 4,  // ContentSecurityPolicy
-      },
-      {
-        actionName: 'DevTools.IssuesPanelResourceOpened',
-        actionCode: 12,  // ContentSecurityPolicyLearnMore
       },
     ]);
   });

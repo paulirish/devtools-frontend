@@ -155,9 +155,13 @@ class Templates:
             fill_recursive(path.dirname(path_part), depth - 1)
             components.append(path.basename(path_part))
 
-        # Typical path is /Source/platform/inspector_protocol/CodeGenerator.py
-        # Let's take 4 components from the real path then.
-        fill_recursive(absolute_path, 4)
+        # Typical path is either
+        # .../devtools-frontend/scripts/build/code_generator_frontend.py
+        # in a standalone checkout or
+        # .../src/scripts/build/code_generator_frontend.py
+        # inside of a chromium checkout. Let's take 3 components from the real
+        # path then.
+        fill_recursive(absolute_path, 3)
 
         return "/".join(components)
 
@@ -307,12 +311,15 @@ class Generator:
         return description
 
     @staticmethod
-    def convert_json_parameter(json_parameter, domain_name):
+    def convert_json_parameter(json_parameter, domain_name, enum_name):
         json_param_name = json_parameter.get("name") or json_parameter["id"]
         json_param_description = json_param_description = Generator.format_description(
             json_parameter.get("description", ""))
 
         type_ref = json_parameter.get("$ref")
+        if type_ref:
+            type_ref = type_ref if '.' in type_ref else "%s.%s" % (domain_name,
+                                                                   type_ref)
         json_ref = ""
         js_bind_type = resolve_param_raw_type_js(json_parameter, domain_name)
 
@@ -328,6 +335,9 @@ class Generator:
             json_ref = json_parameter["$ref"]
             type_ref = json_ref if '.' in json_ref else "%s.%s" % (domain_name,
                                                                    json_ref)
+
+        if (json_parameter.get("enum") and enum_name):
+            type_ref = enum_name
 
         optional = json_parameter.get("optional", False)
         param_dict = {
@@ -346,7 +356,7 @@ class Generator:
         js_param_list = []
         for json_parameter in json_type:
             js_param_text = Generator.convert_json_parameter(
-                json_parameter, domain_name)
+                json_parameter, domain_name, None)
             js_param_list.append(js_param_text)
 
         js_parameters_text = ", ".join(js_param_list)
@@ -366,10 +376,14 @@ class Generator:
         if "parameters" in json_command:
             json_params = json_command["parameters"]
             js_param_list = []
-
+            enum_name = None
             for json_parameter in json_params:
+                if "enum" in json_parameter:
+                    enum_name = "%s.%sRequest%s" % (
+                        domain_name, to_title_case(json_command["name"]),
+                        to_title_case(json_parameter["name"]))
                 js_param_text = Generator.convert_json_parameter(
-                    json_parameter, domain_name)
+                    json_parameter, domain_name, enum_name)
                 js_param_list.append(js_param_text)
 
             js_parameters_text = ", ".join(js_param_list)

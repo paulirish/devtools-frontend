@@ -36,7 +36,7 @@ import type * as Protocol from '../../generated/protocol.js';
 export const DevToolsStubErrorCode = -32015;
 // TODO(dgozman): we are not reporting generic errors in tests, but we should
 // instead report them and just have some expected errors in test expectations.
-const GenericError = -32000;
+const GenericErrorCode = -32000;
 const ConnectionClosedErrorCode = -32001;
 
 type MessageParams = {
@@ -99,7 +99,7 @@ interface CallbackWithDebugInfo {
 }
 
 export class InspectorBackend {
-  readonly agentPrototypes: Map<ProtocolDomainName, _AgentPrototype> = new Map();
+  readonly agentPrototypes: Map<ProtocolDomainName, AgentPrototype> = new Map();
   #initialized: boolean = false;
   #eventParameterNamesForDomain = new Map<ProtocolDomainName, EventParameterNames>();
   readonly typeMap = new Map<QualifiedName, CommandParameter[]>();
@@ -134,10 +134,10 @@ export class InspectorBackend {
     return this.#initialized;
   }
 
-  private agentPrototype(domain: ProtocolDomainName): _AgentPrototype {
+  private agentPrototype(domain: ProtocolDomainName): AgentPrototype {
     let prototype = this.agentPrototypes.get(domain);
     if (!prototype) {
-      prototype = new _AgentPrototype(domain);
+      prototype = new AgentPrototype(domain);
       this.agentPrototypes.set(domain, prototype);
     }
     return prototype;
@@ -366,7 +366,7 @@ export class SessionRouter {
   private sendRawMessageForTesting(method: QualifiedName, params: Object|null, callback: Callback|null, sessionId = ''):
       void {
     const domain = method.split('.')[0];
-    this.sendMessage(sessionId, domain, method, params, callback || ((): void => {}));
+    this.sendMessage(sessionId, domain, method, params, callback || (() => {}));
   }
 
   private onMessage(message: string|Object): void {
@@ -544,7 +544,7 @@ export class TargetBase {
     router.registerSession(this, this.sessionId);
 
     for (const [domain, agentPrototype] of inspectorBackend.agentPrototypes) {
-      const agent = Object.create((agentPrototype as _AgentPrototype));
+      const agent = Object.create((agentPrototype as AgentPrototype));
       agent.target = this;
       this.#agents.set(domain, agent);
     }
@@ -610,6 +610,10 @@ export class TargetBase {
 
   auditsAgent(): ProtocolProxyApi.AuditsApi {
     return this.getAgent('Audits');
+  }
+
+  autofillAgent(): ProtocolProxyApi.AutofillApi {
+    return this.getAgent('Autofill');
   }
 
   browserAgent(): ProtocolProxyApi.BrowserApi {
@@ -796,6 +800,10 @@ export class TargetBase {
     this.registerDispatcher('Accessibility', dispatcher);
   }
 
+  registerAutofillDispatcher(dispatcher: ProtocolProxyApi.AutofillDispatcher): void {
+    this.registerDispatcher('Autofill', dispatcher);
+  }
+
   registerAnimationDispatcher(dispatcher: ProtocolProxyApi.AnimationDispatcher): void {
     this.registerDispatcher('Animation', dispatcher);
   }
@@ -922,9 +930,7 @@ export class TargetBase {
  * The reasons this is done is so that on the prototypes we can install the implementations
  * of the invoke_enable, etc. methods that the front-end uses.
  */
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-class _AgentPrototype {
+class AgentPrototype {
   replyArgs: {
     [x: string]: string[],
   };
@@ -941,15 +947,14 @@ class _AgentPrototype {
   registerCommand(
       methodName: UnqualifiedName, parameters: CommandParameter[], replyArgs: string[], description: string): void {
     const domainAndMethod = qualifyName(this.domain, methodName);
-    function sendMessagePromise(this: _AgentPrototype, ...args: unknown[]): Promise<unknown> {
-      return _AgentPrototype.prototype.sendMessageToBackendPromise.call(this, domainAndMethod, parameters, args);
+    function sendMessagePromise(this: AgentPrototype, ...args: unknown[]): Promise<unknown> {
+      return AgentPrototype.prototype.sendMessageToBackendPromise.call(this, domainAndMethod, parameters, args);
     }
     // @ts-ignore Method code generation
     this[methodName] = sendMessagePromise;
     this.metadata[domainAndMethod] = {parameters, description, replyArgs};
 
-    function invoke(
-        this: _AgentPrototype, request: Object|undefined = {}): Promise<Protocol.ProtocolResponseWithError> {
+    function invoke(this: AgentPrototype, request: Object|undefined = {}): Promise<Protocol.ProtocolResponseWithError> {
       return this.invoke(domainAndMethod, request);
     }
 
@@ -1017,7 +1022,7 @@ class _AgentPrototype {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const callback: Callback = (error: MessageError|null, result: any|null): void => {
         if (error) {
-          if (!test.suppressRequestErrors && error.code !== DevToolsStubErrorCode && error.code !== GenericError &&
+          if (!test.suppressRequestErrors && error.code !== DevToolsStubErrorCode && error.code !== GenericErrorCode &&
               error.code !== ConnectionClosedErrorCode) {
             console.error('Request ' + method + ' failed. ' + JSON.stringify(error));
           }
@@ -1043,12 +1048,12 @@ class _AgentPrototype {
     return new Promise(fulfill => {
       const callback: Callback = (error: MessageError|undefined|null, result: Object|null): void => {
         if (error && !test.suppressRequestErrors && error.code !== DevToolsStubErrorCode &&
-            error.code !== GenericError && error.code !== ConnectionClosedErrorCode) {
+            error.code !== GenericErrorCode && error.code !== ConnectionClosedErrorCode) {
           console.error('Request ' + method + ' failed. ' + JSON.stringify(error));
         }
 
         const errorMessage = error?.message;
-        fulfill({...result, getError: (): string | undefined => errorMessage});
+        fulfill({...result, getError: () => errorMessage});
       };
 
       const router = this.target.router();

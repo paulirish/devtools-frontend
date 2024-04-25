@@ -30,7 +30,6 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
-import * as Root from '../../core/root/root.js';
 import * as FormatterActions from '../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line rulesdir/es_modules_import
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Persistence from '../../models/persistence/persistence.js';
@@ -82,6 +81,7 @@ export class UISourceCodeFrame extends
 
   constructor(uiSourceCode: Workspace.UISourceCode.UISourceCode) {
     super(() => this.workingCopy());
+
     this.uiSourceCodeInternal = uiSourceCode;
 
     this.muteSourceCodeEvents = false;
@@ -94,11 +94,11 @@ export class UISourceCodeFrame extends
     this.boundOnBindingChanged = this.onBindingChanged.bind(this);
 
     Common.Settings.Settings.instance()
-        .moduleSetting('persistenceNetworkOverridesEnabled')
+        .moduleSetting('persistence-network-overrides-enabled')
         .addChangeListener(this.onNetworkPersistenceChanged, this);
 
-    this.errorPopoverHelper =
-        new UI.PopoverHelper.PopoverHelper(this.textEditor.editor.contentDOM, this.getErrorPopoverContent.bind(this));
+    this.errorPopoverHelper = new UI.PopoverHelper.PopoverHelper(
+        this.textEditor.editor.contentDOM, this.getErrorPopoverContent.bind(this), 'sources.error');
     this.errorPopoverHelper.setHasPadding(true);
 
     this.errorPopoverHelper.setTimeout(100, 100);
@@ -204,8 +204,7 @@ export class UISourceCodeFrame extends
     const canPrettyPrint = FormatterActions.FORMATTABLE_MEDIA_TYPES.includes(this.contentType) &&
         !this.uiSourceCodeInternal.project().canSetFileContent() &&
         Persistence.Persistence.PersistenceImpl.instance().binding(this.uiSourceCodeInternal) === null;
-    const autoPrettyPrint = Root.Runtime.experiments.isEnabled('sourcesPrettyPrint') &&
-        !this.uiSourceCodeInternal.contentType().isFromSourceMap();
+    const autoPrettyPrint = !this.uiSourceCodeInternal.contentType().isFromSourceMap();
     this.setCanPrettyPrint(canPrettyPrint, autoPrettyPrint);
   }
 
@@ -417,7 +416,7 @@ export class UISourceCodeFrame extends
     this.textEditor.editor.destroy();
     this.detach();
     Common.Settings.Settings.instance()
-        .moduleSetting('persistenceNetworkOverridesEnabled')
+        .moduleSetting('persistence-network-overrides-enabled')
         .removeChangeListener(this.onNetworkPersistenceChanged, this);
   }
 
@@ -503,7 +502,7 @@ export class UISourceCodeFrame extends
     return {
       box: anchor,
       hide(): void{},
-      show: async(popover: UI.GlassPane.GlassPane): Promise<true> => {
+      show: async (popover: UI.GlassPane.GlassPane) => {
         popover.contentElement.append(element);
         return true;
       },
@@ -572,9 +571,7 @@ function getIconDataForMessage(message: RowMessage): IconButton.Icon.IconData {
   return getIconDataForLevel(message.level());
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   ToolbarItemsChanged = 'ToolbarItemsChanged',
 }
 
@@ -726,7 +723,7 @@ class RowMessageDecorations {
   static create(messages: RowMessages, doc: CodeMirror.Text): RowMessageDecorations {
     const builder = new CodeMirror.RangeSetBuilder<CodeMirror.Decoration>();
     for (const row of messages.rows) {
-      const line = doc.line(row[0].lineNumber() + 1);
+      const line = doc.line(Math.min(doc.lines, row[0].lineNumber() + 1));
       const minCol = row.reduce((col, msg) => Math.min(col, msg.columnNumber() || 0), line.length);
       if (minCol < line.length) {
         builder.add(line.from + minCol, line.to, underlineMark);
@@ -831,8 +828,7 @@ const rowMessageTheme = CodeMirror.EditorView.baseTheme({
 
 function rowMessages(initialMessages: RowMessage[]): CodeMirror.Extension {
   return [
-    showRowMessages.init(
-        (state): RowMessageDecorations => RowMessageDecorations.create(RowMessages.create(initialMessages), state.doc)),
+    showRowMessages.init(state => RowMessageDecorations.create(RowMessages.create(initialMessages), state.doc)),
     rowMessageTheme,
   ];
 }

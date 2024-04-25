@@ -7,18 +7,15 @@
 .text-prompt-root {
   display: flex;
   align-items: center;
+  font-size: var(--sys-size-6);
 }
 
 .text-prompt-editing {
   box-shadow: var(--drop-shadow);
-  background-color: var(--color-background);
+  background-color: var(--sys-color-cdt-base-container);
   text-overflow: clip !important; /* stylelint-disable-line declaration-no-important */
-  padding-left: 2px;
-  margin-left: -2px;
-  padding-right: 2px;
-  margin-right: -2px;
-  margin-bottom: -1px;
-  padding-bottom: 1px;
+  margin: 0 -2px -1px;
+  padding: 0 2px 1px;
   opacity: 100% !important; /* stylelint-disable-line declaration-no-important */
 }
 
@@ -32,18 +29,24 @@
 }
 
 .text-prompt-editing > .text-prompt {
-  color: var(--color-text-primary) !important; /* stylelint-disable-line declaration-no-important */
+  color: var(--sys-color-on-surface) !important; /* stylelint-disable-line declaration-no-important */
   text-decoration: none !important; /* stylelint-disable-line declaration-no-important */
   white-space: pre;
 }
 
 .text-prompt > .auto-complete-text {
-  color: var(--color-text-secondary) !important; /* stylelint-disable-line declaration-no-important */
+  color: var(--sys-color-token-subtle) !important; /* stylelint-disable-line declaration-no-important */
 }
 
-.text-prompt[data-placeholder]:empty::before {
-  content: attr(data-placeholder);
-  color: var(--color-text-secondary);
+.text-prompt[data-placeholder] {
+  &:empty::before {
+    content: attr(data-placeholder);
+    color: var(--sys-color-on-surface-subtle);
+  }
+
+  &.disabled:empty::before {
+    color: var(--sys-color-state-disabled);
+  }
 }
 
 .text-prompt:not([data-placeholder]):empty::after {

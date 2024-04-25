@@ -3,20 +3,19 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import * as Menus from '../../../ui/components/menus/menus.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
-import * as Menus from '../../../ui/components/menus/menus.js';
-
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import type * as Converters from '../converters/converters.js';
 import * as Models from '../models/models.js';
 
-import stepViewStyles from './stepView.css.js';
-
 import {type StepEditedEvent} from './StepEditor.js';
-
+import stepViewStyles from './stepView.css.js';
 import {
   TimelineSection,
   type TimelineSectionData,
@@ -271,6 +270,7 @@ type Action = {
   label: string,
   group: string,
   groupTitle: string,
+  jslogContext?: string,
 };
 
 export class StepView extends HTMLElement {
@@ -303,6 +303,11 @@ export class StepView extends HTMLElement {
   #extensionConverters?: Converters.Converter.Converter[];
   #isSelected = false;
   #recorderSettings?: Models.RecorderSettings.RecorderSettings;
+
+  constructor() {
+    super();
+    this.setAttribute('jslog', `${VisualLogging.section('step-view')}`);
+  }
 
   set data(data: StepViewData) {
     const prevState = this.#state;
@@ -590,7 +595,7 @@ export class StepView extends HTMLElement {
     if (this.#step) {
       for (const converter of this.#builtInConverters || []) {
         actions.push({
-          id: COPY_ACTION_PREFIX + converter.getId(),
+          id: COPY_ACTION_PREFIX + Platform.StringUtilities.toKebabCase(converter.getId()),
           label: converter.getFormatName(),
           group: 'copy',
           groupTitle: i18nString(UIStrings.copyAs),
@@ -598,10 +603,11 @@ export class StepView extends HTMLElement {
       }
       for (const converter of this.#extensionConverters || []) {
         actions.push({
-          id: COPY_ACTION_PREFIX + converter.getId(),
+          id: COPY_ACTION_PREFIX + Platform.StringUtilities.toKebabCase(converter.getId()),
           label: converter.getFormatName(),
           group: 'copy',
           groupTitle: i18nString(UIStrings.copyAs),
+          jslogContext: COPY_ACTION_PREFIX + 'extension',
         });
       }
     }
@@ -635,12 +641,13 @@ export class StepView extends HTMLElement {
         title=${i18nString(UIStrings.openStepActions)}
         aria-label=${i18nString(UIStrings.openStepActions)}
         @click=${this.#onToggleActionsMenu}
-        @keydown=${(event: Event): void => {
+        @keydown=${(event: Event) => {
           event.stopPropagation();
         }}
         on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
           this.#actionsMenuButton = node as Buttons.Button.Button;
         })}
+        jslog=${VisualLogging.dropDown('step-actions').track({click: true})}
         .data=${
           {
             variant: Buttons.Button.Variant.TOOLBAR,
@@ -671,6 +678,7 @@ export class StepView extends HTMLElement {
                 item => {
                   return LitHtml.html`<${Menus.Menu.MenuItem.litTagName}
                       .value=${item.id}
+                      jslog=${VisualLogging.action().track({click: true}).context(`${item.jslogContext || item.id}`)}
                     >
                       ${item.label}
                     </${Menus.Menu.MenuItem.litTagName}>
@@ -708,7 +716,7 @@ export class StepView extends HTMLElement {
         this.#handleStepAction(
             new Menus.Menu.MenuItemSelectedEvent(item.id),
         );
-      });
+      }, {jslogContext: item.id});
     }
 
     const preferredCopyAction = copyActions.find(
@@ -720,11 +728,11 @@ export class StepView extends HTMLElement {
         this.#handleStepAction(
             new Menus.Menu.MenuItemSelectedEvent(preferredCopyAction.id),
         );
-      });
+      }, {jslogContext: preferredCopyAction.id});
     }
 
     if (copyActions.length) {
-      const copyAs = menu.section('copy').appendSubMenuItem(i18nString(UIStrings.copyAs));
+      const copyAs = menu.section('copy').appendSubMenuItem(i18nString(UIStrings.copyAs), false, 'copy');
       for (const item of copyActions) {
         if (item === preferredCopyAction) {
           continue;
@@ -733,7 +741,7 @@ export class StepView extends HTMLElement {
           this.#handleStepAction(
               new Menus.Menu.MenuItemSelectedEvent(item.id),
           );
-        });
+        }, {jslogContext: item.id});
       }
     }
 
@@ -785,7 +793,7 @@ export class StepView extends HTMLElement {
           </g>
           <path @click=${this.#onBreakpointClick.bind(
             this,
-          )} class="breakpoint-icon" d="M2.5 5.5H17.7098L21.4241 12L17.7098 18.5H2.5V5.5Z"/>
+          )} jslog=${VisualLogging.action('breakpoint').track({click: true})} class="breakpoint-icon" d="M2.5 5.5H17.7098L21.4241 12L17.7098 18.5H2.5V5.5Z"/>
         </svg>
         <div class="summary">
           <div class="title-container ${isExpandable ? 'action' : ''}"
@@ -794,6 +802,7 @@ export class StepView extends HTMLElement {
               isExpandable && this.#onToggleShowDetailsKeydown.bind(this)
             }
             tabindex="0"
+            jslog=${VisualLogging.sectionHeader().track({click: true})}
             aria-role=${isExpandable ? 'button' : ''}
             aria-label=${isExpandable ? 'Show details for step' : ''}
           >
@@ -801,12 +810,8 @@ export class StepView extends HTMLElement {
               isExpandable
                 ? LitHtml.html`<${IconButton.Icon.Icon.litTagName}
                     class="chevron"
-                    .data=${
-                      {
-                        iconName: 'triangle-down',
-                        color: 'var(--color-text-primary)',
-                      } as IconButton.Icon.IconData
-                    }>
+                    jslog=${VisualLogging.expand().track({click: true})}
+                    name="triangle-down">
                   </${IconButton.Icon.Icon.litTagName}>`
                 : ''
             }
@@ -822,6 +827,7 @@ export class StepView extends HTMLElement {
           ${
             this.#step &&
             LitHtml.html`<devtools-recorder-step-editor
+            class=${this.#isSelected ? 'is-selected' : ''}
             .step=${this.#step}
             .disabled=${this.#isPlaying}
             @stepedited=${this.#stepEdited}>
@@ -854,4 +860,4 @@ export class StepView extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-step-view', StepView);
+customElements.define('devtools-step-view', StepView);

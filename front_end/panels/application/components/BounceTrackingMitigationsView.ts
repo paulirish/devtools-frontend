@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ChromeLink from '../../../ui/components/chrome_link/chrome_link.js';
 import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as ReportView from '../../../ui/components/report_view/report_view.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import bounceTrackingMitigationsViewStyles from './bounceTrackingMitigationsView.css.js';
 
@@ -89,7 +90,8 @@ export class BounceTrackingMitigationsView extends LegacyWrapper.LegacyWrapper.W
     LitHtml.render(LitHtml.html`
       <${ReportView.ReportView.Report.litTagName} .data=${
           {reportTitle: i18nString(UIStrings.bounceTrackingMitigationsTitle)} as ReportView.ReportView.ReportData
-      }>
+      }
+      jslog=${VisualLogging.pane('bounce-tracking-mitigations')}>
         ${await this.#renderMainFrameInformation()}
       </${ReportView.ReportView.Report.litTagName}>
     `, this.#shadow, {host: this});
@@ -103,7 +105,7 @@ export class BounceTrackingMitigationsView extends LegacyWrapper.LegacyWrapper.W
 
     if (this.#screenStatus === ScreenStatusType.Disabled) {
       const mitigationsFlagLink = new ChromeLink.ChromeLink.ChromeLink();
-      mitigationsFlagLink.href = 'chrome://flags/#bounce-tracking-mitigations';
+      mitigationsFlagLink.href = 'chrome://flags/#bounce-tracking-mitigations' as Platform.DevToolsPath.UrlString;
       mitigationsFlagLink.textContent = i18nString(UIStrings.featureFlag);
 
       // clang-format off
@@ -126,7 +128,8 @@ export class BounceTrackingMitigationsView extends LegacyWrapper.LegacyWrapper.W
       <${ReportView.ReportView.ReportSectionDivider.litTagName}>
       </${ReportView.ReportView.ReportSectionDivider.litTagName}>
       <${ReportView.ReportView.ReportSection.litTagName}>
-        <x-link href="https://privacycg.github.io/nav-tracking-mitigations/#bounce-tracking-mitigations" class="link">
+        <x-link href="https://privacycg.github.io/nav-tracking-mitigations/#bounce-tracking-mitigations" class="link"
+        jslog=${VisualLogging.link('learn-more').track({click: true})}>
           ${i18nString(UIStrings.learnMore)}
         </x-link>
       </${ReportView.ReportView.ReportSection.litTagName}>
@@ -144,7 +147,8 @@ export class BounceTrackingMitigationsView extends LegacyWrapper.LegacyWrapper.W
         .disabled=${isMitigationRunning}
         .spinner=${isMitigationRunning}
         .variant=${Buttons.Button.Variant.PRIMARY}
-        @click=${this.#runMitigations}>
+        @click=${this.#runMitigations}
+        jslog=${VisualLogging.action('force-run').track({click: true})}>
         ${isMitigationRunning ? LitHtml.html`
           ${i18nString(UIStrings.runningMitigations)}`:`
           ${i18nString(UIStrings.forceRun)}
@@ -249,11 +253,9 @@ export class BounceTrackingMitigationsView extends LegacyWrapper.LegacyWrapper.W
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent(
-    'devtools-bounce-tracking-mitigations-view', BounceTrackingMitigationsView);
+customElements.define('devtools-bounce-tracking-mitigations-view', BounceTrackingMitigationsView);
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLElementTagNameMap {
     'devtools-bounce-tracking-mitigations-view': BounceTrackingMitigationsView;
   }

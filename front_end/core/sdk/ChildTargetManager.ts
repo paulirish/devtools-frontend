@@ -2,18 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as i18n from '../../core/i18n/i18n.js';
+import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import type * as ProtocolClient from '../protocol_client/protocol_client.js';
-import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
-import type * as Protocol from '../../generated/protocol.js';
 
 import {ParallelConnection} from './Connections.js';
-
-import {Capability, Type, type Target} from './Target.js';
-import {SDKModel} from './SDKModel.js';
-import {Events as TargetManagerEvents, TargetManager} from './TargetManager.js';
 import {PrimaryPageChangeType, ResourceTreeModel} from './ResourceTreeModel.js';
+import {SDKModel} from './SDKModel.js';
+import {Capability, type Target, Type} from './Target.js';
+import {Events as TargetManagerEvents, TargetManager} from './TargetManager.js';
+
+const UIStrings = {
+  /**
+   * @description Text that refers to the main target. The main target is the primary webpage that
+   * DevTools is connected to. This text is used in various places in the UI as a label/name to inform
+   * the user which target/webpage they are currently connected to, as DevTools may connect to multiple
+   * targets at the same time in some scenarios.
+   */
+  main: 'Main',
+};
+const str_ = i18n.i18n.registerUIStrings('core/sdk/ChildTargetManager.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ChildTargetManager extends SDKModel<EventTypes> implements ProtocolProxyApi.TargetDispatcher {
   readonly #targetManager: TargetManager;
@@ -89,6 +101,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
         if (resourceTreeModel && resourceTreeModel.mainFrame) {
           resourceTreeModel.primaryPageChanged(resourceTreeModel.mainFrame, PrimaryPageChangeType.Activation);
         }
+        target.setName(i18nString(UIStrings.main));
       } else {
         target.updateTargetInfo(targetInfo);
       }
@@ -103,8 +116,14 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     this.dispatchEventToListeners(Events.TargetDestroyed, targetId);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  targetCrashed({targetId, status, errorCode}: Protocol.Target.TargetCrashedEvent): void {
+  targetCrashed({targetId}: Protocol.Target.TargetCrashedEvent): void {
+    this.#targetInfosInternal.delete(targetId);
+    const target = this.#childTargetsById.get(targetId);
+    if (target) {
+      target.dispose('targetCrashed event from CDP');
+    }
+    this.fireAvailableTargetsChanged();
+    this.dispatchEventToListeners(Events.TargetDestroyed, targetId);
   }
 
   private fireAvailableTargetsChanged(): void {
@@ -117,6 +136,10 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       this.#parentTargetId = (await this.#parentTarget.targetAgent().invoke_getTargetInfo({})).targetInfo.targetId;
     }
     return this.#parentTargetId;
+  }
+
+  async getTargetInfo(): Promise<Protocol.Target.TargetInfo> {
+    return (await this.#parentTarget.targetAgent().invoke_getTargetInfo({})).targetInfo;
   }
 
   async attachedToTarget({sessionId, targetInfo, waitingForDebugger}: Protocol.Target.AttachedToTargetEvent):
@@ -132,7 +155,9 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       const KNOWN_FRAME_PATTERNS = [
         '^chrome://print/$',
         '^chrome://file-manager/',
+        '^chrome://feedback/',
         '^chrome://.*\\.top-chrome/$',
+        '^chrome://view-cert/$',
         '^devtools://',
       ];
       if (KNOWN_FRAME_PATTERNS.some(p => targetInfo.url.match(p))) {
@@ -154,8 +179,12 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       type = Type.Frame;
     } else if (targetInfo.type === 'worker') {
       type = Type.Worker;
+    } else if (targetInfo.type === 'worklet') {
+      type = Type.Worklet;
     } else if (targetInfo.type === 'shared_worker') {
       type = Type.SharedWorker;
+    } else if (targetInfo.type === 'shared_storage_worklet') {
+      type = Type.SharedStorageWorklet;
     } else if (targetInfo.type === 'service_worker') {
       type = Type.ServiceWorker;
     } else if (targetInfo.type === 'auction_worklet') {
@@ -235,9 +264,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
                                    }) => Promise<void>);
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   TargetCreated = 'TargetCreated',
   TargetDestroyed = 'TargetDestroyed',
   TargetInfoChanged = 'TargetInfoChanged',

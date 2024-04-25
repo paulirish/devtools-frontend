@@ -1,18 +1,8 @@
 "use strict";
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -37,27 +27,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
-    if (kind === "m") throw new TypeError("Private method is not writable");
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
-    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
-};
-var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
-    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
-};
-var _PuppeteerURL_functionName, _PuppeteerURL_siteString;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPageContent = exports.setPageContent = exports.getReadableFromProtocolStream = exports.getReadableAsBuffer = exports.importFSPromises = exports.waitWithTimeout = exports.pageBindingInitString = exports.addPageBinding = exports.evaluationString = exports.createJSHandle = exports.waitForEvent = exports.isDate = exports.isRegExp = exports.isPlainObject = exports.isNumber = exports.isString = exports.removeEventListeners = exports.addEventListener = exports.releaseObject = exports.valueFromRemoteObject = exports.getSourcePuppeteerURLIfAvailable = exports.withSourcePuppeteerURLIfNone = exports.PuppeteerURL = exports.createClientError = exports.createEvaluationError = exports.debugError = void 0;
-const environment_js_1 = require("../environment.js");
+exports.filterAsync = exports.fromEmitterEvent = exports.unitToPixels = exports.parsePDFOptions = exports.NETWORK_IDLE_TIME = exports.getSourceUrlComment = exports.SOURCE_URL_REGEX = exports.UTILITY_WORLD_NAME = exports.timeout = exports.validateDialogType = exports.getReadableFromProtocolStream = exports.getReadableAsBuffer = exports.importFSPromises = exports.evaluationString = exports.isDate = exports.isRegExp = exports.isPlainObject = exports.isNumber = exports.isString = exports.getSourcePuppeteerURLIfAvailable = exports.withSourcePuppeteerURLIfNone = exports.PuppeteerURL = exports.DEFAULT_VIEWPORT = exports.debugError = void 0;
+const rxjs_js_1 = require("../../third_party/rxjs/rxjs.js");
 const assert_js_1 = require("../util/assert.js");
-const Deferred_js_1 = require("../util/Deferred.js");
-const ErrorLike_js_1 = require("../util/ErrorLike.js");
 const Debug_js_1 = require("./Debug.js");
-const ElementHandle_js_1 = require("./ElementHandle.js");
-const JSHandle_js_1 = require("./JSHandle.js");
+const Errors_js_1 = require("./Errors.js");
+const PDFOptions_js_1 = require("./PDFOptions.js");
 /**
  * @internal
  */
@@ -65,101 +41,7 @@ exports.debugError = (0, Debug_js_1.debug)('puppeteer:error');
 /**
  * @internal
  */
-function createEvaluationError(details) {
-    let name;
-    let message;
-    if (!details.exception) {
-        name = 'Error';
-        message = details.text;
-    }
-    else if ((details.exception.type !== 'object' ||
-        details.exception.subtype !== 'error') &&
-        !details.exception.objectId) {
-        return valueFromRemoteObject(details.exception);
-    }
-    else {
-        const detail = getErrorDetails(details);
-        name = detail.name;
-        message = detail.message;
-    }
-    const messageHeight = message.split('\n').length;
-    const error = new Error(message);
-    error.name = name;
-    const stackLines = error.stack.split('\n');
-    const messageLines = stackLines.splice(0, messageHeight);
-    // The first line is this function which we ignore.
-    stackLines.shift();
-    if (details.stackTrace && stackLines.length < Error.stackTraceLimit) {
-        for (const frame of details.stackTrace.callFrames.reverse()) {
-            if (PuppeteerURL.isPuppeteerURL(frame.url) &&
-                frame.url !== PuppeteerURL.INTERNAL_URL) {
-                const url = PuppeteerURL.parse(frame.url);
-                stackLines.unshift(`    at ${frame.functionName || url.functionName} (${url.functionName} at ${url.siteString}, <anonymous>:${frame.lineNumber}:${frame.columnNumber})`);
-            }
-            else {
-                stackLines.push(`    at ${frame.functionName || '<anonymous>'} (${frame.url}:${frame.lineNumber}:${frame.columnNumber})`);
-            }
-            if (stackLines.length >= Error.stackTraceLimit) {
-                break;
-            }
-        }
-    }
-    error.stack = [...messageLines, ...stackLines].join('\n');
-    return error;
-}
-exports.createEvaluationError = createEvaluationError;
-/**
- * @internal
- */
-function createClientError(details) {
-    let name;
-    let message;
-    if (!details.exception) {
-        name = 'Error';
-        message = details.text;
-    }
-    else if ((details.exception.type !== 'object' ||
-        details.exception.subtype !== 'error') &&
-        !details.exception.objectId) {
-        return valueFromRemoteObject(details.exception);
-    }
-    else {
-        const detail = getErrorDetails(details);
-        name = detail.name;
-        message = detail.message;
-    }
-    const messageHeight = message.split('\n').length;
-    const error = new Error(message);
-    error.name = name;
-    const stackLines = [];
-    const messageLines = error.stack.split('\n').splice(0, messageHeight);
-    if (details.stackTrace && stackLines.length < Error.stackTraceLimit) {
-        for (const frame of details.stackTrace.callFrames.reverse()) {
-            stackLines.push(`    at ${frame.functionName || '<anonymous>'} (${frame.url}:${frame.lineNumber}:${frame.columnNumber})`);
-            if (stackLines.length >= Error.stackTraceLimit) {
-                break;
-            }
-        }
-    }
-    error.stack = [...messageLines, ...stackLines].join('\n');
-    return error;
-}
-exports.createClientError = createClientError;
-const getErrorDetails = (details) => {
-    let name = '';
-    let message;
-    const lines = details.exception?.description?.split('\n    at ') ?? [];
-    const size = Math.min(details.stackTrace?.callFrames.length ?? 0, lines.length - 1);
-    lines.splice(-size, size);
-    if (details.exception?.className) {
-        name = details.exception.className;
-    }
-    message = lines.join('\n');
-    if (name && message.startsWith(`${name}: `)) {
-        message = message.slice(name.length + 2);
-    }
-    return { message, name };
-};
+exports.DEFAULT_VIEWPORT = Object.freeze({ width: 800, height: 600 });
 /**
  * @internal
  */
@@ -168,43 +50,40 @@ const SOURCE_URL = Symbol('Source URL for Puppeteer evaluation scripts');
  * @internal
  */
 class PuppeteerURL {
-    constructor() {
-        _PuppeteerURL_functionName.set(this, void 0);
-        _PuppeteerURL_siteString.set(this, void 0);
-    }
+    static INTERNAL_URL = 'pptr:internal';
     static fromCallSite(functionName, site) {
         const url = new PuppeteerURL();
-        __classPrivateFieldSet(url, _PuppeteerURL_functionName, functionName, "f");
-        __classPrivateFieldSet(url, _PuppeteerURL_siteString, site.toString(), "f");
+        url.#functionName = functionName;
+        url.#siteString = site.toString();
         return url;
     }
+    static parse = (url) => {
+        url = url.slice('pptr:'.length);
+        const [functionName = '', siteString = ''] = url.split(';');
+        const puppeteerUrl = new PuppeteerURL();
+        puppeteerUrl.#functionName = functionName;
+        puppeteerUrl.#siteString = decodeURIComponent(siteString);
+        return puppeteerUrl;
+    };
+    static isPuppeteerURL = (url) => {
+        return url.startsWith('pptr:');
+    };
+    #functionName;
+    #siteString;
     get functionName() {
-        return __classPrivateFieldGet(this, _PuppeteerURL_functionName, "f");
+        return this.#functionName;
     }
     get siteString() {
-        return __classPrivateFieldGet(this, _PuppeteerURL_siteString, "f");
+        return this.#siteString;
     }
     toString() {
         return `pptr:${[
-            __classPrivateFieldGet(this, _PuppeteerURL_functionName, "f"),
-            encodeURIComponent(__classPrivateFieldGet(this, _PuppeteerURL_siteString, "f")),
+            this.#functionName,
+            encodeURIComponent(this.#siteString),
         ].join(';')}`;
     }
 }
 exports.PuppeteerURL = PuppeteerURL;
-_PuppeteerURL_functionName = new WeakMap(), _PuppeteerURL_siteString = new WeakMap();
-PuppeteerURL.INTERNAL_URL = 'pptr:internal';
-PuppeteerURL.parse = (url) => {
-    url = url.slice('pptr:'.length);
-    const [functionName = '', siteString = ''] = url.split(';');
-    const puppeteerUrl = new PuppeteerURL();
-    __classPrivateFieldSet(puppeteerUrl, _PuppeteerURL_functionName, functionName, "f");
-    __classPrivateFieldSet(puppeteerUrl, _PuppeteerURL_siteString, decodeURIComponent(siteString), "f");
-    return puppeteerUrl;
-};
-PuppeteerURL.isPuppeteerURL = (url) => {
-    return url.startsWith('pptr:');
-};
 /**
  * @internal
  */
@@ -214,8 +93,9 @@ const withSourcePuppeteerURLIfNone = (functionName, object) => {
     }
     const original = Error.prepareStackTrace;
     Error.prepareStackTrace = (_, stack) => {
-        // First element is the function. Second element is the caller of this
-        // function. Third element is the caller of the caller of this function
+        // First element is the function.
+        // Second element is the caller of this function.
+        // Third element is the caller of the caller of this function
         // which is precisely what we want.
         return stack[2];
     };
@@ -236,66 +116,6 @@ const getSourcePuppeteerURLIfAvailable = (object) => {
     return undefined;
 };
 exports.getSourcePuppeteerURLIfAvailable = getSourcePuppeteerURLIfAvailable;
-/**
- * @internal
- */
-function valueFromRemoteObject(remoteObject) {
-    (0, assert_js_1.assert)(!remoteObject.objectId, 'Cannot extract value when objectId is given');
-    if (remoteObject.unserializableValue) {
-        if (remoteObject.type === 'bigint') {
-            return BigInt(remoteObject.unserializableValue.replace('n', ''));
-        }
-        switch (remoteObject.unserializableValue) {
-            case '-0':
-                return -0;
-            case 'NaN':
-                return NaN;
-            case 'Infinity':
-                return Infinity;
-            case '-Infinity':
-                return -Infinity;
-            default:
-                throw new Error('Unsupported unserializable value: ' +
-                    remoteObject.unserializableValue);
-        }
-    }
-    return remoteObject.value;
-}
-exports.valueFromRemoteObject = valueFromRemoteObject;
-/**
- * @internal
- */
-async function releaseObject(client, remoteObject) {
-    if (!remoteObject.objectId) {
-        return;
-    }
-    await client
-        .send('Runtime.releaseObject', { objectId: remoteObject.objectId })
-        .catch(error => {
-        // Exceptions might happen in case of a page been navigated or closed.
-        // Swallow these since they are harmless and we don't leak anything in this case.
-        (0, exports.debugError)(error);
-    });
-}
-exports.releaseObject = releaseObject;
-/**
- * @internal
- */
-function addEventListener(emitter, eventName, handler) {
-    emitter.on(eventName, handler);
-    return { emitter, eventName, handler };
-}
-exports.addEventListener = addEventListener;
-/**
- * @internal
- */
-function removeEventListeners(listeners) {
-    for (const listener of listeners) {
-        listener.emitter.removeListener(listener.eventName, listener.handler);
-    }
-    listeners.length = 0;
-}
-exports.removeEventListeners = removeEventListeners;
 /**
  * @internal
  */
@@ -334,41 +154,6 @@ exports.isDate = isDate;
 /**
  * @internal
  */
-async function waitForEvent(emitter, eventName, predicate, timeout, abortPromise) {
-    const deferred = Deferred_js_1.Deferred.create({
-        message: `Timeout exceeded while waiting for event ${String(eventName)}`,
-        timeout,
-    });
-    const listener = addEventListener(emitter, eventName, async (event) => {
-        if (await predicate(event)) {
-            deferred.resolve(event);
-        }
-    });
-    return Deferred_js_1.Deferred.race([deferred, abortPromise]).then(r => {
-        removeEventListeners([listener]);
-        if ((0, ErrorLike_js_1.isErrorLike)(r)) {
-            throw r;
-        }
-        return r;
-    }, error => {
-        removeEventListeners([listener]);
-        throw error;
-    });
-}
-exports.waitForEvent = waitForEvent;
-/**
- * @internal
- */
-function createJSHandle(context, remoteObject) {
-    if (remoteObject.subtype === 'node' && context._world) {
-        return new ElementHandle_js_1.CDPElementHandle(context, remoteObject, context._world.frame());
-    }
-    return new JSHandle_js_1.CDPJSHandle(context, remoteObject);
-}
-exports.createJSHandle = createJSHandle;
-/**
- * @internal
- */
 function evaluationString(fun, ...args) {
     if ((0, exports.isString)(fun)) {
         (0, assert_js_1.assert)(args.length === 0, 'Cannot evaluate a string with arguments');
@@ -383,67 +168,6 @@ function evaluationString(fun, ...args) {
     return `(${fun})(${args.map(serializeArgument).join(',')})`;
 }
 exports.evaluationString = evaluationString;
-/**
- * @internal
- */
-function addPageBinding(type, name) {
-    // This is the CDP binding.
-    // @ts-expect-error: In a different context.
-    const callCDP = globalThis[name];
-    // We replace the CDP binding with a Puppeteer binding.
-    Object.assign(globalThis, {
-        [name](...args) {
-            // This is the Puppeteer binding.
-            // @ts-expect-error: In a different context.
-            const callPuppeteer = globalThis[name];
-            callPuppeteer.args ??= new Map();
-            callPuppeteer.callbacks ??= new Map();
-            const seq = (callPuppeteer.lastSeq ?? 0) + 1;
-            callPuppeteer.lastSeq = seq;
-            callPuppeteer.args.set(seq, args);
-            callCDP(JSON.stringify({
-                type,
-                name,
-                seq,
-                args,
-                isTrivial: !args.some(value => {
-                    return value instanceof Node;
-                }),
-            }));
-            return new Promise((resolve, reject) => {
-                callPuppeteer.callbacks.set(seq, {
-                    resolve(value) {
-                        callPuppeteer.args.delete(seq);
-                        resolve(value);
-                    },
-                    reject(value) {
-                        callPuppeteer.args.delete(seq);
-                        reject(value);
-                    },
-                });
-            });
-        },
-    });
-}
-exports.addPageBinding = addPageBinding;
-/**
- * @internal
- */
-function pageBindingInitString(type, name) {
-    return evaluationString(addPageBinding, type, name);
-}
-exports.pageBindingInitString = pageBindingInitString;
-/**
- * @internal
- */
-async function waitWithTimeout(promise, taskName, timeout) {
-    const deferred = Deferred_js_1.Deferred.create({
-        message: `waiting for ${taskName} failed: timeout ${timeout}ms exceeded`,
-        timeout,
-    });
-    return await Deferred_js_1.Deferred.race([promise, deferred]);
-}
-exports.waitWithTimeout = waitWithTimeout;
 /**
  * @internal
  */
@@ -471,13 +195,18 @@ exports.importFSPromises = importFSPromises;
  */
 async function getReadableAsBuffer(readable, path) {
     const buffers = [];
+    const reader = readable.getReader();
     if (path) {
         const fs = await importFSPromises();
         const fileHandle = await fs.open(path, 'w+');
         try {
-            for await (const chunk of readable) {
-                buffers.push(chunk);
-                await fileHandle.writeFile(chunk);
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+                buffers.push(value);
+                await fileHandle.writeFile(value);
             }
         }
         finally {
@@ -485,14 +214,19 @@ async function getReadableAsBuffer(readable, path) {
         }
     }
     else {
-        for await (const chunk of readable) {
-            buffers.push(chunk);
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            buffers.push(value);
         }
     }
     try {
         return Buffer.concat(buffers);
     }
     catch (error) {
+        (0, exports.debugError)(error);
         return null;
     }
 }
@@ -500,34 +234,28 @@ exports.getReadableAsBuffer = getReadableAsBuffer;
 /**
  * @internal
  */
+/**
+ * @internal
+ */
 async function getReadableFromProtocolStream(client, handle) {
-    // TODO: Once Node 18 becomes the lowest supported version, we can migrate to
-    // ReadableStream.
-    if (!environment_js_1.isNode) {
-        throw new Error('Cannot create a stream outside of Node.js environment.');
-    }
-    const { Readable } = await Promise.resolve().then(() => __importStar(require('stream')));
-    let eof = false;
-    return new Readable({
-        async read(size) {
+    return new ReadableStream({
+        async pull(controller) {
+            function getUnit8Array(data, isBase64) {
+                if (isBase64) {
+                    return Uint8Array.from(atob(data), m => {
+                        return m.codePointAt(0);
+                    });
+                }
+                const encoder = new TextEncoder();
+                return encoder.encode(data);
+            }
+            const { data, base64Encoded, eof } = await client.send('IO.read', {
+                handle,
+            });
+            controller.enqueue(getUnit8Array(data, base64Encoded ?? false));
             if (eof) {
-                return;
-            }
-            try {
-                const response = await client.send('IO.read', { handle, size });
-                this.push(response.data, response.base64Encoded ? 'base64' : undefined);
-                if (response.eof) {
-                    eof = true;
-                    await client.send('IO.close', { handle });
-                    this.push(null);
-                }
-            }
-            catch (error) {
-                if ((0, ErrorLike_js_1.isErrorLike)(error)) {
-                    this.destroy(error);
-                    return;
-                }
-                throw error;
+                await client.send('IO.close', { handle });
+                controller.close();
             }
         },
     });
@@ -536,32 +264,166 @@ exports.getReadableFromProtocolStream = getReadableFromProtocolStream;
 /**
  * @internal
  */
-async function setPageContent(page, content) {
-    // We rely upon the fact that document.open() will reset frame lifecycle with "init"
-    // lifecycle event. @see https://crrev.com/608658
-    return page.evaluate(html => {
-        document.open();
-        document.write(html);
-        document.close();
-    }, content);
+function validateDialogType(type) {
+    let dialogType = null;
+    const validDialogTypes = new Set([
+        'alert',
+        'confirm',
+        'prompt',
+        'beforeunload',
+    ]);
+    if (validDialogTypes.has(type)) {
+        dialogType = type;
+    }
+    (0, assert_js_1.assert)(dialogType, `Unknown javascript dialog type: ${type}`);
+    return dialogType;
 }
-exports.setPageContent = setPageContent;
+exports.validateDialogType = validateDialogType;
 /**
  * @internal
  */
-function getPageContent() {
-    let content = '';
-    for (const node of document.childNodes) {
-        switch (node) {
-            case document.documentElement:
-                content += document.documentElement.outerHTML;
-                break;
-            default:
-                content += new XMLSerializer().serializeToString(node);
-                break;
-        }
-    }
-    return content;
+function timeout(ms, cause) {
+    return ms === 0
+        ? rxjs_js_1.NEVER
+        : (0, rxjs_js_1.timer)(ms).pipe((0, rxjs_js_1.map)(() => {
+            throw new Errors_js_1.TimeoutError(`Timed out after waiting ${ms}ms`, { cause });
+        }));
 }
-exports.getPageContent = getPageContent;
+exports.timeout = timeout;
+/**
+ * @internal
+ */
+exports.UTILITY_WORLD_NAME = '__puppeteer_utility_world__';
+/**
+ * @internal
+ */
+exports.SOURCE_URL_REGEX = /^[\040\t]*\/\/[@#] sourceURL=\s*(\S*?)\s*$/m;
+/**
+ * @internal
+ */
+function getSourceUrlComment(url) {
+    return `//# sourceURL=${url}`;
+}
+exports.getSourceUrlComment = getSourceUrlComment;
+/**
+ * @internal
+ */
+exports.NETWORK_IDLE_TIME = 500;
+/**
+ * @internal
+ */
+function parsePDFOptions(options = {}, lengthUnit = 'in') {
+    const defaults = {
+        scale: 1,
+        displayHeaderFooter: false,
+        headerTemplate: '',
+        footerTemplate: '',
+        printBackground: false,
+        landscape: false,
+        pageRanges: '',
+        preferCSSPageSize: false,
+        omitBackground: false,
+        outline: false,
+        tagged: true,
+    };
+    let width = 8.5;
+    let height = 11;
+    if (options.format) {
+        const format = PDFOptions_js_1.paperFormats[options.format.toLowerCase()];
+        (0, assert_js_1.assert)(format, 'Unknown paper format: ' + options.format);
+        width = format.width;
+        height = format.height;
+    }
+    else {
+        width = convertPrintParameterToInches(options.width, lengthUnit) ?? width;
+        height =
+            convertPrintParameterToInches(options.height, lengthUnit) ?? height;
+    }
+    const margin = {
+        top: convertPrintParameterToInches(options.margin?.top, lengthUnit) || 0,
+        left: convertPrintParameterToInches(options.margin?.left, lengthUnit) || 0,
+        bottom: convertPrintParameterToInches(options.margin?.bottom, lengthUnit) || 0,
+        right: convertPrintParameterToInches(options.margin?.right, lengthUnit) || 0,
+    };
+    // Quirk https://bugs.chromium.org/p/chromium/issues/detail?id=840455#c44
+    if (options.outline) {
+        options.tagged = true;
+    }
+    return {
+        ...defaults,
+        ...options,
+        width,
+        height,
+        margin,
+    };
+}
+exports.parsePDFOptions = parsePDFOptions;
+/**
+ * @internal
+ */
+exports.unitToPixels = {
+    px: 1,
+    in: 96,
+    cm: 37.8,
+    mm: 3.78,
+};
+function convertPrintParameterToInches(parameter, lengthUnit = 'in') {
+    if (typeof parameter === 'undefined') {
+        return undefined;
+    }
+    let pixels;
+    if ((0, exports.isNumber)(parameter)) {
+        // Treat numbers as pixel values to be aligned with phantom's paperSize.
+        pixels = parameter;
+    }
+    else if ((0, exports.isString)(parameter)) {
+        const text = parameter;
+        let unit = text.substring(text.length - 2).toLowerCase();
+        let valueText = '';
+        if (unit in exports.unitToPixels) {
+            valueText = text.substring(0, text.length - 2);
+        }
+        else {
+            // In case of unknown unit try to parse the whole parameter as number of pixels.
+            // This is consistent with phantom's paperSize behavior.
+            unit = 'px';
+            valueText = text;
+        }
+        const value = Number(valueText);
+        (0, assert_js_1.assert)(!isNaN(value), 'Failed to parse parameter value: ' + text);
+        pixels = value * exports.unitToPixels[unit];
+    }
+    else {
+        throw new Error('page.pdf() Cannot handle parameter type: ' + typeof parameter);
+    }
+    return pixels / exports.unitToPixels[lengthUnit];
+}
+/**
+ * @internal
+ */
+function fromEmitterEvent(emitter, eventName) {
+    return new rxjs_js_1.Observable(subscriber => {
+        const listener = (event) => {
+            subscriber.next(event);
+        };
+        emitter.on(eventName, listener);
+        return () => {
+            emitter.off(eventName, listener);
+        };
+    });
+}
+exports.fromEmitterEvent = fromEmitterEvent;
+/**
+ * @internal
+ */
+function filterAsync(predicate) {
+    return (0, rxjs_js_1.mergeMap)((value) => {
+        return (0, rxjs_js_1.from)(Promise.resolve(predicate(value))).pipe((0, rxjs_js_1.filter)(isMatch => {
+            return isMatch;
+        }), (0, rxjs_js_1.map)(() => {
+            return value;
+        }));
+    });
+}
+exports.filterAsync = filterAsync;
 //# sourceMappingURL=util.js.map

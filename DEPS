@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 use_relative_paths = True
+git_dependencies = 'SYNC'
 gclient_gn_args_file = 'build/config/gclient_args.gni'
 gclient_gn_args = [
 ]
@@ -11,24 +12,24 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'aa4570fe0b3d0b43a65fee02d3f9f2a8995bff81',
+  'build_revision': 'a1bcbf3070c78efa89da9037a82bb8952d346c10',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '16be42a9ff1f7e4a3e53b93b3adc181fa7ff9161',
+  'buildtools_revision': '0ac67b7cef80e421283f633ee9c2ce652f6e42cc',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'a8946f3d83a1ff940e8bfba85191ceb13c08e379',
+  'depot_tools_revision': 'fb94001f066d0e38ab14c7413714ed17bfa34082',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': '916f43c554c65ebf4ccd896b0f4e2ac99a67c434',
+  'inspector_protocol_revision': '99e195660e59050e845a24d04d4a2eea1c35fc3b',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
-  'clang_format_revision': 'f97059df7f8b205064625cdb5f97b56668a125ef',
+  'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
 
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:3fccef9033b950e8935e8debeba9fbd71617bc74',
+  'gn_version': 'git_revision:f284b6b47039a2d7edfcbfc51f52664f82b5a789',
 
   'cmake_version': 'version:3.16.1',
 
@@ -45,7 +46,11 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '117.0.5922.2',
+  'chrome': '126.0.6439.0',
+
+  # 'magic' text to tell depot_tools that git submodules should be accepted but
+  # but parity with DEPS file is expected.
+  'SUBMODULE_MIGRATION': 'True'
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -155,7 +160,7 @@ hooks = [
                 '--no_resume',
                 '--extract',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/linux/node-linux-x64.tar.gz.sha1',
     ],
   },
@@ -168,7 +173,7 @@ hooks = [
                 '--no_resume',
                 '--extract',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/mac/node-darwin-x64.tar.gz.sha1',
     ],
   },
@@ -181,7 +186,7 @@ hooks = [
                 '--no_resume',
                 '--extract',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/mac/node-darwin-arm64.tar.gz.sha1',
     ],
   },
@@ -193,7 +198,7 @@ hooks = [
                 'third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/win/node.exe.sha1',
     ],
   },
@@ -270,7 +275,7 @@ hooks = [
     'condition': 'host_os == "win" and build_with_chromium == False',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/win64/chrome-win64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/win64/chrome-win64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-win64',
                 '--rename_to=chrome-win',
@@ -284,7 +289,7 @@ hooks = [
     'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu != "arm64"',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/mac-x64/chrome-mac-x64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/mac-x64/chrome-mac-x64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-mac-x64',
                 '--rename_to=chrome-mac',
@@ -298,7 +303,7 @@ hooks = [
     'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64"',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/mac-arm64/chrome-mac-arm64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/mac-arm64/chrome-mac-arm64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-mac-arm64',
                 '--rename_to=chrome-mac',
@@ -312,7 +317,7 @@ hooks = [
     'condition': 'host_os == "linux" and build_with_chromium == False',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/linux64/chrome-linux64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/linux64/chrome-linux64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-linux64',
                 '--rename_to=chrome-linux',

@@ -28,35 +28,27 @@
  */
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import heapProfilerStyles from './heapProfiler.css.js';
-import profilesPanelStyles from './profilesPanel.css.js';
-import profilesSidebarTreeStyles from './profilesSidebarTree.css.js';
-
 import {
-  ProfileEvents as ProfileTypeEvents,
   type DataDisplayDelegate,
-  type ProfileHeader,
+  ProfileEvents as ProfileTypeEvents,
+  ProfileHeader,
   type ProfileType,
 } from './ProfileHeader.js';
 import {Events as ProfileLauncherEvents, ProfileLauncherView} from './ProfileLauncherView.js';
-import {ProfileSidebarTreeElement, setSharedFileSelectorElement} from './ProfileSidebarTreeElement.js';
-import {instance} from './ProfileTypeRegistry.js';
-import {type ExperimentsSettingsTab} from '../settings/SettingsScreen.js';
+import {ProfileSidebarTreeElement} from './ProfileSidebarTreeElement.js';
+import profilesPanelStyles from './profilesPanel.css.js';
+import profilesSidebarTreeStyles from './profilesSidebarTree.css.js';
 
 const UIStrings = {
-  /**
-   *@description Tooltip text that appears when hovering over the largeicon clear button in the Profiles Panel of a profiler tool
-   */
-  clearAllProfiles: 'Clear all profiles',
   /**
    *@description Text in Profiles Panel of a profiler tool
    *@example {'.js', '.json'} PH1
@@ -72,10 +64,6 @@ const UIStrings = {
    */
   profileLoadingFailedS: 'Profile loading failed: {PH1}.',
   /**
-   *@description A context menu item in the Profiles Panel of a profiler tool
-   */
-  load: 'Load…',
-  /**
    *@description Text in Profiles Panel of a profiler tool
    *@example {2} PH1
    */
@@ -84,27 +72,6 @@ const UIStrings = {
    *@description Text in Profiles Panel of a profiler tool
    */
   profiles: 'Profiles',
-  /**
-   *@description Text in the JS Profiler panel to show warning to user that JS profiler will be deprecated.
-   */
-  deprecationWarnMsg:
-      'This panel will be deprecated in the upcoming version. Use the Performance panel to record JavaScript CPU profiles.',
-  /**
-   *@description Text of a button in the JS Profiler panel to show more information about deprecation.
-   */
-  learnMore: 'Learn more',
-  /**
-   *@description Text of a button in the JS Profiler panel to let user give feedback.
-   */
-  feedback: 'Feedback',
-  /**
-   *@description Text of a button in the JS Profiler panel to let user go to Performance panel.
-   */
-  goToPerformancePanel: 'Go to Performance Panel',
-  /**
-   *@description Text of a button in the JS Profiler panel to let user go to enable the experiment flag to use this panel temporarily.
-   */
-  enableThisPanelTemporarily: 'Enable this panel temporarily',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfilesPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -116,7 +83,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   readonly toolbarElement: HTMLDivElement;
   toggleRecordAction: UI.ActionRegistration.Action;
   readonly toggleRecordButton: UI.Toolbar.ToolbarButton;
-  clearResultsButton: UI.Toolbar.ToolbarButton;
+  readonly #saveToFileAction: UI.ActionRegistration.Action;
   readonly profileViewToolbar: UI.Toolbar.Toolbar;
   profileGroups: {};
   launcherView: ProfileLauncherView;
@@ -160,21 +127,26 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.panelSidebarElement().classList.add('profiles-tree-sidebar');
     const toolbarContainerLeft = document.createElement('div');
     toolbarContainerLeft.classList.add('profiles-toolbar');
+    toolbarContainerLeft.setAttribute('jslog', `${VisualLogging.toolbar('profiles-sidebar')}`);
     this.panelSidebarElement().insertBefore(toolbarContainerLeft, this.panelSidebarElement().firstChild);
     const toolbar = new UI.Toolbar.Toolbar('', toolbarContainerLeft);
-    this.toggleRecordAction =
-        (UI.ActionRegistry.ActionRegistry.instance().action(recordingActionId) as UI.ActionRegistration.Action);
+    toolbar.makeWrappable(true);
+    this.toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction(recordingActionId);
     this.toggleRecordButton = UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction);
     toolbar.appendToolbarItem(this.toggleRecordButton);
 
-    this.clearResultsButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAllProfiles), 'clear');
-    this.clearResultsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.reset, this);
-    toolbar.appendToolbarItem(this.clearResultsButton);
+    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('profiler.clear-all'));
+    toolbar.appendSeparator();
+    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('profiler.load-from-file'));
+    this.#saveToFileAction = UI.ActionRegistry.ActionRegistry.instance().getAction('profiler.save-to-file');
+    this.#saveToFileAction.setEnabled(false);
+    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.#saveToFileAction));
     toolbar.appendSeparator();
     toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('components.collect-garbage'));
 
     this.profileViewToolbar = new UI.Toolbar.Toolbar('', this.toolbarElement);
     this.profileViewToolbar.makeWrappable(true);
+    this.profileViewToolbar.element.setAttribute('jslog', `${VisualLogging.toolbar('profile-view')}`);
 
     this.profileGroups = {};
     this.launcherView = new ProfileLauncherView(this);
@@ -192,8 +164,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.profilesItemTreeElement.select();
     this.showLauncherView();
     this.createFileSelectorElement();
-
-    this.element.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), false);
 
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.SuspendStateChanged, this.onSuspendStateChanged, this);
@@ -228,7 +198,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
       this.element.removeChild(this.fileSelectorElement);
     }
     this.fileSelectorElement = UI.UIUtils.createFileSelectorElement(this.loadFromFile.bind(this));
-    setSharedFileSelectorElement(this.fileSelectorElement);
     this.element.appendChild(this.fileSelectorElement);
   }
 
@@ -256,7 +225,8 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
 
     const error = await profileType.loadFromFile(file);
     if (error && 'message' in error) {
-      void UI.UIUtils.MessageDialog.show(i18nString(UIStrings.profileLoadingFailedS, {PH1: error.message}));
+      void UI.UIUtils.MessageDialog.show(
+          i18nString(UIStrings.profileLoadingFailedS, {PH1: error.message}), undefined, 'profile-loading-failed');
     }
   }
 
@@ -335,7 +305,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.profileViews.removeChildren();
     this.profileViewToolbar.removeToolbarItems();
 
-    this.clearResultsButton.element.classList.remove('hidden');
     this.profilesItemTreeElement.select();
     this.showLauncherView();
   }
@@ -346,6 +315,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.launcherView.show(this.profileViews);
     this.visibleView = this.launcherView;
     this.toolbarElement.classList.add('hidden');
+    this.#saveToFileAction.setEnabled(false);
   }
 
   registerProfileType(profileType: ProfileType): void {
@@ -353,8 +323,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     const profileTypeSection = new ProfileTypeSidebarSection(this, profileType);
     this.typeIdToSidebarSection[profileType.id] = profileTypeSection;
     this.sidebarTree.appendChild(profileTypeSection);
-    profileTypeSection.childrenListElement.addEventListener(
-        'contextmenu', this.handleContextMenuEvent.bind(this), false);
 
     function onAddProfileHeader(this: ProfilesPanel, event: Common.EventTarget.EventTargetEvent<ProfileHeader>): void {
       this.addProfileHeader(event.data);
@@ -378,15 +346,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     for (let i = 0; i < profiles.length; i++) {
       this.addProfileHeader(profiles[i]);
     }
-  }
-
-  handleContextMenuEvent(event: Event): void {
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
-    if (this.panelSidebarElement().isSelfOrAncestor((event.target as Node | null))) {
-      contextMenu.defaultSection().appendItem(
-          i18nString(UIStrings.load), this.fileSelectorElement.click.bind(this.fileSelectorElement));
-    }
-    void contextMenu.show();
   }
 
   showLoadFromFileDialog(): void {
@@ -435,6 +394,8 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     }
 
     this.closeVisibleView();
+    UI.Context.Context.instance().setFlavor(ProfileHeader, profile);
+    this.#saveToFileAction.setEnabled(profile.canSaveToFile());
 
     view.show(this.profileViews);
     this.toolbarElement.classList.remove('hidden');
@@ -478,6 +439,8 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   }
 
   closeVisibleView(): void {
+    UI.Context.Context.instance().setFlavor(ProfileHeader, null);
+    this.#saveToFileAction.setEnabled(false);
     if (this.visibleView) {
       this.visibleView.detach();
     }
@@ -487,10 +450,17 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   override focus(): void {
     this.sidebarTree.focus();
   }
+
   override wasShown(): void {
     super.wasShown();
+    UI.Context.Context.instance().setFlavor(ProfilesPanel, this);
     this.registerCSSFiles([objectValueStyles, profilesPanelStyles, heapProfilerStyles]);
     this.sidebarTree.registerCSSFiles([profilesSidebarTreeStyles]);
+  }
+
+  override willHide(): void {
+    UI.Context.Context.instance().setFlavor(ProfilesPanel, null);
+    super.willHide();
   }
 }
 
@@ -697,129 +667,42 @@ export class ProfilesSidebarTreeElement extends UI.TreeOutline.TreeElement {
   }
 }
 
-let jsProfilerPanelInstance: JSProfilerPanel;
-
-export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistration.ActionDelegate {
-  constructor() {
-    const registry = instance;
-    super('js_profiler', [registry.cpuProfileType], 'profiler.js-toggle-recording');
-    this.splitWidget().mainWidget()?.setMinimumSize(350, 0);
-    if (Root.Runtime.experiments.isEnabled('jsProfilerTemporarilyEnable')) {
-      this.#showDeprecationInfobar();
-    } else {
-      this.#showDeprecationWarningAndNoPanel();
+export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
+  handleAction(context: UI.Context.Context, actionId: string): boolean {
+    switch (actionId) {
+      case 'profiler.clear-all': {
+        const profilesPanel = context.flavor(ProfilesPanel);
+        if (profilesPanel !== null) {
+          profilesPanel.reset();
+          return true;
+        }
+        return false;
+      }
+      case 'profiler.load-from-file': {
+        const profilesPanel = context.flavor(ProfilesPanel);
+        if (profilesPanel !== null) {
+          profilesPanel.showLoadFromFileDialog();
+          return true;
+        }
+        return false;
+      }
+      case 'profiler.save-to-file': {
+        const profile = context.flavor(ProfileHeader);
+        if (profile !== null) {
+          profile.saveToFile();
+          return true;
+        }
+        return false;
+      }
+      case 'profiler.delete-profile': {
+        const profile = context.flavor(ProfileHeader);
+        if (profile !== null) {
+          profile.profileType().removeProfile(profile);
+          return true;
+        }
+        return false;
+      }
     }
-  }
-
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): JSProfilerPanel {
-    const {forceNew} = opts;
-    if (!jsProfilerPanelInstance || forceNew) {
-      jsProfilerPanelInstance = new JSProfilerPanel();
-    }
-    return jsProfilerPanelInstance;
-  }
-
-  #showDeprecationInfobar(): void {
-    function openRFC(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://github.com/ChromeDevTools/rfcs/discussions/2' as Platform.DevToolsPath.UrlString);
-    }
-
-    async function openPerformancePanel(): Promise<void> {
-      await UI.InspectorView.InspectorView.instance().showPanel('timeline');
-    }
-
-    const infobar = new UI.Infobar.Infobar(
-        UI.Infobar.Type.Warning, /* text */ i18nString(UIStrings.deprecationWarnMsg), /* actions? */
-        [
-          {
-            text: i18nString(UIStrings.learnMore),
-            highlight: false,
-            delegate: openRFC,
-            dismiss: false,
-          },
-          {
-            text: i18nString(UIStrings.feedback),
-            highlight: false,
-            delegate: openRFC,
-            dismiss: false,
-          },
-          {
-            text: i18nString(UIStrings.goToPerformancePanel),
-            highlight: true,
-            delegate: openPerformancePanel,
-            dismiss: false,
-          },
-        ],
-        /* disableSetting? */ undefined);
-    infobar.setParentView(this);
-    this.splitWidget().mainWidget()?.element.prepend(infobar.element);
-  }
-
-  #showDeprecationWarningAndNoPanel(): void {
-    const mainWidget = this.splitWidget().mainWidget();
-    mainWidget?.detachChildWidgets();
-    if (mainWidget) {
-      const emptyPage = new UI.Widget.VBox();
-      emptyPage.contentElement.classList.add('empty-landing-page', 'fill');
-
-      const centered = emptyPage.contentElement.createChild('div');
-
-      centered.createChild('p').textContent =
-          'This panel is deprecated and will be removed in the next version. Use the Performance panel to record JavaScript CPU profiles.';
-      centered.createChild('p').textContent =
-          'You can temporarily enable this panel with Settings > Experiments > Enable JavaScript Profiler.';
-
-      centered.appendChild(UI.UIUtils.createTextButton(
-          i18nString(UIStrings.goToPerformancePanel), openPerformancePanel, 'infobar-button primary-button'));
-      centered.appendChild(UI.UIUtils.createTextButton(i18nString(UIStrings.learnMore), openBlogpost));
-      centered.appendChild(UI.UIUtils.createTextButton(i18nString(UIStrings.feedback), openFeedbackLink));
-      centered.appendChild(
-          UI.UIUtils.createTextButton(i18nString(UIStrings.enableThisPanelTemporarily), openExperimentsSettings));
-
-      emptyPage.show(mainWidget.element);
-    }
-
-    async function openPerformancePanel(): Promise<void> {
-      await UI.InspectorView.InspectorView.instance().showPanel('timeline');
-    }
-
-    function openBlogpost(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://developer.chrome.com/blog/js-profiler-deprecation/' as Platform.DevToolsPath.UrlString);
-    }
-
-    function openFeedbackLink(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://bugs.chromium.org/p/chromium/issues/detail?id=1354548' as Platform.DevToolsPath.UrlString);
-    }
-
-    async function openExperimentsSettings(): Promise<void> {
-      await UI.ViewManager.ViewManager.instance().showView('experiments');
-
-      const tab = await UI.ViewManager.ViewManager.instance().view('experiments').widget();
-      (tab as ExperimentsSettingsTab).setFilter('Enable JavaScript Profiler temporarily');
-    }
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    UI.Context.Context.instance().setFlavor(JSProfilerPanel, this);
-  }
-
-  override willHide(): void {
-    UI.Context.Context.instance().setFlavor(JSProfilerPanel, null);
-  }
-
-  handleAction(_context: UI.Context.Context, _actionId: string): boolean {
-    const panel = UI.Context.Context.instance().flavor(JSProfilerPanel);
-    if (panel instanceof JSProfilerPanel) {
-      panel.toggleRecord();
-    } else {
-      throw new Error('non-null JSProfilerPanel expected!');
-    }
-    return true;
+    return false;
   }
 }

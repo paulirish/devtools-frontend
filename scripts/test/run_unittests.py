@@ -19,6 +19,10 @@ sys.path.append(scripts_path)
 import test_helpers
 import devtools_paths
 
+sys.path.append(os.path.join(scripts_path, 'deps'))
+
+from set_lpac_acls import set_lpac_acls
+
 LOG_LEVELS = ['debug', 'info', 'warn', 'error']
 
 
@@ -29,9 +33,10 @@ def log_message(message, message_log_level, user_set_log_level):
 
 
 def run_tests(chrome_binary, target, no_text_coverage, no_html_coverage,
-              coverage, expanded_reporting, cwd, log_level, mocha_fgrep):
+              coverage, expanded_reporting, cwd, log_level, mocha_fgrep,
+              shuffle, karma_args):
     karmaconfig_path = os.path.join(cwd, 'out', target, 'gen', 'test',
-                                    'unittests', 'karma.conf.js')
+                                    'karma.conf.js')
 
     if not os.path.exists(karmaconfig_path):
         log_message('Unable to find Karma config at ' + karmaconfig_path,
@@ -50,6 +55,9 @@ def run_tests(chrome_binary, target, no_text_coverage, no_html_coverage,
         log_level
     ]
 
+    if karma_args:
+        exec_command.extend(karma_args.split())
+
     env = os.environ.copy()
     env['NODE_PATH'] = devtools_paths.node_path()
     if (no_text_coverage is not False):
@@ -65,6 +73,8 @@ def run_tests(chrome_binary, target, no_text_coverage, no_html_coverage,
     if (mocha_fgrep is not None):
         print('Using Mocha --fgrep flag ' + mocha_fgrep)
         env['MOCHA_FGREP'] = mocha_fgrep
+    if (shuffle is not False):
+        env['SHUFFLE'] = '1'
     exit_code = test_helpers.popen(exec_command, cwd=cwd, env=env)
     if exit_code == 1:
         return True
@@ -80,7 +90,9 @@ def run_unit_tests_on_ninja_build_target(target,
                                          cwd=None,
                                          log_level=None,
                                          mocha_fgrep=None,
-                                         swarming_output_file=None):
+                                         shuffle=False,
+                                         swarming_output_file=None,
+                                         karma_args=None):
     if chrome_binary and not test_helpers.check_chrome_binary(chrome_binary):
         log_message(
             'Chrome binary argument path does not exist or is not executable, reverting to downloaded binary',
@@ -102,6 +114,11 @@ def run_unit_tests_on_ninja_build_target(target,
     log_message('Using Chromium binary (%s)' % chrome_binary, 'info',
                 log_level)
 
+    # On Windows we have to setup LPAC ACLs for the binary.
+    # See https://bit.ly/31yqMJR.
+    if os.name == 'nt':
+        set_lpac_acls(os.path.dirname(chrome_binary))
+
     if not cwd:
         cwd = devtools_paths.devtools_root_path()
 
@@ -109,7 +126,7 @@ def run_unit_tests_on_ninja_build_target(target,
 
     errors_found = run_tests(chrome_binary, target, no_text_coverage,
                              no_html_coverage, coverage, expanded_reporting,
-                             cwd, log_level, mocha_fgrep)
+                             cwd, log_level, mocha_fgrep, shuffle, karma_args)
 
     if coverage and not no_html_coverage:
         log_message(
@@ -165,6 +182,11 @@ def main():
                         dest='invert',
                         default=False,
                         help='Invert the match specified by mocha-fgrep.')
+    parser.add_argument('--shuffle',
+                        action='store_true',
+                        default=False,
+                        dest='shuffle',
+                        help='Shuffle tests order.')
     parser.add_argument(
         '--log-level',
         dest='log_level',
@@ -177,14 +199,18 @@ def main():
                         dest='swarming_output_file',
                         default=None,
                         help='Save coverage files to swarming output.')
+    parser.add_argument('--karma-args',
+                        dest='karma_args',
+                        default=None,
+                        help='Pass custom args for Karma')
+
     args = parser.parse_args(sys.argv[1:])
 
-    run_unit_tests_on_ninja_build_target(args.target, args.no_text_coverage,
-                                         args.no_html_coverage, args.coverage,
-                                         args.expanded_reporting,
-                                         args.chrome_binary, args.cwd,
-                                         args.log_level, args.mocha_fgrep,
-                                         args.swarming_output_file)
+    run_unit_tests_on_ninja_build_target(
+        args.target, args.no_text_coverage, args.no_html_coverage,
+        args.coverage, args.expanded_reporting, args.chrome_binary, args.cwd,
+        args.log_level, args.mocha_fgrep, args.shuffle,
+        args.swarming_output_file, args.karma_args)
 
 
 if __name__ == '__main__':

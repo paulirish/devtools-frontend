@@ -118,6 +118,23 @@ export async function clearTimeWindow(): Promise<void> {
   await overviewGridCursorArea.click({count: 2});
 }
 
+export async function getTextFilterContent(): Promise<string> {
+  const toolbarHandle = await waitFor('.text-filter');
+  const textFilterContent = toolbarHandle.evaluate(toolbar => {
+    const input = toolbar.shadowRoot?.querySelector('[aria-label="Filter"]');
+    return input?.textContent ?? '';
+  });
+  return textFilterContent;
+}
+
+export async function clearTextFilter(): Promise<void> {
+  const textFilterContent = await getTextFilterContent();
+  if (textFilterContent) {
+    const toolbarHandle = await waitFor('.text-filter');
+    await click('devtools-button', {root: toolbarHandle});
+  }
+}
+
 export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element>) {
   const headerNameElement = await waitFor('.header-name', row);
   const headerNameText = await headerNameElement.evaluate(el => el.textContent || '');
@@ -131,4 +148,12 @@ export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element
   }
 
   return [headerNameText.trim(), headerValueText];
+}
+
+export async function elementContainsTextWithSelector(
+    element: puppeteer.ElementHandle<Element>, textContent: string, selector: string): Promise<boolean> {
+  const selectedElements = await element.evaluate((node, selector) => {
+    return [...node.querySelectorAll(selector)].map(node => node.textContent || '') || [];
+  }, selector);
+  return selectedElements.includes(textContent);
 }

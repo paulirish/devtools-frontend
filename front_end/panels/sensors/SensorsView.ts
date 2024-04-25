@@ -7,6 +7,7 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import sensorsStyles from './sensors.css.js';
 
@@ -161,20 +162,11 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sensors/SensorsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-let _instanceObject: SensorsView|null = null;
 
 export class SensorsView extends UI.Widget.VBox {
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  private readonly LocationSetting: Common.Settings.Setting<string>;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  private Location: SDK.EmulationModel.Location;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  private LocationOverrideEnabled: boolean;
+  readonly #locationSetting: Common.Settings.Setting<string>;
+  #location: SDK.EmulationModel.Location;
+  #locationOverrideEnabled: boolean;
   private fieldsetElement!: HTMLFieldSetElement;
   private timezoneError!: HTMLElement;
   private locationSelectElement!: HTMLSelectElement;
@@ -208,18 +200,19 @@ export class SensorsView extends UI.Widget.VBox {
 
   constructor() {
     super(true);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('sensors').track({resize: true})}`);
     this.contentElement.classList.add('sensors-view');
 
-    this.LocationSetting = Common.Settings.Settings.instance().createSetting('emulation.locationOverride', '');
-    this.Location = SDK.EmulationModel.Location.parseSetting(this.LocationSetting.get());
-    this.LocationOverrideEnabled = false;
+    this.#locationSetting = Common.Settings.Settings.instance().createSetting('emulation.location-override', '');
+    this.#location = SDK.EmulationModel.Location.parseSetting(this.#locationSetting.get());
+    this.#locationOverrideEnabled = false;
 
-    this.createLocationSection(this.Location);
+    this.createLocationSection(this.#location);
 
     this.createPanelSeparator();
 
     this.deviceOrientationSetting =
-        Common.Settings.Settings.instance().createSetting('emulation.deviceOrientationOverride', '');
+        Common.Settings.Settings.instance().createSetting('emulation.device-orientation-override', '');
     this.deviceOrientation = SDK.EmulationModel.DeviceOrientation.parseSetting(this.deviceOrientationSetting.get());
     this.deviceOrientationOverrideEnabled = false;
 
@@ -236,13 +229,6 @@ export class SensorsView extends UI.Widget.VBox {
     this.createPanelSeparator();
   }
 
-  static instance(): SensorsView {
-    if (!_instanceObject) {
-      _instanceObject = new SensorsView();
-    }
-    return _instanceObject;
-  }
-
   override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([sensorsStyles]);
@@ -254,6 +240,7 @@ export class SensorsView extends UI.Widget.VBox {
 
   private createLocationSection(location: SDK.EmulationModel.Location): void {
     const geogroup = this.contentElement.createChild('section', 'sensors-group');
+    geogroup.setAttribute('jslog', `${VisualLogging.section('location')}`);
     const geogroupTitle = UI.UIUtils.createLabel(i18nString(UIStrings.location), 'sensors-group-title');
     geogroup.appendChild(geogroupTitle);
     const fields = geogroup.createChild('div', 'geo-fields');
@@ -261,15 +248,18 @@ export class SensorsView extends UI.Widget.VBox {
 
     const noOverrideOption = {title: i18nString(UIStrings.noOverride), location: NonPresetOptions.NoOverride};
     this.locationSelectElement = (fields.createChild('select', 'chrome-select') as HTMLSelectElement);
+    this.locationSelectElement.setAttribute('jslog', `${VisualLogging.dropDown().track({change: true})}`);
     UI.ARIAUtils.bindLabelToControl(geogroupTitle, this.locationSelectElement);
 
     // No override
-    this.locationSelectElement.appendChild(new Option(noOverrideOption.title, noOverrideOption.location));
+    this.locationSelectElement.appendChild(
+        UI.UIUtils.createOption(noOverrideOption.title, noOverrideOption.location, 'no-override'));
     this.customLocationsGroup = (this.locationSelectElement.createChild('optgroup') as HTMLOptGroupElement);
     this.customLocationsGroup.label = i18nString(UIStrings.overrides);
     const customLocations = Common.Settings.Settings.instance().moduleSetting('emulation.locations');
-    const manageButton =
-        UI.UIUtils.createTextButton(i18nString(UIStrings.manage), () => Common.Revealer.reveal(customLocations));
+    const manageButton = UI.UIUtils.createTextButton(
+        i18nString(UIStrings.manage), () => Common.Revealer.reveal(customLocations),
+        {jslogContext: 'sensors.manage-locations'});
     UI.ARIAUtils.setLabel(manageButton, i18nString(UIStrings.manageTheListOfLocations));
     fields.appendChild(manageButton);
     const fillCustomSettings = (): void => {
@@ -278,7 +268,8 @@ export class SensorsView extends UI.Widget.VBox {
       }
       this.customLocationsGroup.removeChildren();
       for (const [i, customLocation] of customLocations.get().entries()) {
-        this.customLocationsGroup.appendChild(new Option(customLocation.title, JSON.stringify(customLocation)));
+        this.customLocationsGroup.appendChild(
+            UI.UIUtils.createOption(customLocation.title, JSON.stringify(customLocation), 'custom'));
         if (location.latitude === customLocation.lat && location.longitude === customLocation.long) {
           // If the location coming from settings matches the custom location, use its index to select the option
           selectedIndex = i + 1;
@@ -290,17 +281,19 @@ export class SensorsView extends UI.Widget.VBox {
 
     // Other location
     const customLocationOption = {title: i18nString(UIStrings.other), location: NonPresetOptions.Custom};
-    this.locationSelectElement.appendChild(new Option(customLocationOption.title, customLocationOption.location));
+    this.locationSelectElement.appendChild(
+        UI.UIUtils.createOption(customLocationOption.title, customLocationOption.location, 'other'));
 
     // Error location.
     const group = (this.locationSelectElement.createChild('optgroup') as HTMLOptGroupElement);
     group.label = i18nString(UIStrings.error);
-    group.appendChild(new Option(i18nString(UIStrings.locationUnavailable), NonPresetOptions.Unavailable));
+    group.appendChild(UI.UIUtils.createOption(
+        i18nString(UIStrings.locationUnavailable), NonPresetOptions.Unavailable, 'unavailable'));
 
     this.locationSelectElement.selectedIndex = selectedIndex;
-    this.locationSelectElement.addEventListener('change', this.LocationSelectChanged.bind(this));
+    this.locationSelectElement.addEventListener('change', this.#locationSelectChanged.bind(this));
     this.fieldsetElement = (fields.createChild('fieldset') as HTMLFieldSetElement);
-    this.fieldsetElement.disabled = !this.LocationOverrideEnabled;
+    this.fieldsetElement.disabled = !this.#locationOverrideEnabled;
     this.fieldsetElement.id = 'location-override-section';
 
     const latitudeGroup = this.fieldsetElement.createChild('div', 'latlong-group');
@@ -311,7 +304,7 @@ export class SensorsView extends UI.Widget.VBox {
     const cmdOrCtrl = Host.Platform.isMac() ? '\u2318' : 'Ctrl';
     const modifierKeyMessage = i18nString(UIStrings.adjustWithMousewheelOrUpdownKeys, {PH1: cmdOrCtrl});
 
-    this.latitudeInput = UI.UIUtils.createInput('', 'number');
+    this.latitudeInput = UI.UIUtils.createInput('', 'number', 'latitude');
     latitudeGroup.appendChild(this.latitudeInput);
     this.latitudeInput.setAttribute('step', 'any');
     this.latitudeInput.value = '0';
@@ -323,7 +316,7 @@ export class SensorsView extends UI.Widget.VBox {
     latitudeGroup.appendChild(
         UI.UIUtils.createLabel(i18nString(UIStrings.latitude), 'latlong-title', this.latitudeInput));
 
-    this.longitudeInput = UI.UIUtils.createInput('', 'number');
+    this.longitudeInput = UI.UIUtils.createInput('', 'number', 'longitude');
     longitudeGroup.appendChild(this.longitudeInput);
     this.longitudeInput.setAttribute('step', 'any');
     this.longitudeInput.value = '0';
@@ -335,7 +328,7 @@ export class SensorsView extends UI.Widget.VBox {
     longitudeGroup.appendChild(
         UI.UIUtils.createLabel(i18nString(UIStrings.longitude), 'latlong-title', this.longitudeInput));
 
-    this.timezoneInput = UI.UIUtils.createInput('', 'text');
+    this.timezoneInput = UI.UIUtils.createInput('', 'text', 'timezone');
     timezoneGroup.appendChild(this.timezoneInput);
     this.timezoneInput.value = 'Europe/Berlin';
     this.timezoneSetter = UI.UIUtils.bindInput(
@@ -346,7 +339,7 @@ export class SensorsView extends UI.Widget.VBox {
         UI.UIUtils.createLabel(i18nString(UIStrings.timezoneId), 'timezone-title', this.timezoneInput));
     this.timezoneError = (timezoneGroup.createChild('div', 'timezone-error') as HTMLElement);
 
-    this.localeInput = UI.UIUtils.createInput('', 'text');
+    this.localeInput = UI.UIUtils.createInput('', 'text', 'locale');
     localeGroup.appendChild(this.localeInput);
     this.localeInput.value = 'en-US';
     this.localeSetter = UI.UIUtils.bindInput(
@@ -356,32 +349,30 @@ export class SensorsView extends UI.Widget.VBox {
     this.localeError = (localeGroup.createChild('div', 'locale-error') as HTMLElement);
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  private LocationSelectChanged(): void {
+  #locationSelectChanged(): void {
     this.fieldsetElement.disabled = false;
     this.timezoneError.textContent = '';
     const value = this.locationSelectElement.options[this.locationSelectElement.selectedIndex].value;
     if (value === NonPresetOptions.NoOverride) {
-      this.LocationOverrideEnabled = false;
+      this.#locationOverrideEnabled = false;
       this.clearFieldsetElementInputs();
       this.fieldsetElement.disabled = true;
     } else if (value === NonPresetOptions.Custom) {
-      this.LocationOverrideEnabled = true;
+      this.#locationOverrideEnabled = true;
       const location = SDK.EmulationModel.Location.parseUserInput(
           this.latitudeInput.value.trim(), this.longitudeInput.value.trim(), this.timezoneInput.value.trim(),
           this.localeInput.value.trim());
       if (!location) {
         return;
       }
-      this.Location = location;
+      this.#location = location;
     } else if (value === NonPresetOptions.Unavailable) {
-      this.LocationOverrideEnabled = true;
-      this.Location = new SDK.EmulationModel.Location(0, 0, '', '', true);
+      this.#locationOverrideEnabled = true;
+      this.#location = new SDK.EmulationModel.Location(0, 0, '', '', true);
     } else {
-      this.LocationOverrideEnabled = true;
+      this.#locationOverrideEnabled = true;
       const coordinates = JSON.parse(value);
-      this.Location = new SDK.EmulationModel.Location(
+      this.#location = new SDK.EmulationModel.Location(
           coordinates.lat, coordinates.long, coordinates.timezoneId, coordinates.locale, false);
       this.latitudeSetter(coordinates.lat);
       this.longitudeSetter(coordinates.long);
@@ -406,18 +397,18 @@ export class SensorsView extends UI.Widget.VBox {
     this.timezoneError.textContent = '';
 
     this.setSelectElementLabel(this.locationSelectElement, NonPresetOptions.Custom);
-    this.Location = location;
+    this.#location = location;
     this.applyLocation();
   }
 
   private applyLocation(): void {
-    if (this.LocationOverrideEnabled) {
-      this.LocationSetting.set(this.Location.toSetting());
+    if (this.#locationOverrideEnabled) {
+      this.#locationSetting.set(this.#location.toSetting());
     } else {
-      this.LocationSetting.set('');
+      this.#locationSetting.set('');
     }
     for (const emulationModel of SDK.TargetManager.TargetManager.instance().models(SDK.EmulationModel.EmulationModel)) {
-      emulationModel.emulateLocation(this.LocationOverrideEnabled ? this.Location : null).catch(err => {
+      emulationModel.emulateLocation(this.#locationOverrideEnabled ? this.#location : null).catch(err => {
         switch (err.type) {
           case 'emulation-set-timezone': {
             this.timezoneError.textContent = err.message;
@@ -441,12 +432,17 @@ export class SensorsView extends UI.Widget.VBox {
 
   private createDeviceOrientationSection(): void {
     const orientationGroup = this.contentElement.createChild('section', 'sensors-group');
+    orientationGroup.setAttribute('jslog', `${VisualLogging.section('device-orientation')}`);
     const orientationTitle = UI.UIUtils.createLabel(i18nString(UIStrings.orientation), 'sensors-group-title');
     orientationGroup.appendChild(orientationTitle);
     const orientationContent = orientationGroup.createChild('div', 'orientation-content');
     const fields = orientationContent.createChild('div', 'orientation-fields');
 
-    const orientationOffOption = {title: i18nString(UIStrings.off), orientation: NonPresetOptions.NoOverride};
+    const orientationOffOption = {
+      title: i18nString(UIStrings.off),
+      orientation: NonPresetOptions.NoOverride,
+      jslogContext: 'off',
+    };
     const customOrientationOption = {
       title: i18nString(UIStrings.customOrientation),
       orientation: NonPresetOptions.Custom,
@@ -454,26 +450,32 @@ export class SensorsView extends UI.Widget.VBox {
     const orientationGroups = [{
       title: i18nString(UIStrings.presets),
       value: [
-        {title: i18nString(UIStrings.portrait), orientation: '[0, 90, 0]'},
-        {title: i18nString(UIStrings.portraitUpsideDown), orientation: '[-180, -90, 0]'},
-        {title: i18nString(UIStrings.landscapeLeft), orientation: '[90, 0, -90]'},
-        {title: i18nString(UIStrings.landscapeRight), orientation: '[90, -180, -90]'},
-        {title: i18nString(UIStrings.displayUp), orientation: '[0, 0, 0]'},
-        {title: i18nString(UIStrings.displayDown), orientation: '[0, -180, 0]'},
+        {title: i18nString(UIStrings.portrait), orientation: '[0, 90, 0]', jslogContext: 'portrait'},
+        {
+          title: i18nString(UIStrings.portraitUpsideDown),
+          orientation: '[180, -90, 0]',
+          jslogContext: 'portrait-upside-down',
+        },
+        {title: i18nString(UIStrings.landscapeLeft), orientation: '[90, 0, -90]', jslogContext: 'landscape-left'},
+        {title: i18nString(UIStrings.landscapeRight), orientation: '[90, -180, -90]', jslogContext: 'landscape-right'},
+        {title: i18nString(UIStrings.displayUp), orientation: '[0, 0, 0]', jslogContext: 'display-up'},
+        {title: i18nString(UIStrings.displayDown), orientation: '[0, -180, 0]', jslogContext: 'displayUp-down'},
       ],
     }];
     this.orientationSelectElement = (this.contentElement.createChild('select', 'chrome-select') as HTMLSelectElement);
+    this.orientationSelectElement.setAttribute('jslog', `${VisualLogging.dropDown().track({change: true})}`);
     UI.ARIAUtils.bindLabelToControl(orientationTitle, this.orientationSelectElement);
-    this.orientationSelectElement.appendChild(new Option(orientationOffOption.title, orientationOffOption.orientation));
+    this.orientationSelectElement.appendChild(UI.UIUtils.createOption(
+        orientationOffOption.title, orientationOffOption.orientation, orientationOffOption.jslogContext));
     this.orientationSelectElement.appendChild(
-        new Option(customOrientationOption.title, customOrientationOption.orientation));
+        UI.UIUtils.createOption(customOrientationOption.title, customOrientationOption.orientation, 'custom'));
 
     for (let i = 0; i < orientationGroups.length; ++i) {
       const groupElement = (this.orientationSelectElement.createChild('optgroup') as HTMLOptGroupElement);
       groupElement.label = orientationGroups[i].title;
       const group = orientationGroups[i].value;
       for (let j = 0; j < group.length; ++j) {
-        groupElement.appendChild(new Option(group[j].title, group[j].orientation));
+        groupElement.appendChild(UI.UIUtils.createOption(group[j].title, group[j].orientation, group[j].jslogContext));
       }
     }
     this.orientationSelectElement.selectedIndex = 0;
@@ -482,6 +484,7 @@ export class SensorsView extends UI.Widget.VBox {
 
     this.deviceOrientationFieldset = this.createDeviceOrientationOverrideElement(this.deviceOrientation);
     this.stageElement = (orientationContent.createChild('div', 'orientation-stage') as HTMLElement);
+    this.stageElement.setAttribute('jslog', `${VisualLogging.preview().track({drag: true})}`);
     this.orientationLayer = (this.stageElement.createChild('div', 'orientation-layer') as HTMLDivElement);
     this.boxElement = this.orientationLayer.createChild('section', 'orientation-box orientation-element');
 
@@ -520,6 +523,7 @@ export class SensorsView extends UI.Widget.VBox {
     if (value === NonPresetOptions.NoOverride) {
       this.deviceOrientationOverrideEnabled = false;
       this.enableOrientationFields(true);
+      this.applyDeviceOrientation();
     } else if (value === NonPresetOptions.Custom) {
       this.deviceOrientationOverrideEnabled = true;
       this.resetDeviceOrientation();
@@ -608,21 +612,21 @@ export class SensorsView extends UI.Widget.VBox {
     fieldsetElement.classList.add('device-orientation-override-section');
     const cellElement = fieldsetElement.createChild('td', 'orientation-inputs-cell');
 
-    this.alphaElement = UI.UIUtils.createInput('', 'number');
+    this.alphaElement = UI.UIUtils.createInput('', 'number', 'alpha');
     this.alphaElement.setAttribute('step', 'any');
     this.alphaSetter = this.createAxisInput(
         cellElement, this.alphaElement, i18nString(UIStrings.alpha),
         SDK.EmulationModel.DeviceOrientation.alphaAngleValidator);
     this.alphaSetter(String(deviceOrientation.alpha));
 
-    this.betaElement = UI.UIUtils.createInput('', 'number');
+    this.betaElement = UI.UIUtils.createInput('', 'number', 'beta');
     this.betaElement.setAttribute('step', 'any');
     this.betaSetter = this.createAxisInput(
         cellElement, this.betaElement, i18nString(UIStrings.beta),
         SDK.EmulationModel.DeviceOrientation.betaAngleValidator);
     this.betaSetter(String(deviceOrientation.beta));
 
-    this.gammaElement = UI.UIUtils.createInput('', 'number');
+    this.gammaElement = UI.UIUtils.createInput('', 'number', 'gamma');
     this.gammaElement.setAttribute('step', 'any');
     this.gammaSetter = this.createAxisInput(
         cellElement, this.gammaElement, i18nString(UIStrings.gamma),
@@ -630,7 +634,8 @@ export class SensorsView extends UI.Widget.VBox {
     this.gammaSetter(String(deviceOrientation.gamma));
 
     const resetButton = UI.UIUtils.createTextButton(
-        i18nString(UIStrings.reset), this.resetDeviceOrientation.bind(this), 'orientation-reset-button');
+        i18nString(UIStrings.reset), this.resetDeviceOrientation.bind(this),
+        {className: 'orientation-reset-button', jslogContext: 'sensors.reset-device-orientiation'});
     UI.ARIAUtils.setLabel(resetButton, i18nString(UIStrings.resetDeviceOrientation));
     resetButton.setAttribute('type', 'reset');
     cellElement.appendChild(resetButton);
@@ -752,7 +757,7 @@ export class SensorsView extends UI.Widget.VBox {
   private appendIdleEmulator(): void {
     const container = this.contentElement.createChild('div', 'idle-section');
     const control = UI.SettingsUI.createControlForSetting(
-        Common.Settings.Settings.instance().moduleSetting('emulation.idleDetection'),
+        Common.Settings.Settings.instance().moduleSetting('emulation.idle-detection'),
         i18nString(UIStrings.forcesSelectedIdleStateEmulation));
 
     if (control) {
@@ -775,40 +780,10 @@ export const NonPresetOptions = {
   Unavailable: 'unavailable',
 };
 
-export class PresetOrientations {
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  static get Orientations(): {title: string, value: {title: string, orientation: string}[]}[] {
-    return [{
-      title: i18nString(UIStrings.presets),
-      value: [
-        {title: i18nString(UIStrings.portrait), orientation: '[0, 90, 0]'},
-        {title: i18nString(UIStrings.portraitUpsideDown), orientation: '[-180, -90, 0]'},
-        {title: i18nString(UIStrings.landscapeLeft), orientation: '[90, 0, -90]'},
-        {title: i18nString(UIStrings.landscapeRight), orientation: '[90, -180, -90]'},
-        {title: i18nString(UIStrings.displayUp), orientation: '[0, 0, 0]'},
-        {title: i18nString(UIStrings.displayDown), orientation: '[0, -180, 0]'},
-      ],
-    }];
-  }
-}
-
-let showActionDelegateInstance: ShowActionDelegate;
-
 export class ShowActionDelegate implements UI.ActionRegistration.ActionDelegate {
   handleAction(_context: UI.Context.Context, _actionId: string): boolean {
     void UI.ViewManager.ViewManager.instance().showView('sensors');
     return true;
-  }
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ShowActionDelegate {
-    const {forceNew} = opts;
-    if (!showActionDelegateInstance || forceNew) {
-      showActionDelegateInstance = new ShowActionDelegate();
-    }
-
-    return showActionDelegateInstance;
   }
 }
 

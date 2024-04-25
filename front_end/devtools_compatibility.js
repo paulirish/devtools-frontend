@@ -319,6 +319,10 @@ const DevToolsAPIImpl = class {
     this._dispatchOnInspectorFrontendAPI('searchCompleted', [requestId, fileSystemPath, files]);
   }
 
+  colorThemeChanged() {
+    this._dispatchOnInspectorFrontendAPI('colorThemeChanged', []);
+  }
+
   /**
    * @param {string} tabId
    */
@@ -401,12 +405,10 @@ window.DevToolsAPI = DevToolsAPI;
  */
 const EnumeratedHistogram = {
   ActionTaken: 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded: 'DevTools.BreakpointWithConditionAdded',
   BreakpointEditDialogRevealedFrom: 'DevTools.BreakpointEditDialogRevealedFrom',
   CSSHintShown: 'DevTools.CSSHintShown',
   DeveloperResourceLoaded: 'DevTools.DeveloperResourceLoaded',
   DeveloperResourceScheme: 'DevTools.DeveloperResourceScheme',
-  ElementsSidebarTabShown: 'DevTools.Elements.SidebarTabShown',
   ExperimentDisabled: 'DevTools.ExperimentDisabled',
   ExperimentDisabledAtLaunch: 'DevTools.ExperimentDisabledAtLaunch',
   ExperimentEnabled: 'DevTools.ExperimentEnabled',
@@ -419,11 +421,11 @@ const EnumeratedHistogram = {
   KeyboardShortcutFired: 'DevTools.KeyboardShortcutFired',
   Language: 'DevTools.Language',
   LighthouseModeRun: 'DevTools.LighthouseModeRun',
-  LinearMemoryInspectorRevealedFrom: 'DevTools.LinearMemoryInspector.RevealedFrom',
-  LinearMemoryInspectorTarget: 'DevTools.LinearMemoryInspector.Target',
+  LighthouseCategoryUsed: 'DevTools.LighthouseCategoryUsed',
   ManifestSectionSelected: 'DevTools.ManifestSectionSelected',
   PanelClosed: 'DevTools.PanelClosed',
   PanelShown: 'DevTools.PanelShown',
+  PanelShownInLocation: 'DevTools.PanelShownInLocation',
   RecordingAssertion: 'DevTools.RecordingAssertion',
   RecordingCodeToggled: 'DevTools.RecordingCodeToggled',
   RecordingCopiedToClipboard: 'DevTools.RecordingCopiedToClipboard',
@@ -443,11 +445,15 @@ const EnumeratedHistogram = {
   ColorConvertedFrom: 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom: 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation: 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed: 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown: 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount: 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated: 'DevTools.SwatchActivated',
-  BadgeActivated: 'DevTools.BadgeActivated',
+  AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
+  AnimationPointDragged: 'DevTools.AnimationPointDragged',
+  LegacyResourceTypeFilterNumberOfSelectedChanged: 'DevTools.LegacyResourceTypeFilterNumberOfSelectedChanged',
+  LegacyResourceTypeFilterItemSelected: 'DevTools.LegacyResourceTypeFilterItemSelected',
+  ResourceTypeFilterNumberOfSelectedChanged: 'DevTools.ResourceTypeFilterNumberOfSelectedChanged',
+  ResourceTypeFilterItemSelected: 'DevTools.ResourceTypeFilterItemSelected',
+  NetworkPanelMoreFiltersNumberOfSelectedChanged: 'DevTools.NetworkPanelMoreFiltersNumberOfSelectedChanged',
+  NetworkPanelMoreFiltersItemSelected: 'DevTools.NetworkPanelMoreFiltersItemSelected',
 };
 
 /**
@@ -662,6 +668,14 @@ const InspectorFrontendHostImpl = class {
    */
   openInNewTab(url) {
     DevToolsAPI.sendMessageToEmbedder('openInNewTab', [url], null);
+  }
+
+  /**
+   * @override
+   * @param {string} query
+   */
+  openSearchResultsInNewTab(query) {
+    DevToolsAPI.sendMessageToEmbedder('openSearchResultsInNewTab', [query], null);
   }
 
   /**
@@ -979,6 +993,62 @@ const InspectorFrontendHostImpl = class {
     DevToolsAPI.setAddExtensionCallback(callback);
   }
 
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ImpressionEvent} impressionEvent
+   */
+  recordImpression(impressionEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordImpression', [impressionEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ResizeEvent} resizeEvent
+   */
+  recordResize(resizeEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordResize', [resizeEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ClickEvent} clickEvent
+   */
+  recordClick(clickEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordClick', [clickEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.HoverEvent} hoverEvent
+   */
+  recordHover(hoverEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordHover', [hoverEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.DragEvent} dragEvent
+   */
+  recordDrag(dragEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordDrag', [dragEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.ChangeEvent} changeEvent
+   */
+  recordChange(changeEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordChange', [changeEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.KeyDownEvent} keyDownEvent
+   */
+  recordKeyDown(keyDownEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordKeyDown', [keyDownEvent], null);
+  }
+
   // Backward-compatible methods below this line --------------------------------------------
 
   /**
@@ -1054,6 +1124,23 @@ const InspectorFrontendHostImpl = class {
    */
   initialTargetId() {
     return DevToolsAPI._initialTargetIdPromise;
+  }
+
+  /**
+   * @param {string} request
+   * @param {number} streamId
+   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   */
+  doAidaConversation(request, streamId, cb) {
+    DevToolsAPI.sendMessageToEmbedder('doAidaConversation', [request, streamId], cb);
+  }
+
+  /**
+   * @param {string} request
+   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   */
+  registerAidaClientEvent(request) {
+    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request]);
   }
 };
 
@@ -1191,7 +1278,6 @@ function installObjectObserve() {
     'showHeaSnapshotObjectsHiddenProperties',
     'showInheritedComputedStyleProperties',
     'showMediaQueryInspector',
-    'showNativeFunctionsInJSProfile',
     'showUAShadowDOM',
     'showWhitespacesInEditor',
     'sidebarPosition',
