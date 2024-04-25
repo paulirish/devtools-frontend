@@ -162,8 +162,16 @@ export interface Commands {
     params: Bidi.Network.ContinueRequestParameters;
     returnType: Bidi.EmptyResult;
   };
+  'network.continueWithAuth': {
+    params: Bidi.Network.ContinueWithAuthParameters;
+    returnType: Bidi.EmptyResult;
+  };
   'network.failRequest': {
     params: Bidi.Network.FailRequestParameters;
+    returnType: Bidi.EmptyResult;
+  };
+  'network.provideResponse': {
+    params: Bidi.Network.ProvideResponseParameters;
     returnType: Bidi.EmptyResult;
   };
 }

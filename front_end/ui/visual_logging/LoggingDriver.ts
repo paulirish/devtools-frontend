@@ -11,13 +11,14 @@ import {getDomState, visibleOverlap} from './DomState.js';
 import {type Loggable} from './Loggable.js';
 import {getLoggingConfig} from './LoggingConfig.js';
 import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown, logResize} from './LoggingEvents.js';
-import {getLoggingState, getOrCreateLoggingState} from './LoggingState.js';
+import {getLoggingState, getOrCreateLoggingState, type LoggingState} from './LoggingState.js';
 import {getNonDomState, unregisterAllLoggables, unregisterLoggable} from './NonDomState.js';
 
 const PROCESS_DOM_INTERVAL = 500;
 const KEYBOARD_LOG_INTERVAL = 3000;
 const HOVER_LOG_INTERVAL = 1000;
 const DRAG_LOG_INTERVAL = 1250;
+const DRAG_REPORT_THRESHOLD = 50;
 const CLICK_LOG_INTERVAL = 500;
 const RESIZE_LOG_INTERVAL = 1000;
 const RESIZE_REPORT_THRESHOLD = 50;
@@ -33,16 +34,15 @@ let dragLogThrottler = noOpThrottler;
 export let clickLogThrottler = noOpThrottler;
 export let resizeLogThrottler = noOpThrottler;
 
-const mutationObservers = new WeakMap<Node, MutationObserver>();
+const mutationObserver = new MutationObserver(scheduleProcessing);
+const resizeObserver = new ResizeObserver(onResizeOrIntersection);
+const intersectionObserver = new IntersectionObserver(onResizeOrIntersection);
 const documents: Document[] = [];
+const pendingResize = new Map<Element, DOMRect>();
 
 function observeMutations(roots: Node[]): void {
   for (const root of roots) {
-    if (!mutationObservers.has(root)) {
-      const observer = new MutationObserver(scheduleProcessing);
-      observer.observe(root, {attributes: true, childList: true, subtree: true});
-      mutationObservers.set(root, observer);
-    }
+    mutationObserver.observe(root, {attributes: true, childList: true, subtree: true});
   }
 }
 
@@ -87,15 +87,12 @@ export function stopLogging(): void {
   for (const document of documents) {
     document.removeEventListener('visibilitychange', scheduleProcessing);
     document.removeEventListener('scroll', scheduleProcessing);
-    mutationObservers.get(document.body)?.disconnect();
-    mutationObservers.delete(document.body);
   }
-  const {shadowRoots} = getDomState(documents);
-  for (const shadowRoot of shadowRoots) {
-    mutationObservers.get(shadowRoot)?.disconnect();
-    mutationObservers.delete(shadowRoot);
-  }
+  mutationObserver.disconnect();
+  resizeObserver.disconnect();
+  intersectionObserver.disconnect();
   documents.length = 0;
+  viewportRects.clear();
   processingThrottler = noOpThrottler;
 }
 
@@ -107,6 +104,15 @@ export function scheduleProcessing(): void {
       () => Coordinator.RenderCoordinator.RenderCoordinator.instance().read('processForLogging', process));
 }
 
+const viewportRects = new Map<Document, DOMRect>();
+const viewportRectFor = (element: Element): DOMRect => {
+  const ownerDocument = element.ownerDocument;
+  const viewportRect = viewportRects.get(ownerDocument) ||
+      new DOMRect(0, 0, ownerDocument.defaultView?.innerWidth || 0, ownerDocument.defaultView?.innerHeight || 0);
+  viewportRects.set(ownerDocument, viewportRect);
+  return viewportRect;
+};
+
 async function process(): Promise<void> {
   if (document.hidden) {
     return;
@@ -114,16 +120,7 @@ async function process(): Promise<void> {
   const startTime = performance.now();
   const {loggables, shadowRoots} = getDomState(documents);
   const visibleLoggables: Loggable[] = [];
-  const viewportRects = new Map<Document, DOMRect>();
   observeMutations(shadowRoots);
-
-  const viewportRectFor = (element: Element): DOMRect => {
-    const ownerDocument = element.ownerDocument;
-    const viewportRect = viewportRects.get(ownerDocument) ||
-        new DOMRect(0, 0, ownerDocument.defaultView?.innerWidth || 0, ownerDocument.defaultView?.innerHeight || 0);
-    viewportRects.set(ownerDocument, viewportRect);
-    return viewportRect;
-  };
 
   for (const {element, parent} of loggables) {
     const loggingState = getOrCreateLoggingState(element, getLoggingConfig(element), parent);
@@ -157,9 +154,9 @@ async function process(): Promise<void> {
       }
       const trackDrag = loggingState.config.track?.drag;
       if (trackDrag) {
-        element.addEventListener('pointerdown', logDrag(dragLogThrottler), {capture: true});
-        document.addEventListener('pointerup', cancelDrag, {capture: true});
-        document.addEventListener('dragend', cancelDrag, {capture: true});
+        element.addEventListener('pointerdown', onDragStart, {capture: true});
+        document.addEventListener('pointerup', maybeCancelDrag, {capture: true});
+        document.addEventListener('dragend', maybeCancelDrag, {capture: true});
       }
       if (loggingState.config.track?.change) {
         element.addEventListener('change', logChange, {capture: true});
@@ -169,18 +166,8 @@ async function process(): Promise<void> {
         element.addEventListener('keydown', e => logKeyDown(keyboardLogThrottler)(e.currentTarget, e), {capture: true});
       }
       if (loggingState.config.track?.resize) {
-        const updateSize = (): void => {
-          const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
-          if (!loggingState.size) {
-            return;
-          }
-          if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
-              Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
-            void logResize(resizeLogThrottler)(element, overlap);
-          }
-        };
-        new ResizeObserver(updateSize).observe(element);
-        new IntersectionObserver(updateSize).observe(element);
+        resizeObserver.observe(element);
+        intersectionObserver.observe(element);
       }
       if (element.tagName === 'SELECT') {
         const onSelectOpen = (): void => {
@@ -237,6 +224,77 @@ async function process(): Promise<void> {
 async function cancelLogging(): Promise<void> {
 }
 
-function cancelDrag(): void {
+let dragStartX = 0, dragStartY = 0;
+
+function onDragStart(event: Event): void {
+  if (!(event instanceof MouseEvent)) {
+    return;
+  }
+  dragStartX = event.screenX;
+  dragStartY = event.screenY;
+  void logDrag(dragLogThrottler)(event);
+}
+
+function maybeCancelDrag(event: Event): void {
+  if (!(event instanceof MouseEvent)) {
+    return;
+  }
+  if (Math.abs(event.screenX - dragStartX) >= DRAG_REPORT_THRESHOLD ||
+      Math.abs(event.screenY - dragStartY) >= DRAG_REPORT_THRESHOLD) {
+    return;
+  }
   void dragLogThrottler.schedule(cancelLogging);
+}
+
+function isAncestorOf(state1: LoggingState|null, state2: LoggingState|null): boolean {
+  while (state2) {
+    if (state2 === state1) {
+      return true;
+    }
+    state2 = state2.parent;
+  }
+  return false;
+}
+
+function onResizeOrIntersection(entries: ResizeObserverEntry[]|IntersectionObserverEntry[]): void {
+  for (const entry of entries) {
+    const element = entry.target;
+    const loggingState = getLoggingState(element);
+    const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
+    if (!loggingState?.size) {
+      continue;
+    }
+
+    let hasPendingParent = false;
+    for (const pendingElement of pendingResize.keys()) {
+      if (pendingElement === element) {
+        continue;
+      }
+      const pendingState = getLoggingState(pendingElement);
+      if (isAncestorOf(pendingState, loggingState)) {
+        hasPendingParent = true;
+        break;
+      }
+      if (isAncestorOf(loggingState, pendingState)) {
+        pendingResize.delete(pendingElement);
+      }
+    }
+    if (hasPendingParent) {
+      continue;
+    }
+    pendingResize.set(element, overlap);
+    void resizeLogThrottler.schedule(async () => {
+      for (const [element, overlap] of pendingResize.entries()) {
+        const loggingState = getLoggingState(element);
+        if (!loggingState) {
+          continue;
+        }
+        if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
+            Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
+          logResize(element, overlap);
+        }
+      }
+      pendingResize.clear();
+    });
+  }
 }

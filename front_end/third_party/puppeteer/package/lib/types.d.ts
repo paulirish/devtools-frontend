@@ -174,7 +174,7 @@ export declare interface BoxModel {
  * - connected to via {@link Puppeteer.connect} or
  * - launched by {@link PuppeteerNode.launch}.
  *
- * {@link Browser} {@link EventEmitter | emits} various events which are
+ * {@link Browser} {@link EventEmitter.emit | emits} various events which are
  * documented in the {@link BrowserEvent} enum.
  *
  * @example Using a {@link Browser} to create a {@link Page}:
@@ -480,7 +480,7 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      *
      * @deprecated In Chrome, the
      * {@link Browser.defaultBrowserContext | default browser context} can also be
-     * "icognito" if configured via the arguments and in such cases this getter
+     * "incognito" if configured via the arguments and in such cases this getter
      * returns wrong results (see
      * https://github.com/puppeteer/puppeteer/issues/8836). Also, the term
      * "incognito" is not applicable to other browsers. To migrate, check the
@@ -755,7 +755,7 @@ export declare type CDPEvents = {
  * @example
  *
  * ```ts
- * const client = await page.target().createCDPSession();
+ * const client = await page.createCDPSession();
  * await client.send('Animation.enable');
  * client.on('Animation.animationCreated', () =>
  *   console.log('Animation created!')
@@ -1714,6 +1714,7 @@ export declare type ElementFor<TagName extends keyof HTMLElementTagNameMap | key
 export declare abstract class ElementHandle<ElementType extends Node = Element> extends JSHandle<ElementType> {
     #private;
     /* Excluded from this release type: [_isElementHandle] */
+    /* Excluded from this release type: isolatedHandle */
     /* Excluded from this release type: bindIsolatedHandle */
     /* Excluded from this release type: handle */
     /* Excluded from this release type: __constructor */
@@ -1888,13 +1889,13 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
     clickablePoint(offset?: Offset): Promise<Point>;
     /**
      * This method scrolls element into view if needed, and then
-     * uses {@link Page} to hover over the center of the element.
+     * uses {@link Page.mouse} to hover over the center of the element.
      * If the element is detached from DOM, the method throws an error.
      */
     hover(this: ElementHandle<Element>): Promise<void>;
     /**
      * This method scrolls element into view if needed, and then
-     * uses {@link Page | Page.mouse} to click in the center of the element.
+     * uses {@link Page.mouse} to click in the center of the element.
      * If the element is detached from DOM, the method throws an error.
      */
     click(this: ElementHandle<Element>, options?: Readonly<ClickOptions>): Promise<void>;
@@ -2905,6 +2906,8 @@ export declare interface GoToOptions extends WaitForOptions {
     referrerPolicy?: string;
 }
 
+/* Excluded from this release type: handleError */
+
 /**
  * @public
  */
@@ -2964,6 +2967,7 @@ export declare abstract class HTTPRequest {
     /* Excluded from this release type: _response */
     /* Excluded from this release type: _fromMemoryCache */
     /* Excluded from this release type: _redirectChain */
+    /* Excluded from this release type: interception */
     /**
      * Warning! Using this client can break Puppeteer. Use with caution.
      *
@@ -2980,16 +2984,16 @@ export declare abstract class HTTPRequest {
      * if the interception is allowed to continue (ie, `abort()` and
      * `respond()` aren't called).
      */
-    abstract continueRequestOverrides(): ContinueRequestOverrides;
+    continueRequestOverrides(): ContinueRequestOverrides;
     /**
      * The `ResponseForRequest` that gets used if the
      * interception is allowed to respond (ie, `abort()` is not called).
      */
-    abstract responseForRequest(): Partial<ResponseForRequest> | null;
+    responseForRequest(): Partial<ResponseForRequest> | null;
     /**
      * The most recent reason for aborting the request
      */
-    abstract abortErrorReason(): Protocol.Network.ErrorReason | null;
+    abortErrorReason(): Protocol.Network.ErrorReason | null;
     /**
      * An InterceptResolutionState object describing the current resolution
      * action and priority.
@@ -3001,24 +3005,27 @@ export declare abstract class HTTPRequest {
      * InterceptResolutionAction is one of: `abort`, `respond`, `continue`,
      * `disabled`, `none`, or `already-handled`.
      */
-    abstract interceptResolutionState(): InterceptResolutionState;
+    interceptResolutionState(): InterceptResolutionState;
     /**
      * Is `true` if the intercept resolution has already been handled,
      * `false` otherwise.
      */
-    abstract isInterceptResolutionHandled(): boolean;
+    isInterceptResolutionHandled(): boolean;
     /**
      * Adds an async request handler to the processing queue.
      * Deferred handlers are not guaranteed to execute in any particular order,
      * but they are guaranteed to resolve before the request interception
      * is finalized.
      */
-    abstract enqueueInterceptAction(pendingHandler: () => void | PromiseLike<unknown>): void;
+    enqueueInterceptAction(pendingHandler: () => void | PromiseLike<unknown>): void;
+    /* Excluded from this release type: _abort */
+    /* Excluded from this release type: _respond */
+    /* Excluded from this release type: _continue */
     /**
      * Awaits pending interception handlers and then decides how to fulfill
      * the request interception.
      */
-    abstract finalizeInterceptions(): Promise<void>;
+    finalizeInterceptions(): Promise<void>;
     /**
      * Contains the request's resource type as it was perceived by the rendering
      * engine.
@@ -3145,7 +3152,7 @@ export declare abstract class HTTPRequest {
      *
      * Exception is immediately thrown if the request interception is not enabled.
      */
-    abstract continue(overrides?: ContinueRequestOverrides, priority?: number): Promise<void>;
+    continue(overrides?: ContinueRequestOverrides, priority?: number): Promise<void>;
     /**
      * Fulfills a request with the given response.
      *
@@ -3178,7 +3185,7 @@ export declare abstract class HTTPRequest {
      *
      * Exception is immediately thrown if the request interception is not enabled.
      */
-    abstract respond(response: Partial<ResponseForRequest>, priority?: number): Promise<void>;
+    respond(response: Partial<ResponseForRequest>, priority?: number): Promise<void>;
     /**
      * Aborts a request.
      *
@@ -3193,7 +3200,7 @@ export declare abstract class HTTPRequest {
      * {@link Page.setRequestInterception}. If it is not enabled, this method will
      * throw an exception immediately.
      */
-    abstract abort(errorCode?: ErrorCode, priority?: number): Promise<void>;
+    abort(errorCode?: ErrorCode, priority?: number): Promise<void>;
 }
 
 /**
@@ -4372,7 +4379,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @deprecated We no longer support intercepting drag payloads. Use the new
      * drag APIs found on {@link ElementHandle} to drag (or just use the
-     * {@link Page | Page.mouse}).
+     * {@link Page.mouse}).
      */
     abstract isDragInterceptionEnabled(): boolean;
     /**
@@ -4530,7 +4537,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @deprecated We no longer support intercepting drag payloads. Use the new
      * drag APIs found on {@link ElementHandle} to drag (or just use the
-     * {@link Page | Page.mouse}).
+     * {@link Page.mouse}).
      */
     abstract setDragInterception(enabled: boolean): Promise<void>;
     /**
@@ -4807,9 +4814,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @example
      *
      * ```ts
-     * // if you don't provide HTMLInputElement here, TS will error
-     * // as `value` is not on `Element`
-     * await page.$$eval('input', (elements: HTMLInputElement[]) => {
+     * await page.$$eval('input', elements => {
      *   return elements.map(e => e.value);
      * });
      * ```
@@ -4821,11 +4826,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @example
      *
      * ```ts
-     * // The compiler can infer the return type in this case, but if it can't
-     * // or if you want to be more explicit, provide it as the generic type.
-     * const allInputValues = await page.$$eval<string[]>(
-     *   'input',
-     *   (elements: HTMLInputElement[]) => elements.map(e => e.textContent)
+     * const allInputValues = await page.$$eval('input', elements =>
+     *   elements.map(e => e.textContent)
      * );
      * ```
      *
@@ -5506,7 +5508,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * This is either the viewport set with the previous {@link Page.setViewport}
      * call or the default viewport set via
-     * {@link BrowserConnectOptions | BrowserConnectOptions.defaultViewport}.
+     * {@link BrowserConnectOptions.defaultViewport |
+     * BrowserConnectOptions.defaultViewport}.
      */
     abstract viewport(): Viewport | null;
     /**
@@ -5700,7 +5703,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     abstract get mouse(): Mouse;
     /**
      * This method fetches an element with `selector`, scrolls it into view if
-     * needed, and then uses {@link Page | Page.mouse} to click in the center of the
+     * needed, and then uses {@link Page.mouse} to click in the center of the
      * element. If there's no element matching `selector`, the method throws an
      * error.
      *
@@ -5745,7 +5748,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     focus(selector: string): Promise<void>;
     /**
      * This method fetches an element with `selector`, scrolls it into view if
-     * needed, and then uses {@link Page | Page.mouse}
+     * needed, and then uses {@link Page.mouse}
      * to hover over the center of the element.
      * If there's no element matching `selector`, the method throws an error.
      * @param selector - A
@@ -5788,7 +5791,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     select(selector: string, ...values: string[]): Promise<string[]>;
     /**
      * This method fetches an element with `selector`, scrolls it into view if
-     * needed, and then uses {@link Page | Page.touchscreen}
+     * needed, and then uses {@link Page.touchscreen}
      * to tap in the center of the element.
      * If there's no element matching `selector`, the method throws an error.
      * @param selector - A
@@ -6246,7 +6249,7 @@ export declare interface PDFOptions {
     headerTemplate?: string;
     /**
      * HTML template for the print footer. Has the same constraints and support
-     * for special classes as {@link PDFOptions | PDFOptions.headerTemplate}.
+     * for special classes as {@link PDFOptions.headerTemplate}.
      */
     footerTemplate?: string;
     /**
@@ -6624,11 +6627,11 @@ export declare class PuppeteerNode extends Puppeteer {
      * specified.
      *
      * When using with `puppeteer-core`,
-     * {@link LaunchOptions | options.executablePath} or
-     * {@link LaunchOptions | options.channel} must be provided.
+     * {@link LaunchOptions.executablePath | options.executablePath} or
+     * {@link LaunchOptions.channel | options.channel} must be provided.
      *
      * @example
-     * You can use {@link LaunchOptions | options.ignoreDefaultArgs}
+     * You can use {@link LaunchOptions.ignoreDefaultArgs | options.ignoreDefaultArgs}
      * to filter out `--mute-audio` from default arguments:
      *
      * ```ts

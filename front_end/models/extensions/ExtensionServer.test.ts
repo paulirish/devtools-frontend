@@ -2,10 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Common from '../../core/common/common.js';
-import * as Platform from '../../core/platform/platform.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import {createTarget, expectConsoleLogs} from '../../testing/EnvironmentHelpers.js';
+import {
+  describeWithDevtoolsExtension,
+  getExtensionOrigin,
+} from '../../testing/ExtensionHelpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Bindings from '../bindings/bindings.js';
 import * as Extensions from '../extensions/extensions.js';
@@ -13,15 +19,6 @@ import type * as HAR from '../har/har.js';
 import * as Logs from '../logs/logs.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
-
-const {assert} = chai;
-
-import {
-  describeWithDevtoolsExtension,
-  getExtensionOrigin,
-} from '../../testing/ExtensionHelpers.js';
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
-import {createTarget, expectConsoleLogs} from '../../testing/EnvironmentHelpers.js';
 
 describeWithDevtoolsExtension('Extensions', {}, context => {
   it('are initialized after the target is initialized and navigated to a non-privileged URL', async () => {
@@ -332,7 +329,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     const target = createTarget({type: SDK.Target.Type.Frame});
     target.setInspectedURL('http://example.com2' as Platform.DevToolsPath.UrlString);
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
-    Platform.assertNotNullOrUndefined(networkManager);
+    assert.exists(networkManager);
     const frameId = 'frame-id' as Protocol.Page.FrameId;
     createRequest(networkManager, frameId, 'blocked-url-request-id' as Protocol.Network.RequestId, blockedUrl);
     createRequest(networkManager, frameId, 'allowed-url-request-id' as Protocol.Network.RequestId, allowedUrl);
@@ -354,7 +351,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     const parentTarget = parentFrame?.resourceTreeModel()?.target();
     const target = createTarget({id: `${name}-target-id` as Protocol.Target.TargetID, parentTarget});
     const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    Platform.assertNotNullOrUndefined(resourceTreeModel);
+    assert.exists(resourceTreeModel);
 
     const id = `${name}-frame-id` as Protocol.Page.FrameId;
     resourceTreeModel.frameNavigated(
@@ -375,7 +372,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     if (executionContextOrigin) {
       executionContextOrigin = new URL(executionContextOrigin).origin as Platform.DevToolsPath.UrlString;
       const parentRuntimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
-      Platform.assertNotNullOrUndefined(parentRuntimeModel);
+      assert.exists(parentRuntimeModel);
       parentRuntimeModel.executionContextCreated({
         id: 0 as Protocol.Runtime.ExecutionContextId,
         origin: executionContextOrigin,
@@ -386,7 +383,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     }
 
     const frame = resourceTreeModel.frameForId(id);
-    Platform.assertNotNullOrUndefined(frame);
+    assert.exists(frame);
     return frame;
   }
 
@@ -416,7 +413,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     // Create a fake content script execution context, i.e., a non-default context with the extension's (== window's)
     // origin.
     const runtimeModel = childFrame.resourceTreeModel()?.target().model(SDK.RuntimeModel.RuntimeModel);
-    Platform.assertNotNullOrUndefined(runtimeModel);
+    assert.exists(runtimeModel);
     runtimeModel.executionContextCreated({
       id: 1 as Protocol.Runtime.ExecutionContextId,
       origin: window.location.origin,
@@ -425,7 +422,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
       auxData: {frameId: childFrame.id, isDefault: false},
     });
     const contentScriptExecutionContext = runtimeModel.executionContext(1);
-    Platform.assertNotNullOrUndefined(contentScriptExecutionContext);
+    assert.exists(contentScriptExecutionContext);
     sinon.stub(contentScriptExecutionContext, 'evaluate').returns(Promise.resolve({
       object: SDK.RemoteObject.RemoteObject.fromLocalObject(4),
     }));
@@ -448,7 +445,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     // Create a non-default context with a blocked origin.
     const childExeContextOrigin = blockedUrl;
     const runtimeModel = childFrame.resourceTreeModel()?.target().model(SDK.RuntimeModel.RuntimeModel);
-    Platform.assertNotNullOrUndefined(runtimeModel);
+    assert.exists(runtimeModel);
     runtimeModel.executionContextCreated({
       id: 1 as Protocol.Runtime.ExecutionContextId,
       origin: childExeContextOrigin,
@@ -505,7 +502,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     await createUISourceCode(project, blockedUrl);
     await createUISourceCode(project, allowedUrl);
 
-    Platform.assertNotNullOrUndefined(context.chrome.devtools);
+    assert.exists(context.chrome.devtools);
     const resources =
         await new Promise<Chrome.DevTools.Resource[]>(r => context.chrome.devtools?.inspectedWindow.getResources(r));
     assert.deepStrictEqual(resources.map(r => r.url), [blockedUrl, allowedUrl]);
@@ -549,7 +546,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
             Extensions.ExtensionAPI.PrivateAPI.Events.NetworkRequestFinished));
 
     const networkManager = target.model(SDK.NetworkManager.NetworkManager);
-    Platform.assertNotNullOrUndefined(networkManager);
+    assert.exists(networkManager);
     createRequest(networkManager, frameId, 'blocked-url-request-id' as Protocol.Network.RequestId, blockedUrl);
     createRequest(networkManager, frameId, 'allowed-url-request-id' as Protocol.Network.RequestId, allowedUrl);
 
@@ -570,7 +567,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     await createUISourceCode(project, blockedUrl);
     await createUISourceCode(project, allowedUrl);
 
-    Platform.assertNotNullOrUndefined(context.chrome.devtools);
+    assert.exists(context.chrome.devtools);
     const resources =
         await new Promise<Chrome.DevTools.Resource[]>(r => context.chrome.devtools?.inspectedWindow.getResources(r));
     assert.deepStrictEqual(resources.map(r => r.url), [blockedUrl, allowedUrl]);

@@ -569,6 +569,35 @@ export type PageLoadEvent = TraceEventFirstContentfulPaint|TraceEventMarkDOMCont
     TraceEventLargestContentfulPaintCandidate|TraceEventLayoutShift|TraceEventFirstPaint|TraceEventMarkLoad|
     TraceEventNavigationStart;
 
+const markerTypeGuards = [
+  isTraceEventMarkDOMContent,
+  isTraceEventMarkLoad,
+  isTraceEventFirstPaint,
+  isTraceEventFirstContentfulPaint,
+  isTraceEventLargestContentfulPaintCandidate,
+  isTraceEventNavigationStart,
+];
+
+export const MarkerName =
+    ['MarkDOMContent', 'MarkLoad', 'firstPaint', 'firstContentfulPaint', 'largestContentfulPaint::Candidate'] as const;
+
+interface MakerEvent extends TraceEventData {
+  name: typeof MarkerName[number];
+}
+
+export function isTraceEventMarkerEvent(event: TraceEventData): event is MakerEvent {
+  return markerTypeGuards.some(fn => fn(event));
+}
+
+const pageLoadEventTypeGuards = [
+  ...markerTypeGuards,
+  isTraceEventInteractiveTime,
+];
+
+export function eventIsPageLoadEvent(event: TraceEventData): event is PageLoadEvent {
+  return pageLoadEventTypeGuards.some(fn => fn(event));
+}
+
 export interface TraceEventLargestContentfulPaintCandidate extends TraceEventMark {
   name: 'largestContentfulPaint::Candidate';
   args: TraceEventArgs&{
@@ -706,7 +735,7 @@ export interface TraceEventMarkDOMContent extends TraceEventInstant {
     data?: TraceEventArgsData & {
       frame: string,
       isMainFrame: boolean,
-      page: string,
+      isOutermostMainFrame?: boolean, page: string,
     },
   };
 }
@@ -718,6 +747,7 @@ export interface TraceEventMarkLoad extends TraceEventInstant {
       frame: string,
       isMainFrame: boolean,
       page: string,
+      isOutermostMainFrame?: boolean,
     },
   };
 }
@@ -971,6 +1001,7 @@ export interface TraceEventStyleRecalcInvalidationTracking extends TraceEventIns
     },
   };
 }
+
 export function isTraceEventStyleRecalcInvalidationTracking(event: TraceEventData):
     event is TraceEventStyleRecalcInvalidationTracking {
   return event.name === KnownEventName.StyleRecalcInvalidationTracking;
@@ -1046,7 +1077,12 @@ export type TraceEventPerformanceMeasureEnd = TraceEventPairableUserTiming&Trace
 export type TraceEventPerformanceMeasure = TraceEventPerformanceMeasureBegin|TraceEventPerformanceMeasureEnd;
 
 export interface TraceEventPerformanceMark extends TraceEventUserTiming {
-  ph: Phase.INSTANT|Phase.MARK;
+  args: TraceEventArgs&{
+    data?: TraceEventArgsData & {
+      detail?: string,
+    },
+  };
+  ph: Phase.INSTANT|Phase.MARK|Phase.ASYNC_NESTABLE_INSTANT;
 }
 
 export interface TraceEventConsoleTimeBegin extends TraceEventPairableAsyncBegin {
@@ -1071,21 +1107,6 @@ export interface TraceEventTimeStamp extends TraceEventData {
     },
   };
 }
-
-export interface TraceEventExtensionMeasureBegin extends TraceEventPerformanceMeasureBegin {
-  name: `devtools-entry-${string}`;
-}
-
-export interface TraceEventExtensionMeasureEnd extends TraceEventPerformanceMeasureEnd {
-  name: `devtools-entry-${string}`;
-}
-
-export interface TraceEventExtensionMark extends TraceEventPerformanceMark {
-  name: `devtools-entry-${string}`;
-  ph: Phase.INSTANT|Phase.MARK;
-}
-
-export type TraceEventExtensionMeasure = TraceEventExtensionMeasureBegin|TraceEventExtensionMeasureEnd;
 
 /** ChromeFrameReporter args for PipelineReporter event.
     Matching proto: https://source.chromium.org/chromium/chromium/src/+/main:third_party/perfetto/protos/perfetto/trace/track_event/chrome_frame_reporter.proto
@@ -1190,6 +1211,7 @@ export function isTraceEventPipelineReporter(event: TraceEventData): event is Tr
 // display the right information, so we create these synthetic events.
 export interface SyntheticEventPair<T extends TraceEventPairableAsync = TraceEventPairableAsync> extends
     TraceEventData {
+  name: T['name'];
   cat: T['cat'];
   id?: string;
   id2?: {local?: string, global?: string};
@@ -1421,10 +1443,71 @@ export function isSyntheticInvalidation(event: TraceEventData): event is Synthet
   return event.name === 'SyntheticInvalidation';
 }
 
+export interface TraceEventDrawLazyPixelRef extends TraceEventInstant {
+  name: KnownEventName.DrawLazyPixelRef;
+  args?: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LazyPixelRef: number,
+  };
+}
+export function isTraceEventDrawLazyPixelRef(event: TraceEventData): event is TraceEventDrawLazyPixelRef {
+  return event.name === KnownEventName.DrawLazyPixelRef;
+}
+
+export interface TraceEventDecodeLazyPixelRef extends TraceEventInstant {
+  name: KnownEventName.DecodeLazyPixelRef;
+  args?: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LazyPixelRef: number,
+  };
+}
+export function isTraceEventDecodeLazyPixelRef(event: TraceEventData): event is TraceEventDecodeLazyPixelRef {
+  return event.name === KnownEventName.DecodeLazyPixelRef;
+}
+
+export interface TraceEventDecodeImage extends TraceEventComplete {
+  name: KnownEventName.DecodeImage;
+  args: TraceEventArgs&{
+    imageType: string,
+  };
+}
+export function isTraceEventDecodeImage(event: TraceEventData): event is TraceEventDecodeImage {
+  return event.name === KnownEventName.DecodeImage;
+}
+
+export interface SelectorTiming {
+  'elapsed (us)': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'fast_reject_count': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'match_attempts': number;
+  'selector': string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'style_sheet_id': string;
+}
+
+export interface SelectorStats {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  selector_timings: SelectorTiming[];
+}
+
+export interface TraceEventStyleRecalcSelectorStats extends TraceEventComplete {
+  name: KnownEventName.SelectorStats;
+  args: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    selector_stats?: SelectorStats,
+  };
+}
+
+export function isStyleRecalcSelectorStats(event: TraceEventData): event is TraceEventStyleRecalcSelectorStats {
+  return event.name === KnownEventName.SelectorStats;
+}
+
 export interface TraceEventUpdateLayoutTree extends TraceEventComplete {
   name: KnownEventName.UpdateLayoutTree;
   args: TraceEventArgs&{
-    elementCount: number,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    selector_stats?: SelectorStats, elementCount: number,
     beginData?: {
       frame: string,
       stackTrace?: TraceEventCallFrame[],
@@ -1785,16 +1868,17 @@ export interface TraceEventAsync extends TraceEventData {
       Phase.ASYNC_BEGIN|Phase.ASYNC_END|Phase.ASYNC_STEP_PAST;
 }
 
+const asyncPhases = new Set([
+  Phase.ASYNC_NESTABLE_START,
+  Phase.ASYNC_NESTABLE_INSTANT,
+  Phase.ASYNC_NESTABLE_END,
+  Phase.ASYNC_STEP_INTO,
+  Phase.ASYNC_BEGIN,
+  Phase.ASYNC_END,
+  Phase.ASYNC_STEP_PAST,
+]);
+
 export function isTraceEventAsyncPhase(traceEventData: TraceEventData): boolean {
-  const asyncPhases = new Set([
-    Phase.ASYNC_NESTABLE_START,
-    Phase.ASYNC_NESTABLE_INSTANT,
-    Phase.ASYNC_NESTABLE_END,
-    Phase.ASYNC_STEP_INTO,
-    Phase.ASYNC_BEGIN,
-    Phase.ASYNC_END,
-    Phase.ASYNC_STEP_PAST,
-  ]);
   return asyncPhases.has(traceEventData.ph);
 }
 
@@ -1816,13 +1900,45 @@ export interface TraceEventPaint extends TraceEventComplete {
       clip: number[],
       frame: string,
       layerId: number,
-      nodeId: number,
+      // With CompositeAfterPaint enabled, paint events are no longer
+      // associated with a Node, and nodeId will not be present.
+      nodeId?: Protocol.DOM.BackendNodeId,
     },
   };
 }
 
 export function isTraceEventPaint(event: TraceEventData): event is TraceEventPaint {
   return event.name === KnownEventName.Paint;
+}
+
+export interface TraceEventPaintImage extends TraceEventComplete {
+  name: KnownEventName.PaintImage;
+  args: TraceEventArgs&{
+    data: TraceEventData & {
+      height: number,
+      width: number,
+      x: number,
+      y: number,
+      url?: string, srcHeight: number, srcWidth: number,
+      nodeId?: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventPaintImage(event: TraceEventData): event is TraceEventPaintImage {
+  return event.name === KnownEventName.PaintImage;
+}
+
+export interface TraceEventScrollLayer extends TraceEventComplete {
+  name: KnownEventName.ScrollLayer;
+  args: TraceEventArgs&{
+    data: TraceEventData & {
+      frame: string,
+      nodeId?: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventScrollLayer(event: TraceEventData): event is TraceEventScrollLayer {
+  return event.name === KnownEventName.ScrollLayer;
 }
 
 export interface TraceEventSetLayerTreeId extends TraceEventInstant {
@@ -2173,7 +2289,6 @@ export const enum KnownEventName {
   /* Gc */
   GC = 'GCEvent',
   DOMGC = 'BlinkGC.AtomicPhase',
-  IncrementalGCMarking = 'V8.GCIncrementalMarking',
   MajorGC = 'MajorGC',
   MinorGC = 'MinorGC',
   GCCollectGarbage = 'BlinkGC.AtomicPhase',
@@ -2195,6 +2310,7 @@ export const enum KnownEventName {
   ScheduleStyleInvalidationTracking = 'ScheduleStyleInvalidationTracking',
   StyleRecalcInvalidationTracking = 'StyleRecalcInvalidationTracking',
   StyleInvalidatorInvalidationTracking = 'StyleInvalidatorInvalidationTracking',
+  SelectorStats = 'SelectorStats',
 
   /* Paint */
   ScrollLayer = 'ScrollLayer',

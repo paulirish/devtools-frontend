@@ -93,14 +93,6 @@ const UIStrings = {
    */
   unknownPropertyName: 'Unknown property name',
   /**
-   *@description Text to filter result items
-   */
-  filter: 'Filter',
-  /**
-   *@description ARIA accessible name in Styles Sidebar Pane of the Elements panel
-   */
-  filterStyles: 'Filter Styles',
-  /**
    *@description Separator element text content in Styles Sidebar Pane of the Elements panel
    *@example {scrollbar-corner} PH1
    */
@@ -329,6 +321,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         const hint = activeHints.get(possibleHintNodeFromHintIcon);
 
         if (hint) {
+          this.#hintPopoverHelper.jslogContext = 'elements.css-hint';
           return {
             box: hoveredNode.boxInWindow(),
             show: async (popover: UI.GlassPane.GlassPane) => {
@@ -349,6 +342,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         const cssProperty = cssPropertyName && this.#webCustomData.findCssProperty(cssPropertyName);
 
         if (cssProperty) {
+          this.#hintPopoverHelper.jslogContext = 'elements.css-property-doc';
           return {
             box: hoveredNode.boxInWindow(),
             show: async (popover: UI.GlassPane.GlassPane) => {
@@ -363,6 +357,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
       if (hoveredNode.matches('.simple-selector')) {
         const specificity = StylePropertiesSection.getSpecificityStoredForNodeElement(hoveredNode);
+        this.#hintPopoverHelper.jslogContext = 'elements.css-selector-specificity';
         return {
           box: hoveredNode.boxInWindow(),
           show: async (popover: UI.GlassPane.GlassPane) => {
@@ -378,7 +373,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       }
 
       return null;
-    }, 'elements.css-property-doc');
+    });
 
     this.#hintPopoverHelper.setDisableOnClick(true);
     this.#hintPopoverHelper.setTimeout(300);
@@ -1461,9 +1456,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const container = this.contentElement.createChild('div', 'styles-sidebar-pane-toolbar-container');
     const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
-    const filterInput = new UI.Toolbar.ToolbarInput(
-        i18nString(UIStrings.filter), i18nString(UIStrings.filterStyles), 1, 1, undefined, undefined, false,
-        'styles-filter');
+    const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     toolbar.makeToggledGray();

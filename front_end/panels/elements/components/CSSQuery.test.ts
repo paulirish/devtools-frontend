@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertShadowRoot, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 
 import * as ElementsComponents from './components.js';
-
-const {assert} = chai;
 
 describe('CSSQuery', () => {
   it('renders a normal query correctly', () => {
@@ -17,13 +15,8 @@ describe('CSSQuery', () => {
       queryText: '(min-width: 10px)',
     };
 
-    assertShadowRoot(component.shadowRoot);
-
-    const queryElement = component.shadowRoot.querySelector<HTMLElement>('.query');
-    if (!queryElement) {
-      assert.fail('query element should exist');
-      return;
-    }
+    const queryElement = component.shadowRoot!.querySelector<HTMLElement>('.query');
+    assert.isNotNull(queryElement, 'query element should exist');
 
     assert.strictEqual(
         queryElement.innerText,
@@ -45,13 +38,8 @@ describe('CSSQuery', () => {
       onQueryTextClick: clickListener,
     };
 
-    assertShadowRoot(component.shadowRoot);
-
-    const queryElement = component.shadowRoot.querySelector<HTMLElement>('.query');
-    if (!queryElement) {
-      assert.fail('query element should exist');
-      return;
-    }
+    const queryElement = component.shadowRoot!.querySelector<HTMLElement>('.query');
+    assert.isNotNull(queryElement, 'query element should exist');
 
     assert.strictEqual(
         queryElement.innerText,
@@ -60,10 +48,7 @@ describe('CSSQuery', () => {
     );
 
     const queryText = queryElement.querySelector<HTMLElement>('.editable .query-text');
-    if (!queryText) {
-      assert.fail('editable query text should exist');
-      return;
-    }
+    assert.isNotNull(queryText, 'editable query text should exist');
 
     queryText.click();
     assert.strictEqual(clickListener.callCount, 1, 'query text click listener should be triggered by clicking');

@@ -55,6 +55,7 @@ import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 import {ActiveFilters} from './ActiveFilters.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
+import {Tracker} from './FreshRecording.js';
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
 import {IsolateSelector} from './IsolateSelector.js';
 import {PerformanceModel} from './PerformanceModel.js';
@@ -85,6 +86,10 @@ const UIStrings = {
    *@description Title of capture layers and pictures setting in timeline panel of the performance panel
    */
   enableAdvancedPaint: 'Enable advanced paint instrumentation (slow)',
+  /**
+   *@description Title of CSS selector stats setting in timeline panel of the performance panel
+   */
+  enableSelectorStats: 'Enable CSS selector stats',
   /**
    *@description Title of show screenshots setting in timeline panel of the performance panel
    */
@@ -132,6 +137,10 @@ const UIStrings = {
   /**
    *@description Text in Timeline Panel of the Performance panel
    */
+  capturesSelectorStats: 'Captures CSS selector statistics',
+  /**
+   *@description Text in Timeline Panel of the Performance panel
+   */
   network: 'Network:',
   /**
    *@description Text in Timeline Panel of the Performance panel
@@ -163,6 +172,10 @@ const UIStrings = {
    *@description Text in Timeline Panel of the Performance panel
    */
   SignificantOverheadDueToPaint: '- Significant overhead due to paint instrumentation',
+  /**
+   *@description Text in Timeline Panel of the Performance panel
+   */
+  SelectorStatsEnabled: '- Selector stats is enabled',
   /**
    *@description Text in Timeline Panel of the Performance panel
    */
@@ -275,6 +288,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private performanceModel: PerformanceModel|null;
   private disableCaptureJSProfileSetting: Common.Settings.Setting<boolean>;
   private readonly captureLayersAndPicturesSetting: Common.Settings.Setting<boolean>;
+  private readonly captureSelectorStatsSetting: Common.Settings.Setting<boolean>;
   private showScreenshotsSetting: Common.Settings.Setting<boolean>;
   private showMemorySetting: Common.Settings.Setting<boolean>;
   private readonly panelToolbar: UI.Toolbar.Toolbar;
@@ -363,6 +377,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.captureLayersAndPicturesSetting =
         Common.Settings.Settings.instance().createSetting('timeline-capture-layers-and-pictures', false);
     this.captureLayersAndPicturesSetting.setTitle(i18nString(UIStrings.enableAdvancedPaint));
+    this.captureSelectorStatsSetting =
+        Common.Settings.Settings.instance().createSetting('timeline-capture-selector-stats', false);
+    this.captureSelectorStatsSetting.setTitle(i18nString(UIStrings.enableSelectorStats));
 
     this.showScreenshotsSetting =
         Common.Settings.Settings.instance().createSetting('timeline-show-screenshots', isNode ? false : true);
@@ -417,26 +434,24 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.SuspendStateChanged, this.onSuspendStateChanged, this);
-    if (Root.Runtime.experiments.isEnabled('timeline-as-console-profile-result-panel')) {
-      const profilerModels = SDK.TargetManager.TargetManager.instance().models(SDK.CPUProfilerModel.CPUProfilerModel);
-      for (const model of profilerModels) {
-        for (const message of model.registeredConsoleProfileMessages) {
-          this.consoleProfileFinished(message);
-        }
+    const profilerModels = SDK.TargetManager.TargetManager.instance().models(SDK.CPUProfilerModel.CPUProfilerModel);
+    for (const model of profilerModels) {
+      for (const message of model.registeredConsoleProfileMessages) {
+        this.consoleProfileFinished(message);
       }
-      SDK.TargetManager.TargetManager.instance().observeModels(
-          SDK.CPUProfilerModel.CPUProfilerModel,
-          {
-            modelAdded: (model: SDK.CPUProfilerModel.CPUProfilerModel) => {
-              model.addEventListener(
-                  SDK.CPUProfilerModel.Events.ConsoleProfileFinished, event => this.consoleProfileFinished(event.data));
-            },
-            modelRemoved: (_model: SDK.CPUProfilerModel.CPUProfilerModel) => {
-
-            },
-          },
-      );
     }
+    SDK.TargetManager.TargetManager.instance().observeModels(
+        SDK.CPUProfilerModel.CPUProfilerModel,
+        {
+          modelAdded: (model: SDK.CPUProfilerModel.CPUProfilerModel) => {
+            model.addEventListener(
+                SDK.CPUProfilerModel.Events.ConsoleProfileFinished, event => this.consoleProfileFinished(event.data));
+          },
+          modelRemoved: (_model: SDK.CPUProfilerModel.CPUProfilerModel) => {
+
+          },
+        },
+    );
     SDK.TargetManager.TargetManager.instance().observeTargets({
       targetAdded: (target: SDK.Target.Target) => {
         if (target !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
@@ -495,6 +510,34 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     return this.#minimapComponent;
   }
 
+  /**
+   * NOTE: this method only exists to enable some layout tests to be migrated to the new engine.
+   * DO NOT use this method within DevTools. It is marked as deprecated so
+   * within DevTools you are warned when using the method.
+   * @deprecated
+   **/
+  getTraceEngineDataForLayoutTests(): TraceEngine.Handlers.Types.TraceParseData {
+    const data = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
+    if (data === null) {
+      throw new Error('No trace engine data found.');
+    }
+    return data;
+  }
+
+  /**
+   * NOTE: this method only exists to enable some layout tests to be migrated to the new engine.
+   * DO NOT use this method within DevTools. It is marked as deprecated so
+   * within DevTools you are warned when using the method.
+   * @deprecated
+   **/
+  getTraceEngineRawTraceEventsForLayoutTests(): readonly TraceEngine.Types.TraceEvents.TraceEventData[] {
+    const data = this.#traceEngineModel.traceEvents(this.#traceEngineActiveTraceIndex);
+    if (data === null) {
+      throw new Error('No trace engine data found.');
+    }
+    return data;
+  }
+
   #onChartPlayableStateChange(event: Common.EventTarget.EventTargetEvent<boolean, unknown>): void {
     if (event.data) {
       const dateObj = new Date();
@@ -539,12 +582,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.panelToolbar.appendToolbarItem(this.clearButton);
 
     // Load / Save
-    this.loadButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.loadProfile), 'import');
+    this.loadButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.loadProfile), 'import', undefined, 'timeline.load-from-file');
     this.loadButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceImported);
       this.selectFileToLoad();
     });
-    this.saveButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.saveProfile), 'download');
+    this.saveButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.saveProfile), 'download', undefined, 'timeline.save-to-file');
     this.saveButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
       void this.saveToFile();
@@ -602,6 +647,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         SDK.CPUThrottlingManager.Events.HardwareConcurrencyChanged, this.updateShowSettingsToolbarButton, this);
     this.disableCaptureJSProfileSetting.addChangeListener(this.updateShowSettingsToolbarButton, this);
     this.captureLayersAndPicturesSetting.addChangeListener(this.updateShowSettingsToolbarButton, this);
+    this.captureSelectorStatsSetting.addChangeListener(this.updateShowSettingsToolbarButton, this);
 
     this.settingsPane = new UI.Widget.HBox();
     this.settingsPane.element.classList.add('timeline-settings-pane');
@@ -614,6 +660,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.disableCaptureJSProfileSetting, i18nString(UIStrings.disablesJavascriptSampling)));
     captureToolbar.appendToolbarItem(
         this.createSettingCheckbox(this.captureLayersAndPicturesSetting, i18nString(UIStrings.capturesAdvancedPaint)));
+    captureToolbar.appendToolbarItem(
+        this.createSettingCheckbox(this.captureSelectorStatsSetting, i18nString(UIStrings.capturesSelectorStats)));
 
     const throttlingPane = new UI.Widget.VBox();
     throttlingPane.element.classList.add('flex-auto');
@@ -750,6 +798,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   async showHistory(): Promise<void> {
+    this.#saveAnnotationsForActiveTrace();
     const recordingData = await this.#historyManager.showHistoryDropDown();
     if (recordingData && recordingData.traceParseDataIndex !== this.#traceEngineActiveTraceIndex) {
       this.setModel(recordingData.legacyModel, /* exclusiveFilter= */ null, recordingData.traceParseDataIndex);
@@ -757,11 +806,19 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   navigateHistory(direction: number): boolean {
+    this.#saveAnnotationsForActiveTrace();
     const recordingData = this.#historyManager.navigate(direction);
     if (recordingData && recordingData.traceParseDataIndex !== this.#traceEngineActiveTraceIndex) {
       this.setModel(recordingData.legacyModel, /* exclusiveFilter= */ null, recordingData.traceParseDataIndex);
     }
     return true;
+  }
+
+  #saveAnnotationsForActiveTrace(): void {
+    const newAnnotations = AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.getAnnotations();
+    if (newAnnotations) {
+      this.#traceEngineModel.overrideAnnotations(this.#traceEngineActiveTraceIndex, newAnnotations);
+    }
   }
 
   selectFileToLoad(): void {
@@ -806,6 +863,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private onModeChanged(): void {
+    this.flameChart.updateCountersGraphToggle(this.showMemorySetting.get());
     this.updateOverviewControls();
     this.doResize();
     this.select(null);
@@ -835,6 +893,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     if (this.captureLayersAndPicturesSetting.get()) {
       messages.push(i18nString(UIStrings.SignificantOverheadDueToPaint));
+    }
+    if (this.captureSelectorStatsSetting.get()) {
+      messages.push(i18nString(UIStrings.SelectorStatsEnabled));
     }
     if (this.disableCaptureJSProfileSetting.get()) {
       messages.push(i18nString(UIStrings.JavascriptSamplingIsDisabled));
@@ -983,6 +1044,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         enableJSSampling: !this.disableCaptureJSProfileSetting.get(),
         capturePictures: this.captureLayersAndPicturesSetting.get(),
         captureFilmStrip: this.showScreenshotsSetting.get(),
+        captureSelectorStats: this.captureSelectorStatsSetting.get(),
       };
       // Order is important here: we tell the controller to start recording, which enables tracing.
       const response = await this.controller.startRecording(recordingOptions);
@@ -1000,6 +1062,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private async startRecording(): Promise<void> {
+    this.#saveAnnotationsForActiveTrace();
     console.assert(!this.statusPane, 'Status pane is already opened.');
     this.setState(State.StartPending);
     this.showRecordingStarted();
@@ -1179,18 +1242,18 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // http/tests/devtools/tracing/timeline-js/timeline-open-function-call.js
     // http/tests/devtools/tracing/timeline-misc/timeline-filtering-self-time.js
     // http/tests/devtools/tracing/timeline-misc/timeline-filtering.js
-    // http/tests/devtools/tracing/timeline-misc/timeline-range-stats.js
     this.#applyActiveFilters(false, exclusiveFilter);
   }
 
   setModel(
       model: PerformanceModel|null, exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null,
-      traceEngineIndex: number = -1, metadata: TraceEngine.Types.File.MetaData|null = null): void {
+      traceEngineIndex: number = -1): void {
     this.performanceModel = model;
     this.#traceEngineActiveTraceIndex = traceEngineIndex;
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
     const isCpuProfile = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex)?.dataOrigin ===
         TraceEngine.Types.File.DataOrigin.CPUProfile;
+    const annotations = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex)?.annotations;
 
     this.#minimapComponent.reset();
     // Order is important: the bounds must be set before we initiate any UI
@@ -1211,10 +1274,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         entryToNodeMap: samplesAndRendererEventsEntryToNodeMap,
         wholeTraceBounds: traceBounds?.micro.entireTraceBounds,
       });
-      if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS) &&
-          metadata?.annotations) {
-        AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.applyAnnotations(
-            metadata?.annotations);
+      if (annotations) {
+        AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.applyAnnotations(annotations);
       }
 
       this.#applyActiveFilters(traceParsedData.Meta.traceIsGeneric, exclusiveFilter);
@@ -1414,14 +1475,21 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #onSourceMapsNodeNamesResolved(): void {
-    this.flameChart.updateColorMapper();
+    this.flameChart.refreshMainFlameChart();
   }
 
+  /**
+   * This is called with we are done loading a trace from a file, or after we
+   * have recorded a fresh trace.
+   **/
   async loadingComplete(
       collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[],
       tracingModel: TraceEngine.Legacy.TracingModel|null,
       exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null, isCpuProfile: boolean,
       recordingStartTime: number|null, metadata: TraceEngine.Types.File.MetaData|null): Promise<void> {
+    // Before loading a new trace, update annotations of the previous one
+    this.#saveAnnotationsForActiveTrace();
+
     this.#traceEngineModel.resetProcessor();
     SourceMapsResolver.clearResolvedNodeNames();
 
@@ -1452,7 +1520,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       await Promise.all([
         // Calling setTracingModel now and setModel so much later, leads to several problems due to addEventListener order being unexpected
         // TODO(paulirish): Resolve this, or just wait for the death of tracingModel. :)
-        this.performanceModel.setTracingModel(tracingModel, recordingIsFresh),
+        this.performanceModel.setTracingModel(tracingModel),
         this.#executeNewTraceEngine(collectedEvents, recordingIsFresh, metadata),
       ]);
 
@@ -1461,7 +1529,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // the newest trace will be automatically set to active.
       this.#traceEngineActiveTraceIndex = this.#traceEngineModel.size() - 1;
 
-      this.setModel(this.performanceModel, exclusiveFilter, this.#traceEngineActiveTraceIndex, metadata);
+      this.setModel(this.performanceModel, exclusiveFilter, this.#traceEngineActiveTraceIndex);
 
       if (this.statusPane) {
         this.statusPane.remove();
@@ -1471,6 +1539,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       const traceData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
       if (!traceData) {
         throw new Error(`Could not get trace data at index ${this.#traceEngineActiveTraceIndex}`);
+      }
+      if (recordingIsFresh) {
+        Tracker.instance().registerFreshRecording(traceData);
       }
 
       // Set up SourceMapsResolver to ensure we resolve any function names in

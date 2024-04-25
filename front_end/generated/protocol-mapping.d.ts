@@ -33,6 +33,10 @@ export namespace ProtocolMapping {
      * Event for animation that has been started.
      */
     'Animation.animationStarted': [Protocol.Animation.AnimationStartedEvent];
+    /**
+     * Event for animation that has been updated.
+     */
+    'Animation.animationUpdated': [Protocol.Animation.AnimationUpdatedEvent];
     'Audits.issueAdded': [Protocol.Audits.IssueAddedEvent];
     /**
      * Emitted when an address form is filled.
@@ -275,6 +279,12 @@ export namespace ProtocolMapping {
      * it, and responseReceivedExtraInfo may be fired before or after responseReceived.
      */
     'Network.responseReceivedExtraInfo': [Protocol.Network.ResponseReceivedExtraInfoEvent];
+    /**
+     * Fired when 103 Early Hints headers is received in addition to the common response.
+     * Not every responseReceived event will have an responseReceivedEarlyHints fired.
+     * Only one responseReceivedEarlyHints may be fired for eached responseReceived event.
+     */
+    'Network.responseReceivedEarlyHints': [Protocol.Network.ResponseReceivedEarlyHintsEvent];
     /**
      * Fired exactly once for each Trust Token operation. Depending on
      * the type of the operation and whether the operation succeeded or
@@ -932,6 +942,15 @@ export namespace ProtocolMapping {
     'Audits.checkFormsIssues': {
       paramsType: [];
       returnType: Protocol.Audits.CheckFormsIssuesResponse;
+    };
+    /**
+     * Installs an unpacked extension from the filesystem similar to
+     * --load-extension CLI flags. Returns extension ID once the extension
+     * has been installed.
+     */
+    'Extensions.loadUnpacked': {
+      paramsType: [Protocol.Extensions.LoadUnpackedRequest];
+      returnType: Protocol.Extensions.LoadUnpackedResponse;
     };
     /**
      * Trigger autofill on a form identified by the fieldId.
@@ -1647,6 +1666,13 @@ export namespace ProtocolMapping {
     'DOM.getTopLayerElements': {
       paramsType: [];
       returnType: Protocol.DOM.GetTopLayerElementsResponse;
+    };
+    /**
+     * Returns the NodeId of the matched element according to certain relations.
+     */
+    'DOM.getElementByRelation': {
+      paramsType: [Protocol.DOM.GetElementByRelationRequest];
+      returnType: Protocol.DOM.GetElementByRelationResponse;
     };
     /**
      * Re-does the last undone action.
@@ -3142,8 +3168,15 @@ export namespace ProtocolMapping {
       paramsType: [];
       returnType: void;
     };
+    /**
+     * Gets the processed manifest for this current document.
+     *   This API always waits for the manifest to be loaded.
+     *   If manifestId is provided, and it does not match the manifest of the
+     *     current document, this API errors out.
+     *   If there is not a loaded page, this API errors out immediately.
+     */
     'Page.getAppManifest': {
-      paramsType: [];
+      paramsType: [Protocol.Page.GetAppManifestRequest?];
       returnType: Protocol.Page.GetAppManifestResponse;
     };
     'Page.getInstallabilityErrors': {
@@ -4359,6 +4392,13 @@ export namespace ProtocolMapping {
     'FedCm.resetCooldown': {
       paramsType: [];
       returnType: void;
+    };
+    /**
+     * Returns the following OS state for the given manifest id.
+     */
+    'PWA.getOsAppState': {
+      paramsType: [Protocol.PWA.GetOsAppStateRequest];
+      returnType: Protocol.PWA.GetOsAppStateResponse;
     };
     /**
      * Continues execution until specific location is reached.
