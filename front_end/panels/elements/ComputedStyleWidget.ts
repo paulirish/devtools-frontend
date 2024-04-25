@@ -47,21 +47,11 @@ import computedStyleSidebarPaneStyles from './computedStyleSidebarPane.css.js';
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
 import {PlatformFontsWidget} from './PlatformFontsWidget.js';
 import {categorizePropertyName, type Category, DefaultCategoryOrder} from './PropertyNameCategories.js';
-import {ColorMatch, ColorMatcher, type RenderingContext} from './PropertyParser.js';
+import {type ColorMatch, ColorMatcher} from './PropertyParser.js';
+import {type MatchRenderer, Renderer, type RenderingContext, StringRenderer, URLRenderer} from './PropertyRenderer.js';
 import {StylePropertiesSection} from './StylePropertiesSection.js';
-import {StringRenderer, StylePropertyTreeElement, URLRenderer} from './StylePropertyTreeElement.js';
 
 const UIStrings = {
-  /**
-   * @description Placeholder text for a text input used to filter which CSS properties show up in
-   * the list of computed properties. In the Computed Style Widget of the Elements panel.
-   */
-  filter: 'Filter',
-  /**
-   * @description ARIA accessible name for the text input used to filter which CSS properties show up
-   * in the list of computed properties. In the Computed Style Widget of the Elements panel.
-   */
-  filterComputedStyles: 'Filter Computed Styles',
   /**
    * @description Text for a checkbox setting that controls whether the user-supplied filter text
    * excludes all CSS propreties which are filtered out, or just greys them out. In Computed Style
@@ -114,11 +104,10 @@ function renderPropertyContents(
   if (valueFromCache) {
     return valueFromCache;
   }
-  const name = StylePropertyTreeElement.renderNameElement(propertyName);
+  const name = Renderer.renderNameElement(propertyName);
   name.slot = 'name';
-  const value = StylePropertyTreeElement.renderValueElement(
-      propertyName, propertyValue,
-      [ColorRenderer.matcher(), URLRenderer.matcher(null, node), StringRenderer.matcher()]);
+  const value = Renderer.renderValueElement(
+      propertyName, propertyValue, [new ColorRenderer(), new URLRenderer(null, node), new StringRenderer()]);
   value.slot = 'value';
   propertyContentsCache.set(cacheKey, {name, value});
   return {name, value};
@@ -155,9 +144,8 @@ const createTraceElement =
      linkifier: Components.Linkifier.Linkifier): ElementsComponents.ComputedStyleTrace.ComputedStyleTrace => {
       const trace = new ElementsComponents.ComputedStyleTrace.ComputedStyleTrace();
 
-      const valueElement = StylePropertyTreeElement.renderValueElement(
-          property.name, property.value,
-          [ColorRenderer.matcher(), URLRenderer.matcher(null, node), StringRenderer.matcher()]);
+      const valueElement = Renderer.renderValueElement(
+          property.name, property.value, [new ColorRenderer(), new URLRenderer(null, node), new StringRenderer()]);
       valueElement.slot = 'trace-value';
       trace.appendChild(valueElement);
 
@@ -176,11 +164,11 @@ const createTraceElement =
       return trace;
     };
 
-class ColorRenderer extends ColorMatch {
-  render(_node: unknown, context: RenderingContext): Node[] {
+class ColorRenderer implements MatchRenderer<ColorMatch> {
+  render(match: ColorMatch, context: RenderingContext): Node[] {
     const swatch = new InlineEditor.ColorSwatch.ColorSwatch();
     swatch.setReadonly(true);
-    swatch.renderColor(this.text, true);
+    swatch.renderColor(match.text, true);
     const valueElement = document.createElement('span');
     valueElement.textContent = swatch.getText();
     swatch.append(valueElement);
@@ -195,8 +183,8 @@ class ColorRenderer extends ColorMatch {
     return [swatch];
   }
 
-  static matcher(): ColorMatcher {
-    return new ColorMatcher(text => new ColorRenderer(text));
+  matcher(): ColorMatcher {
+    return new ColorMatcher();
   }
 }
 
@@ -266,8 +254,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
 
     const hbox = this.contentElement.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
-    const filterInput = new UI.Toolbar.ToolbarInput(
-        i18nString(UIStrings.filter), i18nString(UIStrings.filterComputedStyles), 1, 1, undefined, undefined, false);
+    const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     this.input = filterInput;

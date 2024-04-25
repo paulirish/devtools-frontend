@@ -735,7 +735,7 @@ export interface TraceEventMarkDOMContent extends TraceEventInstant {
     data?: TraceEventArgsData & {
       frame: string,
       isMainFrame: boolean,
-      page: string,
+      isOutermostMainFrame?: boolean, page: string,
     },
   };
 }
@@ -747,6 +747,7 @@ export interface TraceEventMarkLoad extends TraceEventInstant {
       frame: string,
       isMainFrame: boolean,
       page: string,
+      isOutermostMainFrame?: boolean,
     },
   };
 }
@@ -1442,6 +1443,38 @@ export function isSyntheticInvalidation(event: TraceEventData): event is Synthet
   return event.name === 'SyntheticInvalidation';
 }
 
+export interface TraceEventDrawLazyPixelRef extends TraceEventInstant {
+  name: KnownEventName.DrawLazyPixelRef;
+  args?: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LazyPixelRef: number,
+  };
+}
+export function isTraceEventDrawLazyPixelRef(event: TraceEventData): event is TraceEventDrawLazyPixelRef {
+  return event.name === KnownEventName.DrawLazyPixelRef;
+}
+
+export interface TraceEventDecodeLazyPixelRef extends TraceEventInstant {
+  name: KnownEventName.DecodeLazyPixelRef;
+  args?: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LazyPixelRef: number,
+  };
+}
+export function isTraceEventDecodeLazyPixelRef(event: TraceEventData): event is TraceEventDecodeLazyPixelRef {
+  return event.name === KnownEventName.DecodeLazyPixelRef;
+}
+
+export interface TraceEventDecodeImage extends TraceEventComplete {
+  name: KnownEventName.DecodeImage;
+  args: TraceEventArgs&{
+    imageType: string,
+  };
+}
+export function isTraceEventDecodeImage(event: TraceEventData): event is TraceEventDecodeImage {
+  return event.name === KnownEventName.DecodeImage;
+}
+
 export interface SelectorTiming {
   'elapsed (us)': number;
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -1867,13 +1900,45 @@ export interface TraceEventPaint extends TraceEventComplete {
       clip: number[],
       frame: string,
       layerId: number,
-      nodeId: number,
+      // With CompositeAfterPaint enabled, paint events are no longer
+      // associated with a Node, and nodeId will not be present.
+      nodeId?: Protocol.DOM.BackendNodeId,
     },
   };
 }
 
 export function isTraceEventPaint(event: TraceEventData): event is TraceEventPaint {
   return event.name === KnownEventName.Paint;
+}
+
+export interface TraceEventPaintImage extends TraceEventComplete {
+  name: KnownEventName.PaintImage;
+  args: TraceEventArgs&{
+    data: TraceEventData & {
+      height: number,
+      width: number,
+      x: number,
+      y: number,
+      url?: string, srcHeight: number, srcWidth: number,
+      nodeId?: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventPaintImage(event: TraceEventData): event is TraceEventPaintImage {
+  return event.name === KnownEventName.PaintImage;
+}
+
+export interface TraceEventScrollLayer extends TraceEventComplete {
+  name: KnownEventName.ScrollLayer;
+  args: TraceEventArgs&{
+    data: TraceEventData & {
+      frame: string,
+      nodeId?: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventScrollLayer(event: TraceEventData): event is TraceEventScrollLayer {
+  return event.name === KnownEventName.ScrollLayer;
 }
 
 export interface TraceEventSetLayerTreeId extends TraceEventInstant {

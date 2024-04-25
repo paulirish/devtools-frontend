@@ -1783,6 +1783,11 @@ export const NativeFunctions = [
     receivers: ["DOMMatrixReadOnly"]
   },
   {
+    name: "translate",
+    signatures: [["input"]],
+    receivers: ["LanguageTranslator"]
+  },
+  {
     name: "drawFocusIfNeeded",
     signatures: [["element"],["path","element"]]
   },
@@ -6407,6 +6412,10 @@ export const NativeFunctions = [
     signatures: [["root","node","?init"]]
   },
   {
+    name: "moveBefore",
+    signatures: [["node","child"]]
+  },
+  {
     name: "Observable",
     signatures: [["callback"]]
   },
@@ -6425,6 +6434,10 @@ export const NativeFunctions = [
   {
     name: "switchMap",
     signatures: [["mapper"]]
+  },
+  {
+    name: "inspect",
+    signatures: [["?inspect_observer"]]
   },
   {
     name: "first",
@@ -6534,6 +6547,10 @@ export const NativeFunctions = [
   },
   {
     name: "InputEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "InterestEvent",
     signatures: [["type","?eventInitDict"]]
   },
   {
@@ -6793,6 +6810,10 @@ export const NativeFunctions = [
   {
     name: "VTTCue",
     signatures: [["startTime","endTime","text"]]
+  },
+  {
+    name: "DeviceProperties",
+    signatures: [["?devicePropertiesInitDict"]]
   },
   {
     name: "InputDeviceCapabilities",
@@ -7914,6 +7935,14 @@ export const NativeFunctions = [
     signatures: [["timestamp"]]
   },
   {
+    name: "canTranslate",
+    signatures: [["options"]]
+  },
+  {
+    name: "createTranslator",
+    signatures: [["options"]]
+  },
+  {
     name: "AbortPaymentEvent",
     signatures: [["type","eventInitDict"]]
   },
@@ -7979,11 +8008,7 @@ export const NativeFunctions = [
   },
   {
     name: "RTCEncodedAudioFrame",
-    signatures: [["originalFrame","?newMetadata"]]
-  },
-  {
-    name: "setTimestamp",
-    signatures: [["timestamp"]]
+    signatures: [["originalFrame","?options"]]
   },
   {
     name: "setMetadata",
@@ -7991,7 +8016,7 @@ export const NativeFunctions = [
   },
   {
     name: "RTCEncodedVideoFrame",
-    signatures: [["originalFrame","?newMetadata"]]
+    signatures: [["originalFrame","?options"]]
   },
   {
     name: "RTCErrorEvent",

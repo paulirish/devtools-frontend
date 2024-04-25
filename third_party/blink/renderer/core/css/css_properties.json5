@@ -820,50 +820,6 @@
       valid_for_keyframe: false,
     },
     {
-      name: "-alternative-animation-delay",
-      alternative_of: "animation-delay",
-      longhands: [
-        "animation-delay-start", "animation-delay-end"
-      ],
-      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-      // Animation properites are never incremental.
-      supports_incremental_style: false,
-      valid_for_keyframe: false,
-      runtime_flag: "CSSAnimationDelayStartEnd",
-    },
-    {
-      name: "animation-delay-start",
-      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
-      style_builder_template: "animation",
-      style_builder_template_args: {
-        attribute: "DelayStart",
-      },
-      typedom_types: ["Time"],
-      separator: ",",
-      valid_for_marker: true,
-      is_animation_property: true,
-      // Animation properites are never incremental.
-      supports_incremental_style: false,
-      valid_for_keyframe: false,
-      runtime_flag: "CSSAnimationDelayStartEnd",
-    },
-    {
-      name: "animation-delay-end",
-      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
-      style_builder_template: "animation",
-      style_builder_template_args: {
-        attribute: "DelayEnd",
-      },
-      typedom_types: ["Time"],
-      separator: ",",
-      valid_for_marker: true,
-      is_animation_property: true,
-      // Animation properites are never incremental.
-      supports_incremental_style: false,
-      valid_for_keyframe: false,
-      runtime_flag: "CSSAnimationDelayStartEnd",
-    },
-    {
       name: "animation-direction",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "InitialValue"],
       keywords: ["normal", "reverse", "alternate", "alternate-reverse"],
@@ -1574,6 +1530,23 @@
       supports_incremental_style: false,
     },
     {
+      name: "font-variant-emoji",
+      property_methods: ["CSSValueFromComputedStyleInternal"],
+      inherited: true,
+      runtime_flag: "FontVariantEmoji",
+      font: true,
+      name_for_methods: "VariantEmoji",
+      type_name: "FontDescription::FontVariantEmoji",
+      converter: "ConvertFontVariantEmoji",
+      priority: 1,
+      keywords: ["normal", "text", "emoji", "unicode"],
+      typedom_types: ["Keyword"],
+      valid_for_first_letter: true,
+      valid_for_first_line: true,
+      valid_for_marker: true,
+      supports_incremental_style: false,
+    },
+    {
       name: "font-variant-position",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
@@ -2107,7 +2080,7 @@
     },
     {
       name: "border-bottom-style",
-      property_methods: ["CSSValueFromComputedStyleInternal"],
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "box",
       field_template: "keyword",
       keywords: [
@@ -2132,11 +2105,10 @@
       interpolable: true,
       field_group: "box",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/platform/geometry/layout_unit.h"],
       keywords: ["thin", "medium", "thick"],
-      default_value: "LayoutUnit(3)",
+      default_value: "3",
       typedom_types: ["Keyword", "Length"],
-      type_name: "LayoutUnit",
+      type_name: "int",
       computed_style_custom_functions: ["getter"],
       converter: "ConvertBorderWidth",
       valid_for_first_letter: true,
@@ -2255,7 +2227,7 @@
     },
     {
       name: "border-left-style",
-      property_methods: ["CSSValueFromComputedStyleInternal"],
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "box",
       field_template: "keyword",
       keywords: [
@@ -2280,11 +2252,10 @@
       interpolable: true,
       field_group: "box",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/platform/geometry/layout_unit.h"],
       keywords: ["thin", "medium", "thick"],
-      default_value: "LayoutUnit(3)",
+      default_value: "3",
       typedom_types: ["Keyword", "Length"],
-      type_name: "LayoutUnit",
+      type_name: "int",
       computed_style_custom_functions: ["getter"],
       converter: "ConvertBorderWidth",
       valid_for_first_letter: true,
@@ -2324,7 +2295,7 @@
     },
     {
       name: "border-right-style",
-      property_methods: ["CSSValueFromComputedStyleInternal"],
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "box",
       field_template: "keyword",
       keywords: [
@@ -2349,11 +2320,10 @@
       interpolable: true,
       field_group: "box",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/platform/geometry/layout_unit.h"],
       keywords: ["thin", "medium", "thick"],
-      default_value: "LayoutUnit(3)",
+      default_value: "3",
       typedom_types: ["Keyword", "Length"],
-      type_name: "LayoutUnit",
+      type_name: "int",
       computed_style_custom_functions: ["getter"],
       converter: "ConvertBorderWidth",
       valid_for_first_letter: true,
@@ -2435,7 +2405,7 @@
     },
     {
       name: "border-top-style",
-      property_methods: ["CSSValueFromComputedStyleInternal"],
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "box",
       field_template: "keyword",
       keywords: [
@@ -2461,11 +2431,10 @@
       interpolable: true,
       field_group: "box",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/platform/geometry/layout_unit.h"],
       keywords: ["thin", "medium", "thick"],
-      default_value: "LayoutUnit(3)",
+      default_value: "3",
       typedom_types: ["Keyword", "Length"],
-      type_name: "LayoutUnit",
+      type_name: "int",
       computed_style_custom_functions: ["getter"],
       converter: "ConvertBorderWidth",
       valid_for_first_letter: true,
@@ -2506,7 +2475,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/core/style/shadow_list.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "ShadowList",
       converter: "ConvertShadowList",
@@ -3516,9 +3485,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginBottom",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3539,9 +3508,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginLeft",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3562,9 +3531,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginRight",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3585,9 +3554,9 @@
       field_group: "box",
       field_template: "<length>",
       default_value: "Length::Fixed()",
-      converter: "ConvertMarginTop",
+      converter: "ConvertQuirkyLength",
       computed_style_custom_functions: ["setter"],
-      keywords: ["auto", "-internal-user-margin"],
+      keywords: ["auto"],
       typedom_types: ["Keyword", "Length", "Percentage"],
       valid_for_first_letter: true,
       valid_for_position_try: true,
@@ -3976,9 +3945,8 @@
       interpolable: true,
       field_group: "*",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/platform/geometry/layout_unit.h"],
-      default_value: "LayoutUnit(3)",
-      type_name: "LayoutUnit",
+      default_value: "3",
+      type_name: "int",
       computed_style_custom_functions: ["getter"],
       converter: "ConvertBorderWidth",
       keywords: ["thin", "medium", "thick"],
@@ -4166,6 +4134,7 @@
         resolver: "bottom",
       },
       supports_incremental_style: true,
+      valid_for_permission_element: true,
     },
     {
       name: "padding-left",
@@ -4185,6 +4154,7 @@
         resolver: "left",
       },
       supports_incremental_style: true,
+      valid_for_permission_element: true,
     },
     {
       name: "padding-right",
@@ -4204,6 +4174,7 @@
         resolver: "right",
       },
       supports_incremental_style: true,
+      valid_for_permission_element: true,
     },
     {
       name: "padding-top",
@@ -4223,6 +4194,7 @@
         resolver: "top",
       },
       supports_incremental_style: true,
+      valid_for_permission_element: true,
     },
     {
       name: "page",
@@ -4319,13 +4291,15 @@
       supports_incremental_style: false,
       // @position-try-styling rely on this being high-priority, so that
       // declarations from @position-try blocks can be applied conditionally
-      // based on whether or not we're out-of-flow positioned.
-      priority: 1,
+      // based on whether or not we're out-of-flow positioned. Also, it needs to
+      // have a priority higher than inset-area which is already at priority:1.
+      priority: 2,
       valid_for_permission_element: true,
     },
     {
       name: "position-anchor",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal" ],
+      style_builder_custom_functions: ["initial", "inherit", "value"],
       include_paths: ["third_party/blink/renderer/core/style/scoped_css_name.h"],
       type_name: "ScopedCSSName",
       wrapper_pointer_name: "Member",
@@ -4338,21 +4312,9 @@
       runtime_flag: "CSSAnchorPositioning",
       valid_for_permission_element: true,
       valid_for_position_try: true,
-      priority: 1,
-    },
-    {
-      name: "position-fallback-bounds",
-      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal" ],
-      include_paths: ["third_party/blink/renderer/core/style/scoped_css_name.h"],
-      type_name: "ScopedCSSName",
-      wrapper_pointer_name: "Member",
-      default_value: "nullptr",
-      field_group: "*",
-      field_template: "external",
-      converter: "ConvertNormalOrCustomIdent",
-      keywords: ["normal"],
-      typedom_types: ["Keyword"],
-      runtime_flag: "CSSPositionFallbackBounds",
+      // Needs to be applied before inset-area which in turn needs to be applied
+      // before inset properties.
+      priority: 2,
     },
     {
       name: "position-try-options",
@@ -4388,7 +4350,8 @@
       getter: "GetPositionVisibility",
       type_name: "PositionVisibility",
       converter: "ConvertPositionVisibility",
-      keywords: ["always", "anchors-valid", "anchors-visible", "no-overflow"],
+      // TODO(crbug.com/332933527): Support anchors-valid.
+      keywords: ["always", "anchors-visible", "no-overflow"],
       typedom_types: ["Keyword"],
       runtime_flag: "CSSPositionVisibility",
     },
@@ -4500,12 +4463,13 @@
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       inherited: true,
       name_for_methods: "ScrollbarColor",
-      type_name: "std::optional<StyleScrollbarColor>",
+      type_name: "StyleScrollbarColor",
       converter: "ConvertScrollbarColor",
       keywords: ["auto"],
       field_group: "*",
-      field_template: "external",
-      default_value: "std::optional<StyleScrollbarColor>()",
+      field_template: "pointer",
+      default_value: "nullptr",
+      wrapper_pointer_name: "Member",
       include_paths: ["third_party/blink/renderer/core/style/style_scrollbar_color.h"],
       runtime_flag: "ScrollbarColor",
     },
@@ -5204,7 +5168,6 @@
       getter: "GetTextAlign",
       style_builder_custom_functions: ["value"],
       valid_for_formatted_text: true,
-      valid_for_permission_element: true,
       valid_for_page_context: true,
     },
     {
@@ -5216,7 +5179,6 @@
       keywords: ["auto", "start", "end", "left", "right", "center", "justify"],
       default_value: "auto",
       typedom_types: ["Keyword"],
-      valid_for_permission_element: true,
       valid_for_page_context: true,
     },
     {
@@ -5406,7 +5368,7 @@
       field_group: "*",
       field_template: "pointer",
       include_paths: ["third_party/blink/renderer/core/style/shadow_list.h"],
-      wrapper_pointer_name: "scoped_refptr",
+      wrapper_pointer_name: "Member",
       default_value: "nullptr",
       type_name: "ShadowList",
       converter: "ConvertShadowList",
@@ -5695,7 +5657,6 @@
       keywords: ["baseline", "sub", "super", "text-top", "text-bottom", "middle"],
       valid_for_first_letter: true,
       valid_for_first_line: true,
-      valid_for_permission_element: true,
     },
     {
       name: "view-timeline-axis",
@@ -5805,6 +5766,9 @@
       computed_style_protected_functions: ["getter"],
       default_value: "kNoControlPart",
       type_name: "ControlPart",
+      // appearance needs to be computed before
+      // -internal-appearance-auto-base-select() can be resolved.
+      priority: 1,
     },
     {
       name: "-webkit-appearance",
@@ -6006,9 +5970,8 @@
       interpolable: true,
       field_group: "*",
       field_template: "external",
-      include_paths: ["third_party/blink/renderer/platform/geometry/layout_unit.h"],
-      default_value: "LayoutUnit(3)",
-      type_name: "LayoutUnit",
+      default_value: "3",
+      type_name: "int",
       computed_style_custom_functions: ["initial", "getter", "setter"],
       converter: "ConvertColumnRuleWidth",
       keywords: ["thin", "medium", "thick"],
@@ -6287,22 +6250,22 @@
       name: "-webkit-ruby-position",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
-      field_group: "*",
-      field_template: "keyword",
-      keywords: ["before", "after"],
-      default_value: "before",
       type_name: "RubyPosition",
       converter: "ConvertRubyPosition",
       computable: false,
+      surrogate_for: "ruby-position",
       valid_for_permission_element: true,
     },
     {
       name: "ruby-position",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
+      field_group: "*",
+      field_template: "keyword",
+      keywords: ["over", "under"],
+      default_value: "over",
       type_name: "RubyPosition",
       converter: "ConvertRubyPosition",
-      surrogate_for: "-webkit-ruby-position",
       valid_for_permission_element: true,
     },
     {
@@ -7271,6 +7234,7 @@
     {
       name: "inset-area",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
+      style_builder_custom_functions: ["value", "inherit"],
       field_group: "*",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/style/inset_area.h"],
@@ -7285,6 +7249,10 @@
       valid_for_position_try: true,
       runtime_flag: "CSSAnchorPositioning",
       valid_for_permission_element: true,
+      // inset-area needs to be applied before inset properties since
+      // anchor() functions compute relative to the containing block that is
+      // modified by inset-area in AnchorEvaluatorImpl.
+      priority: 1,
     },
 
     // Shorthands
@@ -7314,23 +7282,6 @@
       supports_incremental_style: false,
       valid_for_keyframe: false,
       runtime_flag: 'ScrollTimeline',
-    },
-    {
-      // Variant of the "animation" shorthand which includes the
-      // animation-delay-start and animation-delay-end longhands.
-      name: "-alternative-animation-with-delay-start-end",
-      alternative_of: "-alternative-animation-with-timeline",
-      longhands: [
-        "animation-duration", "animation-timing-function",
-        "animation-delay-start", "animation-delay-end",
-        "animation-iteration-count", "animation-direction",
-        "animation-fill-mode", "animation-play-state", "animation-name",
-        "animation-timeline", "animation-range-start", "animation-range-end"
-      ],
-      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-      supports_incremental_style: false,
-      valid_for_keyframe: false,
-      runtime_flag: 'CSSAnimationDelayStartEnd',
     },
     {
       name: "animation-range",
@@ -7633,9 +7584,10 @@
       longhands: [
         "font-style", "font-variant-ligatures", "font-variant-caps",
         "font-variant-numeric", "font-variant-east-asian", "font-variant-alternates",
-        "font-variant-position", "font-weight", "font-stretch", "font-size",
-        "line-height", "font-family", "font-optical-sizing", "font-size-adjust",
-        "font-kerning", "font-feature-settings", "font-variation-settings"
+        "font-variant-position", "font-variant-emoji", "font-weight", "font-stretch",
+        "font-size", "line-height", "font-family", "font-optical-sizing",
+        "font-size-adjust", "font-kerning", "font-feature-settings",
+        "font-variation-settings"
       ],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       // Changes to anything related to fonts require that we call style.UpdateFont(),
@@ -7646,7 +7598,8 @@
       name: "font-variant",
       longhands: [
         "font-variant-ligatures", "font-variant-caps", "font-variant-alternates",
-        "font-variant-numeric", "font-variant-east-asian", "font-variant-position"
+        "font-variant-numeric", "font-variant-east-asian", "font-variant-position",
+        "font-variant-emoji"
       ],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       is_descriptor: true,
@@ -7916,16 +7869,9 @@
     },
     {
       name: "view-timeline",
-      longhands: ["view-timeline-name", "view-timeline-axis"],
-      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-      runtime_flag: "ScrollTimeline",
-    },
-    {
-      name: "-alternative-view-timeline-with-inset",
-      alternative_of: "view-timeline",
       longhands: ["view-timeline-name", "view-timeline-axis", "view-timeline-inset"],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
-      runtime_flag: "CSSViewTimelineInsetShorthand",
+      runtime_flag: "ScrollTimeline",
     },
     {
       name: "-webkit-border-after",
@@ -8500,20 +8446,8 @@
       runtime_flag: "ScrollTimeline",
     },
     {
-      name: "-webkit-alternative-animation-with-delay-start-end",
-      alias_for: "-alternative-animation-with-delay-start-end",
-      alternative_of: "-webkit-alternative-animation-with-timeline",
-      runtime_flag: "CSSAnimationDelayStartEnd",
-    },
-    {
       name: "-webkit-animation-delay",
       alias_for: "animation-delay",
-    },
-    {
-      name: "-webkit-alternative-animation-delay",
-      alias_for: "-alternative-animation-delay",
-      alternative_of: "-webkit-animation-delay",
-      runtime_flag: "CSSAnimationDelayStartEnd",
     },
     {
       name: "-webkit-animation-direction",

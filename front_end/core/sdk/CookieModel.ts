@@ -58,11 +58,7 @@ export class CookieModel extends SDKModel<void> {
       return [];
     }
     const normalCookies = response.cookies.map(Cookie.fromProtocolCookie);
-    const blockedCookieArray = Array.from(this.#blockedCookies.values());
-    const matchesBlockedCookie = (cookie: Cookie): boolean => {
-      return blockedCookieArray.some(blockedCookie => cookie.isEqual(blockedCookie));
-    };
-    return normalCookies.filter(cookie => !matchesBlockedCookie(cookie)).concat(blockedCookieArray);
+    return normalCookies.concat(Array.from(this.#blockedCookies.values()));
   }
 
   async deleteCookie(cookie: Cookie): Promise<void> {
@@ -130,7 +126,7 @@ export class CookieModel extends SDKModel<void> {
     }
     const resourceTreeModel = this.target().model(ResourceTreeModel);
     if (resourceTreeModel) {
-      // In case the current frame was unreachable, add it's cookies
+      // In case the current frame was unreachable, add its cookies
       // because they might help to debug why the frame was unreachable.
       if (resourceTreeModel.mainFrame && resourceTreeModel.mainFrame.unreachableUrl()) {
         resourceURLs.push(resourceTreeModel.mainFrame.unreachableUrl());

@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {expectCall} from '../../testing/ExpectStubCall.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 
 import * as Emulation from './emulation.js';
@@ -15,18 +15,11 @@ describeWithMockConnection('MediaQueryInspector', () => {
   const tests = (targetFactory: () => SDK.Target.Target) => {
     let target: SDK.Target.Target;
     let throttler: Common.Throttler.Throttler;
-    let onScheduled: () => void;
     let inspector: Emulation.MediaQueryInspector.MediaQueryInspector;
 
     beforeEach(() => {
       target = targetFactory();
       throttler = new Common.Throttler.Throttler(0);
-      onScheduled = () => {};
-      sinon.stub(throttler, 'schedule').callsFake(async (work: () => (Promise<unknown>), _?: boolean) => {
-        await work();
-        onScheduled();
-        return Promise.resolve();
-      });
     });
 
     afterEach(() => {
@@ -44,18 +37,18 @@ describeWithMockConnection('MediaQueryInspector', () => {
       assert.strictEqual(inspector.contentElement.querySelectorAll('.media-inspector-marker').length, 0);
 
       const cssModel = target.model(SDK.CSSModel.CSSModel);
-      assertNotNullOrUndefined(cssModel);
+      assert.exists(cssModel);
       const CSS_MEDIA = {
         text: 'foo',
         source: Protocol.CSS.CSSMediaSource.MediaRule,
         mediaList: [{expressions: [{value: 42, computedLength: 42, unit: 'UNIT', feature: 'max-width'}], active: true}],
       } as unknown as Protocol.CSS.CSSMedia;
       sinon.stub(cssModel, 'getMediaQueries').resolves([new SDK.CSSMedia.CSSMedia(cssModel, CSS_MEDIA)]);
+      const workScheduled = expectCall(sinon.stub(throttler, 'schedule'));
       cssModel.dispatchEventToListeners(
           SDK.CSSModel.Events.StyleSheetAdded, {} as SDK.CSSStyleSheetHeader.CSSStyleSheetHeader);
-      await new Promise<void>(resolve => {
-        onScheduled = resolve;
-      });
+      const [work] = await workScheduled;
+      await work();
       assert.strictEqual(inspector.contentElement.querySelectorAll('.media-inspector-marker').length, 1);
     });
   };

@@ -4,20 +4,18 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
-import * as Workspace from '../../models/workspace/workspace.js';
 import {
-  assertElement,
   dispatchClickEvent,
   dispatchMouseUpEvent,
   raf,
 } from '../../testing/DOMHelpers.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {stubFileManager} from '../../testing/FileManagerHelpers.js';
 import {describeWithMockConnection, dispatchEvent} from '../../testing/MockConnection.js';
 import * as Coordinator from '../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -63,7 +61,7 @@ describeWithMockConnection('NetworkLogView', () => {
         SDK.NetworkRequest.NetworkRequest {
       const effectiveTarget = options.target || target;
       const networkManager = effectiveTarget.model(SDK.NetworkManager.NetworkManager);
-      assertNotNullOrUndefined(networkManager);
+      assert.exists(networkManager);
       let request: SDK.NetworkRequest.NetworkRequest|undefined;
       const onRequestStarted = (event: Common.EventTarget.EventTargetEvent<SDK.NetworkManager.RequestStartedEvent>) => {
         request = event.data.request;
@@ -74,7 +72,7 @@ describeWithMockConnection('NetworkLogView', () => {
           {requestId: `request${++nextId}`, loaderId: 'loaderId', request: {url}} as unknown as
               Protocol.Network.RequestWillBeSentEvent);
       networkManager.removeEventListener(SDK.NetworkManager.Events.RequestStarted, onRequestStarted);
-      assertNotNullOrUndefined(request);
+      assert.exists(request);
       request.requestMethod = 'GET';
       if (options.requestHeaders) {
         request.setRequestHeaders(options.requestHeaders);
@@ -172,7 +170,7 @@ describeWithMockConnection('NetworkLogView', () => {
         networkLogView.setRecording(true);
 
         const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-        assertNotNullOrUndefined(resourceTreeModel);
+        assert.exists(resourceTreeModel);
         resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.Load, {resourceTreeModel, loadTime: 5});
         resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.DOMContentLoaded, 6);
         if (inScope) {
@@ -189,11 +187,7 @@ describeWithMockConnection('NetworkLogView', () => {
         const harWriterWrite = sinon.stub(HAR.Writer.Writer, 'write').resolves();
         const URL_HOST = 'example.com';
         target.setInspectedURL(`http://${URL_HOST}/foo` as Platform.DevToolsPath.UrlString);
-        const FILENAME = `${URL_HOST}.har` as Platform.DevToolsPath.RawPathString;
-        const fileManager = Workspace.FileManager.FileManager.instance();
-        const fileManagerSave =
-            sinon.stub(fileManager, 'save').withArgs(FILENAME, '', true).resolves({fileSystemPath: FILENAME});
-        const fileManagerClose = sinon.stub(fileManager, 'close');
+        const fileManager = stubFileManager();
 
         const FINISHED_REQUEST_1 = createNetworkRequest('http://example.com/', {finished: true});
         const FINISHED_REQUEST_2 = createNetworkRequest('http://example.com/favicon.ico', {finished: true});
@@ -208,12 +202,12 @@ describeWithMockConnection('NetworkLogView', () => {
         if (inScope) {
           assert.isTrue(harWriterWrite.calledOnceWith(
               sinon.match.any, [FINISHED_REQUEST_1, FINISHED_REQUEST_2], sinon.match.any));
-          assert.isTrue(fileManagerSave.calledOnce);
-          assert.isTrue(fileManagerClose.calledOnce);
+          assert.isTrue(fileManager.save.calledOnce);
+          assert.isTrue(fileManager.close.calledOnce);
         } else {
           assert.isFalse(harWriterWrite.called);
-          assert.isFalse(fileManagerSave.called);
-          assert.isFalse(fileManagerClose.called);
+          assert.isFalse(fileManager.save.called);
+          assert.isFalse(fileManager.close.called);
         }
       });
 
@@ -264,7 +258,7 @@ describeWithMockConnection('NetworkLogView', () => {
 
         networkLogView.setRecording(true);
         const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-        assertNotNullOrUndefined(resourceTreeModel);
+        assert.exists(resourceTreeModel);
         resourceTreeModel.dispatchEventToListeners(
             SDK.ResourceTreeModel.Events.Load, {resourceTreeModel, loadTime: 0.686191});
         resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.DOMContentLoaded, 0.683709);
@@ -273,7 +267,7 @@ describeWithMockConnection('NetworkLogView', () => {
 
         const toolbar = networkLogView.summaryToolbar();
         const textElements = toolbar.element.shadowRoot?.querySelectorAll('.toolbar-text');
-        assertNotNullOrUndefined(textElements);
+        assert.exists(textElements);
         const textContents = [...textElements].map(item => item.textContent);
         if (inScope) {
           assert.deepEqual(textContents, [
@@ -298,7 +292,7 @@ describeWithMockConnection('NetworkLogView', () => {
       SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
       const anotherTarget = createTarget();
       const networkManager = target.model(SDK.NetworkManager.NetworkManager);
-      assertNotNullOrUndefined(networkManager);
+      assert.exists(networkManager);
       const request1 = createNetworkRequest('url1', {target});
       const request2 = createNetworkRequest('url2', {target});
       const request3 = createNetworkRequest('url3', {target: anotherTarget});
@@ -328,7 +322,7 @@ describeWithMockConnection('NetworkLogView', () => {
       SDK.TargetManager.TargetManager.instance().setScopeTarget(target);
       const anotherTarget = createTarget();
       const networkManager = target.model(SDK.NetworkManager.NetworkManager);
-      assertNotNullOrUndefined(networkManager);
+      assert.exists(networkManager);
       const request1 = createNetworkRequest('url1', {target});
       const request2 = createNetworkRequest('url2', {target});
       const request3 = createNetworkRequest('url3', {target: anotherTarget});
@@ -342,7 +336,7 @@ describeWithMockConnection('NetworkLogView', () => {
           rootNode.children.map(n => (n as Network.NetworkDataGridNode.NetworkNode).request()), [request1, request2]);
 
       const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-      assertNotNullOrUndefined(resourceTreeModel);
+      assert.exists(resourceTreeModel);
       const frame = {
         url: 'http://example.com/',
         unreachableUrl: () => Platform.DevToolsPath.EmptyUrlString,
@@ -439,7 +433,7 @@ describeWithMockConnection('NetworkLogView', () => {
          const dropdown = setupRequestTypesDropdown();
          const button = dropdown.element().querySelector('.toolbar-button');
 
-         assertElement(button, HTMLElement);
+         assert.instanceOf(button, HTMLElement);
          dispatchClickEvent(button, {bubbles: true, composed: true});
          await raf();
 
@@ -448,10 +442,10 @@ describeWithMockConnection('NetworkLogView', () => {
          const optionAll = getRequestTypeDropdownOption('All');
          const optionAllCheckmark = optionAll?.querySelector('.checkmark') || null;
 
-         assertElement(optionImg, HTMLElement);
-         assertElement(optionImgCheckmark, HTMLElement);
-         assertElement(optionAll, HTMLElement);
-         assertElement(optionAllCheckmark, HTMLElement);
+         assert.instanceOf(optionImg, HTMLElement);
+         assert.instanceOf(optionImgCheckmark, HTMLElement);
+         assert.instanceOf(optionAll, HTMLElement);
+         assert.instanceOf(optionAllCheckmark, HTMLElement);
 
          assert.isTrue(optionAll.ariaLabel === 'All, checked');
          assert.isTrue(optionImg.ariaLabel === 'Image, unchecked');
@@ -483,7 +477,7 @@ describeWithMockConnection('NetworkLogView', () => {
 
       const dropdown = setupRequestTypesDropdown();
       const button = dropdown.element().querySelector('.toolbar-button');
-      assertElement(button, HTMLElement);
+      assert.instanceOf(button, HTMLElement);
 
       let countAdorner = button.querySelector('.active-filters-count');
       assert.isTrue(countAdorner?.classList.contains('hidden'));
@@ -507,7 +501,7 @@ describeWithMockConnection('NetworkLogView', () => {
 
       const dropdown = setupRequestTypesDropdown();
       const button = dropdown.element().querySelector('.toolbar-button');
-      assertElement(button, HTMLElement);
+      assert.instanceOf(button, HTMLElement);
 
       let toolbarText = button.querySelector('.toolbar-text')?.textContent;
       assert.strictEqual(toolbarText, 'Request types');
@@ -536,7 +530,7 @@ describeWithMockConnection('NetworkLogView', () => {
 
       const dropdown = setupRequestTypesDropdown();
       const button = dropdown.element().querySelector('.toolbar-button');
-      assertElement(button, HTMLElement);
+      assert.instanceOf(button, HTMLElement);
 
       let tooltipText = button.title;
       assert.strictEqual(tooltipText, 'Filter requests by type');
@@ -562,7 +556,7 @@ describeWithMockConnection('NetworkLogView', () => {
 
       const dropdown = setupRequestTypesDropdown();
       const button = dropdown.element().querySelector('.toolbar-button');
-      assertElement(button, HTMLElement);
+      assert.instanceOf(button, HTMLElement);
 
       dispatchClickEvent(button, {bubbles: true, composed: true});
       await raf();
@@ -649,10 +643,10 @@ describeWithMockConnection('NetworkLogView', () => {
       ({filterBar, networkLogView} = createEnvironment());
 
       const dropdown = await openMoreTypesDropdown(filterBar, networkLogView);
-      assertNotNullOrUndefined(dropdown);
+      assert.exists(dropdown);
 
       const button = dropdown.element().querySelector('.toolbar-button');
-      assertElement(button, HTMLElement);
+      assert.instanceOf(button, HTMLElement);
       assert.strictEqual(button.title, 'Show only/hide requests');
 
       const softMenu = getSoftMenu();
@@ -675,10 +669,10 @@ describeWithMockConnection('NetworkLogView', () => {
       ({filterBar, networkLogView} = createEnvironment());
 
       const dropdown = await openMoreTypesDropdown(filterBar, networkLogView);
-      assertNotNullOrUndefined(dropdown);
+      assert.exists(dropdown);
 
       const button = dropdown.element().querySelector('.toolbar-button');
-      assertElement(button, HTMLElement);
+      assert.instanceOf(button, HTMLElement);
       assert.strictEqual(button.title, 'Show only/hide requests');
 
       const softMenu = getSoftMenu();
@@ -867,7 +861,7 @@ function clickCheckbox(checkbox: HTMLInputElement) {
 function getCheckbox(filterBar: UI.FilterBar.FilterBar, title: string) {
   const checkbox =
       filterBar.element.querySelector(`[title="${title}"] span`)?.shadowRoot?.querySelector('input') || null;
-  assertElement(checkbox, HTMLInputElement);
+  assert.instanceOf(checkbox, HTMLInputElement);
   return checkbox;
 }
 
@@ -879,7 +873,7 @@ function getRequestTypeDropdownOption(requestType: string): Element|null {
 
 async function selectRequestTypesOption(option: string) {
   const item = getRequestTypeDropdownOption(option);
-  assertElement(item, HTMLElement);
+  assert.instanceOf(item, HTMLElement);
   dispatchMouseUpEvent(item, {bubbles: true, composed: true});
   await raf();
 }
@@ -923,13 +917,13 @@ function getMoreFiltersActiveCount(filterBar: UI.FilterBar.FilterBar): string {
 function getSoftMenu(): HTMLElement {
   const container = document.querySelector('div[data-devtools-glass-pane]');
   const softMenu = container!.shadowRoot!.querySelector('.soft-context-menu');
-  assertElement(softMenu, HTMLElement);
+  assert.instanceOf(softMenu, HTMLElement);
   return softMenu;
 }
 
 function getDropdownItem(softMenu: HTMLElement, label: string) {
   const item = softMenu?.querySelector(`[aria-label^="${label}"]`);
-  assertElement(item, HTMLElement);
+  assert.instanceOf(item, HTMLElement);
   return item;
 }
 

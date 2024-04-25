@@ -12,8 +12,6 @@
 import type * as NodeText from '../ui/components/node_text/node_text.js';
 import * as UI from '../ui/legacy/legacy.js';
 
-const {assert} = chai;
-
 const TEST_CONTAINER_ID = '__devtools-test-container-id';
 
 interface RenderOptions {
@@ -52,10 +50,10 @@ function removeChildren(node: Node): void {
       widget.detach();
       continue;
     }
-      // For regular children, recursively remove their children, since some of them
-      // might be widgets, and only afterwards remove the child from the current node.
-      removeChildren(firstChild);
-      node.removeChild(firstChild);
+    // For regular children, recursively remove their children, since some of them
+    // might be widgets, and only afterwards remove the child from the current node.
+    removeChildren(firstChild);
+    node.removeChild(firstChild);
   }
 }
 /**
@@ -75,24 +73,9 @@ export const resetTestDOM = () => {
   document.body.appendChild(newContainer);
 };
 
-/**
- * An easy way to assert the component's shadowRoot exists so you're able to assert on its contents.
- */
-export function assertShadowRoot(shadowRoot: ShadowRoot|null): asserts shadowRoot is ShadowRoot {
-  assert.instanceOf(shadowRoot, ShadowRoot);
-}
-
 type Constructor<T> = {
   new (...args: unknown[]): T,
 };
-
-/**
- * Asserts that `element` is of type `T`.
- */
-export function assertElement<T extends Element>(
-    element: Element|null, elementClass: Constructor<T>): asserts element is T {
-  assert.instanceOf(element, elementClass);
-}
 
 /**
  * Asserts that all emenents of `nodeList` are at least of type `T`.
@@ -104,15 +87,15 @@ export function assertElements<T extends Element>(
 
 export function getElementWithinComponent<T extends HTMLElement, V extends Element>(
     component: T, selector: string, elementClass: Constructor<V>) {
-  assertShadowRoot(component.shadowRoot);
+  assert.isNotNull(component.shadowRoot);
   const element = component.shadowRoot.querySelector(selector);
-  assertElement(element, elementClass);
+  assert.instanceOf(element, elementClass);
   return element;
 }
 
 export function getElementsWithinComponent<T extends HTMLElement, V extends Element>(
     component: T, selector: string, elementClass: Constructor<V>) {
-  assertShadowRoot(component.shadowRoot);
+  assert.isNotNull(component.shadowRoot);
   const elements = component.shadowRoot.querySelectorAll(selector);
   assertElements(elements, elementClass);
   return elements;
@@ -280,7 +263,7 @@ export function getCleanTextContentFromElements(el: ShadowRoot|HTMLElement, sele
 }
 
 export function assertNodeTextContent(component: NodeText.NodeText.NodeText, expectedContent: string) {
-  assertShadowRoot(component.shadowRoot);
+  assert.isNotNull(component.shadowRoot);
   const content = Array.from(component.shadowRoot.querySelectorAll('span')).map(span => span.textContent).join('');
   assert.strictEqual(content, expectedContent);
 }

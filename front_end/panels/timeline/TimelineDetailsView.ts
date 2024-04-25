@@ -271,12 +271,12 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     if (TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selectionObject)) {
       const event = selectionObject;
       const networkDetails = await TimelineUIUtils.buildSyntheticNetworkRequestDetails(
-          event, this.model.timelineModel(), this.detailsLinkifier);
+          this.#traceEngineData, event, this.detailsLinkifier);
       this.setContent(networkDetails);
     } else if (TimelineSelection.isTraceEventSelection(selectionObject)) {
       const event = selectionObject;
-      const traceEventDetails = await TimelineUIUtils.buildTraceEventDetails(
-          event, this.model.timelineModel(), this.detailsLinkifier, true, this.#traceEngineData);
+      const traceEventDetails =
+          await TimelineUIUtils.buildTraceEventDetails(event, this.detailsLinkifier, true, this.#traceEngineData);
       this.appendDetailsTabsForTraceEventAndShowDetails(event, traceEventDetails);
     } else if (TimelineSelection.isFrameObject(selectionObject)) {
       const frame = selectionObject;
@@ -398,12 +398,15 @@ export class TimelineDetailsView extends UI.Widget.VBox {
 
   private updateSelectedRangeStats(
       startTime: TraceEngine.Types.Timing.MilliSeconds, endTime: TraceEngine.Types.Timing.MilliSeconds): void {
-    if (!this.model || !this.#selectedEvents) {
+    if (!this.model || !this.#selectedEvents || !this.#traceEngineData) {
       return;
     }
+
+    const minBoundsMilli =
+        TraceEngine.Helpers.Timing.traceWindowMilliSeconds(this.#traceEngineData.Meta.traceBounds).min;
     const aggregatedStats = TimelineUIUtils.statsForTimeRange(this.#selectedEvents, startTime, endTime);
-    const startOffset = startTime - this.model.timelineModel().minimumRecordTime();
-    const endOffset = endTime - this.model.timelineModel().minimumRecordTime();
+    const startOffset = startTime - minBoundsMilli;
+    const endOffset = endTime - minBoundsMilli;
 
     const contentHelper = new TimelineDetailsContentHelper(null, null);
     contentHelper.addSection(i18nString(

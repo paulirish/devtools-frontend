@@ -80,12 +80,6 @@ export class UserMetrics {
     );
   }
 
-  elementsSidebarTabShown(sidebarPaneName: string): void {
-    const code = ElementsSidebarTabCodes[sidebarPaneName as keyof typeof ElementsSidebarTabCodes] || 0;
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.ElementsSidebarTabShown, code, ElementsSidebarTabCodes.MaxValue);
-  }
-
   sourcesSidebarTabShown(sidebarPaneName: string): void {
     const code = SourcesSidebarTabCodes[sidebarPaneName as keyof typeof SourcesSidebarTabCodes] || 0;
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
@@ -361,11 +355,6 @@ export class UserMetrics {
   swatchActivated(swatch: SwatchType): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.SwatchActivated, swatch, SwatchType.MaxValue);
-  }
-
-  badgeActivated(badge: BadgeType): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BadgeActivated, badge, BadgeType.MaxValue);
   }
 
   animationPlaybackRateChanged(playbackRate: AnimationsPlaybackRate): void {
@@ -699,8 +688,6 @@ export enum PanelWithLocation {
   'sources.search-drawer' = 28,
   'security-main' = 29,
   'security-drawer' = 30,
-  'js_profiler-main' = 31,
-  'js_profiler-drawer' = 32,
   'lighthouse-main' = 33,
   'lighthouse-drawer' = 34,
   'coverage-main' = 35,
@@ -1055,7 +1042,6 @@ export enum DevtoolsExperiments {
   'css-type-component-length-deprecate' = 85,
   'timeline-show-postmessage-events' = 86,
   'save-and-load-trace-with-annotations' = 87,
-  'timeline-track-configuration' = 88,
   'timeline-extensions' = 89,
 
   // Increment this when new experiments are added.

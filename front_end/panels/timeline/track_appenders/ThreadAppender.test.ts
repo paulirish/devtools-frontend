@@ -18,8 +18,6 @@ import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Timeline from '../timeline.js';
 
-const {assert} = chai;
-
 function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData, traceParsedData: TraceModel.Handlers.Types.TraceParseData,
     entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[],
@@ -534,8 +532,8 @@ describeWithEnvironment('ThreadAppender', function() {
         return event.name === bizarreName;
       });
       assert.isAbove(unknownEventIndex, -1);
-      assert.isDefined(finalFlamechartData.entryStartTimes);
-      assert.isDefined(finalFlamechartData.entryTotalTimes);
+      assert.exists(finalFlamechartData.entryStartTimes);
+      assert.exists(finalFlamechartData.entryTotalTimes);
       Root.Runtime.experiments.disableForTest('timeline-show-all-events');
     });
   });

@@ -9,8 +9,6 @@ import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Timeline from '../timeline.js';
 
-const {assert} = chai;
-
 function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
     traceParsedData: TraceEngine.Handlers.Types.TraceParseData,
@@ -81,7 +79,7 @@ describeWithEnvironment('InteractionsTrackAppender', function() {
       const events = traceParsedData.UserInteractions.interactionEventsWithNoNesting;
       for (const event of events) {
         const markerIndex = entryData.indexOf(event);
-        assert.isDefined(markerIndex);
+        assert.exists(markerIndex);
         assert.strictEqual(
             flameChartData.entryStartTimes[markerIndex],
             TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts));
@@ -94,7 +92,7 @@ describeWithEnvironment('InteractionsTrackAppender', function() {
       const events = traceParsedData.UserInteractions.interactionEventsWithNoNesting;
       for (const event of events) {
         const markerIndex = entryData.indexOf(event);
-        assert.isDefined(markerIndex);
+        assert.exists(markerIndex);
         const expectedTotalTimeForEvent = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
             (event.dur || 0) as TraceEngine.Types.Timing.MicroSeconds);
         assert.strictEqual(flameChartData.entryTotalTimes[markerIndex], expectedTotalTimeForEvent);

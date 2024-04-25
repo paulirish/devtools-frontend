@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
+import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import * as Coverage from './coverage.js';
 import {createTarget, registerNoopActions} from '../../testing/EnvironmentHelpers.js';
-import * as SDK from '../../core/sdk/sdk.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Coordinator from '../../ui/components/render_coordinator/render_coordinator.js';
+
+import * as Coverage from './coverage.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -46,12 +44,12 @@ const setupTargetAndModels = () => {
   Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance({forceNew: true, resourceMapping, targetManager});
 
   const coverageModel = target.model(Coverage.CoverageModel.CoverageModel);
-  assertNotNullOrUndefined(coverageModel);
+  assert.exists(coverageModel);
   const startSpy = sinon.spy(coverageModel, 'start');
   const stopSpy = sinon.spy(coverageModel, 'stop');
 
   const cssModel = target.model(SDK.CSSModel.CSSModel);
-  assertNotNullOrUndefined(cssModel);
+  assert.exists(cssModel);
   sinon.stub(cssModel.agent, 'invoke_startRuleUsageTracking').resolves({
     getError: () => undefined,
   });
@@ -80,7 +78,7 @@ const setupTargetAndModels = () => {
   });
 
   const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-  assertNotNullOrUndefined(resourceTreeModel);
+  assert.exists(resourceTreeModel);
 
   return {startSpy, stopSpy, resourceTreeModel};
 };

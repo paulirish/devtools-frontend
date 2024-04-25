@@ -62,8 +62,10 @@ import {
   visibleTypes,
 } from './EventUICategory.js';
 import * as Extensions from './extensions/extensions.js';
+import {Tracker} from './FreshRecording.js';
 import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
 import {SourceMapsResolver} from './SourceMapsResolver.js';
+import {targetForEvent} from './TargetForEvent.js';
 import {TimelinePanel} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 
@@ -98,11 +100,11 @@ const UIStrings = {
    */
   presentationDelay: 'Presentation delay',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text shown when the user has selected an event that represents script compiliation.
    */
   compile: 'Compile',
   /**
-   *@description Text to parse something
+   *@description Text shown when the user selects an event that represents script parsing.
    */
   parse: 'Parse',
   /**
@@ -112,20 +114,21 @@ const UIStrings = {
    */
   sS: '{PH1}: {PH2}',
   /**
-   *@description Details text in Timeline UIUtils of the Performance panel
+   *@description Details text used to show the amount of data collected.
    *@example {30 MB} PH1
    */
   sCollected: '{PH1} collected',
   /**
-   *@description Details text in Timeline UIUtils of the Performance panel
-   *@example {https://example.com} PH1
+   *@description Text used to show a URL to a script and the relevant line numbers.
+   *@example {https://example.com/foo.js} PH1
    *@example {2} PH2
    *@example {4} PH3
    */
   sSs: '{PH1} [{PH2}…{PH3}]',
   /**
-   *@description Details text in Timeline UIUtils of the Performance panel
-   *@example {https://example.com} PH1
+   *@description Text used to show a URL to a script and the starting line
+   *             number - used when there is no end line number available.
+   *@example {https://example.com/foo.js} PH1
    *@example {2} PH2
    */
   sSSquareBrackets: '{PH1} [{PH2}…]',
@@ -134,11 +137,11 @@ const UIStrings = {
    */
   learnMore: 'Learn more',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text referring to the status of the browser's compilation cache.
    */
   compilationCacheStatus: 'Compilation cache status',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text referring to the size of the browser's compiliation cache.
    */
   compilationCacheSize: 'Compilation cache size',
   /**
@@ -150,17 +153,19 @@ const UIStrings = {
    */
   compilationCacheKind: 'Compilation cache kind',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to inform the user that the script they are looking
+   *             at was loaded from the browser's cache.
    */
   scriptLoadedFromCache: 'script loaded from cache',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to inform the user that the script they are looking at
+   *             was unable to be loaded from the browser's cache.
    */
   failedToLoadScriptFromCache: 'failed to load script from cache',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to inform the user that the script they are looking at was not eligible to be loaded from the browser's cache.
    */
-  scriptNotEligible: 'script not eligible',
+  scriptNotEligibleToBeLoadedFromCache: 'script not eligible',
   /**
    *@description Text for the total time of something
    */
@@ -178,19 +183,19 @@ const UIStrings = {
    */
   function: 'Function',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text for referring to the ID of a timer.
    */
   timerId: 'Timer ID',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text for referring to a timer that has timed-out and therefore is being removed.
    */
   timeout: 'Timeout',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to indicate that a timer is repeating (e.g. every X seconds) rather than a one off.
    */
   repeats: 'Repeats',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text for referring to the ID of a callback function installed by an event.
    */
   callbackId: 'Callback ID',
   /**
@@ -202,11 +207,11 @@ const UIStrings = {
    */
   priority: 'Priority',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used when referring to the data sent in a network request that is encoded as a particular file format.
    */
   encodedData: 'Encoded Data',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to refer to the data sent in a network request that has been decoded.
    */
   decodedBody: 'Decoded Body',
   /**
@@ -218,23 +223,23 @@ const UIStrings = {
    */
   script: 'Script',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to tell a user that a compilation trace event was streamed.
    */
   streamed: 'Streamed',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to indicate if a compilation event was eager.
    */
   eagerCompile: 'Compiling all functions eagerly',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to refer to the URL associated with a given event.
    */
   url: 'Url',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to indicate to the user the size of the cache (as a filesize - e.g. 5mb).
    */
   producedCacheSize: 'Produced Cache Size',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to indicate to the user the amount of the cache (as a filesize - e.g. 5mb) that has been used.
    */
   consumedCacheSize: 'Consumed Cache Size',
   /**
@@ -242,17 +247,17 @@ const UIStrings = {
    */
   location: 'Location',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show a coordinate pair (e.g. (3, 2)).
    *@example {2} PH1
    *@example {2} PH2
    */
   sSCurlyBrackets: '({PH1}, {PH2})',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to indicate to the user they are looking at the physical dimensions of a shape that was drawn by the browser.
    */
   dimensions: 'Dimensions',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the user the dimensions of a shape and indicate its area (e.g. 3x2).
    *@example {2} PH1
    *@example {2} PH2
    */
@@ -266,23 +271,23 @@ const UIStrings = {
    */
   ownerElement: 'Owner Element',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the user the URL of the image they are viewing.
    */
   imageUrl: 'Image URL',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the user that the URL they are viewing is loading a CSS stylesheet.
    */
   stylesheetUrl: 'Stylesheet URL',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used next to a number to show the user how many elements were affected.
    */
   elementsAffected: 'Elements Affected',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used next to a number to show the user how many nodes required the browser to update and re-layout the page.
    */
   nodesThatNeedLayout: 'Nodes That Need Layout',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the amount in a subset - e.g. "2 of 10".
    *@example {2} PH1
    *@example {10} PH2
    */
@@ -292,11 +297,11 @@ const UIStrings = {
    */
   layoutRoot: 'Layout root',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used when viewing an event that can have a custom message attached.
    */
   message: 'Message',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to tell the user they are viewing an event that has a function embedded in it, which is referred to as the "callback function".
    */
   callbackFunction: 'Callback Function',
   /**
@@ -304,15 +309,15 @@ const UIStrings = {
    */
   state: 'State',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the relevant range of a file - e.g. "lines 2-10".
    */
   range: 'Range',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to refer to the amount of time some event or code was given to complete within.
    */
   allottedTime: 'Allotted Time',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to tell a user that a particular event or function was automatically run by a timeout.
    */
   invokedByTimeout: 'Invoked by Timeout',
   /**
@@ -382,7 +387,7 @@ const UIStrings = {
    */
   movedTo: 'Moved to',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text that indicates a particular HTML element or node is related to what the user is viewing.
    */
   relatedNode: 'Related Node',
   /**
@@ -390,23 +395,23 @@ const UIStrings = {
    */
   preview: 'Preview',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to refer to the total time summed up across multiple events.
    */
   aggregatedTime: 'Aggregated Time',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text to indicate to the user they are viewing an event representing a network request.
    */
   networkRequest: 'Network request',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to indicate if a network request was loaded from the cache.
    */
   loadFromCache: 'load from cache',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to indicate if a network request was transferred over the network (rather than being loaded from the cache.)
    */
   networkTransfer: 'network transfer',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the total time a network request spent loading a resource.
    *@example {1ms} PH1
    *@example {network transfer} PH2
    *@example {1ms} PH3
@@ -417,15 +422,15 @@ const UIStrings = {
    */
   duration: 'Duration',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the mime-type of the data transferred with a network request (e.g. "application/json").
    */
   mimeType: 'Mime Type',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the user that a request was served from the browser's in-memory cache.
    */
   FromMemoryCache: ' (from memory cache)',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the user that a request was served from the browser's file cache.
    */
   FromCache: ' (from cache)',
   /**
@@ -433,7 +438,7 @@ const UIStrings = {
    */
   FromPush: ' (from push)',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show a user that a request was served from an installed, active service worker.
    */
   FromServiceWorker: ' (from `service worker`)',
   /**
@@ -477,7 +482,7 @@ const UIStrings = {
    */
   stackTrace: 'Stack Trace',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show any invalidations for a particular event that caused the browser to have to do more work to update the page.
    */
   invalidations: 'Invalidations',
   /**
@@ -501,17 +506,17 @@ const UIStrings = {
    */
   sAtS: '{PH1} at {PH2}',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used next to a time to indicate that the particular event took that much time itself. In context this might look like "3ms blink.console (self)"
    *@example {blink.console} PH1
    */
   sSelf: '{PH1} (self)',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used next to a time to indicate that the event's children took that much time. In context this might look like "3ms blink.console (children)"
    *@example {blink.console} PH1
    */
   sChildren: '{PH1} (children)',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to show the user how much time the browser spent on rendering (drawing the page onto the screen).
    */
   timeSpentInRendering: 'Time spent in rendering',
   /**
@@ -519,7 +524,7 @@ const UIStrings = {
    */
   frame: 'Frame',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to refer to the duration of an event at a given offset - e.g. "2ms at 10ms" which can be read as "2ms starting after 10ms".
    *@example {10ms} PH1
    *@example {10ms} PH2
    */
@@ -529,7 +534,7 @@ const UIStrings = {
    */
   UnknownNode: '[ unknown node ]',
   /**
-   *@description Text in Timeline UIUtils of the Performance panel
+   *@description Text used to refer to a particular element and the file it was referred to in.
    *@example {node} PH1
    *@example {app.js} PH2
    */
@@ -905,7 +910,9 @@ export class TimelineUIUtils {
     return detailsText;
 
     async function linkifyTopCallFrameAsText(): Promise<string|null> {
-      const frame = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).topFrame();
+      const frame = TraceEngine.Legacy.eventIsFromNewEngine(event) ?
+          TraceEngine.Helpers.Trace.stackTraceForEvent(event)?.at(0) :
+          null;
       if (!frame) {
         return null;
       }
@@ -1158,13 +1165,12 @@ export class TimelineUIUtils {
           i18nString(UIStrings.compilationCacheStatus), i18nString(UIStrings.failedToLoadScriptFromCache));
     } else {
       contentHelper.appendTextRow(
-          i18nString(UIStrings.compilationCacheStatus), i18nString(UIStrings.scriptNotEligible));
+          i18nString(UIStrings.compilationCacheStatus), i18nString(UIStrings.scriptNotEligibleToBeLoadedFromCache));
     }
   }
 
   static async buildTraceEventDetails(
       event: TraceEngine.Legacy.CompatibleTraceEvent,
-      model: TimelineModel.TimelineModel.TimelineModelImpl,
       linkifier: LegacyComponents.Linkifier.Linkifier,
       detailed: boolean,
       // TODO(crbug.com/1430809): the order of these arguments is slightly
@@ -1173,45 +1179,33 @@ export class TimelineUIUtils {
       // and then we can more easily change this method.
       traceParseData: TraceEngine.Handlers.Types.TraceParseData|null = null,
       ): Promise<DocumentFragment> {
-    const maybeTarget = model.targetByEvent(event);
+    const maybeTarget = maybeTargetForEvent(traceParseData, event);
     const {duration, selfTime} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
-    let relatedNodesMap: (Map<number, SDK.DOMModel.DOMNode|null>|null)|null = null;
+
+    const relatedNodesMap = traceParseData && TraceEngine.Legacy.eventIsFromNewEngine(event) ?
+        await TraceEngine.Extras.FetchNodes.extractRelatedDOMNodesFromEvent(
+            traceParseData,
+            event,
+            ) :
+        null;
+
     if (maybeTarget) {
-      const target = (maybeTarget as SDK.Target.Target);
       // @ts-ignore TODO(crbug.com/1011811): Remove symbol usage.
       if (typeof event[previewElementSymbol] === 'undefined') {
         let previewElement: (Element|null)|null = null;
         const url = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).url;
         if (url) {
-          previewElement = await LegacyComponents.ImagePreview.ImagePreview.build(target, url, false, {
+          previewElement = await LegacyComponents.ImagePreview.ImagePreview.build(maybeTarget, url, false, {
             imageAltText: LegacyComponents.ImagePreview.ImagePreview.defaultAltTextForImageURL(url),
             precomputedFeatures: undefined,
           });
         } else if (
             traceParseData && TraceEngine.Legacy.eventIsFromNewEngine(event) &&
             TraceEngine.Types.TraceEvents.isTraceEventPaint(event)) {
-          previewElement = await TimelineUIUtils.buildPicturePreviewContent(traceParseData, event, target);
+          previewElement = await TimelineUIUtils.buildPicturePreviewContent(traceParseData, event, maybeTarget);
         }
         // @ts-ignore TODO(crbug.com/1011811): Remove symbol usage.
         event[previewElementSymbol] = previewElement;
-      }
-
-      const nodeIdsToResolve = new Set<Protocol.DOM.BackendNodeId>();
-      const timelineData = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event);
-      if (timelineData.backendNodeIds) {
-        for (let i = 0; i < timelineData.backendNodeIds.length; ++i) {
-          nodeIdsToResolve.add(timelineData.backendNodeIds[i]);
-        }
-      }
-      if (nodeIdsToResolve.size) {
-        const domModel = target.model(SDK.DOMModel.DOMModel);
-        if (domModel) {
-          relatedNodesMap = await domModel.pushNodesByBackendIdsToFrontend(nodeIdsToResolve);
-        }
-      }
-      if (traceParseData && TraceEngine.Legacy.eventIsFromNewEngine(event) &&
-          TraceEngine.Types.TraceEvents.isSyntheticLayoutShift(event)) {
-        relatedNodesMap = await TraceEngine.Extras.FetchNodes.extractRelatedDOMNodesFromEvent(traceParseData, event);
       }
     }
 
@@ -1225,10 +1219,12 @@ export class TimelineUIUtils {
     // This message may vary per event.name;
     let relatedNodeLabel;
 
-    const contentHelper = new TimelineDetailsContentHelper(model.targetByEvent(event), linkifier);
+    const contentHelper = new TimelineDetailsContentHelper(maybeTargetForEvent(traceParseData, event), linkifier);
 
     const defaultColorForEvent = this.eventColor(event);
-    const color = model.isMarkerEvent(event) ? TimelineUIUtils.markerStyleForEvent(event).color : defaultColorForEvent;
+    const isMarker =
+        traceParseData && TraceEngine.Legacy.eventIsFromNewEngine(event) && isMarkerEvent(traceParseData, event);
+    const color = isMarker ? TimelineUIUtils.markerStyleForEvent(event).color : defaultColorForEvent;
 
     contentHelper.addSection(TimelineUIUtils.eventTitle(event), color);
 
@@ -1292,6 +1288,8 @@ export class TimelineUIUtils {
       }
     }
 
+    const isFreshRecording = Boolean(traceParseData && Tracker.instance().recordingIsFresh(traceParseData));
+
     switch (event.name) {
       case recordTypes.GCEvent:
       case recordTypes.MajorGC:
@@ -1308,7 +1306,7 @@ export class TimelineUIUtils {
       case recordTypes.JSSystemFrame:
       case recordTypes.FunctionCall: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, model.targetByEvent(event), linkifier, model.isFreshRecording());
+            event, maybeTargetForEvent(traceParseData, event), linkifier, isFreshRecording);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.function), detailsNode);
         }
@@ -1560,7 +1558,7 @@ export class TimelineUIUtils {
 
       case recordTypes.EventTiming: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, model.targetByEvent(event), linkifier, model.isFreshRecording());
+            event, maybeTargetForEvent(traceParseData, event), linkifier, isFreshRecording);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);
         }
@@ -1632,7 +1630,7 @@ export class TimelineUIUtils {
 
       default: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, model.targetByEvent(event), linkifier, model.isFreshRecording());
+            event, maybeTargetForEvent(traceParseData, event), linkifier, isFreshRecording);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);
         }
@@ -1807,10 +1805,10 @@ export class TimelineUIUtils {
   }
 
   static async buildSyntheticNetworkRequestDetails(
+      traceParseData: TraceEngine.Handlers.Types.TraceParseData|null,
       event: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest,
-      model: TimelineModel.TimelineModel.TimelineModelImpl,
       linkifier: LegacyComponents.Linkifier.Linkifier): Promise<DocumentFragment> {
-    const maybeTarget = model.targetByEvent(event);
+    const maybeTarget = maybeTargetForEvent(traceParseData, event);
     const contentHelper = new TimelineDetailsContentHelper(maybeTarget, linkifier);
 
     const category = TimelineUIUtils.syntheticNetworkRequestCategory(event);
@@ -1890,7 +1888,9 @@ export class TimelineUIUtils {
     }
     const title = i18nString(UIStrings.initiatedBy);
 
-    const topFrame = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).topFrame();
+    const topFrame = TraceEngine.Legacy.eventIsFromNewEngine(event) ?
+        TraceEngine.Helpers.Trace.stackTraceForEvent(event)?.at(0) :
+        null;
     if (topFrame) {
       const link = linkifier.maybeLinkifyConsoleCallFrame(
           maybeTarget, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
@@ -2006,7 +2006,9 @@ export class TimelineUIUtils {
     const link = document.createElement('span');
 
     const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
+
     if (!traceBoundsState) {
+      console.error('Tried to link to an entry without any traceBoundsState. This should never happen.');
       return link;
     }
 
@@ -2487,13 +2489,10 @@ export class TimelineUIUtils {
     return colorGenerator.colorForID(id);
   }
 
-  static displayNameForFrame(frame: TimelineModel.TimelineModel.PageFrame, trimAt: number = 30): string {
-    const url = frame.url;
-    if (!trimAt) {
-      trimAt = 30;
-    }
+  static displayNameForFrame(frame: TraceEngine.Types.TraceEvents.TraceFrame, trimAt: number = 80): string {
+    const url = frame.url as Platform.DevToolsPath.UrlString;
     return Common.ParsedURL.schemeIs(url, 'about:') ? `"${Platform.StringUtilities.trimMiddle(frame.name, trimAt)}"` :
-                                                      frame.url.trimEnd(trimAt);
+                                                      frame.url.slice(0, trimAt);
   }
 }
 
@@ -2669,4 +2668,66 @@ export function timeStampForEventAdjustedForClosestNavigationIfPossible(
       traceParsedData.Meta.navigationsByFrameId,
   );
   return TraceEngine.Helpers.Timing.microSecondsToMilliseconds(time);
+}
+
+/**
+ * Determines if an event is potentially a marker event. A marker event here
+ * is a single moment in time that we want to highlight on the timeline, such as
+ * the LCP time. This method does not filter out events: for example, it treats
+ * every LCP Candidate event as a potential marker event.
+ **/
+export function isMarkerEvent(
+    traceParseData: TraceEngine.Handlers.Types.TraceParseData,
+    event: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
+  const {KnownEventName} = TraceEngine.Types.TraceEvents;
+
+  if (event.name === KnownEventName.TimeStamp) {
+    return true;
+  }
+
+  if (TraceEngine.Types.TraceEvents.isTraceEventFirstContentfulPaint(event) ||
+      TraceEngine.Types.TraceEvents.isTraceEventFirstPaint(event)) {
+    return event.args.frame === traceParseData.Meta.mainFrameId;
+  }
+
+  if (TraceEngine.Types.TraceEvents.isTraceEventMarkDOMContent(event) ||
+      TraceEngine.Types.TraceEvents.isTraceEventMarkLoad(event) ||
+      TraceEngine.Types.TraceEvents.isTraceEventLargestContentfulPaintCandidate(event)) {
+    // isOutermostMainFrame was added in 2022, so we fallback to isMainFrame
+    // for older traces.
+    if (!event.args.data) {
+      return false;
+    }
+    const {isOutermostMainFrame, isMainFrame} = event.args.data;
+    if (typeof isOutermostMainFrame !== 'undefined') {
+      // If isOutermostMainFrame is defined we want to use that and not
+      // fallback to isMainFrame, even if isOutermostMainFrame is false. Hence
+      // this check.
+      return isOutermostMainFrame;
+    }
+    return Boolean(isMainFrame);
+  }
+
+  return false;
+}
+
+// This function only exists to abstract dealing with two different event types
+// whilst we are in the middle of the migration. We are working on removing the
+// CompatibleTraceEvent type, at which point this method can be removed and we
+// can use the method in TargetForEvent.ts directly.
+function maybeTargetForEvent(
+    traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null,
+    event: TraceEngine.Legacy.CompatibleTraceEvent,
+    ): SDK.Target.Target|null {
+  // Both these conditionals should not happen in theory; all events in the UI
+  // now are powered by the new engine. But until we fully remove the old model
+  // and its types, we need to satisfy TypeScript.
+  if (!TraceEngine.Legacy.eventIsFromNewEngine(event)) {
+    return null;
+  }
+  if (!traceParsedData) {
+    return null;
+  }
+
+  return targetForEvent(traceParsedData, event);
 }

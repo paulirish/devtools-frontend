@@ -9,8 +9,6 @@ import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Timeline from '../timeline.js';
 
-const {assert} = chai;
-
 function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData, traceParsedData: TraceModel.Handlers.Types.TraceParseData,
     entryData: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartEntry[],
@@ -73,7 +71,7 @@ describeWithEnvironment('LayoutShiftsTrackAppender', function() {
     const events = traceParsedData.LayoutShifts.clusters.flatMap(c => c.events);
     for (const event of events) {
       const markerIndex = entryData.indexOf(event);
-      assert.isDefined(markerIndex);
+      assert.exists(markerIndex);
       assert.strictEqual(
           flameChartData.entryStartTimes[markerIndex], TraceModel.Helpers.Timing.microSecondsToMilliseconds(event.ts));
     }
@@ -84,7 +82,7 @@ describeWithEnvironment('LayoutShiftsTrackAppender', function() {
     const events = traceParsedData.LayoutShifts.clusters.flatMap(c => c.events);
     for (const event of events) {
       const markerIndex = entryData.indexOf(event);
-      assert.isDefined(markerIndex);
+      assert.exists(markerIndex);
       assert.strictEqual(flameChartData.entryTotalTimes[markerIndex], 5);
     }
   });

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
@@ -11,8 +10,6 @@ import {
 } from '../../testing/MockConnection.js';
 
 import type * as WebauthnModule from './webauthn.js';
-
-const {assert} = chai;
 
 describeWithMockConnection('WebAuthn pane', () => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -66,7 +63,7 @@ describeWithMockConnection('WebAuthn pane', () => {
       target = targetFactory();
       SDK.TargetManager.TargetManager.instance().setScopeTarget(inScope ? target : null);
       model = target.model(SDK.WebAuthnModel.WebAuthnModel) as SDK.WebAuthnModel.WebAuthnModel;
-      assertNotNullOrUndefined(model);
+      assert.exists(model);
       panel = new Webauthn.WebauthnPane.WebauthnPaneImpl();
     });
 

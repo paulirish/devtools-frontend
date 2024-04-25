@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import type * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection, dispatchEvent} from '../../testing/MockConnection.js';
 
 import type * as LighthouseModule from './lighthouse.js';
-
-const {assert} = chai;
 
 describeWithMockConnection('LighthouseProtocolService', () => {
   const attachDetach = (targetFactory: () => {rootTarget: SDK.Target.Target, primaryTarget: SDK.Target.Target}) => {
@@ -41,7 +38,7 @@ describeWithMockConnection('LighthouseProtocolService', () => {
       resumeAllTargets = sinon.stub(targetManager, 'resumeAllTargets').resolves();
       SDK.ChildTargetManager.ChildTargetManager.install();
       const childTargetManager = primaryTarget.model(SDK.ChildTargetManager.ChildTargetManager);
-      assertNotNullOrUndefined(childTargetManager);
+      assert.exists(childTargetManager);
 
       sinon.stub(childTargetManager, 'getParentTargetId').resolves(primaryTarget.targetInfo()?.targetId);
       if (rootTarget === primaryTarget) {
@@ -51,7 +48,7 @@ describeWithMockConnection('LighthouseProtocolService', () => {
         });
       } else {
         const rootChildTargetManager = rootTarget.model(SDK.ChildTargetManager.ChildTargetManager);
-        assertNotNullOrUndefined(rootChildTargetManager);
+        assert.exists(rootChildTargetManager);
         sinon.stub(rootChildTargetManager, 'getParentTargetId').resolves(rootTarget.targetInfo()?.targetId);
         createParallelConnection = sinon.stub(rootChildTargetManager, 'createParallelConnection').resolves({
           connection: {disconnect: () => {}} as ProtocolClient.InspectorBackend.Connection,

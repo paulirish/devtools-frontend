@@ -5,30 +5,6 @@
 export const generatedProperties = [
  {
   "longhands": [
-   "animation-delay-start",
-   "animation-delay-end"
-  ],
-  "name": "-alternative-animation-delay"
- },
- {
-  "longhands": [
-   "animation-duration",
-   "animation-timing-function",
-   "animation-delay-start",
-   "animation-delay-end",
-   "animation-iteration-count",
-   "animation-direction",
-   "animation-fill-mode",
-   "animation-play-state",
-   "animation-name",
-   "animation-timeline",
-   "animation-range-start",
-   "animation-range-end"
-  ],
-  "name": "-alternative-animation-with-delay-start-end"
- },
- {
-  "longhands": [
    "animation-duration",
    "animation-timing-function",
    "animation-delay",
@@ -42,14 +18,6 @@ export const generatedProperties = [
    "animation-range-end"
   ],
   "name": "-alternative-animation-with-timeline"
- },
- {
-  "longhands": [
-   "view-timeline-name",
-   "view-timeline-axis",
-   "view-timeline-inset"
-  ],
-  "name": "-alternative-view-timeline-with-inset"
  },
  {
   "inherited": true,
@@ -207,10 +175,6 @@ export const generatedProperties = [
  },
  {
   "inherited": true,
-  "keywords": [
-   "before",
-   "after"
-  ],
   "name": "-webkit-ruby-position"
  },
  {
@@ -358,12 +322,6 @@ export const generatedProperties = [
  },
  {
   "name": "animation-delay"
- },
- {
-  "name": "animation-delay-end"
- },
- {
-  "name": "animation-delay-start"
  },
  {
   "keywords": [
@@ -1579,6 +1537,7 @@ export const generatedProperties = [
    "font-variant-east-asian",
    "font-variant-alternates",
    "font-variant-position",
+   "font-variant-emoji",
    "font-weight",
    "font-stretch",
    "font-size",
@@ -1726,7 +1685,8 @@ export const generatedProperties = [
    "font-variant-alternates",
    "font-variant-numeric",
    "font-variant-east-asian",
-   "font-variant-position"
+   "font-variant-position",
+   "font-variant-emoji"
   ],
   "name": "font-variant"
  },
@@ -1765,6 +1725,16 @@ export const generatedProperties = [
    "ruby"
   ],
   "name": "font-variant-east-asian"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "normal",
+   "text",
+   "emoji",
+   "unicode"
+  ],
+  "name": "font-variant-emoji"
  },
  {
   "inherited": true,
@@ -2195,8 +2165,7 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-bottom"
  },
@@ -2221,22 +2190,19 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-left"
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-right"
  },
  {
   "keywords": [
-   "auto",
-   "-internal-user-margin"
+   "auto"
   ],
   "name": "margin-top"
  },
@@ -2775,12 +2741,6 @@ export const generatedProperties = [
   "name": "position-anchor"
  },
  {
-  "keywords": [
-   "normal"
-  ],
-  "name": "position-fallback-bounds"
- },
- {
   "longhands": [
    "position-try-order",
    "position-try-options"
@@ -2809,7 +2769,6 @@ export const generatedProperties = [
  {
   "keywords": [
    "always",
-   "anchors-valid",
    "anchors-visible",
    "no-overflow"
   ],
@@ -2871,6 +2830,10 @@ export const generatedProperties = [
  },
  {
   "inherited": true,
+  "keywords": [
+   "over",
+   "under"
+  ],
   "name": "ruby-position"
  },
  {
@@ -3666,7 +3629,8 @@ export const generatedProperties = [
  {
   "longhands": [
    "view-timeline-name",
-   "view-timeline-axis"
+   "view-timeline-axis",
+   "view-timeline-inset"
   ],
   "name": "view-timeline"
  },
@@ -3836,12 +3800,6 @@ export const generatedPropertyValues = {
   "values": [
    "logical",
    "visual"
-  ]
- },
- "-webkit-ruby-position": {
-  "values": [
-   "before",
-   "after"
   ]
  },
  "-webkit-text-security": {
@@ -4713,6 +4671,14 @@ export const generatedPropertyValues = {
    "ruby"
   ]
  },
+ "font-variant-emoji": {
+  "values": [
+   "normal",
+   "text",
+   "emoji",
+   "unicode"
+  ]
+ },
  "font-variant-ligatures": {
   "values": [
    "normal",
@@ -5234,11 +5200,6 @@ export const generatedPropertyValues = {
    "implicit"
   ]
  },
- "position-fallback-bounds": {
-  "values": [
-   "normal"
-  ]
- },
  "position-try-options": {
   "values": [
    "none",
@@ -5259,7 +5220,6 @@ export const generatedPropertyValues = {
  "position-visibility": {
   "values": [
    "always",
-   "anchors-valid",
    "anchors-visible",
    "no-overflow"
   ]
@@ -5298,6 +5258,12 @@ export const generatedPropertyValues = {
  "row-gap": {
   "values": [
    "normal"
+  ]
+ },
+ "ruby-position": {
+  "values": [
+   "over",
+   "under"
   ]
  },
  "rx": {
@@ -5878,14 +5844,6 @@ export const generatedAliasesFor = new Map([
  [
   "-webkit-align-self",
   "align-self"
- ],
- [
-  "-webkit-alternative-animation-delay",
-  "-alternative-animation-delay"
- ],
- [
-  "-webkit-alternative-animation-with-delay-start-end",
-  "-alternative-animation-with-delay-start-end"
  ],
  [
   "-webkit-alternative-animation-with-timeline",
