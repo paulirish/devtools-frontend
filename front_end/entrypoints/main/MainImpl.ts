@@ -289,11 +289,9 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timeline-as-console-profile-result-panel',
         'View console.profile() results in the Performance panel for Node.js', true);
-
-    // JS Profiler
     Root.Runtime.experiments.register(
-        'js-profiler-temporarily-enable', 'Enable JavaScript Profiler temporarily', /* unstable= */ false,
-        'https://goo.gle/js-profiler-deprecation', 'https://crbug.com/1354548');
+        'timeline-track-configuration',
+        'Timeline: Enable track configuration feature that can reorder or hide a track in the flame chart', true);
 
     // Sources
     Root.Runtime.experiments.register(
@@ -384,7 +382,20 @@ export class MainImpl {
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-        'Enable Autofill view',
+        'Autofill panel',
+        false,
+        'https://goo.gle/devtools-autofill-panel',
+        'https://crbug.com/329106326',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
+        'Timeline: Show postMessage dispatch and handling flows',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
+        'Enable save and load trace with annotations in Performance Panel',
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([

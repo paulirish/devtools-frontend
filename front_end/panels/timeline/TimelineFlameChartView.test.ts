@@ -40,7 +40,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
         new UI.SearchableView.SearchConfig(/* query */ searchQuery, /* caseSensitive */ false, /* isRegex */ false);
     flameChartView.performSearch(searchConfig, true);
 
-    assert.strictEqual(flameChartView.getSearchResults()?.length, 15);
+    assert.strictEqual(flameChartView.getSearchResults()?.length, 17);
     assertSelectionName('PrePaint');
 
     flameChartView.jumpToNextSearchResult();
@@ -96,6 +96,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
     const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
     flameChartView.setModel(performanceModel, traceParsedData);
+    TraceEngine.EntriesFilter.EntriesFilter.maybeInstance({entryToNodeMap: traceParsedData.Renderer.entryToNode});
 
     // Find the main track to later collapse entries of
     const mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -140,6 +141,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
        const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
        flameChartView.setModel(performanceModel, traceParsedData);
+       TraceEngine.EntriesFilter.EntriesFilter.maybeInstance({entryToNodeMap: traceParsedData.Renderer.entryToNode});
 
        // Find the main track to later collapse entries of
        const mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -187,6 +189,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
        const flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
        flameChartView.setModel(performanceModel, traceParsedData);
+       TraceEngine.EntriesFilter.EntriesFilter.maybeInstance({entryToNodeMap: traceParsedData.Renderer.entryToNode});
 
        // Find the main track to later collapse entries of
        let mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {
@@ -248,6 +251,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
       flameChartView = new Timeline.TimelineFlameChartView.TimelineFlameChartView(mockViewDelegate);
       flameChartView.setModel(performanceModel, traceParsedData);
+      TraceEngine.EntriesFilter.EntriesFilter.maybeInstance({entryToNodeMap: traceParsedData.Renderer.entryToNode});
 
       // Find the Main track to later collapse entries of
       const mainTrack = flameChartView.getMainFlameChart().timelineData()?.groups.find(group => {

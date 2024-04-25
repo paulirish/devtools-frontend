@@ -31,6 +31,7 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
+import * as Root from '../../../../core/root/root.js';
 import type * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as UI from '../../legacy.js';
@@ -207,6 +208,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private forceDecorationCache?: Int8Array|null;
   private entryColorsCache?: string[]|null;
   private totalTime?: number;
+  private lastIndexOfUpdatedPopover: number;
   #font: string;
   #groupTreeRoot?: GroupTreeNode|null;
   #searchResultEntryIndex: number;
@@ -282,6 +284,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     this.lastMouseOffsetX = 0;
     this.selectedGroupIndex = -1;
+    this.lastIndexOfUpdatedPopover = -1;
 
     // Keyboard focused group is used to navigate groups irrespective of whether they are selectable or not
     this.keyboardFocusedGroup = -1;
@@ -544,6 +547,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private updatePopover(entryIndex: number): void {
+    // Just update position if cursor is hovering the same entry.
+    if (entryIndex === this.lastIndexOfUpdatedPopover) {
+      return this.updatePopoverOffset();
+    }
     this.entryInfo.removeChildren();
     const data = this.timelineData();
     if (!data) {
@@ -553,12 +560,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // If the mouse is hovering over the hidden descendants arrow, get an element that shows how many children are hidden, otherwise an element with the event name and length
     const popoverElement = (this.isMouseOverRevealChildrenArrow(this.lastMouseOffsetX, entryIndex) && group) ?
         this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo &&
-            this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo(group, entryIndex) :
+            this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo(entryIndex) :
         this.dataProvider.prepareHighlightedEntryInfo(entryIndex);
     if (popoverElement) {
       this.entryInfo.appendChild(popoverElement);
       this.updatePopoverOffset();
     }
+    this.lastIndexOfUpdatedPopover = entryIndex;
   }
 
   private updatePopoverOffset(): void {
@@ -605,32 +613,37 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    // If any button is clicked, we should handle the action only and ignore others.
-    const {groupIndex, editButtonType} = this.coordinatesToGroupIndexAndButton(mouseEvent.offsetX, mouseEvent.offsetY);
-    if (groupIndex >= 0) {
-      switch (editButtonType) {
-        case EditButtonType.UP:
-          this.moveGroupUp(groupIndex);
-          return;
-        case EditButtonType.DOWN:
-          this.moveGroupDown(groupIndex);
-          return;
-        case EditButtonType.HIDE:
-          this.hideGroup(groupIndex);
-          return;
-        case EditButtonType.SAVE:
-        case EditButtonType.EDIT:
-          this.#editMode = !this.#editMode;
-          this.resetCanvas();
-          this.draw();
-          return;
+    const trackConfigurationEnabled =
+        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_TRACK_CONFIGURATION);
+    if (trackConfigurationEnabled) {
+      // If any button is clicked, we should handle the action only and ignore others.
+      const {groupIndex, editButtonType} =
+          this.coordinatesToGroupIndexAndButton(mouseEvent.offsetX, mouseEvent.offsetY);
+      if (groupIndex >= 0) {
+        switch (editButtonType) {
+          case EditButtonType.UP:
+            this.moveGroupUp(groupIndex);
+            return;
+          case EditButtonType.DOWN:
+            this.moveGroupDown(groupIndex);
+            return;
+          case EditButtonType.HIDE:
+            this.hideGroup(groupIndex);
+            return;
+          case EditButtonType.SAVE:
+          case EditButtonType.EDIT:
+            this.#editMode = !this.#editMode;
+            this.resetCanvas();
+            this.draw();
+            return;
+        }
       }
-    }
 
-    // Ignore any other actions when user is customizing the tracks.
-    // For example, we won't toggle the expand status in the editing mode.
-    if (this.#editMode) {
-      return;
+      // Ignore any other actions when user is customizing the tracks.
+      // For example, we won't toggle the expand status in the editing mode.
+      if (this.#editMode) {
+        return;
+      }
     }
 
     const {groupIndex: groupIndexForSelection} =
@@ -899,11 +912,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (!data) {
       return;
     }
-    const group = data.groups.at(this.selectedGroupIndex);
-    if (!group || !group.expanded || !group.showStackContextMenu) {
-      return;
-    }
-    this.dataProvider.modifyTree?.(group, index, treeAction);
+    this.dataProvider.modifyTree?.(index, treeAction);
     this.dataProvider.timelineData(true);
     this.update();
   }
@@ -925,7 +934,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     // Check which actions are possible on an entry.
     // If an action would not change the entries (for example it has no children to collapse), we do not need to show it.
-    return this.dataProvider.findPossibleContextMenuActions?.(group, this.selectedEntryIndex);
+    return this.dataProvider.findPossibleContextMenuActions?.(this.selectedEntryIndex);
   }
 
   onContextMenu(_event: Event): void {
@@ -2077,10 +2086,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     });
 
     context.save();
+    const trackConfigurationEnabled =
+        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_TRACK_CONFIGURATION);
     this.forEachGroupInViewport((offset, index, group) => {
       context.font = this.#font;
       if (this.isGroupCollapsible(index) && !group.expanded || group.style.shareHeaderLine) {
-        const width = this.labelWidthForGroup(context, group) + (hoveredGroupIndex === index ? EDIT_BUTTON_SIZE : 0);
+        const width = this.labelWidthForGroup(context, group) +
+            ((trackConfigurationEnabled && hoveredGroupIndex === index) ? EDIT_BUTTON_SIZE : 0);
         if (this.isGroupFocused(index)) {
           context.fillStyle =
               ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
@@ -2099,17 +2111,19 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const titleStart = Math.floor(this.expansionArrowIndent * (group.style.nestingLevel + 1) + this.arrowSide);
       context.fillText(group.name, titleStart, offset + group.style.height - this.textBaseline);
 
-      if (this.#editMode) {
-        // We only allow to reorder the top level groups.
-        if (group.style.nestingLevel === 0) {
-          drawIcon(-EDITION_MODE_INDENT, offset, moveUpIconPath);
-          drawIcon(-EDITION_MODE_INDENT + EDIT_BUTTON_SIZE, offset, moveDownIconPath);
-        }
-        drawIcon(-EDITION_MODE_INDENT + EDIT_BUTTON_SIZE * 2, offset, hideIconPath);
+      if (trackConfigurationEnabled) {
+        if (this.#editMode) {
+          // We only allow to reorder the top level groups.
+          if (group.style.nestingLevel === 0) {
+            drawIcon(-EDITION_MODE_INDENT, offset, moveUpIconPath);
+            drawIcon(-EDITION_MODE_INDENT + EDIT_BUTTON_SIZE, offset, moveDownIconPath);
+          }
+          drawIcon(-EDITION_MODE_INDENT + EDIT_BUTTON_SIZE * 2, offset, hideIconPath);
 
-        drawIcon(this.labelWidthForGroup(context, group), offset, saveIconPath);
-      } else if (hoveredGroupIndex === index) {
-        drawIcon(this.labelWidthForGroup(context, group), offset, editIconPath);
+          drawIcon(this.labelWidthForGroup(context, group), offset, saveIconPath);
+        } else if (hoveredGroupIndex === index) {
+          drawIcon(this.labelWidthForGroup(context, group), offset, editIconPath);
+        }
       }
     });
     context.restore();
@@ -3399,7 +3413,7 @@ export interface FlameChartDataProvider {
 
   prepareHighlightedEntryInfo(entryIndex: number): Element|null;
 
-  prepareHighlightedHiddenEntriesArrowInfo?(group: Group, entryIndex: number): Element|null;
+  prepareHighlightedHiddenEntriesArrowInfo?(entryIndex: number): Element|null;
 
   canJumpToEntry(entryIndex: number): boolean;
 
@@ -3419,9 +3433,9 @@ export interface FlameChartDataProvider {
 
   mainFrameNavigationStartEvents?(): readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[];
 
-  modifyTree?(group: Group, node: number, action: TraceEngine.EntriesFilter.FilterAction): void;
+  modifyTree?(node: number, action: TraceEngine.EntriesFilter.FilterAction): void;
 
-  findPossibleContextMenuActions?(group: Group, node: number): TraceEngine.EntriesFilter.PossibleFilterActions|void;
+  findPossibleContextMenuActions?(node: number): TraceEngine.EntriesFilter.PossibleFilterActions|void;
 }
 
 export interface FlameChartMarker {

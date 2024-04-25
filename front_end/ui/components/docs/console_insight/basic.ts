@@ -13,6 +13,9 @@ const ConsoleInsight = Explain.ConsoleInsight;
 
 const component = new ConsoleInsight(
     {
+      getSearchQuery() {
+        return '';
+      },
       async buildPrompt() {
         return {
           prompt: '',
@@ -91,7 +94,7 @@ document.querySelector('test').style = 'black';
             };
           },
     },
-    'Understand this error', {
+    {
       isSyncActive: true,
       accountEmail: 'some-email',
     });

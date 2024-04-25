@@ -2207,7 +2207,6 @@ export class StylesSidebarPropertyRenderer {
   readonly propertyValue: string;
   private fontHandler: ((arg0: string) => Node)|null;
   private shadowHandler: ((arg0: string, arg1: string) => Node)|null;
-  private gridHandler: ((arg0: string, arg1: string) => Node)|null;
   private lengthHandler: ((arg0: string) => Node)|null;
   private animationHandler: ((data: string) => Node)|null;
   matchers: Matcher[];
@@ -2221,7 +2220,6 @@ export class StylesSidebarPropertyRenderer {
     this.propertyValue = value;
     this.fontHandler = null;
     this.shadowHandler = null;
-    this.gridHandler = null;
     this.lengthHandler = null;
     this.animationHandler = null;
     this.matchers = matchers;
@@ -2233,10 +2231,6 @@ export class StylesSidebarPropertyRenderer {
 
   setShadowHandler(handler: (arg0: string, arg1: string) => Node): void {
     this.shadowHandler = handler;
-  }
-
-  setGridHandler(handler: (arg0: string, arg1: string) => Node): void {
-    this.gridHandler = handler;
   }
 
   setAnimationHandler(handler: (arg0: string) => Node): void {
@@ -2275,12 +2269,6 @@ export class StylesSidebarPropertyRenderer {
       return valueElement;
     }
 
-    if (this.gridHandler && metadata.isGridAreaDefiningProperty(this.propertyName)) {
-      valueElement.appendChild(this.gridHandler(this.propertyValue, this.propertyName));
-      valueElement.normalize();
-      return valueElement;
-    }
-
     if (this.animationHandler && (this.propertyName === 'animation' || this.propertyName === '-webkit-animation')) {
       valueElement.appendChild(this.animationHandler(this.propertyValue));
       valueElement.normalize();
@@ -2300,12 +2288,6 @@ export class StylesSidebarPropertyRenderer {
       return new RegExp(`^${source}$`, flags);
     };
 
-    if (this.fontHandler && metadata.isFontAwareProperty(this.propertyName)) {
-      matchers.push(new LegacyRegexMatcher(
-          this.propertyName === 'font-family' ? InlineEditor.FontEditorUtils.FontFamilyRegex :
-                                                InlineEditor.FontEditorUtils.FontPropertiesRegex,
-          this.fontHandler));
-    }
     if (!Root.Runtime.experiments.isEnabled('css-type-component-length-deprecate') && this.lengthHandler) {
       // TODO(changhaohan): crbug.com/1138628 refactor this to handle unitless 0 cases
       matchers.push(
