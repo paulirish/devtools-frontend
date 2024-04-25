@@ -33,11 +33,8 @@ You'll probably use something like…
 See also http://go/btlax
 
 ```sh
-# Build devtools and prep a package
-scripts/trace/build-trace-engine-lib.sh
-# Test and copy built files to $HOME/code/trace_engine
-scripts/trace/copy-build-trace-engine-for-publish.sh
-
+# Build devtools and prep a package, then invoke the copy script to prepare $HOME/code/trace_engine
+scripts/trace/prep-trace-engine-package.sh
 
 # switch to standalone
 cd $HOME/code/trace_engine

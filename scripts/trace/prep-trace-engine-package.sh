@@ -32,3 +32,6 @@ echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
+
+
+$DIRNAME/copy-build-trace-engine-for-publish.sh
