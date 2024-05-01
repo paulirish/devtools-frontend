@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 import type * as Protocol from '../generated/protocol.js';
 import * as CPUProfile from '../models/cpu_profile/cpu_profile.js';
-import type * as TimelineModel from '../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../models/trace/trace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
 import * as PerfUI from '../ui/legacy/components/perf_ui/perf_ui.js';
@@ -56,64 +55,6 @@ export async function getMainFlameChartWithTracks(
   tracksAppender.setVisibleTracks(trackAppenderNames);
   dataProvider.buildFromTrackAppenders(
       {filterThreadsByName: trackName, expandedTracks: expanded ? trackAppenderNames : undefined});
-  const delegate = new MockFlameChartDelegate();
-  const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
-  const minTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
-  const maxTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.max);
-  flameChart.setWindowTimes(minTime, maxTime);
-  flameChart.markAsRoot();
-  flameChart.update();
-  return {flameChart, dataProvider};
-}
-
-/**
- * Draws a track in the flame chart using the legacy system. For this to work,
- * a codepath to append the track must be available in the implementation of
- * TimelineFlameChartDataProvider.appendLegacyTrackData.
- *
- * @param traceFileName The name of the trace file to be loaded to the flame
- * chart.
- * @param trackType the legacy "type" of the track to be rendered. For
- * example: "GPU"
- * @param expanded if the track is expanded
- * @param trackNameFilter used to further filter down the tracks rendered by seeing if their name contains this string.
- * @returns a flame chart element and its corresponding data provider.
- */
-export async function getMainFlameChartWithLegacyTrackTypes(
-    traceFileName: string, trackType: TimelineModel.TimelineModel.TrackType, expanded: boolean,
-    trackNameFilter?: string): Promise<{
-  flameChart: PerfUI.FlameChart.FlameChart,
-  dataProvider: Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider,
-}> {
-  await initializeGlobalVars();
-
-  // This function is used to load a component example.
-  const {traceParsedData, performanceModel, timelineModel} =
-      await TraceLoader.allModels(/* context= */ null, traceFileName);
-
-  const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-  // The data provider still needs a reference to the legacy model to
-  // work properly.
-  dataProvider.setModel(performanceModel, traceParsedData);
-  // We use filter() here because some tracks (e.g. Rasterizer) actually can
-  // have N tracks for a given trace, depending on how many
-  // CompositorTileWorker threads there were. So in this case, we want to
-  // render all of them, not just the first one we find.
-  const tracks = timelineModel.tracks().filter(track => {
-    const isRightType = track.type === trackType;
-    if (!trackNameFilter) {
-      return isRightType;
-    }
-
-    return isRightType && track.name.includes(trackNameFilter);
-  });
-
-  if (tracks.length === 0) {
-    throw new Error(`Legacy track with of type ${trackType} not found in timeline model.`);
-  }
-  for (const track of tracks) {
-    dataProvider.appendLegacyTrackData(track, expanded);
-  }
   const delegate = new MockFlameChartDelegate();
   const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
   const minTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
@@ -198,7 +139,6 @@ export function getTree(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Rend
   const tree = thread.tree;
   if (!tree) {
     assert(false, `Couldn't get tree in thread ${thread.name}`);
-    return null as never;
   }
   return tree;
 }
@@ -213,7 +153,6 @@ export function getRootAt(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Re
   const node = [...tree.roots][index];
   if (node === undefined) {
     assert(false, `Couldn't get the id of the root at index ${index} in thread ${thread.name}`);
-    return null as never;
   }
   return node;
 }
@@ -261,7 +200,6 @@ export function getNodeFor(
   const node = findNode(tree.roots, nodeId);
   if (!node) {
     assert(false, `Couldn't get the node with id ${nodeId} in thread ${thread.name}`);
-    return null as never;
   }
   return node;
 }
@@ -582,6 +520,10 @@ export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataP
     return 0;
   }
 
+  hasTrackConfigurationMode(): boolean {
+    return false;
+  }
+
   totalTime(): number {
     return 100;
   }
@@ -720,4 +662,19 @@ export function getBaseTraceParseModelData(overrides: Partial<TraceParseData> = 
     LargestTextPaint: new Map(),
     ...overrides,
   } as Partial<TraceParseData>as TraceParseData;
+}
+
+/**
+ * A helper that will query the given array of events and find the first event
+ * matching the predicate. It will also assert that a match is found, which
+ * saves the need to do that for every test.
+ */
+export function getEventOfType<T extends TraceEngine.Types.TraceEvents.TraceEventData>(
+    events: TraceEngine.Types.TraceEvents.TraceEventData[],
+    predicate: (e: TraceEngine.Types.TraceEvents.TraceEventData) => e is T): T {
+  const match = events.find(predicate);
+  if (!match) {
+    throw new Error('Failed to find matching event of type.');
+  }
+  return match;
 }

@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-import * as SDK from './sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
-import {assertNotNullOrUndefined} from '../platform/platform.js';
 import type * as Platform from '../platform/platform.js';
+
+import * as SDK from './sdk.js';
 
 describeWithMockConnection('CSSModel', () => {
   it('gets the FontFace of a source URL', () => {
@@ -84,8 +83,8 @@ describeWithMockConnection('CSSModel', () => {
     });
 
     it('resets on navigation', () => {
-      assertNotNullOrUndefined(cssModel);
-      assertNotNullOrUndefined(resourceTreeModel);
+      assert.exists(cssModel);
+      assert.exists(resourceTreeModel);
 
       cssModel.styleSheetAdded(header);
       let styleSheetIds =
@@ -101,8 +100,8 @@ describeWithMockConnection('CSSModel', () => {
     });
 
     it('does not reset on prerender activation', () => {
-      assertNotNullOrUndefined(cssModel);
-      assertNotNullOrUndefined(resourceTreeModel);
+      assert.exists(cssModel);
+      assert.exists(resourceTreeModel);
 
       cssModel.styleSheetAdded(header);
       let styleSheetIds =

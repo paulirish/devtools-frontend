@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
@@ -14,8 +13,6 @@ import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import * as Application from './application.js';
-
-const {assert} = chai;
 
 describeWithMockConnection('StorageBucketsTreeElement', function() {
   const tests = (targetFactory: () => SDK.Target.Target) => {
@@ -84,7 +81,7 @@ describeWithMockConnection('StorageBucketsTreeElement', function() {
     };
 
     const setStorageBucketTrackingStub = ({storageKey}: {storageKey: string}) => {
-      assertNotNullOrUndefined(storageBucketsModel);
+      assert.exists(storageBucketsModel);
       for (const bucketInfo of getBucketsForStorageKeys(storageKey)) {
         storageBucketsModel.storageBucketCreatedOrUpdated({bucketInfo});
       }
@@ -105,7 +102,7 @@ describeWithMockConnection('StorageBucketsTreeElement', function() {
     });
 
     it('adds bucket tree elements on non default buckets added', async () => {
-      assertNotNullOrUndefined(storageBucketsModel);
+      assert.exists(storageBucketsModel);
 
       sinon.stub(storageBucketsModel.storageAgent, 'invoke_setStorageBucketTracking')
           .callsFake(setStorageBucketTrackingStub);
@@ -126,7 +123,7 @@ describeWithMockConnection('StorageBucketsTreeElement', function() {
     });
 
     it('shows view on select', async () => {
-      assertNotNullOrUndefined(storageBucketsModel);
+      assert.exists(storageBucketsModel);
 
       const panel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
       panel.markAsRoot();

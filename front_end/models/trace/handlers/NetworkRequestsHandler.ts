@@ -401,6 +401,8 @@ export async function finalize(): Promise<void> {
           stackTrace: finalSendRequest.args.data.stackTrace,
           timing,
           url,
+          failed: request.resourceFinish?.args.data.didFail ?? false,
+          finished: Boolean(request.resourceFinish),
         },
       },
       cat: 'loading',
@@ -445,8 +447,8 @@ export function data(): NetworkRequestData {
   }
 
   return {
-    byOrigin: new Map(requestsByOrigin),
-    byTime: [...requestsByTime],
+    byOrigin: requestsByOrigin,
+    byTime: requestsByTime,
   };
 }
 

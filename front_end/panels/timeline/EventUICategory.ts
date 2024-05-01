@@ -411,10 +411,6 @@ const UIStrings = {
    */
   imageDecode: 'Image Decode',
   /**
-   *@description Event category in the Performance panel for time spent to resize an image
-   */
-  imageResize: 'Image Resize',
-  /**
    *@description Event category in the Performance panel for time spent to perform Garbage Collection for the Document Object Model
    */
   domGc: 'DOM GC',
@@ -914,9 +910,6 @@ export function maybeInitSylesMap(): EventStylesMap {
     [TraceEngine.Types.TraceEvents.KnownEventName.MinorGC]:
         new TimelineRecordStyle(i18nString(UIStrings.minorGc), defaultCategoryStyles.scripting),
 
-    [TraceEngine.Types.TraceEvents.KnownEventName.IncrementalGCMarking]:
-        new TimelineRecordStyle(i18nString(UIStrings.gcEvent), defaultCategoryStyles.scripting),
-
     [TraceEngine.Types.TraceEvents.KnownEventName.CPPGCSweep]:
         new TimelineRecordStyle(i18nString(UIStrings.cppGc), defaultCategoryStyles.scripting),
 
@@ -967,9 +960,6 @@ export function maybeInitSylesMap(): EventStylesMap {
 
     [TraceEngine.Types.TraceEvents.KnownEventName.DecodeImage]:
         new TimelineRecordStyle(i18nString(UIStrings.imageDecode), defaultCategoryStyles.painting),
-
-    [TraceEngine.Types.TraceEvents.KnownEventName.ResizeImage]:
-        new TimelineRecordStyle(i18nString(UIStrings.imageResize), defaultCategoryStyles.painting),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.GPUTask]:
         new TimelineRecordStyle(i18nString(UIStrings.gpu), defaultCategoryStyles.gpu),

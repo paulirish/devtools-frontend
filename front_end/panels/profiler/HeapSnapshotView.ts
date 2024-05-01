@@ -101,10 +101,9 @@ const UIStrings = {
    */
   filter: 'Filter',
   /**
-   * @description Filter label text in the Memory tool to filter by JavaScript class names for a heap
-   * snapshot.
+   *@description Placeholder text in the filter bar to filter by JavaScript class names for a heap
    */
-  classFilter: 'Class filter',
+  filterByClass: 'Filter by class',
   /**
    *@description Text in Heap Snapshot View of a profiler tool
    */
@@ -257,6 +256,11 @@ const UIStrings = {
    */
   stackWasNotRecordedForThisObject:
       'Stack was not recorded for this object because it had been allocated before this profile recording started.',
+  /**
+   *@description Text in Heap Snapshot View of a profiler tool.
+   * This text is on a button to undo all previous "Ignore this retainer" actions.
+   */
+  restoreIgnoredRetainers: 'Restore ignored retainers',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/HeapSnapshotView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -296,6 +300,7 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
   readonly filterSelect: UI.Toolbar.ToolbarComboBox;
   readonly classNameFilter: UI.Toolbar.ToolbarInput;
   readonly selectedSizeText: UI.Toolbar.ToolbarText;
+  readonly resetRetainersButton: UI.Toolbar.ToolbarButton;
   readonly popoverHelper: UI.PopoverHelper.PopoverHelper;
   currentPerspectiveIndex: number;
   currentPerspective: SummaryPerspective|ComparisonPerspective|ContainmentPerspective|AllocationPerspective|
@@ -432,12 +437,23 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     this.filterSelect.setVisible(false);
     this.updateFilterOptions();
 
-    this.classNameFilter = new UI.Toolbar.ToolbarInput(i18nString(UIStrings.classFilter));
+    this.classNameFilter = new UI.Toolbar.ToolbarFilter(i18nString(UIStrings.filterByClass));
     this.classNameFilter.setVisible(false);
     this.constructorsDataGrid.setNameFilter(this.classNameFilter);
     this.diffDataGrid.setNameFilter(this.classNameFilter);
 
     this.selectedSizeText = new UI.Toolbar.ToolbarText();
+
+    const restoreIgnoredRetainers = i18nString(UIStrings.restoreIgnoredRetainers);
+    this.resetRetainersButton =
+        new UI.Toolbar.ToolbarButton(restoreIgnoredRetainers, 'clear-list', restoreIgnoredRetainers);
+    this.resetRetainersButton.setVisible(false);
+    this.resetRetainersButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, async () => {
+      // The reset retainers button acts upon whichever snapshot is currently shown in the Retainers pane.
+      await this.retainmentDataGrid.snapshot?.unignoreAllNodesInRetainersView();
+      await this.retainmentDataGrid.dataSourceChanged();
+    });
+    this.retainmentDataGrid.resetRetainersButton = this.resetRetainersButton;
 
     this.popoverHelper = new UI.PopoverHelper.PopoverHelper(
         this.element, this.getPopoverRequest.bind(this), 'profiler.heap-snapshot-object');
@@ -586,6 +602,7 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
       result.push(this.baseSelect, this.filterSelect);
     }
     result.push(this.selectedSizeText);
+    result.push(this.resetRetainersButton);
     return result;
   }
 

@@ -150,10 +150,8 @@ const buildFiles = async () => {
   const nonJSOrCSSFileName = Array.from(changedFiles).find(f => !f.endsWith('.css') && !f.endsWith('.ts'));
   if (nonJSOrCSSFileName) {
     console.log(`${currentTimeString()} - ${relativeFileName(nonJSOrCSSFileName)} changed, running ninja`);
-    childProcess.spawnSync(
-        'autoninja', ['-C', `out/${target}`, 'front_end/ui/components/docs/performance_panel'],
-        {cwd, env, stdio: 'inherit'});
     changedFiles.clear();
+    childProcess.spawnSync('autoninja', ['-C', `out/${target}`], {cwd, env, stdio: 'inherit'});
     return;
   }
   // …Otherwise we can do fast rebuilds
@@ -186,9 +184,14 @@ const fastRebuildFile = async fileName => {
 
     const jsFileName = `${fileName.substring(0, fileName.length - 3)}.js`;
     const outFile = path.resolve('out', target, 'gen', relativeFileName(jsFileName));
-    const res = childProcess.spawnSync(
-        ESBUILD_PATH, [fileName, `--outfile=${outFile}`, '--sourcemap'], {cwd, env, stdio: 'inherit'});
+    const tsConfigLocation = path.join(cwd, 'tsconfig.json');
+    // Hack to mimic node_ts_library for test files.
+    const cjsForTests = fileName.includes('/test/') ? ['--format=cjs'] : [];
     changedFiles.delete(fileName);
+    const res = childProcess.spawnSync(
+        ESBUILD_PATH,
+        [fileName, `--outfile=${outFile}`, '--sourcemap', `--tsconfig=${tsConfigLocation}`, ...cjsForTests],
+        {cwd, env, stdio: 'inherit'});
 
     if (res && res.status === 1) {
       notifyWebSocketConections(JSON.stringify({

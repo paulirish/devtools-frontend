@@ -166,7 +166,7 @@ export interface ResizeEvent {
 
 export interface ClickEvent {
   veid: number;
-  mouseButton: number;
+  mouseButton?: number;
   context?: number;
   doubleClick: boolean;
 }
@@ -427,7 +427,6 @@ export interface SyncInformation {
  */
 export const enum EnumeratedHistogram {
   ActionTaken = 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded = 'DevTools.BreakpointWithConditionAdded',
   BreakpointEditDialogRevealedFrom = 'DevTools.BreakpointEditDialogRevealedFrom',
   PanelClosed = 'DevTools.PanelClosed',
   PanelShown = 'DevTools.PanelShown',
@@ -439,7 +438,6 @@ export const enum EnumeratedHistogram {
   IssuesPanelOpenedFrom = 'DevTools.IssuesPanelOpenedFrom',
   IssuesPanelResourceOpened = 'DevTools.IssuesPanelResourceOpened',
   KeybindSetSettingChanged = 'DevTools.KeybindSetSettingChanged',
-  ElementsSidebarTabShown = 'DevTools.Elements.SidebarTabShown',
   ExperimentEnabledAtLaunch = 'DevTools.ExperimentEnabledAtLaunch',
   ExperimentDisabledAtLaunch = 'DevTools.ExperimentDisabledAtLaunch',
   ExperimentEnabled = 'DevTools.ExperimentEnabled',
@@ -469,11 +467,7 @@ export const enum EnumeratedHistogram {
   ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed = 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown = 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount = 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated = 'DevTools.SwatchActivated',
-  BadgeActivated = 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged = 'DevTools.AnimationPlaybackRateChanged',
   AnimationPointDragged = 'DevTools.AnimationPointDragged',
   LegacyResourceTypeFilterNumberOfSelectedChanged = 'DevTools.LegacyResourceTypeFilterNumberOfSelectedChanged',

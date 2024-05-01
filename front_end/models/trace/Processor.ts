@@ -36,6 +36,7 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
   readonly #traceHandlers: Handlers.Types.HandlersWithMeta<EnabledModelHandlers>;
   #status = Status.IDLE;
   #modelConfiguration = Types.Configuration.DEFAULT;
+  #data: Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>|null = null;
   #insights: Insights.Types.TraceInsightData<EnabledModelHandlers>|null = null;
 
   static createWithAllHandlers(): TraceProcessor<typeof Handlers.ModelHandlers> {
@@ -118,8 +119,8 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
       handler.reset();
     }
 
+    this.#data = null;
     this.#insights = null;
-
     this.#status = Status.IDLE;
   }
 
@@ -183,12 +184,44 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
       return null;
     }
 
-    const traceParsedData = {};
-    for (const [name, handler] of Object.entries(this.#traceHandlers)) {
-      Object.assign(traceParsedData, {[name]: handler.data()});
+    if (this.#data) {
+      return this.#data;
     }
 
-    return traceParsedData as Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>;
+    // Handlers that depend on other handlers do so via .data(), which used to always
+    // return a shallow clone of its internal data structures. However, that pattern
+    // easily results in egregious amounts of allocation. Now .data() does not do any
+    // cloning, and it happens here instead so that users of the trace processor may
+    // still assume that the parsed data is theirs.
+    // See: crbug/41484172
+    const shallowClone = (value: unknown, recurse = true): unknown => {
+      if (value instanceof Map) {
+        return new Map(value);
+      }
+      if (value instanceof Set) {
+        return new Set(value);
+      }
+      if (Array.isArray(value)) {
+        return [...value];
+      }
+      if (typeof value === 'object' && value && recurse) {
+        const obj: Record<string, unknown> = {};
+        for (const [key, v] of Object.entries(value)) {
+          obj[key] = shallowClone(v, false);
+        }
+        return obj;
+      }
+      return value;
+    };
+
+    const traceParsedData = {};
+    for (const [name, handler] of Object.entries(this.#traceHandlers)) {
+      const data = shallowClone(handler.data());
+      Object.assign(traceParsedData, {[name]: data});
+    }
+
+    this.#data = traceParsedData as Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>;
+    return this.#data;
   }
 
   #getEnabledInsightRunners(traceParsedData: Handlers.Types.EnabledHandlerDataWithMeta<EnabledModelHandlers>):

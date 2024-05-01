@@ -41,11 +41,13 @@ var __setFunctionName = (this && this.__setFunctionName) || function (f, name, p
     if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
 };
+import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import { combineLatest, defer, delayWhen, filter, first, firstValueFrom, map, of, raceWith, switchMap, } from '../../third_party/rxjs/rxjs.js';
 import { Frame, throwIfDetached, } from '../api/Frame.js';
 import { ConsoleMessage, } from '../common/ConsoleMessage.js';
 import { TargetCloseError, UnsupportedOperation } from '../common/Errors.js';
 import { debugError, fromEmitterEvent, timeout } from '../common/util.js';
+import { isErrorLike } from '../util/ErrorLike.js';
 import { BidiCdpSession } from './CDPSession.js';
 import { BidiDeserializer } from './Deserializer.js';
 import { BidiDialog } from './Dialog.js';
@@ -169,7 +171,7 @@ let BidiFrame = (() => {
             this.browsingContext.on('closed', () => {
                 for (const session of BidiCdpSession.sessions.values()) {
                     if (session.frame === this) {
-                        void session.detach().catch(debugError);
+                        session.onClose();
                     }
                 }
                 this.page().trustedEmitter.emit("framedetached" /* PageEvent.FrameDetached */, this);
@@ -177,12 +179,12 @@ let BidiFrame = (() => {
             this.browsingContext.on('request', ({ request }) => {
                 const httpRequest = BidiHTTPRequest.from(request, this);
                 request.once('success', () => {
-                    // SAFETY: BidiHTTPRequest will create this before here.
                     this.page().trustedEmitter.emit("requestfinished" /* PageEvent.RequestFinished */, httpRequest);
                 });
                 request.once('error', () => {
                     this.page().trustedEmitter.emit("requestfailed" /* PageEvent.RequestFailed */, httpRequest);
                 });
+                void httpRequest.finalizeInterceptions();
             });
             this.browsingContext.on('navigation', ({ navigation }) => {
                 navigation.once('fragment', () => {
@@ -314,7 +316,15 @@ let BidiFrame = (() => {
                 // readiness=interactive.
                 //
                 // Related: https://bugzilla.mozilla.org/show_bug.cgi?id=1846601
-                this.browsingContext.navigate(url, "interactive" /* Bidi.BrowsingContext.ReadinessState.Interactive */),
+                this.browsingContext
+                    .navigate(url, "interactive" /* Bidi.BrowsingContext.ReadinessState.Interactive */)
+                    .catch(error => {
+                    if (isErrorLike(error) &&
+                        error.message.includes('net::ERR_HTTP_RESPONSE_CODE_FAILURE')) {
+                        return;
+                    }
+                    throw error;
+                }),
             ]).catch(rewriteNavigationError(url, options.timeout ?? this.timeoutSettings.navigationTimeout()));
             return response;
         }
@@ -339,9 +349,7 @@ let BidiFrame = (() => {
                             return of(undefined);
                         }
                         return combineLatest(frames);
-                    }), raceWith(fromEmitterEvent(navigation, 'fragment'), fromEmitterEvent(navigation, 'failed').pipe(map(({ url }) => {
-                        throw new Error(`Navigation failed: ${url}`);
-                    })), fromEmitterEvent(navigation, 'aborted').pipe(map(({ url }) => {
+                    }), raceWith(fromEmitterEvent(navigation, 'fragment'), fromEmitterEvent(navigation, 'failed'), fromEmitterEvent(navigation, 'aborted').pipe(map(({ url }) => {
                         throw new Error(`Navigation aborted: ${url}`);
                     }))), switchMap(() => {
                         if (navigation.request) {
@@ -372,9 +380,9 @@ let BidiFrame = (() => {
                 if (!request) {
                     return null;
                 }
-                const httpRequest = requests.get(request);
-                const lastRedirect = httpRequest.redirectChain().at(-1);
-                return (lastRedirect !== undefined ? lastRedirect : httpRequest).response();
+                const lastRequest = request.lastRedirect ?? request;
+                const httpRequest = requests.get(lastRequest);
+                return httpRequest.response();
             }), raceWith(timeout(ms), this.#detached$().pipe(map(() => {
                 throw new TargetCloseError('Frame detached.');
             })))));
@@ -412,6 +420,7 @@ let BidiFrame = (() => {
                 targetId: this._id,
                 flatten: true,
             });
+            await this.browsingContext.subscribe([Bidi.ChromiumBidi.BiDiModule.Cdp]);
             return new BidiCdpSession(this, sessionId);
         }
         get #waitForLoad$() { return _private_waitForLoad$_descriptor.value; }
