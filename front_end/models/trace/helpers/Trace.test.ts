@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {getMainThread} from '../../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as TraceModel from '../trace.js';
 
@@ -122,7 +123,6 @@ describeWithEnvironment('TraceModel helpers', function() {
                       ?.get(TraceModel.Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP);
       if (!fcp || !fcp.event) {
         assert.fail('FCP not found');
-        return;
       }
       const navigationForFirstRequest =
           TraceModel.Helpers.Trace.getNavigationForTraceEvent(fcp.event, Meta.mainFrameId, Meta.navigationsByFrameId);
@@ -417,6 +417,88 @@ describeWithEnvironment('TraceModel helpers', function() {
         '@ 41818.833 for 2005.601: third measure',
       ]);
       assert.strictEqual(synthEvents.length, 237);
+    });
+  });
+
+  describe('getZeroIndexedLineAndColumnNumbersForEvent', () => {
+    it('subtracts one from the line number of a function call', async () => {
+      const fakeFunctionCall: TraceModel.Types.TraceEvents.TraceEventFunctionCall = {
+        name: TraceModel.Types.TraceEvents.KnownEventName.FunctionCall,
+        ph: TraceModel.Types.TraceEvents.Phase.COMPLETE,
+        cat: 'devtools-timeline',
+        dur: TraceModel.Types.Timing.MicroSeconds(100),
+        ts: TraceModel.Types.Timing.MicroSeconds(100),
+        pid: TraceModel.Types.TraceEvents.ProcessID(1),
+        tid: TraceModel.Types.TraceEvents.ThreadID(1),
+        args: {
+          data: {
+            functionName: 'test',
+            url: 'https://google.com/test.js',
+            scriptId: Number(123),
+            lineNumber: 1,
+            columnNumber: 1,
+          },
+        },
+      };
+      assert.deepEqual(TraceModel.Helpers.Trace.getZeroIndexedLineAndColumnNumbersForEvent(fakeFunctionCall), {
+        lineNumber: 0,
+        columnNumber: 0,
+      });
+    });
+  });
+
+  describe('frameIDForEvent', () => {
+    it('returns the frame ID from beginData if the event has it', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+      const parseHTMLEvent =
+          traceParsedData.Renderer.allTraceEntries.find(TraceModel.Types.TraceEvents.isTraceEventParseHTML);
+      assert.isOk(parseHTMLEvent);
+      const frameId = TraceModel.Helpers.Trace.frameIDForEvent(parseHTMLEvent);
+      assert.isNotNull(frameId);
+      assert.strictEqual(frameId, parseHTMLEvent.args.beginData.frame);
+    });
+
+    it('returns the frame ID from args.data if the event has it', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+      const invalidateLayoutEvent =
+          traceParsedData.Renderer.allTraceEntries.find(TraceModel.Types.TraceEvents.isTraceEventInvalidateLayout);
+      assert.isOk(invalidateLayoutEvent);
+      const frameId = TraceModel.Helpers.Trace.frameIDForEvent(invalidateLayoutEvent);
+      assert.isNotNull(frameId);
+      assert.strictEqual(frameId, invalidateLayoutEvent.args.data.frame);
+    });
+
+    it('returns null if the event does not have a frame', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+      const v8CompileEvent =
+          traceParsedData.Renderer.allTraceEntries.find(TraceModel.Types.TraceEvents.isTraceEventV8Compile);
+      assert.isOk(v8CompileEvent);
+      const frameId = TraceModel.Helpers.Trace.frameIDForEvent(v8CompileEvent);
+      assert.isNull(frameId);
+    });
+  });
+
+  describe('findUpdateLayoutTreeEvents', () => {
+    it('returns the set of UpdateLayoutTree events within the right time range', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'selector-stats.json.gz');
+      const mainThread = getMainThread(traceParsedData.Renderer);
+      const foundEvents = TraceModel.Helpers.Trace.findUpdateLayoutTreeEvents(
+          mainThread.entries,
+          traceParsedData.Meta.traceBounds.min,
+      );
+      assert.lengthOf(foundEvents, 11);
+
+      const lastEvent = foundEvents.at(-1);
+      assert.isOk(lastEvent);
+
+      // Check we can filter by endTime by making the endTime less than the start
+      // time of the last event:
+      const filteredByEndTimeEvents = TraceModel.Helpers.Trace.findUpdateLayoutTreeEvents(
+          mainThread.entries,
+          traceParsedData.Meta.traceBounds.min,
+          TraceModel.Types.Timing.MicroSeconds(lastEvent.ts - 1_000),
+      );
+      assert.lengthOf(filteredByEndTimeEvents, 10);
     });
   });
 });

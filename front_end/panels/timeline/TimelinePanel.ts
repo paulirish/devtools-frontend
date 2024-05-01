@@ -1515,14 +1515,27 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     metadata = metadata ?
         metadata :
         await TraceEngine.Extras.Metadata.forNewRecording(isCpuProfile, recordingStartTime ?? undefined);
+
+    const enginePromises: Promise<void>[] = [
+      this.#executeNewTraceEngine(collectedEvents, recordingIsFresh, metadata),
+    ];
+
+    // An experiment added in April 2024 that is ENABLED BY DEFAULT
+    // To aid us in spotting bugs as we turn down and remove usage of the legacy engine.
+    // TODO(crbug.com/40287735): remove this experiment and remove the old engine.
+    const shouldRunOldEngine = Root.Runtime.experiments.isEnabled(
+        Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
+    );
+    if (shouldRunOldEngine) {
+      enginePromises.push(
+          this.performanceModel.setTracingModel(tracingModel),
+      );
+    }
+
     try {
-      // Run the new engine in parallel with the parsing done in the performanceModel
-      await Promise.all([
-        // Calling setTracingModel now and setModel so much later, leads to several problems due to addEventListener order being unexpected
-        // TODO(paulirish): Resolve this, or just wait for the death of tracingModel. :)
-        this.performanceModel.setTracingModel(tracingModel),
-        this.#executeNewTraceEngine(collectedEvents, recordingIsFresh, metadata),
-      ]);
+      // TODO(crbug.com/40287735): once we don't run the old engine, we don't
+      // need the Promise.all() here with a single promise.
+      await Promise.all(enginePromises);
 
       // This code path is only executed when a new trace is recorded/imported,
       // so we know that the active index will be the size of the model because
@@ -1742,7 +1755,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.select(null);
   }
 
-  highlightEvent(event: TraceEngine.Legacy.Event|null): void {
+  highlightEvent(event: TraceEngine.Types.TraceEvents.TraceEventData|null): void {
     this.flameChart.highlightEvent(event);
   }
 
@@ -1809,7 +1822,7 @@ export const headerHeight = 20;
 export interface TimelineModeViewDelegate {
   select(selection: TimelineSelection|null): void;
   selectEntryAtTime(events: TraceEngine.Types.TraceEvents.TraceEventData[]|null, time: number): void;
-  highlightEvent(event: TraceEngine.Legacy.CompatibleTraceEvent|null): void;
+  highlightEvent(event: TraceEngine.Types.TraceEvents.TraceEventData|null): void;
 }
 
 export class StatusPane extends UI.Widget.VBox {

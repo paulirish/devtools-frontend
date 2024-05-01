@@ -23,6 +23,7 @@ import {
   setupPageResourceLoaderForSourceMap,
 } from '../../testing/SourceMapHelpers.js';
 import {
+  getEventOfType,
   getMainThread,
   makeCompleteEvent,
   makeMockSamplesHandlerData,
@@ -68,53 +69,52 @@ describeWithMockConnection('TimelineUIUtils', function() {
   });
 
   it('creates top frame location text for function calls', async function() {
-    const event = new TraceEngine.Legacy.ConstructedEvent(
-        'devtools.timeline', 'FunctionCall', TraceEngine.Types.TraceEvents.Phase.COMPLETE, 10, thread);
-
-    event.addArgs({
-      data: {
-        functionName: 'test',
-        url: 'test.js',
-        scriptId: SCRIPT_ID_STRING,
-        lineNumber: 0,
-        columnNumber: 0,
-      },
-    });
+    const traceParsedData = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
+    const functionCallEvent =
+        traceParsedData.Renderer.allTraceEntries.find(TraceEngine.Types.TraceEvents.isTraceEventFunctionCall);
+    assert.isOk(functionCallEvent);
     assert.strictEqual(
-        'test.js:1:1', await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(event));
+        'chrome-extension://blijaeebfebmkmekmdnehcmmcjnblkeo/lib/utils.js:11:43',
+        await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(
+            functionCallEvent, traceParsedData));
   });
 
   it('creates top frame location text as a fallback', async function() {
-    const events = await TraceLoader.rawEvents(this, 'web-dev.json.gz');
-    const timerInstallEvent = events.find(TraceEngine.Types.TraceEvents.isTraceEventTimerInstall);
+    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const timerInstallEvent =
+        traceParsedData.Renderer.allTraceEntries.find(TraceEngine.Types.TraceEvents.isTraceEventTimerInstall);
     assert.isOk(timerInstallEvent);
     assert.strictEqual(
         'https://web.dev/js/index-7b6f3de4.js:96:533',
-        await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(timerInstallEvent));
+        await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(
+            timerInstallEvent, traceParsedData));
   });
 
   describe('script location as an URL', function() {
-    let event: TraceEngine.Legacy.ConstructedEvent;
-    beforeEach(() => {
-      event = new TraceEngine.Legacy.ConstructedEvent(
-          'devtools.timeline', TimelineModel.TimelineModel.RecordType.FunctionCall,
-          TraceEngine.Types.TraceEvents.Phase.COMPLETE, 10, thread);
-
-      event.addArgs({
-        data: {
-          functionName: 'test',
-          url: 'https://google.com/test.js',
-          scriptId: SCRIPT_ID_STRING,
-          lineNumber: 0,
-          columnNumber: 0,
-        },
-      });
-    });
     it('makes the script location of a call frame a full URL when the inspected target is not the same the call frame was taken from (e.g. a loaded file)',
        async function() {
+         const fakeFunctionCall: TraceEngine.Types.TraceEvents.TraceEventFunctionCall = {
+           name: TraceEngine.Types.TraceEvents.KnownEventName.FunctionCall,
+           ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+           cat: 'devtools-timeline',
+           dur: TraceEngine.Types.Timing.MicroSeconds(100),
+           ts: TraceEngine.Types.Timing.MicroSeconds(100),
+           pid: TraceEngine.Types.TraceEvents.ProcessID(1),
+           tid: TraceEngine.Types.TraceEvents.ThreadID(1),
+           args: {
+             data: {
+               functionName: 'test',
+               url: 'https://google.com/test.js',
+               scriptId: Number(SCRIPT_ID_STRING),
+               lineNumber: 1,
+               columnNumber: 1,
+             },
+           },
+         };
+
          target.setInspectedURL('https://not-google.com' as Platform.DevToolsPath.UrlString);
          const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForTraceEvent(
-             event, target, new Components.Linkifier.Linkifier());
+             fakeFunctionCall, target, new Components.Linkifier.Linkifier(), false, null);
          if (!node) {
            throw new Error('Node was unexpectedly null');
          }
@@ -123,9 +123,27 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
     it('makes the script location of a call frame a script name when the inspected target is the one the call frame was taken from',
        async function() {
+         const fakeFunctionCall: TraceEngine.Types.TraceEvents.TraceEventFunctionCall = {
+           name: TraceEngine.Types.TraceEvents.KnownEventName.FunctionCall,
+           ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
+           cat: 'devtools-timeline',
+           dur: TraceEngine.Types.Timing.MicroSeconds(100),
+           ts: TraceEngine.Types.Timing.MicroSeconds(100),
+           pid: TraceEngine.Types.TraceEvents.ProcessID(1),
+           tid: TraceEngine.Types.TraceEvents.ThreadID(1),
+           args: {
+             data: {
+               functionName: 'test',
+               url: 'https://google.com/test.js',
+               scriptId: Number(SCRIPT_ID_STRING),
+               lineNumber: 1,
+               columnNumber: 1,
+             },
+           },
+         };
          target.setInspectedURL('https://google.com' as Platform.DevToolsPath.UrlString);
          const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForTraceEvent(
-             event, target, new Components.Linkifier.Linkifier());
+             fakeFunctionCall, target, new Components.Linkifier.Linkifier(), false, null);
          if (!node) {
            throw new Error('Node was unexpectedly null');
          }
@@ -243,7 +261,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
       const linkifier = new Components.Linkifier.Linkifier();
       const node = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForTraceEvent(
-          profileCall, target, linkifier, true);
+          profileCall, target, linkifier, true, traceParsedData);
       if (!node) {
         throw new Error('Node was unexpectedly null');
       }
@@ -1277,6 +1295,79 @@ describeWithMockConnection('TimelineUIUtils', function() {
       };
       const name = Timeline.TimelineUIUtils.TimelineUIUtils.displayNameForFrame(frame, 10);
       assert.strictEqual(name, '"test-…long"');
+    });
+  });
+
+  describe('urlForEvent', () => {
+    it('returns the URL if it has one', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+      const commitLoadEvent =
+          traceParsedData.Renderer.allTraceEntries.find(TraceEngine.Types.TraceEvents.isTraceEventCommitLoad);
+      assert.isOk(commitLoadEvent);
+      const url = Timeline.TimelineUIUtils.urlForEvent(traceParsedData, commitLoadEvent);
+      assert.isNotNull(url);
+      assert.strictEqual(url, commitLoadEvent.args.data?.url);
+    });
+
+    it('finds the URL for a ParseHTML event', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+      const parseHTMLEvent =
+          traceParsedData.Renderer.allTraceEntries.find(TraceEngine.Types.TraceEvents.isTraceEventParseHTML);
+      assert.isOk(parseHTMLEvent);
+      const url = Timeline.TimelineUIUtils.urlForEvent(traceParsedData, parseHTMLEvent);
+      assert.isNotNull(url);
+      assert.strictEqual(url, parseHTMLEvent.args.beginData.url);
+    });
+
+    it('uses the PaintImage URL for a DecodeImage event', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+      const decodeImage =
+          traceParsedData.Renderer.allTraceEntries.find(TraceEngine.Types.TraceEvents.isTraceEventDecodeImage);
+      assert.isOk(decodeImage);
+      const url = Timeline.TimelineUIUtils.urlForEvent(traceParsedData, decodeImage);
+      assert.isNotNull(url);
+      assert.strictEqual(
+          url, 'https://web-dev.imgix.net/image/admin/WkMOiDtaDgiAA2YkRZ5H.jpg?fit=crop&h=64&w=64&dpr=1&q=75');
+    });
+  });
+
+  describe('buildDetailsNodeForMarkerEvents', () => {
+    it('builds the right link for an LCP Event', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+      const markLCPEvent = getEventOfType(
+          traceParsedData.PageLoadMetrics.allMarkerEvents,
+          TraceEngine.Types.TraceEvents.isTraceEventLargestContentfulPaintCandidate);
+      const html = Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForMarkerEvents(
+          markLCPEvent,
+      );
+      const url = html.querySelector('x-link')?.getAttribute('href');
+      assert.strictEqual(url, 'https://web.dev/lcp/');
+      assert.strictEqual(html.innerText, 'Learn more about largest contentful paint.');
+    });
+
+    it('builds the right link for an FCP Event', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+      const markFCPEvent = getEventOfType(
+          traceParsedData.PageLoadMetrics.allMarkerEvents,
+          TraceEngine.Types.TraceEvents.isTraceEventFirstContentfulPaint);
+      const html = Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForMarkerEvents(
+          markFCPEvent,
+      );
+      const url = html.querySelector('x-link')?.getAttribute('href');
+      assert.strictEqual(url, 'https://web.dev/first-contentful-paint/');
+      assert.strictEqual(html.innerText, 'Learn more about first contentful paint.');
+    });
+
+    it('builds a generic event for other marker events', async function() {
+      const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+      const markLoadEvent = getEventOfType(
+          traceParsedData.PageLoadMetrics.allMarkerEvents, TraceEngine.Types.TraceEvents.isTraceEventMarkLoad);
+      const html = Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsNodeForMarkerEvents(
+          markLoadEvent,
+      );
+      const url = html.querySelector('x-link')?.getAttribute('href');
+      assert.strictEqual(url, 'https://web.dev/user-centric-performance-metrics/');
+      assert.strictEqual(html.innerText, 'Learn more about page performance metrics.');
     });
   });
 });

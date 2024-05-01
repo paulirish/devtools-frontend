@@ -1024,7 +1024,6 @@ export enum DevtoolsExperiments {
   'contrast-issues' = 44,
   'experimental-cookie-features' = 45,
   'styles-pane-css-changes' = 55,
-  'evaluate-expressions-with-source-maps' = 58,
   'instrumentation-breakpoints' = 61,
   'authored-deployed-grouping' = 63,
   'important-dom-properties' = 64,
@@ -1043,9 +1042,12 @@ export enum DevtoolsExperiments {
   'timeline-show-postmessage-events' = 86,
   'save-and-load-trace-with-annotations' = 87,
   'timeline-extensions' = 89,
+  'timeline-enhanced-traces' = 90,
+  'timeline-compiled-sources' = 91,
+  'timeline-enable-old-timeline-model-engine' = 92,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 90,
+  'MaxValue' = 93,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
