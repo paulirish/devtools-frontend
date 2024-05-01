@@ -7,7 +7,6 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -261,15 +260,6 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.networkDataProvider.setModel(newTraceEngineData);
     ExtensionDataGatherer.instance().modelChanged(newTraceEngineData);
     this.#reset();
-
-    const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
-    if (!traceBoundsState) {
-      throw new Error('TimelineFlameChartView could not set the window bounds.');
-    }
-    const visibleWindow = traceBoundsState.milli.timelineTraceWindow;
-    this.mainFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max);
-    this.networkDataProvider.setWindowTimes(visibleWindow.min, visibleWindow.max);
-    this.networkFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max);
     this.updateSearchResults(false, false);
     this.refreshMainFlameChart();
     this.#updateFlameCharts();
@@ -287,6 +277,15 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.mainFlameChart.reset();
     this.networkFlameChart.reset();
     this.updateSearchResults(false, false);
+
+    const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
+    if (!traceBoundsState) {
+      throw new Error('TimelineFlameChartView could not set the window bounds.');
+    }
+    const visibleWindow = traceBoundsState.milli.timelineTraceWindow;
+    this.mainFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max);
+    this.networkDataProvider.setWindowTimes(visibleWindow.min, visibleWindow.max);
+    this.networkFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max);
   }
 
   #updateDetailViews(): void {
@@ -303,41 +302,23 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private onEntryHighlighted(commonEvent: Common.EventTarget.EventTargetEvent<number>): void {
     SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
     const entryIndex = commonEvent.data;
-    // TODO(crbug.com/1431166): explore how we can make highlighting agnostic
-    // and take either legacy events, or new trace engine events. Currently if
-    // this highlight comes from a TrackAppender, we create a new legacy event
-    // from the event payload, mainly to satisfy this method.
     const event = this.mainDataProvider.eventByIndex(entryIndex);
-    if (!event) {
+    if (!event || !this.#traceEngineData) {
       return;
     }
-    const target = this.#traceEngineData && TraceEngine.Legacy.eventIsFromNewEngine(event) ?
-        targetForEvent(this.#traceEngineData, event) :
-        null;
+
+    const target = targetForEvent(this.#traceEngineData, event);
     if (!target) {
       return;
     }
-    let backendNodeIds;
 
-    // Events for tracks that are migrated to the new engine won't use
-    // TimelineModel.TimelineData.
-    if (event instanceof TraceEngine.Legacy.Event) {
-      const timelineData = TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event);
-      backendNodeIds = timelineData.backendNodeIds;
-    } else if (TraceEngine.Types.TraceEvents.isTraceEventLayoutShift(event)) {
-      const impactedNodes = event.args.data?.impacted_nodes ?? [];
-      backendNodeIds = impactedNodes.map(node => node.node_id);
-    }
-
-    if (!backendNodeIds) {
-      return;
-    }
-    for (let i = 0; i < backendNodeIds.length; ++i) {
-      new SDK.DOMModel.DeferredDOMNode(target, backendNodeIds[i]).highlight();
+    const nodeIds = TraceEngine.Extras.FetchNodes.nodeIdsForEvent(this.#traceEngineData, event);
+    for (const nodeId of nodeIds) {
+      new SDK.DOMModel.DeferredDOMNode(target, nodeId).highlight();
     }
   }
 
-  highlightEvent(event: TraceEngine.Legacy.Event|null): void {
+  highlightEvent(event: TraceEngine.Types.TraceEvents.TraceEventData|null): void {
     const entryIndex =
         event ? this.mainDataProvider.entryIndexForSelection(TimelineSelection.fromTraceEvent(event)) : -1;
     if (entryIndex >= 0) {

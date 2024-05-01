@@ -289,6 +289,10 @@ export class MainImpl {
         'timeline-v8-runtime-call-stats', 'Performance panel: V8 runtime call stats', true);
     Root.Runtime.experiments.register(
         'timeline-extensions', 'Performance panel: enable user timings based extensions', true);
+    Root.Runtime.experiments.register(
+        'timeline-enhanced-traces', 'Performance panel: Enable collecting enhanced traces', true);
+    Root.Runtime.experiments.register(
+        'timeline-compiled-sources', 'Performance panel: Enable collecting source text for compiled script', true);
 
     // Sources
     Root.Runtime.experiments.register(
@@ -297,9 +301,6 @@ export class MainImpl {
         'https://crbug.com/1479986');
 
     // Debugging
-    Root.Runtime.experiments.register(
-        'evaluate-expressions-with-source-maps', 'Resolve variable names in expressions using source maps', undefined,
-        'https://goo.gle/evaluate-source-var-default', 'https://crbug.com/1504123');
     Root.Runtime.experiments.register('instrumentation-breakpoints', 'Enable instrumentation breakpoints', true);
     Root.Runtime.experiments.register('set-all-breakpoints-eagerly', 'Set all breakpoints eagerly at startup');
     Root.Runtime.experiments.register('use-source-map-scopes', 'Use scope information from source maps', true);
@@ -395,13 +396,19 @@ export class MainImpl {
         'Enable saving and loading traces with annotations in the Performance panel',
     );
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
+        'Enable the legacy tracing model when inspecting Chrome traces using the performance panel',
+        true,  // mark as unstable as we don't expect users to change this setting
+    );
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'css-type-component-length-deprecate',
       'set-all-breakpoints-eagerly',
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
-      'evaluate-expressions-with-source-maps',
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,
+      Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 

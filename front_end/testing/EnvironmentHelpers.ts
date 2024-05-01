@@ -120,7 +120,6 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.HEADER_OVERRIDES,
   Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
   Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY,
-  'evaluate-expressions-with-source-maps',
   Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
   'font-editor',
   Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
@@ -128,6 +127,7 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.AUTOFILL_VIEW,
   Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
   Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS,
+  Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -290,6 +290,10 @@ export async function initializeGlobalVars({reset = true} = {}) {
   for (const experimentName of REGISTERED_EXPERIMENTS) {
     Root.Runtime.experiments.register(experimentName, '');
   }
+
+  Root.Runtime.experiments.enableExperimentsByDefault([
+    Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
+  ]);
 
   // Dynamically import UI after the rest of the environment is set up, otherwise it will fail.
   UI = await import('../ui/legacy/legacy.js');

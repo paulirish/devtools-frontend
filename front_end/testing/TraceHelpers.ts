@@ -139,7 +139,6 @@ export function getTree(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Rend
   const tree = thread.tree;
   if (!tree) {
     assert(false, `Couldn't get tree in thread ${thread.name}`);
-    return null as never;
   }
   return tree;
 }
@@ -154,7 +153,6 @@ export function getRootAt(thread: TraceEngine.Handlers.ModelHandlers.Renderer.Re
   const node = [...tree.roots][index];
   if (node === undefined) {
     assert(false, `Couldn't get the id of the root at index ${index} in thread ${thread.name}`);
-    return null as never;
   }
   return node;
 }
@@ -202,7 +200,6 @@ export function getNodeFor(
   const node = findNode(tree.roots, nodeId);
   if (!node) {
     assert(false, `Couldn't get the node with id ${nodeId} in thread ${thread.name}`);
-    return null as never;
   }
   return node;
 }
@@ -523,6 +520,10 @@ export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataP
     return 0;
   }
 
+  hasTrackConfigurationMode(): boolean {
+    return false;
+  }
+
   totalTime(): number {
     return 100;
   }
@@ -661,4 +662,19 @@ export function getBaseTraceParseModelData(overrides: Partial<TraceParseData> = 
     LargestTextPaint: new Map(),
     ...overrides,
   } as Partial<TraceParseData>as TraceParseData;
+}
+
+/**
+ * A helper that will query the given array of events and find the first event
+ * matching the predicate. It will also assert that a match is found, which
+ * saves the need to do that for every test.
+ */
+export function getEventOfType<T extends TraceEngine.Types.TraceEvents.TraceEventData>(
+    events: TraceEngine.Types.TraceEvents.TraceEventData[],
+    predicate: (e: TraceEngine.Types.TraceEvents.TraceEventData) => e is T): T {
+  const match = events.find(predicate);
+  if (!match) {
+    throw new Error('Failed to find matching event of type.');
+  }
+  return match;
 }

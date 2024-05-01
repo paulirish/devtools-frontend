@@ -1017,6 +1017,32 @@ export namespace Audits {
     NoRegisterOsTriggerHeader = 'NoRegisterOsTriggerHeader',
   }
 
+  export const enum SharedDictionaryError {
+    UseErrorCrossOriginNoCorsRequest = 'UseErrorCrossOriginNoCorsRequest',
+    UseErrorDictionaryLoadFailure = 'UseErrorDictionaryLoadFailure',
+    UseErrorMatchingDictionaryNotUsed = 'UseErrorMatchingDictionaryNotUsed',
+    UseErrorUnexpectedContentDictionaryHeader = 'UseErrorUnexpectedContentDictionaryHeader',
+    WriteErrorCossOriginNoCorsRequest = 'WriteErrorCossOriginNoCorsRequest',
+    WriteErrorDisallowedBySettings = 'WriteErrorDisallowedBySettings',
+    WriteErrorExpiredResponse = 'WriteErrorExpiredResponse',
+    WriteErrorFeatureDisabled = 'WriteErrorFeatureDisabled',
+    WriteErrorInsufficientResources = 'WriteErrorInsufficientResources',
+    WriteErrorInvalidMatchField = 'WriteErrorInvalidMatchField',
+    WriteErrorInvalidStructuredHeader = 'WriteErrorInvalidStructuredHeader',
+    WriteErrorNavigationRequest = 'WriteErrorNavigationRequest',
+    WriteErrorNoMatchField = 'WriteErrorNoMatchField',
+    WriteErrorNonListMatchDestField = 'WriteErrorNonListMatchDestField',
+    WriteErrorNonSecureContext = 'WriteErrorNonSecureContext',
+    WriteErrorNonStringIdField = 'WriteErrorNonStringIdField',
+    WriteErrorNonStringInMatchDestList = 'WriteErrorNonStringInMatchDestList',
+    WriteErrorNonStringMatchField = 'WriteErrorNonStringMatchField',
+    WriteErrorNonTokenTypeField = 'WriteErrorNonTokenTypeField',
+    WriteErrorRequestAborted = 'WriteErrorRequestAborted',
+    WriteErrorShuttingDown = 'WriteErrorShuttingDown',
+    WriteErrorTooLongIdField = 'WriteErrorTooLongIdField',
+    WriteErrorUnsupportedType = 'WriteErrorUnsupportedType',
+  }
+
   /**
    * Details for issues around "Attribution Reporting API" usage.
    * Explainer: https://github.com/WICG/attribution-reporting-api
@@ -1047,6 +1073,11 @@ export namespace Audits {
   export interface NavigatorUserAgentIssueDetails {
     url: string;
     location?: SourceCodeLocation;
+  }
+
+  export interface SharedDictionaryIssueDetails {
+    sharedDictionaryError: SharedDictionaryError;
+    request: AffectedRequest;
   }
 
   export const enum GenericIssueErrorType {
@@ -1288,6 +1319,7 @@ export namespace Audits {
     StylesheetLoadingIssue = 'StylesheetLoadingIssue',
     FederatedAuthUserInfoRequestIssue = 'FederatedAuthUserInfoRequestIssue',
     PropertyRuleIssue = 'PropertyRuleIssue',
+    SharedDictionaryIssue = 'SharedDictionaryIssue',
   }
 
   /**
@@ -1316,6 +1348,7 @@ export namespace Audits {
     stylesheetLoadingIssueDetails?: StylesheetLoadingIssueDetails;
     propertyRuleIssueDetails?: PropertyRuleIssueDetails;
     federatedAuthUserInfoRequestIssueDetails?: FederatedAuthUserInfoRequestIssueDetails;
+    sharedDictionaryIssueDetails?: SharedDictionaryIssueDetails;
   }
 
   /**
@@ -4425,6 +4458,28 @@ export namespace DOM {
      * NodeIds of top layer elements
      */
     nodeIds: NodeId[];
+  }
+
+  export const enum GetElementByRelationRequestRelation {
+    PopoverTarget = 'PopoverTarget',
+  }
+
+  export interface GetElementByRelationRequest {
+    /**
+     * Id of the node from which to query the relation.
+     */
+    nodeId: NodeId;
+    /**
+     * Type of relation to get.
+     */
+    relation: GetElementByRelationRequestRelation;
+  }
+
+  export interface GetElementByRelationResponse extends ProtocolResponseWithError {
+    /**
+     * NodeId of the element matching the queried relation.
+     */
+    nodeId: NodeId;
   }
 
   export interface RemoveAttributeRequest {
@@ -12146,6 +12201,7 @@ export namespace Page {
     EmbedderExtensionMessaging = 'EmbedderExtensionMessaging',
     EmbedderExtensionMessagingForOpenPort = 'EmbedderExtensionMessagingForOpenPort',
     EmbedderExtensionSentMessageToCachedFrame = 'EmbedderExtensionSentMessageToCachedFrame',
+    RequestedByWebViewClient = 'RequestedByWebViewClient',
   }
 
   /**

@@ -19,7 +19,7 @@ class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegat
   }
   selectEntryAtTime(_events: TraceEngine.Types.TraceEvents.TraceEventData[]|null, _time: number): void {
   }
-  highlightEvent(_event: TraceEngine.Legacy.Event|null): void {
+  highlightEvent(_event: TraceEngine.Types.TraceEvents.TraceEventData|null): void {
   }
 }
 
@@ -28,10 +28,14 @@ const baseTraceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds = {
   max: TraceEngine.Types.Timing.MicroSeconds(10_000),
   range: TraceEngine.Types.Timing.MicroSeconds(10_000),
 };
-const boundsManager =
-    TraceBounds.TraceBounds.BoundsManager.instance({forceNew: true}).resetWithNewBounds(baseTraceWindow);
 
 describeWithEnvironment('TimelineFlameChartView', function() {
+  let boundsManager: TraceBounds.TraceBounds.BoundsManager;
+  beforeEach(() => {
+    boundsManager =
+        TraceBounds.TraceBounds.BoundsManager.instance({forceNew: true}).resetWithNewBounds(baseTraceWindow);
+  });
+
   it('Can search for events by name in the timeline', async function() {
     const {traceParsedData, performanceModel} = await TraceLoader.allModels(this, 'lcp-images.json.gz');
     // The timeline flamechart view will invoke the `select` method
@@ -307,7 +311,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          flameChartView.getMainFlameChart().highlightEntry(iDOfNodeWithNoChildren);
 
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
-         flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+         flameChartView.getMainFlameChart().onContextMenu(new MouseEvent(''));
 
          assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
          // Hide function enabled
@@ -380,7 +384,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          flameChartView.getMainFlameChart().highlightEntry(iDOfNodeWithNoChildren);
 
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
-         flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+         flameChartView.getMainFlameChart().onContextMenu(new MouseEvent(''));
 
          assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
          // Hide function enabled
@@ -453,7 +457,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          flameChartView.getMainFlameChart().highlightEntry(iDOfNodeWithNoChildren);
 
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
-         flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+         flameChartView.getMainFlameChart().onContextMenu(new MouseEvent(''));
 
          assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
          // Hide function enabled
@@ -528,7 +532,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
          flameChartView.getMainFlameChart().highlightEntry(iDOfNodeWithNoChildren);
 
          // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
-         flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+         flameChartView.getMainFlameChart().onContextMenu(new MouseEvent(''));
 
          // Hide function disabled
          assert.strictEqual(
@@ -598,7 +602,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
       flameChartView.getMainFlameChart().highlightEntry(iDOfNode);
 
       // The mouse event passed to the Context Menu is used to indicate where the menu should appear. Since we don't need it to actually appear for this test, pass an empty event.
-      flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+      flameChartView.getMainFlameChart().onContextMenu(new MouseEvent(''));
 
       assert.strictEqual(flameChartView.getMainFlameChart().getContextMenu()?.defaultSection().items.length, 5);
       assert.strictEqual(
@@ -611,7 +615,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
       flameChartView.getMainFlameChart().modifyTree(TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, iDOfNode);
       flameChartView.getMainFlameChart().highlightEntry(iDOfNode);
-      flameChartView.getMainFlameChart().onContextMenu(new Event(''));
+      flameChartView.getMainFlameChart().onContextMenu(new MouseEvent(''));
 
       // Check that Reset Trace is enabled
       assert.strictEqual(

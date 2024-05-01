@@ -32,7 +32,6 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
@@ -726,17 +725,11 @@ export class DebuggerPlugin extends Plugin {
       box,
       show: async (popover: UI.GlassPane.GlassPane) => {
         let resolvedText: string = '';
-        if (Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps')) {
-          const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
-          try {
-            resolvedText =
-                await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(evaluationText, nameMap);
-          } catch {
-          }
-        } else {
-          resolvedText = await SourceMapScopes.NamesResolver.resolveExpression(
-              selectedCallFrame, evaluationText, this.uiSourceCode, highlightLine.number - 1,
-              highlightRange.from - highlightLine.from, highlightRange.to - highlightLine.from);
+        const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
+        try {
+          resolvedText =
+              await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(evaluationText, nameMap);
+        } catch {
         }
         // We use side-effect free debug-evaluate when the highlighted expression contains a
         // function/method call. Otherwise we allow side-effects. The motiviation here are
@@ -747,8 +740,7 @@ export class DebuggerPlugin extends Plugin {
         //   * Explicit function calls on the other hand must be side-effect free. The canonical
         //     example is hovering over {Math.random()} which would result in a different value
         //     each time the user hovers over it.
-        const throwOnSideEffect = Root.Runtime.experiments.isEnabled('evaluate-expressions-with-source-maps') &&
-            highlightRange.containsSideEffects;
+        const throwOnSideEffect = highlightRange.containsSideEffects;
         const result = await selectedCallFrame.evaluate({
           expression: resolvedText || evaluationText,
           objectGroup: 'popover',
@@ -1046,6 +1038,10 @@ export class DebuggerPlugin extends Plugin {
 
     while (CodeMirror.syntaxParserRunning(this.editor.editor)) {
       await new Promise(resolve => window.requestIdleCallback(resolve));
+      // After the `await` the DebuggerPlugin could have been disposed. Re-check `this.editor`.
+      if (!this.editor) {
+        return null;
+      }
       CodeMirror.ensureSyntaxTree(this.editor.state, executionOffset, 16);
     }
 
@@ -1055,7 +1051,8 @@ export class DebuggerPlugin extends Plugin {
     }
 
     const scopeMappings = await computeScopeMappings(callFrame, rawLocationToEditorOffset);
-    if (scopeMappings.length === 0) {
+    // After the `await` the DebuggerPlugin could have been disposed. Re-check `this.editor`.
+    if (!this.editor || scopeMappings.length === 0) {
       return null;
     }
 

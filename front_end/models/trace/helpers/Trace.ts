@@ -312,3 +312,121 @@ export function createMatchedSortedSyntheticEvents<T extends Types.TraceEvents.T
   const syntheticEvents = createSortedSyntheticEvents<T>(matchedPairs, syntheticEventCallback);
   return syntheticEvents;
 }
+
+/**
+ * Different trace events return line/column numbers that are 1 or 0 indexed.
+ * This function knows which events return 1 indexed numbers and normalizes
+ * them. The UI expects 0 indexed line numbers, so that is what we return.
+ */
+export function getZeroIndexedLineAndColumnNumbersForEvent(event: Types.TraceEvents.TraceEventData): {
+  lineNumber?: number,
+  columnNumber?: number,
+} {
+  // Some events emit line numbers that are 1 indexed, but the UI layer expects
+  // numbers to be 0 indexed. So here, if the event matches a known 1-indexed
+  // number event, we subtract one from the line and column numbers.
+  // Otherwise, if the event has args.data.lineNumber/colNumber, we return it
+  // as is.
+  const numbers = getRawLineAndColumnNumbersForEvent(event);
+  const {lineNumber, columnNumber} = numbers;
+
+  switch (event.name) {
+    // All these events have line/column numbers which are 1 indexed; so we
+    // subtract to make them 0 indexed.
+    case Types.TraceEvents.KnownEventName.FunctionCall:
+    case Types.TraceEvents.KnownEventName.EvaluateScript:
+    case Types.TraceEvents.KnownEventName.Compile:
+    case Types.TraceEvents.KnownEventName.CacheScript: {
+      return {
+        lineNumber: typeof lineNumber === 'number' ? lineNumber - 1 : undefined,
+        columnNumber: typeof columnNumber === 'number' ? columnNumber - 1 : undefined,
+      };
+    }
+    default: {
+      return numbers;
+    }
+  }
+}
+
+/**
+ * NOTE: you probably do not want this function! (Which is why it is not exported).
+ *
+ * Some trace events have 0 indexed line/column numbers, and others have 1
+ * indexed. This function does NOT normalize them, but
+ * `getZeroIndexedLineAndColumnNumbersForEvent` does. It is best to use that!
+ *
+ * @see {@link getZeroIndexedLineAndColumnNumbersForEvent}
+ **/
+function getRawLineAndColumnNumbersForEvent(event: Types.TraceEvents.TraceEventData): {
+  lineNumber?: number,
+  columnNumber?: number,
+} {
+  if (!event.args?.data) {
+    return {
+      lineNumber: undefined,
+      columnNumber: undefined,
+    };
+  }
+  let lineNumber: number|undefined = undefined;
+  let columnNumber: number|undefined = undefined;
+  if ('lineNumber' in event.args.data && typeof event.args.data.lineNumber === 'number') {
+    lineNumber = event.args.data.lineNumber;
+  }
+  if ('columnNumber' in event.args.data && typeof event.args.data.columnNumber === 'number') {
+    columnNumber = event.args.data.columnNumber;
+  }
+
+  return {lineNumber, columnNumber};
+}
+
+export function frameIDForEvent(event: Types.TraceEvents.TraceEventData): string|null {
+  // There are a few events (for example UpdateLayoutTree, ParseHTML) that have
+  // the frame stored in args.beginData
+  // Rather than list them all we just check for the presence of the field, so
+  // we are robust against future trace events also doing this.
+  // This check seems very robust, but it also helps satisfy TypeScript and
+  // prevents us against unexpected data.
+  if (event.args && 'beginData' in event.args && typeof event.args.beginData === 'object' &&
+      event.args.beginData !== null && 'frame' in event.args.beginData &&
+      typeof event.args.beginData.frame === 'string') {
+    return event.args.beginData.frame;
+  }
+  // Otherwise, we expect frame to be in args.data
+  if (event.args?.data?.frame) {
+    return event.args.data.frame;
+  }
+
+  // No known frame for this event.
+  return null;
+}
+
+const DevToolsTimelineEventCategory = 'disabled-by-default-devtools.timeline';
+function isTopLevelEvent(event: Types.TraceEvents.TraceEventData): boolean {
+  return event.cat.includes(DevToolsTimelineEventCategory) && event.name === Types.TraceEvents.KnownEventName.RunTask;
+}
+
+function topLevelEventIndexEndingAfter(
+    events: Types.TraceEvents.TraceEventData[], time: Types.Timing.MicroSeconds): number {
+  let index = Platform.ArrayUtilities.upperBound(events, time, (time, event) => time - event.ts) - 1;
+  while (index > 0 && !isTopLevelEvent(events[index])) {
+    index--;
+  }
+  return Math.max(index, 0);
+}
+export function findUpdateLayoutTreeEvents(
+    events: Types.TraceEvents.TraceEventData[], startTime: Types.Timing.MicroSeconds,
+    endTime?: Types.Timing.MicroSeconds): Types.TraceEvents.TraceEventUpdateLayoutTree[] {
+  const foundEvents: Types.TraceEvents.TraceEventUpdateLayoutTree[] = [];
+  const startEventIndex = topLevelEventIndexEndingAfter(events, startTime);
+  for (let i = startEventIndex; i < events.length; i++) {
+    const event = events[i];
+    if (!Types.TraceEvents.isTraceEventUpdateLayoutTree(event)) {
+      continue;
+    }
+    if (event.ts >= (endTime || Infinity)) {
+      continue;
+    }
+    foundEvents.push(event);
+  }
+  return foundEvents;
+}

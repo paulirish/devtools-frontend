@@ -120,7 +120,9 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       return this.lazySelectorStatsView;
     }
 
-    this.lazySelectorStatsView = new TimelineSelectorStatsView();
+    this.lazySelectorStatsView = new TimelineSelectorStatsView(
+        this.#traceEngineData,
+    );
     return this.lazySelectorStatsView;
   }
 
@@ -159,7 +161,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     this.#selectedEvents = selectedEvents;
     this.tabbedPane.closeTabs([Tab.PaintProfiler, Tab.LayerViewer], false);
     for (const view of this.rangeDetailViews.values()) {
-      view.setModelWithEvents(model, selectedEvents, traceEngineData);
+      view.setModelWithEvents(selectedEvents, traceEngineData);
     }
     this.lazyPaintProfilerView = null;
     this.lazyLayersView = null;
@@ -275,8 +277,8 @@ export class TimelineDetailsView extends UI.Widget.VBox {
       this.setContent(networkDetails);
     } else if (TimelineSelection.isTraceEventSelection(selectionObject)) {
       const event = selectionObject;
-      const traceEventDetails = await TimelineUIUtils.buildTraceEventDetails(
-          event, this.model.timelineModel(), this.detailsLinkifier, true, this.#traceEngineData);
+      const traceEventDetails =
+          await TimelineUIUtils.buildTraceEventDetails(event, this.detailsLinkifier, true, this.#traceEngineData);
       this.appendDetailsTabsForTraceEventAndShowDetails(event, traceEventDetails);
     } else if (TimelineSelection.isFrameObject(selectionObject)) {
       const frame = selectionObject;
@@ -310,8 +312,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     if (this.lazyLayersView) {
       return this.lazyLayersView;
     }
-    this.lazyLayersView =
-        new TimelineLayersView(this.model.timelineModel(), this.showSnapshotInPaintProfiler.bind(this));
+    this.lazyLayersView = new TimelineLayersView(this.showSnapshotInPaintProfiler.bind(this));
     return this.lazyLayersView;
   }
 
@@ -338,7 +339,7 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     this.tabbedPane.selectTab(Tab.PaintProfiler, true);
   }
 
-  private showSelectorStats(event: TraceEngine.Legacy.CompatibleTraceEvent): void {
+  private showSelectorStatsForIndividualEvent(event: TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree): void {
     const selectorStatsView = this.selectorStatsView();
 
     selectorStatsView.setEvent(event);
@@ -348,10 +349,10 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     }
   }
 
-  private showAggregatedSelectorStats(events: TraceEngine.Legacy.Event[]): void {
+  private showAggregatedSelectorStats(events: TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree[]): void {
     const selectorStatsView = this.selectorStatsView();
 
-    selectorStatsView.setAggregatedEvent(events);
+    selectorStatsView.setAggregatedEvents(events);
 
     if (!this.tabbedPane.hasTab(Tab.SelectorStats)) {
       this.appendTab(Tab.SelectorStats, i18nString(UIStrings.selectorStats), selectorStatsView);
@@ -368,11 +369,10 @@ export class TimelineDetailsView extends UI.Widget.VBox {
           TraceEngine.Types.TraceEvents.isTraceEventRasterTask(event)) {
         this.showEventInPaintProfiler(event);
       }
-    }
 
-    if (event.name === TimelineModel.TimelineModel.RecordType.RecalculateStyles ||
-        event.name === TimelineModel.TimelineModel.RecordType.UpdateLayoutTree) {
-      this.showSelectorStats(event);
+      if (TraceEngine.Types.TraceEvents.isTraceEventUpdateLayoutTree(event)) {
+        this.showSelectorStatsForIndividualEvent(event);
+      }
     }
   }
 
@@ -420,8 +420,11 @@ export class TimelineDetailsView extends UI.Widget.VBox {
     const isSelectorStatsEnabled =
         Common.Settings.Settings.instance().createSetting('timeline-capture-selector-stats', false).get();
     if (this.#selectedEvents && isSelectorStatsEnabled) {
-      const eventsInRange = TimelineModel.TimelineModel.TimelineModelImpl.findRecalculateStyleEvents(
-          this.#selectedEvents, startTime, endTime);
+      const eventsInRange = TraceEngine.Helpers.Trace.findUpdateLayoutTreeEvents(
+          this.#selectedEvents,
+          TraceEngine.Helpers.Timing.millisecondsToMicroseconds(startTime),
+          TraceEngine.Helpers.Timing.millisecondsToMicroseconds(endTime),
+      );
       if (eventsInRange.length > 0) {
         this.showAggregatedSelectorStats(eventsInRange);
       }

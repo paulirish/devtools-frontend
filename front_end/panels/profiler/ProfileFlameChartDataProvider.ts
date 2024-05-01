@@ -81,6 +81,10 @@ export class ProfileFlameChartDataProvider implements PerfUI.FlameChart.FlameCha
     return this.maxStackDepthInternal;
   }
 
+  hasTrackConfigurationMode(): boolean {
+    return false;
+  }
+
   timelineData(): PerfUI.FlameChart.FlameChartTimelineData|null {
     return this.timelineDataInternal || this.calculateTimelineData();
   }

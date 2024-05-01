@@ -34,7 +34,7 @@ export async function logImpressions(loggables: Loggable[]): Promise<void> {
   }
 }
 
-export const logResize = (throttler: Common.Throttler.Throttler) => (loggable: Loggable, size: DOMRect) => {
+export const logResize = (loggable: Loggable, size: DOMRect): void => {
   const loggingState = getLoggingState(loggable);
   if (!loggingState) {
     return;
@@ -42,10 +42,8 @@ export const logResize = (throttler: Common.Throttler.Throttler) => (loggable: L
   loggingState.size = size;
   const resizeEvent: Host.InspectorFrontendHostAPI
       .ResizeEvent = {veid: loggingState.veid, width: loggingState.size.width, height: loggingState.size.height};
-  void throttler.schedule(async () => {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordResize(resizeEvent);
-    processEventForDebugging('Resize', loggingState, {width: size.width, height: size.height});
-  });
+  Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordResize(resizeEvent);
+  processEventForDebugging('Resize', loggingState, {width: size.width, height: size.height});
 };
 
 export const logClick = (throttler: Common.Throttler.Throttler) => (
@@ -92,8 +90,13 @@ export async function logChange(event: Event): Promise<void> {
   const loggingState = getLoggingState(event.currentTarget as Element);
   assertNotNullOrUndefined(loggingState);
   const changeEvent: Host.InspectorFrontendHostAPI.ChangeEvent = {veid: loggingState.veid};
+  const context = loggingState.lastInputEventType;
+  delete loggingState.lastInputEventType;
+  if (context) {
+    changeEvent.context = await contextAsNumber(context);
+  }
   Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordChange(changeEvent);
-  processEventForDebugging('Change', loggingState);
+  processEventForDebugging('Change', loggingState, {context});
 }
 
 let pendingKeyDownContext: string|null = null;
