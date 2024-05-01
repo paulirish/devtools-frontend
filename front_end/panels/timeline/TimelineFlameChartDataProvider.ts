@@ -612,6 +612,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         breakdown.entry = event;
         additionalContent.push(breakdown);
       }
+
     } else if (entryType === EntryType.Frame) {
       const frame = (this.entryData[entryIndex] as TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame);
       time = i18n.TimeUtilities.preciseMillisToString(
@@ -631,6 +632,16 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     } else {
       return null;
+    }
+
+    if (Root.Runtime.experiments.isEnabled('timeline-show-trace-event-details')) {
+      const entry = this.entryData[entryIndex];
+      try {
+        const extraTooltipText = '\n' + JSON.stringify(entry, null, 2).slice(0, 1000).replace(/{\n  /, '{ ');
+        title += extraTooltipText;
+      } catch (e) {
+        console.warn(e);
+      }
     }
 
     const element = document.createElement('div');

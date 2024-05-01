@@ -293,6 +293,8 @@ export class MainImpl {
         'timeline-enhanced-traces', 'Performance panel: Enable collecting enhanced traces', true);
     Root.Runtime.experiments.register(
         'timeline-compiled-sources', 'Performance panel: Enable collecting source text for compiled script', true);
+    Root.Runtime.experiments.register(
+        'timeline-show-trace-event-details', 'Performance panel: Enable debug mode (trace event details, etc)', true);
 
     // Sources
     Root.Runtime.experiments.register(
