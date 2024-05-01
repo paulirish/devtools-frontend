@@ -1863,6 +1863,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.#drawDecorations(context, timelineData, allIndexes);
 
     this.drawMarkers(context, timelineData, markerIndices);
+
     this.drawEventTitles(context, timelineData, titleIndices, canvasWidth);
     context.restore();
 

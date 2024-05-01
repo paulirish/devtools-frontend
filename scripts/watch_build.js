@@ -205,9 +205,7 @@ const fastRebuildFile = async fileName => {
 
 console.log('Running initial build before watching changes');
 assertTargetArgsForWatchBuild();
-childProcess.spawnSync(
-    'autoninja', ['-C', `out/${target}`, 'front_end/ui/components/docs/performance_panel'],
-    {cwd, env, stdio: 'inherit'});
+childProcess.spawnSync('autoninja', ['-C', `out/${target}`], {cwd, env, stdio: 'inherit'});
 
 // Watch the front_end and test folder and build on any change.
 console.log(`Watching for changes in ${frontEndDir} and ${testsDir}`);

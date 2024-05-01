@@ -1660,9 +1660,15 @@ export class TimelineUIUtils {
       contentHelper.appendElementRow('', event[previewElementSymbol]);
     }
 
-    if (initiator || timelineData.stackTraceForSelfOrInitiator() ||
-        TimelineModel.TimelineModel.InvalidationTracker.invalidationEventsFor(event)) {
-      TimelineUIUtils.generateCauses(event, model.targetByEvent(event), relatedNodesMap, contentHelper);
+    if (TraceEngine.Legacy.eventIsFromNewEngine(event) && traceParseData) {
+      const stackTrace = TraceEngine.Helpers.Trace.stackTraceForEvent(event);
+      if (initiator || initiatorFor || stackTrace || traceParseData?.Invalidations.invalidationsForEvent.get(event)) {
+        await TimelineUIUtils.generateCauses(event, contentHelper, traceParseData);
+      }
+    }
+
+    if (Root.Runtime.experiments.isEnabled('timeline-show-all-events')) {
+      TimelineUIUtils.renderEventJson(event, contentHelper);
     }
 
     const stats: {

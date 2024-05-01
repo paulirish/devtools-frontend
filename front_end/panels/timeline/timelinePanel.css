@@ -234,11 +234,11 @@
   margin-top: 5px;
 }
 
-<<<<<<< HEAD ======= .timeline-details-view-row-stack-trace {
+.timeline-details-view-row-stack-trace {
   line-height: inherit;
 }
 
->>>>>>>flamechart-debugmode .timeline-flamechart {
+.timeline-flamechart {
   overflow: hidden;
 }
 

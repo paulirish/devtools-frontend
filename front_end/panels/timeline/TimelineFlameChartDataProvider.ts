@@ -612,7 +612,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         breakdown.entry = event;
         additionalContent.push(breakdown);
       }
-
     } else if (entryType === EntryType.Frame) {
       const frame = (this.entryData[entryIndex] as TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame);
       time = i18n.TimeUtilities.preciseMillisToString(
