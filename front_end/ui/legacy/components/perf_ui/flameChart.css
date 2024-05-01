@@ -74,12 +74,9 @@
   background-color: var(--sys-color-cdt-base-container);
   pointer-events: none;
   padding: 4px 8px;
-  white-space: pre-wrap;
+  white-space: nowrap;
   max-width: 80%;
   box-shadow: var(--drop-shadow);
-  /* remaining styles for trace event debug mode */
-  max-height: 100%;
-  overflow: auto;
 }
 
 .flame-chart-entry-info table tr td:empty {
