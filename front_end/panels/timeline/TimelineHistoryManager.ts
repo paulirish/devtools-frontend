@@ -13,7 +13,6 @@ import {
   type TimelineEventOverview,
   TimelineEventOverviewCPUActivity,
   TimelineEventOverviewNetwork,
-  TimelineEventOverviewResponsiveness,
 } from './TimelineEventOverview.js';
 import timelineHistoryManagerStyles from './timelineHistoryManager.css.js';
 import {type TimelineMiniMap} from './TimelineMiniMap.js';
@@ -110,17 +109,6 @@ export class TimelineHistoryManager {
     // Attempt to reuse the overviews coming from the panel's minimap
     // before creating new instances.
     this.allOverviews = [
-      {
-
-        constructor: traceParsedData => {
-          const responsivenessOverviewFromMinimap =
-              this.#minimapComponent?.getControls().find(
-                  control => control instanceof TimelineEventOverviewResponsiveness) as
-              TimelineEventOverviewResponsiveness;
-          return responsivenessOverviewFromMinimap || new TimelineEventOverviewResponsiveness(traceParsedData);
-        },
-        height: 3,
-      },
       {
         constructor: traceParsedData => {
           const cpuOverviewFromMinimap =

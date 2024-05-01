@@ -15,7 +15,6 @@ import {
   TimelineEventOverviewCPUActivity,
   TimelineEventOverviewMemory,
   TimelineEventOverviewNetwork,
-  TimelineEventOverviewResponsiveness,
   TimelineFilmStripOverview,
 } from './TimelineEventOverview.js';
 import miniMapStyles from './timelineMiniMap.css.js';
@@ -215,7 +214,6 @@ export class TimelineMiniMap extends
 
     this.#setMarkers(data.traceParsedData);
     this.#setNavigationStartEvents(data.traceParsedData);
-    this.#controls.push(new TimelineEventOverviewResponsiveness(data.traceParsedData));
     this.#controls.push(new TimelineEventOverviewCPUActivity(data.traceParsedData));
 
     this.#controls.push(new TimelineEventOverviewNetwork(data.traceParsedData));

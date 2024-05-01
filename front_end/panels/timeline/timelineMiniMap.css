@@ -39,7 +39,7 @@
 
 .timeline-minimap #timeline-overview-network::before,
 .timeline-minimap #timeline-overview-cpu-activity::before {
-  content: "";
+  content: '';
   position: absolute;
   left: 0;
   right: 0;
@@ -50,11 +50,6 @@
 
 .timeline-minimap .overview-strip .background {
   z-index: -10;
-}
-
-.timeline-minimap #timeline-overview-responsiveness {
-  flex-basis: 5px;
-  margin-top: 0 !important; /* stylelint-disable-line declaration-no-important */
 }
 
 .timeline-minimap #timeline-overview-input {
