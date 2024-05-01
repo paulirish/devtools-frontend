@@ -633,7 +633,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return null;
     }
 
-    if (Root.Runtime.experiments.isEnabled('timeline-show-trace-event-details')) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
       const entry = this.entryData[entryIndex];
       try {
         const extraTooltipText = '\n' + JSON.stringify(entry, null, 2).slice(0, 1000).replace(/{\n  /, '{ ');

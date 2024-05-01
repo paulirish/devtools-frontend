@@ -1667,7 +1667,7 @@ export class TimelineUIUtils {
       }
     }
 
-    if (Root.Runtime.experiments.isEnabled('timeline-show-all-events')) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
       TimelineUIUtils.renderEventJson(event, contentHelper);
     }
 

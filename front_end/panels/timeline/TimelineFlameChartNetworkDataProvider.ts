@@ -285,7 +285,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     div.style.color = this.#colorForPriority(event.args.data.priority) || 'black';
     contents.createChild('span').textContent = Platform.StringUtilities.trimMiddle(event.args.data.url, maxURLChars);
 
-    if (Root.Runtime.experiments.isEnabled('timeline-show-trace-event-details')) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
       try {
         const extraTooltipText = '\n' + JSON.stringify(event, null, 2).slice(0, 1000).replace(/{\n  /, '{ ');
         contents.createChild('span').textContent = extraTooltipText;
