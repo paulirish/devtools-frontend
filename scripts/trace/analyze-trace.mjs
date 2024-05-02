@@ -26,7 +26,8 @@ polyfillDOMRect();
  */
 export async function analyzeTrace(filename) {
   const traceEvents = loadTraceEventsFromFile(filename);
-  const model = TraceEngine.TraceModel.Model.createWithAllHandlers(TraceEngine.Types.Configuration.DEFAULT); // aka `fullTraceEngine`
+  const model = TraceEngine.TraceModel.Model.createWithAllHandlers(
+      TraceEngine.Types.Configuration.DEFAULT);  // aka `fullTraceEngine`
   await model.parse(traceEvents);
   return model.traceParsedData();
 }
@@ -75,14 +76,13 @@ function isGzip(ab) {
   return buf[0] === 0x1F && buf[1] === 0x8B && buf[2] === 0x08;
 }
 
-function polyfillDOMRect() {
-
+export function polyfillDOMRect() {
   // devtools assumes clientside :(
 
   // Everything else in here is the DOMRect polyfill
   // https://raw.githubusercontent.com/JakeChampion/polyfill-library/master/polyfills/DOMRect/polyfill.js
 
-  (function (global) {
+  (function(global) {
     function number(v) {
       return v === undefined ? 0 : Number(v);
     }
@@ -101,8 +101,10 @@ function polyfillDOMRect() {
 
       Object.defineProperties(this, {
         x: {
-          get: function () { return x; },
-          set: function (newX) {
+          get: function() {
+            return x;
+          },
+          set: function(newX) {
             if (different(x, newX)) {
               x = newX;
               left = right = undefined;
@@ -111,8 +113,10 @@ function polyfillDOMRect() {
           enumerable: true
         },
         y: {
-          get: function () { return y; },
-          set: function (newY) {
+          get: function() {
+            return y;
+          },
+          set: function(newY) {
             if (different(y, newY)) {
               y = newY;
               top = bottom = undefined;
@@ -121,8 +125,10 @@ function polyfillDOMRect() {
           enumerable: true
         },
         width: {
-          get: function () { return width; },
-          set: function (newWidth) {
+          get: function() {
+            return width;
+          },
+          set: function(newWidth) {
             if (different(width, newWidth)) {
               width = newWidth;
               left = right = undefined;
@@ -131,8 +137,10 @@ function polyfillDOMRect() {
           enumerable: true
         },
         height: {
-          get: function () { return height; },
-          set: function (newHeight) {
+          get: function() {
+            return height;
+          },
+          set: function(newHeight) {
             if (different(height, newHeight)) {
               height = newHeight;
               top = bottom = undefined;
@@ -141,7 +149,7 @@ function polyfillDOMRect() {
           enumerable: true
         },
         left: {
-          get: function () {
+          get: function() {
             if (left === undefined) {
               left = x + Math.min(0, width);
             }
@@ -150,7 +158,7 @@ function polyfillDOMRect() {
           enumerable: true
         },
         right: {
-          get: function () {
+          get: function() {
             if (right === undefined) {
               right = x + Math.max(0, width);
             }
@@ -159,7 +167,7 @@ function polyfillDOMRect() {
           enumerable: true
         },
         top: {
-          get: function () {
+          get: function() {
             if (top === undefined) {
               top = y + Math.min(0, height);
             }
@@ -168,7 +176,7 @@ function polyfillDOMRect() {
           enumerable: true
         },
         bottom: {
-          get: function () {
+          get: function() {
             if (bottom === undefined) {
               bottom = y + Math.max(0, height);
             }
