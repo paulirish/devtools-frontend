@@ -329,8 +329,7 @@ export class ChartViewport extends UI.Widget.VBox {
   }
 
   timeToPosition(time: number): number {
-    return Math.floor(
-        (time - this.visibleLeftTime) / (this.visibleRightTime - this.visibleLeftTime) * this.offsetWidth);
+    return (time - this.visibleLeftTime) / (this.visibleRightTime - this.visibleLeftTime) * this.offsetWidth;
   }
 
   timeToPixel(): number {

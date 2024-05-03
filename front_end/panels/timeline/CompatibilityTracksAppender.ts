@@ -20,7 +20,7 @@ import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
 import {ThreadAppender} from './ThreadAppender.js';
 import {
   EntryType,
-  InstantEventVisibleDurationMs,
+  InstantEventVisibleDur,
   type TimelineFlameChartEntry,
 } from './TimelineFlameChartDataProvider.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
@@ -474,9 +474,7 @@ export class CompatibilityTracksAppender {
     this.#legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
     this.#flameChartData.entryLevels[index] = level;
     this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-    const msDuration = event.dur ||
-        TraceEngine.Helpers.Timing.millisecondsToMicroseconds(
-            InstantEventVisibleDurationMs as TraceEngine.Types.Timing.MilliSeconds);
+    const msDuration = event.dur || InstantEventVisibleDur;
     this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(msDuration);
     return index;
   }

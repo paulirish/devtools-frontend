@@ -76,7 +76,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
         }
         const expectedTotalTimeForEvent = event.dur ?
             TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.dur as TraceEngine.Types.Timing.MicroSeconds) :
-            Timeline.TimelineFlameChartDataProvider.InstantEventVisibleDurationMs;
+            Timeline.TimelineFlameChartDataProvider.InstantEventVisibleDur;
         assert.strictEqual(flameChartData.entryTotalTimes[i], expectedTotalTimeForEvent);
       }
     });

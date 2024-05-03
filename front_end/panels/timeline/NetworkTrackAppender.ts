@@ -8,7 +8,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {buildGroupStyle, buildTrackHeader, getEventLevel, getFormattedTime} from './AppenderUtils.js';
 import {type HighlightedEntryInfo, type TrackAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
-import {InstantEventVisibleDurationMs} from './TimelineFlameChartDataProvider.js';
+import {InstantEventVisibleDur} from './TimelineFlameChartDataProvider.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
@@ -126,9 +126,7 @@ export class NetworkTrackAppender implements TrackAppender {
     const index = this.#flameChartData.entryLevels.length;
     this.#flameChartData.entryLevels[index] = level;
     this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-    const msDuration = event.dur ||
-        TraceEngine.Helpers.Timing.millisecondsToMicroseconds(
-            InstantEventVisibleDurationMs as TraceEngine.Types.Timing.MilliSeconds);
+    const msDuration = event.dur || InstantEventVisibleDur;
     this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(msDuration);
     return level;
   }
