@@ -936,7 +936,8 @@ export class TimelineUIUtils {
   static async buildDetailsNodeForTraceEvent(
       event: TraceEngine.Legacy.CompatibleTraceEvent, target: SDK.Target.Target|null,
       linkifier: LegacyComponents.Linkifier.Linkifier, isFreshRecording = false,
-      traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null): Promise<Node|null> {
+      traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null,
+      contentHelper: TimelineDetailsContentHelper): Promise<Node|null> {
     const recordType = TimelineModel.TimelineModel.RecordType;
     let details: HTMLElement|HTMLSpanElement|(Element | null)|Text|null = null;
     let detailsText;
@@ -1080,6 +1081,14 @@ export class TimelineUIUtils {
         if (TraceEngine.Legacy.eventHasCategory(
                 event, TimelineModel.TimelineModel.TimelineModelImpl.Category.Console)) {
           detailsText = null;
+        } else if (TraceEngine.Legacy.eventHasCategory(
+                       event, TimelineModel.TimelineModel.TimelineModelImpl.Category.UserTiming)) {
+          const utEventDetail = {
+            ...JSON.parse(event.args.detail ?? '{}'),
+            ...JSON.parse(event.args.data?.beginEvent?.args?.detail ?? '{}'),
+            ...JSON.parse(event.args.data?.endEvent?.args?.detail ?? '{}'),
+          };
+          TimelineUIUtils.renderEventJson(utEventDetail, contentHelper, 'Attached Detail');
         } else {
           details = TraceEngine.Legacy.eventIsFromNewEngine(event) ?
               this.linkifyTopCallFrame(event, target, linkifier, isFreshRecording) :
@@ -1630,7 +1639,8 @@ export class TimelineUIUtils {
 
       default: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
-            event, maybeTargetForEvent(traceParseData, event), linkifier, isFreshRecording, traceParseData);
+            event, maybeTargetForEvent(traceParseData, event), linkifier, isFreshRecording, traceParseData,
+            contentHelper);
         if (detailsNode) {
           contentHelper.appendElementRow(i18nString(UIStrings.details), detailsNode);
         }
@@ -1921,8 +1931,8 @@ export class TimelineUIUtils {
   }
 
   private static renderEventJson(
-      event: TraceEngine.Legacy.CompatibleTraceEvent, contentHelper: TimelineDetailsContentHelper): void {
-    contentHelper.addSection(i18nString(UIStrings.traceEvent));
+      event: TraceEngine.Legacy.CompatibleTraceEvent, contentHelper: TimelineDetailsContentHelper, title): void {
+    contentHelper.addSection(title ?? i18nString(UIStrings.traceEvent));
 
     const eventWithArgsFirst = {
       ...{args: event.args},
