@@ -187,9 +187,17 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     const timeDeltas = event.args.data?.timeDeltas || [];
     const lines = event.args.data?.lines || Array(samples.length).fill(0);
     cdpProfile.nodes.push(...nodes);
-    cdpProfile.samples?.push(...samples);
-    cdpProfile.timeDeltas?.push(...timeDeltas);
-    cdpProfile.lines?.push(...lines);
+    // V8 cannot push spread arrays bigger than this
+    if (samples.length <= 125_507) {
+      cdpProfile.samples?.push(...samples);
+      cdpProfile.timeDeltas?.push(...timeDeltas);
+      cdpProfile.lines?.push(...lines);
+    } else {
+      // Concat is slower, as it allocates more memory, but it can handle larger sizes.
+      cdpProfile.samples = cdpProfile.samples?.concat(samples);
+      cdpProfile.timeDeltas = cdpProfile.timeDeltas?.concat(timeDeltas);
+      cdpProfile.lines = cdpProfile.lines?.concat(lines);
+    }
     if (cdpProfile.samples && cdpProfile.timeDeltas && cdpProfile.samples.length !== cdpProfile.timeDeltas.length) {
       console.error('Failed to parse CPU profile.');
       return;
