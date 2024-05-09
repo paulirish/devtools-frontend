@@ -65,11 +65,14 @@ describeWithEnvironment('SamplesIntegrator', function() {
     it('generates JSSamples from samples under debug mode', () => {
       const config = {
         ...TraceModel.Types.Configuration.DEFAULT,
+        experiments: {
+          ...TraceModel.Types.Configuration.DEFAULT.experiments,
+          timelineDebugMode: true,
+        },
       };
-      config.experiments.timelineDebugMode = true;
 
       const integrator =
-          new TraceModel.Helpers.SamplesIntegrator.SamplesIntegrator(parsedBasicProfile, pid, tid, config);
+          new TraceModel.Helpers.SamplesIntegrator.SamplesIntegrator(parsedBasicProfile, PROFILE_ID, pid, tid, config);
       integrator.callsFromProfileSamples();
       const jsSampleEvents = integrator.jsSampleEvents;
 
