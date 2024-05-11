@@ -29,7 +29,6 @@
 //  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import {type AreaBounds, type Bounds} from './common.js';
-
 import {drawGridLabels, type GridLabelState} from './css_grid_label_helpers.js';
 import {applyMatrixToPoint, buildPath, emptyBounds, hatchFillPath} from './highlight_common.js';
 
@@ -40,7 +39,7 @@ export const gridStyle = `
   position: absolute;
   -webkit-user-select: none;
   padding: 2px;
-  font-family: Menlo, monospace;
+font-family: 'Roboto Mono DG';
   font-size: 10px;
   min-width: 17px;
   min-height: 15px;

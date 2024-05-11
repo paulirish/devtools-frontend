@@ -22,7 +22,7 @@ LitHtml.render(
     LitHtml.html`
         <style>
           .source-code {
-            font-family: monospace;
+            font-family: 'Roboto Mono DG';
           }
         </style>
 
