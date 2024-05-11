@@ -40,7 +40,7 @@ export const gridStyle = `
   position: absolute;
   -webkit-user-select: none;
   padding: 2px;
-  font-family: Menlo, monospace;
+font-family: 'Operator Mono';
   font-size: 10px;
   min-width: 17px;
   min-height: 15px;
