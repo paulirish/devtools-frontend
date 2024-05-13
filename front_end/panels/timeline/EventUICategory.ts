@@ -709,7 +709,7 @@ export function maybeInitSylesMap(): EventStylesMap {
         ),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.Layerize]:
-        new TimelineRecordStyle(i18nString(UIStrings.layerize), defaultCategoryStyles.rendering),
+        new TimelineRecordStyle(i18nString(UIStrings.layerize), defaultCategoryStyles.painting),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.Layout]:
         new TimelineRecordStyle(i18nString(UIStrings.layout), defaultCategoryStyles.rendering),
