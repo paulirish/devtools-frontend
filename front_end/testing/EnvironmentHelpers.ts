@@ -113,21 +113,20 @@ const REGISTERED_EXPERIMENTS = [
   'timeline-show-all-events',
   'timeline-v8-runtime-call-stats',
   'timeline-invalidation-tracking',
-  'ignore-list-js-frames-on-timeline',
   Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS,
   'css-type-component-length-deprecate',
   Root.Runtime.ExperimentName.STYLES_PANE_CSS_CHANGES,
   Root.Runtime.ExperimentName.HEADER_OVERRIDES,
   Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
-  Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY,
   Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
   'font-editor',
   Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
   Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE,
   Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-  Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
+  Root.Runtime.ExperimentName.PERF_PANEL_ANNOTATIONS,
   Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS,
   Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
+  Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {

@@ -152,8 +152,8 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
   private lastHoveredProfileNode!: TimelineModel.TimelineProfileTree.Node|null;
   private textFilterInternal!: TimelineRegExp;
   private taskFilter!: TimelineModel.TimelineModelFilter.ExclusiveNameFilter;
-  protected startTime!: number;
-  protected endTime!: number;
+  protected startTime!: TraceEngine.Types.Timing.MilliSeconds;
+  protected endTime!: TraceEngine.Types.Timing.MilliSeconds;
   splitWidget!: UI.SplitWidget.SplitWidget;
   detailsView!: UI.Widget.Widget;
   private searchableView!: UI.SearchableView.SearchableView;
@@ -202,8 +202,9 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
   init(): void {
     this.linkifier = new Components.Linkifier.Linkifier();
 
-    this.taskFilter =
-        new TimelineModel.TimelineModelFilter.ExclusiveNameFilter([TimelineModel.TimelineModel.RecordType.Task]);
+    this.taskFilter = new TimelineModel.TimelineModelFilter.ExclusiveNameFilter([
+      TraceEngine.Types.TraceEvents.KnownEventName.RunTask,
+    ]);
     this.textFilterInternal = new TimelineRegExp();
 
     this.currentThreadSetting = Common.Settings.Settings.instance().createSetting('timeline-tree-current-thread', 0);
@@ -251,7 +252,7 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
     this.setRange(selection.startTime, selection.endTime);
   }
 
-  setRange(startTime: number, endTime: number): void {
+  setRange(startTime: TraceEngine.Types.Timing.MilliSeconds, endTime: TraceEngine.Types.Timing.MilliSeconds): void {
     this.startTime = startTime;
     this.endTime = endTime;
     this.refreshTree();

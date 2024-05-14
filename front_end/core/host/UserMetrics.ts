@@ -1020,7 +1020,6 @@ export enum DevtoolsExperiments {
   'apca' = 39,
   'font-editor' = 41,
   'full-accessibility-tree' = 42,
-  'ignore-list-js-frames-on-timeline' = 43,
   'contrast-issues' = 44,
   'experimental-cookie-features' = 45,
   'styles-pane-css-changes' = 55,
@@ -1031,23 +1030,21 @@ export enum DevtoolsExperiments {
   'preloading-status-panel' = 68,
   'outermost-target-selector' = 71,
   'highlight-errors-elements-panel' = 73,
-  'set-all-breakpoints-eagerly' = 74,
   'use-source-map-scopes' = 76,
-  'storage-buckets-tree' = 77,
   'network-panel-filter-bar-redesign' = 79,
   'autofill-view' = 82,
   'sources-frame-indentation-markers-temporarily-disable' = 83,
   'heap-snapshot-treat-backing-store-as-containing-object' = 84,
   'css-type-component-length-deprecate' = 85,
   'timeline-show-postmessage-events' = 86,
-  'save-and-load-trace-with-annotations' = 87,
   'timeline-extensions' = 89,
   'timeline-enhanced-traces' = 90,
   'timeline-compiled-sources' = 91,
-  'timeline-enable-old-timeline-model-engine' = 92,
+  'timeline-debug-mode' = 93,
+  'perf-panel-annotations' = 94,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 93,
+  'MaxValue' = 95,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

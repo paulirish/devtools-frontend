@@ -268,8 +268,6 @@ export class MainImpl {
   #initializeExperiments(): void {
     Root.Runtime.experiments.register('apply-custom-stylesheet', 'Allow extensions to load custom stylesheets');
     Root.Runtime.experiments.register('capture-node-creation-stacks', 'Capture node creation stacks');
-    Root.Runtime.experiments.register(
-        'ignore-list-js-frames-on-timeline', 'Ignore list for JavaScript frames in Performance panel', true);
     Root.Runtime.experiments.register('live-heap-profile', 'Live heap profile', true);
     Root.Runtime.experiments.register(
         'protocol-monitor', 'Protocol Monitor', undefined,
@@ -293,6 +291,9 @@ export class MainImpl {
         'timeline-enhanced-traces', 'Performance panel: Enable collecting enhanced traces', true);
     Root.Runtime.experiments.register(
         'timeline-compiled-sources', 'Performance panel: Enable collecting source text for compiled script', true);
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
+        'Performance panel: Enable debug mode (trace event details, etc)', true);
 
     // Sources
     Root.Runtime.experiments.register(
@@ -302,7 +303,6 @@ export class MainImpl {
 
     // Debugging
     Root.Runtime.experiments.register('instrumentation-breakpoints', 'Enable instrumentation breakpoints', true);
-    Root.Runtime.experiments.register('set-all-breakpoints-eagerly', 'Set all breakpoints eagerly at startup');
     Root.Runtime.experiments.register('use-source-map-scopes', 'Use scope information from source maps', true);
 
     // Advanced Perceptual Contrast Algorithm.
@@ -368,9 +368,6 @@ export class MainImpl {
         false);
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.STORAGE_BUCKETS_TREE, 'Enable storage buckets tree in Application panel', true);
-
-    Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
         'Redesign of the filter bar in the Network panel',
         false,
@@ -392,23 +389,15 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
+        Root.Runtime.ExperimentName.PERF_PANEL_ANNOTATIONS,
         'Enable saving and loading traces with annotations in the Performance panel',
-    );
-
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
-        'Enable the legacy tracing model when inspecting Chrome traces using the performance panel',
-        true,  // mark as unstable as we don't expect users to change this setting
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
       'css-type-component-length-deprecate',
-      'set-all-breakpoints-eagerly',
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-      Root.Runtime.ExperimentName.TIMELINE_EXECUTE_OLD_ENGINE,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 
@@ -448,24 +437,7 @@ export class MainImpl {
     if (!ThemeSupport.ThemeSupport.hasInstance()) {
       ThemeSupport.ThemeSupport.instance({forceNew: true, setting: themeSetting});
     }
-
     ThemeSupport.ThemeSupport.instance().applyTheme(document);
-
-    const onThemeChange = (): void => {
-      ThemeSupport.ThemeSupport.instance().applyTheme(document);
-    };
-
-    // When the theme changes we instantiate a new theme support and reapply.
-    // Equally if the user has set to match the system and the OS preference changes
-    // we perform the same change.
-    const darkThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const highContrastMediaQuery = window.matchMedia('(forced-colors: active)');
-    darkThemeMediaQuery.addEventListener('change', onThemeChange);
-    highContrastMediaQuery.addEventListener('change', onThemeChange);
-    themeSetting.addChangeListener(onThemeChange);
-
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
-        Host.InspectorFrontendHostAPI.Events.ColorThemeChanged, () => ThemeSupport.ThemeSupport.fetchColors(document));
 
     UI.UIUtils.installComponentRootStyles((document.body as Element));
 
@@ -572,7 +544,7 @@ export class MainImpl {
     const app = (appProvider as Common.AppProvider.AppProvider).createApp();
     // It is important to kick controller lifetime after apps are instantiated.
     UI.DockController.DockController.instance().initialize();
-    ThemeSupport.ThemeSupport.fetchColors(document);
+    ThemeSupport.ThemeSupport.instance().fetchColors(document);
     app.presentUI(document);
 
     if (UI.ActionRegistry.ActionRegistry.instance().hasAction('elements.toggle-element-search')) {

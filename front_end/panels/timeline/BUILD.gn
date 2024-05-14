@@ -69,7 +69,6 @@ devtools_module("timeline") {
     "IsolateSelector.ts",
     "LayoutShiftsTrackAppender.ts",
     "NetworkTrackAppender.ts",
-    "PerformanceModel.ts",
     "SaveFileFormatter.ts",
     "SourceMapsResolver.ts",
     "TargetForEvent.ts",
@@ -114,6 +113,7 @@ devtools_module("timeline") {
     "../../services/annotations_manager:bundle",
     "../../services/trace_bounds:bundle",
     "../../ui/components/buttons:bundle",
+    "../../ui/components/code_highlighter:bundle",  # trace event highlighting
     "../../ui/components/data_grid:bundle",
     "../../ui/components/linkifier:bundle",
     "../../ui/components/menus:bundle",

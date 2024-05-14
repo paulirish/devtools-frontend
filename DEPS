@@ -12,16 +12,16 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'f89d973fd4f19ba059f4f5277f12e875e7a77ab9',
+  'build_revision': 'e6bad9d579ad23c516bb49a145dedae944a7e639',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '0ac67b7cef80e421283f633ee9c2ce652f6e42cc',
+  'buildtools_revision': '2ff28130aafb3950ee3b09d37869611325129ec7',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'e75b940aeabcca1ea7e38881231e73a32a352753',
+  'depot_tools_revision': '84798693112c7e241d8c560ea6090e5d91a12fa2',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': '99e195660e59050e845a24d04d4a2eea1c35fc3b',
+  'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
@@ -29,7 +29,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:f284b6b47039a2d7edfcbfc51f52664f82b5a789',
+  'gn_version': 'git_revision:df98b86690c83b81aedc909ded18857296406159',
 
   'cmake_version': 'version:3.16.1',
 
@@ -46,7 +46,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '126.0.6449.0',
+  'chrome': '126.0.6478.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -108,7 +108,7 @@ deps = {
   'buildtools/win': {
     'packages': [
       {
-        'package': 'gn/gn/windows-${{arch}}',
+        'package': 'gn/gn/windows-amd64',
         'version': Var('gn_version'),
       }
     ],
@@ -216,58 +216,6 @@ hooks = [
     ],
   },
 
-  # Pull clang-format binaries using checked-in hashes.
-  {
-    'name': 'clang_format_win',
-    'pattern': '.',
-    'condition': 'host_os == "win" and build_with_chromium == False',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--no_auth',
-                '--bucket', 'chromium-clang-format',
-                '-s', 'buildtools/win/clang-format.exe.sha1',
-    ],
-  },
-  {
-    'name': 'clang_format_mac_x64',
-    'pattern': '.',
-    'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "x64"',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--no_auth',
-                '--bucket', 'chromium-clang-format',
-                '-s', 'buildtools/mac/clang-format.x64.sha1',
-                '-o', 'buildtools/mac/clang-format',
-    ],
-  },
-  {
-    'name': 'clang_format_mac_arm64',
-    'pattern': '.',
-    'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64"',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--no_auth',
-                '--bucket', 'chromium-clang-format',
-                '-s', 'buildtools/mac/clang-format.arm64.sha1',
-                '-o', 'buildtools/mac/clang-format',
-    ],
-  },
-  {
-    'name': 'clang_format_linux',
-    'pattern': '.',
-    'condition': 'host_os == "linux" and build_with_chromium == False',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--no_auth',
-                '--bucket', 'chromium-clang-format',
-                '-s', 'buildtools/linux64/clang-format.sha1',
-    ],
-  },
-
   # Pull Chrome binaries from CfT buckets.
   {
     'name': 'download_chrome_win',
@@ -335,13 +283,6 @@ hooks = [
                '-o', 'build/util/LASTCHANGE'],
   },
   {
-    'name': 'sysroot_x64',
-    'pattern': '.',
-    'condition': 'checkout_linux and checkout_x64 and build_with_chromium == False',
-    'action': ['python3', 'build/linux/sysroot_scripts/install-sysroot.py',
-               '--arch=x64'],
-  },
-  {
     'name': 'emscripten',
     'pattern': '.',
     'condition': 'build_with_chromium == False',
@@ -353,4 +294,9 @@ hooks = [
     'condition': 'build_with_chromium == False',
     'action': ['python3', 'third_party/node/node.py', '--output', 'scripts/deps/sync-vscode-settings.js']
   },
+]
+
+recursedeps = [
+  'build',
+  'buildtools',
 ]

@@ -28,134 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import * as Common from '../../core/common/common.js';
-import * as Platform from '../../core/platform/platform.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as TraceEngine from '../trace/trace.js';
 
 export class TimelineModelImpl {
-  private inspectedTargetEventsInternal!: TraceEngine.Legacy.Event[];
   private sessionId!: string|null;
-  private mainFrameNodeId!: number|null;
-  private requestsFromBrowser!: Map<string, TraceEngine.Legacy.Event>;
-  private lastScheduleStyleRecalculation!: {
-    [x: string]: TraceEngine.Types.TraceEvents.TraceEventData,
-  };
   private lastPaintForLayer!: {
     [x: string]: TraceEngine.Legacy.Event,
   };
   private currentScriptEvent!: TraceEngine.Legacy.Event|null;
   private eventStack!: TraceEngine.Legacy.Event[];
   private browserFrameTracking!: boolean;
-  private currentTaskLayoutAndRecalcEvents: TraceEngine.Legacy.Event[];
-  private tracingModelInternal: TraceEngine.Legacy.TracingModel|null;
-  private lastRecalculateStylesEvent: TraceEngine.Legacy.Event|null;
 
   constructor() {
     this.reset();
     this.resetProcessingState();
-
-    this.currentTaskLayoutAndRecalcEvents = [];
-    this.tracingModelInternal = null;
-    this.lastRecalculateStylesEvent = null;
-  }
-
-  /**
-   * Iterates events in a tree hierarchically, from top to bottom,
-   * calling back on every event's start and end in the order
-   * dictated by the corresponding timestamp.
-   *
-   * Events are assumed to be in ascendent order by timestamp.
-   *
-   * For example, given this tree, the following callbacks
-   * are expected to be made in the following order
-   * |---------------A---------------|
-   *  |------B------||-------D------|
-   *    |---C---|
-   *
-   * 1. Start A
-   * 3. Start B
-   * 4. Start C
-   * 5. End C
-   * 6. End B
-   * 7. Start D
-   * 8. End D
-   * 9. End A
-   *
-   * By default, async events are filtered. This behaviour can be
-   * overriden making use of the filterAsyncEvents parameter.
-   */
-  static forEachEvent(
-      events: TraceEngine.Legacy.CompatibleTraceEvent[],
-      onStartEvent: (arg0: TraceEngine.Legacy.CompatibleTraceEvent) => void,
-      onEndEvent: (arg0: TraceEngine.Legacy.CompatibleTraceEvent) => void,
-      onInstantEvent?:
-          ((arg0: TraceEngine.Legacy.CompatibleTraceEvent, arg1: TraceEngine.Legacy.CompatibleTraceEvent|null) => void),
-      startTime?: number, endTime?: number, filter?: ((arg0: TraceEngine.Legacy.CompatibleTraceEvent) => boolean),
-      ignoreAsyncEvents = true): void {
-    startTime = startTime || 0;
-    endTime = endTime || Infinity;
-    const stack: TraceEngine.Legacy.CompatibleTraceEvent[] = [];
-    const startEvent = TimelineModelImpl.topLevelEventEndingAfter(events, startTime);
-    for (let i = startEvent; i < events.length; ++i) {
-      const e = events[i];
-      const {endTime: eventEndTime, startTime: eventStartTime, duration: eventDuration} =
-          TraceEngine.Legacy.timesForEventInMilliseconds(e);
-      const eventPhase = TraceEngine.Legacy.phaseForEvent(e);
-      if ((eventEndTime || eventStartTime) < startTime) {
-        continue;
-      }
-      if (eventStartTime >= endTime) {
-        break;
-      }
-      const canIgnoreAsyncEvent = ignoreAsyncEvents && TraceEngine.Types.TraceEvents.isAsyncPhase(eventPhase);
-      if (canIgnoreAsyncEvent || TraceEngine.Types.TraceEvents.isFlowPhase(eventPhase)) {
-        continue;
-      }
-      let last = stack[stack.length - 1];
-      let lastEventEndTime = last && TraceEngine.Legacy.timesForEventInMilliseconds(last).endTime;
-      while (last && lastEventEndTime !== undefined && lastEventEndTime <= eventStartTime) {
-        stack.pop();
-        onEndEvent(last);
-        last = stack[stack.length - 1];
-        lastEventEndTime = last && TraceEngine.Legacy.timesForEventInMilliseconds(last).endTime;
-      }
-
-      if (filter && !filter(e)) {
-        continue;
-      }
-      if (eventDuration) {
-        onStartEvent(e);
-        stack.push(e);
-      } else {
-        onInstantEvent && onInstantEvent(e, stack[stack.length - 1] || null);
-      }
-    }
-    while (stack.length) {
-      const last = stack.pop();
-      if (last) {
-        onEndEvent(last);
-      }
-    }
-  }
-
-  private static topLevelEventEndingAfter(events: TraceEngine.Legacy.CompatibleTraceEvent[], time: number): number {
-    let index =
-        Platform.ArrayUtilities.upperBound(
-            events, time, (time, event) => time - TraceEngine.Legacy.timesForEventInMilliseconds(event).startTime) -
-        1;
-    while (index > 0 && !TraceEngine.Legacy.TracingModel.isTopLevelEvent(events[index])) {
-      index--;
-    }
-    return Math.max(index, 0);
   }
 
   setEvents(tracingModel: TraceEngine.Legacy.TracingModel): void {
     this.reset();
     this.resetProcessingState();
-    this.tracingModelInternal = tracingModel;
 
     this.processSyncBrowserEvents(tracingModel);
     if (this.browserFrameTracking) {
@@ -170,15 +63,10 @@ export class TimelineModelImpl {
         this.processGenericTrace(tracingModel);
       }
     }
-    this.inspectedTargetEventsInternal.sort(TraceEngine.Legacy.Event.compareStartTime);
     this.resetProcessingState();
   }
 
   private processGenericTrace(tracingModel: TraceEngine.Legacy.TracingModel): void {
-    let browserMainThread = TraceEngine.Legacy.TracingModel.browserMainThread(tracingModel);
-    if (!browserMainThread && tracingModel.sortedProcesses().length) {
-      browserMainThread = tracingModel.sortedProcesses()[0].sortedThreads()[0];
-    }
     for (const process of tracingModel.sortedProcesses()) {
       for (const thread of process.sortedThreads()) {
         this.processThreadEvents(thread);
@@ -241,9 +129,6 @@ export class TimelineModelImpl {
         pageDevToolsMetadataEvents.push(event);
       } else if (event.name === TimelineModelImpl.DevToolsMetadataEvent.TracingSessionIdForWorker) {
         workersDevToolsMetadataEvents.push(event);
-      } else if (event.name === TimelineModelImpl.DevToolsMetadataEvent.TracingStartedInBrowser) {
-        console.assert(!this.mainFrameNodeId, 'Multiple sessions in trace');
-        this.mainFrameNodeId = event.args['frameTreeNodeId'];
       }
     }
     if (!pageDevToolsMetadataEvents.length) {
@@ -254,7 +139,7 @@ export class TimelineModelImpl {
         pageDevToolsMetadataEvents[0].args['sessionId'] || pageDevToolsMetadataEvents[0].args['data']['sessionId'];
     this.sessionId = sessionId;
 
-    const mismatchingIds = new Set<any>();
+    const mismatchingIds = new Set<unknown>();
     function checkSessionId(event: TraceEngine.Legacy.Event): boolean {
       let args = event.args;
       // FIXME: put sessionId into args["data"] for TracingStartedInPage event.
@@ -288,7 +173,6 @@ export class TimelineModelImpl {
   }
 
   private resetProcessingState(): void {
-    this.lastScheduleStyleRecalculation = {};
     this.lastPaintForLayer = {};
     this.currentScriptEvent = null;
     this.eventStack = [];
@@ -324,18 +208,10 @@ export class TimelineModelImpl {
         event.selfTime = event.duration;
         eventStack.push(event);
       }
-
-      this.inspectedTargetEventsInternal.push(event);
     }
   }
 
   private processEvent(event: TraceEngine.Legacy.Event): boolean {
-    const eventStack = this.eventStack;
-
-    if (!eventStack.length) {
-      this.currentTaskLayoutAndRecalcEvents = [];
-    }
-
     if (this.currentScriptEvent) {
       if (this.currentScriptEvent.endTime !== undefined && event.startTime > this.currentScriptEvent.endTime) {
         this.currentScriptEvent = null;
@@ -344,29 +220,10 @@ export class TimelineModelImpl {
 
     const eventData = event.args['data'] || event.args['beginData'] || {};
     switch (event.name) {
-      case RecordType.ScheduleStyleRecalculation: {
-        if (!(event instanceof TraceEngine.Legacy.PayloadEvent)) {
-          break;
-        }
-        this.lastScheduleStyleRecalculation[eventData['frame']] = event.rawPayload();
-        break;
-      }
-
-      case RecordType.UpdateLayoutTree:
-      case RecordType.RecalculateStyles: {
-        if (this.currentScriptEvent) {
-          this.currentTaskLayoutAndRecalcEvents.push(event);
-        }
-        break;
-      }
-
       case RecordType.Layout: {
         const frameId = event.args?.beginData?.frame;
         if (!frameId) {
           break;
-        }
-        if (this.currentScriptEvent) {
-          this.currentTaskLayoutAndRecalcEvents.push(event);
         }
         break;
       }
@@ -389,11 +246,6 @@ export class TimelineModelImpl {
         this.lastPaintForLayer[layerId] = event;
         break;
       }
-
-      case RecordType.SelectorStats: {
-        this.lastRecalculateStylesEvent?.addArgs(event.args);
-        break;
-      }
     }
     return true;
   }
@@ -402,7 +254,6 @@ export class TimelineModelImpl {
     if (event.name === RecordType.ResourceWillSendRequest) {
       const requestId = event.args?.data?.requestId;
       if (typeof requestId === 'string') {
-        this.requestsFromBrowser.set(requestId, event);
       }
       return;
     }
@@ -414,25 +265,13 @@ export class TimelineModelImpl {
           return;
         }
         this.browserFrameTracking = true;
-        this.mainFrameNodeId = data['frameTreeNodeId'];
         return;
       }
     }
   }
 
   private reset(): void {
-    this.inspectedTargetEventsInternal = [];
     this.sessionId = null;
-    this.mainFrameNodeId = null;
-    this.requestsFromBrowser = new Map();
-  }
-
-  tracingModel(): TraceEngine.Legacy.TracingModel|null {
-    return this.tracingModelInternal;
-  }
-
-  inspectedTargetEvents(): TraceEngine.Legacy.Event[] {
-    return this.inspectedTargetEventsInternal;
   }
 }
 
@@ -453,7 +292,6 @@ export enum RecordType {
   DroppedFrame = 'DroppedFrame',
   HitTest = 'HitTest',
   ScheduleStyleRecalculation = 'ScheduleStyleRecalculation',
-  RecalculateStyles = 'RecalculateStyles',
   UpdateLayoutTree = 'UpdateLayoutTree',
   InvalidateLayout = 'InvalidateLayout',
   Layerize = 'Layerize',
@@ -616,10 +454,6 @@ export namespace TimelineModelImpl {
   export const WorkerThreadName = 'DedicatedWorker thread';
   export const WorkerThreadNameLegacy = 'DedicatedWorker Thread';
   export const RendererMainThreadName = 'CrRendererMain';
-  export const BrowserMainThreadName = 'CrBrowserMain';
-  // The names of threads before M111 were exactly this, but afterwards have
-  // it a suffix after the exact role.
-  export const UtilityMainThreadNameSuffix = 'CrUtilityMain';
 
   export const DevToolsMetadataEvent = {
     TracingStartedInBrowser: 'TracingStartedInBrowser',
@@ -628,14 +462,6 @@ export namespace TimelineModelImpl {
     FrameCommittedInBrowser: 'FrameCommittedInBrowser',
     ProcessReadyInBrowser: 'ProcessReadyInBrowser',
     FrameDeletedInBrowser: 'FrameDeletedInBrowser',
-  };
-
-  export const Thresholds = {
-    LongTask: 50,
-    Handler: 150,
-    RecurringHandler: 50,
-    ForcedLayout: 30,
-    IdleCallbackAddon: 5,
   };
 }
 

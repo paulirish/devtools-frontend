@@ -1,5 +1,5 @@
 /**
  * @internal
  */
-export const packageVersion = '22.7.1';
+export const packageVersion = '22.8.1';
 //# sourceMappingURL=version.js.map

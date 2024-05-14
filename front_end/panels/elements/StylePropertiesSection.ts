@@ -40,6 +40,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
+import type * as Buttons from '../../ui/components/buttons/buttons.js';
 import type * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -86,7 +87,7 @@ const UIStrings = {
    *@description Show all button text content in Styles Sidebar Pane of the Elements panel
    *@example {3} PH1
    */
-  showAllPropertiesSMore: 'Show All Properties ({PH1} more)',
+  showAllPropertiesSMore: 'Show all properties ({PH1} more)',
   /**
    *@description Text in Elements Tree Element of the Elements panel, copy should be used as a verb
    */
@@ -130,7 +131,7 @@ export class StylePropertiesSection {
   readonly #styleRuleElement: HTMLElement;
   private readonly titleElement: HTMLElement;
   propertiesTreeOutline: UI.TreeOutline.TreeOutlineInShadow;
-  private showAllButton: HTMLButtonElement;
+  private showAllButton: Buttons.Button.Button;
   protected selectorElement: HTMLSpanElement;
   private readonly newStyleRuleToolbar: UI.Toolbar.Toolbar|undefined;
   private readonly fontEditorToolbar: UI.Toolbar.Toolbar|undefined;
@@ -223,9 +224,10 @@ export class StylePropertiesSection {
     this.selectorElement.addEventListener('mouseenter', this.onMouseEnterSelector.bind(this), false);
     this.selectorElement.addEventListener('mouseleave', this.onMouseOutSelector.bind(this), false);
 
-    if (headerText.length > 0) {
+    // We only add braces for style rules with selectors and non-style rules, which create their own sections.
+    if (headerText.length > 0 || !(rule instanceof SDK.CSSRule.CSSStyleRule)) {
       const openBrace = selectorContainer.createChild('span', 'sidebar-pane-open-brace');
-      openBrace.textContent = ' {';
+      openBrace.textContent = headerText.length > 0 ? ' {' : '{';  // We don't add spacing when there is no selector.
 
       const closeBrace = this.#styleRuleElement.createChild('div', 'sidebar-pane-closing-brace');
       closeBrace.createChild('span', 'styles-clipboard-only').textContent = indent.repeat(this.nestingLevel);
@@ -273,7 +275,7 @@ export class StylePropertiesSection {
 
     this.selectorElement.addEventListener('click', this.handleSelectorClick.bind(this), false);
     this.selectorElement.setAttribute(
-        'jslog', `${VisualLogging.cssQuery('selector').track({click: true, change: true})}`);
+        'jslog', `${VisualLogging.cssRuleHeader('selector').track({click: true, change: true})}`);
     this.element.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), false);
     this.element.addEventListener('mousedown', this.handleEmptySpaceMouseDown.bind(this), false);
     this.element.addEventListener('click', this.handleEmptySpaceClick.bind(this), false);

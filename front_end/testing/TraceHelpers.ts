@@ -1,9 +1,12 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
+import * as Bindings from '../models/bindings/bindings.js';
 import * as CPUProfile from '../models/cpu_profile/cpu_profile.js';
 import * as TraceEngine from '../models/trace/trace.js';
+import * as Workspace from '../models/workspace/workspace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
 import * as PerfUI from '../ui/legacy/components/perf_ui/perf_ui.js';
 
@@ -45,12 +48,12 @@ export async function getMainFlameChartWithTracks(
   await initializeGlobalVars();
 
   // This function is used to load a component example.
-  const {traceParsedData, performanceModel} = await TraceLoader.allModels(/* context= */ null, traceFileName);
+  const traceParsedData = await TraceLoader.traceEngine(/* context= */ null, traceFileName);
 
   const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
   // The data provider still needs a reference to the legacy model to
   // work properly.
-  dataProvider.setModel(performanceModel, traceParsedData);
+  dataProvider.setModel(traceParsedData);
   const tracksAppender = dataProvider.compatibilityTracksAppenderInstance();
   tracksAppender.setVisibleTracks(trackAppenderNames);
   dataProvider.buildFromTrackAppenders(
@@ -73,14 +76,13 @@ export async function getMainFlameChartWithTracks(
  * @param expanded if the track is expanded
  * @returns a flame chart element and its corresponding data provider.
  */
-export async function getNetworkFlameChartWithLegacyTrack(traceFileName: string, expanded: boolean): Promise<{
+export async function getNetworkFlameChart(traceFileName: string, expanded: boolean): Promise<{
   flameChart: PerfUI.FlameChart.FlameChart,
   dataProvider: Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider,
 }> {
   await initializeGlobalVars();
 
-  // This function is used to load a component example.
-  const {traceParsedData} = await TraceLoader.allModels(/* context= */ null, traceFileName);
+  const traceParsedData = await TraceLoader.traceEngine(/* context= */ null, traceFileName);
   const minTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.min);
   const maxTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(traceParsedData.Meta.traceBounds.max);
   const dataProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
@@ -266,6 +268,39 @@ export function makeCompleteEvent(
   };
 }
 
+export function makeAsyncStartEvent(
+    name: string,
+    ts: number,
+    pid: number = 0,
+    tid: number = 0,
+    ): TraceEngine.Types.TraceEvents.TraceEventAsync {
+  return {
+    args: {},
+    cat: '*',
+    name,
+    ph: TraceEngine.Types.TraceEvents.Phase.ASYNC_NESTABLE_START,
+    pid: TraceEngine.Types.TraceEvents.ProcessID(pid),
+    tid: TraceEngine.Types.TraceEvents.ThreadID(tid),
+    ts: TraceEngine.Types.Timing.MicroSeconds(ts),
+  };
+}
+export function makeAsyncEndEvent(
+    name: string,
+    ts: number,
+    pid: number = 0,
+    tid: number = 0,
+    ): TraceEngine.Types.TraceEvents.TraceEventAsync {
+  return {
+    args: {},
+    cat: '*',
+    name,
+    ph: TraceEngine.Types.TraceEvents.Phase.ASYNC_NESTABLE_END,
+    pid: TraceEngine.Types.TraceEvents.ProcessID(pid),
+    tid: TraceEngine.Types.TraceEvents.ThreadID(tid),
+    ts: TraceEngine.Types.Timing.MicroSeconds(ts),
+  };
+}
+
 export function makeCompleteEventInMilliseconds(
     name: string, tsMillis: number, durMillis: number, cat: string = '*', pid: number = 0,
     tid: number = 0): TraceEngine.Types.TraceEvents.TraceEventComplete {
@@ -335,6 +370,8 @@ export function makeProfileCall(
     cat: '',
     name: 'ProfileCall',
     nodeId,
+    sampleIndex: 0,
+    profileId: TraceEngine.Types.TraceEvents.ProfileID('fake-profile-id'),
     ph: TraceEngine.Types.TraceEvents.Phase.COMPLETE,
     pid,
     tid,
@@ -507,6 +544,7 @@ export function makeMockSamplesHandlerData(profileCalls: TraceEngine.Types.Trace
     parsedProfile: new CPUProfile.CPUProfileDataModel.CPUProfileDataModel(profile),
     profileCalls,
     profileTree: tree,
+    profileId: TraceEngine.Types.TraceEvents.ProfileID('fake-profile-id'),
   };
   const profilesInThread = new Map([[1 as TraceEngine.Types.TraceEvents.ThreadID, profileData]]);
   return {
@@ -677,4 +715,30 @@ export function getEventOfType<T extends TraceEngine.Types.TraceEvents.TraceEven
     throw new Error('Failed to find matching event of type.');
   }
   return match;
+}
+
+/**
+ * The Performance Panel is integrated with the IgnoreListManager so in tests
+ * that render a flame chart or a track appender, it needs to be setup to avoid
+ * errors.
+ */
+export function setupIgnoreListManagerEnvironment(): {
+  ignoreListManager: Bindings.IgnoreListManager.IgnoreListManager,
+} {
+  const targetManager = SDK.TargetManager.TargetManager.instance({forceNew: true});
+  const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
+  const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+
+  const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+    forceNew: true,
+    resourceMapping,
+    targetManager,
+  });
+
+  const ignoreListManager = Bindings.IgnoreListManager.IgnoreListManager.instance({
+    forceNew: true,
+    debuggerWorkspaceBinding,
+  });
+
+  return {ignoreListManager};
 }

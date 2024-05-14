@@ -649,6 +649,9 @@ export function maybeInitSylesMap(): EventStylesMap {
     [TraceEngine.Types.TraceEvents.KnownEventName.ProfileCall]:
         new TimelineRecordStyle(i18nString(UIStrings.jsFrame), defaultCategoryStyles.scripting),
 
+    [TraceEngine.Types.TraceEvents.KnownEventName.JSSample]:
+        new TimelineRecordStyle(TraceEngine.Types.TraceEvents.KnownEventName.JSSample, defaultCategoryStyles.scripting),
+
     [TraceEngine.Types.TraceEvents.KnownEventName.Program]:
         new TimelineRecordStyle(i18nString(UIStrings.other), defaultCategoryStyles.other),
 
@@ -692,9 +695,6 @@ export function maybeInitSylesMap(): EventStylesMap {
         i18nString(UIStrings.scheduleStyleRecalculation),
         defaultCategoryStyles.rendering,
         ),
-
-    [TraceEngine.Types.TraceEvents.KnownEventName.RecalculateStyles]:
-        new TimelineRecordStyle(i18nString(UIStrings.recalculateStyle), defaultCategoryStyles.rendering),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.UpdateLayoutTree]:
         new TimelineRecordStyle(i18nString(UIStrings.recalculateStyle), defaultCategoryStyles.rendering),

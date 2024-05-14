@@ -19,6 +19,7 @@ import {
 } from '../../testing/MockConnection.js';
 import {MockProtocolBackend} from '../../testing/MockScopeChain.js';
 import {createFileSystemFileForPersistenceTests} from '../../testing/PersistenceHelpers.js';
+import {getInitializedResourceTreeModel} from '../../testing/ResourceTreeHelpers.js';
 import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
 import {setupPageResourceLoaderForSourceMap} from '../../testing/SourceMapHelpers.js';
 import {
@@ -101,19 +102,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
     // Wait for the resource tree model to load; otherwise, our uiSourceCodes could be asynchronously
     // invalidated during the test.
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    assert.exists(resourceTreeModel);
-    await new Promise<void>(resolver => {
-      if (resourceTreeModel.cachedResourcesLoaded()) {
-        resolver();
-      } else {
-        const eventListener =
-            resourceTreeModel.addEventListener(SDK.ResourceTreeModel.Events.CachedResourcesLoaded, () => {
-              Common.EventTarget.removeEventListeners([eventListener]);
-              resolver();
-            });
-      }
-    });
+    await getInitializedResourceTreeModel(target);
 
     breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance(
         {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
@@ -699,8 +688,6 @@ describeWithMockConnection('BreakpointManager', () => {
     // Remove the default target so that we can simulate starting the debugger afresh.
     targetManager.removeTarget(target);
 
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
-
     // Set the breakpoint storage to contain a breakpoint and re-initialize
     // the breakpoint manager from that storage. This should create a breakpoint instance
     // in the breakpoint manager.
@@ -726,15 +713,11 @@ describeWithMockConnection('BreakpointManager', () => {
     });
     SDK.TargetManager.TargetManager.instance().setScopeTarget(createTarget());
     await breakpointSetPromise;
-
-    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
   });
 
   it('eagerly restores TypeScript breakpoints in a new target', async () => {
     // Remove the default target so that we can simulate starting the debugger afresh.
     targetManager.removeTarget(target);
-
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
 
     // Set the breakpoint storage to contain a source-mapped breakpoint and re-initialize
     // the breakpoint manager from that storage. This should create a breakpoint instance
@@ -768,14 +751,11 @@ describeWithMockConnection('BreakpointManager', () => {
     SDK.TargetManager.TargetManager.instance().setScopeTarget(createTarget());
     await breakpointSetPromise;
 
-    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
   });
 
   it('saves generated location into storage', async () => {
     // Remove the default target so that we can simulate starting the debugger afresh.
     targetManager.removeTarget(target);
-
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
 
     // Re-create a target and breakpoint manager.
     target = createTarget();
@@ -825,14 +805,11 @@ describeWithMockConnection('BreakpointManager', () => {
                        condition: '' as SDK.DebuggerModel.BackendCondition,
                      }]);
 
-    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
   });
 
   it('restores latest breakpoints from storage', async () => {
     // Remove the default target so that we can simulate starting the debugger afresh.
     targetManager.removeTarget(target);
-
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
 
     const expectedBreakpointLines = [1, 2];
 
@@ -889,8 +866,6 @@ describeWithMockConnection('BreakpointManager', () => {
     });
 
     assert.deepEqual(Array.from(await breakpointRequestLines), expectedBreakpointLines);
-
-    Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.SET_ALL_BREAKPOINTS_EAGERLY);
   });
 
   describe('with instrumentation breakpoints turned on', () => {

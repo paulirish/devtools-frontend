@@ -6369,10 +6369,6 @@ export const NativeFunctions = [
     signatures: [["x","y"]]
   },
   {
-    name: "requestStorageAccessFor",
-    signatures: [["requestedOrigin"]]
-  },
-  {
     name: "hasPrivateToken",
     signatures: [["issuer"]]
   },
@@ -7652,6 +7648,10 @@ export const NativeFunctions = [
     receivers: ["GPUQueue"]
   },
   {
+    name: "dispatch",
+    signatures: [["graph","inputs","outputs"]]
+  },
+  {
     name: "MLModelLoader",
     signatures: [["context"]]
   },
@@ -8314,6 +8314,10 @@ export const NativeFunctions = [
   {
     name: "SpeechSynthesisUtterance",
     signatures: [["?text"]]
+  },
+  {
+    name: "requestStorageAccessFor",
+    signatures: [["requestedOrigin"]]
   },
   {
     name: "StorageEvent",

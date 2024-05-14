@@ -328,12 +328,16 @@ export interface SyntheticNetworkRequest extends TraceEventComplete {
       frame: string,
       fromServiceWorker: boolean,
       isLinkPreload: boolean,
-      host: string,
       mimeType: string,
-      pathname: string,
-      search: string,
       priority: Protocol.Network.ResourcePriority,
       initialPriority: Protocol.Network.ResourcePriority,
+      /**
+       * This is the protocol used to resolve the request.
+       *
+       * Note, this is not the same as URL.protocol.
+       *
+       * Example values (not exhaustive): http/0.9, http/1.0, http/1.1, http, h2, h3-Q050, data, blob
+       */
       protocol: string,
       redirects: SyntheticNetworkRedirect[],
       renderBlocking: RenderBlocking,
@@ -488,19 +492,22 @@ export interface SyntheticScreenshot extends TraceEventData {
 
 export interface TraceEventAnimation extends TraceEventData {
   args: TraceEventArgs&{
-    id?: string,
-    name?: string,
-    nodeId?: number,
-    nodeName?: string,
-    state?: string,
-    compositeFailed?: number,
-    unsupportedProperties?: string[],
+    data: TraceEventArgsData & {
+      nodeName?: string,
+      nodeId?: number,
+      displayName?: string,
+      id?: string,
+      name?: string,
+      state?: string,
+      compositeFailed?: number,
+      unsupportedProperties?: string[],
+    },
   };
   name: 'Animation';
   id2?: {
     local?: string,
   };
-  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
+  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END|Phase.ASYNC_NESTABLE_INSTANT;
 }
 
 // Metadata events.
@@ -924,6 +931,14 @@ export interface TraceEventResourceReceiveResponse extends TraceEventInstant {
   name: 'ResourceReceiveResponse';
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
+      /**
+       * This is the protocol used to resolve the request.
+       *
+       * Note, this is not the same as URL.protocol.
+       *
+       * Example values (not exhaustive): http/0.9, http/1.0, http/1.1, http, h2, h3-Q050, data, blob
+       */
+      protocol: string,
       encodedDataLength: number,
       frame: string,
       fromCache: boolean,
@@ -1065,7 +1080,7 @@ export interface TraceEventPrePaint extends TraceEventComplete {
 }
 
 export interface TraceEventPairableAsync extends TraceEventData {
-  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
+  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END|Phase.ASYNC_NESTABLE_INSTANT;
   // The id2 field gives flexibility to explicitly specify if an event
   // id is global among processes or process local. However not all
   // events use it, so both kind of ids need to be marked as optional.
@@ -1074,6 +1089,10 @@ export interface TraceEventPairableAsync extends TraceEventData {
 }
 export interface TraceEventPairableAsyncBegin extends TraceEventPairableAsync {
   ph: Phase.ASYNC_NESTABLE_START;
+}
+
+export interface TraceEventPairableAsyncInstant extends TraceEventPairableAsync {
+  ph: Phase.ASYNC_NESTABLE_INSTANT;
 }
 
 export interface TraceEventPairableAsyncEnd extends TraceEventPairableAsync {
@@ -1242,6 +1261,7 @@ export interface SyntheticEventPair<T extends TraceEventPairableAsync = TraceEve
     data: {
       beginEvent: T & TraceEventPairableAsyncBegin,
       endEvent: T&TraceEventPairableAsyncEnd,
+      instantEvents?: Array<T&TraceEventPairableAsyncInstant>,
     },
   };
 }
@@ -1290,10 +1310,33 @@ export interface SyntheticTraceEntry extends TraceEventData {
 /**
  * A profile call created in the frontend from samples disguised as a
  * trace event.
+ *
+ * We store the sampleIndex, profileId and nodeId so that we can easily link
+ * back a Synthetic Trace Entry to an indivdual Sample trace event within a
+ * Profile.
+ *
+ * Because a sample contains a set of call frames representing the stack at the
+ * point in time that the sample was created, we also have to store the ID of
+ * the Node that points to the function call that this profile call represents.
  */
 export interface SyntheticProfileCall extends SyntheticTraceEntry {
   callFrame: Protocol.Runtime.CallFrame;
   nodeId: Protocol.integer;
+  sampleIndex: number;
+  profileId: ProfileID;
+}
+
+/**
+ * A JS Sample reflects a single sample from the V8 CPU Profile
+ */
+export interface SyntheticJSSample extends SyntheticTraceEntry {
+  name: KnownEventName.JSSample;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      stackTrace: Protocol.Runtime.CallFrame[],
+    },
+  };
+  ph: Phase.INSTANT;
 }
 
 /**
@@ -1699,7 +1742,8 @@ export function isTraceEventNavigationStart(
 export function isTraceEventAnimation(
     traceEventData: TraceEventData,
     ): traceEventData is TraceEventAnimation {
-  return traceEventData.name === 'Animation';
+  // We've found some rare traces with an Animtation trace event from a different category: https://crbug.com/1472375#comment7
+  return traceEventData.name === 'Animation' && traceEventData.cat.includes('devtools.timeline');
 }
 
 export function isTraceEventLayoutShift(
@@ -2205,6 +2249,9 @@ export interface TraceEventV8Compile extends TraceEventComplete {
     data?: {
       url?: string,
       columnNumber?: number,
+      consumedCacheSize?: number,
+      cacheRejected?: boolean,
+      cacheKind?: 'full'|'normal',
       lineNumber?: number,
       notStreamedReason?: string,
       streamed?: boolean,
@@ -2336,7 +2383,6 @@ export const enum KnownEventName {
 
   /* Layout */
   ScheduleStyleRecalculation = 'ScheduleStyleRecalculation',
-  RecalculateStyles = 'RecalculateStyles',
   Layout = 'Layout',
   UpdateLayoutTree = 'UpdateLayoutTree',
   InvalidateLayout = 'InvalidateLayout',
@@ -2429,6 +2475,8 @@ export const enum KnownEventName {
   StartProfiling = 'CpuProfiler::StartProfiling',
   ProfileChunk = 'ProfileChunk',
   UpdateCounters = 'UpdateCounters',
+
+  JSSample = 'JSSample',
 
   /* Other */
   Animation = 'Animation',

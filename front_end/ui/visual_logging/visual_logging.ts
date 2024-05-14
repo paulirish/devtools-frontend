@@ -10,7 +10,7 @@ import * as NonDomState from './NonDomState.js';
 
 export type Loggable = LoggableModule.Loggable;
 export {startLogging, stopLogging, addDocument} from './LoggingDriver.js';
-export {logImpressions, logChange} from './LoggingEvents.js';
+export {logImpressions} from './LoggingEvents.js';
 export const logClick = (l: Loggable, e: Event): void => LoggingEvents.logClick(LoggingDriver.clickLogThrottler)(l, e);
 export const logResize = (l: Loggable, s: DOMRect): void => LoggingEvents.logResize(l, s);
 export const logKeyDown = async(l: Loggable|null, e: Event, context?: string): Promise<void> =>
@@ -22,7 +22,7 @@ export function registerLoggable(loggable: Loggable, config: string, parent: Log
     return;
   }
   NonDomState.registerLoggable(loggable, LoggingConfig.parseJsLog(config), parent || undefined);
-  LoggingDriver.scheduleProcessing();
+  void LoggingDriver.scheduleProcessing();
 }
 
 /**
@@ -48,7 +48,7 @@ export const counter = LoggingConfig.makeConfigStringBuilder.bind(null, 'Counter
  */
 export const controlPoint = LoggingConfig.makeConfigStringBuilder.bind(null, 'ControlPoint');
 export const cssColorMix = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssColorMix');
-export const cssQuery = LoggingConfig.makeConfigStringBuilder.bind(null, 'CssQuery');
+export const cssRuleHeader = LoggingConfig.makeConfigStringBuilder.bind(null, 'CSSRuleHeader');
 export const deviceModeRuler = LoggingConfig.makeConfigStringBuilder.bind(null, 'DeviceModeRuler');
 export const domBreakpoint = LoggingConfig.makeConfigStringBuilder.bind(null, 'DOMBreakpoint');
 export const drawer = LoggingConfig.makeConfigStringBuilder.bind(null, 'Drawer');
