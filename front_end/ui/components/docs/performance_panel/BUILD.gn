@@ -41,3 +41,89 @@ copy_to_gen("performance_panel") {
 
   deps = [ ":ts" ]
 }
+
+
+
+ts_library("standalone") {
+  testonly = true
+  sources = [
+    "standalone.ts",
+  ]
+  deps = [
+    "../../../../core/common:bundle",
+    "../../../../core/sdk:bundle",
+    "../../../../models/bindings:bundle",
+    "../../../../models/timeline_model:bundle",
+    "../../../../models/trace:bundle",
+    "../../../../models/workspace:bundle",
+    "../../../../panels/timeline:bundle",
+    "../../../../testing",
+    "../../../legacy:bundle",
+    "../../../legacy/components/perf_ui:bundle",
+    "../../helpers:bundle",
+  ]
+}
+
+group("standalone_package") {
+  deps = [
+    # ":bundled_library",
+    ":standalone",
+    ":standalone_html",
+    # ":standalone_element",
+  ]
+}
+
+copy_to_gen("standalone_html") {
+  sources = [
+    "standalone.html",
+    # "package.json",
+  ]
+}
+
+# # Copy the optimized standalone implementation from the parent folder
+# node_action("standalone_element") {
+#   script = "scripts/build/ninja/copy-files.js"
+
+#   deps = [ "../:bundle" ]
+
+#   args = rebase_path([
+#                        "$target_gen_dir/../",
+#                        "$target_gen_dir/standalone/",
+#                      ]) + [ "standalone.js" ]
+
+#   outputs = [ "$target_gen_dir/standalone/standalone.js" ]
+# }
+
+# # Make sure to bundle all imports into 1 complete bundle
+# node_action("bundled_library") {
+#   script = "node_modules/rollup/dist/bin/rollup"
+
+#   _bundled_entrypoint = target_gen_dir + "/../../library/library.js"
+#   _output_file_location = target_gen_dir + "/library/library.js"
+
+#   inputs = [
+#     _bundled_entrypoint,
+#     "rollup.config.js",
+#   ]
+
+#   deps = [ "../../library:bundle" ]
+
+#   args = [
+#     # TODO(crbug.com/1098074): We need to hide warnings that are written stderr,
+#     # as Chromium does not process the returncode of the subprocess correctly
+#     # and instead looks if `stderr` is empty.
+#     "--silent",
+#     "--config",
+#     rebase_path("rollup.config.js", root_build_dir),
+#     "--input",
+#     rebase_path(_bundled_entrypoint, root_build_dir),
+#     "--dir",
+#     get_path_info(rebase_path(_output_file_location, root_build_dir), "dir"),
+#   ]
+
+#   if (!devtools_dcheck_always_on) {
+#     args += [ "--configDCHECK" ]
+#   }
+
+#   outputs = [ _output_file_location ]
+# }

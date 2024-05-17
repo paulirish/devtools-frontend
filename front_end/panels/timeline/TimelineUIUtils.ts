@@ -2045,7 +2045,7 @@ export class TimelineUIUtils {
 
     // Check if it is in the hidden array
     const isEntryHidden =
-        AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.getEntriesFilter().inEntryInvisible(
+        AnnotationsManager.default.AnnotationsManager.maybeInstance()?.getEntriesFilter().inEntryInvisible(
             entry);
 
     if (!isEntryOutsideBreadcrumb) {
