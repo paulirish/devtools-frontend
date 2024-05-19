@@ -265,7 +265,7 @@ function walkTreeByNode(
  */
 function treeNodeIsInWindow(node: TraceEntryNode, traceWindow: Types.Timing.TraceWindowMicroSeconds): boolean {
   const startTime = node.entry.ts;
-  const endTime = node.entry.ts + (node.entry.dur || 0);
+  const endTime = node.entry.ts + (node.entry.dur ?? 0);
 
   // Min ======= startTime ========= Max => node is within window
   if (startTime >= traceWindow.min && startTime < traceWindow.max) {

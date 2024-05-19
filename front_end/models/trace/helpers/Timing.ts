@@ -155,16 +155,25 @@ export interface EventTimingsData<
   selfTime: ValueType;
 }
 
+export function endTimeMicroseconds(event: Types.TraceEvents.TraceEventData): Types.Timing.MicroSeconds {
+  return Types.Timing.MicroSeconds(event.ts + (event.dur ?? 0));
+}
+
+export function durationMicroseconds(event: Types.TraceEvents.TraceEventData): Types.Timing.MicroSeconds {
+  return Types.Timing.MicroSeconds(event.dur ?? 0);
+}
+
 export function eventTimingsMicroSeconds(event: Types.TraceEvents.TraceEventData):
     EventTimingsData<Types.Timing.MicroSeconds> {
+  const duration = Types.Timing.MicroSeconds(event.dur ?? 0);
   return {
     startTime: event.ts,
-    endTime: Types.Timing.MicroSeconds(event.ts + (event.dur || Types.Timing.MicroSeconds(0))),
-    duration: Types.Timing.MicroSeconds(event.dur || 0),
+    endTime: Types.Timing.MicroSeconds(event.ts + duration),
+    duration,
     // TODO(crbug.com/1434599): Implement selfTime calculation for events
     // from the new engine.
     selfTime: Types.TraceEvents.isSyntheticTraceEntry(event) ? Types.Timing.MicroSeconds(event.selfTime || 0) :
-                                                               Types.Timing.MicroSeconds(event.dur || 0),
+                                                               duration,
   };
 }
 export function eventTimingsMilliSeconds(event: Types.TraceEvents.TraceEventData):

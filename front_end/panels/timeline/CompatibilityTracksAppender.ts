@@ -319,7 +319,7 @@ export class CompatibilityTracksAppender {
         events.push(this.#entryData[i] as TraceEngine.Types.TraceEvents.TraceEventData);
       }
     }
-    events.sort((a, b) => a.ts - b.ts);
+    // events.sort((a, b) => a.ts - b.ts);
     this.#eventsForTrack.set(trackAppender, events);
     return events;
   }

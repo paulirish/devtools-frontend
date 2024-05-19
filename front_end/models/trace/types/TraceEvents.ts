@@ -1365,6 +1365,7 @@ export function isSyntheticInteractionEvent(event: TraceEventData): event is Syn
       'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
 }
 
+// TODO: All RendererEvents are NOT Synthetic
 export function isSyntheticTraceEntry(event: TraceEventData): event is SyntheticTraceEntry {
   return isTraceEventRendererEvent(event) || isProfileCall(event);
 }
