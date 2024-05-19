@@ -214,6 +214,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
 
     const drawThreadEntries =
         (context: CanvasRenderingContext2D, threadData: TraceEngine.Handlers.Threads.ThreadData): void => {
+          console.log('drawthreadentries', threadData.name, threadData.entries.length);
           const quantizer = new Quantizer(this.#start, quantTime, drawSample);
           let x = 0;
           const categoryIndexStack: number[] = [];
@@ -275,6 +276,9 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
           );
           TraceEngine.Helpers.TreeHelpers.walkEntireTree(
               threadData.entryToNode, threadData.tree, onEntryStart, onEntryEnd, bounds, minDuration);
+          if (threadData.name === 'CrRendererMain') {
+            console.log(quantizer);
+          }
           quantizer.appendInterval(this.#start + timeRange + quantTime, idleIndex);  // Kick drawing the last bucket.
           for (let i = categoryOrder.length - 1; i > 0; --i) {
             paths[i].lineTo(width, height);
@@ -673,6 +677,10 @@ export class TimelineEventOverviewMemory extends TimelineEventOverview {
   }
 }
 
+/**
+ * The Quantizer ensures that data is processed (via the `callback`),
+ * at a controlled rate (configured by `quantDuration`)
+ */
 export class Quantizer {
   private lastTime: number;
   private quantDuration: number;

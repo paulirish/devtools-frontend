@@ -12,14 +12,13 @@ export const makeEmptyTraceEntryTree = (): TraceEntryTree => ({
   maxDepth: 0,
 });
 
-export const makeEmptyTraceEntryNode =
-    (entry: Types.TraceEvents.SyntheticTraceEntry, id: TraceEntryNodeId): TraceEntryNode => ({
-      entry,
-      id,
-      parent: null,
-      children: [],
-      depth: 0,
-    });
+export const makeEmptyTraceEntryNode = (entry: Types.TraceEvents.SyntheticTraceEntry): TraceEntryNode => ({
+  entry,
+  id: makeTraceEntryNodeId(),
+  parent: null,
+  children: [],
+  depth: 0,
+});
 
 export interface TraceEntryTree {
   roots: Set<TraceEntryNode>;
@@ -64,6 +63,7 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
   // easily look up that node in the tree.
   const entryToNode = new Map<Types.TraceEvents.SyntheticTraceEntry, TraceEntryNode>();
 
+
   const stack = [];
   // Reset the node id counter for every new renderer.
   nodeIdCount = -1;
@@ -77,18 +77,18 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
       continue;
     }
 
-    const duration = event.dur || 0;
-    const nodeId = makeTraceEntryNodeId();
-    const node = makeEmptyTraceEntryNode(event, nodeId);
+    const duration = event.dur ?? 0;
 
     // If the parent stack is empty, then the current event is a root. Create a
     // node for it, mark it as a root, then proceed with the next event.
     if (stack.length === 0) {
+      const node = makeEmptyTraceEntryNode(event);
       tree.roots.add(node);
       event.selfTime = Types.Timing.MicroSeconds(duration);
       stack.push(node);
       tree.maxDepth = Math.max(tree.maxDepth, stack.length);
       entryToNode.set(event, node);
+
       continue;
     }
 
@@ -98,12 +98,11 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     }
 
     const parentEvent = parentNode.entry;
-
-    const begin = event.ts;
     const parentBegin = parentEvent.ts;
-    const parentDuration = parentEvent.dur || 0;
-    const end = begin + duration;
+    const parentDuration = parentEvent.dur ?? 0;
     const parentEnd = parentBegin + parentDuration;
+    const begin = event.ts;
+    const end = begin + duration;
     // Check the relationship between the parent event at the top of the stack,
     // and the current event being processed. There are only 4 distinct
     // possiblities, only 2 of them actually valid, given the assumed sorting:
@@ -123,10 +122,9 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     //    parent. Pop, then handle current event again.
     const startsAfterParent = begin >= parentEnd;
     if (startsAfterParent) {
+      // Note: parentEvent is now finalized
       stack.pop();
       i--;
-      // The last created node has been discarded, so discard this id.
-      nodeIdCount--;
       continue;
     }
     // 3. If the current event starts during the parent event, but ends
@@ -142,12 +140,13 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     //    contained within the parent event. Create a node for the current
     //    event, establish the parent/child relationship, then proceed with the
     //    next event.
+    const node = makeEmptyTraceEntryNode(event);
     node.depth = stack.length;
     node.parent = parentNode;
     parentNode.children.push(node);
     event.selfTime = Types.Timing.MicroSeconds(duration);
     if (parentEvent.selfTime !== undefined) {
-      parentEvent.selfTime = Types.Timing.MicroSeconds(parentEvent.selfTime - (event.dur || 0));
+      parentEvent.selfTime = Types.Timing.MicroSeconds(parentEvent.selfTime - duration);
     }
     stack.push(node);
     tree.maxDepth = Math.max(tree.maxDepth, stack.length);
