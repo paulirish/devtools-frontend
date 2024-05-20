@@ -1654,7 +1654,7 @@ export class TimelineUIUtils {
         [x: string]: number,
       } = {};
       // @ts-ignore TODO(crbug.com/1011811): Remove symbol usage.
-      const cache = events[categoryBreakdownCacheSymbol];
+      const cache = globalThis.boi === 'tre' ? globalThis.categoryBreakdownCache : events[categoryBreakdownCacheSymbol];
       for (const category in cache) {
         const categoryCache = cache[category];
         const index =

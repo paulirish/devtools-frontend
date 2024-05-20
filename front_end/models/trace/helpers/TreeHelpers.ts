@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {TimelineUIUtils} from '../../../panels/timeline/timeline.js';
 import * as Types from '../types/types.js';
 
 let nodeIdCount = 0;
@@ -19,6 +20,15 @@ export const makeEmptyTraceEntryNode = (entry: Types.TraceEvents.SyntheticTraceE
   children: [],
   depth: 0,
 });
+
+export interface AggregatedStats {
+  [x: string]: number;
+}
+
+interface CategoryTime {
+  time: number[];
+  value: number[];
+}
 
 export interface TraceEntryTree {
   roots: Set<TraceEntryNode>;
@@ -63,6 +73,10 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
   // easily look up that node in the tree.
   const entryToNode = new Map<Types.TraceEvents.SyntheticTraceEntry, TraceEntryNode>();
 
+  const aggregatedStats: AggregatedStats = {};
+  const categoryStack: string[] = [];
+  const categoryBreakdownCache: {[category: string]: CategoryTime} = {};
+  let lastTime = 0;
 
   const stack = [];
   // Reset the node id counter for every new renderer.
@@ -83,6 +97,9 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     // node for it, mark it as a root, then proceed with the next event.
     if (stack.length === 0) {
       const node = makeEmptyTraceEntryNode(event);
+      const parentCategory = categoryStack.length ? categoryStack[categoryStack.length - 1] : null;
+      const eventCategory = TimelineUIUtils.TimelineUIUtils.eventStyle(event).category.name;
+      markCategory(eventCategory, event.ts / 1000, categoryBreakdownCache, parentCategory);
       tree.roots.add(node);
       event.selfTime = Types.Timing.MicroSeconds(duration);
       stack.push(node);
@@ -100,6 +117,7 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     const parentEvent = parentNode.entry;
     const parentBegin = parentEvent.ts;
     const parentDuration = parentEvent.dur ?? 0;
+    const parentCategory = categoryStack.length ? categoryStack[categoryStack.length - 1] : null;
     const parentEnd = parentBegin + parentDuration;
     const begin = event.ts;
     const end = begin + duration;
@@ -124,6 +142,10 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     if (startsAfterParent) {
       // Note: parentEvent is now finalized
       stack.pop();
+      const category = categoryStack.pop();
+      if (category !== parentCategory) {
+        categoryChange(category || null, parentCategory, parentEnd / 1000, categoryBreakdownCache);
+      }
       i--;
       continue;
     }
@@ -141,6 +163,8 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     //    event, establish the parent/child relationship, then proceed with the
     //    next event.
     const node = makeEmptyTraceEntryNode(event);
+    const eventCategory = TimelineUIUtils.TimelineUIUtils.eventStyle(event).category.name;
+    markCategory(eventCategory, event.ts / 1000, categoryBreakdownCache, parentCategory);
     node.depth = stack.length;
     node.parent = parentNode;
     parentNode.children.push(node);
@@ -152,7 +176,46 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     tree.maxDepth = Math.max(tree.maxDepth, stack.length);
     entryToNode.set(event, node);
   }
+
+  console.log({categoryBreakdownCache});
+  globalThis.categoryBreakdownCache = categoryBreakdownCache;
   return {tree, entryToNode};
+
+  function markCategory(
+      category: string, startTime: number, cache: {[category: string]: CategoryTime},
+      parentCategory: string|null): void {
+    if (category !== parentCategory) {
+      categoryChange(parentCategory || null, category, startTime, cache);
+    }
+    categoryStack.push(category);
+  }
+
+  function categoryChange(
+      from: string|null, to: string|null, time: number, cache: {[category: string]: CategoryTime}): void {
+    if (from) {
+      updateCategory(from, time, cache);
+    }
+    lastTime = time;
+    if (to) {
+      updateCategory(to, time, cache);
+    }
+  }
+
+  function updateCategory(category: string, time: number, cache: {[category: string]: CategoryTime}): void {
+    let statsArrays: CategoryTime = cache[category];
+    if (!statsArrays) {
+      statsArrays = {time: [], value: []};
+      cache[category] = statsArrays;
+    }
+
+    if (statsArrays.time.at(-1) === time || lastTime > time) {
+      return;
+    }
+    const lastValue = statsArrays.time.at(-1) ?? 0;
+    statsArrays.value.push(lastValue + time - lastTime);
+    statsArrays.time.push(time);
+    lastTime = time;
+  }
 }
 
 /**
