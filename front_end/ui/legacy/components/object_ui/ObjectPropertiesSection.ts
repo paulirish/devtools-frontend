@@ -492,9 +492,9 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       } else {
         propertyValue = new ObjectPropertyValue(valueElement);
         propertyValue.element.textContent = description;
-         const formattedDescription = (type === 'number' && subtype === undefined) ?
-           Platform.NumberUtilities.withUnderscoreThousandsSeparator(description) :
-           description;
+        const formattedDescription = (type === 'number' && subtype === undefined) ?
+            Platform.NumberUtilities.withUnderscoreThousandsSeparator(description) :
+            description;
         UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, formattedDescription || '');
       }
       if (!isSyntheticProperty) {

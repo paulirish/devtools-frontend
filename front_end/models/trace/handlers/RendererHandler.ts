@@ -377,7 +377,6 @@ export function buildHierarchy(
   }
 }
 
-
 function mapFlows(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
   for (const {flowStart, flowEnd} of flowStartById.values()) {
     if (flowEnd.ts < flowStart.ts) {

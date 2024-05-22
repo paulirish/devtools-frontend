@@ -76,9 +76,8 @@ export function treify(entries: Types.TraceEvents.SyntheticTraceEntry[], options
     //   console.log(event, stack.toReversed().map(o => o.entry.name));
     // }
     if (event.cat === 'flowy') {
-      console.log('in tree', event)
+      console.log('in tree', event);
     }
-
 
     // If the current event should not be part of the tree, then simply proceed
     // with the next event.
