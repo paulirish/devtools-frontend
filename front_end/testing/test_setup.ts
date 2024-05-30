@@ -6,6 +6,8 @@
  * This file is automatically loaded and run by Karma because it automatically
  * loads and injects all *.js files it finds.
  */
+import * as Common from '../core/common/common.js';
+import * as Host from '../core/host/host.js';
 import * as TraceEngine from '../models/trace/trace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
 import * as ThemeSupport from '../ui/legacy/theme_support/theme_support.js';
@@ -25,6 +27,10 @@ beforeEach(() => {
     handler.reset();
   }
   Timeline.SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
+
+  // Don't retain host binding listeners across tests. Set this up before initializing ThemeSupport as
+  // ThemeSupport adds a host binding listener.
+  Host.InspectorFrontendHost.InspectorFrontendHostInstance.events = new Common.ObjectWrapper.ObjectWrapper();
 
   // Some unit tests exercise code that assumes a ThemeSupport instance is available.
   // Run this in a beforeEach in case an individual test overrides it.

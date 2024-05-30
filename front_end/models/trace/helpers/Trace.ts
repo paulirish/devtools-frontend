@@ -319,6 +319,7 @@ export function createSortedSyntheticEvents<T extends Types.TraceEvents.TraceEve
     }
     const targetEvent = endEvent || beginEvent;
     const event: MatchedPairType<T> = {
+      rawSourceEvent: beginEvent,
       cat: targetEvent.cat,
       ph: targetEvent.ph,
       pid: targetEvent.pid,
@@ -469,7 +470,14 @@ export function frameIDForEvent(event: Types.TraceEvents.TraceEventData): string
 }
 
 const DevToolsTimelineEventCategory = 'disabled-by-default-devtools.timeline';
-function isTopLevelEvent(event: Types.TraceEvents.TraceEventData): boolean {
+export function isTopLevelEvent(event: Types.TraceEvents.TraceEventData): boolean {
+  if (event.name === 'JSRoot' && event.cat === 'toplevel') {
+    // This is used in TimelineJSProfile to insert a fake event prior to the
+    // CPU Profile in order to ensure the trace isn't truncated. So if we see
+    // this, we want to treat it as a top level event.
+    // TODO(crbug.com/341234884): do we need this?
+    return true;
+  }
   return event.cat.includes(DevToolsTimelineEventCategory) && event.name === Types.TraceEvents.KnownEventName.RunTask;
 }
 
@@ -599,4 +607,15 @@ export function forEachEvent(
       config.onEndEvent(last);
     }
   }
+}
+
+// Parsed categories are cached to prevent calling cat.split()
+// multiple times on the same categories string.
+const parsedCategories = new Map<string, Set<string>>();
+export function eventHasCategory(event: Types.TraceEvents.TraceEventData, category: string): boolean {
+  let parsedCategoriesForEvent = parsedCategories.get(event.cat);
+  if (!parsedCategoriesForEvent) {
+    parsedCategoriesForEvent = new Set(event.cat.split(',') || []);
+  }
+  return parsedCategoriesForEvent.has(category);
 }

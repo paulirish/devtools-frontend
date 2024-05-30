@@ -81,6 +81,7 @@ devtools_module("timeline") {
     "TimelineFlameChartNetworkDataProvider.ts",
     "TimelineFlameChartView.ts",
     "TimelineHistoryManager.ts",
+    "TimelineLandingPage.ts",
     "TimelineLayersView.ts",
     "TimelineLoader.ts",
     "TimelineMiniMap.ts",
@@ -178,7 +179,6 @@ ts_library("unittests") {
 
   sources = [
     "Breadcrumbs.test.ts",
-    "EventTypeHelpers.test.ts",
     "FreshRecording.test.ts",
     "Initiators.test.ts",
     "SaveFileFormatter.test.ts",
