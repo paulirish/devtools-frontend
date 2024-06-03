@@ -12,11 +12,32 @@
     <style>p {font-size: 18px;}
          devtools-rpp {
         display: block;
+        height: 100%;
+        width: 100%;
       }
     </style>
   </head>
   <body>
 
+<script>
+  const styleSheetPaths = [
+  'front_end/ui/legacy/themeColors.css',
+  'front_end/ui/legacy/tokens.css',
+  'front_end/ui/legacy/applicationColorTokens.css',
+  'front_end/ui/legacy/designTokens.css',
+  'front_end/ui/legacy/inspectorCommon.css',
+  'front_end/ui/legacy/inspectorSyntaxHighlight.css',
+  'front_end/ui/legacy/textButton.css',
+  'front_end/ui/components/docs/component_docs_styles.css',
+];
+ const div = document.createElement('div');
+ div.innerHTML =  styleSheetPaths
+      .map(link => `<link rel="stylesheet" href="../../../../../${link}" />`)
+      .join('\n');
+document.body.append(div);
+
+
+</script>
 
     <devtools-rpp url="http://localhost:8087/front_end//panels/timeline/fixtures/traces/web-dev.json.gz"></devtools-rpp>
     <script type="module" src="./standalone.js"></script>

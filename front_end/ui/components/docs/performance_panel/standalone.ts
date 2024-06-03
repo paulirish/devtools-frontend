@@ -110,10 +110,6 @@ export class DevToolsRPPStandalone extends HTMLElement {
   constructor() {
     super();
 
-    this.#timeline.markAsRoot();
-    this.#timeline.show(this);
-
-    window.addEventListener('resize', () => this.#timeline.doResize());
   }
 
   static get observedAttributes(): string[] {
@@ -121,6 +117,11 @@ export class DevToolsRPPStandalone extends HTMLElement {
   }
 
   connectedCallback(): void {
+
+    this.#timeline.markAsRoot();
+    this.#timeline.show(this);
+
+    window.addEventListener('resize', () => this.#timeline.doResize());
   }
 
   disconnectedCallback(): void {
