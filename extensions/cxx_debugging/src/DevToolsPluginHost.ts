@@ -69,7 +69,8 @@ export class WorkerPlugin implements Chrome.DevTools.LanguageExtensionPlugin, As
   }
 
   getFunctionInfo(rawLocation: Chrome.DevTools.RawLocation):
-      Promise<{frames: Chrome.DevTools.FunctionInfo[]}|{missingSymbolFiles: string[]}> {
+      Promise<{frames: Chrome.DevTools.FunctionInfo[], missingSymbolFiles: string[]}|
+              {frames: Chrome.DevTools.FunctionInfo[]}|{missingSymbolFiles: string[]}> {
     return this.rpc.sendMessage('getFunctionInfo', rawLocation);
   }
 
@@ -86,7 +87,7 @@ export class WorkerPlugin implements Chrome.DevTools.LanguageExtensionPlugin, As
   }
 
   evaluate(expression: string, context: Chrome.DevTools.RawLocation, stopId: unknown):
-      Promise<Chrome.DevTools.RemoteObject|null> {
+      Promise<Chrome.DevTools.RemoteObject|Chrome.DevTools.ForeignObject|null> {
     return this.rpc.sendMessage('evaluate', expression, context, stopId);
   }
 

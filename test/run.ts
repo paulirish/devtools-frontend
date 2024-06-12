@@ -16,6 +16,8 @@ const options = commandLineArgs(yargs(process.argv.slice(2)))
                     .options('skip-ninja', {type: 'boolean', desc: 'Skip rebuilding'})
                     .options('debug-driver', {type: 'boolean', hidden: true, desc: 'Debug the driver part of tests'})
                     .options('verbose', {alias: 'v', type: 'count', desc: 'Increases the log level'})
+                    .options('warn', {desc: 'Show deprecation warning'})
+                    .options('bail', {alias: 'b', desc: ' bail after first test failure'})
                     .positional('tests', {
                       type: 'string',
                       desc: 'Path to the test suite, starting from out/Target/gen directory.',
@@ -25,7 +27,7 @@ const options = commandLineArgs(yargs(process.argv.slice(2)))
                     })
                     .strict()
                     .argv;
-const CONSUMED_OPTIONS = ['tests', 'skip-ninja', 'debug-driver', 'verbose'];
+const CONSUMED_OPTIONS = ['tests', 'skip-ninja', 'debug-driver', 'bail', 'b', 'verbose', 'v', 'watch'];
 
 let logLevel = 'error';
 if (options['verbose'] === 1) {
@@ -90,11 +92,11 @@ class Tests {
         pathToCheck => isContainedInDirectory(path.buildPath, pathToCheck.buildPath));
   }
 
-  protected run(tests: PathPair[], args: string[]) {
+  protected run(tests: PathPair[], args: string[], positionalTestArgs = true) {
     const argumentsForNode = [
       ...args,
       '--',
-      ...tests.map(t => t.buildPath),
+      ...tests.map(t => positionalTestArgs ? t.buildPath : `--tests=${t.buildPath}`),
       ...forwardOptions(),
     ];
     if (options['debug-driver']) {
@@ -110,17 +112,22 @@ class Tests {
 
 class MochaTests extends Tests {
   override run(tests: PathPair[]) {
-    return super.run(tests, [
-      path.join(SOURCE_ROOT, 'node_modules', 'mocha', 'bin', 'mocha'),
-      '--config',
-      path.join(this.suite.buildPath, 'mocharc.js'),
-    ]);
+    return super.run(
+        tests,
+        [
+          path.join(SOURCE_ROOT, 'node_modules', 'mocha', 'bin', 'mocha'),
+          '--config',
+          path.join(this.suite.buildPath, 'mocharc.js'),
+        ],
+        /* positionalTestArgs= */ false,  // Mocha interprets positional arguments as test files itself. Work around
+                                          // that by passing the tests as dashed args instead.
+    );
   }
 }
 
 class KarmaTests extends Tests {
   override run(tests: PathPair[]) {
-    if (os.type() === 'WINDOWS_NT') {
+    if (os.type() === 'Windows_NT') {
       const result = runProcess(
           'python3',
           [
@@ -142,14 +149,64 @@ class KarmaTests extends Tests {
   }
 }
 
+function showDeprecationWarning(command: string) {
+  let alternative = undefined;
+  const debugFlag = command.includes('debug') || process.env['DEBUG_TEST'] ? ' --debug' : '';
+  switch (command) {
+    case 'auto-e2etest-parallel-rdb':
+    case 'auto-e2etest-rdb':
+    case 'auto-interactionstest-rdb':
+    case 'auto-screenshotstest-rdb':
+    case 'auto-unittest-rdb':
+      alternative = `npm run rdb -- npm run ${command.substring(0, command.length - '-rdb'.length)}`;
+      break;
+    case 'auto-e2etest':
+      alternative = 'npm run test -- test/e2e';
+      break;
+    case 'auto-screenshotstest':
+      alternative = 'npm run test -- test/interactions --fgrep "[screenshot]"';
+      break;
+    case 'auto-unittest':
+      alternative = `npm run test -- front_end${debugFlag}`;
+      break;
+    case 'auto-unittest-coverage':
+      alternative = 'npm run test -- front_end --coverage';
+      break;
+    case 'e2etest':
+      alternative = `npm run test -- test/e2e${debugFlag}`;
+      break;
+    case 'interactionstest':
+      alternative = `npm run test -- test/interactions${debugFlag}`;
+      break;
+    case 'perf':
+      alternative = 'npm run test -- test/perf';
+      break;
+    case 'unittest':
+      alternative = `npm run test -- front_end${debugFlag}`;
+      break;
+    case 'e2etest-parallel':
+    case 'watch-unittest':
+      break;
+    default:
+      throw new Error(`Deprecation warning for '${options['warn']}' has no deprecation details`);
+  }
+  const format = process.stderr.hasColors() ? '\x1b[1;31m%s\x1b[0m' : '%s';
+  console.error(format, `WARNING: The npm command '${command}' is deprecated and will be removed in the near future.`);
+  if (alternative) {
+    console.error(format, `Use \`${alternative}\` instead.`);
+  }
+  return 0;
+}
+
 // TODO(333423685)
-// - perf
-// - screenshots
 // - iterations
 // - expanded-reporting
 // - watch
 // - layout?
 function main() {
+  if (options['warn']) {
+    return showDeprecationWarning(options['warn']);
+  }
   const tests: string[] = options['tests'];
 
   const testKinds = [

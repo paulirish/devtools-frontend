@@ -147,13 +147,17 @@ export class MainImpl {
   async #loaded(): Promise<void> {
     console.timeStamp('Main._loaded');
     Root.Runtime.Runtime.setPlatform(Host.Platform.platform());
-    const prefs = await new Promise<{[key: string]: string}>(resolve => {
+    const prefsPromise = new Promise<{[key: string]: string}>(resolve => {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.getPreferences(resolve);
     });
+    const configPromise = new Promise<Root.Runtime.HostConfig>(resolve => {
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.getHostConfig(resolve);
+    });
+    const [prefs, config] = await Promise.all([prefsPromise, configPromise]);
 
     console.timeStamp('Main._gotPreferences');
     this.#initializeGlobalsForLayoutTests();
-    this.createSettings(prefs);
+    this.createSettings(prefs, config);
     await this.requestAndRegisterLocaleData();
 
     Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync-preferences').get());
@@ -209,9 +213,11 @@ export class MainImpl {
     }
   }
 
-  createSettings(prefs: {
-    [x: string]: string,
-  }): void {
+  createSettings(
+      prefs: {
+        [x: string]: string,
+      },
+      config: Root.Runtime.HostConfig): void {
     this.#initializeExperiments();
     let storagePrefix = '';
     if (Host.Platform.isCustomDevtoolsFrontend()) {
@@ -255,7 +261,7 @@ export class MainImpl {
     // setting can't change storage buckets during a single DevTools session.
     const syncedStorage = new Common.Settings.SettingsStorage(prefs, hostSyncedStorage, storagePrefix);
     const globalStorage = new Common.Settings.SettingsStorage(prefs, hostUnsyncedStorage, storagePrefix);
-    Common.Settings.Settings.instance({forceNew: true, syncedStorage, globalStorage, localStorage});
+    Common.Settings.Settings.instance({forceNew: true, syncedStorage, globalStorage, localStorage, config});
 
     // Needs to be created after Settings are available.
     new SettingTracker();
@@ -389,8 +395,19 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.PERF_PANEL_ANNOTATIONS,
-        'Enable saving and loading traces with annotations in the Performance panel',
+        Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK,
+        'Enable saving and loading traces with modifications in the Performance panel',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_SIDEBAR,
+        'Enable the experimental, WIP sidebar for the Performance Panel.',
+        true,
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
+        'Enable new Performance panel landing page which includes live metrics and field data',
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
@@ -760,7 +777,9 @@ let mainMenuItemInstance: MainMenuItem;
 export class MainMenuItem implements UI.Toolbar.Provider {
   readonly #itemInternal: UI.Toolbar.ToolbarMenuButton;
   constructor() {
-    this.#itemInternal = new UI.Toolbar.ToolbarMenuButton(this.#handleContextMenu.bind(this), true, 'main-menu');
+    this.#itemInternal = new UI.Toolbar.ToolbarMenuButton(
+        this.#handleContextMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'main-menu');
+    this.#itemInternal.setGlyph('dots-vertical');
     this.#itemInternal.element.classList.add('main-menu');
     this.#itemInternal.setTitle(i18nString(UIStrings.customizeAndControlDevtools));
   }

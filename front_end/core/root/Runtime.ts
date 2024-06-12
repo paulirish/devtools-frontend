@@ -78,10 +78,12 @@ export class Runtime {
     return runtimePlatform;
   }
 
-  static isDescriptorEnabled(descriptor: {
-    experiment: ((string | undefined)|null),
-    condition?: Condition,
-  }): boolean {
+  static isDescriptorEnabled(
+      descriptor: {
+        experiment: ((string | undefined)|null),
+        condition?: Condition,
+      },
+      config?: HostConfig): boolean {
     const {experiment} = descriptor;
     if (experiment === '*') {
       return true;
@@ -93,7 +95,7 @@ export class Runtime {
       return false;
     }
     const {condition} = descriptor;
-    return condition ? condition() : true;
+    return condition ? condition(config) : true;
   }
 
   loadLegacyModule(modulePath: string): Promise<void> {
@@ -289,17 +291,44 @@ export const enum ExperimentName {
   AUTOFILL_VIEW = 'autofill-view',
   INDENTATION_MARKERS_TEMP_DISABLE = 'sources-frame-indentation-markers-temporarily-disable',
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
-  PERF_PANEL_ANNOTATIONS = 'perf-panel-annotations',
+  TIMELINE_WRITE_MODIFICATIONS_TO_DISK = 'perf-panel-annotations',
+  TIMELINE_SIDEBAR = 'timeline-rpp-sidebar',
   TIMELINE_EXTENSIONS = 'timeline-extensions',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
-  TIMELINE_EXECUTE_OLD_ENGINE = 'timeline-enable-old-timeline-model-engine',
+  TIMELINE_OBSERVATIONS = 'timeline-observations',
+}
+
+export interface HostConfigConsoleInsights {
+  aidaModelId: string;
+  aidaTemperature: number;
+  blocked: boolean;
+  blockedByAge: boolean;
+  blockedByEnterprisePolicy: boolean;
+  blockedByFeatureFlag: boolean;
+  blockedByGeo: boolean;
+  blockedByRollout: boolean;
+  disallowLogging: boolean;
+  enabled: boolean;
+  optIn: boolean;
+}
+
+export interface HostConfigConsoleInsightsDogfood {
+  aidaModelId: string;
+  aidaTemperature: number;
+  enabled: boolean;
+  optIn: boolean;
+}
+
+export interface HostConfig {
+  devToolsConsoleInsights: HostConfigConsoleInsights;
+  devToolsConsoleInsightsDogfood: HostConfigConsoleInsightsDogfood;
 }
 
 /**
  * When defining conditions make sure that objects used by the function have
  * been instantiated.
  */
-export type Condition = () => boolean;
+export type Condition = (config?: HostConfig) => boolean;
 
 export const conditions = {
   canDock: () => Boolean(Runtime.queryParam('can_dock')),

@@ -143,9 +143,9 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
      * Illustration of a previous change to `eventsPerChunk`: https://imgur.com/wzp8BnR
      */
     const eventsPerChunk = 50_000;
-
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
+
     // Reset.
     for (const handler of sortedHandlers) {
       handler.reset();
@@ -173,7 +173,12 @@ export class TraceProcessor<EnabledModelHandlers extends {[key: string]: Handler
 
     // Finalize.
     for (const handler of sortedHandlers) {
-      await handler.finalize?.();
+      if (handler.finalize) {
+        // Yield to the UI because finalize() calls can be expensive
+        // TODO(jacktfranklin): consider using `scheduler.yield()` or `scheduler.postTask(() => {}, {priority: 'user-blocking'})`
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await handler.finalize();
+      }
     }
   }
 

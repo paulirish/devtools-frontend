@@ -126,6 +126,7 @@ export class CookieModel extends SDKModel<EventTypes> {
     if (error || !response.success) {
       return false;
     }
+    await this.#refreshThrottled();
     return response.success;
   }
 
@@ -151,6 +152,7 @@ export class CookieModel extends SDKModel<EventTypes> {
       path: cookie.path(),
       partitionKey: cookie.partitionKey(),
     })));
+    await this.#refreshThrottled();
   }
 
   #isRefreshing(): boolean {

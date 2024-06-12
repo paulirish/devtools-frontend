@@ -227,10 +227,8 @@ export class ThrottlingManager {
   }
 
   createMobileThrottlingButton(): UI.Toolbar.ToolbarMenuButton {
-    const button = new UI.Toolbar.ToolbarMenuButton(appendItems, undefined, 'mobile-throttling');
+    const button = new UI.Toolbar.ToolbarMenuButton(appendItems, undefined, undefined, 'mobile-throttling');
     button.setTitle(i18nString(UIStrings.throttling));
-    button.setGlyph('');
-    button.turnIntoSelect();
     button.setDarkText();
 
     let options: ConditionsList = [];
@@ -406,7 +404,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
       return true;
     }
     if (actionId === 'network-conditions.network-mid-tier-mobile') {
-      SDK.NetworkManager.MultitargetNetworkManager.instance().setNetworkConditions(SDK.NetworkManager.Fast3GConditions);
+      SDK.NetworkManager.MultitargetNetworkManager.instance().setNetworkConditions(SDK.NetworkManager.Slow4GConditions);
       return true;
     }
     if (actionId === 'network-conditions.network-offline') {

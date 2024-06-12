@@ -11,6 +11,7 @@ generate_css("css_files") {
   sources = [
     "breadcrumbsUI.css",
     "interactionBreakdown.css",
+    "sidebar.css",
   ]
 }
 
@@ -20,11 +21,14 @@ devtools_module("components") {
     "BreadcrumbsUI.ts",
     "DetailsView.ts",
     "InteractionBreakdown.ts",
+    "LiveMetricsView.ts",
+    "Sidebar.ts",
   ]
 
   deps = [
     "../../../core/i18n:bundle",
     "../../../generated",
+    "../../../models/live-metrics:bundle",
     "../../../models/trace:bundle",
     "../../../services/trace_bounds:bundle",
     "../../../ui/components/helpers:bundle",
@@ -46,7 +50,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "..:*",
-    "../../../services/annotations_manager/*",
+    "../../../services/modifications_manager/*",
     "../../../ui/components/docs/*",
     "../../application/components/*",
   ]

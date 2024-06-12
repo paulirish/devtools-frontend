@@ -19,7 +19,7 @@ def node_path(options):
     try:
         old_sys_path = sys.path[:]
         sys.path.append(
-            os.path.join(options.chromium_dir, 'third_party', 'node'))
+            os.path.join(options.devtools_dir, 'third_party', 'node'))
         import node
     finally:
         sys.path = old_sys_path
@@ -103,16 +103,8 @@ def get_hook_action(options, hook_name, project_dir):
 
 
 def sync_node(options):
-    """Executes the nodejs sync hook from Chromium DEPS file."""
-    action = get_hook_action(options, 'node_linux64', options.chromium_dir)
-    gclient_context = os.path.join(options.chromium_dir, '..')
-    subprocess.check_call(action, cwd=gclient_context)
-
-
-def sync_clang_format(options):
-    """Executes the clang_format sync hook from Devtools DEPS file."""
-    action = get_hook_action(options, 'clang_format_linux',
-                             options.devtools_dir)
+    """Executes the nodejs sync hook from Devtools DEPS file."""
+    action = get_hook_action(options, 'node_linux64', options.devtools_dir)
     subprocess.check_call(action, cwd=options.devtools_dir)
 
 
@@ -126,9 +118,8 @@ def copy_files(options):
 
 
 def generate_signatures(options):
-    print(
-        'generating JavaScript native functions signatures from .idl and typescript definitions'
-    )
+    print('generating JavaScript native functions signatures from .idl '
+          'and typescript definitions')
     subprocess.check_call([
         node_path(options),
         os.path.join(options.devtools_dir, 'scripts', 'javascript_natives',
@@ -184,7 +175,6 @@ if __name__ == '__main__':
         update(OPTIONS)
     if OPTIONS.update_node:
         sync_node(OPTIONS)
-        sync_clang_format(OPTIONS)
     copy_files(OPTIONS)
     generate_signatures(OPTIONS)
     generate_dom_pinned_properties(OPTIONS)

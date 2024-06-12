@@ -135,7 +135,7 @@ export interface TraceEventSample extends TraceEventData {
  * A fake trace event created to support CDP.Profiler.Profiles in the
  * trace engine.
  */
-export interface SyntheticCpuProfile extends TraceEventInstant, SyntheticEvent<Phase.INSTANT> {
+export interface SyntheticCpuProfile extends TraceEventInstant, SyntheticBasedEvent<Phase.INSTANT> {
   name: 'CpuProfile';
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
@@ -332,7 +332,7 @@ interface SyntheticArgsData {
   waiting: MicroSeconds;
 }
 
-export interface SyntheticNetworkRequest extends TraceEventComplete, SyntheticEvent<Phase.COMPLETE> {
+export interface SyntheticNetworkRequest extends TraceEventComplete, SyntheticBasedEvent<Phase.COMPLETE> {
   rawSourceEvent: TraceEventData;
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
@@ -395,7 +395,7 @@ export const enum AuctionWorkletType {
   UNKNOWN = 'unknown',
 }
 
-export interface SyntheticAuctionWorkletEvent extends TraceEventInstant, SyntheticEvent<Phase.INSTANT> {
+export interface SyntheticAuctionWorkletEvent extends TraceEventInstant, SyntheticBasedEvent<Phase.INSTANT> {
   rawSourceEvent: TraceEventData;
   name: 'SyntheticAuctionWorkletEvent';
   // The PID that the AuctionWorklet is running in.
@@ -494,7 +494,7 @@ export function isTraceEventScreenshot(event: TraceEventData): event is TraceEve
   return event.name === KnownEventName.Screenshot;
 }
 
-export interface SyntheticScreenshot extends TraceEventData, SyntheticEvent {
+export interface SyntheticScreenshot extends TraceEventData, SyntheticBasedEvent {
   rawSourceEvent: TraceEventScreenshot;
   /** This is the correct presentation timestamp. */
   ts: MicroSeconds;
@@ -843,7 +843,7 @@ export interface LayoutShiftParsedData {
   cumulativeWeightedScoreInWindow: number;
   sessionWindowData: LayoutShiftSessionWindowData;
 }
-export interface SyntheticLayoutShift extends TraceEventLayoutShift, SyntheticEvent<Phase.INSTANT> {
+export interface SyntheticLayoutShift extends TraceEventLayoutShift, SyntheticBasedEvent<Phase.INSTANT> {
   name: 'LayoutShift';
   rawSourceEvent: TraceEventLayoutShift;
   args: TraceEventArgs&{
@@ -1095,6 +1095,19 @@ export function isTraceEventScheduleStyleRecalculation(event: TraceEventData):
   return event.name === KnownEventName.ScheduleStyleRecalculation;
 }
 
+export interface TraceEventRenderFrameImplCreateChildFrame extends TraceEventData {
+  name: KnownEventName.RenderFrameImplCreateChildFrame;
+  /* eslint-disable @typescript-eslint/naming-convention */
+  args: TraceEventArgs&{
+    child_frame_token: string,
+    frame_token: string,
+  };
+}
+export function isTraceEventRenderFrameImplCreateChildFrame(event: TraceEventData):
+    event is TraceEventRenderFrameImplCreateChildFrame {
+  return event.name === KnownEventName.RenderFrameImplCreateChildFrame;
+}
+
 export interface TraceEventPrePaint extends TraceEventComplete {
   name: 'PrePaint';
 }
@@ -1265,14 +1278,22 @@ export interface TraceEventPipelineReporter extends TraceEventData {
 export function isTraceEventPipelineReporter(event: TraceEventData): event is TraceEventPipelineReporter {
   return event.name === KnownEventName.PipelineReporter;
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
-interface SyntheticEvent<Ph extends Phase = Phase> extends TraceEventData {
+// A type used for synthetic events created based on a raw trace event.
+export interface SyntheticBasedEvent<Ph extends Phase = Phase> extends SyntheticEntry {
   ph: Ph;
   rawSourceEvent: TraceEventData;
 }
 
-export function isSyntheticEvent(event: TraceEventData): event is SyntheticEvent {
+// A branded type is used to ensure not all events can be typed as
+// SyntheticEntry and prevent places different to the
+// SyntheticEventsManager from creating synthetic events. This is
+// because synthetic events need to be registered in order to resolve
+// serialized event keys into event objects, so we ensure events are
+// registered at the time they are created by the SyntheticEventsManager.
+export type SyntheticEntry = TraceEventData&{_tag: 'SyntheticEntryTag'};
+
+export function isSyntheticBasedEvent(event: TraceEventData): event is SyntheticBasedEvent {
   return 'rawSourceEvent' in event;
 }
 
@@ -1280,7 +1301,7 @@ export function isSyntheticEvent(event: TraceEventData): event is SyntheticEvent
 // events: the begin, and the end. We need both of them to be able to
 // display the right information, so we create these synthetic events.
 export interface SyntheticEventPair<T extends TraceEventPairableAsync = TraceEventPairableAsync> extends
-    SyntheticEvent {
+    SyntheticBasedEvent {
   rawSourceEvent: TraceEventData;
   name: T['name'];
   cat: T['cat'];
@@ -1355,6 +1376,7 @@ export interface SyntheticProfileCall extends SyntheticTraceEntry {
   nodeId: Protocol.integer;
   sampleIndex: number;
   profileId: ProfileID;
+  selfTime: MicroSeconds;
 }
 
 /**
@@ -1624,7 +1646,9 @@ export interface TraceEventLayout extends TraceEventComplete {
       partialLayout: boolean,
       totalObjects: number,
     },
-    endData: {
+    // endData is not reliably populated.
+    // Why? TBD. https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/frame/local_frame_view.cc;l=847-851;drc=8b6aaad8027390ce6b32d82d57328e93f34bb8e5
+    endData?: {
       layoutRoots: Array<{
         depth: number,
         nodeId: Protocol.DOM.BackendNodeId,
@@ -1665,6 +1689,15 @@ export type CallFrameID = number&CallFrameIdTag;
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export function CallFrameID(value: number): CallFrameID {
   return value as CallFrameID;
+}
+
+class SampleIndexTag {
+  readonly #sampleIndexTag: (symbol|undefined);
+}
+export type SampleIndex = number&SampleIndexTag;
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export function SampleIndex(value: number): SampleIndex {
+  return value as SampleIndex;
 }
 
 class ProcessIdTag {
@@ -2218,6 +2251,7 @@ export interface TraceEventWebSocketCreate extends TraceEventInstant {
       identifier: number,
       url: string,
       frame?: string,
+      workerId?: string,
       websocketProtocol?: string,
       stackTrace?: TraceEventCallFrame,
     },
@@ -2225,6 +2259,72 @@ export interface TraceEventWebSocketCreate extends TraceEventInstant {
 }
 export function isTraceEventWebSocketCreate(event: TraceEventData): event is TraceEventWebSocketCreate {
   return event.name === KnownEventName.WebSocketCreate;
+}
+
+export interface TraceEventWebSocketInfo extends TraceEventInstant {
+  name: KnownEventName.WebSocketDestroy|KnownEventName.WebSocketReceiveHandshake|
+      KnownEventName.WebSocketReceiveHandshakeResponse;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string,
+    },
+  };
+}
+export interface TraceEventWebSocketTransfer extends TraceEventInstant {
+  name: KnownEventName.WebSocketSend|KnownEventName.WebSocketReceive;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string, dataLength: number,
+    },
+  };
+}
+export function isTraceEventWebSocketInfo(traceEventData: TraceEventData): traceEventData is TraceEventWebSocketInfo {
+  return traceEventData.name === KnownEventName.WebSocketSendHandshakeRequest ||
+      traceEventData.name === KnownEventName.WebSocketReceiveHandshakeResponse ||
+      traceEventData.name === KnownEventName.WebSocketDestroy;
+}
+
+export function isTraceEventWebSocketTransfer(traceEventData: TraceEventData):
+    traceEventData is TraceEventWebSocketTransfer {
+  return traceEventData.name === KnownEventName.WebSocketSend ||
+      traceEventData.name === KnownEventName.WebSocketReceive;
+}
+
+export interface TraceEventWebSocketSend extends TraceEventInstant {
+  name: KnownEventName.WebSocketSend;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string, dataLength: number,
+    },
+  };
+}
+
+export function isTraceEventWebSocketSend(event: TraceEventData): event is TraceEventWebSocketSend {
+  return event.name === KnownEventName.WebSocketSend;
+}
+
+export interface TraceEventWebSocketReceive extends TraceEventInstant {
+  name: KnownEventName.WebSocketReceive;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string, dataLength: number,
+    },
+  };
+}
+export function isTraceEventWebSocketReceive(event: TraceEventData): event is TraceEventWebSocketReceive {
+  return event.name === KnownEventName.WebSocketReceive;
 }
 
 export interface TraceEventWebSocketSendHandshakeRequest extends TraceEventInstant {
@@ -2269,10 +2369,10 @@ export function isTraceEventWebSocketDestroy(event: TraceEventData): event is Tr
 }
 
 export function isWebSocketTraceEvent(event: TraceEventData): event is TraceEventWebSocketCreate|
-    TraceEventWebSocketDestroy|TraceEventWebSocketReceiveHandshakeResponse|TraceEventWebSocketSendHandshakeRequest {
-  return isTraceEventWebSocketCreate(event) || isTraceEventWebSocketDestroy(event) ||
-      isTraceEventWebSocketReceiveHandshakeResponse(event) || isTraceEventWebSocketSendHandshakeRequest(event);
+    TraceEventWebSocketInfo|TraceEventWebSocketTransfer {
+  return isTraceEventWebSocketCreate(event) || isTraceEventWebSocketInfo(event) || isTraceEventWebSocketTransfer(event);
 }
+export type WebSocketEvent = TraceEventWebSocketCreate|TraceEventWebSocketInfo|TraceEventWebSocketTransfer;
 
 export interface TraceEventV8Compile extends TraceEventComplete {
   name: KnownEventName.Compile;
@@ -2392,6 +2492,8 @@ export const enum KnownEventName {
   WebSocketSendHandshake = 'WebSocketSendHandshakeRequest',
   WebSocketReceiveHandshake = 'WebSocketReceiveHandshakeResponse',
   WebSocketDestroy = 'WebSocketDestroy',
+  WebSocketSend = 'WebSocketSend',
+  WebSocketReceive = 'WebSocketReceive',
   CryptoDoEncrypt = 'DoEncrypt',
   CryptoDoEncryptReply = 'DoEncryptReply',
   CryptoDoDecrypt = 'DoDecrypt',
@@ -2527,6 +2629,8 @@ export const enum KnownEventName {
 
   SchedulePostMessage = 'SchedulePostMessage',
   HandlePostMessage = 'HandlePostMessage',
+
+  RenderFrameImplCreateChildFrame = 'RenderFrameImpl::createChildFrame',
 }
 
 // NOT AN EXHAUSTIVE LIST: just some categories we use and refer

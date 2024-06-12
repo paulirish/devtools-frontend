@@ -178,7 +178,7 @@ describe('LoggingDriver', () => {
 
     await VisualLoggingTesting.LoggingDriver.startLogging();
     assert.isTrue(recordImpression.calledOnce);
-    assert.strictEqual(recordImpression.firstCall.firstArg.impressions[0]?.context, 4191634312);
+    assert.strictEqual(recordImpression.firstCall.firstArg.impressions[0]?.context, -103332984);
   });
 
   it('logs clicks', async () => {
@@ -564,7 +564,7 @@ describe('LoggingDriver', () => {
     assert.exists(dragLogThrottler.process);
     assert.isFalse(recordDrag.called);
 
-    await dragLogThrottler.schedule(async () => {}, true);
+    await dragLogThrottler.schedule(async () => {}, Common.Throttler.Scheduling.AsSoonAsPossible);
     await dragLogThrottler.process?.();
     assert.isTrue(recordDrag.called);
     assert.isTrue(recordDrag.calledOnce);

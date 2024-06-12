@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as SDK from '../core/sdk/sdk.js';
+import * as SDK from '../core/sdk/sdk.js';
 
 const base64Digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -148,7 +148,6 @@ export class OriginalScopeBuilder {
       this.#encodedScope += encodeVlq(name);
     }
     if (variables !== undefined) {
-      this.#encodedScope += encodeVlq(variables.length);
       this.#encodedScope += encodeVlqList(variables);
     }
 
@@ -185,5 +184,109 @@ export class OriginalScopeBuilder {
       case 'block':
         return 0x04;
     }
+  }
+}
+
+export class GeneratedRangeBuilder {
+  #encodedRange = '';
+  #state = {
+    line: 0,
+    column: 0,
+    defSourceIdx: 0,
+    defScopeIdx: 0,
+    callsiteSourceIdx: 0,
+    callsiteLine: 0,
+    callsiteColumn: 0,
+  };
+
+  start(line: number, column: number, options?: {
+    definition?: {sourceIdx: number, scopeIdx: number},
+    callsite?: {sourceIdx: number, line: number, column: number},
+  }): this {
+    this.#emitLineSeparator(line);
+    this.#emitItemSepratorIfRequired();
+
+    const emittedColumn = column - (this.#state.line === line ? this.#state.column : 0);
+    this.#encodedRange += encodeVlq(emittedColumn);
+
+    this.#state.line = line;
+    this.#state.column = column;
+
+    let flags = 0;
+    if (options?.definition) {
+      flags |= SDK.SourceMapScopes.EncodedGeneratedRangeFlag.HasDefinition;
+    }
+    if (options?.callsite) {
+      flags |= SDK.SourceMapScopes.EncodedGeneratedRangeFlag.HasCallsite;
+    }
+    this.#encodedRange += encodeVlq(flags);
+
+    if (options?.definition) {
+      const {sourceIdx, scopeIdx} = options.definition;
+      this.#encodedRange += encodeVlq(sourceIdx - this.#state.defSourceIdx);
+
+      const emittedScopeIdx = scopeIdx - (this.#state.defSourceIdx === sourceIdx ? this.#state.defScopeIdx : 0);
+      this.#encodedRange += encodeVlq(emittedScopeIdx);
+
+      this.#state.defSourceIdx = sourceIdx;
+      this.#state.defScopeIdx = scopeIdx;
+    }
+
+    if (options?.callsite) {
+      const {sourceIdx, line, column} = options.callsite;
+      this.#encodedRange += encodeVlq(sourceIdx - this.#state.callsiteSourceIdx);
+
+      const emittedLine = line - (this.#state.callsiteSourceIdx === sourceIdx ? this.#state.callsiteLine : 0);
+      this.#encodedRange += encodeVlq(emittedLine);
+
+      const emittedColumn = column - (this.#state.callsiteLine === line ? this.#state.callsiteColumn : 0);
+      this.#encodedRange += encodeVlq(emittedColumn);
+
+      this.#state.callsiteSourceIdx = sourceIdx;
+      this.#state.callsiteLine = line;
+      this.#state.callsiteColumn = column;
+    }
+
+    return this;
+  }
+
+  end(line: number, column: number): this {
+    this.#emitLineSeparator(line);
+    this.#emitItemSepratorIfRequired();
+
+    const emittedColumn = column - (this.#state.line === line ? this.#state.column : 0);
+    this.#encodedRange += encodeVlq(emittedColumn);
+
+    this.#state.line = line;
+    this.#state.column = column;
+
+    return this;
+  }
+
+  #emitLineSeparator(line: number): void {
+    for (let i = this.#state.line; i < line; ++i) {
+      this.#encodedRange += ';';
+    }
+  }
+
+  #emitItemSepratorIfRequired(): void {
+    if (this.#encodedRange !== '' && this.#encodedRange[this.#encodedRange.length - 1] !== ';') {
+      this.#encodedRange += ',';
+    }
+  }
+
+  build(): string {
+    const result = this.#encodedRange;
+    this.#state = {
+      line: 0,
+      column: 0,
+      defSourceIdx: 0,
+      defScopeIdx: 0,
+      callsiteSourceIdx: 0,
+      callsiteLine: 0,
+      callsiteColumn: 0,
+    };
+    this.#encodedRange = '';
+    return result;
   }
 }

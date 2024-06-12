@@ -33,8 +33,10 @@ export interface ParseConfig {
  * to be used at that point. For tests, if you want to construct a model with
  * all handlers, you can use the static `Model.createWithAllHandlers` method.
  **/
-export class Model<EnabledModelHandlers extends {[key: string]: Handlers.Types.TraceEventHandler}> extends EventTarget {
+export class Model<EnabledModelHandlers extends {[key: string]: Handlers.Types.TraceEventHandler} =
+                                                    typeof Handlers.ModelHandlers> extends EventTarget {
   readonly #traces: ParsedTraceFile<EnabledModelHandlers>[] = [];
+  readonly #syntheticEventsManagerByTrace: Helpers.SyntheticEvents.SyntheticEventsManager[] = [];
   readonly #nextNumberByDomain = new Map<string, number>();
 
   readonly #recordingsAvailable: string[] = [];
@@ -104,11 +106,14 @@ export class Model<EnabledModelHandlers extends {[key: string]: Handlers.Types.T
     try {
       // Wait for all outstanding promises before finishing the async execution,
       // but perform all tasks in parallel.
+      const syntheticEventsManager =
+          Helpers.SyntheticEvents.SyntheticEventsManager.initSyntheticEventsManagerForTrace(traceEvents);
       await this.#processor.parse(traceEvents, isFreshRecording);
       this.#storeParsedFileData(file, this.#processor.traceParsedData, this.#processor.insights);
       // We only push the file onto this.#traces here once we know it's valid
       // and there's been no errors in the parsing.
       this.#traces.push(file);
+      this.#syntheticEventsManagerByTrace.push(syntheticEventsManager);
     } catch (e) {
       throw e;
     } finally {
@@ -160,7 +165,7 @@ export class Model<EnabledModelHandlers extends {[key: string]: Handlers.Types.T
     return this.#traces[index].traceInsights;
   }
 
-  metadata(index: number): Types.File.MetaData|null {
+  metadata(index: number = this.#traces.length - 1): Types.File.MetaData|null {
     if (!this.#traces[index]) {
       return null;
     }
@@ -168,18 +173,26 @@ export class Model<EnabledModelHandlers extends {[key: string]: Handlers.Types.T
     return this.#traces[index].metadata;
   }
 
-  overrideAnnotations(index: number, newAnnotations: Types.File.Annotations): void {
+  overrideModifications(index: number, newModifications: Types.File.Modifications): void {
     if (this.#traces[index]) {
-      this.#traces[index].metadata.annotations = newAnnotations;
+      this.#traces[index].metadata.modifications = newModifications;
     }
   }
 
-  traceEvents(index: number): readonly Types.TraceEvents.TraceEventData[]|null {
+  rawTraceEvents(index: number = this.#traces.length - 1): readonly Types.TraceEvents.TraceEventData[]|null {
     if (!this.#traces[index]) {
       return null;
     }
 
     return this.#traces[index].traceEvents;
+  }
+  syntheticTraceEventsManager(index: number = this.#traces.length - 1): Helpers.SyntheticEvents.SyntheticEventsManager
+      |null {
+    if (!this.#syntheticEventsManagerByTrace[index]) {
+      return null;
+    }
+
+    return this.#syntheticEventsManagerByTrace[index];
   }
 
   size(): number {

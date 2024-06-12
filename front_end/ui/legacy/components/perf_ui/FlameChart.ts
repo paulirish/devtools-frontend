@@ -31,6 +31,7 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
+import * as Root from '../../../../core/root/root.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../components/buttons/buttons.js';
@@ -305,6 +306,15 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.revealDescendantsArrowHighlightElement =
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
+
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK)) {
+      // When this experiment is enabled the new Overlays system is
+      // used to render the selected entry outline, so hide this one.
+      // Once the overlay is ready we can remove this.selectedElement
+      // entirely.
+      this.selectedElement.style.display = 'none';
+    }
+
     this.canvas.addEventListener('focus', () => {
       this.dispatchEventToListeners(Events.CanvasFocused);
     }, false);
@@ -1024,6 +1034,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.dataProvider.modifyTree?.(index, treeAction);
     this.dataProvider.timelineData(true);
+    this.dataProvider.buildFlowForInitiator?.(index);
     this.update();
   }
 
@@ -1052,7 +1063,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
     const label = i18nString(UIStrings.enterTrackConfigurationMode);
     this.contextMenu.defaultSection().appendItem(label, () => {
       this.#enterEditMode();
@@ -1066,7 +1077,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (this.#inTrackConfigEditMode === false) {
       return;
     }
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
     const label = i18nString(UIStrings.exitTrackConfigurationMode);
     this.contextMenu.defaultSection().appendItem(label, () => {
       this.#exitEditMode();
@@ -1130,7 +1141,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
 
     const hideEntryOption = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.hideFunction), () => {
       this.modifyTree(TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, this.selectedEntryIndex);
@@ -1850,6 +1861,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.resetCanvas();
 
+    this.dispatchEventToListeners(Events.LatestDrawDimensions, {
+      chart: {
+        widthPixels: this.offsetWidth,
+        heightPixels: this.offsetHeight,
+        scrollOffsetPixels: this.chartViewport.scrollOffset(),
+      },
+      traceWindow: TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
+          this.minimumBoundary(),
+          this.maximumBoundary(),
+          ),
+    });
     const canvasWidth = this.offsetWidth;
     const canvasHeight = this.offsetHeight;
     const context = (this.canvas.getContext('2d') as CanvasRenderingContext2D);
@@ -2173,7 +2195,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const markerIndices: number[] = [];
     const {entryTotalTimes, entryStartTimes} = timelineData;
 
-    const height = this.offsetHeight;
     const top = this.chartViewport.scrollOffset();
 
     const textPadding = this.textPadding;
@@ -2190,7 +2211,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const colorBuckets = new Map<string, {indexes: number[]}>();
     for (let level = 0; level < this.dataProvider.maxStackDepth(); ++level) {
       // Since tracks can be reordered the |visibleLevelOffsets| is not necessarily sorted, so we need to check all levels.
-      if (this.levelToOffset(level) < top || this.levelToOffset(level) > top + height) {
+      // Note that to check if a level is off the top of the screen, we can't
+      // just check its offset, because then the level will disappear the
+      // moment it is 1px off the top of the screen. So instead we check that
+      // the entire height of the level is off the top of the screen before
+      // skipping it.
+      if (this.levelToOffset(level) + this.levelHeight(level) < top ||
+          this.levelToOffset(level) > top + this.offsetHeight) {
         continue;
       }
       if (!this.visibleLevels || !this.visibleLevels[level]) {
@@ -3372,6 +3399,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return false;
   }
 
+  getMarkerPixelsForEntryIndex(entryIndex: number): {x: number, width: number}|null {
+    return this.markerPositions.get(entryIndex) ?? null;
+  }
+
   /**
    * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
    * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
@@ -3490,7 +3521,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return this.visibleLevelOffsets[level];
   }
 
-  private levelHeight(level: number): number {
+  levelHeight(level: number): number {
     if (!this.visibleLevelHeights) {
       throw new Error('No visible level heights');
     }
@@ -3705,6 +3736,8 @@ export class FlameChartTimelineData {
 }
 
 export interface FlameChartDataProvider {
+  buildFlowForInitiator?(index: number): unknown;
+
   minimumBoundary(): number;
 
   totalTime(): number;
@@ -3744,6 +3777,8 @@ export interface FlameChartDataProvider {
   hasTrackConfigurationMode(): boolean;
 
   eventByIndex?(entryIndex: number): TraceEngine.Types.TraceEvents.TraceEventData|null;
+
+  indexForEvent?(event: TraceEngine.Types.TraceEvents.TraceEventData): number|null;
 }
 
 export interface FlameChartMarker {
@@ -3785,6 +3820,8 @@ export const enum Events {
    */
   EntryHighlighted = 'EntryHighlighted',
   ChartPlayableStateChange = 'ChartPlayableStateChange',
+
+  LatestDrawDimensions = 'LatestDrawDimensions',
 }
 
 export type EventTypes = {
@@ -3793,6 +3830,14 @@ export type EventTypes = {
   [Events.EntrySelected]: number,
   [Events.EntryHighlighted]: number,
   [Events.ChartPlayableStateChange]: boolean,
+  [Events.LatestDrawDimensions]: {
+    chart: {
+      widthPixels: number,
+      heightPixels: number,
+      scrollOffsetPixels: number,
+    },
+    traceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
+  },
 };
 
 export interface Group {

@@ -4,8 +4,11 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as PanelFeedback from '../../ui/components/panel_feedback/panel_feedback.js';
 import * as UI from '../../ui/legacy/legacy.js';
+
+import * as Components from './components/components.js';
 
 const UIStrings = {
   /**
@@ -52,6 +55,30 @@ export class TimelineLandingPage extends UI.Widget.VBox {
 
     this.toggleRecordAction = toggleRecordAction;
 
+    this.contentElement.classList.add('timeline-landing-page', 'fill');
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS)) {
+      this.renderLandingPage();
+    } else {
+      this.renderLegacyLandingPage(options);
+    }
+  }
+
+  private renderLandingPage(): void {
+    const mainWidget = new UI.Widget.Widget();
+    mainWidget.contentElement.append(new Components.LiveMetricsView.LiveMetricsView());
+
+    const sidebarWidget = new UI.Widget.Widget();
+    const nextSteps = sidebarWidget.contentElement.createChild('div');
+    nextSteps.textContent = 'Next steps';
+
+    const splitView = new UI.SplitWidget.SplitWidget(true, true);
+    splitView.setMainWidget(mainWidget);
+    splitView.setSidebarWidget(sidebarWidget);
+
+    splitView.show(this.contentElement);
+  }
+
+  private renderLegacyLandingPage(options?: Options): void {
     function encloseWithTag(tagName: string, contents: string): HTMLElement {
       const e = document.createElement(tagName);
       e.textContent = contents;
@@ -69,7 +96,7 @@ export class TimelineLandingPage extends UI.Widget.VBox {
         'b', UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('timeline.record-reload')[0].title());
     const navigateNode = encloseWithTag('b', i18nString(UIStrings.wasd));
 
-    this.contentElement.classList.add('timeline-landing-page', 'fill');
+    this.contentElement.classList.add('legacy');
     const centered = this.contentElement.createChild('div');
 
     const recordButton = UI.UIUtils.createInlineButton(UI.Toolbar.Toolbar.createActionButton(this.toggleRecordAction));

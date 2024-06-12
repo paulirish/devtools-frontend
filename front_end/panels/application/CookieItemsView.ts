@@ -301,14 +301,14 @@ export class CookieItemsView extends StorageItemsView {
    */
   override deleteAllItems(): void {
     this.showPreview(null);
-    void this.model.deleteCookies(this.shownCookies).then(() => this.refreshItems());
+    void this.model.deleteCookies(this.shownCookies);
   }
 
   override deleteSelectedItem(): void {
     const selectedCookie = this.cookiesTable.selectedCookie();
     if (selectedCookie) {
       this.showPreview(null);
-      void this.model.deleteCookie(selectedCookie).then(() => this.refreshItems());
+      void this.model.deleteCookie(selectedCookie);
     }
   }
 
