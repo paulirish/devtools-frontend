@@ -127,7 +127,6 @@ describeWithEnvironment('ThreadAppender', function() {
       'Raster',
       'Rasterizer Thread 1',
       'Rasterizer Thread 2',
-      'Thread Pool',
       'Thread Pool Worker 1',
     ];
     assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
@@ -139,7 +138,7 @@ describeWithEnvironment('ThreadAppender', function() {
     // together. It isn't selectable and isn't nested
     assert.strictEqual(flameChartData.groups[1].name, 'Raster');
     assert.strictEqual(flameChartData.groups[1].selectable, false);
-    assert.strictEqual(flameChartData.groups[1].style.nestingLevel, 0);
+    assert.strictEqual(flameChartData.groups[1].style.nestingLevel, 3);
 
     // These groups correspond to the raster tracks titles, or the
     // individual raster tracks themselves. They are selectable and

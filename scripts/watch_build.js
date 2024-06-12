@@ -41,7 +41,7 @@ let lastConnectionId = 0;
 const target = extractArgument('--target') || 'Default';
 const PORT = 8080;
 const TARGET_GEN_DIR = path.join('out', target, 'gen');
-
+console.log({TARGET_GEN_DIR});
 // Make sure that the target has
 // - `is_debug = true`
 // - `devtools_skip_typecheck = true`

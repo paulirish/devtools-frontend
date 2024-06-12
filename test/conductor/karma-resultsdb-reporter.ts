@@ -34,9 +34,20 @@ function*
 }
 
 export function resultAssertionsDiff({assertionErrors}: any) {
-  return assertionErrors && assertionErrors.length > 0 ?
-      diff.diffLines(`${assertionErrors[0].expected}`, `${assertionErrors[0].actual}`) :
-      [];
+  if (assertionErrors?.length === 0) {
+    return [];
+  }
+  const err = assertionErrors[0];
+  // If actual/expected look like JSON, parse into JSON for easier multiline diffs. https://github.com/litixsoft/karma-mocha-reporter/pull/62
+  if (String(err.actual).match(/^".*"$/) && String(err.expected).match(/^".*"$/)) {
+    try {
+      err.actual = JSON.parse(err.actual);
+      err.expected = JSON.parse(err.expected);
+    } catch (e) {
+    }
+  }
+
+  return diff.diffLines(`${err.expected}`, `${err.actual}`);
 }
 
 export function formatAsPatch(assertionDiff: any) {
