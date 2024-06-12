@@ -124,7 +124,7 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
   Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE,
   Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-  Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK,
+  Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS,
   Root.Runtime.ExperimentName.TIMELINE_SIDEBAR,
   Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS,
   Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
@@ -383,11 +383,13 @@ export async function initializeGlobalLocaleVars() {
     },
   });
 
+  if (i18n.i18n.hasLocaleDataForTest('en-US')) {
+    return;
+  }
+
   // Load the strings from the resource file.
-  const locale = i18n.DevToolsLocale.DevToolsLocale.instance().locale;
-  // proxied call.
   try {
-    await i18n.i18n.fetchAndRegisterLocaleData(locale);
+    await i18n.i18n.fetchAndRegisterLocaleData('en-US');
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('EnvironmentHelper: Loading en-US locale failed', error.message);

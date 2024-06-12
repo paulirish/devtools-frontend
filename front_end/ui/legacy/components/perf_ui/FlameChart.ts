@@ -268,6 +268,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   #searchResultHighlightElements: HTMLElement[] = [];
   #inTrackConfigEditMode: boolean = false;
 
+  // Stored because we cache this value to save extra lookups and layoffs.
+  #canvasBoundingClientRect: DOMRect|null = null;
+
   constructor(
       dataProvider: FlameChartDataProvider, flameChartDelegate: FlameChartDelegate,
       groupExpansionSetting?: Common.Settings.Setting<GroupExpansionState>) {
@@ -307,7 +310,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
 
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK)) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS)) {
       // When this experiment is enabled the new Overlays system is
       // used to render the selected entry outline, so hide this one.
       // Once the overlay is ready we can remove this.selectedElement
@@ -355,6 +358,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   override willHide(): void {
     this.hideHighlight();
+  }
+
+  canvasBoundingClientRect(): DOMRect|null {
+    if (this.#canvasBoundingClientRect) {
+      return this.#canvasBoundingClientRect;
+    }
+    this.#canvasBoundingClientRect = this.canvas.getBoundingClientRect();
+    return this.#canvasBoundingClientRect;
   }
 
   getBarHeight(): number {
@@ -1063,7 +1074,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
     const label = i18nString(UIStrings.enterTrackConfigurationMode);
     this.contextMenu.defaultSection().appendItem(label, () => {
       this.#enterEditMode();
@@ -1077,7 +1088,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (this.#inTrackConfigEditMode === false) {
       return;
     }
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
     const label = i18nString(UIStrings.exitTrackConfigurationMode);
     this.contextMenu.defaultSection().appendItem(label, () => {
       this.#exitEditMode();
@@ -1141,7 +1152,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    this.contextMenu = new UI.ContextMenu.ContextMenu(event);
+    this.contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
 
     const hideEntryOption = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.hideFunction), () => {
       this.modifyTree(TraceEngine.EntriesFilter.FilterAction.MERGE_FUNCTION, this.selectedEntryIndex);
@@ -1186,22 +1197,24 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     });
 
     const entry = this.dataProvider.eventByIndex?.(this.selectedEntryIndex);
-    const url = (entry && TraceEngine.Types.TraceEvents.isProfileCall(entry)) ?
-        entry.callFrame.url as Platform.DevToolsPath.UrlString :
-        undefined;
-    if (url) {
-      if (Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url)) {
-        this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeScriptFromIgnoreList), () => {
-          Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListURL(url);
-        }, {
-          jslogContext: 'remove-from-ignore-list',
-        });
-      } else {
-        this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.addScriptToIgnoreList), () => {
-          Bindings.IgnoreListManager.IgnoreListManager.instance().ignoreListURL(url);
-        }, {
-          jslogContext: 'add-to-ignore-list',
-        });
+    if (entry && entry instanceof TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame === false) {
+      const url = (TraceEngine.Types.TraceEvents.isProfileCall(entry)) ?
+          entry.callFrame.url as Platform.DevToolsPath.UrlString :
+          undefined;
+      if (url) {
+        if (Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url)) {
+          this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeScriptFromIgnoreList), () => {
+            Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListURL(url);
+          }, {
+            jslogContext: 'remove-from-ignore-list',
+          });
+        } else {
+          this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.addScriptToIgnoreList), () => {
+            Bindings.IgnoreListManager.IgnoreListManager.instance().ignoreListURL(url);
+          }, {
+            jslogContext: 'add-to-ignore-list',
+          });
+        }
       }
     }
 
@@ -1828,6 +1841,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.viewportElement.removeChild(confirmButton);
     }
   }
+
   #exitEditMode(): void {
     this.#removeEditModeButton();
     this.#inTrackConfigEditMode = false;
@@ -1866,6 +1880,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         widthPixels: this.offsetWidth,
         heightPixels: this.offsetHeight,
         scrollOffsetPixels: this.chartViewport.scrollOffset(),
+        // If there are no groups because we have no timeline data, we treat
+        // that as all being collapsed.
+        allGroupsCollapsed: this.rawTimelineData?.groups.every(g => !g.expanded) ?? true,
       },
       traceWindow: TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
           this.minimumBoundary(),
@@ -3540,6 +3557,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   override onResize(): void {
+    // Clear the rect cache because we have been resized.
+    this.#canvasBoundingClientRect = null;
     this.scheduleUpdate();
   }
 
@@ -3776,9 +3795,11 @@ export interface FlameChartDataProvider {
 
   hasTrackConfigurationMode(): boolean;
 
-  eventByIndex?(entryIndex: number): TraceEngine.Types.TraceEvents.TraceEventData|null;
+  eventByIndex?(entryIndex: number): TraceEngine.Types.TraceEvents.TraceEventData
+      |TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame|null;
 
-  indexForEvent?(event: TraceEngine.Types.TraceEvents.TraceEventData): number|null;
+  indexForEvent?(event: TraceEngine.Types.TraceEvents.TraceEventData|
+                 TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame): number|null;
 }
 
 export interface FlameChartMarker {
@@ -3835,6 +3856,7 @@ export type EventTypes = {
       widthPixels: number,
       heightPixels: number,
       scrollOffsetPixels: number,
+      allGroupsCollapsed: boolean,
     },
     traceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
   },

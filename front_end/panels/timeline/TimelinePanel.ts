@@ -699,7 +699,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.flameChart.getMainFlameChart().coordinatesToEntryIndex(mouseEvent.offsetX, mouseEvent.offsetY) !== -1) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
     contextMenu.appendItemsAtLocation('timelineMenu');
     void contextMenu.show();
   }
@@ -711,8 +711,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const traceEvents = this.#traceEngineModel.rawTraceEvents(this.#traceEngineActiveTraceIndex);
     const metadata = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex);
     // Save modifications into the metadata if modifications experiment is on
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK) &&
-        metadata) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS) && metadata) {
       metadata.modifications = ModificationsManager.ModificationsManager.ModificationsManager.activeManager()?.toJSON();
     }
     if (!traceEvents) {
@@ -1217,11 +1216,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       TraceBounds.TraceBounds.BoundsManager.instance().resetWithNewBounds(
           traceParsedData.Meta.traceBounds,
       );
-
-      // Create an instance of the modifications manager for this trace.
-      ModificationsManager.ModificationsManager.ModificationsManager
-          .initModificationsManagerForTrace(this.#traceEngineModel, this.#traceEngineActiveTraceIndex)
-          .applyModificationsIfPresent();
+      // Create an instance of the modifications manager for this trace or activate a manager for previousy loaded trace.
+      ModificationsManager.ModificationsManager.ModificationsManager.initAndActivateModificationsManager(
+          this.#traceEngineModel, this.#traceEngineActiveTraceIndex);
       this.#applyActiveFilters(traceParsedData.Meta.traceIsGeneric, exclusiveFilter);
     }
     if (traceParsedData) {

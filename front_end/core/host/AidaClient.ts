@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
-import * as Root from '../root/root.js';
+
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
 import {bindOutputStream} from './ResourceLoader.js';
 
@@ -29,22 +30,33 @@ export interface AidaResponse {
 }
 
 export class AidaClient {
-  static buildApiRequest(input: string): AidaRequest {
+  static buildConsoleInsightsRequest(input: string): AidaRequest {
     const request: AidaRequest = {
       input,
       client: 'CHROME_DEVTOOLS',
     };
-    const temperature = parseFloat(Root.Runtime.Runtime.queryParam('aidaTemperature') || '');
+    const config = Common.Settings.Settings.instance().getHostConfig();
+    let temperature = NaN;
+    let modelId = null;
+    let disallowLogging = false;
+    if (config?.devToolsConsoleInsightsDogfood.enabled) {
+      temperature = config.devToolsConsoleInsightsDogfood.aidaTemperature;
+      modelId = config.devToolsConsoleInsightsDogfood.aidaModelId;
+    } else if (config?.devToolsConsoleInsights.enabled) {
+      temperature = config.devToolsConsoleInsights.aidaTemperature;
+      modelId = config.devToolsConsoleInsights.aidaModelId;
+      disallowLogging = config.devToolsConsoleInsights.disallowLogging;
+    }
+
     if (!isNaN(temperature)) {
       request.options ??= {};
       request.options.temperature = temperature;
     }
-    const modelId = Root.Runtime.Runtime.queryParam('aidaModelId');
     if (modelId) {
       request.options ??= {};
       request.options.model_id = modelId;
     }
-    if (Root.Runtime.Runtime.queryParam('ci_disallowLogging') === 'true') {
+    if (disallowLogging) {
       request.metadata = {
         disable_user_content_logging: true,
       };
@@ -52,7 +64,7 @@ export class AidaClient {
     return request;
   }
 
-  async * fetch(input: string): AsyncGenerator<AidaResponse, void, void> {
+  async * fetch(request: AidaRequest): AsyncGenerator<AidaResponse, void, void> {
     if (!InspectorFrontendHostInstance.doAidaConversation) {
       throw new Error('doAidaConversation is not available');
     }
@@ -73,18 +85,17 @@ export class AidaClient {
       };
     })();
     const streamId = bindOutputStream(stream);
-    InspectorFrontendHostInstance.doAidaConversation(
-        JSON.stringify(AidaClient.buildApiRequest(input)), streamId, result => {
-          if (result.statusCode === 403) {
-            stream.fail(new Error('Server responded: permission denied'));
-          } else if (result.error) {
-            stream.fail(new Error(`Cannot send request: ${result.error} ${result.detail || ''}`));
-          } else if (result.statusCode !== 200) {
-            stream.fail(new Error(`Request failed: ${JSON.stringify(result)}`));
-          } else {
-            void stream.close();
-          }
-        });
+    InspectorFrontendHostInstance.doAidaConversation(JSON.stringify(request), streamId, result => {
+      if (result.statusCode === 403) {
+        stream.fail(new Error('Server responded: permission denied'));
+      } else if (result.error) {
+        stream.fail(new Error(`Cannot send request: ${result.error} ${result.detail || ''}`));
+      } else if (result.statusCode !== 200) {
+        stream.fail(new Error(`Request failed: ${JSON.stringify(result)}`));
+      } else {
+        void stream.close();
+      }
+    });
     let chunk;
     const text = [];
     let inCodeChunk = false;

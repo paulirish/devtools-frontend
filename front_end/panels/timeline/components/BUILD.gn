@@ -11,7 +11,9 @@ generate_css("css_files") {
   sources = [
     "breadcrumbsUI.css",
     "interactionBreakdown.css",
+    "liveMetricsView.css",
     "sidebar.css",
+    "timeRangeOverlay.css",
   ]
 }
 
@@ -23,6 +25,7 @@ devtools_module("components") {
     "InteractionBreakdown.ts",
     "LiveMetricsView.ts",
     "Sidebar.ts",
+    "TimeRangeOverlay.ts",
   ]
 
   deps = [
@@ -63,6 +66,7 @@ ts_library("unittests") {
     "BreadcrumbsUI.test.ts",
     "InteractionBreakdown.test.ts",
     "Invalidations.test.ts",
+    "LiveMetricsView.test.ts",
   ]
 
   deps = [

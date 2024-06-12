@@ -5,10 +5,11 @@
 import {assert} from 'chai';
 
 import {
+  $$,
   enableExperiment,
   getBrowserAndPages,
   goToResource,
-  waitFor,
+  waitForMany,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
@@ -40,22 +41,29 @@ describe('The Performance panel landing page', () => {
 
       await goToResource('performance/fake-website.html');
       await lcpPromise;
-      await target.click('div.container');
+      await target.click('#long-interaction');
+      await target.click('#long-interaction');
       await target.evaluate(() => new Promise(r => requestAnimationFrame(r)));
       await target.evaluate(() => new Promise(r => requestAnimationFrame(r)));
       await frontend.bringToFront();
 
-      const liveLcpDataElem = await waitFor('.lcp-data');
-      const lcpText = await liveLcpDataElem.evaluate(el => el.textContent) || '';
-      assert.match(lcpText, /LCP:/);
+      const [lcpValueElem, clsValueElem, inpValueElem] = await waitForMany('.metric-card-value:not(.waiting)', 3);
+      const interactions = await $$<HTMLElement>('.interaction');
+      assert.lengthOf(interactions, 2);
 
-      const liveClsDataElem = await waitFor('.cls-data');
-      const clsText = await liveClsDataElem.evaluate(el => el.textContent) || '';
-      assert.match(clsText, /CLS:/);
+      const lcpValue = await lcpValueElem.evaluate(el => el.textContent) || '';
+      assert.match(lcpValue, /[0-9\.]+ (s|ms)/);
 
-      const liveInpDataElem = await waitFor('.inp-data');
-      const inpText = await liveInpDataElem.evaluate(el => el.textContent) || '';
-      assert.match(inpText, /INP:/);
+      const clsValue = await clsValueElem.evaluate(el => el.textContent) || '';
+      assert.match(clsValue, /[0-9\.]+/);
+
+      const inpValue = await inpValueElem.evaluate(el => el.textContent) || '';
+      assert.match(inpValue, /[0-9\.]+ (s|ms)/);
+
+      for (const interaction of interactions) {
+        const interactionText = await interaction.evaluate(el => el.innerText) || '';
+        assert.match(interactionText, /pointer\n[\d.]+ (s|ms)/);
+      }
     } finally {
       await targetSession.detach();
     }
@@ -79,7 +87,8 @@ describe('The Performance panel landing page', () => {
 
       await goToResource('performance/fake-website.html');
       await lcpPromise;
-      await target.click('div.container');
+      await target.click('#long-interaction');
+      await target.click('#long-interaction');
       await target.evaluate(() => new Promise(r => requestAnimationFrame(r)));
       await target.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
@@ -100,17 +109,23 @@ describe('The Performance panel landing page', () => {
 
       await frontend.bringToFront();
 
-      const liveLcpDataElem = await waitFor('.lcp-data');
-      const lcpText = await liveLcpDataElem.evaluate(el => el.textContent) || '';
-      assert.match(lcpText, /LCP:/);
+      const [lcpValueElem, clsValueElem, inpValueElem] = await waitForMany('.metric-card-value:not(.waiting)', 3);
+      const interactions = await $$<HTMLElement>('.interaction');
+      assert.lengthOf(interactions, 2);
 
-      const liveClsDataElem = await waitFor('.cls-data');
-      const clsText = await liveClsDataElem.evaluate(el => el.textContent) || '';
-      assert.match(clsText, /CLS:/);
+      const lcpValue = await lcpValueElem.evaluate(el => el.textContent) || '';
+      assert.match(lcpValue, /[0-9\.]+ (s|ms)/);
 
-      const liveInpDataElem = await waitFor('.inp-data');
-      const inpText = await liveInpDataElem.evaluate(el => el.textContent) || '';
-      assert.match(inpText, /INP:/);
+      const clsValue = await clsValueElem.evaluate(el => el.textContent) || '';
+      assert.match(clsValue, /[0-9\.]+/);
+
+      const inpValue = await inpValueElem.evaluate(el => el.textContent) || '';
+      assert.match(inpValue, /[0-9\.]+ (s|ms)/);
+
+      for (const interaction of interactions) {
+        const interactionText = await interaction.evaluate(el => el.innerText) || '';
+        assert.match(interactionText, /pointer\n[\d.]+ (s|ms)/);
+      }
     } finally {
       await targetSession.detach();
     }
