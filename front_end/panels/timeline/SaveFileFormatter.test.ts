@@ -44,17 +44,17 @@ describe('SaveFileFormatter', () => {
       };
       const formatted = Array.from(Timeline.SaveFileFormatter.traceJsonGenerator(events, metadata)).join('');
       assertValidJSON(formatted);
-      assert.strictEqual(formatted, `{"metadata": {
+      assert.strictEqual(formatted, `{"traceEvents": [
+  {"name":"event_one","tid":0,"pid":0,"ts":0,"cat":"test","ph":"M"},
+  {"name":"event_two","tid":0,"pid":0,"ts":0,"cat":"test","ph":"M"}
+],
+"metadata": {
   "source": "DevTools",
   "startTime": "1234",
   "networkThrottling": "4",
   "cpuThrottling": 1,
   "hardwareConcurrency": 1
-},
-"traceEvents": [
-  {"name":"event_one","tid":0,"pid":0,"ts":0,"cat":"test","ph":"M"},
-  {"name":"event_two","tid":0,"pid":0,"ts":0,"cat":"test","ph":"M"}
-]}\n`);
+}}\n`);
     });
 
     it('will emit {} for the metadata if none is provided', async () => {
@@ -63,11 +63,11 @@ describe('SaveFileFormatter', () => {
       const events = [eventOne, eventTwo];
       const formatted = Array.from(Timeline.SaveFileFormatter.traceJsonGenerator(events, null)).join('');
       assertValidJSON(formatted);
-      assert.strictEqual(formatted, `{"metadata": {},
-"traceEvents": [
+      assert.strictEqual(formatted, `{"traceEvents": [
   {"name":"event_one","tid":0,"pid":0,"ts":0,"cat":"test","ph":"M"},
   {"name":"event_two","tid":0,"pid":0,"ts":0,"cat":"test","ph":"M"}
-]}\n`);
+],
+"metadata": {}}\n`);
     });
   });
 });
