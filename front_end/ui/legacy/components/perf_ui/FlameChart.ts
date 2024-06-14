@@ -2148,6 +2148,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // start and end.
     context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
   }
+
+  // TODO: REMOVE!
   drawTrackLevelNumbers(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData): void {
     const allLevels = new Set(timelineData.entryLevels);
     const max = Math.max(...Array.from(allLevels));

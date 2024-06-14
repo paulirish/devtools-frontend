@@ -72,10 +72,6 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
       return this.#timelineDataInternal;
     }
 
-
-    // this.#traceEngineData.NetworkRequests.byTime = [
-    //   ...this.#traceEngineData.NetworkRequests.byTime, ...this.#traceEngineData.WebSockets.synthEvents
-    // ].sort((a, b) => a.ts - b.ts);
     this.#events = this.#traceEngineData.NetworkRequests.byTime;
     this.#networkTrackAppender = new NetworkTrackAppender(this.#traceEngineData, this.#timelineDataInternal);
     this.#maxLevel = this.#networkTrackAppender.appendTrackAtLevel(0);
