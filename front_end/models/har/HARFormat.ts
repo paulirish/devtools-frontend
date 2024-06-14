@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../core/platform/platform.js';
-import * as SDK from '../../core/sdk/sdk.js';
+// import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -395,8 +395,7 @@ export class HARInitiator extends HARBase {
    */
   constructor(data: any) {
     super(data);
-    this.type = (HARBase.optionalString(data['type']) ?? SDK.NetworkRequest.InitiatorType.Other) as
-        Protocol.Network.InitiatorType;
+    this.type = (HARBase.optionalString(data['type']) ?? 'other') as Protocol.Network.InitiatorType;
     this.url = HARBase.optionalString(data['url']);
     this.lineNumber = HARBase.optionalNumber(data['lineNumber']);
     this.requestId = HARBase.optionalString(data['requestId']) as Protocol.Network.RequestId;
