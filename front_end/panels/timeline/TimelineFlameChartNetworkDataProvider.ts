@@ -40,9 +40,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
   setModel(traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null): void {
     this.#timelineDataInternal = null;
     this.#traceEngineData = traceEngineData;
-    this.#events = !traceEngineData?.NetworkRequests.byTime ? [] : [
-      ...traceEngineData.NetworkRequests.byTime, ...traceEngineData.WebSockets.synthEvents
-    ].sort((a, b) => a.ts - b.ts);
+    this.#events = traceEngineData?.NetworkRequests.byTime || [];
     this.#eventIndexByEvent.clear();
 
     if (this.#traceEngineData) {
@@ -75,9 +73,9 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     }
 
 
-    this.#traceEngineData.NetworkRequests.byTime = [
-      ...this.#traceEngineData.NetworkRequests.byTime, ...this.#traceEngineData.WebSockets.synthEvents
-    ].sort((a, b) => a.ts - b.ts);
+    // this.#traceEngineData.NetworkRequests.byTime = [
+    //   ...this.#traceEngineData.NetworkRequests.byTime, ...this.#traceEngineData.WebSockets.synthEvents
+    // ].sort((a, b) => a.ts - b.ts);
     this.#events = this.#traceEngineData.NetworkRequests.byTime;
     this.#networkTrackAppender = new NetworkTrackAppender(this.#traceEngineData, this.#timelineDataInternal);
     this.#maxLevel = this.#networkTrackAppender.appendTrackAtLevel(0);

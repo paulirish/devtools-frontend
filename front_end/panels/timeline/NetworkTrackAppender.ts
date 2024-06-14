@@ -67,8 +67,6 @@ export class NetworkTrackAppender implements TrackAppender {
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean|undefined): number {
     const networkEvents = this.#traceParsedData.NetworkRequests.byTime;
-    // const networkAndWsEvents =
-    //     [...networkEvents, ...this.#traceParsedData.WebSockets.synthEvents].sort((a, b) => a.ts - b.ts);
     if (networkEvents.length === 0) {
       return trackStartLevel;
     }
@@ -114,11 +112,11 @@ export class NetworkTrackAppender implements TrackAppender {
       const event = events[i];
       const level = getEventLevel(event, lastUsedTimeByLevel);
       this.#appendEventAtLevel(event, trackStartLevel + level);
-      if (event.args?.data.nestedEvents) {
-        for (const nestedEvent of event.args.data.nestedEvents) {
-          this.#appendEventAtLevel(event, trackStartLevel);
-        }
-      }
+      // if (event.args?.data.nestedEvents) {
+      //   for (const nestedEvent of event.args.data.nestedEvents) {
+      //     this.#appendEventAtLevel(event, trackStartLevel);
+      //   }
+      // }
     }
     return trackStartLevel + lastUsedTimeByLevel.length;
   }

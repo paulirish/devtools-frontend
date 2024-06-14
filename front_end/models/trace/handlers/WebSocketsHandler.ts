@@ -36,28 +36,29 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('WebSockets Handler is not initialized');
   }
+  return;
 
-  if (Types.TraceEvents.isTraceEventWebSocketCreate(event) || Types.TraceEvents.isTraceEventWebSocketInfo(event) ||
-      Types.TraceEvents.isTraceEventWebSocketTransfer(event)) {
-    const identifier = event.args.data.identifier;
-    if (!webSocketData.has(identifier)) {
-      if (event.args.data.frame) {
-        webSocketData.set(identifier, {
-          frame: event.args.data.frame,
-          webSocketIdentifier: identifier,
-          events: [],
-        });
-      } else if (event.args.data.workerId) {
-        webSocketData.set(identifier, {
-          workerId: event.args.data.workerId,
-          webSocketIdentifier: identifier,
-          events: [],
-        });
-      }
-    }
+  // if (Types.TraceEvents.isTraceEventWebSocketCreate(event) || Types.TraceEvents.isTraceEventWebSocketInfo(event) ||
+  //     Types.TraceEvents.isTraceEventWebSocketTransfer(event)) {
+  //   const identifier = event.args.data.identifier;
+  //   if (!webSocketData.has(identifier)) {
+  //     if (event.args.data.frame) {
+  //       webSocketData.set(identifier, {
+  //         frame: event.args.data.frame,
+  //         webSocketIdentifier: identifier,
+  //         events: [],
+  //       });
+  //     } else if (event.args.data.workerId) {
+  //       webSocketData.set(identifier, {
+  //         workerId: event.args.data.workerId,
+  //         webSocketIdentifier: identifier,
+  //         events: [],
+  //       });
+  //     }
+  //   }
 
-    webSocketData.get(identifier)?.events.push(event);
-  }
+  //   webSocketData.get(identifier)?.events.push(event);
+  // }
 }
 
 function createSyntheticWebSocketConnectionEvent(
@@ -93,27 +94,28 @@ export async function finalize(): Promise<void> {
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('WebSockets handler is not initialized');
   }
-  // Creating a synthetic WebSocket event for each WebSocket connection
-  webSocketData.forEach(data => {
-    let startEvent: Types.TraceEvents.WebSocketEvent|null = null;
-    let endEvent: Types.TraceEvents.TraceEventWebSocketDestroy|null = null;
-    if (data.events.length > 0 && Types.TraceEvents.isSyntheticWebSocketConnectionEvent(data.events[0])) {
-      // drop the synthetic event if it already exists. We will create a new one with updated duration
-      data.events.shift();
-    }
-    for (const event of data.events) {
-      if (Types.TraceEvents.isTraceEventWebSocketCreate(event)) {
-        startEvent = event;
-      }
-      if (Types.TraceEvents.isTraceEventWebSocketDestroy(event)) {
-        endEvent = event;
-      }
-    }
-    const syntheticWebSocketConnectionEvent =
-        createSyntheticWebSocketConnectionEvent(startEvent, endEvent, data.events[0], data.events);
-    data.events.unshift(syntheticWebSocketConnectionEvent);
-    synthEvents.push(syntheticWebSocketConnectionEvent);
-  });
+
+  // // Creating a synthetic WebSocket event for each WebSocket connection
+  // webSocketData.forEach(data => {
+  //   let startEvent: Types.TraceEvents.WebSocketEvent|null = null;
+  //   let endEvent: Types.TraceEvents.TraceEventWebSocketDestroy|null = null;
+  //   if (data.events.length > 0 && Types.TraceEvents.isSyntheticWebSocketConnectionEvent(data.events[0])) {
+  //     // drop the synthetic event if it already exists. We will create a new one with updated duration
+  //     data.events.shift();
+  //   }
+  //   for (const event of data.events) {
+  //     if (Types.TraceEvents.isTraceEventWebSocketCreate(event)) {
+  //       startEvent = event;
+  //     }
+  //     if (Types.TraceEvents.isTraceEventWebSocketDestroy(event)) {
+  //       endEvent = event;
+  //     }
+  //   }
+  //   const syntheticWebSocketConnectionEvent =
+  //       createSyntheticWebSocketConnectionEvent(startEvent, endEvent, data.events[0], data.events);
+  //   data.events.unshift(syntheticWebSocketConnectionEvent);
+  //   synthEvents.push(syntheticWebSocketConnectionEvent);
+  // });
   handlerState = HandlerState.FINALIZED;
 }
 
