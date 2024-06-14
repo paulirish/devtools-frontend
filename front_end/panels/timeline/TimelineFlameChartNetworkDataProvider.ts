@@ -155,7 +155,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
 
   entryTitle(index: number): string|null {
     const event = this.#events[index];
-    const parsedURL = new Common.ParsedURL.ParsedURL(event.args.data.url);
+    const parsedURL = new Common.ParsedURL.ParsedURL(event.args.data?.url ?? 'https://example.ooooops');
     return parsedURL.isValid ? `${parsedURL.displayName} (${parsedURL.host})` : event.args.data.url || null;
   }
 
@@ -353,7 +353,8 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     const div = (contents.createChild('span') as HTMLElement);
     div.textContent = PerfUI.NetworkPriorities.uiLabelForNetworkPriority((event.args.data.priority));
     div.style.color = this.#colorForPriority(event.args.data.priority) || 'black';
-    contents.createChild('span').textContent = Platform.StringUtilities.trimMiddle(event.args.data.url, maxURLChars);
+    contents.createChild('span').textContent =
+        Platform.StringUtilities.trimMiddle(event.args.data?.url ?? 'https://example.ooooops', maxURLChars);
     return element;
   }
 

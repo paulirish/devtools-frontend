@@ -248,6 +248,10 @@ export async function finalize(): Promise<void> {
     // the captured requests, so here we store all of them together.
     requests.all.push(syntheticWebSocketConnectionEvent);
     requestsByTime.push(syntheticWebSocketConnectionEvent);
+    for (const event of syntheticWebSocketConnectionEvent.args.data.nestedEvents) {
+      requests.all.push(event);
+      requestsByTime.push(event);
+    }
   });
 
   const {rendererProcessesByFrame} = metaHandlerData();
@@ -559,6 +563,7 @@ export function data(): NetworkRequestData {
   return {
     byOrigin: requestsByOrigin,
     byTime: requestsByTime,
+    webSocketData,
   };
 }
 

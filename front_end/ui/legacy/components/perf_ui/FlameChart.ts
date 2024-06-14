@@ -1924,7 +1924,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.#drawDecorations(context, timelineData, allIndexes);
 
     this.drawMarkers(context, timelineData, markerIndices);
-
+    this.drawTrackLevelNumbers(context, timelineData);
     this.drawEventTitles(context, timelineData, titleIndices, canvasWidth);
     context.restore();
 
@@ -2148,6 +2148,18 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // start and end.
     context.rect(barX, barY, barWidth - 0.5, barHeight - 1);
   }
+  drawTrackLevelNumbers(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData): void {
+    const allLevels = new Set(timelineData.entryLevels);
+    const max = Math.max(...Array.from(allLevels));
+    context.font = this.#font;
+    context.fillStyle = 'gray';
+    for (let levelNum = 0; levelNum <= max; levelNum++) {
+      const y = this.levelToOffset(levelNum) + this.levelHeight(levelNum) - this.textBaseline - 6;  // 6 fudge factor
+      const x = 5;
+      context.fillText(`${levelNum}`, x, y + this.textBaseline);
+    }
+  }
+
 
   #eventBarHeight(timelineData: FlameChartTimelineData, entryIndex: number): number {
     const {entryLevels} = timelineData;

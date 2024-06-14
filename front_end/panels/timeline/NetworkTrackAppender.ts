@@ -94,6 +94,14 @@ export class NetworkTrackAppender implements TrackAppender {
     this.#flameChartData.groups.push(this.#group);
   }
 
+  establishWebSocketLevel(event: TraceEngine.Types.TraceEvents.TraceEventData, level: number): number {
+    const webSocketIdentifier = event.args.data.identifier;
+    const webSocketData = this.#traceParsedData.NetworkRequests.webSocketData.get(webSocketIdentifier);
+    if (webSocketData.level === undefined) {
+      webSocketData.level = level;
+    }
+    return webSocketData.level;
+  }
   /**
    * Adds into the flame chart data a list of trace events.
    * @param events the trace events that will be appended to the flame chart.
@@ -110,13 +118,14 @@ export class NetworkTrackAppender implements TrackAppender {
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      const level = getEventLevel(event, lastUsedTimeByLevel);
+
+      let level = getEventLevel(event, lastUsedTimeByLevel);
+      if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event) ||
+          TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
+        level = this.establishWebSocketLevel(event, level);
+      }
+
       this.#appendEventAtLevel(event, trackStartLevel + level);
-      // if (event.args?.data.nestedEvents) {
-      //   for (const nestedEvent of event.args.data.nestedEvents) {
-      //     this.#appendEventAtLevel(event, trackStartLevel);
-      //   }
-      // }
     }
     return trackStartLevel + lastUsedTimeByLevel.length;
   }
