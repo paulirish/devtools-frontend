@@ -50,7 +50,6 @@ const UIStrings = {
    */
   writingFile: 'Writing file…',
 };
-
 const i18nString = t => t;
 export class Writer {
   static async write(

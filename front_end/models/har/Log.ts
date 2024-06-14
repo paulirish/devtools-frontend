@@ -55,7 +55,7 @@ export class Log {
   }
 
   private creator(): Creator {
-    const webKitVersion = /AppleWebKit\/([^ ]+)/.exec(window.navigator.userAgent);
+    const webKitVersion = /AppleWebKit\/([^ ]+)/.exec(globalThis.navigator?.userAgent ?? '');
 
     return {name: 'WebInspector', version: webKitVersion ? webKitVersion[1] : 'n/a'};
   }
