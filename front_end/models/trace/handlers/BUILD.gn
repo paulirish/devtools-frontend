@@ -35,7 +35,6 @@ devtools_module("handlers") {
     "UserInteractionsHandler.ts",
     "UserTimingsHandler.ts",
     "WarningsHandler.ts",
-    "WebSocketsHandler.ts",
     "WorkersHandler.ts",
     "types.ts",
   ]
