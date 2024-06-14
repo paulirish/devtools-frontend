@@ -24,9 +24,12 @@ export interface WebSocketsData {
   traceData: WebSocketTraceData[];
 }
 
+const synthEvents = [];
 const webSocketData: Map<number, WebSocketTraceData> = new Map();
 export function reset(): void {
   handlerState = HandlerState.INITIALIZED;
+  synthEvents.length = 0;
+  webSocketData.clear();
 }
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
@@ -77,8 +80,10 @@ function createSyntheticWebSocketConnectionEvent(
     s: mainEvent.s,
     args: {
       data: {
+        mimeType: 'text/javascript',
         identifier: mainEvent.args.data.identifier,
-        nestedEvents: allEvents,
+        url: mainEvent.args.data.url ?? '',
+        nestedEvents: allEvents.filter(event => event !== startEvent && event !== endEvent),
       },
     },
   };
@@ -107,6 +112,7 @@ export async function finalize(): Promise<void> {
     const syntheticWebSocketConnectionEvent =
         createSyntheticWebSocketConnectionEvent(startEvent, endEvent, data.events[0], data.events);
     data.events.unshift(syntheticWebSocketConnectionEvent);
+    synthEvents.push(syntheticWebSocketConnectionEvent);
   });
   handlerState = HandlerState.FINALIZED;
 }
@@ -117,6 +123,6 @@ export function data(): WebSocketsData {
   }
 
   return {
-    traceData: [...webSocketData.values()],
+    synthEvents,
   };
 }

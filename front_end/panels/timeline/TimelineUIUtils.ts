@@ -720,6 +720,9 @@ export class TimelineUIUtils {
 
   static syntheticNetworkRequestCategory(request: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest):
       NetworkCategory {
+    if (!request?.args?.data?.mimeType) {
+      return NetworkCategory.Other;
+    }
     switch (request.args.data.mimeType) {
       case 'text/html':
         return NetworkCategory.HTML;
