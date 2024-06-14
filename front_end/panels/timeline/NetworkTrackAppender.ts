@@ -172,7 +172,12 @@ export class NetworkTrackAppender implements TrackAppender {
         this.#flameChartData.entryLevels[i] = -1;
         continue;
       }
-      const level = getEventLevel(event, lastTimeByLevel);
+      let level = getEventLevel(event, lastTimeByLevel);
+      if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event) ||
+          TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
+        level = this.establishWebSocketLevel(event, level);
+      }
+
       this.#flameChartData.entryLevels[i] = level;
       maxLevel = Math.max(maxLevel, lastTimeByLevel.length);
     }
@@ -197,9 +202,9 @@ export class NetworkTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    // if (!TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestDetailsEvent(event)) {
-    //   throw new Error(`Unexpected Network Request: The event's type is '${event.name}'`);
-    // }
+    if (TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
+      return '#ffffff00';
+    }
     const category = TimelineUIUtils.syntheticNetworkRequestCategory(event);
     return TimelineUIUtils.networkCategoryColor(category);
   }
