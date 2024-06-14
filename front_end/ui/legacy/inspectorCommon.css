@@ -41,9 +41,9 @@
   --legacy-item-selection-bg-color: #cfe8fc;
   --legacy-item-selection-inactive-bg-color: #e0e0e0;
   --monospace-font-size: 10px;
-  --monospace-font-family: monospace;
+  --monospace-font-family: 'Roboto Mono DG', monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: monospace;
+  --source-code-font-family: 'Roboto Mono DG', monospace;
   --sys-motion-duration-short4: 200ms;
   --sys-motion-duration-medium2: 300ms;
   --sys-motion-duration-long2: 500ms;
@@ -81,7 +81,7 @@
 }
 
 body {
-  --default-font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
+  --default-font-family: '.SFNSDisplay-Regular', 'Helvetica Neue', 'Lucida Grande', sans-serif;
 
   height: 100%;
   width: 100%;
@@ -99,7 +99,7 @@ body {
 
 /* Default fonts */
 .platform-linux {
-  --default-font-family: "Google Sans Text", "Google Sans", system-ui, sans-serif;
+  --default-font-family: 'Google Sans Text', 'Google Sans', system-ui, sans-serif;
 }
 
 .platform-mac {
@@ -118,25 +118,25 @@ body {
 .platform-mac,
 :host-context(.platform-mac) {
   --monospace-font-size: 11px;
-  --monospace-font-family: monospace;
+  --monospace-font-family: 'Roboto Mono DG', monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: monospace;
+  --source-code-font-family: 'Roboto Mono DG', monospace;
 }
 
 .platform-windows,
 :host-context(.platform-windows) {
   --monospace-font-size: 12px;
-  --monospace-font-family: monospace;
+  --monospace-font-family: 'Roboto Mono DG', monospace;
   --source-code-font-size: 12px;
-  --source-code-font-family: monospace;
+  --source-code-font-family: 'Roboto Mono DG', monospace;
 }
 
 .platform-linux,
 :host-context(.platform-linux) {
   --monospace-font-size: 11px;
-  --monospace-font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
+  --monospace-font-family: 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
+  --source-code-font-family: 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
 }
 
 .monospace {
@@ -275,14 +275,14 @@ input::placeholder {
   --override-input-placeholder-color: rgb(230 230 230 / 54%);
 }
 
-input[type="checkbox"]:not(.-theme-preserve) {
+input[type='checkbox']:not(.-theme-preserve) {
   accent-color: var(--sys-color-primary-bright);
   color: var(--sys-color-on-primary);
 }
 
 .harmony-input:not([type]),
-.harmony-input[type="number"],
-.harmony-input[type="text"] {
+.harmony-input[type='number'],
+.harmony-input[type='text'] {
   padding: 3px 6px;
   height: 24px;
   border: 1px solid var(--sys-color-neutral-outline);
@@ -431,7 +431,7 @@ input[type="checkbox"]:not(.-theme-preserve) {
   white-space: nowrap;
 }
 
-span[is="dt-icon-label"] {
+span[is='dt-icon-label'] {
   flex: none;
 }
 
@@ -547,14 +547,14 @@ button.link:focus-visible {
   }
 
   .harmony-input:not([type]),
-  .harmony-input[type="number"],
-  .harmony-input[type="text"] {
+  .harmony-input[type='number'],
+  .harmony-input[type='text'] {
     border: 1px solid ButtonText;
   }
 
   .harmony-input:not([type]):focus,
-  .harmony-input[type="number"]:focus,
-  .harmony-input[type="text"]:focus {
+  .harmony-input[type='number']:focus,
+  .harmony-input[type='text']:focus {
     border: 1px solid Highlight;
   }
 }
@@ -583,15 +583,19 @@ input.custom-search-input::-webkit-search-cancel-button:hover {
   border: var(--override-spinner-size, 3px) solid var(--override-spinner-color, var(--sys-color-token-subtle));
   border-radius: 12px;
   clip: rect(0, var(--clip-size, 15px), var(--clip-size, 15px), 0);
-  content: "";
+  content: '';
   position: absolute;
   animation: spinner-animation 1s linear infinite;
   box-sizing: border-box;
 }
 
 @keyframes spinner-animation {
-  from { transform: rotate(0); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 /** Adorner */
 .adorner-container {

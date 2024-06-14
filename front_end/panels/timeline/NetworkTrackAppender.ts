@@ -171,20 +171,16 @@ export class NetworkTrackAppender implements TrackAppender {
    * @returns the number of levels used by this track
    */
   filterTimelineDataBetweenTimes(
-      events: (TraceEngine.Types.TraceEvents.SyntheticNetworkRequest|TraceEngine.Types.TraceEvents.WebSocketEvent)[],
       startTime: TraceEngine.Types.Timing.MilliSeconds, endTime: TraceEngine.Types.Timing.MilliSeconds): number {
+    const events = this.#traceParsedData.NetworkRequests.byTime;
     if (!this.#flameChartData || events.length === 0) {
       return 0;
     }
     const lastTimeByLevel: number[] = [];
-    this.webSocketIdToLevel = new Map<number, number>();
     let maxLevel = 0;
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
       const beginTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-      event.dur = event.dur ||
-          TraceEngine.Helpers.Timing.millisecondsToMicroseconds(
-              InstantEventVisibleDurationMs as TraceEngine.Types.Timing.MilliSeconds);
       const eventEndTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
           (event.ts + event.dur) as TraceEngine.Types.Timing.MicroSeconds);
       const isBetweenTimes = beginTime < endTime && eventEndTime > startTime;
@@ -192,21 +188,9 @@ export class NetworkTrackAppender implements TrackAppender {
         this.#flameChartData.entryLevels[i] = -1;
         continue;
       }
-      let level;
-      if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event) ||
-          TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
-        const webSocketIdentifier = event.args.data.identifier;
-        if (this.webSocketIdToLevel.has(webSocketIdentifier)) {
-          level = this.webSocketIdToLevel.get(webSocketIdentifier) || 0;
-        } else {
-          level = getEventLevel(event, lastTimeByLevel);
-          this.webSocketIdToLevel.set(webSocketIdentifier, level);
-        }
-      } else {
-        level = getEventLevel(event, lastTimeByLevel);
-      }
+      const level = getEventLevel(event, lastTimeByLevel);
       this.#flameChartData.entryLevels[i] = level;
-      maxLevel = Math.max(maxLevel, lastTimeByLevel.length, level);
+      maxLevel = Math.max(maxLevel, lastTimeByLevel.length);
     }
     for (let i = 0; i < events.length; ++i) {
       // -1 means this event is invisible.

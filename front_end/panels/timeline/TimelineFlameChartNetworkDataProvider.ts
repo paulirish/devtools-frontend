@@ -57,6 +57,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     if (traceEngineData.NetworkRequests.byTime) {
       this.#events.push(...traceEngineData.NetworkRequests.byTime);
     }
+    this.#events.sort((a, b) => a.ts - b.ts);
   }
 
   isEmpty(): boolean {
@@ -332,12 +333,14 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
         (event.ts + event.dur) as TraceEngine.Types.Timing.MicroSeconds);
     const start = timeToPixel(beginTime) + 0.5;
     const end = timeToPixel(endTime) - 0.5;
-    context.strokeStyle = '#ccc';
+    context.strokeStyle = '#ddd';
 
     const lineY = Math.floor(barY + barHeight / 2) + 0.5;
-    context.moveTo(start, lineY);
-    context.setLineDash([6, 4]);
-    context.lineTo(end, lineY);
+    // context.setLineDash([3, 2]);
+    context.moveTo(start, lineY - 1);
+    context.lineTo(end, lineY - 1);
+    context.moveTo(start, lineY + 1);
+    context.lineTo(end, lineY + 1);
     context.stroke();
     context.restore();
     return true;
