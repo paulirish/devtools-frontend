@@ -9,7 +9,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import {buildGroupStyle, buildTrackHeader, getEventLevel, getFormattedTime} from './AppenderUtils.js';
 import {type HighlightedEntryInfo, type TrackAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
 import {InstantEventVisibleDurationMs} from './TimelineFlameChartDataProvider.js';
-import {TimelineUIUtils} from './TimelineUIUtils.js';
+import {NetworkCategory, TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -94,7 +94,7 @@ export class NetworkTrackAppender implements TrackAppender {
     this.#flameChartData.groups.push(this.#group);
   }
 
-  establishWebSocketLevel(event: TraceEngine.Types.TraceEvents.TraceEventData, level: number): number {
+  establishWebSocketLevel(event: TraceEngine.Types.TraceEvents.TraceEventData, level?: number): number {
     const webSocketIdentifier = event.args.data.identifier;
     const webSocketData = this.#traceParsedData.NetworkRequests.webSocketData.get(webSocketIdentifier);
     if (webSocketData.level === undefined) {
@@ -118,18 +118,24 @@ export class NetworkTrackAppender implements TrackAppender {
     const lastUsedTimeByLevel: number[] = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-
-      let level = getEventLevel(event, lastUsedTimeByLevel);
-      if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event) ||
-          TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
-        level = this.establishWebSocketLevel(event, level);
-      }
-
+      const level = this.getNetworkEventLevel(event, lastUsedTimeByLevel);
       this.#appendEventAtLevel(event, trackStartLevel + level);
     }
     return trackStartLevel + lastUsedTimeByLevel.length;
   }
 
+  getNetworkEventLevel(event: TraceEngine.Types.TraceEvents.TraceEventData, lastUsedTimeByLevel: number[]): number {
+    let level;
+    if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event)) {
+      level = this.establishWebSocketLevel(event, level);
+    } else {
+      level = getEventLevel(event, lastUsedTimeByLevel);
+      if (TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
+        this.establishWebSocketLevel(event, level);
+      }
+    }
+    return level;
+  }
   /**
    * Adds an event to the flame chart data at a defined level.
    * @param event the event to be appended,
@@ -172,11 +178,7 @@ export class NetworkTrackAppender implements TrackAppender {
         this.#flameChartData.entryLevels[i] = -1;
         continue;
       }
-      let level = getEventLevel(event, lastTimeByLevel);
-      if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event) ||
-          TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
-        level = this.establishWebSocketLevel(event, level);
-      }
+      const level = this.getNetworkEventLevel(event, lastTimeByLevel);
 
       this.#flameChartData.entryLevels[i] = level;
       maxLevel = Math.max(maxLevel, lastTimeByLevel.length);
@@ -204,6 +206,9 @@ export class NetworkTrackAppender implements TrackAppender {
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
     if (TraceEngine.Types.TraceEvents.isSyntheticWebSocketConnectionEvent(event)) {
       return '#ffffff00';
+    }
+    if (TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(event)) {
+      return TimelineUIUtils.networkCategoryColor(NetworkCategory.Script);
     }
     const category = TimelineUIUtils.syntheticNetworkRequestCategory(event);
     return TimelineUIUtils.networkCategoryColor(category);

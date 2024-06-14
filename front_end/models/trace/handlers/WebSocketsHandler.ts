@@ -61,34 +61,34 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   // }
 }
 
-function createSyntheticWebSocketConnectionEvent(
-    startEvent: Types.TraceEvents.TraceEventWebSocketCreate|null,
-    endEvent: Types.TraceEvents.TraceEventWebSocketDestroy|null, firstRecordedEvent: Types.TraceEvents.WebSocketEvent,
-    allEvents: Types.TraceEvents.WebSocketEvent[]): Types.TraceEvents.SyntheticWebSocketConnectionEvent {
-  const {traceBounds} = metaHandlerData();
-  const startTs = startEvent ? startEvent.ts : traceBounds.min;
-  const endTs = endEvent ? endEvent.ts : traceBounds.max;
-  const duration = endTs - startTs;
-  const mainEvent = startEvent || endEvent || firstRecordedEvent;
-  return {
-    name: 'SyntheticWebSocketConnectionEvent',
-    cat: mainEvent.cat,
-    ph: mainEvent.ph,
-    ts: startTs,
-    dur: duration as Types.Timing.MicroSeconds,
-    pid: mainEvent.pid,
-    tid: mainEvent.tid,
-    s: mainEvent.s,
-    args: {
-      data: {
-        mimeType: 'text/javascript',
-        identifier: mainEvent.args.data.identifier,
-        url: mainEvent.args.data.url ?? '',
-        nestedEvents: allEvents.filter(event => event !== startEvent && event !== endEvent),
-      },
-    },
-  };
-}
+// function createSyntheticWebSocketConnectionEvent(
+//     startEvent: Types.TraceEvents.TraceEventWebSocketCreate|null,
+//     endEvent: Types.TraceEvents.TraceEventWebSocketDestroy|null, firstRecordedEvent: Types.TraceEvents.WebSocketEvent,
+//     allEvents: Types.TraceEvents.WebSocketEvent[]): Types.TraceEvents.SyntheticWebSocketConnectionEvent {
+//   const {traceBounds} = metaHandlerData();
+//   const startTs = startEvent ? startEvent.ts : traceBounds.min;
+//   const endTs = endEvent ? endEvent.ts : traceBounds.max;
+//   const duration = endTs - startTs;
+//   const mainEvent = startEvent || endEvent || firstRecordedEvent;
+//   return {
+//     name: 'SyntheticWebSocketConnectionEvent',
+//     cat: mainEvent.cat,
+//     ph: mainEvent.ph,
+//     ts: startTs,
+//     dur: duration as Types.Timing.MicroSeconds,
+//     pid: mainEvent.pid,
+//     tid: mainEvent.tid,
+//     s: mainEvent.s,
+//     args: {
+//       data: {
+//         mimeType: 'text/javascript',
+//         identifier: mainEvent.args.data.identifier,
+//         url: mainEvent.args.data.url ?? '',
+//         nestedEvents: allEvents.filter(event => event !== startEvent && event !== endEvent),
+//       },
+//     },
+//   };
+// }
 
 export async function finalize(): Promise<void> {
   if (handlerState !== HandlerState.INITIALIZED) {
@@ -125,6 +125,6 @@ export function data(): WebSocketsData {
   }
 
   return {
-    synthEvents,
+    synthEvents: [],
   };
 }

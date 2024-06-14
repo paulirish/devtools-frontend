@@ -201,7 +201,7 @@ function createSyntheticWebSocketConnectionEvent(
         mimeType: 'text/javascript',
         identifier: mainEvent.args.data.identifier,
         url: mainEvent.args.data.url ?? '',
-        nestedEvents: allEvents.filter(event => event !== startEvent && event !== endEvent),
+        nestedEvents: allEvents,
       },
     },
   };
@@ -231,7 +231,7 @@ export async function finalize(): Promise<void> {
     }
     const syntheticWebSocketConnectionEvent =
         createSyntheticWebSocketConnectionEvent(startEvent, endEvent, data.events[0], data.events);
-    data.events.unshift(syntheticWebSocketConnectionEvent);
+    // data.events.unshift(syntheticWebSocketConnectionEvent);
     synthEvents.push(syntheticWebSocketConnectionEvent);
 
     const requests =
