@@ -4,9 +4,8 @@
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
-import * as Root from '../../../core/root/root.js';
 import {dispatchClickEvent, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {describeWithEnvironment, getGetHostConfigStub} from '../../../testing/EnvironmentHelpers.js';
 import * as Explain from '../explain.js';
 
 describeWithEnvironment('ConsoleInsight', () => {
@@ -215,9 +214,12 @@ describeWithEnvironment('ConsoleInsight', () => {
     it('reports negative rating', reportsRating(false));
 
     it('has no thumbs up/down buttons if logging is disabled', async () => {
-      const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-      stub.withArgs('ci_disallowLogging').returns('true');
-
+      const stub = getGetHostConfigStub({
+        devToolsConsoleInsights: {
+          enabled: true,
+          disallowLogging: true,
+        },
+      });
       const component = await renderInsight();
       const thumbsUpButton = component.shadowRoot!.querySelector('.rating [data-rating="true"]');
       assert.isNull(thumbsUpButton);

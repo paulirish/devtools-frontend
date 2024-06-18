@@ -44,6 +44,7 @@ import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Extensions from '../../models/extensions/extensions.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
+import * as LiveMetrics from '../../models/live-metrics/live-metrics.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
@@ -395,19 +396,20 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK,
-        'Enable saving and loading traces with modifications in the Performance panel',
+        Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS,
+        'Performance panel: enable annotations',
+        true,
     );
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_SIDEBAR,
-        'Enable the experimental, WIP sidebar for the Performance Panel.',
+        'Performance panel: enable sidebar',
         true,
     );
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
-        'Enable new Performance panel landing page which includes live metrics and field data',
+        'Performance panel: enable live metrics landing page',
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
@@ -538,6 +540,10 @@ export class MainImpl {
     });
 
     AutofillManager.AutofillManager.AutofillManager.instance();
+
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS)) {
+      LiveMetrics.LiveMetrics.instance({forceNew: true});
+    }
 
     new PauseListener();
 
@@ -895,7 +901,8 @@ export class MainMenuItem implements UI.Toolbar.Provider {
     contextMenu.appendItemsAtLocation('mainMenu');
     const moreTools =
         contextMenu.defaultSection().appendSubMenuItem(i18nString(UIStrings.moreTools), false, 'more-tools');
-    const viewExtensions = UI.ViewManager.getRegisteredViewExtensions();
+    const viewExtensions =
+        UI.ViewManager.getRegisteredViewExtensions(Common.Settings.Settings.instance().getHostConfig());
     viewExtensions.sort((extension1, extension2) => {
       const title1 = extension1.title();
       const title2 = extension2.title();

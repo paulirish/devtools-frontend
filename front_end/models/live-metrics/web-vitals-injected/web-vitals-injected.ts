@@ -4,9 +4,11 @@
 
 import * as WebVitals from '../../../third_party/web-vitals/web-vitals.js';
 
+import * as OnEachInteraction from './OnEachInteraction.js';
 import * as Spec from './spec/spec.js';
 
 const {onLCP, onCLS, onINP} = WebVitals.Attribution;
+const {onEachInteraction} = OnEachInteraction;
 
 declare const window: Window&{
   getNodeForIndex: (index: number) => Node | undefined,
@@ -57,6 +59,16 @@ function initialize(): void {
 
   sendEventToDevTools({name: 'reset'});
 
+  // We want to treat bfcache navigations like a standard navigations, so emit
+  // a reset event when bfcache is restored.
+  //
+  // Metric functions will also re-emit their values using this listener's callback.
+  // To ensure this event is fired before those values are emitted, register this
+  // callback before any others.
+  WebVitals.onBFCacheRestore(() => {
+    sendEventToDevTools({name: 'reset'});
+  });
+
   onLCP(metric => {
     const event: Spec.LCPChangeEvent = {
       name: 'LCP',
@@ -93,5 +105,20 @@ function initialize(): void {
     }
     sendEventToDevTools(event);
   }, {reportAllChanges: true});
+
+  onEachInteraction(interaction => {
+    const event: Spec.InteractionEvent = {
+      name: 'Interaction',
+      duration: interaction.value,
+      rating: interaction.rating,
+      interactionId: interaction.attribution.interactionId,
+      interactionType: interaction.attribution.interactionType,
+    };
+    const node = interaction.attribution.interactionTargetElement;
+    if (node) {
+      event.nodeIndex = establishNodeIndex(node);
+    }
+    sendEventToDevTools(event);
+  });
 }
 initialize();

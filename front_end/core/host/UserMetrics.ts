@@ -41,15 +41,6 @@ export class UserMetrics {
     this.#launchPanelName = '';
   }
 
-  breakpointEditDialogRevealedFrom(breakpointEditDialogRevealedFrom: BreakpointEditDialogRevealedFrom): void {
-    if (breakpointEditDialogRevealedFrom >= BreakpointEditDialogRevealedFrom.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BreakpointEditDialogRevealedFrom, breakpointEditDialogRevealedFrom,
-        BreakpointEditDialogRevealedFrom.MaxValue);
-  }
-
   panelShown(panelName: string, isLaunching?: boolean): void {
     const code = PanelCodes[panelName as keyof typeof PanelCodes] || 0;
     InspectorFrontendHostInstance.recordEnumeratedHistogram(EnumeratedHistogram.PanelShown, code, PanelCodes.MaxValue);
@@ -571,7 +562,9 @@ export enum Action {
   AnimationGroupSelected = 142,
   ScrollDrivenAnimationGroupSelected = 143,
   ScrollDrivenAnimationGroupScrubbed = 144,
-  MaxValue = 145,
+  FreestylerOpenedFromElementsPanel = 145,
+  FreestylerOpenedFromStylesTab = 146,
+  MaxValue = 147,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -858,7 +851,6 @@ export enum KeybindSetSettings {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
-/* eslint-disable @typescript-eslint/naming-convention */
 export enum KeyboardShortcutAction {
   OtherShortcut = 0,
   'quick-open.show-command-menu' = 1,
@@ -1040,17 +1032,6 @@ export enum DevtoolsExperiments {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
-export const enum BreakpointEditDialogRevealedFrom {
-  BreakpointSidebarContextMenu = 0,
-  BreakpointSidebarEditButton = 1,
-  BreakpointMarkerContextMenu = 2,
-  LineGutterContextMenu = 3,
-  KeyboardShortcut = 4,
-  Linkifier = 5,
-  MouseClick = 6,
-  MaxValue = 7,
-}
-
 export const enum ColorConvertedFrom {
   ColorSwatch = 0,
   ColorPicker = 1,
@@ -1214,15 +1195,15 @@ export enum ResourceType {
   /* eslint-disable @typescript-eslint/naming-convention */
   all = 0,
   /* eslint-enable @typescript-eslint/naming-convention */
-  Documents = 1,
-  Scripts = 2,
+  Document = 1,
+  JavaScript = 2,
   'Fetch and XHR' = 3,
-  Stylesheets = 4,
-  Fonts = 5,
-  Images = 6,
+  CSS = 4,
+  Font = 5,
+  Image = 6,
   Media = 7,
   Manifest = 8,
-  WebSockets = 9,
+  WebSocket = 9,
   WebAssembly = 10,
   Other = 11,
   MaxValue = 12,

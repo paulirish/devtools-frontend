@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '1cb0cd5333b879f2719beae4b0e1177202bc2cc7',
+  'build_revision': '587ff397defc2be4e504c8311b79fc56baa8f344',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'f15f314b785b7a8ce19ca2851989b2da7fe6d004',
+  'buildtools_revision': '8acbed51859808fe82c5c4c079efe05a012ea041',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '2a18f6d3245450d8c96c843a6584aaea561ef873',
+  'depot_tools_revision': '1d1f17af898bc5158fb1128952894ac061b06f56',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
@@ -29,9 +29,9 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:4fb095d3f70f624c73bfdd156c5179fad535287d',
+  'gn_version': 'git_revision:b2afae122eeb6ce09c52d63f67dc53fc517dbdc8',
 
-  'cmake_version': 'version:3.16.1',
+  'cmake_version': 'version:2@3.21.3',
 
   'llvm_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/',
   'llvm_revision': 'c08d3b08f6d71e974537de226c68d4c94c396a46',
@@ -46,11 +46,14 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '127.0.6519.0',
+  'chrome': '128.0.6541.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
-  'SUBMODULE_MIGRATION': 'True'
+  'SUBMODULE_MIGRATION': 'True',
+
+  # condition to allowlist deps for non-git-source processing.
+  'non_git_source': 'True',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -64,7 +67,7 @@ deps = {
   },
   'third_party/cmake': {
     'packages': [{
-      'package': 'infra/cmake/${{platform}}',
+      'package': 'infra/3pp/tools/cmake/${{platform}}',
       'version': Var('cmake_version')
     }],
     'dep_type':
@@ -123,6 +126,7 @@ deps = {
       }
     ],
     'dep_type': 'cipd',
+    'condition': 'non_git_source',
   },
 
   'build': {

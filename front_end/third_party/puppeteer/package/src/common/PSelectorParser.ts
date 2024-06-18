@@ -4,21 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {type Token, tokenize, TOKENS, stringify} from 'parsel-js';
+import {
+  type Token,
+  tokenize,
+  TOKENS,
+  stringify,
+} from '../../third_party/parsel-js/parsel-js.js';
+import type {
+  ComplexPSelector,
+  ComplexPSelectorList,
+  CompoundPSelector,
+} from '../injected/PQuerySelector.js';
+import {PCombinator} from '../injected/PQuerySelector.js';
 
-export type CSSSelector = string;
-export interface PPseudoSelector {
-  name: string;
-  value: string;
-}
-export const enum PCombinator {
-  Descendent = '>>>',
-  Child = '>>>>',
-}
-export type CompoundPSelector = Array<CSSSelector | PPseudoSelector>;
-export type ComplexPSelector = Array<CompoundPSelector | PCombinator>;
-export type ComplexPSelectorList = ComplexPSelector[];
-
+TOKENS['nesting'] = /&/g;
 TOKENS['combinator'] = /\s*(>>>>?|[\s>+~])\s*/g;
 
 const ESCAPE_REGEXP = /\\[\s\S]/g;
@@ -34,13 +33,21 @@ const unquote = (text: string): string => {
   });
 };
 
+/**
+ * @internal
+ */
 export function parsePSelectors(
   selector: string
-): [selector: ComplexPSelectorList, isPureCSS: boolean] {
+): [
+  selector: ComplexPSelectorList,
+  isPureCSS: boolean,
+  hasPseudoClasses: boolean,
+] {
   let isPureCSS = true;
+  let hasPseudoClasses = false;
   const tokens = tokenize(selector);
   if (tokens.length === 0) {
-    return [[], isPureCSS];
+    return [[], isPureCSS, hasPseudoClasses];
   }
   let compoundSelector: CompoundPSelector = [];
   let complexSelector: ComplexPSelector = [compoundSelector];
@@ -86,6 +93,9 @@ export function parsePSelectors(
           value: unquote(token.argument ?? ''),
         });
         continue;
+      case 'pseudo-class':
+        hasPseudoClasses = true;
+        break;
       case 'comma':
         if (storage.length) {
           compoundSelector.push(stringify(storage));
@@ -101,5 +111,5 @@ export function parsePSelectors(
   if (storage.length) {
     compoundSelector.push(stringify(storage));
   }
-  return [selectors, isPureCSS];
+  return [selectors, isPureCSS, hasPseudoClasses];
 }

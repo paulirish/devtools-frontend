@@ -116,6 +116,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     this.contentElement.classList.add('vbox');
 
     const settingsLabelElement = document.createElement('div');
+    settingsLabelElement.classList.add('settings-window-label-element');
     const settingsTitleElement =
         UI.UIUtils
             .createShadowRootWithCoreStyles(
@@ -129,7 +130,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
         () => SettingsScreen.revealSettingsScreen(), 'settings-view');
     const tabbedPane = this.tabbedLocation.tabbedPane();
     tabbedPane.registerCSSFiles([settingsScreenStyles]);
-    tabbedPane.leftToolbar().appendToolbarItem(new UI.Toolbar.ToolbarItem(settingsLabelElement));
+    tabbedPane.headerElement().prepend(settingsLabelElement);
     tabbedPane.setShrinkableTabs(false);
     tabbedPane.makeVerticalTabLayout();
     const keyBindsView = UI.ViewManager.ViewManager.instance().view('keybinds');
@@ -584,7 +585,8 @@ export class Revealer implements Common.Revealer.Revealer<Root.Runtime.Experimen
     }
 
     // Reveal settings views
-    for (const view of UI.ViewManager.getRegisteredViewExtensions()) {
+    for (const view of UI.ViewManager.getRegisteredViewExtensions(
+             Common.Settings.Settings.instance().getHostConfig())) {
       const id = view.viewId();
       const location = view.location();
       if (location !== UI.ViewManager.ViewLocationValues.SETTINGS_VIEW) {

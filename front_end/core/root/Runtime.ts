@@ -28,6 +28,10 @@ export function getRemoteBase(location: string = self.location.toString()): {
   return {base: `devtools://devtools/remote/serve_file/${version[1]}/`, version: version[1]};
 }
 
+export function getPathName(): string {
+  return window.location.pathname;
+}
+
 export class Runtime {
   private constructor() {
   }
@@ -291,33 +295,34 @@ export const enum ExperimentName {
   AUTOFILL_VIEW = 'autofill-view',
   INDENTATION_MARKERS_TEMP_DISABLE = 'sources-frame-indentation-markers-temporarily-disable',
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
-  TIMELINE_WRITE_MODIFICATIONS_TO_DISK = 'perf-panel-annotations',
+  TIMELINE_ANNOTATIONS_OVERLAYS = 'perf-panel-annotations',
   TIMELINE_SIDEBAR = 'timeline-rpp-sidebar',
   TIMELINE_EXTENSIONS = 'timeline-extensions',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
   TIMELINE_OBSERVATIONS = 'timeline-observations',
 }
 
+export interface HostConfigConsoleInsights {
+  aidaModelId: string;
+  aidaTemperature: number;
+  blocked: boolean;
+  blockedByAge: boolean;
+  blockedByEnterprisePolicy: boolean;
+  blockedByFeatureFlag: boolean;
+  blockedByGeo: boolean;
+  blockedByRollout: boolean;
+  disallowLogging: boolean;
+  enabled: boolean;
+  optIn: boolean;
+}
+
+export interface HostConfigFreestylerDogfood {
+  enabled: boolean;
+}
+
 export interface HostConfig {
-  devToolsConsoleInsights: {
-    aidaModelId: string,
-    aidaTemperature: number,
-    blocked: boolean,
-    blockedByAge: boolean,
-    blockedByEnterprisePolicy: boolean,
-    blockedByFeatureFlag: boolean,
-    blockedByGeo: boolean,
-    blockedByRollout: boolean,
-    disallowLogging: boolean,
-    enabled: boolean,
-    optIn: boolean,
-  };
-  devToolsConsoleInsightsDogfood: {
-    aidaModelId: string,
-    aidaTemperature: number,
-    enabled: boolean,
-    optIn: boolean,
-  };
+  devToolsConsoleInsights: HostConfigConsoleInsights;
+  devToolsFreestylerDogfood: HostConfigFreestylerDogfood;
 }
 
 /**

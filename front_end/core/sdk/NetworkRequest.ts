@@ -199,11 +199,11 @@ const UIStrings = {
    /**
     *@description Tooltip to explain why the cookie should have been blocked by third-party cookie phaseout but is exempted.
     */
-   exemptionReasonTPCDMetadata: 'This cookie is allowed by a third-party cookie deprecation trial grace period. Learn more: goo.gle/ps-dt.',
+   exemptionReasonTPCDMetadata: 'This cookie is allowed by a third-party cookie deprecation trial grace period. Learn more: goo.gle/dt-grace.',
    /**
     *@description Tooltip to explain why the cookie should have been blocked by third-party cookie phaseout but is exempted.
     */
-   exemptionReasonTPCDDeprecationTrial: 'This cookie is allowed by third-party cookie phaseout deprecation trial.',
+   exemptionReasonTPCDDeprecationTrial: 'This cookie is allowed by third-party cookie phaseout deprecation trial. Learn more: goo.gle/ps-dt.',
    /**
     *@description Tooltip to explain why the cookie should have been blocked by third-party cookie phaseout but is exempted.
     */
@@ -224,6 +224,10 @@ const UIStrings = {
     *@description Tooltip to explain why the cookie should have been blocked by third-party cookie phaseout but is exempted.
     */
    exemptionReasonCorsOptIn: 'This cookie is allowed by CORS opt-in. Learn more: goo.gle/cors',
+   /**
+    *@description Tooltip to explain why the cookie should have been blocked by third-party cookie phaseout but is exempted.
+    */
+    exemptionReasonScheme: 'This cookie is allowed by the top-level url scheme',
 };
 // clang-format on
 
@@ -1167,7 +1171,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
       if (this.#responseCookiesPartitionKey) {
         for (const cookie of this.#responseCookiesInternal) {
           if (cookie.partitioned()) {
-            cookie.setPartitionKey(this.#responseCookiesPartitionKey);
+            cookie.setPartitionKey(this.#responseCookiesPartitionKey, cookie.hasCrossSiteAncestor());
           }
         }
       } else if (this.#responseCookiesPartitionKeyOpaque) {
@@ -1605,7 +1609,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     if (extraResponseInfo.exemptedResponseCookies) {
       this.#exemptedResponseCookiesInternal = extraResponseInfo.exemptedResponseCookies;
     }
-    this.#responseCookiesPartitionKey = extraResponseInfo.cookiePartitionKey || null;
+    this.#responseCookiesPartitionKey = extraResponseInfo.cookiePartitionKey?.topLevelSite || null;
     this.#responseCookiesPartitionKeyOpaque = extraResponseInfo.cookiePartitionKeyOpaque || null;
     this.responseHeaders = extraResponseInfo.responseHeaders;
     // We store a copy of the headers we initially received, so that after
@@ -1847,6 +1851,8 @@ export const cookieExemptionReasonToUiString = function(exemptionReason: Protoco
           return i18nString(UIStrings.exemptionReasonTopLevelStorageAccessAPI);
         case Protocol.Network.CookieExemptionReason.CorsOptIn:
           return i18nString(UIStrings.exemptionReasonCorsOptIn);
+        case Protocol.Network.CookieExemptionReason.Scheme:
+          return i18nString(UIStrings.exemptionReasonScheme);
       }
       return '';
     };
@@ -2057,7 +2063,7 @@ export interface ExtraResponseInfo {
   responseHeadersText?: string;
   resourceIPAddressSpace: Protocol.Network.IPAddressSpace;
   statusCode: number|undefined;
-  cookiePartitionKey: string|undefined;
+  cookiePartitionKey?: Protocol.Network.CookiePartitionKey;
   cookiePartitionKeyOpaque: boolean|undefined;
   exemptedResponseCookies: {
     cookie: Cookie,

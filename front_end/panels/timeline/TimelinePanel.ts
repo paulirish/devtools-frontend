@@ -401,6 +401,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.setSearchableView(this.searchableViewInternal);
     this.searchableViewInternal.hideWidget();
 
+    this.#sideBar.setMainWidget(this.timelinePane);
+    this.#sideBar.show(this.element);
+
     this.onModeChanged();
     this.populateToolbar();
     this.showLandingPage();
@@ -699,7 +702,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.flameChart.getMainFlameChart().coordinatesToEntryIndex(mouseEvent.offsetX, mouseEvent.offsetY) !== -1) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
     contextMenu.appendItemsAtLocation('timelineMenu');
     void contextMenu.show();
   }
@@ -711,10 +714,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const traceEvents = this.#traceEngineModel.rawTraceEvents(this.#traceEngineActiveTraceIndex);
     const metadata = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex);
     // Save modifications into the metadata if modifications experiment is on
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_WRITE_MODIFICATIONS_TO_DISK) &&
-        metadata) {
-      metadata.modifications =
-          ModificationsManager.ModificationsManager.ModificationsManager.maybeInstance()?.getModifications();
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS) && metadata) {
+      metadata.modifications = ModificationsManager.ModificationsManager.ModificationsManager.activeManager()?.toJSON();
     }
     if (!traceEvents) {
       return;
@@ -769,8 +770,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   async showHistory(): Promise<void> {
-    this.#saveModificationsForActiveTrace();
     const recordingData = await this.#historyManager.showHistoryDropDown();
+    this.#saveModificationsForActiveTrace();
     if (recordingData && recordingData.traceParseDataIndex !== this.#traceEngineActiveTraceIndex) {
       this.setModel(recordingData.traceParseDataIndex);
     }
@@ -786,8 +787,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #saveModificationsForActiveTrace(): void {
-    const newModifications =
-        ModificationsManager.ModificationsManager.ModificationsManager.maybeInstance()?.getModifications();
+    const newModifications = ModificationsManager.ModificationsManager.ModificationsManager.activeManager()?.toJSON();
     if (newModifications) {
       this.#traceEngineModel.overrideModifications(this.#traceEngineActiveTraceIndex, newModifications);
     }
@@ -846,8 +846,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       return;
     }
     if (this.showSettingsPaneSetting.get()) {
+      this.showSettingsPaneButton.setToggled(true);
       this.settingsPane.showWidget();
     } else {
+      this.showSettingsPaneButton.setToggled(false);
       this.settingsPane.hideWidget();
     }
   }
@@ -1211,7 +1213,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const traceParsedData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
     const isCpuProfile = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex)?.dataOrigin ===
         TraceEngine.Types.File.DataOrigin.CPUProfile;
-    const modifications = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex)?.modifications;
 
     this.#minimapComponent.reset();
     // Order is important: the bounds must be set before we initiate any UI
@@ -1220,23 +1221,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       TraceBounds.TraceBounds.BoundsManager.instance().resetWithNewBounds(
           traceParsedData.Meta.traceBounds,
       );
-
-      // Since we have a single instance to ModificationsManager, combine both SyntheticEvent to Node maps
-      const samplesAndRendererEventsEntryToNodeMap =
-          new Map([...traceParsedData.Samples.entryToNode, ...traceParsedData.Renderer.entryToNode]);
-      // If the modifications experiment is on and there are some modifications saved, apply the modifications from the file.
-      // We create ModificationsManager regardless of the experiment because the EntriesFilterer initiated in the ModificationsManager
-      // needs to work even if the experiment is off.
-      const traceBounds = TraceBounds.TraceBounds.BoundsManager.instance().state();
-      ModificationsManager.ModificationsManager.ModificationsManager.maybeInstance({
-        entryToNodeMap: samplesAndRendererEventsEntryToNodeMap,
-        wholeTraceBounds: traceBounds?.micro.entireTraceBounds,
-      });
-      if (modifications) {
-        ModificationsManager.ModificationsManager.ModificationsManager.maybeInstance()?.applyModifications(
-            modifications);
-      }
-
+      // Create an instance of the modifications manager for this trace or activate a manager for previousy loaded trace.
+      ModificationsManager.ModificationsManager.ModificationsManager.initAndActivateModificationsManager(
+          this.#traceEngineModel, this.#traceEngineActiveTraceIndex);
       this.#applyActiveFilters(traceParsedData.Meta.traceIsGeneric, exclusiveFilter);
     }
     if (traceParsedData) {
@@ -1276,18 +1263,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.#minimapComponent.addInitialBreadcrumb();
       }
 
-      // To calculate the activity we might want to zoom in, we find the last
-      // main thread. Or we find the CPU Profile thread, for e.g. Node traces.
-      const mainThreadTypes = [
-        TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD,
-        TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE,
-      ];
-      const lastMainThread = TraceEngine.Handlers.Threads.threadsInTrace(traceParsedData)
-                                 .filter(data => mainThreadTypes.includes(data.type))
-                                 .at(-1);
-      if (lastMainThread) {
+      // To calculate the activity we might want to zoom in, we use the top-most main-thread track
+      const topMostMainThreadAppender =
+          this.flameChart.getMainDataProvider().compatibilityTracksAppenderInstance().threadAppenders().at(0);
+      if (topMostMainThreadAppender) {
         const zoomedInBounds = TraceEngine.Extras.MainThreadActivity.calculateWindow(
-            traceParsedData.Meta.traceBounds, lastMainThread.entries);
+            traceParsedData.Meta.traceBounds, topMostMainThreadAppender.getEntries());
 
         TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(zoomedInBounds);
       }
@@ -1331,6 +1312,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private showLandingPage(): void {
     this.updateSettingsPaneVisibility();
+    this.#sideBar.hideSidebar();
     if (this.landingPage) {
       this.landingPage.show(this.statusPaneContainer);
       return;
@@ -1436,11 +1418,19 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.statusPane.remove();
       }
       this.statusPane = null;
-
+      if (!isNode && Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
+        this.#sideBar.showBoth();
+      }
       const traceData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
       if (!traceData) {
         throw new Error(`Could not get trace data at index ${this.#traceEngineActiveTraceIndex}`);
       }
+
+      const traceInsightsData = this.#traceEngineModel.traceInsights(this.#traceEngineActiveTraceIndex);
+      if (traceInsightsData) {
+        this.#sideBar.data = traceInsightsData;
+      }
+
       if (recordingIsFresh) {
         Tracker.instance().registerFreshRecording(traceData);
       }

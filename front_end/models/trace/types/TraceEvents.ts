@@ -123,6 +123,9 @@ export interface TraceFrame {
   // Added to Chromium in April 2024:
   // crrev.com/c/5424783
   isOutermostMainFrame?: boolean;
+  // Added to Chromium in June 2024:
+  // crrev.com/c/5595033
+  isInPrimaryMainFrame?: boolean;
 }
 
 // Sample events.
@@ -900,6 +903,7 @@ export interface TraceEventResourceSendRequest extends TraceEventInstant {
       requestMethod?: string,
       renderBlocking?: RenderBlocking,
       initiator?: Initiator,
+      isLinkPreload?: boolean,
     },
   };
 }
@@ -988,7 +992,8 @@ export interface TraceEventResourceReceiveResponse extends TraceEventInstant {
       responseTime: MilliSeconds,
       statusCode: number,
       timing: TraceEventResourceReceiveResponseTimingData,
-      isLinkPreload?: boolean, connectionId: number, connectionReused: boolean,
+      connectionId: number,
+      connectionReused: boolean,
       headers?: Array<{name: string, value: string}>,
     },
   };
@@ -1115,6 +1120,19 @@ export function isTraceEventScheduleStyleRecalculation(event: TraceEventData):
   return event.name === KnownEventName.ScheduleStyleRecalculation;
 }
 
+export interface TraceEventRenderFrameImplCreateChildFrame extends TraceEventData {
+  name: KnownEventName.RenderFrameImplCreateChildFrame;
+  /* eslint-disable @typescript-eslint/naming-convention */
+  args: TraceEventArgs&{
+    child_frame_token: string,
+    frame_token: string,
+  };
+}
+export function isTraceEventRenderFrameImplCreateChildFrame(event: TraceEventData):
+    event is TraceEventRenderFrameImplCreateChildFrame {
+  return event.name === KnownEventName.RenderFrameImplCreateChildFrame;
+}
+
 export interface TraceEventPrePaint extends TraceEventComplete {
   name: 'PrePaint';
 }
@@ -1143,6 +1161,10 @@ export interface TraceEventUserTiming extends TraceEventData {
   id2?: {local?: string, global?: string};
   id?: string;
   cat: 'blink.user_timing';
+  // Note that the timestamp for user timing trace events is set to the
+  // start time passed by the user at the call site of the timing (based
+  // on the UserTiming spec).
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/timing/performance_user_timing.cc;l=236;drc=494419358caf690316f160a1f27d9e771a14c033
 }
 
 export type TraceEventPairableUserTiming = TraceEventUserTiming&TraceEventPairableAsync;
@@ -1383,6 +1405,7 @@ export interface SyntheticProfileCall extends SyntheticTraceEntry {
   nodeId: Protocol.integer;
   sampleIndex: number;
   profileId: ProfileID;
+  selfTime: MicroSeconds;
 }
 
 /**
@@ -1695,6 +1718,15 @@ export type CallFrameID = number&CallFrameIdTag;
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export function CallFrameID(value: number): CallFrameID {
   return value as CallFrameID;
+}
+
+class SampleIndexTag {
+  readonly #sampleIndexTag: (symbol|undefined);
+}
+export type SampleIndex = number&SampleIndexTag;
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export function SampleIndex(value: number): SampleIndex {
+  return value as SampleIndex;
 }
 
 class ProcessIdTag {
@@ -2633,6 +2665,8 @@ export const enum KnownEventName {
 
   SchedulePostMessage = 'SchedulePostMessage',
   HandlePostMessage = 'HandlePostMessage',
+
+  RenderFrameImplCreateChildFrame = 'RenderFrameImpl::createChildFrame',
 }
 
 // NOT AN EXHAUSTIVE LIST: just some categories we use and refer

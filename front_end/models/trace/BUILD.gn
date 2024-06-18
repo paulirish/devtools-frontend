@@ -35,12 +35,14 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
+    "../../../test/interactions/*",
     "../../core/sdk:unittests",
     "../../legacy_test_runner/*",
     "../../panels/lighthouse/*",
     "../../panels/network/*",
     "../../panels/recorder/*",
     "../../panels/timeline/*",
+    "../../services/events_serializer/*",
     "../../services/modifications_manager/*",
     "../../services/trace_bounds/*",
     "../../services/tracing/*",

@@ -427,6 +427,12 @@
    * Colors for menus.
    */
   --app-color-menu-background: var(--sys-color-surface);
+
+  /**
+   * Colors for navigation drawers.
+   */
+  --app-color-navigation-drawer-label-selected: var(--sys-color-on-surface);
+  --app-color-navigation-drawer-background-selected: var(--ref-palette-primary95);
 }
 
 :root.baseline-default {
@@ -435,6 +441,18 @@
   --sys-color-surface3: color-mix(in sRGB, #6991d6 11%, var(--ref-palette-neutral100));
   --sys-color-surface2: color-mix(in sRGB, #6991d6 8%, var(--ref-palette-neutral100));
   --sys-color-surface1: color-mix(in sRGB, #6991d6 5%, var(--ref-palette-neutral100));
+
+  /**
+   * Color for navigation drawers.
+   */
+  --app-color-navigation-drawer-label-selected: var(--sys-color-primary);
+
+  &.-theme-with-dark-background {
+    /**
+    * Color for navigation drawers.
+    */
+    --app-color-navigation-drawer-label-selected: var(--sys-color-surface);
+  }
 }
 
 :root.baseline-grayscale {
@@ -452,7 +470,7 @@
   --sys-color-surface: var(--ref-palette-neutral100);
   --sys-color-cdt-base-container: var(--ref-palette-neutral100);
 
-  &.-theme-with-dark-background {
+  &.theme-with-dark-background {
     --sys-color-surface5: color-mix(in sRGB, #d1e1ff 14%, var(--ref-palette-neutral10));
     --sys-color-surface4: color-mix(in sRGB, #d1e1ff 12%, var(--ref-palette-neutral10));
     --sys-color-surface3: color-mix(in sRGB, #d1e1ff 11%, var(--ref-palette-neutral10));
@@ -465,7 +483,7 @@
   }
 }
 
-.-theme-with-dark-background {
+.theme-with-dark-background {
   --color-primary-old: rgb(138 180 248);
   --color-primary-variant: rgb(102 157 246);
   --color-background: rgb(32 33 36);
@@ -844,4 +862,10 @@
    * Colors for menus.
    */
   --app-color-menu-background: var(--sys-color-surface3);
+
+  /**
+   * Colors for navigation drawers.
+   */
+  --app-color-navigation-drawer-label-selected: var(--sys-color-surface);
+  --app-color-navigation-drawer-background-selected: var(--ref-palette-primary70);
 }

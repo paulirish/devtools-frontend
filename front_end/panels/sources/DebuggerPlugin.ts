@@ -350,9 +350,6 @@ export class DebuggerPlugin extends Plugin {
           return false;
         }
         const line = selectionLine(this.editor);
-        Host.userMetrics.breakpointEditDialogRevealedFrom(
-            Host.UserMetrics.BreakpointEditDialogRevealedFrom.KeyboardShortcut);
-
         this.#openEditDialogForLine(line);
         return true;
       },
@@ -509,13 +506,9 @@ export class DebuggerPlugin extends Plugin {
             {jslogContext: 'add-breakpoint'});
         if (supportsConditionalBreakpoints) {
           contextMenu.debugSection().appendItem(i18nString(UIStrings.addConditionalBreakpoint), () => {
-            Host.userMetrics.breakpointEditDialogRevealedFrom(
-                Host.UserMetrics.BreakpointEditDialogRevealedFrom.LineGutterContextMenu);
             this.editBreakpointCondition({line, breakpoint: null, location: null, isLogpoint: false});
           }, {jslogContext: 'add-cnd-breakpoint'});
           contextMenu.debugSection().appendItem(i18nString(UIStrings.addLogpoint), () => {
-            Host.userMetrics.breakpointEditDialogRevealedFrom(
-                Host.UserMetrics.BreakpointEditDialogRevealedFrom.LineGutterContextMenu);
             this.editBreakpointCondition({line, breakpoint: null, location: null, isLogpoint: true});
           }, {jslogContext: 'add-logpoint'});
           contextMenu.debugSection().appendItem(
@@ -538,8 +531,6 @@ export class DebuggerPlugin extends Plugin {
         // and logpoints and both are currently only available for JavaScript
         // debugging.
         contextMenu.debugSection().appendItem(i18nString(UIStrings.editBreakpoint), () => {
-          Host.userMetrics.breakpointEditDialogRevealedFrom(
-              Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
           this.editBreakpointCondition({line, breakpoint: breakpoints[0], location: null});
         }, {jslogContext: 'edit-breakpoint'});
       }
@@ -718,11 +709,13 @@ export class DebuggerPlugin extends Plugin {
       box,
       show: async (popover: UI.GlassPane.GlassPane) => {
         let resolvedText: string = '';
-        const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
-        try {
-          resolvedText =
-              await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(evaluationText, nameMap);
-        } catch {
+        if (selectedCallFrame.script.isJavaScript()) {
+          const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(selectedCallFrame);
+          try {
+            resolvedText =
+                await Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(evaluationText, nameMap);
+          } catch {
+          }
         }
         // We use side-effect free debug-evaluate when the highlighted expression contains a
         // function/method call. Otherwise we allow side-effects. The motiviation here are
@@ -1391,20 +1384,14 @@ export class DebuggerPlugin extends Plugin {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     if (breakpoint) {
       contextMenu.debugSection().appendItem(i18nString(UIStrings.editBreakpoint), () => {
-        Host.userMetrics.breakpointEditDialogRevealedFrom(
-            Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
         this.editBreakpointCondition({line, breakpoint, location: null});
       }, {jslogContext: 'edit-breakpoint'});
     } else {
       const uiLocation = this.transformer.editorLocationToUILocation(line.number - 1, position - line.from);
       contextMenu.debugSection().appendItem(i18nString(UIStrings.addConditionalBreakpoint), () => {
-        Host.userMetrics.breakpointEditDialogRevealedFrom(
-            Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
         this.editBreakpointCondition({line, breakpoint: null, location: uiLocation, isLogpoint: false});
       }, {jslogContext: 'add-cnd-breakpoint'});
       contextMenu.debugSection().appendItem(i18nString(UIStrings.addLogpoint), () => {
-        Host.userMetrics.breakpointEditDialogRevealedFrom(
-            Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointMarkerContextMenu);
         this.editBreakpointCondition({line, breakpoint: null, location: uiLocation, isLogpoint: true});
       }, {jslogContext: 'add-logpoint'});
       contextMenu.debugSection().appendItem(
@@ -1595,7 +1582,6 @@ export class DebuggerPlugin extends Plugin {
       return false;
     }
     if (event.metaKey || event.ctrlKey) {
-      Host.userMetrics.breakpointEditDialogRevealedFrom(Host.UserMetrics.BreakpointEditDialogRevealedFrom.MouseClick);
       this.#openEditDialogForLine(line, event.shiftKey);
       return true;
     }

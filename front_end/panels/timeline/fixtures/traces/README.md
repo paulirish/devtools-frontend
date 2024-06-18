@@ -178,3 +178,18 @@ Contains the following requests in the document body:
 - `script.js?beforeImage`: a script fetched before the image
 - `chrome.jpeg`: a normal image
 - `script.js?afterImage`: a script fetched after the image
+
+### web-dev-modifications
+
+Contains a recording of web-dev with the following modifications:
+
+- One entry with hidden children
+- A child breadcrumb under the total trace window.
+
+### iframe-shift
+
+Generated from the shift-attribution page in https://github.com/GoogleChrome/lighthouse/blob/main/cli/test/fixtures/shift-attribution.html. Contains an iframe and layout shifts.
+
+### primary-page-frame
+
+Created from the speculation-rules demo page (https://speculative-rules.glitch.me/common-fruits.html). Contains a trace that includes the `isInPrimaryPageFrame` flag added to Chromium in crrev.com/c/5595033, which allows the trace engine to more accurately identify the main thread via the primary frame.

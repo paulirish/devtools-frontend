@@ -3484,7 +3484,7 @@
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       type_name: "StyleInitialLetter",
       valid_for_first_letter: true,
-      invalidate: ["layout", "paint"],
+      invalidate: ["reshape", "layout", "paint"],
     },
     {
       name: "isolation",
@@ -3566,6 +3566,7 @@
       valid_for_marker: true,
       valid_for_permission_element: true,
       valid_for_page_context: true,
+      affected_by_zoom: true,
     },
     {
       name: "lighting-color",
@@ -5012,38 +5013,6 @@
       computable: false,
     },
     {
-      name: "scroll-start-block",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->start",
-      field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/style/scroll_start_data.h"],
-      default_value: "blink::ScrollStartData()",
-      type_name: "ScrollStartData",
-      logical_property_group : {
-        name: "scroll-start",
-        resolver: "block"
-      },
-      keywords: ["auto", "start", "end", "center", "top", "bottom", "left", "right"],
-      typedom_types: ["Keyword", "Length", "Percentage"],
-      runtime_flag: "CSSScrollStart",
-    },
-    {
-      name: "scroll-start-inline",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->start",
-      field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/style/scroll_start_data.h"],
-      default_value: "blink::ScrollStartData()",
-      type_name: "ScrollStartData",
-      logical_property_group : {
-        name: "scroll-start",
-        resolver: "inline"
-      },
-      keywords: ["auto", "start", "end", "center", "top", "bottom", "left", "right"],
-      typedom_types: ["Keyword", "Length", "Percentage"],
-      runtime_flag: "CSSScrollStart",
-    },
-    {
       name: "scroll-start-x",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*->start",
@@ -5071,36 +5040,6 @@
         name: "scroll-start",
         resolver: "vertical"
       },
-      runtime_flag: "CSSScrollStart",
-    },
-    {
-      name: "scroll-start-target-block",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->target",
-      field_template: "keyword",
-      default_value: "none",
-      type_name: "EScrollStartTarget",
-      logical_property_group: {
-        name: "scroll-start-target",
-        resolver: "block",
-      },
-      keywords: ["none", "auto"],
-      typedom_types: ["Keyword"],
-      runtime_flag: "CSSScrollStart",
-    },
-    {
-      name: "scroll-start-target-inline",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->target",
-      field_template: "keyword",
-      default_value: "none",
-      type_name: "EScrollStartTarget",
-      logical_property_group: {
-        name: "scroll-start-target",
-        resolver: "inline",
-      },
-      keywords: ["none", "auto"],
-      typedom_types: ["Keyword"],
       runtime_flag: "CSSScrollStart",
     },
     {
@@ -5668,16 +5607,17 @@
       style_builder_custom_functions: ["initial", "inherit", "value"],
       default_value: "TextSizeAdjust::AdjustAuto()",
       getter: "GetTextSizeAdjust",
-      // When `NewTextSizeAdjust` is enabled, this affects font-size during
-      // style building and needs to apply before it.
+      // When `TextSizeAdjustImprovements` is enabled, this affects font-size
+      // during style building and needs to apply before it.
       priority: 2,
       type_name: "TextSizeAdjust",
       converter: "ConvertTextSizeAdjust",
       keywords: ["none", "auto"],
       typedom_types: ["Keyword", "Percentage"],
-      // When `NewTextSizeAdjust` is enabled, this affects font-size during
-      // style building. Changes to anything related to fonts require that we
-      // call style.UpdateFont(), which the incremental path does not do.
+      // When `TextSizeAdjustImprovements` is enabled, this affects font-size
+      // during style building. Changes to anything related to fonts require
+      // that we call style.UpdateFont(), which the incremental path does not
+      // do.
       supports_incremental_style: false,
       invalidate: ["layout", "paint"],
     },
@@ -6595,7 +6535,7 @@
     },
     {
       name: "ruby-position",
-      property_methods: ["CSSValueFromComputedStyleInternal"],
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       inherited: true,
       field_group: "*",
       field_template: "keyword",
@@ -7104,6 +7044,42 @@
       },
       typedom_types: ["Length", "Percentage"],
       valid_for_page_context: true,
+    },
+    {
+      name: "scroll-start-block",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group : {
+        name: "scroll-start",
+        resolver: "block"
+      },
+      runtime_flag: "CSSScrollStart",
+    },
+    {
+      name: "scroll-start-inline",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group : {
+        name: "scroll-start",
+        resolver: "inline"
+      },
+      runtime_flag: "CSSScrollStart",
+    },
+    {
+      name: "scroll-start-target-block",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group: {
+        name: "scroll-start-target",
+        resolver: "block",
+      },
+      runtime_flag: "CSSScrollStart",
+    },
+    {
+      name: "scroll-start-target-inline",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group: {
+        name: "scroll-start-target",
+        resolver: "inline",
+      },
+      runtime_flag: "CSSScrollStart",
     },
     {
       name: "border-inline-start-width",

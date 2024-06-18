@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Root from '../root/root.js';
+import {describeWithEnvironment, getGetHostConfigStub} from '../../testing/EnvironmentHelpers.js';
 
 import * as Host from './host.js';
 
 const TEST_MODEL_ID = 'testModelId';
 
-describe('AidaClient', () => {
-  it('adds no model temperature if there is no aidaTemperature query param', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaTemperature').returns(null);
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
+describeWithEnvironment('AidaClient', () => {
+  it('adds no model temperature if console insights is not enabled', () => {
+    const stub = getGetHostConfigStub({});
+    const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
     assert.deepStrictEqual(request, {
       input: 'foo',
       client: 'CHROME_DEVTOOLS',
@@ -21,9 +20,13 @@ describe('AidaClient', () => {
   });
 
   it('adds a model temperature', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaTemperature').returns('0.5');
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
+    const stub = getGetHostConfigStub({
+      devToolsConsoleInsights: {
+        enabled: true,
+        aidaTemperature: 0.5,
+      },
+    });
+    const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
     assert.deepStrictEqual(request, {
       input: 'foo',
       client: 'CHROME_DEVTOOLS',
@@ -35,9 +38,13 @@ describe('AidaClient', () => {
   });
 
   it('adds a model temperature of 0', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaTemperature').returns('0');
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
+    const stub = getGetHostConfigStub({
+      devToolsConsoleInsights: {
+        enabled: true,
+        aidaTemperature: 0,
+      },
+    });
+    const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
     assert.deepStrictEqual(request, {
       input: 'foo',
       client: 'CHROME_DEVTOOLS',
@@ -48,47 +55,15 @@ describe('AidaClient', () => {
     stub.restore();
   });
 
-  it('adds no model temperature if the aidaTemperature query param cannot be parsed into a float', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaTemperature').returns('not a number');
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
-    assert.deepStrictEqual(request, {
-      input: 'foo',
-      client: 'CHROME_DEVTOOLS',
-    });
-    stub.restore();
-  });
-
-  it('adds no model id if there is no aidaModelId query param', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaModelId').returns(null);
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
-    assert.deepStrictEqual(request, {
-      input: 'foo',
-      client: 'CHROME_DEVTOOLS',
-    });
-    stub.restore();
-  });
-
-  it('adds a model id', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaModelId').returns(TEST_MODEL_ID);
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
-    assert.deepStrictEqual(request, {
-      input: 'foo',
-      client: 'CHROME_DEVTOOLS',
-      options: {
-        model_id: TEST_MODEL_ID,
+  it('adds a model id and temperature', () => {
+    const stub = getGetHostConfigStub({
+      devToolsConsoleInsights: {
+        enabled: true,
+        aidaModelId: TEST_MODEL_ID,
+        aidaTemperature: 0.5,
       },
     });
-    stub.restore();
-  });
-
-  it('adds a model id and temperature', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('aidaModelId').returns(TEST_MODEL_ID);
-    stub.withArgs('aidaTemperature').returns('0.5');
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
+    const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
     assert.deepStrictEqual(request, {
       input: 'foo',
       client: 'CHROME_DEVTOOLS',
@@ -101,14 +76,22 @@ describe('AidaClient', () => {
   });
 
   it('adds metadata to disallow logging', () => {
-    const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
-    stub.withArgs('ci_disallowLogging').returns('true');
-    const request = Host.AidaClient.AidaClient.buildApiRequest('foo');
+    const stub = getGetHostConfigStub({
+      devToolsConsoleInsights: {
+        enabled: true,
+        aidaTemperature: 0.5,
+        disallowLogging: true,
+      },
+    });
+    const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
     assert.deepStrictEqual(request, {
       input: 'foo',
       client: 'CHROME_DEVTOOLS',
       metadata: {
         disable_user_content_logging: true,
+      },
+      options: {
+        temperature: 0.5,
       },
     });
     stub.restore();
@@ -116,7 +99,7 @@ describe('AidaClient', () => {
 
   async function getAllResults(provider: Host.AidaClient.AidaClient): Promise<Host.AidaClient.AidaResponse[]> {
     const results = [];
-    for await (const result of provider.fetch('foo')) {
+    for await (const result of provider.fetch(Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo'))) {
       results.push(result);
     }
     return results;
