@@ -1,0 +1,84 @@
+# Copyright 2024 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../../scripts/build/ninja/devtools_entrypoint.gni")
+import("../../../../scripts/build/ninja/devtools_module.gni")
+import("../../../../third_party/typescript/typescript.gni")
+import("../../visibility.gni")
+
+devtools_module("lantern") {
+  sources = [
+    "BaseNode.ts",
+    "CpuNode.ts",
+    "LanternError.ts",
+    "Metric.ts",
+    "NetworkNode.ts",
+    "PageDependencyGraph.ts",
+    "TBTUtils.ts",
+    "metrics/FirstContentfulPaint.ts",
+    "metrics/Interactive.ts",
+    "metrics/LargestContentfulPaint.ts",
+    "metrics/MaxPotentialFID.ts",
+    "metrics/SpeedIndex.ts",
+    "metrics/TotalBlockingTime.ts",
+    "metrics/metrics.ts",
+    "simulation/ConnectionPool.ts",
+    "simulation/Constants.ts",
+    "simulation/DNSCache.ts",
+    "simulation/NetworkAnalyzer.ts",
+    "simulation/SimulationTimingMap.ts",
+    "simulation/Simulator.ts",
+    "simulation/TcpConnection.ts",
+    "simulation/simulation.ts",
+    "types/lantern.ts",
+  ]
+
+  deps = [
+    "../../../core/common:bundle",
+    "../../../core/platform:bundle",
+    "../../../core/root:bundle",
+    "../../../core/sdk:bundle",
+    "../types:bundle",
+  ]
+}
+
+devtools_entrypoint("bundle") {
+  entrypoint = "lantern.ts"
+  deps = [ ":lantern" ]
+  visibility = [
+    ":*",
+    "../*",
+  ]
+
+  visibility += devtools_models_visibility
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [
+    "BaseNode.test.ts",
+    "PageDependencyGraph.test.ts",
+    "TBTUtils.test.ts",
+    "metrics/FirstContentfulPaint.test.ts",
+    "metrics/Interactive.test.ts",
+    "metrics/LargestContentfulPaint.test.ts",
+    "metrics/SpeedIndex.test.ts",
+    "simulation/ConnectionPool.test.ts",
+    "simulation/DNSCache.test.ts",
+    "simulation/NetworkAnalyzer.test.ts",
+    "simulation/Simulator.test.ts",
+    "simulation/TCPConnection.test.ts",
+    "testing/MetricTestUtils.ts",
+  ]
+
+  deps = [
+    "../:bundle",
+    "../../../../test/shared",
+    "../../../core/platform:bundle",
+    "../../../generated",
+    "../../../models/trace:bundle",
+    "../../../testing",
+  ]
+}
