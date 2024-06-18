@@ -35,3 +35,16 @@ echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
 
 
 $DIRNAME/copy-build-trace-engine-for-publish.sh
+
+
+
+## This esbuild command outputs a single file bundle (untyped!) of the library.
+## It can be useful for checking bundle-size, dependencies added, or using the esbuild analyzer: https://esbuild.github.io/analyze/
+# ./third_party/esbuild/esbuild \
+#       --outdir=./out/trace_engine-esbuild --out-extension:.js=.mjs \
+#       --bundle --tree-shaking=true --format=esm \
+#       --sourcemap  --source-root="@trace_engine/x/x/x/x/" \
+#       --metafile=./out/trace_engine-esbuild/meta.json \
+#       --log-level=info \
+#       --external:"*TracingManager.js" --external:"*extras.js" \
+#       ./front_end/models/trace/trace.ts
