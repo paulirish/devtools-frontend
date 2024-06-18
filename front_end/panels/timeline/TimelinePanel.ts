@@ -401,6 +401,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.setSearchableView(this.searchableViewInternal);
     this.searchableViewInternal.hideWidget();
 
+    this.#sideBar.setMainWidget(this.timelinePane);
+    this.#sideBar.show(this.element);
+
     this.onModeChanged();
     this.populateToolbar();
     this.showLandingPage();
@@ -843,8 +846,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       return;
     }
     if (this.showSettingsPaneSetting.get()) {
+      this.showSettingsPaneButton.setToggled(true);
       this.settingsPane.showWidget();
     } else {
+      this.showSettingsPaneButton.setToggled(false);
       this.settingsPane.hideWidget();
     }
   }
@@ -1258,18 +1263,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.#minimapComponent.addInitialBreadcrumb();
       }
 
-      // To calculate the activity we might want to zoom in, we find the last
-      // main thread. Or we find the CPU Profile thread, for e.g. Node traces.
-      const mainThreadTypes = [
-        TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD,
-        TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE,
-      ];
-      const lastMainThread = TraceEngine.Handlers.Threads.threadsInTrace(traceParsedData)
-                                 .filter(data => mainThreadTypes.includes(data.type))
-                                 .at(-1);
-      if (lastMainThread) {
+      // To calculate the activity we might want to zoom in, we use the top-most main-thread track
+      const topMostMainThreadAppender =
+          this.flameChart.getMainDataProvider().compatibilityTracksAppenderInstance().threadAppenders().at(0);
+      if (topMostMainThreadAppender) {
         const zoomedInBounds = TraceEngine.Extras.MainThreadActivity.calculateWindow(
-            traceParsedData.Meta.traceBounds, lastMainThread.entries);
+            traceParsedData.Meta.traceBounds, topMostMainThreadAppender.getEntries());
 
         TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(zoomedInBounds);
       }
@@ -1313,6 +1312,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private showLandingPage(): void {
     this.updateSettingsPaneVisibility();
+    this.#sideBar.hideSidebar();
     if (this.landingPage) {
       this.landingPage.show(this.statusPaneContainer);
       return;
@@ -1418,11 +1418,19 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.statusPane.remove();
       }
       this.statusPane = null;
-
+      if (!isNode && Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
+        this.#sideBar.showBoth();
+      }
       const traceData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
       if (!traceData) {
         throw new Error(`Could not get trace data at index ${this.#traceEngineActiveTraceIndex}`);
       }
+
+      const traceInsightsData = this.#traceEngineModel.traceInsights(this.#traceEngineActiveTraceIndex);
+      if (traceInsightsData) {
+        this.#sideBar.data = traceInsightsData;
+      }
+
       if (recordingIsFresh) {
         Tracker.instance().registerFreshRecording(traceData);
       }

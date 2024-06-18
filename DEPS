@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'd589326c99425e96ed025c14e2609916f460f7b6',
+  'build_revision': 'cc4481a0c558edd5c414c8c58e5f1d33fd2ff8d3',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
   'buildtools_revision': '2bd8dea61c53448c67f70419004ded4032590fe7',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'c0883c509ea30e18e5657552527999734c7bac05',
+  'depot_tools_revision': '43c6415bced9310c0aefabadaac2d405fbd5043d',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
@@ -31,7 +31,7 @@ vars = {
   # GN CIPD package version.
   'gn_version': 'git_revision:b2afae122eeb6ce09c52d63f67dc53fc517dbdc8',
 
-  'cmake_version': 'version:3.16.1',
+  'cmake_version': 'version:2@3.21.3',
 
   'llvm_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/',
   'llvm_revision': 'c08d3b08f6d71e974537de226c68d4c94c396a46',
@@ -50,7 +50,10 @@ vars = {
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
-  'SUBMODULE_MIGRATION': 'True'
+  'SUBMODULE_MIGRATION': 'True',
+
+  # condition to allowlist deps for non-git-source processing.
+  'non_git_source': 'True',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -64,7 +67,7 @@ deps = {
   },
   'third_party/cmake': {
     'packages': [{
-      'package': 'infra/cmake/${{platform}}',
+      'package': 'infra/3pp/tools/cmake/${{platform}}',
       'version': Var('cmake_version')
     }],
     'dep_type':
