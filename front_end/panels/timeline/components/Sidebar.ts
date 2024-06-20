@@ -15,7 +15,6 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import sidebarStyles from './sidebar.css.js';
-import * as SidebarInsight from './SidebarInsight.js';
 
 const COLLAPSED_WIDTH = 40;
 const DEFAULT_EXPANDED_WIDTH = 240;
@@ -81,61 +80,8 @@ export class SidebarUI extends HTMLElement {
   selectedCategory: InsightsCategories = InsightsCategories.ALL;
   #expanded: boolean = false;
 
-  #traceParsedData?: TraceEngine.Handlers.Types.TraceParseData|null;
-  #inpMetric: {
-    longestINPDur: TraceEngine.Types.Timing.MicroSeconds,
-    inpScoreClassification: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification,
-  }|null = null;
-  #lcpMetric: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricScore|null = null;
-  #clsMetric: {
-    clsScore: number,
-    clsScoreClassification: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification,
-  }|null = null;
-  #phaseData: Array<{phase: string, timing: number|TraceEngine.Types.Timing.MilliSeconds, percent: string}> = [];
-  #insights: TraceEngine.Insights.Types.TraceInsightData<typeof Handlers.ModelHandlers>|null = null;
 
   #renderBound = this.#render.bind(this);
-
-  getLCPInsightData(): Array<{phase: string, timing: number|TraceEngine.Types.Timing.MilliSeconds, percent: string}> {
-    if (!this.#insights) {
-      return [];
-    }
-    // For now use the first navigation of the trace.
-    const firstNav = this.#insights.values().next().value;
-    if (!firstNav) {
-      return [];
-    }
-    const lcpInsight = firstNav.LargestContentfulPaint;
-    if (lcpInsight instanceof Error) {
-      return [];
-    }
-
-    const timing = lcpInsight.lcpMs;
-    const phases = lcpInsight.phases;
-
-    if (!timing || !phases) {
-      return [];
-    }
-
-    const {ttfb, loadDelay, loadTime, renderDelay} = phases;
-
-    if (loadDelay && loadTime) {
-      const phaseData = [
-        {phase: 'Time to first byte', timing: ttfb, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
-        {phase: 'Resource load delay', timing: loadDelay, percent: `${(100 * loadDelay / timing).toFixed(0)}%`},
-        {phase: 'Resource load duration', timing: loadTime, percent: `${(100 * loadTime / timing).toFixed(0)}%`},
-        {phase: 'Resource render delay', timing: renderDelay, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
-      ];
-      return phaseData;
-    }
-
-    // If the lcp is text, we only have ttfb and render delay.
-    const phaseData = [
-      {phase: 'Time to first byte', timing: ttfb, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
-      {phase: 'Resource render delay', timing: renderDelay, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
-    ];
-    return phaseData;
-  }
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [sidebarStyles];
@@ -151,58 +97,6 @@ export class SidebarUI extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
-  set insights(insights: TraceEngine.Insights.Types.TraceInsightData<typeof Handlers.ModelHandlers>) {
-    if (insights === this.#insights) {
-      return;
-    }
-    this.#insights = insights;
-    this.#phaseData = this.getLCPInsightData();
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-  }
-
-  set traceParsedData(traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null) {
-    if (this.#traceParsedData === traceParsedData) {
-      // If this is the same trace, do not re-render.
-      return;
-    }
-    this.#traceParsedData = traceParsedData;
-    // Clear all data before re-render.
-    this.#inpMetric = null;
-    this.#lcpMetric = null;
-    this.#clsMetric = null;
-
-    if (!traceParsedData) {
-      void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-      return;
-    }
-
-    // Get LCP metric for first navigation.
-    const eventsByNavigation =
-        traceParsedData.PageLoadMetrics.metricScoresByFrameId.get(traceParsedData.Meta.mainFrameId);
-    if (eventsByNavigation) {
-      const metricsByName = eventsByNavigation.values().next().value;
-      if (metricsByName) {
-        this.#lcpMetric = metricsByName.get(TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
-      }
-    }
-
-    const clsScore = traceParsedData.LayoutShifts.sessionMaxScore;
-    this.#clsMetric = {
-      clsScore,
-      clsScoreClassification:
-          TraceEngine.Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(clsScore),
-    };
-
-    if (traceParsedData.UserInteractions.longestInteractionEvent) {
-      this.#inpMetric = {
-        longestINPDur: traceParsedData.UserInteractions.longestInteractionEvent.dur,
-        inpScoreClassification:
-            TraceEngine.Handlers.ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(
-                traceParsedData.UserInteractions.longestInteractionEvent.dur),
-      };
-    }
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-  }
 
   #toggleButtonClick(): void {
     this.dispatchEvent(new Event('togglebuttonclick'));
@@ -235,126 +129,12 @@ export class SidebarUI extends HTMLElement {
     // clang-format on
   }
 
-  #onTargetSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
-    this.selectedCategory = event.itemValue as InsightsCategories;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-  }
-
-  #renderMetricValue(
-      label: string, value: string,
-      classification: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification): LitHtml.TemplateResult {
-    return LitHtml.html`
-      <div class="metric">
-        <div class="metric-value metric-value-${classification}">${value}</div>
-        <div class="metric-label">${label}</div>
-      </div>
-    `;
-  }
-
-  #renderINPMetric(): LitHtml.TemplateResult|null {
-    if (!this.#inpMetric) {
-      return null;
-    }
-    const timeString = i18n.TimeUtilities.formatMicroSecondsTime(this.#inpMetric.longestINPDur);
-    return this.#renderMetricValue('INP', timeString, this.#inpMetric.inpScoreClassification);
-  }
-
-  #renderLCPMetric(): LitHtml.TemplateResult|null {
-    if (!this.#lcpMetric) {
-      return null;
-    }
-    const timeString = i18n.TimeUtilities.formatMicroSecondsAsSeconds(this.#lcpMetric.timing);
-    return this.#renderMetricValue(this.#lcpMetric.metricName, timeString, this.#lcpMetric.classification);
-  }
-
-  #renderCLSMetric(): LitHtml.TemplateResult|null {
-    if (!this.#clsMetric) {
-      return null;
-    }
-    return this.#renderMetricValue(
-        TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricName.CLS, this.#clsMetric.clsScore.toPrecision(3),
-        this.#clsMetric.clsScoreClassification);
-  }
-
-  #renderInsightsForCategory(insightsCategory: InsightsCategories): LitHtml.TemplateResult {
-    switch (insightsCategory) {
-      case InsightsCategories.ALL:
-        return LitHtml.html`
-          <div class="metrics-row">
-            ${this.#renderINPMetric()}
-            ${this.#renderLCPMetric()}
-            ${this.#renderCLSMetric()}
-          </div>
-          <div class="insights">${this.#renderLCPPhases()}</div>
-        `;
-      case InsightsCategories.LCP:
-        return LitHtml.html`
-          ${this.#renderLCPMetric()}
-          <div class="insights">${this.#renderLCPPhases()}</div>
-        `;
-      case InsightsCategories.CLS:
-        return LitHtml.html`${this.#renderCLSMetric()}`;
-      case InsightsCategories.INP:
-        return LitHtml.html`${this.#renderINPMetric()}`;
-      case InsightsCategories.OTHER:
-        return LitHtml.html`<div>${insightsCategory}</div>`;
-    }
-  }
-
-  #renderLCPPhases(): LitHtml.LitTemplate {
-    const lcpTitle = 'LCP by Phase';
-    const showLCPPhases = this.#phaseData ? this.#phaseData.length > 0 : false;
-
-    // clang-format off
-    return LitHtml.html`${
-        showLCPPhases ? LitHtml.html`
-        <${SidebarInsight.SidebarInsight.litTagName} .data=${{
-            title: lcpTitle,
-          } as SidebarInsight.InsightDetails}>
-          <div slot="insight-description" class="insight-description">
-            Each
-            <x-link class="link" href="https://web.dev/articles/optimize-lcp#lcp-breakdown">phase has specific recommendations to improve.</x-link>
-            In an ideal load, the two delay phases should be quite short.
-          </div>
-          <div slot="insight-content" class="table-container">
-            <dl>
-              <dt class="dl-title">Phase</dt>
-              <dd class="dl-title">% of LCP</dd>
-              ${this.#phaseData?.map(phase => LitHtml.html`
-                <dt>${phase.phase}</dt>
-                <dd class="dl-value">${phase.percent}</dd>
-              `)}
-            </dl>
-          </div>
-        </${SidebarInsight.SidebarInsight}>` : LitHtml.nothing}`;
-    // clang-format on
-  }
 
   #renderInsightsTabContent(): LitHtml.TemplateResult {
     // clang-format off
     return LitHtml.html`
-      <${Menus.SelectMenu.SelectMenu.litTagName}
-            class="target-select-menu"
-            @selectmenuselected=${this.#onTargetSelected}
-            .showDivider=${true}
-            .showArrow=${true}
-            .sideButton=${false}
-            .showSelectedItem=${true}
-            .showConnector=${false}
-            .position=${Dialogs.Dialog.DialogVerticalPosition.BOTTOM}
-            .buttonTitle=${this.selectedCategory}
-            jslog=${VisualLogging.dropDown('performance.sidebar-insights-category-select').track({click: true})}
-          >
-          ${Object.values(InsightsCategories).map(insightsCategory => {
-            return LitHtml.html`
-              <${Menus.Menu.MenuItem.litTagName} .value=${insightsCategory}>
-                ${insightsCategory}
-              </${Menus.Menu.MenuItem.litTagName}>
-            `;
-          })}
-      </${Menus.SelectMenu.SelectMenu.litTagName}>
-
-      ${this.#renderInsightsForCategory(this.selectedCategory)}
+      <h2>Content for Insights Tab</h2>
+      <p>This is the content of the Insights tab.</p>
     `;
     // clang-format on
   }
