@@ -7,7 +7,7 @@ import * as Host from '../../core/host/host.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import {FreestylerEvaluateAction} from './FreestylerEvaluateAction.js';
+import {ExecutionError, FreestylerEvaluateAction} from './FreestylerEvaluateAction.js';
 
 const preamble = `You are a CSS debugging agent integrated into Chrome DevTools.
 You are going to receive a query about the CSS on the page and you are going to answer to this query in these steps:
@@ -51,15 +51,18 @@ export enum Step {
   THOUGHT = 'thought',
   ACTION = 'action',
   ANSWER = 'answer',
+  ERROR = 'error',
 }
 
 export type StepData = {
-  step: Step.THOUGHT|Step.ANSWER,
+  step: Step.THOUGHT|Step.ANSWER|Step.ERROR,
   text: string,
+  rpcId?: number,
 }|{
   step: Step.ACTION,
   code: string,
   output: string,
+  rpcId?: number,
 };
 
 async function executeJsCode(code: string): Promise<string> {
@@ -83,15 +86,31 @@ async function executeJsCode(code: string): Promise<string> {
     throw new Error('Execution context is not found for executing code');
   }
 
-  return FreestylerEvaluateAction.execute(code, executionContext);
+  try {
+    return await FreestylerEvaluateAction.execute(code, executionContext);
+  } catch (err) {
+    if (err instanceof ExecutionError) {
+      return `Error: ${err.message}`;
+    }
+
+    throw err;
+  }
 }
+
+type HistoryChunk = {
+  text: string,
+  entity: Host.AidaClient.Entity,
+};
 
 const MAX_STEPS = 5;
 export class FreestylerAgent {
   #aidaClient: Host.AidaClient.AidaClient;
+  #chatHistory: Array<HistoryChunk> = [];
+  #execJs: typeof executeJsCode;
 
-  constructor({aidaClient}: {aidaClient: Host.AidaClient.AidaClient}) {
+  constructor({aidaClient, execJs}: {aidaClient: Host.AidaClient.AidaClient, execJs?: typeof executeJsCode}) {
     this.#aidaClient = aidaClient;
+    this.#execJs = execJs ?? executeJsCode;
   }
 
   static buildRequest(input: string, preamble?: string, chatHistory?: Host.AidaClient.Chunk[]):
@@ -104,11 +123,8 @@ export class FreestylerAgent {
       chat_history: chatHistory,
       client: 'CHROME_DEVTOOLS',
       options: {
-        // TODO: have a config for temperature
-        temperature: 0,
-        // TODO: have a separate config for modelId
-        model_id: config?.devToolsConsoleInsightsDogfood.aidaModelId ?? config?.devToolsConsoleInsights.aidaModelId ??
-            undefined,
+        temperature: config?.devToolsFreestylerDogfood.aidaTemperature ?? 0,
+        model_id: config?.devToolsFreestylerDogfood.aidaModelId ?? undefined,
       },
       metadata: {
         // TODO: enable logging later.
@@ -116,6 +132,10 @@ export class FreestylerAgent {
       },
     };
     return request;
+  }
+
+  get chatHistoryForTesting(): Array<HistoryChunk> {
+    return this.#chatHistory;
   }
 
   static parseResponse(response: string): {thought?: string, action?: string, answer?: string} {
@@ -134,12 +154,15 @@ export class FreestylerAgent {
         const actionLines = [];
         let j = i + 1;
         while (j < lines.length && lines[j].trim() !== 'STOP') {
-          actionLines.push(lines[j]);
+          // Sometimes the code block is in the form of "`````\njs\n{code}`````"
+          if (lines[j].trim() !== 'js') {
+            actionLines.push(lines[j]);
+          }
           j++;
         }
         // TODO: perhaps trying to parse with a Markdown parser would
         // yield more reliable results.
-        action = actionLines.join('\n').replaceAll('```', '').trim();
+        action = actionLines.join('\n').replaceAll('```', '').replaceAll('``', '').trim();
         i = j + 1;
       } else if (trimmed.startsWith('ANSWER:') && !answer) {
         const answerLines = [
@@ -163,66 +186,80 @@ export class FreestylerAgent {
     return {thought, action, answer};
   }
 
-  async #aidaFetch(request: Host.AidaClient.AidaRequest): Promise<string> {
-    let result;
+  async #aidaFetch(request: Host.AidaClient.AidaRequest): Promise<{response: string, rpcId: number|undefined}> {
+    let response = '';
+    let rpcId;
     for await (const lastResult of this.#aidaClient.fetch(request)) {
-      result = lastResult.explanation;
+      response = lastResult.explanation;
+      rpcId = lastResult.metadata.rpcGlobalId ?? rpcId;
     }
 
-    return result ?? '';
+    return {response, rpcId};
   }
 
-  async run(query: string, onStep: (data: StepData) => void): Promise<void> {
+  resetHistory(): void {
+    this.#chatHistory = [];
+  }
+
+  async * run(query: string): AsyncGenerator<StepData, void, void> {
     const structuredLog = [];
-    const chatHistory: Host.AidaClient.Chunk[] = [];
     query = `QUERY: ${query}`;
     for (let i = 0; i < MAX_STEPS; i++) {
-      const request = FreestylerAgent.buildRequest(query, preamble, chatHistory.length ? chatHistory : undefined);
-      const response = await this.#aidaFetch(request);
-      debugLog(`Iteration: ${i}: ${JSON.stringify(request)}\n${response}`);
+      const request =
+          FreestylerAgent.buildRequest(query, preamble, this.#chatHistory.length ? this.#chatHistory : undefined);
+      let response: string;
+      let rpcId: number|undefined;
+      try {
+        const fetchResult = await this.#aidaFetch(request);
+        response = fetchResult.response;
+        rpcId = fetchResult.rpcId;
+      } catch (err) {
+        yield {step: Step.ERROR, text: err.message, rpcId};
+        break;
+      }
+
+      debugLog(`Iteration: ${i}`, 'Request', request, 'Response', response);
       structuredLog.push({
-        request: request,
+        request: structuredClone(request),
         response: response,
       });
 
-      chatHistory.push({
-        text: query,
-        entity: i === 0 ? Host.AidaClient.Entity.USER : Host.AidaClient.Entity.SYSTEM,
-      });
+      this.#chatHistory.push(
+          {
+            text: query,
+            entity: Host.AidaClient.Entity.USER,
+          },
+          {
+            text: response,
+            entity: Host.AidaClient.Entity.SYSTEM,
+          });
 
       const {thought, action, answer} = FreestylerAgent.parseResponse(response);
 
       if (!thought && !action && !answer) {
-        onStep({step: Step.ANSWER, text: 'Sorry, I could not help you with this query.'});
+        yield {step: Step.ANSWER, text: 'Sorry, I could not help you with this query.', rpcId};
         break;
       }
 
       if (answer) {
-        onStep({step: Step.ANSWER, text: answer});
-        chatHistory.push({
-          text: `ANSWER: ${answer}`,
-          entity: Host.AidaClient.Entity.SYSTEM,
-        });
+        yield {step: Step.ANSWER, text: answer, rpcId};
         break;
       }
 
       if (thought) {
-        onStep({step: Step.THOUGHT, text: thought});
-        chatHistory.push({
-          text: `THOUGHT: ${thought}`,
-          entity: Host.AidaClient.Entity.SYSTEM,
-        });
+        yield {step: Step.THOUGHT, text: thought, rpcId};
       }
 
       if (action) {
-        chatHistory.push({
-          text: `ACTION\n${action}\nSTOP`,
-          entity: Host.AidaClient.Entity.SYSTEM,
-        });
-        const observation = await executeJsCode(`{${action};data}`);
-        debugLog(`Executed action: ${action}\nResult: ${observation}`);
-        onStep({step: Step.ACTION, code: action, output: observation});
+        debugLog(`Action to execute: ${action}`);
+        const observation = await this.#execJs(`{${action};((typeof data !== "undefined") ? data : undefined)}`);
+        debugLog(`Action result: ${observation}`);
+        yield {step: Step.ACTION, code: action, output: observation, rpcId};
         query = `OBSERVATION: ${observation}`;
+      }
+
+      if (i === MAX_STEPS - 1) {
+        yield {step: Step.ERROR, text: 'Max steps reached, please try again.'};
       }
     }
     if (isDebugMode()) {
@@ -236,13 +273,13 @@ function isDebugMode(): boolean {
   return Boolean(localStorage.getItem('debugFreestylerEnabled'));
 }
 
-function debugLog(log: string): void {
+function debugLog(...log: unknown[]): void {
   if (!isDebugMode()) {
     return;
   }
 
   // eslint-disable-next-line no-console
-  console.log(log);
+  console.log(...log);
 }
 
 function setDebugFreestylerEnabled(enabled: boolean): void {

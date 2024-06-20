@@ -78,15 +78,15 @@
   }
 
   &.query {
-    /* TODO(ergunsh): Handle dark mode */
-    background: #f2f2f2; /* stylelint-disable-line plugin/use_theme_colors */
+    color: var(--sys-color-on-surface);
+    background: var(--sys-color-surface2);
     margin-left: auto;
   }
 
   &.answer {
     max-width: 440px;
-    /* TODO(ergunsh): Handle dark mode */
-    background: #ecf3fe; /* stylelint-disable-line plugin/use_theme_colors */
+    color: var(--sys-color-on-surface);
+    background: var(--sys-color-surface2);
   }
 }
 
@@ -138,4 +138,8 @@
   color: var(--sys-color-on-surface);
   font-size: 10px;
   font-family: var(--source-code-font-family);
+}
+
+.error-step {
+  color: var(--sys-color-error);
 }

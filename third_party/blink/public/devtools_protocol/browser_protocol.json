@@ -248,7 +248,8 @@
                         "errormessage",
                         "flowto",
                         "labelledby",
-                        "owns"
+                        "owns",
+                        "url"
                     ]
                 },
                 {
@@ -2707,6 +2708,12 @@
                         {
                             "name": "allowWithoutSanitization",
                             "description": "For \"clipboard\" permission, may specify allowWithoutSanitization.",
+                            "optional": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "name": "allowWithoutGesture",
+                            "description": "For \"fullscreen\" permission, must specify allowWithoutGesture:true.",
                             "optional": true,
                             "type": "boolean"
                         },
@@ -21571,7 +21578,8 @@
                         "destinationBothLimitsReached",
                         "reportingOriginsPerSiteLimitReached",
                         "exceedsMaxChannelCapacity",
-                        "exceedsMaxTriggerStateCardinality"
+                        "exceedsMaxTriggerStateCardinality",
+                        "destinationPerDayReportingLimitReached"
                     ]
                 },
                 {

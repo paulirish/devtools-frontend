@@ -214,6 +214,7 @@ export namespace Accessibility {
     Flowto = 'flowto',
     Labelledby = 'labelledby',
     Owns = 'owns',
+    Url = 'url',
   }
 
   /**
@@ -1804,6 +1805,10 @@ export namespace Browser {
      * For "clipboard" permission, may specify allowWithoutSanitization.
      */
     allowWithoutSanitization?: boolean;
+    /**
+     * For "fullscreen" permission, must specify allowWithoutGesture:true.
+     */
+    allowWithoutGesture?: boolean;
     /**
      * For "camera" permission, may specify panTiltZoom.
      */
@@ -14389,6 +14394,7 @@ export namespace Storage {
     ReportingOriginsPerSiteLimitReached = 'reportingOriginsPerSiteLimitReached',
     ExceedsMaxChannelCapacity = 'exceedsMaxChannelCapacity',
     ExceedsMaxTriggerStateCardinality = 'exceedsMaxTriggerStateCardinality',
+    DestinationPerDayReportingLimitReached = 'destinationPerDayReportingLimitReached',
   }
 
   export const enum AttributionReportingSourceRegistrationTimeConfig {

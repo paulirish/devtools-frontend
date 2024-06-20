@@ -37,12 +37,8 @@ import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {
-  decodeGeneratedRanges,
-  decodeOriginalScopes,
-  type GeneratedRange,
-  type OriginalScope,
-} from './SourceMapScopes.js';
+import {type CallFrame} from './DebuggerModel.js';
+import {SourceMapScopesInfo} from './SourceMapScopesInfo.js';
 
 /**
  * Type of the base source map JSON object, which contains the sources and the mappings at the very least, plus
@@ -190,9 +186,7 @@ export class SourceMap {
   readonly #sourceInfos: Map<Platform.DevToolsPath.UrlString, SourceInfo>;
 
   /* eslint-disable-next-line no-unused-private-class-members */
-  #originalScopes: OriginalScope[]|null = null;
-  /* eslint-disable-next-line no-unused-private-class-members */
-  #generatedRanges: GeneratedRange|null = null;
+  #scopesInfo: SourceMapScopesInfo|null = null;
 
   /**
    * Implements Source Map V3 model. See https://github.com/google/closure-compiler/wiki/Source-Maps
@@ -235,6 +229,11 @@ export class SourceMap {
       return null;
     }
     return entry.content;
+  }
+
+  hasScopeInfo(): boolean {
+    this.#ensureMappingsProcessed();
+    return this.#scopesInfo !== null;
   }
 
   findEntry(lineNumber: number, columnNumber: number): SourceMapEntry|null {
@@ -622,14 +621,9 @@ export class SourceMap {
   }
 
   #parseScopes(map: SourceMapV3Object): void {
-    if (!map.originalScopes || !map.generatedRanges) {
-      return;
+    if (map.originalScopes && map.generatedRanges) {
+      this.#scopesInfo = SourceMapScopesInfo.parseFromMap(map);
     }
-
-    const names = map.names ?? [];
-    const scopeTrees = decodeOriginalScopes(map.originalScopes, names);
-    this.#originalScopes = scopeTrees.map(tree => tree.root);
-    this.#generatedRanges = decodeGeneratedRanges(map.generatedRanges, scopeTrees, names);
   }
 
   findScopeEntry(sourceURL: Platform.DevToolsPath.UrlString, sourceLineNumber: number, sourceColumnNumber: number):
@@ -804,6 +798,21 @@ export class SourceMap {
   compatibleForURL(sourceURL: Platform.DevToolsPath.UrlString, other: SourceMap): boolean {
     return this.embeddedContentByURL(sourceURL) === other.embeddedContentByURL(sourceURL) &&
         this.hasIgnoreListHint(sourceURL) === other.hasIgnoreListHint(sourceURL);
+  }
+
+  expandCallFrame(frame: CallFrame): CallFrame[] {
+    this.#ensureMappingsProcessed();
+    if (this.#scopesInfo === null) {
+      return [frame];
+    }
+
+    const functionNames =
+        this.#scopesInfo.findInlinedFunctionNames(frame.location().lineNumber, frame.location().columnNumber);
+    const result: CallFrame[] = [];
+    for (const [index, name] of functionNames.entries()) {
+      result.push(frame.createVirtualCallFrame(index, name));
+    }
+    return result;
   }
 }
 

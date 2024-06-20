@@ -6,6 +6,7 @@ import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
+import {type SyncInformation} from './InspectorFrontendHostAPI.js';
 import {bindOutputStream} from './ResourceLoader.js';
 
 export enum Entity {
@@ -43,6 +44,13 @@ export interface AidaResponse {
   };
 }
 
+export enum AidaAvailability {
+  AVAILABLE = 'available',
+  NO_ACCOUNT_EMAIL = 'no-account-email',
+  NO_ACTIVE_SYNC = 'no-active-sync',
+  NO_INTERNET = 'no-internet',
+}
+
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
     const request: AidaRequest = {
@@ -53,10 +61,7 @@ export class AidaClient {
     let temperature = NaN;
     let modelId = null;
     let disallowLogging = false;
-    if (config?.devToolsConsoleInsightsDogfood.enabled) {
-      temperature = config.devToolsConsoleInsightsDogfood.aidaTemperature;
-      modelId = config.devToolsConsoleInsightsDogfood.aidaModelId;
-    } else if (config?.devToolsConsoleInsights.enabled) {
+    if (config?.devToolsConsoleInsights.enabled) {
       temperature = config.devToolsConsoleInsights.aidaTemperature;
       modelId = config.devToolsConsoleInsights.aidaModelId;
       disallowLogging = config.devToolsConsoleInsights.disallowLogging;
@@ -76,6 +81,24 @@ export class AidaClient {
       };
     }
     return request;
+  }
+
+  static async getAidaClientAvailability(): Promise<AidaAvailability> {
+    if (!navigator.onLine) {
+      return AidaAvailability.NO_INTERNET;
+    }
+
+    const syncInfo = await new Promise<SyncInformation>(
+        resolve => InspectorFrontendHostInstance.getSyncInformation(syncInfo => resolve(syncInfo)));
+    if (!syncInfo.accountEmail) {
+      return AidaAvailability.NO_ACCOUNT_EMAIL;
+    }
+
+    if (!syncInfo.isSyncActive) {
+      return AidaAvailability.NO_ACTIVE_SYNC;
+    }
+
+    return AidaAvailability.AVAILABLE;
   }
 
   async * fetch(request: AidaRequest): AsyncGenerator<AidaResponse, void, void> {

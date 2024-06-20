@@ -1273,6 +1273,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(zoomedInBounds);
       }
     }
+
+    this.#sideBar.setTraceParsedData(traceParsedData);
+
     this.updateTimelineControls();
   }
 
@@ -1688,6 +1691,7 @@ export const rowHeight = 18;
 export const headerHeight = 20;
 export interface TimelineModeViewDelegate {
   select(selection: TimelineSelection|null): void;
+  element: Element;
   selectEntryAtTime(events: TraceEngine.Types.TraceEvents.TraceEventData[]|null, time: number): void;
   highlightEvent(event: TraceEngine.Types.TraceEvents.TraceEventData|null): void;
 }
