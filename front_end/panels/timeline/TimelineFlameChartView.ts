@@ -17,7 +17,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import {CountersGraph} from './CountersGraph.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
-import {Overlays, type TimeRangeLabel} from './Overlays.js';
+import {Overlays, type TimeRangeLabel, EntryChart} from './Overlays.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {TimelineDetailsView} from './TimelineDetailsView.js';
 import {TimelineRegExp} from './TimelineFilters.js';
@@ -124,7 +124,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.mainFlameChart.enableRuler(false);
 
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.LatestDrawDimensions, dimensions => {
-      this.#overlays.updateChartDimensions('main', dimensions.data.chart);
+      this.#overlays.updateChartDimensions(EntryChart.MAIN, dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
       this.#overlays.update();
     });
@@ -140,7 +140,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     });
     this.networkFlameChart.alwaysShowVerticalScroll();
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.LatestDrawDimensions, dimensions => {
-      this.#overlays.updateChartDimensions('network', dimensions.data.chart);
+      this.#overlays.updateChartDimensions(EntryChart.NETWORK, dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
       this.#overlays.update();
     });
@@ -463,6 +463,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
          TimelineSelection.isFrameObject(selection.object))) {
       this.#overlays.add({
         type: 'ENTRY_SELECTED',
+        chart: networkIndex === -1 ? EntryChart.MAIN : EntryChart.NETWORK,
         entry: selection.object,
       });
       this.#overlays.update();

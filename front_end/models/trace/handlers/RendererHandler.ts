@@ -95,6 +95,13 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     });
   }
 
+  // Skip adding these to main thread since they're accounted for in Network
+  if (Types.TraceEvents.isTraceEventWebSocketCreate(event) || Types.TraceEvents.isTraceEventWebSocketInfo(event) ||
+      Types.TraceEvents.isTraceEventWebSocketTransfer(event)) {
+    return;
+  }
+
+
   if (Types.TraceEvents.isTraceEventBegin(event) || Types.TraceEvents.isTraceEventEnd(event)) {
     const process = getOrCreateRendererProcess(processes, event.pid);
     const thread = getOrCreateRendererThread(process, event.tid);

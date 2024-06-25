@@ -20,7 +20,10 @@ const NETWORK_RESIZE_ELEM_HEIGHT_PX = 8;
  * to adjust its Y value if it's in the main chart which is drawn below the
  * network chart
  */
-export type EntryChartLocation = 'main'|'network';
+export enum EntryChart {
+  MAIN = 'main',
+  NETWORK = 'network',
+}
 
 /**
  * You can add overlays to trace events, but also right now frames are drawn on
@@ -165,15 +168,16 @@ export class Overlays {
     return TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(entry);
   }
 
-  #chartForOverlayEntry(entry: OverlayEntry): EntryChartLocation {
+  #chartForOverlayEntry(entry: OverlayEntry): EntryChart {
     if (entry instanceof TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame) {
-      return 'main';
+      return EntryChart.MAIN;
     }
-    if (TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestDetailsEvent(entry)) {
-      return 'network';
+    if (TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestDetailsEvent(entry) ||
+        TraceEngine.Types.TraceEvents.isWebSocketTraceEvent(entry)) {
+      return EntryChart.NETWORK;
     }
 
-    return 'main';
+    return EntryChart.MAIN;
   }
 
   /**
@@ -253,7 +257,7 @@ export class Overlays {
    * Update the dimenions of a chart.
    * IMPORTANT: this does not trigger a re-draw. You must call the render() method manually.
    */
-  updateChartDimensions(chart: EntryChartLocation, dimensions: FlameChartDimensions): void {
+  updateChartDimensions(chart: EntryChart, dimensions: FlameChartDimensions): void {
     this.#dimensions.charts[chart] = dimensions;
   }
 
@@ -332,8 +336,8 @@ export class Overlays {
     // Time ranges span both charts, it doesn't matter which one we pass here.
     // It's used to get the width of the container, and both charts have the
     // same width.
-    const leftEdgePixel = this.#xPixelForMicroSeconds('main', overlay.bounds.min);
-    const rightEdgePixel = this.#xPixelForMicroSeconds('main', overlay.bounds.max);
+    const leftEdgePixel = this.#xPixelForMicroSeconds(EntryChart.MAIN, overlay.bounds.min);
+    const rightEdgePixel = this.#xPixelForMicroSeconds(EntryChart.MAIN, overlay.bounds.max);
     if (leftEdgePixel === null || rightEdgePixel === null) {
       return;
     }
@@ -418,7 +422,7 @@ export class Overlays {
         // Adjust the y position: we need to move it down from the top Y
         // position to the Y position of the first visible pixel. The
         // adjustment is totalHeight - height because if the totalHeight is 17,
-        // and the visibleHeight is 5, we need to draw the overay at 17-5=12px
+        // and the visibleHeight is 5, we need to draw the over
         // vertically from the top of the event.
         y = y + totalHeight - height;
       }
@@ -616,7 +620,7 @@ export class Overlays {
    * how far along the timeline the event is. We can then multiply that by the
    * width of the canvas to get its pixel position.
    */
-  #xPixelForMicroSeconds(chart: EntryChartLocation, timestamp: TraceEngine.Types.Timing.MicroSeconds): number|null {
+  #xPixelForMicroSeconds(chart: EntryChart, timestamp: TraceEngine.Types.Timing.MicroSeconds): number|null {
     if (this.#dimensions.trace.visibleWindow === null) {
       console.error('Cannot calculate xPixel without visible trace window.');
       return null;
