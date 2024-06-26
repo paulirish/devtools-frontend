@@ -9,26 +9,29 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 import {ExecutionError, FreestylerEvaluateAction} from './FreestylerEvaluateAction.js';
 
-const preamble = `You are a CSS debugging agent integrated into Chrome DevTools.
-You are going to receive a query about the CSS on the page and you are going to answer to this query in these steps:
+const preamble = `You are a CSS debugging assistant integrated into Chrome DevTools.
+The user selected a DOM element in the browser's DevTools and sends a CSS-related
+query about the selected DOM element. You are going to answer to the query in these steps:
 * THOUGHT
 * ACTION
 * ANSWER
-Use ACTION to evaluate JS code (without markdown) on the page to gather all the data needed to answer the query and put it inside the data variable - then return STOP.
+Use ACTION to evaluate JavaScript code on the page to gather all the data needed to answer the query and put it inside the data variable - then return STOP.
+You have access to a special $0 variable referencing the current element in the scope of the JavaScript code.
 OBSERVATION will be the result of running the JS code on the page.
-You can then answer the question with ANSWER or run another ACTION query.
-Please run ACTION again if the information you got is not enough to answer the query.
+After that, you can answer the question with ANSWER or run another ACTION query.
+Please run ACTION again if the information you received is not enough to answer the query.
+Please answer only if you are sure about the answer. Otherwise, explain why you're not able to answer.
 
 Example:
 ACTION
 const data = {
-  hoverStyles: window.getComputedStyle($0, 'hover') // USING 'hover' NOT ':hover'
+  color: window.getComputedStyle($0)['color'],
+  backgroundColor: window.getComputedStyle($0)['backgroundColor'],
 }
 STOP
 
-You have access to $0 variable to denote the currently inspected element while executing JS code.
-
 Example session:
+
 QUERY: Why is this element centered in its container?
 THOUGHT: Let's check the layout properties of the container.
 ACTION
@@ -45,7 +48,7 @@ OBSERVATION
 You then output:
 ANSWER: The element is centered on the page because the parent is a flex container with justify-content set to center.
 
-Please answer only if you are sure about the answer. Otherwise, explain why you're not able to answer.`;
+The example session ends here.`;
 
 export enum Step {
   THOUGHT = 'thought',
@@ -57,10 +60,12 @@ export enum Step {
 export type StepData = {
   step: Step.THOUGHT|Step.ANSWER|Step.ERROR,
   text: string,
+  rpcId?: number,
 }|{
   step: Step.ACTION,
   code: string,
   output: string,
+  rpcId?: number,
 };
 
 async function executeJsCode(code: string): Promise<string> {
@@ -95,13 +100,20 @@ async function executeJsCode(code: string): Promise<string> {
   }
 }
 
+type HistoryChunk = {
+  text: string,
+  entity: Host.AidaClient.Entity,
+};
+
 const MAX_STEPS = 5;
 export class FreestylerAgent {
   #aidaClient: Host.AidaClient.AidaClient;
-  #chatHistory: {text: string, entity: Host.AidaClient.Entity}[] = [];
+  #chatHistory: Map<number, HistoryChunk[]> = new Map();
+  #execJs: typeof executeJsCode;
 
-  constructor({aidaClient}: {aidaClient: Host.AidaClient.AidaClient}) {
+  constructor({aidaClient, execJs}: {aidaClient: Host.AidaClient.AidaClient, execJs?: typeof executeJsCode}) {
     this.#aidaClient = aidaClient;
+    this.#execJs = execJs ?? executeJsCode;
   }
 
   static buildRequest(input: string, preamble?: string, chatHistory?: Host.AidaClient.Chunk[]):
@@ -114,17 +126,27 @@ export class FreestylerAgent {
       chat_history: chatHistory,
       client: 'CHROME_DEVTOOLS',
       options: {
-        // TODO: have a config for temperature
-        temperature: 0,
-        // TODO: have a separate config for modelId
-        model_id: config?.devToolsConsoleInsights.aidaModelId ?? undefined,
+        temperature: config?.devToolsFreestylerDogfood.aidaTemperature ?? 0,
+        model_id: config?.devToolsFreestylerDogfood.aidaModelId ?? undefined,
       },
       metadata: {
         // TODO: enable logging later.
         disable_user_content_logging: true,
       },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      functionality_type: Host.AidaClient.FunctionalityType.CHAT,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      client_feature: Host.AidaClient.ClientFeature.CHROME_FREESTYLER,
     };
     return request;
+  }
+
+  get #getHistoryEntry(): Array<HistoryChunk> {
+    return [...this.#chatHistory.values()].flat();
+  }
+
+  get chatHistoryForTesting(): Array<HistoryChunk> {
+    return this.#getHistoryEntry;
   }
 
   static parseResponse(response: string): {thought?: string, action?: string, answer?: string} {
@@ -175,30 +197,49 @@ export class FreestylerAgent {
     return {thought, action, answer};
   }
 
-  async #aidaFetch(request: Host.AidaClient.AidaRequest): Promise<string> {
-    let result;
+  async #aidaFetch(request: Host.AidaClient.AidaRequest): Promise<{response: string, rpcId: number|undefined}> {
+    let response = '';
+    let rpcId;
     for await (const lastResult of this.#aidaClient.fetch(request)) {
-      result = lastResult.explanation;
+      response = lastResult.explanation;
+      rpcId = lastResult.metadata.rpcGlobalId ?? rpcId;
     }
 
-    return result ?? '';
+    return {response, rpcId};
   }
 
   resetHistory(): void {
-    this.#chatHistory = [];
+    this.#chatHistory = new Map();
   }
 
-  async run(query: string, onStep: (data: StepData) => void): Promise<void> {
+  #runId = 0;
+  async * run(query: string, options?: {signal: AbortSignal}): AsyncGenerator<StepData, void, void> {
     const structuredLog = [];
     query = `QUERY: ${query}`;
+    const currentRunId = ++this.#runId;
+
+    options?.signal.addEventListener('abort', () => {
+      this.#chatHistory.delete(currentRunId);
+    });
     for (let i = 0; i < MAX_STEPS; i++) {
       const request =
-          FreestylerAgent.buildRequest(query, preamble, this.#chatHistory.length ? this.#chatHistory : undefined);
+          FreestylerAgent.buildRequest(query, preamble, this.#chatHistory.size ? this.#getHistoryEntry : undefined);
       let response: string;
+      let rpcId: number|undefined;
       try {
-        response = await this.#aidaFetch(request);
+        const fetchResult = await this.#aidaFetch(request);
+        response = fetchResult.response;
+        rpcId = fetchResult.rpcId;
       } catch (err) {
-        onStep({step: Step.ERROR, text: err.message});
+        if (options?.signal.aborted) {
+          break;
+        }
+
+        yield {step: Step.ERROR, text: err.message, rpcId};
+        break;
+      }
+
+      if (options?.signal.aborted) {
         break;
       }
 
@@ -207,43 +248,45 @@ export class FreestylerAgent {
         request: structuredClone(request),
         response: response,
       });
-
-      this.#chatHistory.push(
-          {
-            text: query,
-            entity: Host.AidaClient.Entity.USER,
-          },
-          {
-            text: response,
-            entity: Host.AidaClient.Entity.SYSTEM,
-          });
+      const currentRunEntries = this.#chatHistory.get(currentRunId) ?? [];
+      this.#chatHistory.set(currentRunId, [
+        ...currentRunEntries,
+        {
+          text: query,
+          entity: Host.AidaClient.Entity.USER,
+        },
+        {
+          text: response,
+          entity: Host.AidaClient.Entity.SYSTEM,
+        },
+      ]);
 
       const {thought, action, answer} = FreestylerAgent.parseResponse(response);
 
       if (!thought && !action && !answer) {
-        onStep({step: Step.ANSWER, text: 'Sorry, I could not help you with this query.'});
+        yield {step: Step.ANSWER, text: 'Sorry, I could not help you with this query.', rpcId};
         break;
       }
 
       if (answer) {
-        onStep({step: Step.ANSWER, text: answer});
+        yield {step: Step.ANSWER, text: answer, rpcId};
         break;
       }
 
       if (thought) {
-        onStep({step: Step.THOUGHT, text: thought});
+        yield {step: Step.THOUGHT, text: thought, rpcId};
       }
 
       if (action) {
         debugLog(`Action to execute: ${action}`);
-        const observation = await executeJsCode(`{${action};((typeof data !== "undefined") ? data : undefined)}`);
+        const observation = await this.#execJs(`{${action};((typeof data !== "undefined") ? data : undefined)}`);
         debugLog(`Action result: ${observation}`);
-        onStep({step: Step.ACTION, code: action, output: observation});
+        yield {step: Step.ACTION, code: action, output: observation, rpcId};
         query = `OBSERVATION: ${observation}`;
       }
 
       if (i === MAX_STEPS - 1) {
-        onStep({step: Step.ERROR, text: 'Max steps reached, please try again.'});
+        yield {step: Step.ERROR, text: 'Max steps reached, please try again.'};
       }
     }
     if (isDebugMode()) {

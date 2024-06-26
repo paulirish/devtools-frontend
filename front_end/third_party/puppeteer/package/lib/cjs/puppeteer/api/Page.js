@@ -279,20 +279,20 @@ let Page = (() => {
          * the selector, the return value resolves to `null`.
          *
          * @param selector -
-         * {@link https://pptr.dev/guides/page-interactions#query-selectors | selector}
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
          * to query page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
-         * {@link https://pptr.dev/guides/page-interactions#p-selectors | Puppeteer-specific seletor syntax}
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
          * allows quering by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
          * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
          * and
-         * {@link https://pptr.dev/guides/page-interactions#-and--combinators | combining these queries across shadow roots}.
-         * Alternatively, you can specify a selector type using a prefix
-         * {@link https://pptr.dev/guides/page-interactions#built-in-selectors | prefix}.
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          *
          * @remarks
          *
@@ -306,20 +306,20 @@ let Page = (() => {
          * match the selector, the return value resolves to `[]`.
          *
          * @param selector -
-         * {@link https://pptr.dev/guides/page-interactions#query-selectors | selector}
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
          * to query page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
-         * {@link https://pptr.dev/guides/page-interactions#p-selectors | Puppeteer-specific seletor syntax}
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
          * allows quering by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
          * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
          * and
-         * {@link https://pptr.dev/guides/page-interactions#-and--combinators | combining these queries across shadow roots}.
-         * Alternatively, you can specify a selector type using a prefix
-         * {@link https://pptr.dev/guides/page-interactions#built-in-selectors | prefix}.
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          *
          * @remarks
          *
@@ -440,20 +440,20 @@ let Page = (() => {
          * ```
          *
          * @param selector -
-         * {@link https://pptr.dev/guides/page-interactions#query-selectors | selector}
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
          * to query page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
-         * {@link https://pptr.dev/guides/page-interactions#p-selectors | Puppeteer-specific seletor syntax}
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
          * allows quering by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
          * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
          * and
-         * {@link https://pptr.dev/guides/page-interactions#-and--combinators | combining these queries across shadow roots}.
-         * Alternatively, you can specify a selector type using a prefix
-         * {@link https://pptr.dev/guides/page-interactions#built-in-selectors | prefix}.
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - the function to be evaluated in the page context.
          * Will be passed the result of the element matching the selector as its
          * first argument.
@@ -513,20 +513,20 @@ let Page = (() => {
          * ```
          *
          * @param selector -
-         * {@link https://pptr.dev/guides/page-interactions#query-selectors | selector}
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
          * to query page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
-         * {@link https://pptr.dev/guides/page-interactions#p-selectors | Puppeteer-specific seletor syntax}
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
          * allows quering by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
          * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
          * and
-         * {@link https://pptr.dev/guides/page-interactions#-and--combinators | combining these queries across shadow roots}.
-         * Alternatively, you can specify a selector type using a prefix
-         * {@link https://pptr.dev/guides/page-interactions#built-in-selectors | prefix}.
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - the function to be evaluated in the page context.
          * Will be passed an array of matching elements as its first argument.
          * @param args - any additional arguments to pass through to `pageFunction`.
@@ -642,14 +642,14 @@ let Page = (() => {
          *   {@link Page.setDefaultTimeout} method.
          */
         waitForRequest(urlOrPredicate, options = {}) {
-            const { timeout: ms = this._timeoutSettings.timeout() } = options;
+            const { timeout: ms = this._timeoutSettings.timeout(), signal } = options;
             if (typeof urlOrPredicate === 'string') {
                 const url = urlOrPredicate;
                 urlOrPredicate = (request) => {
                     return request.url() === url;
                 };
             }
-            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "request" /* PageEvent.Request */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "request" /* PageEvent.Request */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed!');
             }))));
             return (0, rxjs_js_1.firstValueFrom)(observable$);
@@ -682,14 +682,14 @@ let Page = (() => {
          *   the {@link Page.setDefaultTimeout} method.
          */
         waitForResponse(urlOrPredicate, options = {}) {
-            const { timeout: ms = this._timeoutSettings.timeout() } = options;
+            const { timeout: ms = this._timeoutSettings.timeout(), signal } = options;
             if (typeof urlOrPredicate === 'string') {
                 const url = urlOrPredicate;
                 urlOrPredicate = (response) => {
                     return response.url() === url;
                 };
             }
-            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "response" /* PageEvent.Response */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "response" /* PageEvent.Response */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed!');
             }))));
             return (0, rxjs_js_1.firstValueFrom)(observable$);
@@ -707,13 +707,13 @@ let Page = (() => {
          * @internal
          */
         waitForNetworkIdle$(options = {}) {
-            const { timeout: ms = this._timeoutSettings.timeout(), idleTime = util_js_1.NETWORK_IDLE_TIME, concurrency = 0, } = options;
+            const { timeout: ms = this._timeoutSettings.timeout(), idleTime = util_js_1.NETWORK_IDLE_TIME, concurrency = 0, signal, } = options;
             return this.#inflight$.pipe((0, rxjs_js_1.switchMap)(inflight => {
                 if (inflight > concurrency) {
                     return rxjs_js_1.EMPTY;
                 }
                 return (0, rxjs_js_1.timer)(idleTime);
-            }), (0, rxjs_js_1.map)(() => { }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            }), (0, rxjs_js_1.map)(() => { }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed!');
             }))));
         }
@@ -729,13 +729,13 @@ let Page = (() => {
          * ```
          */
         async waitForFrame(urlOrPredicate, options = {}) {
-            const { timeout: ms = this.getDefaultTimeout() } = options;
+            const { timeout: ms = this.getDefaultTimeout(), signal } = options;
             if ((0, util_js_1.isString)(urlOrPredicate)) {
                 urlOrPredicate = (frame) => {
                     return urlOrPredicate === frame.url();
                 };
             }
-            return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.merge)((0, util_js_1.fromEmitterEvent)(this, "frameattached" /* PageEvent.FrameAttached */), (0, util_js_1.fromEmitterEvent)(this, "framenavigated" /* PageEvent.FrameNavigated */), (0, rxjs_js_1.from)(this.frames())).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.first)(), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.merge)((0, util_js_1.fromEmitterEvent)(this, "frameattached" /* PageEvent.FrameAttached */), (0, util_js_1.fromEmitterEvent)(this, "framenavigated" /* PageEvent.FrameNavigated */), (0, rxjs_js_1.from)(this.frames())).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.first)(), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed.');
             })))));
         }
@@ -1073,15 +1073,7 @@ let Page = (() => {
                                 ...scrollDimensions,
                             });
                             stack.defer(async () => {
-                                if (viewport) {
-                                    await this.setViewport(viewport).catch(util_js_1.debugError);
-                                }
-                                else {
-                                    await this.setViewport({
-                                        width: 0,
-                                        height: 0,
-                                    }).catch(util_js_1.debugError);
-                                }
+                                await this.setViewport(viewport).catch(util_js_1.debugError);
                             });
                         }
                     }

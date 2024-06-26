@@ -1714,7 +1714,8 @@
       inherited: true,
       field_template: "keyword",
       include_paths: ["third_party/blink/renderer/platform/text/writing_mode.h"],
-      keywords: ["horizontal-tb", "vertical-rl", "vertical-lr"],
+      keywords: ["horizontal-tb", "vertical-rl", "vertical-lr",
+                 "sideways-rl", "sideways-lr"],
       typedom_types: ["Keyword"],
       default_value: "horizontal-tb",
       type_name: "WritingMode",
@@ -2614,6 +2615,7 @@
       // Storage for this property also covers these legacy properties:
       // page-break-after, -webkit-column-break-after
       field_template: "keyword",
+      field_group: "*",
       keywords: [
         "auto", "avoid", "avoid-column", "avoid-page", "column", "left", "page",
         "recto", "right", "verso"
@@ -2629,6 +2631,7 @@
       // Storage for this property also covers these legacy properties:
       // page-break-before, -webkit-column-break-before
       field_template: "keyword",
+      field_group: "*",
       keywords: [
         "auto", "avoid", "avoid-column", "avoid-page", "column", "left", "page",
         "recto", "right", "verso"
@@ -2644,6 +2647,7 @@
       // Storage for this property also covers these legacy properties:
       // page-break-inside, -webkit-column-break-inside
       field_template: "keyword",
+      field_group: "*",
       keywords: ["auto", "avoid", "avoid-column", "avoid-page"],
       typedom_types: ["Keyword"],
       default_value: "auto",
@@ -2891,6 +2895,7 @@
       computed_style_custom_functions: ["getter"],
       style_builder_custom_functions: ["initial", "inherit", "value"],
       valid_for_marker: true,
+      valid_for_page_context: true,
       supports_incremental_style: true,
     },
     {
@@ -4603,7 +4608,7 @@
       invalidate: ["layout"],
     },
     {
-      name: "reading-order-items",
+      name: "reading-flow",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       field_group: "*",
       field_template: "keyword",
@@ -4611,7 +4616,7 @@
       typedom_types: ["Keyword"],
       default_value: "normal",
       invalidate: ["layout"],
-      runtime_flag: "CSSReadingOrderItems",
+      runtime_flag: "CSSReadingFlow",
     },
     {
       name: "resize",
@@ -5890,6 +5895,7 @@
       keywords: ["baseline", "sub", "super", "text-top", "text-bottom", "middle"],
       valid_for_first_letter: true,
       valid_for_first_line: true,
+      valid_for_page_context: true,
     },
     {
       name: "view-timeline-axis",

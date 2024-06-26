@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '00b3ce0aadb3827aa59227a7a4c89e33e787886f',
+  'build_revision': '7c98ce06eff74ceda8662fbce98dc91dc9dab0fe',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '7817c353d060281937d1c8b59004af11dcc95884',
+  'buildtools_revision': '94d7b86a83537f8a7db7dccb0bf885739f7a81aa',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '66df2a3ec70d0628d47df1fdba69838a870a1303',
+  'depot_tools_revision': '7e547050e88a1642434b40c8264c268ec167c4eb',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
@@ -34,19 +34,19 @@ vars = {
   'cmake_version': 'version:2@3.21.3',
 
   'llvm_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/',
-  'llvm_revision': 'c08d3b08f6d71e974537de226c68d4c94c396a46',
+  'llvm_revision': '3c51ea3619e488db19cd26840ed46d58cfc7062f',
 
   'lldb_eval_url': 'https://chromium.googlesource.com/external/github.com/google/lldb-eval.git',
   'lldb_eval_revision': 'e87123a7e639bf1d86f24c37079570fb7fa00b72',
 
   # ninja CIPD package version.
-  # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
-  'ninja_version': 'version:2@1.11.1.chromium.6',
+  # https://chrome-infra-packages.appspot.com/p/infra/3pp/build_support/ninja-1_11_1/
+  'ninja_version': 'version:2@1.11.1.chromium.2',
 
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '128.0.6543.0',
+  'chrome': '128.0.6548.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -144,7 +144,7 @@ deps = {
   'third_party/ninja': {
     'packages': [
       {
-        'package': 'infra/3pp/tools/ninja/${{platform}}',
+        'package': 'infra/3pp/build_support/ninja-1_11_1/${{platform}}',
         'version': Var('ninja_version'),
       }
     ],

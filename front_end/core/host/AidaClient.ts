@@ -6,6 +6,7 @@ import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
+import {type SyncInformation} from './InspectorFrontendHostAPI.js';
 import {bindOutputStream} from './ResourceLoader.js';
 
 export enum Entity {
@@ -17,6 +18,24 @@ export enum Entity {
 export interface Chunk {
   text: string;
   entity: Entity;
+}
+
+export enum FunctionalityType {
+  // Unspecified functionality type.
+  FUNCTIONALITY_TYPE_UNSPECIFIED = 0,
+  // The generic AI chatbot functionality.
+  CHAT = 1,
+  // The explain error functionality.
+  EXPLAIN_ERROR = 2,
+}
+
+export enum ClientFeature {
+  // Unspecified client feature.
+  CLIENT_FEATURE_UNSPECIFIED = 0,
+  // Chrome console insights feature.
+  CHROME_CONSOLE_INSIGHTS = 1,
+  // Chrome freestyler.
+  CHROME_FREESTYLER = 2,
 }
 
 export interface AidaRequest {
@@ -34,6 +53,10 @@ export interface AidaRequest {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     disable_user_content_logging: boolean,
   };
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  functionality_type?: FunctionalityType;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  client_feature?: ClientFeature;
 }
 
 export interface AidaResponse {
@@ -43,11 +66,20 @@ export interface AidaResponse {
   };
 }
 
+export enum AidaAvailability {
+  AVAILABLE = 'available',
+  NO_ACCOUNT_EMAIL = 'no-account-email',
+  NO_ACTIVE_SYNC = 'no-active-sync',
+  NO_INTERNET = 'no-internet',
+}
+
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
     const request: AidaRequest = {
       input,
       client: 'CHROME_DEVTOOLS',
+      functionality_type: FunctionalityType.EXPLAIN_ERROR,
+      client_feature: ClientFeature.CHROME_CONSOLE_INSIGHTS,
     };
     const config = Common.Settings.Settings.instance().getHostConfig();
     let temperature = NaN;
@@ -73,6 +105,24 @@ export class AidaClient {
       };
     }
     return request;
+  }
+
+  static async getAidaClientAvailability(): Promise<AidaAvailability> {
+    if (!navigator.onLine) {
+      return AidaAvailability.NO_INTERNET;
+    }
+
+    const syncInfo = await new Promise<SyncInformation>(
+        resolve => InspectorFrontendHostInstance.getSyncInformation(syncInfo => resolve(syncInfo)));
+    if (!syncInfo.accountEmail) {
+      return AidaAvailability.NO_ACCOUNT_EMAIL;
+    }
+
+    if (!syncInfo.isSyncActive) {
+      return AidaAvailability.NO_ACTIVE_SYNC;
+    }
+
+    return AidaAvailability.AVAILABLE;
   }
 
   async * fetch(request: AidaRequest): AsyncGenerator<AidaResponse, void, void> {

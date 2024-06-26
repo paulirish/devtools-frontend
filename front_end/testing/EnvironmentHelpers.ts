@@ -131,6 +131,7 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
   Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
   Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
+  Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -285,6 +286,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.ELEMENTS, 'show-css-property-documentation-on-hover', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.NONE, 'freestyler-dogfood-consent-onboarding-finished', false,
         Common.Settings.SettingType.BOOLEAN),
   ];
 
@@ -497,6 +501,8 @@ export function getGetHostConfigStub(config: RecursivePartial<Root.Runtime.HostC
       ...config.devToolsConsoleInsights,
     } as Root.Runtime.HostConfigConsoleInsights,
     devToolsFreestylerDogfood: {
+      aidaModelId: '',
+      aidaTemperature: 0,
       enabled: false,
       ...config.devToolsFreestylerDogfood,
     },

@@ -7,6 +7,7 @@ import {LabelPlacementEngine} from '../../third_party/label-placement-engine/lab
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import * as Components from './components/components.js';
+import {LAYOUT_SHIFT_SYNTHETIC_DURATION} from './LayoutShiftsTrackAppender.js';
 import {type TimelineFlameChartDataProvider} from './TimelineFlameChartDataProvider.js';
 import {type TimelineFlameChartNetworkDataProvider} from './TimelineFlameChartNetworkDataProvider.js';
 
@@ -43,6 +44,15 @@ export interface EntrySelected {
 }
 
 /**
+ * Represents an object created when a user creates a label for an entry in the timeline.
+ */
+export interface EntryLabel {
+  type: 'ENTRY_LABEL';
+  entry: OverlayEntry;
+  label: string;
+}
+
+/**
  * Represents a time range on the trace. Also used when the user shift+clicks
  * and drags to create a time range.
  */
@@ -56,7 +66,7 @@ export interface TimeRangeLabel {
 /**
  * All supported overlay types. Expected to grow in time!
  */
-export type TimelineOverlay = EntrySelected|TimeRangeLabel;
+export type TimelineOverlay = EntrySelected|TimeRangeLabel|EntryLabel;
 
 /**
  * To be able to draw overlays accurately at the correct pixel position, we
@@ -165,7 +175,15 @@ export class Overlays {
         selfTime: TraceEngine.Types.Timing.MicroSeconds(0),
       };
     }
-
+    if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShift(entry)) {
+      const endTime = TraceEngine.Types.Timing.MicroSeconds(entry.ts + LAYOUT_SHIFT_SYNTHETIC_DURATION);
+      return {
+        endTime,
+        duration: LAYOUT_SHIFT_SYNTHETIC_DURATION,
+        startTime: entry.ts,
+        selfTime: TraceEngine.Types.Timing.MicroSeconds(0),
+      };
+    }
     return TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(entry);
   }
 
@@ -296,7 +314,6 @@ export class Overlays {
       const element = existingElement || this.#createElementForNewOverlay(overlay);
       if (existingElement) {
         this.#updateOverlayElementIfRequired(overlay, element);
-
       } else {
         // This is a new overlay, so we have to store the element and add it to the DOM.
         this.#overlaysToElements.set(overlay, element);
@@ -325,7 +342,22 @@ export class Overlays {
         }
         break;
       }
-
+      case 'ENTRY_LABEL': {
+        if (this.entryIsVisibleOnChart(overlay.entry)) {
+          element.style.visibility = 'visible';
+          const entryDimensions = this.#positionEntryLabelOverlay(overlay, element);
+          const component = element.querySelector('devtools-entry-label-overlay');
+          if (component && entryDimensions) {
+            component.entryDimensions = entryDimensions;
+          } else {
+            element.style.visibility = 'hidden';
+            console.error('Cannot calculate entry width and height values required to draw a label overlay.');
+          }
+        } else {
+          element.style.visibility = 'hidden';
+        }
+        break;
+      }
       default: {
         Platform.TypeScriptUtilities.assertNever(overlay, `Unknown overlay: ${JSON.stringify(overlay)}`);
       }
@@ -347,6 +379,40 @@ export class Overlays {
     element.style.left = `${leftEdgePixel}px`;
     element.style.width = `${rangeWidth}px`;
   }
+
+  /**
+   * Positions an EntryLabel overlay
+   * @param overlay - the EntrySelected overlay that we need to position.
+   * @param element - the DOM element representing the overlay
+   */
+  #positionEntryLabelOverlay(overlay: EntryLabel, element: HTMLElement): {height: number, width: number}|null {
+    const chartName = this.#chartForOverlayEntry(overlay.entry);
+    const x = this.xPixelForEventOnChart(overlay.entry);
+    const y = this.yPixelForEventOnChart(overlay.entry);
+    const {endTime} = this.#timingsForOverlayEntry(overlay.entry);
+    const endX = this.#xPixelForMicroSeconds(chartName, endTime);
+
+    if (x === null || y === null || endX === null) {
+      return null;
+    }
+
+    const entryHeight = this.pixelHeightForEventOnChart(overlay.entry) ?? 0;
+
+    // The width of the overlay is by default the width of the entry. However
+    // we modify that for instant events like LCP markers, and also ensure a
+    // minimum width.
+    const widthPixels = endX - x;
+
+    // The part of the overlay that draws a box around an entry is always at least 2px wide.
+    const entryWidth = Math.max(2, widthPixels);
+    // Position the start of label overlay at the start of the entry + length of connector + legth of the label element
+    element.style.top = `${y - Components.EntryLabelOverlay.EntryLabelOverlay.LABEL_AND_CONNECTOR_HEIGHT}px`;
+    // Position the start of the entry label overlay in the the middle of the entry.
+    element.style.left = `${x + entryWidth / 2}px`;
+
+    return {height: entryHeight, width: entryWidth};
+  }
+
   /**
    * Positions an EntrySelected overlay. As we extend the list of overlays,
    * some of the code in here around positioning may be re-used elsewhere.
@@ -450,14 +516,27 @@ export class Overlays {
   #createElementForNewOverlay(overlay: TimelineOverlay): HTMLElement {
     const div = document.createElement('div');
     div.classList.add('overlay-item', `overlay-type-${overlay.type}`);
-    if (overlay.type === 'TIME_RANGE') {
-      const component = new Components.TimeRangeOverlay.TimeRangeOverlay();
-      component.duration = overlay.showDuration ? overlay.bounds.range : null;
-      component.label = overlay.label;
-      component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
-      div.appendChild(component);
+    switch (overlay.type) {
+      case 'ENTRY_LABEL': {
+        const component = new Components.EntryLabelOverlay.EntryLabelOverlay(overlay.label);
+        component.addEventListener(Components.EntryLabelOverlay.EmptyEntryLabelRemoveEvent.eventName, () => {
+          this.remove(overlay);
+        });
+        div.appendChild(component);
+        return div;
+      }
+      case 'TIME_RANGE': {
+        const component = new Components.TimeRangeOverlay.TimeRangeOverlay();
+        component.duration = overlay.showDuration ? overlay.bounds.range : null;
+        component.label = overlay.label;
+        component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
+        div.appendChild(component);
+        return div;
+      }
+      default: {
+        return div;
+      }
     }
-    return div;
   }
 
   /**
@@ -476,6 +555,11 @@ export class Overlays {
           component.label = overlay.label;
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
         }
+        break;
+      }
+      case 'ENTRY_LABEL': {
+        // TODO: update if the label changes
+        // Nothing to do here.
         break;
       }
       default:

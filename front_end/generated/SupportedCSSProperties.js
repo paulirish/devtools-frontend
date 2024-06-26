@@ -2809,7 +2809,7 @@ export const generatedProperties = [
    "grid-columns",
    "grid-order"
   ],
-  "name": "reading-order-items"
+  "name": "reading-flow"
  },
  {
   "keywords": [
@@ -3728,7 +3728,9 @@ export const generatedProperties = [
   "keywords": [
    "horizontal-tb",
    "vertical-rl",
-   "vertical-lr"
+   "vertical-lr",
+   "sideways-rl",
+   "sideways-lr"
   ],
   "name": "writing-mode"
  },
@@ -5242,7 +5244,7 @@ export const generatedPropertyValues = {
    "none"
   ]
  },
- "reading-order-items": {
+ "reading-flow": {
   "values": [
    "normal",
    "flex-visual",
@@ -5784,7 +5786,9 @@ export const generatedPropertyValues = {
   "values": [
    "horizontal-tb",
    "vertical-rl",
-   "vertical-lr"
+   "vertical-lr",
+   "sideways-rl",
+   "sideways-lr"
   ]
  },
  "z-index": {

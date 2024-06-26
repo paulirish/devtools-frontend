@@ -16,7 +16,6 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {CountersGraph} from './CountersGraph.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
-import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
 import {Overlays, type TimeRangeLabel} from './Overlays.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {TimelineDetailsView} from './TimelineDetailsView.js';
@@ -66,6 +65,8 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private readonly countersView: CountersGraph;
   private readonly detailsSplitWidget: UI.SplitWidget.SplitWidget;
   private readonly detailsView: TimelineDetailsView;
+  private readonly onMainAnnotateEntry: (event: Common.EventTarget.EventTargetEvent<number>) => void;
+  private readonly onNetworkAnnotateEntry: (event: Common.EventTarget.EventTargetEvent<number>) => void;
   private readonly onMainEntrySelected: (event: Common.EventTarget.EventTargetEvent<number>) => void;
   private readonly onNetworkEntrySelected: (event: Common.EventTarget.EventTargetEvent<number>) => void;
   readonly #boundRefreshAfterIgnoreList: () => void;
@@ -181,6 +182,13 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.detailsSplitWidget.setSidebarWidget(this.detailsView);
     this.detailsSplitWidget.show(this.element);
 
+    this.onMainAnnotateEntry = this.onAnnotateEntry.bind(this, this.mainDataProvider);
+    this.onNetworkAnnotateEntry = this.onAnnotateEntry.bind(this, this.networkDataProvider);
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS)) {
+      this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.AnnotateEntry, this.onMainAnnotateEntry, this);
+      this.networkFlameChart.addEventListener(
+          PerfUI.FlameChart.Events.AnnotateEntry, this.onNetworkAnnotateEntry, this);
+    }
     this.onMainEntrySelected = this.onEntrySelected.bind(this, this.mainDataProvider);
     this.onNetworkEntrySelected = this.onEntrySelected.bind(this, this.networkDataProvider);
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.EntrySelected, this.onMainEntrySelected, this);
@@ -326,7 +334,6 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.#selectedEvents = null;
     this.mainDataProvider.setModel(newTraceEngineData, isCpuProfile);
     this.networkDataProvider.setModel(newTraceEngineData);
-    ExtensionDataGatherer.instance().modelChanged(newTraceEngineData);
     this.#reset();
     this.updateSearchResults(false, false);
     this.refreshMainFlameChart();
@@ -464,6 +471,23 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       this.#overlays.add({
         type: 'ENTRY_SELECTED',
         entry: selection.object,
+      });
+      this.#overlays.update();
+    }
+  }
+
+  private onAnnotateEntry(
+      dataProvider: TimelineFlameChartDataProvider|TimelineFlameChartNetworkDataProvider,
+      event: Common.EventTarget.EventTargetEvent<number>): void {
+    const selection = dataProvider.createSelection(event.data);
+    if (selection &&
+        (TimelineSelection.isTraceEventSelection(selection.object) ||
+         TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selection.object))) {
+      this.setSelection(selection);
+      this.#overlays.add({
+        type: 'ENTRY_LABEL',
+        entry: selection.object,
+        label: '',
       });
       this.#overlays.update();
     }

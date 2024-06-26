@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -14,7 +15,7 @@ import {
   type Props as FreestylerChatUiProps,
   State as FreestylerChatUiState,
 } from './components/FreestylerChatUi.js';
-import {FreestylerAgent, type StepData} from './FreestylerAgent.js';
+import {FreestylerAgent, Step} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
 
 /*
@@ -31,6 +32,14 @@ const TempUIStrings = {
    *@description Freestyler UI text for sending feedback.
    */
   sendFeedback: 'Send feedback',
+  /**
+   *@description Freestyelr UI text for the help button.
+   */
+  help: 'Help',
+  /**
+   *@description Displayed when the user stop the response
+   */
+  stoppedResponse: 'You stopped this response',
 };
 
 // TODO(nvitkov): b/346933425
@@ -58,8 +67,7 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   rightToolbar.appendSeparator();
   const feedbackButton =
       new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.sendFeedback), 'bug', undefined, 'freestyler.feedback');
-  const helpButton =
-      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.sendFeedback), 'help', undefined, 'freestyler.help');
+  const helpButton = new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.help), 'help', undefined, 'freestyler.help');
   rightToolbar.appendToolbarItem(feedbackButton);
   rightToolbar.appendToolbarItem(helpButton);
 }
@@ -89,25 +97,35 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #agent: FreestylerAgent;
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
-  private constructor(private view: View = defaultView) {
+  #consentViewAcceptedSetting =
+      Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
+  constructor(private view: View = defaultView, {aidaClient, aidaAvailability}: {
+    aidaClient: Host.AidaClient.AidaClient,
+    aidaAvailability: Host.AidaClient.AidaAvailability,
+  }) {
     super(FreestylerPanel.panelName);
 
     createToolbar(this.contentElement, {onClearClick: this.#clearMessages.bind(this)});
     this.#toggleSearchElementAction =
         UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
-    this.#aidaClient = new Host.AidaClient.AidaClient();
+    this.#aidaClient = aidaClient;
     this.#contentContainer = this.contentElement.createChild('div', 'freestyler-chat-ui-container');
     this.#agent = new FreestylerAgent({aidaClient: this.#aidaClient});
     this.#selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
     this.#viewProps = {
-      state: FreestylerChatUiState.CHAT_VIEW,
+      state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
+                                                      FreestylerChatUiState.CONSENT_VIEW,
+      aidaAvailability,
       messages: [],
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
       selectedNode: this.#selectedNode,
+      isLoading: false,
       onTextSubmit: this.#handleTextSubmit.bind(this),
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
+      onRateClick: this.#handleRateClick.bind(this),
+      onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
+      onCancelClick: this.#cancel.bind(this),
     };
-
     this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.Toggled, ev => {
       this.#viewProps.inspectElementToggled = ev.data;
       this.doUpdate();
@@ -119,19 +137,19 @@ export class FreestylerPanel extends UI.Panel.Panel {
       }
 
       this.#viewProps.selectedNode = ev.data;
-      this.#agent.resetHistory();
       this.#clearMessages();
-      this.doUpdate();
     });
     this.doUpdate();
   }
 
-  static instance(opts: {
+  static async instance(opts: {
     forceNew: boolean|null,
-  }|undefined = {forceNew: null}): FreestylerPanel {
+  }|undefined = {forceNew: null}): Promise<FreestylerPanel> {
     const {forceNew} = opts;
     if (!freestylerPanelInstance || forceNew) {
-      freestylerPanelInstance = new FreestylerPanel();
+      const aidaAvailability = await Host.AidaClient.AidaClient.getAidaClientAvailability();
+      const aidaClient = new Host.AidaClient.AidaClient();
+      freestylerPanelInstance = new FreestylerPanel(defaultView, {aidaClient, aidaAvailability});
     }
 
     return freestylerPanelInstance;
@@ -150,6 +168,16 @@ export class FreestylerPanel extends UI.Panel.Panel {
     void this.#toggleSearchElementAction.execute();
   }
 
+  #handleRateClick(): void {
+    // TODO(348145480): Handle this -- e.g. there be dragons.
+  }
+
+  #handleAcceptConsentClick(): void {
+    this.#consentViewAcceptedSetting.set(true);
+    this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW;
+    this.doUpdate();
+  }
+
   handleAction(actionId: string): void {
     switch (actionId) {
       case 'freestyler.element-panel-context': {
@@ -165,11 +193,19 @@ export class FreestylerPanel extends UI.Panel.Panel {
     }
   }
 
-  // TODO(ergunsh): Handle cancelling agent run.
   #clearMessages(): void {
     this.#viewProps.messages = [];
-    this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW;
+    this.#viewProps.isLoading = false;
     this.#agent.resetHistory();
+    this.#cancel();
+    this.doUpdate();
+  }
+
+  #runAbortController = new AbortController();
+  #cancel(): void {
+    this.#runAbortController.abort();
+    this.#runAbortController = new AbortController();
+    this.#viewProps.isLoading = false;
     this.doUpdate();
   }
 
@@ -178,23 +214,37 @@ export class FreestylerPanel extends UI.Panel.Panel {
       entity: ChatMessageEntity.USER,
       text,
     });
-    this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW_LOADING;
-    this.doUpdate();
-
+    this.#viewProps.isLoading = true;
     const systemMessage: ChatMessage = {
       entity: ChatMessageEntity.MODEL,
       steps: [],
     };
-
     this.#viewProps.messages.push(systemMessage);
-    await this.#agent.run(text, (data: StepData) => {
-      if (this.#viewProps.state === FreestylerChatUiState.CHAT_VIEW_LOADING) {
-        this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW;
+    this.doUpdate();
+
+    this.#runAbortController = new AbortController();
+
+    const signal = this.#runAbortController.signal;
+    signal.addEventListener('abort', () => {
+      systemMessage.steps.push({step: Step.ERROR, text: i18nString(TempUIStrings.stoppedResponse)});
+    });
+    for await (const data of this.#agent.run(text, {signal})) {
+      if (data.step === Step.ANSWER || data.step === Step.ERROR) {
+        this.#viewProps.isLoading = false;
+      }
+
+      // There can be multiple steps from the same call from the agent.
+      // We want to show `rate answer` buttons for the full response.
+      // That's why we're removing the `rpcId` from the previous step
+      // if there is a new incoming step from the call with the same rpcId.
+      const lastStep = systemMessage.steps.at(-1);
+      if (lastStep && lastStep.rpcId && lastStep.rpcId === data.rpcId) {
+        delete lastStep.rpcId;
       }
 
       systemMessage.steps.push(data);
       this.doUpdate();
-    });
+    }
   }
 }
 
