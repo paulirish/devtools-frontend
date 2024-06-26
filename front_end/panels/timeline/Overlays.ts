@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 import * as Platform from '../../core/platform/platform.js';
 import * as TraceEngine from '../../models/trace/trace.js';
+import {LabelPlacementEngine} from '../../third_party/label-placement-engine/label-placement-engine.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import * as Components from './components/components.js';
@@ -138,12 +139,15 @@ export class Overlays {
    */
   #overlaysContainer: HTMLElement;
 
+  #labelPlacementEngine: LabelPlacementEngine;
+
   constructor(init: {
     container: HTMLElement,
     charts: TimelineCharts,
   }) {
     this.#overlaysContainer = init.container;
     this.#charts = init.charts;
+    this.#labelPlacementEngine = new LabelPlacementEngine();
   }
 
   /**
