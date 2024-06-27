@@ -10,6 +10,8 @@ import * as Spec from './web-vitals-injected/spec/spec.js';
 
 const LIVE_METRICS_WORLD_NAME = 'live_metrics_world';
 
+let liveMetricsInstance: LiveMetrics;
+
 class InjectedScript {
   static #injectedScript?: string;
   static async get(): Promise<string> {
@@ -26,11 +28,40 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   #target?: SDK.Target.Target;
   #scriptIdentifier?: Protocol.Page.ScriptIdentifier;
   #lastResetContextId?: Protocol.Runtime.ExecutionContextId;
+  #lcpValue?: LCPValue;
+  #clsValue?: CLSValue;
+  #inpValue?: INPValue;
+  #interactions: InteractionValue[] = [];
   #mutex = new Common.Mutex.Mutex();
 
-  constructor() {
+  private constructor() {
     super();
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
+  }
+
+  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): LiveMetrics {
+    const {forceNew} = opts;
+    if (!liveMetricsInstance || forceNew) {
+      liveMetricsInstance = new LiveMetrics();
+    }
+
+    return liveMetricsInstance;
+  }
+
+  get lcpValue(): LCPValue|undefined {
+    return this.#lcpValue;
+  }
+
+  get clsValue(): CLSValue|undefined {
+    return this.#clsValue;
+  }
+
+  get inpValue(): INPValue|undefined {
+    return this.#inpValue;
+  }
+
+  get interactions(): InteractionValue[] {
+    return this.#interactions;
   }
 
   /**
@@ -66,11 +97,43 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     return domModel.pushObjectAsNodeToFrontend(remoteObject);
   }
 
+  async #refreshNode(domModel: SDK.DOMModel.DOMModel, node: SDK.DOMModel.DOMNode):
+      Promise<SDK.DOMModel.DOMNode|undefined> {
+    const backendNodeId = node.backendNodeId();
+    const nodes = await domModel.pushNodesByBackendIdsToFrontend(new Set([backendNodeId]));
+    return nodes?.get(backendNodeId) || undefined;
+  }
+
+  /**
+   * If there is a document update then any node handles we have already resolved will be invalid.
+   * This function should re-resolve any relevant DOM nodes after a document update.
+   */
+  async #onDocumentUpdate(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMModel>): Promise<void> {
+    const domModel = event.data;
+
+    if (this.lcpValue?.node) {
+      this.lcpValue.node = await this.#refreshNode(domModel, this.lcpValue.node);
+    }
+
+    for (const interaction of this.interactions) {
+      if (interaction.node) {
+        interaction.node = await this.#refreshNode(domModel, interaction.node);
+      }
+    }
+
+    this.dispatchEventToListeners(Events.Status, {
+      lcp: this.#lcpValue,
+      cls: this.#clsValue,
+      inp: this.#inpValue,
+      interactions: this.#interactions,
+    });
+  }
+
   async #handleWebVitalsEvent(
       webVitalsEvent: Spec.WebVitalsEvent, executionContextId: Protocol.Runtime.ExecutionContextId): Promise<void> {
     switch (webVitalsEvent.name) {
       case 'LCP': {
-        const lcpEvent: LCPChangeEvent = {
+        const lcpEvent: LCPValue = {
           value: webVitalsEvent.value,
           rating: webVitalsEvent.rating,
         };
@@ -81,50 +144,51 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
           }
         }
 
-        this.dispatchEventToListeners(Events.LCPChanged, lcpEvent);
+        this.#lcpValue = lcpEvent;
         break;
       }
       case 'CLS': {
-        this.dispatchEventToListeners(Events.CLSChanged, {
+        const event: CLSValue = {
           value: webVitalsEvent.value,
           rating: webVitalsEvent.rating,
-        });
+        };
+        this.#clsValue = event;
         break;
       }
       case 'INP': {
-        const inpEvent: INPChangeEvent = {
+        const inpEvent: INPValue = {
           value: webVitalsEvent.value,
           rating: webVitalsEvent.rating,
-          interactionType: webVitalsEvent.interactionType,
         };
-        if (webVitalsEvent.nodeIndex !== undefined) {
-          const node = await this.#resolveDomNode(webVitalsEvent.nodeIndex, executionContextId);
-          if (node) {
-            inpEvent.node = node;
-          }
-        }
-
-        this.dispatchEventToListeners(Events.INPChanged, inpEvent);
+        this.#inpValue = inpEvent;
         break;
       }
       case 'Interaction': {
-        const {nodeIndex, ...rest} = webVitalsEvent;
-        const interactionEvent: InteractionEvent = rest;
-        if (nodeIndex !== undefined) {
-          const node = await this.#resolveDomNode(nodeIndex, executionContextId);
+        const interactionEvent: InteractionValue = webVitalsEvent;
+        if (webVitalsEvent.nodeIndex !== undefined) {
+          const node = await this.#resolveDomNode(webVitalsEvent.nodeIndex, executionContextId);
           if (node) {
             interactionEvent.node = node;
           }
         }
 
-        this.dispatchEventToListeners(Events.Interaction, interactionEvent);
+        this.#interactions.push(interactionEvent);
         break;
       }
       case 'reset': {
-        this.dispatchEventToListeners(Events.Reset);
+        this.#lcpValue = undefined;
+        this.#clsValue = undefined;
+        this.#inpValue = undefined;
+        this.#interactions = [];
         break;
       }
     }
+    this.dispatchEventToListeners(Events.Status, {
+      lcp: this.#lcpValue,
+      cls: this.#clsValue,
+      inp: this.#inpValue,
+      interactions: this.#interactions,
+    });
   }
 
   async #onBindingCalled(event: {data: Protocol.Runtime.BindingCalledEvent}): Promise<void> {
@@ -155,20 +219,27 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     if (target !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
       return;
     }
-    void this.enable(target);
+    void this.#enable(target);
   }
 
   targetRemoved(target: SDK.Target.Target): void {
     if (target !== SDK.TargetManager.TargetManager.instance().primaryPageTarget()) {
       return;
     }
-    void this.disable();
+    void this.#disable();
   }
 
-  async enable(target: SDK.Target.Target): Promise<void> {
+  async #enable(target: SDK.Target.Target): Promise<void> {
     if (this.#target) {
       return;
     }
+
+    const domModel = target.model(SDK.DOMModel.DOMModel);
+    if (!domModel) {
+      return;
+    }
+
+    domModel.addEventListener(SDK.DOMModel.Events.DocumentUpdated, this.#onDocumentUpdate, this);
 
     const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
     if (!runtimeModel) {
@@ -194,14 +265,23 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     this.#target = target;
   }
 
-  async disable(): Promise<void> {
+  async #disable(): Promise<void> {
     if (!this.#target) {
       return;
     }
 
     const runtimeModel = this.#target.model(SDK.RuntimeModel.RuntimeModel);
-    if (!runtimeModel) {
-      return;
+    if (runtimeModel) {
+      await runtimeModel.removeBinding({
+        name: Spec.EVENT_BINDING_NAME,
+      });
+
+      runtimeModel.removeEventListener(SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
+    }
+
+    const domModel = this.#target.model(SDK.DOMModel.DOMModel);
+    if (domModel) {
+      domModel.removeEventListener(SDK.DOMModel.Events.DocumentUpdated, this.#onDocumentUpdate, this);
     }
 
     if (this.#scriptIdentifier) {
@@ -210,47 +290,36 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       });
     }
 
-    await runtimeModel.removeBinding({
-      name: Spec.EVENT_BINDING_NAME,
-    });
-
-    runtimeModel.removeEventListener(SDK.RuntimeModel.Events.BindingCalled, this.#onBindingCalled, this);
-
     this.#target = undefined;
   }
 }
 
 export const enum Events {
-  LCPChanged = 'lcp_changed',
-  CLSChanged = 'cls_changed',
-  INPChanged = 'inp_changed',
-  Interaction = 'interaction',
-  Reset = 'reset',
+  Status = 'status',
 }
 
-export type MetricChangeEvent = Pick<Spec.MetricChangeEvent, 'value'|'rating'>;
+export type MetricValue = Pick<Spec.MetricChangeEvent, 'value'|'rating'>;
 
 export type Rating = Spec.MetricChangeEvent['rating'];
 
-export interface LCPChangeEvent extends MetricChangeEvent {
+export interface LCPValue extends MetricValue {
   node?: SDK.DOMModel.DOMNode;
 }
 
-export interface INPChangeEvent extends MetricChangeEvent {
-  interactionType: Spec.INPChangeEvent['interactionType'];
-  node?: SDK.DOMModel.DOMNode;
-}
+export type INPValue = MetricValue;
+export type CLSValue = MetricValue;
 
-export type CLSChangeEvent = MetricChangeEvent;
-
-export type InteractionEvent = Pick<Spec.InteractionEvent, 'rating'|'interactionType'|'duration'>&{
+export type InteractionValue = Pick<Spec.InteractionEvent, 'rating'|'interactionType'|'duration'>&{
   node?: SDK.DOMModel.DOMNode,
 };
 
+export interface StatusEvent {
+  lcp?: LCPValue;
+  cls?: CLSValue;
+  inp?: INPValue;
+  interactions: InteractionValue[];
+}
+
 type EventTypes = {
-  [Events.LCPChanged]: LCPChangeEvent,
-  [Events.CLSChanged]: CLSChangeEvent,
-  [Events.INPChanged]: INPChangeEvent,
-  [Events.Interaction]: InteractionEvent,
-  [Events.Reset]: void,
+  [Events.Status]: StatusEvent,
 };

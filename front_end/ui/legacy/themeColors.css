@@ -433,6 +433,13 @@
    */
   --app-color-navigation-drawer-label-selected: var(--sys-color-on-surface);
   --app-color-navigation-drawer-background-selected: var(--ref-palette-primary95);
+
+  /**
+   * Colors for performance panel metric ratings.
+   */
+  --app-color-performance-bad: var(--color-error-bright);
+  --app-color-performance-ok: var(--color-orange-bright);
+  --app-color-performance-good: var(--sys-color-green-bright);
 }
 
 :root.baseline-default {
@@ -446,6 +453,13 @@
    * Color for navigation drawers.
    */
   --app-color-navigation-drawer-label-selected: var(--sys-color-primary);
+
+  &.theme-with-dark-background {
+    /**
+    * Color for navigation drawers.
+    */
+    --app-color-navigation-drawer-label-selected: var(--sys-color-surface);
+  }
 }
 
 :root.baseline-grayscale {
@@ -463,7 +477,7 @@
   --sys-color-surface: var(--ref-palette-neutral100);
   --sys-color-cdt-base-container: var(--ref-palette-neutral100);
 
-  &.-theme-with-dark-background {
+  &.theme-with-dark-background {
     --sys-color-surface5: color-mix(in sRGB, #d1e1ff 14%, var(--ref-palette-neutral10));
     --sys-color-surface4: color-mix(in sRGB, #d1e1ff 12%, var(--ref-palette-neutral10));
     --sys-color-surface3: color-mix(in sRGB, #d1e1ff 11%, var(--ref-palette-neutral10));
@@ -476,7 +490,7 @@
   }
 }
 
-.-theme-with-dark-background {
+.theme-with-dark-background {
   --color-primary-old: rgb(138 180 248);
   --color-primary-variant: rgb(102 157 246);
   --color-background: rgb(32 33 36);
@@ -859,6 +873,6 @@
   /**
    * Colors for navigation drawers.
    */
-  --app-color-navigation-drawer-label-selected: var(--ref-palette-primary70);
-  --app-color-navigation-drawer-background-selected: var(--sys-color-surface);
+  --app-color-navigation-drawer-label-selected: var(--sys-color-surface);
+  --app-color-navigation-drawer-background-selected: var(--ref-palette-primary70);
 }

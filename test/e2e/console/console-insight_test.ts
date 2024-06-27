@@ -30,11 +30,10 @@ describe('ConsoleInsight', function() {
         enabled: true,
         optIn: false,
       },
-      devToolsConsoleInsightsDogfood: {
+      devToolsFreestylerDogfood: {
         aidaModelId: 'modelB',
         aidaTemperature: 222,
         enabled: false,
-        optIn: false,
       },
     };
     const mergedConfig: Root.Runtime.HostConfig = {

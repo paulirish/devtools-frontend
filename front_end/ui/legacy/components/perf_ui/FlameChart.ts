@@ -29,12 +29,13 @@
  */
 
 import * as Common from '../../../../core/common/common.js';
+import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as Root from '../../../../core/root/root.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../components/buttons/buttons.js';
+import type * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -201,6 +202,15 @@ interface GroupTreeNode {
   children: GroupTreeNode[];
 }
 
+export interface OptionalFlameChartConfig {
+  /**
+   * The FlameChart will highlight the entry that is selected by default. In
+   * some cases (Performance Panel) we manage this ourselves with the Overlays
+   * system, so we disable the built in one.
+   */
+  selectedElementOutline?: boolean;
+  groupExpansionSetting?: Common.Settings.Setting<GroupExpansionState>;
+}
 export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements Calculator, ChartViewportDelegate {
   private readonly groupExpansionSetting?: Common.Settings.Setting<GroupExpansionState>;
@@ -217,7 +227,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private readonly markerHighlighElement: HTMLElement;
   readonly highlightElement: HTMLElement;
   readonly revealDescendantsArrowHighlightElement: HTMLElement;
-  private readonly selectedElement: HTMLElement;
+  private readonly selectedElement: HTMLElement|null = null;
   private rulerEnabled: boolean;
   private barHeight: number;
   // Additional space around an entry that is added for operations with entry.
@@ -270,16 +280,21 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   // Stored because we cache this value to save extra lookups and layoffs.
   #canvasBoundingClientRect: DOMRect|null = null;
+  #selectedElementOutlineEnabled = true;
 
   constructor(
       dataProvider: FlameChartDataProvider, flameChartDelegate: FlameChartDelegate,
-      groupExpansionSetting?: Common.Settings.Setting<GroupExpansionState>) {
+      optionalConfig: OptionalFlameChartConfig = {}) {
     super(true);
     this.#font = `${DEFAULT_FONT_SIZE} ${getFontFamilyForCanvas()}`;
     this.registerRequiredCSS(flameChartStyles);
     this.contentElement.classList.add('flame-chart-main-pane');
-    this.groupExpansionSetting = groupExpansionSetting;
-    this.groupExpansionState = groupExpansionSetting && groupExpansionSetting.get() || {};
+    if (typeof optionalConfig.selectedElementOutline === 'boolean') {
+      this.#selectedElementOutlineEnabled = optionalConfig.selectedElementOutline;
+    }
+
+    this.groupExpansionSetting = optionalConfig.groupExpansionSetting;
+    this.groupExpansionState = optionalConfig.groupExpansionSetting?.get() || {};
     this.groupHiddenState = {};
     this.flameChartDelegate = flameChartDelegate;
 
@@ -308,14 +323,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.highlightElement = this.viewportElement.createChild('div', 'flame-chart-highlight-element');
     this.revealDescendantsArrowHighlightElement =
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
-    this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
 
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS)) {
-      // When this experiment is enabled the new Overlays system is
-      // used to render the selected entry outline, so hide this one.
-      // Once the overlay is ready we can remove this.selectedElement
-      // entirely.
-      this.selectedElement.style.display = 'none';
+    if (this.#selectedElementOutlineEnabled) {
+      this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     }
 
     this.canvas.addEventListener('focus', () => {
@@ -788,10 +798,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
           this.#selectGroup(groupIndex);
 
           const timelineData = this.timelineData();
+          const isMetaOrControl = Host.Platform.isMac() ? mouseEvent.metaKey : mouseEvent.ctrlKey;
           if (mouseEvent.shiftKey && this.highlightedEntryIndex !== -1 && timelineData) {
             const start = timelineData.entryStartTimes[this.highlightedEntryIndex];
             const end = start + timelineData.entryTotalTimes[this.highlightedEntryIndex];
             this.chartViewport.setRangeSelection(start, end);
+          } else if (isMetaOrControl && this.highlightedEntryIndex !== -1 && timelineData) {
+            this.dispatchEventToListeners(Events.AnnotateEntry, this.highlightedEntryIndex);
           } else {
             this.chartViewport.onClick(mouseEvent);
             this.dispatchEventToListeners(Events.EntryInvoked, this.highlightedEntryIndex);
@@ -1986,6 +1999,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     this.updateElementPosition(this.highlightElement, this.highlightedEntryIndex);
     this.updateElementPosition(this.selectedElement, this.selectedEntryIndex);
+
     if (this.#searchResultEntryIndex !== -1) {
       this.showPopoverForSearchResult(this.#searchResultEntryIndex);
     }
@@ -3424,7 +3438,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
    * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
    */
-  private updateElementPosition(element: Element, entryIndex: number, isDecoration?: boolean): void {
+  private updateElementPosition(element: Element|null, entryIndex: number, isDecoration?: boolean): void {
+    if (!element) {
+      return;
+    }
     const elementMinWidthPx = 2;
     element.classList.add('hidden');
     if (entryIndex === -1) {
@@ -3518,9 +3535,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   /**
    * Returns the visibility of a level in the.
    * flame chart.
-   * Now this function is only used for tests.
    */
-  levelVisibilityForTest(level: number): boolean {
+  levelIsVisible(level: number): boolean {
     if (!this.visibleLevels) {
       throw new Error('No level visiblibities');
     }
@@ -3761,6 +3777,8 @@ export interface FlameChartDataProvider {
 
   totalTime(): number;
 
+  setVisualElementLoggingParent?(parent: VisualLogging.Loggable): void;
+
   formatValue(value: number, precision?: number): string;
 
   maxStackDepth(): number;
@@ -3824,6 +3842,8 @@ export const enum Events {
    * away from any events)
    */
   EntryInvoked = 'EntryInvoked',
+  // Emmited when annotate entry shortcut is clicked.
+  AnnotateEntry = 'AnnotateEntry',
   /**
    * Emitted when an event is selected via keyboard navigation using the arrow
    * keys.
@@ -3846,6 +3866,7 @@ export const enum Events {
 }
 
 export type EventTypes = {
+  [Events.AnnotateEntry]: number,
   [Events.CanvasFocused]: number|void,
   [Events.EntryInvoked]: number,
   [Events.EntrySelected]: number,
@@ -3871,6 +3892,7 @@ export interface Group {
   style: GroupStyle;
   /** Should be turned on if the track supports user editable stacks. */
   showStackContextMenu?: boolean;
+  jslogContext?: string;
 }
 
 export interface GroupStyle {

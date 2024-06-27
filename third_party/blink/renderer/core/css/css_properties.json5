@@ -438,7 +438,8 @@
     // - name_for_methods: "BlendMode"
     // Tweaks how we choose defaults for getter, setter, initial and type_name.
     // For example, setting this to BlendMode will make us use a setter of
-    // setBlendMode
+    // SetBlendMode. Note that 'name_for_methods' also determines the name
+    // of the generated field on ComputedStyle.
     // - initial
     // The static function to invoke on ComputedStyleInitialValues
     // or FontBuilder to retrieve the initial value.
@@ -1714,7 +1715,8 @@
       inherited: true,
       field_template: "keyword",
       include_paths: ["third_party/blink/renderer/platform/text/writing_mode.h"],
-      keywords: ["horizontal-tb", "vertical-rl", "vertical-lr"],
+      keywords: ["horizontal-tb", "vertical-rl", "vertical-lr",
+                 "sideways-rl", "sideways-lr"],
       typedom_types: ["Keyword"],
       default_value: "horizontal-tb",
       type_name: "WritingMode",
@@ -2614,6 +2616,7 @@
       // Storage for this property also covers these legacy properties:
       // page-break-after, -webkit-column-break-after
       field_template: "keyword",
+      field_group: "*",
       keywords: [
         "auto", "avoid", "avoid-column", "avoid-page", "column", "left", "page",
         "recto", "right", "verso"
@@ -2629,6 +2632,7 @@
       // Storage for this property also covers these legacy properties:
       // page-break-before, -webkit-column-break-before
       field_template: "keyword",
+      field_group: "*",
       keywords: [
         "auto", "avoid", "avoid-column", "avoid-page", "column", "left", "page",
         "recto", "right", "verso"
@@ -2644,6 +2648,7 @@
       // Storage for this property also covers these legacy properties:
       // page-break-inside, -webkit-column-break-inside
       field_template: "keyword",
+      field_group: "*",
       keywords: ["auto", "avoid", "avoid-column", "avoid-page"],
       typedom_types: ["Keyword"],
       default_value: "auto",
@@ -2891,6 +2896,7 @@
       computed_style_custom_functions: ["getter"],
       style_builder_custom_functions: ["initial", "inherit", "value"],
       valid_for_marker: true,
+      valid_for_page_context: true,
       supports_incremental_style: true,
     },
     {
@@ -3622,6 +3628,7 @@
       style_builder_custom_functions: ["value"],
       keywords: ["none"],
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     {
       name: "list-style-position",
@@ -4603,7 +4610,7 @@
       invalidate: ["layout"],
     },
     {
-      name: "reading-order-items",
+      name: "reading-flow",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       field_group: "*",
       field_template: "keyword",
@@ -4611,7 +4618,7 @@
       typedom_types: ["Keyword"],
       default_value: "normal",
       invalidate: ["layout"],
-      runtime_flag: "CSSReadingOrderItems",
+      runtime_flag: "CSSReadingFlow",
     },
     {
       name: "resize",
@@ -5013,38 +5020,6 @@
       computable: false,
     },
     {
-      name: "scroll-start-block",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->start",
-      field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/style/scroll_start_data.h"],
-      default_value: "blink::ScrollStartData()",
-      type_name: "ScrollStartData",
-      logical_property_group : {
-        name: "scroll-start",
-        resolver: "block"
-      },
-      keywords: ["auto", "start", "end", "center", "top", "bottom", "left", "right"],
-      typedom_types: ["Keyword", "Length", "Percentage"],
-      runtime_flag: "CSSScrollStart",
-    },
-    {
-      name: "scroll-start-inline",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->start",
-      field_template: "external",
-      include_paths: ["third_party/blink/renderer/core/style/scroll_start_data.h"],
-      default_value: "blink::ScrollStartData()",
-      type_name: "ScrollStartData",
-      logical_property_group : {
-        name: "scroll-start",
-        resolver: "inline"
-      },
-      keywords: ["auto", "start", "end", "center", "top", "bottom", "left", "right"],
-      typedom_types: ["Keyword", "Length", "Percentage"],
-      runtime_flag: "CSSScrollStart",
-    },
-    {
       name: "scroll-start-x",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*->start",
@@ -5072,36 +5047,6 @@
         name: "scroll-start",
         resolver: "vertical"
       },
-      runtime_flag: "CSSScrollStart",
-    },
-    {
-      name: "scroll-start-target-block",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->target",
-      field_template: "keyword",
-      default_value: "none",
-      type_name: "EScrollStartTarget",
-      logical_property_group: {
-        name: "scroll-start-target",
-        resolver: "block",
-      },
-      keywords: ["none", "auto"],
-      typedom_types: ["Keyword"],
-      runtime_flag: "CSSScrollStart",
-    },
-    {
-      name: "scroll-start-target-inline",
-      property_methods: ["ParseSingleValue"],
-      field_group: "*->target",
-      field_template: "keyword",
-      default_value: "none",
-      type_name: "EScrollStartTarget",
-      logical_property_group: {
-        name: "scroll-start-target",
-        resolver: "inline",
-      },
-      keywords: ["none", "auto"],
-      typedom_types: ["Keyword"],
       runtime_flag: "CSSScrollStart",
     },
     {
@@ -5296,6 +5241,7 @@
       keywords: ["none"],
       typedom_types: ["Keyword"],
       invalidate: ["paint", "stroke"],
+      affected_by_zoom: true,
     },
     {
       name: "stroke-dashoffset",
@@ -5310,6 +5256,7 @@
       converter: "ConvertLength",
       typedom_types: ["Length", "Percentage"],
       invalidate: ["paint"],
+      affected_by_zoom: true,
     },
     {
       name: "stroke-linecap",
@@ -5381,6 +5328,7 @@
       valid_for_highlight_legacy: true,
       valid_for_highlight: true,
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     {
       name: "table-layout",
@@ -5620,6 +5568,7 @@
       typedom_types: ["Length", "Percentage"],
       valid_for_page_context: true,
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     {
       name: "text-overflow",
@@ -5657,6 +5606,7 @@
       valid_for_formatted_text_run: true,
       valid_for_page_context: true,
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     {
       name: "text-size-adjust",
@@ -5739,6 +5689,7 @@
       valid_for_highlight: true,
       valid_for_page_context: true,
       invalidate: ["text-decoration"],
+      affected_by_zoom: true,
     },
     {
       name: "text-underline-position",
@@ -5952,6 +5903,7 @@
       keywords: ["baseline", "sub", "super", "text-top", "text-bottom", "middle"],
       valid_for_first_letter: true,
       valid_for_first_line: true,
+      valid_for_page_context: true,
     },
     {
       name: "view-timeline-axis",
@@ -6101,6 +6053,7 @@
       converter: "ConvertComputedLength<short>",
       valid_for_first_letter: true,
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     {
       name: "-webkit-border-image",
@@ -6124,6 +6077,7 @@
       converter: "ConvertComputedLength<short>",
       valid_for_first_letter: true,
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     // For valid values of box-align see
     // http://www.w3.org/TR/2009/WD-css3-flexbox-20090723/#alignment
@@ -6140,6 +6094,7 @@
     },
     {
       name: "-webkit-box-decoration-break",
+      name_for_methods: "WebkitBoxDecorationBreak",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       field_group: "box",
       field_template: "keyword",
@@ -6722,6 +6677,7 @@
       valid_for_highlight_legacy: true,
       valid_for_highlight: true,
       invalidate: ["layout", "paint"],
+      affected_by_zoom: true,
     },
     {
       name: "-webkit-transform-origin-x",
@@ -6903,6 +6859,7 @@
       valid_for_marker: true,
       valid_for_permission_element: true,
       valid_for_page_context: true,
+      affected_by_zoom: true,
     },
     {
       name: "z-index",
@@ -7106,6 +7063,42 @@
       },
       typedom_types: ["Length", "Percentage"],
       valid_for_page_context: true,
+    },
+    {
+      name: "scroll-start-block",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group : {
+        name: "scroll-start",
+        resolver: "block"
+      },
+      runtime_flag: "CSSScrollStart",
+    },
+    {
+      name: "scroll-start-inline",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group : {
+        name: "scroll-start",
+        resolver: "inline"
+      },
+      runtime_flag: "CSSScrollStart",
+    },
+    {
+      name: "scroll-start-target-block",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group: {
+        name: "scroll-start-target",
+        resolver: "block",
+      },
+      runtime_flag: "CSSScrollStart",
+    },
+    {
+      name: "scroll-start-target-inline",
+      property_methods: ["ParseSingleValue"],
+      logical_property_group: {
+        name: "scroll-start-target",
+        resolver: "inline",
+      },
+      runtime_flag: "CSSScrollStart",
     },
     {
       name: "border-inline-start-width",

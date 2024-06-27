@@ -200,6 +200,7 @@ export class GeneratedRangeBuilder {
   };
 
   start(line: number, column: number, options?: {
+    isScope?: boolean,
     definition?: {sourceIdx: number, scopeIdx: number},
     callsite?: {sourceIdx: number, line: number, column: number},
     bindings?: (number|{line: number, column: number, nameIdx: number}[])[],
@@ -219,6 +220,9 @@ export class GeneratedRangeBuilder {
     }
     if (options?.callsite) {
       flags |= SDK.SourceMapScopes.EncodedGeneratedRangeFlag.HasCallsite;
+    }
+    if (options?.isScope) {
+      flags |= SDK.SourceMapScopes.EncodedGeneratedRangeFlag.IsScope;
     }
     this.#encodedRange += encodeVlq(flags);
 
@@ -254,8 +258,8 @@ export class GeneratedRangeBuilder {
         continue;
       }
 
-      this.#encodedRange += encodeVlq(bindings[0].nameIdx);
       this.#encodedRange += encodeVlq(-bindings.length);
+      this.#encodedRange += encodeVlq(bindings[0].nameIdx);
       if (bindings[0].line !== line || bindings[0].column !== column) {
         throw new Error('First binding line/column must match the range start line/column');
       }

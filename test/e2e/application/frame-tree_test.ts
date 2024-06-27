@@ -14,6 +14,7 @@ import {
   pressKey,
   waitFor,
   waitForFunction,
+  waitForNone,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
@@ -21,6 +22,7 @@ import {
   getFrameTreeTitles,
   getTrimmedTextContent,
   navigateToApplicationTab,
+  navigateToServiceWorkers,
 } from '../helpers/application-helpers.js';
 import {setIgnoreListPattern} from '../helpers/settings-helpers.js';
 
@@ -35,6 +37,7 @@ const EXPAND_STACKTRACE_BUTTON_SELECTOR = '.arrow-icon-button';
 const STACKTRACE_ROW_SELECTOR = '.stack-trace-row';
 const STACKTRACE_ROW_LINK_SELECTOR = '.stack-trace-row .link';
 const APPLICATION_PANEL_SELECTED_SELECTOR = '.tabbed-pane-header-tab.selected[aria-label="Application"]';
+const UNREGISTER_SERVICE_WORKER_SELECTOR = '[title="Unregister service worker"]';
 
 const getTrailingURL = (text: string) => {
   const match = text.match(/http.*$/);
@@ -74,14 +77,6 @@ const getFieldValuesTextContent = async () => {
 };
 
 describe('The Application Tab', () => {
-  afterEach(async () => {
-    const {target} = getBrowserAndPages();
-    await target.evaluate(async () => {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(registration => registration.unregister()));
-    });
-  });
-
   // Update and reactivate when the whole FrameDetailsView is a custom component
   it.skip('[crbug.com/1519420]: shows details for a frame when clicked on in the frame tree', async () => {
     const {target} = getBrowserAndPages();
@@ -286,6 +281,13 @@ describe('The Application Tab', () => {
       'None',
     ];
     assert.deepEqual(fieldValuesTextContent, expected);
+
+    // Unregister service worker to prevent leftovers from causing test errors.
+    void pressKey('ArrowUp');
+    void pressKey('ArrowLeft');
+    await navigateToServiceWorkers();
+    await click(UNREGISTER_SERVICE_WORKER_SELECTOR);
+    await waitForNone(UNREGISTER_SERVICE_WORKER_SELECTOR);
   });
 
   // Update and reactivate when the whole FrameDetailsView is a custom component
