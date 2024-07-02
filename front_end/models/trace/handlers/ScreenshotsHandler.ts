@@ -51,7 +51,7 @@ export async function finalize(): Promise<void> {
       pid,
       tid,
       // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot was adjusted to the right/later
-      ts: getPresentationTimestamp(snapshotEvent),
+      ts: snapshotEvent.ts,  // getPresentationTimestamp(snapshotEvent),
       args: {
         dataUri: `data:image/jpg;base64,${snapshotEvent.args.snapshot}`,
       },
