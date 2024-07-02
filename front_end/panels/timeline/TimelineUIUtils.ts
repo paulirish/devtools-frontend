@@ -1192,12 +1192,7 @@ export class TimelineUIUtils {
       contentHelper.appendElementRow('', filmStripPreview);
       // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
     }
-    const viewport = traceParseData.Meta.viewportRect;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx || !viewport) {
-      return;
-    }
+
     const shift = event;
 
     const screenshot = image;
@@ -1221,36 +1216,68 @@ export class TimelineUIUtils {
         [];
     // }
 
-    canvas.width = screenshot.width;
-    canvas.height = screenshot.height;
-    ctx.save();
-    ctx.drawImage(screenshot, 0, 0, screenshot.width, screenshot.height);
+    const viewport = traceParseData.Meta.viewportRect;
 
-    for (const currentRect of affectedElementsCurrentRects) {
-      ctx.beginPath();
+    function canvasOverlay() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx || !viewport) {
+        return;
+      }
 
-      // Map the node's dimensions and coordinates from the viewport
-      // dimensions to the screenshot dimensions.
-      const mappedRectX = currentRect.x * canvas.width / viewport.width;
-      const mappedRectY = currentRect.y * canvas.height / viewport.height;
-      const mappedRectWidth = currentRect.width * canvas.width / viewport.width;
-      const mappedRectHeight = currentRect.height * canvas.height / viewport.height;
-      ctx.fillStyle = 'rgba(132, 48, 206, 0.5)';
-      ctx.strokeStyle = 'rgb(132, 48, 206)';
-      ctx.lineWidth = 2;
+      canvas.width = screenshot.width;
+      canvas.height = screenshot.height;
+      ctx.save();
+      ctx.drawImage(screenshot, 0, 0, screenshot.width, screenshot.height);
 
-      ctx.fillRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
-      ctx.strokeRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
-      ctx.restore();
+      for (const currentRect of affectedElementsCurrentRects) {
+        ctx.beginPath();
+
+        // Map the node's dimensions and coordinates from the viewport
+        // dimensions to the screenshot dimensions.
+        const mappedRectX = currentRect.x * canvas.width / viewport.width;
+        const mappedRectY = currentRect.y * canvas.height / viewport.height;
+        const mappedRectWidth = currentRect.width * canvas.width / viewport.width;
+        const mappedRectHeight = currentRect.height * canvas.height / viewport.height;
+        ctx.fillStyle = 'rgba(132, 48, 206, 0.5)';
+        ctx.strokeStyle = 'rgb(132, 48, 206)';
+        ctx.lineWidth = 2;
+
+        ctx.fillRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
+        ctx.strokeRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
+        ctx.restore();
+      }
+      shift.screenshot = new Image();
+      shift.screenshot.src = canvas.toDataURL();
+
+      const overlayEl = document.createElement('div');
+      overlayEl.classList.add('timeline-filmstrip-preview');
+      overlayEl.appendChild(shift.screenshot);
+      contentHelper.appendElementRow('', overlayEl);
     }
-    shift.screenshot = new Image();
-    shift.screenshot.src = canvas.toDataURL();
+    // canvasOverlay();
 
-    const overlayEl = document.createElement('div');
-    overlayEl.classList.add('timeline-filmstrip-preview');
-    overlayEl.appendChild(shift.screenshot);
-    contentHelper.appendElementRow('', overlayEl);
+    // write a version of canvasOverlay that uses DOM elements for the mappedRects instead of canvas.
+    const screenshotContainer = image.parentNode;
+    screenshotContainer.style.position = 'relative';
+    for (const currentRect of affectedElementsCurrentRects) {
+      const rectEl = document.createElement('div');
+      rectEl.classList.add('timeline-filmstrip-preview-rect');
+      const mappedRectX = currentRect.x * image.width / viewport.width;
+      const mappedRectY = currentRect.y * image.height / viewport.height;
+      const mappedRectWidth = currentRect.width * image.width / viewport.width;
+      const mappedRectHeight = currentRect.height * image.height / viewport.height;
+      rectEl.style.left = `${mappedRectX}px`;
+      rectEl.style.top = `${mappedRectY}px`;
+      rectEl.style.width = `${mappedRectWidth}px`;
+      rectEl.style.height = `${mappedRectHeight}px`;
+      rectEl.style.border = '2px solid rgb(132, 48, 206)';
+      rectEl.style.backgroundColor = 'rgba(132, 48, 206, 0.5)';
+      rectEl.style.position = 'absolute';
+      screenshotContainer.appendChild(rectEl);
+    }
   }
+
 
 
   static buildDetailsNodeForMarkerEvents(event: TraceEngine.Types.TraceEvents.MarkerEvent): HTMLElement {
