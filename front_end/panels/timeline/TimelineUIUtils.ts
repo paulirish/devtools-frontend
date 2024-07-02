@@ -1180,13 +1180,13 @@ export class TimelineUIUtils {
       traceParseData:
           Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
       Promise<void> {
-    const screenshotSource = event.parsedData.screenshotSource;
+    const screenshots = event.parsedData.screenshots;
     let image: HTMLImageElement;
 
-    if (screenshotSource) {
+    if (screenshots.old) {
       const filmStripPreview = document.createElement('div');
       filmStripPreview.classList.add('timeline-filmstrip-preview');
-      image = await UI.UIUtils.loadImage(screenshotSource);
+      image = await UI.UIUtils.loadImage(screenshots.old.args.dataUri);
 
       if (image)
         filmStripPreview.appendChild(image);
@@ -1262,6 +1262,17 @@ export class TimelineUIUtils {
     }
     // canvasOverlay();
 
+
+    const newImage = await UI.UIUtils.loadImage(screenshots.new.args.dataUri);
+    if (newImage) {
+      newImage.style.opacity = '0';
+      newImage.style.position = 'absolute';
+      newImage.style.top = '0';
+      newImage.style.left = '0';
+      newImage.style.transition = 'all 1s';
+      image.parentNode.appendChild(newImage);
+    }
+
     // write a version of canvasOverlay that uses DOM elements for the mappedRects instead of canvas.
     const screenshotContainer = image.parentNode;
     screenshotContainer.style.position = 'relative';
@@ -1285,6 +1296,7 @@ export class TimelineUIUtils {
     });
 
     setTimeout(() => {
+      newImage.style.opacity = '1';
       rectEls.forEach((rectEl, i) => {
         const newRect = affectedElementsCurrentRects[i];
         const mappedRectX = newRect.x * image.width / viewport.width;

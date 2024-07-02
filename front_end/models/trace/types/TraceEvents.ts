@@ -838,8 +838,8 @@ interface LayoutShiftSessionWindowData {
   id: number;
 }
 export interface LayoutShiftParsedData {
-  /** Base64 encoding of the screenshot taken right after this shift. */
-  screenshotSource?: string;
+  /** screenshot taken before and after this shift. */
+  screenshots: {old: SyntheticScreenshot, new: SyntheticScreenshot};
   timeFromNavigation?: MicroSeconds;
   // The sum of the weighted scores of the shifts that
   // belong to a session window up until this shift

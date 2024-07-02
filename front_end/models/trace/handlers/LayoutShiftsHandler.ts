@@ -169,13 +169,15 @@ function updateTraceWindowMax(
   traceWindow.range = Types.Timing.MicroSeconds(traceWindow.max - traceWindow.min);
 }
 
-function findNextScreenshotSource(timestamp: Types.Timing.MicroSeconds): string|undefined {
+function findScreenshots(timestamp: Types.Timing.MicroSeconds): any {
   const screenshots = screenshotsHandlerData();
   const screenshotIndex = findNextScreenshotEventIndex(screenshots, timestamp);
   if (!screenshotIndex) {
     return undefined;
   }
-  return screenshots[screenshotIndex].args.dataUri;
+  return {
+    new: screenshots[screenshotIndex], old: screenshots[screenshotIndex - 1] ?? undefined,
+  }
 }
 
 export function findNextScreenshotEventIndex(
@@ -343,7 +345,7 @@ async function buildLayoutShiftsClusters(): Promise<void> {
                         },
                         parsedData: {
                           timeFromNavigation,
-                          screenshotSource: findNextScreenshotSource(event.ts),
+                          screenshots: findScreenshots(event.ts),
                           cumulativeWeightedScoreInWindow: currentCluster.clusterCumulativeScore,
                           // The score of the session window is temporarily set to 0 just
                           // to initialize it. Since we need to get the score of all shifts
