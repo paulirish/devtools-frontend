@@ -387,11 +387,11 @@ const UIStrings = {
   /**
    *@description Label for Cumulative Layout records, indicating where they moved from
    */
-  movedFrom: 'Moved from',
+  movedFrom: 'Moved <<<<',
   /**
    *@description Label for Cumulative Layout records, indicating where they moved to
    */
-  movedTo: 'Moved to',
+  movedTo: 'Moved >>>>',
   /**
    *@description Text that indicates a particular HTML element or node is related to what the user is viewing.
    */
@@ -1193,24 +1193,13 @@ export class TimelineUIUtils {
       contentHelper.appendElementRow('', filmStripPreview);
       // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
     }
+    if (!image)
+      return;
 
     const shift = event;
 
     const screenshot = image;
-    // if (!screenshot) {
-    //   continue;
-    // }
-    // let affectedElementsCurrentRects = shift.domNodeSources.map(node => node.currentRect);
-    // if (!affectedElementsCurrentRects.length) {
-    //   // If nodes haven't been collected from the backend and, thus,
-    //   // the domNodeSources array is empty, try to use the rect
-    //   // values from the trace event. This happens when running in
-    //   // tests environments where the relevant CDP methods aren't
-    //   // mocked.
-    //   const impactedNodes = shift.args.data?.impacted_nodes;
-    //   if (!impactedNodes || !impactedNodes.length) {
-    //     continue;
-    //   }
+
     const affectedElementsOldRects =
         shift.args.data?.impacted_nodes?.map(
             node => new DOMRect(node.old_rect[0], node.old_rect[1], node.old_rect[2], node.old_rect[3])) ??
@@ -1219,49 +1208,15 @@ export class TimelineUIUtils {
         shift.args.data?.impacted_nodes?.map(
             node => new DOMRect(node.new_rect[0], node.new_rect[1], node.new_rect[2], node.new_rect[3])) ??
         [];
-    // }
 
+
+
+    // TODO: we need to /= the rect values by the DPR
+    // see normalizeLayoutShiftImpactedNodes in Performance Insights impl. and https://crbug.com/1300309
     const viewport = traceParseData.Meta.viewportRect;
 
-    function canvasOverlay() {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx || !viewport) {
-        return;
-      }
-
-      canvas.width = screenshot.width;
-      canvas.height = screenshot.height;
-      ctx.save();
-      ctx.drawImage(screenshot, 0, 0, screenshot.width, screenshot.height);
-
-      for (const currentRect of affectedElementsCurrentRects) {
-        ctx.beginPath();
-
-        // Map the node's dimensions and coordinates from the viewport
-        // dimensions to the screenshot dimensions.
-        const mappedRectX = currentRect.x * canvas.width / viewport.width;
-        const mappedRectY = currentRect.y * canvas.height / viewport.height;
-        const mappedRectWidth = currentRect.width * canvas.width / viewport.width;
-        const mappedRectHeight = currentRect.height * canvas.height / viewport.height;
-        ctx.fillStyle = 'rgba(132, 48, 206, 0.5)';
-        ctx.strokeStyle = 'rgb(132, 48, 206)';
-        ctx.lineWidth = 2;
-
-        ctx.fillRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
-        ctx.strokeRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
-        ctx.restore();
-      }
-      shift.screenshot = new Image();
-      shift.screenshot.src = canvas.toDataURL();
-
-      const overlayEl = document.createElement('div');
-      overlayEl.classList.add('timeline-filmstrip-preview');
-      overlayEl.appendChild(shift.screenshot);
-      contentHelper.appendElementRow('', overlayEl);
-    }
-    // canvasOverlay();
-
+    if (!viewport)
+      return;
 
     const newImage = await UI.UIUtils.loadImage(screenshots.new.args.dataUri);
     if (newImage) {
