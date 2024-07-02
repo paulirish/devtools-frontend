@@ -1118,6 +1118,63 @@ export class TimelineUIUtils {
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(frame.url as Platform.DevToolsPath.UrlString, options);
   }
 
+  static async buildDetailsForLayoutShift(
+      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
+      unsafeEventData: any): Promise<void> {
+    const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
+    const layoutShiftEventData = layoutShift.args.data;
+    const screenshotSource = layoutShift.parsedData.screenshotSource
+
+    if (screenshotSource) {
+      const filmStripPreview = document.createElement('div');
+      filmStripPreview.classList.add('timeline-filmstrip-preview');
+      void UI.UIUtils.loadImage(screenshotSource).then(image => image && filmStripPreview.appendChild(image));
+      contentHelper.appendElementRow('', filmStripPreview);
+      // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
+    }
+
+    // function frameClicked(
+    //     filmStrip: TraceEngine.Extras.FilmStrip.Data, filmStripFrame: TraceEngine.Extras.FilmStrip.Frame): void {
+    //   PerfUI.FilmStripView.Dialog.fromFilmStrip(filmStrip, filmStripFrame.index);
+    // }
+
+    const warning = document.createElement('span');
+    const clsLink = UI.XLink.XLink.create(
+        'https://web.dev/cls/', i18nString(UIStrings.cumulativeLayoutShifts), undefined, undefined,
+        'cumulative-layout-shifts');
+    const evolvedClsLink = UI.XLink.XLink.create(
+        'https://web.dev/evolving-cls/', i18nString(UIStrings.evolvedClsLink), undefined, undefined, 'evolved-cls');
+
+    warning.appendChild(
+        i18n.i18n.getFormatLocalizedString(str_, UIStrings.sCLSInformation, {PH1: clsLink, PH2: evolvedClsLink}));
+    contentHelper.appendElementRow(i18nString(UIStrings.warning), warning, true);
+    if (!layoutShiftEventData) {
+      return;
+    }
+    contentHelper.appendTextRow(i18nString(UIStrings.score), layoutShiftEventData['score'].toPrecision(4));
+    contentHelper.appendTextRow(
+        i18nString(UIStrings.cumulativeScore), layoutShiftEventData['cumulative_score'].toPrecision(4));
+    contentHelper.appendTextRow(i18nString(UIStrings.currentClusterId), layoutShift.parsedData.sessionWindowData.id);
+    contentHelper.appendTextRow(
+        i18nString(UIStrings.currentClusterScore),
+        layoutShift.parsedData.sessionWindowData.cumulativeWindowScore.toPrecision(4));
+    contentHelper.appendTextRow(
+        i18nString(UIStrings.hadRecentInput),
+        unsafeEventData['had_recent_input'] ? i18nString(UIStrings.yes) : i18nString(UIStrings.no));
+
+    for (const impactedNode of unsafeEventData['impacted_nodes']) {
+      const oldRect = new CLSRect(impactedNode['old_rect']);
+      const newRect = new CLSRect(impactedNode['new_rect']);
+
+      const linkedOldRect = await Common.Linkifier.Linkifier.linkify(oldRect);
+      const linkedNewRect = await Common.Linkifier.Linkifier.linkify(newRect);
+
+      contentHelper.appendElementRow(i18nString(UIStrings.movedFrom), linkedOldRect);
+      contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
+    }
+  }
+
+
   static buildDetailsNodeForMarkerEvents(event: TraceEngine.Types.TraceEvents.MarkerEvent): HTMLElement {
     let link = 'https://web.dev/user-centric-performance-metrics/';
     let name = 'page performance metrics';
@@ -1552,59 +1609,7 @@ export class TimelineUIUtils {
           console.error('Unexpected type for LayoutShift event');
           break;
         }
-        const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
-        const layoutShiftEventData = layoutShift.args.data;
-        const screenshotSource = layoutShift.parsedData.screenshotSource
-
-        if (screenshotSource) {
-          const filmStripPreview = document.createElement('div');
-          filmStripPreview.classList.add('timeline-filmstrip-preview');
-          void UI.UIUtils.loadImage(screenshotSource).then(image => image && filmStripPreview.appendChild(image));
-          contentHelper.appendElementRow('', filmStripPreview);
-          // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
-        }
-
-        // function frameClicked(
-        //     filmStrip: TraceEngine.Extras.FilmStrip.Data, filmStripFrame: TraceEngine.Extras.FilmStrip.Frame): void {
-        //   PerfUI.FilmStripView.Dialog.fromFilmStrip(filmStrip, filmStripFrame.index);
-        // }
-
-        const warning = document.createElement('span');
-        const clsLink = UI.XLink.XLink.create(
-            'https://web.dev/cls/', i18nString(UIStrings.cumulativeLayoutShifts), undefined, undefined,
-            'cumulative-layout-shifts');
-        const evolvedClsLink = UI.XLink.XLink.create(
-            'https://web.dev/evolving-cls/', i18nString(UIStrings.evolvedClsLink), undefined, undefined, 'evolved-cls');
-
-        warning.appendChild(
-            i18n.i18n.getFormatLocalizedString(str_, UIStrings.sCLSInformation, {PH1: clsLink, PH2: evolvedClsLink}));
-        contentHelper.appendElementRow(i18nString(UIStrings.warning), warning, true);
-        if (!layoutShiftEventData) {
-          break;
-        }
-        contentHelper.appendTextRow(i18nString(UIStrings.score), layoutShiftEventData['score'].toPrecision(4));
-        contentHelper.appendTextRow(
-            i18nString(UIStrings.cumulativeScore), layoutShiftEventData['cumulative_score'].toPrecision(4));
-        contentHelper.appendTextRow(
-            i18nString(UIStrings.currentClusterId), layoutShift.parsedData.sessionWindowData.id);
-        contentHelper.appendTextRow(
-            i18nString(UIStrings.currentClusterScore),
-            layoutShift.parsedData.sessionWindowData.cumulativeWindowScore.toPrecision(4));
-        contentHelper.appendTextRow(
-            i18nString(UIStrings.hadRecentInput),
-            unsafeEventData['had_recent_input'] ? i18nString(UIStrings.yes) : i18nString(UIStrings.no));
-
-        for (const impactedNode of unsafeEventData['impacted_nodes']) {
-          const oldRect = new CLSRect(impactedNode['old_rect']);
-          const newRect = new CLSRect(impactedNode['new_rect']);
-
-          const linkedOldRect = await Common.Linkifier.Linkifier.linkify(oldRect);
-          const linkedNewRect = await Common.Linkifier.Linkifier.linkify(newRect);
-
-          contentHelper.appendElementRow(i18nString(UIStrings.movedFrom), linkedOldRect);
-          contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
-        }
-
+        await TimelineUIUtils.buildDetailsForLayoutShift(event, contentHelper, unsafeEventData);
         break;
       }
 
