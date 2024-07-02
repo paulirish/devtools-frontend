@@ -44,6 +44,7 @@ import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as ModificationsManager from '../../services/modifications_manager/modifications_manager.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
+import {currentCompletions} from '../../third_party/codemirror.next/codemirror.next.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css.js';
@@ -1210,6 +1211,10 @@ export class TimelineUIUtils {
     //   if (!impactedNodes || !impactedNodes.length) {
     //     continue;
     //   }
+    const affectedElementsOldRects =
+        shift.args.data?.impacted_nodes?.map(
+            node => new DOMRect(node.old_rect[0], node.old_rect[1], node.old_rect[2], node.old_rect[3])) ??
+        [];
     const affectedElementsCurrentRects =
         shift.args.data?.impacted_nodes?.map(
             node => new DOMRect(node.new_rect[0], node.new_rect[1], node.new_rect[2], node.new_rect[3])) ??
@@ -1260,7 +1265,7 @@ export class TimelineUIUtils {
     // write a version of canvasOverlay that uses DOM elements for the mappedRects instead of canvas.
     const screenshotContainer = image.parentNode;
     screenshotContainer.style.position = 'relative';
-    for (const currentRect of affectedElementsCurrentRects) {
+    const rectEls = affectedElementsOldRects.map(currentRect => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('timeline-filmstrip-preview-rect');
       const mappedRectX = currentRect.x * image.width / viewport.width;
@@ -1274,8 +1279,24 @@ export class TimelineUIUtils {
       rectEl.style.border = '2px solid rgb(132, 48, 206)';
       rectEl.style.backgroundColor = 'rgba(132, 48, 206, 0.5)';
       rectEl.style.position = 'absolute';
+      rectEl.style.transition = 'all 1s';
       screenshotContainer.appendChild(rectEl);
-    }
+      return rectEl;
+    });
+
+    setTimeout(() => {
+      rectEls.forEach((rectEl, i) => {
+        const newRect = affectedElementsCurrentRects[i];
+        const mappedRectX = newRect.x * image.width / viewport.width;
+        const mappedRectY = newRect.y * image.height / viewport.height;
+        const mappedRectWidth = newRect.width * image.width / viewport.width;
+        const mappedRectHeight = newRect.height * image.height / viewport.height;
+        rectEl.style.left = `${mappedRectX}px`;
+        rectEl.style.top = `${mappedRectY}px`;
+        rectEl.style.width = `${mappedRectWidth}px`;
+        rectEl.style.height = `${mappedRectHeight}px`;
+      });
+    }, 1000);
   }
 
 
