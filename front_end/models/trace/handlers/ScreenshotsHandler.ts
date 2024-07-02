@@ -41,6 +41,7 @@ export async function finalize(): Promise<void> {
 
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
+    console.log('off', getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts);
     const syntheticEvent = Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticBasedEvent<
         Types.TraceEvents.SyntheticScreenshot>({
       rawSourceEvent: snapshotEvent,
