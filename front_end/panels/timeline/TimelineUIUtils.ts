@@ -1120,18 +1120,16 @@ export class TimelineUIUtils {
 
   static async buildDetailsForLayoutShift(
       event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
-      unsafeEventData: any): Promise<void> {
+      unsafeEventData: any,
+      traceParseData:
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
+      Promise<void> {
     const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
     const layoutShiftEventData = layoutShift.args.data;
-    const screenshotSource = layoutShift.parsedData.screenshotSource
 
-    if (screenshotSource) {
-      const filmStripPreview = document.createElement('div');
-      filmStripPreview.classList.add('timeline-filmstrip-preview');
-      void UI.UIUtils.loadImage(screenshotSource).then(image => image && filmStripPreview.appendChild(image));
-      contentHelper.appendElementRow('', filmStripPreview);
-      // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
-    }
+
+    await TimelineUIUtils.drawScreenshotOverlays(event, contentHelper, traceParseData);
+
 
     // function frameClicked(
     //     filmStrip: TraceEngine.Extras.FilmStrip.Data, filmStripFrame: TraceEngine.Extras.FilmStrip.Frame): void {
@@ -1172,6 +1170,86 @@ export class TimelineUIUtils {
       contentHelper.appendElementRow(i18nString(UIStrings.movedFrom), linkedOldRect);
       contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
     }
+  }
+
+
+
+  static async drawScreenshotOverlays(
+      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
+      traceParseData:
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
+      Promise<void> {
+    const screenshotSource = event.parsedData.screenshotSource;
+    let image: HTMLImageElement;
+
+    if (screenshotSource) {
+      const filmStripPreview = document.createElement('div');
+      filmStripPreview.classList.add('timeline-filmstrip-preview');
+      image = await UI.UIUtils.loadImage(screenshotSource);
+
+      if (image)
+        filmStripPreview.appendChild(image);
+      contentHelper.appendElementRow('', filmStripPreview);
+      // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
+    }
+    const viewport = traceParseData.Meta.viewportRect;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !viewport) {
+      return;
+    }
+    const shift = event;
+
+    const screenshot = image;
+    // if (!screenshot) {
+    //   continue;
+    // }
+    // let affectedElementsCurrentRects = shift.domNodeSources.map(node => node.currentRect);
+    // if (!affectedElementsCurrentRects.length) {
+    //   // If nodes haven't been collected from the backend and, thus,
+    //   // the domNodeSources array is empty, try to use the rect
+    //   // values from the trace event. This happens when running in
+    //   // tests environments where the relevant CDP methods aren't
+    //   // mocked.
+    //   const impactedNodes = shift.args.data?.impacted_nodes;
+    //   if (!impactedNodes || !impactedNodes.length) {
+    //     continue;
+    //   }
+    const affectedElementsCurrentRects =
+        shift.args.data?.impacted_nodes?.map(
+            node => new DOMRect(node.new_rect[0], node.new_rect[1], node.new_rect[2], node.new_rect[3])) ??
+        [];
+    // }
+
+    canvas.width = screenshot.width;
+    canvas.height = screenshot.height;
+    ctx.save();
+    ctx.drawImage(screenshot, 0, 0, screenshot.width, screenshot.height);
+
+    for (const currentRect of affectedElementsCurrentRects) {
+      ctx.beginPath();
+
+      // Map the node's dimensions and coordinates from the viewport
+      // dimensions to the screenshot dimensions.
+      const mappedRectX = currentRect.x * canvas.width / viewport.width;
+      const mappedRectY = currentRect.y * canvas.height / viewport.height;
+      const mappedRectWidth = currentRect.width * canvas.width / viewport.width;
+      const mappedRectHeight = currentRect.height * canvas.height / viewport.height;
+      ctx.fillStyle = 'rgba(132, 48, 206, 0.5)';
+      ctx.strokeStyle = 'rgb(132, 48, 206)';
+      ctx.lineWidth = 2;
+
+      ctx.fillRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
+      ctx.strokeRect(mappedRectX, mappedRectY, mappedRectWidth, mappedRectHeight);
+      ctx.restore();
+    }
+    shift.screenshot = new Image();
+    shift.screenshot.src = canvas.toDataURL();
+
+    const overlayEl = document.createElement('div');
+    overlayEl.classList.add('timeline-filmstrip-preview');
+    overlayEl.appendChild(shift.screenshot);
+    contentHelper.appendElementRow('', overlayEl);
   }
 
 
@@ -1609,7 +1687,7 @@ export class TimelineUIUtils {
           console.error('Unexpected type for LayoutShift event');
           break;
         }
-        await TimelineUIUtils.buildDetailsForLayoutShift(event, contentHelper, unsafeEventData);
+        await TimelineUIUtils.buildDetailsForLayoutShift(event, contentHelper, unsafeEventData, traceParseData);
         break;
       }
 
