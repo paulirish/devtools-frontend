@@ -25,6 +25,7 @@ let browserThreadId: Types.TraceEvents.ThreadID = Types.TraceEvents.ThreadID(-1)
 let gpuProcessId: Types.TraceEvents.ProcessID = Types.TraceEvents.ProcessID(-1);
 let gpuThreadId: Types.TraceEvents.ThreadID = Types.TraceEvents.ThreadID(-1);
 let viewportRect: DOMRect|null = null;
+let devicePixelRatio: number|null = null;
 
 const processNames: Map<Types.TraceEvents.ProcessID, Types.TraceEvents.TraceEventProcessName> = new Map();
 
@@ -199,6 +200,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     const viewportWidth = rectAsArray[2];
     const viewportHeight = rectAsArray[5];
     viewportRect = new DOMRect(viewportX, viewportY, viewportWidth, viewportHeight);
+    devicePixelRatio = event.args.data.dpr;
   }
 
   // The TracingStartedInBrowser event includes the data on which frames are
@@ -427,14 +429,15 @@ export type MetaHandlerData = {
   gpuProcessId: Types.TraceEvents.ProcessID,
   gpuThreadId?: Types.TraceEvents.ThreadID,
   viewportRect?: DOMRect,
-              navigationsByFrameId: Map<string, Types.TraceEvents.TraceEventNavigationStart[]>,
-              navigationsByNavigationId: Map<string, Types.TraceEvents.TraceEventNavigationStart>,
-              threadsInProcess:
-                  Map<Types.TraceEvents.ProcessID,
-                      Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventThreadName>>,
-              mainFrameId: string,
-              mainFrameURL: string,
-              /**
+  devicePixelRatio?: number,
+                  navigationsByFrameId: Map<string, Types.TraceEvents.TraceEventNavigationStart[]>,
+                  navigationsByNavigationId: Map<string, Types.TraceEvents.TraceEventNavigationStart>,
+                  threadsInProcess:
+                      Map<Types.TraceEvents.ProcessID,
+                          Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventThreadName>>,
+                  mainFrameId: string,
+                  mainFrameURL: string,
+                  /**
                * A frame can have multiple renderer processes, at the same time,
                * a renderer process can have multiple URLs. This map tracks the
                * processes active on a given frame, with the time window in which
@@ -442,10 +445,10 @@ export type MetaHandlerData = {
                * URLs, each process in each frame has an array of windows, with an
                * entry for each URL it had.
                */
-              rendererProcessesByFrame: FrameProcessData,
-              topLevelRendererIds: Set<Types.TraceEvents.ProcessID>,
-              frameByProcessId: Map<Types.TraceEvents.ProcessID, Map<string, Types.TraceEvents.TraceFrame>>,
-              mainFrameNavigations: Types.TraceEvents.TraceEventNavigationStart[],
+                  rendererProcessesByFrame: FrameProcessData,
+                  topLevelRendererIds: Set<Types.TraceEvents.ProcessID>,
+                  frameByProcessId: Map<Types.TraceEvents.ProcessID, Map<string, Types.TraceEvents.TraceFrame>>,
+                  mainFrameNavigations: Types.TraceEvents.TraceEventNavigationStart[],
 };
 
 // Each frame has a single render process at a given time but it can have
@@ -480,6 +483,7 @@ export function data(): MetaHandlerData {
     gpuProcessId,
     gpuThreadId: gpuThreadId === Types.TraceEvents.ThreadID(-1) ? undefined : gpuThreadId,
     viewportRect: viewportRect || undefined,
+    devicePixelRatio: devicePixelRatio,
     mainFrameId,
     mainFrameURL,
     navigationsByFrameId,

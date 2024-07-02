@@ -169,14 +169,18 @@ function updateTraceWindowMax(
   traceWindow.range = Types.Timing.MicroSeconds(traceWindow.max - traceWindow.min);
 }
 
-function findScreenshots(timestamp: Types.Timing.MicroSeconds): any {
+function findScreenshots(timestamp: Types.Timing.MicroSeconds): Types.TraceEvents.LayoutShiftParsedData['screenshots'] {
   const screenshots = screenshotsHandlerData();
   const screenshotIndex = findNextScreenshotEventIndex(screenshots, timestamp);
   if (!screenshotIndex) {
-    return undefined;
+    return {
+      after: undefined,
+      before: undefined,
+    };
   }
   return {
-    new: screenshots[screenshotIndex], old: screenshots[screenshotIndex - 1] ?? undefined,
+  after:
+    screenshots[screenshotIndex], before: screenshots[screenshotIndex - 1] ?? undefined,
   }
 }
 

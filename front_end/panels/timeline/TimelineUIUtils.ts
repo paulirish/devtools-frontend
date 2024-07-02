@@ -1128,14 +1128,7 @@ export class TimelineUIUtils {
     const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
     const layoutShiftEventData = layoutShift.args.data;
 
-
-    await TimelineUIUtils.drawScreenshotOverlays(event, contentHelper, traceParseData);
-
-
-    // function frameClicked(
-    //     filmStrip: TraceEngine.Extras.FilmStrip.Data, filmStripFrame: TraceEngine.Extras.FilmStrip.Frame): void {
-    //   PerfUI.FilmStripView.Dialog.fromFilmStrip(filmStrip, filmStripFrame.index);
-    // }
+    await TimelineUIUtils.drawLayoutShiftScreenshotRects(event, contentHelper, traceParseData);
 
     const warning = document.createElement('span');
     const clsLink = UI.XLink.XLink.create(
@@ -1172,72 +1165,60 @@ export class TimelineUIUtils {
       contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
     }
   }
-
-
-
-  static async drawScreenshotOverlays(
+  static async drawLayoutShiftScreenshotRects(
       event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
       traceParseData:
           Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
       Promise<void> {
     const screenshots = event.parsedData.screenshots;
-    let image: HTMLImageElement;
+    const viewport = traceParseData.Meta.viewportRect;
+    /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+     * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
+     * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
+     * See https://crbug.com/1300309
+    */
+    const dpr = traceParseData.Meta.devicePixelRatio ?? 1;
 
-    if (screenshots.old) {
-      const filmStripPreview = document.createElement('div');
-      filmStripPreview.classList.add('timeline-filmstrip-preview');
-      image = await UI.UIUtils.loadImage(screenshots.old.args.dataUri);
-
-      if (image)
-        filmStripPreview.appendChild(image);
-      contentHelper.appendElementRow('', filmStripPreview);
-      // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
-    }
-    if (!image)
+    const afterImage = screenshots.after?.args.dataUri && await UI.UIUtils.loadImage(screenshots.after?.args.dataUri);
+    const beforeImage =
+        screenshots.before?.args.dataUri && await UI.UIUtils.loadImage(screenshots.before?.args.dataUri);
+    if (!beforeImage || !viewport) {
       return;
-
-    const shift = event;
-
-    const screenshot = image;
+    }
 
     const affectedElementsOldRects =
-        shift.args.data?.impacted_nodes?.map(
-            node => new DOMRect(node.old_rect[0], node.old_rect[1], node.old_rect[2], node.old_rect[3])) ??
+        event.args.data?.impacted_nodes?.map(
+            node => new DOMRect(
+                node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
         [];
     const affectedElementsCurrentRects =
-        shift.args.data?.impacted_nodes?.map(
-            node => new DOMRect(node.new_rect[0], node.new_rect[1], node.new_rect[2], node.new_rect[3])) ??
+        event.args.data?.impacted_nodes?.map(
+            node => new DOMRect(
+                node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
         [];
 
+    const screenshotContainer = document.createElement('div');
+    screenshotContainer.classList.add('timeline-filmstrip-preview');
+    screenshotContainer.style.position = 'relative';
+    screenshotContainer.appendChild(beforeImage);
+    contentHelper.appendElementRow('', screenshotContainer);
 
-
-    // TODO: we need to /= the rect values by the DPR
-    // see normalizeLayoutShiftImpactedNodes in Performance Insights impl. and https://crbug.com/1300309
-    const viewport = traceParseData.Meta.viewportRect;
-
-    if (!viewport)
-      return;
-
-    const newImage = await UI.UIUtils.loadImage(screenshots.new.args.dataUri);
-    if (newImage) {
-      newImage.style.opacity = '0';
-      newImage.style.position = 'absolute';
-      newImage.style.top = '0';
-      newImage.style.left = '0';
-      newImage.style.transition = 'all 1s';
-      image.parentNode.appendChild(newImage);
+    if (afterImage) {
+      afterImage.style.opacity = '0';
+      afterImage.style.position = 'absolute';
+      afterImage.style.top = '0';
+      afterImage.style.left = '0';
+      afterImage.style.transition = 'all 1s';
+      screenshotContainer.appendChild(afterImage);
     }
 
-    // write a version of canvasOverlay that uses DOM elements for the mappedRects instead of canvas.
-    const screenshotContainer = image.parentNode;
-    screenshotContainer.style.position = 'relative';
     const rectEls = affectedElementsOldRects.map(currentRect => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('timeline-filmstrip-preview-rect');
-      const mappedRectX = currentRect.x * image.width / viewport.width;
-      const mappedRectY = currentRect.y * image.height / viewport.height;
-      const mappedRectWidth = currentRect.width * image.width / viewport.width;
-      const mappedRectHeight = currentRect.height * image.height / viewport.height;
+      const mappedRectX = currentRect.x * beforeImage.width / viewport.width;
+      const mappedRectY = currentRect.y * beforeImage.height / viewport.height;
+      const mappedRectWidth = currentRect.width * beforeImage.width / viewport.width;
+      const mappedRectHeight = currentRect.height * beforeImage.height / viewport.height;
       rectEl.style.left = `${mappedRectX}px`;
       rectEl.style.top = `${mappedRectY}px`;
       rectEl.style.width = `${mappedRectWidth}px`;
@@ -1251,13 +1232,13 @@ export class TimelineUIUtils {
     });
 
     setTimeout(() => {
-      newImage.style.opacity = '1';
+      afterImage.style.opacity = '1';
       rectEls.forEach((rectEl, i) => {
         const newRect = affectedElementsCurrentRects[i];
-        const mappedRectX = newRect.x * image.width / viewport.width;
-        const mappedRectY = newRect.y * image.height / viewport.height;
-        const mappedRectWidth = newRect.width * image.width / viewport.width;
-        const mappedRectHeight = newRect.height * image.height / viewport.height;
+        const mappedRectX = newRect.x * beforeImage.width / viewport.width;
+        const mappedRectY = newRect.y * beforeImage.height / viewport.height;
+        const mappedRectWidth = newRect.width * beforeImage.width / viewport.width;
+        const mappedRectHeight = newRect.height * beforeImage.height / viewport.height;
         rectEl.style.left = `${mappedRectX}px`;
         rectEl.style.top = `${mappedRectY}px`;
         rectEl.style.width = `${mappedRectWidth}px`;

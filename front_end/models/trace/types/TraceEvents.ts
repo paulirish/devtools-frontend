@@ -748,6 +748,8 @@ export interface TraceEventMainFrameViewport extends TraceEventInstant {
     data: TraceEventArgsData&{
       // eslint-disable-next-line @typescript-eslint/naming-convention
       viewport_rect: number[],
+      /** Device Pixel Ratio. Added in m128 */
+      dpr: number,
     },
   };
 }
@@ -839,7 +841,7 @@ interface LayoutShiftSessionWindowData {
 }
 export interface LayoutShiftParsedData {
   /** screenshot taken before and after this shift. */
-  screenshots: {old: SyntheticScreenshot, new: SyntheticScreenshot};
+  screenshots: {before?: SyntheticScreenshot, after?: SyntheticScreenshot};
   timeFromNavigation?: MicroSeconds;
   // The sum of the weighted scores of the shifts that
   // belong to a session window up until this shift
