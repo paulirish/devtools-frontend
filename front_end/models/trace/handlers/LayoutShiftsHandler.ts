@@ -175,11 +175,11 @@ function findNextScreenshotSource(timestamp: Types.Timing.MicroSeconds): string|
   if (!screenshotIndex) {
     return undefined;
   }
-  return `data:img/png;base64,${screenshots[screenshotIndex].args.snapshot}`;
+  return screenshots[screenshotIndex].args.dataUri;
 }
 
 export function findNextScreenshotEventIndex(
-    screenshots: Types.TraceEvents.TraceEventSnapshot[], timestamp: Types.Timing.MicroSeconds): number|null {
+    screenshots: Types.TraceEvents.SyntheticScreenshot[], timestamp: Types.Timing.MicroSeconds): number|null {
   return Platform.ArrayUtilities.nearestIndexFromBeginning(screenshots, frame => frame.ts > timestamp);
 }
 

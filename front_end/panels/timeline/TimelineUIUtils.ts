@@ -1554,6 +1554,21 @@ export class TimelineUIUtils {
         }
         const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
         const layoutShiftEventData = layoutShift.args.data;
+        const screenshotSource = layoutShift.parsedData.screenshotSource
+
+        if (screenshotSource) {
+          const filmStripPreview = document.createElement('div');
+          filmStripPreview.classList.add('timeline-filmstrip-preview');
+          void UI.UIUtils.loadImage(screenshotSource).then(image => image && filmStripPreview.appendChild(image));
+          contentHelper.appendElementRow('', filmStripPreview);
+          // filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
+        }
+
+        // function frameClicked(
+        //     filmStrip: TraceEngine.Extras.FilmStrip.Data, filmStripFrame: TraceEngine.Extras.FilmStrip.Frame): void {
+        //   PerfUI.FilmStripView.Dialog.fromFilmStrip(filmStrip, filmStripFrame.index);
+        // }
+
         const warning = document.createElement('span');
         const clsLink = UI.XLink.XLink.create(
             'https://web.dev/cls/', i18nString(UIStrings.cumulativeLayoutShifts), undefined, undefined,
