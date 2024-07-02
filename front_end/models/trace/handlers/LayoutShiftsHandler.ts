@@ -9,6 +9,7 @@ import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
 import {ScoreClassification} from './PageLoadMetricsHandler.js';
+import {data as screenshotsHandlerData} from './ScreenshotsHandler.js';
 import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 // We start with a score of zero and step through all Layout Shift records from
@@ -166,6 +167,20 @@ function updateTraceWindowMax(
     traceWindow: Types.Timing.TraceWindowMicroSeconds, newMax: Types.Timing.MicroSeconds): void {
   traceWindow.max = newMax;
   traceWindow.range = Types.Timing.MicroSeconds(traceWindow.max - traceWindow.min);
+}
+
+function findNextScreenshotSource(timestamp: Types.Timing.MicroSeconds): string|undefined {
+  const screenshots = screenshotsHandlerData();
+  const screenshotIndex = findNextScreenshotEventIndex(screenshots, timestamp);
+  if (!screenshotIndex) {
+    return undefined;
+  }
+  return `data:img/png;base64,${screenshots[screenshotIndex].args.snapshot}`;
+}
+
+export function findNextScreenshotEventIndex(
+    screenshots: Types.TraceEvents.TraceEventSnapshot[], timestamp: Types.Timing.MicroSeconds): number|null {
+  return Platform.ArrayUtilities.nearestIndexFromBeginning(screenshots, frame => frame.ts > timestamp);
 }
 
 function buildScoreRecords(): void {
@@ -328,6 +343,7 @@ async function buildLayoutShiftsClusters(): Promise<void> {
                         },
                         parsedData: {
                           timeFromNavigation,
+                          screenshotSource: findNextScreenshotSource(event.ts),
                           cumulativeWeightedScoreInWindow: currentCluster.clusterCumulativeScore,
                           // The score of the session window is temporarily set to 0 just
                           // to initialize it. Since we need to get the score of all shifts
