@@ -35,7 +35,7 @@ ruleTester.run('optional-properties-last', rule, {
     {
       code: `
         type InvalidType = {
-          name?: string; // Optional before required
+          name?: string;
           age: number;
         };
       `,
@@ -46,10 +46,9 @@ ruleTester.run('optional-properties-last', rule, {
         },
       ],
       output: `
-        type AnotherInvalidType = {
-          isAwesome: boolean;
-          isCool?: boolean;
-          job?: string;
+        type InvalidType = {
+          age: number;
+          name?: string;
         };
       `,
     },

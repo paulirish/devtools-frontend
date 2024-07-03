@@ -24,42 +24,24 @@ module.exports = {
       TSTypeAliasDeclaration(node) {
         const typeAnnotation = node.typeAnnotation;
         if (typeAnnotation.type === 'TSTypeLiteral') {
-          let foundOptionalWithinAnnotation = null;
+          let misplacedOptionalProp = null;
           for (const property of typeAnnotation.members) {
             if (property.optional) {
-              foundOptionalWithinAnnotation = property;
-            } else if (foundOptionalWithinAnnotation && !property.optional) {
-              const requiredProp = property;
+              misplacedOptionalProp = property;
+            } else if (misplacedOptionalProp && !property.optional) {
               // Required property found after an optional one
+              const requiredProp = property;
               context.report({
-                node: foundOptionalWithinAnnotation,
+                node: misplacedOptionalProp,
                 message: 'Optional property \'{{name}}\' should be defined after required properties.',
-                data: {name: foundOptionalWithinAnnotation.key.name},
+                data: {name: misplacedOptionalProp.key.name},
                 fix(fixer) {
-                  const node = foundOptionalWithinAnnotation;
-                  console.log({node});
-                  console.log({mem: node.parent.members});
                   const sourceCode = context.getSourceCode();
-                  console.log({x: Object.keys(sourceCode)});
-                  // Gather required and optional properties
-                  const requiredProperties = [];
-                  const optionalProperties = [];
-                  for (const property of node.parent.members) {
-                    if (property.optional) {
-                      optionalProperties.push(property);
-                    } else {
-                      requiredProperties.push(property);
-                    }
-                  }
-                  console.log({optionalProperties});
-                  if (requiredProperties.length > 0 && optionalProperties.length > 0) {
-                    // Create text for rearranged properties
-                    const requiredText = requiredProperties.map(node => sourceCode.getText(node)).join('\n');
-                    const optionalText = optionalProperties.map(node => sourceCode.getText(node)).join('\n');
-                    console.log({requiredText, optionalText});
-                    // Replace the entire property block with the rearranged text
-                    return fixer.replaceTextRange([node.parent.range[0] + 1, node.parent.range[1] - 1], `${requiredText}${optionalText}`);
-                  }
+                  const optionalPropertyText = sourceCode.getText(misplacedOptionalProp);
+                  const requiredPropertyText = sourceCode.getText(requiredProp);
+
+                  // Swap the positions of the two properties
+                  return [fixer.replaceText(misplacedOptionalProp, requiredPropertyText), fixer.replaceText(requiredProp, optionalPropertyText)];
                 },
               });
             }
