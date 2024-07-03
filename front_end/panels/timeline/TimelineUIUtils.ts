@@ -1165,6 +1165,7 @@ export class TimelineUIUtils {
       contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
     }
   }
+
   static async drawLayoutShiftScreenshotRects(
       event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
       traceParseData:
@@ -1172,13 +1173,6 @@ export class TimelineUIUtils {
       Promise<void> {
     const screenshots = event.parsedData.screenshots;
     const viewport = traceParseData.Meta.viewportRect;
-    /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
-     * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
-     * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
-     * See https://crbug.com/1300309
-    */
-    const dpr = traceParseData.Meta.devicePixelRatio ?? 1;
-
     const afterImage = screenshots.after?.args.dataUri && await UI.UIUtils.loadImage(screenshots.after?.args.dataUri);
     const beforeImage =
         screenshots.before?.args.dataUri && await UI.UIUtils.loadImage(screenshots.before?.args.dataUri);
@@ -1186,6 +1180,12 @@ export class TimelineUIUtils {
       return;
     }
 
+    /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+     * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
+     * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
+     * See https://crbug.com/1300309
+    */
+    const dpr = traceParseData.Meta.devicePixelRatio ?? 1;
     const affectedElementsOldRects =
         event.args.data?.impacted_nodes?.map(
             node => new DOMRect(
@@ -1198,51 +1198,53 @@ export class TimelineUIUtils {
         [];
 
     const screenshotContainer = document.createElement('div');
-    screenshotContainer.classList.add('timeline-filmstrip-preview');
+    screenshotContainer.classList.add('layout-shift-screenshot-preview');
     screenshotContainer.style.position = 'relative';
     screenshotContainer.appendChild(beforeImage);
     contentHelper.appendElementRow('', screenshotContainer);
 
-    if (afterImage) {
-      afterImage.style.opacity = '0';
-      afterImage.style.position = 'absolute';
-      afterImage.style.top = '0';
-      afterImage.style.left = '0';
-      afterImage.style.transition = 'all 1s';
-      screenshotContainer.appendChild(afterImage);
-    }
+    // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
+    // That's because this function is complete before the contentHelper adds it to the DOM.. so we can't query offsetHeight for its resolved size…
+    const maxHeight = 300;
+    const maxWidth = 500;
+    const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight);
+    beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
+    beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
 
     const rectEls = affectedElementsOldRects.map(currentRect => {
       const rectEl = document.createElement('div');
-      rectEl.classList.add('timeline-filmstrip-preview-rect');
-      const mappedRectX = currentRect.x * beforeImage.width / viewport.width;
-      const mappedRectY = currentRect.y * beforeImage.height / viewport.height;
-      const mappedRectWidth = currentRect.width * beforeImage.width / viewport.width;
-      const mappedRectHeight = currentRect.height * beforeImage.height / viewport.height;
-      rectEl.style.left = `${mappedRectX}px`;
-      rectEl.style.top = `${mappedRectY}px`;
-      rectEl.style.width = `${mappedRectWidth}px`;
-      rectEl.style.height = `${mappedRectHeight}px`;
-      rectEl.style.border = '2px solid rgb(132, 48, 206)';
-      rectEl.style.backgroundColor = 'rgba(132, 48, 206, 0.5)';
-      rectEl.style.position = 'absolute';
-      rectEl.style.transition = 'all 1s';
+      rectEl.classList.add('layout-shift-screenshot-preview-rect');
+      const scaledRectX = currentRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectY = currentRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      const scaledRectWidth = currentRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectHeight = currentRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      rectEl.style.left = `${scaledRectX}px`;
+      rectEl.style.top = `${scaledRectY}px`;
+      rectEl.style.width = `${scaledRectWidth}px`;
+      rectEl.style.height = `${scaledRectHeight}px`;
       screenshotContainer.appendChild(rectEl);
       return rectEl;
     });
+    if (afterImage) {
+      afterImage.classList.add('layout-shift-screenshot-after');
+      screenshotContainer.appendChild(afterImage);
+      afterImage.style.width = beforeImage.style.width;
+      afterImage.style.height = beforeImage.style.height;
+    }
 
+    // Hack to show the animation for now..
     setTimeout(() => {
       afterImage.style.opacity = '1';
       rectEls.forEach((rectEl, i) => {
         const newRect = affectedElementsCurrentRects[i];
-        const mappedRectX = newRect.x * beforeImage.width / viewport.width;
-        const mappedRectY = newRect.y * beforeImage.height / viewport.height;
-        const mappedRectWidth = newRect.width * beforeImage.width / viewport.width;
-        const mappedRectHeight = newRect.height * beforeImage.height / viewport.height;
-        rectEl.style.left = `${mappedRectX}px`;
-        rectEl.style.top = `${mappedRectY}px`;
-        rectEl.style.width = `${mappedRectWidth}px`;
-        rectEl.style.height = `${mappedRectHeight}px`;
+        const scaledRectX = newRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+        const scaledRectY = newRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+        const scaledRectWidth = newRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+        const scaledRectHeight = newRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+        rectEl.style.left = `${scaledRectX}px`;
+        rectEl.style.top = `${scaledRectY}px`;
+        rectEl.style.width = `${scaledRectWidth}px`;
+        rectEl.style.height = `${scaledRectHeight}px`;
       });
     }, 1000);
   }
