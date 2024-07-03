@@ -1234,7 +1234,9 @@ export class TimelineUIUtils {
 
     // Hack to show the animation for now..
     setTimeout(() => {
-      afterImage.style.opacity = '1';
+      if (afterImage) {
+        afterImage.style.opacity = '1';
+      }
       rectEls.forEach((rectEl, i) => {
         const newRect = affectedElementsCurrentRects[i];
         const scaledRectX = newRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;

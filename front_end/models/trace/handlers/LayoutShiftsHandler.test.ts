@@ -232,14 +232,12 @@ describe('LayoutShiftsHandler', function() {
         if (screenshotIndex === null) {
           continue;
         }
-        assert.isDefined(shift.parsedData.screenshotSource);
+        assert.isDefined(shift.parsedData.screenshots.after);
         // Make sure the screenshot came after the shift.
-        assert.isAtLeast(screenshots[screenshotIndex].ts, shift.ts);
-        if (screenshotIndex > 0) {
-          // Make sure the previous screenshot came before the shift, meaning
-          // the index corresponds to the first screenshot after the shift.
-          // (the screenshot data is ordered asc).
-          assert.isBelow(screenshots[screenshotIndex - 1].ts, shift.ts);
+        assert.isAtLeast(shift.parsedData.screenshots.after.ts, shift.ts);
+        if (shift.parsedData.screenshots.before) {
+          // Make sure the previous screenshot came before the shift
+          assert.isBelow(shift.parsedData.screenshots.before.ts, shift.ts);
         }
       }
     });

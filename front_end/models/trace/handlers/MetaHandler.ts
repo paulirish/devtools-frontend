@@ -483,7 +483,7 @@ export function data(): MetaHandlerData {
     gpuProcessId,
     gpuThreadId: gpuThreadId === Types.TraceEvents.ThreadID(-1) ? undefined : gpuThreadId,
     viewportRect: viewportRect || undefined,
-    devicePixelRatio: devicePixelRatio,
+    devicePixelRatio: devicePixelRatio ?? undefined,
     mainFrameId,
     mainFrameURL,
     navigationsByFrameId,
