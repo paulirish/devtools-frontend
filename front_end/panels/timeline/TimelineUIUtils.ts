@@ -575,13 +575,12 @@ let colorGenerator: Common.Color.Generator;
 
 const requestPreviewElements = new WeakMap<TraceEngine.Types.TraceEvents.SyntheticNetworkRequest, HTMLImageElement>();
 
-type LinkifyLocationOptions = {
-  scriptId: Protocol.Runtime.ScriptId|null,
-  url: string,
-  lineNumber: number,
-  columnNumber?: number,
-  isFreshRecording?: boolean, target: SDK.Target.Target|null, linkifier: LegacyComponents.Linkifier.Linkifier,
-};
+type LinkifyLocationOptions = {scriptId: Protocol.Runtime.ScriptId|null,
+url: string,
+lineNumber: number,
+target: SDK.Target.Target|null,
+linkifier: LegacyComponents.Linkifier.Linkifier,isFreshRecording?: boolean,
+columnNumber?: number,};
 
 export class TimelineUIUtils {
   static frameDisplayName(frame: Protocol.Runtime.CallFrame): string {

@@ -11,10 +11,15 @@ let activeManager: ModificationsManager|null;
 
 type ModificationsManagerData = {
   traceParsedData: TraceEngine.Handlers.Types.TraceParseData,
-  traceBounds: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
-  modifications?: TraceEngine.Types.File.Modifications,
+  traceBounds: TraceEngine.Types.Timing.TraceWindowMicroSeconds,modifications?: TraceEngine.Types.File.Modifications,
+
                rawTraceEvents: readonly TraceEngine.Types.TraceEvents.TraceEventData[],
                syntheticEvents: TraceEngine.Types.TraceEvents.SyntheticBasedEvent[],
+};
+
+type InvalidType = {
+  name?: string,  // Optional before required
+  age: number,
 };
 
 export class ModificationsManager {

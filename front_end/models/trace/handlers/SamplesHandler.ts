@@ -269,8 +269,8 @@ export type ProfileData = {
 };
 
 type PreprocessedData = {
-  rawProfile: CPUProfile.CPUProfileDataModel.ExtendedProfile,
-  threadId?: Types.TraceEvents.ThreadID, profileId: Types.TraceEvents.ProfileID,
+  rawProfile: CPUProfile.CPUProfileDataModel.ExtendedProfile,threadId?: Types.TraceEvents.ThreadID,
+   profileId: Types.TraceEvents.ProfileID,
 };
 
 /**

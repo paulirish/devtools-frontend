@@ -4,7 +4,6 @@
 // found in the LICENSE file.
 'use strict';
 
-
 const rule = require('../lib/enforce-optional-properties-last.js');
 const ruleTester = new (require('eslint').RuleTester)({
   parserOptions: {ecmaVersion: 9, sourceType: 'module'},
@@ -46,6 +45,13 @@ ruleTester.run('optional-properties-last', rule, {
           type: 'TSPropertySignature'
         },
       ],
+      output: `
+        type AnotherInvalidType = {
+          isAwesome: boolean;
+          isCool?: boolean;
+          job?: string;
+        };
+      `,
     },
     {
       code: `
@@ -61,6 +67,13 @@ ruleTester.run('optional-properties-last', rule, {
           type: 'TSPropertySignature'
         },
       ],
+      output: `
+        type AnotherInvalidType = {
+          isAwesome: boolean;
+          isCool?: boolean;
+          job?: string;
+        };
+      `,
     },
   ],
 });

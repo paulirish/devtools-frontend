@@ -28,8 +28,8 @@ const str_ = i18n.i18n.registerUIStrings('panels/sources/OutlineQuickOpen.ts', U
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export type OutlineItem = {
-  title: string,
-  subtitle?: string, lineNumber: number, columnNumber: number,
+  title: string,subtitle?: string,
+   lineNumber: number, columnNumber: number,
 };
 
 export function outline(state: CodeMirror.EditorState): OutlineItem[] {

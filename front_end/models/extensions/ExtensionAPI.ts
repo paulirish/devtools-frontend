@@ -143,8 +143,8 @@ export namespace PrivateAPI {
   export type RecordingExtensionPluginCapability = 'export'|'replay';
   type RegisterRecorderExtensionPluginRequest = {
     command: Commands.RegisterRecorderExtensionPlugin,
-    pluginName: string,
-    mediaType?: string, capabilities: RecordingExtensionPluginCapability[], port: MessagePort,
+    pluginName: string,mediaType?: string,
+     capabilities: RecordingExtensionPluginCapability[], port: MessagePort,
   };
   type CreateRecorderViewRequest = {
     command: Commands.CreateRecorderView,
@@ -180,8 +180,8 @@ export namespace PrivateAPI {
   type SetSidebarHeightRequest = {command: Commands.SetSidebarHeight, id: string, height: string};
   type SetSidebarContentRequest = {
     command: Commands.SetSidebarContent,
-    id: string,
-    evaluateOnPage?: boolean, expression: string,
+    id: string,evaluateOnPage?: boolean,
+     expression: string,
     rootTitle?: string,
     evaluateOptions?: EvaluateOptions,
   };
