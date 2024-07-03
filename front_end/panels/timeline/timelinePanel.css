@@ -119,7 +119,7 @@
 }
 
 #memory-graphs-container .timeline-memory-header::after {
-  content: '';
+  content: "";
   background-image: var(--image-file-toolbarResizerVertical);
   background-repeat: no-repeat;
   background-position: right center, center;
@@ -348,7 +348,7 @@
 }
 
 .timeline-flamechart-resizer::after {
-  content: '...';
+  content: "...";
   font-size: 14px;
   margin-bottom: -1px;
 }
@@ -364,8 +364,8 @@
 }
 
 .timeline-filmstrip-preview > img {
-  /* max-width: 500px;
-  max-height: 300px; */
+  max-width: 500px;
+  max-height: 300px;
   cursor: pointer;
   border: 1px solid var(--sys-color-divider);
 }
@@ -455,7 +455,7 @@
 }
 
 .timeline-tree-view .data-grid .name-container .activity-warning::after {
-  content: '[deopt]';
+  content: "[deopt]";
   margin: 0 4px;
   line-height: 12px;
   font-size: 10px;
@@ -561,7 +561,7 @@
   border: 1px solid var(--sys-color-divider);
   display: inline-block;
   margin-right: 4px;
-  content: ' ';
+  content: " ";
 }
 
 .timeline-landing-page.legacy > div {

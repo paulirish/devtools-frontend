@@ -44,7 +44,6 @@ import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as ModificationsManager from '../../services/modifications_manager/modifications_manager.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
-import {currentCompletions} from '../../third_party/codemirror.next/codemirror.next.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css.js';
@@ -387,11 +386,11 @@ const UIStrings = {
   /**
    *@description Label for Cumulative Layout records, indicating where they moved from
    */
-  movedFrom: 'Moved <<<<',
+  movedFrom: 'Moved from',
   /**
    *@description Label for Cumulative Layout records, indicating where they moved to
    */
-  movedTo: 'Moved >>>>',
+  movedTo: 'Moved to',
   /**
    *@description Text that indicates a particular HTML element or node is related to what the user is viewing.
    */
@@ -1119,53 +1118,6 @@ export class TimelineUIUtils {
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(frame.url as Platform.DevToolsPath.UrlString, options);
   }
 
-  static async buildDetailsForLayoutShift(
-      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
-      unsafeEventData: any,
-      traceParseData:
-          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
-      Promise<void> {
-    const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
-    const layoutShiftEventData = layoutShift.args.data;
-
-    await TimelineUIUtils.drawLayoutShiftScreenshotRects(event, contentHelper, traceParseData);
-
-    const warning = document.createElement('span');
-    const clsLink = UI.XLink.XLink.create(
-        'https://web.dev/cls/', i18nString(UIStrings.cumulativeLayoutShifts), undefined, undefined,
-        'cumulative-layout-shifts');
-    const evolvedClsLink = UI.XLink.XLink.create(
-        'https://web.dev/evolving-cls/', i18nString(UIStrings.evolvedClsLink), undefined, undefined, 'evolved-cls');
-
-    warning.appendChild(
-        i18n.i18n.getFormatLocalizedString(str_, UIStrings.sCLSInformation, {PH1: clsLink, PH2: evolvedClsLink}));
-    contentHelper.appendElementRow(i18nString(UIStrings.warning), warning, true);
-    if (!layoutShiftEventData) {
-      return;
-    }
-    contentHelper.appendTextRow(i18nString(UIStrings.score), layoutShiftEventData['score'].toPrecision(4));
-    contentHelper.appendTextRow(
-        i18nString(UIStrings.cumulativeScore), layoutShiftEventData['cumulative_score'].toPrecision(4));
-    contentHelper.appendTextRow(i18nString(UIStrings.currentClusterId), layoutShift.parsedData.sessionWindowData.id);
-    contentHelper.appendTextRow(
-        i18nString(UIStrings.currentClusterScore),
-        layoutShift.parsedData.sessionWindowData.cumulativeWindowScore.toPrecision(4));
-    contentHelper.appendTextRow(
-        i18nString(UIStrings.hadRecentInput),
-        unsafeEventData['had_recent_input'] ? i18nString(UIStrings.yes) : i18nString(UIStrings.no));
-
-    for (const impactedNode of unsafeEventData['impacted_nodes']) {
-      const oldRect = new CLSRect(impactedNode['old_rect']);
-      const newRect = new CLSRect(impactedNode['new_rect']);
-
-      const linkedOldRect = await Common.Linkifier.Linkifier.linkify(oldRect);
-      const linkedNewRect = await Common.Linkifier.Linkifier.linkify(newRect);
-
-      contentHelper.appendElementRow(i18nString(UIStrings.movedFrom), linkedOldRect);
-      contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
-    }
-  }
-
   static async drawLayoutShiftScreenshotRects(
       event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
       traceParseData:
@@ -1687,7 +1639,47 @@ export class TimelineUIUtils {
           console.error('Unexpected type for LayoutShift event');
           break;
         }
-        await TimelineUIUtils.buildDetailsForLayoutShift(event, contentHelper, unsafeEventData, traceParseData);
+
+        const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
+        const layoutShiftEventData = layoutShift.args.data;
+
+        await TimelineUIUtils.drawLayoutShiftScreenshotRects(event, contentHelper, traceParseData);
+
+        const warning = document.createElement('span');
+        const clsLink = UI.XLink.XLink.create(
+            'https://web.dev/cls/', i18nString(UIStrings.cumulativeLayoutShifts), undefined, undefined,
+            'cumulative-layout-shifts');
+        const evolvedClsLink = UI.XLink.XLink.create(
+            'https://web.dev/evolving-cls/', i18nString(UIStrings.evolvedClsLink), undefined, undefined, 'evolved-cls');
+
+        warning.appendChild(
+            i18n.i18n.getFormatLocalizedString(str_, UIStrings.sCLSInformation, {PH1: clsLink, PH2: evolvedClsLink}));
+        contentHelper.appendElementRow(i18nString(UIStrings.warning), warning, true);
+        if (!layoutShiftEventData) {
+          break;
+        }
+        contentHelper.appendTextRow(i18nString(UIStrings.score), layoutShiftEventData['score'].toPrecision(4));
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.cumulativeScore), layoutShiftEventData['cumulative_score'].toPrecision(4));
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.currentClusterId), layoutShift.parsedData.sessionWindowData.id);
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.currentClusterScore),
+            layoutShift.parsedData.sessionWindowData.cumulativeWindowScore.toPrecision(4));
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.hadRecentInput),
+            unsafeEventData['had_recent_input'] ? i18nString(UIStrings.yes) : i18nString(UIStrings.no));
+
+        for (const impactedNode of unsafeEventData['impacted_nodes']) {
+          const oldRect = new CLSRect(impactedNode['old_rect']);
+          const newRect = new CLSRect(impactedNode['new_rect']);
+
+          const linkedOldRect = await Common.Linkifier.Linkifier.linkify(oldRect);
+          const linkedNewRect = await Common.Linkifier.Linkifier.linkify(newRect);
+
+          contentHelper.appendElementRow(i18nString(UIStrings.movedFrom), linkedOldRect);
+          contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
+        }
         break;
       }
 

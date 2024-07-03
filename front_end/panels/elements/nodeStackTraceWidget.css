@@ -6,5 +6,5 @@
 
 .stack-trace {
   font-size: 11px !important; /* stylelint-disable-line declaration-no-important */
-  font-family: 'Roboto Mono DG';
+  font-family: Menlo, monospace;
 }

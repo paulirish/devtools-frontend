@@ -41,17 +41,15 @@
   --legacy-item-selection-bg-color: #cfe8fc;
   --legacy-item-selection-inactive-bg-color: #e0e0e0;
   --monospace-font-size: 10px;
-  --monospace-font-family: 'Roboto Mono DG';
+  --monospace-font-family: monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: 'Roboto Mono DG';
+  --source-code-font-family: monospace;
   --sys-motion-duration-short4: 200ms;
   --sys-motion-duration-medium2: 300ms;
   --sys-motion-duration-long2: 500ms;
   --sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
   --sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
   --sys-motion-easing-emphasized-accelerate: cubic-bezier(0.2, 0, 0, 1);
-
-  font-feature-settings: 'calt';
 }
 
 .theme-with-dark-background {
@@ -83,7 +81,7 @@
 }
 
 body {
-  --default-font-family: '.SFNSDisplay-Regular', 'Helvetica Neue', 'Lucida Grande', sans-serif;
+  --default-font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
 
   height: 100%;
   width: 100%;
@@ -101,7 +99,7 @@ body {
 
 /* Default fonts */
 .platform-linux {
-  --default-font-family: 'Google Sans Text', 'Google Sans', system-ui, sans-serif;
+  --default-font-family: "Google Sans Text", "Google Sans", system-ui, sans-serif;
 }
 
 .platform-mac {
@@ -120,25 +118,25 @@ body {
 .platform-mac,
 :host-context(.platform-mac) {
   --monospace-font-size: 11px;
-  --monospace-font-family: 'Roboto Mono DG';
+  --monospace-font-family: monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: 'Roboto Mono DG';
+  --source-code-font-family: monospace;
 }
 
 .platform-windows,
 :host-context(.platform-windows) {
   --monospace-font-size: 12px;
-  --monospace-font-family: 'Roboto Mono DG';
+  --monospace-font-family: monospace;
   --source-code-font-size: 12px;
-  --source-code-font-family: 'Roboto Mono DG';
+  --source-code-font-family: monospace;
 }
 
 .platform-linux,
 :host-context(.platform-linux) {
   --monospace-font-size: 11px;
-  --monospace-font-family: 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+  --monospace-font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+  --source-code-font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
 }
 
 .monospace {
@@ -265,12 +263,12 @@ input {
 input {
   color: inherit;
 
-  &[type='checkbox'] {
+  &[type="checkbox"] {
     position: relative;
 
     &:hover::after,
     &:active::before {
-      content: '';
+      content: "";
       height: 24px;
       width: 24px;
       border-radius: var(--sys-shape-corner-full);
@@ -296,7 +294,7 @@ input {
       outline: none;
 
       &::before {
-        content: '';
+        content: "";
         height: 15px;
         width: 15px;
         border-radius: 5px;
@@ -329,8 +327,8 @@ input::placeholder {
 }
 
 .harmony-input:not([type]),
-.harmony-input[type='number'],
-.harmony-input[type='text'] {
+.harmony-input[type="number"],
+.harmony-input[type="text"] {
   padding: 3px 6px;
   height: 24px;
   border: 1px solid var(--sys-color-neutral-outline);
@@ -479,7 +477,7 @@ input::placeholder {
   white-space: nowrap;
 }
 
-span[is='dt-icon-label'] {
+span[is="dt-icon-label"] {
   flex: none;
 }
 
@@ -595,14 +593,14 @@ button.link:focus-visible {
   }
 
   .harmony-input:not([type]),
-  .harmony-input[type='number'],
-  .harmony-input[type='text'] {
+  .harmony-input[type="number"],
+  .harmony-input[type="text"] {
     border: 1px solid ButtonText;
   }
 
   .harmony-input:not([type]):focus,
-  .harmony-input[type='number']:focus,
-  .harmony-input[type='text']:focus {
+  .harmony-input[type="number"]:focus,
+  .harmony-input[type="text"]:focus {
     border: 1px solid Highlight;
   }
 }
@@ -631,19 +629,15 @@ input.custom-search-input::-webkit-search-cancel-button:hover {
   border: var(--override-spinner-size, 3px) solid var(--override-spinner-color, var(--sys-color-token-subtle));
   border-radius: 12px;
   clip: rect(0, var(--clip-size, 15px), var(--clip-size, 15px), 0);
-  content: '';
+  content: "";
   position: absolute;
   animation: spinner-animation 1s linear infinite;
   box-sizing: border-box;
 }
 
 @keyframes spinner-animation {
-  from {
-    transform: rotate(0);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
 }
 /** Adorner */
 .adorner-container {
