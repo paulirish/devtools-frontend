@@ -11,7 +11,6 @@ const ruleTester = new (require('eslint').RuleTester)({
   parser: require.resolve('@typescript-eslint/parser'),
 });
 
-console.log({rule: rule.create.toString()});
 ruleTester.run('optional-properties-last', rule, {
   valid: [
     {
@@ -22,48 +21,46 @@ ruleTester.run('optional-properties-last', rule, {
         };
       `,
     },
-    // {
-    //   code: `
-    //     type AnotherValidType = {
-    //       isActive: boolean;
-    //       address?: string;
-    //       email?: string;
-    //     };
-    //   `,
-    // },
+    {
+      code: `
+        type AnotherValidType = {
+          isActive: boolean;
+          address?: string;
+          email?: string;
+        };
+      `,
+    },
   ],
 
   invalid: [
-    // {
-    //   code: `
-    //     type InvalidType = {
-    //       name?: string; // Optional before required
-    //       age: number;
-    //     };
-    //   `,
-    //   errors: [
-    //     {
-    //       message: 'Optional property \'name\' should be defined after required properties.',
-    //       type: 'TSPropertySignature'  // Specify the node type
-    //     },
-    //   ],
-    // },
-
-
-    // {
-    //   code: `
-    //     type AnotherInvalidType = {
-    //       isCool?: boolean;
-    //       isAwesome: boolean;
-    //       job?: string;
-    //     };
-    //   `,
-    //   errors: [
-    //     {
-    //       message: 'Optional property \'isCool\' should be defined after required properties.',
-    //       type: 'TSPropertySignature'
-    //     },
-    //   ],
-    // },
+    {
+      code: `
+        type InvalidType = {
+          name?: string; // Optional before required
+          age: number;
+        };
+      `,
+      errors: [
+        {
+          message: 'Optional property \'name\' should be defined after required properties.',
+          type: 'TSPropertySignature'
+        },
+      ],
+    },
+    {
+      code: `
+        type AnotherInvalidType = {
+          isCool?: boolean;
+          isAwesome: boolean;
+          job?: string;
+        };
+      `,
+      errors: [
+        {
+          message: 'Optional property \'isCool\' should be defined after required properties.',
+          type: 'TSPropertySignature'
+        },
+      ],
+    },
   ],
 });

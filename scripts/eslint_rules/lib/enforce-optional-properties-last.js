@@ -24,17 +24,16 @@ module.exports = {
       TSTypeAliasDeclaration(node) {
         const typeAnnotation = node.typeAnnotation;
         if (typeAnnotation.type === 'TSTypeLiteral') {
-          let foundOptional = false;
+          let foundOptionalWithinAnnotation = null;
           for (const property of typeAnnotation.members) {
             if (property.optional) {
-              foundOptional = true;
-            } else if (foundOptional) {
-              // Optional property found before a required one
+              foundOptionalWithinAnnotation = property;
+            } else if (foundOptionalWithinAnnotation && !property.optional) {
+              // Required property found after an optional one
               context.report({
-                node: property,
-
+                node: foundOptionalWithinAnnotation,
                 message: 'Optional property \'{{name}}\' should be defined after required properties.',
-                data: { name: property.key.name },
+                data: { name: foundOptionalWithinAnnotation.key.name },
                 fix(fixer) {
                   // TODO: Implement automatic fixing by rearranging properties
                 }
