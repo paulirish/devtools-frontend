@@ -391,6 +391,9 @@ export interface SyntheticWebSocketConnectionEvent extends TraceEventInstant {
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
       identifier: number,
+      mimeType: string,
+      url: string,
+      nestedEvents: WebSocketEvent[],
     },
   };
   cat: string;
