@@ -4,7 +4,7 @@
 
 import type * as Protocol from '../generated/protocol.js';
 import * as TraceEngine from '../models/trace/trace.js';
-import * as ModificationsManager from '../services/modifications_manager/modifications_manager.js';
+import * as Timeline from '../panels/timeline/timeline.js';
 import * as TraceBounds from '../services/trace_bounds/trace_bounds.js';
 
 // We maintain two caches:
@@ -95,7 +95,7 @@ export class TraceLoader {
     const contents = await TraceLoader.fixtureContents(context, name);
 
     const events = 'traceEvents' in contents ? contents.traceEvents : contents;
-    TraceEngine.Helpers.SyntheticEvents.SyntheticEventsManager.initSyntheticEventsManagerForTrace(events);
+    TraceEngine.Helpers.SyntheticEvents.SyntheticEventsManager.initAndActivate(events);
     return events;
   }
 
@@ -130,9 +130,7 @@ export class TraceLoader {
    * will fall back to the Default config if not provided.
    */
   static async traceEngine(
-      context: Mocha.Context|Mocha.Suite|null, name: string, options: TraceEngineLoaderOptions = {
-        initTraceBounds: true,
-      },
+      context: Mocha.Context|Mocha.Suite|null, name: string,
       config: TraceEngine.Types.Configuration.Configuration = TraceEngine.Types.Configuration.defaults()):
       Promise<TraceEngine.Handlers.Types.TraceParseData> {
     // Force the TraceBounds to be reset to empty. This ensures that in
@@ -144,10 +142,20 @@ export class TraceLoader {
 
     const fromCache = traceEngineCache.get(name)?.get(configCacheKey);
     if (fromCache) {
-      ModificationsManager.ModificationsManager.ModificationsManager.initAndActivateModificationsManager(
-          fromCache.model, 0);
-      if (options.initTraceBounds) {
-        TraceLoader.initTraceBoundsManager(fromCache.traceParsedData);
+      TraceLoader.initTraceBoundsManager(fromCache.traceParsedData);
+      Timeline.ModificationsManager.ModificationsManager.initAndActivateModificationsManager(fromCache.model, 0);
+
+      // This init step is usually done in model.parse(), but as we loaded from
+      // the cache here, we manually run it.
+      // The SyntheticEventsManager caches instances based on the rawEvents()
+      // array, so we can safely do this even if we have already created an
+      // instance for this trace before - the old one will be re-used, rather
+      // than creating a new one.
+      const rawEvents = fromCache.model.rawTraceEvents();
+      if (rawEvents) {
+        TraceEngine.Helpers.SyntheticEvents.SyntheticEventsManager.initAndActivate(
+            rawEvents,
+        );
       }
       return fromCache.traceParsedData;
     }
@@ -160,11 +168,9 @@ export class TraceLoader {
                 {traceParsedData: TraceEngine.Handlers.Types.TraceParseData, model: TraceEngine.TraceModel.Model}>();
     cacheByName.set(configCacheKey, traceEngineData);
     traceEngineCache.set(name, cacheByName);
-    ModificationsManager.ModificationsManager.ModificationsManager.initAndActivateModificationsManager(
-        traceEngineData.model, 0);
-    if (options.initTraceBounds) {
-      TraceLoader.initTraceBoundsManager(traceEngineData.traceParsedData);
-    }
+
+    TraceLoader.initTraceBoundsManager(traceEngineData.traceParsedData);
+    Timeline.ModificationsManager.ModificationsManager.initAndActivateModificationsManager(traceEngineData.model, 0);
     return traceEngineData.traceParsedData;
   }
 

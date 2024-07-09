@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as Root from '../../../core/root/root.js';
 import type * as Handlers from '../../../models/trace/handlers/handlers.js';
 import * as TraceEngine from '../../../models/trace/trace.js';
 import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
@@ -18,7 +18,6 @@ import sidebarStyles from './sidebar.css.js';
 import * as SidebarAnnotationsTab from './SidebarAnnotationsTab.js';
 import * as SidebarInsight from './SidebarInsight.js';
 
-const COLLAPSED_WIDTH = 40;
 const DEFAULT_EXPANDED_WIDTH = 240;
 
 const enum SidebarTabsName {
@@ -42,36 +41,37 @@ export class ToggleSidebarInsights extends Event {
   }
 }
 
-export class SidebarWidget extends UI.SplitWidget.SplitWidget {
-  #sidebarExpanded: boolean = false;
+export const enum WidgetEvents {
+  SidebarCollapseClick = 'SidebarCollapseClick',
+}
+
+export type WidgetEventTypes = {
+  [WidgetEvents.SidebarCollapseClick]: {},
+};
+
+export class SidebarWidget extends Common.ObjectWrapper.eventMixin<WidgetEventTypes, typeof UI.SplitWidget.SplitWidget>(
+    UI.SplitWidget.SplitWidget) {
   #sidebarUI = new SidebarUI();
 
   constructor() {
-    super(true /* isVertical */, false /* secondIsSidebar */, undefined /* settingName */, COLLAPSED_WIDTH);
+    super(true /* isVertical */, false /* secondIsSidebar */, undefined /* settingName */, DEFAULT_EXPANDED_WIDTH);
 
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
-      this.sidebarElement().append(this.#sidebarUI);
-    } else {
-      this.hideSidebar();
-    }
+    this.sidebarElement().append(this.#sidebarUI);
 
-    this.setResizable(this.#sidebarExpanded);
-    this.#sidebarUI.expanded = this.#sidebarExpanded;
-
-    this.#sidebarUI.addEventListener('togglebuttonclick', () => {
-      this.#sidebarExpanded = !this.#sidebarExpanded;
-
-      if (this.#sidebarExpanded) {
-        this.setResizable(true);
-        this.forceSetSidebarWidth(DEFAULT_EXPANDED_WIDTH);
-
-      } else {
-        this.setResizable(false);
-        this.forceSetSidebarWidth(COLLAPSED_WIDTH);
-      }
-
-      this.#sidebarUI.expanded = this.#sidebarExpanded;
+    this.#sidebarUI.addEventListener('closebuttonclick', () => {
+      this.dispatchEventToListeners(
+          WidgetEvents.SidebarCollapseClick,
+          {},
+      );
     });
+  }
+
+  updateContentsOnExpand(): void {
+    this.#sidebarUI.onWidgetShow();
+  }
+
+  setAnnotationsTabContent(updatedAnnotations: TraceEngine.Types.File.Annotation[]): void {
+    this.#sidebarUI.annotations = updatedAnnotations;
   }
 
   setTraceParsedData(traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null): void {
@@ -88,7 +88,6 @@ export class SidebarUI extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #activeTab: SidebarTabsName = SidebarTabsName.INSIGHTS;
   selectedCategory: InsightsCategories = InsightsCategories.ALL;
-  #expanded: boolean = false;
   #lcpPhasesExpanded: boolean = false;
 
   #traceParsedData?: TraceEngine.Handlers.Types.TraceParseData|null;
@@ -103,20 +102,25 @@ export class SidebarUI extends HTMLElement {
   }|null = null;
   #phaseData: Array<{phase: string, timing: number|TraceEngine.Types.Timing.MilliSeconds, percent: string}> = [];
   #insights: TraceEngine.Insights.Types.TraceInsightData<typeof Handlers.ModelHandlers>|null = null;
+  #annotations: TraceEngine.Types.File.Annotation[] = [];
 
   #renderBound = this.#render.bind(this);
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [sidebarStyles];
-    // Force an immediate render of the default state (not expanded).
+  }
+
+  onWidgetShow(): void {
+    // Called when the SidebarWidget is expanded in order to render. Because
+    // this happens distinctly from any data being passed in, we need to expose
+    // a method to allow the widget to let us know when to render. This also
+    // matters because this is when we can update the underline below the
+    // active tab, now that the sidebar is visible and has width.
     this.#render();
   }
 
-  set expanded(expanded: boolean) {
-    if (expanded === this.#expanded) {
-      return;
-    }
-    this.#expanded = expanded;
+  set annotations(annotations: TraceEngine.Types.File.Annotation[]) {
+    this.#annotations = annotations;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
@@ -175,8 +179,8 @@ export class SidebarUI extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
-  #toggleButtonClick(): void {
-    this.dispatchEvent(new Event('togglebuttonclick'));
+  #closeButtonClick(): void {
+    this.dispatchEvent(new Event('closebuttonclick'));
   }
 
   #onTabHeaderClicked(activeTab: SidebarTabsName): void {
@@ -314,7 +318,10 @@ export class SidebarUI extends HTMLElement {
       case SidebarTabsName.INSIGHTS:
         return this.#renderInsightsTabContent();
       case SidebarTabsName.ANNOTATIONS:
-        return new SidebarAnnotationsTab.SidebarAnnotationsTab();
+        return LitHtml.html`
+        <${SidebarAnnotationsTab.SidebarAnnotationsTab.litTagName} .annotations=${this.#annotations}></${
+            SidebarAnnotationsTab.SidebarAnnotationsTab.litTagName}>
+      `;
       default:
         return null;
     }
@@ -342,25 +349,20 @@ export class SidebarUI extends HTMLElement {
   }
 
   #render(): void {
-    const toggleIcon = this.#expanded ? 'left-panel-close' : 'left-panel-open';
     // clang-format off
-    const output = LitHtml.html`<div class=${LitHtml.Directives.classMap({
-      sidebar: true,
-      'is-expanded': this.#expanded,
-      'is-closed': !this.#expanded,
-    })}>
+    const output = LitHtml.html`<div class="sidebar">
       <div class="tab-bar">
-        ${this.#expanded? this.#renderHeader() : LitHtml.nothing}
+        ${this.#renderHeader()}
         <${IconButton.Icon.Icon.litTagName}
-          name=${toggleIcon}
-          @click=${this.#toggleButtonClick}
+          name='left-panel-close'
+          @click=${this.#closeButtonClick}
           class="sidebar-toggle-button"
-          jslog=${VisualLogging.action('performance.sidebar-toggle').track({click: true})}
+          jslog=${VisualLogging.action('performance.sidebar-close').track({click: true})}
         ></${IconButton.Icon.Icon.litTagName}>
       </div>
-      <div class="tab-slider" ?hidden=${!this.#expanded}></div>
-      <div class="tab-headers-bottom-line" ?hidden=${!this.#expanded}></div>
-      ${this.#expanded ? LitHtml.html`<div class="sidebar-body">${this.#renderContent()}</div>` : LitHtml.nothing}
+      <div class="tab-slider"></div>
+      <div class="tab-headers-bottom-line"></div>
+      <div class="sidebar-body">${this.#renderContent()}</div>
     </div>`;
     // clang-format on
     LitHtml.render(output, this.#shadow, {host: this});

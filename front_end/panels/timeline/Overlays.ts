@@ -121,7 +121,19 @@ export interface TimelineCharts {
   networkProvider: TimelineFlameChartNetworkDataProvider;
 }
 
-export class Overlays {
+// An event dispatched when one of the Annotation Overlays (overlay created by the user,
+// ex. EntryLabel) is removed or updated. When one of the Annotation Overlays is removed or updated,
+// ModificationsManager listens to this event and updates the current annotations.
+export type UpdateAction = 'Remove'|'Update';
+export class AnnotationOverlayActionEvent extends Event {
+  static readonly eventName = 'annotationoverlayactionsevent';
+
+  constructor(public overlay: TimelineOverlay, public action: UpdateAction) {
+    super(AnnotationOverlayActionEvent.eventName);
+  }
+}
+
+export class Overlays extends EventTarget {
   /**
    * The list of active overlays. Overlays can't be marked as visible or
    * hidden; every overlay in this list is rendered.
@@ -160,6 +172,7 @@ export class Overlays {
     container: HTMLElement,
     charts: TimelineCharts,
   }) {
+    super();
     this.#overlaysContainer = init.container;
     this.#charts = init.charts;
   }
@@ -195,7 +208,7 @@ export class Overlays {
     if (entry instanceof TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame) {
       return 'main';
     }
-    if (TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestDetailsEvent(entry)) {
+    if (TraceEngine.Types.TraceEvents.isNetworkTrackEntry(entry)) {
       return 'network';
     }
 
@@ -314,6 +327,7 @@ export class Overlays {
    * rendered in the right place.
    */
   update(): void {
+    const timeRangeOverlays: TimeRangeLabel[] = [];
     for (const [overlay, existingElement] of this.#overlaysToElements) {
       const element = existingElement || this.#createElementForNewOverlay(overlay);
       if (existingElement) {
@@ -324,6 +338,71 @@ export class Overlays {
         this.#overlaysContainer.appendChild(element);
       }
       this.#positionOverlay(overlay, element);
+      if (overlay.type === 'TIME_RANGE') {
+        timeRangeOverlays.push(overlay);
+      }
+    }
+
+    if (timeRangeOverlays.length > 1) {  // If there are 0 or 1 overlays, they can't overlap
+      this.#positionOverlappingTimeRangeLabels(timeRangeOverlays);
+    }
+  }
+
+  /**
+   * If any time-range overlays overlap, we try to adjust their horizontal
+   * position in order to make sure you can distinguish them and that the labels
+   * do not entirely overlap.
+   * This is very much minimal best effort, and does not guarantee that all
+   * labels will remain readable.
+   */
+  #positionOverlappingTimeRangeLabels(overlays: readonly TimeRangeLabel[]): void {
+    const overlaysSorted = overlays.toSorted((o1, o2) => {
+      return o1.bounds.min - o2.bounds.min;
+    });
+
+    // Track the overlays which overlap other overlays.
+    // This isn't bi-directional: if we find that O2 overlaps O1, we will
+    // store O1 => [O2]. We will not then also store O2 => [O1], because we
+    // only need to deal with the overlap once.
+    const overlapsByOverlay: Map<TimeRangeLabel, TimeRangeLabel[]> = new Map();
+
+    for (let i = 0; i < overlaysSorted.length; i++) {
+      const current = overlaysSorted[i];
+      const overlaps: TimeRangeLabel[] = [];
+
+      // Walk through subsequent overlays and find stop when you find the next one that does not overlap.
+      for (let j = i + 1; j < overlaysSorted.length; j++) {
+        const next = overlaysSorted[j];
+        const currentAndNextOverlap = TraceEngine.Helpers.Timing.boundsIncludeTimeRange({
+          bounds: current.bounds,
+          timeRange: next.bounds,
+        });
+        if (currentAndNextOverlap) {
+          overlaps.push(next);
+        } else {
+          // Overlays are sorted by time, if this one does not overlap, the next one will not, so we can break.
+          break;
+        }
+      }
+      overlapsByOverlay.set(current, overlaps);
+    }
+    for (const [firstOverlay, overlappingOverlays] of overlapsByOverlay) {
+      const element = this.#overlaysToElements.get(firstOverlay);
+      if (!element) {
+        continue;
+      }
+
+      // If the first overlay is adjusted, we can start back from 0 again
+      // rather than continually increment up.
+      let firstIndexForOverlapClass = 1;
+      if (element.getAttribute('class')?.includes('overlap-')) {
+        firstIndexForOverlapClass = 0;
+      }
+
+      overlappingOverlays.forEach(overlay => {
+        const element = this.#overlaysToElements.get(overlay);
+        element?.classList.add(`overlap-${firstIndexForOverlapClass++}`);
+      });
     }
   }
 
@@ -535,7 +614,7 @@ export class Overlays {
     // We don't need to worry about it going off the bottom, because in that
     // case we don't draw the overlay anyway.
     if (chartName === 'main') {
-      const chartTopPadding = this.#networkChartOffsetHeight();
+      const chartTopPadding = this.networkChartOffsetHeight();
       // We now calculate the available height: if the entry is cut off we don't
       // show the border for the part that is cut off.
       const cutOffTop = y < chartTopPadding;
@@ -578,7 +657,12 @@ export class Overlays {
       case 'ENTRY_LABEL': {
         const component = new Components.EntryLabelOverlay.EntryLabelOverlay(overlay.label);
         component.addEventListener(Components.EntryLabelOverlay.EmptyEntryLabelRemoveEvent.eventName, () => {
-          this.remove(overlay);
+          this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Remove'));
+        });
+        component.addEventListener(Components.EntryLabelOverlay.EntryLabelChangeEvent.eventName, event => {
+          const newLabel = (event as Components.EntryLabelOverlay.EntryLabelChangeEvent).newLabel;
+          overlay.label = newLabel;
+          this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Update'));
         });
         div.appendChild(component);
         return div;
@@ -720,7 +804,7 @@ export class Overlays {
       // its y value without the network track adjustment. If it is < 0, then
       // it's off the top of the screen.
       //
-      const yWithoutNetwork = y - this.#networkChartOffsetHeight();
+      const yWithoutNetwork = y - this.networkChartOffsetHeight();
       // Check if the y position + the height is less than 0. We add height so
       // that we correctly consider an event only partially scrolled off to be
       // visible.
@@ -834,7 +918,7 @@ export class Overlays {
     // Now if the event is in the main chart, we need to pad its Y position
     // down by the height of the network chart + the network resize element.
     if (chartName === 'main') {
-      pixelAdjustedForScroll += this.#networkChartOffsetHeight();
+      pixelAdjustedForScroll += this.networkChartOffsetHeight();
     }
 
     return pixelAdjustedForScroll;
@@ -871,7 +955,7 @@ export class Overlays {
    * Note that it is possible for the chart to have 0 height if the user is
    * looking at a trace with no network requests.
    */
-  #networkChartOffsetHeight(): number {
+  networkChartOffsetHeight(): number {
     if (this.#dimensions.charts.network === null) {
       return 0;
     }

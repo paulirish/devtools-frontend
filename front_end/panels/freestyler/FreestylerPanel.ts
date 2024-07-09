@@ -4,6 +4,7 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
@@ -16,8 +17,10 @@ import {
   Rating,
   State as FreestylerChatUiState,
 } from './components/FreestylerChatUi.js';
-import {FreestylerAgent, Step} from './FreestylerAgent.js';
+import {FIX_THIS_ISSUE_PROMPT, FreestylerAgent, Step} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
+
+const DOGFOOD_INFO = ' https://goo.gle/freestyler-dogfood' as Platform.DevToolsPath.UrlString;
 
 /*
   * TODO(nvitkov): b/346933425
@@ -66,10 +69,11 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   leftToolbar.appendToolbarItem(clearButton);
 
   rightToolbar.appendSeparator();
-  const feedbackButton =
-      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.sendFeedback), 'bug', undefined, 'freestyler.feedback');
-  const helpButton = new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.help), 'help', undefined, 'freestyler.help');
-  rightToolbar.appendToolbarItem(feedbackButton);
+  const helpButton =
+      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.sendFeedback), 'help', undefined, 'freestyler.feedback');
+  helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(DOGFOOD_INFO);
+  });
   rightToolbar.appendToolbarItem(helpButton);
 }
 
@@ -111,7 +115,8 @@ export class FreestylerPanel extends UI.Panel.Panel {
         UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
     this.#aidaClient = aidaClient;
     this.#contentContainer = this.contentElement.createChild('div', 'freestyler-chat-ui-container');
-    this.#agent = new FreestylerAgent({aidaClient: this.#aidaClient});
+    this.#agent =
+        new FreestylerAgent({aidaClient: this.#aidaClient, confirmSideEffect: this.showConfirmSideEffectUi.bind(this)});
     this.#selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
     this.#viewProps = {
       state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
@@ -126,6 +131,9 @@ export class FreestylerPanel extends UI.Panel.Panel {
       onRateClick: this.#handleRateClick.bind(this),
       onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
       onCancelClick: this.#cancel.bind(this),
+      onFixThisIssueClick: () => {
+        void this.#handleTextSubmit(FIX_THIS_ISSUE_PROMPT);
+      },
     };
     this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.Toggled, ev => {
       this.#viewProps.inspectElementToggled = ev.data;
@@ -165,21 +173,34 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.view(this.#viewProps, this.#viewOutput, this.#contentContainer);
   }
 
+  async showConfirmSideEffectUi(action: string): Promise<boolean> {
+    const sideEffectConfirmationPromiseWithResolvers = Platform.PromiseUtilities.promiseWithResolvers<boolean>();
+    this.#viewProps.confirmSideEffectDialog = {
+      code: action,
+      onAnswer: (answer: boolean) => sideEffectConfirmationPromiseWithResolvers.resolve(answer),
+    };
+    this.doUpdate();
+
+    const result = await sideEffectConfirmationPromiseWithResolvers.promise;
+    this.#viewProps.confirmSideEffectDialog = undefined;
+    this.doUpdate();
+
+    return result;
+  }
+
   #handleSelectElementClick(): void {
     void this.#toggleSearchElementAction.execute();
   }
 
   #handleRateClick(rpcId: number, rating: Rating): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.registerAidaClientEvent(JSON.stringify({
-      client: Host.AidaClient.CLIENT_NAME,
-      event_time: new Date().toISOString(),
+    this.#aidaClient.registerClientEvent({
       corresponding_aida_rpc_global_id: rpcId,
       do_conversation_client_event: {
         user_feedback: {
           sentiment: rating === Rating.POSITIVE ? 'POSITIVE' : 'NEGATIVE',
         },
       },
-    }));
+    });
   }
 
   #handleAcceptConsentClick(): void {
@@ -225,8 +246,12 @@ export class FreestylerPanel extends UI.Panel.Panel {
       text,
     });
     this.#viewProps.isLoading = true;
+    // TODO: We should only show "Fix this issue" button when the answer suggests fix or fixes.
+    // We shouldn't show this when the answer is complete like a confirmation without any suggestion.
+    const suggestingFix = text !== FIX_THIS_ISSUE_PROMPT;
     let systemMessage: ModelChatMessage = {
       entity: ChatMessageEntity.MODEL,
+      suggestingFix,
       steps: [],
     };
     this.doUpdate();
@@ -242,6 +267,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       if (data.step === Step.QUERYING) {
         systemMessage = {
           entity: ChatMessageEntity.MODEL,
+          suggestingFix,
           steps: [],
         };
         this.#viewProps.messages.push(systemMessage);

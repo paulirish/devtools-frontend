@@ -15,6 +15,10 @@ import * as Components from './components.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
+const LOCAL_METRIC_SELECTOR = '.local-value .metric-value';
+const FIELD_METRIC_SELECTOR = '.field-value .metric-value';
+const INTERACTION_SELECTOR = '.interaction';
+
 describeWithMockConnection('LiveMetricsView', () => {
   const mockHandleAction = sinon.stub();
 
@@ -50,13 +54,13 @@ describeWithMockConnection('LiveMetricsView', () => {
     const view = new Components.LiveMetricsView.LiveMetricsView();
     renderElementIntoDOM(view);
     LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-      lcp: {value: 100, rating: 'good'},
+      lcp: {value: 100},
       interactions: [],
     });
     await coordinator.done();
     const metricEl = view.shadowRoot?.querySelector('#lcp') as HTMLDivElement;
-    const metricValueEl = metricEl.querySelector('.local-metric-value') as HTMLDivElement;
-    assert.strictEqual(metricValueEl.className, 'local-metric-value good');
+    const metricValueEl = metricEl.querySelector(LOCAL_METRIC_SELECTOR) as HTMLDivElement;
+    assert.strictEqual(metricValueEl.className, 'metric-value good');
     assert.strictEqual(metricValueEl.innerText, '100 ms');
   });
 
@@ -64,25 +68,25 @@ describeWithMockConnection('LiveMetricsView', () => {
     const view = new Components.LiveMetricsView.LiveMetricsView();
     renderElementIntoDOM(view);
     LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-      cls: {value: 1.34294789234, rating: 'needs-improvement'},
+      cls: {value: 0.14294789234},
       interactions: [],
     });
     await coordinator.done();
     const metricEl = view.shadowRoot?.querySelector('#cls') as HTMLDivElement;
-    const metricValueEl = metricEl.querySelector('.local-metric-value') as HTMLDivElement;
-    assert.strictEqual(metricValueEl.className, 'local-metric-value needs-improvement');
-    assert.strictEqual(metricValueEl.innerText, '1.343');
+    const metricValueEl = metricEl.querySelector(LOCAL_METRIC_SELECTOR) as HTMLDivElement;
+    assert.strictEqual(metricValueEl.className, 'metric-value needs-improvement');
+    assert.strictEqual(metricValueEl.innerText, '0.14');
   });
 
   it('should show INP value', async () => {
     const view = new Components.LiveMetricsView.LiveMetricsView();
     renderElementIntoDOM(view);
     LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(
-        LiveMetrics.Events.Status, {inp: {value: 2000, rating: 'poor'}, interactions: []});
+        LiveMetrics.Events.Status, {inp: {value: 2000}, interactions: []});
     await coordinator.done();
     const metricEl = view.shadowRoot?.querySelector('#inp') as HTMLDivElement;
-    const metricValueEl = metricEl.querySelector('.local-metric-value') as HTMLDivElement;
-    assert.strictEqual(metricValueEl.className, 'local-metric-value poor');
+    const metricValueEl = metricEl.querySelector(LOCAL_METRIC_SELECTOR) as HTMLDivElement;
+    assert.strictEqual(metricValueEl.className, 'metric-value poor');
     assert.strictEqual(metricValueEl.innerText, '2.00 s');
   });
 
@@ -91,8 +95,8 @@ describeWithMockConnection('LiveMetricsView', () => {
     renderElementIntoDOM(view);
     await coordinator.done();
     const metricEl = view.shadowRoot?.querySelector('#inp') as HTMLDivElement;
-    const metricValueEl = metricEl.querySelector('.local-metric-value') as HTMLDivElement;
-    assert.strictEqual(metricValueEl.className.trim(), 'local-metric-value waiting');
+    const metricValueEl = metricEl.querySelector(LOCAL_METRIC_SELECTOR) as HTMLDivElement;
+    assert.strictEqual(metricValueEl.className.trim(), 'metric-value waiting');
     assert.strictEqual(metricValueEl.innerText, '-');
   });
 
@@ -101,28 +105,28 @@ describeWithMockConnection('LiveMetricsView', () => {
     renderElementIntoDOM(view);
     LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
       interactions: [
-        {duration: 500, rating: 'poor', interactionType: 'pointer'},
-        {duration: 30, rating: 'good', interactionType: 'keyboard'},
+        {duration: 500, interactionType: 'pointer'},
+        {duration: 30, interactionType: 'keyboard'},
       ],
     });
     await coordinator.done();
     const interactionsListEl = view.shadowRoot?.querySelector('.interactions-list') as HTMLDivElement;
-    const interactionsEls = interactionsListEl.querySelectorAll('.interaction');
+    const interactionsEls = interactionsListEl.querySelectorAll(INTERACTION_SELECTOR);
     assert.lengthOf(interactionsEls, 2);
 
     const typeEl1 = interactionsEls[0].querySelector('.interaction-type') as HTMLDivElement;
     assert.strictEqual(typeEl1.textContent, 'pointer');
 
-    const durationEl1 = interactionsEls[0].querySelector('.interaction-duration') as HTMLDivElement;
+    const durationEl1 = interactionsEls[0].querySelector('.interaction-duration .metric-value') as HTMLDivElement;
     assert.strictEqual(durationEl1.textContent, '500 ms');
-    assert.strictEqual(durationEl1.className, 'interaction-duration poor');
+    assert.strictEqual(durationEl1.className, 'metric-value needs-improvement');
 
     const typeEl2 = interactionsEls[1].querySelector('.interaction-type') as HTMLDivElement;
     assert.strictEqual(typeEl2.textContent, 'keyboard');
 
-    const durationEl2 = interactionsEls[1].querySelector('.interaction-duration') as HTMLDivElement;
+    const durationEl2 = interactionsEls[1].querySelector('.interaction-duration .metric-value') as HTMLDivElement;
     assert.strictEqual(durationEl2.textContent, '30 ms');
-    assert.strictEqual(durationEl2.className, 'interaction-duration good');
+    assert.strictEqual(durationEl2.className, 'metric-value good');
   });
 
   it('record action button should work', async () => {
@@ -158,7 +162,7 @@ describeWithMockConnection('LiveMetricsView', () => {
     let mockFieldData: CrUXManager.PageResult;
 
     beforeEach(async () => {
-      CrUXManager.CrUXManager.instance().getAutomaticSetting().set(false);
+      CrUXManager.CrUXManager.instance().getEnabledSetting().set(false);
 
       const tabTarget = createTarget({type: SDK.Target.Type.Tab});
       target = createTarget({parentTarget: tabTarget});
@@ -177,7 +181,7 @@ describeWithMockConnection('LiveMetricsView', () => {
       sinon.stub(CrUXManager.CrUXManager.instance(), 'getFieldDataForCurrentPage').callsFake(async () => mockFieldData);
     });
 
-    it('should show when requested manually', async () => {
+    it('should not show when crux is disabled', async () => {
       mockFieldData['url-ALL'] = {
         record: {
           key: {
@@ -211,23 +215,29 @@ describeWithMockConnection('LiveMetricsView', () => {
       const view = new Components.LiveMetricsView.LiveMetricsView();
       renderElementIntoDOM(view);
 
-      const fieldDataCard = view.shadowRoot?.querySelector('#field-setup') as HTMLDivElement;
-
-      (fieldDataCard.querySelector('button') as HTMLButtonElement).click();
       await coordinator.done();
 
-      const lcpFieldEl = view.shadowRoot?.querySelector('#lcp .field-data') as HTMLDivElement;
-      assert.strictEqual(lcpFieldEl.innerText, '50%\n30%\n20%');
+      const lcpHistogramEl = view.shadowRoot?.querySelector('#lcp .field-data-histogram');
+      assert.isNull(lcpHistogramEl);
 
-      const clsFieldEl = view.shadowRoot?.querySelector('#cls .field-data') as HTMLDivElement;
-      assert.strictEqual(clsFieldEl.innerText, '10%\n10%\n80%');
+      const clsHistogramEl = view.shadowRoot?.querySelector('#cls .field-data-histogram');
+      assert.isNull(clsHistogramEl);
 
-      const inpFieldEl = view.shadowRoot?.querySelector('#inp .field-data');
-      assert.isNull(inpFieldEl);
+      const inpHistogramEl = view.shadowRoot?.querySelector('#inp .field-data-histogram');
+      assert.isNull(inpHistogramEl);
+
+      const lcpFieldEl = view.shadowRoot?.querySelector(`#lcp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(lcpFieldEl.textContent, '-');
+
+      const clsFieldEl = view.shadowRoot?.querySelector(`#cls ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(clsFieldEl.textContent, '-');
+
+      const inpFieldEl = view.shadowRoot?.querySelector(`#inp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(inpFieldEl.textContent, '-');
     });
 
-    it('should show when requested automatically', async () => {
-      CrUXManager.CrUXManager.instance().getAutomaticSetting().set(true);
+    it('should show when crux is enabled', async () => {
+      CrUXManager.CrUXManager.instance().getEnabledSetting().set(true);
 
       const view = new Components.LiveMetricsView.LiveMetricsView();
       renderElementIntoDOM(view);
@@ -272,18 +282,29 @@ describeWithMockConnection('LiveMetricsView', () => {
 
       await coordinator.done();
 
-      const lcpFieldEl = view.shadowRoot?.querySelector('#lcp .field-data') as HTMLDivElement;
-      assert.strictEqual(lcpFieldEl.innerText, '50%\n30%\n20%');
+      const lcpHistogramEl = view.shadowRoot?.querySelector('#lcp .field-data-histogram') as HTMLDivElement;
+      assert.strictEqual(
+          lcpHistogramEl.innerText, 'Good (≤2.50 s)\n50%\nNeeds improvement (2.50 s-4.00 s)\n30%\nPoor (>4.00 s)\n20%');
 
-      const clsFieldEl = view.shadowRoot?.querySelector('#cls .field-data') as HTMLDivElement;
-      assert.strictEqual(clsFieldEl.innerText, '10%\n10%\n80%');
+      const clsHistogramEl = view.shadowRoot?.querySelector('#cls .field-data-histogram') as HTMLDivElement;
+      assert.strictEqual(
+          clsHistogramEl.innerText, 'Good (≤0.10)\n10%\nNeeds improvement (0.10-0.25)\n10%\nPoor (>0.25)\n80%');
 
-      const inpFieldEl = view.shadowRoot?.querySelector('#inp .field-data');
-      assert.isNull(inpFieldEl);
+      const inpHistogramEl = view.shadowRoot?.querySelector('#inp .field-data-histogram');
+      assert.isNull(inpHistogramEl);
+
+      const lcpFieldEl = view.shadowRoot?.querySelector(`#lcp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(lcpFieldEl.textContent, '1.00 s');
+
+      const clsFieldEl = view.shadowRoot?.querySelector(`#cls ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(clsFieldEl.textContent, '0.25');
+
+      const inpFieldEl = view.shadowRoot?.querySelector(`#inp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(inpFieldEl.textContent, '-');
     });
 
-    it('should make initial request on render when set to automatic', async () => {
-      CrUXManager.CrUXManager.instance().getAutomaticSetting().set(true);
+    it('should make initial request on render when crux is enabled', async () => {
+      CrUXManager.CrUXManager.instance().getEnabledSetting().set(true);
 
       mockFieldData['url-ALL'] = {
         record: {
@@ -320,14 +341,57 @@ describeWithMockConnection('LiveMetricsView', () => {
 
       await coordinator.done();
 
-      const lcpFieldEl = view.shadowRoot?.querySelector('#lcp .field-data') as HTMLDivElement;
-      assert.strictEqual(lcpFieldEl.innerText, '50%\n30%\n20%');
+      const lcpFieldEl1 = view.shadowRoot?.querySelector(`#lcp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(lcpFieldEl1.textContent, '1.00 s');
+    });
 
-      const clsFieldEl = view.shadowRoot?.querySelector('#cls .field-data') as HTMLDivElement;
-      assert.strictEqual(clsFieldEl.innerText, '10%\n10%\n80%');
+    it('should be removed once crux is disabled', async () => {
+      CrUXManager.CrUXManager.instance().getEnabledSetting().set(true);
 
-      const inpFieldEl = view.shadowRoot?.querySelector('#inp .field-data');
-      assert.isNull(inpFieldEl);
+      mockFieldData['url-ALL'] = {
+        record: {
+          key: {
+            url: 'https://example.com',
+          },
+          metrics: {
+            'largest_contentful_paint': {
+              histogram: [
+                {start: 0, end: 2500, density: 0.5},
+                {start: 2500, end: 4000, density: 0.3},
+                {start: 4000, density: 0.2},
+              ],
+              percentiles: {p75: 1000},
+            },
+            'cumulative_layout_shift': {
+              histogram: [
+                {start: 0, end: 0.1, density: 0.1},
+                {start: 0.1, end: 0.25, density: 0.1},
+                {start: 0.25, density: 0.8},
+              ],
+              percentiles: {p75: 0.25},
+            },
+          },
+          collectionPeriod: {
+            firstDate: {year: 2024, month: 1, day: 1},
+            lastDate: {year: 2024, month: 1, day: 29},
+          },
+        },
+      };
+
+      const view = new Components.LiveMetricsView.LiveMetricsView();
+      renderElementIntoDOM(view);
+
+      await coordinator.done();
+
+      const lcpFieldEl1 = view.shadowRoot?.querySelector(`#lcp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(lcpFieldEl1.textContent, '1.00 s');
+
+      CrUXManager.CrUXManager.instance().getEnabledSetting().set(false);
+
+      await coordinator.done();
+
+      const lcpFieldEl2 = view.shadowRoot?.querySelector(`#lcp ${FIELD_METRIC_SELECTOR}`) as HTMLElement;
+      assert.strictEqual(lcpFieldEl2.textContent, '-');
     });
   });
 });

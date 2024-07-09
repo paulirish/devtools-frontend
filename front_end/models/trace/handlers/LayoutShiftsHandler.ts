@@ -311,6 +311,12 @@ async function buildLayoutShiftsClusters(): Promise<void> {
         updateTraceWindowMax(currentCluster.clusterWindow, Types.Timing.MicroSeconds(previousClusterEndTime));
       }
 
+      // If this cluster happened after a navigation, set the navigationId to
+      // the current navigation. This lets us easily group clusters by
+      // navigation.
+      const navigationId =
+          currentShiftNavigation === null ? undefined : navigations[currentShiftNavigation].args.data?.navigationId;
+
       clusters.push({
         events: [],
         clusterWindow: traceWindowFromTime(clusterStartTime),
@@ -320,6 +326,7 @@ async function buildLayoutShiftsClusters(): Promise<void> {
           needsImprovement: null,
           bad: null,
         },
+        navigationId,
       });
 
       firstShiftTime = clusterStartTime;
@@ -489,6 +496,8 @@ export interface LayoutShiftCluster {
     needsImprovement: Types.Timing.TraceWindowMicroSeconds|null,
     bad: Types.Timing.TraceWindowMicroSeconds|null,
   };
+  // The last navigation that happened before this cluster.
+  navigationId?: string;
 }
 
 // Based on https://web.dev/cls/
