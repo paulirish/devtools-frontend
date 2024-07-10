@@ -123,11 +123,15 @@ export interface TraceFrame {
   // Added to Chromium in April 2024:
   // crrev.com/c/5424783
   isOutermostMainFrame?: boolean;
-  // Added to Chromium in June 2024:
-  // crrev.com/c/5595033
-  isInPrimaryMainFrame?: boolean;
+  // Added to Chromium in June 2024: crrev.com/c/5595033
+  isInPrimaryMainFrame: NewIn<127, boolean>;
 }
 
+// Define NewIn
+type Version =  127|128|129|130|131|132|133|134|135|136|137|138|139|140;
+type min_version = 133;
+// type NewIn<V extends Version, T> = V extends Version ? T : never;
+type NewIn<V extends Version, T> = min_version >= V? T : undefined
 // Sample events.
 
 export interface TraceEventSample extends TraceEventData {
