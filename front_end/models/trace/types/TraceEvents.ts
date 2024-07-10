@@ -120,18 +120,19 @@ export interface TraceFrame {
   processId: ProcessID;
   url: string;
   parent?: string;
-  // Added to Chromium in April 2024:
-  // crrev.com/c/5424783
-  isOutermostMainFrame?: boolean;
-  // Added to Chromium in June 2024: crrev.com/c/5595033
-  isInPrimaryMainFrame: NewIn<127, boolean>;
+  // Added to Chromium in April 2024: crrev.com/c/5424783
+  isOutermostMainFrame: LandedIn<125, boolean>;
+  // Added to Chromium in June 2024:crrev.com/c/5595033
+  isInPrimaryMainFrame: LandedIn<127, boolean>;
 }
 
-// Define NewIn
-type Version =  127|128|129|130|131|132|133|134|135|136|137|138|139|140;
-type min_version = 133;
-// type NewIn<V extends Version, T> = V extends Version ? T : never;
-type NewIn<V extends Version, T> = min_version >= V? T : undefined
+// We are OK with throwing exceptions for traces from these milestones. (TODO: Create tooling to construct this union. It can't accidentally exclude one. A >= check is obviously simpler, but isn't TS compatible.)
+type UnsupportedMilestones = 78|77|76;
+/** If it was recently added, the type will be optional, so that we defensively code around its precence.
+ * But, if it's from a milestone in `UnsupportedMilestones`, the type will be required. This allows code cleanup, but also means we risk exceptions */
+type LandedIn<Milestone extends number, T> = Milestone extends UnsupportedMilestones ? T : (T | undefined);
+
+
 // Sample events.
 
 export interface TraceEventSample extends TraceEventData {
