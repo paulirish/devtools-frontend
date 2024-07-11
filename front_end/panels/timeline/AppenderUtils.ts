@@ -108,9 +108,6 @@ export function getFormattedTime(
 
 /**
  * Returns the first level that is available for an event.
- * @param event the event.
- * @param lastTimestampByLevel
- * @returns the first available level for the event.
  */
 export function getEventLevel(
     event: TraceEngine.Types.TraceEvents.TraceEventData, lastTimestampByLevel: LastTimestampByLevel): number {

@@ -142,7 +142,7 @@ export class NetworkTrackAppender implements TrackAppender {
    */
   #appendEventsAtLevel(events: readonly TraceEngine.Types.TraceEvents.TraceEventData[], trackStartLevel: number):
       number {
-    // Appending everything to the same level isn't "correct"", but filterTimelineDataBetweenTimes will handle that
+    // Appending everything to the same level isn't "correct", but filterTimelineDataBetweenTimes() will handle that
     // before anything is rendered.
     for (let i = 0; i < events.length; ++i) {
       this.#appendEventAtLevel(events[i], trackStartLevel);
