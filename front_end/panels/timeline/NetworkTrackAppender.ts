@@ -12,6 +12,7 @@ import {
   buildTrackHeader,
   getEventLevel,
   getFormattedTime,
+  type LastTimestampByLevel,
 } from './AppenderUtils.js';
 import {
   type HighlightedEntryInfo,
@@ -179,7 +180,7 @@ export class NetworkTrackAppender implements TrackAppender {
     if (!this.#flameChartData || events.length === 0) {
       return 0;
     }
-    const lastTimeByLevel: number[] = [];
+    const lastTimestampByLevel: LastTimestampByLevel = [];
     this.webSocketIdToLevel = new Map<number, number>();
     let maxLevel = 0;
     for (let i = 0; i < events.length; ++i) {
@@ -196,15 +197,15 @@ export class NetworkTrackAppender implements TrackAppender {
         this.#flameChartData.entryLevels[i] = -1;
         continue;
       }
-      // Layout the entries by assigning levels. For websocket trace events, place them on top of their parent websocket.
+      // Layout the entries by assigning levels.
       let level: number;
       if ('identifier' in event.args.data && TraceEngine.Types.TraceEvents.isWebSocketEvent(event)) {
-        level = this.getWebSocketLevel(event, lastTimeByLevel);
+        level = this.getWebSocketLevel(event, lastTimestampByLevel);
       } else {
-        level = getEventLevel(event, lastTimeByLevel);
+        level = getEventLevel(event, lastTimestampByLevel);
       }
       this.#flameChartData.entryLevels[i] = level;
-      maxLevel = Math.max(maxLevel, lastTimeByLevel.length, level);
+      maxLevel = Math.max(maxLevel, lastTimestampByLevel.length, level);
     }
     for (let i = 0; i < events.length; ++i) {
       // -1 means this event is invisible.
@@ -216,13 +217,15 @@ export class NetworkTrackAppender implements TrackAppender {
     return maxLevel;
   }
 
-  getWebSocketLevel(event: TraceEngine.Types.TraceEvents.WebSocketEvent, lastTimeByLevel: number[]) {
+  getWebSocketLevel(event: TraceEngine.Types.TraceEvents.WebSocketEvent, lastTimestampByLevel: LastTimestampByLevel) {
     const webSocketIdentifier = event.args.data.identifier;
     let level: number;
     if (this.webSocketIdToLevel.has(webSocketIdentifier)) {
+      // We're placing an instant event on top of its parent websocket
       level = this.webSocketIdToLevel.get(webSocketIdentifier) || 0;
     } else {
-      level = getEventLevel(event, lastTimeByLevel);
+      // We're placing the parent websocket
+      level = getEventLevel(event, lastTimestampByLevel);
       this.webSocketIdToLevel.set(webSocketIdentifier, level);
     }
     return level;

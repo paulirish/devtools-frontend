@@ -9,7 +9,7 @@ import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
-import {getEventLevel} from './AppenderUtils.js';
+import {getEventLevel, type LastTimestampByLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import {getEventStyle} from './EventUICategory.js';
 import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
@@ -475,21 +475,21 @@ export class CompatibilityTracksAppender {
   appendEventsAtLevel<T extends TraceEngine.Types.TraceEvents.TraceEventData>(
       events: readonly T[], trackStartLevel: number, appender: TrackAppender,
       eventAppendedCallback?: (event: T, index: number) => void): number {
-    const lastUsedTimeByLevel: number[] = [];
+    const lastTimestampByLevel: LastTimestampByLevel = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
       if (!this.entryIsVisibleInTimeline(event)) {
         continue;
       }
 
-      const level = getEventLevel(event, lastUsedTimeByLevel);
+      const level = getEventLevel(event, lastTimestampByLevel);
       const index = this.appendEventAtLevel(event, trackStartLevel + level, appender);
       eventAppendedCallback?.(event, index);
     }
 
-    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
+    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastTimestampByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
-    return trackStartLevel + lastUsedTimeByLevel.length;
+    return trackStartLevel + lastTimestampByLevel.length;
   }
 
   entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
