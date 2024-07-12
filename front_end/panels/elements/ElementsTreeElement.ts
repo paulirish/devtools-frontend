@@ -221,8 +221,8 @@ type OpeningTagContext = {
     readonly adornerContainer: HTMLElement,
     adorners: Adorners.Adorner.Adorner[],
     styleAdorners: Adorners.Adorner.Adorner[],
-    readonly adornersThrottler: Common.Throttler.Throttler,canAddAttributes: boolean,
-
+    readonly adornersThrottler: Common.Throttler.Throttler,
+    canAddAttributes: boolean,
     slot?: Adorners.Adorner.Adorner,
 };
 
