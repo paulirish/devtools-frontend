@@ -23,6 +23,9 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/AppenderUtils.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+/** An array, indexed by entry levels, where the values are the last timestamp (typically `endTime`) of data within that level. */
+export type LastTimestampByLevel = number[];
+
 /**
  * Builds the style for the group.
  * Each group has a predefined style and a reference to the definition of the legacy track (which should be removed in the future).
@@ -59,7 +62,8 @@ export function buildGroupStyle(extra?: Partial<PerfUI.FlameChart.GroupStyle>): 
  */
 export function buildTrackHeader(
     jslogContext: VisualLoggingTrackName|null, startLevel: number, name: string, style: PerfUI.FlameChart.GroupStyle,
-    selectable: boolean, expanded?: boolean, showStackContextMenu?: boolean): PerfUI.FlameChart.Group {
+    selectable: boolean, expanded?: boolean, showStackContextMenu?: boolean,
+    legends?: PerfUI.FlameChart.Legend[]): PerfUI.FlameChart.Group {
   const group: PerfUI.FlameChart.Group = {
     startLevel,
     name: name as Common.UIString.LocalizedString,
@@ -67,6 +71,7 @@ export function buildTrackHeader(
     selectable,
     expanded,
     showStackContextMenu,
+    legends,
   };
   if (jslogContext !== null) {
     group.jslogContext = jslogContext;
@@ -103,23 +108,20 @@ export function getFormattedTime(
 
 /**
  * Returns the first level that is available for an event.
- * @param event the event.
- * @param lastUsedTimeByLevel the array that stores the last timestamp that is used by a level.
- * @returns the first available level for the event.
  */
 export function getEventLevel(
-    event: TraceEngine.Types.TraceEvents.TraceEventData, lastUsedTimeByLevel: number[]): number {
+    event: TraceEngine.Types.TraceEvents.TraceEventData, lastTimestampByLevel: LastTimestampByLevel): number {
   let level = 0;
   const startTime = event.ts;
   const endTime = event.ts + (event.dur || 0);
   // Look vertically for the first level where this event fits,
   // that is, where it wouldn't overlap with other events.
-  while (level < lastUsedTimeByLevel.length && startTime < lastUsedTimeByLevel[level]) {
+  while (level < lastTimestampByLevel.length && startTime < lastTimestampByLevel[level]) {
     // For each event, we look each level from top, and see if start timestamp of this
     // event is used by current level already. If yes, we will go to check next level.
     ++level;
   }
-  lastUsedTimeByLevel[level] = endTime;
+  lastTimestampByLevel[level] = endTime;
   return level;
 }
 

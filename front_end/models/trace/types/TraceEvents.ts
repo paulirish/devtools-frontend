@@ -390,6 +390,25 @@ export interface SyntheticNetworkRequest extends TraceEventComplete, SyntheticBa
   tid: ThreadID;
 }
 
+export interface SyntheticWebSocketConnectionEvent extends TraceEventComplete, SyntheticBasedEvent<Phase.COMPLETE> {
+  rawSourceEvent: TraceEventData;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      priority: Protocol.Network.ResourcePriority,
+      url: string,
+    },
+  };
+  cat: string;
+  name: 'SyntheticWebSocketConnectionEvent';
+  ph: Phase.COMPLETE;
+  dur: MicroSeconds;
+  ts: MicroSeconds;
+  pid: ProcessID;
+  tid: ThreadID;
+  s: TraceEventScope;
+}
+
 export const enum AuctionWorkletType {
   BIDDER = 'bidder',
   SELLER = 'seller',
@@ -578,6 +597,10 @@ export interface TraceEventNavigationStart extends TraceEventMark {
       // reasonably may import traces from before that date that do not have
       // this field present.
       isOutermostMainFrame?: boolean, navigationId: string,
+      /**
+       * @deprecated use documentLoaderURL for navigation events URLs
+       */
+      url?: string,
     },
         frame: string,
   };
@@ -1641,19 +1664,13 @@ export function isTraceEventActivateLayerTree(event: TraceEventData): event is T
   return event.name === KnownEventName.ActivateLayerTree;
 }
 
-export interface SyntheticInvalidation extends TraceEventInstant {
-  name: 'SyntheticInvalidation';
-  nodeName?: string;
-  rawEvent: TraceEventScheduleStyleInvalidationTracking|TraceEventStyleRecalcInvalidationTracking|
-      TraceEventStyleInvalidatorInvalidationTracking|TraceEventLayoutInvalidationTracking;
-  nodeId: Protocol.DOM.BackendNodeId;
-  frame: string;
-  reason?: string;
-  stackTrace?: TraceEventCallFrame[];
-}
+export type InvalidationTrackingEvent =
+    TraceEventScheduleStyleInvalidationTracking|TraceEventStyleRecalcInvalidationTracking|
+    TraceEventStyleInvalidatorInvalidationTracking|TraceEventLayoutInvalidationTracking;
 
-export function isSyntheticInvalidation(event: TraceEventData): event is SyntheticInvalidation {
-  return event.name === 'SyntheticInvalidation';
+export function isTraceEventInvalidationTracking(event: TraceEventData): event is InvalidationTrackingEvent {
+  return isTraceEventScheduleStyleInvalidationTracking(event) || isTraceEventStyleRecalcInvalidationTracking(event) ||
+      isTraceEventStyleInvalidatorInvalidationTracking(event) || isTraceEventLayoutInvalidationTracking(event);
 }
 
 export interface TraceEventDrawLazyPixelRef extends TraceEventInstant {
@@ -2022,10 +2039,22 @@ export function isTraceEventResourceReceivedData(
   return traceEventData.name === 'ResourceReceivedData';
 }
 
-export function isSyntheticNetworkRequestDetailsEvent(
+export function isSyntheticNetworkRequestEvent(
     traceEventData: TraceEventData,
     ): traceEventData is SyntheticNetworkRequest {
   return traceEventData.name === 'SyntheticNetworkRequest';
+}
+
+export function isSyntheticWebSocketConnectionEvent(
+    traceEventData: TraceEventData,
+    ): traceEventData is SyntheticWebSocketConnectionEvent {
+  return traceEventData.name === 'SyntheticWebSocketConnectionEvent';
+}
+
+export function isNetworkTrackEntry(traceEventData: TraceEventData):
+    traceEventData is SyntheticWebSocketConnectionEvent|SyntheticNetworkRequest {
+  return isSyntheticNetworkRequestEvent(traceEventData) || isSyntheticWebSocketConnectionEvent(traceEventData) ||
+      isWebSocketTraceEvent(traceEventData);
 }
 
 export function isTraceEventPrePaint(
@@ -2463,11 +2492,16 @@ export function isTraceEventWebSocketDestroy(event: TraceEventData): event is Tr
   return event.name === KnownEventName.WebSocketDestroy;
 }
 
-export function isWebSocketTraceEvent(event: TraceEventData): event is TraceEventWebSocketCreate|
-    TraceEventWebSocketInfo|TraceEventWebSocketTransfer {
+export type WebSocketTraceEvent = TraceEventWebSocketCreate|TraceEventWebSocketInfo|TraceEventWebSocketTransfer;
+export function isWebSocketTraceEvent(event: TraceEventData): event is WebSocketTraceEvent {
   return isTraceEventWebSocketCreate(event) || isTraceEventWebSocketInfo(event) || isTraceEventWebSocketTransfer(event);
 }
-export type WebSocketEvent = TraceEventWebSocketCreate|TraceEventWebSocketInfo|TraceEventWebSocketTransfer;
+
+export type WebSocketEvent = WebSocketTraceEvent|SyntheticWebSocketConnectionEvent;
+export function isWebSocketEvent(event: TraceEventData): event is WebSocketTraceEvent|
+    SyntheticWebSocketConnectionEvent {
+  return isWebSocketTraceEvent(event) || isSyntheticWebSocketConnectionEvent(event);
+}
 
 export interface TraceEventV8Compile extends TraceEventComplete {
   name: KnownEventName.Compile;

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Core from '../core/core.js';
 import * as Graph from '../graph/graph.js';
 import type * as Simulation from '../simulation/simulation.js';
 
@@ -33,10 +34,10 @@ class TotalBlockingTime extends Metric {
 
   static override getEstimateFromSimulation(simulation: Simulation.Result, extras: Extras): Simulation.Result {
     if (!extras.fcpResult) {
-      throw new Error('missing fcpResult');
+      throw new Core.LanternError('missing fcpResult');
     }
     if (!extras.interactiveResult) {
-      throw new Error('missing interactiveResult');
+      throw new Core.LanternError('missing interactiveResult');
     }
 
     // Intentionally use the opposite FCP estimate. A pessimistic FCP is higher than equal to an
@@ -70,16 +71,15 @@ class TotalBlockingTime extends Metric {
     };
   }
 
-  static override async compute(data: MetricComputationDataInput, extras?: Omit<Extras, 'optimistic'>):
-      Promise<MetricResult> {
+  static override compute(data: MetricComputationDataInput, extras?: Omit<Extras, 'optimistic'>): MetricResult {
     const fcpResult = extras?.fcpResult;
     if (!fcpResult) {
-      throw new Error('FCP is required to calculate the TBT metric');
+      throw new Core.LanternError('FCP is required to calculate the TBT metric');
     }
 
     const interactiveResult = extras?.fcpResult;
     if (!interactiveResult) {
-      throw new Error('Interactive is required to calculate the TBT metric');
+      throw new Core.LanternError('Interactive is required to calculate the TBT metric');
     }
 
     return super.compute(data, extras);

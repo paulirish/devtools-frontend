@@ -23,7 +23,6 @@ function* reporters() {
   } else {
     yield 'progress-diff';
   }
-  // TODO(333423685)   EXPANDED_REPORTING ? 'mocha' : 'resultsdb',
   if (TestConfig.coverage) {
     yield 'coverage';
   }
@@ -59,6 +58,13 @@ const ProgressWithDiffReporter = function(
 };
 ProgressWithDiffReporter.$inject =
     ['formatError', 'config.reportSlowerThan', 'config.colors', 'config.browserConsoleLogOptions'];
+
+const coveragePreprocessors = TestConfig.coverage ? {
+  [path.join(GEN_DIR, 'front_end/!(third_party)/**/!(*.test).{js,mjs}')]: ['coverage'],
+  [path.join(GEN_DIR, 'inspector_overlay/**/*.{js,mjs}')]: ['coverage'],
+  [path.join(GEN_DIR, 'front_end/third_party/i18n/**/*.{js,mjs}')]: ['coverage'],
+} :
+                                                    {};
 
 module.exports = function(config: any) {
   const targetDir = path.relative(SOURCE_ROOT, GEN_DIR);
@@ -131,7 +137,7 @@ module.exports = function(config: any) {
 
     preprocessors: {
       '**/*.{js,mjs}': ['sourcemap'],
-      // TODO(333423685) ...COVERAGE_PREPROCESSING_FOLDERS,
+      ...coveragePreprocessors,
     },
 
     proxies: {

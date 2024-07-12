@@ -33,7 +33,10 @@ ts_library("unittests") {
   sources = [ "NetworkAnalyzer.test.ts" ]
 
   deps = [
-    "../:bundle",
+    "../:bundle",  # Lantern bundle
+    "../../:bundle",  # Trace engine bundle
     "../testing:bundle",
   ]
+
+  public_deps = [ "../../../../panels/timeline/fixtures/traces" ]
 }

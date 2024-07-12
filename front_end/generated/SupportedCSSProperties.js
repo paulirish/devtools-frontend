@@ -20,6 +20,13 @@ export const generatedProperties = [
   "name": "-alternative-animation-with-timeline"
  },
  {
+  "longhands": [
+   "position-try-order",
+   "position-try-fallbacks"
+  ],
+  "name": "-alternative-position-try"
+ },
+ {
   "inherited": true,
   "name": "-webkit-border-horizontal-spacing"
  },
@@ -2052,6 +2059,14 @@ export const generatedProperties = [
   "name": "inset-inline-start"
  },
  {
+  "inherited": true,
+  "keywords": [
+   "numeric-only",
+   "allow-keywords"
+  ],
+  "name": "interpolate-size"
+ },
+ {
   "keywords": [
    "auto",
    "isolate"
@@ -2770,6 +2785,9 @@ export const generatedProperties = [
    "flip-inline",
    "flip-start"
   ],
+  "name": "position-try-fallbacks"
+ },
+ {
   "name": "position-try-options"
  },
  {
@@ -2937,7 +2955,7 @@ export const generatedProperties = [
    "after",
    "before"
   ],
-  "name": "scroll-markers"
+  "name": "scroll-marker-group"
  },
  {
   "longhands": [
@@ -4874,6 +4892,12 @@ export const generatedPropertyValues = {
    "all"
   ]
  },
+ "interpolate-size": {
+  "values": [
+   "numeric-only",
+   "allow-keywords"
+  ]
+ },
  "isolation": {
   "values": [
    "auto",
@@ -5227,7 +5251,7 @@ export const generatedPropertyValues = {
    "auto"
   ]
  },
- "position-try-options": {
+ "position-try-fallbacks": {
   "values": [
    "none",
    "flip-block",
@@ -5317,7 +5341,7 @@ export const generatedPropertyValues = {
    "smooth"
   ]
  },
- "scroll-markers": {
+ "scroll-marker-group": {
   "values": [
    "none",
    "after",

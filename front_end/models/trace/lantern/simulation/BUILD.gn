@@ -18,6 +18,7 @@ devtools_module("simulation") {
   ]
 
   deps = [
+    "../core:bundle",
     "../graph:bundle",
     "../types:bundle",
   ]
@@ -46,6 +47,9 @@ ts_library("unittests") {
 
   deps = [
     "../:bundle",
+    "../../:bundle",  # Trace engine bundle
     "../testing:bundle",
   ]
+
+  public_deps = [ "../../../../panels/timeline/fixtures/traces" ]
 }

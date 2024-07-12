@@ -4,12 +4,14 @@
 
 /* eslint-disable no-console */
 
+import * as fs from 'fs';
+import * as path from 'path';
 // use require here due to
 // https://github.com/evanw/esbuild/issues/587#issuecomment-901397213
 import puppeteer = require('puppeteer-core');
 
 import {installPageErrorHandlers} from './events.js';
-import {getTestRunnerConfigSetting} from './test_runner_config.js';
+import {BUILD_ROOT} from './paths.js';
 
 // When loading DevTools with target.goto, we wait for it to be fully loaded using these events.
 const DEVTOOLS_WAITUNTIL_EVENTS: puppeteer.PuppeteerLifeCycleEvent[] = ['networkidle2', 'domcontentloaded'];
@@ -50,10 +52,10 @@ export class DevToolsFrontendTab {
 
   static async create({browser, testServerPort, targetId}: DevToolsFrontendCreationOptions):
       Promise<DevToolsFrontendTab> {
-    const devToolsAppURL =
-        getTestRunnerConfigSetting<string>('hosted-server-devtools-url', 'front_end/devtools_app.html');
-    if (!devToolsAppURL) {
-      throw new Error('Could not load DevTools. hosted-server-devtools-url config not found.');
+    // TODO(pfaffe): Remove the distinction once it's uniform in chrome-branded builds
+    let devToolsAppURL = 'devtools_app.html';
+    if (!fs.existsSync(path.join(BUILD_ROOT, 'gen', devToolsAppURL))) {
+      devToolsAppURL = 'front_end/devtools_app.html';
     }
 
     // We load the DevTools frontend on a unique origin. Otherwise we would share 'localhost' with
