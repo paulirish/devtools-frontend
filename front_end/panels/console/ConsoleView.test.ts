@@ -4,14 +4,16 @@
 
 import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
+import {findMenuItemWithLabel, getContextMenuForElement} from '../../testing/ContextMenuHelpers.js';
 import {dispatchPasteEvent} from '../../testing/DOMHelpers.js';
 import {createTarget, registerNoopActions} from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {stubFileManager} from '../../testing/FileManagerHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
-import * as UI from '../../ui/legacy/legacy.js';
 
 import * as Console from './console.js';
 
@@ -50,8 +52,10 @@ describeWithMockConnection('ConsoleView', () => {
         target.model(SDK.RuntimeModel.RuntimeModel), Protocol.Log.LogEntrySource.Javascript, null, message, {type});
   }
 
-  async function canSaveToFile(targetFactory: () => SDK.Target.Target) {
-    const target = targetFactory();
+  it('can save to file', async () => {
+    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+    const target = createTarget({parentTarget: tabTarget});
 
     const consoleModel = target.model(SDK.ConsoleModel.ConsoleModel);
     assert.exists(consoleModel);
@@ -60,15 +64,9 @@ describeWithMockConnection('ConsoleView', () => {
     const messagesElement = consoleView.element.querySelector('#console-messages');
     assert.exists(messagesElement);
 
-    const contextMenuShow = sinon.stub(UI.ContextMenu.ContextMenu.prototype, 'show').resolves();
-    const contextMenuSetHandler = sinon.spy(UI.ContextMenu.ContextMenu.prototype, 'setHandler');
-    messagesElement.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true}));
-    assert.isTrue(contextMenuShow.calledOnce);
-    const saveAsItem = contextMenuShow.thisValues[0].saveSection().items.find(
-        (item: UI.ContextMenu.Item) => item.buildDescriptor().label === 'Save as...');
+    const contextMenu = getContextMenuForElement(messagesElement);
+    const saveAsItem = findMenuItemWithLabel(contextMenu.saveSection(), 'Save as...');
     assert.exists(saveAsItem);
-    const saveAsHandler = contextMenuSetHandler.getCalls().find(c => c.args[0] === saveAsItem.id());
-    assert.exists(saveAsHandler);
 
     const TIMESTAMP = 42;
     const URL_HOST = 'example.com';
@@ -77,18 +75,11 @@ describeWithMockConnection('ConsoleView', () => {
     const FILENAME = `${URL_HOST}-${TIMESTAMP}.log` as Platform.DevToolsPath.RawPathString;
     const fileManager = stubFileManager();
     const fileManagerCloseCall = expectCall(fileManager.close);
-    saveAsHandler.args[1]();
-    assert.isTrue(fileManager.save.calledOnceWith(FILENAME, '', true));
+    contextMenu.invokeHandler(saveAsItem.id());
+    assert.isTrue(fileManager.save.calledOnceWith(FILENAME, '', true, false));
     await fileManagerCloseCall;
     assert.isTrue(fileManager.append.calledOnceWith(FILENAME, sinon.match('message 1\nmessage 2\n')));
-  }
-
-  it('can save to file without tab target', () => canSaveToFile(() => createTarget()));
-  it('can save to file with tab target', () => canSaveToFile(() => {
-                                           const tabTarget = createTarget({type: SDK.Target.Type.Tab});
-                                           createTarget({parentTarget: tabTarget, subtype: 'prerender'});
-                                           return createTarget({parentTarget: tabTarget});
-                                         }));
+  });
 
   async function getConsoleMessages() {
     const messagesElement = consoleView.element.querySelector('#console-messages');
@@ -205,6 +196,21 @@ describeWithMockConnection('ConsoleView', () => {
       }
       assert.isTrue(selfXssWarningDisabledSetting.get());
     });
+
+    it('is not shown when disabled via command line', () => {
+      const stub = sinon.stub(Root.Runtime.Runtime, 'queryParam');
+      stub.withArgs('disableSelfXssWarnings').returns('true');
+
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'foo');
+
+      const messagesElement = consoleView.element.querySelector('#console-messages');
+      assert.instanceOf(messagesElement, HTMLElement);
+      dispatchPasteEvent(messagesElement, {clipboardData: dt, bubbles: true});
+
+      assert.strictEqual(Common.Console.Console.instance().messages().length, 0);
+      stub.restore();
+    });
   });
 
   it('appends commands to the history right away', async () => {
@@ -222,5 +228,23 @@ describeWithMockConnection('ConsoleView', () => {
         createConsoleMessage(target, 'await new Promise(() => ())', SDK.ConsoleModel.FrontendMessageType.Command));
 
     assert.deepStrictEqual(consoleHistorySetting.get(), ['await new Promise(() => ())']);
+  });
+
+  it('keeps updating the issue counter when re-attached after detaching', async () => {
+    consoleView.markAsRoot();
+    const spy = sinon.spy(consoleView, 'issuesCountUpdatedForTest');
+    const issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.IssuesCountUpdated);
+    assert.isTrue(spy.calledOnce);
+
+    // Pauses updating the issue counter
+    consoleView.onDetach();
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.IssuesCountUpdated);
+    assert.isTrue(spy.calledOnce);
+
+    // Continues updating the issue counter
+    consoleView.show(document.body);
+    issuesManager.dispatchEventToListeners(IssuesManager.IssuesManager.Events.IssuesCountUpdated);
+    assert.isTrue(spy.calledTwice);
   });
 });

@@ -24,9 +24,12 @@ import {
   type NewDocumentScriptEvaluation,
   type ScreenshotOptions,
 } from '../api/Page.js';
-import {Accessibility} from '../cdp/Accessibility.js';
 import {Coverage} from '../cdp/Coverage.js';
 import {EmulationManager} from '../cdp/EmulationManager.js';
+import type {
+  InternalNetworkConditions,
+  NetworkConditions,
+} from '../cdp/NetworkManager.js';
 import {Tracing} from '../cdp/Tracing.js';
 import type {
   Cookie,
@@ -86,10 +89,11 @@ export class BidiPage extends Page {
   readonly keyboard: BidiKeyboard;
   readonly mouse: BidiMouse;
   readonly touchscreen: BidiTouchscreen;
-  readonly accessibility: Accessibility;
   readonly tracing: Tracing;
   readonly coverage: Coverage;
   readonly #cdpEmulationManager: EmulationManager;
+
+  #emulatedNetworkConditions?: InternalNetworkConditions;
 
   _client(): BidiCdpSession {
     return this.#frame.client;
@@ -104,7 +108,6 @@ export class BidiPage extends Page {
     this.#frame = BidiFrame.from(this, browsingContext);
 
     this.#cdpEmulationManager = new EmulationManager(this.#frame.client);
-    this.accessibility = new Accessibility(this.#frame.client);
     this.tracing = new Tracing(this.#frame.client);
     this.coverage = new Coverage(this.#frame.client);
     this.keyboard = new BidiKeyboard(this);
@@ -125,16 +128,71 @@ export class BidiPage extends Page {
       this.#workers.delete(worker as BidiWebWorker);
     });
   }
-
+  /**
+   * @internal
+   */
+  _userAgentHeaders: Record<string, string> = {};
+  #userAgentInterception?: string;
+  #userAgentPreloadScript?: string;
   override async setUserAgent(
     userAgent: string,
-    userAgentMetadata?: Protocol.Emulation.UserAgentMetadata | undefined
+    userAgentMetadata?: Protocol.Emulation.UserAgentMetadata
   ): Promise<void> {
-    // TODO: handle CDP-specific cases such as mprach.
-    await this._client().send('Network.setUserAgentOverride', {
-      userAgent: userAgent,
-      userAgentMetadata: userAgentMetadata,
-    });
+    if (!this.#browserContext.browser().cdpSupported && userAgentMetadata) {
+      throw new UnsupportedOperation(
+        'Current Browser does not support `userAgentMetadata`'
+      );
+    } else if (
+      this.#browserContext.browser().cdpSupported &&
+      userAgentMetadata
+    ) {
+      return await this._client().send('Network.setUserAgentOverride', {
+        userAgent: userAgent,
+        userAgentMetadata: userAgentMetadata,
+      });
+    }
+    const enable = userAgent !== '';
+    userAgent = userAgent ?? (await this.#browserContext.browser().userAgent());
+
+    this._userAgentHeaders = enable
+      ? {
+          'User-Agent': userAgent,
+        }
+      : {};
+
+    this.#userAgentInterception = await this.#toggleInterception(
+      [Bidi.Network.InterceptPhase.BeforeRequestSent],
+      this.#userAgentInterception,
+      enable
+    );
+
+    const changeUserAgent = (userAgent: string) => {
+      Object.defineProperty(navigator, 'userAgent', {
+        value: userAgent,
+      });
+    };
+
+    const frames = [this.#frame];
+    for (const frame of frames) {
+      frames.push(...frame.childFrames());
+    }
+
+    if (this.#userAgentPreloadScript) {
+      await this.removeScriptToEvaluateOnNewDocument(
+        this.#userAgentPreloadScript
+      );
+    }
+    const [evaluateToken] = await Promise.all([
+      enable
+        ? this.evaluateOnNewDocument(changeUserAgent, userAgent)
+        : undefined,
+      // When we disable the UserAgent we want to
+      // evaluate the original value in all Browsing Contexts
+      frames.map(frame => {
+        return frame.evaluate(changeUserAgent, userAgent);
+      }),
+    ]);
+    this.#userAgentPreloadScript = evaluateToken?.identifier;
   }
 
   override async setBypassCSP(enabled: boolean): Promise<void> {
@@ -286,17 +344,17 @@ export class BidiPage extends Page {
     return await this.#cdpEmulationManager.emulateVisionDeficiency(type);
   }
 
-  override async setViewport(viewport: Viewport): Promise<void> {
+  override async setViewport(viewport: Viewport | null): Promise<void> {
     if (!this.browser().cdpSupported) {
       await this.#frame.browsingContext.setViewport({
         viewport:
-          viewport.width && viewport.height
+          viewport?.width && viewport?.height
             ? {
                 width: viewport.width,
                 height: viewport.height,
               }
             : null,
-        devicePixelRatio: viewport.deviceScaleFactor
+        devicePixelRatio: viewport?.deviceScaleFactor
           ? viewport.deviceScaleFactor
           : null,
       });
@@ -593,12 +651,59 @@ export class BidiPage extends Page {
     throw new UnsupportedOperation();
   }
 
-  override setOfflineMode(): never {
-    throw new UnsupportedOperation();
+  override async setOfflineMode(enabled: boolean): Promise<void> {
+    if (!this.#browserContext.browser().cdpSupported) {
+      throw new UnsupportedOperation();
+    }
+
+    if (!this.#emulatedNetworkConditions) {
+      this.#emulatedNetworkConditions = {
+        offline: false,
+        upload: -1,
+        download: -1,
+        latency: 0,
+      };
+    }
+    this.#emulatedNetworkConditions.offline = enabled;
+    return await this.#applyNetworkConditions();
   }
 
-  override emulateNetworkConditions(): never {
-    throw new UnsupportedOperation();
+  override async emulateNetworkConditions(
+    networkConditions: NetworkConditions | null
+  ): Promise<void> {
+    if (!this.#browserContext.browser().cdpSupported) {
+      throw new UnsupportedOperation();
+    }
+    if (!this.#emulatedNetworkConditions) {
+      this.#emulatedNetworkConditions = {
+        offline: false,
+        upload: -1,
+        download: -1,
+        latency: 0,
+      };
+    }
+    this.#emulatedNetworkConditions.upload = networkConditions
+      ? networkConditions.upload
+      : -1;
+    this.#emulatedNetworkConditions.download = networkConditions
+      ? networkConditions.download
+      : -1;
+    this.#emulatedNetworkConditions.latency = networkConditions
+      ? networkConditions.latency
+      : 0;
+    return await this.#applyNetworkConditions();
+  }
+
+  async #applyNetworkConditions(): Promise<void> {
+    if (!this.#emulatedNetworkConditions) {
+      return;
+    }
+    await this._client().send('Network.emulateNetworkConditions', {
+      offline: this.#emulatedNetworkConditions.offline,
+      latency: this.#emulatedNetworkConditions.latency,
+      uploadThroughput: this.#emulatedNetworkConditions.upload,
+      downloadThroughput: this.#emulatedNetworkConditions.download,
+    });
   }
 
   override async setCookie(...cookies: CookieParam[]): Promise<void> {

@@ -82,6 +82,12 @@ const DevToolsAPIImpl = class {
    */
   _dispatchOnInspectorFrontendAPI(method, args) {
     const inspectorFrontendAPI = /** @type {!Object<string, function()>} */ (window['InspectorFrontendAPI']);
+    if (!inspectorFrontendAPI) {
+      // This is the case for device_mode_emulation_frame entrypoint. It's created via `window.open` from
+      // the DevTools window, so it shares a context with DevTools but has a separate DevToolsUIBinding and `window` object.
+      // We can safely ignore the events since they also arrive on the DevTools `window` object.
+      return;
+    }
     inspectorFrontendAPI[method].apply(inspectorFrontendAPI, args);
   }
 
@@ -282,10 +288,6 @@ const DevToolsAPIImpl = class {
     }
   }
 
-  reattachMainTarget() {
-    this._dispatchOnInspectorFrontendAPI('reattachMainTarget', []);
-  }
-
   /**
    * @param {boolean} hard
    */
@@ -405,7 +407,6 @@ window.DevToolsAPI = DevToolsAPI;
  */
 const EnumeratedHistogram = {
   ActionTaken: 'DevTools.ActionTaken',
-  BreakpointEditDialogRevealedFrom: 'DevTools.BreakpointEditDialogRevealedFrom',
   CSSHintShown: 'DevTools.CSSHintShown',
   DeveloperResourceLoaded: 'DevTools.DeveloperResourceLoaded',
   DeveloperResourceScheme: 'DevTools.DeveloperResourceScheme',
@@ -423,7 +424,6 @@ const EnumeratedHistogram = {
   LighthouseModeRun: 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed: 'DevTools.LighthouseCategoryUsed',
   ManifestSectionSelected: 'DevTools.ManifestSectionSelected',
-  PanelClosed: 'DevTools.PanelClosed',
   PanelShown: 'DevTools.PanelShown',
   PanelShownInLocation: 'DevTools.PanelShownInLocation',
   RecordingAssertion: 'DevTools.RecordingAssertion',
@@ -639,6 +639,14 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @override
+   * @param {function(Object<string, Object<string, string|boolean>>):void} callback
+   */
+  getHostConfig(callback) {
+    DevToolsAPI.sendMessageToEmbedder('getHostConfig', [], /** @type {function(?Object)} */ (callback));
+  }
+
+  /**
+   * @override
    * @param {string} origin
    * @param {string} script
    */
@@ -691,9 +699,10 @@ const InspectorFrontendHostImpl = class {
    * @param {string} url
    * @param {string} content
    * @param {boolean} forceSaveAs
+   * @param {boolean} isBase64
    */
-  save(url, content, forceSaveAs) {
-    DevToolsAPI.sendMessageToEmbedder('save', [url, content, forceSaveAs], null);
+  save(url, content, forceSaveAs, isBase64) {
+    DevToolsAPI.sendMessageToEmbedder('save', [url, content, forceSaveAs, isBase64], null);
   }
 
   /**

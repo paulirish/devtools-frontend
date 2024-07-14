@@ -24,7 +24,12 @@ const UIStrings = {
   /**
    *@description Column name and percentage of slow mach non-matches computing a style rule
    */
-  rejectPercentage: '% of slow-path non-matches',
+  rejectPercentage: '% of Slow-Path Non-Matches',
+  /**
+   *@description Tooltip description '% of slow-path non-matches'
+   */
+  rejectPercentageExplanation:
+      'The percentage of non-matching nodes (Match Attempts - Match Count) that couldn\'t be quickly ruled out by the bloom filter. Lower is better.',
   /**
    *@description Column name for count of elements that the engine attempted to match against a style rule
    */
@@ -59,6 +64,11 @@ const UIStrings = {
    */
   tableCopiedToClipboard: 'Table copied to clipboard',
   /**
+   *@description Text shown as the "Selectelector" cell value for one row of the Selector Stats table, however this particular row is the totals. While normally the Selector cell is values like "div.container", the parenthesis can denote this description is not an actual selector, but a general row description.
+   */
+  totalForAllSelectors: '(Totals for all selectors)',
+
+  /**
    *@description Text for showing the location of a selector in the style sheet
    *@example {256} PH1
    *@example {14} PH2
@@ -78,28 +88,32 @@ export const enum SelectorTimingsKey {
   StyleSheetId = 'style_sheet_id',
 }
 
-interface SelectorTimings {
-  [SelectorTimingsKey.Elapsed]: number;
-  [SelectorTimingsKey.FastRejectCount]: number;
-  [SelectorTimingsKey.MatchAttempts]: number;
-  [SelectorTimingsKey.MatchCount]: number;
-  [SelectorTimingsKey.Selector]: string;
-  [SelectorTimingsKey.StyleSheetId]: string;
-}
-
 export class TimelineSelectorStatsView extends UI.Widget.VBox {
   #datagrid: DataGrid.DataGridController.DataGridController;
   #selectorLocations: Map<string, Protocol.CSS.SourceRange[]>;
+  #traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null = null;
+  /**
+   * We store the last event (or array of events) that we renderered. We do
+   * this because as the user zooms around the panel this view is updated,
+   * however if the set of events that are populating the view is the same as it
+   * was the last time, we can bail without doing any re-rendering work.
+   * If the user views a single event, this will be set to that single event, but if they are viewing a range of events, this will be set to an array.
+   * If it's null, that means we have not rendered yet.
+   */
+  #lastStatsSourceEventOrEvents: TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree|
+      TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree[]|null = null;
 
-  constructor() {
+  constructor(traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null) {
     super();
 
     this.#datagrid = new DataGrid.DataGridController.DataGridController();
     this.#selectorLocations = new Map<string, Protocol.CSS.SourceRange[]>();
+    this.#traceParsedData = traceParsedData;
 
     this.#datagrid.data = {
       label: i18nString(UIStrings.selectorStats),
       showScrollbar: true,
+      autoScrollToBottom: false,
       initialSort: {
         columnId: SelectorTimingsKey.Elapsed as Lowercase<string>,
         direction: DataGrid.DataGridUtils.SortDirection.DESC,
@@ -141,6 +155,8 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
         {
           id: SelectorTimingsKey.RejectPercentage as Lowercase<string>,
           title: i18nString(UIStrings.rejectPercentage),
+          titleElement: LitHtml.html`<span title=${i18nString(UIStrings.rejectPercentageExplanation)}>${
+              i18nString(UIStrings.rejectPercentage)}</span>`,
           sortable: true,
           widthWeighting: 1,
           visible: true,
@@ -153,7 +169,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
           id: SelectorTimingsKey.Selector as Lowercase<string>,
           title: i18nString(UIStrings.selector),
           sortable: true,
-          widthWeighting: 4,
+          widthWeighting: 3,
           visible: true,
           hideable: true,
         },
@@ -161,7 +177,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
           id: SelectorTimingsKey.StyleSheetId as Lowercase<string>,
           title: i18nString(UIStrings.styleSheetId),
           sortable: true,
-          widthWeighting: 4,
+          widthWeighting: 1.5,
           visible: true,
           hideable: true,
         },
@@ -207,16 +223,26 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     this.contentElement.appendChild(this.#datagrid);
   }
 
-  setEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): boolean {
-    const selectorStats = event.args['selector_stats'];
+  setEvent(event: TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree): boolean {
+    if (!this.#traceParsedData) {
+      return false;
+    }
+
+    if (this.#lastStatsSourceEventOrEvents === event) {
+      // The event that is populating the selector stats table has not changed,
+      // so no need to do any work because the data will be the same.
+      return false;
+    }
+
+    this.#lastStatsSourceEventOrEvents = event;
+
+    const selectorStats = this.#traceParsedData.SelectorStats.dataForUpdateLayoutEvent.get(event);
     if (!selectorStats) {
       this.#datagrid.data = {...this.#datagrid.data, rows: []};
       return false;
     }
 
-    // Host.userMetrics.recordPerformancePanelAction(Host.UserMetrics.PerformancePanelAction.ViewSelectorStats);
-
-    const timings: SelectorTimings[] = selectorStats['selector_timings'];
+    const timings: TraceEngine.Types.TraceEvents.SelectorTiming[] = selectorStats.timings;
     void this.createRowsForTable(timings).then(rows => {
       this.#datagrid.data = {...this.#datagrid.data, rows};
     });
@@ -224,16 +250,49 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     return true;
   }
 
-  setAggregatedEvent(events: TraceEngine.Legacy.Event[]): boolean {
-    const timings: SelectorTimings[] = [];
-    const selectorMap = new Map<String, SelectorTimings>();
-    while (events.length > 0) {
-      const e = events.pop();
-      const selectorStats = e?.args['selector_stats'];
+  setAggregatedEvents(events: TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree[]): void {
+    const timings: TraceEngine.Types.TraceEvents.SelectorTiming[] = [];
+    const selectorMap = new Map<String, TraceEngine.Types.TraceEvents.SelectorTiming>();
+
+    if (!this.#traceParsedData) {
+      return;
+    }
+
+    const sums = {
+      [SelectorTimingsKey.Elapsed]: 0,
+      [SelectorTimingsKey.MatchAttempts]: 0,
+      [SelectorTimingsKey.MatchCount]: 0,
+      [SelectorTimingsKey.FastRejectCount]: 0,
+    };
+
+    // Now we want to check if the set of events we have been given matches the
+    // set of events we last rendered. We can't just compare the arrays because
+    // they will be different events, so instead for each event in the new
+    // array we see if it has a match in the old set of events at the same
+    // index.
+
+    if (Array.isArray(this.#lastStatsSourceEventOrEvents)) {
+      if (this.#lastStatsSourceEventOrEvents.length === events.length && events.every((event, index) => {
+            // This is true due to the isArray check, but without this cast TS
+            // would want us to repeat the isArray() check inside this callback,
+            // but we want to avoid that extra work.
+            const previousEvents =
+                this.#lastStatsSourceEventOrEvents as TraceEngine.Types.TraceEvents.TraceEventUpdateLayoutTree[];
+            return event === previousEvents[index];
+          })) {
+        return;
+      }
+    }
+
+    this.#lastStatsSourceEventOrEvents = events;
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const selectorStats = event ? this.#traceParsedData.SelectorStats.dataForUpdateLayoutEvent.get(event) : undefined;
       if (!selectorStats) {
         continue;
       } else {
-        const data: SelectorTimings[] = selectorStats['selector_timings'];
+        const data: TraceEngine.Types.TraceEvents.SelectorTiming[] = selectorStats.timings;
         for (const timing of data) {
           const key = timing[SelectorTimingsKey.Selector] + '_' + timing[SelectorTimingsKey.StyleSheetId];
           const findTiming = selectorMap.get(key);
@@ -245,6 +304,11 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
           } else {
             selectorMap.set(key, structuredClone(timing));
           }
+          // Keep track of the total times for a sum row.
+          sums[SelectorTimingsKey.Elapsed] += timing[SelectorTimingsKey.Elapsed];
+          sums[SelectorTimingsKey.MatchAttempts] += timing[SelectorTimingsKey.MatchAttempts];
+          sums[SelectorTimingsKey.MatchCount] += timing[SelectorTimingsKey.MatchCount];
+          sums[SelectorTimingsKey.FastRejectCount] += timing[SelectorTimingsKey.FastRejectCount];
         }
       }
     }
@@ -255,17 +319,26 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       selectorMap.clear();
     } else {
       this.#datagrid.data = {...this.#datagrid.data, rows: []};
-      return false;
+      return;
     }
+
+    // Add the sum row.
+    timings.unshift({
+      [SelectorTimingsKey.Elapsed]: sums[SelectorTimingsKey.Elapsed],
+      [SelectorTimingsKey.FastRejectCount]: sums[SelectorTimingsKey.FastRejectCount],
+      [SelectorTimingsKey.MatchAttempts]: sums[SelectorTimingsKey.MatchAttempts],
+      [SelectorTimingsKey.MatchCount]: sums[SelectorTimingsKey.MatchCount],
+      [SelectorTimingsKey.Selector]: i18nString(UIStrings.totalForAllSelectors),
+      [SelectorTimingsKey.StyleSheetId]: 'n/a',
+    });
 
     void this.createRowsForTable(timings).then(rows => {
       this.#datagrid.data = {...this.#datagrid.data, rows};
     });
-
-    return true;
   }
 
-  private async createRowsForTable(timings: SelectorTimings[]): Promise<DataGrid.DataGridUtils.Row[]> {
+  private async createRowsForTable(timings: TraceEngine.Types.TraceEvents.SelectorTiming[]):
+      Promise<DataGrid.DataGridUtils.Row[]> {
     async function toSourceFileLocation(
         cssModel: SDK.CSSModel.CSSModel, styleSheetId: Protocol.CSS.StyleSheetId, selectorText: string,
         selectorLocations: Map<string, Protocol.CSS.SourceRange[]>):
@@ -313,7 +386,9 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       const elapsedTimeInMs = x[SelectorTimingsKey.Elapsed] / 1000.0;
       const nonMatches = x[SelectorTimingsKey.MatchAttempts] - x[SelectorTimingsKey.MatchCount];
       const rejectPercentage = (nonMatches ? x[SelectorTimingsKey.FastRejectCount] / nonMatches : 1) * 100;
-      const locations = await toSourceFileLocation(cssModel, styleSheetId, selectorText, this.#selectorLocations);
+      const locations = styleSheetId === 'n/a' ?
+          null :
+          await toSourceFileLocation(cssModel, styleSheetId, selectorText, this.#selectorLocations);
 
       return {
         cells: [
@@ -328,7 +403,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
             columnId: SelectorTimingsKey.RejectPercentage,
             value: rejectPercentage,
             renderer(): LitHtml.TemplateResult {
-              return LitHtml.html`${rejectPercentage.toFixed(2)}`;
+              return LitHtml.html`${rejectPercentage.toFixed(1)}`;
             },
           },
           {columnId: SelectorTimingsKey.MatchAttempts, value: x[SelectorTimingsKey.MatchAttempts]},
@@ -342,7 +417,10 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
             columnId: SelectorTimingsKey.StyleSheetId,
             value: x[SelectorTimingsKey.StyleSheetId],
             renderer(): LitHtml.TemplateResult {
-              if (!locations) {
+              if (locations === null) {
+                return LitHtml.html`<span></span>`;
+              }
+              if (locations === undefined) {
                 return LitHtml.html`<span title=${i18nString(UIStrings.unableToLinkViaStyleSheetId, {
                   PH1: x[SelectorTimingsKey.StyleSheetId],
                 })} aria-label=${i18nString(UIStrings.unableToLinkViaStyleSheetId, {

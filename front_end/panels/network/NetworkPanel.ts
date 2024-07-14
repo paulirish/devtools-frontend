@@ -639,7 +639,6 @@ export class NetworkPanel extends UI.Panel.Panel implements
   private onRowSizeChanged(): void {
     this.updateUI();
   }
-
   private onRequestSelected(event: Common.EventTarget.EventTargetEvent<SDK.NetworkRequest.NetworkRequest|null>): void {
     const request = event.data;
     this.currentRequest = request;
@@ -819,13 +818,13 @@ export class FilmStripRecorder implements TraceEngine.TracingManager.TracingMana
   private resourceTreeModel: SDK.ResourceTreeModel.ResourceTreeModel|null;
   private readonly timeCalculator: NetworkTimeCalculator;
   private readonly filmStripView: PerfUI.FilmStripView.FilmStripView;
-  private tracingModel: TraceEngine.Legacy.TracingModel|null;
   private callback: ((filmStrip: TraceEngine.Extras.FilmStrip.Data) => void)|null;
   // Used to fetch screenshots of the page load and show them in the panel.
-  #traceEngine: TraceEngine.TraceModel.Model<TraceEngine.Extras.FilmStrip.HandlersWithFilmStrip>;
+  #traceEngine: TraceEngine.TraceModel.Model;
+  #collectedTraceEvents: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
 
   constructor(timeCalculator: NetworkTimeCalculator, filmStripView: PerfUI.FilmStripView.FilmStripView) {
-    this.#traceEngine = new TraceEngine.TraceModel.Model({
+    this.#traceEngine = TraceEngine.TraceModel.Model.createWithSubsetOfHandlers({
       Screenshots: TraceEngine.Handlers.ModelHandlers.Screenshots,
     });
 
@@ -833,29 +832,22 @@ export class FilmStripRecorder implements TraceEngine.TracingManager.TracingMana
     this.resourceTreeModel = null;
     this.timeCalculator = timeCalculator;
     this.filmStripView = filmStripView;
-    this.tracingModel = null;
     this.callback = null;
   }
 
-  traceEventsCollected(events: TraceEngine.TracingManager.EventPayload[]): void {
-    if (this.tracingModel) {
-      this.tracingModel.addEvents(events);
-    }
+  traceEventsCollected(events: TraceEngine.Types.TraceEvents.TraceEventData[]): void {
+    this.#collectedTraceEvents.push(...events);
   }
 
   async tracingComplete(): Promise<void> {
-    if (!this.tracingModel || !this.tracingManager) {
+    if (!this.tracingManager) {
       return;
     }
-    this.tracingModel.tracingComplete();
     this.tracingManager = null;
-    await this.#traceEngine.parse(
-        // OPP's data layer uses `EventPayload` as the type to represent raw JSON from the trace.
-        // When we pass this into the new data engine, we need to tell TS to use the new TraceEventData type.
-        this.tracingModel.allRawEvents() as unknown as TraceEngine.Types.TraceEvents.TraceEventData[],
-    );
+    await this.#traceEngine.parse(this.#collectedTraceEvents);
 
-    const data = this.#traceEngine.traceParsedData(this.#traceEngine.size() - 1);
+    const data = this.#traceEngine.traceParsedData(this.#traceEngine.size() - 1) as
+        TraceEngine.Extras.FilmStrip.HandlerDataWithScreenshots;
     if (!data) {
       return;
     }
@@ -885,6 +877,7 @@ export class FilmStripRecorder implements TraceEngine.TracingManager.TracingMana
   }
 
   startRecording(): void {
+    this.#collectedTraceEvents = [];
     this.filmStripView.reset();
     this.filmStripView.setStatusText(i18nString(UIStrings.recordingFrames));
     const tracingManager =
@@ -895,7 +888,6 @@ export class FilmStripRecorder implements TraceEngine.TracingManager.TracingMana
 
     this.tracingManager = tracingManager;
     this.resourceTreeModel = this.tracingManager.target().model(SDK.ResourceTreeModel.ResourceTreeModel);
-    this.tracingModel = new TraceEngine.Legacy.TracingModel();
     void this.tracingManager.start(this, '-*,disabled-by-default-devtools.screenshot', '');
 
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.FilmStripStartedRecording);

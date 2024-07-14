@@ -399,6 +399,14 @@ const UIStrings = {
    */
   receiveWebsocketHandshake: 'Receive WebSocket Handshake',
   /**
+   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   */
+  wsMessageReceived: 'Receive WebSocket Message',
+  /**
+   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   */
+  wsMessageSent: 'Send WebSocket Message',
+  /**
    *@description Text in Timeline UIUtils of the Performance panel
    */
   destroyWebsocket: 'Destroy WebSocket',
@@ -410,10 +418,6 @@ const UIStrings = {
    *@description Event category in the Performance panel for time spent decoding an image
    */
   imageDecode: 'Image Decode',
-  /**
-   *@description Event category in the Performance panel for time spent to resize an image
-   */
-  imageResize: 'Image Resize',
   /**
    *@description Event category in the Performance panel for time spent to perform Garbage Collection for the Document Object Model
    */
@@ -653,6 +657,9 @@ export function maybeInitSylesMap(): EventStylesMap {
     [TraceEngine.Types.TraceEvents.KnownEventName.ProfileCall]:
         new TimelineRecordStyle(i18nString(UIStrings.jsFrame), defaultCategoryStyles.scripting),
 
+    [TraceEngine.Types.TraceEvents.KnownEventName.JSSample]:
+        new TimelineRecordStyle(TraceEngine.Types.TraceEvents.KnownEventName.JSSample, defaultCategoryStyles.scripting),
+
     [TraceEngine.Types.TraceEvents.KnownEventName.Program]:
         new TimelineRecordStyle(i18nString(UIStrings.other), defaultCategoryStyles.other),
 
@@ -696,9 +703,6 @@ export function maybeInitSylesMap(): EventStylesMap {
         i18nString(UIStrings.scheduleStyleRecalculation),
         defaultCategoryStyles.rendering,
         ),
-
-    [TraceEngine.Types.TraceEvents.KnownEventName.RecalculateStyles]:
-        new TimelineRecordStyle(i18nString(UIStrings.recalculateStyle), defaultCategoryStyles.rendering),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.UpdateLayoutTree]:
         new TimelineRecordStyle(i18nString(UIStrings.recalculateStyle), defaultCategoryStyles.rendering),
@@ -958,15 +962,20 @@ export function maybeInitSylesMap(): EventStylesMap {
 
     [TraceEngine.Types.TraceEvents.KnownEventName.WebSocketDestroy]:
         new TimelineRecordStyle(i18nString(UIStrings.destroyWebsocket), defaultCategoryStyles.scripting),
+    [TraceEngine.Types.TraceEvents.KnownEventName.WebSocketSend]: new TimelineRecordStyle(
+        i18nString(UIStrings.wsMessageSent),
+        defaultCategoryStyles.scripting,
+        ),
+    [TraceEngine.Types.TraceEvents.KnownEventName.WebSocketReceive]: new TimelineRecordStyle(
+        i18nString(UIStrings.wsMessageReceived),
+        defaultCategoryStyles.scripting,
+        ),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.EmbedderCallback]:
         new TimelineRecordStyle(i18nString(UIStrings.embedderCallback), defaultCategoryStyles.scripting),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.DecodeImage]:
         new TimelineRecordStyle(i18nString(UIStrings.imageDecode), defaultCategoryStyles.painting),
-
-    [TraceEngine.Types.TraceEvents.KnownEventName.ResizeImage]:
-        new TimelineRecordStyle(i18nString(UIStrings.imageResize), defaultCategoryStyles.painting),
 
     [TraceEngine.Types.TraceEvents.KnownEventName.GPUTask]:
         new TimelineRecordStyle(i18nString(UIStrings.gpu), defaultCategoryStyles.gpu),

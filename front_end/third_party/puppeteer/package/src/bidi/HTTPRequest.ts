@@ -38,7 +38,8 @@ export class BidiHTTPRequest extends HTTPRequest {
     request.#initialize();
     return request;
   }
-  #redirectBy: BidiHTTPRequest | undefined;
+
+  #redirectChain: BidiHTTPRequest[];
   #response: BidiHTTPResponse | null = null;
   override readonly id: string;
   readonly #frame: BidiFrame;
@@ -47,7 +48,7 @@ export class BidiHTTPRequest extends HTTPRequest {
   private constructor(
     request: Request,
     frame: BidiFrame,
-    redirectBy?: BidiHTTPRequest
+    redirect?: BidiHTTPRequest
   ) {
     super();
     requests.set(request, this);
@@ -56,7 +57,7 @@ export class BidiHTTPRequest extends HTTPRequest {
 
     this.#request = request;
     this.#frame = frame;
-    this.#redirectBy = redirectBy;
+    this.#redirectChain = redirect ? redirect.#redirectChain : [];
     this.id = request.id;
   }
 
@@ -67,6 +68,19 @@ export class BidiHTTPRequest extends HTTPRequest {
   #initialize() {
     this.#request.on('redirect', request => {
       const httpRequest = BidiHTTPRequest.from(request, this.#frame, this);
+      this.#redirectChain.push(this);
+
+      request.once('success', () => {
+        this.#frame
+          .page()
+          .trustedEmitter.emit(PageEvent.RequestFinished, httpRequest);
+      });
+
+      request.once('error', () => {
+        this.#frame
+          .page()
+          .trustedEmitter.emit(PageEvent.RequestFailed, httpRequest);
+      });
       void httpRequest.finalizeInterceptions();
     });
     this.#request.once('success', data => {
@@ -76,7 +90,7 @@ export class BidiHTTPRequest extends HTTPRequest {
 
     this.#frame.page().trustedEmitter.emit(PageEvent.Request, this);
 
-    if (Object.keys(this.#extraHTTPHeaders).length) {
+    if (this.#hasInternalHeaderOverwrite) {
       this.interception.handlers.push(async () => {
         await this.continue(
           {
@@ -112,8 +126,19 @@ export class BidiHTTPRequest extends HTTPRequest {
     throw new UnsupportedOperation();
   }
 
+  get #hasInternalHeaderOverwrite(): boolean {
+    return Boolean(
+      Object.keys(this.#extraHTTPHeaders).length ||
+        Object.keys(this.#userAgentHeaders).length
+    );
+  }
+
   get #extraHTTPHeaders(): Record<string, string> {
     return this.#frame?.page()._extraHTTPHeaders ?? {};
+  }
+
+  get #userAgentHeaders(): Record<string, string> {
+    return this.#frame?.page()._userAgentHeaders ?? {};
   }
 
   override headers(): Record<string, string> {
@@ -124,6 +149,7 @@ export class BidiHTTPRequest extends HTTPRequest {
     return {
       ...headers,
       ...this.#extraHTTPHeaders,
+      ...this.#userAgentHeaders,
     };
   }
 
@@ -147,16 +173,7 @@ export class BidiHTTPRequest extends HTTPRequest {
   }
 
   override redirectChain(): BidiHTTPRequest[] {
-    if (this.#redirectBy === undefined) {
-      return [];
-    }
-    const redirects = [this.#redirectBy];
-    for (const redirect of redirects) {
-      if (redirect.#redirectBy !== undefined) {
-        redirects.push(redirect.#redirectBy);
-      }
-    }
-    return redirects;
+    return this.#redirectChain.slice();
   }
 
   override frame(): BidiFrame {
@@ -169,9 +186,7 @@ export class BidiHTTPRequest extends HTTPRequest {
   ): Promise<void> {
     return await super.continue(
       {
-        headers: Object.keys(this.#extraHTTPHeaders).length
-          ? this.headers()
-          : undefined,
+        headers: this.#hasInternalHeaderOverwrite ? this.headers() : undefined,
         ...overrides,
       },
       priority

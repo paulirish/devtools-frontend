@@ -42,7 +42,7 @@ export enum VisualElements {
   Section = 10,
   SectionHeader = 11,
   Timeline = 12,
-  StylesSelector = 13,
+  CSSRuleHeader = 13,
   Expand = 14,
   ToggleSubpane = 15,
   ControlPoint = 16,
@@ -135,11 +135,11 @@ export function parseJsLog(jslog: string): LoggingConfig {
   const trackString = getComponent('track:');
   if (trackString) {
     config.track = {};
-    for (const [key, value] of trackString.split(',').map(t => t.split(':') as [string, string])) {
-      if (key === 'keydown' && value?.length) {
-        config.track.keydown = value;
+    for (const track of trackString.split(',')) {
+      if (track.startsWith('keydown:')) {
+        config.track.keydown = track.substr('keydown:'.length);
       } else {
-        config.track[key as keyof TrackConfig] = true;
+        config.track[track as keyof TrackConfig] = true;
       }
     }
   }

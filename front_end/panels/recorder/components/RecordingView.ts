@@ -28,10 +28,10 @@ import * as Actions from '../recorder-actions/recorder-actions.js';
 import {ExtensionView} from './ExtensionView.js';
 import recordingViewStyles from './recordingView.css.js';
 import {
-  ReplayButton,
-  type ReplayButtonData,
+  ReplaySection,
+  type ReplaySectionData,
   type StartReplayEvent,
-} from './ReplayButton.js';
+} from './ReplaySection.js';
 import {
   type CopyStepEvent,
   State,
@@ -269,7 +269,8 @@ const networkConditionPresets = [
   SDK.NetworkManager.NoThrottlingConditions,
   SDK.NetworkManager.OfflineConditions,
   SDK.NetworkManager.Slow3GConditions,
-  SDK.NetworkManager.Fast3GConditions,
+  SDK.NetworkManager.Slow4GConditions,
+  SDK.NetworkManager.Fast4GConditions,
 ];
 
 function converterIdToFlowMetric(
@@ -780,7 +781,7 @@ export class RecordingView extends HTMLElement {
             value=${
               this.#settings.timeout || Models.RecordingPlayer.defaultTimeout
             }
-            jslog=${VisualLogging.textField('timeout').track({keydown: true})}
+            jslog=${VisualLogging.textField('timeout').track({change: true})}
             class="devtools-text-input"
             type="number">
         </label>
@@ -919,7 +920,7 @@ export class RecordingView extends HTMLElement {
                 jslog=${VisualLogging.close().track({click: true})}
               ></${Buttons.Button.Button.litTagName}>
             </div>
-            <div class="text-editor" jslog=${VisualLogging.textField().track({keydown: true})}>
+            <div class="text-editor" jslog=${VisualLogging.textField().track({change: true})}>
               <${TextEditor.TextEditor.TextEditor.litTagName} .state=${
           this.#editorState
         }></${TextEditor.TextEditor.TextEditor.litTagName}>
@@ -956,17 +957,17 @@ export class RecordingView extends HTMLElement {
     }
 
     // clang-format off
-    return LitHtml.html`<${ReplayButton.litTagName}
+    return LitHtml.html`<${ReplaySection.litTagName}
         .data=${
           {
             settings: this.#recorderSettings,
             replayExtensions: this.#replayExtensions,
-          } as ReplayButtonData
+          } as ReplaySectionData
         }
         .disabled=${this.#replayState.isPlaying}
         @startreplay=${this.#handleTogglePlaying}
         >
-      </${ReplayButton.litTagName}>`;
+      </${ReplaySection.litTagName}>`;
     // clang-format on
   }
 
@@ -1232,6 +1233,7 @@ export class RecordingView extends HTMLElement {
                 >
                   ${i18nString(UIStrings.performancePanel)}
                 </${Buttons.Button.Button.litTagName}>
+                <div class="separator"></div>
                 ${this.#renderReplayOrAbortButton()}
               </div>`
             : ''

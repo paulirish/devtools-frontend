@@ -20,15 +20,7 @@ import type * as UI from '../../ui/legacy/legacy.js';
 import * as InspectorMain from './inspector_main.js';
 
 describeWithMockConnection('FocusDebuggeeActionDelegate', () => {
-  it('uses main frame without tab tatget', async () => {
-    const target = createTarget();
-    const delegate = new InspectorMain.InspectorMain.FocusDebuggeeActionDelegate();
-    const bringToFront = sinon.spy(target.pageAgent(), 'invoke_bringToFront');
-    delegate.handleAction({} as UI.Context.Context, 'foo');
-    assert.isTrue(bringToFront.calledOnce);
-  });
-
-  it('uses main frame with tab tatget', async () => {
+  it('uses main frame', async () => {
     const tabTarget = createTarget({type: SDK.Target.Type.Tab});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     const frameTarget = createTarget({parentTarget: tabTarget});
@@ -141,6 +133,19 @@ describeWithMockConnection('InspectorMainImpl', () => {
     await Promise.all([debuggerPauseCalled, result]);
     assert.isTrue(debuggerPause.calledOnce);
     Root.Runtime.Runtime.setQueryParamForTesting('panel', '');
+  });
+
+  it('frontend correctly registers if Debugger.enable fails', async () => {
+    const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+    assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
+
+    setMockConnectionResponseHandler('Debugger.enable', () => ({getError: () => 'Debugger.enable failed'}));
+    await inspectorMain.run();
+
+    const target = SDK.TargetManager.TargetManager.instance().rootTarget();
+    assert.isNotNull(target);
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
+    assert.isFalse(debuggerModel.debuggerEnabled());
   });
 
   it('calls Runtime.runIfWaitingForDebugger for Node target', async () => {

@@ -10,6 +10,7 @@ import("../visibility.gni")
 devtools_module("source_map_scopes") {
   sources = [
     "NamesResolver.ts",
+    "ScopeChainModel.ts",
     "ScopeTreeCache.ts",
   ]
 
@@ -55,5 +56,6 @@ ts_library("unittests") {
     "../../core/sdk:bundle",
     "../../testing",
     "../formatter:bundle",
+    "../text_utils:bundle",
   ]
 }

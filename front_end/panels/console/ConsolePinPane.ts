@@ -199,7 +199,7 @@ export class ConsolePin {
   <div class='console-pin'>
   ${this.deletePinIcon}
   <div class='console-pin-name' $='name' jslog="${VisualLogging.textField().track({
-      keydown: true,
+      change: true,
     })}"></div>
   <div class='console-pin-preview' $='preview'></div>
   </div>`;
@@ -259,6 +259,18 @@ export class ConsolePin {
         {
           key: 'Mod-Enter',
           run: () => {
+            this.focusOut();
+            return true;
+          },
+        },
+        {
+          key: 'Tab',
+          run: (view: CodeMirror.EditorView) => {
+            if (CodeMirror.completionStatus !== null) {
+              return false;
+            }
+            // User should be able to tab out of edit field after auto complete is done
+            view.dispatch({changes: {from: 0, to: view.state.doc.length, insert: this.committedExpression}});
             this.focusOut();
             return true;
           },

@@ -41,7 +41,6 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
   #page: CdpPage;
   #networkManager: NetworkManager;
   #timeoutSettings: TimeoutSettings;
-  #contextIdToContext = new Map<string, ExecutionContext>();
   #isolatedWorlds = new Set<string>();
   #client: CDPSession;
 
@@ -76,13 +75,12 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
   constructor(
     client: CDPSession,
     page: CdpPage,
-    ignoreHTTPSErrors: boolean,
     timeoutSettings: TimeoutSettings
   ) {
     super();
     this.#client = client;
     this.#page = page;
-    this.#networkManager = new NetworkManager(ignoreHTTPSErrors, this);
+    this.#networkManager = new NetworkManager(this);
     this.#timeoutSettings = timeoutSettings;
     this.setupEventListeners(this.#client);
     client.once(CDPSessionEvent.Disconnected, () => {
@@ -123,8 +121,6 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
    * its frame tree and ID.
    */
   async swapFrameTree(client: CDPSession): Promise<void> {
-    this.#onExecutionContextsCleared(this.#client);
-
     this.#client = client;
     assert(
       this.#client instanceof CdpCDPSession,
@@ -135,10 +131,8 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
       this.#frameNavigatedReceived.add(this.#client._target()._targetId);
       this._frameTree.removeFrame(frame);
       frame.updateId(this.#client._target()._targetId);
-      frame.mainRealm().clearContext();
-      frame.isolatedRealm().clearContext();
       this._frameTree.addFrame(frame);
-      frame.updateClient(client, true);
+      frame.updateClient(client);
     }
     this.setupEventListeners(client);
     client.once(CDPSessionEvent.Disconnected, () => {
@@ -191,14 +185,6 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
       await this.#frameTreeHandled?.valueOrThrow();
       this.#onExecutionContextCreated(event.context, session);
     });
-    session.on('Runtime.executionContextDestroyed', async event => {
-      await this.#frameTreeHandled?.valueOrThrow();
-      this.#onExecutionContextDestroyed(event.executionContextId, session);
-    });
-    session.on('Runtime.executionContextsCleared', async () => {
-      await this.#frameTreeHandled?.valueOrThrow();
-      this.#onExecutionContextsCleared(session);
-    });
     session.on('Page.lifecycleEvent', async event => {
       await this.#frameTreeHandled?.valueOrThrow();
       this.#onLifecycleEvent(event);
@@ -234,22 +220,6 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
 
       throw error;
     }
-  }
-
-  executionContextById(
-    contextId: number,
-    session: CDPSession = this.#client
-  ): ExecutionContext {
-    const context = this.getExecutionContextById(contextId, session);
-    assert(context, 'INTERNAL ERROR: missing context with id = ' + contextId);
-    return context;
-  }
-
-  getExecutionContextById(
-    contextId: number,
-    session: CDPSession = this.#client
-  ): ExecutionContext | undefined {
-    return this.#contextIdToContext.get(`${session.id()}:${contextId}`);
   }
 
   page(): CdpPage {
@@ -484,10 +454,7 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
       }
       if (contextPayload.auxData && contextPayload.auxData['isDefault']) {
         world = frame.worlds[MAIN_WORLD];
-      } else if (
-        contextPayload.name === UTILITY_WORLD_NAME &&
-        !frame.worlds[PUPPETEER_WORLD].hasContext()
-      ) {
+      } else if (contextPayload.name === UTILITY_WORLD_NAME) {
         // In case of multiple sessions to the same target, there's a race between
         // connections so we might end up creating multiple isolated worlds.
         // We can use either.
@@ -503,40 +470,7 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
       contextPayload,
       world
     );
-    if (world) {
-      world.setContext(context);
-    }
-    const key = `${session.id()}:${contextPayload.id}`;
-    this.#contextIdToContext.set(key, context);
-  }
-
-  #onExecutionContextDestroyed(
-    executionContextId: number,
-    session: CDPSession
-  ): void {
-    const key = `${session.id()}:${executionContextId}`;
-    const context = this.#contextIdToContext.get(key);
-    if (!context) {
-      return;
-    }
-    this.#contextIdToContext.delete(key);
-    if (context._world) {
-      context._world.clearContext();
-    }
-  }
-
-  #onExecutionContextsCleared(session: CDPSession): void {
-    for (const [key, context] of this.#contextIdToContext.entries()) {
-      // Make sure to only clear execution contexts that belong
-      // to the current session.
-      if (context._client !== session) {
-        continue;
-      }
-      if (context._world) {
-        context._world.clearContext();
-      }
-      this.#contextIdToContext.delete(key);
-    }
+    world.setContext(context);
   }
 
   #removeFramesRecursively(frame: CdpFrame): void {

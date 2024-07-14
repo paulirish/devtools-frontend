@@ -134,12 +134,14 @@ export async function setThrottlingMethod(throttlingMethod: 'simulate'|'devtools
 }
 
 export async function clickStartButton() {
-  await click('.lighthouse-start-view button');
+  await click('.lighthouse-start-view devtools-button');
 }
 
 export async function isGenerateReportButtonDisabled() {
-  const button = await waitFor('.lighthouse-start-view .primary-button');
-  return button.evaluate(element => (element as HTMLButtonElement).disabled);
+  const button = await waitFor<HTMLElement>('.lighthouse-start-view devtools-button');
+  return button.evaluate(element => {
+    return element.hasAttribute('disabled');
+  });
 }
 
 export async function getHelpText() {

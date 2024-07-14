@@ -8,7 +8,7 @@ import * as Types from '../types/types.js';
 import {HandlerState, type TraceEventHandlerName} from './types.js';
 import {data as userTimingsData} from './UserTimingsHandler.js';
 
-const extensionFlameChartEntries: Types.Extensions.SyntheticExtensionFlameChartEntry[] = [];
+const extensionFlameChartEntries: Types.Extensions.SyntheticExtensionTrackChartEntry[] = [];
 const extensionTrackData: Types.Extensions.ExtensionTrackData[] = [];
 const extensionMarkers: Types.Extensions.SyntheticExtensionMarker[] = [];
 
@@ -54,10 +54,7 @@ export function extractExtensionEntries(
       // Not an extension user timing.
       continue;
     }
-    const extensionName = extensionPayload.metadata.extensionName;
-    if (!extensionName) {
-      continue;
-    }
+
     const extensionSyntheticEntry = {
       name: timing.name,
       ph: Types.TraceEvents.Phase.COMPLETE,
@@ -73,8 +70,8 @@ export function extractExtensionEntries(
       extensionMarkers.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionMarker);
       continue;
     }
-    if (Types.Extensions.isExtensionPayloadFlameChartEntry(extensionPayload)) {
-      extensionFlameChartEntries.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionFlameChartEntry);
+    if (Types.Extensions.isExtensionPayloadTrackEntry(extensionPayload)) {
+      extensionFlameChartEntries.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionTrackChartEntry);
       continue;
     }
   }
@@ -88,14 +85,26 @@ export function extensionDataInTiming(timing: Types.TraceEvents.SyntheticUserTim
   if (!timingDetail) {
     return null;
   }
-  const detailObj = JSON.parse(timingDetail);
-  if (!('devtools' in detailObj)) {
+  try {
+    // Attempt to parse the detail as an object that might be coming from a
+    // DevTools Perf extension.
+    // Wrapped in a try-catch because timingDetail might either:
+    // 1. Not be `json.parse`-able (it should, but just in case...)
+    // 2.Not be an object - in which case the `in` check will error.
+    // If we hit either of these cases, we just ignore this mark and move on.
+    const detailObj = JSON.parse(timingDetail);
+    if (!('devtools' in detailObj)) {
+      return null;
+    }
+    if (!Types.Extensions.isValidExtensionPayload(detailObj.devtools)) {
+      return null;
+    }
+    return detailObj.devtools;
+  } catch (e) {
+    // No need to worry about this error, just discard this event and don't
+    // treat it as having any useful information for the purposes of extensions
     return null;
   }
-  if (!('metadata' in detailObj['devtools'])) {
-    return null;
-  }
-  return detailObj.devtools;
 }
 
 export function data(): ExtensionTraceData {

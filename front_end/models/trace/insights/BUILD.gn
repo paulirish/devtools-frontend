@@ -8,14 +8,19 @@ import("../../visibility.gni")
 
 devtools_module("insights") {
   sources = [
+    "CumulativeLayoutShift.ts",
     "InsightRunners.ts",
     "InteractionToNextPaint.ts",
     "LargestContentfulPaint.ts",
     "RenderBlocking.ts",
+    "Viewport.ts",
     "types.ts",
   ]
 
-  deps = [ "../handlers:bundle" ]
+  deps = [
+    "../handlers:bundle",
+    "../lantern:bundle",
+  ]
 }
 
 devtools_entrypoint("bundle") {
@@ -33,9 +38,11 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "CumulativeLayoutShift.test.ts",
     "InteractionToNextPaint.test.ts",
     "LargestContentfulPaint.test.ts",
     "RenderBlocking.test.ts",
+    "Viewport.test.ts",
   ]
 
   deps = [

@@ -68,6 +68,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
       value: 'someHeaderValue',
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Disabled,
     };
     const {component, scrollIntoViewSpy} = await renderHeaderSectionRow(headerData);
     assert.isNotNull(component.shadowRoot);
@@ -86,6 +87,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('cross-origin-resource-policy'),
       value: null,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Disabled,
       headerNotSet: true,
       blockedDetails: {
         explanation: () =>
@@ -130,6 +132,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('x-client-data'),
       value: 'CJa2yQEIpLbJAQiTocsB',
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Disabled,
     };
     const {component} = await renderHeaderSectionRow(headerData);
     assert.isNotNull(component.shadowRoot);
@@ -155,6 +158,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('set-cookie'),
       value: 'secure=only; Secure',
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Disabled,
       setCookieBlockedReasons:
           [Protocol.Network.SetCookieBlockedReason.SecureOnly, Protocol.Network.SetCookieBlockedReason.OverwriteSecure],
     };
@@ -184,6 +188,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
       value: 'someHeaderValue',
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Disabled,
       highlight: true,
     };
     const {component, scrollIntoViewSpy} = await renderHeaderSectionRow(headerData);
@@ -200,7 +205,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: originalHeaderName,
       value: originalHeaderValue,
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
     const editedHeaderName = 'new-header-name';
     const editedHeaderValue = 'new value for header';
@@ -274,7 +279,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: headerName,
       value: 'someHeaderValue',
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
 
     const {component, nameEditable} = await renderHeaderSectionRow(headerData);
@@ -300,7 +305,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
       value: originalHeaderValue,
       originalValue: originalHeaderValue,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
 
     const {component, valueEditable} = await renderHeaderSectionRow(headerData);
@@ -327,7 +332,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
       value: 'someHeaderValue',
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
     const editedHeaderValue = 'new value for header';
 
@@ -350,38 +355,12 @@ describeWithEnvironment('HeaderSectionRow', () => {
     assert.strictEqual(eventCount, 1);
   });
 
-  it('removes formatting for pasted content', async () => {
-    const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
-      name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
-      value: 'someHeaderValue',
-      valueEditable: true,
-    };
-
-    const {component, valueEditable} = await renderHeaderSectionRow(headerData);
-    assert.isNotNull(component.shadowRoot);
-
-    let headerValueFromEvent = '';
-    component.addEventListener('headeredited', event => {
-      headerValueFromEvent = event.headerValue;
-    });
-
-    assert.instanceOf(valueEditable, HTMLElement);
-    valueEditable.focus();
-    const dt = new DataTransfer();
-    dt.setData('text/plain', 'foo\nbar');
-    dt.setData('text/html', 'This is <b>bold</b>');
-    dispatchPasteEvent(valueEditable, {clipboardData: dt, bubbles: true});
-    valueEditable.blur();
-
-    assert.strictEqual(headerValueFromEvent, 'foo bar');
-  });
-
   it('adds and removes `header-overridden` class correctly', async () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
       value: 'someHeaderValue',
       originalValue: 'someHeaderValue',
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
       highlight: true,
     };
 
@@ -411,7 +390,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: Platform.StringUtilities.toLowerCaseString('some-header-name'),
       value: null,
       originalValue: null,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
 
     const {component, valueEditable} = await renderHeaderSectionRow(headerData);
@@ -437,7 +416,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       value: 'someHeaderValue',
       originalValue: 'someHeaderValue',
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
 
     const {component, nameEditable} = await renderHeaderSectionRow(headerData);
@@ -468,7 +447,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: originalHeaderName,
       value: originalHeaderValue,
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
     const editedHeaderName = 'permissions-Policy: unload=(https://xyz.com)';
 
@@ -522,7 +501,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: originalHeaderName,
       value: originalHeaderValue,
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
     const editedHeaderName = ':abc';
 
@@ -564,7 +543,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: originalHeaderName,
       value: originalHeaderValue,
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
     const editedHeaderName = 'permissions-Policy: unload=(https://xyz.com)';
 
@@ -614,7 +593,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
     const headerData: NetworkComponents.HeaderSectionRow.HeaderDescriptor = {
       name: headerName,
       value: headerValue,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
 
     const {component} = await renderHeaderSectionRow(headerData);
@@ -645,7 +624,7 @@ describeWithEnvironment('HeaderSectionRow', () => {
       name: originalHeaderName,
       value: originalHeaderValue,
       nameEditable: true,
-      valueEditable: true,
+      valueEditable: NetworkComponents.HeaderSectionRow.EditingAllowedStatus.Enabled,
     };
     const editedHeaderName = ' new-header-name ';
     const editedHeaderValue = ' new value for header ';

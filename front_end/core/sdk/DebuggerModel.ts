@@ -298,6 +298,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
 
   private registerDebugger(response: Protocol.Debugger.EnableResponse): void {
     if (response.getError()) {
+      this.#debuggerEnabledInternal = false;
       return;
     }
     const {debuggerId} = response;
@@ -639,10 +640,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
 
     const pausedDetails =
         new DebuggerPausedDetails(this, callFrames, reason, auxData, breakpointIds, asyncStackTrace, asyncStackTraceId);
-
-    if (this.#expandCallFramesCallback) {
-      pausedDetails.callFrames = await this.#expandCallFramesCallback.call(null, pausedDetails.callFrames);
-    }
+    await this.#expandCallFrames(pausedDetails);
 
     if (this.continueToLocationCallback) {
       const callback = this.continueToLocationCallback;
@@ -661,6 +659,33 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     } else {
       Common.EventTarget.fireEvent('DevTools.DebuggerPaused');
     }
+  }
+
+  /** Delegates to the DebuggerLanguagePlugin and potential attached source maps to expand inlined call frames */
+  async #expandCallFrames(pausedDetails: DebuggerPausedDetails): Promise<void> {
+    if (this.#expandCallFramesCallback) {
+      pausedDetails.callFrames = await this.#expandCallFramesCallback.call(null, pausedDetails.callFrames);
+    }
+
+    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES)) {
+      return;
+    }
+
+    // TODO(crbug.com/40277685): Support attaching/detaching source maps after pausing.
+    // Expanding call frames via source maps here is only suitable for the experiment prototype because
+    // we block until all relevant source maps are loaded.
+    // We should change this so the "Debugger Plugin" and "Source Map" have a bottle neck where they expand
+    // call frames and that bottleneck should support attaching/detaching source maps while paused.
+    const finalFrames: CallFrame[] = [];
+    for (const frame of pausedDetails.callFrames) {
+      const sourceMap = await this.sourceMapManager().sourceMapForClientPromise(frame.script);
+      if (sourceMap?.hasScopeInfo()) {
+        finalFrames.push(...sourceMap.expandCallFrame(frame));
+      } else {
+        finalFrames.push(frame);
+      }
+    }
+    pausedDetails.callFrames = finalFrames;
   }
 
   resumedScript(): void {
@@ -1456,11 +1481,6 @@ export class DebuggerPausedDetails {
     let stack: (Protocol.Runtime.StackTrace|undefined)|Protocol.Runtime.StackTrace = asyncStackTrace;
     let previous: Protocol.Runtime.StackTrace|null = null;
     while (stack) {
-      // TODO(crbug.com/1254259): Remove this post-processing step once the V8
-      // inspector back-end change propagated to Node LTS.
-      if (stack.description === 'async function' && stack.callFrames.length) {
-        stack.callFrames.shift();
-      }
       if (previous && !stack.callFrames.length) {
         previous.parent = stack.parent;
       } else {

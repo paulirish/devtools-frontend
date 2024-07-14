@@ -76,7 +76,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     }
   }
 
-  private findNodeWithEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): TimelineModel.TimelineProfileTree.Node
+  private findNodeWithEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): TimelineModel.TimelineProfileTree.Node
       |null {
     if (event.name === TraceEngine.Types.TraceEvents.KnownEventName.RunTask) {
       // No node is ever created for the top level RunTask event, so
@@ -98,7 +98,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     return null;
   }
 
-  private selectEvent(event: TraceEngine.Legacy.CompatibleTraceEvent, expand?: boolean): void {
+  private selectEvent(event: TraceEngine.Types.TraceEvents.TraceEventData, expand?: boolean): void {
     const node = this.findNodeWithEvent(event);
     if (!node) {
       return;
@@ -132,11 +132,15 @@ export class EventsTimelineTreeView extends TimelineTreeView {
   }
 
   override showDetailsForNode(node: TimelineModel.TimelineProfileTree.Node): boolean {
+    const traceParseData = this.traceParseData();
+    if (!traceParseData) {
+      return false;
+    }
     const traceEvent = node.event;
     if (!traceEvent) {
       return false;
     }
-    void TimelineUIUtils.buildTraceEventDetails(traceEvent, this.linkifier, false, this.traceParseData())
+    void TimelineUIUtils.buildTraceEventDetails(traceParseData, traceEvent, this.linkifier, false)
         .then(fragment => this.detailsView.element.appendChild(fragment));
     return true;
   }
@@ -189,7 +193,7 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     function durationFilterChanged(this: Filters): void {
       const duration = (durationFilterUI.selectedOption() as HTMLOptionElement).value;
       const minimumRecordDuration = parseInt(duration, 10);
-      this.durationFilter.setMinimumRecordDuration(minimumRecordDuration);
+      this.durationFilter.setMinimumRecordDuration(TraceEngine.Types.Timing.MilliSeconds(minimumRecordDuration));
       this.notifyFiltersChanged();
     }
 

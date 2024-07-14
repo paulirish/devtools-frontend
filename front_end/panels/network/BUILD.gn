@@ -151,11 +151,13 @@ ts_library("unittests") {
     "RequestPayloadView.test.ts",
     "RequestPreviewView.test.ts",
     "RequestResponseView.test.ts",
+    "RequestTimingView.test.ts",
   ]
 
   deps = [
     ":bundle",
     ":meta",
+    "../../core/common:bundle",
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated:protocol",

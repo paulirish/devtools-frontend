@@ -350,7 +350,7 @@ describe('The Network Request view', () => {
     const filterInput =
         await waitFor('[aria-label="Filter using regex (example: (web)?socket)"][role=textbox]', messagesView);
     await filterInput.focus();
-    await typeText('ping');
+    await typeText('p[ai]ng');
 
     messages = await waitForMessages(2);
     assert.deepEqual(messages, ['ping', 'ping']);
@@ -642,7 +642,7 @@ describe('The Network Request view', () => {
     await waitForSomeRequestsToAppear(2);
 
     await selectRequestByName('image.svg?id=42&param=a%20b');
-    const SEARCH_QUERY = '[aria-label="Search Query"]';
+    const SEARCH_QUERY = '[aria-label="Find"]';
     const SEARCH_RESULT = '.search-result';
     const {frontend} = getBrowserAndPages();
 

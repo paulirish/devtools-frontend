@@ -23,8 +23,8 @@ export async function logImpressions(loggables: Loggable[]): Promise<void> {
       impression.parent = loggingState.parent.veid;
     }
     if (loggingState.size) {
-      impression.width = loggingState.size.width;
-      impression.height = loggingState.size.height;
+      impression.width = Math.round(loggingState.size.width);
+      impression.height = Math.round(loggingState.size.height);
     }
     return impression;
   }));
@@ -43,7 +43,7 @@ export const logResize = (loggable: Loggable, size: DOMRect): void => {
   const resizeEvent: Host.InspectorFrontendHostAPI
       .ResizeEvent = {veid: loggingState.veid, width: loggingState.size.width, height: loggingState.size.height};
   Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordResize(resizeEvent);
-  processEventForDebugging('Resize', loggingState, {width: size.width, height: size.height});
+  processEventForDebugging('Resize', loggingState, {width: Math.round(size.width), height: Math.round(size.height)});
 };
 
 export const logClick = (throttler: Common.Throttler.Throttler) => (
@@ -68,7 +68,7 @@ export const logHover = (throttler: Common.Throttler.Throttler) => async (event:
   const loggingState = getLoggingState(event.currentTarget as Element);
   assertNotNullOrUndefined(loggingState);
   const hoverEvent: Host.InspectorFrontendHostAPI.HoverEvent = {veid: loggingState.veid};
-  void throttler.schedule(async () => {});  // Ensure the logging won't get scheduled immediately
+  await throttler.schedule(async () => {});  // Ensure the logging won't get scheduled immediately
   void throttler.schedule(async () => {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordHover(hoverEvent);
     processEventForDebugging('Hover', loggingState);
@@ -86,12 +86,16 @@ export const logDrag = (throttler: Common.Throttler.Throttler) => async (event: 
   });
 };
 
-export async function logChange(event: Event): Promise<void> {
-  const loggingState = getLoggingState(event.currentTarget as Element);
+export async function logChange(loggable: Loggable): Promise<void> {
+  const loggingState = getLoggingState(loggable);
   assertNotNullOrUndefined(loggingState);
   const changeEvent: Host.InspectorFrontendHostAPI.ChangeEvent = {veid: loggingState.veid};
+  const context = loggingState.lastInputEventType;
+  if (context) {
+    changeEvent.context = await contextAsNumber(context);
+  }
   Host.InspectorFrontendHost.InspectorFrontendHostInstance.recordChange(changeEvent);
-  processEventForDebugging('Change', loggingState);
+  processEventForDebugging('Change', loggingState, {context});
 }
 
 let pendingKeyDownContext: string|null = null;
@@ -103,7 +107,7 @@ export const logKeyDown =
       }
       const loggingState = loggable ? getLoggingState(loggable) : null;
       const codes = (typeof loggingState?.config.track?.keydown === 'string') ? loggingState.config.track.keydown : '';
-      if (codes.length && !codes.split('|').includes(event.code)) {
+      if (codes.length && !codes.split('|').includes(event.code) && !codes.split('|').includes(event.key)) {
         return;
       }
       const keyDownEvent: Host.InspectorFrontendHostAPI.KeyDownEvent = {veid: loggingState?.veid};
@@ -130,8 +134,10 @@ function contextFromKeyCodes(event: Event): string|undefined {
   if (!(event instanceof KeyboardEvent)) {
     return undefined;
   }
+  const key = event.key;
+  const lowerCaseKey = key.toLowerCase();
   const components = [];
-  if (event.shiftKey) {
+  if (event.shiftKey && key !== lowerCaseKey) {
     components.push('shift');
   }
   if (event.ctrlKey) {
@@ -143,7 +149,7 @@ function contextFromKeyCodes(event: Event): string|undefined {
   if (event.metaKey) {
     components.push('meta');
   }
-  components.push(event.key.toLowerCase());
+  components.push(lowerCaseKey);
   return components.join('-');
 }
 
@@ -162,5 +168,5 @@ async function contextAsNumber(context: string|undefined): Promise<number|undefi
   const encoder = new TextEncoder();
   const data = encoder.encode(context);
   const digest = await crypto.subtle.digest('SHA-1', data);
-  return new DataView(digest).getUint32(0, true);
+  return new DataView(digest).getInt32(0, true);
 }

@@ -193,7 +193,7 @@ export class CommandMenu {
         locations.set(name, category);
       }
     }
-    const views = UI.ViewManager.getRegisteredViewExtensions();
+    const views = UI.ViewManager.getRegisteredViewExtensions(Common.Settings.Settings.instance().getHostConfig());
     for (const view of views) {
       const viewLocation = view.location();
       const category = viewLocation && locations.get(viewLocation);
@@ -211,7 +211,7 @@ export class CommandMenu {
       this.commandsInternal.push(CommandMenu.createRevealViewCommand(options));
     }
     // Populate allowlisted settings.
-    const settingsRegistrations = Common.Settings.getRegisteredSettings();
+    const settingsRegistrations = Common.Settings.Settings.instance().getRegisteredSettings();
     for (const settingRegistration of settingsRegistrations) {
       const options = settingRegistration.options;
       if (!options || !settingRegistration.category) {

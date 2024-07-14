@@ -8,10 +8,7 @@ import {
   type TraceEventData,
 } from './TraceEvents.js';
 
-export const enum ExtensionEntryType {
-  TRACK_ENTRY = 'track-entry',
-  MARKER = 'marker',
-}
+export type ExtensionEntryType = 'track-entry'|'marker';
 
 const extensionPalette = [
   'primary',
@@ -33,62 +30,39 @@ export function colorIsValid(color: string): boolean {
 }
 
 export interface ExtensionDataPayload {
-  metadata: {dataType: ExtensionEntryType, extensionName: string};
-}
-export interface ExtensionFlameChartEntryPayload extends ExtensionDataPayload {
-  metadata: ExtensionDataPayload['metadata']&{dataType: ExtensionEntryType.TRACK_ENTRY};
-  color: ExtensionColorFromPalette;
-  track: string;
+  dataType?: 'track-entry'|'marker';
+  color?: ExtensionColorFromPalette;
+  track?: string;
   detailsPairs?: [string, string][];
   hintText?: string;
+}
+
+export interface ExtensionTrackEntryPayload extends ExtensionDataPayload {
+  // Typed as possibly undefined since when no data type is provided
+  // the entry is defaulted to a track entry
+  dataType?: 'track-entry';
+  // The name of the track the entry will be displayed in.
+  // Entries intended to be displayed in the same track must contain the
+  // same value in this property.
+  // If undefined, measurement is added to the Timings track
+  track: string;
+  // The track group an entry’s track belongs to.
+  // Entries intended to be displayed in the same track must contain the
+  // same value in this property as well as the same value in the track
+  // property.
+  trackGroup?: string;
 }
 
 export interface ExtensionMarkerPayload extends ExtensionDataPayload {
-  metadata: ExtensionDataPayload['metadata']&{dataType: ExtensionEntryType.MARKER};
-  color: ExtensionColorFromPalette;
-  detailsPairs?: [string, string][];
-  hintText?: string;
-}
-
-export interface SyntheticExtensionFlameChartEntry extends SyntheticTraceEntry {
-  args: TraceEventArgs&ExtensionFlameChartEntryPayload;
-}
-
-export interface SyntheticExtensionMarker extends SyntheticTraceEntry {
-  args: TraceEventArgs&ExtensionMarkerPayload;
-}
-
-export type SyntheticExtensionEntry = SyntheticExtensionFlameChartEntry|SyntheticExtensionMarker;
-
-export function validateColorInPayload(payload: ExtensionDataPayload): boolean {
-  if (!('color' in payload) || !payload.color) {
-    return false;
-  }
-  const color = payload['color'] as ExtensionColorFromPalette;
-  return colorIsValid(color);
-}
-
-export function isExtensionPayloadMarker(payload: ExtensionDataPayload): payload is ExtensionMarkerPayload {
-  const colorIsValid = validateColorInPayload(payload);
-  return payload.metadata.dataType === ExtensionEntryType.MARKER && colorIsValid;
-}
-
-export function isExtensionPayloadFlameChartEntry(payload: ExtensionDataPayload):
-    payload is ExtensionFlameChartEntryPayload {
-  const colorIsValid = validateColorInPayload(payload);
-  const hasTrack = 'track' in payload && Boolean(payload.track);
-  return payload.metadata.dataType === ExtensionEntryType.TRACK_ENTRY && hasTrack && colorIsValid;
-}
-
-export function isSyntheticExtensionEntry(entry: TraceEventData): entry is SyntheticExtensionEntry {
-  return entry.cat === 'devtools.extension';
+  dataType: 'marker';
+  track: undefined;
 }
 
 /**
  * Synthetic events created for extension tracks.
  */
-export interface SyntheticExtensionFlameChartEntry extends SyntheticTraceEntry {
-  args: TraceEventArgs&ExtensionFlameChartEntryPayload;
+export interface SyntheticExtensionTrackChartEntry extends SyntheticTraceEntry {
+  args: TraceEventArgs&ExtensionTrackEntryPayload;
   cat: 'devtools.extension';
 }
 
@@ -100,8 +74,36 @@ export interface SyntheticExtensionMarker extends SyntheticTraceEntry {
   cat: 'devtools.extension';
 }
 
+export type SyntheticExtensionEntry = SyntheticExtensionTrackChartEntry|SyntheticExtensionMarker;
+
+export function isExtensionPayloadMarker(payload: {dataType?: string}): payload is ExtensionMarkerPayload {
+  return payload.dataType === 'marker';
+}
+
+export function isExtensionPayloadTrackEntry(payload: {track?: string, dataType?: string}):
+    payload is ExtensionTrackEntryPayload {
+  const hasTrack = 'track' in payload && Boolean(payload.track);
+  const validEntryType = payload.dataType === 'track-entry' || payload.dataType === undefined;
+  return validEntryType && hasTrack;
+}
+
+export function isValidExtensionPayload(payload: {track?: string, dataType?: string}): payload is ExtensionDataPayload {
+  return isExtensionPayloadMarker(payload) || isExtensionPayloadTrackEntry(payload);
+}
+
+export function isSyntheticExtensionEntry(entry: TraceEventData): entry is SyntheticExtensionEntry {
+  return entry.cat === 'devtools.extension';
+}
+
 export interface ExtensionTrackData {
+  // Name of the top level track. If it's a track group then this value
+  // has the name of the group, otherwise it has the name of the track.
   name: string;
-  extensionName: string;
-  flameChartEntries: SyntheticExtensionFlameChartEntry[];
+  isTrackGroup: boolean;
+  // If this contains the data of a track group, this property contains
+  // the entries of each of the tracks in the the group. If this is a
+  // standalone track, then this contains that track's entries only.
+  entriesByTrack: {
+    [x: string]: SyntheticExtensionTrackChartEntry[],
+  };
 }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../core/platform/platform.js';
+import type * as Root from '../root/root.js';
 
 export enum Events {
   AppendedToURL = 'appendedToURL',
@@ -26,7 +27,6 @@ export enum Events {
   IndexingWorked = 'indexingWorked',
   IndexingDone = 'indexingDone',
   KeyEventUnhandled = 'keyEventUnhandled',
-  ReattachRootTarget = 'reattachMainTarget',
   ReloadInspectedPage = 'reloadInspectedPage',
   RevealSourceLine = 'revealSourceLine',
   SavedURL = 'savedURL',
@@ -58,7 +58,6 @@ export const EventDescriptors = [
   [Events.IndexingWorked, 'indexingWorked', ['requestId', 'fileSystemPath', 'worked']],
   [Events.IndexingDone, 'indexingDone', ['requestId', 'fileSystemPath']],
   [Events.KeyEventUnhandled, 'keyEventUnhandled', ['event']],
-  [Events.ReattachRootTarget, 'reattachMainTarget', []],
   [Events.ReloadInspectedPage, 'reloadInspectedPage', ['hard']],
   [Events.RevealSourceLine, 'revealSourceLine', ['url', 'lineNumber', 'columnNumber']],
   [Events.SavedURL, 'savedURL', ['url', 'fileSystemPath']],
@@ -219,7 +218,6 @@ export type EventTypes = {
   [Events.IndexingWorked]: IndexingWorkedEvent,
   [Events.IndexingDone]: IndexingEvent,
   [Events.KeyEventUnhandled]: KeyEventUnhandledEvent,
-  [Events.ReattachRootTarget]: void,
   [Events.ReloadInspectedPage]: boolean,
   [Events.RevealSourceLine]: RevealSourceLineEvent,
   [Events.SavedURL]: SavedURLEvent,
@@ -264,7 +262,7 @@ export interface InspectorFrontendHostAPI {
 
   requestFileSystems(): void;
 
-  save(url: Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean): void;
+  save(url: Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean, isBase64: boolean): void;
 
   append(url: Platform.DevToolsPath.UrlString, content: string): void;
 
@@ -302,6 +300,8 @@ export interface InspectorFrontendHostAPI {
   clearPreferences(): void;
 
   getSyncInformation(callback: (arg0: SyncInformation) => void): void;
+
+  getHostConfig(callback: (arg0: Root.Runtime.HostConfig) => void): void;
 
   upgradeDraggedFileSystemPermissions(fileSystem: FileSystem): void;
 
@@ -378,6 +378,7 @@ export interface ContextMenuDescriptor {
   enabled?: boolean;
   checked?: boolean;
   subItems?: ContextMenuDescriptor[];
+  shortcut?: string;
   jslogContext?: string;
 }
 export interface LoadNetworkResourceResult {
@@ -427,8 +428,6 @@ export interface SyncInformation {
  */
 export const enum EnumeratedHistogram {
   ActionTaken = 'DevTools.ActionTaken',
-  BreakpointEditDialogRevealedFrom = 'DevTools.BreakpointEditDialogRevealedFrom',
-  PanelClosed = 'DevTools.PanelClosed',
   PanelShown = 'DevTools.PanelShown',
   PanelShownInLocation = 'DevTools.PanelShownInLocation',
   SidebarPaneShown = 'DevTools.SidebarPaneShown',

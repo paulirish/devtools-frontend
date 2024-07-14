@@ -198,8 +198,9 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
         'Show item in folder is not enabled in hosted mode. Please inspect using chrome://inspect');
   }
 
-  save(url: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean):
-      void {
+  save(
+      url: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean,
+      isBase64: boolean): void {
     let buffer = this.#urlsBeingSaved.get(url);
     if (!buffer) {
       buffer = [];
@@ -397,6 +398,42 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
     });
   }
 
+  getHostConfig(callback: (arg0: Root.Runtime.HostConfig) => void): void {
+    const result = {
+      devToolsAida: {
+        blocked: true,
+        blockedByAge: false,
+        blockedByEnterprisePolicy: false,
+        blockedByFeatureFlag: true,
+        blockedByGeo: false,
+        blockedByRollout: false,
+        enabled: false,
+      },
+      devToolsConsoleInsights: {
+        aidaModelId: '',
+        aidaTemperature: 0,
+        disallowLogging: false,
+        enabled: false,
+        optIn: false,
+      },
+      devToolsFreestylerDogfood: {
+        aidaModelId: '',
+        aidaTemperature: 0,
+        enabled: false,
+      },
+    };
+    if ('hostConfigForTesting' in globalThis) {
+      const {hostConfigForTesting} = (globalThis as unknown as {hostConfigForTesting: Root.Runtime.HostConfig});
+      for (const key of Object.keys(hostConfigForTesting)) {
+        const mergeEntry = <K extends keyof Root.Runtime.HostConfig>(key: K): void => {
+          result[key] = {...result[key], ...hostConfigForTesting[key]};
+        };
+        mergeEntry(key as keyof Root.Runtime.HostConfig);
+      }
+    }
+    callback(result);
+  }
+
   upgradeDraggedFileSystemPermissions(fileSystem: FileSystem): void {
   }
 
@@ -476,7 +513,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 
   doAidaConversation(request: string, streamId: number, callback: (result: DoAidaConversationResult) => void): void {
     callback({
-      error: 'Not implemened',
+      error: 'Not implemented',
     });
   }
 
@@ -549,18 +586,6 @@ function initializeInspectorFrontendHost(): void {
     // Instantiate stub for web-hosted mode if necessary.
     // @ts-ignore Global injected by devtools-compatibility.js
     globalThis.InspectorFrontendHost = InspectorFrontendHostInstance = new InspectorFrontendHostStub();
-    if ('doAidaConversationForTesting' in globalThis) {
-      InspectorFrontendHostInstance['doAidaConversation'] =
-          (globalThis as unknown as {
-            doAidaConversationForTesting: typeof InspectorFrontendHostInstance['doAidaConversation'],
-          }).doAidaConversationForTesting;
-    }
-    if ('getSyncInformationForTesting' in globalThis) {
-      InspectorFrontendHostInstance['getSyncInformation'] =
-          (globalThis as unknown as {
-            getSyncInformationForTesting: typeof InspectorFrontendHostInstance['getSyncInformation'],
-          }).getSyncInformationForTesting;
-    }
   } else {
     // Otherwise add stubs for missing methods that are declared in the interface.
     proto = InspectorFrontendHostStub.prototype;

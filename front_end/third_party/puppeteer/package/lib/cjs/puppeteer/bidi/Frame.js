@@ -70,6 +70,7 @@ exports.BidiFrame = void 0;
 const Bidi = __importStar(require("chromium-bidi/lib/cjs/protocol/protocol.js"));
 const rxjs_js_1 = require("../../third_party/rxjs/rxjs.js");
 const Frame_js_1 = require("../api/Frame.js");
+const Accessibility_js_1 = require("../cdp/Accessibility.js");
 const ConsoleMessage_js_1 = require("../common/ConsoleMessage.js");
 const Errors_js_1 = require("../common/Errors.js");
 const util_js_1 = require("../common/util.js");
@@ -95,6 +96,7 @@ let BidiFrame = (() => {
     let _private_waitForNetworkIdle$_decorators;
     let _private_waitForNetworkIdle$_descriptor;
     let _setFiles_decorators;
+    let _locateNodes_decorators;
     return class BidiFrame extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
@@ -104,6 +106,7 @@ let BidiFrame = (() => {
             _private_waitForLoad$_decorators = [Frame_js_1.throwIfDetached];
             _private_waitForNetworkIdle$_decorators = [Frame_js_1.throwIfDetached];
             _setFiles_decorators = [Frame_js_1.throwIfDetached];
+            _locateNodes_decorators = [Frame_js_1.throwIfDetached];
             __esDecorate(this, null, _goto_decorators, { kind: "method", name: "goto", static: false, private: false, access: { has: obj => "goto" in obj, get: obj => obj.goto }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setContent_decorators, { kind: "method", name: "setContent", static: false, private: false, access: { has: obj => "setContent" in obj, get: obj => obj.setContent }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _waitForNavigation_decorators, { kind: "method", name: "waitForNavigation", static: false, private: false, access: { has: obj => "waitForNavigation" in obj, get: obj => obj.waitForNavigation }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -163,6 +166,7 @@ let BidiFrame = (() => {
                     });
                 }, "#waitForNetworkIdle$") }, _private_waitForNetworkIdle$_decorators, { kind: "method", name: "#waitForNetworkIdle$", static: false, private: true, access: { has: obj => #waitForNetworkIdle$ in obj, get: obj => obj.#waitForNetworkIdle$ }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setFiles_decorators, { kind: "method", name: "setFiles", static: false, private: false, access: { has: obj => "setFiles" in obj, get: obj => obj.setFiles }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _locateNodes_decorators, { kind: "method", name: "locateNodes", static: false, private: false, access: { has: obj => "locateNodes" in obj, get: obj => obj.locateNodes }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static from(parent, browsingContext) {
@@ -170,12 +174,13 @@ let BidiFrame = (() => {
             frame.#initialize();
             return frame;
         }
-        #parent = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #parent = __runInitializers(this, _instanceExtraInitializers);
         browsingContext;
         #frames = new WeakMap();
         realms;
         _id;
         client;
+        accessibility;
         constructor(parent, browsingContext) {
             super();
             this.#parent = parent;
@@ -186,6 +191,7 @@ let BidiFrame = (() => {
                 default: Realm_js_1.BidiFrameRealm.from(this.browsingContext.defaultRealm, this),
                 internal: Realm_js_1.BidiFrameRealm.from(this.browsingContext.createWindowRealm(`__puppeteer_internal_${Math.ceil(Math.random() * 10000)}`), this),
             };
+            this.accessibility = new Accessibility_js_1.Accessibility(this.realms.default);
         }
         #initialize() {
             for (const browsingContext of this.browsingContext.children) {
@@ -435,12 +441,6 @@ let BidiFrame = (() => {
             this.#exposedFunctions.delete(name);
             await exposedFunction[Symbol.asyncDispose]();
         }
-        waitForSelector(selector, options) {
-            if (selector.startsWith('aria') && !this.page().browser().cdpSupported) {
-                throw new Errors_js_1.UnsupportedOperation('ARIA selector is not supported for BiDi!');
-            }
-            return super.waitForSelector(selector, options);
-        }
         async createCDPSession() {
             const { sessionId } = await this.client.send('Target.attachToTarget', {
                 targetId: this._id,
@@ -455,6 +455,11 @@ let BidiFrame = (() => {
             await this.browsingContext.setFiles(
             // SAFETY: ElementHandles are always remote references.
             element.remoteValue(), files);
+        }
+        async locateNodes(element, locator) {
+            return await this.browsingContext.locateNodes(locator, 
+            // SAFETY: ElementHandles are always remote references.
+            [element.remoteValue()]);
         }
     };
 })();

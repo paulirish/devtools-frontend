@@ -4,6 +4,7 @@
 
 export * as Animations from './AnimationHandler.js';
 export * as AuctionWorklets from './AuctionWorkletsHandler.js';
+export * as EnhancedTraces from './EnhancedTracesHandler.js';
 export * as ExtensionTraceData from './ExtensionTraceDataHandler.js';
 export * as Frames from './FramesHandler.js';
 export * as GPU from './GPUHandler.js';
@@ -22,6 +23,7 @@ export * as PageLoadMetrics from './PageLoadMetricsHandler.js';
 export * as Renderer from './RendererHandler.js';
 export * as Samples from './SamplesHandler.js';
 export * as Screenshots from './ScreenshotsHandler.js';
+export * as SelectorStats from './SelectorStatsHandler.js';
 export * as UserInteractions from './UserInteractionsHandler.js';
 export * as UserTimings from './UserTimingsHandler.js';
 export * as Warnings from './WarningsHandler.js';

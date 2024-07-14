@@ -30,6 +30,9 @@
   align-items: center;
 }
 
+/* This specific nesting is incompatible with what stylelint requires as ordering of the rules. */
+/* stylelint-disable no-descending-specificity */
+
 button {
   --hover-layer-color: var(--sys-color-state-hover-on-subtle);
   --active-layer-color: var(--sys-color-state-ripple-neutral-on-subtle);
@@ -51,13 +54,17 @@ button {
   white-space: nowrap;
   width: var(--button-width);
 
+  &.primary-toggle {
+    --toggle-color: var(--sys-color-primary-bright);
+  }
+
+  &.red-toggle {
+    --toggle-color: var(--sys-color-error-bright);
+  }
+
   devtools-icon {
     width: var(--icon-size);
     height: var(--icon-size);
-  }
-
-  &.small {
-    --button-height: 20px;
   }
 
   &.toolbar,
@@ -67,13 +74,18 @@ button {
     --button-width: 26px;
     --icon-size: var(--sys-size-9);
 
+    padding: 0;
     border: none;
     overflow: hidden;
 
     &.small {
-      --button-height: var(--sys-size-11);
-      --button-width: var(--sys-size-11);
+      --button-height: var(--sys-size-9);
+      --button-width: var(--sys-size-9);
       --icon-size: var(--sys-size-8);
+    }
+
+    &.toggled devtools-icon {
+      color: var(--toggle-color); /* stylelint-disable-line plugin/use_theme_colors */
     }
   }
 
@@ -125,8 +137,6 @@ button {
     }
   }
 
-  /* This specific nesting is incompatible with what stylelint requires as ordering of the rules. */
-  /* stylelint-disable no-descending-specificity */
   &.outlined {
     border: var(--button-border-size) solid var(--sys-color-tonal-outline);
     background: transparent;
@@ -157,35 +167,31 @@ button {
 
   &:disabled {
     pointer-events: none;
+    color: var(--sys-color-state-disabled);
 
     &.primary {
       border: var(--button-border-size) solid var(--sys-color-state-disabled-container);
       background: var(--sys-color-state-disabled-container);
-      color: var(--sys-color-state-disabled);
     }
 
     &.tonal {
       border: var(--button-border-size) solid var(--sys-color-state-disabled-container);
       background: var(--sys-color-state-disabled-container);
-      color: var(--sys-color-state-disabled);
     }
 
     &.outlined {
       border: var(--button-border-size) solid var(--sys-color-state-disabled-container);
-      color: var(--sys-color-state-disabled);
     }
 
     &.toolbar,
     &.icon {
       background: transparent;
-      color: var(--sys-color-state-disabled);
     }
 
     devtools-icon {
       color: var(--icon-disabled);
     }
   }
-  /* stylelint-enable no-descending-specificity */
 
   &:not(.icon):not(.toolbar).only-icon {
     width: 100%;
@@ -204,6 +210,10 @@ button {
     &.toolbar,
     &.icon {
       outline-offset: -1px;
+
+      &.small {
+        outline-offset: -2px;
+      }
     }
   }
 
@@ -211,8 +221,6 @@ button {
     padding-left: var(--sys-size-4);
   }
 
-  /* This specific nesting is incompatible with what stylelint requires as ordering of the rules. */
-  /* stylelint-disable no-descending-specificity */
   &:hover::after {
     content: "";
     height: 100%;
@@ -263,8 +271,8 @@ button {
       }
     }
   }
-  /* stylelint-enable no-descending-specificity */
 }
+/* stylelint-enable no-descending-specificity */
 
 .spinner {
   display: block;
