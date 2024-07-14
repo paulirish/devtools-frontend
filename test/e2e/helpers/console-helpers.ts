@@ -253,9 +253,7 @@ export async function unifyLogVM(actualLog: string, expectedLog: string) {
   const actualLogArray = actualLog.trim().split('\n').map(s => s.trim());
   const expectedLogArray = expectedLog.trim().split('\n').map(s => s.trim());
 
-  if (actualLogArray.length !== expectedLogArray.length) {
-    throw 'logs are not the same length';
-  }
+  assert.strictEqual(actualLogArray.length, expectedLogArray.length, 'logs are not the same length');
 
   for (let index = 0; index < actualLogArray.length; index++) {
     const repl = actualLogArray[index].match(/VM\d+:/g);
@@ -285,7 +283,7 @@ export async function navigateToConsoleTab() {
 
 export async function waitForConsoleInfoMessageAndClickOnLink() {
   const consoleMessage = await waitFor('div.console-group-messages .console-info-level span.source-code');
-  await click('span.devtools-link', {root: consoleMessage});
+  await click('button.devtools-link', {root: consoleMessage});
 }
 
 export async function turnOffHistoryAutocomplete() {

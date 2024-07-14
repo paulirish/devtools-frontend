@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -219,6 +220,13 @@ export class CompatibilityTracksAppender {
       return appender.entriesFilter().findPossibleActions(node);
     }
     console.warn('Could not find possible context menu actions.');
+  }
+
+  revealEntry(group: PerfUI.FlameChart.Group, index: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void {
+    const appender = this.#trackForGroup.get(group);
+    if (appender && appender.entriesFilter) {
+      appender.entriesFilter().revealEntry(index);
+    }
   }
 
   findHiddenDescendantsAmount(group: PerfUI.FlameChart.Group, node: TraceEngine.Types.TraceEvents.SyntheticTraceEntry):
@@ -585,6 +593,12 @@ export class CompatibilityTracksAppender {
       // Therefore we mark them as visible so they are appended onto the Thread
       // track, and hence accessible by the CountersGraph view.
       return true;
+    }
+
+    // Gate the visibility of post message events behind the experiement flag
+    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
     }
 
     // Default styles are globally defined for each event name. Some

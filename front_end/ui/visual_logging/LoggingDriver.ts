@@ -22,12 +22,16 @@ const CLICK_LOG_INTERVAL = 500;
 const RESIZE_LOG_INTERVAL = 1000;
 const RESIZE_REPORT_THRESHOLD = 50;
 
-let processingThrottler: Common.Throttler.Throttler|null;
-let keyboardLogThrottler: Common.Throttler.Throttler;
-let hoverLogThrottler: Common.Throttler.Throttler;
-let dragLogThrottler: Common.Throttler.Throttler;
-let clickLogThrottler: Common.Throttler.Throttler;
-let resizeLogThrottler: Common.Throttler.Throttler;
+const noOpThrottler = {
+  schedule: async () => {},
+} as unknown as Common.Throttler.Throttler;
+
+let processingThrottler = noOpThrottler;
+export let keyboardLogThrottler = noOpThrottler;
+let hoverLogThrottler = noOpThrottler;
+let dragLogThrottler = noOpThrottler;
+export let clickLogThrottler = noOpThrottler;
+export let resizeLogThrottler = noOpThrottler;
 
 const mutationObservers = new WeakMap<Node, MutationObserver>();
 const documents: Document[] = [];
@@ -91,7 +95,7 @@ export function stopLogging(): void {
     mutationObservers.delete(shadowRoot);
   }
   documents.length = 0;
-  processingThrottler = null;
+  processingThrottler = noOpThrottler;
 }
 
 export function scheduleProcessing(): void {
@@ -134,39 +138,38 @@ async function process(): Promise<void> {
       }
     }
     if (!loggingState.processed) {
-      if (loggingState.config.track?.has('click')) {
+      if (loggingState.config.track?.click) {
         element.addEventListener('click', e => {
           const loggable = e.currentTarget as Element;
-          void clickLogThrottler.schedule(async () => logClick(loggable, e));
+          logClick(clickLogThrottler)(loggable, e);
         }, {capture: true});
       }
-      if (loggingState.config.track?.has('dblclick')) {
+      if (loggingState.config.track?.dblclick) {
         element.addEventListener('dblclick', e => {
           const loggable = e.currentTarget as Element;
-          void clickLogThrottler.schedule(async () => logClick(loggable, e, {doubleClick: true}));
+          logClick(clickLogThrottler)(loggable, e, {doubleClick: true});
         }, {capture: true});
       }
-      const trackHover = loggingState.config.track?.has('hover');
+      const trackHover = loggingState.config.track?.hover;
       if (trackHover) {
         element.addEventListener('mouseover', logHover(hoverLogThrottler), {capture: true});
         const cancelLogging = (): Promise<void> => Promise.resolve();
         element.addEventListener('mouseout', () => hoverLogThrottler.schedule(cancelLogging), {capture: true});
       }
-      const trackDrag = loggingState.config.track?.has('drag');
+      const trackDrag = loggingState.config.track?.drag;
       if (trackDrag) {
         element.addEventListener('pointerdown', logDrag(dragLogThrottler), {capture: true});
         const cancelLogging = (): Promise<void> => Promise.resolve();
         element.addEventListener('pointerup', () => dragLogThrottler.schedule(cancelLogging), {capture: true});
       }
-      if (loggingState.config.track?.has('change')) {
+      if (loggingState.config.track?.change) {
         element.addEventListener('change', logChange, {capture: true});
       }
-      const trackKeyDown = loggingState.config.track?.has('keydown');
-      const codes = loggingState.config.track?.get('keydown')?.split('|') || [];
+      const trackKeyDown = loggingState.config.track?.keydown;
       if (trackKeyDown) {
-        element.addEventListener('keydown', logKeyDown(codes, keyboardLogThrottler), {capture: true});
+        element.addEventListener('keydown', e => logKeyDown(keyboardLogThrottler)(e.currentTarget, e), {capture: true});
       }
-      if (loggingState.config.track?.has('resize')) {
+      if (loggingState.config.track?.resize) {
         const updateSize = (): void => {
           const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
           if (!loggingState.size) {
@@ -174,7 +177,7 @@ async function process(): Promise<void> {
           }
           if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
               Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
-            void logResize(element, overlap, resizeLogThrottler);
+            void logResize(resizeLogThrottler)(element, overlap);
           }
         };
         new ResizeObserver(updateSize).observe(element);
@@ -205,8 +208,8 @@ async function process(): Promise<void> {
         }, {capture: true});
         element.addEventListener('change', e => {
           for (const option of (element as HTMLSelectElement).selectedOptions) {
-            if (getLoggingState(option)?.config.track?.has('click')) {
-              void logClick(option, e);
+            if (getLoggingState(option)?.config.track?.click) {
+              void logClick(clickLogThrottler)(option, e);
             }
           }
         }, {capture: true});

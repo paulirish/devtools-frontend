@@ -5,12 +5,18 @@
 import type * as LoggableModule from './Loggable.js';
 import * as LoggingConfig from './LoggingConfig.js';
 import * as LoggingDriver from './LoggingDriver.js';
+import * as LoggingEvents from './LoggingEvents.js';
 import * as NonDomState from './NonDomState.js';
 
 export type Loggable = LoggableModule.Loggable;
 export {startLogging, stopLogging, addDocument} from './LoggingDriver.js';
-export {logClick, logImpressions, logResize} from './LoggingEvents.js';
-export {registerContextProvider, registerParentProvider, setMappedParent} from './LoggingState.js';
+export {logImpressions, logChange} from './LoggingEvents.js';
+export const logClick = (l: Loggable, e: Event): void => LoggingEvents.logClick(LoggingDriver.clickLogThrottler)(l, e);
+export const logResize = (l: Loggable, s: DOMRect): void =>
+    LoggingEvents.logResize(LoggingDriver.resizeLogThrottler)(l, s);
+export const logKeyDown = async(l: Loggable|null, e: Event, context?: string): Promise<void> =>
+    LoggingEvents.logKeyDown(LoggingDriver.keyboardLogThrottler)(l, e, context);
+export {registerParentProvider, setMappedParent} from './LoggingState.js';
 
 export function registerLoggable(loggable: Loggable, config: string, parent: Loggable|null): void {
   if (!LoggingDriver.isLogging()) {
@@ -86,6 +92,7 @@ export const slider = LoggingConfig.makeConfigStringBuilder.bind(null, 'Slider')
 export const section = LoggingConfig.makeConfigStringBuilder.bind(null, 'Section');
 export const sectionHeader = LoggingConfig.makeConfigStringBuilder.bind(null, 'SectionHeader');
 export const stylesSelector = LoggingConfig.makeConfigStringBuilder.bind(null, 'StylesSelector');
+export const tableRow = LoggingConfig.makeConfigStringBuilder.bind(null, 'TableRow');
 export const tableCell = LoggingConfig.makeConfigStringBuilder.bind(null, 'TableCell');
 export const tableHeader = LoggingConfig.makeConfigStringBuilder.bind(null, 'TableHeader');
 

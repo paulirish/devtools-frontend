@@ -54,6 +54,7 @@ import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {format, updateStyle} from './ConsoleFormat.js';
 import consoleViewStyles from './consoleView.css.js';
@@ -588,7 +589,8 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     clickableElement.appendChild(messageElement);
     const stackTraceElement = contentElement.createChild('div');
     const stackTracePreview = Components.JSPresentationUtils.buildStackTracePreviewContents(
-        runtimeModel.target(), this.linkifier, {stackTrace: this.message.stackTrace, tabStops: undefined});
+        runtimeModel.target(), this.linkifier,
+        {stackTrace: this.message.stackTrace, tabStops: undefined, widthConstrained: true});
     stackTraceElement.appendChild(stackTracePreview.element);
     for (const linkElement of stackTracePreview.links) {
       this.selectableChildren.push({element: linkElement, forceSelect: () => linkElement.focus()});
@@ -1257,6 +1259,10 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     }
 
     this.elementInternal.className = 'console-message-wrapper';
+    this.elementInternal.setAttribute('jslog', `${VisualLogging.item('console-message').track({
+                                        click: true,
+                                        keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space|Home|End',
+                                      })}`);
     this.elementInternal.removeChildren();
     this.consoleRowWrapper = this.elementInternal.createChild('div');
     this.consoleRowWrapper.classList.add('console-row-wrapper');
@@ -1315,6 +1321,11 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
   }
 
   shouldShowInsights(): boolean {
+    if (this.message.source === SDK.ConsoleModel.FrontendMessageSource.ConsoleAPI &&
+        this.message.stackTrace?.callFrames[0]?.url === '') {
+      // Do not show insights for direct calls to Console APIs from within DevTools Console.
+      return false;
+    }
     return this.message.level === Protocol.Log.LogEntryLevel.Error ||
         this.message.level === Protocol.Log.LogEntryLevel.Warning;
   }

@@ -57,6 +57,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ExecutionContextSelector} from './ExecutionContextSelector.js';
+import {SettingTracker} from './SettingTracker.js';
 
 const UIStrings = {
   /**
@@ -256,6 +257,9 @@ export class MainImpl {
     const globalStorage = new Common.Settings.SettingsStorage(prefs, hostUnsyncedStorage, storagePrefix);
     Common.Settings.Settings.instance({forceNew: true, syncedStorage, globalStorage, localStorage});
 
+    // Needs to be created after Settings are available.
+    new SettingTracker();
+
     if (!Host.InspectorFrontendHost.isUnderTest()) {
       new Common.Settings.VersionController().updateVersion();
     }
@@ -285,11 +289,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timeline-as-console-profile-result-panel',
         'View console.profile() results in the Performance panel for Node.js', true);
-
-    // JS Profiler
-    Root.Runtime.experiments.register(
-        'js-profiler-temporarily-enable', 'Enable JavaScript Profiler temporarily', /* unstable= */ false,
-        'https://goo.gle/js-profiler-deprecation', 'https://crbug.com/1354548');
 
     // Sources
     Root.Runtime.experiments.register(
@@ -368,9 +367,6 @@ export class MainImpl {
         'Enable background page selector (e.g. for prerendering debugging)', false);
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.SELF_XSS_WARNING, 'Show warning about Self-XSS when pasting code');
-
-    Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.STORAGE_BUCKETS_TREE, 'Enable Storage Buckets Tree in Application panel', true);
 
     Root.Runtime.experiments.register(
@@ -382,12 +378,21 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TRACK_CONTEXT_MENU,
-        'Enable context menu that allows to modify trees in the Flame Chart', true);
+        Root.Runtime.ExperimentName.AUTOFILL_VIEW,
+        'Autofill panel',
+        false,
+        'https://goo.gle/devtools-autofill-panel',
+        'https://crbug.com/329106326',
+    );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-        'Enable Autofill view',
+        Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
+        'Timeline: Show postMessage dispatch and handling flows',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS,
+        'Enable save and load trace with annotations in Performance Panel',
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
@@ -395,9 +400,9 @@ export class MainImpl {
       'set-all-breakpoints-eagerly',
       Root.Runtime.ExperimentName.TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL,
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
-      Root.Runtime.ExperimentName.SELF_XSS_WARNING,
       Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
       'evaluate-expressions-with-source-maps',
+      Root.Runtime.ExperimentName.AUTOFILL_VIEW,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 
@@ -817,7 +822,8 @@ export class MainMenuItem implements UI.Toolbar.Provider {
           i18nString(UIStrings.placementOfDevtoolsRelativeToThe, {PH1: toggleDockSideShorcuts[0].title()}));
       dockItemElement.appendChild(titleElement);
       const dockItemToolbar = new UI.Toolbar.Toolbar('', dockItemElement);
-      dockItemElement.setAttribute('jslog', `${VisualLogging.item('dock-side')}`);
+      dockItemElement.setAttribute(
+          'jslog', `${VisualLogging.item('dock-side').track({keydown: 'ArrowDown|ArrowLeft|ArrowRight'})}`);
       dockItemToolbar.makeBlueOnHover();
       const undock = new UI.Toolbar.ToolbarToggle(
           i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'undock');
