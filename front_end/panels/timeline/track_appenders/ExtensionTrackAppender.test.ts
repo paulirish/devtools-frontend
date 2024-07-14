@@ -51,8 +51,8 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
   describe('appendTrackAtLevel', function() {
     it('creates a flamechart group for the Extension tracks', function() {
       assert.strictEqual(flameChartData.groups.length, 2);
-      assert.strictEqual(flameChartData.groups[0].name, 'An Extension Track');
-      assert.strictEqual(flameChartData.groups[1].name, 'Another Extension Track');
+      assert.strictEqual(flameChartData.groups[1].name, 'An Extension Track');
+      assert.strictEqual(flameChartData.groups[0].name, 'Another Extension Track');
     });
 
     it('adds start times correctly', function() {
@@ -93,8 +93,8 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
       styleElement.id = 'fake-perf-panel-colors';
       styleElement.textContent = `
         :root {
-          --ref-palette-primary60: rgb(4 4 4);
-          --ref-palette-tertiary80: rgb(10 10 10);
+          --ref-palette-primary70: rgb(4 4 4);
+          --ref-palette-tertiary70: rgb(10 10 10);
         }
       `;
       document.documentElement.appendChild(styleElement);
@@ -113,13 +113,13 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
           traceParsedData.ExtensionTraceData.extensionTrackData.flatMap(track => track.flameChartEntries);
       for (const event of allExtensionTrackEntries) {
         assert.strictEqual(extensionTrackAppenders[0].titleForEvent(event), event.name);
-        if (event.args.color === 'tertiary-light') {
-          // "tertiary-light" color category is mapped to --ref-palette-tertiary80
+        if (event.args.color === 'tertiary') {
+          // "tertiary" color category is mapped to --ref-palette-tertiary70
           // which is faked out to 10, 10, 10
           assert.strictEqual(extensionTrackAppenders[0].colorForEvent(event), 'rgb(10 10 10)');
         } else {
           // Unknown colors are mapped to "primary" by default, and
-          // "primary" color category is mapped to --ref-palette-primary60
+          // "primary" color category is mapped to --ref-palette-primary70
           // which is faked out to 4, 4, 4
           assert.strictEqual(extensionTrackAppenders[0].colorForEvent(event), 'rgb(4 4 4)');
         }
@@ -143,7 +143,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
         },
         cat: 'devtools.extension',
       } as unknown as TraceEngine.Types.TraceEvents.TraceEventData;
-      // "primary" color category is mapped to --ref-palette-primary60
+      // "primary" color category is mapped to --ref-palette-primary70
       // which is faked out to 4, 4, 4
       assert.strictEqual(extensionTrackAppenders[0].colorForEvent(mockExtensionEntryNoColor), 'rgb(4 4 4)');
       assert.strictEqual(extensionTrackAppenders[0].colorForEvent(mockExtensionEntryUnknownColor), 'rgb(4 4 4)');
@@ -156,7 +156,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
           traceParsedData.ExtensionTraceData.extensionTrackData.flatMap(track => track.flameChartEntries);
       const highlightedEntryInfo = extensionTrackAppenders[0].highlightedEntryInfo(allExtensionTrackEntries[0]);
       // The i18n encodes spaces using the u00A0 unicode character.
-      assert.strictEqual(highlightedEntryInfo.formattedTime, '3.00\u00A0s');
+      assert.strictEqual(highlightedEntryInfo.formattedTime, '1.00\u00A0s');
       assert.strictEqual(highlightedEntryInfo.title, 'A hint if needed');
     });
   });

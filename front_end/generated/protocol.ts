@@ -2890,6 +2890,7 @@ export namespace CSS {
      * Associated style declaration.
      */
     style: CSSStyle;
+    active: boolean;
   }
 
   /**
@@ -3158,7 +3159,7 @@ export namespace CSS {
      */
     cssPositionFallbackRules?: CSSPositionFallbackRule[];
     /**
-     * A list of CSS @position-try rules matching this node, based on the position-try-options property.
+     * A list of CSS @position-try rules matching this node, based on the position-try-fallbacks property.
      */
     cssPositionTryRules?: CSSPositionTryRule[];
     /**

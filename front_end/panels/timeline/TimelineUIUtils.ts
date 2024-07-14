@@ -42,7 +42,6 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import * as ModificationsManager from '../../services/modifications_manager/modifications_manager.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 // eslint-disable-next-line rulesdir/es_modules_import
@@ -54,7 +53,6 @@ import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import inspectorCommonStyles from '../../ui/legacy/inspectorCommon.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CLSRect} from './CLSLinkifier.js';
 import * as TimelineComponents from './components/components.js';
@@ -69,6 +67,7 @@ import {
 import * as Extensions from './extensions/extensions.js';
 import {Tracker} from './FreshRecording.js';
 import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
+import {ModificationsManager} from './ModificationsManager.js';
 import {SourceMapsResolver} from './SourceMapsResolver.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {TimelinePanel} from './TimelinePanel.js';
@@ -716,56 +715,6 @@ export class TimelineUIUtils {
 
   static isUserFrame(frame: Protocol.Runtime.CallFrame): boolean {
     return frame.scriptId !== '0' && !(frame.url && frame.url.startsWith('native '));
-  }
-
-  static syntheticNetworkRequestCategory(request: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest):
-      NetworkCategory {
-    switch (request.args.data.mimeType) {
-      case 'text/html':
-        return NetworkCategory.HTML;
-      case 'application/javascript':
-      case 'application/x-javascript':
-      case 'text/javascript':
-        return NetworkCategory.Script;
-      case 'text/css':
-        return NetworkCategory.Style;
-      case 'audio/ogg':
-      case 'image/gif':
-      case 'image/jpeg':
-      case 'image/png':
-      case 'image/svg+xml':
-      case 'image/webp':
-      case 'image/x-icon':
-      case 'font/opentype':
-      case 'font/woff2':
-      case 'font/ttf':
-      case 'application/font-woff':
-        return NetworkCategory.Media;
-      default:
-        return NetworkCategory.Other;
-    }
-  }
-
-  static networkCategoryColor(category: NetworkCategory): string {
-    let cssVarName = '--app-color-system';
-    switch (category) {
-      case NetworkCategory.HTML:
-        cssVarName = '--app-color-loading';
-        break;
-      case NetworkCategory.Script:
-        cssVarName = '--app-color-scripting';
-        break;
-      case NetworkCategory.Style:
-        cssVarName = '--app-color-rendering';
-        break;
-      case NetworkCategory.Media:
-        cssVarName = '--app-color-painting';
-        break;
-      default:
-        cssVarName = '--app-color-system';
-        break;
-    }
-    return ThemeSupport.ThemeSupport.instance().getComputedValue(cssVarName);
   }
 
   static async buildDetailsTextForTraceEvent(
@@ -1871,8 +1820,7 @@ export class TimelineUIUtils {
     const maybeTarget = targetForEvent(traceParseData, event);
     const contentHelper = new TimelineDetailsContentHelper(maybeTarget, linkifier);
 
-    const category = TimelineUIUtils.syntheticNetworkRequestCategory(event);
-    const color = TimelineUIUtils.networkCategoryColor(category);
+    const color = TimelineComponents.Utils.colorForNetworkRequest(event);
     contentHelper.addSection(i18nString(UIStrings.networkRequest), color);
 
     const options = {
@@ -1944,14 +1892,13 @@ export class TimelineUIUtils {
       contentHelper.appendTextRow(
           i18nString(UIStrings.decodedBody), Platform.NumberUtilities.bytesToString(event.args.data.decodedBodyLength));
     }
-    const title = i18nString(UIStrings.initiatedBy);
 
     const topFrame = TraceEngine.Helpers.Trace.getZeroIndexedStackTraceForEvent(event)?.at(0) ?? null;
     if (topFrame) {
       const link = linkifier.maybeLinkifyConsoleCallFrame(
           maybeTarget, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
       if (link) {
-        contentHelper.appendElementRow(title, link);
+        contentHelper.appendElementRow(i18nString(UIStrings.initiatedBy), link);
       }
     }
 
@@ -2096,9 +2043,7 @@ export class TimelineUIUtils {
         traceBoundsState.micro.minimapTraceBounds.max < entry.ts;
 
     // Check if it is in the hidden array
-    const isEntryHidden = ModificationsManager.ModificationsManager.ModificationsManager.activeManager()
-                              ?.getEntriesFilter()
-                              .inEntryInvisible(entry);
+    const isEntryHidden = ModificationsManager.activeManager()?.getEntriesFilter().inEntryInvisible(entry);
 
     if (!isEntryOutsideBreadcrumb) {
       link.classList.add('devtools-link');
@@ -2551,14 +2496,6 @@ export class TimelineUIUtils {
     return Common.ParsedURL.schemeIs(url, 'about:') ? `"${Platform.StringUtilities.trimMiddle(frame.name, trimAt)}"` :
                                                       frame.url.slice(0, trimAt);
   }
-}
-
-export const enum NetworkCategory {
-  HTML = 'HTML',
-  Script = 'Script',
-  Style = 'Style',
-  Media = 'Media',
-  Other = 'Other',
 }
 
 export const aggregatedStatsKey = Symbol('aggregatedStats');
