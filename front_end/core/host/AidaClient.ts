@@ -15,6 +15,11 @@ export enum Entity {
   SYSTEM = 2,
 }
 
+export const enum Rating {
+  POSITIVE = 'POSITIVE',
+  NEGATIVE = 'NEGATIVE',
+}
+
 export interface Chunk {
   text: string;
   entity: Entity;
@@ -59,11 +64,49 @@ export interface AidaRequest {
   client_feature?: ClientFeature;
 }
 
+export interface AidaDoConversationClientEvent {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  corresponding_aida_rpc_global_id: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  disable_user_content_logging?: boolean;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  do_conversation_client_event: {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    user_feedback: {
+      sentiment?: `${Rating}`,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      user_input?: {comment?: string},
+    },
+  };
+}
+
+export enum RecitationAction {
+  ACTION_UNSPECIFIED = 'ACTION_UNSPECIFIED',
+  CITE = 'CITE',
+  BLOCK = 'BLOCK',
+  NO_ACTION = 'NO_ACTION',
+  EXEMPT_FOUND_IN_PROMPT = 'EXEMPT_FOUND_IN_PROMPT',
+}
+
+export interface Citation {
+  startIndex: number;
+  endIndex: number;
+  url: string;
+}
+
+export interface AttributionMetadata {
+  attributionAction: RecitationAction;
+  citations: Citation[];
+}
+
+export interface AidaResponseMetadata {
+  rpcGlobalId?: number;
+  attributionMetadata?: AttributionMetadata[];
+}
+
 export interface AidaResponse {
   explanation: string;
-  metadata: {
-    rpcGlobalId?: number,
-  };
+  metadata: AidaResponseMetadata;
 }
 
 export enum AidaAvailability {
@@ -73,11 +116,13 @@ export enum AidaAvailability {
   NO_INTERNET = 'no-internet',
 }
 
+export const CLIENT_NAME = 'CHROME_DEVTOOLS';
+
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
     const request: AidaRequest = {
       input,
-      client: 'CHROME_DEVTOOLS',
+      client: CLIENT_NAME,
       functionality_type: FunctionalityType.EXPLAIN_ERROR,
       client_feature: ClientFeature.CHROME_CONSOLE_INSIGHTS,
     };
@@ -160,7 +205,7 @@ export class AidaClient {
     let chunk;
     const text = [];
     let inCodeChunk = false;
-    const metadata = {rpcGlobalId: 0};
+    const metadata: AidaResponseMetadata = {rpcGlobalId: 0};
     while ((chunk = await stream.read())) {
       let textUpdated = false;
       // The AIDA response is a JSON array of objects, split at the object
@@ -190,6 +235,12 @@ export class AidaClient {
       for (const result of results) {
         if ('metadata' in result) {
           metadata.rpcGlobalId = result.metadata.rpcGlobalId;
+          if ('attributionMetadata' in result.metadata) {
+            if (!metadata.attributionMetadata) {
+              metadata.attributionMetadata = [];
+            }
+            metadata.attributionMetadata.push(result.metadata.attributionMetadata);
+          }
         }
         if ('textChunk' in result) {
           if (inCodeChunk) {
@@ -218,5 +269,13 @@ export class AidaClient {
         };
       }
     }
+  }
+
+  registerClientEvent(clientEvent: AidaDoConversationClientEvent): void {
+    InspectorFrontendHostInstance.registerAidaClientEvent(JSON.stringify({
+      client: CLIENT_NAME,
+      event_time: new Date().toISOString(),
+      ...clientEvent,
+    }));
   }
 }

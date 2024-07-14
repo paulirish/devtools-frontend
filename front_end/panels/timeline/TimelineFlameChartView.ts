@@ -16,7 +16,14 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {CountersGraph} from './CountersGraph.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
-import {Overlays, type TimeRangeLabel} from './Overlays.js';
+import {ModificationsManager} from './ModificationsManager.js';
+import {
+  AnnotationOverlayActionEvent,
+  Overlays,
+  type TimelineOverlay,
+  type TimeRangeLabel,
+  type TimespanBreakdown,
+} from './Overlays.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {TimelineDetailsView} from './TimelineDetailsView.js';
 import {TimelineRegExp} from './TimelineFilters.js';
@@ -38,6 +45,22 @@ const UIStrings = {
    *@example {10ms} PH2
    */
   sAtS: '{PH1} at {PH2}',
+  /**
+   *@description Time to first byte title for the Largest Contentful Paint's phases timespan breakdown.
+   */
+  timeToFirstByte: 'Time to first byte',
+  /**
+   *@description Resource load delay title for the Largest Contentful Paint phases timespan breakdown.
+   */
+  resourceLoadDelay: 'Resource load delay',
+  /**
+   *@description Resource load time title for the Largest Contentful Paint phases timespan breakdown.
+   */
+  resourceLoadTime: 'Resource load time',
+  /**
+   *@description Element render delay title for the Largest Contentful Paint phases timespan breakdown.
+   */
+  elementRenderDelay: 'Element render delay',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineFlameChartView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -79,6 +102,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   private selectedSearchResult?: number;
   private searchRegex?: RegExp;
   #traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null;
+  #traceInsightsData: TraceEngine.Insights.Types.TraceInsightData|null = null;
   #selectedGroupName: string|null = null;
   #onTraceBoundsChangeBound = this.#onTraceBoundsChange.bind(this);
   #gameKeyMatches = 0;
@@ -88,6 +112,11 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   #overlays: Overlays;
 
   #timeRangeSelectionOverlay: TimeRangeLabel|null = null;
+
+  #timespanBreakdownOverlay: TimespanBreakdown|null = null;
+  #sidebarInsightToggled: Boolean = false;
+
+  #tooltipElement = document.createElement('div');
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -107,6 +136,9 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.#overlaysContainer.classList.add('timeline-overlays-container');
     flameChartsContainer.element.appendChild(this.#overlaysContainer);
 
+    this.#tooltipElement.classList.add('timeline-entry-tooltip-element');
+    flameChartsContainer.element.appendChild(this.#tooltipElement);
+
     // Ensure that the network panel & resizer appears above the main thread.
     this.networkSplitWidget.sidebarElement().style.zIndex = '120';
 
@@ -120,6 +152,8 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       groupExpansionSetting: mainViewGroupExpansionSetting,
       // The TimelineOverlays are used for selected elements
       selectedElementOutline: false,
+      tooltipElement: this.#tooltipElement,
+      useOverlaysForCursorRuler: true,
     });
     this.mainFlameChart.alwaysShowVerticalScroll();
     this.mainFlameChart.enableRuler(false);
@@ -138,12 +172,27 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       groupExpansionSetting: this.networkFlameChartGroupExpansionSetting,
       // The TimelineOverlays are used for selected elements
       selectedElementOutline: false,
+      tooltipElement: this.#tooltipElement,
+      useOverlaysForCursorRuler: true,
     });
     this.networkFlameChart.alwaysShowVerticalScroll();
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.LatestDrawDimensions, dimensions => {
       this.#overlays.updateChartDimensions('network', dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
       this.#overlays.update();
+
+      // If the height of the network chart has changed, we need to tell the
+      // main flame chart because its tooltips are positioned based in part on
+      // the height of the network chart.
+      this.mainFlameChart.setTooltipYPixelAdjustment(this.#overlays.networkChartOffsetHeight());
+    });
+
+    this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.MouseMove, event => {
+      this.#processFlameChartMouseMoveEvent(event.data);
+    });
+
+    this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.MouseMove, event => {
+      this.#processFlameChartMouseMoveEvent(event.data);
     });
 
     this.#overlays = new Overlays({
@@ -154,6 +203,15 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
         networkChart: this.networkFlameChart,
         networkProvider: this.networkDataProvider,
       },
+    });
+
+    this.#overlays.addEventListener(AnnotationOverlayActionEvent.eventName, event => {
+      const {overlay, action} = (event as AnnotationOverlayActionEvent);
+      if (action === 'Remove') {
+        ModificationsManager.activeManager()?.removeAnnotationOverlay(overlay);
+      } else if (action === 'Update') {
+        ModificationsManager.activeManager()?.updateAnnotationOverlay(overlay);
+      }
     });
 
     this.networkPane = new UI.Widget.VBox();
@@ -206,6 +264,43 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.refreshMainFlameChart();
 
     TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
+  }
+
+  toggleSidebarInsights(): void {
+    this.#sidebarInsightToggled = !this.#sidebarInsightToggled;
+    if (this.#sidebarInsightToggled) {
+      this.#timespanBreakdownOverlay = this.createLCPPhaseOverlay();
+      if (this.#timespanBreakdownOverlay) {
+        this.addOverlay(this.#timespanBreakdownOverlay);
+      }
+    } else {
+      if (this.#timespanBreakdownOverlay) {
+        this.removeOverlay(this.#timespanBreakdownOverlay);
+      }
+    }
+  }
+
+  #processFlameChartMouseMoveEvent(data: PerfUI.FlameChart.EventTypes['MouseMove']): void {
+    const {mouseEvent, timeInMicroSeconds} = data;
+
+    // If the user is no longer holding shift, remove any existing marker.
+    if (!mouseEvent.shiftKey) {
+      const removedCount = this.#overlays.removeOverlaysOfType('CURSOR_TIMESTAMP_MARKER');
+      if (removedCount > 0) {
+        // Don't trigger lots of updates on a mouse move if we didn't actually
+        // remove any overlays.
+        this.#overlays.update();
+      }
+    }
+
+    if (!mouseEvent.metaKey && mouseEvent.shiftKey) {
+      // CURSOR_TIMESTAMP_MARKER is a singleton; if one already exists it will
+      // be updated rather than create an entirely new one.
+      this.addOverlay({
+        type: 'CURSOR_TIMESTAMP_MARKER',
+        timestamp: timeInMicroSeconds,
+      });
+    }
   }
 
   #keydownHandler(event: KeyboardEvent): void {
@@ -291,18 +386,17 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       );
 
       if (this.#timeRangeSelectionOverlay) {
-        this.#overlays.updateExisting(this.#timeRangeSelectionOverlay, {
+        this.updateExistingOverlay(this.#timeRangeSelectionOverlay, {
           bounds,
         });
       } else {
-        this.#timeRangeSelectionOverlay = this.#overlays.add({
+        this.#timeRangeSelectionOverlay = this.addOverlay({
           type: 'TIME_RANGE',
           label: '',
           showDuration: true,
           bounds,
         });
       }
-      this.#overlays.update();
     }
   }
 
@@ -338,6 +432,102 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.updateSearchResults(false, false);
     this.refreshMainFlameChart();
     this.#updateFlameCharts();
+  }
+
+  setInsights(insights: TraceEngine.Insights.Types.TraceInsightData|null): void {
+    if (this.#traceInsightsData !== insights) {
+      this.#traceInsightsData = insights;
+    }
+    // Disable selected insight overlay by default with new insight data.
+    this.#sidebarInsightToggled = false;
+  }
+
+  /**
+   * This creates and returns a new timespanBreakdownOverlay with LCP phases data.
+   */
+  createLCPPhaseOverlay(): TimespanBreakdown|null {
+    if (!this.#traceInsightsData || !this.#traceEngineData) {
+      return null;
+    }
+
+    // For now use the first navigation of the trace.
+    const firstNav: TraceEngine.Insights.Types.NavigationInsightData = this.#traceInsightsData.values().next().value;
+    if (!firstNav) {
+      return null;
+    }
+
+    const lcpInsight: Error|TraceEngine.Insights.Types.LCPInsightResult = firstNav.LargestContentfulPaint;
+    if (lcpInsight instanceof Error) {
+      return null;
+    }
+
+    const phases = lcpInsight.phases;
+    const lcpTs = lcpInsight.lcpTs;
+    if (!phases || !lcpTs) {
+      return null;
+    }
+    const lcpMicroseconds =
+        TraceEngine.Types.Timing.MicroSeconds(TraceEngine.Helpers.Timing.millisecondsToMicroseconds(lcpTs));
+
+    const sections = [];
+    // For text LCP, we should only have ttfb and renderDelay sections.
+    if (!phases?.loadDelay && !phases?.loadTime) {
+      const renderBegin: TraceEngine.Types.Timing.MicroSeconds = TraceEngine.Types.Timing.MicroSeconds(
+          lcpMicroseconds - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
+      const renderDelay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+          renderBegin,
+          lcpMicroseconds,
+      );
+
+      const mainReqStart = TraceEngine.Types.Timing.MicroSeconds(
+          renderBegin - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.ttfb));
+      const ttfb = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+          mainReqStart,
+          renderBegin,
+      );
+      sections.push(
+          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte)},
+          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay)});
+    } else if (phases?.loadDelay && phases?.loadTime) {
+      const renderBegin: TraceEngine.Types.Timing.MicroSeconds = TraceEngine.Types.Timing.MicroSeconds(
+          lcpMicroseconds - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
+      const renderDelay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+          renderBegin,
+          lcpMicroseconds,
+      );
+
+      const loadBegin = TraceEngine.Types.Timing.MicroSeconds(
+          renderBegin - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.loadTime));
+      const loadTime = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+          loadBegin,
+          renderBegin,
+      );
+
+      const loadDelayStart = TraceEngine.Types.Timing.MicroSeconds(
+          loadBegin - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.loadDelay));
+      const loadDelay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+          loadDelayStart,
+          loadBegin,
+      );
+
+      const mainReqStart = TraceEngine.Types.Timing.MicroSeconds(
+          loadDelayStart - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.ttfb));
+      const ttfb = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+          mainReqStart,
+          loadDelayStart,
+      );
+
+      sections.push(
+          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte)},
+          {bounds: loadDelay, label: i18nString(UIStrings.resourceLoadDelay)},
+          {bounds: loadTime, label: i18nString(UIStrings.resourceLoadTime)},
+          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay)},
+      );
+    }
+    return {
+      type: 'TIMESPAN_BREAKDOWN',
+      sections,
+    };
   }
 
   #reset(): void {
@@ -468,12 +658,27 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
         (TimelineSelection.isTraceEventSelection(selection.object) ||
          TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selection.object) ||
          TimelineSelection.isFrameObject(selection.object))) {
-      this.#overlays.add({
+      this.addOverlay({
         type: 'ENTRY_SELECTED',
         entry: selection.object,
       });
-      this.#overlays.update();
     }
+  }
+
+  addOverlay<T extends TimelineOverlay>(newOverlay: T): T {
+    const overlay = this.#overlays.add(newOverlay);
+    this.#overlays.update();
+    return overlay;
+  }
+
+  removeOverlay(removedOverlay: TimelineOverlay): void {
+    this.#overlays.remove(removedOverlay);
+    this.#overlays.update();
+  }
+
+  updateExistingOverlay<T extends TimelineOverlay>(existingOverlay: T, newData: Partial<T>): void {
+    this.#overlays.updateExisting(existingOverlay, newData);
+    this.#overlays.update();
   }
 
   private onAnnotateEntry(
@@ -484,12 +689,11 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
         (TimelineSelection.isTraceEventSelection(selection.object) ||
          TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selection.object))) {
       this.setSelection(selection);
-      this.#overlays.add({
+      ModificationsManager.activeManager()?.createAnnotation({
         type: 'ENTRY_LABEL',
         entry: selection.object,
         label: '',
       });
-      this.#overlays.update();
     }
   }
 
@@ -510,9 +714,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       VisualLogging.logClick(groupForLevel, new MouseEvent('click'));
     }
 
-    if (dataProvider === this.mainDataProvider) {
-      this.mainDataProvider.buildFlowForInitiator(entryIndex);
-    }
+    dataProvider.buildFlowForInitiator(entryIndex);
     this.delegate.select(dataProvider.createSelection(entryIndex));
   }
 

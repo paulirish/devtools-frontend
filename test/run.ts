@@ -4,11 +4,20 @@
 
 import * as childProcess from 'child_process';
 import * as fs from 'fs';
+import * as glob from 'glob';
 import * as os from 'os';
 import * as path from 'path';
 
 import {commandLineArgs} from './conductor/commandline.js';
-import {defaultChromePath, GEN_DIR, isContainedInDirectory, PathPair, SOURCE_ROOT} from './conductor/paths.js';
+import {
+  BUILD_WITH_CHROMIUM,
+  CHECKOUT_ROOT,
+  defaultChromePath,
+  GEN_DIR,
+  isContainedInDirectory,
+  PathPair,
+  SOURCE_ROOT,
+} from './conductor/paths.js';
 
 const yargs = require('yargs');
 const unparse = require('yargs-unparser');
@@ -16,7 +25,6 @@ const options = commandLineArgs(yargs(process.argv.slice(2)))
                     .options('skip-ninja', {type: 'boolean', desc: 'Skip rebuilding'})
                     .options('debug-driver', {type: 'boolean', hidden: true, desc: 'Debug the driver part of tests'})
                     .options('verbose', {alias: 'v', type: 'count', desc: 'Increases the log level'})
-                    .options('warn', {desc: 'Show deprecation warning'})
                     .options('bail', {alias: 'b', desc: ' bail after first test failure'})
                     .positional('tests', {
                       type: 'string',
@@ -62,7 +70,9 @@ function ninja(stdio: 'inherit'|'pipe', ...args: string[]) {
     buildRoot = parent;
   }
   const ninjaCommand = os.platform() === 'win32' ? 'autoninja.bat' : 'autoninja';
-  const result = runProcess(ninjaCommand, args, {encoding: 'utf-8', cwd: buildRoot, stdio});
+  // autoninja can't always find ninja if not run from the checkout root, so
+  // run it from there and pass the build root as an argument.
+  const result = runProcess(ninjaCommand, ['-C', buildRoot, ...args], {encoding: 'utf-8', cwd: CHECKOUT_ROOT, stdio});
   if (result.error) {
     throw result.error;
   }
@@ -149,82 +159,41 @@ class KarmaTests extends Tests {
   }
 }
 
-function showDeprecationWarning(command: string) {
-  let alternative = undefined;
-  const debugFlag = command.includes('debug') || process.env['DEBUG_TEST'] ? ' --debug' : '';
-  switch (command) {
-    case 'auto-e2etest-parallel-rdb':
-    case 'auto-e2etest-rdb':
-    case 'auto-interactionstest-rdb':
-    case 'auto-screenshotstest-rdb':
-    case 'auto-unittest-rdb':
-      alternative = `npm run rdb -- npm run ${command.substring(0, command.length - '-rdb'.length)}`;
-      break;
-    case 'auto-e2etest':
-      alternative = 'npm run test -- test/e2e';
-      break;
-    case 'auto-screenshotstest':
-      alternative = 'npm run test -- test/interactions --fgrep "[screenshot]"';
-      break;
-    case 'auto-unittest':
-      alternative = `npm run test -- front_end${debugFlag}`;
-      break;
-    case 'auto-unittest-coverage':
-      alternative = 'npm run test -- front_end --coverage';
-      break;
-    case 'e2etest':
-      alternative = `npm run test -- test/e2e${debugFlag}`;
-      break;
-    case 'interactionstest':
-      alternative = `npm run test -- test/interactions${debugFlag}`;
-      break;
-    case 'perf':
-      alternative = 'npm run test -- test/perf';
-      break;
-    case 'unittest':
-      alternative = `npm run test -- front_end${debugFlag}`;
-      break;
-    case 'e2etest-parallel':
-    case 'watch-unittest':
-      break;
-    default:
-      throw new Error(`Deprecation warning for '${options['warn']}' has no deprecation details`);
-  }
-  const format = process.stderr.hasColors() ? '\x1b[1;31m%s\x1b[0m' : '%s';
-  console.error(format, `WARNING: The npm command '${command}' is deprecated and will be removed in the near future.`);
-  if (alternative) {
-    console.error(format, `Use \`${alternative}\` instead.`);
-  }
-  return 0;
-}
-
 // TODO(333423685)
-// - iterations
-// - expanded-reporting
 // - watch
-// - layout?
 function main() {
-  if (options['warn']) {
-    return showDeprecationWarning(options['warn']);
-  }
   const tests: string[] = options['tests'];
 
   const testKinds = [
+    new KarmaTests(path.join(GEN_DIR, 'front_end'), path.join(GEN_DIR, 'inspector_overlay')),
     new MochaTests(path.join(GEN_DIR, 'test/interactions')),
     new MochaTests(path.join(GEN_DIR, 'test/e2e')),
-    new KarmaTests(path.join(GEN_DIR, 'front_end'), path.join(GEN_DIR, 'inspector_overlay')),
     new MochaTests(path.join(GEN_DIR, 'test/perf')),
   ];
 
   if (!options['skip-ninja']) {
-    const {status} = ninja('inherit');
+    // For a devtools only checkout, it is fast enough to build everything. For
+    // a chromium checkout we want to build only the targets that are needed.
+    const targets = BUILD_WITH_CHROMIUM ?
+        [
+          'chrome',
+          'third_party/devtools-frontend/src/test:test',
+          'third_party/devtools-frontend/src/scripts/hosted_mode:hosted_mode',
+          'third_party/devtools-frontend/src/scripts/component_server:component_server',
+        ] :
+        [];
+    const {status} = ninja('inherit', ...targets);
     if (status) {
       return status;
     }
   }
 
   const suites = new Map<MochaTests, PathPair[]>();
-  for (const t of tests) {
+  const testFiles = tests.flatMap(t => {
+    const globbed = glob.glob.sync(t);
+    return globbed.length > 0 ? globbed : t;
+  });
+  for (const t of testFiles) {
     const repoPath = PathPair.get(t);
     if (!repoPath) {
       console.error(`Could not locate the test input for '${t}'`);

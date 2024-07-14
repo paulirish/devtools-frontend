@@ -164,7 +164,7 @@ export class CloseEvent extends Event {
 }
 
 type PublicPromptBuilder = Pick<PromptBuilder, 'buildPrompt'|'getSearchQuery'>;
-type PublicAidaClient = Pick<Host.AidaClient.AidaClient, 'fetch'>;
+type PublicAidaClient = Pick<Host.AidaClient.AidaClient, 'fetch'|'registerClientEvent'>;
 
 function localizeType(sourceType: SourceType): string {
   switch (sourceType) {
@@ -335,6 +335,7 @@ export class ConsoleInsight extends HTMLElement {
         type: State.CONSENT_ONBOARDING,
         page: ConsentOnboardingPage.PAGE1,
       });
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingShown);
       return;
     }
     if (!this.#state.consentReminderConfirmed) {
@@ -344,11 +345,21 @@ export class ConsoleInsight extends HTMLElement {
         sources,
         isPageReloadRecommended,
       });
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightConsentReminderShown);
       return;
     }
   }
 
   #onClose(): void {
+    if (this.#state.type === State.CONSENT_REMINDER) {
+      Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightConsentReminderCanceled);
+    } else if (this.#state.type === State.CONSENT_ONBOARDING) {
+      if (this.#state.page === ConsentOnboardingPage.PAGE1) {
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingCanceledOnPage1);
+      } else {
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingCanceledOnPage2);
+      }
+    }
     this.dispatchEvent(new CloseEvent());
     this.classList.add('closing');
   }
@@ -357,10 +368,14 @@ export class ConsoleInsight extends HTMLElement {
     if (this.#state.type !== State.INSIGHT) {
       throw new Error('Unexpected state');
     }
+    if (this.#state.metadata?.rpcGlobalId === undefined) {
+      throw new Error('RPC Id not in metadata');
+    }
     // If it was rated, do not record again.
     if (this.#selectedRating !== undefined) {
       return;
     }
+
     this.#selectedRating = (event.target as HTMLElement).dataset.rating === 'true';
     this.#render();
     if (this.#selectedRating) {
@@ -368,16 +383,14 @@ export class ConsoleInsight extends HTMLElement {
     } else {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightRatedNegative);
     }
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.registerAidaClientEvent(JSON.stringify({
-      client: 'CHROME_DEVTOOLS',
-      event_time: new Date().toISOString(),
-      corresponding_aida_rpc_global_id: this.#state.metadata?.rpcGlobalId,
+    this.#aidaClient.registerClientEvent({
+      corresponding_aida_rpc_global_id: this.#state.metadata.rpcGlobalId,
       do_conversation_client_event: {
         user_feedback: {
-          sentiment: this.#selectedRating ? 'POSITIVE' : 'NEGATIVE',
+          sentiment: this.#selectedRating ? Host.AidaClient.Rating.POSITIVE : Host.AidaClient.Rating.NEGATIVE,
         },
       },
-    }));
+    });
   }
 
   #onReport(): void {
@@ -395,6 +408,7 @@ export class ConsoleInsight extends HTMLElement {
       consentReminderConfirmed: true,
       consentOnboardingFinished: this.#getOnboardingCompletedSetting().get(),
     });
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightConsentReminderConfirmed);
     try {
       for await (const {sources, isPageReloadRecommended, explanation, metadata} of this.#getInsight()) {
         const tokens = this.#validateMarkdown(explanation);
@@ -484,6 +498,7 @@ export class ConsoleInsight extends HTMLElement {
       this.#onClose();
       UI.InspectorView.InspectorView.instance().displayReloadRequiredWarning('Reload for the change to apply.');
     }
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingFeatureDisabled);
   }
 
   #goToNextPage(): void {
@@ -491,6 +506,7 @@ export class ConsoleInsight extends HTMLElement {
       type: State.CONSENT_ONBOARDING,
       page: ConsentOnboardingPage.PAGE2,
     });
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingNextPage);
   }
 
   #focusHeader(): void {
@@ -515,6 +531,7 @@ export class ConsoleInsight extends HTMLElement {
       consentReminderConfirmed: false,
       consentOnboardingFinished: this.#getOnboardingCompletedSetting().get(),
     });
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingConfirmed);
     void this.#generateInsightIfNeeded();
   }
 
@@ -523,6 +540,7 @@ export class ConsoleInsight extends HTMLElement {
       type: State.CONSENT_ONBOARDING,
       page: ConsentOnboardingPage.PAGE1,
     });
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOnboardingPrevPage);
   }
 
   #renderCancelButton(): LitHtml.TemplateResult {

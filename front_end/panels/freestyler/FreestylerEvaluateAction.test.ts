@@ -13,7 +13,7 @@ describe('FreestylerEvaluateAction', () => {
     function executeWithResult(mockResult: SDK.RuntimeModel.EvaluationResult): Promise<string> {
       const executionContextStub = sinon.createStubInstance(SDK.RuntimeModel.ExecutionContext);
       executionContextStub.evaluate.resolves(mockResult);
-      return Freestyler.FreestylerEvaluateAction.execute('', executionContextStub);
+      return Freestyler.FreestylerEvaluateAction.execute('', executionContextStub, {throwOnSideEffect: false});
     }
 
     function mockRemoteObject(overrides: Partial<SDK.RemoteObject.RemoteObject> = {}): SDK.RemoteObject.RemoteObject {
@@ -61,6 +61,19 @@ describe('FreestylerEvaluateAction', () => {
            assert.strictEqual(err.message, 'Error description');
          }
        });
+
+    it('should throw a SideEffectError when the resulted exception starts with possible side effect error',
+       async () => {
+         try {
+           await executeWithResult({
+             object: mockRemoteObject(),
+             exceptionDetails: mockExceptionDetails({description: 'EvalError: Possible side-effect in debug-evaluate'}),
+           });
+         } catch (err) {
+           assert.instanceOf(err, Freestyler.SideEffectError);
+           assert.strictEqual(err.message, 'EvalError: Possible side-effect in debug-evaluate');
+         }
+       });
   });
 
   describeWithRealConnection('serialization', () => {
@@ -72,7 +85,8 @@ describe('FreestylerEvaluateAction', () => {
     }
 
     async function executeForTest(code: string) {
-      return Freestyler.FreestylerEvaluateAction.execute(code, await executionContextForTest());
+      return Freestyler.FreestylerEvaluateAction.execute(
+          code, await executionContextForTest(), {throwOnSideEffect: false});
     }
 
     it('should serialize primitive values correctly', async () => {
@@ -84,14 +98,56 @@ describe('FreestylerEvaluateAction', () => {
       assert.strictEqual(await executeForTest('Symbol("sym")'), 'Symbol(sym)');
     });
 
-    it('should serialize DOM nodes correctly', async () => {
-      assert.strictEqual(
-          await executeForTest(`{
-        const div = document.createElement('div');
-        div.setAttribute('data-custom-attr', 'i exist');
-        div
-      }`),
-          '"<div data-custom-attr=\\"i exist\\"></div>"');
+    describe('HTMLElement', () => {
+      it('should work with plain nodes', async () => {
+        const serializedElement = await executeForTest(`{
+          const el = document.createElement('div');
+
+          el;
+        }`);
+        assert.strictEqual(serializedElement, '"<div></div>"');
+      });
+
+      it('should serialize node with classes', async () => {
+        const serializedElement = await executeForTest(`{
+          const el = document.createElement('div');
+          el.classList.add('section');
+          el.classList.add('section-main');
+
+          el;
+        }`);
+        assert.strictEqual(serializedElement, '"<div class=\\"section section-main\\"></div>"');
+      });
+
+      it('should serialize node with id', async () => {
+        const serializedElement = await executeForTest(`{
+          const el = document.createElement('div');
+          el.id = 'promotion-section';
+
+          el;
+        }`);
+        assert.strictEqual(serializedElement, '"<div id=\\"promotion-section\\"></div>"');
+      });
+      it('should serialize node with class and id', async () => {
+        const serializedElement = await executeForTest(`{
+          const el = document.createElement('div');
+          el.id = 'promotion-section';
+          el.classList.add('section');
+
+          el;
+        }`);
+        assert.strictEqual(serializedElement, '"<div id=\\"promotion-section\\" class=\\"section\\"></div>"');
+      });
+      it('should serialize node with children', async () => {
+        const serializedElement = await executeForTest(`{
+          const el = document.createElement('div');
+          const p = document.createElement('p');
+          el.appendChild(p);
+
+          el;
+        }`);
+        assert.strictEqual(serializedElement, '"<div>...</div>"');
+      });
     });
 
     it('should serialize arrays correctly', async () => {

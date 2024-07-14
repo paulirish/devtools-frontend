@@ -5,6 +5,8 @@
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 
+// This key is expected to be visible in the frontend.
+// b/349721878
 const CRUX_API_KEY = 'AIzaSyCCSOx25vrb5z0tbedCB3_JRzzbVW6Uwgw';
 const DEFAULT_ENDPOINT = `https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=${CRUX_API_KEY}`;
 
@@ -25,7 +27,7 @@ export interface CrUXRequest {
 
 export interface MetricResponse {
   histogram: Array<{start: number, end?: number, density?: number}>;
-  percentiles: {p75: number};
+  percentiles: {p75: number|string};
 }
 
 interface CollectionDate {
@@ -55,9 +57,16 @@ export type PageResult = {
   [K in`${PageScope}-${DeviceScope}`]: CrUXResponse|null;
 };
 
+export interface ConfigSetting {
+  enabled: boolean;
+  override: string;
+}
+
 let cruxManagerInstance: CrUXManager;
 
-const deviceScopeList: DeviceScope[] = ['ALL', 'DESKTOP', 'PHONE', 'TABLET'];
+// TODO: Potentially support `TABLET`. Tablet field data will always be `null` until then.
+export const DEVICE_SCOPE_LIST: DeviceScope[] = ['ALL', 'DESKTOP', 'PHONE'];
+
 const pageScopeList: PageScope[] = ['origin', 'url'];
 const metrics: MetricNames[] = ['largest_contentful_paint', 'cumulative_layout_shift', 'interaction_to_next_paint'];
 
@@ -65,14 +74,14 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   #originCache = new Map<string, CrUXResponse|null>();
   #urlCache = new Map<string, CrUXResponse|null>();
   #mainDocumentUrl?: string;
-  #automaticFieldSetting = Common.Settings.Settings.instance().createSetting('automatic-field-data', false);
+  #configSetting =
+      Common.Settings.Settings.instance().createSetting<ConfigSetting>('field-data', {enabled: false, override: ''});
   #endpoint = DEFAULT_ENDPOINT;
 
   private constructor() {
     super();
 
-    this.#automaticFieldSetting.setTitle('Automatic field data');
-    this.#automaticFieldSetting.addChangeListener(() => {
+    this.#configSetting.addChangeListener(() => {
       void this.#automaticRefresh();
     });
 
@@ -90,8 +99,8 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     return cruxManagerInstance;
   }
 
-  getAutomaticSetting(): Common.Settings.Setting<boolean> {
-    return this.#automaticFieldSetting;
+  getConfigSetting(): Common.Settings.Setting<ConfigSetting> {
+    return this.#configSetting;
   }
 
   async getFieldDataForPage(pageUrl: string): Promise<PageResult> {
@@ -111,7 +120,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       const promises: Promise<void>[] = [];
 
       for (const pageScope of pageScopeList) {
-        for (const deviceScope of deviceScopeList) {
+        for (const deviceScope of DEVICE_SCOPE_LIST) {
           const promise = this.#getScopedData(normalizedUrl, pageScope, deviceScope).then(response => {
             pageResult[`${pageScope}-${deviceScope}`] = response;
           });
@@ -137,7 +146,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
    * the main document URL cannot be found.
    */
   async getFieldDataForCurrentPage(): Promise<PageResult> {
-    const pageUrl = this.#mainDocumentUrl || await this.#getInspectedURL();
+    const pageUrl = this.#configSetting.get().override || this.#mainDocumentUrl || await this.#getInspectedURL();
     return this.getFieldDataForPage(pageUrl);
   }
 
@@ -170,13 +179,14 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   }
 
   async #automaticRefresh(): Promise<void> {
-    if (!this.#automaticFieldSetting.get()) {
+    // This does 2 things:
+    // - Tells listeners to clear old data so it isn't shown during a URL transition
+    // - Tells listeners to clear old data when field data is disabled.
+    this.dispatchEventToListeners(Events.FieldDataChanged, undefined);
+
+    if (!this.#configSetting.get().enabled) {
       return;
     }
-
-    // Fetching field data for the next page can take time. To avoid showing field data that is
-    // irrelevant to the new page, clear the current set of field data until the new set is ready.
-    this.dispatchEventToListeners(Events.FieldDataChanged, undefined);
 
     const pageResult = await this.getFieldDataForCurrentPage();
 
