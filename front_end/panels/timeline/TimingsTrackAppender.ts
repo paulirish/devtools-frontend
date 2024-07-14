@@ -12,6 +12,7 @@ import {
   type HighlightedEntryInfo,
   type TrackAppender,
   type TrackAppenderName,
+  VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
 import * as Extensions from './extensions/extensions.js';
 import {TimelineFlameChartMarker} from './TimelineFlameChartView.js';
@@ -87,8 +88,9 @@ export class TimingsTrackAppender implements TrackAppender {
   #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
     const trackIsCollapsible = this.#traceParsedData.UserTimings.performanceMeasures.length > 0;
     const style = buildGroupStyle({useFirstLineForOverview: true, collapsible: trackIsCollapsible});
-    const group =
-        buildTrackHeader(currentLevel, i18nString(UIStrings.timings), style, /* selectable= */ true, expanded);
+    const group = buildTrackHeader(
+        VisualLoggingTrackName.TIMINGS, currentLevel, i18nString(UIStrings.timings), style, /* selectable= */ true,
+        expanded);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
   }
 
@@ -118,6 +120,11 @@ export class TimingsTrackAppender implements TrackAppender {
 
     const minTimeMs = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(this.#traceParsedData.Meta.traceBounds.min);
     const flameChartMarkers = markers.map(marker => {
+      // The timestamp for user timing trace events is set to the
+      // start time passed by the user at the call site of the timing
+      // (based on the UserTiming spec), meaning we can use event.ts
+      // directly.
+      // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/timing/performance_user_timing.cc;l=236;drc=494419358caf690316f160a1f27d9e771a14c033
       const startTimeMs = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(marker.ts);
       const style = TraceEngine.Types.Extensions.isSyntheticExtensionEntry(marker) ?
           this.markerStyleForExtensionMarker(marker) :

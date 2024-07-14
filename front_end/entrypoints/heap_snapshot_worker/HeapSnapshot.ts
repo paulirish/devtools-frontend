@@ -117,6 +117,10 @@ export class HeapSnapshotEdge implements HeapSnapshotItem {
   getValueForSorting(_fieldName: string): number {
     throw new Error('Not implemented');
   }
+
+  nameIndex(): number {
+    throw new Error('Not implemented');
+  }
 }
 
 export interface HeapSnapshotItemIterator {
@@ -213,6 +217,10 @@ export class HeapSnapshotRetainerEdge implements HeapSnapshotItem {
 
   name(): string {
     return this.edge().name();
+  }
+
+  nameIndex(): number {
+    return this.edge().nameIndex();
   }
 
   node(): HeapSnapshotNode {
@@ -716,6 +724,8 @@ export abstract class HeapSnapshot {
   #ignoredNodesInRetainersView: Set<number>;
   #ignoredEdgesInRetainersView: Set<number>;
   #nodeDistancesForRetainersView: Int32Array|undefined;
+  #edgeNamesThatAreNotWeakMaps: Platform.TypedArrayUtilities.BitVector;
+  #syntheticClassNames: Map<string, number>;
 
   constructor(profile: Profile, progress: HeapSnapshotProgress) {
     this.nodes = profile.nodes;
@@ -741,6 +751,8 @@ export abstract class HeapSnapshot {
     this.#profile = profile;
     this.#ignoredNodesInRetainersView = new Set();
     this.#ignoredEdgesInRetainersView = new Set();
+    this.#edgeNamesThatAreNotWeakMaps = Platform.TypedArrayUtilities.createBitVector(this.strings.length);
+    this.#syntheticClassNames = new Map();
   }
 
   initialize(): void {
@@ -1058,14 +1070,10 @@ export abstract class HeapSnapshot {
   private createNamedFilter(filterName: string): (node: HeapSnapshotNode) => boolean {
     // Allocate an array with a single bit per node, which can be used by each
     // specific filter implemented below.
-    const bitmap = new Uint8Array(Math.ceil(this.nodeCount / 8));
+    const bitmap = Platform.TypedArrayUtilities.createBitVector(this.nodeCount);
     const getBit = (node: HeapSnapshotNode): boolean => {
       const ordinal = node.nodeIndex / this.nodeFieldCount;
-      const value = bitmap[ordinal >> 3] & (1 << (ordinal & 7));
-      return value !== 0;
-    };
-    const setBit = (nodeOrdinal: number): void => {
-      bitmap[nodeOrdinal >> 3] |= (1 << (nodeOrdinal & 7));
+      return bitmap.getBit(ordinal);
     };
 
     // Traverses the graph in breadth-first order with the given filter, and
@@ -1082,7 +1090,7 @@ export abstract class HeapSnapshot {
       this.bfs(nodesToVisit, nodesToVisitLength, distances, filter);
       for (let i = 0; i < this.nodeCount; ++i) {
         if (distances[i] !== this.#noDistance) {
-          setBit(i);
+          bitmap.setBit(i);
         }
       }
     };
@@ -1090,7 +1098,7 @@ export abstract class HeapSnapshot {
     const markUnreachableNodes = (): void => {
       for (let i = 0; i < this.nodeCount; ++i) {
         if (this.nodeDistances[i] === this.#noDistance) {
-          setBit(i);
+          bitmap.setBit(i);
         }
       }
     };
@@ -1131,8 +1139,8 @@ export abstract class HeapSnapshot {
             if (alreadyVisitedNodeIndex === undefined) {
               stringToNodeIndexMap.set(name, node.nodeIndex);
             } else {
-              setBit(alreadyVisitedNodeIndex / this.nodeFieldCount);
-              setBit(node.nodeIndex / this.nodeFieldCount);
+              bitmap.setBit(alreadyVisitedNodeIndex / this.nodeFieldCount);
+              bitmap.setBit(node.nodeIndex / this.nodeFieldCount);
             }
           }
         }
@@ -1343,7 +1351,7 @@ export abstract class HeapSnapshot {
           self: selfSize,
           maxRet: 0,
           type: nodeType,
-          name: nameMatters ? node.name() : null,
+          name: nameMatters ? node.className() : null,
           idxs: [nodeIndex],
         };
         aggregates[classIndex] = value;
@@ -1430,11 +1438,20 @@ export abstract class HeapSnapshot {
     }
   }
 
-  static tryParseWeakMapEdgeName(edgeName: string): {duplicatedPart: string, tableId: string}|undefined {
+  tryParseWeakMapEdgeName(edgeNameIndex: number): {duplicatedPart: string, tableId: string}|undefined {
+    const previousResult = this.#edgeNamesThatAreNotWeakMaps.getBit(edgeNameIndex);
+    if (previousResult) {
+      return undefined;
+    }
+    const edgeName = this.strings[edgeNameIndex];
     const ephemeronNameRegex =
         /^\d+(?<duplicatedPart> \/ part of key \(.*? @\d+\) -> value \(.*? @\d+\) pair in WeakMap \(table @(?<tableId>\d+)\))$/;
     const match = edgeName.match(ephemeronNameRegex);
-    return match ? match.groups as {duplicatedPart: string, tableId: string} : undefined;
+    if (!match) {
+      this.#edgeNamesThatAreNotWeakMaps.setBit(edgeNameIndex);
+      return undefined;
+    }
+    return match.groups as {duplicatedPart: string, tableId: string};
   }
 
   /**
@@ -1450,8 +1467,8 @@ export abstract class HeapSnapshot {
     // dominators. We've found that the edge from the key generally produces
     // more useful results, so here we skip the edge from the table.
     if (edgeType === this.edgeInternalType) {
-      const edgeName = this.strings[this.containmentEdges.getValue(edgeIndex + this.edgeNameOffset)];
-      const match = HeapSnapshot.tryParseWeakMapEdgeName(edgeName);
+      const edgeNameIndex = this.containmentEdges.getValue(edgeIndex + this.edgeNameOffset);
+      const match = this.tryParseWeakMapEdgeName(edgeNameIndex);
       if (match) {
         const nodeId = this.nodes.getValue(nodeIndex + this.nodeIdOffset);
         return nodeId !== parseInt(match.tableId, 10);
@@ -1635,7 +1652,7 @@ export abstract class HeapSnapshot {
 
     // The affected array is used to mark entries which dominators
     // have to be recalculated because of changes in their retainers.
-    const affected = new Uint8Array(nodesCount);
+    const affected = Platform.TypedArrayUtilities.createBitVector(nodesCount);
     let nodeOrdinal;
 
     {  // Mark the root direct children as affected.
@@ -1646,18 +1663,16 @@ export abstract class HeapSnapshot {
           continue;
         }
         const childNodeOrdinal = containmentEdges.getValue(edgeIndex + edgeToNodeOffset) / nodeFieldCount;
-        affected[nodeOrdinal2PostOrderIndex[childNodeOrdinal]] = 1;
+        affected.setBit(nodeOrdinal2PostOrderIndex[childNodeOrdinal]);
       }
     }
 
     let changed = true;
     while (changed) {
       changed = false;
-      for (let postOrderIndex = rootPostOrderedIndex - 1; postOrderIndex >= 0; --postOrderIndex) {
-        if (affected[postOrderIndex] === 0) {
-          continue;
-        }
-        affected[postOrderIndex] = 0;
+      for (let postOrderIndex = affected.previous(rootPostOrderedIndex); postOrderIndex >= 0;
+           postOrderIndex = affected.previous(postOrderIndex)) {
+        affected.clearBit(postOrderIndex);
         // If dominator of the entry has already been set to root,
         // then it can't propagate any further.
         if (dominators[postOrderIndex] === rootPostOrderedIndex) {
@@ -1717,7 +1732,7 @@ export abstract class HeapSnapshot {
           for (let toNodeFieldIndex = beginEdgeToNodeFieldIndex; toNodeFieldIndex < endEdgeToNodeFieldIndex;
                toNodeFieldIndex += edgeFieldsCount) {
             const childNodeOrdinal = containmentEdges.getValue(toNodeFieldIndex) / nodeFieldCount;
-            affected[nodeOrdinal2PostOrderIndex[childNodeOrdinal]] = 1;
+            affected.setBit(nodeOrdinal2PostOrderIndex[childNodeOrdinal]);
           }
         }
       }
@@ -2246,8 +2261,7 @@ export abstract class HeapSnapshot {
         if (!edge.isInternal()) {
           continue;
         }
-        const edgeName = edge.name();
-        const match = HeapSnapshot.tryParseWeakMapEdgeName(edgeName);
+        const match = this.tryParseWeakMapEdgeName(edge.nameIndex());
         if (match) {
           unreachableWeakMapEdges.set(edge.nodeIndex(), match.duplicatedPart);
         }
@@ -2263,7 +2277,7 @@ export abstract class HeapSnapshot {
         if (!reverseEdge.isInternal()) {
           continue;
         }
-        const match = HeapSnapshot.tryParseWeakMapEdgeName(reverseEdge.name());
+        const match = this.tryParseWeakMapEdgeName(reverseEdge.nameIndex());
         if (match && unreachableWeakMapEdges.hasValue(targetNodeIndex, match.duplicatedPart)) {
           const forwardEdgeIndex = this.retainingEdges[reverseEdge.itemIndex()];
           this.#ignoredEdgesInRetainersView.add(forwardEdgeIndex);
@@ -2295,6 +2309,15 @@ export abstract class HeapSnapshot {
 
   isEdgeIgnoredInRetainersView(edgeIndex: number): boolean {
     return this.#ignoredEdgesInRetainersView.has(edgeIndex);
+  }
+
+  getIndexForSyntheticClassName(className: string): number {
+    let index = this.#syntheticClassNames.get(className);
+    if (index === undefined) {
+      index = this.addString(className);
+      this.#syntheticClassNames.set(className, index);
+    }
+    return index;
   }
 }
 
@@ -2782,6 +2805,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
 
   override calculateDistances(isForRetainersView: boolean): void {
     const pendingEphemeronEdges = new Set<string>();
+    const snapshot = this;
     function filter(node: HeapSnapshotNode, edge: HeapSnapshotEdge): boolean {
       if (node.isHidden() && edge.name() === 'sloppy_function_map' && node.rawName() === 'system / NativeContext') {
         return false;
@@ -2811,7 +2835,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
         // part of the filter skips the first edge in the matched pair of edges,
         // so that the distance gets set based on the second, which should be
         // greater or equal due to traversal order.
-        const match = HeapSnapshot.tryParseWeakMapEdgeName(edge.name());
+        const match = snapshot.tryParseWeakMapEdgeName(edge.nameIndex());
         if (match) {
           if (!pendingEphemeronEdges.delete(match.duplicatedPart)) {
             pendingEphemeronEdges.add(match.duplicatedPart);
@@ -3128,8 +3152,21 @@ export class JSHeapSnapshotNode extends HeapSnapshotNode {
       case 'hidden':
         return '(system)';
       case 'object':
-      case 'native':
-        return this.name();
+      case 'native': {
+        let name = this.name();
+        if (name.startsWith('<')) {
+          const firstSpace = name.indexOf(' ');
+          if (firstSpace !== -1) {
+            name = name.substring(0, firstSpace) + '>';
+          }
+        } else if (name.startsWith('Detached <')) {
+          const firstSpace = name.indexOf(' ', 10);
+          if (firstSpace !== -1) {
+            name = name.substring(0, firstSpace) + '>';
+          }
+        }
+        return name;
+      }
       case 'code':
         return '(compiled code)';
       case 'closure':
@@ -3146,7 +3183,10 @@ export class JSHeapSnapshotNode extends HeapSnapshotNode {
     const nodes = snapshot.nodes;
     const type = nodes.getValue(this.nodeIndex + snapshot.nodeTypeOffset);
     if (type === snapshot.nodeObjectType || type === snapshot.nodeNativeType) {
-      return nodes.getValue(this.nodeIndex + snapshot.nodeNameOffset);
+      const name = this.name();
+      const useSyntheticClassName = name.startsWith('<') || name.startsWith('Detached <');
+      return useSyntheticClassName ? snapshot.getIndexForSyntheticClassName(this.className()) :
+                                     nodes.getValue(this.nodeIndex + snapshot.nodeNameOffset);
     }
     return -1 - type;
   }
@@ -3282,6 +3322,13 @@ export class JSHeapSnapshotEdge extends HeapSnapshotEdge {
 
   override rawType(): number {
     return this.edges.getValue(this.edgeIndex + this.snapshot.edgeTypeOffset);
+  }
+
+  override nameIndex(): number {
+    if (!this.hasStringNameInternal()) {
+      throw new Error('Edge does not have string name');
+    }
+    return this.nameOrIndex();
   }
 }
 

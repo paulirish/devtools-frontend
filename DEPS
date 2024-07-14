@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'd589326c99425e96ed025c14e2609916f460f7b6',
+  'build_revision': '04d8986a8e579d5b3de0a00c4d1a44c5edb32d49',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '2bd8dea61c53448c67f70419004ded4032590fe7',
+  'buildtools_revision': '4fc53c36f2e0bbdc0120db514eabdd0d5b7f4c4e',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'c0883c509ea30e18e5657552527999734c7bac05',
+  'depot_tools_revision': '99548b292dd81ecef659d66248ffefc7921512ec',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
@@ -31,26 +31,29 @@ vars = {
   # GN CIPD package version.
   'gn_version': 'git_revision:b2afae122eeb6ce09c52d63f67dc53fc517dbdc8',
 
-  'cmake_version': 'version:3.16.1',
+  'cmake_version': 'version:2@3.21.3',
 
   'llvm_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/',
-  'llvm_revision': 'c08d3b08f6d71e974537de226c68d4c94c396a46',
+  'llvm_revision': '3c51ea3619e488db19cd26840ed46d58cfc7062f',
 
   'lldb_eval_url': 'https://chromium.googlesource.com/external/github.com/google/lldb-eval.git',
   'lldb_eval_revision': 'e87123a7e639bf1d86f24c37079570fb7fa00b72',
 
   # ninja CIPD package version.
-  # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
-  'ninja_version': 'version:2@1.11.1.chromium.6',
+  # https://chrome-infra-packages.appspot.com/p/infra/3pp/build_support/ninja-1_11_1/
+  'ninja_version': 'version:2@1.11.1.chromium.2',
 
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '127.0.6533.2',
+  'chrome': '128.0.6550.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
-  'SUBMODULE_MIGRATION': 'True'
+  'SUBMODULE_MIGRATION': 'True',
+
+  # condition to allowlist deps for non-git-source processing.
+  'non_git_source': 'True',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -64,7 +67,7 @@ deps = {
   },
   'third_party/cmake': {
     'packages': [{
-      'package': 'infra/cmake/${{platform}}',
+      'package': 'infra/3pp/tools/cmake/${{platform}}',
       'version': Var('cmake_version')
     }],
     'dep_type':
@@ -141,7 +144,7 @@ deps = {
   'third_party/ninja': {
     'packages': [
       {
-        'package': 'infra/3pp/tools/ninja/${{platform}}',
+        'package': 'infra/3pp/build_support/ninja-1_11_1/${{platform}}',
         'version': Var('ninja_version'),
       }
     ],

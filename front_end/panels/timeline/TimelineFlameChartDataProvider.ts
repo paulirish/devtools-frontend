@@ -39,9 +39,11 @@ import * as ModificationsManager from '../../services/modifications_manager/modi
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {CompatibilityTracksAppender, type TrackAppenderName} from './CompatibilityTracksAppender.js';
 import * as Components from './components/components.js';
+import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
 import {initiatorsDataToDraw} from './Initiators.js';
 import {ThreadAppender} from './ThreadAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
@@ -110,6 +112,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   #eventIndexByEvent: WeakMap<
       TraceEngine.Types.TraceEvents.TraceEventData|TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame,
       number|null> = new WeakMap();
+  #visualElementsParent: VisualLogging.Loggable|null = null;
 
   constructor() {
     super();
@@ -148,6 +151,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     });
   }
 
+  setVisualElementLoggingParent(parent: VisualLogging.Loggable|null): void {
+    this.#visualElementsParent = parent;
+  }
+
   hasTrackConfigurationMode(): boolean {
     return true;
   }
@@ -183,6 +190,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   setModel(traceEngineData: TraceEngine.Handlers.Types.TraceParseData|null, isCpuProfile = false): void {
     this.reset();
     this.traceEngineData = traceEngineData;
+    ExtensionDataGatherer.instance().modelChanged(traceEngineData);
 
     this.isCpuProfile = isCpuProfile;
     if (traceEngineData) {
@@ -339,7 +347,25 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     }
 
+    this.#registerGroupsForLogging();
     return this.timelineDataInternal;
+  }
+
+  /**
+   * Register the groups (aka tracks) with the VisualElements framework so
+   * later on we can log when an entry inside this group is selected.
+   */
+  #registerGroupsForLogging(): void {
+    if (!this.timelineDataInternal) {
+      return;
+    }
+
+    for (const group of this.timelineDataInternal.groups) {
+      if (group.jslogContext) {
+        VisualLogging.registerLoggable(
+            group, `${VisualLogging.section().context(group.jslogContext)}`, this.#visualElementsParent);
+      }
+    }
   }
 
   #processGenericTrace(): void {
@@ -376,16 +402,16 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           return 2;
         case 'LayoutShifts':
           return 3;
-        case 'GPU':
-          return 8;
-        case 'Thread':
-          return 4;
-        case 'Thread_AuctionWorklet':
-          return 10;
         case 'Extension':
-          return 11;
+          return 4;
+        case 'Thread':
+          return 5;
+        case 'GPU':
+          return 6;
+        case 'Thread_AuctionWorklet':
+          return 7;
         default:
-          return 12;
+          return 8;
       }
     };
 

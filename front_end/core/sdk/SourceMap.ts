@@ -37,12 +37,8 @@ import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {
-  decodeGeneratedRanges,
-  decodeOriginalScopes,
-  type GeneratedRange,
-  type OriginalScope,
-} from './SourceMapScopes.js';
+import {type CallFrame} from './DebuggerModel.js';
+import {SourceMapScopesInfo} from './SourceMapScopesInfo.js';
 
 /**
  * Type of the base source map JSON object, which contains the sources and the mappings at the very least, plus
@@ -190,9 +186,7 @@ export class SourceMap {
   readonly #sourceInfos: Map<Platform.DevToolsPath.UrlString, SourceInfo>;
 
   /* eslint-disable-next-line no-unused-private-class-members */
-  #originalScopes: OriginalScope[]|null = null;
-  /* eslint-disable-next-line no-unused-private-class-members */
-  #generatedRanges: GeneratedRange|null = null;
+  #scopesInfo: SourceMapScopesInfo|null = null;
 
   /**
    * Implements Source Map V3 model. See https://github.com/google/closure-compiler/wiki/Source-Maps
@@ -237,7 +231,31 @@ export class SourceMap {
     return entry.content;
   }
 
-  findEntry(lineNumber: number, columnNumber: number): SourceMapEntry|null {
+  hasScopeInfo(): boolean {
+    this.#ensureMappingsProcessed();
+    return this.#scopesInfo !== null;
+  }
+
+  findEntry(lineNumber: number, columnNumber: number, inlineFrameIndex?: number): SourceMapEntry|null {
+    this.#ensureMappingsProcessed();
+    if (inlineFrameIndex && this.#scopesInfo !== null) {
+      // For inlineFrameIndex != 0 we use the callsite info for the corresponding inlining site.
+      // Note that the callsite for "inlineFrameIndex" is actually in the previous frame.
+      const functions = this.#scopesInfo.findInlinedFunctions(lineNumber, columnNumber);
+      const {callsite} = functions[inlineFrameIndex - 1];
+      if (!callsite) {
+        console.error('Malformed source map. Expected to have a callsite info for index', inlineFrameIndex);
+        return null;
+      }
+      return {
+        lineNumber,
+        columnNumber,
+        sourceURL: this.sourceURLs()[callsite.sourceIndex],
+        sourceLineNumber: callsite.line,
+        sourceColumnNumber: callsite.column,
+        name: undefined,
+      };
+    }
     const mappings = this.mappings();
     const index = Platform.ArrayUtilities.upperBound(
         mappings, undefined, (unused, entry) => lineNumber - entry.lineNumber || columnNumber - entry.columnNumber);
@@ -622,14 +640,9 @@ export class SourceMap {
   }
 
   #parseScopes(map: SourceMapV3Object): void {
-    if (!map.originalScopes || !map.generatedRanges) {
-      return;
+    if (map.originalScopes && map.generatedRanges) {
+      this.#scopesInfo = SourceMapScopesInfo.parseFromMap(map);
     }
-
-    const names = map.names ?? [];
-    const scopeTrees = decodeOriginalScopes(map.originalScopes, names);
-    this.#originalScopes = scopeTrees.map(tree => tree.root);
-    this.#generatedRanges = decodeGeneratedRanges(map.generatedRanges, scopeTrees, names);
   }
 
   findScopeEntry(sourceURL: Platform.DevToolsPath.UrlString, sourceLineNumber: number, sourceColumnNumber: number):
@@ -804,6 +817,21 @@ export class SourceMap {
   compatibleForURL(sourceURL: Platform.DevToolsPath.UrlString, other: SourceMap): boolean {
     return this.embeddedContentByURL(sourceURL) === other.embeddedContentByURL(sourceURL) &&
         this.hasIgnoreListHint(sourceURL) === other.hasIgnoreListHint(sourceURL);
+  }
+
+  expandCallFrame(frame: CallFrame): CallFrame[] {
+    this.#ensureMappingsProcessed();
+    if (this.#scopesInfo === null) {
+      return [frame];
+    }
+
+    const functionNames =
+        this.#scopesInfo.findInlinedFunctions(frame.location().lineNumber, frame.location().columnNumber);
+    const result: CallFrame[] = [];
+    for (const [index, fn] of functionNames.entries()) {
+      result.push(frame.createVirtualCallFrame(index, fn.name));
+    }
+    return result;
   }
 }
 

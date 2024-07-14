@@ -6461,10 +6461,6 @@ export const NativeFunctions = [
     signatures: [["?options"]]
   },
   {
-    name: "getPartNode",
-    signatures: [["index"]]
-  },
-  {
     name: "expand",
     signatures: [["?unit"]],
     receivers: ["Range"]
@@ -6829,10 +6825,6 @@ export const NativeFunctions = [
     signatures: [["startTime","endTime","text"]]
   },
   {
-    name: "DeviceProperties",
-    signatures: [["?devicePropertiesInitDict"]]
-  },
-  {
     name: "InputDeviceCapabilities",
     signatures: [["?deviceInitDict"]]
   },
@@ -6966,7 +6958,7 @@ export const NativeFunctions = [
   },
   {
     name: "setMenuListOptionsBoundsInAXTree",
-    signatures: [["options_bounds"]]
+    signatures: [["options_bounds","children_updated"]]
   },
   {
     name: "allowsFeature",
@@ -7345,6 +7337,10 @@ export const NativeFunctions = [
   },
   {
     name: "parseCreationOptionsFromJSON",
+    signatures: [["options"]]
+  },
+  {
+    name: "parseRequestOptionsFromJSON",
     signatures: [["options"]]
   },
   {
@@ -7901,7 +7897,7 @@ export const NativeFunctions = [
   },
   {
     name: "softmax",
-    signatures: [["input"]]
+    signatures: [["input","?axis"]]
   },
   {
     name: "softplus",
@@ -8088,8 +8084,16 @@ export const NativeFunctions = [
     signatures: [["track"]]
   },
   {
+    name: "sendRtp",
+    signatures: [["packet","options"]]
+  },
+  {
     name: "setHeaderExtensionsToNegotiate",
     signatures: [["extensions"]]
+  },
+  {
+    name: "readReceivedAcks",
+    signatures: [["maxCount"]]
   },
   {
     name: "RTCSessionDescription",
