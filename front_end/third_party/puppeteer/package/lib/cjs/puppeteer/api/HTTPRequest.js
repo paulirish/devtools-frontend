@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STATUS_TEXTS = exports.headersArray = exports.InterceptResolutionAction = exports.HTTPRequest = exports.DEFAULT_INTERCEPT_RESOLUTION_PRIORITY = void 0;
+exports.handleError = exports.STATUS_TEXTS = exports.headersArray = exports.InterceptResolutionAction = exports.HTTPRequest = exports.DEFAULT_INTERCEPT_RESOLUTION_PRIORITY = void 0;
+const util_js_1 = require("../common/util.js");
 /**
  * The default cooperative request interception resolution priority
  *
@@ -42,10 +43,6 @@ class HTTPRequest {
     /**
      * @internal
      */
-    _requestId = '';
-    /**
-     * @internal
-     */
     _interceptionId;
     /**
      * @internal
@@ -64,189 +61,9 @@ class HTTPRequest {
      */
     _redirectChain = [];
     /**
-     * Warning! Using this client can break Puppeteer. Use with caution.
-     *
-     * @experimental
-     */
-    get client() {
-        throw new Error('Not implemented');
-    }
-    /**
      * @internal
      */
     constructor() { }
-    /**
-     * The URL of the request
-     */
-    url() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The `ContinueRequestOverrides` that will be used
-     * if the interception is allowed to continue (ie, `abort()` and
-     * `respond()` aren't called).
-     */
-    continueRequestOverrides() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The `ResponseForRequest` that gets used if the
-     * interception is allowed to respond (ie, `abort()` is not called).
-     */
-    responseForRequest() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The most recent reason for aborting the request
-     */
-    abortErrorReason() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * An InterceptResolutionState object describing the current resolution
-     * action and priority.
-     *
-     * InterceptResolutionState contains:
-     * action: InterceptResolutionAction
-     * priority?: number
-     *
-     * InterceptResolutionAction is one of: `abort`, `respond`, `continue`,
-     * `disabled`, `none`, or `already-handled`.
-     */
-    interceptResolutionState() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * Is `true` if the intercept resolution has already been handled,
-     * `false` otherwise.
-     */
-    isInterceptResolutionHandled() {
-        throw new Error('Not implemented');
-    }
-    enqueueInterceptAction() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * Awaits pending interception handlers and then decides how to fulfill
-     * the request interception.
-     */
-    async finalizeInterceptions() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * Contains the request's resource type as it was perceived by the rendering
-     * engine.
-     */
-    resourceType() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The method used (`GET`, `POST`, etc.)
-     */
-    method() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The request's post body, if any.
-     */
-    postData() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * An object with HTTP headers associated with the request. All
-     * header names are lower-case.
-     */
-    headers() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * A matching `HTTPResponse` object, or null if the response has not
-     * been received yet.
-     */
-    response() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The frame that initiated the request, or null if navigating to
-     * error pages.
-     */
-    frame() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * True if the request is the driver of the current frame's navigation.
-     */
-    isNavigationRequest() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * The initiator of the request.
-     */
-    initiator() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * A `redirectChain` is a chain of requests initiated to fetch a resource.
-     * @remarks
-     *
-     * `redirectChain` is shared between all the requests of the same chain.
-     *
-     * For example, if the website `http://example.com` has a single redirect to
-     * `https://example.com`, then the chain will contain one request:
-     *
-     * ```ts
-     * const response = await page.goto('http://example.com');
-     * const chain = response.request().redirectChain();
-     * console.log(chain.length); // 1
-     * console.log(chain[0].url()); // 'http://example.com'
-     * ```
-     *
-     * If the website `https://google.com` has no redirects, then the chain will be empty:
-     *
-     * ```ts
-     * const response = await page.goto('https://google.com');
-     * const chain = response.request().redirectChain();
-     * console.log(chain.length); // 0
-     * ```
-     *
-     * @returns the chain of requests - if a server responds with at least a
-     * single redirect, this chain will contain all requests that were redirected.
-     */
-    redirectChain() {
-        throw new Error('Not implemented');
-    }
-    /**
-     * Access information about the request's failure.
-     *
-     * @remarks
-     *
-     * @example
-     *
-     * Example of logging all failed requests:
-     *
-     * ```ts
-     * page.on('requestfailed', request => {
-     *   console.log(request.url() + ' ' + request.failure().errorText);
-     * });
-     * ```
-     *
-     * @returns `null` unless the request failed. If the request fails this can
-     * return an object with `errorText` containing a human-readable error
-     * message, e.g. `net::ERR_FAILED`. It is not guaranteed that there will be
-     * failure text if the request fails.
-     */
-    failure() {
-        throw new Error('Not implemented');
-    }
-    async continue() {
-        throw new Error('Not implemented');
-    }
-    async respond() {
-        throw new Error('Not implemented');
-    }
-    async abort() {
-        throw new Error('Not implemented');
-    }
 }
 exports.HTTPRequest = HTTPRequest;
 /**
@@ -350,4 +167,17 @@ exports.STATUS_TEXTS = {
     '510': 'Not Extended',
     '511': 'Network Authentication Required',
 };
+/**
+ * @internal
+ */
+function handleError(error) {
+    if (error.originalMessage.includes('Invalid header')) {
+        throw error;
+    }
+    // In certain cases, protocol will return error if the request was
+    // already canceled or the page was closed. We should tolerate these
+    // errors.
+    (0, util_js_1.debugError)(error);
+}
+exports.handleError = handleError;
 //# sourceMappingURL=HTTPRequest.js.map

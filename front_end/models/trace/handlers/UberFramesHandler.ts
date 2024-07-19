@@ -56,6 +56,7 @@ const someStuff  = {
   DecodeLazyPixelRef : 'Decode LazyPixelRef',
 
   BeginFrame: 'BeginFrame',
+  RequestMainThreadFrame: 'RequestMainThreadFrame',
   NeedsBeginFrameChanged: 'NeedsBeginFrameChanged',
   BeginMainThreadFrame: 'BeginMainThreadFrame',
   ActivateLayerTree: 'ActivateLayerTree',
@@ -65,6 +66,24 @@ const someStuff  = {
 const someRelevantTraceEventTypes = [
 
   ... Object.values(someStuff),
+
+  // timeline frame model
+  'ActivateLayerTree',
+  'BeginFrame',
+  'BeginMainThreadFrame,',
+  'CompositeLayers',
+  'Commit',
+  'DrawFrame',
+  'DroppedFrame',
+  'InvalidateLayout,',
+  'LayerTreeHostImplSnapshot',
+  'NeedsBeginFrameChanged',
+  'Paint',
+  'RequestMainThreadFrame',
+  'ScheduleStyleRecalculation,',
+  'ScrollLayer,',
+  'SetLayerTreeId',
+
 
   'MainFrame.NotifyReadyToCommitOnImpl',
   'MainFrame.CommitComplete',
@@ -78,10 +97,23 @@ const someRelevantTraceEventTypes = [
   'SendBeginMainFrameToCommit',
   'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
   'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase in eventlatency
-  'Graphics.Pipeline',
+  // 'Graphics.Pipeline',
 
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
   'Frame',
+
+  // these are all pipeline reporter subitems. HOEVER they are also included in the eventlatency children too.
+  'Activation',
+  'BeginImplFrameToSendBeginMainFrame',
+  'Commit',
+  'EndActivateToSubmitCompositorFrame',
+  'EndCommitToActivation',
+  'ReceiveCompositorFrameToStartDraw',
+  'SendBeginMainFrameToCommit',
+  'StartDrawToSwapStart',
+  'SubmitCompositorFrameToPresentationCompositorFrame',
+  'SubmitToReceiveCompositorFrame',
+  'Swap',
 
   'BeginFrame',
   'DroppedFrame',
@@ -98,7 +130,6 @@ const someRelevantTraceEventTypes = [
   'Scheduler::BeginFrame',
   'DisplayScheduler::BeginFrame',
   'Scheduler::BeginImplFrame',
-
 
   'EventLatency', // mocny said these are complicated. but.. they're also great.
   // https://docs.google.com/spreadsheets/d/1F6BPrtIMgDD4eKH-VxEqzZy8dOeh3U2EZaYjVlIv-Hk/edit?resourcekey=0-UtBlkaCsd0Oi1Z3bQqHqow#gid=557410449
@@ -209,7 +240,6 @@ export const waterfallTypes = new Map([
   ['SubmitCompositorFrameToPresentationCompositorFrame', 2],
 ]);
 
-
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
 
   if (Types.TraceEvents.isTraceEventGPUTask(event)) {
@@ -225,7 +255,12 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     } else {
 
       if (eventLatencyBreakdownTypeNames.includes(event.name)) {
-        waterFallEvents.push(event);
+        // we have two diff events named Commit, we'll exclude the normal mainthread one.
+        if (event.name === 'Commit' && !event.cat.includes('cc')) {
+
+        } else {
+          waterFallEvents.push(event);
+        }
       }
       relevantEvts.push(event);
     }
@@ -306,8 +341,12 @@ export async function finalize(): Promise<void> {
       },
     };
 
+    // still I do see some 0's in the real trace. i messed up the c++ side.
     if (event.name === 'EventLatency') {
-      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence;
+      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence ?? null;
+    }
+    if (event.name === 'PipelineReporter') {
+      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.chrome_frame_reporter.frame_sequence ?? null;
     }
 
     const existingDuplicate = syntheticEvents.find(e => {

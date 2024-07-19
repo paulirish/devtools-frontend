@@ -1,18 +1,23 @@
+/**
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import type {ProtocolMapping} from 'devtools-protocol/types/protocol-mapping.js';
 
 import {
   type CDPEvents,
   CDPSession,
   CDPSessionEvent,
+  type CommandOptions,
 } from '../api/CDPSession.js';
+import {CallbackRegistry} from '../common/CallbackRegistry.js';
 import {TargetCloseError} from '../common/Errors.js';
 import {assert} from '../util/assert.js';
+import {createProtocolErrorMessage} from '../util/ErrorLike.js';
 
-import {
-  CallbackRegistry,
-  type Connection,
-  createProtocolErrorMessage,
-} from './Connection.js';
+import type {Connection} from './Connection.js';
 import type {CdpTarget} from './Target.js';
 
 /**
@@ -68,7 +73,8 @@ export class CdpCDPSession extends CDPSession {
 
   override parentSession(): CDPSession | undefined {
     if (!this.#parentSessionId) {
-      return;
+      // To make it work in Firefox that does not have parent (tab) sessions.
+      return this;
     }
     const parent = this.#connection?.session(this.#parentSessionId);
     return parent ?? undefined;
@@ -76,24 +82,22 @@ export class CdpCDPSession extends CDPSession {
 
   override send<T extends keyof ProtocolMapping.Commands>(
     method: T,
-    ...paramArgs: ProtocolMapping.Commands[T]['paramsType']
+    params?: ProtocolMapping.Commands[T]['paramsType'][0],
+    options?: CommandOptions
   ): Promise<ProtocolMapping.Commands[T]['returnType']> {
     if (!this.#connection) {
       return Promise.reject(
         new TargetCloseError(
-          `Protocol error (${method}): Session closed. Most likely the ${
-            this.#targetType
-          } has been closed.`
+          `Protocol error (${method}): Session closed. Most likely the ${this.#targetType} has been closed.`
         )
       );
     }
-    // See the comment in Connection#send explaining why we do this.
-    const params = paramArgs.length ? paramArgs[0] : undefined;
     return this.#connection._rawSend(
       this.#callbacks,
       method,
       params,
-      this.#sessionId
+      this.#sessionId,
+      options
     );
   }
 
@@ -130,9 +134,7 @@ export class CdpCDPSession extends CDPSession {
   override async detach(): Promise<void> {
     if (!this.#connection) {
       throw new Error(
-        `Session already detached. Most likely the ${
-          this.#targetType
-        } has been closed.`
+        `Session already detached. Most likely the ${this.#targetType} has been closed.`
       );
     }
     await this.#connection.send('Target.detachFromTarget', {
@@ -154,5 +156,12 @@ export class CdpCDPSession extends CDPSession {
    */
   override id(): string {
     return this.#sessionId;
+  }
+
+  /**
+   * @internal
+   */
+  getPendingProtocolErrors(): Error[] {
+    return this.#callbacks.getPendingProtocolErrors();
   }
 }

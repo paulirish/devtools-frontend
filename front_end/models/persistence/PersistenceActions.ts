@@ -51,21 +51,13 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/persistence/PersistenceActions.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let contextMenuProviderInstance: ContextMenuProvider;
-
-export class ContextMenuProvider implements UI.ContextMenu.Provider {
-  static instance(opts: {forceNew: boolean|null} = {forceNew: null}): ContextMenuProvider {
-    const {forceNew} = opts;
-    if (!contextMenuProviderInstance || forceNew) {
-      contextMenuProviderInstance = new ContextMenuProvider();
-    }
-
-    return contextMenuProviderInstance;
-  }
-
-  appendApplicableItems(event: Event, contextMenu: UI.ContextMenu.ContextMenu, target: Object): void {
-    const contentProvider = target as TextUtils.ContentProvider.ContentProvider;
-
+export class ContextMenuProvider implements
+    UI.ContextMenu
+        .Provider<Workspace.UISourceCode.UISourceCode|SDK.Resource.Resource|SDK.NetworkRequest.NetworkRequest> {
+  appendApplicableItems(
+      _event: Event, contextMenu: UI.ContextMenu.ContextMenu,
+      contentProvider: Workspace.UISourceCode.UISourceCode|SDK.Resource.Resource|
+      SDK.NetworkRequest.NetworkRequest): void {
     async function saveAs(): Promise<void> {
       if (contentProvider instanceof Workspace.UISourceCode.UISourceCode) {
         (contentProvider as Workspace.UISourceCode.UISourceCode).commitWorkingCopy();
@@ -76,7 +68,7 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
         decodedContent = window.atob(decodedContent);
       }
       const url = contentProvider.contentURL();
-      void Workspace.FileManager.FileManager.instance().save(url, decodedContent, true);
+      await Workspace.FileManager.FileManager.instance().save(url, decodedContent, true);
       Workspace.FileManager.FileManager.instance().close(url);
     }
 
@@ -90,9 +82,9 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
     }
 
     if (contentProvider.contentType().isDocumentOrScriptOrStyleSheet()) {
-      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), saveAs);
+      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveAs), saveAs, {jslogContext: 'save-as'});
     } else if (contentProvider instanceof SDK.Resource.Resource && contentProvider.contentType().isImage()) {
-      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveImage), saveImage);
+      contextMenu.saveSection().appendItem(i18nString(UIStrings.saveImage), saveImage, {jslogContext: 'save-image'});
     }
 
     // Retrieve uiSourceCode by URL to pick network resources everywhere.
@@ -102,11 +94,12 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
     const binding = uiSourceCode && PersistenceImpl.instance().binding(uiSourceCode);
     const fileURL = binding ? binding.fileSystem.contentURL() : contentProvider.contentURL();
 
-    if (fileURL.startsWith('file://')) {
+    if (Common.ParsedURL.schemeIs(fileURL, 'file:')) {
       const path = Common.ParsedURL.ParsedURL.urlToRawPathString(fileURL, Host.Platform.isWin());
       contextMenu.revealSection().appendItem(
           i18nString(UIStrings.openInContainingFolder),
-          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.showItemInFolder(path));
+          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.showItemInFolder(path),
+          {jslogContext: 'open-in-containing-folder'});
     }
 
     if (contentProvider instanceof Workspace.UISourceCode.UISourceCode &&
@@ -115,29 +108,29 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
       return;
     }
 
+    let disabled = true;
+    let handler = (): void => {};
     if (uiSourceCode && networkPersistenceManager.isUISourceCodeOverridable(uiSourceCode)) {
       if (!uiSourceCode.contentType().isFromSourceMap()) {
-        contextMenu.overrideSection().appendItem(
-            i18nString(UIStrings.overrideContent),
-            async () => await this.handleOverrideContent(uiSourceCode, contentProvider));
+        disabled = false;
+        handler = this.handleOverrideContent.bind(this, uiSourceCode, contentProvider);
       } else {
         // show redirect dialog for source mapped file
         const deployedUiSourceCode = this.getDeployedUiSourceCode(uiSourceCode);
         if (deployedUiSourceCode) {
-          contextMenu.overrideSection().appendItem(
-              i18nString(UIStrings.overrideContent),
-              async () => await this.redirectOverrideToDeployedUiSourceCode(deployedUiSourceCode, uiSourceCode));
+          disabled = false;
+          handler = this.redirectOverrideToDeployedUiSourceCode.bind(this, deployedUiSourceCode, uiSourceCode);
         }
       }
-    } else {
-      contextMenu.overrideSection().appendItem(i18nString(UIStrings.overrideContent), () => {}, true);
     }
+    contextMenu.overrideSection().appendItem(
+        i18nString(UIStrings.overrideContent), handler, {disabled, jslogContext: 'override-content'});
 
     if (contentProvider instanceof SDK.NetworkRequest.NetworkRequest) {
       contextMenu.overrideSection().appendItem(i18nString(UIStrings.showOverrides), async () => {
         await UI.ViewManager.ViewManager.instance().showView('navigator-overrides');
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.ShowAllOverridesFromNetworkContextMenu);
-      });
+      }, {jslogContext: 'show-overrides'});
     }
   }
 
@@ -185,7 +178,8 @@ export class ContextMenuProvider implements UI.ContextMenu.Provider {
     const warningMessage = i18nString(UIStrings.overrideSourceMappedFileWarning, {PH1: deployedName}) + '\n' +
         i18nString(UIStrings.overrideSourceMappedFileExplanation, {PH1: originalName});
 
-    const shouldJumpToDeployedFile = await UI.UIUtils.ConfirmDialog.show(warningMessage);
+    const shouldJumpToDeployedFile = await UI.UIUtils.ConfirmDialog.show(
+        warningMessage, undefined, {jslogContext: 'override-source-mapped-file-warning'});
 
     if (shouldJumpToDeployedFile) {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.OverrideContentContextMenuRedirectToDeployed);

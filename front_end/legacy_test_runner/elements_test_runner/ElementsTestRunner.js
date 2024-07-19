@@ -3,8 +3,12 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Platform from '../../core/platform/platform.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import * as Animation from '../../panels/animation/animation.js';
 import * as Elements from '../../panels/elements/elements.js';
 import * as EventListeners from '../../panels/event_listeners/event_listeners.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 /**
@@ -398,9 +402,8 @@ ElementsTestRunner.firstElementsTreeOutline = function() {
 };
 
 ElementsTestRunner.filterMatchedStyles = function(text) {
-  const regex = (text ? new RegExp(text, 'i') : null);
   TestRunner.addResult('Filtering styles by: ' + text);
-  Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.onFilterChanged(regex);
+  Elements.ElementsPanel.ElementsPanel.instance().stylesWidget.onFilterChanged({data: text});
 };
 
 ElementsTestRunner.dumpRenderedMatchedStyles = function() {
@@ -455,7 +458,8 @@ ElementsTestRunner.dumpRenderedMatchedStyles = function() {
     for (let i = 0; i < property.childCount(); ++i) {
       const childProperty = property.childAt(i);
       let text = indent;
-      text += String.sprintf('%s: %s', childProperty.nameElement.textContent, childProperty.valueElement.textContent);
+      text += Platform.StringUtilities.sprintf(
+          '%s: %s', childProperty.nameElement.textContent, childProperty.valueElement.textContent);
 
       if (childProperty.listItemElement.classList.contains('filter-match')) {
         text = 'F' + text.substring(1);
@@ -506,7 +510,7 @@ async function printStyleSection(section, omitLonghands, includeSelectorGroupMar
 
   TestRunner.addResult(
       '[expanded] ' + ((section.propertiesTreeOutline.element.classList.contains('no-affect') ? '[no-affect] ' : '')));
-  const queries = section.titleElement.querySelectorAll('devtools-css-query');
+  const queries = section.element.querySelectorAll('devtools-css-query');
 
   for (const query of queries) {
     const queryElement = query.shadowRoot.querySelector('.query');
@@ -525,7 +529,7 @@ async function printStyleSection(section, omitLonghands, includeSelectorGroupMar
 
   if (anchor) {
     const anchorText = await extractLinkText(anchor);
-    selectorText += String.sprintf(' (%s)', anchorText);
+    selectorText += Platform.StringUtilities.sprintf(' (%s)', anchorText);
   }
 
   TestRunner.addResult(selectorText);
@@ -550,7 +554,7 @@ async function extractLinkText(element) {
   }
 
   const anchorText = anchor.textContent;
-  const info = Components.Linkifier.linkInfo(anchor);
+  const info = Components.Linkifier.Linkifier.linkInfo(anchor);
   const uiLocation = info && info.uiLocation;
   const anchorTarget =
       (uiLocation ?
@@ -586,19 +590,19 @@ ElementsTestRunner.toggleMatchedStyleProperty = function(propertyName, checked) 
 };
 
 ElementsTestRunner.eventListenersWidget = function() {
-  UI.ViewManager.ViewManager.instance().showView('elements.eventListeners');
+  UI.ViewManager.ViewManager.instance().showView('elements.event-listeners');
   return Elements.EventListenersWidget.EventListenersWidget.instance();
 };
 
 ElementsTestRunner.showEventListenersWidget = function() {
-  return UI.ViewManager.ViewManager.instance().showView('elements.eventListeners');
+  return UI.ViewManager.ViewManager.instance().showView('elements.event-listeners');
 };
 
 /**
  * @return {Promise}
  */
 ElementsTestRunner.showComputedStyles = function() {
-  Elements.ElementsPanel.ElementsPanel.instance().sidebarPaneView.tabbedPane().selectTab('Computed', true);
+  Elements.ElementsPanel.ElementsPanel.instance().sidebarPaneView.tabbedPane().selectTab('computed', true);
   return ElementsTestRunner.computedStyleWidget().doUpdate();
 };
 
@@ -988,7 +992,7 @@ ElementsTestRunner.generateUndoTest = function(testBody) {
           ElementsTestRunner.dumpElementsTree(testNode);
         }
 
-        self.SDK.domModelUndoStack.undo().then(redo);
+        SDK.DOMModel.DOMModelUndoStack.instance().undo().then(redo);
       }
     }
 
@@ -1003,7 +1007,7 @@ ElementsTestRunner.generateUndoTest = function(testBody) {
           ElementsTestRunner.dumpElementsTree(testNode);
         }
 
-        self.SDK.domModelUndoStack.redo().then(done);
+        SDK.DOMModel.DOMModelUndoStack.instance().redo().then(done);
       }
     }
 
@@ -1205,7 +1209,7 @@ ElementsTestRunner.addNewRuleInStyleSheet = function(styleSheetHeader, selector,
 ElementsTestRunner.addNewRule = function(selector, callback) {
   Elements.ElementsPanel.ElementsPanel.instance()
       .stylesWidget.contentElement.querySelector('.styles-pane-toolbar')
-      .shadowRoot.querySelector('.plus')
+      .shadowRoot.querySelector('[aria-label="New Style Rule"]')
       .click();
   TestRunner.addSniffer(
       Elements.StylesSidebarPane.StylesSidebarPane.prototype, 'addBlankSection',
@@ -1294,7 +1298,7 @@ ElementsTestRunner.dumpInspectorHighlightStyleJSON = async function(idValue) {
 };
 
 ElementsTestRunner.waitForAnimationAdded = function(callback) {
-  TestRunner.addSniffer(Animation.AnimationTimeline.prototype, 'addAnimationGroup', callback);
+  TestRunner.addSniffer(Animation.AnimationTimeline.AnimationTimeline.prototype, 'addAnimationGroup', callback);
 };
 
 ElementsTestRunner.dumpAnimationTimeline = function(timeline) {
@@ -1314,7 +1318,7 @@ ElementsTestRunner.ignoreSidebarUpdates = function() {
 
 ElementsTestRunner.getDocumentElements = function() {
   const map = TestRunner.domModel.idToDOMNode;
-  const documents = Array.from(map.values()).filter(n => n instanceof SDK.DOMDocument);
+  const documents = Array.from(map.values()).filter(n => n instanceof SDK.DOMModel.DOMDocument);
   return documents;
 };
 

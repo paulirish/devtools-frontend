@@ -1,33 +1,24 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import type {Protocol} from 'devtools-protocol';
 import type {ProtocolMapping} from 'devtools-protocol/types/protocol-mapping.js';
 
+import type {CommandOptions} from '../api/CDPSession.js';
 import {
   CDPSessionEvent,
   type CDPSession,
   type CDPSessionEvents,
 } from '../api/CDPSession.js';
+import {CallbackRegistry} from '../common/CallbackRegistry.js';
 import type {ConnectionTransport} from '../common/ConnectionTransport.js';
 import {debug} from '../common/Debug.js';
-import {ProtocolError, TargetCloseError} from '../common/Errors.js';
+import {TargetCloseError} from '../common/Errors.js';
 import {EventEmitter} from '../common/EventEmitter.js';
-import {debugError} from '../common/util.js';
-import {Deferred} from '../util/Deferred.js';
+import {createProtocolErrorMessage} from '../util/ErrorLike.js';
 
 import {CdpCDPSession} from './CDPSession.js';
 
@@ -38,159 +29,6 @@ const debugProtocolReceive = debug('puppeteer:protocol:RECV ◀');
  * @public
  */
 export type {ConnectionTransport, ProtocolMapping};
-
-/**
- * @internal
- */
-type GetIdFn = () => number;
-
-/**
- * @internal
- */
-function createIncrementalIdGenerator(): GetIdFn {
-  let id = 0;
-  return (): number => {
-    return ++id;
-  };
-}
-
-/**
- * @internal
- */
-export class Callback {
-  #id: number;
-  #error = new ProtocolError();
-  #deferred = Deferred.create<unknown>();
-  #timer?: ReturnType<typeof setTimeout>;
-  #label: string;
-
-  constructor(id: number, label: string, timeout?: number) {
-    this.#id = id;
-    this.#label = label;
-    if (timeout) {
-      this.#timer = setTimeout(() => {
-        this.#deferred.reject(
-          rewriteError(
-            this.#error,
-            `${label} timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`
-          )
-        );
-      }, timeout);
-    }
-  }
-
-  resolve(value: unknown): void {
-    clearTimeout(this.#timer);
-    this.#deferred.resolve(value);
-  }
-
-  reject(error: Error): void {
-    clearTimeout(this.#timer);
-    this.#deferred.reject(error);
-  }
-
-  get id(): number {
-    return this.#id;
-  }
-
-  get promise(): Deferred<unknown> {
-    return this.#deferred;
-  }
-
-  get error(): ProtocolError {
-    return this.#error;
-  }
-
-  get label(): string {
-    return this.#label;
-  }
-}
-
-/**
- * Manages callbacks and their IDs for the protocol request/response communication.
- *
- * @internal
- */
-export class CallbackRegistry {
-  #callbacks = new Map<number, Callback>();
-  #idGenerator = createIncrementalIdGenerator();
-
-  create(
-    label: string,
-    timeout: number | undefined,
-    request: (id: number) => void
-  ): Promise<unknown> {
-    const callback = new Callback(this.#idGenerator(), label, timeout);
-    this.#callbacks.set(callback.id, callback);
-    try {
-      request(callback.id);
-    } catch (error) {
-      // We still throw sync errors synchronously and clean up the scheduled
-      // callback.
-      callback.promise
-        .valueOrThrow()
-        .catch(debugError)
-        .finally(() => {
-          this.#callbacks.delete(callback.id);
-        });
-      callback.reject(error as Error);
-      throw error;
-    }
-    // Must only have sync code up until here.
-    return callback.promise.valueOrThrow().finally(() => {
-      this.#callbacks.delete(callback.id);
-    });
-  }
-
-  reject(id: number, message: string, originalMessage?: string): void {
-    const callback = this.#callbacks.get(id);
-    if (!callback) {
-      return;
-    }
-    this._reject(callback, message, originalMessage);
-  }
-
-  _reject(
-    callback: Callback,
-    errorMessage: string | ProtocolError,
-    originalMessage?: string
-  ): void {
-    let error: ProtocolError;
-    let message: string;
-    if (errorMessage instanceof ProtocolError) {
-      error = errorMessage;
-      error.cause = callback.error;
-      message = errorMessage.message;
-    } else {
-      error = callback.error;
-      message = errorMessage;
-    }
-
-    callback.reject(
-      rewriteError(
-        error,
-        `Protocol error (${callback.label}): ${message}`,
-        originalMessage
-      )
-    );
-  }
-
-  resolve(id: number, value: unknown): void {
-    const callback = this.#callbacks.get(id);
-    if (!callback) {
-      return;
-    }
-    callback.resolve(value);
-  }
-
-  clear(): void {
-    for (const callback of this.#callbacks.values()) {
-      // TODO: probably we can accept error messages as params.
-      this._reject(callback, new TargetCloseError('Target closed'));
-    }
-    this.#callbacks.clear();
-  }
-}
 
 /**
  * @public
@@ -257,7 +95,8 @@ export class Connection extends EventEmitter<CDPSessionEvents> {
 
   send<T extends keyof ProtocolMapping.Commands>(
     method: T,
-    ...paramArgs: ProtocolMapping.Commands[T]['paramsType']
+    params?: ProtocolMapping.Commands[T]['paramsType'][0],
+    options?: CommandOptions
   ): Promise<ProtocolMapping.Commands[T]['returnType']> {
     // There is only ever 1 param arg passed, but the Protocol defines it as an
     // array of 0 or 1 items See this comment:
@@ -265,8 +104,7 @@ export class Connection extends EventEmitter<CDPSessionEvents> {
     // which explains why the protocol defines the params this way for better
     // type-inference.
     // So now we check if there are any params or not and deal with them accordingly.
-    const params = paramArgs.length ? paramArgs[0] : undefined;
-    return this._rawSend(this.#callbacks, method, params);
+    return this._rawSend(this.#callbacks, method, params, undefined, options);
   }
 
   /**
@@ -276,9 +114,10 @@ export class Connection extends EventEmitter<CDPSessionEvents> {
     callbacks: CallbackRegistry,
     method: T,
     params: ProtocolMapping.Commands[T]['paramsType'][0],
-    sessionId?: string
+    sessionId?: string,
+    options?: CommandOptions
   ): Promise<ProtocolMapping.Commands[T]['returnType']> {
-    return callbacks.create(method, this.#timeout, id => {
+    return callbacks.create(method, options?.timeout ?? this.#timeout, id => {
       const stringifiedMessage = JSON.stringify({
         method,
         params,
@@ -412,35 +251,18 @@ export class Connection extends EventEmitter<CDPSessionEvents> {
   ): Promise<CDPSession> {
     return await this._createSession(targetInfo, false);
   }
-}
 
-/**
- * @internal
- */
-export function createProtocolErrorMessage(object: {
-  error: {message: string; data: any; code: number};
-}): string {
-  let message = `${object.error.message}`;
-  // TODO: remove the type checks when we stop connecting to BiDi with a CDP
-  // client.
-  if (
-    object.error &&
-    typeof object.error === 'object' &&
-    'data' in object.error
-  ) {
-    message += ` ${object.error.data}`;
+  /**
+   * @internal
+   */
+  getPendingProtocolErrors(): Error[] {
+    const result: Error[] = [];
+    result.push(...this.#callbacks.getPendingProtocolErrors());
+    for (const session of this.#sessions.values()) {
+      result.push(...session.getPendingProtocolErrors());
+    }
+    return result;
   }
-  return message;
-}
-
-function rewriteError(
-  error: ProtocolError,
-  message: string,
-  originalMessage?: string
-): Error {
-  error.message = message;
-  error.originalMessage = originalMessage ?? error.originalMessage;
-  return error;
 }
 
 /**

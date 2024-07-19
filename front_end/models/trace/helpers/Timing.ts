@@ -127,7 +127,7 @@ export function formatMicrosecondsTime(
 
 export function timeStampForEventAdjustedByClosestNavigation(
     event: Types.TraceEvents.TraceEventData,
-    traceBounds: Types.Timing.TraceWindow,
+    traceBounds: Types.Timing.TraceWindowMicroSeconds,
     navigationsByNavigationId: Map<string, Types.TraceEvents.TraceEventNavigationStart>,
     navigationsByFrameId: Map<string, Types.TraceEvents.TraceEventNavigationStart[]>,
     ): Types.Timing.MicroSeconds {
@@ -163,8 +163,8 @@ export function eventTimingsMicroSeconds(event: Types.TraceEvents.TraceEventData
     duration: Types.Timing.MicroSeconds(event.dur || 0),
     // TODO(crbug.com/1434599): Implement selfTime calculation for events
     // from the new engine.
-    selfTime: Types.TraceEvents.isRendererEvent(event) ? Types.Timing.MicroSeconds(event.selfTime || 0) :
-                                                         Types.Timing.MicroSeconds(event.dur || 0),
+    selfTime: Types.TraceEvents.isSyntheticTraceEntry(event) ? Types.Timing.MicroSeconds(event.selfTime || 0) :
+                                                               Types.Timing.MicroSeconds(event.dur || 0),
   };
 }
 export function eventTimingsMilliSeconds(event: Types.TraceEvents.TraceEventData):
@@ -187,14 +187,40 @@ export function eventTimingsSeconds(event: Types.TraceEvents.TraceEventData): Ev
   };
 }
 
-export function traceBoundsMilliseconds(bounds: Types.Timing.TraceWindow): {
-  min: Types.Timing.MilliSeconds,
-  max: Types.Timing.MilliSeconds,
-  range: Types.Timing.MilliSeconds,
-} {
+export function traceWindowMilliSeconds(bounds: Types.Timing.TraceWindowMicroSeconds):
+    Types.Timing.TraceWindowMilliSeconds {
   return {
     min: microSecondsToMilliseconds(bounds.min),
     max: microSecondsToMilliseconds(bounds.max),
     range: microSecondsToMilliseconds(bounds.range),
   };
+}
+
+export function traceWindowMillisecondsToMicroSeconds(bounds: Types.Timing.TraceWindowMilliSeconds):
+    Types.Timing.TraceWindowMicroSeconds {
+  return {
+    min: millisecondsToMicroseconds(bounds.min),
+    max: millisecondsToMicroseconds(bounds.max),
+    range: millisecondsToMicroseconds(bounds.range),
+  };
+}
+
+export function traceWindowFromMilliSeconds(
+    min: Types.Timing.MilliSeconds, max: Types.Timing.MilliSeconds): Types.Timing.TraceWindowMicroSeconds {
+  const traceWindow: Types.Timing.TraceWindowMicroSeconds = {
+    min: millisecondsToMicroseconds(min),
+    max: millisecondsToMicroseconds(max),
+    range: Types.Timing.MicroSeconds(millisecondsToMicroseconds(max) - millisecondsToMicroseconds(min)),
+  };
+  return traceWindow;
+}
+
+export function traceWindowFromMicroSeconds(
+    min: Types.Timing.MicroSeconds, max: Types.Timing.MicroSeconds): Types.Timing.TraceWindowMicroSeconds {
+  const traceWindow: Types.Timing.TraceWindowMicroSeconds = {
+    min,
+    max,
+    range: Types.Timing.MicroSeconds(max - min),
+  };
+  return traceWindow;
 }

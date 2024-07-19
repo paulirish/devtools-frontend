@@ -1,7 +1,13 @@
+/**
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { CDPSession, CDPSessionEvent, } from '../api/CDPSession.js';
+import { CallbackRegistry } from '../common/CallbackRegistry.js';
 import { TargetCloseError } from '../common/Errors.js';
 import { assert } from '../util/assert.js';
-import { CallbackRegistry, createProtocolErrorMessage, } from './Connection.js';
+import { createProtocolErrorMessage } from '../util/ErrorLike.js';
 /**
  * @internal
  */
@@ -44,18 +50,17 @@ export class CdpCDPSession extends CDPSession {
     }
     parentSession() {
         if (!this.#parentSessionId) {
-            return;
+            // To make it work in Firefox that does not have parent (tab) sessions.
+            return this;
         }
         const parent = this.#connection?.session(this.#parentSessionId);
         return parent ?? undefined;
     }
-    send(method, ...paramArgs) {
+    send(method, params, options) {
         if (!this.#connection) {
             return Promise.reject(new TargetCloseError(`Protocol error (${method}): Session closed. Most likely the ${this.#targetType} has been closed.`));
         }
-        // See the comment in Connection#send explaining why we do this.
-        const params = paramArgs.length ? paramArgs[0] : undefined;
-        return this.#connection._rawSend(this.#callbacks, method, params, this.#sessionId);
+        return this.#connection._rawSend(this.#callbacks, method, params, this.#sessionId, options);
     }
     /**
      * @internal
@@ -99,6 +104,12 @@ export class CdpCDPSession extends CDPSession {
      */
     id() {
         return this.#sessionId;
+    }
+    /**
+     * @internal
+     */
+    getPendingProtocolErrors() {
+        return this.#callbacks.getPendingProtocolErrors();
     }
 }
 //# sourceMappingURL=CDPSession.js.map

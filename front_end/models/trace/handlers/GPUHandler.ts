@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {data as metaHandlerData} from './MetaHandler.js';
-
-import {type TraceEventHandlerName, HandlerState} from './types.js';
-
 import * as Types from '../types/types.js';
 import * as Helpers from '../helpers/helpers.js';
+
+
+import {data as metaHandlerData} from './MetaHandler.js';
+import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 let handlerState = HandlerState.UNINITIALIZED;
 
@@ -70,7 +70,7 @@ export function data(): GPUHandlerReturnData {
     throw new Error('GPU Handler is not finalized');
   }
   return {
-    mainGPUThreadTasks: [...mainGPUThreadTasks],
+    mainGPUThreadTasks,
   };
 }
 

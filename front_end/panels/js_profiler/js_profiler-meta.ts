@@ -3,21 +3,10 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Root from '../../core/root/root.js';
+import type * as Timeline from '../../panels/timeline/timeline.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type * as Profiler from '../profiler/profiler.js';
-import type * as Timeline from '../timeline/timeline.js';
-
 const UIStrings = {
-  /**
-   *@description Title of the Profiler tool
-   */
-  profiler: 'Profiler',
-  /**
-   *@description Command for showing the Profiler tool
-   */
-  showProfiler: 'Show Profiler',
   /**
    *@description Text for the performance of something
    */
@@ -26,10 +15,6 @@ const UIStrings = {
    *@description Command for showing the 'Performance' tool
    */
   showPerformance: 'Show Performance',
-  /**
-   *@description Text in the Shortcuts page to explain a keyboard shortcut (start/stop recording performance)
-   */
-  startStopRecording: 'Start/stop recording',
   /**
    *@description Title of an action in the timeline tool to show history
    */
@@ -51,27 +36,12 @@ const str_ = i18n.i18n.registerUIStrings('panels/js_profiler/js_profiler-meta.ts
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
 let loadedTimelineModule: (typeof Timeline|undefined);
-let loadedProfilerModule: (typeof Profiler|undefined);
-
-async function loadProfilerModule(): Promise<typeof Profiler> {
-  if (!loadedProfilerModule) {
-    loadedProfilerModule = await import('../profiler/profiler.js');
-  }
-  return loadedProfilerModule;
-}
 
 async function loadTimelineModule(): Promise<typeof Timeline> {
   if (!loadedTimelineModule) {
     loadedTimelineModule = await import('../timeline/timeline.js');
   }
   return loadedTimelineModule;
-}
-
-function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (profilerModule: typeof Profiler) => T[]): T[] {
-  if (loadedProfilerModule === undefined) {
-    return [];
-  }
-  return getClassCallBack(loadedProfilerModule);
 }
 
 function maybeRetrieveTimelineContextTypes<T = unknown>(getClassCallBack: (timelineModule: typeof Timeline) => T[]):
@@ -81,20 +51,6 @@ function maybeRetrieveTimelineContextTypes<T = unknown>(getClassCallBack: (timel
   }
   return getClassCallBack(loadedTimelineModule);
 }
-
-UI.ViewManager.registerViewExtension({
-  location: UI.ViewManager.ViewLocationValues.PANEL,
-  id: 'js_profiler',
-  title: i18nLazyString(UIStrings.profiler),
-  commandPrompt: i18nLazyString(UIStrings.showProfiler),
-  order: 65,
-  persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
-  experiment: Root.Runtime.ExperimentName.JS_PROFILER_TEMP_ENABLE,
-  async loadView() {
-    const Profiler = await loadProfilerModule();
-    return Profiler.ProfilesPanel.JSProfilerPanel.instance();
-  },
-});
 
 UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.PANEL,
@@ -111,37 +67,10 @@ UI.ViewManager.registerViewExtension({
 });
 
 UI.ActionRegistration.registerActionExtension({
-  actionId: 'profiler.js-toggle-recording',
-  category: UI.ActionRegistration.ActionCategory.JAVASCRIPT_PROFILER,
-  title: i18nLazyString(UIStrings.startStopRecording),
-  iconClass: UI.ActionRegistration.IconClass.START_RECORDING,
-  toggleable: true,
-  toggledIconClass: UI.ActionRegistration.IconClass.STOP_RECORDING,
-  toggleWithRedColor: true,
-  contextTypes() {
-    return maybeRetrieveContextTypes(Profiler => [Profiler.ProfilesPanel.JSProfilerPanel]);
-  },
-  async loadActionDelegate() {
-    const Profiler = await loadProfilerModule();
-    return Profiler.ProfilesPanel.JSProfilerPanel.instance();
-  },
-  bindings: [
-    {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
-      shortcut: 'Ctrl+E',
-    },
-    {
-      platform: UI.ActionRegistration.Platforms.Mac,
-      shortcut: 'Meta+E',
-    },
-  ],
-});
-
-UI.ActionRegistration.registerActionExtension({
   actionId: 'timeline.show-history',
   async loadActionDelegate() {
     const Timeline = await loadTimelineModule();
-    return Timeline.TimelinePanel.ActionDelegate.instance();
+    return new Timeline.TimelinePanel.ActionDelegate();
   },
   category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
   title: i18nLazyString(UIStrings.showRecentTimelineSessions),
@@ -172,7 +101,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   async loadActionDelegate() {
     const Timeline = await loadTimelineModule();
-    return Timeline.TimelinePanel.ActionDelegate.instance();
+    return new Timeline.TimelinePanel.ActionDelegate();
   },
   options: [
     {
@@ -206,7 +135,7 @@ UI.ActionRegistration.registerActionExtension({
   title: i18nLazyString(UIStrings.startProfilingAndReloadPage),
   async loadActionDelegate() {
     const Timeline = await loadTimelineModule();
-    return Timeline.TimelinePanel.ActionDelegate.instance();
+    return new Timeline.TimelinePanel.ActionDelegate();
   },
   bindings: [
     {

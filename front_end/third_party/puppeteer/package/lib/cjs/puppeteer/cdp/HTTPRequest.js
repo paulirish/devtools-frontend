@@ -8,6 +8,7 @@ const assert_js_1 = require("../util/assert.js");
  * @internal
  */
 class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
+    id;
     #client;
     #isNavigationRequest;
     #allowInterception;
@@ -15,6 +16,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     #url;
     #resourceType;
     #method;
+    #hasPostData = false;
     #postData;
     #headers = {};
     #frame;
@@ -32,7 +34,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     constructor(client, frame, interceptionId, allowInterception, data, redirectChain) {
         super();
         this.#client = client;
-        this._requestId = data.requestId;
+        this.id = data.requestId;
         this.#isNavigationRequest =
             data.requestId === data.loaderId && data.type === 'Document';
         this._interceptionId = interceptionId;
@@ -41,6 +43,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         this.#resourceType = (data.type || 'other').toLowerCase();
         this.#method = data.request.method;
         this.#postData = data.request.postData;
+        this.#hasPostData = data.request.hasPostData ?? false;
         this.#frame = frame;
         this._redirectChain = redirectChain;
         this.#continueRequestOverrides = {};
@@ -105,6 +108,21 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     }
     postData() {
         return this.#postData;
+    }
+    hasPostData() {
+        return this.#hasPostData;
+    }
+    async fetchPostData() {
+        try {
+            const result = await this.#client.send('Network.getRequestPostData', {
+                requestId: this.id,
+            });
+            return result.postData;
+        }
+        catch (err) {
+            (0, util_js_1.debugError)(err);
+            return;
+        }
     }
     headers() {
         return this.#headers;
@@ -180,7 +198,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         })
             .catch(error => {
             this.#interceptionHandled = false;
-            return handleError(error);
+            return (0, HTTPRequest_js_1.handleError)(error);
         });
     }
     async respond(response, priority) {
@@ -245,7 +263,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         })
             .catch(error => {
             this.#interceptionHandled = false;
-            return handleError(error);
+            return (0, HTTPRequest_js_1.handleError)(error);
         });
     }
     async abort(errorCode = 'failed', priority) {
@@ -280,7 +298,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
             requestId: this._interceptionId,
             errorReason: errorReason || 'Failed',
         })
-            .catch(handleError);
+            .catch(HTTPRequest_js_1.handleError);
     }
 }
 exports.CdpHTTPRequest = CdpHTTPRequest;
@@ -300,13 +318,4 @@ const errorReasons = {
     timedout: 'TimedOut',
     failed: 'Failed',
 };
-async function handleError(error) {
-    if (['Invalid header'].includes(error.originalMessage)) {
-        throw error;
-    }
-    // In certain cases, protocol will return error if the request was
-    // already canceled or the page was closed. We should tolerate these
-    // errors.
-    (0, util_js_1.debugError)(error);
-}
 //# sourceMappingURL=HTTPRequest.js.map

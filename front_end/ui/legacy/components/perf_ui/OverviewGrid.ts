@@ -72,8 +72,12 @@ export class OverviewGrid {
     this.window = new Window(this.element, this.grid.dividersLabelBarElement, calculator);
   }
 
-  enableCreateBreadcrumbsButton(): void {
-    this.window.enableCreateBreadcrumbsButton();
+  enableCreateBreadcrumbsButton(): HTMLElement {
+    return this.window.enableCreateBreadcrumbsButton();
+  }
+
+  set showingScreenshots(isShowing: boolean) {
+    this.window.showingScreenshots = isShowing;
   }
 
   clientWidth(): number {
@@ -142,6 +146,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private breadcrumbButtonContainerElement: HTMLElement;
   private createBreadcrumbButton: HTMLElement;
   private curtainsRange?: HTMLElement;
+  private breadcrumbZoomIcon?: IconButton.Icon.Icon;
 
   private overviewWindowSelector!: WindowSelector|undefined;
   private offsetLeft!: number;
@@ -153,10 +158,12 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   private enabled?: boolean;
   private clickHandler?: ((arg0: Event) => boolean)|null;
   private resizerParentOffsetLeft?: number;
-  private breadcrumbsEnabled: boolean = false;
+  #breadcrumbsEnabled: boolean = false;
+  #mouseOverGridOverview: boolean = false;
   constructor(parentElement: Element, dividersLabelBarElement?: Element, calculator?: Calculator) {
     super();
     this.parentElement = parentElement;
+    this.parentElement.classList.add('parent-element');
     UI.ARIAUtils.markAsGroup(this.parentElement);
     this.calculator = calculator;
 
@@ -176,16 +183,10 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     ThemeSupport.ThemeSupport.instance().appendStyle(this.parentElement, overviewGridStyles);
 
     this.leftResizeElement = parentElement.createChild('div', 'overview-grid-window-resizer') as HTMLElement;
-    this.leftResizeElement.classList.add('overview-grid-window-left-resizer');
-    this.leftResizeElement.createChild('div', 'overview-grid-window-resizer-vertical-bar') as HTMLElement;
-    this.leftResizeElement.createChild('div', 'overview-grid-window-resizer-vertical-bar') as HTMLElement;
     UI.UIUtils.installDragHandle(
         this.leftResizeElement, this.resizerElementStartDragging.bind(this), this.leftResizeElementDragging.bind(this),
         null, 'ew-resize');
     this.rightResizeElement = (parentElement.createChild('div', 'overview-grid-window-resizer') as HTMLElement);
-    this.rightResizeElement.classList.add('overview-grid-window-right-resizer');
-    this.rightResizeElement.createChild('div', 'overview-grid-window-resizer-vertical-bar') as HTMLElement;
-    this.rightResizeElement.createChild('div', 'overview-grid-window-resizer-vertical-bar') as HTMLElement;
     UI.UIUtils.installDragHandle(
         this.rightResizeElement, this.resizerElementStartDragging.bind(this),
         this.rightResizeElementDragging.bind(this), null, 'ew-resize');
@@ -204,29 +205,58 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     this.leftCurtainElement = (parentElement.createChild('div', 'window-curtain-left') as HTMLElement);
     this.rightCurtainElement = (parentElement.createChild('div', 'window-curtain-right') as HTMLElement);
 
-    this.breadcrumbButtonContainerElement = (parentElement.createChild('div') as HTMLElement);
-    this.createBreadcrumbButton = (this.breadcrumbButtonContainerElement.createChild('div') as HTMLElement);
+    this.breadcrumbButtonContainerElement =
+        (parentElement.createChild('div', 'create-breadcrumb-button-container') as HTMLElement);
+    this.createBreadcrumbButton =
+        (this.breadcrumbButtonContainerElement.createChild('div', 'create-breadcrumb-button') as HTMLElement);
     this.reset();
   }
 
-  enableCreateBreadcrumbsButton(): void {
+  enableCreateBreadcrumbsButton(): HTMLElement {
     this.curtainsRange = (this.createBreadcrumbButton.createChild('div') as HTMLElement);
-    this.breadcrumbButtonContainerElement.classList.add('create-breadcrumb-button-container');
-    this.createBreadcrumbButton.classList.add('create-breadcrumb-button');
-
-    const zoomIcon = new IconButton.Icon.Icon();
-    zoomIcon.data = {
+    this.breadcrumbZoomIcon = new IconButton.Icon.Icon();
+    this.breadcrumbZoomIcon.data = {
       iconName: 'zoom-in',
       color: 'var(--icon-default)',
       width: '20px',
       height: '20px',
     };
-    this.createBreadcrumbButton.appendChild(zoomIcon);
+    this.createBreadcrumbButton.appendChild(this.breadcrumbZoomIcon);
     this.createBreadcrumbButton.addEventListener('click', () => {
-      this.createBreadcrumb();
+      this.#createBreadcrumb();
     });
 
-    this.breadcrumbsEnabled = true;
+    this.#breadcrumbsEnabled = true;
+
+    this.#changeBreadcrumbButtonVisibilityOnInteraction(this.parentElement);
+    this.#changeBreadcrumbButtonVisibilityOnInteraction(this.rightResizeElement);
+    this.#changeBreadcrumbButtonVisibilityOnInteraction(this.leftResizeElement);
+
+    return this.breadcrumbButtonContainerElement;
+  }
+
+  set showingScreenshots(isShowing: boolean) {
+    this.breadcrumbButtonContainerElement.classList.toggle('with-screenshots', isShowing);
+  }
+
+  #changeBreadcrumbButtonVisibilityOnInteraction(element: Element): void {
+    if (!this.#breadcrumbsEnabled) {
+      return;
+    }
+    element.addEventListener('mouseover', () => {
+      if ((this.windowLeft ?? 0) <= 0 && (this.windowRight ?? 1) >= 1) {
+        this.breadcrumbButtonContainerElement.classList.toggle('is-breadcrumb-button-visible', false);
+        this.#mouseOverGridOverview = false;
+      } else {
+        this.breadcrumbButtonContainerElement.classList.toggle('is-breadcrumb-button-visible', true);
+        this.#mouseOverGridOverview = true;
+      }
+    });
+
+    element.addEventListener('mouseout', () => {
+      this.breadcrumbButtonContainerElement.classList.toggle('is-breadcrumb-button-visible', false);
+      this.#mouseOverGridOverview = false;
+    });
   }
 
   private onRightResizeElementFocused(): void {
@@ -322,6 +352,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 
   private windowSelectorDragging(event: Event): void {
+    this.#mouseOverGridOverview = true;
     if (!this.overviewWindowSelector) {
       return;
     }
@@ -338,7 +369,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     const window = this.overviewWindowSelector.close(mouseEvent.x - this.offsetLeft);
 
     // prevent selecting a window on clicking the minimap if breadcrumbs are enabled
-    if (this.breadcrumbsEnabled && window.start === window.end) {
+    if (this.#breadcrumbsEnabled && window.start === window.end) {
       return;
     }
 
@@ -371,6 +402,10 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 
   private windowDragging(event: Event): void {
+    this.#mouseOverGridOverview = true;
+    if (this.#breadcrumbsEnabled) {
+      this.breadcrumbButtonContainerElement.classList.toggle('is-breadcrumb-button-visible', true);
+    }
     const mouseEvent = (event as MouseEvent);
     mouseEvent.preventDefault();
     let delta: number = (mouseEvent.pageX - this.dragStartPoint) / this.parentElement.clientWidth;
@@ -386,6 +421,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 
   private resizeWindowLeft(start: number): void {
+    this.#mouseOverGridOverview = true;
     // Glue to edge.
     if (start < OffsetFromWindowEnds) {
       start = 0;
@@ -396,6 +432,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 
   private resizeWindowRight(end: number): void {
+    this.#mouseOverGridOverview = true;
     // Glue to edge.
     if (end > this.parentElement.clientWidth - OffsetFromWindowEnds) {
       end = this.parentElement.clientWidth;
@@ -470,16 +507,23 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
       this.dispatchEventToListeners(Events.WindowChangedWithPosition, this.calculateWindowPosition());
     }
     this.dispatchEventToListeners(Events.WindowChanged);
-    this.changeBreadcrumbButtonVisibility(windowLeft, windowRight);
+    this.#changeBreadcrumbButtonVisibility(windowLeft, windowRight);
   }
 
-  // Add breadcrumb button is only visible when the window is set to something other than the full range
-  private changeBreadcrumbButtonVisibility(windowLeft: number, windowRight: number): void {
-    this.breadcrumbButtonContainerElement.style.visibility =
-        (windowRight >= 1 && windowLeft <= 0) ? 'hidden' : 'visible';
+  // "Create breadcrumb" button is only visible when the window is set to
+  // something other than the full range and mouse is hovering over the MiniMap
+  #changeBreadcrumbButtonVisibility(windowLeft: number, windowRight: number): void {
+    if (!this.#breadcrumbsEnabled) {
+      return;
+    }
+    if ((windowRight >= 1 && windowLeft <= 0) || !this.#mouseOverGridOverview) {
+      this.breadcrumbButtonContainerElement.classList.toggle('is-breadcrumb-button-visible', false);
+    } else {
+      this.breadcrumbButtonContainerElement.classList.toggle('is-breadcrumb-button-visible', true);
+    }
   }
 
-  createBreadcrumb(): void {
+  #createBreadcrumb(): void {
     this.dispatchEventToListeners(Events.BreadcrumbAdded, this.calculateWindowPosition());
   }
 
@@ -514,11 +558,13 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     this.leftCurtainElement.style.width = leftResizerPercLeftOffsetString;
     this.rightCurtainElement.style.width = rightResizerPercRightOffset + '%';
 
-    this.breadcrumbButtonContainerElement.style.marginLeft = leftResizerPercLeftOffsetString;
-    this.breadcrumbButtonContainerElement.style.marginRight = (100 - rightResizerPercLeftOffset) + '%';
+    this.breadcrumbButtonContainerElement.style.marginLeft =
+        (leftResizerPercLeftOffset > 0) ? leftResizerPercLeftOffset + '%' : '0%';
+    this.breadcrumbButtonContainerElement.style.marginRight =
+        (rightResizerPercRightOffset > 0) ? rightResizerPercRightOffset + '%' : '0%';
 
     if (this.curtainsRange) {
-      this.curtainsRange.textContent = (this.getRawSliderValue(false) - this.getRawSliderValue(true)).toFixed(0) + 'ms';
+      this.curtainsRange.textContent = this.getWindowRange().toFixed(0) + ' ms';
     }
 
     this.updateResizeElementPositionValue(leftResizerPercLeftOffset, rightResizerPercLeftOffset);
@@ -527,6 +573,33 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     } else {
       this.updateResizeElementPercentageLabels(leftResizerPercLeftOffsetString, rightResizerPercLeftOffsetString);
     }
+
+    this.toggleZoomButtonDisplay();
+  }
+
+  private toggleZoomButtonDisplay(): void {
+    if (this.breadcrumbZoomIcon) {
+      // disable button that creates breadcrumbs and hide the zoom icon
+      // when the selected window is smaller than 4.5 ms
+      // 4.5 is rounded to 5 in the UI
+      if (this.getWindowRange() < 4.5) {
+        this.breadcrumbZoomIcon.style.display = 'none';
+        this.breadcrumbButtonContainerElement.style.pointerEvents = 'none';
+      } else {
+        this.breadcrumbZoomIcon.style.display = 'flex';
+        this.breadcrumbButtonContainerElement.style.pointerEvents = 'auto';
+      }
+    }
+  }
+
+  private getWindowRange(): number {
+    if (!this.calculator) {
+      throw new Error('No calculator to calculate window range');
+    }
+
+    const left = (this.windowLeft && this.windowLeft > 0) ? this.windowLeft : 0;
+    const right = (this.windowRight && this.windowRight < 1) ? this.windowRight : 1;
+    return (this.calculator.boundarySpan() * (right - left));
   }
 
   private setWindowPosition(start: number|null, end: number|null): void {
@@ -585,9 +658,7 @@ export class Window extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   WindowChanged = 'WindowChanged',
   WindowChangedWithPosition = 'WindowChangedWithPosition',
   BreadcrumbAdded = 'BreadcrumbAdded',

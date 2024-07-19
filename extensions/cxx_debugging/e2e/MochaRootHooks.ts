@@ -18,12 +18,6 @@ import {click} from 'test/shared/helper';
 const EXTENSION_DIR = path.join(__dirname, '..', '..', '..', 'DevTools_CXX_Debugging.stage2', 'gen');
 const DEVTOOLS_DIR = path.join(__dirname, '..', '..', '..', 'devtools-frontend', 'gen');
 
-function _isPageTarget(target: {url: string, type: string}): boolean {
-  // Treat DevTools targets as page targets too.
-  return target.url.startsWith('devtools://') || target.type === 'page' || target.type === 'background_page' ||
-      target.type === 'webview';
-}
-
 async function beforeAll() {
   setTestServerPort(Number(process.env.testServerPort));
   registerHandlers();
@@ -36,7 +30,7 @@ async function beforeAll() {
   };
 
   const browser = await puppeteer.launch({
-    headless: process.env['DEBUG_TEST'] ? false : 'new',
+    headless: !Boolean(process.env['DEBUG_TEST']),
     devtools: true,
     dumpio: !process.env['DEBUG_TEST'],
     executablePath,
@@ -51,7 +45,7 @@ async function beforeAll() {
     ],
   });
 
-  const connectOptions = {browserWSEndpoint: browser.wsEndpoint(), _isPageTarget};
+  const connectOptions = {browserWSEndpoint: browser.wsEndpoint()};
   const conn = await puppeteer.connect(connectOptions);
 
   const newTabTarget =

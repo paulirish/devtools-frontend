@@ -1,17 +1,7 @@
 /**
- * Copyright 2023 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
@@ -58,6 +48,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     var e = new Error(message);
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
+import { _isElementHandle } from '../api/ElementHandleSymbol.js';
 import { isErrorLike } from '../util/ErrorLike.js';
 import { interpolateFunction, stringifyFunction } from '../util/Function.js';
 import { transposeIterableHandle } from './HandleIterator.js';
@@ -136,8 +127,7 @@ export class QueryHandler {
             const result = __addDisposableResource(env_2, await element.evaluateHandle(this._querySelector, selector, LazyArg.create(context => {
                 return context.puppeteerUtil;
             })), false);
-            const { ElementHandle } = await import('../api/ElementHandle.js');
-            if (!(result instanceof ElementHandle)) {
+            if (!(_isElementHandle in result)) {
                 return null;
             }
             return result.move();
@@ -160,10 +150,9 @@ export class QueryHandler {
     static async waitFor(elementOrFrame, selector, options) {
         const env_3 = { stack: [], error: void 0, hasError: false };
         try {
-            const { ElementHandle } = await import('../api/ElementHandle.js');
             let frame;
             const element = __addDisposableResource(env_3, await (async () => {
-                if (!(elementOrFrame instanceof ElementHandle)) {
+                if (!(_isElementHandle in elementOrFrame)) {
                     frame = elementOrFrame;
                     return;
                 }
@@ -190,7 +179,7 @@ export class QueryHandler {
                     if (signal?.aborted) {
                         throw signal.reason;
                     }
-                    if (!(handle instanceof ElementHandle)) {
+                    if (!(_isElementHandle in handle)) {
                         return null;
                     }
                     return await frame.mainRealm().transferHandle(handle);

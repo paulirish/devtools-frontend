@@ -59,10 +59,11 @@ export class Runtime {
     [x: string]: boolean,
   } {
     try {
-      return JSON.parse(
-                 self.localStorage && self.localStorage['experiments'] ? self.localStorage['experiments'] : '{}') as {
-        [x: string]: boolean,
-      };
+      return Platform.StringUtilities.toKebabCaseKeys(
+          JSON.parse(self.localStorage && self.localStorage['experiments'] ? self.localStorage['experiments'] : '{}') as
+          {
+            [x: string]: boolean,
+          });
     } catch (e) {
       console.error('Failed to parse localStorage[\'experiments\']');
       return {};
@@ -79,27 +80,20 @@ export class Runtime {
 
   static isDescriptorEnabled(descriptor: {
     experiment: ((string | undefined)|null),
-    condition: ((string | undefined)|null),
+    condition?: Condition,
   }): boolean {
-    const activatorExperiment = descriptor['experiment'];
-    if (activatorExperiment === '*') {
+    const {experiment} = descriptor;
+    if (experiment === '*') {
       return true;
     }
-    if (activatorExperiment && activatorExperiment.startsWith('!') &&
-        experiments.isEnabled(activatorExperiment.substring(1))) {
+    if (experiment && experiment.startsWith('!') && experiments.isEnabled(experiment.substring(1))) {
       return false;
     }
-    if (activatorExperiment && !activatorExperiment.startsWith('!') && !experiments.isEnabled(activatorExperiment)) {
+    if (experiment && !experiment.startsWith('!') && !experiments.isEnabled(experiment)) {
       return false;
     }
-    const condition = descriptor['condition'];
-    if (condition && !condition.startsWith('!') && !Runtime.queryParam(condition)) {
-      return false;
-    }
-    if (condition && condition.startsWith('!') && Runtime.queryParam(condition.substring(1))) {
-      return false;
-    }
-    return true;
+    const {condition} = descriptor;
+    return condition ? condition() : true;
   }
 
   loadLegacyModule(modulePath: string): Promise<void> {
@@ -120,21 +114,18 @@ export class ExperimentsSupport {
   #enabledTransiently: Set<string>;
   readonly #enabledByDefault: Set<string>;
   readonly #serverEnabled: Set<string>;
-  // Experiments in this set won't be shown to the user
-  readonly #nonConfigurable: Set<string>;
   constructor() {
     this.#experiments = [];
     this.#experimentNames = new Set();
     this.#enabledTransiently = new Set();
     this.#enabledByDefault = new Set();
     this.#serverEnabled = new Set();
-    this.#nonConfigurable = new Set();
   }
 
   allConfigurableExperiments(): Experiment[] {
     const result = [];
     for (const experiment of this.#experiments) {
-      if (!this.#enabledTransiently.has(experiment.name) && !this.#nonConfigurable.has(experiment.name)) {
+      if (!this.#enabledTransiently.has(experiment.name)) {
         result.push(experiment);
       }
     }
@@ -151,8 +142,9 @@ export class ExperimentsSupport {
   register(
       experimentName: string, experimentTitle: string, unstable?: boolean, docLink?: string,
       feedbackLink?: string): void {
-    Platform.DCHECK(
-        () => !this.#experimentNames.has(experimentName), 'Duplicate registration of experiment ' + experimentName);
+    if (this.#experimentNames.has(experimentName)) {
+      throw new Error(`Duplicate registraction of experiment '${experimentName}'`);
+    }
     this.#experimentNames.add(experimentName);
     this.#experiments.push(new Experiment(
         this, experimentName, experimentTitle, Boolean(unstable),
@@ -205,13 +197,6 @@ export class ExperimentsSupport {
     }
   }
 
-  setNonConfigurableExperiments(experimentNames: string[]): void {
-    for (const experiment of experimentNames) {
-      this.checkExperiment(experiment);
-      this.#nonConfigurable.add(experiment);
-    }
-  }
-
   enableForTest(experimentName: string): void {
     this.checkExperiment(experimentName);
     this.#enabledTransiently.add(experimentName);
@@ -247,7 +232,9 @@ export class ExperimentsSupport {
   }
 
   private checkExperiment(experimentName: string): void {
-    Platform.DCHECK(() => this.#experimentNames.has(experimentName), 'Unknown experiment ' + experimentName);
+    if (!this.#experimentNames.has(experimentName)) {
+      throw new Error(`Unknown experiment '${experimentName}'`);
+    }
   }
 }
 
@@ -281,44 +268,41 @@ export class Experiment {
 // This must be constructed after the query parameters have been parsed.
 export const experiments = new ExperimentsSupport();
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ExperimentName {
-  CAPTURE_NODE_CREATION_STACKS = 'captureNodeCreationStacks',
-  CSS_OVERVIEW = 'cssOverview',
-  LIVE_HEAP_PROFILE = 'liveHeapProfile',
-  DEVELOPER_RESOURCES_VIEW = 'developerResourcesView',
-  CSP_VIOLATIONS_VIEW = 'cspViolationsView',
-  WASM_DWARF_DEBUGGING = 'wasmDWARFDebugging',
+export const enum ExperimentName {
+  CAPTURE_NODE_CREATION_STACKS = 'capture-node-creation-stacks',
+  CSS_OVERVIEW = 'css-overview',
+  LIVE_HEAP_PROFILE = 'live-heap-profile',
   ALL = '*',
-  PROTOCOL_MONITOR = 'protocolMonitor',
-  WEBAUTHN_PANE = 'webauthnPane',
-  FULL_ACCESSIBILITY_TREE = 'fullAccessibilityTree',
-  PRECISE_CHANGES = 'preciseChanges',
-  STYLES_PANE_CSS_CHANGES = 'stylesPaneCSSChanges',
-  HEADER_OVERRIDES = 'headerOverrides',
-  EYEDROPPER_COLOR_PICKER = 'eyedropperColorPicker',
-  INSTRUMENTATION_BREAKPOINTS = 'instrumentationBreakpoints',
-  AUTHORED_DEPLOYED_GROUPING = 'authoredDeployedGrouping',
-  IMPORTANT_DOM_PROPERTIES = 'importantDOMProperties',
-  JUST_MY_CODE = 'justMyCode',
-  PRELOADING_STATUS_PANEL = 'preloadingStatusPanel',
-  DISABLE_COLOR_FORMAT_SETTING = 'disableColorFormatSetting',
-  TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL = 'timelineAsConsoleProfileResultPanel',
-  OUTERMOST_TARGET_SELECTOR = 'outermostTargetSelector',
-  JS_PROFILER_TEMP_ENABLE = 'jsProfilerTemporarilyEnable',
-  HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlightErrorsElementsPanel',
-  SET_ALL_BREAKPOINTS_EAGERLY = 'setAllBreakpointsEagerly',
-  SELF_XSS_WARNING = 'selfXssWarning',
-  USE_SOURCE_MAP_SCOPES = 'useSourceMapScopes',
-  STORAGE_BUCKETS_TREE = 'storageBucketsTree',
-  DELETE_OVERRIDES_TEMP_ENABLE = 'deleteOverridesTemporarilyEnable',
-  NETWORK_PANEL_FILTER_BAR_REDESIGN = 'networkPanelFilterBarRedesign',
+  PROTOCOL_MONITOR = 'protocol-monitor',
+  FULL_ACCESSIBILITY_TREE = 'full-accessibility-tree',
+  STYLES_PANE_CSS_CHANGES = 'styles-pane-css-changes',
+  HEADER_OVERRIDES = 'header-overrides',
+  INSTRUMENTATION_BREAKPOINTS = 'instrumentation-breakpoints',
+  AUTHORED_DEPLOYED_GROUPING = 'authored-deployed-grouping',
+  IMPORTANT_DOM_PROPERTIES = 'important-dom-properties',
+  JUST_MY_CODE = 'just-my-code',
+  PRELOADING_STATUS_PANEL = 'preloading-status-panel',
+  TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL = 'timeline-as-console-profile-result-panel',
+  OUTERMOST_TARGET_SELECTOR = 'outermost-target-selector',
+  HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlight-errors-elements-panel',
+  SET_ALL_BREAKPOINTS_EAGERLY = 'set-all-breakpoints-eagerly',
+  USE_SOURCE_MAP_SCOPES = 'use-source-map-scopes',
+  STORAGE_BUCKETS_TREE = 'storage-buckets-tree',
+  NETWORK_PANEL_FILTER_BAR_REDESIGN = 'network-panel-filter-bar-redesign',
+  AUTOFILL_VIEW = 'autofill-view',
+  INDENTATION_MARKERS_TEMP_DISABLE = 'sources-frame-indentation-markers-temporarily-disable',
+  TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
+  SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS = 'save-and-load-trace-with-annotations',
+  TIMELINE_TRACK_CONFIGURATION = 'timeline-track-configuration',
+  TIMELINE_EXTENSIONS = 'timeline-extensions',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ConditionName {
-  CAN_DOCK = 'can_dock',
-  NOT_SOURCES_HIDE_ADD_FOLDER = '!sources.hide_add_folder',
-}
+/**
+ * When defining conditions make sure that objects used by the function have
+ * been instantiated.
+ */
+export type Condition = () => boolean;
+
+export const conditions = {
+  canDock: () => Boolean(Runtime.queryParam('can_dock')),
+};

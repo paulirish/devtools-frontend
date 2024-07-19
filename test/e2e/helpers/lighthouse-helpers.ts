@@ -2,29 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert} from 'chai';
+import {type ElementHandle} from 'puppeteer-core';
+
 import {
   $,
   click,
+  clickMoreTabsButton,
   getBrowserAndPages,
   goToResource,
   waitFor,
-  waitForAria,
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
 
 import {getQuotaUsage, waitForQuotaUsage} from './application-helpers.js';
 
-import {type ElementHandle} from 'puppeteer-core';
-import {assert} from 'chai';
-
 export async function navigateToLighthouseTab(path?: string): Promise<ElementHandle<Element>> {
   let lighthouseTabButton = await $('#tab-lighthouse');
 
   // Lighthouse tab can be hidden if the frontend is in a dockable state.
   if (!lighthouseTabButton) {
-    const moreTabsButton = await waitForAria('More tabs');
-    await moreTabsButton.click();
+    await clickMoreTabsButton();
     lighthouseTabButton = await waitForElementWithTextContent('Lighthouse');
   }
 
@@ -80,7 +79,7 @@ type CheckboxLabel = Element&{checkboxElement: HTMLInputElement};
 
 /**
  * Set the category checkboxes
- * @param selectedCategoryIds One of 'performance'|'accessibility'|'best-practices'|'seo'|'pwa'|'lighthouse-plugin-publisher-ads'
+ * @param selectedCategoryIds One of 'performance'|'accessibility'|'best-practices'|'seo'|'pwa'
  */
 export async function selectCategories(selectedCategoryIds: string[]) {
   const startViewHandle = await waitFor('.lighthouse-start-view');
@@ -109,7 +108,7 @@ export async function selectMode(mode: 'navigation'|'timespan'|'snapshot') {
 }
 
 export async function selectDevice(device: 'mobile'|'desktop') {
-  await selectRadioOption(device, 'lighthouse.device_type');
+  await selectRadioOption(device, 'lighthouse.device-type');
 }
 
 export async function setToolbarCheckboxWithText(enabled: boolean, textContext: string) {
@@ -150,10 +149,8 @@ export async function getHelpText() {
 
 export async function openStorageView() {
   await click('#tab-resources');
-  const STORAGE_SELECTOR = '[aria-label="Storage"]';
   await waitFor('.storage-group-list-item');
-  await waitFor(STORAGE_SELECTOR);
-  await click(STORAGE_SELECTOR);
+  await click('[aria-label="Storage"]');
 }
 
 export async function clearSiteData() {

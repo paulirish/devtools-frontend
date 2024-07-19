@@ -7,23 +7,15 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ApplicationPanelSidebar, StorageCategoryView} from './ApplicationPanelSidebar.js';
 import {CookieItemsView} from './CookieItemsView.js';
-import {DatabaseQueryView} from './DatabaseQueryView.js';
-import {DatabaseTableView} from './DatabaseTableView.js';
 import {DOMStorageItemsView} from './DOMStorageItemsView.js';
 import {type DOMStorage} from './DOMStorageModel.js';
-import * as PreloadingHelper from './preloading/helper/helper.js';
+import type * as PreloadingHelper from './preloading/helper/helper.js';
 import resourcesPanelStyles from './resourcesPanel.css.js';
 import {StorageItemsView} from './StorageItemsView.js';
-
-const UIStrings = {
-  /**
-   *@description Web SQL deprecation warning message
-   */
-  webSqlDeprecation: 'Web SQL is deprecated. You can join the deprecation trial to keep using it until Chrome 123.',
-};
 
 let resourcesPanelInstance: ResourcesPanel;
 
@@ -43,7 +35,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
     super('resources');
 
     this.resourcesLastSelectedItemSetting =
-        Common.Settings.Settings.instance().createSetting('resourcesLastSelectedElementPath', []);
+        Common.Settings.Settings.instance().createSetting('resources-last-selected-element-path', []);
 
     this.visibleView = null;
 
@@ -52,6 +44,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
     this.categoryView = null;
 
     const mainContainer = new UI.Widget.VBox();
+    mainContainer.setMinimumSize(100, 0);
     this.storageViews = mainContainer.element.createChild('div', 'vbox flex-auto');
     this.storageViewToolbar = new UI.Toolbar.Toolbar('resources-toolbar', mainContainer.element);
     this.splitWidget().setMainWidget(mainContainer);
@@ -83,8 +76,6 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
       SourceFrame.ImageView.ImageView,
       SourceFrame.FontView.FontView,
       StorageItemsView,
-      DatabaseQueryView,
-      DatabaseTableView,
     ];
     return viewClassesToClose.some(type => view instanceof type);
   }
@@ -151,13 +142,10 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
     if (!this.categoryView) {
       this.categoryView = new StorageCategoryView();
     }
+    this.categoryView.element.setAttribute(
+        'jslog', `${VisualLogging.pane().context(Platform.StringUtilities.toKebabCase(categoryName))}`);
     this.categoryView.setText(categoryName);
     this.categoryView.setLink(categoryLink);
-    const categoryWarning = categoryName === 'Web SQL' ? UIStrings.webSqlDeprecation : null;
-    const learnMoreLink = categoryName === 'Web SQL' ?
-        'https://developer.chrome.com/blog/deprecating-web-sql/' as Platform.DevToolsPath.UrlString :
-        Platform.DevToolsPath.EmptyUrlString;
-    this.categoryView.setWarning(categoryWarning, learnMoreLink);
     this.showView(this.categoryView);
   }
 
@@ -204,93 +192,30 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
   }
 }
 
-let resourceRevealerInstance: ResourceRevealer;
-
-export class ResourceRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): ResourceRevealer {
-    const {forceNew} = opts;
-    if (!resourceRevealerInstance || forceNew) {
-      resourceRevealerInstance = new ResourceRevealer();
-    }
-
-    return resourceRevealerInstance;
-  }
-
-  async reveal(resource: Object): Promise<void> {
-    if (!(resource instanceof SDK.Resource.Resource)) {
-      throw new Error('Internal error: not a resource');
-    }
+export class ResourceRevealer implements Common.Revealer.Revealer<SDK.Resource.Resource> {
+  async reveal(resource: SDK.Resource.Resource): Promise<void> {
     const sidebar = await ResourcesPanel.showAndGetSidebar();
     await sidebar.showResource(resource);
   }
 }
 
-let frameDetailsRevealerInstance: FrameDetailsRevealer;
-
-export class FrameDetailsRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): FrameDetailsRevealer {
-    const {forceNew} = opts;
-    if (!frameDetailsRevealerInstance || forceNew) {
-      frameDetailsRevealerInstance = new FrameDetailsRevealer();
-    }
-
-    return frameDetailsRevealerInstance;
-  }
-
-  async reveal(frame: Object): Promise<void> {
-    if (!(frame instanceof SDK.ResourceTreeModel.ResourceTreeFrame)) {
-      throw new Error('Internal error: not a frame');
-    }
+export class FrameDetailsRevealer implements Common.Revealer.Revealer<SDK.ResourceTreeModel.ResourceTreeFrame> {
+  async reveal(frame: SDK.ResourceTreeModel.ResourceTreeFrame): Promise<void> {
     const sidebar = await ResourcesPanel.showAndGetSidebar();
     sidebar.showFrame(frame);
   }
 }
 
-let ruleSetViewRevealerInstance: RuleSetViewRevealer;
-
-export class RuleSetViewRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): FrameDetailsRevealer {
-    const {forceNew} = opts;
-    if (!ruleSetViewRevealerInstance || forceNew) {
-      ruleSetViewRevealerInstance = new RuleSetViewRevealer();
-    }
-
-    return ruleSetViewRevealerInstance;
-  }
-
-  async reveal(revealInfo: Object): Promise<void> {
-    if (!(revealInfo instanceof PreloadingHelper.PreloadingForward.RuleSetView)) {
-      throw new Error('Internal error: not an RuleSetView');
-    }
+export class RuleSetViewRevealer implements Common.Revealer.Revealer<PreloadingHelper.PreloadingForward.RuleSetView> {
+  async reveal(revealInfo: PreloadingHelper.PreloadingForward.RuleSetView): Promise<void> {
     const sidebar = await ResourcesPanel.showAndGetSidebar();
     sidebar.showPreloadingRuleSetView(revealInfo);
   }
 }
 
-let attemptViewWithFilterRevealerInstance: AttemptViewWithFilterRevealer;
-
-export class AttemptViewWithFilterRevealer implements Common.Revealer.Revealer {
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): FrameDetailsRevealer {
-    const {forceNew} = opts;
-    if (!attemptViewWithFilterRevealerInstance || forceNew) {
-      attemptViewWithFilterRevealerInstance = new AttemptViewWithFilterRevealer();
-    }
-
-    return attemptViewWithFilterRevealerInstance;
-  }
-
-  async reveal(filter: Object): Promise<void> {
-    if (!(filter instanceof PreloadingHelper.PreloadingForward.AttemptViewWithFilter)) {
-      throw new Error('Internal error: not an AttemptViewWithFilter');
-    }
+export class AttemptViewWithFilterRevealer implements
+    Common.Revealer.Revealer<PreloadingHelper.PreloadingForward.AttemptViewWithFilter> {
+  async reveal(filter: PreloadingHelper.PreloadingForward.AttemptViewWithFilter): Promise<void> {
     const sidebar = await ResourcesPanel.showAndGetSidebar();
     sidebar.showPreloadingAttemptViewWithFilter(filter);
   }

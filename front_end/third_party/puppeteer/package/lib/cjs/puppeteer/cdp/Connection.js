@@ -1,147 +1,20 @@
 "use strict";
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isTargetClosedError = exports.createProtocolErrorMessage = exports.Connection = exports.CallbackRegistry = exports.Callback = void 0;
+exports.isTargetClosedError = exports.Connection = void 0;
 const CDPSession_js_1 = require("../api/CDPSession.js");
+const CallbackRegistry_js_1 = require("../common/CallbackRegistry.js");
 const Debug_js_1 = require("../common/Debug.js");
 const Errors_js_1 = require("../common/Errors.js");
 const EventEmitter_js_1 = require("../common/EventEmitter.js");
-const util_js_1 = require("../common/util.js");
-const Deferred_js_1 = require("../util/Deferred.js");
+const ErrorLike_js_1 = require("../util/ErrorLike.js");
 const CDPSession_js_2 = require("./CDPSession.js");
 const debugProtocolSend = (0, Debug_js_1.debug)('puppeteer:protocol:SEND ►');
 const debugProtocolReceive = (0, Debug_js_1.debug)('puppeteer:protocol:RECV ◀');
-/**
- * @internal
- */
-function createIncrementalIdGenerator() {
-    let id = 0;
-    return () => {
-        return ++id;
-    };
-}
-/**
- * @internal
- */
-class Callback {
-    #id;
-    #error = new Errors_js_1.ProtocolError();
-    #deferred = Deferred_js_1.Deferred.create();
-    #timer;
-    #label;
-    constructor(id, label, timeout) {
-        this.#id = id;
-        this.#label = label;
-        if (timeout) {
-            this.#timer = setTimeout(() => {
-                this.#deferred.reject(rewriteError(this.#error, `${label} timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`));
-            }, timeout);
-        }
-    }
-    resolve(value) {
-        clearTimeout(this.#timer);
-        this.#deferred.resolve(value);
-    }
-    reject(error) {
-        clearTimeout(this.#timer);
-        this.#deferred.reject(error);
-    }
-    get id() {
-        return this.#id;
-    }
-    get promise() {
-        return this.#deferred;
-    }
-    get error() {
-        return this.#error;
-    }
-    get label() {
-        return this.#label;
-    }
-}
-exports.Callback = Callback;
-/**
- * Manages callbacks and their IDs for the protocol request/response communication.
- *
- * @internal
- */
-class CallbackRegistry {
-    #callbacks = new Map();
-    #idGenerator = createIncrementalIdGenerator();
-    create(label, timeout, request) {
-        const callback = new Callback(this.#idGenerator(), label, timeout);
-        this.#callbacks.set(callback.id, callback);
-        try {
-            request(callback.id);
-        }
-        catch (error) {
-            // We still throw sync errors synchronously and clean up the scheduled
-            // callback.
-            callback.promise
-                .valueOrThrow()
-                .catch(util_js_1.debugError)
-                .finally(() => {
-                this.#callbacks.delete(callback.id);
-            });
-            callback.reject(error);
-            throw error;
-        }
-        // Must only have sync code up until here.
-        return callback.promise.valueOrThrow().finally(() => {
-            this.#callbacks.delete(callback.id);
-        });
-    }
-    reject(id, message, originalMessage) {
-        const callback = this.#callbacks.get(id);
-        if (!callback) {
-            return;
-        }
-        this._reject(callback, message, originalMessage);
-    }
-    _reject(callback, errorMessage, originalMessage) {
-        let error;
-        let message;
-        if (errorMessage instanceof Errors_js_1.ProtocolError) {
-            error = errorMessage;
-            error.cause = callback.error;
-            message = errorMessage.message;
-        }
-        else {
-            error = callback.error;
-            message = errorMessage;
-        }
-        callback.reject(rewriteError(error, `Protocol error (${callback.label}): ${message}`, originalMessage));
-    }
-    resolve(id, value) {
-        const callback = this.#callbacks.get(id);
-        if (!callback) {
-            return;
-        }
-        callback.resolve(value);
-    }
-    clear() {
-        for (const callback of this.#callbacks.values()) {
-            // TODO: probably we can accept error messages as params.
-            this._reject(callback, new Errors_js_1.TargetCloseError('Target closed'));
-        }
-        this.#callbacks.clear();
-    }
-}
-exports.CallbackRegistry = CallbackRegistry;
 /**
  * @public
  */
@@ -153,7 +26,7 @@ class Connection extends EventEmitter_js_1.EventEmitter {
     #sessions = new Map();
     #closed = false;
     #manuallyAttached = new Set();
-    #callbacks = new CallbackRegistry();
+    #callbacks = new CallbackRegistry_js_1.CallbackRegistry();
     constructor(url, transport, delay = 0, timeout) {
         super();
         this.#url = url;
@@ -191,21 +64,20 @@ class Connection extends EventEmitter_js_1.EventEmitter {
     url() {
         return this.#url;
     }
-    send(method, ...paramArgs) {
+    send(method, params, options) {
         // There is only ever 1 param arg passed, but the Protocol defines it as an
         // array of 0 or 1 items See this comment:
         // https://github.com/ChromeDevTools/devtools-protocol/pull/113#issuecomment-412603285
         // which explains why the protocol defines the params this way for better
         // type-inference.
         // So now we check if there are any params or not and deal with them accordingly.
-        const params = paramArgs.length ? paramArgs[0] : undefined;
-        return this._rawSend(this.#callbacks, method, params);
+        return this._rawSend(this.#callbacks, method, params, undefined, options);
     }
     /**
      * @internal
      */
-    _rawSend(callbacks, method, params, sessionId) {
-        return callbacks.create(method, this.#timeout, id => {
+    _rawSend(callbacks, method, params, sessionId, options) {
+        return callbacks.create(method, options?.timeout ?? this.#timeout, id => {
             const stringifiedMessage = JSON.stringify({
                 method,
                 params,
@@ -263,7 +135,7 @@ class Connection extends EventEmitter_js_1.EventEmitter {
         }
         else if (object.id) {
             if (object.error) {
-                this.#callbacks.reject(object.id, createProtocolErrorMessage(object), object.error.message);
+                this.#callbacks.reject(object.id, (0, ErrorLike_js_1.createProtocolErrorMessage)(object), object.error.message);
             }
             else {
                 this.#callbacks.resolve(object.id, object.result);
@@ -322,28 +194,19 @@ class Connection extends EventEmitter_js_1.EventEmitter {
     async createSession(targetInfo) {
         return await this._createSession(targetInfo, false);
     }
+    /**
+     * @internal
+     */
+    getPendingProtocolErrors() {
+        const result = [];
+        result.push(...this.#callbacks.getPendingProtocolErrors());
+        for (const session of this.#sessions.values()) {
+            result.push(...session.getPendingProtocolErrors());
+        }
+        return result;
+    }
 }
 exports.Connection = Connection;
-/**
- * @internal
- */
-function createProtocolErrorMessage(object) {
-    let message = `${object.error.message}`;
-    // TODO: remove the type checks when we stop connecting to BiDi with a CDP
-    // client.
-    if (object.error &&
-        typeof object.error === 'object' &&
-        'data' in object.error) {
-        message += ` ${object.error.data}`;
-    }
-    return message;
-}
-exports.createProtocolErrorMessage = createProtocolErrorMessage;
-function rewriteError(error, message, originalMessage) {
-    error.message = message;
-    error.originalMessage = originalMessage ?? error.originalMessage;
-    return error;
-}
 /**
  * @internal
  */

@@ -1,25 +1,14 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import type {Protocol} from 'devtools-protocol';
 
 import {type CDPSession, CDPSessionEvent} from '../api/CDPSession.js';
 import {FrameEvent} from '../api/Frame.js';
-import type {Page} from '../api/Page.js';
-import {EventEmitter, type EventType} from '../common/EventEmitter.js';
+import {EventEmitter} from '../common/EventEmitter.js';
 import type {TimeoutSettings} from '../common/TimeoutSettings.js';
 import {debugError, PuppeteerURL, UTILITY_WORLD_NAME} from '../common/util.js';
 import {assert} from '../util/assert.js';
@@ -32,42 +21,14 @@ import {isTargetClosedError} from './Connection.js';
 import {DeviceRequestPromptManager} from './DeviceRequestPrompt.js';
 import {ExecutionContext} from './ExecutionContext.js';
 import {CdpFrame} from './Frame.js';
+import type {FrameManagerEvents} from './FrameManagerEvents.js';
+import {FrameManagerEvent} from './FrameManagerEvents.js';
 import {FrameTree} from './FrameTree.js';
 import type {IsolatedWorld} from './IsolatedWorld.js';
 import {MAIN_WORLD, PUPPETEER_WORLD} from './IsolatedWorlds.js';
 import {NetworkManager} from './NetworkManager.js';
+import type {CdpPage} from './Page.js';
 import type {CdpTarget} from './Target.js';
-
-/**
- * We use symbols to prevent external parties listening to these events.
- * They are internal to Puppeteer.
- *
- * @internal
- */
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace FrameManagerEvent {
-  export const FrameAttached = Symbol('FrameManager.FrameAttached');
-  export const FrameNavigated = Symbol('FrameManager.FrameNavigated');
-  export const FrameDetached = Symbol('FrameManager.FrameDetached');
-  export const FrameSwapped = Symbol('FrameManager.FrameSwapped');
-  export const LifecycleEvent = Symbol('FrameManager.LifecycleEvent');
-  export const FrameNavigatedWithinDocument = Symbol(
-    'FrameManager.FrameNavigatedWithinDocument'
-  );
-}
-
-/**
- * @internal
- */
-
-export interface FrameManagerEvents extends Record<EventType, unknown> {
-  [FrameManagerEvent.FrameAttached]: CdpFrame;
-  [FrameManagerEvent.FrameNavigated]: CdpFrame;
-  [FrameManagerEvent.FrameDetached]: CdpFrame;
-  [FrameManagerEvent.FrameSwapped]: CdpFrame;
-  [FrameManagerEvent.LifecycleEvent]: CdpFrame;
-  [FrameManagerEvent.FrameNavigatedWithinDocument]: CdpFrame;
-}
 
 const TIME_FOR_WAITING_FOR_SWAP = 100; // ms.
 
@@ -77,7 +38,7 @@ const TIME_FOR_WAITING_FOR_SWAP = 100; // ms.
  * @internal
  */
 export class FrameManager extends EventEmitter<FrameManagerEvents> {
-  #page: Page;
+  #page: CdpPage;
   #networkManager: NetworkManager;
   #timeoutSettings: TimeoutSettings;
   #contextIdToContext = new Map<string, ExecutionContext>();
@@ -98,6 +59,8 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
     DeviceRequestPromptManager
   >();
 
+  #frameTreeHandled?: Deferred<void>;
+
   get timeoutSettings(): TimeoutSettings {
     return this.#timeoutSettings;
   }
@@ -112,7 +75,7 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
 
   constructor(
     client: CDPSession,
-    page: Page,
+    page: CdpPage,
     ignoreHTTPSErrors: boolean,
     timeoutSettings: TimeoutSettings
   ) {
@@ -193,52 +156,69 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
   }
 
   private setupEventListeners(session: CDPSession) {
-    session.on('Page.frameAttached', event => {
+    session.on('Page.frameAttached', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onFrameAttached(session, event.frameId, event.parentFrameId);
     });
-    session.on('Page.frameNavigated', event => {
+    session.on('Page.frameNavigated', async event => {
       this.#frameNavigatedReceived.add(event.frame.id);
+      await this.#frameTreeHandled?.valueOrThrow();
       void this.#onFrameNavigated(event.frame, event.type);
     });
-    session.on('Page.navigatedWithinDocument', event => {
+    session.on('Page.navigatedWithinDocument', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onFrameNavigatedWithinDocument(event.frameId, event.url);
     });
     session.on(
       'Page.frameDetached',
-      (event: Protocol.Page.FrameDetachedEvent) => {
+      async (event: Protocol.Page.FrameDetachedEvent) => {
+        await this.#frameTreeHandled?.valueOrThrow();
         this.#onFrameDetached(
           event.frameId,
           event.reason as Protocol.Page.FrameDetachedEventReason
         );
       }
     );
-    session.on('Page.frameStartedLoading', event => {
+    session.on('Page.frameStartedLoading', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onFrameStartedLoading(event.frameId);
     });
-    session.on('Page.frameStoppedLoading', event => {
+    session.on('Page.frameStoppedLoading', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onFrameStoppedLoading(event.frameId);
     });
-    session.on('Runtime.executionContextCreated', event => {
+    session.on('Runtime.executionContextCreated', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onExecutionContextCreated(event.context, session);
     });
-    session.on('Runtime.executionContextDestroyed', event => {
+    session.on('Runtime.executionContextDestroyed', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onExecutionContextDestroyed(event.executionContextId, session);
     });
-    session.on('Runtime.executionContextsCleared', () => {
+    session.on('Runtime.executionContextsCleared', async () => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onExecutionContextsCleared(session);
     });
-    session.on('Page.lifecycleEvent', event => {
+    session.on('Page.lifecycleEvent', async event => {
+      await this.#frameTreeHandled?.valueOrThrow();
       this.#onLifecycleEvent(event);
     });
   }
 
   async initialize(client: CDPSession): Promise<void> {
     try {
+      this.#frameTreeHandled?.resolve();
+      this.#frameTreeHandled = Deferred.create();
+      // We need to schedule all these commands while the target is paused,
+      // therefore, it needs to happen synchroniously. At the same time we
+      // should not start processing execution context and frame events before
+      // we received the initial information about the frame tree.
       await Promise.all([
         this.#networkManager.addClient(client),
         client.send('Page.enable'),
         client.send('Page.getFrameTree').then(({frameTree}) => {
           this.#handleFrameTree(client, frameTree);
+          this.#frameTreeHandled?.resolve();
         }),
         client.send('Page.setLifecycleEventsEnabled', {enabled: true}),
         client.send('Runtime.enable').then(() => {
@@ -246,6 +226,7 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
         }),
       ]);
     } catch (error) {
+      this.#frameTreeHandled?.resolve();
       // The target might have been closed before the initialization finished.
       if (isErrorLike(error) && isTargetClosedError(error)) {
         return;
@@ -271,7 +252,7 @@ export class FrameManager extends EventEmitter<FrameManagerEvents> {
     return this.#contextIdToContext.get(`${session.id()}:${contextId}`);
   }
 
-  page(): Page {
+  page(): CdpPage {
     return this.#page;
   }
 

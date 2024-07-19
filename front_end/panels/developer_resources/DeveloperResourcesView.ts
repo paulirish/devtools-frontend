@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {DeveloperResourcesListView} from './DeveloperResourcesListView.js';
 import developerResourcesViewStyles from './developerResourcesView.css.js';
@@ -42,6 +44,18 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/developer_resources/DeveloperResourcesView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export class DeveloperResourcesRevealer implements Common.Revealer.Revealer<SDK.PageResourceLoader.ResourceKey> {
+  async reveal(resourceInitiatorKey: SDK.PageResourceLoader.ResourceKey): Promise<void> {
+    const loader = SDK.PageResourceLoader.PageResourceLoader.instance();
+    const resource = loader.getResourcesLoaded().get(resourceInitiatorKey.key);
+    if (resource) {
+      await UI.ViewManager.ViewManager.instance().showView('developer-resources');
+      const developerResourcesView =
+          await UI.ViewManager.ViewManager.instance().view('developer-resources').widget() as DeveloperResourcesView;
+      return developerResourcesView.select(resource);
+    }
+  }
+}
 
 export class DeveloperResourcesView extends UI.ThrottledWidget.ThrottledWidget {
   private textFilterRegExp: RegExp|null;
@@ -55,7 +69,10 @@ export class DeveloperResourcesView extends UI.ThrottledWidget.ThrottledWidget {
   constructor() {
     super(true);
 
+    this.element.setAttribute('jslog', `${VisualLogging.panel('developer-resources').track({resize: true})}`);
+
     const toolbarContainer = this.contentElement.createChild('div', 'developer-resource-view-toolbar-container');
+    toolbarContainer.setAttribute('jslog', `${VisualLogging.toolbar()}`);
     const toolbar = new UI.Toolbar.Toolbar('developer-resource-view-toolbar', toolbarContainer);
 
     this.textFilterRegExp = null;
@@ -83,9 +100,23 @@ export class DeveloperResourcesView extends UI.ThrottledWidget.ThrottledWidget {
   }
 
   override async doUpdate(): Promise<void> {
+    const selectedItem = this.listView.selectedItem();
     this.listView.reset();
     this.listView.update(this.loader.getScopedResourcesLoaded().values());
+    if (selectedItem) {
+      this.listView.select(selectedItem);
+    }
     this.updateStats();
+  }
+
+  async select(resource: SDK.PageResourceLoader.PageResource): Promise<void> {
+    await this.lastUpdatePromise;
+    this.listView.select(resource);
+  }
+
+  async selectedItem(): Promise<SDK.PageResourceLoader.PageResource|null> {
+    await this.lastUpdatePromise;
+    return this.listView.selectedItem();
   }
 
   private updateStats(): void {

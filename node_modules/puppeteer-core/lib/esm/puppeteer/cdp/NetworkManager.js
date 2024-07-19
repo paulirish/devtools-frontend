@@ -1,41 +1,17 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { CDPSessionEvent } from '../api/CDPSession.js';
-import { EventEmitter, EventSubscription, } from '../common/EventEmitter.js';
+import { EventEmitter, EventSubscription } from '../common/EventEmitter.js';
+import { NetworkManagerEvent, } from '../common/NetworkManagerEvents.js';
 import { debugError, isString } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { DisposableStack } from '../util/disposable.js';
 import { CdpHTTPRequest } from './HTTPRequest.js';
 import { CdpHTTPResponse } from './HTTPResponse.js';
 import { NetworkEventManager, } from './NetworkEventManager.js';
-/**
- * We use symbols to prevent any external parties listening to these events.
- * They are internal to Puppeteer.
- *
- * @internal
- */
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export var NetworkManagerEvent;
-(function (NetworkManagerEvent) {
-    NetworkManagerEvent.Request = Symbol('NetworkManager.Request');
-    NetworkManagerEvent.RequestServedFromCache = Symbol('NetworkManager.RequestServedFromCache');
-    NetworkManagerEvent.Response = Symbol('NetworkManager.Response');
-    NetworkManagerEvent.RequestFailed = Symbol('NetworkManager.RequestFailed');
-    NetworkManagerEvent.RequestFinished = Symbol('NetworkManager.RequestFinished');
-})(NetworkManagerEvent || (NetworkManagerEvent = {}));
 /**
  * @internal
  */
@@ -453,7 +429,7 @@ export class NetworkManager extends EventEmitter {
         this.#networkEventManager.responseExtraInfo(event.requestId).push(event);
     }
     #forgetRequest(request, events) {
-        const requestId = request._requestId;
+        const requestId = request.id;
         const interceptionId = request._interceptionId;
         this.#networkEventManager.forgetRequest(requestId);
         interceptionId !== undefined &&
@@ -483,7 +459,7 @@ export class NetworkManager extends EventEmitter {
         // Under certain conditions we never get the Network.responseReceived
         // event from protocol. @see https://crbug.com/883475
         if (request.response()) {
-            request.response()?._resolveBody(null);
+            request.response()?._resolveBody();
         }
         this.#forgetRequest(request, true);
         this.emit(NetworkManagerEvent.RequestFinished, request);
@@ -509,7 +485,7 @@ export class NetworkManager extends EventEmitter {
         request._failureText = event.errorText;
         const response = request.response();
         if (response) {
-            response._resolveBody(null);
+            response._resolveBody();
         }
         this.#forgetRequest(request, true);
         this.emit(NetworkManagerEvent.RequestFailed, request);

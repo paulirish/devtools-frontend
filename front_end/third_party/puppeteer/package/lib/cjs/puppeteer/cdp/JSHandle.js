@@ -1,24 +1,14 @@
 "use strict";
 /**
- * Copyright 2019 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2019 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CdpJSHandle = void 0;
+exports.releaseObject = exports.CdpJSHandle = void 0;
 const JSHandle_js_1 = require("../api/JSHandle.js");
 const util_js_1 = require("../common/util.js");
-const ExecutionContext_js_1 = require("./ExecutionContext.js");
+const utils_js_1 = require("./utils.js");
 /**
  * @internal
  */
@@ -42,7 +32,7 @@ class CdpJSHandle extends JSHandle_js_1.JSHandle {
     }
     async jsonValue() {
         if (!this.#remoteObject.objectId) {
-            return (0, util_js_1.valueFromRemoteObject)(this.#remoteObject);
+            return (0, utils_js_1.valueFromRemoteObject)(this.#remoteObject);
         }
         const value = await this.evaluate(object => {
             return object;
@@ -64,11 +54,11 @@ class CdpJSHandle extends JSHandle_js_1.JSHandle {
             return;
         }
         this.#disposed = true;
-        await (0, ExecutionContext_js_1.releaseObject)(this.client, this.#remoteObject);
+        await releaseObject(this.client, this.#remoteObject);
     }
     toString() {
         if (!this.#remoteObject.objectId) {
-            return 'JSHandle:' + (0, util_js_1.valueFromRemoteObject)(this.#remoteObject);
+            return 'JSHandle:' + (0, utils_js_1.valueFromRemoteObject)(this.#remoteObject);
         }
         const type = this.#remoteObject.subtype || this.#remoteObject.type;
         return 'JSHandle@' + type;
@@ -81,4 +71,20 @@ class CdpJSHandle extends JSHandle_js_1.JSHandle {
     }
 }
 exports.CdpJSHandle = CdpJSHandle;
+/**
+ * @internal
+ */
+async function releaseObject(client, remoteObject) {
+    if (!remoteObject.objectId) {
+        return;
+    }
+    await client
+        .send('Runtime.releaseObject', { objectId: remoteObject.objectId })
+        .catch(error => {
+        // Exceptions might happen in case of a page been navigated or closed.
+        // Swallow these since they are harmless and we don't leak anything in this case.
+        (0, util_js_1.debugError)(error);
+    });
+}
+exports.releaseObject = releaseObject;
 //# sourceMappingURL=JSHandle.js.map

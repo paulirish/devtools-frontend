@@ -1,28 +1,14 @@
 /**
- * Copyright 2022 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2022 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { CDPSession, CDPSessionEvent } from '../api/CDPSession.js';
-import { TargetType } from '../api/Target.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { debugError } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { Deferred } from '../util/Deferred.js';
 import { CdpTarget, InitializationStatus } from './Target.js';
-function isTargetExposed(target) {
-    return target.type() !== TargetType.TAB && !target._subtype();
-}
 function isPageTargetBecomingPrimary(target, newTargetInfo) {
     return Boolean(target._subtype()) && !newTargetInfo.subtype;
 }
@@ -67,15 +53,9 @@ export class ChromeTargetManager extends EventEmitter {
     #initializeDeferred = Deferred.create();
     #targetsIdsForInit = new Set();
     #waitForInitiallyDiscoveredTargets = true;
-    // TODO: remove the flag once the testing/rollout is done.
-    #tabMode;
-    #discoveryFilter;
-    constructor(connection, targetFactory, targetFilterCallback, waitForInitiallyDiscoveredTargets = true, useTabTarget = false) {
+    #discoveryFilter = [{}];
+    constructor(connection, targetFactory, targetFilterCallback, waitForInitiallyDiscoveredTargets = true) {
         super();
-        this.#tabMode = useTabTarget;
-        this.#discoveryFilter = this.#tabMode
-            ? [{}]
-            : [{ type: 'tab', exclude: true }, {}];
         this.#connection = connection;
         this.#targetFilterCallback = targetFilterCallback;
         this.#targetFactory = targetFactory;
@@ -85,13 +65,6 @@ export class ChromeTargetManager extends EventEmitter {
         this.#connection.on('Target.targetInfoChanged', this.#onTargetInfoChanged);
         this.#connection.on(CDPSessionEvent.SessionDetached, this.#onSessionDetached);
         this.#setupAttachmentListeners(this.#connection);
-        this.#connection
-            .send('Target.setDiscoverTargets', {
-            discover: true,
-            filter: this.#discoveryFilter,
-        })
-            .then(this.#storeExistingTargetsForInit)
-            .catch(debugError);
     }
     #storeExistingTargetsForInit = () => {
         if (!this.#waitForInitiallyDiscoveredTargets) {
@@ -107,19 +80,22 @@ export class ChromeTargetManager extends EventEmitter {
         }
     };
     async initialize() {
+        await this.#connection.send('Target.setDiscoverTargets', {
+            discover: true,
+            filter: this.#discoveryFilter,
+        });
+        this.#storeExistingTargetsForInit();
         await this.#connection.send('Target.setAutoAttach', {
             waitForDebuggerOnStart: true,
             flatten: true,
             autoAttach: true,
-            filter: this.#tabMode
-                ? [
-                    {
-                        type: 'page',
-                        exclude: true,
-                    },
-                    ...this.#discoveryFilter,
-                ]
-                : this.#discoveryFilter,
+            filter: [
+                {
+                    type: 'page',
+                    exclude: true,
+                },
+                ...this.#discoveryFilter,
+            ],
         });
         this.#finishInitializationIfReady();
         await this.#initializeDeferred.valueOrThrow();
@@ -132,13 +108,7 @@ export class ChromeTargetManager extends EventEmitter {
         this.#removeAttachmentListeners(this.#connection);
     }
     getAvailableTargets() {
-        const result = new Map();
-        for (const [id, target] of this.#attachedTargetsByTargetId.entries()) {
-            if (isTargetExposed(target)) {
-                result.set(id, target);
-            }
-        }
-        return result;
+        return this.#attachedTargetsByTargetId;
     }
     #setupAttachmentListeners(session) {
         const listener = (event) => {
@@ -212,7 +182,6 @@ export class ChromeTargetManager extends EventEmitter {
         const previousURL = target.url();
         const wasInitialized = target._initializedDeferred.value() === InitializationStatus.SUCCESS;
         if (isPageTargetBecomingPrimary(target, event.targetInfo)) {
-            const target = this.#attachedTargetsByTargetId.get(event.targetInfo.targetId);
             const session = target?._session();
             assert(session, 'Target that is being activated is missing a CDPSession.');
             session.parentSession()?.emit(CDPSessionEvent.Swapped, session);
@@ -284,14 +253,9 @@ export class ChromeTargetManager extends EventEmitter {
             this.#attachedTargetsByTargetId.set(targetInfo.targetId, target);
             this.#attachedTargetsBySessionId.set(session.id(), target);
         }
-        if (parentSession instanceof CDPSession) {
-            parentSession.emit(CDPSessionEvent.Ready, session);
-        }
-        else {
-            parentSession.emit(CDPSessionEvent.Ready, session);
-        }
+        parentSession.emit(CDPSessionEvent.Ready, session);
         this.#targetsIdsForInit.delete(target._targetId);
-        if (!isExistingTarget && isTargetExposed(target)) {
+        if (!isExistingTarget) {
             this.emit("targetAvailable" /* TargetManagerEvent.TargetAvailable */, target);
         }
         this.#finishInitializationIfReady();
@@ -320,9 +284,7 @@ export class ChromeTargetManager extends EventEmitter {
             return;
         }
         this.#attachedTargetsByTargetId.delete(target._targetId);
-        if (isTargetExposed(target)) {
-            this.emit("targetGone" /* TargetManagerEvent.TargetGone */, target);
-        }
+        this.emit("targetGone" /* TargetManagerEvent.TargetGone */, target);
     };
 }
 //# sourceMappingURL=ChromeTargetManager.js.map

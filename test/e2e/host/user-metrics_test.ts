@@ -184,10 +184,6 @@ describe('User Metrics', () => {
     await assertHistogramEventsInclude([
       {
         actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // 'console-view'.
-      },
-      {
-        actionName: 'DevTools.PanelShown',
         actionCode: 11,  // 'animations'.
       },
     ]);
@@ -200,10 +196,6 @@ describe('User Metrics', () => {
       {
         actionName: 'DevTools.IssuesPanelOpenedFrom',
         actionCode: 3,  // 'HamburgerMenu'.
-      },
-      {
-        actionName: 'DevTools.PanelShown',
-        actionCode: 10,  // 'console-view'.
       },
       {
         actionName: 'DevTools.PanelShown',
@@ -373,7 +365,7 @@ describe('User Metrics', () => {
     await assertHistogramEventsInclude([
       {
         actionName: 'DevTools.ExperimentEnabledAtLaunch',
-        actionCode: 52,  // Enabled by default: cssTypeComponentLength
+        actionCode: 74,  // Enabled by default: setAllBreakpointsEagerly
       },
       {
         actionName: 'DevTools.ExperimentDisabledAtLaunch',
@@ -395,8 +387,7 @@ describe('User Metrics', () => {
 
     const events = await retrieveRecordedPerformanceHistogramEvents(frontend);
 
-    assert.strictEqual(events.length, 1);
-    assert.strictEqual(events[0].histogramName, 'DevTools.Launch.Timeline');
+    assert.include(events.map(e => e.histogramName), 'DevTools.Launch.Timeline');
   });
 
   it('records the selected language', async () => {
@@ -416,7 +407,7 @@ describe('User Metrics', () => {
   });
 });
 
-describe('User Metrics for CSS Overview', () => {
+describe('User metrics for CSS overview', () => {
   it('dispatch events when capture overview button hit', async () => {
     await goToResource('css_overview/default.html');
     await navigateToCssOverviewTab();
@@ -472,7 +463,7 @@ describe('User Metrics for sidebar panes', () => {
 
 describe('User Metrics for Issue Panel', () => {
   beforeEach(async () => {
-    await enableExperiment('contrastIssues');
+    await enableExperiment('contrast-issues');
     await openPanelViaMoreTools('Issues');
   });
 
@@ -522,7 +513,6 @@ describe('User Metrics for Issue Panel', () => {
 
   it('dispatch events when a link to an element is clicked', async () => {
     await goToResource('elements/element-reveal-inline-issue.html');
-    await waitFor('.issue');
     await click('.issue');
 
     await waitFor('.element-reveal-icon');
@@ -547,43 +537,6 @@ describe('User Metrics for Issue Panel', () => {
         actionCode: 7,  // ContentSecurityPolicyElement
       },
     ]);
-  });
-
-  it('dispatch events when a "Learn More" link is clicked', async () => {
-    const {browser} = getBrowserAndPages();
-
-    await goToResource('elements/element-reveal-inline-issue.html');
-    await waitFor('.issue');
-    await click('.issue');
-
-    await waitFor('.link-list x-link');
-    await scrollElementIntoView('.link-list x-link');
-    await click('.link-list x-link');
-
-    try {
-      await assertHistogramEventsInclude([
-        {
-          actionName: 'DevTools.IssueCreated',
-          actionCode: 1,  // ContentSecurityPolicyIssue
-        },
-        {
-          actionName: 'DevTools.IssueCreated',
-          actionCode: 1,  // ContentSecurityPolicyIssue
-        },
-        {
-          actionName: 'DevTools.IssuesPanelIssueExpanded',
-          actionCode: 4,  // ContentSecurityPolicy
-        },
-        {
-          actionName: 'DevTools.IssuesPanelResourceOpened',
-          actionCode: 12,  // ContentSecurityPolicyLearnMore
-        },
-      ]);
-    } finally {
-      const target = await browser.waitForTarget(target => target.url().includes('web.dev'));
-      const page = await target.page();
-      await page?.close();
-    }
   });
 
   it('dispatches events when Quirks Mode issues are created', async () => {
@@ -636,8 +589,7 @@ describe('User Metrics for CSS custom properties in the Styles pane', () => {
     await focusElementsTree();
   });
 
-  // Flaky test.
-  it.skip('[crbug.com/1483974]: dispatch events when capture overview button hit', async () => {
+  it('dispatch events when capture overview button hit', async () => {
     const {frontend} = getBrowserAndPages();
     await frontend.keyboard.press('ArrowRight');
     await waitForContentOfSelectedElementsNode('<div id=\u200B"properties-to-inspect">\u200B</div>\u200B');

@@ -6,6 +6,7 @@ import * as CodeHighlighter from '../../../ui/components/code_highlighter/code_h
 // eslint-disable-next-line rulesdir/es_modules_import
 import codeHighlighterStyles from '../../../ui/components/code_highlighter/codeHighlighter.css.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import contentEditableStyles from './suggestionInput.css.js';
 
@@ -224,6 +225,9 @@ class SuggestionBox extends LitElement {
         selected: index === this.cursor,
       })}
           @mousedown=${this.#dispatchSuggestEvent.bind(this, suggestion)}
+          jslog=${VisualLogging.item('suggestion').track({
+        click: true,
+      })}
         >
           ${suggestion}
         </li>`;
@@ -257,6 +261,7 @@ export class SuggestionInput extends LitElement {
   @property({type: Boolean}) declare disabled: boolean;
   @property() declare strikethrough: boolean;
   @property() declare mimeType: string;
+  @property() declare jslogContext?: string;
 
   constructor() {
     super();
@@ -271,6 +276,11 @@ export class SuggestionInput extends LitElement {
     this.mimeType = '';
     this.autocomplete = true;
     this.addEventListener('blur', this.#handleBlurEvent);
+    let jslog = VisualLogging.value().track({keydown: 'ArrowUp|ArrowDown|Enter', change: true});
+    if (this.jslogContext) {
+      jslog = jslog.context(this.jslogContext);
+    }
+    this.setAttribute('jslog', jslog.toString());
   }
 
   #cachedEditableContent?: EditableContent;
@@ -288,8 +298,12 @@ export class SuggestionInput extends LitElement {
 
   #handleBlurEvent = (): void => {
     window.getSelection()?.removeAllRanges();
+    const changed = this.value !== this.#editableContent.value;
     this.value = this.#editableContent.value;
     this.expression = this.#editableContent.value;
+    if (changed) {
+      this.dispatchEvent(new Event('change'));
+    }
   };
 
   #handleFocusEvent = (event: FocusEvent): void => {

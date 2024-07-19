@@ -7,9 +7,7 @@
 
 import {assert} from 'chai';
 import * as childProcess from 'child_process';
-import {createHash} from 'crypto';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import type * as puppeteer from 'puppeteer-core';
 
@@ -20,6 +18,7 @@ import {
   timeout,
   waitFor,
 } from '../shared/helper.js';
+import {ScreenshotError} from '../shared/screenshot-error.js';
 
 /**
  * The goldens screenshot folder is always taken from the source directory (NOT
@@ -78,6 +77,11 @@ export const assertElementScreenshotUnchanged = async (
   if (!element) {
     assert.fail(`Given element for test ${fileName} was not found.`);
   }
+  // Only assert screenshots on Linux. We don't observe platform-specific differences enough to justify
+  // the costs of asserting 3 platforms per screenshot.
+  if (platform !== 'linux') {
+    return;
+  }
   return assertScreenshotUnchangedWithRetries(element, fileName, maximumDiffThreshold, DEFAULT_RETRIES_COUNT, options);
 };
 
@@ -96,7 +100,11 @@ const assertScreenshotUnchangedWithRetries = async (
     const goldenScreenshotPath = path.join(GOLDENS_FOLDER, fileNameForPlatform);
     const generatedScreenshotPath = path.join(generatedScreenshotFolder, fileNameForPlatform);
 
-    if (fs.existsSync(generatedScreenshotPath)) {
+    // You can run the tests with ITERATIONS=2 to run each test twice. In that
+    // case we would expect the generated screenshots to already exists, so if
+    // we are running more than 1 iteration, we do not error.
+    const testIterations = process.env.ITERATIONS ? parseInt(process.env.ITERATIONS, 10) : 1;
+    if (fs.existsSync(generatedScreenshotPath) && testIterations < 2) {
       // If this happened something went wrong during the clean-up at the start of the test run, so let's bail.
       throw new Error(`${generatedScreenshotPath} already exists.`);
     }
@@ -134,7 +142,7 @@ interface ScreenshotAssertionOptions {
   retryCount?: number;
 }
 
-const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Promise<void> => {
+const assertScreenshotUnchanged = async (options: ScreenshotAssertionOptions) => {
   const {
     elementOrPage,
     generatedScreenshotPath,
@@ -272,7 +280,6 @@ async function execImageDiffCommand(cmd: string) {
 
 async function compare(golden: string, generated: string, maximumDiffThreshold: number) {
   const isOnBot = process.env.LUCI_CONTEXT !== undefined;
-
   if (!isOnBot && process.env.SKIP_SCREENSHOT_COMPARISONS_FOR_FAST_COVERAGE) {
     // When checking test coverage locally the tests get sped up significantly
     // if we do not do the actual image comparison. Obviously this makes the
@@ -344,108 +351,4 @@ export async function waitForDialogAnimationEnd(root?: puppeteer.ElementHandle) 
     });
   });
   await Promise.race([animationPromise, timeout(ANIMATION_TIMEOUT)]);
-}
-
-type ArtifactGroup = {
-  [key: string]: {
-    filePath: string,
-  },
-};
-
-export class ScreenshotError extends Error {
-  // The max length of the summary is 4000, but we need to leave some room for
-  // the rest of the HTML formatting (e.g. <pre> and </pre>).
-  static readonly SUMMARY_LENGTH_CUTOFF = 3900;
-  readonly screenshots: ArtifactGroup;
-
-  private constructor(screenshots: ArtifactGroup, message?: string, cause?: Error) {
-    message = message ?? cause?.message ?? '';
-    super(message);
-    this.cause = cause;
-    this.screenshots = screenshots;
-  }
-
-  /**
-   * Creates a ScreenshotError when a reference golden does not exists.
-   */
-  static fromMessage(message: string, generatedImgPath: string) {
-    const screenshots = {
-      'generated': {filePath: this.stashArtifact(generatedImgPath, 'generated')},
-    };
-    return new ScreenshotError(screenshots, message, undefined);
-  }
-
-  /**
-   * Creates a ScreenshotError when a generated screenshot is different from
-   * the golden.
-   */
-  static fromError(error: Error, goldenImgPath: string, generatedImgPath: string, diffImgPath: string) {
-    const screenshots = {
-      'expected_image': {filePath: this.stashArtifact(goldenImgPath, 'expected')},
-      'actual_image': {filePath: this.stashArtifact(generatedImgPath, 'actual')},
-      'image_diff': {filePath: this.stashArtifact(diffImgPath, 'diff')},
-    };
-    return new ScreenshotError(screenshots, undefined, error);
-  }
-
-  /**
-   * Creates a ScreenshotError an unexpected error occurs. Screenshots are
-   * were taken for both the target and the frontend.
-   */
-  static fromBase64Images(error: unknown, targetScreenshot?: string, frontendScreenshot?: string) {
-    if (!targetScreenshot || !frontendScreenshot) {
-      console.error('No artifacts to save.');
-      return error;
-    }
-    const screenshots = {
-      'target': {filePath: this.saveArtifact(targetScreenshot)},
-      'frontend': {filePath: this.saveArtifact(frontendScreenshot)},
-    };
-    return new ScreenshotError(screenshots, undefined, error as Error);
-  }
-
-  /**
-   * Costructs artifact group and summary for Milo
-   * at resultdb publication time.
-   */
-  toMiloArtifacts(): [ArtifactGroup, string] {
-    let summary: string;
-    if ('expected_image' in this.screenshots) {
-      // no summary; autogenerated by Milo based on artifact name convention
-      summary = '';
-    } else if ('generated' in this.screenshots) {
-      // TODO(liviurau): embed image once Milo supports it
-      summary = '<pre>' + this.message.slice(0, ScreenshotError.SUMMARY_LENGTH_CUTOFF) +
-          '</pre><p>Screenshot generated (see below)</p>';
-    } else {
-      // TODO(liviurau): embed images once Milo supports it
-      summary = '<pre>' + this.message.slice(0, ScreenshotError.SUMMARY_LENGTH_CUTOFF) +
-          '</pre><p>Unexppected error. See target and frontend screenshots ' +
-          'below.</p>';
-    }
-    return [this.screenshots, summary];
-  }
-
-  /**
-   * Copy artifacts in tmp folder so they remain available
-   * at resultdb publication time.
-   */
-  private static stashArtifact(originalFile: string, tag: string): string {
-    const stashedFileName = tag + '-' + path.basename(originalFile);
-    const artifactPath = path.join(os.tmpdir(), stashedFileName);
-    fs.copyFileSync(originalFile, artifactPath);
-    return artifactPath;
-  }
-
-  /**
-   * Save base64 image in tmp folder to make it available at resultdb
-   * publication time.
-   */
-  private static saveArtifact(base64Image: string): string {
-    base64Image = base64Image.replace(/^data:image\/png;base64,/, '');
-    const fileName = createHash('sha256').update(base64Image).digest('hex');
-    const artifactPath = path.join(os.tmpdir(), fileName);
-    fs.writeFileSync(artifactPath, base64Image, {encoding: 'base64'});
-    return artifactPath;
-  }
 }

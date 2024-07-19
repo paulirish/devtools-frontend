@@ -5,16 +5,16 @@
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
-import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import type * as Protocol from '../../generated/protocol.js';
-
-import {ExpandableApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
-import {type ResourcesPanel} from './ResourcesPanel.js';
-import {StorageMetadataView} from './components/components.js';
 import {IndexedDBTreeElement} from './ApplicationPanelSidebar.js';
+import {ExpandableApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
+import {StorageMetadataView} from './components/components.js';
+import {type ResourcesPanel} from './ResourcesPanel.js';
 import {ServiceWorkerCacheTreeElement} from './ServiceWorkerCacheTreeElement.js';
 
 const UIStrings = {
@@ -32,8 +32,8 @@ export class StorageBucketsTreeParentElement extends ExpandableApplicationPanelT
   private bucketTreeElements: Set<StorageBucketsTreeElement> = new Set();
 
   constructor(storagePanel: ResourcesPanel) {
-    super(storagePanel, i18nString(UIStrings.storageBuckets), 'StorageBuckets');
-    const icon = UI.Icon.Icon.create('database', 'resource-tree-item');
+    super(storagePanel, i18nString(UIStrings.storageBuckets), 'storage-buckets');
+    const icon = IconButton.Icon.create('database');
     this.setLeadingIcons([icon]);
     this.setLink(
         'https://github.com/WICG/storage-buckets/blob/gh-pages/explainer.md' as Platform.DevToolsPath.UrlString);
@@ -134,10 +134,10 @@ export class StorageBucketsTreeElement extends ExpandableApplicationPanelTreeEle
       bucketInfo: Protocol.Storage.StorageBucketInfo) {
     const {bucket} = bucketInfo;
     const {origin} = SDK.StorageKeyManager.parseStorageKey(bucketInfo.bucket.storageKey);
-    super(resourcesPanel, `${bucket.name} - ${origin}`, `StorageBucket_${bucket.name}_${bucket.storageKey}`);
+    super(resourcesPanel, `${bucket.name} - ${origin}`, 'storage-bucket');
     this.bucketModel = model;
     this.storageBucketInfo = bucketInfo;
-    const icon = UI.Icon.Icon.create('database', 'resource-tree-item');
+    const icon = IconButton.Icon.create('database');
     this.setLeadingIcons([icon]);
   }
 

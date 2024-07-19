@@ -5,35 +5,29 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import cssOverviewSidebarPanelStyles from './cssOverviewSidebarPanel.css.js';
 
 const UIStrings = {
   /**
-   *@description Label for the 'Clear overview' button in the CSS Overview report
+   *@description Label for the 'Clear overview' button in the CSS overview report
    */
   clearOverview: 'Clear overview',
   /**
-   * @description Accessible label for the CSS Overview panel sidebar
+   * @description Accessible label for the CSS overview panel sidebar
    */
-  cssOverviewPanelSidebar: 'CSS Overview panel sidebar',
+  cssOverviewPanelSidebar: 'CSS overview panel sidebar',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/css_overview/CSSOverviewSidebarPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+const ITEM_CLASS_NAME = 'overview-sidebar-panel-item';
+const SELECTED_CLASS_NAME = 'selected';
+
 export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
     UI.Widget.VBox) {
   containerElement: HTMLDivElement;
-
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  static get ITEM_CLASS_NAME(): string {
-    return 'overview-sidebar-panel-item';
-  }
-
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  static get SELECTED(): string {
-    return 'selected';
-  }
 
   constructor() {
     super(true);
@@ -52,7 +46,8 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
     UI.ARIAUtils.markAsTree(this.containerElement);
 
     // Clear overview.
-    const clearResultsButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearOverview), 'clear');
+    const clearResultsButton = new UI.Toolbar.ToolbarButton(
+        i18nString(UIStrings.clearOverview), 'clear', undefined, 'css-overview.clear-overview');
     clearResultsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.#reset, this);
 
     // Toolbar.
@@ -62,7 +57,13 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
   }
 
   addItem(name: string, id: string): void {
-    const item = this.containerElement.createChild('div', CSSOverviewSidebarPanel.ITEM_CLASS_NAME);
+    const item = this.containerElement.createChild('div', ITEM_CLASS_NAME);
+    item.setAttribute(
+        'jslog',
+        `${
+            VisualLogging.item()
+                .track({click: true, keydown: 'Enter|ArrowUp|ArrowDown'})
+                .context(`css-overview.${id}`)}`);
     UI.ARIAUtils.markAsTreeitem(item);
     item.textContent = name;
     item.dataset.id = id;
@@ -74,15 +75,15 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
   }
 
   #deselectAllItems(): void {
-    const items = this.containerElement.querySelectorAll(`.${CSSOverviewSidebarPanel.ITEM_CLASS_NAME}`);
+    const items = this.containerElement.querySelectorAll(`.${ITEM_CLASS_NAME}`);
     items.forEach(item => {
-      item.classList.remove(CSSOverviewSidebarPanel.SELECTED);
+      item.classList.remove(SELECTED_CLASS_NAME);
     });
   }
 
   #onItemClick(event: Event): void {
     const target = (event.composedPath()[0] as HTMLElement);
-    if (!target.classList.contains(CSSOverviewSidebarPanel.ITEM_CLASS_NAME)) {
+    if (!target.classList.contains(ITEM_CLASS_NAME)) {
       return;
     }
 
@@ -99,7 +100,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
       return;
     }
     const target = (event.composedPath()[0] as HTMLElement);
-    if (!target.classList.contains(CSSOverviewSidebarPanel.ITEM_CLASS_NAME)) {
+    if (!target.classList.contains(ITEM_CLASS_NAME)) {
       return;
     }
 
@@ -112,7 +113,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
       this.select(id, false);
       this.dispatchEventToListeners(SidebarEvents.ItemSelected, {id, isMouseEvent: false, key: event.key});
     } else {  // arrow up/down key
-      const items = this.containerElement.querySelectorAll(`.${CSSOverviewSidebarPanel.ITEM_CLASS_NAME}`);
+      const items = this.containerElement.querySelectorAll(`.${ITEM_CLASS_NAME}`);
 
       let currItemIndex = -1;
       for (let idx = 0; idx < items.length; idx++) {
@@ -145,12 +146,12 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
       return;
     }
 
-    if (target.classList.contains(CSSOverviewSidebarPanel.SELECTED)) {
+    if (target.classList.contains(SELECTED_CLASS_NAME)) {
       return;
     }
 
     this.#deselectAllItems();
-    target.classList.add(CSSOverviewSidebarPanel.SELECTED);
+    target.classList.add(SELECTED_CLASS_NAME);
 
     if (focus) {
       target.contentEditable = 'true';

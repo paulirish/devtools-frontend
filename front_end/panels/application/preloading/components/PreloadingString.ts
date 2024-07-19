@@ -109,9 +109,15 @@ const UIStrings = {
    */
   PrefetchNotUsedProbeFailed: 'The prefetch was blocked by your Internet Service Provider or network administrator.',
   /**
-   *@description  Description text for Prefetch status PrefetchEvicted.
+   *@description  Description text for Prefetch status PrefetchEvictedForNewerPrefetch.
    */
-  PrefetchEvicted: 'The prefetch was discarded for a newer prefetch because |kPrefetchNewLimits| is enabled',
+  PrefetchEvictedForNewerPrefetch:
+      'The prefetch was discarded because the initiating page has too many prefetches ongoing, and this was one of the oldest.',
+  /**
+   *@description Description text for Prefetch status PrefetchEvictedAfterCandidateRemoved.
+   */
+  PrefetchEvictedAfterCandidateRemoved:
+      'The prefetch was discarded because no speculation rule in the initating page triggers a prefetch for this URL anymore.',
   /**
    *@description  Description text for Prefetch status PrefetchNotEligibleBatterySaverEnabled.
    */
@@ -120,7 +126,7 @@ const UIStrings = {
   /**
    *@description  Description text for Prefetch status PrefetchNotEligiblePreloadingDisabled.
    */
-  PrefetchNotEligiblePreloadingDisabled: 'The prefetch was not performed because preloading was disabled.',
+  PrefetchNotEligiblePreloadingDisabled: 'The prefetch was not performed because speculative loading was disabled.',
 
   /**
    *  Description text for PrerenderFinalStatus::kLowEndDevice.
@@ -318,10 +324,6 @@ const UIStrings = {
   prerenderFinalStatusPrerenderingDisabledByDevTools:
       'The prerender was not performed because DevTools has been used to disable prerendering.',
   /**
-   *  Description text for PrerenderFinalStatus::kResourceLoadBlockedByClient.
-   */
-  prerenderFinalStatusResourceLoadBlockedByClient: 'Some resource load was blocked.',
-  /**
    * Description text for PrerenderFinalStatus::kSpeculationRuleRemoved.
    */
   prerenderFinalStatusSpeculationRuleRemoved:
@@ -335,17 +337,17 @@ const UIStrings = {
    * Description text for PrerenderFinalStatus::kMaxNumOfRunningEagerPrerendersExceeded.
    */
   prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules to enable further prerendering.',
+      'The prerender whose eagerness is "eager" was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules with "eager" to enable further prerendering.',
   /**
    * Description text for PrerenderFinalStatus::kMaxNumOfRunningEmbedderPrerendersExceeded.
    */
   prerenderFinalStatusMaxNumOfRunningEmbedderPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing.',
+      'The browser-triggered prerender was not performed because the initiating page already has too many prerenders ongoing.',
   /**
    * Description text for PrerenderFinalStatus::kMaxNumOfRunningNonEagerPrerendersExceeded.
    */
   prerenderFinalStatusMaxNumOfRunningNonEagerPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules to enable further prerendering.',
+      'The old non-eager prerender (with a "moderate" or "conservative" eagerness and triggered by hovering or clicking links) was automatically canceled due to starting a new non-eager prerender. It can be retriggered by interacting with the link again.',
   /**
    * Description text for PrenderFinalStatus::kPrerenderingUrlHasEffectiveUrl.
    */
@@ -417,7 +419,8 @@ export const PrefetchReasonDescription: {[key: string]: {name: () => Platform.UI
   'PrefetchNotUsedCookiesChanged': {name: i18nLazyString(UIStrings.PrefetchNotUsedCookiesChanged)},
   'PrefetchProxyNotAvailable': {name: i18nLazyString(UIStrings.PrefetchProxyNotAvailable)},
   'PrefetchNotUsedProbeFailed': {name: i18nLazyString(UIStrings.PrefetchNotUsedProbeFailed)},
-  'PrefetchEvicted': {name: i18nLazyString(UIStrings.PrefetchEvicted)},
+  'PrefetchEvictedForNewerPrefetch': {name: i18nLazyString(UIStrings.PrefetchEvictedForNewerPrefetch)},
+  'PrefetchEvictedAfterCandidateRemoved': {name: i18nLazyString(UIStrings.PrefetchEvictedAfterCandidateRemoved)},
   'PrefetchNotEligibleBatterySaverEnabled': {name: i18nLazyString(UIStrings.PrefetchNotEligibleBatterySaverEnabled)},
   'PrefetchNotEligiblePreloadingDisabled': {name: i18nLazyString(UIStrings.PrefetchNotEligiblePreloadingDisabled)},
 };
@@ -460,8 +463,10 @@ export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.Pref
       return PrefetchReasonDescription['PrefetchFailedPerPageLimitExceeded'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIneligibleRetryAfter:
       return PrefetchReasonDescription['PrefetchIneligibleRetryAfter'].name();
-    case Protocol.Preload.PrefetchStatus.PrefetchEvicted:
-      return PrefetchReasonDescription['PrefetchEvicted'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchEvictedForNewerPrefetch:
+      return PrefetchReasonDescription['PrefetchEvictedForNewerPrefetch'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchEvictedAfterCandidateRemoved:
+      return PrefetchReasonDescription['PrefetchEvictedAfterCandidateRemoved'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIsPrivacyDecoy:
       return PrefetchReasonDescription['PrefetchIsPrivacyDecoy'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIsStale:
@@ -645,8 +650,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusMemoryPressureAfterTriggered);
     case Protocol.Preload.PrerenderFinalStatus.PrerenderingDisabledByDevTools:
       return i18nString(UIStrings.prerenderFinalStatusPrerenderingDisabledByDevTools);
-    case Protocol.Preload.PrerenderFinalStatus.ResourceLoadBlockedByClient:
-      return i18nString(UIStrings.prerenderFinalStatusResourceLoadBlockedByClient);
     case Protocol.Preload.PrerenderFinalStatus.SpeculationRuleRemoved:
       return i18nString(UIStrings.prerenderFinalStatusSpeculationRuleRemoved);
     case Protocol.Preload.PrerenderFinalStatus.ActivatedWithAuxiliaryBrowsingContexts:

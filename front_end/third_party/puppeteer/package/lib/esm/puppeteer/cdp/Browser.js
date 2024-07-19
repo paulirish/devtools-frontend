@@ -1,23 +1,11 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
-import { Browser as BrowserBase, WEB_PERMISSION_TO_PROTOCOL_PERMISSION, } from '../api/Browser.js';
-import { BrowserContext } from '../api/BrowserContext.js';
+import { Browser as BrowserBase, } from '../api/Browser.js';
 import { CDPSessionEvent } from '../api/CDPSession.js';
-import { USE_TAB_TARGET } from '../environment.js';
-import { assert } from '../util/assert.js';
+import { CdpBrowserContext } from './BrowserContext.js';
 import { ChromeTargetManager } from './ChromeTargetManager.js';
 import { FirefoxTargetManager } from './FirefoxTargetManager.js';
 import { DevToolsTarget, InitializationStatus, OtherTarget, PageTarget, WorkerTarget, } from './Target.js';
@@ -25,8 +13,9 @@ import { DevToolsTarget, InitializationStatus, OtherTarget, PageTarget, WorkerTa
  * @internal
  */
 export class CdpBrowser extends BrowserBase {
-    static async _create(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true, useTabTarget = USE_TAB_TARGET) {
-        const browser = new CdpBrowser(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets, useTabTarget);
+    protocol = 'cdp';
+    static async _create(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true) {
+        const browser = new CdpBrowser(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets);
         await browser._attach();
         return browser;
     }
@@ -40,10 +29,7 @@ export class CdpBrowser extends BrowserBase {
     #defaultContext;
     #contexts = new Map();
     #targetManager;
-    get _targets() {
-        return this.#targetManager.getAvailableTargets();
-    }
-    constructor(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true, useTabTarget = USE_TAB_TARGET) {
+    constructor(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true) {
         super();
         product = product || 'chrome';
         this.#ignoreHTTPSErrors = ignoreHTTPSErrors;
@@ -61,7 +47,7 @@ export class CdpBrowser extends BrowserBase {
             this.#targetManager = new FirefoxTargetManager(connection, this.#createTarget, this.#targetFilterCallback);
         }
         else {
-            this.#targetManager = new ChromeTargetManager(connection, this.#createTarget, this.#targetFilterCallback, waitForInitiallyDiscoveredTargets, useTabTarget);
+            this.#targetManager = new ChromeTargetManager(connection, this.#createTarget, this.#targetFilterCallback, waitForInitiallyDiscoveredTargets);
         }
         this.#defaultContext = new CdpBrowserContext(this.#connection, this);
         for (const contextId of contextIds) {
@@ -104,7 +90,7 @@ export class CdpBrowser extends BrowserBase {
     _getIsPageTargetCallback() {
         return this.#isPageTargetCallback;
     }
-    async createIncognitoBrowserContext(options = {}) {
+    async createBrowserContext(options = {}) {
         const { proxyServer, proxyBypassList } = options;
         const { browserContextId } = await this.#connection.send('Target.createBrowserContext', {
             proxyServer,
@@ -154,8 +140,9 @@ export class CdpBrowser extends BrowserBase {
         return otherTarget;
     };
     #onAttachedToTarget = async (target) => {
-        if ((await target._initializedDeferred.valueOrThrow()) ===
-            InitializationStatus.SUCCESS) {
+        if (target._isTargetExposed() &&
+            (await target._initializedDeferred.valueOrThrow()) ===
+                InitializationStatus.SUCCESS) {
             this.emit("targetcreated" /* BrowserEvent.TargetCreated */, target);
             target.browserContext().emit("targetcreated" /* BrowserContextEvent.TargetCreated */, target);
         }
@@ -163,8 +150,9 @@ export class CdpBrowser extends BrowserBase {
     #onDetachedFromTarget = async (target) => {
         target._initializedDeferred.resolve(InitializationStatus.ABORTED);
         target._isClosedDeferred.resolve();
-        if ((await target._initializedDeferred.valueOrThrow()) ===
-            InitializationStatus.SUCCESS) {
+        if (target._isTargetExposed() &&
+            (await target._initializedDeferred.valueOrThrow()) ===
+                InitializationStatus.SUCCESS) {
             this.emit("targetdestroyed" /* BrowserEvent.TargetDestroyed */, target);
             target.browserContext().emit("targetdestroyed" /* BrowserContextEvent.TargetDestroyed */, target);
         }
@@ -206,7 +194,8 @@ export class CdpBrowser extends BrowserBase {
     }
     targets() {
         return Array.from(this.#targetManager.getAvailableTargets().values()).filter(target => {
-            return (target._initializedDeferred.value() === InitializationStatus.SUCCESS);
+            return (target._isTargetExposed() &&
+                target._initializedDeferred.value() === InitializationStatus.SUCCESS);
         });
     }
     target() {
@@ -228,12 +217,13 @@ export class CdpBrowser extends BrowserBase {
     }
     async close() {
         await this.#closeCallback.call(null);
-        this.disconnect();
+        await this.disconnect();
     }
     disconnect() {
         this.#targetManager.dispose();
         this.#connection.dispose();
         this._detach();
+        return Promise.resolve();
     }
     get connected() {
         return !this.#connection._closed;
@@ -241,78 +231,10 @@ export class CdpBrowser extends BrowserBase {
     #getVersion() {
         return this.#connection.send('Browser.getVersion');
     }
-}
-/**
- * @internal
- */
-export class CdpBrowserContext extends BrowserContext {
-    #connection;
-    #browser;
-    #id;
-    constructor(connection, browser, contextId) {
-        super();
-        this.#connection = connection;
-        this.#browser = browser;
-        this.#id = contextId;
-    }
-    get id() {
-        return this.#id;
-    }
-    targets() {
-        return this.#browser.targets().filter(target => {
-            return target.browserContext() === this;
-        });
-    }
-    waitForTarget(predicate, options = {}) {
-        return this.#browser.waitForTarget(target => {
-            return target.browserContext() === this && predicate(target);
-        }, options);
-    }
-    async pages() {
-        const pages = await Promise.all(this.targets()
-            .filter(target => {
-            return (target.type() === 'page' ||
-                (target.type() === 'other' &&
-                    this.#browser._getIsPageTargetCallback()?.(target)));
-        })
-            .map(target => {
-            return target.page();
-        }));
-        return pages.filter((page) => {
-            return !!page;
-        });
-    }
-    isIncognito() {
-        return !!this.#id;
-    }
-    async overridePermissions(origin, permissions) {
-        const protocolPermissions = permissions.map(permission => {
-            const protocolPermission = WEB_PERMISSION_TO_PROTOCOL_PERMISSION.get(permission);
-            if (!protocolPermission) {
-                throw new Error('Unknown permission: ' + permission);
-            }
-            return protocolPermission;
-        });
-        await this.#connection.send('Browser.grantPermissions', {
-            origin,
-            browserContextId: this.#id || undefined,
-            permissions: protocolPermissions,
-        });
-    }
-    async clearPermissionOverrides() {
-        await this.#connection.send('Browser.resetPermissions', {
-            browserContextId: this.#id || undefined,
-        });
-    }
-    newPage() {
-        return this.#browser._createPageInContext(this.#id);
-    }
-    browser() {
-        return this.#browser;
-    }
-    async close() {
-        assert(this.#id, 'Non-incognito profiles cannot be closed!');
-        await this.#browser._disposeContext(this.#id);
+    get debugInfo() {
+        return {
+            pendingProtocolErrors: this.#connection.getPendingProtocolErrors(),
+        };
     }
 }
 //# sourceMappingURL=Browser.js.map

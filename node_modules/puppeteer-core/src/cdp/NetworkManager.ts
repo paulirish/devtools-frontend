@@ -1,28 +1,18 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import type {Protocol} from 'devtools-protocol';
 
 import {CDPSessionEvent, type CDPSession} from '../api/CDPSession.js';
 import type {Frame} from '../api/Frame.js';
+import {EventEmitter, EventSubscription} from '../common/EventEmitter.js';
 import {
-  EventEmitter,
-  EventSubscription,
-  type EventType,
-} from '../common/EventEmitter.js';
+  NetworkManagerEvent,
+  type NetworkManagerEvents,
+} from '../common/NetworkManagerEvents.js';
 import {debugError, isString} from '../common/util.js';
 import {assert} from '../util/assert.js';
 import {DisposableStack} from '../util/disposable.js';
@@ -46,11 +36,17 @@ export interface Credentials {
  * @public
  */
 export interface NetworkConditions {
-  // Download speed (bytes/s)
+  /**
+   * Download speed (bytes/s)
+   */
   download: number;
-  // Upload speed (bytes/s)
+  /**
+   * Upload speed (bytes/s)
+   */
   upload: number;
-  // Latency (ms)
+  /**
+   * Latency (ms)
+   */
   latency: number;
 }
 
@@ -59,34 +55,6 @@ export interface NetworkConditions {
  */
 export interface InternalNetworkConditions extends NetworkConditions {
   offline: boolean;
-}
-
-/**
- * We use symbols to prevent any external parties listening to these events.
- * They are internal to Puppeteer.
- *
- * @internal
- */
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace NetworkManagerEvent {
-  export const Request = Symbol('NetworkManager.Request');
-  export const RequestServedFromCache = Symbol(
-    'NetworkManager.RequestServedFromCache'
-  );
-  export const Response = Symbol('NetworkManager.Response');
-  export const RequestFailed = Symbol('NetworkManager.RequestFailed');
-  export const RequestFinished = Symbol('NetworkManager.RequestFinished');
-}
-
-/**
- * @internal
- */
-export interface CdpNetworkManagerEvents extends Record<EventType, unknown> {
-  [NetworkManagerEvent.Request]: CdpHTTPRequest;
-  [NetworkManagerEvent.RequestServedFromCache]: CdpHTTPRequest | undefined;
-  [NetworkManagerEvent.Response]: CdpHTTPResponse;
-  [NetworkManagerEvent.RequestFailed]: CdpHTTPRequest;
-  [NetworkManagerEvent.RequestFinished]: CdpHTTPRequest;
 }
 
 /**
@@ -99,7 +67,7 @@ export interface FrameProvider {
 /**
  * @internal
  */
-export class NetworkManager extends EventEmitter<CdpNetworkManagerEvents> {
+export class NetworkManager extends EventEmitter<NetworkManagerEvents> {
   #ignoreHTTPSErrors: boolean;
   #frameManager: FrameProvider;
   #networkEventManager = new NetworkEventManager();
@@ -669,7 +637,7 @@ export class NetworkManager extends EventEmitter<CdpNetworkManagerEvents> {
   }
 
   #forgetRequest(request: CdpHTTPRequest, events: boolean): void {
-    const requestId = request._requestId;
+    const requestId = request.id;
     const interceptionId = request._interceptionId;
 
     this.#networkEventManager.forgetRequest(requestId);
@@ -708,7 +676,7 @@ export class NetworkManager extends EventEmitter<CdpNetworkManagerEvents> {
     // Under certain conditions we never get the Network.responseReceived
     // event from protocol. @see https://crbug.com/883475
     if (request.response()) {
-      request.response()?._resolveBody(null);
+      request.response()?._resolveBody();
     }
     this.#forgetRequest(request, true);
     this.emit(NetworkManagerEvent.RequestFinished, request);
@@ -740,7 +708,7 @@ export class NetworkManager extends EventEmitter<CdpNetworkManagerEvents> {
     request._failureText = event.errorText;
     const response = request.response();
     if (response) {
-      response._resolveBody(null);
+      response._resolveBody();
     }
     this.#forgetRequest(request, true);
     this.emit(NetworkManagerEvent.RequestFailed, request);

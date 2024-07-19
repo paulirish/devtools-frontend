@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Platform from '../../core/platform/platform.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
+import * as Trace from '../../models/trace/trace.js';
 import * as Timeline from '../../panels/timeline/timeline.js';
+import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 /**
@@ -77,19 +81,15 @@ TestRunner.formatters.formatAsInvalidationCause = function(cause) {
 };
 
 PerformanceTestRunner.createTracingModel = function(events) {
-  const model = new Trace.TracingModel();
+  const model = new Trace.Legacy.TracingModel();
   model.addEvents(events);
   model.tracingComplete();
   return model;
 };
 
-PerformanceTestRunner.tracingModel = function() {
-  return Timeline.TimelinePanel.TimelinePanel.instance().performanceModel.tracingModel();
-};
-
 PerformanceTestRunner.invokeWithTracing = function(functionName, callback, additionalCategories, enableJSSampling) {
   let categories = '-*,disabled-by-default-devtools.timeline*,devtools.timeline,blink.user_timing,' +
-      Trace.TracingModel.LegacyTopLevelEventCategory;
+      Trace.Legacy.LegacyTopLevelEventCategory;
 
   if (additionalCategories) {
     categories += ',' + additionalCategories;
@@ -118,12 +118,8 @@ PerformanceTestRunner.timelineModel = function() {
   return PerformanceTestRunner.performanceModel().timelineModel();
 };
 
-PerformanceTestRunner.timelineFrameModel = function() {
-  return PerformanceTestRunner.performanceModel().frameModel();
-};
-
 PerformanceTestRunner.createPerformanceModelWithEvents = async function(events) {
-  const tracingModel = new Trace.TracingModel();
+  const tracingModel = new Trace.Legacy.TracingModel();
   tracingModel.addEvents(events);
   tracingModel.tracingComplete();
   const performanceModel = new Timeline.PerformanceModel.PerformanceModel();
@@ -135,7 +131,7 @@ PerformanceTestRunner.createPerformanceModelWithEvents = async function(events) 
 
 PerformanceTestRunner.createTimelineController = function() {
   const controller = new Timeline.TimelineController.TimelineController(
-      self.SDK.targetManager.primaryPageTarget(), Timeline.TimelinePanel.TimelinePanel.instance());
+      SDK.TargetManager.TargetManager.instance().primaryPageTarget(), Timeline.TimelinePanel.TimelinePanel.instance());
   controller.tracingManager = TestRunner.tracingManager;
   return controller;
 };
@@ -289,13 +285,9 @@ PerformanceTestRunner.printTraceEventProperties = function(traceEvent) {
 PerformanceTestRunner.printTraceEventPropertiesWithDetails = async function(event) {
   PerformanceTestRunner.printTraceEventProperties(event);
   const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildDetailsTextForTraceEvent(
-      event, self.SDK.targetManager.primaryPageTarget(), new Components.Linkifier());
+      event, SDK.TargetManager.TargetManager.instance().primaryPageTarget(), new Components.Linkifier.Linkifier());
   TestRunner.waitForPendingLiveLocationUpdates();
   TestRunner.addResult(`Text details for ${event.name}: ${details}`);
-
-  if (TimelineModel.TimelineModel.EventOnTimelineData.forEvent(event).warning) {
-    TestRunner.addResult(`${event.name} has a warning`);
-  }
 };
 
 PerformanceTestRunner.mainTrack = function() {

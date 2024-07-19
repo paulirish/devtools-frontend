@@ -37,7 +37,7 @@ import type * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
-import {DebuggerWorkspaceBinding, type DebuggerSourceMapping} from './DebuggerWorkspaceBinding.js';
+import {type DebuggerSourceMapping, DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
 import {NetworkProject} from './NetworkProject.js';
 import {metadataForURL} from './ResourceUtils.js';
 
@@ -484,23 +484,18 @@ export class ResourceScriptFile extends Common.ObjectWrapper.ObjectWrapper<Resou
       return;
     }
     const {pluginManager} = DebuggerWorkspaceBinding.instance();
-    if (pluginManager) {
-      pluginManager.setDebugInfoURL(this.#script, debugInfoURL);
-    }
+    pluginManager.setDebugInfoURL(this.#script, debugInfoURL);
   }
 
   hasSourceMapURL(): boolean {
     return this.#script !== undefined && Boolean(this.#script.sourceMapURL);
   }
 
-  async missingSymbolFiles(): Promise<string[]|null> {
+  async missingSymbolFiles(): Promise<SDK.DebuggerModel.MissingDebugFiles[]|null> {
     if (!this.#script) {
       return null;
     }
     const {pluginManager} = this.#resourceScriptMapping.debuggerWorkspaceBinding;
-    if (!pluginManager) {
-      return null;
-    }
     const sources = await pluginManager.getSourcesForScript(this.#script);
     return sources && 'missingSymbolFiles' in sources ? sources.missingSymbolFiles : null;
   }

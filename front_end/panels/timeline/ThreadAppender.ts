@@ -8,7 +8,8 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as AnnotationsManager from '../../services/annotations_manager/annotations_manager.js';
+import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {
   addDecorationToEvent,
@@ -22,7 +23,6 @@ import {
   type TrackAppender,
   type TrackAppenderName,
 } from './CompatibilityTracksAppender.js';
-import * as TimelineComponents from './components/components.js';
 import {getCategoryStyles, getEventStyle} from './EventUICategory.js';
 
 const UIStrings = {
@@ -36,6 +36,10 @@ const UIStrings = {
    * @example{example.com} PH1
    */
   mainS: 'Main — {PH1}',
+  /**
+   * @description Refers to the main thread of execution of a program. See https://developer.mozilla.org/en-US/docs/Glossary/Main_thread
+   */
+  main: 'Main',
   /**
    * @description Refers to any frame in the page. See https://www.w3.org/TR/html401/present/frames.html
    * @example {https://example.com} PH1
@@ -71,10 +75,19 @@ const UIStrings = {
    */
   raster: 'Raster',
   /**
+   *@description Threads used for background tasks.
+   */
+  threadPool: 'Thread Pool',
+  /**
    *@description Name for a thread that rasterizes graphics in a website.
    *@example {2} PH1
    */
   rasterizerThreadS: 'Rasterizer Thread {PH1}',
+  /**
+   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   *@example {2} PH1
+   */
+  threadPoolThreadS: 'Thread Pool Worker {PH1}',
   /**
    *@description Title of a bidder auction worklet with known URL in the timeline flame chart of the Performance panel
    *@example {https://google.com} PH1
@@ -117,18 +130,15 @@ const UIStrings = {
    * @example {https://google.com} PH1
    */
   workletServiceS: 'Auction Worklet Service — {PH1}',
+  /**
+   *@description Text used to show an EventDispatch event which has a type associated with it
+   *@example {click} PH1
+   */
+  eventDispatchS: 'Event: {PH1}',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/ThreadAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-export const enum ThreadType {
-  MAIN_THREAD = 'MAIN_THREAD',
-  WORKER = 'WORKER',
-  RASTERIZER = 'RASTERIZER',
-  AUCTION_WORKLET = 'AUCTION_WORKLET',
-  OTHER = 'OTHER',
-}
 
 // This appender is only triggered when the Renderer handler is run. At
 // the moment this only happens in the basic component server example.
@@ -138,34 +148,27 @@ export const enum ThreadType {
 export class ThreadAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'Thread';
 
-  #colorGenerator: Common.Color.Generator;
+  #colorGenerator: Common.Color.GeneratorOKLCH;
   #compatibilityBuilder: CompatibilityTracksAppender;
-  #traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData;
+  #traceParsedData: TraceEngine.Handlers.Types.TraceParseData;
 
   #entries: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
-  #tree: TraceEngine.Handlers.ModelHandlers.Renderer.RendererTree;
+  #tree: TraceEngine.Helpers.TreeHelpers.TraceEntryTree;
   #processId: TraceEngine.Types.TraceEvents.ProcessID;
   #threadId: TraceEngine.Types.TraceEvents.ThreadID;
   #threadDefaultName: string;
-  #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
   #expanded = false;
-  // Raster threads are rendered together under a singler header, so
-  // the header is added for the first raster thread and skipped
-  // thereafter.
-  #rasterIndex: number;
   #headerAppended: boolean = false;
-  readonly threadType: ThreadType = ThreadType.MAIN_THREAD;
+  readonly threadType: TraceEngine.Handlers.Threads.ThreadType = TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD;
   readonly isOnMainFrame: boolean;
-  #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignoreListJSFramesOnTimeline');
-  // TODO(crbug.com/1428024) Clean up API so that we don't have to pass
-  // a raster index to the appender (for instance, by querying the flame
-  // chart data in the appender or by passing data about the flamechart
-  // groups).
+  #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignore-list-js-frames-on-timeline');
+  #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
+  #url: string = '';
+  #headerNestingLevel: number|null = null;
   constructor(
-      compatibilityBuilder: CompatibilityTracksAppender, flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
-      traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData,
+      compatibilityBuilder: CompatibilityTracksAppender, traceParsedData: TraceEngine.Handlers.Types.TraceParseData,
       processId: TraceEngine.Types.TraceEvents.ProcessID, threadId: TraceEngine.Types.TraceEvents.ThreadID,
-      threadName: string|null, type: ThreadType, rasterCount: number) {
+      threadName: string|null, type: TraceEngine.Handlers.Threads.ThreadType) {
     this.#compatibilityBuilder = compatibilityBuilder;
     // TODO(crbug.com/1456706):
     // The values for this color generator have been taken from the old
@@ -173,21 +176,22 @@ export class ThreadAppender implements TrackAppender {
     // generator is used here to create colors for js frames (profile
     // calls) in the flamechart by hashing the script's url. We might
     // need to reconsider this generator when migrating to GM3 colors.
-    this.#colorGenerator =
-        new Common.Color.Generator({min: 30, max: 330, count: undefined}, {min: 50, max: 80, count: 3}, 85);
+    this.#colorGenerator = new Common.Color.GeneratorOKLCH(92, 0.07, {min: 70, max: 325, count: undefined});
     // Add a default color for call frames with no url.
     this.#colorGenerator.setColorForID('', '#f2ecdc');
     this.#traceParsedData = traceParsedData;
     this.#processId = processId;
     this.#threadId = threadId;
-    this.#rasterIndex = rasterCount;
-    this.#flameChartData = flameChartData;
-    const entries = this.#traceParsedData.Renderer?.processes.get(processId)?.threads?.get(threadId)?.entries;
-    const tree = this.#traceParsedData.Renderer?.processes.get(processId)?.threads?.get(threadId)?.tree;
-    if (!entries) {
-      throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
-    }
-    if (!tree) {
+
+    // When loading a CPU profile, only CPU data will be available, thus
+    // we get the data from the SamplesHandler.
+    const entries = type === TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE ?
+        this.#traceParsedData.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileCalls :
+        this.#traceParsedData.Renderer?.processes.get(processId)?.threads?.get(threadId)?.entries;
+    const tree = type === TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE ?
+        this.#traceParsedData.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileTree :
+        this.#traceParsedData.Renderer?.processes.get(processId)?.threads?.get(threadId)?.tree;
+    if (!entries || !tree) {
       throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
     }
     this.#entries = entries;
@@ -201,6 +205,7 @@ export class ThreadAppender implements TrackAppender {
     if (this.#traceParsedData.AuctionWorklets.worklets.has(processId)) {
       this.appenderName = 'Thread_AuctionWorklet';
     }
+    this.#url = this.#traceParsedData.Renderer?.processes.get(this.#processId)?.url || '';
   }
 
   processId(): TraceEngine.Types.TraceEvents.ProcessID {
@@ -228,6 +233,9 @@ export class ThreadAppender implements TrackAppender {
     return this.#appendTreeAtLevel(trackStartLevel);
   }
 
+  setHeaderNestingLevel(level: number): void {
+    this.#headerNestingLevel = level;
+  }
   /**
    * Track header is appended only if there are events visible on it.
    * Otherwise we don't append any track. So, instead of preemptively
@@ -238,12 +246,21 @@ export class ThreadAppender implements TrackAppender {
     if (this.#headerAppended) {
       return;
     }
-    this.#headerAppended = true;
-    if (this.threadType === ThreadType.RASTERIZER) {
-      this.#appendRasterHeaderAndTitle(trackStartLevel);
+    if (this.threadType === TraceEngine.Handlers.Threads.ThreadType.RASTERIZER ||
+        this.threadType === TraceEngine.Handlers.Threads.ThreadType.THREAD_POOL) {
+      this.#appendGroupedTrackHeaderAndTitle(trackStartLevel, this.threadType);
     } else {
       this.#appendTrackHeaderAtLevel(trackStartLevel);
     }
+    this.#headerAppended = true;
+  }
+
+  setHeaderAppended(headerAppended: boolean): void {
+    this.#headerAppended = headerAppended;
+  }
+
+  headerAppended(): boolean {
+    return this.#headerAppended;
   }
 
   /**
@@ -258,7 +275,12 @@ export class ThreadAppender implements TrackAppender {
   #appendTrackHeaderAtLevel(currentLevel: number): void {
     const trackIsCollapsible = this.#entries.length > 0;
     const style = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
-    const group = buildTrackHeader(currentLevel, this.trackName(), style, /* selectable= */ true, this.#expanded);
+    if (this.#headerNestingLevel !== null) {
+      style.nestingLevel = this.#headerNestingLevel;
+    }
+    const group = buildTrackHeader(
+        currentLevel, this.trackName(), style, /* selectable= */ true, this.#expanded, /* track= */ null,
+        /* showStackContextMenu= */ true);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
   }
   /**
@@ -266,49 +288,66 @@ export class ThreadAppender implements TrackAppender {
    * flamechart. However, each thread has a unique title which needs to
    * be added to the flamechart data.
    */
-  #appendRasterHeaderAndTitle(trackStartLevel: number): void {
-    if (this.#rasterIndex === 1) {
+  #appendGroupedTrackHeaderAndTitle(
+      trackStartLevel: number,
+      threadType: TraceEngine.Handlers.Threads.ThreadType.RASTERIZER|
+      TraceEngine.Handlers.Threads.ThreadType.THREAD_POOL): void {
+    const currentTrackCount = this.#compatibilityBuilder.getCurrentTrackCountForThreadType(threadType);
+    if (currentTrackCount === 0) {
       const trackIsCollapsible = this.#entries.length > 0;
       const headerStyle = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
       const headerGroup =
           buildTrackHeader(trackStartLevel, this.trackName(), headerStyle, /* selectable= */ false, this.#expanded);
-      this.#flameChartData.groups.push(headerGroup);
+      this.#compatibilityBuilder.getFlameChartTimelineData().groups.push(headerGroup);
     }
+
     // Nesting is set to 1 because the track is appended inside the
     // header for all raster threads.
     const titleStyle = buildGroupStyle({padding: 2, nestingLevel: 1, collapsible: false});
-    const rasterizerTitle = i18nString(UIStrings.rasterizerThreadS, {PH1: this.#rasterIndex});
+    const rasterizerTitle = this.threadType === TraceEngine.Handlers.Threads.ThreadType.RASTERIZER ?
+        i18nString(UIStrings.rasterizerThreadS, {PH1: currentTrackCount + 1}) :
+        i18nString(UIStrings.threadPoolThreadS, {PH1: currentTrackCount + 1});
     const titleGroup =
         buildTrackHeader(trackStartLevel, rasterizerTitle, titleStyle, /* selectable= */ true, this.#expanded);
     this.#compatibilityBuilder.registerTrackForGroup(titleGroup, this);
   }
 
   trackName(): string {
-    // This UI string doesn't yet use the i18n API because it is not
-    // shown in production, only in the component server, reason being
-    // it is not ready to be shipped.
-    const url = this.#traceParsedData.Renderer?.processes.get(this.#processId)?.url || '';
     let threadTypeLabel: string|null = null;
     switch (this.threadType) {
-      case ThreadType.MAIN_THREAD:
-        threadTypeLabel =
-            this.isOnMainFrame ? i18nString(UIStrings.mainS, {PH1: url}) : i18nString(UIStrings.frameS, {PH1: url});
+      case TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD:
+        threadTypeLabel = this.isOnMainFrame ? i18nString(UIStrings.mainS, {PH1: this.#url}) :
+                                               i18nString(UIStrings.frameS, {PH1: this.#url});
         break;
-      case ThreadType.WORKER:
+      case TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE:
+        threadTypeLabel = i18nString(UIStrings.main);
+        break;
+      case TraceEngine.Handlers.Threads.ThreadType.WORKER:
         threadTypeLabel = this.#buildNameForWorker();
         break;
-      case ThreadType.RASTERIZER:
+      case TraceEngine.Handlers.Threads.ThreadType.RASTERIZER:
         threadTypeLabel = i18nString(UIStrings.raster);
         break;
-      case ThreadType.OTHER:
+      case TraceEngine.Handlers.Threads.ThreadType.THREAD_POOL:
+        threadTypeLabel = i18nString(UIStrings.threadPool);
         break;
-      case ThreadType.AUCTION_WORKLET:
+      case TraceEngine.Handlers.Threads.ThreadType.OTHER:
+        break;
+      case TraceEngine.Handlers.Threads.ThreadType.AUCTION_WORKLET:
         threadTypeLabel = this.#buildNameForAuctionWorklet();
         break;
       default:
         return Platform.assertNever(this.threadType, `Unknown thread type: ${this.threadType}`);
     }
-    return threadTypeLabel || this.#threadDefaultName;
+    let suffix = '';
+    if (this.#traceParsedData.Meta.traceIsGeneric) {
+      suffix = suffix + ` (${this.threadId()})`;
+    }
+    return (threadTypeLabel || this.#threadDefaultName) + suffix;
+  }
+
+  getUrl(): string {
+    return this.#url;
   }
 
   #buildNameForAuctionWorklet(): string {
@@ -403,14 +442,27 @@ export class ThreadAppender implements TrackAppender {
    * listed is done before appending.
    */
   #appendNodesAtLevel(
-      nodes: Iterable<TraceEngine.Handlers.ModelHandlers.Renderer.RendererEntryNode>, startingLevel: number,
+      nodes: Iterable<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
+    const invisibleEntries = AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()
+                                 ?.getEntriesFilter()
+                                 .invisibleEntries() ??
+        [];
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
       const entry = node.entry;
       const entryIsIgnoreListed = this.isIgnoreListedEntry(entry);
-      const entryIsVisible = this.#compatibilityBuilder.entryIsVisibleInTimeline(entry);
+      // Events' visibility is determined from their predefined styles,
+      // which is something that's not available in the engine data.
+      // Thus it needs to be checked in the appenders, but preemptively
+      // checking if there are visible events and returning early if not
+      // is potentially expensive since, in theory, we would be adding
+      // another traversal to the entries array (which could grow
+      // large). To avoid the extra cost we  add the check in the
+      // traversal we already need to append events.
+      const entryIsVisible = !invisibleEntries.includes(entry) &&
+          (this.#compatibilityBuilder.entryIsVisibleInTimeline(entry) || this.#showAllEventsEnabled);
       // For ignore listing support, these two conditions need to be met
       // to not append a profile call to the flame chart:
       // 1. It is ignore listed
@@ -436,33 +488,28 @@ export class ThreadAppender implements TrackAppender {
   }
 
   #appendEntryAtLevel(entry: TraceEngine.Types.TraceEvents.TraceEventData, level: number): void {
-    // Events' visibility is determined from their predefined styles,
-    // which is something that's not available in the engine data.
-    // Thus it needs to be checked in the appenders, but preemptively
-    // checking if there are visible events and returning early if not
-    // is potentially expensive since, in theory, we would be adding
-    // another traversal to the entries array (which could grow
-    // large). To avoid the extra cost we  add the check in the
-    // traversal we already need to append events.
-    if (!this.#compatibilityBuilder.entryIsVisibleInTimeline(entry)) {
-      return;
-    }
     this.#ensureTrackHeaderAppended(level);
     const index = this.#compatibilityBuilder.appendEventAtLevel(entry, level, this);
     this.#addDecorationsToEntry(entry, index);
   }
 
   #addDecorationsToEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData, index: number): void {
+    const flameChartData = this.#compatibilityBuilder.getFlameChartTimelineData();
+    if (AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.getEntriesFilter().isEntryModified(
+            entry)) {
+      addDecorationToEvent(
+          flameChartData, index, {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW});
+    }
     const warnings = this.#traceParsedData.Warnings.perEvent.get(entry);
     if (!warnings) {
       return;
     }
-    addDecorationToEvent(this.#flameChartData, index, {type: 'WARNING_TRIANGLE'});
+    addDecorationToEvent(flameChartData, index, {type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE});
     if (!warnings.includes('LONG_TASK')) {
       return;
     }
-    addDecorationToEvent(this.#flameChartData, index, {
-      type: 'CANDY',
+    addDecorationToEvent(flameChartData, index, {
+      type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
       startAtTime: TraceEngine.Handlers.ModelHandlers.Warnings.LONG_MAIN_THREAD_TASK_THRESHOLD,
     });
   }
@@ -494,19 +541,25 @@ export class ThreadAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
+    if (this.#traceParsedData.Meta.traceIsGeneric) {
+      return event.name ? `hsl(${Platform.StringUtilities.hashCode(event.name) % 300 + 30}, 40%, 70%)` : '#ccc';
+    }
+
     if (TraceEngine.Types.TraceEvents.isProfileCall(event)) {
+      if (event.callFrame.functionName === '(idle)') {
+        return getCategoryStyles().idle.getComputedColorValue();
+      }
       if (event.callFrame.scriptId === '0') {
         // If we can not match this frame to a script, return the
         // generic "scripting" color.
-        return getCategoryStyles().Scripting.getComputedValue();
+        return getCategoryStyles().scripting.getComputedColorValue();
       }
       // Otherwise, return a color created based on its URL.
       return this.#colorGenerator.colorForID(event.callFrame.url);
     }
-    const idForColorGeneration = this.titleForEvent(event);
     const defaultColor =
-        getEventStyle(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category.getComputedValue();
-    return defaultColor || this.#colorGenerator.colorForID(idForColorGeneration);
+        getEventStyle(event.name as TraceEngine.Types.TraceEvents.KnownEventName)?.category.getComputedColorValue();
+    return defaultColor || getCategoryStyles().other.getComputedColorValue();
   }
 
   /**
@@ -536,6 +589,13 @@ export class ThreadAppender implements TrackAppender {
       return entry.callFrame.functionName || i18nString(UIStrings.anonymous);
     }
 
+    if (TraceEngine.Types.TraceEvents.isTraceEventDispatch(entry)) {
+      // EventDispatch represent user actions such as clicks, so in this case
+      // rather than show the event title (which is always just "Event"), we
+      // add the type ("click") to help the user understand the event.
+      return i18nString(UIStrings.eventDispatchS, {PH1: entry.args.data.type});
+    }
+
     const defaultName = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName)?.title;
     return defaultName || entry.name;
   }
@@ -544,7 +604,7 @@ export class ThreadAppender implements TrackAppender {
    * Returns the info shown when an event added by this appender
    * is hovered in the timeline.
    */
-  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticEventWithSelfTime): HighlightedEntryInfo {
+  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): HighlightedEntryInfo {
     let title = this.titleForEvent(event);
     if (TraceEngine.Types.TraceEvents.isTraceEventParseHTML(event)) {
       const startLine = event.args['beginData']['startLine'];
@@ -554,8 +614,6 @@ export class ThreadAppender implements TrackAppender {
       const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
       title += ` - ${url} [${range}]`;
     }
-    const warningElements: HTMLSpanElement[] =
-        TimelineComponents.DetailsView.buildWarningElementsForEvent(event, this.#traceParsedData);
-    return {title, formattedTime: getFormattedTime(event.dur, event.selfTime), warningElements};
+    return {title, formattedTime: getFormattedTime(event.dur, event.selfTime)};
   }
 }

@@ -1,17 +1,23 @@
 "use strict";
+/**
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CdpCDPSession = void 0;
 const CDPSession_js_1 = require("../api/CDPSession.js");
+const CallbackRegistry_js_1 = require("../common/CallbackRegistry.js");
 const Errors_js_1 = require("../common/Errors.js");
 const assert_js_1 = require("../util/assert.js");
-const Connection_js_1 = require("./Connection.js");
+const ErrorLike_js_1 = require("../util/ErrorLike.js");
 /**
  * @internal
  */
 class CdpCDPSession extends CDPSession_js_1.CDPSession {
     #sessionId;
     #targetType;
-    #callbacks = new Connection_js_1.CallbackRegistry();
+    #callbacks = new CallbackRegistry_js_1.CallbackRegistry();
     #connection;
     #parentSessionId;
     #target;
@@ -47,18 +53,17 @@ class CdpCDPSession extends CDPSession_js_1.CDPSession {
     }
     parentSession() {
         if (!this.#parentSessionId) {
-            return;
+            // To make it work in Firefox that does not have parent (tab) sessions.
+            return this;
         }
         const parent = this.#connection?.session(this.#parentSessionId);
         return parent ?? undefined;
     }
-    send(method, ...paramArgs) {
+    send(method, params, options) {
         if (!this.#connection) {
             return Promise.reject(new Errors_js_1.TargetCloseError(`Protocol error (${method}): Session closed. Most likely the ${this.#targetType} has been closed.`));
         }
-        // See the comment in Connection#send explaining why we do this.
-        const params = paramArgs.length ? paramArgs[0] : undefined;
-        return this.#connection._rawSend(this.#callbacks, method, params, this.#sessionId);
+        return this.#connection._rawSend(this.#callbacks, method, params, this.#sessionId, options);
     }
     /**
      * @internal
@@ -66,7 +71,7 @@ class CdpCDPSession extends CDPSession_js_1.CDPSession {
     _onMessage(object) {
         if (object.id) {
             if (object.error) {
-                this.#callbacks.reject(object.id, (0, Connection_js_1.createProtocolErrorMessage)(object), object.error.message);
+                this.#callbacks.reject(object.id, (0, ErrorLike_js_1.createProtocolErrorMessage)(object), object.error.message);
             }
             else {
                 this.#callbacks.resolve(object.id, object.result);
@@ -102,6 +107,12 @@ class CdpCDPSession extends CDPSession_js_1.CDPSession {
      */
     id() {
         return this.#sessionId;
+    }
+    /**
+     * @internal
+     */
+    getPendingProtocolErrors() {
+        return this.#callbacks.getPendingProtocolErrors();
     }
 }
 exports.CdpCDPSession = CdpCDPSession;

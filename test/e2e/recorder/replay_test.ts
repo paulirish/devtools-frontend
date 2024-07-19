@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/es_modules_import */
-
 import {assert} from 'chai';
+import {type Target} from 'puppeteer-core';
 
 import {
-  type StepType,
   type AssertedEventType,
+  type StepType,
 } from '../../../front_end/panels/recorder/models/Schema.js';
 import {
+  click,
   getBrowserAndPages,
   getResourcesPath,
   getTestServerPort,
   waitFor,
-  click,
 } from '../../../test/shared/helper.js';
 import {
   describe,
@@ -498,23 +497,19 @@ describe('Recorder', function() {
       await waitFor('[aria-label="Performance panel"]');
     });
 
-    // Flaky
-    it.skip('[crbug.com/1403915]: should be able to replay actions with popups', async () => {
+    it('should be able to replay actions with popups', async () => {
       const {browser} = getBrowserAndPages();
       const events: Array<{type: string, url: string}> = [];
       // We can't import 'puppeteer' here because its not listed in the tsconfig.json of
       // the test target.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const targetLifecycleHandler = (target: any, type: string) => {
+      const targetLifecycleHandler = (target: Target, type: string) => {
         if (!target.url().endsWith('popup.html')) {
           return;
         }
         events.push({type, url: target.url()});
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const targetCreatedHandler = (target: any) => targetLifecycleHandler(target, 'targetCreated');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const targetDestroyedHandler = (target: any) => targetLifecycleHandler(target, 'targetDestroyed');
+      const targetCreatedHandler = (target: Target) => targetLifecycleHandler(target, 'targetCreated');
+      const targetDestroyedHandler = (target: Target) => targetLifecycleHandler(target, 'targetDestroyed');
 
       browser.on('targetcreated', targetCreatedHandler);
       browser.on('targetdestroyed', targetDestroyedHandler);

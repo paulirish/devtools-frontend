@@ -7,7 +7,7 @@ import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
 import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
 import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
 
-describe('Timings track', () => {
+describe('Timings track', function() {
   preloadForCodeCoverage('performance_panel/track_example.html');
 
   const urlForTest = 'performance_panel/track_example.html?track=Timings&fileName=timings-track';

@@ -107,9 +107,10 @@ export class CSSModel extends SDKModel<EventTypes> {
     this.#isTrackingRequestPending = false;
     this.#stylePollingThrottler = new Common.Throttler.Throttler(StylePollingInterval);
 
-    this.#sourceMapManager.setEnabled(Common.Settings.Settings.instance().moduleSetting('cssSourceMapsEnabled').get());
+    this.#sourceMapManager.setEnabled(
+        Common.Settings.Settings.instance().moduleSetting('css-source-maps-enabled').get());
     Common.Settings.Settings.instance()
-        .moduleSetting('cssSourceMapsEnabled')
+        .moduleSetting('css-source-maps-enabled')
         .addChangeListener(event => this.#sourceMapManager.setEnabled((event.data as boolean)));
   }
 
@@ -199,6 +200,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -219,6 +221,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -240,6 +243,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -260,6 +264,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -325,7 +330,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       return null;
     }
 
-    return new CSSMatchedStyles({
+    return await CSSMatchedStyles.create({
       cssModel: this,
       node: (node as DOMNode),
       inlinePayload: response.inlineStyle || null,
@@ -337,8 +342,10 @@ export class CSSModel extends SDKModel<EventTypes> {
       animationsPayload: response.cssKeyframesRules || [],
       parentLayoutNodeId: response.parentLayoutNodeId,
       positionFallbackRules: response.cssPositionFallbackRules || [],
+      positionTryRules: response.cssPositionTryRules || [],
       propertyRules: response.cssPropertyRules ?? [],
       cssPropertyRegistrations: response.cssPropertyRegistrations ?? [],
+      fontPaletteValuesRule: response.cssFontPaletteValuesRule,
     });
   }
 
@@ -451,6 +458,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -473,6 +481,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -494,6 +503,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -534,6 +544,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return new CSSStyleRule(this, rule);
     } catch (e) {
+      console.error(e);
       return null;
     }
   }
@@ -557,6 +568,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       }
       return this.#styleSheetIdToHeader.get(styleSheetId) || null;
     } catch (e) {
+      console.error(e);
       return null;
     }
   }
@@ -856,8 +868,6 @@ export class CSSModel extends SDKModel<EventTypes> {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   FontsUpdated = 'FontsUpdated',
   MediaQueryResultChanged = 'MediaQueryResultChanged',
@@ -1018,9 +1028,7 @@ export class CSSPropertyTracker extends Common.ObjectWrapper.ObjectWrapper<CSSPr
 
 const StylePollingInterval = 1000;  // throttling interval for style polling, in milliseconds
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum CSSPropertyTrackerEvents {
+export const enum CSSPropertyTrackerEvents {
   TrackedCSSPropertiesUpdated = 'TrackedCSSPropertiesUpdated',
 }
 

@@ -1,20 +1,11 @@
 /**
- * Copyright 2023 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import {mkdtemp} from 'fs/promises';
+import os from 'os';
 import path from 'path';
 
 import {
@@ -25,7 +16,6 @@ import {
 
 import type {Browser} from '../api/Browser.js';
 import {debugError} from '../common/util.js';
-import {USE_TAB_TARGET} from '../environment.js';
 import {assert} from '../util/assert.js';
 
 import type {
@@ -46,23 +36,24 @@ export class ChromeLauncher extends ProductLauncher {
   }
 
   override launch(options: PuppeteerNodeLaunchOptions = {}): Promise<Browser> {
-    const headless = options.headless ?? true;
     if (
-      headless === true &&
       this.puppeteer.configuration.logLevel === 'warn' &&
-      !Boolean(process.env['PUPPETEER_DISABLE_HEADLESS_WARNING'])
+      process.platform === 'darwin' &&
+      process.arch === 'x64'
     ) {
-      console.warn(
-        [
-          '\x1B[1m\x1B[43m\x1B[30m',
-          'Puppeteer old Headless deprecation warning:\x1B[0m\x1B[33m',
-          '  In the near future `headless: true` will default to the new Headless mode',
-          '  for Chrome instead of the old Headless implementation. For more',
-          '  information, please see https://developer.chrome.com/articles/new-headless/.',
-          '  Consider opting in early by passing `headless: "new"` to `puppeteer.launch()`',
-          '  If you encounter any bugs, please report them to https://github.com/puppeteer/puppeteer/issues/new/choose.\x1B[0m\n',
-        ].join('\n  ')
-      );
+      const cpus = os.cpus();
+      if (cpus[0]?.model.includes('Apple')) {
+        console.warn(
+          [
+            '\x1B[1m\x1B[43m\x1B[30m',
+            'Degraded performance warning:\x1B[0m\x1B[33m',
+            'Launching Chrome on Mac Silicon (arm64) from an x64 Node installation results in',
+            'Rosetta translating the Chrome binary, even if Chrome is already arm64. This would',
+            'result in huge performance issues. To resolve this, you must run Puppeteer with',
+            'a version of Node built for arm64.',
+          ].join('\n  ')
+        );
+      }
     }
 
     return super.launch(options);
@@ -136,7 +127,7 @@ export class ChromeLauncher extends ProductLauncher {
         channel || !this.puppeteer._isPuppeteerCore,
         `An \`executablePath\` or \`channel\` must be specified for \`puppeteer-core\``
       );
-      chromeExecutable = this.executablePath(channel);
+      chromeExecutable = this.executablePath(channel, options.headless ?? true);
     }
 
     return {
@@ -167,17 +158,36 @@ export class ChromeLauncher extends ProductLauncher {
   override defaultArgs(options: BrowserLaunchArgumentOptions = {}): string[] {
     // See https://github.com/GoogleChrome/chrome-launcher/blob/main/docs/chrome-flags-for-tools.md
 
+    const userDisabledFeatures = getFeatures(
+      '--disable-features',
+      options.args
+    );
+    if (options.args && userDisabledFeatures.length > 0) {
+      removeMatchingFlags(options.args, '--disable-features');
+    }
+
+    // Merge default disabled features with user-provided ones, if any.
     const disabledFeatures = [
       'Translate',
       // AcceptCHFrame disabled because of crbug.com/1348106.
       'AcceptCHFrame',
       'MediaRouter',
       'OptimizationHints',
+      // https://crbug.com/1492053
+      'ProcessPerSiteUpToMainFrameThreshold',
+      ...userDisabledFeatures,
     ];
 
-    if (!USE_TAB_TARGET) {
-      disabledFeatures.push('Prerender2');
+    const userEnabledFeatures = getFeatures('--enable-features', options.args);
+    if (options.args && userEnabledFeatures.length > 0) {
+      removeMatchingFlags(options.args, '--enable-features');
     }
+
+    // Merge default enabled features with user-provided ones, if any.
+    const enabledFeatures = [
+      'NetworkServiceInProcess2',
+      ...userEnabledFeatures,
+    ];
 
     const chromeArguments = [
       '--allow-pre-commit-input',
@@ -191,8 +201,9 @@ export class ChromeLauncher extends ProductLauncher {
       '--disable-default-apps',
       '--disable-dev-shm-usage',
       '--disable-extensions',
-      `--disable-features=${disabledFeatures.join(',')}`,
+      '--disable-field-trial-config', // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
       '--disable-hang-monitor',
+      '--disable-infobars',
       '--disable-ipc-flooding-protection',
       '--disable-popup-blocking',
       '--disable-prompt-on-repost',
@@ -200,16 +211,15 @@ export class ChromeLauncher extends ProductLauncher {
       '--disable-search-engine-choice-screen',
       '--disable-sync',
       '--enable-automation',
-      // TODO(sadym): remove '--enable-blink-features=IdleDetection' once
-      // IdleDetection is turned on by default.
-      '--enable-blink-features=IdleDetection',
-      '--enable-features=NetworkServiceInProcess2',
       '--export-tagged-pdf',
+      '--generate-pdf-document-outline',
       '--force-color-profile=srgb',
       '--metrics-recording-only',
       '--no-first-run',
       '--password-store=basic',
       '--use-mock-keychain',
+      `--disable-features=${disabledFeatures.join(',')}`,
+      `--enable-features=${enabledFeatures.join(',')}`,
     ];
     const {
       devtools = false,
@@ -225,7 +235,7 @@ export class ChromeLauncher extends ProductLauncher {
     }
     if (headless) {
       chromeArguments.push(
-        headless === 'new' ? '--headless=new' : '--headless',
+        headless === 'shell' ? '--headless' : '--headless=new',
         '--hide-scrollbars',
         '--mute-audio'
       );
@@ -241,14 +251,17 @@ export class ChromeLauncher extends ProductLauncher {
     return chromeArguments;
   }
 
-  override executablePath(channel?: ChromeReleaseChannel): string {
+  override executablePath(
+    channel?: ChromeReleaseChannel,
+    headless?: boolean | 'shell'
+  ): string {
     if (channel) {
       return computeSystemExecutablePath({
         browser: SupportedBrowsers.CHROME,
         channel: convertPuppeteerChannelToBrowsersChannel(channel),
       });
     } else {
-      return this.resolveExecutablePath();
+      return this.resolveExecutablePath(headless);
     }
   }
 }
@@ -266,4 +279,48 @@ function convertPuppeteerChannelToBrowsersChannel(
     case 'chrome-canary':
       return BrowsersChromeReleaseChannel.CANARY;
   }
+}
+
+/**
+ * Extracts all features from the given command-line flag
+ * (e.g. `--enable-features`, `--enable-features=`).
+ *
+ * Example input:
+ * ["--enable-features=NetworkService,NetworkServiceInProcess", "--enable-features=Foo"]
+ *
+ * Example output:
+ * ["NetworkService", "NetworkServiceInProcess", "Foo"]
+ *
+ * @internal
+ */
+export function getFeatures(flag: string, options: string[] = []): string[] {
+  return options
+    .filter(s => {
+      return s.startsWith(flag.endsWith('=') ? flag : `${flag}=`);
+    })
+    .map(s => {
+      return s.split(new RegExp(`${flag}=\\s*`))[1]?.trim();
+    })
+    .filter(s => {
+      return s;
+    }) as string[];
+}
+
+/**
+ * Removes all elements in-place from the given string array
+ * that match the given command-line flag.
+ *
+ * @internal
+ */
+export function removeMatchingFlags(array: string[], flag: string): string[] {
+  const regex = new RegExp(`^${flag}=.*`);
+  let i = 0;
+  while (i < array.length) {
+    if (regex.test(array[i]!)) {
+      array.splice(i, 1);
+    } else {
+      i++;
+    }
+  }
+  return array;
 }

@@ -1,6 +1,11 @@
+/**
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping.js';
-import { type CDPEvents, CDPSession } from '../api/CDPSession.js';
-import { type Connection } from './Connection.js';
+import { type CDPEvents, CDPSession, type CommandOptions } from '../api/CDPSession.js';
+import type { Connection } from './Connection.js';
 import type { CdpTarget } from './Target.js';
 /**
  * @internal
@@ -25,7 +30,7 @@ export declare class CdpCDPSession extends CDPSession {
     _target(): CdpTarget;
     connection(): Connection | undefined;
     parentSession(): CDPSession | undefined;
-    send<T extends keyof ProtocolMapping.Commands>(method: T, ...paramArgs: ProtocolMapping.Commands[T]['paramsType']): Promise<ProtocolMapping.Commands[T]['returnType']>;
+    send<T extends keyof ProtocolMapping.Commands>(method: T, params?: ProtocolMapping.Commands[T]['paramsType'][0], options?: CommandOptions): Promise<ProtocolMapping.Commands[T]['returnType']>;
     /**
      * @internal
      */
@@ -53,5 +58,9 @@ export declare class CdpCDPSession extends CDPSession {
      * Returns the session's id.
      */
     id(): string;
+    /**
+     * @internal
+     */
+    getPendingProtocolErrors(): Error[];
 }
 //# sourceMappingURL=CDPSession.d.ts.map

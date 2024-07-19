@@ -5,9 +5,9 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
+import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
-import {CSSLength, type CSSShadowModel} from './CSSShadowModel.js';
 import cssShadowEditorStyles from './cssShadowEditor.css.js';
 
 const UIStrings = {
@@ -41,6 +41,56 @@ const defaultUnit: string = 'px';
 const sliderThumbRadius: number = 6;
 const canvasSize: number = 88;
 
+export interface CSSShadowModel {
+  setInset(inset: boolean): void;
+  setOffsetX(offsetX: CSSLength): void;
+  setOffsetY(offsetY: CSSLength): void;
+  setBlurRadius(blurRadius: CSSLength): void;
+  setSpreadRadius(spreadRadius: CSSLength): void;
+  isBoxShadow(): boolean;
+  inset(): boolean;
+  offsetX(): CSSLength;
+  offsetY(): CSSLength;
+  blurRadius(): CSSLength;
+  spreadRadius(): CSSLength;
+}
+
+const CSS_LENGTH_REGEX = (function(): string {
+  const number = '([+-]?(?:[0-9]*[.])?[0-9]+(?:[eE][+-]?[0-9]+)?)';
+  const unit = '(ch|cm|em|ex|in|mm|pc|pt|px|rem|vh|vmax|vmin|vw)';
+  const zero = '[+-]?(?:0*[.])?0+(?:[eE][+-]?[0-9]+)?';
+  return new RegExp(number + unit + '|' + zero, 'gi').source;
+})();
+
+export class CSSLength {
+  amount: number;
+  unit: string;
+  constructor(amount: number, unit: string) {
+    this.amount = amount;
+    this.unit = unit;
+  }
+
+  static parse(text: string): CSSLength|null {
+    const lengthRegex = new RegExp('^(?:' + CSS_LENGTH_REGEX + ')$', 'i');
+    const match = text.match(lengthRegex);
+    if (!match) {
+      return null;
+    }
+    if (match.length > 2 && match[2]) {
+      return new CSSLength(parseFloat(match[1]), match[2]);
+    }
+    return CSSLength.zero();
+  }
+
+  static zero(): CSSLength {
+    return new CSSLength(0, '');
+  }
+
+  asCSSText(): string {
+    return this.amount + this.unit;
+  }
+}
+
 export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
     UI.Widget.VBox) {
   private readonly typeField: HTMLElement;
@@ -62,6 +112,8 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
   constructor() {
     super(true);
     this.contentElement.tabIndex = 0;
+    this.contentElement.setAttribute(
+        'jslog', `${VisualLogging.dialog('cssShadowEditor').parent('mapped').track({keydown: 'Enter|Escape'})}`);
     this.setDefaultFocusedElement(this.contentElement);
 
     this.typeField = this.contentElement.createChild('div', 'shadow-editor-field shadow-editor-flex-field');
@@ -74,10 +126,15 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.insetButton.addEventListener('click', this.onButtonClick.bind(this), false);
 
     const xField = this.contentElement.createChild('div', 'shadow-editor-field');
-    this.xInput = this.createTextInput(xField, i18nString(UIStrings.xOffset));
+    this.xInput = this.createTextInput(xField, i18nString(UIStrings.xOffset), 'x-offset');
     const yField = this.contentElement.createChild('div', 'shadow-editor-field');
-    this.yInput = this.createTextInput(yField, i18nString(UIStrings.yOffset));
+    this.yInput = this.createTextInput(yField, i18nString(UIStrings.yOffset), 'y-offset');
     this.xySlider = (xField.createChild('canvas', 'shadow-editor-2D-slider') as HTMLCanvasElement);
+    this.xySlider.setAttribute('jslog', `${VisualLogging.slider('xy').track({
+                                 click: true,
+                                 drag: true,
+                                 keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight',
+                               })}`);
     this.xySlider.width = canvasSize;
     this.xySlider.height = canvasSize;
     this.xySlider.tabIndex = -1;
@@ -89,15 +146,15 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
 
     const blurField =
         this.contentElement.createChild('div', 'shadow-editor-field shadow-editor-flex-field shadow-editor-blur-field');
-    this.blurInput = this.createTextInput(blurField, i18nString(UIStrings.blur));
-    this.blurSlider = this.createSlider(blurField);
+    this.blurInput = this.createTextInput(blurField, i18nString(UIStrings.blur), 'blur');
+    this.blurSlider = this.createSlider(blurField, 'blur');
 
     this.spreadField = this.contentElement.createChild('div', 'shadow-editor-field shadow-editor-flex-field');
-    this.spreadInput = this.createTextInput(this.spreadField, i18nString(UIStrings.spread));
-    this.spreadSlider = this.createSlider(this.spreadField);
+    this.spreadInput = this.createTextInput(this.spreadField, i18nString(UIStrings.spread), 'spread');
+    this.spreadSlider = this.createSlider(this.spreadField, 'spread');
   }
 
-  private createTextInput(field: Element, propertyName: string): HTMLInputElement {
+  private createTextInput(field: Element, propertyName: string, jslogContext: string): HTMLInputElement {
     const label = field.createChild('label', 'shadow-editor-label');
     label.textContent = propertyName;
     label.setAttribute('for', propertyName);
@@ -108,12 +165,15 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
     textInput.addEventListener('wheel', this.handleValueModification.bind(this), false);
     textInput.addEventListener('input', this.onTextInput.bind(this), false);
     textInput.addEventListener('blur', this.onTextBlur.bind(this), false);
+    textInput.setAttribute(
+        'jslog', `${VisualLogging.value().track({change: true, keydown: 'ArrowUp|ArrowDown'}).context(jslogContext)}`);
     return textInput;
   }
 
-  private createSlider(field: Element): HTMLInputElement {
+  private createSlider(field: Element, jslogContext: string): HTMLInputElement {
     const slider = UI.UIUtils.createSlider(0, maxRange, -1);
     slider.addEventListener('input', this.onSliderInput.bind(this), false);
+    slider.setAttribute('jslog', `${VisualLogging.slider().track({click: true, drag: true}).context(jslogContext)}`);
     field.appendChild(slider);
     return slider as HTMLInputElement;
   }
@@ -427,9 +487,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   ShadowChanged = 'ShadowChanged',
 }
 

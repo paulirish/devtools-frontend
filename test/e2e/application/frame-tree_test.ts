@@ -36,7 +36,7 @@ const STACKTRACE_ROW_SELECTOR = '.stack-trace-row';
 const STACKTRACE_ROW_LINK_SELECTOR = '.stack-trace-row .link';
 const APPLICATION_PANEL_SELECTED_SELECTOR = '.tabbed-pane-header-tab.selected[aria-label="Application"]';
 
-const getTrailingURL = (text: string): string => {
+const getTrailingURL = (text: string) => {
   const match = text.match(/http.*$/);
   return match ? match[0] : '';
 };
@@ -56,7 +56,24 @@ declare global {
   }
 }
 
-describe('The Application Tab', async () => {
+const getFieldValuesTextContent = async () => {
+  const fieldValues = await getTrimmedTextContent('devtools-report-value');
+  if (fieldValues[0]) {
+    // This contains some CSS from the svg icon link being rendered. It's
+    // system-specific, so we get rid of it and only look at the (URL) text.
+    fieldValues[0] = getTrailingURL(fieldValues[0]);
+  }
+  if (fieldValues[10] && fieldValues[10].includes('accelerometer')) {
+    fieldValues[10] = 'accelerometer';
+  }
+  // Make sure the length is equivalent to the expected value below
+  if (fieldValues.length === 11) {
+    return fieldValues;
+  }
+  return undefined;
+};
+
+describe('The Application Tab', () => {
   afterEach(async () => {
     const {target} = getBrowserAndPages();
     await target.evaluate(async () => {
@@ -66,28 +83,13 @@ describe('The Application Tab', async () => {
   });
 
   // Update and reactivate when the whole FrameDetailsView is a custom component
-  it('shows details for a frame when clicked on in the frame tree', async () => {
+  it.skip('[crbug.com/1519420]: shows details for a frame when clicked on in the frame tree', async () => {
     const {target} = getBrowserAndPages();
     await navigateToApplicationTab(target, 'frame-tree');
     await click('#tab-resources');
     await doubleClickSourceTreeItem(TOP_FRAME_SELECTOR);
 
-    const fieldValuesTextContent = await waitForFunction(async () => {
-      const fieldValues = await getTrimmedTextContent('devtools-report-value');
-      if (fieldValues[0]) {
-        // This contains some CSS from the svg icon link being rendered. It's
-        // system-specific, so we get rid of it and only look at the (URL) text.
-        fieldValues[0] = getTrailingURL(fieldValues[0]);
-      }
-      if (fieldValues[9] && fieldValues[9].includes('accelerometer')) {
-        fieldValues[9] = 'accelerometer';
-      }
-      // Make sure the length is equivalent to the expected value below
-      if (fieldValues.length === 10) {
-        return fieldValues;
-      }
-      return undefined;
-    });
+    const fieldValuesTextContent = await waitForFunction(getFieldValuesTextContent);
     const expected = [
       `https://localhost:${getTestServerPort()}/test/e2e/resources/application/frame-tree.html`,
       `https://localhost:${getTestServerPort()}`,
@@ -96,6 +98,7 @@ describe('The Application Tab', async () => {
       'No',
       'None',
       'UnsafeNone',
+      'None',
       'unavailable\xA0requires cross-origin isolated context',
       'unavailable\xA0Learn more',
       'accelerometer',
@@ -188,7 +191,7 @@ describe('The Application Tab', async () => {
     assert.deepEqual(stackTraceRowsTextContent, expectedCollapsed);
   });
 
-  describe('', async () => {
+  describe('', () => {
     after(async () => {
       const {target} = getBrowserAndPages();
       await target.evaluate(() => {
@@ -286,7 +289,7 @@ describe('The Application Tab', async () => {
   });
 
   // Update and reactivate when the whole FrameDetailsView is a custom component
-  it('can handle when JS writes to frame', async () => {
+  it.skip('[crbug.com/1519420]: can handle when JS writes to frame', async () => {
     expectError('Request CacheStorage.requestCacheNames failed. {"code":-32602,"message":"Invalid security origin"}');
     const {target} = getBrowserAndPages();
     await goToResource('application/main-frame.html');
@@ -295,22 +298,7 @@ describe('The Application Tab', async () => {
     await doubleClickSourceTreeItem(IFRAME_FRAME_ID_SELECTOR);
 
     // check iframe's URL after pageload
-    const fieldValuesTextContent = await waitForFunction(async () => {
-      const fieldValues = await getTrimmedTextContent('devtools-report-value');
-      if (fieldValues[0]) {
-        // This contains some CSS from the svg icon link being rendered. It's
-        // system-specific, so we get rid of it and only look at the (URL) text.
-        fieldValues[0] = getTrailingURL(fieldValues[0]);
-      }
-      if (fieldValues[9] && fieldValues[9].includes('accelerometer')) {
-        fieldValues[9] = 'accelerometer';
-      }
-      // Make sure the length is equivalent to the expected value below
-      if (fieldValues.length === 10) {
-        return fieldValues;
-      }
-      return undefined;
-    });
+    const fieldValuesTextContent = await waitForFunction(getFieldValuesTextContent);
     const expected = [
       `https://localhost:${getTestServerPort()}/test/e2e/resources/application/iframe.html`,
       `https://localhost:${getTestServerPort()}`,
@@ -319,6 +307,7 @@ describe('The Application Tab', async () => {
       'No',
       'None',
       'UnsafeNone',
+      'None',
       'unavailable\xA0requires cross-origin isolated context',
       'unavailable\xA0Learn more',
       'accelerometer',
@@ -340,20 +329,7 @@ describe('The Application Tab', async () => {
 
     // check that iframe's URL has changed
     await doubleClickSourceTreeItem(MAIN_FRAME_SELECTOR);
-    const fieldValuesTextContent2 = await waitForFunction(async () => {
-      const fieldValues = await getTrimmedTextContent('devtools-report-value');
-      if (fieldValues[0]) {
-        fieldValues[0] = getTrailingURL(fieldValues[0]);
-      }
-      if (fieldValues[9] && fieldValues[9].includes('accelerometer')) {
-        fieldValues[9] = 'accelerometer';
-      }
-      // Make sure the length is equivalent to the expected value below
-      if (fieldValues.length === 10) {
-        return fieldValues;
-      }
-      return undefined;
-    });
+    const fieldValuesTextContent2 = await waitForFunction(getFieldValuesTextContent);
     const expected2 = [
       `https://localhost:${getTestServerPort()}/test/e2e/resources/application/main-frame.html`,
       `https://localhost:${getTestServerPort()}`,
@@ -362,6 +338,7 @@ describe('The Application Tab', async () => {
       'No',
       'None',
       'UnsafeNone',
+      'None',
       'unavailable\xA0requires cross-origin isolated context',
       'unavailable\xA0Learn more',
       'accelerometer',

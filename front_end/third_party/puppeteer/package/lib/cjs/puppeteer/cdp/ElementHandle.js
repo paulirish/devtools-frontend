@@ -1,18 +1,8 @@
 "use strict";
 /**
- * Copyright 2019 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2019 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -171,29 +161,30 @@ let CdpElementHandle = (() => {
                     return path.resolve(filePath);
                 }
             });
-            const { node } = await this.client.send('DOM.describeNode', {
-                objectId: this.id,
-            });
-            const { backendNodeId } = node;
-            /*  The zero-length array is a special case, it seems that
-                 DOM.setFileInputFiles does not actually update the files in that case,
-                 so the solution is to eval the element value to a new FileList directly.
+            /**
+             * The zero-length array is a special case, it seems that
+             * DOM.setFileInputFiles does not actually update the files in that case, so
+             * the solution is to eval the element value to a new FileList directly.
              */
             if (files.length === 0) {
+                // XXX: These events should converted to trusted events. Perhaps do this
+                // in `DOM.setFileInputFiles`?
                 await this.evaluate(element => {
                     element.files = new DataTransfer().files;
                     // Dispatch events for this case because it should behave akin to a user action.
-                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
                     element.dispatchEvent(new Event('change', { bubbles: true }));
                 });
+                return;
             }
-            else {
-                await this.client.send('DOM.setFileInputFiles', {
-                    objectId: this.id,
-                    files,
-                    backendNodeId,
-                });
-            }
+            const { node: { backendNodeId }, } = await this.client.send('DOM.describeNode', {
+                objectId: this.id,
+            });
+            await this.client.send('DOM.setFileInputFiles', {
+                objectId: this.id,
+                files,
+                backendNodeId,
+            });
         }
         async autofill(data) {
             const nodeInfo = await this.client.send('DOM.describeNode', {

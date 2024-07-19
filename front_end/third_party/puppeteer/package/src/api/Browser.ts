@@ -1,32 +1,32 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import type {ChildProcess} from 'child_process';
 
 import type {Protocol} from 'devtools-protocol';
 
+import {
+  firstValueFrom,
+  from,
+  merge,
+  raceWith,
+} from '../../third_party/rxjs/rxjs.js';
+import type {ProtocolType} from '../common/ConnectOptions.js';
 import {EventEmitter, type EventType} from '../common/EventEmitter.js';
-import {debugError, waitWithTimeout} from '../common/util.js';
-import {Deferred} from '../util/Deferred.js';
+import {
+  debugError,
+  fromEmitterEvent,
+  filterAsync,
+  timeout,
+} from '../common/util.js';
 import {asyncDisposeSymbol, disposeSymbol} from '../util/disposable.js';
 
 import type {BrowserContext} from './BrowserContext.js';
 import type {Page} from './Page.js';
 import type {Target} from './Target.js';
-
 /**
  * @public
  */
@@ -140,7 +140,7 @@ export const enum BrowserEvent {
    * Emitted when the URL of a target changes. Contains a {@link Target}
    * instance.
    *
-   * @remarks Note that this includes target changes in incognito browser
+   * @remarks Note that this includes target changes in all browser
    * contexts.
    */
   TargetChanged = 'targetchanged',
@@ -151,7 +151,7 @@ export const enum BrowserEvent {
    *
    * Contains a {@link Target} instance.
    *
-   * @remarks Note that this includes target creations in incognito browser
+   * @remarks Note that this includes target creations in all browser
    * contexts.
    */
   TargetCreated = 'targetcreated',
@@ -159,7 +159,7 @@ export const enum BrowserEvent {
    * Emitted when a target is destroyed, for example when a page is closed.
    * Contains a {@link Target} instance.
    *
-   * @remarks Note that this includes target destructions in incognito browser
+   * @remarks Note that this includes target destructions in all browser
    * contexts.
    */
   TargetDestroyed = 'targetdestroyed',
@@ -168,13 +168,6 @@ export const enum BrowserEvent {
    */
   TargetDiscovered = 'targetdiscovered',
 }
-
-export {
-  /**
-   * @deprecated Use {@link BrowserEvent}.
-   */
-  BrowserEvent as BrowserEmittedEvents,
-};
 
 /**
  * @public
@@ -188,6 +181,14 @@ export interface BrowserEvents extends Record<EventType, unknown> {
    * @internal
    */
   [BrowserEvent.TargetDiscovered]: Protocol.Target.TargetInfo;
+}
+
+/**
+ * @public
+ * @experimental
+ */
+export interface DebugInfo {
+  pendingProtocolErrors: Error[];
 }
 
 /**
@@ -219,7 +220,7 @@ export interface BrowserEvents extends Record<EventType, unknown> {
  * // Store the endpoint to be able to reconnect to the browser.
  * const browserWSEndpoint = browser.wsEndpoint();
  * // Disconnect puppeteer from the browser.
- * browser.disconnect();
+ * await browser.disconnect();
  *
  * // Use the endpoint to reestablish a connection
  * const browser2 = await puppeteer.connect({browserWSEndpoint});
@@ -238,46 +239,16 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
   }
 
   /**
-   * @internal
-   */
-  _attach(): Promise<void> {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * @internal
-   */
-  _detach(): void {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * @internal
-   */
-  get _targets(): Map<string, Target> {
-    throw new Error('Not implemented');
-  }
-
-  /**
    * Gets the associated
    * {@link https://nodejs.org/api/child_process.html#class-childprocess | ChildProcess}.
    *
    * @returns `null` if this instance was connected to via
    * {@link Puppeteer.connect}.
    */
-  process(): ChildProcess | null {
-    throw new Error('Not implemented');
-  }
+  abstract process(): ChildProcess | null;
 
   /**
-   * @internal
-   */
-  _getIsPageTargetCallback(): IsPageTargetCallback | undefined {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Creates a new incognito {@link BrowserContext | browser context}.
+   * Creates a new {@link BrowserContext | browser context}.
    *
    * This won't share cookies/cache with other {@link BrowserContext | browser contexts}.
    *
@@ -287,15 +258,15 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    * import puppeteer from 'puppeteer';
    *
    * const browser = await puppeteer.launch();
-   * // Create a new incognito browser context.
-   * const context = await browser.createIncognitoBrowserContext();
+   * // Create a new browser context.
+   * const context = await browser.createBrowserContext();
    * // Create a new page in a pristine context.
    * const page = await context.newPage();
    * // Do stuff
    * await page.goto('https://example.com');
    * ```
    */
-  abstract createIncognitoBrowserContext(
+  abstract createBrowserContext(
     options?: BrowserContextOptions
   ): Promise<BrowserContext>;
 
@@ -316,26 +287,18 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
   abstract defaultBrowserContext(): BrowserContext;
 
   /**
-   * @internal
-   */
-  _disposeContext(contextId?: string): Promise<void>;
-  _disposeContext(): Promise<void> {
-    throw new Error('Not implemented');
-  }
-
-  /**
    * Gets the WebSocket URL to connect to this {@link Browser | browser}.
    *
    * This is usually used with {@link Puppeteer.connect}.
    *
    * You can find the debugger URL (`webSocketDebuggerUrl`) from
-   * `http://${host}:${port}/json/version`.
+   * `http://HOST:PORT/json/version`.
    *
    * See {@link
    * https://chromedevtools.github.io/devtools-protocol/#how-do-i-access-the-browser-target
    * | browser endpoint} for more information.
    *
-   * @remarks The format is always `ws://${host}:${port}/devtools/browser/<id>`.
+   * @remarks The format is always `ws://HOST:PORT/devtools/browser/<id>`.
    */
   abstract wsEndpoint(): string;
 
@@ -344,14 +307,6 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    * {@link Browser.defaultBrowserContext | default browser context}.
    */
   abstract newPage(): Promise<Page>;
-
-  /**
-   * @internal
-   */
-  _createPageInContext(contextId?: string): Promise<Page>;
-  _createPageInContext(): Promise<Page> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * Gets all active {@link Target | targets}.
@@ -387,31 +342,14 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
     predicate: (x: Target) => boolean | Promise<boolean>,
     options: WaitForTargetOptions = {}
   ): Promise<Target> {
-    const {timeout = 30000} = options;
-    const targetDeferred = Deferred.create<Target | PromiseLike<Target>>();
-
-    this.on(BrowserEvent.TargetCreated, check);
-    this.on(BrowserEvent.TargetChanged, check);
-    try {
-      this.targets().forEach(check);
-      if (!timeout) {
-        return await targetDeferred.valueOrThrow();
-      }
-      return await waitWithTimeout(
-        targetDeferred.valueOrThrow(),
-        'target',
-        timeout
-      );
-    } finally {
-      this.off(BrowserEvent.TargetCreated, check);
-      this.off(BrowserEvent.TargetChanged, check);
-    }
-
-    async function check(target: Target): Promise<void> {
-      if ((await predicate(target)) && !targetDeferred.resolved()) {
-        targetDeferred.resolve(target);
-      }
-    }
+    const {timeout: ms = 30000} = options;
+    return await firstValueFrom(
+      merge(
+        fromEmitterEvent(this, BrowserEvent.TargetCreated),
+        fromEmitterEvent(this, BrowserEvent.TargetChanged),
+        from(this.targets())
+      ).pipe(filterAsync(predicate), raceWith(timeout(ms)))
+    );
   }
 
   /**
@@ -454,10 +392,9 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    *
    * {@link Page | Pages} can override the user agent with
    * {@link Page.setUserAgent}.
+   *
    */
-  userAgent(): Promise<string> {
-    throw new Error('Not implemented');
-  }
+  abstract userAgent(): Promise<string>;
 
   /**
    * Closes this {@link Browser | browser} and all associated
@@ -469,14 +406,12 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
    * Disconnects Puppeteer from this {@link Browser | browser}, but leaves the
    * process running.
    */
-  disconnect(): void {
-    throw new Error('Not implemented');
-  }
+  abstract disconnect(): Promise<void>;
 
   /**
    * Whether Puppeteer is connected to this {@link Browser | browser}.
    *
-   * @deprecated Use {@link Browser.connected}.
+   * @deprecated Use {@link Browser | Browser.connected}.
    */
   isConnected(): boolean {
     return this.connected;
@@ -496,4 +431,21 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
   [asyncDisposeSymbol](): Promise<void> {
     return this.close();
   }
+
+  /**
+   * @internal
+   */
+  abstract get protocol(): ProtocolType;
+
+  /**
+   * Get debug information from Puppeteer.
+   *
+   * @remarks
+   *
+   * Currently, includes pending protocol calls. In the future, we might add more info.
+   *
+   * @public
+   * @experimental
+   */
+  abstract get debugInfo(): DebugInfo;
 }

@@ -8,13 +8,13 @@ import * as TimelineComponents from '../../../../../front_end/panels/timeline/co
 const breadcrumbsUI = new TimelineComponents.BreadcrumbsUI.BreadcrumbsUI();
 document.getElementById('container')?.appendChild(breadcrumbsUI);
 
-const traceWindow: TraceEngine.Types.Timing.TraceWindow = {
+const traceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds = {
   min: TraceEngine.Types.Timing.MicroSeconds(3),
   max: TraceEngine.Types.Timing.MicroSeconds(9),
   range: TraceEngine.Types.Timing.MicroSeconds(6),
 };
 
-const breadcrumb: TimelineComponents.Breadcrumbs.Breadcrumb = {
+const breadcrumb: TraceEngine.Types.File.Breadcrumb = {
   window: traceWindow,
   child: null,
 };

@@ -1,17 +1,7 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the 'License');
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an 'AS IS' BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { Keyboard, Mouse, MouseButton, Touchscreen, } from '../api/Input.js';
 import { _keyDefinitions, } from '../common/USKeyboardLayout.js';
@@ -439,23 +429,33 @@ export class CdpTouchscreen extends Touchscreen {
     updateClient(client) {
         this.#client = client;
     }
-    async tap(x, y) {
-        await this.touchStart(x, y);
-        await this.touchEnd();
-    }
     async touchStart(x, y) {
-        const touchPoints = [{ x: Math.round(x), y: Math.round(y) }];
         await this.#client.send('Input.dispatchTouchEvent', {
             type: 'touchStart',
-            touchPoints,
+            touchPoints: [
+                {
+                    x: Math.round(x),
+                    y: Math.round(y),
+                    radiusX: 0.5,
+                    radiusY: 0.5,
+                    force: 0.5,
+                },
+            ],
             modifiers: this.#keyboard._modifiers,
         });
     }
     async touchMove(x, y) {
-        const movePoints = [{ x: Math.round(x), y: Math.round(y) }];
         await this.#client.send('Input.dispatchTouchEvent', {
             type: 'touchMove',
-            touchPoints: movePoints,
+            touchPoints: [
+                {
+                    x: Math.round(x),
+                    y: Math.round(y),
+                    radiusX: 0.5,
+                    radiusY: 0.5,
+                    force: 0.5,
+                },
+            ],
             modifiers: this.#keyboard._modifiers,
         });
     }

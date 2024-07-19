@@ -10,6 +10,7 @@ import {AttributionReportingIssue} from './AttributionReportingIssue.js';
 import {BounceTrackingIssue} from './BounceTrackingIssue.js';
 import {ClientHintIssue} from './ClientHintIssue.js';
 import {ContentSecurityPolicyIssue} from './ContentSecurityPolicyIssue.js';
+import {CookieDeprecationMetadataIssue} from './CookieDeprecationMetadataIssue.js';
 import {CookieIssue} from './CookieIssue.js';
 import {CorsIssue} from './CorsIssue.js';
 import {CrossOriginEmbedderPolicyIssue, isCrossOriginEmbedderPolicyIssue} from './CrossOriginEmbedderPolicyIssue.js';
@@ -113,6 +114,10 @@ const issueCodeHandlers = new Map<
     Protocol.Audits.InspectorIssueCode.PropertyRuleIssue,
     PropertyRuleIssue.fromInspectorIssue,
   ],
+  [
+    Protocol.Audits.InspectorIssueCode.CookieDeprecationMetadataIssue,
+    CookieDeprecationMetadataIssue.fromInspectorIssue,
+  ],
 ]);
 
 /**
@@ -153,7 +158,7 @@ export function defaultHideIssueByCodeSetting(): HideIssueMenuSetting {
 
 export function getHideIssueByCodeSetting(): Common.Settings.Setting<HideIssueMenuSetting> {
   return Common.Settings.Settings.instance().createSetting(
-      'HideIssueByCodeSetting-Experiment-2021', defaultHideIssueByCodeSetting());
+      'hide-issue-by-code-setting-experiment-2021', defaultHideIssueByCodeSetting());
 }
 
 /**
@@ -190,7 +195,7 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     SDK.FrameManager.FrameManager.instance().addEventListener(
         SDK.FrameManager.Events.FrameAddedToTarget, this.#onFrameAddedToTarget, this);
 
-    // issueFilter uses the 'showThirdPartyIssues' setting. Clients of IssuesManager need
+    // issueFilter uses the 'show-third-party-issues' setting. Clients of IssuesManager need
     // a full update when the setting changes to get an up-to-date issues list.
     this.showThirdPartyIssuesSetting?.addChangeListener(() => this.#updateFilteredIssues());
     this.hideIssueSetting?.addChangeListener(() => this.#updateFilteredIssues());
@@ -439,7 +444,7 @@ export type EventTypes = {
 };
 
 // @ts-ignore
-globalThis.addIssueForTest = (issue: Protocol.Audits.InspectorIssue): void => {
+globalThis.addIssueForTest = (issue: Protocol.Audits.InspectorIssue) => {
   const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
   const issuesModel = mainTarget?.model(SDK.IssuesModel.IssuesModel);
   issuesModel?.issueAdded({issue});

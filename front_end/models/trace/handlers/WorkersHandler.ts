@@ -28,6 +28,7 @@ export function initialize(): void {
 export function reset(): void {
   sessionIdEvents.length = 0;
   workerIdByThread.clear();
+  workerURLById.clear();
   handlerState = HandlerState.UNINITIALIZED;
 }
 
@@ -60,8 +61,8 @@ export function data(): WorkersData {
   }
 
   return {
-    workerSessionIdEvents: [...sessionIdEvents],
-    workerIdByThread: new Map(workerIdByThread),
-    workerURLById: new Map(workerURLById),
+    workerSessionIdEvents: sessionIdEvents,
+    workerIdByThread,
+    workerURLById,
   };
 }

@@ -252,7 +252,7 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
   }
 
   private screencastFrame(base64Data: string, metadata: Protocol.Page.ScreencastFrameMetadata): void {
-    this.imageElement.onload = (): void => {
+    this.imageElement.onload = () => {
       this.pageScaleFactor = metadata.pageScaleFactor;
       this.screenOffsetTop = metadata.offsetTop;
       this.scrollOffsetX = metadata.scrollOffsetX;
@@ -332,7 +332,7 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
     const node = await this.domModel.nodeForLocation(
         Math.floor(position.x / this.pageScaleFactor + this.scrollOffsetX),
         Math.floor(position.y / this.pageScaleFactor + this.scrollOffsetY),
-        Common.Settings.Settings.instance().moduleSetting('showUAShadowDOM').get());
+        Common.Settings.Settings.instance().moduleSetting('show-ua-shadow-dom').get());
     if (!node) {
       return;
     }
@@ -630,9 +630,9 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
     }
     this.context.lineTo(boxX, boxY + titleHeight);
     this.context.closePath();
-    this.context.fillStyle = 'rgb(255, 255, 194)';
+    this.context.fillStyle = 'var(--sys-color-yellow-container)';
     this.context.fill();
-    this.context.strokeStyle = 'rgb(128, 128, 128)';
+    this.context.strokeStyle = 'var(--sys-color-outline)';
     this.context.stroke();
 
     this.context.restore();
@@ -664,10 +664,10 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
     pattern.height = size * 2;
     const pctx = pattern.getContext('2d') as CanvasRenderingContext2D;
 
-    pctx.fillStyle = 'rgb(195, 195, 195)';
+    pctx.fillStyle = 'var(--sys-color-neutral-outline)';
     pctx.fillRect(0, 0, size * 2, size * 2);
 
-    pctx.fillStyle = 'rgb(225, 225, 225)';
+    pctx.fillStyle = 'var(--sys-color-surface-variant)';
     pctx.fillRect(0, 0, size, size);
     pctx.fillRect(size, size, size, size);
     return context.createPattern(pattern, 'repeat');

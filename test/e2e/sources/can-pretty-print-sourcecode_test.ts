@@ -7,7 +7,6 @@ import {assert} from 'chai';
 import {
   $$,
   click,
-  enableExperiment,
   getBrowserAndPages,
   step,
   typeText,
@@ -15,9 +14,10 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
-import {beforeEach, describe, it} from '../../shared/mocha-extensions.js';
+import {describe, it} from '../../shared/mocha-extensions.js';
 import {elementContainsTextWithSelector} from '../helpers/network-helpers.js';
 import {openGoToLineQuickOpen} from '../helpers/quick_open-helpers.js';
+import {togglePreferenceInSettingsTab} from '../helpers/settings-helpers.js';
 import {
   addBreakpointForLine,
   isPrettyPrinted,
@@ -35,10 +35,6 @@ describe('The Sources Tab', function() {
   if (this.timeout() > 0) {
     this.timeout(10000);
   }
-
-  beforeEach(async () => {
-    await enableExperiment('sourcesPrettyPrint');
-  });
 
   it('can pretty-print a JavaScript file inline', async () => {
     await openSourceCodeEditorForFile('minified-sourcecode.js', 'minified-sourcecode.html');
@@ -125,7 +121,7 @@ describe('The Sources Tab', function() {
     await step('can un-pretty-print a json subtype file', async () => {
       await click(PRETTY_PRINT_BUTTON);
       const expectedNotPrettyLines =
-          '{"Keys": [{"Key1": "Value1","Key2": "Value2","Key3": true},{"Key1": "Value1","Key2": "Value2","Key3": false}]}';
+          '{"Keys": [{"Key1": "Value1","Key2": "Value2","Key3": true},{"Key1": "Value1","Key2": "Value2","Key3": false}]},';
       const actualNotPrettyText = await retrieveCodeMirrorEditorContent();
       assert.strictEqual(expectedNotPrettyLines, actualNotPrettyText.toString());
     });
@@ -200,6 +196,20 @@ describe('The Sources Tab', function() {
     await typeText('6');
     await frontend.keyboard.press('Enter');
     await waitForHighlightedLine(6);
+  });
+
+  it('automatically pretty-prints minified code (by default)', async () => {
+    await openSourceCodeEditorForFile('minified-sourcecode-1.min.js', 'minified-sourcecode-1.html');
+    const lines = await retrieveCodeMirrorEditorContent();
+    assert.strictEqual(lines.length, 23);
+  });
+
+  it('does not automatically pretty-print minified code (when disabled via settings)', async () => {
+    await togglePreferenceInSettingsTab('Automatically pretty print minified sources', false);
+
+    await openSourceCodeEditorForFile('minified-sourcecode-1.min.js', 'minified-sourcecode-1.html');
+    const lines = await retrieveCodeMirrorEditorContent();
+    assert.strictEqual(lines.length, 3);
   });
 
   it('does not automatically pretty-print authored code', async () => {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/check_component_naming, rulesdir/custom_element_definitions_location, rulesdir/no_underscored_properties, rulesdir/ban_style_tags_in_lit_html, rulesdir/ban_a_tags_in_lit_html, rulesdir/custom_element_component_definition, rulesdir/lit_html_host_this,  @typescript-eslint/naming-convention,  @typescript-eslint/explicit-function-return-type,  @typescript-eslint/no-unused-vars */
+/* eslint-disable rulesdir/check_component_naming, rulesdir/custom_element_definitions_location, rulesdir/no_underscored_properties, rulesdir/ban_style_tags_in_lit_html, rulesdir/ban_a_tags_in_lit_html, rulesdir/lit_html_host_this,  @typescript-eslint/naming-convention,  @typescript-eslint/explicit-function-return-type,  @typescript-eslint/no-unused-vars */
 
 import {html, nothing, render} from 'lit-html';
 
@@ -139,7 +139,6 @@ export class ModuleConfigurationList extends HTMLElement {
         cursor: pointer;
         display: inline-block;
         mask-size: contain;
-        -webkit-mask-size: contain;
         width: 20px;
         height: 20px;
         background-color: rgb(110 110 110);
@@ -153,13 +152,11 @@ export class ModuleConfigurationList extends HTMLElement {
       }
       .mc-delete {
         mask-image: url("data:image/svg+xml,%0A%3Csvg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='%23000000'%3E%3Cpath d='M0 0h24v24H0V0z' fill='none'/%3E%3Cpath d='M15 4V3H9v1H4v2h1v13c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6h1V4h-5zm2 15H7V6h10v13zM9 8h2v9H9zm4 0h2v9h-2z'/%3E%3C/svg%3E");
-        -webkit-mask-image: url("data:image/svg+xml,%0A%3Csvg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='%23000000'%3E%3Cpath d='M0 0h24v24H0V0z' fill='none'/%3E%3Cpath d='M15 4V3H9v1H4v2h1v13c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6h1V4h-5zm2 15H7V6h10v13zM9 8h2v9H9zm4 0h2v9h-2z'/%3E%3C/svg%3E");
         width: 32px;
         height: 32px;
       }
       .sm-delete {
         mask-image: url('data:image/svg+xml,%0A%3Csvg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="%23000000"%3E%3Cpath d="M0 0h24v24H0V0z" fill="none"/%3E%3Cpath d="M7 11v2h10v-2H7zm5-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/%3E%3C/svg%3E');
-        -webkit-mask-image: url('data:image/svg+xml,%0A%3Csvg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="%23000000"%3E%3Cpath d="M0 0h24v24H0V0z" fill="none"/%3E%3Cpath d="M7 11v2h10v-2H7zm5-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/%3E%3C/svg%3E');
       }
     </style>
     <p>
