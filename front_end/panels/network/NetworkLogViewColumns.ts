@@ -133,7 +133,7 @@ const UIStrings = {
    */
   content: 'Content',
   /**
-   *@description Text that refers to the time
+   *@description Noun that refers to a duration in milliseconds.
    */
   time: 'Time',
   /**
@@ -562,7 +562,6 @@ export class NetworkLogViewColumns {
       return;
     }
     this.gridMode = gridMode;
-    this.networkLogView.element.classList.toggle('grid-mode', gridMode);
     this.updateColumns();
     this.updateRowsSize();
   }
@@ -579,6 +578,7 @@ export class NetworkLogViewColumns {
     if (!this.splitWidget) {
       return;
     }
+    this.networkLogView.element.classList.toggle('has-waterfall', visible);
     if (visible) {
       this.splitWidget.showBoth();
       this.activeScroller = this.waterfallScroller;
@@ -611,7 +611,7 @@ export class NetworkLogViewColumns {
     for (const columnId of columnIds) {
       const setting = savedSettings[columnId];
       let columnConfig = this.columns.find(columnConfig => columnConfig.id === columnId);
-      if (!columnConfig) {
+      if (!columnConfig && setting.title) {
         columnConfig = this.addCustomHeader(setting.title, columnId) || undefined;
       }
       if (columnConfig && columnConfig.hideable && typeof setting.visible === 'boolean') {
@@ -740,10 +740,6 @@ export class NetworkLogViewColumns {
     const dialog = new UI.Dialog.Dialog('manage-custom-headers');
     manageCustomHeaders.show(dialog.contentElement);
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
-    // @ts-ignore
-    // TypeScript somehow tries to appy the `WidgetElement` class to the
-    // `Document` type of the (Document|Element) union. WidgetElement inherits
-    // from HTMLElement so its valid to be passed here.
     dialog.show(this.networkLogView.element);
   }
 

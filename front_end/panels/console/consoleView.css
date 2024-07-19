@@ -225,7 +225,7 @@
   flex-direction: row;
 }
 
-.-theme-with-dark-background .console-message-wrapper {
+.theme-with-dark-background .console-message-wrapper {
   /* Dark theme console ANSI color */
   --console-color-red: rgb(237 78 76);
   --console-color-green: rgb(1 200 1);
@@ -497,9 +497,8 @@ devtools-console-insight {
   padding: 4px 3px 4px 5px;
   position: absolute;
   right: 6px;
-  display: block;
+  display: none;
   width: var(--width);
-  visibility: hidden;
 }
 
 .hover-button span {
@@ -543,7 +542,7 @@ devtools-console-insight {
   &:focus,
   &.console-selected {
     .hover-button {
-      visibility: visible;
+      display: block;
 
       &:focus,
       &:hover {

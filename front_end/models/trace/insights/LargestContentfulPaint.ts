@@ -6,7 +6,7 @@ import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {type InsightResult, InsightWarning, type NavigationInsightContext, type RequiredData} from './types.js';
+import {InsightWarning, type LCPInsightResult, type NavigationInsightContext, type RequiredData} from './types.js';
 
 export function deps(): ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'] {
   return ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'];
@@ -102,8 +102,8 @@ function findLCPRequest(
   return lcpResource;
 }
 
-export function generateInsight(traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext):
-    InsightResult<{lcpMs?: Types.Timing.MilliSeconds, phases?: LCPPhases}> {
+export function generateInsight(
+    traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): LCPInsightResult {
   const networkRequests = traceParsedData.NetworkRequests;
 
   const nav = traceParsedData.Meta.navigationsByNavigationId.get(context.navigationId);
@@ -126,19 +126,34 @@ export function generateInsight(traceParsedData: RequiredData<typeof deps>, cont
     return {warnings: [InsightWarning.NO_LCP]};
   }
 
-  const lcpTiming = metricScore.timing;
-
-  const lcpMs = Helpers.Timing.microSecondsToMilliseconds(lcpTiming);
-
+  // This helps calculate the phases.
+  const lcpMs = Helpers.Timing.microSecondsToMilliseconds(metricScore.timing);
+  // This helps position things on the timeline's UI accurately for a trace.
+  const lcpTs = metricScore.event?.ts ? Helpers.Timing.microSecondsToMilliseconds(metricScore.event?.ts) : undefined;
   const lcpResource = findLCPRequest(traceParsedData, context, lcpEvent);
-
   const mainReq = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!mainReq) {
-    return {lcpMs, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]};
+    return {lcpMs, lcpTs, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]};
   }
 
+  if (!lcpResource) {
+    return {
+      lcpMs: lcpMs,
+      lcpTs: lcpTs,
+      phases: breakdownPhases(nav, mainReq, lcpMs, lcpResource),
+    };
+  }
+
+  const imageLoadingAttr = lcpEvent.args.data?.loadingAttr;
+  const imagePreloaded = lcpResource?.args.data.isLinkPreload || lcpResource?.args.data.initiator?.type === 'preload';
+  const imageFetchPriorityHint = lcpResource?.args.data.fetchPriorityHint;
+
   return {
-    lcpMs,
+    lcpMs: lcpMs,
+    lcpTs: lcpTs,
     phases: breakdownPhases(nav, mainReq, lcpMs, lcpResource),
+    shouldRemoveLazyLoading: imageLoadingAttr === 'lazy',
+    shouldIncreasePriorityHint: imageFetchPriorityHint !== 'high',
+    shouldPreloadImage: !imagePreloaded,
   };
 }

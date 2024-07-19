@@ -5,18 +5,17 @@
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import {dispatchClickEvent, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {describeWithEnvironment, getGetHostConfigStub} from '../../../testing/EnvironmentHelpers.js';
 import * as Explain from '../explain.js';
-
-const {assert} = chai;
 
 describeWithEnvironment('ConsoleInsight', () => {
   function getTestAidaClient() {
     return {
       async *
           fetch() {
-            yield {explanation: 'test', metadata: {}};
+            yield {explanation: 'test', metadata: {rpcGlobalId: 0}};
           },
+      registerClientEvent: sinon.spy(),
     };
   }
 
@@ -31,6 +30,7 @@ describeWithEnvironment('ConsoleInsight', () => {
               value: 'error message',
             },
           ],
+          isPageReloadRecommended: true,
         };
       },
       getSearchQuery() {
@@ -59,20 +59,16 @@ describeWithEnvironment('ConsoleInsight', () => {
     });
 
     it('should show privacy notice first', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       assert.strictEqual(component.shadowRoot!.querySelector('h2')?.innerText, 'Privacy notice');
     });
 
     it('should show legal notice second', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.next-button')!);
@@ -81,10 +77,8 @@ describeWithEnvironment('ConsoleInsight', () => {
     });
 
     it('should not confirm legal notice without checkbox', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.next-button')!);
@@ -95,10 +89,8 @@ describeWithEnvironment('ConsoleInsight', () => {
     });
 
     it('should confirm legal notice if checkbox is pressed', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.next-button')!);
@@ -113,10 +105,8 @@ describeWithEnvironment('ConsoleInsight', () => {
     });
 
     it('can cancel the onboarding flow', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.cancel-button')!);
@@ -126,10 +116,8 @@ describeWithEnvironment('ConsoleInsight', () => {
 
     it('can disable the feature', async () => {
       Common.Settings.settingForTest('console-insights-enabled').set(true);
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.disable-button')!);
@@ -142,10 +130,8 @@ describeWithEnvironment('ConsoleInsight', () => {
     skipConsentOnboarding();
 
     it('shows the consent reminder flow for signed-in users', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       assert.strictEqual(component.shadowRoot!.querySelector('h2')?.innerText, 'Data used to understand this message');
@@ -154,10 +140,8 @@ describeWithEnvironment('ConsoleInsight', () => {
     });
 
     it('consent reminder can be accepted', async () => {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.continue-button')!, {
@@ -170,15 +154,9 @@ describeWithEnvironment('ConsoleInsight', () => {
       assert(component.shadowRoot!.querySelector('.rating'));
     });
 
-    const reportsRating = (positive: boolean) => async () => {
-      const actionTaken = sinon.stub(Host.userMetrics, 'actionTaken');
-      const registerAidaClientEvent =
-          sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'registerAidaClientEvent');
-
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: true,
-        accountEmail: 'some-email',
-      });
+    const renderInsight = async(aidaClient = getTestAidaClient()): Promise<Explain.ConsoleInsight> => {
+      const component =
+          new Explain.ConsoleInsight(getTestPromptBuilder(), aidaClient, Host.AidaClient.AidaAvailability.AVAILABLE);
       renderElementIntoDOM(component);
       await drainMicroTasks();
       dispatchClickEvent(component.shadowRoot!.querySelector('.continue-button')!, {
@@ -187,13 +165,25 @@ describeWithEnvironment('ConsoleInsight', () => {
       });
       // Expected to be rendered in the next task.
       await new Promise(resolve => setTimeout(resolve, 0));
+      return component;
+    };
+
+    const reportsRating = (positive: boolean) => async () => {
+      const actionTaken = sinon.stub(Host.userMetrics, 'actionTaken');
+      const aidaClient = getTestAidaClient();
+      const component = await renderInsight(aidaClient);
       dispatchClickEvent(component.shadowRoot!.querySelector(`.rating [data-rating=${positive}]`)!, {
         bubbles: true,
         composed: true,
       });
 
-      assert(registerAidaClientEvent.calledOnce);
-      assert.include(registerAidaClientEvent.firstCall.firstArg, positive ? 'POSITIVE' : 'NEGATIVE');
+      assert(aidaClient.registerClientEvent.calledOnce);
+      sinon.assert.match(aidaClient.registerClientEvent.firstCall.firstArg, sinon.match({
+        corresponding_aida_rpc_global_id: 0,
+        do_conversation_client_event: {
+          user_feedback: {sentiment: positive ? 'POSITIVE' : 'NEGATIVE'},
+        },
+      }));
       assert(actionTaken.calledWith(
           positive ? Host.UserMetrics.Action.InsightRatedPositive : Host.UserMetrics.Action.InsightRatedNegative));
 
@@ -202,18 +192,32 @@ describeWithEnvironment('ConsoleInsight', () => {
         composed: true,
       });
       // Can only rate once.
-      assert(registerAidaClientEvent.calledOnce);
-      assert.include(registerAidaClientEvent.firstCall.firstArg, positive ? 'POSITIVE' : 'NEGATIVE');
+      assert(aidaClient.registerClientEvent.calledOnce);
     };
 
     it('reports positive rating', reportsRating(true));
     it('reports negative rating', reportsRating(false));
+
+    it('has no thumbs up/down buttons if logging is disabled', async () => {
+      const stub = getGetHostConfigStub({
+        devToolsConsoleInsights: {
+          enabled: true,
+          disallowLogging: true,
+        },
+      });
+      const component = await renderInsight();
+      const thumbsUpButton = component.shadowRoot!.querySelector('.rating [data-rating="true"]');
+      assert.isNull(thumbsUpButton);
+      const thumbsDownButton = component.shadowRoot!.querySelector('.rating [data-rating="false"]');
+      assert.isNull(thumbsDownButton);
+
+      stub.restore();
+    });
   });
 
   it('report if the user is not logged in', async () => {
-    const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-      isSyncActive: false,
-    });
+    const component = new Explain.ConsoleInsight(
+        getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.NO_ACCOUNT_EMAIL);
     renderElementIntoDOM(component);
     await drainMicroTasks();
     const content = component.shadowRoot!.querySelector('main')!.innerText.trim();
@@ -221,10 +225,8 @@ describeWithEnvironment('ConsoleInsight', () => {
   });
 
   it('report if the sync is not enabled', async () => {
-    const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-      isSyncActive: false,
-      accountEmail: 'some-email',
-    });
+    const component = new Explain.ConsoleInsight(
+        getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.NO_ACTIVE_SYNC);
     renderElementIntoDOM(component);
     await drainMicroTasks();
     const content = component.shadowRoot!.querySelector('main')!.innerText.trim();
@@ -232,24 +234,11 @@ describeWithEnvironment('ConsoleInsight', () => {
   });
 
   it('report if the navigator is offline', async () => {
-    const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')!;
-    Object.defineProperty(globalThis, 'navigator', {
-      get() {
-        return {onLine: false};
-      },
-    });
-
-    try {
-      const component = new Explain.ConsoleInsight(getTestPromptBuilder(), getTestAidaClient(), {
-        isSyncActive: false,
-        accountEmail: 'some-email',
-      });
-      renderElementIntoDOM(component);
-      await drainMicroTasks();
-      const content = component.shadowRoot!.querySelector('main')!.innerText.trim();
-      assert.strictEqual(content, 'Check your internet connection and try again.');
-    } finally {
-      Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
-    }
+    const component = new Explain.ConsoleInsight(
+        getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAvailability.NO_INTERNET);
+    renderElementIntoDOM(component);
+    await drainMicroTasks();
+    const content = component.shadowRoot!.querySelector('main')!.innerText.trim();
+    assert.strictEqual(content, 'Check your internet connection and try again.');
   });
 });

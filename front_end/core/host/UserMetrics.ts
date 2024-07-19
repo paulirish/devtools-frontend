@@ -41,15 +41,6 @@ export class UserMetrics {
     this.#launchPanelName = '';
   }
 
-  breakpointEditDialogRevealedFrom(breakpointEditDialogRevealedFrom: BreakpointEditDialogRevealedFrom): void {
-    if (breakpointEditDialogRevealedFrom >= BreakpointEditDialogRevealedFrom.MaxValue) {
-      return;
-    }
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BreakpointEditDialogRevealedFrom, breakpointEditDialogRevealedFrom,
-        BreakpointEditDialogRevealedFrom.MaxValue);
-  }
-
   panelShown(panelName: string, isLaunching?: boolean): void {
     const code = PanelCodes[panelName as keyof typeof PanelCodes] || 0;
     InspectorFrontendHostInstance.recordEnumeratedHistogram(EnumeratedHistogram.PanelShown, code, PanelCodes.MaxValue);
@@ -60,16 +51,6 @@ export class UserMetrics {
     }
   }
 
-  /**
-   * Fired when a panel is closed (regardless if it exists in the main panel or the drawer)
-   */
-  panelClosed(panelName: string): void {
-    const code = PanelCodes[panelName as keyof typeof PanelCodes] || 0;
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(EnumeratedHistogram.PanelClosed, code, PanelCodes.MaxValue);
-    // Store that the user has changed the panel so we know launch histograms should not be fired.
-    this.#panelChangedSinceLaunch = true;
-  }
-
   panelShownInLocation(panelName: string, location: 'main'|'drawer'): void {
     const panelWithLocationName = `${panelName}-${location}`;
     const panelWithLocation = PanelWithLocation[panelWithLocationName as keyof typeof PanelWithLocation] || 0;
@@ -78,12 +59,6 @@ export class UserMetrics {
         panelWithLocation,
         PanelWithLocation.MaxValue,
     );
-  }
-
-  elementsSidebarTabShown(sidebarPaneName: string): void {
-    const code = ElementsSidebarTabCodes[sidebarPaneName as keyof typeof ElementsSidebarTabCodes] || 0;
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.ElementsSidebarTabShown, code, ElementsSidebarTabCodes.MaxValue);
   }
 
   sourcesSidebarTabShown(sidebarPaneName: string): void {
@@ -363,18 +338,6 @@ export class UserMetrics {
         EnumeratedHistogram.SwatchActivated, swatch, SwatchType.MaxValue);
   }
 
-  badgeActivated(badge: BadgeType): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BadgeActivated, badge, BadgeType.MaxValue);
-  }
-
-  breakpointsRestoredFromStorage(count: number): void {
-    const countBucket = this.#breakpointCountToBucket(count);
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.BreakpointsRestoredFromStorageCount, countBucket,
-        BreakpointsRestoredFromStorageCount.MaxValue);
-  }
-
   animationPlaybackRateChanged(playbackRate: AnimationsPlaybackRate): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.AnimationPlaybackRateChanged, playbackRate, AnimationsPlaybackRate.MaxValue);
@@ -383,37 +346,6 @@ export class UserMetrics {
   animationPointDragged(dragType: AnimationPointDragType): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.AnimationPointDragged, dragType, AnimationPointDragType.MaxValue);
-  }
-
-  #breakpointCountToBucket(count: number): BreakpointsRestoredFromStorageCount {
-    if (count < 100) {
-      return BreakpointsRestoredFromStorageCount.LessThan100;
-    }
-    if (count < 300) {
-      return BreakpointsRestoredFromStorageCount.LessThan300;
-    }
-    if (count < 1000) {
-      return BreakpointsRestoredFromStorageCount.LessThan1000;
-    }
-    if (count < 3000) {
-      return BreakpointsRestoredFromStorageCount.LessThan3000;
-    }
-    if (count < 10000) {
-      return BreakpointsRestoredFromStorageCount.LessThan10000;
-    }
-    if (count < 30000) {
-      return BreakpointsRestoredFromStorageCount.LessThan30000;
-    }
-    if (count < 100000) {
-      return BreakpointsRestoredFromStorageCount.LessThan100000;
-    }
-    if (count < 300000) {
-      return BreakpointsRestoredFromStorageCount.LessThan300000;
-    }
-    if (count < 1000000) {
-      return BreakpointsRestoredFromStorageCount.LessThan1000000;
-    }
-    return BreakpointsRestoredFromStorageCount.Above1000000;
   }
 
   workspacesPopulated(wallClockTimeInMilliseconds: number): void {
@@ -630,7 +562,22 @@ export enum Action {
   AnimationGroupSelected = 142,
   ScrollDrivenAnimationGroupSelected = 143,
   ScrollDrivenAnimationGroupScrubbed = 144,
-  MaxValue = 145,
+  FreestylerOpenedFromElementsPanel = 145,
+  FreestylerOpenedFromStylesTab = 146,
+  ConsoleFilterByContext = 147,
+  ConsoleFilterBySource = 148,
+  ConsoleFilterByUrl = 149,
+  InsightConsentReminderShown = 150,
+  InsightConsentReminderCanceled = 151,
+  InsightConsentReminderConfirmed = 152,
+  InsightsOnboardingShown = 153,
+  InsightsOnboardingCanceledOnPage1 = 154,
+  InsightsOnboardingCanceledOnPage2 = 155,
+  InsightsOnboardingConfirmed = 156,
+  InsightsOnboardingNextPage = 157,
+  InsightsOnboardingPrevPage = 158,
+  InsightsOnboardingFeatureDisabled = 159,
+  MaxValue = 160,
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -737,8 +684,6 @@ export enum PanelWithLocation {
   'sources.search-drawer' = 28,
   'security-main' = 29,
   'security-drawer' = 30,
-  'js_profiler-main' = 31,
-  'js_profiler-drawer' = 32,
   'lighthouse-main' = 33,
   'lighthouse-drawer' = 34,
   'coverage-main' = 35,
@@ -919,7 +864,6 @@ export enum KeybindSetSettings {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
-/* eslint-disable @typescript-eslint/naming-convention */
 export enum KeyboardShortcutAction {
   OtherShortcut = 0,
   'quick-open.show-command-menu' = 1,
@@ -1071,46 +1015,34 @@ export enum DevtoolsExperiments {
   'apca' = 39,
   'font-editor' = 41,
   'full-accessibility-tree' = 42,
-  'ignore-list-js-frames-on-timeline' = 43,
   'contrast-issues' = 44,
   'experimental-cookie-features' = 45,
   'styles-pane-css-changes' = 55,
-  'evaluate-expressions-with-source-maps' = 58,
   'instrumentation-breakpoints' = 61,
   'authored-deployed-grouping' = 63,
   'important-dom-properties' = 64,
   'just-my-code' = 65,
-  'timeline-as-console-profile-result-panel' = 67,
   'preloading-status-panel' = 68,
   'outermost-target-selector' = 71,
   'highlight-errors-elements-panel' = 73,
-  'set-all-breakpoints-eagerly' = 74,
   'use-source-map-scopes' = 76,
-  'storage-buckets-tree' = 77,
   'network-panel-filter-bar-redesign' = 79,
   'autofill-view' = 82,
   'sources-frame-indentation-markers-temporarily-disable' = 83,
-  'heap-snapshot-treat-backing-store-as-containing-object' = 84,
   'css-type-component-length-deprecate' = 85,
   'timeline-show-postmessage-events' = 86,
-  'save-and-load-trace-with-annotations' = 87,
-  'timeline-track-configuration' = 88,
+  'timeline-extensions' = 89,
+  'timeline-enhanced-traces' = 90,
+  'timeline-compiled-sources' = 91,
+  'timeline-debug-mode' = 93,
+  'perf-panel-annotations' = 94,
+  'timeline-rpp-sidebar' = 95,
+  'timeline-observations' = 96,
 
   // Increment this when new experiments are added.
-  'MaxValue' = 89,
+  'MaxValue' = 97,
 }
 /* eslint-enable @typescript-eslint/naming-convention */
-
-export const enum BreakpointEditDialogRevealedFrom {
-  BreakpointSidebarContextMenu = 0,
-  BreakpointSidebarEditButton = 1,
-  BreakpointMarkerContextMenu = 2,
-  LineGutterContextMenu = 3,
-  KeyboardShortcut = 4,
-  Linkifier = 5,
-  MouseClick = 6,
-  MaxValue = 7,
-}
 
 export const enum ColorConvertedFrom {
   ColorSwatch = 0,
@@ -1129,20 +1061,6 @@ export const enum CSSPropertyDocumentation {
   ToggledOn = 1,
   ToggledOff = 2,
   MaxValue = 3,
-}
-
-export const enum BreakpointsRestoredFromStorageCount {
-  LessThan100 = 0,
-  LessThan300 = 1,
-  LessThan1000 = 2,
-  LessThan3000 = 3,
-  LessThan10000 = 4,
-  LessThan30000 = 5,
-  LessThan100000 = 6,
-  LessThan300000 = 7,
-  LessThan1000000 = 8,
-  Above1000000 = 9,
-  MaxValue = 10,
 }
 
 // Update DevToolsIssuesPanelIssueExpanded from tools/metrics/histograms/enums.xml if new enum is added.
@@ -1289,15 +1207,15 @@ export enum ResourceType {
   /* eslint-disable @typescript-eslint/naming-convention */
   all = 0,
   /* eslint-enable @typescript-eslint/naming-convention */
-  Documents = 1,
-  Scripts = 2,
+  Document = 1,
+  JavaScript = 2,
   'Fetch and XHR' = 3,
-  Stylesheets = 4,
-  Fonts = 5,
-  Images = 6,
+  CSS = 4,
+  Font = 5,
+  Image = 6,
   Media = 7,
   Manifest = 8,
-  WebSockets = 9,
+  WebSocket = 9,
   WebAssembly = 10,
   Other = 11,
   MaxValue = 12,

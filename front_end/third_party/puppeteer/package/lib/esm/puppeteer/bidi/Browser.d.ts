@@ -5,7 +5,7 @@
  */
 /// <reference types="node" />
 import type { ChildProcess } from 'child_process';
-import type * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
+import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import { Browser, type BrowserCloseCallback, type BrowserContextOptions, type DebugInfo } from '../api/Browser.js';
 import type { Page } from '../api/Page.js';
 import type { Target } from '../api/Target.js';
@@ -34,7 +34,7 @@ export declare class BidiBrowser extends Browser {
     static create(opts: BidiBrowserOptions): Promise<BidiBrowser>;
     private constructor();
     get cdpSupported(): boolean;
-    userAgent(): never;
+    userAgent(): Promise<string>;
     get connection(): BidiConnection;
     wsEndpoint(): string;
     close(): Promise<void>;

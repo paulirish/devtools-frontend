@@ -28,7 +28,7 @@ const UIStrings = {
   /**
    *@description Title of an action in the timeline tool to record reload
    */
-  startProfilingAndReloadPage: 'Start profiling and reload page',
+  recordAndReload: 'Record and reload',
   /**
    *@description Tooltip text that appears when hovering over the largeicon download button
    */
@@ -72,14 +72,6 @@ async function loadTimelineModule(): Promise<typeof Timeline> {
   }
   return loadedTimelineModule;
 }
-
-// The profiler module is imported here because the js profiler tab is implemented
-// in the profiler module. Since the tab doesn't belong to all apps that extend
-// the shell app, it cannot be registered in profiler's meta file, as profiler is
-// part of the shell app, and thus all of the extensions registered in profiler
-// belong to all apps that extend from shell.
-// Instead, we register the extensions for the js profiler tab in panels/timeline/ and
-// js_profiler/ so that the tab is available only in the apps it belongs to.
 
 function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (timelineModule: typeof Timeline) => T[]): T[] {
   if (loadedTimelineModule === undefined) {
@@ -143,7 +135,7 @@ UI.ActionRegistration.registerActionExtension({
     return maybeRetrieveContextTypes(Timeline => [Timeline.TimelinePanel.TimelinePanel]);
   },
   category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-  title: i18nLazyString(UIStrings.startProfilingAndReloadPage),
+  title: i18nLazyString(UIStrings.recordAndReload),
   async loadActionDelegate() {
     const Timeline = await loadTimelineModule();
     return new Timeline.TimelinePanel.ActionDelegate();

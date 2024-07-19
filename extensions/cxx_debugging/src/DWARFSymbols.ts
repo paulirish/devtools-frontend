@@ -32,7 +32,6 @@ type ScopeInfo = {
   icon?: string,
 };
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 type LazyFSNode = FS.FSNode&{contents: {cacheLength: Function, length: number}};
 
 function mapEnumerator(apiEnumerator: SymbolsBackend.Enumerator): Formatters.Enumerator {
@@ -543,7 +542,7 @@ export class DWARFLanguageExtensionPlugin implements Chrome.DevTools.LanguageExt
   }
 
   async evaluate(expression: string, context: SymbolsBackend.RawLocation, stopId: unknown):
-      Promise<Chrome.DevTools.RemoteObject|null> {
+      Promise<Chrome.DevTools.RemoteObject|Chrome.DevTools.ForeignObject|null> {
     const valueInfo = await this.getValueInfo(expression, context, stopId);
     if (!valueInfo) {
       return null;

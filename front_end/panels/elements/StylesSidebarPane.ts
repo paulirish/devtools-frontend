@@ -93,14 +93,6 @@ const UIStrings = {
    */
   unknownPropertyName: 'Unknown property name',
   /**
-   *@description Text to filter result items
-   */
-  filter: 'Filter',
-  /**
-   *@description ARIA accessible name in Styles Sidebar Pane of the Elements panel
-   */
-  filterStyles: 'Filter Styles',
-  /**
    *@description Separator element text content in Styles Sidebar Pane of the Elements panel
    *@example {scrollbar-corner} PH1
    */
@@ -117,15 +109,17 @@ const UIStrings = {
   /**
    *@description Title of  in styles sidebar pane of the elements panel
    *@example {Ctrl} PH1
+   *@example {Alt} PH2
    */
   incrementdecrementWithMousewheelOne:
-      'Increment/decrement with mousewheel or up/down keys. {PH1}: R ±1, Shift: G ±1, Alt: B ±1',
+      'Increment/decrement with mousewheel or up/down keys. {PH1}: R ±1, Shift: G ±1, {PH2}: B ±1',
   /**
    *@description Title of  in styles sidebar pane of the elements panel
    *@example {Ctrl} PH1
+   *@example {Alt} PH2
    */
   incrementdecrementWithMousewheelHundred:
-      'Increment/decrement with mousewheel or up/down keys. {PH1}: ±100, Shift: ±10, Alt: ±0.1',
+      'Increment/decrement with mousewheel or up/down keys. {PH1}: ±100, Shift: ±10, {PH2}: ±0.1',
   /**
    *@description Announcement string for invalid properties.
    *@example {Invalid property value} PH1
@@ -329,6 +323,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         const hint = activeHints.get(possibleHintNodeFromHintIcon);
 
         if (hint) {
+          this.#hintPopoverHelper.jslogContext = 'elements.css-hint';
           return {
             box: hoveredNode.boxInWindow(),
             show: async (popover: UI.GlassPane.GlassPane) => {
@@ -349,6 +344,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
         const cssProperty = cssPropertyName && this.#webCustomData.findCssProperty(cssPropertyName);
 
         if (cssProperty) {
+          this.#hintPopoverHelper.jslogContext = 'elements.css-property-doc';
           return {
             box: hoveredNode.boxInWindow(),
             show: async (popover: UI.GlassPane.GlassPane) => {
@@ -363,6 +359,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
 
       if (hoveredNode.matches('.simple-selector')) {
         const specificity = StylePropertiesSection.getSpecificityStoredForNodeElement(hoveredNode);
+        this.#hintPopoverHelper.jslogContext = 'elements.css-selector-specificity';
         return {
           box: hoveredNode.boxInWindow(),
           show: async (popover: UI.GlassPane.GlassPane) => {
@@ -378,7 +375,7 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       }
 
       return null;
-    }, 'elements.css-property-doc');
+    });
 
     this.#hintPopoverHelper.setDisableOnClick(true);
     this.#hintPopoverHelper.setTimeout(300);
@@ -1200,7 +1197,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     for (const positionTryRule of matchedStyles.positionTryRules()) {
       const block = SectionBlock.createPositionTryBlock(positionTryRule.name().text);
       this.idleCallbackManager.schedule(() => {
-        block.sections.push(new PositionTryRuleSection(this, matchedStyles, positionTryRule.style, sectionIdx));
+        block.sections.push(new PositionTryRuleSection(
+            this, matchedStyles, positionTryRule.style, sectionIdx, positionTryRule.active()));
         sectionIdx++;
       });
       blocks.push(block);
@@ -1461,14 +1459,17 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const container = this.contentElement.createChild('div', 'styles-sidebar-pane-toolbar-container');
     const hbox = container.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
-    const filterInput = new UI.Toolbar.ToolbarInput(
-        i18nString(UIStrings.filter), i18nString(UIStrings.filterStyles), 1, 1, undefined, undefined, false,
-        'styles-filter');
+    const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     toolbar.makeToggledGray();
     void toolbar.appendItemsAtLocation('styles-sidebarpane-toolbar');
     this.toolbar = toolbar;
+
+    if (UI.ActionRegistry.ActionRegistry.instance().hasAction('freestyler.style-tab-context')) {
+      toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('freestyler.style-tab-context'));
+    }
+
     const toolbarPaneContainer = container.createChild('div', 'styles-sidebar-toolbar-pane-container');
     const toolbarPaneContent = (toolbarPaneContainer.createChild('div', 'styles-sidebar-toolbar-pane') as HTMLElement);
 
@@ -1897,11 +1898,14 @@ export class CSSPropertyPrompt extends UI.TextPrompt.TextPrompt {
       if (treeElement && treeElement.valueElement) {
         const cssValueText = treeElement.valueElement.textContent;
         const cmdOrCtrl = Host.Platform.isMac() ? 'Cmd' : 'Ctrl';
+        const optionOrAlt = Host.Platform.isMac() ? 'Option' : 'Alt';
         if (cssValueText !== null) {
           if (cssValueText.match(/#[\da-f]{3,6}$/i)) {
-            this.setTitle(i18nString(UIStrings.incrementdecrementWithMousewheelOne, {PH1: cmdOrCtrl}));
+            this.setTitle(
+                i18nString(UIStrings.incrementdecrementWithMousewheelOne, {PH1: cmdOrCtrl, PH2: optionOrAlt}));
           } else if (cssValueText.match(/\d+/)) {
-            this.setTitle(i18nString(UIStrings.incrementdecrementWithMousewheelHundred, {PH1: cmdOrCtrl}));
+            this.setTitle(
+                i18nString(UIStrings.incrementdecrementWithMousewheelHundred, {PH1: cmdOrCtrl, PH2: optionOrAlt}));
           }
         }
       }
