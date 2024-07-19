@@ -103,7 +103,8 @@
   text-wrap: nowrap;
 }
 
-.card-metric-values .metric-value {
+.local-value,
+.field-value {
   font-size: 30px;
 }
 
@@ -180,9 +181,8 @@
 }
 
 .field-data-histogram {
-  width: 100%;
   display: grid;
-  grid-template-columns: 50% auto max-content;
+  grid-template-columns: max-content 100px max-content;
   grid-auto-rows: 1fr;
   column-gap: 8px;
   justify-items: flex-end;
@@ -222,9 +222,24 @@
   flex-shrink: 0;
 }
 
-.throttling-setting {
+.live-metrics-option {
   display: flex;
-  flex-direction: row;
+  flex-flow: row nowrap;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  text-wrap: nowrap;
+}
+
+.live-metrics-option > devtools-select-menu {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.no-data {
+  color: var(--sys-color-token-subtle);
+}
+
+.tooltip-content {
+  margin: 0 6px;
 }

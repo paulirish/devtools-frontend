@@ -10,15 +10,14 @@ import("../../../../third_party/typescript/typescript.gni")
 generate_css("css_files") {
   sources = [
     "breadcrumbsUI.css",
-    "entryLabelOverlay.css",
+    "fieldSettingsDialog.css",
     "interactionBreakdown.css",
     "liveMetricsView.css",
+    "networkRequestDetails.css",
     "networkRequestTooltip.css",
     "sidebar.css",
     "sidebarAnnotationsTab.css",
-    "sidebarInsight.css",
-    "timeRangeOverlay.css",
-    "timespanBreakdownOverlay.css",
+    "sidebarSingleNavigation.css",
   ]
 }
 
@@ -28,16 +27,15 @@ devtools_module("components") {
     "BreadcrumbsUI.ts",
     "CPUThrottlingSelector.ts",
     "DetailsView.ts",
-    "EntryLabelOverlay.ts",
+    "FieldSettingsDialog.ts",
     "InteractionBreakdown.ts",
     "LiveMetricsView.ts",
+    "NetworkRequestDetails.ts",
     "NetworkRequestTooltip.ts",
     "NetworkThrottlingSelector.ts",
     "Sidebar.ts",
     "SidebarAnnotationsTab.ts",
-    "SidebarInsight.ts",
-    "TimeRangeOverlay.ts",
-    "TimespanBreakdownOverlay.ts",
+    "SidebarSingleNavigation.ts",
     "Utils.ts",
   ]
 
@@ -57,7 +55,10 @@ devtools_module("components") {
     "../../../ui/legacy/components/perf_ui:bundle",
     "../../../ui/lit-html:bundle",
     "../../../ui/visual_logging:bundle",
+    "../../emulation:bundle",
     "../../mobile_throttling:bundle",
+    "../utils:bundle",
+    "./insights:bundle",
   ]
 }
 
@@ -73,7 +74,6 @@ devtools_entrypoint("bundle") {
     ":*",
     "..:*",
     "../../../ui/components/docs/*",
-    "../../application/components/*",
   ]
 }
 
@@ -83,12 +83,13 @@ ts_library("unittests") {
   sources = [
     "BreadcrumbsUI.test.ts",
     "CPUThrottlingSelector.test.ts",
+    "FieldSettingsDialog.test.ts",
     "InteractionBreakdown.test.ts",
     "Invalidations.test.ts",
     "LiveMetricsView.test.ts",
+    "NetworkRequestDetails.test.ts",
     "NetworkThrottlingSelector.test.ts",
     "SidebarAnnotationsTab.test.ts",
-    "SidebarInsight.test.ts",
   ]
 
   deps = [

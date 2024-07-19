@@ -80,7 +80,7 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
   private readonly expandController: ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionsTreeExpandController;
   private readonly linkifier: Components.Linkifier.Linkifier;
   private infoElement: HTMLDivElement;
-  #scopesScript: SDK.Script.Script|null = null;
+  #scopeChainModel: SourceMapScopes.ScopeChainModel.ScopeChainModel|null = null;
 
   private constructor() {
     super(true);
@@ -96,9 +96,7 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
     this.infoElement = document.createElement('div');
     this.infoElement.className = 'gray-info-message';
     this.infoElement.tabIndex = -1;
-    SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DebuggerModel.DebuggerModel, SDK.DebuggerModel.Events.DebugInfoAttached, this.debugInfoAttached, this);
-    void this.update();
+    this.flavorChanged(UI.Context.Context.instance().flavor(SDK.DebuggerModel.CallFrame));
   }
 
   static instance(): ScopeChainSidebarPane {
@@ -108,8 +106,26 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
     return scopeChainSidebarPaneInstance;
   }
 
-  flavorChanged(_object: Object|null): void {
-    void this.update();
+  flavorChanged(callFrame: SDK.DebuggerModel.CallFrame|null): void {
+    this.#scopeChainModel?.dispose();
+    this.#scopeChainModel = null;
+
+    this.linkifier.reset();
+    this.contentElement.removeChildren();
+    this.contentElement.appendChild(this.infoElement);
+
+    if (callFrame) {
+      // Resolving the scope may take a while to complete, so indicate to the user that something
+      // is happening (see https://crbug.com/1162416).
+      this.infoElement.textContent = i18nString(UIStrings.loading);
+
+      this.#scopeChainModel = new SourceMapScopes.ScopeChainModel.ScopeChainModel(callFrame);
+      this.#scopeChainModel.addEventListener(
+          SourceMapScopes.ScopeChainModel.Events.ScopeChainUpdated, event => this.buildScopeTreeOutline(event.data),
+          this);
+    } else {
+      this.infoElement.textContent = i18nString(UIStrings.notPaused);
+    }
   }
 
   override focus(): void {
@@ -122,99 +138,43 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
     }
   }
 
-  private sourceMapAttached(
-      event: Common.EventTarget.EventTargetEvent<{client: SDK.Script.Script, sourceMap: SDK.SourceMap.SourceMap}>):
-      void {
-    if (event.data.client === this.#scopesScript) {
-      void this.update();
-    }
-  }
+  private buildScopeTreeOutline(eventScopeChain: SourceMapScopes.ScopeChainModel.ScopeChain): void {
+    const {callFrame, thisObject, scopeChain} = eventScopeChain;
 
-  private setScopeSourceMapSubscription(callFrame: SDK.DebuggerModel.CallFrame|null): void {
-    const oldScript = this.#scopesScript;
-    this.#scopesScript = callFrame?.script ?? null;
+    const details = UI.Context.Context.instance().flavor(SDK.DebuggerModel.DebuggerPausedDetails);
+    this.treeOutline.removeChildren();
 
-    // Shortcut for the case when we are listening to the same model.
-    if (oldScript?.debuggerModel === this.#scopesScript?.debuggerModel) {
-      return;
-    }
-
-    if (oldScript) {
-      oldScript.debuggerModel.sourceMapManager().removeEventListener(
-          SDK.SourceMapManager.Events.SourceMapAttached, this.sourceMapAttached, this);
-    }
-
-    if (this.#scopesScript) {
-      this.#scopesScript.debuggerModel.sourceMapManager().addEventListener(
-          SDK.SourceMapManager.Events.SourceMapAttached, this.sourceMapAttached, this);
-    }
-  }
-
-  private debugInfoAttached(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {
-    if (event.data === this.#scopesScript) {
-      void this.update();
-    }
-  }
-
-  private async update(): Promise<void> {
-    // The `resolveThisObject(callFrame)` and `resolveScopeChain(callFrame)` calls
-    // below may take a while to complete, so indicate to the user that something
-    // is happening (see https://crbug.com/1162416).
-    this.infoElement.textContent = i18nString(UIStrings.loading);
     this.contentElement.removeChildren();
-    this.contentElement.appendChild(this.infoElement);
+    this.contentElement.appendChild(this.treeOutline.element);
+    let foundLocalScope = false;
+    for (let i = 0; i < scopeChain.length; ++i) {
+      const scope = scopeChain[i];
+      const extraProperties = this.extraPropertiesForScope(scope, details, callFrame, thisObject, i === 0);
 
-    this.linkifier.reset();
-
-    const callFrame = UI.Context.Context.instance().flavor(SDK.DebuggerModel.CallFrame);
-    this.setScopeSourceMapSubscription(callFrame);
-    const [thisObject, scopeChain] = await Promise.all([
-      SourceMapScopes.NamesResolver.resolveThisObject(callFrame),
-      SourceMapScopes.NamesResolver.resolveScopeChain(callFrame),
-    ]);
-    // By now the developer might have moved on, and we don't want to show stale
-    // scope information, so check again that we're still on the same CallFrame.
-    if (callFrame === UI.Context.Context.instance().flavor(SDK.DebuggerModel.CallFrame)) {
-      const details = UI.Context.Context.instance().flavor(SDK.DebuggerModel.DebuggerPausedDetails);
-      this.treeOutline.removeChildren();
-
-      if (!details || !callFrame || !scopeChain) {
-        this.infoElement.textContent = i18nString(UIStrings.notPaused);
-        return;
+      if (scope.type() === Protocol.Debugger.ScopeType.Local) {
+        foundLocalScope = true;
       }
 
-      this.contentElement.removeChildren();
-      this.contentElement.appendChild(this.treeOutline.element);
-      let foundLocalScope = false;
-      for (let i = 0; i < scopeChain.length; ++i) {
-        const scope = scopeChain[i];
-        const extraProperties = this.extraPropertiesForScope(scope, details, callFrame, thisObject, i === 0);
-
-        if (scope.type() === Protocol.Debugger.ScopeType.Local) {
-          foundLocalScope = true;
-        }
-
-        const section = this.createScopeSectionTreeElement(scope, extraProperties);
-        if (scope.type() === Protocol.Debugger.ScopeType.Global) {
-          section.collapse();
-        } else if (!foundLocalScope || scope.type() === Protocol.Debugger.ScopeType.Local) {
-          section.expand();
-        }
-
-        this.treeOutline.appendChild(section);
-        if (i === 0) {
-          section.select(/* omitFocus */ true);
-        }
+      const section = this.createScopeSectionTreeElement(scope, extraProperties);
+      if (scope.type() === Protocol.Debugger.ScopeType.Global) {
+        section.collapse();
+      } else if (!foundLocalScope || scope.type() === Protocol.Debugger.ScopeType.Local) {
+        section.expand();
       }
-      this.sidebarPaneUpdatedForTest();
+
+      this.treeOutline.appendChild(section);
+      if (i === 0) {
+        section.select(/* omitFocus */ true);
+      }
     }
+    this.sidebarPaneUpdatedForTest();
   }
 
   private createScopeSectionTreeElement(
       scope: SDK.DebuggerModel.ScopeChainEntry,
       extraProperties: SDK.RemoteObject.RemoteObjectProperty[]): ObjectUI.ObjectPropertiesSection.RootElement {
     let emptyPlaceholder: Common.UIString.LocalizedString|null = null;
-    if (scope.type() === Protocol.Debugger.ScopeType.Local || Protocol.Debugger.ScopeType.Closure) {
+    if (scope.type() === Protocol.Debugger.ScopeType.Local || scope.type() === Protocol.Debugger.ScopeType.Closure) {
       emptyPlaceholder = i18nString(UIStrings.noVariables);
     }
 
@@ -246,8 +206,8 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
     titleElement.createChild('div', 'scope-chain-sidebar-pane-section-title').textContent = title;
 
     const section = new ObjectUI.ObjectPropertiesSection.RootElement(
-        SourceMapScopes.NamesResolver.resolveScopeInObject(scope), this.linkifier, emptyPlaceholder,
-        ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.All, extraProperties);
+        scope.object(), this.linkifier, emptyPlaceholder, ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.All,
+        extraProperties);
     section.title = titleElement;
     section.listItemElement.classList.add('scope-chain-sidebar-pane-section');
     section.listItemElement.setAttribute('aria-label', title);
@@ -257,7 +217,7 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
   }
 
   private extraPropertiesForScope(
-      scope: SDK.DebuggerModel.ScopeChainEntry, details: SDK.DebuggerModel.DebuggerPausedDetails,
+      scope: SDK.DebuggerModel.ScopeChainEntry, details: SDK.DebuggerModel.DebuggerPausedDetails|null,
       callFrame: SDK.DebuggerModel.CallFrame, thisObject: SDK.RemoteObject.RemoteObject|null,
       isFirstScope: boolean): SDK.RemoteObject.RemoteObjectProperty[] {
     if (scope.type() !== Protocol.Debugger.ScopeType.Local || callFrame.script.isWasm()) {
@@ -270,7 +230,7 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
           'this', thisObject, undefined, undefined, undefined, undefined, undefined, /* synthetic */ true));
     }
     if (isFirstScope) {
-      const exception = details.exception();
+      const exception = details?.exception();
       if (exception) {
         extraProperties.push(new SDK.RemoteObject.RemoteObjectProperty(
             i18nString(UIStrings.exception), exception, undefined, undefined, undefined, undefined, undefined,

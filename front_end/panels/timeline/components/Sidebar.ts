@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 import * as Common from '../../../core/common/common.js';
-import * as i18n from '../../../core/i18n/i18n.js';
-import type * as Handlers from '../../../models/trace/handlers/handlers.js';
-import * as TraceEngine from '../../../models/trace/trace.js';
+import type * as TraceEngine from '../../../models/trace/trace.js';
 import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
@@ -16,16 +14,17 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import sidebarStyles from './sidebar.css.js';
 import * as SidebarAnnotationsTab from './SidebarAnnotationsTab.js';
-import * as SidebarInsight from './SidebarInsight.js';
+import {SidebarSingleNavigation, type SidebarSingleNavigationData} from './SidebarSingleNavigation.js';
 
 const DEFAULT_EXPANDED_WIDTH = 240;
 
-const enum SidebarTabsName {
+export const enum SidebarTabsName {
   INSIGHTS = 'Insights',
   ANNOTATIONS = 'Annotations',
 }
+export const DEFAULT_SIDEBAR_TAB = SidebarTabsName.INSIGHTS;
 
-enum InsightsCategories {
+export enum InsightsCategories {
   ALL = 'All',
   INP = 'INP',
   LCP = 'LCP',
@@ -38,6 +37,14 @@ export class ToggleSidebarInsights extends Event {
 
   constructor() {
     super(ToggleSidebarInsights.eventName, {bubbles: true, composed: true});
+  }
+}
+
+export class RemoveAnnotation extends Event {
+  static readonly eventName = 'removeannotation';
+
+  constructor(public removedAnnotation: TraceEngine.Types.File.Annotation) {
+    super(RemoveAnnotation.eventName, {bubbles: true, composed: true});
   }
 }
 
@@ -78,7 +85,7 @@ export class SidebarWidget extends Common.ObjectWrapper.eventMixin<WidgetEventTy
     this.#sidebarUI.traceParsedData = traceParsedData;
   }
 
-  set data(insights: TraceEngine.Insights.Types.TraceInsightData<typeof Handlers.ModelHandlers>) {
+  setInsights(insights: TraceEngine.Insights.Types.TraceInsightData): void {
     this.#sidebarUI.insights = insights;
   }
 }
@@ -86,25 +93,21 @@ export class SidebarWidget extends Common.ObjectWrapper.eventMixin<WidgetEventTy
 export class SidebarUI extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-performance-sidebar`;
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #activeTab: SidebarTabsName = SidebarTabsName.INSIGHTS;
-  selectedCategory: InsightsCategories = InsightsCategories.ALL;
-  #lcpPhasesExpanded: boolean = false;
+  #activeTab: SidebarTabsName = DEFAULT_SIDEBAR_TAB;
+  #selectedCategory: InsightsCategories = InsightsCategories.ALL;
 
   #traceParsedData?: TraceEngine.Handlers.Types.TraceParseData|null;
-  #inpMetric: {
-    longestINPDur: TraceEngine.Types.Timing.MicroSeconds,
-    inpScoreClassification: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification,
-  }|null = null;
-  #lcpMetric: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricScore|null = null;
-  #clsMetric: {
-    clsScore: number,
-    clsScoreClassification: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification,
-  }|null = null;
-  #phaseData: Array<{phase: string, timing: number|TraceEngine.Types.Timing.MilliSeconds, percent: string}> = [];
-  #insights: TraceEngine.Insights.Types.TraceInsightData<typeof Handlers.ModelHandlers>|null = null;
+  #insights: TraceEngine.Insights.Types.TraceInsightData|null = null;
   #annotations: TraceEngine.Types.File.Annotation[] = [];
 
   #renderBound = this.#render.bind(this);
+
+  /**
+   * When a trace has multiple navigations, we show an accordion with each
+   * navigation in. You can only have one of these open at any time, and we
+   * track it via this ID.
+   */
+  #activeNavigationId: string|null = null;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [sidebarStyles];
@@ -124,14 +127,12 @@ export class SidebarUI extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
-  set insights(insights: TraceEngine.Insights.Types.TraceInsightData<typeof Handlers.ModelHandlers>) {
+  set insights(insights: TraceEngine.Insights.Types.TraceInsightData) {
     if (insights === this.#insights) {
       return;
     }
     this.#insights = insights;
-    this.#phaseData = SidebarInsight.getLCPInsightData(this.#insights);
     // Reset toggled insights.
-    this.#lcpPhasesExpanded = false;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
@@ -141,41 +142,7 @@ export class SidebarUI extends HTMLElement {
       return;
     }
     this.#traceParsedData = traceParsedData;
-    // Clear all data before re-render.
-    this.#inpMetric = null;
-    this.#lcpMetric = null;
-    this.#clsMetric = null;
 
-    if (!traceParsedData) {
-      void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-      return;
-    }
-
-    // Get LCP metric for first navigation.
-    const eventsByNavigation =
-        traceParsedData.PageLoadMetrics.metricScoresByFrameId.get(traceParsedData.Meta.mainFrameId);
-    if (eventsByNavigation) {
-      const metricsByName = eventsByNavigation.values().next().value;
-      if (metricsByName) {
-        this.#lcpMetric = metricsByName.get(TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
-      }
-    }
-
-    const clsScore = traceParsedData.LayoutShifts.sessionMaxScore;
-    this.#clsMetric = {
-      clsScore,
-      clsScoreClassification:
-          TraceEngine.Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(clsScore),
-    };
-
-    if (traceParsedData.UserInteractions.longestInteractionEvent) {
-      this.#inpMetric = {
-        longestINPDur: traceParsedData.UserInteractions.longestInteractionEvent.dur,
-        inpScoreClassification:
-            TraceEngine.Handlers.ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(
-                traceParsedData.UserInteractions.longestInteractionEvent.dur),
-      };
-    }
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
   }
 
@@ -211,80 +178,15 @@ export class SidebarUI extends HTMLElement {
   }
 
   #onTargetSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
-    this.selectedCategory = event.itemValue as InsightsCategories;
+    this.#selectedCategory = event.itemValue as InsightsCategories;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-  }
-
-  #renderMetricValue(
-      label: string, value: string,
-      classification: TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification): LitHtml.TemplateResult {
-    return LitHtml.html`
-      <div class="metric">
-        <div class="metric-value metric-value-${classification}">${value}</div>
-        <div class="metric-label">${label}</div>
-      </div>
-    `;
-  }
-
-  #renderINPMetric(): LitHtml.TemplateResult|null {
-    if (!this.#inpMetric) {
-      return null;
-    }
-    const timeString = i18n.TimeUtilities.formatMicroSecondsTime(this.#inpMetric.longestINPDur);
-    return this.#renderMetricValue('INP', timeString, this.#inpMetric.inpScoreClassification);
-  }
-
-  #renderLCPMetric(): LitHtml.TemplateResult|null {
-    if (!this.#lcpMetric) {
-      return null;
-    }
-    const timeString = i18n.TimeUtilities.formatMicroSecondsAsSeconds(this.#lcpMetric.timing);
-    return this.#renderMetricValue(this.#lcpMetric.metricName, timeString, this.#lcpMetric.classification);
-  }
-
-  #renderCLSMetric(): LitHtml.TemplateResult|null {
-    if (!this.#clsMetric) {
-      return null;
-    }
-    return this.#renderMetricValue(
-        TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.MetricName.CLS, this.#clsMetric.clsScore.toPrecision(3),
-        this.#clsMetric.clsScoreClassification);
-  }
-
-  #toggleLCPPhaseClick(): void {
-    this.#lcpPhasesExpanded = !this.#lcpPhasesExpanded;
-    this.dispatchEvent(new ToggleSidebarInsights());
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
-  }
-
-  #renderInsightsForCategory(insightsCategory: InsightsCategories): LitHtml.TemplateResult {
-    switch (insightsCategory) {
-      case InsightsCategories.ALL:
-        return LitHtml.html`
-          <div class="metrics-row">
-            ${this.#renderINPMetric()}
-            ${this.#renderLCPMetric()}
-            ${this.#renderCLSMetric()}
-          </div>
-          <div class="insights" @click=${this.#toggleLCPPhaseClick}>${
-            SidebarInsight.renderLCPPhases(this.#phaseData, this.#lcpPhasesExpanded)}</div>
-        `;
-      case InsightsCategories.LCP:
-        return LitHtml.html`
-          ${this.#renderLCPMetric()}
-          <div class="insights" @click=${this.#toggleLCPPhaseClick}>${
-            SidebarInsight.renderLCPPhases(this.#phaseData, this.#lcpPhasesExpanded)}</div>
-        `;
-      case InsightsCategories.CLS:
-        return LitHtml.html`${this.#renderCLSMetric()}`;
-      case InsightsCategories.INP:
-        return LitHtml.html`${this.#renderINPMetric()}`;
-      case InsightsCategories.OTHER:
-        return LitHtml.html`<div>${insightsCategory}</div>`;
-    }
   }
 
   #renderInsightsTabContent(): LitHtml.TemplateResult {
+    const navigations = this.#traceParsedData?.Meta.mainFrameNavigations ?? [];
+
+    const hasMultipleNavigations = navigations.length > 1;
+
     // clang-format off
     return LitHtml.html`
       <${Menus.SelectMenu.SelectMenu.litTagName}
@@ -296,8 +198,8 @@ export class SidebarUI extends HTMLElement {
             .showSelectedItem=${true}
             .showConnector=${false}
             .position=${Dialogs.Dialog.DialogVerticalPosition.BOTTOM}
-            .buttonTitle=${this.selectedCategory}
-            jslog=${VisualLogging.dropDown('performance.sidebar-insights-category-select').track({click: true})}
+            .buttonTitle=${this.#selectedCategory}
+            jslog=${VisualLogging.dropDown('timeline.sidebar-insights-category-select').track({click: true})}
           >
           ${Object.values(InsightsCategories).map(insightsCategory => {
             return LitHtml.html`
@@ -308,9 +210,42 @@ export class SidebarUI extends HTMLElement {
           })}
       </${Menus.SelectMenu.SelectMenu.litTagName}>
 
-      ${this.#renderInsightsForCategory(this.selectedCategory)}
+      ${navigations.map(navigation => {
+        const id = navigation.args.data?.navigationId;
+        const url = navigation.args.data?.documentLoaderURL;
+        if(!id || !url) {
+          return LitHtml.nothing;
+        }
+        const data = {
+          traceParsedData: this.#traceParsedData ?? null,
+          insights: this.#insights,
+          navigationId: id,
+          activeCategory: this.#selectedCategory,
+        };
+
+        const contents = LitHtml.html`
+          <${SidebarSingleNavigation.litTagName} .data=${data as SidebarSingleNavigationData}>
+          </${SidebarSingleNavigation.litTagName}>
+        `;
+
+        if(hasMultipleNavigations) {
+          return LitHtml.html`<div class="multi-nav-container">
+            <details ?open=${id === this.#activeNavigationId} class="navigation-wrapper"><summary @click=${this.#navigationClicked(id)}>${url}</summary>${contents}</details>
+            </div>`;
+        }
+
+        return contents;
+      })}
     `;
     // clang-format on
+  }
+
+  #navigationClicked(id: string): (event: Event) => void {
+    return (event: Event) => {
+      event.preventDefault();
+      this.#activeNavigationId = id;
+      void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    };
   }
 
   #renderContent(): LitHtml.TemplateResult|HTMLElement|null {
@@ -357,7 +292,7 @@ export class SidebarUI extends HTMLElement {
           name='left-panel-close'
           @click=${this.#closeButtonClick}
           class="sidebar-toggle-button"
-          jslog=${VisualLogging.action('performance.sidebar-close').track({click: true})}
+          jslog=${VisualLogging.action('timeline.sidebar-close').track({click: true})}
         ></${IconButton.Icon.Icon.litTagName}>
       </div>
       <div class="tab-slider"></div>

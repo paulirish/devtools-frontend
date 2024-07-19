@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Core from '../core/core.js';
+import type * as Lantern from '../types/types.js';
+
 import {type CPUNode} from './CPUNode.js';
 import {type NetworkNode} from './NetworkNode.js';
-import type * as Lantern from '../types/types.js';
 
 /**
  * A union of all types derived from BaseNode, allowing type check discrimination
@@ -48,21 +50,21 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
   }
 
   get type(): 'network'|'cpu' {
-    throw new Error('Unimplemented');
+    throw new Core.LanternError('Unimplemented');
   }
 
   /**
    * In microseconds
    */
   get startTime(): number {
-    throw new Error('Unimplemented');
+    throw new Core.LanternError('Unimplemented');
   }
 
   /**
    * In microseconds
    */
   get endTime(): number {
-    throw new Error('Unimplemented');
+    throw new Core.LanternError('Unimplemented');
   }
 
   setIsMainDocument(value: boolean): void {
@@ -105,7 +107,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
   addDependency(node: Node): void {
     // @ts-expect-error - in checkJs, ts doesn't know that CPUNode and NetworkNode *are* BaseNodes.
     if (node === this) {
-      throw new Error('Cannot add dependency on itself');
+      throw new Core.LanternError('Cannot add dependency on itself');
     }
 
     if (this._dependencies.includes(node)) {
@@ -175,6 +177,10 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
    * Clones the entire graph connected to this node filtered by the optional predicate. If a node is
    * included by the predicate, all nodes along the paths between the node and the root will be included. If the
    * node this was called on is not included in the resulting filtered graph, the method will throw.
+   *
+   * This does not clone NetworkNode's `record` or `rawRecord` fields. It may be reasonable to clone the former,
+   * to assist in graph construction, but the latter should never be cloned as one contraint of Lantern is that
+   * the underlying data records are accessible for plain object reference equality checks.
    */
   cloneWithRelationships(predicate?: (arg0: Node) => boolean): Node {
     const rootNode = this.getRootNode();
@@ -213,7 +219,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
       for (const dependency of originalNode._dependencies) {
         const clonedDependency = idsToIncludedClones.get(dependency.id);
         if (!clonedDependency) {
-          throw new Error('Dependency somehow not cloned');
+          throw new Core.LanternError('Dependency somehow not cloned');
         }
         clonedNode.addDependency(clonedDependency);
       }
@@ -221,7 +227,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
 
     const clonedThisNode = idsToIncludedClones.get(this.id);
     if (!clonedThisNode) {
-      throw new Error('Cloned graph missing node');
+      throw new Core.LanternError('Cloned graph missing node');
     }
     return clonedThisNode;
   }

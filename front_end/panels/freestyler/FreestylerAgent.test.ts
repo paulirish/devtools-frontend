@@ -233,22 +233,46 @@ c`;
     it('builds a request with a model id', async () => {
       mockHostConfig('test model');
       assert.strictEqual(
-          FreestylerAgent.buildRequest('test input').options?.model_id,
+          FreestylerAgent.buildRequest({input: 'test input'}).options?.model_id,
           'test model',
+      );
+    });
+
+    it('builds a request with logging', async () => {
+      mockHostConfig('test model');
+      assert.strictEqual(
+          FreestylerAgent.buildRequest({input: 'test input', serverSideLoggingEnabled: true})
+              .metadata?.disable_user_content_logging,
+          false,
+      );
+    });
+
+    it('builds a request without logging', async () => {
+      mockHostConfig('test model');
+      assert.strictEqual(
+          FreestylerAgent.buildRequest({input: 'test input', serverSideLoggingEnabled: false})
+              .metadata?.disable_user_content_logging,
+          true,
       );
     });
 
     it('builds a request with input', async () => {
       mockHostConfig();
-      const request = FreestylerAgent.buildRequest('test input');
+      const request = FreestylerAgent.buildRequest({input: 'test input'});
       assert.strictEqual(request.input, 'test input');
       assert.strictEqual(request.preamble, undefined);
       assert.strictEqual(request.chat_history, undefined);
     });
 
+    it('builds a request with a sessionId', async () => {
+      mockHostConfig();
+      const request = FreestylerAgent.buildRequest({input: 'test input', sessionId: 'sessionId'});
+      assert.strictEqual(request.metadata?.string_session_id, 'sessionId');
+    });
+
     it('builds a request with preamble', async () => {
       mockHostConfig();
-      const request = FreestylerAgent.buildRequest('test input', 'preamble');
+      const request = FreestylerAgent.buildRequest({input: 'test input', preamble: 'preamble'});
       assert.strictEqual(request.input, 'test input');
       assert.strictEqual(request.preamble, 'preamble');
       assert.strictEqual(request.chat_history, undefined);
@@ -256,12 +280,15 @@ c`;
 
     it('builds a request with chat history', async () => {
       mockHostConfig();
-      const request = FreestylerAgent.buildRequest('test input', undefined, [
-        {
-          text: 'test',
-          entity: Host.AidaClient.Entity.USER,
-        },
-      ]);
+      const request = FreestylerAgent.buildRequest({
+        input: 'test input',
+        chatHistory: [
+          {
+            text: 'test',
+            entity: Host.AidaClient.Entity.USER,
+          },
+        ],
+      });
       assert.strictEqual(request.input, 'test input');
       assert.strictEqual(request.preamble, undefined);
       assert.deepStrictEqual(request.chat_history, [
@@ -275,22 +302,26 @@ c`;
     it('structure matches the snapshot', () => {
       mockHostConfig('test model');
       assert.deepStrictEqual(
-          FreestylerAgent.buildRequest(
-              'test input', 'preamble',
-              [
-                {
-                  text: 'first',
-                  entity: Host.AidaClient.Entity.UNKNOWN,
-                },
-                {
-                  text: 'second',
-                  entity: Host.AidaClient.Entity.SYSTEM,
-                },
-                {
-                  text: 'third',
-                  entity: Host.AidaClient.Entity.USER,
-                },
-              ]),
+          FreestylerAgent.buildRequest({
+            input: 'test input',
+            preamble: 'preamble',
+            chatHistory: [
+              {
+                text: 'first',
+                entity: Host.AidaClient.Entity.UNKNOWN,
+              },
+              {
+                text: 'second',
+                entity: Host.AidaClient.Entity.SYSTEM,
+              },
+              {
+                text: 'third',
+                entity: Host.AidaClient.Entity.USER,
+              },
+            ],
+            serverSideLoggingEnabled: true,
+            sessionId: 'sessionId',
+          }),
           {
             input: 'test input',
             client: 'CHROME_DEVTOOLS',
@@ -311,6 +342,7 @@ c`;
             ],
             metadata: {
               disable_user_content_logging: false,
+              string_session_id: 'sessionId',
             },
             options: {
               model_id: 'test model',
@@ -329,16 +361,11 @@ c`;
     });
 
     function mockAidaClient(
-        generator: () => AsyncGenerator<Host.AidaClient.AidaResponse, void, void>,
+        fetch: () => AsyncGenerator<Host.AidaClient.AidaResponse, void, void>,
         ): Host.AidaClient.AidaClient {
       return {
-        async *
-            fetch(
-                _request: Host.AidaClient.AidaRequest,
-                ): AsyncGenerator<Host.AidaClient.AidaResponse, void, void> {
-              yield* generator();
-            },
-        registerClientEvent() {},
+        fetch,
+        registerClientEvent: () => Promise.resolve({}),
       };
     }
 
@@ -476,11 +503,45 @@ c`;
           execJs,
         });
 
-        await Array.fromAsync(agent.run(Freestyler.FIX_THIS_ISSUE_PROMPT));
+        await Array.fromAsync(agent.run(Freestyler.FIX_THIS_ISSUE_PROMPT, {isFixQuery: true}));
 
         const optionsArg = execJs.lastCall.args[1];
         sinon.assert.notCalled(confirmSideEffect);
         sinon.assert.match(optionsArg, sinon.match({throwOnSideEffect: false}));
+      });
+    });
+
+    describe('long `Observation` text handling', () => {
+      it('errors with too long input', async () => {
+        let count = 0;
+        async function* generateActionAndAnswer() {
+          if (count === 0) {
+            yield {
+              explanation: `ACTION
+              $0.style.backgroundColor = 'red'
+              STOP`,
+              metadata: {},
+            };
+          } else {
+            yield {
+              explanation: 'ANSWER: This is the answer',
+              metadata: {},
+            };
+          }
+          count++;
+        }
+        const execJs = sinon.mock().returns(new Array(10_000).fill('<div>...</div>').join());
+        const confirmSideEffect = sinon.mock().resolves(false);
+        const agent = new FreestylerAgent({
+          aidaClient: mockAidaClient(generateActionAndAnswer),
+          confirmSideEffect,
+          execJs,
+        });
+
+        const result = await Array.fromAsync(agent.run('test'));
+        const lastStepData = result.at(-3)!;
+        assert(lastStepData.step === Freestyler.Step.ACTION, 'Not an Action step');
+        assert(lastStepData.output.includes('Error: Output exceeded the maximum allowed length.'));
       });
     });
 
@@ -529,6 +590,72 @@ c`;
           explanation: 'ANSWER: this is the answer',
           metadata: {
             rpcGlobalId: 123,
+          },
+        };
+      }
+
+      const agent = new FreestylerAgent({
+        aidaClient: mockAidaClient(generateAnswer),
+        confirmSideEffect: () => Promise.resolve(true),
+        execJs: sinon.spy(),
+      });
+
+      const steps = await Array.fromAsync(agent.run('test'));
+      assert.deepStrictEqual(steps, [
+        {
+          step: Freestyler.Step.QUERYING,
+        },
+        {
+          step: Freestyler.Step.ANSWER,
+          text: 'this is the answer',
+          rpcId: 123,
+        },
+      ]);
+    });
+
+    it('throws an error based on the attribution metadata including RecitationAction.BLOCK', async () => {
+      async function* generateAnswer() {
+        yield {
+          explanation: 'ANSWER: this is the answer',
+          metadata: {
+            rpcGlobalId: 123,
+            attributionMetadata: [{
+              attributionAction: Host.AidaClient.RecitationAction.BLOCK,
+              citations: [],
+            }],
+          },
+        };
+      }
+
+      const agent = new FreestylerAgent({
+        aidaClient: mockAidaClient(generateAnswer),
+        confirmSideEffect: () => Promise.resolve(true),
+        execJs: sinon.spy(),
+      });
+
+      const steps = await Array.fromAsync(agent.run('test'));
+      assert.deepStrictEqual(steps, [
+        {
+          step: Freestyler.Step.QUERYING,
+        },
+        {
+          rpcId: undefined,
+          step: Freestyler.Step.ERROR,
+          text: 'Sorry, I could not help you with this query.',
+        },
+      ]);
+    });
+
+    it('does not throw an error based on attribution metadata not including RecitationAction.BLOCK', async () => {
+      async function* generateAnswer() {
+        yield {
+          explanation: 'ANSWER: this is the answer',
+          metadata: {
+            rpcGlobalId: 123,
+            attributionMetadata: [{
+              attributionAction: Host.AidaClient.RecitationAction.ACTION_UNSPECIFIED,
+              citations: [],
+            }],
           },
         };
       }
@@ -665,7 +792,7 @@ ANSWER: this is the answer`,
         };
       }
 
-      const execJs = sinon.spy();
+      const execJs = sinon.spy(async () => 'undefined');
       const agent = new FreestylerAgent({
         aidaClient: mockAidaClient(generateMultipleTimes),
         confirmSideEffect: () => Promise.resolve(true),
@@ -736,7 +863,7 @@ ANSWER: this is the answer`,
 
       const controller = new AbortController();
       controller.abort();
-      await Array.fromAsync(agent.run('test', {signal: controller.signal}));
+      await Array.fromAsync(agent.run('test', {signal: controller.signal, isFixQuery: false}));
 
       assert.deepStrictEqual(agent.chatHistoryForTesting, []);
     });

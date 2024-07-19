@@ -21,13 +21,11 @@ function stringifyObjectOnThePage(this: unknown): string {
     }
 
     if (value instanceof HTMLElement) {
-      const attributesText = [];
-      for (const attribute of value.attributes) {
-        attributesText.push(`${attribute.name}="${attribute.value}"`);
-      }
+      const idAttribute = value.id ? ` id="${value.id}"` : '';
+      const classAttribute = value.classList.value ? ` class="${value.classList.value}"` : '';
 
-      return `<${value.nodeName.toLowerCase()}${attributesText.length > 0 ? ` ${attributesText.join(' ')}` : ''}>${
-          value.hasChildNodes() ? '...' : ''}</${value.nodeName.toLowerCase()}>`;
+      return `<${value.nodeName.toLowerCase()}${idAttribute}${classAttribute}>${value.hasChildNodes() ? '...' : ''}</${
+          value.nodeName.toLowerCase()}>`;
     }
 
     if (this instanceof CSSStyleDeclaration) {
@@ -61,7 +59,7 @@ async function stringifyRemoteObject(object: SDK.RemoteObject.RemoteObject): Pro
         throw new Error('Could not stringify the object' + object);
       }
 
-      return res.object.value as string;
+      return res.object.value;
     }
     default:
       throw new Error('Unknown type to stringify ' + object.type);

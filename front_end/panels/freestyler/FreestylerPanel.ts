@@ -11,23 +11,21 @@ import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 import {
   ChatMessageEntity,
+  DOGFOOD_INFO,
   FreestylerChatUi,
   type ModelChatMessage,
   type Props as FreestylerChatUiProps,
-  Rating,
   State as FreestylerChatUiState,
 } from './components/FreestylerChatUi.js';
 import {FIX_THIS_ISSUE_PROMPT, FreestylerAgent, Step} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
-
-const DOGFOOD_INFO = ' https://goo.gle/freestyler-dogfood' as Platform.DevToolsPath.UrlString;
 
 /*
   * TODO(nvitkov): b/346933425
   * Temporary string that should not be translated
   * as they may change often during development.
   */
-const TempUIStrings = {
+const UIStringsTemp = {
   /**
    *@description Freestyler UI text for clearing messages.
    */
@@ -36,10 +34,6 @@ const TempUIStrings = {
    *@description Freestyler UI text for sending feedback.
    */
   sendFeedback: 'Send feedback',
-  /**
-   *@description Freestyelr UI text for the help button.
-   */
-  help: 'Help',
   /**
    *@description Displayed when the user stop the response
    */
@@ -64,13 +58,13 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
   const clearButton =
-      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.clearMessages), 'clear', undefined, 'freestyler.clear');
+      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.clearMessages), 'clear', undefined, 'freestyler.clear');
   clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, onClearClick);
   leftToolbar.appendToolbarItem(clearButton);
 
   rightToolbar.appendSeparator();
   const helpButton =
-      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.sendFeedback), 'help', undefined, 'freestyler.feedback');
+      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.sendFeedback), 'help', undefined, 'freestyler.feedback');
   helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(DOGFOOD_INFO);
   });
@@ -102,6 +96,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #agent: FreestylerAgent;
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
+  #serverSideLoggingEnabled = isFreestylerServerSideLoggingEnabled();
   #consentViewAcceptedSetting =
       Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability}: {
@@ -115,8 +110,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
     this.#aidaClient = aidaClient;
     this.#contentContainer = this.contentElement.createChild('div', 'freestyler-chat-ui-container');
-    this.#agent =
-        new FreestylerAgent({aidaClient: this.#aidaClient, confirmSideEffect: this.showConfirmSideEffectUi.bind(this)});
+
     this.#selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
     this.#viewProps = {
       state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
@@ -126,20 +120,20 @@ export class FreestylerPanel extends UI.Panel.Panel {
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
       selectedNode: this.#selectedNode,
       isLoading: false,
-      onTextSubmit: this.#handleTextSubmit.bind(this),
+      onTextSubmit: this.#startConversation.bind(this),
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
-      onRateClick: this.#handleRateClick.bind(this),
+      onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
       onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
       onCancelClick: this.#cancel.bind(this),
       onFixThisIssueClick: () => {
-        void this.#handleTextSubmit(FIX_THIS_ISSUE_PROMPT);
+        void this.#startConversation(FIX_THIS_ISSUE_PROMPT, true);
       },
     };
     this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.Toggled, ev => {
       this.#viewProps.inspectElementToggled = ev.data;
       this.doUpdate();
     });
-
+    this.#agent = this.#createAgent();
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, ev => {
       if (this.#viewProps.selectedNode === ev.data) {
         return;
@@ -149,6 +143,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
       this.doUpdate();
     });
     this.doUpdate();
+  }
+
+  #createAgent(): FreestylerAgent {
+    return new FreestylerAgent({
+      aidaClient: this.#aidaClient,
+      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
+      confirmSideEffect: this.showConfirmSideEffectUi.bind(this),
+    });
   }
 
   static async instance(opts: {
@@ -192,12 +194,16 @@ export class FreestylerPanel extends UI.Panel.Panel {
     void this.#toggleSearchElementAction.execute();
   }
 
-  #handleRateClick(rpcId: number, rating: Rating): void {
-    this.#aidaClient.registerClientEvent({
+  #handleFeedbackSubmit(rpcId: number, rating: Host.AidaClient.Rating, feedback?: string): void {
+    void this.#aidaClient.registerClientEvent({
       corresponding_aida_rpc_global_id: rpcId,
+      disable_user_content_logging: !this.#serverSideLoggingEnabled,
       do_conversation_client_event: {
         user_feedback: {
-          sentiment: rating === Rating.POSITIVE ? 'POSITIVE' : 'NEGATIVE',
+          sentiment: rating,
+          user_input: {
+            comment: feedback,
+          },
         },
       },
     });
@@ -227,7 +233,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #clearMessages(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
-    this.#agent.resetHistory();
+    this.#agent = this.#createAgent();
     this.#cancel();
     this.doUpdate();
   }
@@ -240,7 +246,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.doUpdate();
   }
 
-  async #handleTextSubmit(text: string): Promise<void> {
+  async #startConversation(text: string, isFixQuery: boolean = false): Promise<void> {
     this.#viewProps.messages.push({
       entity: ChatMessageEntity.USER,
       text,
@@ -261,9 +267,10 @@ export class FreestylerPanel extends UI.Panel.Panel {
     const signal = this.#runAbortController.signal;
     signal.addEventListener('abort', () => {
       systemMessage.rpcId = undefined;
-      systemMessage.steps.push({step: Step.ERROR, text: i18nString(TempUIStrings.stoppedResponse)});
+      systemMessage.suggestingFix = false;
+      systemMessage.steps.push({step: Step.ERROR, text: i18nString(UIStringsTemp.stoppedResponse)});
     });
-    for await (const data of this.#agent.run(text, {signal})) {
+    for await (const data of this.#agent.run(text, {signal, isFixQuery})) {
       if (data.step === Step.QUERYING) {
         systemMessage = {
           entity: ChatMessageEntity.MODEL,
@@ -272,6 +279,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         };
         this.#viewProps.messages.push(systemMessage);
         this.doUpdate();
+        this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
         continue;
       }
 
@@ -282,6 +290,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       systemMessage.rpcId = data.rpcId;
       systemMessage.steps.push(data);
       this.doUpdate();
+      this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
     }
   }
 }
@@ -314,3 +323,18 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
     return false;
   }
 }
+
+function setFreestylerServerSideLoggingEnabled(enabled: boolean): void {
+  if (enabled) {
+    localStorage.setItem('freestyler_enableServerSideLogging', 'true');
+  } else {
+    localStorage.removeItem('freestyler_enableServerSideLogging');
+  }
+}
+
+function isFreestylerServerSideLoggingEnabled(): boolean {
+  return localStorage.getItem('freestyler_enableServerSideLogging') === 'true';
+}
+
+// @ts-ignore
+globalThis.setFreestylerServerSideLoggingEnabled = setFreestylerServerSideLoggingEnabled;

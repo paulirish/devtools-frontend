@@ -1,12 +1,12 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import * as Root from '../../core/root/root.js';
 import type * as TraceEngine from '../../models/trace/trace.js';
 
-type TrackData = TraceEngine.Types.Extensions.ExtensionTrackData;
-export {TrackData};
+import {TimelinePanel} from './TimelinePanel.js';
 
-type ExtensionData = readonly TrackData[];
+type ExtensionData = TraceEngine.Handlers.ModelHandlers.ExtensionTraceData.ExtensionTraceData;
 
 let extensionDataGathererInstance: ExtensionDataGatherer|undefined;
 
@@ -33,14 +33,16 @@ export class ExtensionDataGatherer {
    * Gets the data provided by extensions.
    */
   getExtensionData(): ExtensionData {
-    if (!this.#traceParsedData || !this.#traceParsedData.ExtensionTraceData) {
-      return [];
+    const extensionDataEnabled = TimelinePanel.extensionDataVisibilitySetting().get() &&
+        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS);
+    if (!extensionDataEnabled || !this.#traceParsedData || !this.#traceParsedData.ExtensionTraceData) {
+      return {extensionMarkers: [], extensionTrackData: []};
     }
     const maybeCachedData = this.#extensionDataByModel.get(this.#traceParsedData);
     if (maybeCachedData) {
       return maybeCachedData;
     }
-    return this.#traceParsedData.ExtensionTraceData.extensionTrackData;
+    return this.#traceParsedData.ExtensionTraceData;
   }
 
   saveCurrentModelData(): void {

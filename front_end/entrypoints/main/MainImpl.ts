@@ -163,8 +163,22 @@ export class MainImpl {
     await this.requestAndRegisterLocaleData();
 
     Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync-preferences').get());
-    if (Root.Runtime.Runtime.queryParam('veLogging')) {
-      void VisualLogging.startLogging();
+    const veLogging = Common.Settings.Settings.instance().getHostConfig()?.devToolsVeLogging;
+    if (veLogging?.enabled) {
+      if (veLogging?.testing) {
+        VisualLogging.setVeDebugLoggingEnabled(true, VisualLogging.DebugLoggingFormat.Test);
+        const options = {
+          processingThrottler: new Common.Throttler.Throttler(10),
+          keyboardLogThrottler: new Common.Throttler.Throttler(10),
+          hoverLogThrottler: new Common.Throttler.Throttler(10),
+          dragLogThrottler: new Common.Throttler.Throttler(10),
+          clickLogThrottler: new Common.Throttler.Throttler(10),
+          resizeLogThrottler: new Common.Throttler.Throttler(10),
+        };
+        void VisualLogging.startLogging(options);
+      } else {
+        void VisualLogging.startLogging();
+      }
     }
     void this.#createAppUI();
   }
@@ -825,12 +839,13 @@ export class MainMenuItem implements UI.Toolbar.Provider {
           'jslog', `${VisualLogging.item('dock-side').track({keydown: 'ArrowDown|ArrowLeft|ArrowRight'})}`);
       dockItemToolbar.makeBlueOnHover();
       const undock = new UI.Toolbar.ToolbarToggle(
-          i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'undock');
-      const bottom =
-          new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToBottom), 'dock-bottom', undefined, 'dock-bottom');
-      const right =
-          new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToRight), 'dock-right', undefined, 'dock-right');
-      const left = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToLeft), 'dock-left', undefined, 'dock-left');
+          i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'current-dock-state-undock');
+      const bottom = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.dockToBottom), 'dock-bottom', undefined, 'current-dock-state-bottom');
+      const right = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.dockToRight), 'dock-right', undefined, 'current-dock-state-right');
+      const left = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.dockToLeft), 'dock-left', undefined, 'current-dock-state-left');
       undock.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
       bottom.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
       right.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());

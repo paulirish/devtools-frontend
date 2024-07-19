@@ -14,7 +14,7 @@ import type * as Freestyler from './freestyler.js';
   * Temporary string that should not be translated
   * as they may change often during development.
   */
-const TempUIStrings = {
+const UIStringsTemp = {
   /**
    * @description The title of the action for showing Freestyler panel.
    */
@@ -52,16 +52,14 @@ async function loadFreestylerModule(): Promise<typeof Freestyler> {
 }
 
 function isFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
-  const blockedByFeatureFlag = config?.devToolsAida ? config.devToolsAida.blockedByFeatureFlag === true :
-                                                      config?.devToolsConsoleInsights?.blockedByFeatureFlag === true;
-  return config?.devToolsFreestylerDogfood?.enabled === true && !blockedByFeatureFlag;
+  return config?.devToolsFreestylerDogfood?.enabled === true;
 }
 
 UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.DRAWER_VIEW,
   id: 'freestyler',
-  commandPrompt: i18nLazyString(TempUIStrings.showFreestyler),
-  title: i18nLazyString(TempUIStrings.freestyler),
+  commandPrompt: i18nLazyString(UIStringsTemp.showFreestyler),
+  title: i18nLazyString(UIStringsTemp.freestyler),
   order: 10,
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   hasToolbar: false,
@@ -76,7 +74,7 @@ Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.GLOBAL,
   settingName: setting,
   settingType: Common.Settings.SettingType.BOOLEAN,
-  title: i18nLazyString(TempUIStrings.enableFreestyler),
+  title: i18nLazyString(UIStringsTemp.enableFreestyler),
   defaultValue: isFeatureAvailable,
   reloadRequired: true,
   condition: isFeatureAvailable,
@@ -89,7 +87,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   setting,
   category: UI.ActionRegistration.ActionCategory.GLOBAL,
-  title: i18nLazyString(TempUIStrings.askFreestyler),
+  title: i18nLazyString(UIStringsTemp.askFreestyler),
   async loadActionDelegate() {
     const Freestyler = await loadFreestylerModule();
     return new Freestyler.ActionDelegate();
@@ -104,7 +102,7 @@ UI.ActionRegistration.registerActionExtension({
   },
   setting,
   category: UI.ActionRegistration.ActionCategory.GLOBAL,
-  title: i18nLazyString(TempUIStrings.askFreestyler),
+  title: i18nLazyString(UIStringsTemp.askFreestyler),
   iconClass: UI.ActionRegistration.IconClass.SPARK,
   async loadActionDelegate() {
     const Freestyler = await loadFreestylerModule();

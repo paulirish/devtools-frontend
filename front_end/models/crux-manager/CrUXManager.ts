@@ -11,7 +11,7 @@ const CRUX_API_KEY = 'AIzaSyCCSOx25vrb5z0tbedCB3_JRzzbVW6Uwgw';
 const DEFAULT_ENDPOINT = `https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=${CRUX_API_KEY}`;
 
 export type MetricNames = 'cumulative_layout_shift'|'first_contentful_paint'|'first_input_delay'|
-    'interaction_to_next_paint'|'largest_contentful_paint'|'experimental_time_to_first_byte';
+    'interaction_to_next_paint'|'largest_contentful_paint'|'experimental_time_to_first_byte'|'round_trip_time';
 export type FormFactor = 'DESKTOP'|'PHONE'|'TABLET';
 export type DeviceScope = FormFactor|'ALL';
 export type PageScope = 'url'|'origin';
@@ -26,8 +26,8 @@ export interface CrUXRequest {
 }
 
 export interface MetricResponse {
-  histogram: Array<{start: number, end?: number, density?: number}>;
-  percentiles: {p75: number|string};
+  histogram?: Array<{start: number, end?: number, density?: number}>;
+  percentiles?: {p75: number|string};
 }
 
 interface CollectionDate {
@@ -57,29 +57,32 @@ export type PageResult = {
   [K in`${PageScope}-${DeviceScope}`]: CrUXResponse|null;
 };
 
+export interface ConfigSetting {
+  enabled: boolean;
+  override: string;
+}
+
 let cruxManagerInstance: CrUXManager;
 
-const deviceScopeList: DeviceScope[] = ['ALL', 'DESKTOP', 'PHONE', 'TABLET'];
+// TODO: Potentially support `TABLET`. Tablet field data will always be `null` until then.
+export const DEVICE_SCOPE_LIST: DeviceScope[] = ['ALL', 'DESKTOP', 'PHONE'];
+
 const pageScopeList: PageScope[] = ['origin', 'url'];
-const metrics: MetricNames[] = ['largest_contentful_paint', 'cumulative_layout_shift', 'interaction_to_next_paint'];
+const metrics: MetricNames[] =
+    ['largest_contentful_paint', 'cumulative_layout_shift', 'interaction_to_next_paint', 'round_trip_time'];
 
 export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   #originCache = new Map<string, CrUXResponse|null>();
   #urlCache = new Map<string, CrUXResponse|null>();
   #mainDocumentUrl?: string;
-  #urlOverrideSetting = Common.Settings.Settings.instance().createSetting('field-data-url-override', '');
-  #enabledSetting = Common.Settings.Settings.instance().createSetting('field-data-enabled', false);
+  #configSetting =
+      Common.Settings.Settings.instance().createSetting<ConfigSetting>('field-data', {enabled: false, override: ''});
   #endpoint = DEFAULT_ENDPOINT;
 
   private constructor() {
     super();
 
-    this.#enabledSetting.setTitle('Enable field data');
-    this.#enabledSetting.addChangeListener(() => {
-      void this.#automaticRefresh();
-    });
-
-    this.#urlOverrideSetting.addChangeListener(() => {
+    this.#configSetting.addChangeListener(() => {
       void this.#automaticRefresh();
     });
 
@@ -97,12 +100,8 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     return cruxManagerInstance;
   }
 
-  getEnabledSetting(): Common.Settings.Setting<boolean> {
-    return this.#enabledSetting;
-  }
-
-  getUrlOverrideSetting(): Common.Settings.Setting<string> {
-    return this.#urlOverrideSetting;
+  getConfigSetting(): Common.Settings.Setting<ConfigSetting> {
+    return this.#configSetting;
   }
 
   async getFieldDataForPage(pageUrl: string): Promise<PageResult> {
@@ -122,7 +121,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       const promises: Promise<void>[] = [];
 
       for (const pageScope of pageScopeList) {
-        for (const deviceScope of deviceScopeList) {
+        for (const deviceScope of DEVICE_SCOPE_LIST) {
           const promise = this.#getScopedData(normalizedUrl, pageScope, deviceScope).then(response => {
             pageResult[`${pageScope}-${deviceScope}`] = response;
           });
@@ -148,7 +147,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
    * the main document URL cannot be found.
    */
   async getFieldDataForCurrentPage(): Promise<PageResult> {
-    const pageUrl = this.#urlOverrideSetting.get() || this.#mainDocumentUrl || await this.#getInspectedURL();
+    const pageUrl = this.#configSetting.get().override || this.#mainDocumentUrl || await this.#getInspectedURL();
     return this.getFieldDataForPage(pageUrl);
   }
 
@@ -186,7 +185,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     // - Tells listeners to clear old data when field data is disabled.
     this.dispatchEventToListeners(Events.FieldDataChanged, undefined);
 
-    if (!this.#enabledSetting.get()) {
+    if (!this.#configSetting.get().enabled) {
       return;
     }
 

@@ -35,7 +35,6 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../components/buttons/buttons.js';
-import type * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
@@ -194,7 +193,10 @@ interface GroupHiddenState {
 }
 
 interface PopoverState {
+  // Index of the last entry the popover was shown over.
   entryIndex: number;
+  // Index of the last group the popover was shown over.
+  groupIndex: number;
   hiddenEntriesPopover: boolean;
 }
 interface GroupTreeNode {
@@ -218,6 +220,10 @@ export interface OptionalFlameChartConfig {
    * The element to use when populating and positioning the mouse tooltip.
    */
   tooltipElement?: HTMLElement;
+  /**
+   * Used to disable the cursor element in ChartViewport and instead use the new overlays system.
+   */
+  useOverlaysForCursorRuler?: boolean;
 }
 
 export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
@@ -310,7 +316,16 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.groupHiddenState = {};
     this.flameChartDelegate = flameChartDelegate;
 
-    this.chartViewport = new ChartViewport(this);
+    // The ChartViewport has its own built-in ruler for when the user holds
+    // shift and moves the mouse. We want to disable that if we are within the
+    // performance panel where we use overlays, but enable it otherwise.
+    let enableCursorElement = true;
+    if (typeof optionalConfig.useOverlaysForCursorRuler === 'boolean') {
+      enableCursorElement = !optionalConfig.useOverlaysForCursorRuler;
+    }
+    this.chartViewport = new ChartViewport(this, {
+      enableCursorElement,
+    });
     this.chartViewport.show(this.contentElement);
 
     this.dataProvider = dataProvider;
@@ -368,6 +383,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.selectedGroupIndex = -1;
     this.lastPopoverState = {
       entryIndex: -1,
+      groupIndex: -1,
       hiddenEntriesPopover: false,
     };
 
@@ -472,6 +488,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.popoverElement.removeChildren();
       this.lastPopoverState = {
         entryIndex: -1,
+        groupIndex: -1,
         hiddenEntriesPopover: false,
       };
     }
@@ -591,13 +608,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   /**
-   * Handle the mouse move event.
-   *
-   * And the handle priority will be:
-   * 1. Track configuration icons -> show tooltip for the icons
-   * 2. Inside a track header -> mouse style will be a "pointer", show edit icon
-   * 3.1 Inside a track -> show edit icon, update the highlight of hovered event
-   * 3.2 Outside all tracks -> clear all highlights
+   * Handle the mouse move event. The handle priority will be:
+   *   1. Track configuration icons -> show tooltip for the icons
+   *   2. Inside a track header -> mouse style will be a "pointer", indicating track can be focused
+   *   3. Inside a track -> update the highlight of hovered event
    */
   private onMouseMove(event: Event): void {
     this.#searchResultEntryIndex = -1;
@@ -610,6 +624,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (this.chartViewport.isDragging()) {
       return;
     }
+
+    const timeMilliSeconds = TraceEngine.Types.Timing.MilliSeconds(this.chartViewport.pixelToTime(mouseEvent.offsetX));
+
+    this.dispatchEventToListeners(Events.MouseMove, {
+      mouseEvent,
+      timeInMicroSeconds: TraceEngine.Helpers.Timing.millisecondsToMicroseconds(timeMilliSeconds),
+    });
+
     // Check if the mouse is hovering any group's header area
     const {groupIndex, hoverType} = this.coordinatesToGroupIndexAndHoverType(mouseEvent.offsetX, mouseEvent.offsetY);
     switch (hoverType) {
@@ -627,16 +649,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         return;
       }
       case HoverType.INSIDE_TRACK_HEADER:
-        this.hideHighlight();
+        this.updateHighlight();
         this.viewportElement.style.cursor = 'pointer';
         return;
       case HoverType.INSIDE_TRACK:
-        this.updateHighlight();
-        return;
-      case HoverType.OUTSIDE_TRACKS:
-        // No group is hovered.
-        // Redraw the flame chart to clear the potentially previously draw edit icon.
-        this.draw();
         this.updateHighlight();
         return;
     }
@@ -688,7 +704,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // No entry is hovered.
     if (entryIndex === -1) {
       this.hideHighlight();
-      const {groupIndex} = this.coordinatesToGroupIndexAndHoverType(this.lastMouseOffsetX, this.lastMouseOffsetY);
+
+      const {groupIndex, hoverType} =
+          this.coordinatesToGroupIndexAndHoverType(this.lastMouseOffsetX, this.lastMouseOffsetY);
+      if (hoverType === HoverType.INSIDE_TRACK_HEADER) {
+        this.#updatePopoverForGroup(groupIndex);
+      }
       if (groupIndex >= 0 && this.rawTimelineData && this.rawTimelineData.groups &&
           this.rawTimelineData.groups[groupIndex].selectable) {
         // This means the mouse is in a selectable group's area, and not hovering any entry.
@@ -744,7 +765,30 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.lastPopoverState = {
       entryIndex,
+      groupIndex: -1,
       hiddenEntriesPopover: isMouseOverRevealChildrenArrow,
+    };
+  }
+
+  #updatePopoverForGroup(groupIndex: number): void {
+    // Just update position if cursor is hovering the group name.
+    if (groupIndex === this.lastPopoverState.groupIndex) {
+      return this.updatePopoverOffset();
+    }
+    this.popoverElement.removeChildren();
+    const data = this.timelineData();
+    if (!data) {
+      return;
+    }
+    const group = data.groups.at(groupIndex);
+    if (group?.description) {
+      this.popoverElement.innerText = (group?.description);
+      this.updatePopoverOffset();
+    }
+    this.lastPopoverState = {
+      groupIndex: groupIndex,
+      entryIndex: -1,
+      hiddenEntriesPopover: false,
     };
   }
 
@@ -1169,12 +1213,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.#buildEnterEditModeContextMenu(event);
     }
 
-    // The following context menu should only work for the flame chart that support tree modification.
-    // So if the data provider doesn't have the |modifyTree| function, simply return to show the default context menu.
-    if (!this.dataProvider.modifyTree) {
-      return;
-    }
-
     if (this.highlightedEntryIndex === -1) {
       // If the user has not selected an individual entry, we do not show any
       // context menu, so finish here.
@@ -1192,6 +1230,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.setSelectedEntry(this.highlightedEntryIndex);
     // Update the selected group as well.
     this.#selectGroup(groupIndex);
+
+    // If the flame chart provider can build a customized context menu for the given entry, we will use that, otherwise
+    // just do nothing and fall back to default context menu.
+    if (this.dataProvider.customizedContextMenu) {
+      this.contextMenu = this.dataProvider.customizedContextMenu(event, this.highlightedEntryIndex);
+      if (this.contextMenu) {
+        void this.contextMenu.show();
+        return;
+      }
+    }
+
+    // The following context menu should only work for the flame chart that support tree modification.
+    // So if the data provider doesn't have the |modifyTree| function, simply return to show the default context menu.
+    if (!this.dataProvider.modifyTree) {
+      return;
+    }
 
     const possibleActions = this.getPossibleActions();
     if (!possibleActions) {
@@ -1930,10 +1984,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         // that as all being collapsed.
         allGroupsCollapsed: this.rawTimelineData?.groups.every(g => !g.expanded) ?? true,
       },
-      traceWindow: TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(
-          this.minimumBoundary(),
-          this.maximumBoundary(),
-          ),
+      traceWindow:
+          TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(this.minimumBoundary(), this.maximumBoundary()),
     });
     const canvasWidth = this.offsetWidth;
     const canvasHeight = this.offsetHeight;
@@ -1983,12 +2035,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.dispatchEventToListeners(Events.ChartPlayableStateChange, wideEntryExists);
 
-    const allIndexes = Array.from(colorBuckets.values()).map(x => x.indexes).flat();
-    this.#drawDecorations(context, timelineData, allIndexes);
-
     this.drawMarkers(context, timelineData, markerIndices);
 
     this.drawEventTitles(context, timelineData, titleIndices, canvasWidth);
+
+    // If there is a `forceDecoration` function, it will be called in `drawEventTitles`, which will overwrite the
+    // default decorations, so we need to call this function after the `drawEventTitles`.
+    const allIndexes = Array.from(colorBuckets.values()).map(x => x.indexes).flat();
+    this.#drawDecorations(context, timelineData, allIndexes);
     context.restore();
 
     this.drawGroupHeaders(canvasWidth, canvasHeight);
@@ -3801,8 +3855,6 @@ export interface FlameChartDataProvider {
 
   totalTime(): number;
 
-  setVisualElementLoggingParent?(parent: VisualLogging.Loggable): void;
-
   formatValue(value: number, precision?: number): string;
 
   maxStackDepth(): number;
@@ -3834,6 +3886,8 @@ export interface FlameChartDataProvider {
   mainFrameNavigationStartEvents?(): readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[];
 
   modifyTree?(node: number, action: TraceEngine.EntriesFilter.FilterAction): void;
+
+  customizedContextMenu?(event: MouseEvent, eventIndex: number): UI.ContextMenu.ContextMenu|undefined;
 
   findPossibleContextMenuActions?(node: number): TraceEngine.EntriesFilter.PossibleFilterActions|void;
 
@@ -3889,6 +3943,8 @@ export const enum Events {
   ChartPlayableStateChange = 'ChartPlayableStateChange',
 
   LatestDrawDimensions = 'LatestDrawDimensions',
+
+  MouseMove = 'MouseMove',
 }
 
 export type EventTypes = {
@@ -3907,6 +3963,10 @@ export type EventTypes = {
     },
     traceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
   },
+  [Events.MouseMove]: {
+    mouseEvent: MouseEvent,
+    timeInMicroSeconds: TraceEngine.Types.Timing.MicroSeconds,
+  },
 };
 
 export interface Group {
@@ -3920,6 +3980,7 @@ export interface Group {
   showStackContextMenu?: boolean;
   legends?: Legend[];
   jslogContext?: string;
+  description?: string;
 }
 
 export interface GroupStyle {

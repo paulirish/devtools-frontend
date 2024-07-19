@@ -31,11 +31,11 @@ describeWithEnvironment('TraceModel', function() {
 
   it('supports being given a set of handlers to run and will run just those and the Meta handler', async function() {
     const model = new TraceModel.TraceModel.Model({
-      Animation: TraceModel.Handlers.ModelHandlers.Animations,
-    });
+      Animations: TraceModel.Handlers.ModelHandlers.Animations,
+    } as TraceModel.Handlers.Types.Handlers);
     const file1 = await TraceLoader.rawEvents(this, 'animation.json.gz');
     await model.parse(file1);
-    assert.deepEqual(Object.keys(model.traceParsedData(0) || {}), ['Meta', 'Animation']);
+    assert.deepEqual(Object.keys(model.traceParsedData(0) || {}), ['Meta', 'Animations']);
   });
 
   it('supports parsing multiple traces', async function() {
@@ -44,8 +44,10 @@ describeWithEnvironment('TraceModel', function() {
     const file2 = await TraceLoader.rawEvents(this, 'slow-interaction-keydown.json.gz');
 
     await model.parse(file1);
+    assert.strictEqual(model.lastTraceIndex(), 0);
     model.resetProcessor();
     await model.parse(file2);
+    assert.strictEqual(model.lastTraceIndex(), 1);
     model.resetProcessor();
 
     assert.strictEqual(model.size(), 2);
@@ -124,14 +126,23 @@ describeWithEnvironment('TraceModel', function() {
       expandableEntries: ['r-4'],
     } as TraceModel.Types.File.Modifications['entriesModifications'];
 
+    const annotations = {
+      entryLabels: [
+        {
+          entry: 'r-4',
+          label: 'entry label',
+        },
+      ],
+    } as TraceModel.Types.File.Modifications['annotations'];
+
     const modifications = {
       entriesModifications,
       initialBreadcrumb,
+      annotations,
     };
 
     model.overrideModifications(0, modifications);
     // Make sure metadata contains overwritten modifications
     assert.strictEqual(model.metadata(0)?.modifications, modifications);
   });
-
 });

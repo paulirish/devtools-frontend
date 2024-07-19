@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Root from '../../core/root/root.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
@@ -71,13 +72,16 @@ export class TimelineMiniMap extends
 
     const icon = new IconButton.Icon.Icon();
     icon.setAttribute('name', 'left-panel-open');
-    icon.setAttribute('jslog', `${VisualLogging.action('performance.sidebar-open').track({click: true})}`);
+    icon.setAttribute('jslog', `${VisualLogging.action('timeline.sidebar-open').track({click: true})}`);
     icon.addEventListener('click', () => {
       this.dispatchEventToListeners(PerfUI.TimelineOverviewPane.Events.OpenSidebarButtonClicked, {});
     });
     this.#sidebarFloatingIcon.setAttribute('aria-label', i18nString(UIStrings.openSidebarButton));
     this.#sidebarFloatingIcon.appendChild(icon);
     this.#sidebarFloatingIcon.classList.add('timeline-sidebar-floating-icon');
+    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
+      this.hideSidebarFloatingIcon();
+    }
 
     this.element.appendChild(this.#sidebarFloatingIcon);
 

@@ -80,10 +80,6 @@ const UIStrings = {
    */
   emptyPlaceholder: '{PH1}',  // eslint-disable-line rulesdir/l10n_no_locked_or_placeholder_only_phrase
   /**
-   *@description Text that refers to updated priority of network request
-   */
-  initialPriority: 'Initial Priority',
-  /**
    *@description Text for timestamps of items
    */
   timestamp: 'Timestamp',
@@ -202,22 +198,6 @@ const UIStrings = {
    *@description Text for referring to the ID of a callback function installed by an event.
    */
   callbackId: 'Callback ID',
-  /**
-   *@description Text that refers to the network request method
-   */
-  requestMethod: 'Request Method',
-  /**
-   *@description Text to show the priority of an item
-   */
-  priority: 'Priority',
-  /**
-   *@description Text used when referring to the data sent in a network request that is encoded as a particular file format.
-   */
-  encodedData: 'Encoded Data',
-  /**
-   *@description Text used to refer to the data sent in a network request that has been decoded.
-   */
-  decodedBody: 'Decoded Body',
   /**
    *@description Text for a module, the programming concept
    */
@@ -403,48 +383,9 @@ const UIStrings = {
    */
   aggregatedTime: 'Aggregated Time',
   /**
-   *@description Text to indicate to the user they are viewing an event representing a network request.
-   */
-  networkRequest: 'Network request',
-  /**
-   *@description Text used to indicate if a network request was loaded from the cache.
-   */
-  loadFromCache: 'load from cache',
-  /**
-   *@description Text used to indicate if a network request was transferred over the network (rather than being loaded from the cache.)
-   */
-  networkTransfer: 'network transfer',
-  /**
-   *@description Text used to show the total time a network request spent loading a resource.
-   *@example {1ms} PH1
-   *@example {network transfer} PH2
-   *@example {1ms} PH3
-   */
-  SSSResourceLoading: ' ({PH1} {PH2} + {PH3} resource loading)',
-  /**
    *@description Text for the duration of something
    */
   duration: 'Duration',
-  /**
-   *@description Text used to show the mime-type of the data transferred with a network request (e.g. "application/json").
-   */
-  mimeType: 'Mime Type',
-  /**
-   *@description Text used to show the user that a request was served from the browser's in-memory cache.
-   */
-  FromMemoryCache: ' (from memory cache)',
-  /**
-   *@description Text used to show the user that a request was served from the browser's file cache.
-   */
-  FromCache: ' (from cache)',
-  /**
-   *@description Label for a network request indicating that it was a HTTP2 server push instead of a regular network request, in the Performance panel
-   */
-  FromPush: ' (from push)',
-  /**
-   *@description Text used to show a user that a request was served from an installed, active service worker.
-   */
-  FromServiceWorker: ' (from `service worker`)',
   /**
    *@description Text for the stack trace of the initiator of something. The Initiator is the event or factor that directly triggered or precipitated a subsequent action.
    */
@@ -572,14 +513,14 @@ let eventDispatchDesciptors: EventDispatchTypeDescriptor[];
 
 let colorGenerator: Common.Color.Generator;
 
-const requestPreviewElements = new WeakMap<TraceEngine.Types.TraceEvents.SyntheticNetworkRequest, HTMLImageElement>();
-
 type LinkifyLocationOptions = {
   scriptId: Protocol.Runtime.ScriptId|null,
   url: string,
   lineNumber: number,
+  target: SDK.Target.Target|null,
+  linkifier: LegacyComponents.Linkifier.Linkifier,
+  isFreshRecording?: boolean,
   columnNumber?: number,
-  isFreshRecording?: boolean, target: SDK.Target.Target|null, linkifier: LegacyComponents.Linkifier.Linkifier,
 };
 
 export class TimelineUIUtils {
@@ -1268,10 +1209,31 @@ export class TimelineUIUtils {
         contentHelper.appendElementRow(i18nString(UIStrings.warning), warning, true);
       }
     }
-    if (detailed && !Number.isNaN(duration || 0)) {
+
+    // Add timestamp to user timings.
+    if (TraceEngine.Helpers.Trace.eventHasCategory(event, TraceEngine.Types.TraceEvents.Categories.UserTiming)) {
+      const adjustedEventTimeStamp = timeStampForEventAdjustedForClosestNavigationIfPossible(
+          event,
+          traceParseData,
+      );
+      contentHelper.appendTextRow(
+          i18nString(UIStrings.timestamp), i18n.TimeUtilities.preciseMillisToString(adjustedEventTimeStamp, 1));
+    }
+
+    // Only show total time and self time for events with non-zero durations.
+    if (detailed && !Number.isNaN(duration || 0) && duration !== 0) {
       contentHelper.appendTextRow(
           i18nString(UIStrings.totalTime), i18n.TimeUtilities.millisToString(duration || 0, true));
       contentHelper.appendTextRow(i18nString(UIStrings.selfTime), i18n.TimeUtilities.millisToString(selfTime, true));
+    }
+
+    if (TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(event) && event.args.data?.detail) {
+      const detailContainer = TimelineUIUtils.renderObjectJson(JSON.parse(event.args.data?.detail));
+      contentHelper.appendElementRow(i18nString(UIStrings.details), detailContainer);
+    }
+    if (TraceEngine.Types.TraceEvents.isSyntheticUserTiming(event) && event.args?.data?.beginEvent.args.detail) {
+      const detailContainer = TimelineUIUtils.renderObjectJson(JSON.parse(event.args?.data?.beginEvent.args.detail));
+      contentHelper.appendElementRow(i18nString(UIStrings.details), detailContainer);
     }
 
     if (traceParseData.Meta.traceIsGeneric) {
@@ -1300,7 +1262,7 @@ export class TimelineUIUtils {
     }
 
     if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(event)) {
-      for (const [key, value] of event.args.detailsPairs || []) {
+      for (const [key, value] of event.args.properties || []) {
         contentHelper.appendTextRow(key, value);
       }
     }
@@ -1813,114 +1775,6 @@ export class TimelineUIUtils {
     }
   }
 
-  static async buildSyntheticNetworkRequestDetails(
-      traceParseData: TraceEngine.Handlers.Types.TraceParseData,
-      event: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest,
-      linkifier: LegacyComponents.Linkifier.Linkifier): Promise<DocumentFragment> {
-    const maybeTarget = targetForEvent(traceParseData, event);
-    const contentHelper = new TimelineDetailsContentHelper(maybeTarget, linkifier);
-
-    const color = TimelineComponents.Utils.colorForNetworkRequest(event);
-    contentHelper.addSection(i18nString(UIStrings.networkRequest), color);
-
-    const options = {
-      tabStop: true,
-      showColumnNumber: false,
-      inlineFrameIndex: 0,
-    };
-    contentHelper.appendElementRow(
-        i18n.i18n.lockedString('URL'),
-        LegacyComponents.Linkifier.Linkifier.linkifyURL(
-            event.args.data.url as Platform.DevToolsPath.UrlString, options));
-
-    // The time from queueing the request until resource processing is finished.
-    const fullDuration = event.dur;
-    if (isFinite(fullDuration)) {
-      let textRow = i18n.TimeUtilities.formatMicroSecondsTime(fullDuration);
-      // The time from queueing the request until the download is finished. This
-      // corresponds to the total time reported for the request in the network tab.
-      const networkDuration = event.args.data.syntheticData.finishTime - event.ts;
-      // The time it takes to make the resource available to the renderer process.
-      const processingDuration = event.ts + event.dur - event.args.data.syntheticData.finishTime;
-      if (isFinite(networkDuration) && isFinite(processingDuration)) {
-        const networkDurationStr =
-            i18n.TimeUtilities.formatMicroSecondsTime(networkDuration as TraceEngine.Types.Timing.MicroSeconds);
-        const processingDurationStr =
-            i18n.TimeUtilities.formatMicroSecondsTime(processingDuration as TraceEngine.Types.Timing.MicroSeconds);
-        const cached = event.args.data.syntheticData.isMemoryCached || event.args.data.syntheticData.isDiskCached;
-        const cacheOrNetworkLabel =
-            cached ? i18nString(UIStrings.loadFromCache) : i18nString(UIStrings.networkTransfer);
-        textRow += i18nString(
-            UIStrings.SSSResourceLoading,
-            {PH1: networkDurationStr, PH2: cacheOrNetworkLabel, PH3: processingDurationStr});
-      }
-      contentHelper.appendTextRow(i18nString(UIStrings.duration), textRow);
-    }
-
-    if (event.args.data.requestMethod) {
-      contentHelper.appendTextRow(i18nString(UIStrings.requestMethod), event.args.data.requestMethod);
-    }
-
-    if (event.args.data.initialPriority) {
-      const initialPriority = PerfUI.NetworkPriorities.uiLabelForNetworkPriority(event.args.data.initialPriority);
-      contentHelper.appendTextRow(i18nString(UIStrings.initialPriority), initialPriority);
-    }
-
-    const priority = PerfUI.NetworkPriorities.uiLabelForNetworkPriority(event.args.data.priority);
-
-    contentHelper.appendTextRow(i18nString(UIStrings.priority), priority);
-
-    if (event.args.data.mimeType) {
-      contentHelper.appendTextRow(i18nString(UIStrings.mimeType), event.args.data.mimeType);
-    }
-    let lengthText = '';
-    if (event.args.data.syntheticData.isMemoryCached) {
-      lengthText += i18nString(UIStrings.FromMemoryCache);
-    } else if (event.args.data.syntheticData.isDiskCached) {
-      lengthText += i18nString(UIStrings.FromCache);
-    } else if (event.args.data.timing?.pushStart) {
-      lengthText += i18nString(UIStrings.FromPush);
-    }
-    if (event.args.data.fromServiceWorker) {
-      lengthText += i18nString(UIStrings.FromServiceWorker);
-    }
-    if (event.args.data.encodedDataLength || !lengthText) {
-      lengthText = `${Platform.NumberUtilities.bytesToString(event.args.data.encodedDataLength)}${lengthText}`;
-    }
-    contentHelper.appendTextRow(i18nString(UIStrings.encodedData), lengthText);
-    if (event.args.data.decodedBodyLength) {
-      contentHelper.appendTextRow(
-          i18nString(UIStrings.decodedBody), Platform.NumberUtilities.bytesToString(event.args.data.decodedBodyLength));
-    }
-
-    const topFrame = TraceEngine.Helpers.Trace.getZeroIndexedStackTraceForEvent(event)?.at(0) ?? null;
-    if (topFrame) {
-      const link = linkifier.maybeLinkifyConsoleCallFrame(
-          maybeTarget, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
-      if (link) {
-        contentHelper.appendElementRow(i18nString(UIStrings.initiatedBy), link);
-      }
-    }
-
-    if (!requestPreviewElements.get(event) && event.args.data.url && maybeTarget) {
-      const previewElement =
-          (await LegacyComponents.ImagePreview.ImagePreview.build(
-               maybeTarget, event.args.data.url as Platform.DevToolsPath.UrlString, false, {
-                 imageAltText: LegacyComponents.ImagePreview.ImagePreview.defaultAltTextForImageURL(
-                     event.args.data.url as Platform.DevToolsPath.UrlString),
-                 precomputedFeatures: undefined,
-               }) as HTMLImageElement);
-
-      requestPreviewElements.set(event, previewElement);
-    }
-
-    const requestPreviewElement = requestPreviewElements.get(event);
-    if (requestPreviewElement) {
-      contentHelper.appendElementRow(i18nString(UIStrings.preview), requestPreviewElement);
-    }
-    return contentHelper.fragment;
-  }
-
   private static renderEventJson(
       event: TraceEngine.Types.TraceEvents.TraceEventData, contentHelper: TimelineDetailsContentHelper): void {
     contentHelper.addSection(i18nString(UIStrings.traceEvent));
@@ -1929,9 +1783,14 @@ export class TimelineUIUtils {
       ...{args: event.args},
       ...event,
     };
+    const highlightContainer = TimelineUIUtils.renderObjectJson(eventWithArgsFirst);
+    contentHelper.appendElementRow('', highlightContainer);
+  }
+
+  private static renderObjectJson(obj: Object): HTMLDivElement {
     const indentLength = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get().length;
     // Elide if the data is huge. Then remove the initial new-line for a denser UI
-    const eventStr = JSON.stringify(eventWithArgsFirst, null, indentLength).slice(0, 10_000).replace(/{\n  /, '{ ');
+    const eventStr = JSON.stringify(obj, null, indentLength).slice(0, 10_000).replace(/{\n  /, '{ ');
 
     // Use CodeHighlighter for syntax highlighting.
     const highlightContainer = document.createElement('div');
@@ -1941,7 +1800,7 @@ export class TimelineUIUtils {
     elem.classList.add('monospace', 'source-code');
     elem.textContent = eventStr;
     void CodeHighlighter.CodeHighlighter.highlightNode(elem, 'text/javascript');
-    contentHelper.appendElementRow('', highlightContainer);
+    return highlightContainer;
   }
 
   static stackTraceFromCallFrames(callFrames: Protocol.Runtime.CallFrame[]|
@@ -2073,7 +1932,7 @@ export class TimelineUIUtils {
   }
 
   private static async generateInvalidationsList(
-      invalidations: TraceEngine.Types.TraceEvents.SyntheticInvalidation[],
+      invalidations: TraceEngine.Types.TraceEvents.InvalidationTrackingEvent[],
       contentHelper: TimelineDetailsContentHelper): Promise<void> {
     const {groupedByReason, backendNodeIds} = TimelineComponents.DetailsView.generateInvalidationsList(invalidations);
 
@@ -2090,19 +1949,21 @@ export class TimelineUIUtils {
   }
 
   private static generateInvalidationsForReason(
-      reason: string, invalidations: TraceEngine.Types.TraceEvents.SyntheticInvalidation[],
+      reason: string, invalidations: TraceEngine.Types.TraceEvents.InvalidationTrackingEvent[],
       relatedNodesMap: Map<number, SDK.DOMModel.DOMNode|null>|null, contentHelper: TimelineDetailsContentHelper): void {
-    function createLinkForInvalidationNode(invalidation: TraceEngine.Types.TraceEvents.SyntheticInvalidation):
+    function createLinkForInvalidationNode(invalidation: TraceEngine.Types.TraceEvents.InvalidationTrackingEvent):
         HTMLSpanElement {
-      const node = (invalidation.nodeId && relatedNodesMap) ? relatedNodesMap.get(invalidation.nodeId) : null;
+      const node = (invalidation.args.data.nodeId && relatedNodesMap) ?
+          relatedNodesMap.get(invalidation.args.data.nodeId) :
+          null;
       if (node) {
         const nodeSpan = document.createElement('span');
         void Common.Linkifier.Linkifier.linkify(node).then(link => nodeSpan.appendChild(link));
         return nodeSpan;
       }
-      if (invalidation.nodeName) {
+      if (invalidation.args.data.nodeName) {
         const nodeSpan = document.createElement('span');
-        nodeSpan.textContent = invalidation.nodeName;
+        nodeSpan.textContent = invalidation.args.data.nodeName;
         return nodeSpan;
       }
       const nodeSpan = document.createElement('span');

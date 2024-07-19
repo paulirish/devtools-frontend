@@ -6,16 +6,14 @@ import * as Breadcrumbs from './Breadcrumbs.js';
 import * as BreadcrumbsUI from './BreadcrumbsUI.js';
 import * as CPUThrottlingSelector from './CPUThrottlingSelector.js';
 import * as DetailsView from './DetailsView.js';
-import * as EntryLabelOverlay from './EntryLabelOverlay.js';
+import * as FieldSettingsDialog from './FieldSettingsDialog.js';
 import * as InteractionBreakdown from './InteractionBreakdown.js';
 import * as LiveMetricsView from './LiveMetricsView.js';
+import * as NetworkRequestDetails from './NetworkRequestDetails.js';
 import * as NetworkRequestTooltip from './NetworkRequestTooltip.js';
 import * as NetworkThrottlingSelector from './NetworkThrottlingSelector.js';
 import * as Sidebar from './Sidebar.js';
 import * as SidebarAnnotationsTab from './SidebarAnnotationsTab.js';
-import * as SidebarInsight from './SidebarInsight.js';
-import * as TimeRangeOverlay from './TimeRangeOverlay.js';
-import * as TimespanBreakdownOverlay from './TimespanBreakdownOverlay.js';
 import * as Utils from './Utils.js';
 
 export {
@@ -23,15 +21,13 @@ export {
   BreadcrumbsUI,
   CPUThrottlingSelector,
   DetailsView,
-  EntryLabelOverlay,
+  FieldSettingsDialog,
   InteractionBreakdown,
   LiveMetricsView,
+  NetworkRequestDetails,
   NetworkRequestTooltip,
   NetworkThrottlingSelector,
   Sidebar,
   SidebarAnnotationsTab,
-  SidebarInsight,
-  TimeRangeOverlay,
-  TimespanBreakdownOverlay,
   Utils,
 };
